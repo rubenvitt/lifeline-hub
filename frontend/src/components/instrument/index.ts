@@ -28,6 +28,7 @@ export {
 } from './Kennzahl';
 export { Aufgliederung, Balken, type Segment } from './Aufgliederung';
 export { default as KlappBand, klappBandKopfStil, klappBandSchluessel } from './KlappBand';
+export { default as Kennung, type KennungProps } from './Kennung';
 export { default as Zeitachseneintrag } from './Zeitachseneintrag';
 export { Status, StatusZelle, NUR_VORLESER, type StatusGroesse } from './Status';
 export { Marke } from './Marke';

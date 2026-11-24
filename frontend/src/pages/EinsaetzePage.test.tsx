@@ -518,7 +518,11 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
     // `zeitKurz` liefert je nach Tagesbezug verschiedene Formen; geprüft wird das Wort „seit"
     // plus der Funktionswert — die Formatierung prüft `format.test.ts`.
     const erwartet = zeitKurz('2026-06-08 06:12:00', DEFAULT_KONVENTIONEN);
-    expect(await screen.findByText(new RegExp(`seit ${erwartet}`))).toBeInTheDocument();
+    // Die Zeit steht in Mono, „seit“ in der Textschrift (ADR-0094): zwei Knoten.
+    const zeiten = await screen.findAllByText(erwartet);
+    expect(zeiten.some((z) => z.parentElement?.textContent?.includes(`seit ${erwartet}`))).toBe(
+      true,
+    );
   });
 
   it('die Karte trägt die Einsatzart als zweiten Tag neben dem Status', async () => {
@@ -1125,7 +1129,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
       </Routes>,
     );
     // Liste: 23.05. 09:00 UTC → 11:00 in Berlin.
-    expect(await screen.findByText('seit 231100')).toBeInTheDocument();
+    const zeiten = await screen.findAllByText('231100');
+    expect(zeiten.some((z) => z.parentElement?.textContent?.includes('seit 231100'))).toBe(true);
     await userEvent.click(await screen.findByRole('button', { name: 'Neuer Einsatz' }));
     const dialog = await screen.findByRole('dialog');
     // Das Feld zeigt die volle DTG in der Anzeigezone: 10:00 UTC → 12:00 Berlin.

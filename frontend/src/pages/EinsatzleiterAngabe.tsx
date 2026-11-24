@@ -177,7 +177,8 @@ export default function EinsatzleiterAngabe({
           <>
             {einsatzleiterKurz(d)}
             {' · '}
-            <span style={monoStil('mono')}>{`seit ${zeitKurz(d.seit, konventionen)}`}</span>
+            {'seit '}
+            <span style={monoStil('mono')}>{zeitKurz(d.seit, konventionen)}</span>
           </>
         ) : null
       }

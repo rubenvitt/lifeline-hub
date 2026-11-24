@@ -583,7 +583,12 @@ export default function AusgabeAnsicht() {
             <span
               role="status"
               data-lfh="ausgabe-offline"
-              style={{ ...monoStil('monoKlein', 500), color: rollen.text2, minHeight: 22 }}
+              style={{
+                ...schriftStil('textKlein'),
+                fontWeight: 500,
+                color: rollen.text2,
+                minHeight: 22,
+              }}
             >
               {online ? '' : 'Offline vorgemerkt'}
             </span>
@@ -818,7 +823,10 @@ export default function AusgabeAnsicht() {
                     </span>
                     <span
                       style={{
-                        ...monoStil('monoKlein', 500),
+                        // „fehlt 3“ trägt ein Wort: Textschrift (ADR-0094).
+                        ...schriftStil('textKlein'),
+                        fontWeight: 500,
+                        fontVariantNumeric: 'tabular-nums',
                         display: 'inline-block',
                         minWidth: `${ziffern(zf.bedarf.sonderkost[k]) + 6}ch`,
                         marginInlineStart: '1ch',
@@ -1027,12 +1035,12 @@ export default function AusgabeAnsicht() {
           }}
         >
           {/* Der Grund gesperrter Tasten, sichtbar und als Beschreibung (LFH-966); fester Platz:
-              18 px tragen eine Zeile der festen 12-px-Mono in jeder Dichte, so verschiebt das
+              18 px tragen eine Zeile der festen 12-px-Schrift in jeder Dichte, so verschiebt das
               Verschwinden des Grunds beim ersten Tipp keine Taste. */}
           <div
             id={grundId}
             data-lfh="zaehltasten-grund"
-            style={{ ...monoStil('monoKlein'), color: rollen.text2, minHeight: 18 }}
+            style={{ ...schriftStil('textKlein'), color: rollen.text2, minHeight: 18 }}
           >
             {grundText}
           </div>
@@ -1104,7 +1112,8 @@ export default function AusgabeAnsicht() {
                   <span
                     data-lfh="ausgabe-ausstehend"
                     style={{
-                      ...monoStil('monoKlein'),
+                      ...schriftStil('textKlein'),
+                      fontVariantNumeric: 'tabular-nums',
                       color: rollen.text2,
                       marginInlineStart: token.marginXS,
                     }}
@@ -1115,7 +1124,12 @@ export default function AusgabeAnsicht() {
                 <div
                   data-lfh="sammlung-sonderkost"
                   title={sammelSonderkost || undefined}
-                  style={{ ...einzeilig, ...monoStil('monoKlein'), color: rollen.text2 }}
+                  style={{
+                    ...einzeilig,
+                    ...schriftStil('textKlein'),
+                    fontVariantNumeric: 'tabular-nums',
+                    color: rollen.text2,
+                  }}
                 >
                   {/* Leer ein geschütztes Leerzeichen: die Zeile behält ihre Höhe. */}
                   {sammelSonderkost || ' '}

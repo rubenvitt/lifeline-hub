@@ -1127,7 +1127,9 @@ function UnterwegsSpalte({
               <Button
                 type="link"
                 style={{
-                  ...monoStil('monoKlein'),
+                  // Registriernummer und Name: Textschrift mit gleich breiten Ziffern.
+                  ...schriftStil('textKlein'),
+                  fontVariantNumeric: 'tabular-nums',
                   paddingInline: 0,
                   justifyContent: 'flex-start',
                   maxWidth: '100%',

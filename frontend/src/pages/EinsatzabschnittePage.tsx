@@ -49,6 +49,7 @@ import {
   Knopfreihe,
   monoStil,
   useRollen,
+  schriftStil,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { abschnittStaerken, einheitenImAbschnitt } from './einsatzabschnitte/abschnittStaerke';
@@ -746,8 +747,11 @@ export default function EinsatzabschnittePage() {
               )}
               <span>{e.name}</span>
               {e.typ_label && <Marke>{e.typ_label}</Marke>}
-              <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
-                eigene <StaerkeAnzeige wert={e.ist} />
+              <span style={{ ...schriftStil('textKlein'), color: rollen.gedaempft }}>
+                eigene{' '}
+                <span style={monoStil('monoKlein')}>
+                  <StaerkeAnzeige wert={e.ist} />
+                </span>
               </span>
               {e.abschnitt_id == null && e.ueber_einheit_id != null && (
                 <Textstufe ton="gedaempft">

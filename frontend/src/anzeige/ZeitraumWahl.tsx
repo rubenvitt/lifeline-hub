@@ -11,7 +11,7 @@ import {
   type ZeitfensterArt,
 } from './zeitfenster';
 import { useAnzeigeKonventionen } from './AnzeigeKonventionenContext';
-import { monoStil } from '../components/instrument';
+import { monoStil, schriftStil } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
 import { serverJetzt } from '../offline/serveruhr';
 
@@ -158,7 +158,19 @@ export default function ZeitraumWahl({ von, bis, letzteLb, onWahl, kennung }: Pr
         aria-label={von || bis ? `Zeitraum ${beschriftung}` : 'Zeitraum'}
         data-lfh={kennung}
       >
-        <span style={von || bis ? monoStil('mono') : undefined}>{beschriftung}</span>
+        {/* Mono nur für die Spanne „von–bis“; „seit …“, „bis …“ und „Heute“ tragen Wörter
+            (ADR-0094). */}
+        <span
+          style={
+            von && bis
+              ? monoStil('mono')
+              : von || bis
+                ? { ...schriftStil('text'), fontVariantNumeric: 'tabular-nums' }
+                : undefined
+          }
+        >
+          {beschriftung}
+        </span>
       </Button>
     </Popover>
   );

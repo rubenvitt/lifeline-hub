@@ -80,9 +80,14 @@ export default function PlanungenPage() {
                 style={{ display: 'block' }}
               >
                 übernommen in{' '}
-                <span style={monoStil('monoKlein')}>
-                  {p.uebernahme.einsatznummer ?? `Einsatz ${p.uebernahme.einsatz_id}`}
-                </span>
+                {/* Die Nummer in Mono, das Ersatzwort „Einsatz“ in der Textschrift (ADR-0094). */}
+                {p.uebernahme.einsatznummer != null ? (
+                  <span style={monoStil('monoKlein')}>{p.uebernahme.einsatznummer}</span>
+                ) : (
+                  <>
+                    Einsatz <span style={monoStil('monoKlein')}>{p.uebernahme.einsatz_id}</span>
+                  </>
+                )}
               </Typography.Text>
             )}
             {loeschTag && (

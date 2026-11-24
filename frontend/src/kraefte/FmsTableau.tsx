@@ -323,6 +323,7 @@ export default function FmsTableau({
                   >
                     <span
                       data-lfh="fms-rufname"
+                      data-schrift="kennung"
                       style={{
                         ...monoStil('datenwertKlein'),
                         letterSpacing: '-0.02em',

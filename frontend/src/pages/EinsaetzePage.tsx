@@ -54,6 +54,7 @@ import {
   Stapel,
   UebungsMarke,
   useRollen,
+  schriftStil,
 } from '../components/instrument';
 import {
   flachZufluss,
@@ -558,14 +559,21 @@ function EinsaetzeInhalt() {
           </span>
           <span
             style={{
-              ...monoStil('monoKlein'),
+              ...schriftStil('textKlein'),
               display: 'flex',
               flexWrap: 'wrap',
               columnGap: token.marginXS,
             }}
           >
-            {kennung && <span data-lfh="einsatznummer">{kennung}</span>}
-            <span>seit {zeitKurz(e.begonnen_at)}</span>
+            {/* Nummer und Zeit in Mono, „seit“ und das Stichwort in der Textschrift. */}
+            {kennung && (
+              <span data-lfh="einsatznummer" style={monoStil('monoKlein')}>
+                {kennung}
+              </span>
+            )}
+            <span>
+              seit <span style={monoStil('monoKlein')}>{zeitKurz(e.begonnen_at)}</span>
+            </span>
             {e.stichwort && <span>{e.stichwort}</span>}
           </span>
         </div>
