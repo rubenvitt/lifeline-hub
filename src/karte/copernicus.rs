@@ -253,14 +253,21 @@ pub(crate) fn select_kandidaten<'a>(
 }
 
 /// Ebenenart aus einem Ebenennamen wie `…_DEL_PRODUCT_floodDepthA_v2_VT`. Der Teil vor der
-/// Version, ohne den letzten Buchstaben (A/L/P = Fläche, Linie, Punkt).
+/// Version (und vor einem `r<n>`), ohne den letzten Buchstaben (A/L/P = Fläche, Linie, Punkt).
 pub(crate) fn parse_ebenen_art(name: &str) -> Option<EbenenArt> {
-    let datei = name.rsplit('/').next()?;
+    let datei = name.rsplit('/').next()?.trim_end_matches(".json");
     let teile: Vec<&str> = datei.split('_').collect();
     let version = teile.iter().rposition(|t| {
         t.len() > 1 && t.starts_with('v') && t[1..].bytes().all(|b| b.is_ascii_digit())
     })?;
-    let teil = teile.get(version.checked_sub(1)?)?;
+    let mut vor = version.checked_sub(1)?;
+    // Im Altbestand steht zwischen Ebene und Version ein `r1` (`…_builtUpP_r1_v3.json`).
+    let ist_lauf =
+        |t: &str| t.len() > 1 && t.starts_with('r') && t[1..].bytes().all(|b| b.is_ascii_digit());
+    if ist_lauf(teile.get(vor)?) {
+        vor = vor.checked_sub(1)?;
+    }
+    let teil = teile.get(vor)?;
     let stamm = teil.strip_suffix(['A', 'L', 'P'])?;
     match stamm {
         "observedEvent" => Some(EbenenArt::Beobachtet),
@@ -274,8 +281,22 @@ pub(crate) fn parse_ebenen_art(name: &str) -> Option<EbenenArt> {
 }
 
 impl EbenenArt {
+    const ALLE: [EbenenArt; 6] = [
+        EbenenArt::Beobachtet,
+        EbenenArt::MaxAusdehnung,
+        EbenenArt::Wassertiefe,
+        EbenenArt::NichtAusgewertet,
+        EbenenArt::SchadenGebaeude,
+        EbenenArt::SchadenVerkehr,
+    ];
+
+    /// Gegenstück zu [`EbenenArt::wire_value`].
+    pub(crate) fn from_wire(s: &str) -> Option<EbenenArt> {
+        Self::ALLE.into_iter().find(|a| a.wire_value() == s)
+    }
+
     /// Wire-Wort von `art`.
-    fn wire_value(self) -> &'static str {
+    pub(crate) fn wire_value(self) -> &'static str {
         match self {
             EbenenArt::Beobachtet => "beobachtet",
             EbenenArt::MaxAusdehnung => "max_ausdehnung",
@@ -983,6 +1004,23 @@ mod tests {
         // Modell statt Beobachtung und Referenzdaten bleiben draußen.
         assert_eq!(n("modelledEventA"), None);
         assert_eq!(n("naturalLandUseA"), None);
+    }
+
+    #[test]
+    fn erkennt_die_ebenenart_im_altbestand() {
+        assert_eq!(
+            parse_ebenen_art("EMSR517_AOI15_GRA_MONIT01_builtUpP_r1_v3.json"),
+            Some(EbenenArt::SchadenGebaeude)
+        );
+        assert_eq!(
+            parse_ebenen_art("EMSR517_AOI01_DEL_PRODUCT_observedEventA_r1_v1.json"),
+            Some(EbenenArt::Beobachtet)
+        );
+        assert_eq!(
+            EbenenArt::from_wire("schaden_verkehr"),
+            Some(EbenenArt::SchadenVerkehr)
+        );
+        assert_eq!(EbenenArt::from_wire("gebiet"), None);
     }
 
     /// Wire-Wörter von `klasse`; das Frontend pinnt dieselben (`theme/statusFarben.test.ts`).

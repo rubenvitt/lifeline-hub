@@ -8,7 +8,9 @@
 //! Herleitung: `docs/superpowers/specs/2026-11-24-pjfe442j-copernicus-aeltere-aktivierungen-design.md`,
 //! ADR-0098. Pflege eines Eintrags: `docs/fachebenen-quellen.md`, Abschnitt „Copernicus EMS“.
 
-use crate::karte::copernicus::{format_zeitpunkt, Details, Gebiet, Produkt};
+use crate::karte::copernicus::{
+    format_zeitpunkt, parse_ebenen_art, Details, EbenenArt, Gebiet, Produkt,
+};
 use crate::karte::typen::Bbox;
 use serde_json::Value;
 use std::sync::OnceLock;
@@ -123,6 +125,121 @@ pub(crate) fn rechteck(b: &Bbox) -> Value {
     })
 }
 
+/// Höchstzahl der Einträge im Verzeichnis eines Vector Package (EMSR517: höchstens 92).
+pub(crate) const PAKET_MAX_EINTRAEGE: usize = 200;
+
+/// Höchstens so viele Bytes entpackt je gebrauchtem Eintrag (EMSR517: höchstens 6,5 MB).
+pub(crate) const PAKET_EINTRAG_MAX: usize = 16 * 1024 * 1024;
+
+/// Höchstens so viele Bytes entpackt für alle gebrauchten Einträge zusammen (EMSR517:
+/// höchstens 9,8 MB). Der Rest des ZIPs (Shapefiles, KMZ, Stile) wird nie entpackt.
+pub(crate) const PAKET_ENTPACKT_MAX: usize = 32 * 1024 * 1024;
+
+/// Properties, die `normalize_ebene` und `klasse_of` lesen; alles andere fällt vor dem
+/// Speichern weg.
+const BEHALTENE_FELDER: [&str; 5] = ["value", "damage_gra", "obj_desc", "info", "notation"];
+
+/// Was ein Eintrag des ZIPs ist: Gebietsumriss, eine bekannte Ebene oder nichts davon.
+enum Eintrag {
+    Umriss,
+    Ebene(EbenenArt),
+}
+
+fn classify_eintrag(name: &str) -> Option<Eintrag> {
+    // Nur Dateien im Wurzelverzeichnis; `/` und `\` schließen auch `..` aus.
+    if name.contains(['/', '\\']) || !name.ends_with(".json") {
+        return None;
+    }
+    if name.contains("_areaOfInterestA_") {
+        return Some(Eintrag::Umriss);
+    }
+    parse_ebenen_art(name).map(Eintrag::Ebene)
+}
+
+/// Liest ein Vector Package: `{"umriss": <Geometrie|null>, "ebenen": [{"art", "fc"}]}`.
+/// Gelesen werden nur die JSON-Dateien des Gebietsumrisses und der bekannten Ebenenarten, mit
+/// ZIP-Bombenschutz wie `pruefe_entpackt` in `src/abloesung/schichtplan/uebernahme/datei.rs`:
+/// erst die angegebenen Größen, dann beim Lesen die echten (die Angabe kann lügen).
+pub(crate) fn read_vector_package(bytes: &[u8]) -> Result<Value, String> {
+    use std::io::Read;
+    let mut archiv =
+        zip::ZipArchive::new(std::io::Cursor::new(bytes)).map_err(|e| format!("kein ZIP: {e}"))?;
+    if archiv.len() > PAKET_MAX_EINTRAEGE {
+        return Err(format!("ZIP mit {} Einträgen", archiv.len()));
+    }
+    let mut gebraucht = Vec::new();
+    let mut angegeben: u64 = 0;
+    for i in 0..archiv.len() {
+        let teil = archiv.by_index_raw(i).map_err(|e| e.to_string())?;
+        let name = teil.name().map_err(|e| e.to_string())?;
+        if let Some(art) = classify_eintrag(&name) {
+            angegeben = angegeben.saturating_add(teil.size());
+            gebraucht.push((i, art));
+        }
+    }
+    if angegeben > PAKET_ENTPACKT_MAX as u64 {
+        return Err("ZIP ist entpackt zu groß".into());
+    }
+    let mut umriss = Value::Null;
+    let mut ebenen: Vec<(EbenenArt, Vec<Value>)> = Vec::new();
+    let mut gelesen = 0usize;
+    for (i, art) in gebraucht {
+        let teil = archiv.by_index(i).map_err(|e| e.to_string())?;
+        let mut roh = Vec::new();
+        teil.take(PAKET_EINTRAG_MAX as u64 + 1)
+            .read_to_end(&mut roh)
+            .map_err(|e| e.to_string())?;
+        gelesen += roh.len();
+        if roh.len() > PAKET_EINTRAG_MAX || gelesen > PAKET_ENTPACKT_MAX {
+            return Err("ZIP ist entpackt zu groß".into());
+        }
+        let fc: Value = serde_json::from_slice(&roh).map_err(|e| e.to_string())?;
+        let features = fc.get("features").and_then(Value::as_array);
+        match art {
+            Eintrag::Umriss => {
+                if let Some(g) = features
+                    .and_then(|f| f.first())
+                    .and_then(|f| f.get("geometry"))
+                    .filter(|g| g.is_object())
+                {
+                    umriss = g.clone();
+                }
+            }
+            Eintrag::Ebene(a) => {
+                let schlank = features.into_iter().flatten().map(slim_feature);
+                match ebenen.iter_mut().find(|(b, _)| *b == a) {
+                    Some((_, liste)) => liste.extend(schlank),
+                    None => ebenen.push((a, schlank.collect())),
+                }
+            }
+        }
+    }
+    let ebenen: Vec<Value> = ebenen
+        .into_iter()
+        .map(|(a, features)| {
+            serde_json::json!({
+                "art": a.wire_value(),
+                "fc": { "type": "FeatureCollection", "features": features },
+            })
+        })
+        .collect();
+    Ok(serde_json::json!({ "umriss": umriss, "ebenen": ebenen }))
+}
+
+/// Feature nur mit Geometrie und den Feldern aus [`BEHALTENE_FELDER`]: der Teilstand im Cache
+/// bleibt so ein Bruchteil des ZIPs.
+fn slim_feature(f: &Value) -> Value {
+    let props: serde_json::Map<String, Value> = BEHALTENE_FELDER
+        .iter()
+        .filter_map(|k| Some((k.to_string(), f.get("properties")?.get(*k)?.clone())))
+        .collect();
+    serde_json::json!({
+        "type": "Feature",
+        "geometry": f.get("geometry").cloned().unwrap_or(Value::Null),
+        "properties": props,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +298,96 @@ mod tests {
     fn katalog_ohne_gebiete_ist_formatbruch() {
         assert_eq!(parse_katalog(&json!([{ "code": "X" }])), None);
         assert_eq!(parse_katalog(&json!({ "code": "X" })), None);
+    }
+
+    // ------------------------------------------------------------------ Vector Package
+
+    const AHRTAL_ZIP: &[u8] = include_bytes!("testdaten/copernicus-emsr517-aoi15.zip");
+
+    fn zip_mit(eintraege: &[(&str, &[u8])]) -> Vec<u8> {
+        use std::io::Write;
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let opt = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+        for (name, inhalt) in eintraege {
+            w.start_file(*name, opt).unwrap();
+            w.write_all(inhalt).unwrap();
+        }
+        w.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn liest_das_ahrtal_paket() {
+        let v = read_vector_package(AHRTAL_ZIP).unwrap();
+        assert_eq!(v["umriss"]["type"], "Polygon");
+        let mut arten: Vec<&str> = v["ebenen"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["art"].as_str().unwrap())
+            .collect();
+        arten.sort();
+        assert_eq!(arten, ["beobachtet", "schaden_gebaeude", "schaden_verkehr"]);
+        let gebaeude = v["ebenen"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["art"] == "schaden_gebaeude")
+            .unwrap();
+        let f = &gebaeude["fc"]["features"][0];
+        assert_eq!(f["geometry"]["type"], "Point");
+        assert!(f["properties"]["damage_gra"].is_string());
+        assert!(f["properties"].get("or_src_id").is_none());
+    }
+
+    #[test]
+    fn lehnt_ein_paket_mit_zu_grossem_eintrag_ab() {
+        let mut gross = b"{\"type\":\"FeatureCollection\",\"features\":[]}".to_vec();
+        gross.resize(PAKET_EINTRAG_MAX + 1, b' ');
+        let zip = zip_mit(&[("X_observedEventA_r1_v1.json", &gross)]);
+        assert!(read_vector_package(&zip).is_err());
+    }
+
+    #[test]
+    fn lehnt_ein_paket_mit_luegender_groesse_ab() {
+        // Das Verzeichnis meldet 10 Byte; entpackt sind es 17 MiB.
+        let mut gross = b"{\"type\":\"FeatureCollection\",\"features\":[]}".to_vec();
+        gross.resize(PAKET_EINTRAG_MAX + 1, b' ');
+        let mut zip = zip_mit(&[("X_observedEventA_r1_v1.json", &gross)]);
+        let echt = (gross.len() as u32).to_le_bytes();
+        let falsch = 10u32.to_le_bytes();
+        // Größe im lokalen Kopf (Offset 22) und im zentralen Verzeichnis (Offset 24) fälschen.
+        for i in 0..zip.len().saturating_sub(4) {
+            if zip[i..i + 4] == echt {
+                zip[i..i + 4].copy_from_slice(&falsch);
+            }
+        }
+        assert!(read_vector_package(&zip).is_err());
+    }
+
+    #[test]
+    fn lehnt_zu_viele_eintraege_ab() {
+        let namen: Vec<String> = (0..=PAKET_MAX_EINTRAEGE)
+            .map(|i| format!("{i}.txt"))
+            .collect();
+        let eintraege: Vec<(&str, &[u8])> = namen.iter().map(|n| (n.as_str(), &b""[..])).collect();
+        assert!(read_vector_package(&zip_mit(&eintraege)).is_err());
+    }
+
+    #[test]
+    fn ignoriert_eintraege_in_unterordnern() {
+        let fc = br#"{"type":"FeatureCollection","features":[{"type":"Feature","properties":{},"geometry":{"type":"Point","coordinates":[7.1,50.5]}}]}"#;
+        let zip = zip_mit(&[
+            ("sub/X_observedEventA_r1_v1.json", fc),
+            ("../X_builtUpP_r1_v1.json", fc),
+        ]);
+        let v = read_vector_package(&zip).unwrap();
+        assert_eq!(v["ebenen"], json!([]));
+        assert_eq!(v["umriss"], Value::Null);
+    }
+
+    #[test]
+    fn kaputtes_zip_ist_ein_fehler() {
+        assert!(read_vector_package(b"kein zip").is_err());
     }
 }
