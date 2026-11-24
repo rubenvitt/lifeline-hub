@@ -46,7 +46,7 @@ async function einsatzMitSchaeden(page: Page): Promise<{ einsatzId: string; schw
     ort: `Deichweg ${i + 1}`,
   }));
   // Registriernummern laufen ab 1 in Anlagefolge; parallel angelegt also nicht sicher i + 1.
-  const auswahl = await page.request.get(`/api/einsaetze/${einsatzId}/damages/options`);
+  const auswahl = await page.request.get(`/api/einsaetze/${einsatzId}/damages/selection`);
   const schwer = ((await auswahl.json()) as { registrier_nr: number; ort: string }[]).find(
     (s) => s.ort === `Deichweg ${SCHWER + 1}`,
   )!;

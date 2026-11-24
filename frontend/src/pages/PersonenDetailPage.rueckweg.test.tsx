@@ -71,7 +71,7 @@ function render(route: string) {
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
     http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(detail)),
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),

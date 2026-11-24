@@ -4151,7 +4151,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
         ),
         ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/persons"), None),
-        ("GET", format!("/api/einsaetze/{einsatz}/abschnitte"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/sectors"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/uhs"), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;

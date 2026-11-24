@@ -88,7 +88,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
@@ -335,16 +335,16 @@ describe('PersonenDetailPage — Ladehoheit', () => {
       expect(await screen.findByText('Bezüge 0')).toBeInTheDocument();
       await waitFor(() => {
         expect(adressen).toContain('/api/einsaetze/1/animals?halter_person_id=10');
-        expect(adressen.some((a) => a.startsWith('/api/einsaetze/1/schaeden?'))).toBe(true);
+        expect(adressen.some((a) => a.startsWith('/api/einsaetze/1/damages?'))).toBe(true);
       });
       expect(adressen).not.toContain('/api/einsaetze/1/animals');
-      expect(pfade).not.toContain('/api/einsaetze/1/schaeden/auswahl');
+      expect(pfade).not.toContain('/api/einsaetze/1/damages/selection');
       expect(pfade).not.toContain('/api/einsaetze/1/uhs');
 
       await userEvent.click(screen.getByRole('button', { name: 'Bezug hinzufügen' }));
       await waitFor(() => {
         expect(adressen).toContain('/api/einsaetze/1/animals');
-        expect(pfade).toContain('/api/einsaetze/1/schaeden/auswahl');
+        expect(pfade).toContain('/api/einsaetze/1/damages/selection');
       });
     } finally {
       loesen();
@@ -1695,7 +1695,7 @@ describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-11
   it('fügt einen freien Schaden als Bezug hinzu (XOR-Leerung)', async () => {
     let patch: Record<string, unknown> | null = null;
     render(einsatzAktiv, detail, [
-      http.get('/api/einsaetze/1/damages/options', () =>
+      http.get('/api/einsaetze/1/damages/selection', () =>
         HttpResponse.json(auswahlAus([freierSchaden])),
       ),
       http.get('/api/einsaetze/1/damages', ({ request }) => {
@@ -1747,7 +1747,7 @@ describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-11
           new URL(request.url).searchParams.has('halter_person_id') ? [] : [freiesTier],
         ),
       ),
-      http.get('/api/einsaetze/1/damages/options', () =>
+      http.get('/api/einsaetze/1/damages/selection', () =>
         HttpResponse.json(auswahlAus([freierSchaden])),
       ),
     ]);
@@ -1775,7 +1775,7 @@ describe('PersonenDetailPage — Bezüge hinzufügen und lösen (LFH-151, LLH-11
   it('bietet in der Suche nur freie, nicht-abgeschlossene Schäden an', async () => {
     render(einsatzAktiv, detail, [
       // Die Suche liest die Schadenauswahl (LFH-1075).
-      http.get('/api/einsaetze/1/damages/options', () => {
+      http.get('/api/einsaetze/1/damages/selection', () => {
         return HttpResponse.json(
           auswahlAus([
             freierSchaden, // S-009, frei + offen → in der Suche
@@ -2557,7 +2557,7 @@ describe('PersonenDetailPage — Fotos und Dateien (LFH-757)', () => {
 describe('PersonenDetailPage — Dialoge und Paneele auf der Erfassungshülle (LFH-796)', () => {
   const leereListen: Parameters<typeof server.use> = [
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
   ];
 

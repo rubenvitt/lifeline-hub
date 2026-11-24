@@ -189,7 +189,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
     ("/api/einsaetze/{id}/evacuation", Some("evakuierung")),
     ("/api/einsaetze/{id}/catering", Some("verpflegung")),
-    ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
+    ("/api/einsaetze/{id}/damages", Some("schaeden")),
     ("/api/einsaetze/{id}/animals", Some("tiere")),
     (
         "/api/einsaetze/{id}/bereitstellungsraeume",

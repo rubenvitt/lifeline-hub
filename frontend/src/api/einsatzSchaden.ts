@@ -227,7 +227,7 @@ export function passtZurSicht(s: Schaden, sicht: SchaedenFilter): boolean | null
  * Nummer zuerst, ohne Beschreibung und ohne Geschädigten-Angaben; `frei` = kein Geschädigter.
  */
 export function listeSchadenAuswahl(einsatzId: number): Promise<SchadenAuswahl[]> {
-  return apiGet<SchadenAuswahl[]>(`/api/einsaetze/${einsatzId}/damages/options`);
+  return apiGet<SchadenAuswahl[]>(`/api/einsaetze/${einsatzId}/damages/selection`);
 }
 
 /** Die Auswahlzeile einer vollen Zeile; `null`, wenn sie nicht in die Auswahl gehört. */

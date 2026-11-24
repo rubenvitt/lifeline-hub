@@ -73,7 +73,7 @@ beforeEach(() => {
       ]);
     }),
     http.get('/api/einsaetze/1/damages', () => HttpResponse.json(schaedenDerPerson)),
-    http.get('/api/einsaetze/1/damages/options', () =>
+    http.get('/api/einsaetze/1/damages/selection', () =>
       HttpResponse.json([
         {
           id: 51,

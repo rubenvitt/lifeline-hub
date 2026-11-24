@@ -158,7 +158,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -1721,7 +1721,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <Routes>
@@ -1808,7 +1808,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -1849,7 +1849,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.einsatz(1), einsatzAktiv);
@@ -1888,7 +1888,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -1917,7 +1917,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -1956,7 +1956,7 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
       http.get('/api/map/config', () => HttpResponse.json({})),
       http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
     );

@@ -156,7 +156,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Betroffenen-, Tier- und Schadenszahl der Lage.
     ("GET", "/api/einsaetze/{id}/persons/export"),
     ("GET", "/api/einsaetze/{id}/animals/export"),
-    ("GET", "/api/einsaetze/{id}/schaeden/export"),
+    ("GET", "/api/einsaetze/{id}/damages/export"),
     // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
     ("GET", "/api/retention/incidents/{id}/archive"),
 ];

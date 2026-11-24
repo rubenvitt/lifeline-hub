@@ -21,6 +21,7 @@ app-code	-
 archive	Archiv
 area	Fläche
 areas	Bereiche
+assessment	Beurteilung
 attachments	Anhänge
 attachments.zip	Anlagen
 attempts	Versuche
@@ -29,6 +30,7 @@ auth	-
 auto-update	automatische Aktualisierung
 availability	Verfügbarkeit
 available	verfügbar
+background-images	Hintergrundbilder
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
@@ -101,6 +103,8 @@ finish	-
 follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
+forecast	Prognose
+free-symbols	freie Zeichen
 from-attachment	aus Anhang
 from-template	aus Vorlage
 gauges	Pegel
@@ -111,6 +115,7 @@ hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
+history	Verlauf
 household	Haushalt
 households	Haushalte
 image	Bild
@@ -168,7 +173,6 @@ oidc	-
 one-time-password	Einmalpasswort
 online-sources	Online-Quellen
 openapi.json	-
-options	Auswahl
 order	Reihenfolge
 orders	Befehle
 org-accommodation-guidelines	Org-Unterkunft-Richtwerte
@@ -238,6 +242,7 @@ schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
+seen	gesehen
 selection	Auswahl
 sessions	Sitzungen
 set	festlegen
@@ -294,6 +299,7 @@ vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
 void	aufheben
+weather	Wetter
 web-push	-
 webauthn	-
 webhook	-

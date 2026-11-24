@@ -155,7 +155,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)),
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
     http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
@@ -392,7 +392,7 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
 
   it('Bezug zu einem Schaden: Grund im Dialog, kein Toast', async () => {
     render(detail, [
-      http.get('/api/einsaetze/1/damages/options', () =>
+      http.get('/api/einsaetze/1/damages/selection', () =>
         HttpResponse.json(
           [freierSchaden].map((s) =>
             alsSchadenAuswahl(s as Parameters<typeof alsSchadenAuswahl>[0]),
@@ -842,7 +842,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
       http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)),
       http.get('/api/einsaetze/1/persons/11', () => HttpResponse.json(zweite)),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
       http.get('/api/einsaetze/1/persons/:pid/audit', () => HttpResponse.json([])),
     );

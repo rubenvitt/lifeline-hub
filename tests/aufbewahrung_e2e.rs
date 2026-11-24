@@ -988,7 +988,7 @@ async fn pruefe_skelett(
         format!("/api/einsaetze/{e}/etb"),
         format!("/api/einsaetze/{e}/persons"),
         format!("/api/einsaetze/{e}/animals"),
-        format!("/api/einsaetze/{e}/schaeden"),
+        format!("/api/einsaetze/{e}/damages"),
         format!("/api/einsaetze/{e}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;

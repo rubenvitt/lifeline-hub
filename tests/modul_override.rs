@@ -513,7 +513,7 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("material", "material"),
     ("personen", "persons"),
     ("tiere", "animals"),
-    ("schaeden", "schaeden"),
+    ("schaeden", "damages"),
     ("unfallhilfsstellen", "uhs"),
     ("bereitstellungsraeume", "bereitstellungsraeume"),
     ("einheiten", "einheiten"),

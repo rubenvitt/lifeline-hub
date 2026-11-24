@@ -21,10 +21,6 @@
 /api/einsaetze/{id}/abloesungen/{aid}/plan-vorlage
 /api/einsaetze/{id}/abloesungen/{aid}/vollzug
 /api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen
-/api/einsaetze/{id}/abschnitte
-/api/einsaetze/{id}/abschnitte/{aid}
-/api/einsaetze/{id}/abschnitte/{aid}/flaeche
-/api/einsaetze/{id}/abschnitte/{aid}/sprechgruppen/{sg}
 /api/einsaetze/{id}/accommodation-guidelines
 /api/einsaetze/{id}/accommodation-guidelines/{schluessel}
 /api/einsaetze/{id}/agenda-items
@@ -125,7 +121,7 @@
 /api/einsaetze/{id}/damages/export
 /api/einsaetze/{id}/damages/marker
 /api/einsaetze/{id}/damages/metrics
-/api/einsaetze/{id}/damages/options
+/api/einsaetze/{id}/damages/selection
 /api/einsaetze/{id}/damages/{sid}
 /api/einsaetze/{id}/damages/{sid}/attachments
 /api/einsaetze/{id}/damages/{sid}/attachments/{aid}
@@ -364,6 +360,6 @@
 /api/einsaetze/{id}/uhs/{uid}/seats/{pid}
 /api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability
 /api/einsaetze/{id}/uhs/{uid}/status
-/api/einsaetze/{id}/wetter
-/api/einsaetze/{id}/zonen
-/api/einsaetze/{id}/zonen/{zid}
+/api/einsaetze/{id}/weather
+/api/einsaetze/{id}/zones
+/api/einsaetze/{id}/zones/{zid}

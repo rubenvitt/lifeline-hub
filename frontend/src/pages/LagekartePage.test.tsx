@@ -1486,7 +1486,7 @@ describe('LagekartePage', () => {
       angelegt_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zonen', () => HttpResponse.json([ZONE_EB])),
+      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_EB])),
       http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
@@ -2789,7 +2789,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
       http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
-      http.patch('/api/einsaetze/1/karten-ansichten/1', async ({ request }) => {
+      http.patch('/api/einsaetze/1/map-views/1', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1, einsatz_id: 1, name: 'Standard', ist_standard: true });
       }),

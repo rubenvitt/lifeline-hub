@@ -167,7 +167,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // Einheit mit überfälliger Rückmeldung, überfälliger Auftrag (samt fälliger Erinnerung an die
   // Quittierfrist), dringende Meldung, dazu die Sofortmeldung oben.
   await anlegen(page, `/api/einsaetze/${e}/persons`, { name: 'Vermisst', status: 'vermisst' });
-  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+  await anlegen(page, `/api/einsaetze/${e}/sectors`, {
     name: 'UHS Turnhalle Nordufer',
     lagezustand: 'kritisch',
   });

@@ -414,7 +414,7 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
       http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.get('/api/einsaetze/7/damages/options', () =>
+      http.get('/api/einsaetze/7/damages/selection', () =>
         HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }]),
       ),
       http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),

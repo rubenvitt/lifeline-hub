@@ -2128,7 +2128,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
     await nordDa();
-    await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
+    await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/persons']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/nachforderungen']).toBeUndefined();

@@ -370,7 +370,12 @@ async fn auswahl_ohne_freitext_und_ohne_stornierte() {
         .await
         .unwrap();
 
-    let (s, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages/options")).await;
+    let (s, v) = get(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/damages/selection"),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let zeilen = zeilen(&v);
     assert_eq!(
@@ -417,7 +422,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
     let b = format!("/api/einsaetze/{e}/damages");
-    for pfad in [format!("{b}/metrics"), format!("{b}/options")] {
+    for pfad in [format!("{b}/metrics"), format!("{b}/selection")] {
         let (s, _) = get(&app, &gustav, &pfad).await;
         assert_eq!(s, StatusCode::OK, "Vorbedingung: {pfad} lesbar");
     }
@@ -430,7 +435,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "Override: {v}");
-    for pfad in [b.clone(), format!("{b}/metrics"), format!("{b}/options")] {
+    for pfad in [b.clone(), format!("{b}/metrics"), format!("{b}/selection")] {
         let (s, _) = get(&app, &gustav, &pfad).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
     }

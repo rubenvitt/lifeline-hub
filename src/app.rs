@@ -1461,7 +1461,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz_schaden::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/damages/options",
+            "/api/einsaetze/{id}/damages/selection",
             get(routes::einsatz_schaden::auswahl),
         )
         .route(

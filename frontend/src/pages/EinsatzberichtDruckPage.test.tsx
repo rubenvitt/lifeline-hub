@@ -74,7 +74,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/persons', 'personen'),
     json('/persons/whereabouts-details', 'personenVerbleibAngaben'),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/schaeden', 'schaeden'),
+    json('/damages', 'schaeden'),
     json('/evacuation', 'evakuierung'),
     json('/care', 'betreuung'),
     json('/catering', 'verpflegung'),

@@ -62,7 +62,7 @@ beforeEach(() => {
       return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/persons/selection', json('personen', [PERSON])),
-    http.get('/api/einsaetze/:id/schaeden/auswahl', json('schaeden', [])),
+    http.get('/api/einsaetze/:id/damages/selection', json('schaeden', [])),
     http.get('/api/einsaetze/:id/uhs', json('uhs', [])),
     http.get('/api/einsaetze/:id/meldungen', json('meldungen', [])),
     http.get('/api/einsaetze/:id/auftraege', json('auftraege', [])),

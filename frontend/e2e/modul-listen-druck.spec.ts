@@ -50,7 +50,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   await saeen(page, `${basis}/persons`, { name: 'Cordes', status: 'vermisst' });
   await saeen(page, `${basis}/animals`, { spezies: 'hund', rufname: 'Rex' });
   await saeen(page, `${basis}/animals`, { spezies: 'katze', rufname: 'Mimi' });
-  await saeen(page, `${basis}/schaeden`, { typ: 'sachschaden', ausmass: 'gering', ort: 'Deich' });
+  await saeen(page, `${basis}/damages`, { typ: 'sachschaden', ausmass: 'gering', ort: 'Deich' });
 
   await page.setViewportSize({ width: 1280, height: 900 });
   const drucken = page.getByRole('button', { name: 'Drucken / als PDF' });

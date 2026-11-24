@@ -56,7 +56,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
         abgeschlossen: zahl('abgeschlossen'),
       });
     }),
-    http.get(`${basis}/options`, () =>
+    http.get(`${basis}/selection`, () =>
       HttpResponse.json(
         alle()
           .filter((s) => s.storniert_at == null)
