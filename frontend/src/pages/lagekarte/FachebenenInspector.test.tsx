@@ -783,6 +783,34 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
   });
 
+  it('Autobahn/Verkehrsmeldung: Art und Reisezeitverlust stehen oben', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | Hamburg-Südost - Norderelbbrücke',
+          kategorie: 'verkehrsmeldung',
+          art: 'stau',
+          verzoegerung_min: 17,
+          richtung: 'Lübeck -> Hamburg',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.getByText('Stau · +17 min Reisezeitverlust')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A7 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: null }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.queryByText(/Reisezeitverlust|Stau/)).not.toBeInTheDocument();
+  });
+
   it('Punkt-/keine Geometrie zeigt keine Fläche', () => {
     render(
       <FachebenenInspector

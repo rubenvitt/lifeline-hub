@@ -667,6 +667,22 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/** Wire-Wörter der Verkehrsmeldung (`art`, LLH-1637) → Anzeige. */
+const MELDUNGSART: Record<string, string> = {
+  stau: 'Stau',
+  zaehfliessend: 'Zähfließend',
+  stillstand: 'Stillstand',
+};
+
+/** Kopfzeile einer Verkehrsmeldung: Art und Reisezeitverlust, was davon da ist. */
+function meldungsKopf(p: Record<string, unknown>): string | undefined {
+  const art = MELDUNGSART[s(p.art) ?? ''];
+  const minuten = typeof p.verzoegerung_min === 'number' && p.verzoegerung_min > 0;
+  const teile = [art, minuten ? `+${p.verzoegerung_min} min Reisezeitverlust` : undefined];
+  const kopf = teile.filter(Boolean).join(' · ');
+  return kopf || undefined;
+}
+
 function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
@@ -679,6 +695,11 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
     <>
       {kategorie && (
         <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Marke>
+      )}
+      {kategorie === 'verkehrsmeldung' && meldungsKopf(p) && (
+        <Typography.Paragraph strong style={{ marginBottom: token.marginSM }}>
+          {meldungsKopf(p)}
+        </Typography.Paragraph>
       )}
       {/* Der `key` bindet den Fehlerzustand an die URL — jeder Kamerawechsel beginnt frisch. */}
       {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
