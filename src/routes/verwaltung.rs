@@ -1,7 +1,7 @@
 //! Übersicht der Verwaltung (LLH-1820, Entwurf
 //! `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`).
 //!
-//! `GET /api/verwaltung/bereitschaft` zählt den Bestand der eigenen Organisation. Er liefert nur
+//! `GET /api/administration/inventory` zählt den Bestand der eigenen Organisation. Er liefert nur
 //! Zahlen und keine Namen, denn die Übersicht sehen auch Führungskräfte, die die Benutzerliste
 //! nicht lesen dürfen. Ob etwas „fehlt“, wertet der Client (`frontend/src/admin/bereitschaft.ts`).
 
@@ -41,7 +41,7 @@ fn zaehle(tabelle: &str, bedingung: &str, demo: bool) -> String {
     )
 }
 
-/// GET /api/verwaltung/bereitschaft — nur mit Zugang zur Verwaltung (`darf_admin_bereich`).
+/// GET /api/administration/inventory — nur mit Zugang zur Verwaltung (`darf_admin_bereich`).
 pub async fn bereitschaft(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

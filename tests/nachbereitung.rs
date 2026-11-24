@@ -48,7 +48,7 @@ async fn abschluss_setzt_nachbereitung_aus_der_org_vorgabe() {
     let (status, body) = anfrage_json(
         &app,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         &admin,
         Some(&json!({ "nachbereitung_tage": 30 })),
     )

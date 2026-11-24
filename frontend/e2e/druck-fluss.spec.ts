@@ -574,7 +574,7 @@ test('Lagebericht mit Organisationslogo: Logo im Druckkopf, im PDF nur auf Seite
 }) => {
   await anmelden(page, { startseite: false });
   const hoch = await mitWiederholung(() =>
-    page.request.post('/api/organisation/logo', {
+    page.request.post('/api/organization/logo', {
       multipart: {
         datei: {
           name: 'logo.png',

@@ -22,17 +22,17 @@ export const server = setupServer(
    * fragt sie app-weit beim Mount ab; ohne Default bräuchte jede Testfläche mit angemeldetem
    * Benutzer den Handler. `{ eintraege: {} }` ist der echte Vorgabezustand des Servers.
    */
-  http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+  http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
   /**
    * Offene Benachrichtigungen — keine als Default. Jede Zentrale (Einsatz- und Org-Layout) reicht
    * beim Mount nach (design.md D5); Tests mit Benachrichtigungen überschreiben per `server.use()`.
    */
-  http.get('/api/benachrichtigungen', () => HttpResponse.json([])),
+  http.get('/api/notifications', () => HttpResponse.json([])),
   /**
    * Halter des letzten Unterschriftsschlüssels (LLH-1605) — keiner als Default. Die
    * Benutzerverwaltung fragt sie für ihre Warnung beim Mount ab; Tests mit Halter überschreiben.
    */
-  http.get('/api/admin/instanz/letzte-schluessel', () => HttpResponse.json([])),
+  http.get('/api/admin/instance/last-keys', () => HttpResponse.json([])),
   /**
    * Adapter der Org (LLH-2018) — keine Art, kein Adapter als Default, der Stand jedes Servers bis
    * zur ersten produktiven Art. Die Seite Anbindungen fragt sie beim Mount ab; Tests mit Adaptern
@@ -104,7 +104,7 @@ export const server = setupServer(
   http.get('/api/einsaetze/:einsatzId/module-counts', () => HttpResponse.json({})),
   // Herkunft der Stammdaten (LLH-1493): ohne Kopplung keine Quelle, nichts gesperrt. Jeder
   // Stammdaten-Reiter fragt sie ab; ein Test mit Hub-Zeilen überschreibt per `server.use`.
-  http.get('/api/instanz/stammdaten/herkunft', () =>
+  http.get('/api/instance/master-data/origin', () =>
     HttpResponse.json({ vom_hub: {}, admins_ohne_passkey: [] }),
   ),
   /**
@@ -189,7 +189,7 @@ export const server = setupServer(
    * Stammdaten der eigenen Organisation ohne Logo als Default; der Druckkopf fragt sie beim
    * Mount ab.
    */
-  http.get('/api/organisation', () =>
+  http.get('/api/organization', () =>
     HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null }),
   ),
   /**
@@ -217,7 +217,7 @@ export const server = setupServer(
    * Archivakte) und bleibt dann bei der Browserzone. Tests mit Zone überschreiben per
    * `server.use()`.
    */
-  http.get('/api/org-einstellungen', () =>
+  http.get('/api/org-settings', () =>
     HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
   ),
   /**
@@ -232,9 +232,7 @@ export const server = setupServer(
    * Demo-Daten: 404 als Default — der echte Zustand ohne `--demo-daten`, aus dem das Frontend
    * „nicht freigeschaltet“ liest. Einsatzliste und Verwaltung fragen ihn für jeden System-Admin ab.
    */
-  http.get('/api/demo-daten', () =>
-    HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
-  ),
+  http.get('/api/demo-data', () => HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 })),
   /**
    * Archiv einspielen (LLH-1711): verfügbar als Default, wie an einer Installation ohne Kopplung,
    * bei der sich eine andere meldet. Tests des Hubs überschreiben per `server.use()`.
@@ -244,7 +242,7 @@ export const server = setupServer(
    * Datenträgerprüfung (LFH-1100): alles verschlüsselt als Default, damit die Verwaltung keine
    * Warnleiste zeigt. Tests der Warnung überschreiben per `server.use()`.
    */
-  http.get('/api/system/datentraeger', () =>
+  http.get('/api/system/storage', () =>
     HttpResponse.json({
       gesamt: 'verschluesselt',
       warnung: false,

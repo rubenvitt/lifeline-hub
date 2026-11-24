@@ -413,7 +413,7 @@ pub struct KoppelnBody {
     pub code: String,
 }
 
-/// POST /api/geraete/koppeln — ein Gerät löst seinen Kopplungscode ein und bekommt eine
+/// POST /api/devices/pair — ein Gerät löst seinen Kopplungscode ein und bekommt eine
 /// Gerätesitzung. Öffentlich (das Gerät hat noch keine Sitzung).
 ///
 /// Reihenfolge wie beim App-Code (LFH-818): Sperre der Adresse (429) → Code prüfen. Jeder

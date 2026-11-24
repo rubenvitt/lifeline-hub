@@ -9,7 +9,7 @@ import { anmeldenPerApi } from './anmelde-kern';
 
 const ADMIN = 'admin';
 const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
-const FACH = '/api/benutzer-einstellungen';
+const FACH = '/api/user-settings';
 
 function paletteInput(page: Page): Locator {
   return page.getByPlaceholder(/Suchen: Module/);

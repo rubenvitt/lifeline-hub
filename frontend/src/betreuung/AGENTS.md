@@ -82,8 +82,8 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Quellenangaben nennen Vorschriften und Werke, nie Personen; ohne Quelle „Ausgangstabellen“.
 - **Rechner-API Unterkunft** (LLH-1524, Spec `rechner-api-unterkunft`, Herleitung
   `openspec/changes/archive/2026-11-12-p4h3v7q9-rechner-api-unterkunft/design.md`; `src/public_api/rechner.rs`,
-  Regeln der Routen in `src/AGENTS.md`, „Öffentliche API v1“): `POST /api/v1/rechner/unterkunft`
-  und `GET …/richtwerte` mit Scope `rechner:use`. **Die Anfrage hat die Form der `eingabe` der
+  Regeln der Routen in `src/AGENTS.md`, „Öffentliche API v1“): `POST /api/v1/calculators/accommodation`
+  und `GET …/reference-values` mit Scope `rechner:use`. **Die Anfrage hat die Form der `eingabe` der
   Fallsammlung, die Antwort die von `erwartet`**; der Paritätstest
   (`src/public_api/rechner/tests.rs`) schickt jeden Fall durch Einlesen, Prüfung, Rechnung und
   Serialisierung. Ein neues Feld der Rechnung kommt also in beide Kerne, die Fallsammlung und die

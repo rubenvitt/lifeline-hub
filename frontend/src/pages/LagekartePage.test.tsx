@@ -437,7 +437,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/care', () => HttpResponse.json({ stellen: [] })),
     http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [] })),
-    http.get('/api/organisation', () =>
+    http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
     http.get('/api/map/config', () => HttpResponse.json(config)),
@@ -1135,7 +1135,7 @@ describe('LagekartePage', () => {
   it('zeigt die taktischen Layer-Toggles und ein nicht-verortetes taktisches Objekt in der Liste', async () => {
     basisHandler([
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.get('/api/organisation', () => HttpResponse.json(ORG_DRK)),
+      http.get('/api/organization', () => HttpResponse.json(ORG_DRK)),
     ]);
     objekteVorn();
     localStorage.removeItem('lfh:lagekarte:leiste-ansicht');

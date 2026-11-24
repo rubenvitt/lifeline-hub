@@ -20,7 +20,7 @@ herleitung:
 ## Regeln
 
 - MUST: Ein Einwurf-Zugang ist die einzige Anmeldung unter `/api/v1/` ohne Schlüsselpaar; er gilt
-  nur unter `/api/v1/einwurf/<key>/…`.
+  nur unter `/api/v1/intake/<key>/…`.
 - MUST: Der Schlüssel hat das Präfix `llh_ew_` und 32 Zufallsbytes; gespeichert wird nur sein
   SHA-256. Er ist widerrufbar, wechselbar und kann ablaufen; Widerruf und Wechsel wirken sofort.
 - MUST: Ein Einwurf schreibt nur in die Ablage seines Scopes (`alarmmeldungen:write` oder
@@ -37,7 +37,7 @@ herleitung:
   `X-Forwarded-Proto` ist `https` und die Gegenstelle steht in `--trusted-proxies`), sonst 403;
   Ausnahme nur per ausdrücklichem Schalter des Betreibers.
 - MUST: Antworten auf Einwürfe tragen `Cache-Control: no-store`.
-- MUST: Der Pfadabschnitt nach `/einwurf/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
+- MUST: Der Pfadabschnitt nach `/intake/` erscheint in keinem Protokoll; `pfad_fuer_protokoll`
   maskiert ihn.
 - MUST: Jeder Einwurf-Zugang ist gedrosselt, und die Ablage hat Obergrenzen je Zugang; ein
   unbekannter Schlüssel zählt im Zähler für Maschinen je IP, nicht in der Anmeldesperre. Ein

@@ -2,7 +2,7 @@
 id: ADR-0085
 titel: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 status: ersetzt
-ersetzt_durch: ADR-0095
+ersetzt_durch: ADR-0097
 datum: 2026-11-22
 gilt_fuer:
   - src/app.rs

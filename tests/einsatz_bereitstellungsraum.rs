@@ -619,7 +619,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &cookie_admin,
         Some(&json!({"anzeigename": "Beob", "benutzername": "beob", "passwort": "startpw12"})),
     )

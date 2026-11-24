@@ -426,7 +426,7 @@ Zeichenflächen `docs/design/2026-11-19-verwaltung-uebersicht/`.
   `defaultAdminPfad()`), den ersten Menüpunkt vor den Gruppen. Wer auf „die Verwaltung“ umleitet,
   nimmt `defaultAdminPfad()`, nie eine Stammdaten-Seite.
 - **Was „fehlt“, bestimmt allein `admin/bereitschaft.ts`** (`bewerteBereitschaft`); der Server
-  zählt nur (`GET /api/verwaltung/bereitschaft`). Pflicht: ein weiterer Benutzer und Fahrzeuge
+  zählt nur (`GET /api/administration/inventory`). Pflicht: ein weiterer Benutzer und Fahrzeuge
   oder Personal; Vorlagen sind Empfehlung.
 - **Die Übersicht zeigt Zahlen, keine Namen; Demo-Daten zählen nicht mit.** Auch die
   Führungskraft sieht sie; der Sprung zur Benutzerseite steht nur für System-Admins.

@@ -1028,7 +1028,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         json!({ "aufbewahrung_kategorien": [
             { "kategorie": "anhaenge", "dauer_tage": 3650, "rechtsgrundlage": "§ 32b Abs. 3 NKatSG" }
         ] }),

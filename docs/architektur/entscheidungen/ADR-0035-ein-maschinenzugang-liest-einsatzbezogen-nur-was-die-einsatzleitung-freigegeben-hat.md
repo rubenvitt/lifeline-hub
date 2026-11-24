@@ -30,7 +30,7 @@ herleitung:
   `instanz::spiegel::art::AUSGENOMMEN`.
 - MUST: Die Freigabe geht auch an einem Einsatz, den die Instanz als Spiegel hält; der Eintrag
   im Einsatztagebuch geht dann als Antrag an den Führer (`routes::leitung_freigabe`).
-- MUST: Ohne Freigabe antwortet `GET /api/v1/lage` mit 200 und `einsatz: null`.
+- MUST: Ohne Freigabe antwortet `GET /api/v1/situation` mit 200 und `einsatz: null`.
 - MUST NOT: Ein Fremdsystem liest Einsatzdaten über einen Schlüssel im Kopf `Authorization:
   Bearer`; den früheren Weg `llh_lm_` gibt es nicht mehr. Der Lagebild-Link für Menschen
   (`llh_lb_`) ist davon nicht berührt.

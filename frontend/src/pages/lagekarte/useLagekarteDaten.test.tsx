@@ -247,7 +247,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       ),
       http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/organisation', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/organization', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/map/config', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/settings', () => new HttpResponse(null, { status: 500 })),
       // 403 auf die Rückmeldungen ist für Rollen ohne „Meldungen" der Normalfall und gehört nicht
@@ -284,7 +284,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
       http.get('/api/map/config', () =>
@@ -418,7 +418,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
       http.get('/api/map/config', () =>
@@ -593,7 +593,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
       http.get('/api/map/config', () =>
@@ -1339,7 +1339,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
       http.get('/api/einsaetze/5', () =>
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
       ),
       http.get('/api/map/config', () =>

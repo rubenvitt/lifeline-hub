@@ -23,8 +23,8 @@ beforeEach(() => {
 function handler(serverStand: BenutzerEinstellungen, putStatus = 200) {
   return [
     meHandler(nutzer),
-    http.get('/api/benutzer-einstellungen', () => HttpResponse.json(serverStand)),
-    http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+    http.get('/api/user-settings', () => HttpResponse.json(serverStand)),
+    http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
       if (putStatus !== 200) return HttpResponse.json({ error: 'nein' }, { status: putStatus });

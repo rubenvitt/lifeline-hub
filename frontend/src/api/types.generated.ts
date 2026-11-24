@@ -1578,7 +1578,7 @@ export interface components {
         /**
          * @description Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
          *     `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
-         *     Client über `GET /api/benachrichtigungen/{id}`.
+         *     Client über `GET /api/notifications/{id}`.
          */
         BenachrichtigungEreignis: {
             art: components["schemas"]["BenachrichtigungArt"];
@@ -2306,7 +2306,7 @@ export interface components {
          * @enum {string}
          */
         DatentraegerOrtArt: "datenbank" | "sicherung" | "auslagerung";
-        /** @description Antwort von `GET /api/system/datentraeger`. */
+        /** @description Antwort von `GET /api/system/storage`. */
         DatentraegerStatus: {
             /** @description `--datentraeger-verschluesselung-extern` ist gesetzt. */
             extern_zugesichert: boolean;
@@ -2772,7 +2772,7 @@ export interface components {
          */
         EinheitenSystem: "metrisch" | "imperial";
         /**
-         * @description Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,
+         * @description Antwort von `POST /api/users/{id}/one-time-password` (LFH-1121): das erzeugte Einmalpasswort,
          *     genau dieses eine Mal.
          */
         Einmalpasswort: {
@@ -2807,6 +2807,13 @@ export interface components {
             fuehrung?: components["schemas"]["EinsatzFuehrung"] | null;
             /** Format: int64 */
             id: number;
+            /**
+             * @description Hubs, über die die Hinweise dieses Einsatzes reisen und deren iOS-Push das Push-Relais
+             *     gerade sperrt (LLH-2074): iPhones von Hub-Konten bekommen nichts, diese Instanz pusht ihnen
+             *     nicht selbst. Die Oberfläche zeigt es Einsatzleitung und Admins der Einsatz-Org. In Liste und
+             *     Detail dieselbe Aussage; fehlt, wenn kein Hub gesperrt ist (und am Spiegel).
+             */
+            ios_push_hub_gesperrt?: components["schemas"]["IosPushHubSperre"][];
             /**
              * @description Aktive lagebezogene Kennzahlen (LFH-640): welche Lageplätze des Kennzahlenbands im
              *     Lage-Dashboard belegt sind. Gesetzt nur durch bewusste Entscheidungen (Pegel festgelegt,
@@ -4702,6 +4709,11 @@ export interface components {
             art: components["schemas"]["InstanzKopplungArt"];
             gegenueber_adresse?: string | null;
             gegenueber_fingerabdruck: string;
+            /**
+             * @description Meldende Seite: das Push-Relais sperrt das Gegenüber seit (UTC, LLH-2074); iOS-Push an
+             *     Konten vom Hub kommt nicht an. Fehlt ohne Sperre und an der erreichten Seite.
+             */
+            gegenueber_ios_push_gesperrt_seit?: string | null;
             gegenueber_kennung: string;
             gegenueber_name: string;
             /** Format: int64 */
@@ -4755,7 +4767,7 @@ export interface components {
          * @enum {string}
          */
         InstanzKopplungZustand: "angebahnt" | "aktiv" | "widerrufen" | "vom_gegenueber_widerrufen";
-        /** @description Antwort von `GET /api/admin/instanz/lan`. */
+        /** @description Antwort von `GET /api/admin/instance/lan`. */
         InstanzLanAntwort: {
             /** @description Die LAN-Entdeckung läuft hier nicht (`--lan-entdeckung` mit `--tls`). */
             aus: boolean;
@@ -4861,6 +4873,19 @@ export interface components {
          * @enum {string}
          */
         InstanzZertifikatZustand: "bestaetigt" | "passt_nicht" | "gegenstelle_kennt_aelteres";
+        /**
+         * @description Ein Hub, über den die Hinweise eines Einsatzes reisen und der iOS-Push anbietet, den das
+         *     Push-Relais aber sperrt (LLH-2074): iPhones von Hub-Konten bekommen dann nichts, und diese
+         *     Instanz pusht ihnen nicht selbst (die Geräte sind am Hub angemeldet). Die Einsatzleitung sieht
+         *     es im Einsatz (`EinsatzAnzeige::ios_push_hub_gesperrt`). Gelesen über die Spalte
+         *     `ios_push_hub_gesperrt_spalte!` in `einsatz::repo`, deren Menge die von [`ziele`] ist.
+         */
+        IosPushHubSperre: {
+            /** @description Name des Hubs, wie er sich meldet. */
+            hub_name: string;
+            /** @description Seit wann das Relais ihn sperrt (UTC), wie der Hub es meldet. */
+            since: string;
+        };
         /** @description Stand von iOS-Push für dieses Gerät. */
         IosPushStand: {
             /**
@@ -6699,7 +6724,7 @@ export interface components {
             sha256: string;
         };
         /**
-         * @description Eine Vorgabe, wie `GET /api/org-modul-einstellungen` sie je Modul liefert (LLH-1179).
+         * @description Eine Vorgabe, wie `GET /api/org-module-settings` sie je Modul liefert (LLH-1179).
          *     `sichtbar` ist aufgelöst: `false` nur, wenn die Organisation das Modul ausblendet.
          */
         OrgModulEinstellung: {

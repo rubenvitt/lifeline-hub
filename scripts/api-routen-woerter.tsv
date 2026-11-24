@@ -1,12 +1,18 @@
-# Glossar der API-Routen (ADR-0095): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0097): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+access	Zugang
+access-changes	Zugangsänderungen
+access-log	Zugangsprotokoll
 accesses	Zugriffe
 accommodation	Unterkunft
 accommodation-guidelines	Unterkunft-Richtwerte
+acknowledge	quittieren
 activate	aktivieren
 adapter	-
 admin	-
+administration	Verwaltung
 agenda-items	Programmpunkte
+alarm	Alarmmeldung
 animals	Tiere
 annul	stornieren
 api	-
@@ -21,19 +27,25 @@ auto-update	automatische Aktualisierung
 availability	Verfügbarkeit
 available	verfügbar
 backup	-
+blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
 buildable-regions	baubare Regionen
 bulk	-
+calculators	Rechner
 callback	-
 cancel	abbrechen
 care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
 check	prüfen
+check-in	melden
+client-errors	Client-Fehler
 close	abschließen
 closure	Abschluss
 code	-
@@ -44,19 +56,26 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
 confirmers	Bestätiger
 contact-person	Bezugsperson
+countersign	gegenzeichnen
 damages	Schäden
+deactivate	deaktivieren
 decision	Entscheidung
+decline	ablehnen
+demo-data	Demo-Daten
 departures	Abmeldungen
 dev	-
 devices	Geräte
 diets	Kostformen
+discard	verwerfen
 discoverable	-
 distributions	Ausgaben
 districts	Bezirke
 download	-
 emergency-takeover	Notübernahme
+end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
@@ -64,6 +83,7 @@ evacuation	Evakuierung
 events	-
 existing	vorhandene
 export	-
+external	extern
 fetch-certificate	Zertifikat abrufen
 file	Datei
 finish	-
@@ -73,10 +93,13 @@ forces	Kräfte
 from-attachment	aus Anhang
 from-template	aus Vorlage
 gauges	Pegel
+generate	erzeugen
 glyphs	-
 grant	Freigabe
+hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
+helpers	Helfer
 household	Haushalt
 households	Haushalte
 image	Bild
@@ -89,15 +112,19 @@ intake	Einwurf
 intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 interventions	Maßnahmen
+inventory	Bestand
 ios-push	-
 jwks.json	-
 key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 list-accesses	Listenzugriffe
 live	-
 login	-
+logins	Anmeldungen
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -114,14 +141,24 @@ module-overrides	Modul-Overrides
 notes	Notizen
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
+object	widersprechen
 occupancies	Belegungen
 occupancy	Belegung
 offline	-
 offline-maps	Offline-Karten
 oidc	-
+one-time-password	Einmalpasswort
 online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
+org-accommodation-guidelines	Org-Unterkunft-Richtwerte
+org-archive-keys	Org-Archiv-Schlüssel
+org-command-roles	Org-Führungsfunktionen
+org-module-settings	Org-Modul-Einstellungen
+org-settings	Org-Einstellungen
+organization	Organisation
+origin	Herkunft
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -138,6 +175,7 @@ position	-
 positions	Stellen
 posts	Posten
 presence	Präsenz
+preview	Vorschau
 print	Druck
 progress	Stände
 providers	-
@@ -145,20 +183,27 @@ proxy	-
 raster	-
 read	gelesen
 reason	Anlass
+reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference-values	Richtwerte
 register	-
 registration	-
 registrations	Registrierungen
+reimport	neu importieren
+reject	zurückweisen
+rejected	abgelehnt
 release-notes	Versionsstand
 reliefs	Ablösungen
 reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
@@ -173,6 +218,7 @@ set	festlegen
 settings	Einstellungen
 shell	-
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
@@ -184,7 +230,9 @@ staging-areas	Bereitstellungsräume
 start	-
 state	Stand
 status	-
+storage	Datenträger
 style.json	-
+subscription	Abo
 system	-
 talk-groups	Sprechgruppen
 tasks	Aufträge
@@ -194,6 +242,7 @@ tilejson	-
 tiles	-
 time-slots	Zeitfenster
 totp	-
+transfer	Übernahme
 transport	-
 transport-means	Transportmittel
 triage	Sichtung
@@ -204,6 +253,7 @@ unit	Einheit
 units	Einheiten
 unregister	-
 update-now	jetzt aktualisieren
+user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge

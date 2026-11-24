@@ -448,7 +448,7 @@ async fn ohne_sitzung_ist_401() {
         ("GET", "/api/auth/sessions"),
         ("POST", "/api/auth/sessions/end-others"),
         ("DELETE", "/api/auth/sessions/00"),
-        ("GET", "/api/benutzer/1/sitzungen"),
+        ("GET", "/api/users/1/sessions"),
     ] {
         let (s, _) = anfrage(&app, m, uri, "lifeline_sid=unsinn", None).await;
         assert_eq!(s, StatusCode::UNAUTHORIZED, "{m} {uri}");
@@ -465,7 +465,7 @@ async fn admin_sieht_und_beendet_sitzungen_einer_person() {
     let firefox = anmelden(&app, "marlene", "marlenepw1", FIREFOX).await;
     let ipad = anmelden(&app, "marlene", "marlenepw1", IPAD).await;
     let vorher = konto(&pool, marlene_id).await;
-    let uri = format!("/api/benutzer/{marlene_id}/sitzungen");
+    let uri = format!("/api/users/{marlene_id}/sessions");
 
     let sitzungen = liste(&app, &admin, &uri).await;
     assert_eq!(sitzungen.len(), 2);
@@ -494,7 +494,7 @@ async fn admin_sieht_und_beendet_sitzungen_einer_person() {
     );
     assert!(anmeldespur(&pool).await.is_empty(), "keine Selbst-Spur");
 
-    let (s, v) = anfrage(&app, "POST", &format!("{uri}/beenden"), &admin, None).await;
+    let (s, v) = anfrage(&app, "POST", &format!("{uri}/end"), &admin, None).await;
     assert_eq!((s, v["beendet"].as_u64()), (StatusCode::OK, Some(1)));
     assert_eq!(me(&app, &firefox).await, StatusCode::UNAUTHORIZED);
     assert_eq!(me(&app, &admin).await, StatusCode::OK);
@@ -513,7 +513,7 @@ async fn admin_am_eigenen_konto_behaelt_die_aktuelle() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let zweite = anmelden(&app, "admin", "startpw12", IPAD).await;
     let admin_id = benutzer_id(&pool, "admin").await;
-    let uri = format!("/api/benutzer/{admin_id}/sitzungen");
+    let uri = format!("/api/users/{admin_id}/sessions");
 
     let sitzungen = liste(&app, &admin, &uri).await;
     let eigene = sitzungen
@@ -530,7 +530,7 @@ async fn admin_am_eigenen_konto_behaelt_die_aktuelle() {
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
-    let (s, v) = anfrage(&app, "POST", &format!("{uri}/beenden"), &admin, None).await;
+    let (s, v) = anfrage(&app, "POST", &format!("{uri}/end"), &admin, None).await;
     assert_eq!((s, v["beendet"].as_u64()), (StatusCode::OK, Some(1)));
     assert_eq!(me(&app, &zweite).await, StatusCode::UNAUTHORIZED);
     assert_eq!(me(&app, &admin).await, StatusCode::OK);
@@ -542,7 +542,7 @@ async fn admin_einer_fremden_organisation_bekommt_404() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
     let fremd = anmelden(&app, "fremd", "fremdpw12", FIREFOX).await;
-    let uri = format!("/api/benutzer/{fremd_id}/sitzungen");
+    let uri = format!("/api/users/{fremd_id}/sessions");
     let k = liste(&app, &fremd, "/api/auth/sessions").await[0]["kennung"]
         .as_str()
         .unwrap()
@@ -550,7 +550,7 @@ async fn admin_einer_fremden_organisation_bekommt_404() {
 
     for (m, u) in [
         ("GET", uri.clone()),
-        ("POST", format!("{uri}/beenden")),
+        ("POST", format!("{uri}/end")),
         ("DELETE", format!("{uri}/{k}")),
     ] {
         let (s, _) = anfrage(&app, m, &u, &admin, None).await;
@@ -569,7 +569,7 @@ async fn ohne_adminrolle_ist_403() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/benutzer/{marlene_id}/sitzungen"),
+        &format!("/api/users/{marlene_id}/sessions"),
         &marlene,
         None,
     )
@@ -581,7 +581,7 @@ async fn ohne_adminrolle_ist_403() {
 async fn unbekanntes_konto_ist_404() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, _) = anfrage(&app, "GET", "/api/benutzer/9999/sitzungen", &admin, None).await;
+    let (s, _) = anfrage(&app, "GET", "/api/users/9999/sessions", &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -604,7 +604,7 @@ async fn geraet_koppeln(app: &axum::Router, admin: &str, einsatz: i64) -> (i64, 
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -639,11 +639,8 @@ async fn geraetesitzungen_bleiben_aussen_vor() {
     assert_eq!(s, StatusCode::FORBIDDEN);
     // Ein Admin sieht das Gerätekonto nicht als Person.
     for (m, u) in [
-        ("GET", format!("/api/benutzer/{konto_id}/sitzungen")),
-        (
-            "POST",
-            format!("/api/benutzer/{konto_id}/sitzungen/beenden"),
-        ),
+        ("GET", format!("/api/users/{konto_id}/sessions")),
+        ("POST", format!("/api/users/{konto_id}/sessions/end")),
     ] {
         let (s, _) = anfrage(&app, m, &u, &admin, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{m} {u}");
@@ -763,7 +760,7 @@ async fn logout_und_deaktivieren_beenden_offene_stroeme() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{marlene_id}/deaktivieren"),
+        &format!("/api/users/{marlene_id}/deactivate"),
         &admin,
         None,
     )

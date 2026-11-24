@@ -1,10 +1,11 @@
 Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,
-eigene Skripte). Grundlage: ADR-0022.
+eigene Skripte). Grundlage: ADR-0096.
 
 ## Stabilitätszusage
 
 - Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und
   ändert sich ohne Ankündigung.
+- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0096).
 - Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue
   Enum-Werte und neue Fehlercodes.
 - Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.
@@ -13,12 +14,13 @@ eigene Skripte). Grundlage: ADR-0022.
 
 ## Namen
 
-Fachbegriffe sind deutsch, alles Technische ist englisch. Umlaute werden umschrieben
-(`einsaetze`).
+Pfade sind englisch, auch für Fachbegriffe (ADR-0097). In Feldern, Werten, Scopes und
+Ereignisarten sind Fachbegriffe deutsch und alles Technische englisch. Umlaute werden
+umschrieben (`einsaetze`).
 
 | Art | Deutsch (Fachbegriff) | Englisch (Technik) |
 | --- | --- | --- |
-| Pfade | `lage`, `einsaetze`, `alarmmeldungen`, `positionen`, `rechner`, `unterkunft`, `richtwerte`, `einwurf`, `zugang`, `instanz` | `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
+| Pfade | – | `incidents`, `situation`, `intake`, `alarm`, `position`, `calculators`, `accommodation`, `reference-values`, `access`, `instance`, `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |
 | Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |
 | Abfrage | `karte` | `after`, `wait` |
 | Fehler | Text (`error`) | `code` |
@@ -29,8 +31,8 @@ Felder sind `snake_case`.
 
 Ein Lese-Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`) sieht nur den Einsatz, den die
 Einsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz läuft. Je Zugang ist
-das höchstens einer. Ohne Freigabe antwortet `GET /api/v1/lage` mit `einsatz: null` und
-`GET /api/v1/einsaetze` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/einsaetze/{id}`
+das höchstens einer. Ohne Freigabe antwortet `GET /api/v1/situation` mit `einsatz: null` und
+`GET /api/v1/incidents` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/incidents/{id}`
 antwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen
 Einsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage
 ihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von
@@ -90,8 +92,8 @@ und `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.
   alte und trägt eine höhere `id`.
 - **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;
   der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit
-  `einsaetze:read` über `GET /api/v1/einsaetze`, sonst über `GET /api/v1/events` ohne `after` und
-  danach `GET /api/v1/lage`.
+  `einsaetze:read` über `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und
+  danach `GET /api/v1/situation`.
 
 ## Einwurf
 
@@ -99,7 +101,7 @@ Absender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 m
 Divera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,
 nimmt den Maschinenzugang.
 
-- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/einwurf/{schluessel}/alarmmeldung` oder
+- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/intake/{schluessel}/alarm` oder
   `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt
   es hier nicht.
 - Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.

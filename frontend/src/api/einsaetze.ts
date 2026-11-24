@@ -227,7 +227,7 @@ export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
 
 /**
  * Modul-Vorgaben der Organisation des Einsatzes (LLH-1183), Form wie
- * `GET /api/org-modul-einstellungen`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
+ * `GET /api/org-module-settings`. Lesbar für Mitglieder und die Einsatz-Org, auch ohne
  * Org-Rolle; daraus zeigt der Editor „Module“ die Herkunft von Rolle und Sichtbarkeit.
  */
 export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {

@@ -401,7 +401,7 @@ async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String 
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),

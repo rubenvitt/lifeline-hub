@@ -1,5 +1,5 @@
 ---
-id: ADR-0095
+id: ADR-0097
 titel: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 status: akzeptiert
 ersetzt: ADR-0085
@@ -17,7 +17,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md
 ---
 
-# ADR-0095: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
+# ADR-0097: API-Routen sind englisch nach einem Glossar, bis 1.0 ohne Alias umbenannt
 
 ## Regeln
 
@@ -28,7 +28,7 @@ herleitung:
 - MUST: Eine Zeile des Bestands, die an der Merge-Base fehlt, übersetzt eine weggefallene: gleich
   viele Segmente, und jedes abweichende Segment steht im Glossar.
 - MUST: Bis 1.0.0 wird ein Pfad ohne Alias umbenannt; Backend, Frontend und Hüllen ziehen im
-  selben PR um. Pfade unter `/api/v1/` erst, wenn eine ADR die Zusage von ADR-0022 ersetzt.
+  selben PR um. Für Pfade unter `/api/v1/` gilt zusätzlich ADR-0096.
 - MUST: Ab 1.0.0 bleibt ein umbenannter Pfad drei Major-Versionen lang als Alias erreichbar.
 - MUST: Bricht eine Umbenennung einen Pfad, den eine Hülle fest aufruft, steigt
   `SHELL_CONTRACT` in `src/routes/shell.rs`, und die Hüllen kennen im selben PR nur noch die neue

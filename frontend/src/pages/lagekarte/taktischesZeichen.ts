@@ -138,7 +138,7 @@ interface TzEingabe {
   einheitTypLabel?: string | null;
   fachaufgabe?: string | null; // tz_fachaufgabe am Objekt (manueller Override)
   organisation?: string | null; // tz_organisation am Objekt (manueller Override)
-  orgDefault?: string | null; // Org-Default aus /api/organisation
+  orgDefault?: string | null; // Org-Default aus /api/organization
   // Fahrzeug-Rohfelder für die Ableitung; manuelle tz_*-Overrides bleiben vorrangig.
   fahrzeugtyp?: string | null; // Freitext-Typ → spezifischeres Grundzeichen + Fachaufgabe
   opta?: string | null; // OPTA → Organisation-Fallback (best effort, unvalidiert)

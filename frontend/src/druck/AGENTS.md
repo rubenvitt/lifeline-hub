@@ -53,7 +53,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `druck.css` (Wächter `druck/uebungSeiten.guard.test.ts`). Ein Blatt ohne Druckkopf trägt
   `DruckUebung` im Titel (Bild-Anlage).
 - **Ohne Organisation druckt nur die Hilfe** (LFH-1096): `DruckKnopf ohneOrganisation` wartet
-  nicht auf Kopf und Logo und fragt `/api/organisation` gar nicht (die Hilfe ist ohne Anmeldung
+  nicht auf Kopf und Logo und fragt `/api/organization` gar nicht (die Hilfe ist ohne Anmeldung
   offen). Jedes Druckstück einer Organisation oder eines Einsatzes bleibt beim Druckkopf. Die
   Mappe der Hilfe beginnt jedes weitere Kapitel auf neuer Seite (`data-lfh="druck-kapitel"`),
   Nachweis `e2e/hilfe-druck.spec.ts`; dort auch die Bilder der Kapitel (LFH-1128): Breite und
@@ -237,5 +237,5 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
   `einsatzakteDruck`, `DRUCK_ABFRAGE`, `gcTime: 0` (Betroffene über `…/persons/print`). Befehle
   und Lageberichte nur freigegeben, je Kette der Kopf (`kettenKoepfe`), wie das ZIP. Das ZIP ist
   ein Link mit `download`, kein Blob.
-- **Org-Branding** (`PATCH /api/organisation`, `…/organisation/logo`, PNG/JPEG ≤ 1 MiB,
+- **Org-Branding** (`PATCH /api/organization`, `…/organization/logo`, PNG/JPEG ≤ 1 MiB,
   Virenscan) liegt außerhalb der Schwärzung (`schwaerzung_registry.rs`).

@@ -18,7 +18,7 @@ function stelleBereit(benutzer: BenutzerAnzeige, anfang: Record<string, number> 
   server.use(
     meHandler(benutzer),
     http.get('/api/unterkunft-richtwerte', () => HttpResponse.json(richtwerteAntwort(org))),
-    http.put('/api/org-unterkunft-richtwerte/:schluessel', async ({ request, params }) => {
+    http.put('/api/org-accommodation-guidelines/:schluessel', async ({ request, params }) => {
       const body = (await request.json()) as { wert: number | null };
       puts.push([params.schluessel, body]);
       const schluessel = String(params.schluessel);

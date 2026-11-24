@@ -372,7 +372,7 @@ async fn fuehrung_am(i: &Instanz, einsatz: i64) -> serde_json::Value {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fuehrung"),
+        &format!("/api/einsaetze/{einsatz}/command"),
         &i.admin,
         None,
     )
@@ -468,7 +468,7 @@ async fn mit_fuehrung_fuehrt_der_hub_den_verwahrten_einsatz_mit_nachvollziehbare
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{h}/command/hand-over"),
         &hub.admin,
         Some(&json!({ "an": elw_kennung })),
     )

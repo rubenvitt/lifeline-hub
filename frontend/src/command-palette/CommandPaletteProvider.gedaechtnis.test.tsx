@@ -24,7 +24,7 @@ beforeEach(() => {
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze', () => HttpResponse.json([])),
-    http.put('/api/benutzer-einstellungen/:schluessel', async ({ params, request }) => {
+    http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });
       return HttpResponse.json({ eintraege: { [String(params.schluessel)]: body.wert } });
@@ -41,7 +41,7 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
    * ab; ein Träger mit Komponentenbindung verlöre den Eintrag still.
    */
   it('merkt einen ausgeführten Befehl über das Schliessen der Palette hinweg', async () => {
-    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    server.use(http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
     renderMitProviders(
       <CommandPaletteProvider>
@@ -69,7 +69,7 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
 
   /** Gegenaussage: ohne Ausführung entsteht die Gruppe nicht. */
   it('zeigt ohne gemerkten Befehl gar keine Gedächtnisgruppe', async () => {
-    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    server.use(http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })));
     const u = userEvent.setup();
     renderMitProviders(
       <CommandPaletteProvider>
@@ -95,7 +95,7 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
       loese = r;
     });
     server.use(
-      http.get('/api/benutzer-einstellungen', async () => {
+      http.get('/api/user-settings', async () => {
         await antwortFrei;
         return HttpResponse.json({
           eintraege: { [SCHLUESSEL_ZULETZT_BEFEHLE]: '["nav:profil"]' },
@@ -135,7 +135,7 @@ describe('Kommandopalette · Gedächtnis zuletzt ausgeführter Befehle', () => {
    */
   it('zeigt den gemerkten Befehl bei aktiver Suche genau einmal', async () => {
     server.use(
-      http.get('/api/benutzer-einstellungen', () =>
+      http.get('/api/user-settings', () =>
         HttpResponse.json({
           eintraege: { [SCHLUESSEL_ZULETZT_BEFEHLE]: '["nav:profil"]' },
         }),

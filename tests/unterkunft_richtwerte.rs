@@ -14,7 +14,7 @@ use common::*;
 const ORG: &str = "/api/unterkunft-richtwerte";
 
 fn org_put(schluessel: &str) -> String {
-    format!("/api/org-unterkunft-richtwerte/{schluessel}")
+    format!("/api/org-accommodation-guidelines/{schluessel}")
 }
 
 fn einsatz_pfad(einsatz: i64) -> String {

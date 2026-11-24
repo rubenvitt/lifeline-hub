@@ -83,7 +83,7 @@ const QUALI = new Map([[5, 'Rettungssanitäter']]);
 function zeigen(props: Partial<Parameters<typeof SchichtplanBlaetter>[0]> = {}) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
+    http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
   );
   return renderMitProviders(
     <div data-lfh="druckwurzel">

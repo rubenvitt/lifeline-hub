@@ -84,7 +84,7 @@ async function mitWiederholung(anfrage: () => Promise<APIResponse>): Promise<API
  */
 export async function logoSetzen(page: Page) {
   const antwort = await mitWiederholung(() =>
-    page.request.post('/api/organisation/logo', {
+    page.request.post('/api/organization/logo', {
       multipart: {
         datei: { name: 'logo.png', mimeType: 'image/png', buffer: pngMitMassen(97, 41) },
       },
