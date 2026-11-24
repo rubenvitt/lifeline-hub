@@ -167,7 +167,8 @@ describe('FachebenenInspector', () => {
   });
 
   describe('Vollmeldung bei warnung.bund.de (LLH-2103)', () => {
-    const vollmeldung = () => screen.queryByRole('link', { name: /Vollmeldung bei warnung\.bund\.de/ });
+    const vollmeldung = () =>
+      screen.queryByRole('link', { name: /Vollmeldung bei warnung\.bund\.de/ });
 
     it('NINA-Warnung verlinkt die Vollmeldung über ihre id in neuem Tab', () => {
       render(
@@ -194,15 +195,16 @@ describe('FachebenenInspector', () => {
           onSchliessen={() => {}}
         />,
       );
-      expect(vollmeldung()).toHaveAttribute(
-        'href',
-        'https://warnung.bund.de/meldungen/a%2Fb%3Fc/',
-      );
+      expect(vollmeldung()).toHaveAttribute('href', 'https://warnung.bund.de/meldungen/a%2Fb%3Fc/');
     });
 
     it('ohne id kein Link', () => {
       render(
-        <FachebenenInspector quelle="nina" properties={{ titel: 'Test' }} onSchliessen={() => {}} />,
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test' }}
+          onSchliessen={() => {}}
+        />,
       );
       expect(vollmeldung()).toBeNull();
       expect(screen.queryByText(/Vollmeldung/)).toBeNull();
