@@ -550,6 +550,149 @@ pub(crate) fn quellkacheln(k: &Kopf, stufe: usize, z: u8, x: u32, y: u32) -> Vec
     aus
 }
 
+// ===== Entpacken und Rendern =====
+
+/// Größte komprimierte Quellkachel, die ein Abruf lädt.
+pub(crate) const QUELLKACHEL_MAX: u64 = 2 * 1024 * 1024;
+
+/// Entpackt eine Quellkachel der Stufe zu `kachel_breite × kachel_hoehe × kanaele` Bytes,
+/// verschränkt, Prädiktor rückgerechnet. Ein Ergebnis in anderer Länge ist ein Fehler, kein
+/// stilles Abschneiden.
+pub(crate) fn entpacke(k: &Kopf, stufe: usize, roh: &[u8]) -> Result<Vec<u8>, CogFehler> {
+    let s = k
+        .stufen
+        .get(stufe)
+        .ok_or_else(|| CogFehler::Format(format!("Stufe {stufe} fehlt")))?;
+    if roh.len() as u64 > QUELLKACHEL_MAX {
+        return Err(CogFehler::ZuGross);
+    }
+    let kanaele = k.kanaele as usize;
+    let erwartet = s.kachel_breite as usize * s.kachel_hoehe as usize * kanaele;
+    let falsch = |n: usize| CogFehler::Format(format!("Kachel mit {n} statt {erwartet} Bytes"));
+    let mut px = match k.kompression {
+        Kompression::Keine => roh.to_vec(),
+        Kompression::Deflate => {
+            use std::io::Read;
+            let mut aus = Vec::with_capacity(erwartet);
+            flate2::read::ZlibDecoder::new(roh)
+                .take(erwartet as u64 + 1)
+                .read_to_end(&mut aus)
+                .map_err(|e| CogFehler::Format(format!("Deflate: {e}")))?;
+            aus
+        }
+        Kompression::Lzw => {
+            let mut aus = weezl::decode::Decoder::with_tiff_size_switch(weezl::BitOrder::Msb, 8)
+                .decode(roh)
+                .map_err(|e| CogFehler::Format(format!("LZW: {e}")))?;
+            // Manche Schreiber hängen nach dem Ende-Code Füllbytes an.
+            if aus.len() > erwartet {
+                aus.truncate(erwartet);
+            }
+            aus
+        }
+        Kompression::Jpeg => entpacke_jpeg(k, s, roh)?,
+    };
+    if px.len() != erwartet {
+        return Err(falsch(px.len()));
+    }
+    if k.praediktor == 2 && k.kompression != Kompression::Jpeg {
+        for zeile in px.chunks_mut(s.kachel_breite as usize * kanaele) {
+            for i in kanaele..zeile.len() {
+                zeile[i] = zeile[i].wrapping_add(zeile[i - kanaele]);
+            }
+        }
+    }
+    Ok(px)
+}
+
+/// JPEG-Kachel: Die gemeinsamen Tabellen (Tag 347) stehen ohne Bildende vor den Daten der
+/// Kachel ohne deren Bildanfang.
+fn entpacke_jpeg(k: &Kopf, s: &Stufe, roh: &[u8]) -> Result<Vec<u8>, CogFehler> {
+    let daten = match &k.jpeg_tabellen {
+        Some(t) if t.len() >= 4 && roh.len() >= 2 => {
+            let mut d = t[..t.len() - 2].to_vec();
+            d.extend_from_slice(&roh[2..]);
+            d
+        }
+        _ => roh.to_vec(),
+    };
+    let bild = image::load_from_memory_with_format(&daten, image::ImageFormat::Jpeg)
+        .map_err(|e| CogFehler::Format(format!("JPEG: {e}")))?;
+    if (bild.width(), bild.height()) != (s.kachel_breite, s.kachel_hoehe) {
+        return Err(CogFehler::Format("JPEG-Kachel in falscher Größe".into()));
+    }
+    Ok(match k.kanaele {
+        1 => bild.to_luma8().into_raw(),
+        3 => bild.to_rgb8().into_raw(),
+        _ => bild.to_rgba8().into_raw(),
+    })
+}
+
+/// Rendert die Zielkachel `z/x/y` als PNG (RGBA, [`ZIEL_PX`]²) aus den entpackten Quellkacheln
+/// der Stufe [`waehle_stufe`], nächster Nachbar. Fehlt eine Quellkachel, bleibt ihr Teil
+/// durchsichtig, ebenso Nodata und alles außerhalb des Bildes.
+pub(crate) fn rendere_kachel(
+    k: &Kopf,
+    z: u8,
+    x: u32,
+    y: u32,
+    quellen: &std::collections::HashMap<usize, Vec<u8>>,
+) -> Result<Vec<u8>, CogFehler> {
+    let mut bild = image::RgbaImage::new(ZIEL_PX, ZIEL_PX);
+    if !k.stufen.is_empty() {
+        let stufe = waehle_stufe(k, z);
+        let s = &k.stufen[stufe];
+        let (sx, sy) = stufen_pixel(k, stufe);
+        let t = ziel_pixel(z);
+        let (kw, _, _, kn) = kachel_ausdehnung(z, x, y);
+        let spalten = s.breite.div_ceil(s.kachel_breite);
+        let kanaele = k.kanaele as usize;
+        let nodata = k.nodata.or((!k.alpha).then_some(0));
+        for py in 0..ZIEL_PX {
+            let zeile = ((k.ursprung.1 - (kn - (py as f64 + 0.5) * t)) / sy).floor();
+            if zeile < 0.0 || zeile >= s.hoehe as f64 {
+                continue;
+            }
+            let zeile = zeile as u32;
+            for px in 0..ZIEL_PX {
+                let spalte = ((kw + (px as f64 + 0.5) * t - k.ursprung.0) / sx).floor();
+                if spalte < 0.0 || spalte >= s.breite as f64 {
+                    continue;
+                }
+                let spalte = spalte as u32;
+                let index = (zeile / s.kachel_hoehe * spalten + spalte / s.kachel_breite) as usize;
+                let Some(q) = quellen.get(&index) else {
+                    continue;
+                };
+                let innen = ((zeile % s.kachel_hoehe) * s.kachel_breite
+                    + spalte % s.kachel_breite) as usize
+                    * kanaele;
+                let Some(w) = q.get(innen..innen + kanaele) else {
+                    continue;
+                };
+                let rgba = match w {
+                    [g] => [*g, *g, *g, 255],
+                    [r, g, b] => [*r, *g, *b, 255],
+                    [r, g, b, a] => [*r, *g, *b, *a],
+                    _ => continue,
+                };
+                let leer = match nodata {
+                    Some(n) => w[..kanaele.min(3)].iter().all(|v| *v == n),
+                    None => false,
+                };
+                if !leer && rgba[3] > 0 {
+                    bild.put_pixel(px, py, image::Rgba(rgba));
+                }
+            }
+        }
+    }
+    let mut png = Vec::new();
+    image::DynamicImage::ImageRgba8(bild)
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .map_err(|e| CogFehler::Format(format!("PNG: {e}")))?;
+    Ok(png)
+}
+
 #[cfg(test)]
 pub(crate) mod test_cog {
     //! Schreibt kleine COGs für Tests: 32 × 32 px in 2 × 2 Kacheln zu 16 px, dazu eine Übersicht
@@ -929,6 +1072,173 @@ mod tests {
         let k = fertig(&ANFANG[..16384]);
         assert!(!kachel_im_bild(&k, 14, 0, 0));
         assert!(quellkacheln(&k, 0, 14, 0, 0).is_empty());
+    }
+
+    // ===== Entpacken und Rendern =====
+
+    fn quellbytes<'a>(daten: &'a [u8], k: &Kopf, stufe: usize, i: usize) -> &'a [u8] {
+        let o = k.stufen[stufe].offsets[i] as usize;
+        &daten[o..o + k.stufen[stufe].laengen[i] as usize]
+    }
+
+    #[test]
+    fn entpackt_die_echte_kleinste_stufe() {
+        let k = fertig(&ANFANG[..16384]);
+        let px = entpacke(&k, 5, quellbytes(ANFANG, &k, 5, 0)).unwrap();
+        assert_eq!(px.len(), 512 * 512 * 3);
+        let s = &k.stufen[5];
+        let (mut innen, mut leer) = (0usize, 0usize);
+        for y in 0..512usize {
+            for x in 0..512usize {
+                let p = &px[(y * 512 + x) * 3..][..3];
+                if x < s.breite as usize && y < s.hoehe as usize {
+                    innen += 1;
+                    leer += (p == [0, 0, 0]) as usize;
+                } else {
+                    assert_eq!(p, [0, 0, 0], "außerhalb des Bildes bei {x}/{y}");
+                }
+            }
+        }
+        // Ein Orthobild hat einen unregelmäßigen Umriss; rund ein Fünftel ist Nodata. Mehr als
+        // die Hälfte schwarz oder kaum verschiedene Farben hieße: falsch entpackt.
+        assert!(leer * 2 < innen, "{leer} von {innen} Pixeln leer");
+        let farben: std::collections::HashSet<&[u8]> = px.chunks(3).collect();
+        assert!(farben.len() > 1000, "nur {} Farben", farben.len());
+    }
+
+    fn pruefe_entpackt(o: &TestCog) {
+        let daten = baue_test_cog(o);
+        let k = fertig(&daten);
+        for (stufe, kacheln) in [(0usize, 4usize), (1, 1)] {
+            for i in 0..kacheln {
+                let px = entpacke(&k, stufe, quellbytes(&daten, &k, stufe, i)).unwrap();
+                let (kx, ky) = (i as u32 % 2, i as u32 / 2);
+                for y in 0..16u32 {
+                    for x in 0..16u32 {
+                        for c in 0..3u8 {
+                            let ist = px[((y * 16 + x) * 3 + c as u32) as usize];
+                            let soll = TestCog::pixel(stufe, kx * 16 + x, ky * 16 + y, c);
+                            assert_eq!(ist, soll, "{o:?} Stufe {stufe} Kachel {i} bei {x}/{y}");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn praediktor_wird_rueckgerechnet() {
+        pruefe_entpackt(&TestCog::default());
+    }
+
+    #[test]
+    fn lzw_und_ohne_kompression() {
+        for kompression in [Kompression::Lzw, Kompression::Keine] {
+            for praediktor in [1, 2] {
+                pruefe_entpackt(&TestCog {
+                    kompression,
+                    praediktor,
+                    ..TestCog::default()
+                });
+            }
+        }
+    }
+
+    #[test]
+    fn kaputte_quellkachel_ist_fehler() {
+        let daten = baue_test_cog(&TestCog::default());
+        let k = fertig(&daten);
+        assert!(entpacke(&k, 0, b"kein zlib").is_err());
+        assert!(entpacke(&k, 0, &[]).is_err());
+        // Gültiges zlib, aber länger als eine Kachel: kein stilles Abschneiden.
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        std::io::Write::write_all(&mut e, &vec![1u8; 16 * 16 * 3 + 1]).unwrap();
+        assert!(entpacke(&k, 0, &e.finish().unwrap()).is_err());
+        // Und kürzer.
+        let mut e = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+        std::io::Write::write_all(&mut e, &[1u8; 10]).unwrap();
+        assert!(entpacke(&k, 0, &e.finish().unwrap()).is_err());
+        assert!(entpacke(&k, 9, &[]).is_err());
+    }
+
+    /// Zielkachel und Pixel darin für einen Punkt in EPSG:3857.
+    fn ziel_von(mx: f64, my: f64, z: u8) -> (u32, u32, u32, u32) {
+        let t = ziel_pixel(z);
+        let gx = (mx + WELT / 2.0) / t;
+        let gy = (WELT / 2.0 - my) / t;
+        let (gx, gy) = (gx.floor() as u32, gy.floor() as u32);
+        (gx / 256, gy / 256, gx % 256, gy % 256)
+    }
+
+    /// Rendert die Zielkachel mit allen Quellkacheln, entpackt.
+    fn rendere(daten: &[u8], k: &Kopf, z: u8, x: u32, y: u32) -> image::RgbaImage {
+        let stufe = waehle_stufe(k, z);
+        let quellen = quellkacheln(k, stufe, z, x, y)
+            .into_iter()
+            .map(|q| {
+                let roh = quellbytes(daten, k, stufe, q.index);
+                (q.index, entpacke(k, stufe, roh).unwrap())
+            })
+            .collect();
+        let png = rendere_kachel(k, z, x, y, &quellen).unwrap();
+        image::load_from_memory(&png).unwrap().to_rgba8()
+    }
+
+    #[test]
+    fn rendert_png_256() {
+        let daten = baue_test_cog(&TestCog::default());
+        let k = fertig(&daten);
+        let (x, y, _, _) = ziel_von(1_000_001.0, 5_999_999.0, 14);
+        let bild = rendere(&daten, &k, 14, x, y);
+        assert_eq!(bild.dimensions(), (256, 256));
+    }
+
+    #[test]
+    fn nodata_ist_durchsichtig() {
+        let daten = baue_test_cog(&TestCog::default());
+        let k = fertig(&daten);
+        // Pixel (0, 0) ist Nodata, Pixel (5, 5) nicht; ihre Mitten in EPSG:3857.
+        let (x, y, nx, ny) = ziel_von(1_000_005.0, 5_999_995.0, 14);
+        let (x2, y2, vx, vy) = ziel_von(1_000_055.0, 5_999_945.0, 14);
+        assert_eq!((x, y), (x2, y2), "beide Punkte in einer Zielkachel");
+        let bild = rendere(&daten, &k, 14, x, y);
+        assert_eq!(bild.get_pixel(nx, ny)[3], 0);
+        let p = bild.get_pixel(vx, vy);
+        assert_eq!(p[3], 255);
+        for c in 0..3u8 {
+            assert_eq!(p[c as usize], TestCog::pixel(0, 5, 5, c));
+        }
+    }
+
+    #[test]
+    fn randkachel_ist_aussen_durchsichtig() {
+        let daten = baue_test_cog(&TestCog::default());
+        let k = fertig(&daten);
+        // Die Zielkachel mit dem Ursprung reicht über den West- und Nordrand des Bildes.
+        let (x, y, _, _) = ziel_von(1_000_005.0, 5_999_995.0, 14);
+        let bild = rendere(&daten, &k, 14, x, y);
+        let t = ziel_pixel(14);
+        let (kw, _, _, kn) = kachel_ausdehnung(14, x, y);
+        let (bw, bs, bo, bn) = ausdehnung(&k);
+        let (mut aussen, mut innen) = (0, 0);
+        for py in 0..256 {
+            for px in 0..256 {
+                let (mx, my) = (kw + (px as f64 + 0.5) * t, kn - (py as f64 + 0.5) * t);
+                let im_bild = mx > bw && mx < bo && my > bs && my < bn;
+                let a = bild.get_pixel(px, py)[3];
+                if im_bild {
+                    innen += (a == 255) as usize;
+                } else {
+                    aussen += 1;
+                    assert_eq!(a, 0, "außerhalb sichtbar bei {px}/{py}");
+                }
+            }
+        }
+        assert!(aussen > 0 && innen > 0, "aussen {aussen}, innen {innen}");
+        // Fehlende Quellkacheln sind durchsichtig, kein Fehler.
+        let png = rendere_kachel(&k, 14, x, y, &Default::default()).unwrap();
+        let leer = image::load_from_memory(&png).unwrap().to_rgba8();
+        assert!(leer.pixels().all(|p| p[3] == 0));
     }
 
     #[test]
