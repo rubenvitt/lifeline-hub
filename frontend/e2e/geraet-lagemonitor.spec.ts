@@ -76,7 +76,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   });
   expect(verortet.ok(), await verortet.text()).toBeTruthy();
   // LLH-1746: zwei Plätze für drei Personen — die UHS Nord ist überbelegt.
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/plaetze/bulk`, {
+  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/seats/bulk`, {
     typ: 'behandlungsplatz',
     menge: 2,
   });
@@ -86,14 +86,14 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await anlegen(page, `/api/einsaetze/${e}/uhs`, { typ: 'sonstige', bezeichnung: `UHS ${b}` });
   }
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
-    await anlegen(page, `/api/einsaetze/${e}/personen`, { name, uhs_id: nord.id });
+    await anlegen(page, `/api/einsaetze/${e}/persons`, { name, uhs_id: nord.id });
   }
   // LFH-1045: zwei Kräfte an der UHS Nord; der Monitor zeigt nur ihre Zahl.
   for (const name of ['Kraft Eins', 'Kraft Zwei']) {
     const kraft = await anlegen(page, `/api/einsaetze/${e}/personal`, {
       adhoc: { name, staerke_position: 'mannschaft' },
     });
-    const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/kraefte/${kraft.id}`);
+    const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/forces/${kraft.id}`);
     expect(zu.ok(), await zu.text()).toBeTruthy();
   }
   // LLH-1153: eine Absperrung, ein Bezirk und eine Skizze, dazu ein Abschnitt mit Fläche.
@@ -166,8 +166,8 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // sichtbar“), damit die Zeile in 28 px überläuft und „+n“ zeigt: vermisst, kritischer Abschnitt,
   // Einheit mit überfälliger Rückmeldung, überfälliger Auftrag (samt fälliger Erinnerung an die
   // Quittierfrist), dringende Meldung, dazu die Sofortmeldung oben.
-  await anlegen(page, `/api/einsaetze/${e}/personen`, { name: 'Vermisst', status: 'vermisst' });
-  await anlegen(page, `/api/einsaetze/${e}/sectors`, {
+  await anlegen(page, `/api/einsaetze/${e}/persons`, { name: 'Vermisst', status: 'vermisst' });
+  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
     name: 'UHS Turnhalle Nordufer',
     lagezustand: 'kritisch',
   });

@@ -2595,7 +2595,7 @@ async fn uebernehmen_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         &cookie,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
     )
@@ -3039,7 +3039,7 @@ async fn abruf_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/personen", l.eid),
+        &format!("/api/einsaetze/{}/persons", l.eid),
         &l.admin,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": l.hlf})),
     )

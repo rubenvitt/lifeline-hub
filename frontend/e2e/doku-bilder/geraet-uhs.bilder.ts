@@ -157,14 +157,14 @@ test.describe(KAPITEL, () => {
       const person = await fuelle<{ id: number }>(
         page,
         'post',
-        `/api/einsaetze/${einsatz}/personen`,
+        `/api/einsaetze/${einsatz}/persons`,
         {
           name: 'Neumann',
           uhs_id: uhs.id,
         },
       );
       const bestaetiger = (await (
-        await geraet.request.get(`/api/einsaetze/${einsatz}/personen/bestaetiger`)
+        await geraet.request.get(`/api/einsaetze/${einsatz}/persons/confirmers`)
       ).json()) as { name: string; funktion: string | null }[];
       const mit = bestaetiger.find((b) => b.funktion) ?? bestaetiger[0];
       expect(mit, 'Personal im Demo-Einsatz').toBeDefined();

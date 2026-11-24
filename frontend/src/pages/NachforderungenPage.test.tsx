@@ -1749,7 +1749,7 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
     ladeModulFreigaben.mockResolvedValue(freigabenFixture());
     listeNachforderungen.mockResolvedValue([FELDBETTEN, DECKEN, RTW]);
     server.use(
-      http.get('/api/einsaetze/1/betreuung', () => {
+      http.get('/api/einsaetze/1/care', () => {
         betreuungAbrufe += 1;
         return HttpResponse.json({ stellen: [turnhalle, stadion], namentlich: [] });
       }),
@@ -1867,7 +1867,7 @@ describe('NachforderungenPage — Personenbezug (LLH-1573)', () => {
   it('lädt das Detail beim Öffnen einmal frisch, auch wenn die Personenseite es hält', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () => {
+      http.get('/api/einsaetze/1/persons/10', () => {
         abrufe++;
         return HttpResponse.json({
           id: 10,
@@ -1894,7 +1894,7 @@ describe('NachforderungenPage — Personenbezug (LLH-1573)', () => {
   it('ein gescheitertes Detail steht als „nicht geladen“ mit „Erneut laden“', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () => {
+      http.get('/api/einsaetze/1/persons/10', () => {
         abrufe++;
         return abrufe === 1
           ? HttpResponse.json({ fehler: 'kaputt' }, { status: 500 })

@@ -89,7 +89,7 @@ test.describe('Titel-Link und Tastatur (Personen, Tabelle)', () => {
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E Kontextmenü Personen ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
       name: 'Kontext',
       vorname: 'Karla',
       antreff_ort: 'Sammelstelle Nord',

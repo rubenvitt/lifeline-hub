@@ -52,7 +52,7 @@ const uhs = {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true, now: Date.parse('2026-10-18T09:34:00Z') });
-  server.use(http.get('/api/einsaetze/1/personen', () => HttpResponse.json(personen)));
+  server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)));
 });
 afterEach(() => vi.useRealTimers());
 
@@ -127,7 +127,7 @@ describe('UhsLagezeile (LLH-1136)', () => {
 
   it('meldet über einem Ladefehler keine Nullen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/personen', () =>
+      http.get('/api/einsaetze/1/persons', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
     );
@@ -139,7 +139,7 @@ describe('UhsLagezeile (LLH-1136)', () => {
 
   it('als Zeile meldet sie über einem Ladefehler „Stand unbekannt“ statt Nullen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/personen', () =>
+      http.get('/api/einsaetze/1/persons', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
     );

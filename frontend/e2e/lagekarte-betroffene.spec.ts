@@ -121,7 +121,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     lon: MITTE[0],
   });
   for (let i = 0; i < 30; i++) {
-    await senden(page, 'post', `${basis}/personen`, {
+    await senden(page, 'post', `${basis}/persons`, {
       // Streuung von wenigen Metern: bei Zoom 13 eine Traube, nie ein einzelner Punkt.
       antreff_lat: MITTE[1] + (i % 6) * 0.0002,
       antreff_lon: MITTE[0] + Math.floor(i / 6) * 0.0002,
@@ -129,7 +129,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     });
   }
   for (let i = 0; i < 3; i++) {
-    await senden(page, 'post', `${basis}/personen`, {
+    await senden(page, 'post', `${basis}/persons`, {
       antreff_lat: FERN[1] + i * 0.0002,
       antreff_lon: FERN[0],
     });
@@ -283,7 +283,7 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
   const basis = `/api/einsaetze/${einsatzId}`;
   const ort: [number, number] = [8.4, 52.0];
   for (let i = 0; i < 3; i++) {
-    await senden(page, 'post', `${basis}/personen`, {
+    await senden(page, 'post', `${basis}/persons`, {
       antreff_lat: ort[1] + i * 0.0002,
       antreff_lon: ort[0],
     });
@@ -388,7 +388,7 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
   });
   const basis = `/api/einsaetze/${einsatzId}`;
   // Ohne Fundort: genau der Fall, für den „Auf Lagekarte verorten“ da ist.
-  const person = (await senden(page, 'post', `${basis}/personen`, { name: 'Rückweg' })) as {
+  const person = (await senden(page, 'post', `${basis}/persons`, { name: 'Rückweg' })) as {
     id: number;
     registrier_nr: number;
   };
@@ -457,7 +457,7 @@ test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungs
   for (let i = 0; i < 3; i++) {
     ids.push(
       (
-        await senden(page, 'post', `${basis}/personen`, {
+        await senden(page, 'post', `${basis}/persons`, {
           antreff_lat: FERN[1] + i * 0.0002,
           antreff_lon: FERN[0],
           sichtung: 'sk3',
@@ -494,14 +494,14 @@ test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungs
   expect(Object.values(await blaetter())).toEqual(['III', 'III', 'III']);
 
   // Reine Inhaltsänderung: offen, das Blatt zeigt die neue Sichtung.
-  await senden(page, 'post', `${basis}/personen/${ids[0]}/sichtung`, { kategorie: 'sk1' });
+  await senden(page, 'post', `${basis}/persons/${ids[0]}/triage`, { kategorie: 'sk1' });
   await expect
     .poll(async () => (await blaetter())[`person-${ids[0]}`], { timeout: 15_000 })
     .toBe('I');
   expect(Object.keys(await blaetter())).toHaveLength(3);
 
   // Zugang in der Traube: Menge geändert → der Spider klappt zu.
-  await senden(page, 'post', `${basis}/personen`, {
+  await senden(page, 'post', `${basis}/persons`, {
     antreff_lat: FERN[1] + 0.0001,
     antreff_lon: FERN[0],
   });

@@ -33,7 +33,7 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function personen(page: Page, einsatzId: number): Promise<PersonZeile[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/personen`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/persons`);
   expect(antwort.ok(), `Personenliste: ${antwort.status()}`).toBeTruthy();
   return (await antwort.json()) as PersonZeile[];
 }
@@ -60,12 +60,12 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Fundorte ${Date.now()}`,
   });
-  const mitKoordinate = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+  const mitKoordinate = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
     name: 'Albers',
     antreff_lat: 53.5511,
     antreff_lon: 9.9937,
   });
-  const ohneKoordinate = await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+  const ohneKoordinate = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
     name: 'Brandt',
   });
 
@@ -147,7 +147,7 @@ test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öff
   const ids: number[] = [];
   for (const i of [0, 1]) {
     ids.push(
-      await post(page, `/api/einsaetze/${einsatzId}/personen`, {
+      await post(page, `/api/einsaetze/${einsatzId}/persons`, {
         name: `Paar ${i}`,
         antreff_lat: 53.0 + i * 0.0001,
         antreff_lon: 8.8,

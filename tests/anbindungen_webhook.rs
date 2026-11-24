@@ -27,7 +27,7 @@ fn pfad(id: &str) -> String {
     format!("{LISTE}/{id}/webhook")
 }
 
-/// Neue Routen sind englisch (ADR-0085), die übrigen Webhook-Routen stehen noch im Bestand.
+/// Neue Routen sind englisch (ADR-0097), die übrigen Webhook-Routen stehen noch im Bestand.
 fn abruf_pfad(id: &str) -> String {
     format!("/api/admin/integrations/{id}/webhook/fetch-certificate")
 }

@@ -24,18 +24,18 @@ async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Sta
 }
 
 fn pfad(e: i64, p: i64) -> String {
-    format!("/api/einsaetze/{e}/personen/{p}/massnahmen")
+    format!("/api/einsaetze/{e}/persons/{p}/interventions")
 }
 
 fn aufheben_pfad(e: i64, p: i64, m: &Value) -> String {
-    format!("{}/{}/aufheben", pfad(e, p), m["id"])
+    format!("{}/{}/void", pfad(e, p), m["id"])
 }
 
 async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -115,7 +115,7 @@ async fn katalog_400_storniert_409_vermisst_422() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{storniert}"),
+        &format!("/api/einsaetze/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -129,7 +129,7 @@ async fn katalog_400_storniert_409_vermisst_422() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/personen/{p}/status"),
+            &format!("/api/einsaetze/{e}/persons/{p}/status"),
             &admin,
             Some(&json!({"status": status}).to_string()),
         )
@@ -177,7 +177,7 @@ async fn aufheben_genau_einmal_und_nur_an_der_eigenen_person() {
     let (s, v) = post(
         &app,
         &admin,
-        &format!("{}/999999/aufheben", pfad(e, p)),
+        &format!("{}/999999/void", pfad(e, p)),
         json!({}),
     )
     .await;
@@ -411,7 +411,7 @@ async fn durchfuehrung_vor_der_registrierung_bleibt_vor_dem_einsatzbeginn_400() 
     let (s, sichtung) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
         json!({"kategorie": "sk2", "zeitpunkt_at": am_fundort}),
     )
     .await;

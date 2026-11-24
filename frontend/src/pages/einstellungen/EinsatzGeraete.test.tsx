@@ -86,8 +86,8 @@ function stelleBereit(a: Aufbau = {}) {
     }),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
     http.get('/api/einsaetze/1/integrations', () => HttpResponse.json(a.anbindungen ?? [])),
-    http.get('/api/einsaetze/1/situation-picture-shares', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/betreuung', () =>
+    http.get('/api/einsaetze/1/lagebild-freigaben', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/care', () =>
       HttpResponse.json({
         stellen: [
           { id: 7, bezeichnung: 'Turnhalle Ost', status: 'geschlossen' },
@@ -299,7 +299,7 @@ describe('EinsatzGeraete (LFH-892)', () => {
     function verpflegungBereit() {
       const r = stelleBereit({ kopplungen: [], ansichten: MIT_VERPFLEGUNG });
       server.use(
-        http.get('/api/einsaetze/1/verpflegung', () =>
+        http.get('/api/einsaetze/1/catering', () =>
           HttpResponse.json({
             zeitfenster: [],
             empfaenger: { einheiten: [], abschnitte: [] },

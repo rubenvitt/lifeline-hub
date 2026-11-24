@@ -25,7 +25,7 @@ test('Bezirk: aus der Übersicht auf die Detailseite, melden, räumen, bearbeite
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Bezirk-Detail ${Date.now()}`,
   });
-  const { id: bezirkId } = await senden(page, `/api/einsaetze/${einsatzId}/evakuierung/bezirke`, {
+  const { id: bezirkId } = await senden(page, `/api/einsaetze/${einsatzId}/evacuation/districts`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
@@ -65,7 +65,7 @@ test('Bezirk: aus der Übersicht auf die Detailseite, melden, räumen, bearbeite
   await expect(band).toContainText('40 %');
 
   // Der Server trägt beides.
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evakuierung`);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/evacuation`);
   const { bezirke } = (await r.json()) as {
     bezirke: { id: number; raeumung: string; plan_personen: number }[];
   };
@@ -95,7 +95,7 @@ test('Bezirk bei 1180 px: der Kopf steht in der Zeile des Titels', async ({ page
   const { id: einsatzId } = await senden(page, '/api/einsaetze', {
     bezeichnung: `E2E Bezirk-Kopf ${Date.now()}`,
   });
-  const { id: bezirkId } = await senden(page, `/api/einsaetze/${einsatzId}/evakuierung/bezirke`, {
+  const { id: bezirkId } = await senden(page, `/api/einsaetze/${einsatzId}/evacuation/districts`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',

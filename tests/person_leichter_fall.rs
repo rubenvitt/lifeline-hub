@@ -12,7 +12,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (Stat
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -23,7 +23,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         cookie,
         None,
     )

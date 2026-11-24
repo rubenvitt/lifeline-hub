@@ -177,7 +177,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
     });
     expect(r.ok(), await r.text()).toBeTruthy();
     const e = (await r.json()) as { id: number };
-    const p = await page.request.post(`/api/einsaetze/${e.id}/personen`, {
+    const p = await page.request.post(`/api/einsaetze/${e.id}/persons`, {
       data: { name: 'Yilmaz', vorname: 'Ayse' },
     });
     expect(p.ok(), await p.text()).toBeTruthy();

@@ -81,7 +81,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
         let p = post(
             &app,
             &admin,
-            &format!("{basis}/personen"),
+            &format!("{basis}/persons"),
             r#"{"geschlecht":"maennlich"}"#,
         )
         .await;
@@ -90,7 +90,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
     let (status, v) = anfrage(
         &app,
         "DELETE",
-        &format!("{basis}/personen/{}", personen[0]),
+        &format!("{basis}/persons/{}", personen[0]),
         &admin,
         None,
     )
@@ -123,7 +123,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
     assert_eq!(v["einheiten"]["gesamt"].as_i64(), Some(2), "{v:?}");
     assert_eq!(v["einsatzabschnitte"]["gesamt"].as_i64(), Some(1), "{v:?}");
     // Parität mit der Personenliste und dem ETB-Zähler.
-    let liste = get(&app, &admin, &format!("{basis}/personen")).await;
+    let liste = get(&app, &admin, &format!("{basis}/persons")).await;
     assert_eq!(
         v["personen"]["gesamt"].as_i64(),
         Some(liste.as_array().unwrap().len() as i64)
@@ -964,7 +964,7 @@ async fn org_rollensperre_laesst_modul_fehlen() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         &erika,
         None,
     )

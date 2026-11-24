@@ -146,7 +146,7 @@ function rendere({
       zaehle('personal');
       return HttpResponse.json(lage.personal ?? []);
     }),
-    http.get('/api/einsaetze/1/personen', () => {
+    http.get('/api/einsaetze/1/persons', () => {
       zaehle('personen');
       return lage.personenStatus
         ? HttpResponse.json({ error: 'gesperrt' }, { status: lage.personenStatus })

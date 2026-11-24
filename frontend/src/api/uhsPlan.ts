@@ -30,7 +30,7 @@ const basis = (einsatzId: number, uhsId: number) => `/api/einsaetze/${einsatzId}
  * eine neue Adresse (sonst käme der alte aus dem HTTP-Cache).
  */
 export function planBildPfad(einsatzId: number, uhsId: number, sha256: string): string {
-  return `${basis(einsatzId, uhsId)}/bild?v=${encodeURIComponent(sha256)}`;
+  return `${basis(einsatzId, uhsId)}/image?v=${encodeURIComponent(sha256)}`;
 }
 
 /**
@@ -82,7 +82,7 @@ export function uebernehmePlan(
   uhsId: number,
   anhangId: number,
 ): Promise<UhsPlan> {
-  return apiSend<UhsPlan>(`${basis(einsatzId, uhsId)}/aus-anhang`, 'POST', {
+  return apiSend<UhsPlan>(`${basis(einsatzId, uhsId)}/from-attachment`, 'POST', {
     anhang_id: anhangId,
   });
 }

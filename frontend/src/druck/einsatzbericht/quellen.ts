@@ -99,19 +99,19 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/lageberichte — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
   // (src/routes/lagebericht.rs:20/30, src/routes/vorlagendokument.rs:39).
   { schluessel: 'lageberichte', bloecke: nur('lage'), modul: 'lageberichte' },
-  // GET …/personen — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
+  // GET …/persons — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
   // Die Hilfeleistungen zählen dieselben Personen (LLH-1575).
   { schluessel: 'personen', bloecke: ['bilanz', 'hilfeleistungen'], modul: 'personen' },
-  // GET …/personen/verbleib-angaben — `EinsatzLesezugriff<Personen>`
+  // GET …/persons/whereabouts-details — `EinsatzLesezugriff<Personen>`
   // (src/routes/einsatz_person.rs, `verbleib_angaben`, LLH-1575 D3).
   { schluessel: 'personenVerbleibAngaben', bloecke: nur('hilfeleistungen'), modul: 'personen' },
   // GET …/damages — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
   { schluessel: 'schaeden', bloecke: nur('bilanz'), modul: 'schaeden' },
-  // GET …/evakuierung — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
+  // GET …/evacuation — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
   { schluessel: 'evakuierung', bloecke: nur('bilanz'), modul: 'evakuierung' },
-  // GET …/betreuung — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs).
+  // GET …/care — `EinsatzLesezugriff<Betreuung>` (src/routes/betreuung.rs).
   { schluessel: 'betreuung', bloecke: nur('bilanz'), modul: 'betreuung' },
-  // GET …/verpflegung — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
+  // GET …/catering — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
   { schluessel: 'verpflegung', bloecke: nur('bilanz'), modul: 'verpflegung' },
   // GET …/etb/zaehler — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
   { schluessel: 'etbZaehler', bloecke: nur('etb'), modul: 'etb' },

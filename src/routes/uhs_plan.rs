@@ -117,7 +117,7 @@ pub struct UebernahmeBody {
     pub anhang_id: i64,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang — einen Bild-Anhang DIESER UHS als Plan
+/// POST /api/einsaetze/{id}/uhs/{uid}/plan/from-attachment — einen Bild-Anhang DIESER UHS als Plan
 /// kopieren (design.md D4). Reihenfolge: Gate → UHS (404/409) → Linker-Lookup (fremd oder
 /// entfernt 404) → Typ des Anhangs (kein Bild 422, ohne Protokoll) → **Lese-Audit** (scheitert
 /// es, kein Plan) → bereinigte Bytes → Annahme → Transaktion. Der Anhang bleibt unverändert.
@@ -219,7 +219,7 @@ pub async fn entfernen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/plan/bild — das Bild zur Anzeige. ETag aus sha256,
+/// GET /api/einsaetze/{id}/uhs/{uid}/plan/image — das Bild zur Anzeige. ETag aus sha256,
 /// 304-Kurzschluss ohne BLOB. **Kein Lese-Audit und kein ETB** (Spec „Anzeige ohne
 /// Protokoll“): der Plan ist kein Anhang. `inline`, `nosniff` und [`ANHANG_CSP`] wie bei
 /// Anhang-Antworten.

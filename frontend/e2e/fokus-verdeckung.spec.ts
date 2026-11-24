@@ -679,7 +679,7 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     feld: 'Rufname',
     seite: async (page: Page) => {
       const einsatzId = await einsatzPerApi(page);
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/tiere`, {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/animals`, {
         data: { spezies: 'hund', rufname: 'Rex' },
       });
       expect(
@@ -1558,8 +1558,8 @@ test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabb
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
-  const zfAntwort = await page.request.post(`${basis}/zeitfenster`, {
+  const basis = `/api/einsaetze/${einsatzId}/catering`;
+  const zfAntwort = await page.request.post(`${basis}/time-slots`, {
     data: {
       bezeichnung: 'Mittag Fokus',
       von_at: zeit(-60),
@@ -1573,7 +1573,7 @@ test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabb
   const { id: zfId } = (await zfAntwort.json()) as { id: number };
   const ANZAHL = 10;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const a = await page.request.post(`${basis}/zeitfenster/${zfId}/ausgaben`, {
+    const a = await page.request.post(`${basis}/time-slots/${zfId}/distributions`, {
       data: { menge: n, zeitpunkt_at: zeit(-55 + n) },
     });
     expect(a.ok(), await a.text()).toBeTruthy();
@@ -1958,7 +1958,7 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   for (const [i, name] of ['Einzeln West', 'Fern West'].entries()) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name, antreff_lat: 53 + i * 0.3, antreff_lon: 8.8 + i * 0.5 },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2045,7 +2045,7 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 14;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name: `Person ${String(n).padStart(2, '0')}` },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2233,7 +2233,7 @@ test('Erste Zeile (LLH-1358): Personenliste — rückwärts steht kein Ziel unte
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 14;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name: `Person ${String(n).padStart(2, '0')}` },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2602,7 +2602,7 @@ const UNTERKUNFT_STELLE = 'Sporthalle Fokusweg';
 
 async function unterkunftSeite(page: Page, dichte: string) {
   const einsatzId = await einsatzAnlegenPerApi(page, `Fokus Unterkunft ${Date.now()}`);
-  const stelle = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+  const stelle = await page.request.post(`/api/einsaetze/${einsatzId}/care/positions`, {
     data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
   });
   expect(stelle.ok(), await stelle.text()).toBeTruthy();

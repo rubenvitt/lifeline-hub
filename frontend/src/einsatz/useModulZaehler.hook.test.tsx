@@ -51,8 +51,8 @@ describe('useModulZaehler (LFH-612)', () => {
     await waitFor(() => expect(angefragt).toHaveLength(5));
     expect([...angefragt].sort()).toEqual([
       '/api/einsaetze/7/abloesungen',
-      '/api/einsaetze/7/betreuung',
-      '/api/einsaetze/7/evakuierung',
+      '/api/einsaetze/7/care',
+      '/api/einsaetze/7/evacuation',
       '/api/einsaetze/7/module-counts',
       '/api/einsaetze/7/weather',
     ]);

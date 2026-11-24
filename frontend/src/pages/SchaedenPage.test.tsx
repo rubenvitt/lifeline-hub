@@ -115,7 +115,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => schaeden).handler,
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
-    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json(personen)),
+    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json(personal)),
   );
   return renderMitProviders(
@@ -139,7 +139,7 @@ function renderSchaedenPage(route: string) {
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
     ...schaedenAttrappe(1, () => []).handler,
-    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -156,7 +156,7 @@ function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => []).handler,
-    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   return renderMitProviders(
@@ -674,7 +674,7 @@ describe('SchaedenPage', () => {
       }),
       ...schaedenAttrappe(1, () => []).handler,
       ...schaedenAttrappe(2, () => []).handler,
-      http.get('/api/einsaetze/:einsatzId/personen/auswahl', ({ params }) =>
+      http.get('/api/einsaetze/:einsatzId/persons/selection', ({ params }) =>
         HttpResponse.json(params.einsatzId === '1' ? [einePerson] : []),
       ),
       http.get('/api/einsaetze/:einsatzId/personal', () => HttpResponse.json([])),
@@ -829,7 +829,7 @@ describe('SchaedenPage', () => {
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
@@ -863,7 +863,7 @@ describe('SchaedenPage', () => {
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );
     renderMitProviders(
@@ -948,7 +948,7 @@ describe('SchaedenPage', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/damages', () => new HttpResponse(null, { status: 500 })),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
     );
     renderMitProviders(

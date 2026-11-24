@@ -126,7 +126,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
       requests.push(`GET ${new URL(request.url).pathname}`);
       return HttpResponse.json([{ id: 21, bezeichnung: 'UHS Nord', status: 'aktiv' }]);
     }),
-    http.put('/api/einsaetze/7/uhs/:uid/kraefte/:ep', async (info) => {
+    http.put('/api/einsaetze/7/uhs/:uid/forces/:ep', async (info) => {
       await rememberRequest(info);
       return HttpResponse.json({ id: 10 });
     }),
@@ -409,7 +409,7 @@ describe('EinsatzkraftPage – Einteilung (3.2)', () => {
     );
     await waehle('Unfallhilfsstelle', 'UHS Nord');
     await userEvent.click(screen.getByRole('button', { name: 'Unfallhilfsstelle speichern' }));
-    await waitFor(() => expect(requests).toContain('PUT /api/einsaetze/7/uhs/21/kraefte/10'));
+    await waitFor(() => expect(requests).toContain('PUT /api/einsaetze/7/uhs/21/forces/10'));
     expect(await screen.findByText('Gespeichert: Unfallhilfsstelle')).toBeInTheDocument();
   });
 

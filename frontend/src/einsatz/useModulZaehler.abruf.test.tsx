@@ -20,8 +20,8 @@ import { freigabenFixture } from '../test/fixtures';
  * aus `test/server.ts`.
  */
 
-const PFAD_EVAK = '/api/einsaetze/7/evakuierung';
-const PFAD_BETREUUNG = '/api/einsaetze/7/betreuung';
+const PFAD_EVAK = '/api/einsaetze/7/evacuation';
+const PFAD_BETREUUNG = '/api/einsaetze/7/care';
 
 const ANDERE = ['meldungen', 'auftraege', 'erinnerungen', 'chat', 'dokumente', 'abloesung'];
 

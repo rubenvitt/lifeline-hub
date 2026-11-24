@@ -19,7 +19,7 @@ import type {
  * Deckung und Fehlmenge rechnet der Server (design.md D2); die zeitabhängige Einstufung
  * rechnet `verpflegung/deckung.ts` im Client. Zeiten am Draht: UTC ohne Zonenkennung.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/verpflegung`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/catering`;
 
 /** Alle Zeitfenster des Einsatzes, nach Beginn geordnet (Ordnung vom Server), und die
  *  Verpflegungsstellen nach Bezeichnung (LLH-1040, keine eigene Leseroute). */
@@ -31,7 +31,7 @@ export function legeZeitfensterAn(
   einsatzId: number,
   body: ZeitfensterEingabe,
 ): Promise<VerpflegungZeitfenster> {
-  return apiSend<VerpflegungZeitfenster>(`${basis(einsatzId)}/zeitfenster`, 'POST', body);
+  return apiSend<VerpflegungZeitfenster>(`${basis(einsatzId)}/time-slots`, 'POST', body);
 }
 
 /**
@@ -43,7 +43,7 @@ export function createTagAusVorlage(
   body: TagAusVorlageEingabe,
 ): Promise<VerpflegungTagErgebnis> {
   return apiSend<VerpflegungTagErgebnis>(
-    `${basis(einsatzId)}/zeitfenster/aus-vorlage`,
+    `${basis(einsatzId)}/time-slots/from-template`,
     'POST',
     body,
   );
@@ -62,7 +62,7 @@ export function aendereZeitfenster(
 ): Promise<VerpflegungZeitfenster> {
   const body = basisGeaendertAt ? { ...patch, basis_geaendert_at: basisGeaendertAt } : patch;
   return apiSend<VerpflegungZeitfenster>(
-    `${basis(einsatzId)}/zeitfenster/${zeitfensterId}`,
+    `${basis(einsatzId)}/time-slots/${zeitfensterId}`,
     'PATCH',
     body,
   );
@@ -70,7 +70,7 @@ export function aendereZeitfenster(
 
 /** 422, solange eine gültige (nicht zurückgenommene) Ausgabe existiert. */
 export function loescheZeitfenster(einsatzId: number, zeitfensterId: number): Promise<void> {
-  return apiSend<void>(`${basis(einsatzId)}/zeitfenster/${zeitfensterId}`, 'DELETE');
+  return apiSend<void>(`${basis(einsatzId)}/time-slots/${zeitfensterId}`, 'DELETE');
 }
 
 /**
@@ -84,7 +84,7 @@ export function erfasseAusgabe(
   optionen?: ApiSendOptionen,
 ): Promise<VerpflegungAusgabeErgebnis> {
   return apiSend<VerpflegungAusgabeErgebnis>(
-    `${basis(einsatzId)}/zeitfenster/${zeitfensterId}/ausgaben`,
+    `${basis(einsatzId)}/time-slots/${zeitfensterId}/distributions`,
     'POST',
     body,
     optionen,
@@ -97,7 +97,7 @@ export function nimmAusgabeZurueck(
   ausgabeId: number,
 ): Promise<VerpflegungAusgabeErgebnis> {
   return apiSend<VerpflegungAusgabeErgebnis>(
-    `${basis(einsatzId)}/ausgaben/${ausgabeId}/zuruecknehmen`,
+    `${basis(einsatzId)}/distributions/${ausgabeId}/undo`,
     'POST',
     {},
   );
@@ -110,7 +110,7 @@ export function createStelle(
   einsatzId: number,
   body: VerpflegungsstelleEingabe,
 ): Promise<Verpflegungsstelle> {
-  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen`, 'POST', body);
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/positions`, 'POST', body);
 }
 
 /** Teiländerung, auch einer aufgelösten Stelle; 409 bei einer stornierten. */
@@ -119,7 +119,7 @@ export function updateStelle(
   stelleId: number,
   body: VerpflegungsstellePatch,
 ): Promise<Verpflegungsstelle> {
-  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', body);
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/positions/${stelleId}`, 'PATCH', body);
 }
 
 /** In Betrieb nehmen (`aktiv`) oder auflösen (`aufgeloest`); 422 bei unzulässigem Übergang. */
@@ -128,12 +128,12 @@ export function setStelleStatus(
   stelleId: number,
   status: VerpflegungsstelleStatus,
 ): Promise<Verpflegungsstelle> {
-  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/stellen/${stelleId}/status`, 'POST', {
+  return apiSend<Verpflegungsstelle>(`${basis(einsatzId)}/positions/${stelleId}/status`, 'POST', {
     status,
   });
 }
 
 /** Storno einer geplanten Stelle ohne Ausgabe; sonst 422. */
 export function storniereStelle(einsatzId: number, stelleId: number): Promise<void> {
-  return apiSend<void>(`${basis(einsatzId)}/stellen/${stelleId}`, 'DELETE');
+  return apiSend<void>(`${basis(einsatzId)}/positions/${stelleId}`, 'DELETE');
 }

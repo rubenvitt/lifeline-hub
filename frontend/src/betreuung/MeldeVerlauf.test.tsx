@@ -29,10 +29,10 @@ vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   };
 });
 
-const B = '/api/einsaetze/7/betreuung';
+const B = '/api/einsaetze/7/care';
 /** Bezirke und Stände gehören seit LLH-1034 zum Modul Evakuierung. */
-const E = '/api/einsaetze/7/evakuierung';
-const basis = (pfad: string) => (/^\/(bezirke|staende)\//.test(pfad) ? E : B);
+const E = '/api/einsaetze/7/evacuation';
+const basis = (pfad: string) => (/^\/(districts|progress)\//.test(pfad) ? E : B);
 
 const STAENDE: StandVerlaufEintrag[] = [
   {
@@ -114,7 +114,7 @@ const eintraege = () => screen.getAllByRole('listitem');
 
 describe('MeldeVerlauf · Zustände', () => {
   it('lädt die Reihe des Bezirks und zeigt sie in Serverreihenfolge', async () => {
-    const aufrufe = liefere('/bezirke/5/staende', STAENDE);
+    const aufrufe = liefere('/districts/5/progress', STAENDE);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     expect(await screen.findByText('480 evakuiert (gezählt)')).toBeInTheDocument();
     expect(eintraege().map((e) => e.textContent)).toEqual([
@@ -126,7 +126,7 @@ describe('MeldeVerlauf · Zustände', () => {
   });
 
   it('nennt den Ladefehler und zeigt NICHT „Noch keine Meldung“', async () => {
-    liefere('/bezirke/5/staende', { error: 'kaputt' }, 500);
+    liefere('/districts/5/progress', { error: 'kaputt' }, 500);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     const alarm = await screen.findByRole('alert');
     expect(alarm).toHaveTextContent('Verlauf konnte nicht geladen werden');
@@ -135,13 +135,13 @@ describe('MeldeVerlauf · Zustände', () => {
   });
 
   it('der Ladezustand steht in Worten da, nicht nur als Skelett', async () => {
-    server.use(http.get(`${E}/bezirke/5/staende`, () => new Promise<Response>(() => {})));
+    server.use(http.get(`${E}/districts/5/progress`, () => new Promise<Response>(() => {})));
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     expect(await screen.findByText('Verlauf wird geladen …')).toBeVisible();
   });
 
   it('eine leere Reihe sagt „Noch keine Meldung.“', async () => {
-    liefere('/stellen/9/belegungen', []);
+    liefere('/positions/9/occupancies', []);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
     expect(await screen.findByText('Noch keine Meldung.')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -150,7 +150,7 @@ describe('MeldeVerlauf · Zustände', () => {
 
 describe('MeldeVerlauf · Kennzeichnung', () => {
   it('aktuell, nachgetragen und zurückgenommen stehen je als WORT an der richtigen Meldung', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
+    liefere('/districts/5/progress', STAENDE);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     await screen.findByText('480 evakuiert (gezählt)');
     const [aktuell, nachgetragen, zurueck] = eintraege();
@@ -173,7 +173,7 @@ describe('MeldeVerlauf · Kennzeichnung', () => {
   });
 
   it('die Stelle nennt ihre aktuelle Meldung „aktuelle Belegung“', async () => {
-    liefere('/stellen/9/belegungen', BELEGUNGEN);
+    liefere('/positions/9/occupancies', BELEGUNGEN);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
     await screen.findByText('0 untergebracht');
     expect(eintraege()[0]).toHaveTextContent('aktuelle Belegung');
@@ -182,7 +182,7 @@ describe('MeldeVerlauf · Kennzeichnung', () => {
 
 describe('MeldeVerlauf · Herkunft Registrierung (LLH-1612)', () => {
   it('eine Meldung aus der Registrierung nennt die Herkunft und bietet kein „Zurücknehmen“', async () => {
-    liefere('/stellen/9/belegungen', [
+    liefere('/positions/9/occupancies', [
       {
         id: 12,
         belegt: 15,
@@ -206,7 +206,7 @@ describe('MeldeVerlauf · Herkunft Registrierung (LLH-1612)', () => {
 
 describe('MeldeVerlauf · Zurücknehmen', () => {
   it('Auslöser nur an nicht zurückgenommenen Meldungen, mit Anzahl und Uhrzeit im Namen', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
+    liefere('/districts/5/progress', STAENDE);
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     await screen.findByText('480 evakuiert (gezählt)');
     const knoepfe = screen.getAllByRole('button', { name: /zurücknehmen$/ });
@@ -216,7 +216,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('ohne Schreibrecht gibt es keinen Auslöser und keine eigene Hinweiszeile', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
+    liefere('/districts/5/progress', STAENDE);
     const { container } = renderMitProviders(
       <MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen={false} />,
     );
@@ -226,7 +226,7 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('geschlossene Stelle: keine Auslöser, genau eine Hinweiszeile', async () => {
-    liefere('/stellen/9/belegungen', BELEGUNGEN);
+    liefere('/positions/9/occupancies', BELEGUNGEN);
     const { container } = renderMitProviders(
       <MeldeVerlauf
         einsatzId={7}
@@ -243,8 +243,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('Abbrechen der Rückfrage sendet nichts', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
-    const ids = faengeRuecknahme('/staende/:id/zuruecknehmen', () => HttpResponse.json({}));
+    liefere('/districts/5/progress', STAENDE);
+    const ids = faengeRuecknahme('/progress/:id/undo', () => HttpResponse.json({}));
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
     await screen.findByText('480 evakuiert (gezählt)');
     await userEvent.click(screen.getByRole('button', { name: /^Meldung 300 von/ }));
@@ -256,8 +256,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('Bestätigen sendet genau EINE Rücknahme an die gewählte Meldung, die Rückfrage nennt „aktuell“', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
-    const ids = faengeRuecknahme('/staende/:id/zuruecknehmen', () =>
+    liefere('/districts/5/progress', STAENDE);
+    const ids = faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ meldung_id: 3, bezirk: {} }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -275,8 +275,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('eine Belegungsmeldung geht an die Rücknahme-Route der Belegungen', async () => {
-    liefere('/stellen/9/belegungen', BELEGUNGEN);
-    const ids = faengeRuecknahme('/belegungen/:id/zuruecknehmen', () =>
+    liefere('/positions/9/occupancies', BELEGUNGEN);
+    const ids = faengeRuecknahme('/occupancies/:id/undo', () =>
       HttpResponse.json({ meldung_id: 8, stelle: {} }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="stelle" objektId={9} darfZuruecknehmen />);
@@ -290,8 +290,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('ein Fehler bleibt IM offenen Dialog und erscheint nicht als Toast', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
-    faengeRuecknahme('/staende/:id/zuruecknehmen', () =>
+    liefere('/districts/5/progress', STAENDE);
+    faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ error: 'Die Standmeldung ist bereits zurückgenommen' }, { status: 422 }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -311,8 +311,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('ein alter Grund wandert nicht in eine neue Rückfrage', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
-    faengeRuecknahme('/staende/:id/zuruecknehmen', () =>
+    liefere('/districts/5/progress', STAENDE);
+    faengeRuecknahme('/progress/:id/undo', () =>
       HttpResponse.json({ error: 'Alter Grund' }, { status: 422 }),
     );
     renderMitProviders(<MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />);
@@ -331,11 +331,11 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('solange die Rücknahme läuft, lässt sich die Rückfrage nicht schließen', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
+    liefere('/districts/5/progress', STAENDE);
     let antworte: (r: Response) => void = () => {};
     server.use(
       http.post(
-        `${E}/staende/:id/zuruecknehmen`,
+        `${E}/progress/:id/undo`,
         () => new Promise<Response>((fertig) => (antworte = fertig)),
       ),
     );
@@ -355,10 +355,8 @@ describe('MeldeVerlauf · Zurücknehmen', () => {
   });
 
   it('nach der Rücknahme liegt der Fokus im Verlauf, nicht auf <body>', async () => {
-    liefere('/bezirke/5/staende', STAENDE);
-    faengeRuecknahme('/staende/:id/zuruecknehmen', () =>
-      HttpResponse.json({ meldung_id: 4, bezirk: {} }),
-    );
+    liefere('/districts/5/progress', STAENDE);
+    faengeRuecknahme('/progress/:id/undo', () => HttpResponse.json({ meldung_id: 4, bezirk: {} }));
     const { container } = renderMitProviders(
       <MeldeVerlauf einsatzId={7} art="bezirk" objektId={5} darfZuruecknehmen />,
     );

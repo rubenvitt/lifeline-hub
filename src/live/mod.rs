@@ -111,7 +111,7 @@ impl LiveEvent {
             // abgeleiteten Führungsflags liefert. Ein `lagekarte`-Leser sieht diese Daten per
             // GET vollständig; ohne den Key fröre sein Führungskräfte-Layer ein.
             //
-            // Dazu `verpflegung` (LLH-1055, design.md D4): `GET …/verpflegung` legt in der
+            // Dazu `verpflegung` (LLH-1055, design.md D4): `GET …/catering` legt in der
             // Empfängerliste Name, Gliederung, Abschnitt und Stärke derselben Einheiten und
             // Abschnitte selbst offen, auch ohne Modul `einheiten`. Ohne den Key fröre die Liste
             // am Tresen ein. NICHT bei `Personal`: die Verpflegung zeigt keine disponierten
@@ -168,7 +168,7 @@ impl LiveEvent {
             // Umbenennen und Auflösen die Stellen selbst mit `betreuung` (LLH-1291,
             // `routes::einsatzabschnitt::sse_namens_traeger`). Der ETB-Nachweis läuft über `etb`.
             //
-            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/verpflegung` legt in der
+            // Dazu `verpflegung` (LLH-1295, design.md D4): `GET …/catering` legt in der
             // Empfängerliste Kennung und Bezeichnung derselben Stellen selbst offen, auch ohne
             // Modul `betreuung`; ohne den Key fröre die Wahl am Tresen ein, und ein Storno, der
             // den Bezug von Ausgaben löst, bliebe unsichtbar. Die Nutzlast trägt nur Kennungen.

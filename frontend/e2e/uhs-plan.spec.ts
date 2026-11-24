@@ -77,12 +77,12 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   const u = uhs.id;
   await seede(
     page,
-    `/api/einsaetze/${e}/uhs/${u}/plaetze/bulk`,
+    `/api/einsaetze/${e}/uhs/${u}/seats/bulk`,
     { typ: 'bett', menge: 10 },
     'Plätze',
   );
   await seede(page, `/api/einsaetze/${e}/uhs/${u}/status`, { status: 'aktiv' }, 'UHS-Status');
-  const abgelegt = await page.request.post(`/api/einsaetze/${e}/uhs/${u}/anhaenge`, {
+  const abgelegt = await page.request.post(`/api/einsaetze/${e}/uhs/${u}/attachments`, {
     multipart: { datei: { name: 'grundriss.jpg', mimeType: 'image/jpeg', buffer: MINI_JPEG } },
   });
   expect(abgelegt.status(), await abgelegt.text()).toBe(201);
@@ -127,7 +127,7 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   const detail = await page.request.get(`/api/einsaetze/${e}/uhs/${u}`);
   const plaetze = (await detail.json()).plaetze as { id: number; bezeichnung: string }[];
   const bett1 = plaetze.find((p) => p.bezeichnung === 'Bett 1')!;
-  const verschoben = await page.request.patch(`/api/einsaetze/${e}/uhs/${u}/plaetze/${bett1.id}`, {
+  const verschoben = await page.request.patch(`/api/einsaetze/${e}/uhs/${u}/seats/${bett1.id}`, {
     data: { pos_x: 970, pos_y: 730 },
   });
   expect(verschoben.ok(), await verschoben.text()).toBeTruthy();

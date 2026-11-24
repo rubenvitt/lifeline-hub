@@ -64,7 +64,7 @@ for (const modus of ['light', 'dark'] as const) {
     });
     // Eine Person ohne Fundort und Verbleib: trägt die Lückenmarke UND erzeugt einen
     // Systemeintrag im ETB.
-    await post(page, `${basis}/personen`, { sichtung: 'sk2' });
+    await post(page, `${basis}/persons`, { sichtung: 'sk2' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);
 
     // Mit Systemeinträgen: in der Vorgabe sind sie aus (kwc2yszv D6).

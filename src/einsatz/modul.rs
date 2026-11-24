@@ -185,12 +185,12 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/staff/info-line", Some("infotelefon")),
     ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
-    ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
+    ("/api/einsaetze/{id}/care", Some("betreuung")),
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
-    ("/api/einsaetze/{id}/evakuierung", Some("evakuierung")),
-    ("/api/einsaetze/{id}/verpflegung", Some("verpflegung")),
-    ("/api/einsaetze/{id}/damages", Some("schaeden")),
-    ("/api/einsaetze/{id}/tiere", Some("tiere")),
+    ("/api/einsaetze/{id}/evacuation", Some("evakuierung")),
+    ("/api/einsaetze/{id}/catering", Some("verpflegung")),
+    ("/api/einsaetze/{id}/schaeden", Some("schaeden")),
+    ("/api/einsaetze/{id}/animals", Some("tiere")),
     (
         "/api/einsaetze/{id}/bereitstellungsraeume",
         Some("bereitstellungsraeume"),
@@ -201,10 +201,10 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/uhs", Some("unfallhilfsstellen")),
     // Die UHS-Belegung einer Person hängt am UHS-Modul, nicht an den Personen.
     (
-        "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
+        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy",
         Some("unfallhilfsstellen"),
     ),
-    ("/api/einsaetze/{id}/personen", Some("personen")),
+    ("/api/einsaetze/{id}/persons", Some("personen")),
     ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
     ("/api/einsaetze/{id}/chat", Some("chat")),
     ("/api/einsaetze/{id}/etb", Some("etb")),
@@ -282,7 +282,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/settings", None),
     // Richtwerte des Unterkunftsrechners (LLH-1520): Einstellung des Einsatzes, modul-los wie die
     // übrigen Einstellungen; der Rechner der Betreuung und die Einstellungsseite lesen sie.
-    ("/api/einsaetze/{id}/unterkunft-richtwerte", None),
+    ("/api/einsaetze/{id}/accommodation-guidelines", None),
     ("/api/einsaetze/{id}/module-overrides", None),
     // Modul-Vorgaben der Einsatz-Org (LLH-1183): modul-los wie die Overrides, die Antwort
     // beschreibt die Modulregeln selbst.
@@ -424,26 +424,26 @@ mod tests {
         );
         // Betreuung (LFH-639): Stellen und Belegungen hängen unter einem Präfix.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen"),
+            key_fuer_pfad("/api/einsaetze/{id}/care/positions/{sid}/occupancies"),
             Some(Some("betreuung"))
         );
         // Evakuierung (LLH-1034): die Bezirke sind umgezogen, eigener Key.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende"),
+            key_fuer_pfad("/api/einsaetze/{id}/evacuation/districts/{bid}/progress"),
             Some(Some("evakuierung"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/evakuierung"),
+            key_fuer_pfad("/api/einsaetze/{id}/evacuation"),
             Some(Some("evakuierung"))
         );
         // Verpflegung (LFH-634): Zeitfenster und Ausgaben hängen unter einem Präfix.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen"),
+            key_fuer_pfad("/api/einsaetze/{id}/catering/distributions/{aid}/undo"),
             Some(Some("verpflegung"))
         );
         // Verpflegungsstellen (LLH-1040) hängen unter demselben Präfix.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/verpflegung/stellen/{sid}/status"),
+            key_fuer_pfad("/api/einsaetze/{id}/catering/positions/{sid}/status"),
             Some(Some("verpflegung"))
         );
         // Lagebesprechung (LLH-1111): eigener Key; beide Präfixe.

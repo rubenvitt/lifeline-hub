@@ -34,7 +34,7 @@ async function saeen(page: Page): Promise<string> {
     });
     expect(r.ok(), `Seeding ETB: ${r.status()} ${await r.text()}`).toBeTruthy();
   }
-  const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+  const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
     data: { name: 'Mustermann', vorname: 'Erika' },
   });
   expect(person.ok(), `Seeding Person: ${person.status()} ${await person.text()}`).toBeTruthy();

@@ -52,7 +52,7 @@ function render(route: string) {
     http.get('/api/einsaetze/:einsatzId', ({ params }) =>
       HttpResponse.json({ ...einsatzAktiv, id: Number(params.einsatzId) }),
     ),
-    http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:einsatzId/animals', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>

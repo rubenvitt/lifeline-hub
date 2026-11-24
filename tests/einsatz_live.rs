@@ -898,14 +898,14 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
 }
 
 fn evakuierung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evakuierung")
+    format!("/api/einsaetze/{einsatz}/evacuation")
 }
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke", evakuierung_pfad(einsatz)),
+        &format!("{}/districts", evakuierung_pfad(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","plan_personen":640,"plan_erhebung":"geschaetzt"}}"#
@@ -920,7 +920,7 @@ async fn bezirk_aendern(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64
     let (status, json) = anfrage(
         app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{bid}", evakuierung_pfad(einsatz)),
         cookie,
         Some(rumpf),
     )
@@ -932,7 +932,7 @@ async fn bezirk_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, bid: 
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke/{bid}/stornieren", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{bid}/annul", evakuierung_pfad(einsatz)),
         cookie,
         None,
     )
@@ -963,7 +963,7 @@ async fn erste_evakuierung_feuert_einsatz_neben_betreuung_weitere_nicht() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{erster}/staende", evakuierung_pfad(einsatz)),
+        &format!("{}/districts/{erster}/progress", evakuierung_pfad(einsatz)),
         &admin,
         Some(r#"{"evakuiert":120,"erhebung":"gezaehlt"}"#),
     )

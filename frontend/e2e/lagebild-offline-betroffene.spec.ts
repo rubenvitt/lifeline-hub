@@ -118,7 +118,7 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
       bezeichnung: UHS,
     });
     await post(page, `${basis}/uhs/${uhsId}/status`, { status: 'aktiv' });
-    await post(page, `${basis}/personen`, {
+    await post(page, `${basis}/persons`, {
       name: NAME,
       sichtung: 'sk2',
       uhs_id: uhsId,

@@ -36,13 +36,13 @@ async function aufbauen(page: Page): Promise<Aufbau> {
   const stempel = Date.now();
   const einsatz = await seede(page, '/api/einsaetze', { bezeichnung: `E2E UHS Form ${stempel}` });
   const E = `/api/einsaetze/${einsatz.id}`;
-  await seede(page, `${E}/personen`, { name: `FormPat${stempel}` });
-  await seede(page, `${E}/personen`, { name: `FormZwei${stempel}` });
+  await seede(page, `${E}/persons`, { name: `FormPat${stempel}` });
+  await seede(page, `${E}/persons`, { name: `FormZwei${stempel}` });
   const uhs = await seede(page, `${E}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: `BHP Form ${stempel}`,
   });
-  await seede(page, `${E}/uhs/${uhs.id}/plaetze/bulk`, { typ: 'bett', menge: PLAETZE });
+  await seede(page, `${E}/uhs/${uhs.id}/seats/bulk`, { typ: 'bett', menge: PLAETZE });
   await seede(page, `${E}/uhs/${uhs.id}/status`, { status: 'aktiv' });
   return {
     einsatzId: String(einsatz.id),
@@ -268,7 +268,7 @@ async function wenigeBetten(page: Page): Promise<Aufbau & { uhsPfad: string }> {
     typ: 'behandlungsplatz',
     bezeichnung: `BHP Wachsen ${stempel}`,
   });
-  await seede(page, `${E}/uhs/${uhs.id}/plaetze/bulk`, { typ: 'bett', menge: 3 });
+  await seede(page, `${E}/uhs/${uhs.id}/seats/bulk`, { typ: 'bett', menge: 3 });
   await seede(page, `${E}/uhs/${uhs.id}/status`, { status: 'aktiv' });
   return {
     einsatzId: String(einsatz.id),
@@ -348,7 +348,7 @@ test('Zug in der gestreckten Fläche: der Server speichert die Strecke in Grundm
   const karte = page.locator('[data-testid="platz-karte"]', { hasText: 'Bett 1' });
   const box = (await karte.boundingBox())!;
   const patch = page.waitForRequest(
-    (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/plaetze\/\d+$/.test(r.url()),
+    (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/seats\/\d+$/.test(r.url()),
   );
   // Nach unten: in der Reihe stünde der Platz auf seinem Nachbarn.
   const cx = box.x + box.width / 2;

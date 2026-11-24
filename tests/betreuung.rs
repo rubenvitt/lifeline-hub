@@ -14,12 +14,12 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/betreuung")
+    format!("/api/einsaetze/{einsatz}/care")
 }
 
 /// Bezirke und Stände sind seit LLH-1034 das eigene Modul Evakuierung.
 fn pfad_evak(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evakuierung")
+    format!("/api/einsaetze/{einsatz}/evacuation")
 }
 
 async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
@@ -39,7 +39,7 @@ async fn bezirk(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &st
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(einsatz)),
+        &format!("{}/districts", pfad_evak(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","plan_personen":640,"plan_erhebung":"geschaetzt"}}"#
@@ -50,7 +50,7 @@ async fn bezirk(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &st
     json["id"].as_i64().unwrap()
 }
 
-/// Die Bezirke aus `GET …/evakuierung` (LLH-1034).
+/// Die Bezirke aus `GET …/evacuation` (LLH-1034).
 async fn bezirke_von(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (s, u) = anfrage(app, "GET", &pfad_evak(einsatz), cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{u:?}");
@@ -61,7 +61,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &st
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen", pfad(einsatz)),
+        &format!("{}/positions", pfad(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","art":"notunterkunft","kapazitaet_personen":150}}"#
@@ -116,7 +116,7 @@ async fn durchstich_bezirk_stand_fortschreibung_ruecknahme() {
     let (s, b) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &admin,
         Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt","sammelstelle":"Parkplatz Nord"}"#),
     )
@@ -135,7 +135,7 @@ async fn durchstich_bezirk_stand_fortschreibung_ruecknahme() {
     let (s, m1) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":212,"erhebung":"gezaehlt","zeitpunkt_at":"2026-09-22T09:30:00Z"}"#),
     )
@@ -153,7 +153,7 @@ async fn durchstich_bezirk_stand_fortschreibung_ruecknahme() {
     let (s, m2) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":480,"erhebung":"gezaehlt"}"#),
     )
@@ -169,7 +169,7 @@ async fn durchstich_bezirk_stand_fortschreibung_ruecknahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/staende/{m2_id}/zuruecknehmen", pfad_evak(e)),
+        &format!("{}/progress/{m2_id}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -202,7 +202,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"status":"in_betrieb"}"#),
     )
@@ -212,7 +212,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":89,"zeitpunkt_at":"2026-09-22 12:00:00"}"#),
     )
@@ -227,7 +227,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, k) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung?zeitpunkt=2026-09-22T13:30:00Z", pfad(e)),
+        &format!("{}/occupancy?zeitpunkt=2026-09-22T13:30:00Z", pfad(e)),
         &admin,
         None,
     )
@@ -238,7 +238,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, k) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung?zeitpunkt=2026-09-22%2011:00:00", pfad(e)),
+        &format!("{}/occupancy?zeitpunkt=2026-09-22%2011:00:00", pfad(e)),
         &admin,
         None,
     )
@@ -250,7 +250,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     assert_eq!(k["stellen_ohne_meldung"], 0);
     assert_eq!(k["stellen"].as_array().unwrap().len(), 0);
     // Ohne Stichtag: jetzt
-    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    let (s, k) = anfrage(&app, "GET", &format!("{}/occupancy", pfad(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert_eq!(k["summe"], 89);
 
@@ -258,7 +258,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/belegungen/{mid}/zuruecknehmen", pfad(e)),
+        &format!("{}/occupancies/{mid}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -269,7 +269,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
         "{r:?}"
     );
     // Jetzt ist die Stelle in Betrieb und ohne Meldung: sie zählt, die Summe ist 0.
-    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    let (s, k) = anfrage(&app, "GET", &format!("{}/occupancy", pfad(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert_eq!(k["summe"], 0);
     assert_eq!(k["stellen_ohne_meldung"], 1);
@@ -278,7 +278,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, st) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/stornieren", pfad(e)),
+        &format!("{}/positions/{sid}/annul", pfad(e)),
         &admin,
         None,
     )
@@ -292,7 +292,7 @@ async fn stelle_belegung_kopfzahl_und_ruecknahme() {
     let (s, stand) = anfrage(
         &app,
         "GET",
-        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &format!("{}/positions/{sid}/state", pfad(e)),
         &admin,
         None,
     )
@@ -312,7 +312,7 @@ async fn stand_einer_stelle_statuscodes() {
     let (s, stand) = anfrage(
         &app,
         "GET",
-        &format!("{}/stellen/{sid}/stand", pfad(e)),
+        &format!("{}/positions/{sid}/state", pfad(e)),
         &admin,
         None,
     )
@@ -321,8 +321,8 @@ async fn stand_einer_stelle_statuscodes() {
     assert!(stand["storniert_at"].is_null(), "{stand:?}");
     let anderer = einsatz_anlegen(&app, &admin).await;
     for pfad_stand in [
-        format!("{}/stellen/{sid}/stand", pfad(anderer)),
-        format!("{}/stellen/999999/stand", pfad(e)),
+        format!("{}/positions/{sid}/state", pfad(anderer)),
+        format!("{}/positions/999999/state", pfad(e)),
     ] {
         let (s, _) = anfrage(&app, "GET", &pfad_stand, &admin, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{pfad_stand}");
@@ -330,7 +330,7 @@ async fn stand_einer_stelle_statuscodes() {
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, e, fid, "fuehrungspersonal").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let pfad_stand = format!("{}/stellen/{sid}/stand", pfad(e));
+    let pfad_stand = format!("{}/positions/{sid}/state", pfad(e));
     let (s, _) = anfrage(&app, "GET", &pfad_stand, &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest sie");
     override_setzen(&app, &admin, e, "betreuung", false, None).await;
@@ -355,7 +355,7 @@ async fn patch_ohne_aenderung_schreibt_nichts() {
     let (s, st) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"art":"notunterkunft","kapazitaet_personen":150,"bezeichnung":"Turnhalle Ost"}"#),
     )
@@ -364,7 +364,7 @@ async fn patch_ohne_aenderung_schreibt_nichts() {
     let (s, b) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(e)),
+        &format!("{}/districts/{bid}", pfad_evak(e)),
         &admin,
         Some(r#"{"plan_personen":640,"plan_erhebung":"geschaetzt","raeumung":"angeordnet"}"#),
     )
@@ -376,7 +376,7 @@ async fn patch_ohne_aenderung_schreibt_nichts() {
     let (s, b) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(e)),
+        &format!("{}/districts/{bid}", pfad_evak(e)),
         &admin,
         Some(r#"{"raeumung":"geraeumt"}"#),
     )
@@ -434,7 +434,7 @@ async fn statuscodes_400() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/bezirke", pfad_evak(e)),
+            &format!("{}/districts", pfad_evak(e)),
             &admin,
             Some(body),
         )
@@ -451,7 +451,7 @@ async fn statuscodes_400() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(e)),
+        &format!("{}/districts/{bid}", pfad_evak(e)),
         &admin,
         Some(r#"{"raeumung":"evakuiert"}"#),
     )
@@ -471,7 +471,7 @@ async fn statuscodes_400() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+            &format!("{}/districts/{bid}/progress", pfad_evak(e)),
             &admin,
             Some(&body),
         )
@@ -490,7 +490,7 @@ async fn statuscodes_400() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/stellen", pfad(e)),
+            &format!("{}/positions", pfad(e)),
             &admin,
             Some(body),
         )
@@ -512,7 +512,7 @@ async fn statuscodes_400() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+            &format!("{}/positions/{sid}/occupancies", pfad(e)),
             &admin,
             Some(&body),
         )
@@ -531,7 +531,7 @@ async fn statuscodes_400() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung?zeitpunkt=morgen", pfad(e)),
+        &format!("{}/occupancy?zeitpunkt=morgen", pfad(e)),
         &admin,
         None,
     )
@@ -541,7 +541,7 @@ async fn statuscodes_400() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/abc", pfad_evak(e)),
+        &format!("{}/districts/abc", pfad_evak(e)),
         &admin,
         Some("{}"),
     )
@@ -567,7 +567,7 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(&format!(
             r#"{{"evakuiert":10,"erhebung":"gezaehlt","zeitpunkt_at":"{}"}}"#,
@@ -579,7 +579,7 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(&format!(
             r#"{{"belegt":7,"zeitpunkt_at":"{}"}}"#,
@@ -596,7 +596,7 @@ async fn zeitpunkt_knapp_in_der_zukunft_ist_toleriert() {
         vorher.as_str() <= gespeichert && gespeichert <= nachher.as_str(),
         "{vorher} ≤ {gespeichert} ≤ {nachher}"
     );
-    let (s, k) = anfrage(&app, "GET", &format!("{}/belegung", pfad(e)), &admin, None).await;
+    let (s, k) = anfrage(&app, "GET", &format!("{}/occupancy", pfad(e)), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{k:?}");
     assert_eq!(k["summe"], 7, "{k:?}");
     let bz = bezirke_von(&app, &admin, e).await;
@@ -617,36 +617,36 @@ async fn personenzahlen_haben_eine_obergrenze() {
         for (methode, url, body) in [
             (
                 "POST",
-                format!("{}/bezirke", pfad_evak(e)),
+                format!("{}/districts", pfad_evak(e)),
                 format!(
                     r#"{{"bezeichnung":"A","plan_personen":{zu_viel},"plan_erhebung":"gezaehlt"}}"#
                 ),
             ),
             (
                 "PATCH",
-                format!("{}/bezirke/{bid}", pfad_evak(e)),
+                format!("{}/districts/{bid}", pfad_evak(e)),
                 format!(r#"{{"plan_personen":{zu_viel}}}"#),
             ),
             (
                 "POST",
-                format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+                format!("{}/districts/{bid}/progress", pfad_evak(e)),
                 format!(r#"{{"evakuiert":{zu_viel},"erhebung":"gezaehlt"}}"#),
             ),
             (
                 "POST",
-                format!("{}/stellen", pfad(e)),
+                format!("{}/positions", pfad(e)),
                 format!(
                     r#"{{"bezeichnung":"B","art":"notunterkunft","kapazitaet_personen":{zu_viel}}}"#
                 ),
             ),
             (
                 "PATCH",
-                format!("{}/stellen/{sid}", pfad(e)),
+                format!("{}/positions/{sid}", pfad(e)),
                 format!(r#"{{"kapazitaet_personen":{zu_viel}}}"#),
             ),
             (
                 "POST",
-                format!("{}/stellen/{sid}/belegungen", pfad(e)),
+                format!("{}/positions/{sid}/occupancies", pfad(e)),
                 format!(r#"{{"belegt":{zu_viel}}}"#),
             ),
         ] {
@@ -670,7 +670,7 @@ async fn personenzahlen_haben_eine_obergrenze() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(e)),
+        &format!("{}/districts/{bid}", pfad_evak(e)),
         &admin,
         Some(r#"{"plan_personen":1000000}"#),
     )
@@ -679,7 +679,7 @@ async fn personenzahlen_haben_eine_obergrenze() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":1000000}"#),
     )
@@ -699,7 +699,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"A","plan_personen":10,"plan_erhebung":"gezaehlt","abschnitt_id":{fremder_abschnitt}}}"#
@@ -710,7 +710,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"B","art":"anlaufstelle","abschnitt_id":{fremder_abschnitt}}}"#
@@ -719,16 +719,13 @@ async fn statuscodes_404_409_422() {
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     for (methode, suffix) in [
-        ("PATCH", format!("{}/bezirke/999999", pfad_evak(e))),
-        ("POST", format!("{}/bezirke/999999/staende", pfad_evak(e))),
+        ("PATCH", format!("{}/districts/999999", pfad_evak(e))),
         (
             "POST",
-            format!("{}/staende/999999/zuruecknehmen", pfad_evak(e)),
+            format!("{}/districts/999999/progress", pfad_evak(e)),
         ),
-        (
-            "POST",
-            format!("{}/belegungen/999999/zuruecknehmen", pfad(e)),
-        ),
+        ("POST", format!("{}/progress/999999/undo", pfad_evak(e))),
+        ("POST", format!("{}/occupancies/999999/undo", pfad(e))),
     ] {
         let (s, _) = anfrage(
             &app,
@@ -745,7 +742,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{fremder_bezirk}/stornieren", pfad_evak(e)),
+        &format!("{}/districts/{fremder_bezirk}/annul", pfad_evak(e)),
         &admin,
         None,
     )
@@ -757,7 +754,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &admin,
         Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":10,"plan_erhebung":"gezaehlt"}"#),
     )
@@ -767,7 +764,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(r#"{"bezeichnung":"Turnhalle Ost","art":"anlaufstelle"}"#),
     )
@@ -775,7 +772,7 @@ async fn statuscodes_404_409_422() {
     assert_eq!(s, StatusCode::CONFLICT);
 
     // 422: geschlossene Stelle belegen, belegte Stelle schließen, doppelte Rücknahme
-    let stelle_patch = format!("{}/stellen/{sid}", pfad(e));
+    let stelle_patch = format!("{}/positions/{sid}", pfad(e));
     let (s, _) = anfrage(
         &app,
         "PATCH",
@@ -788,7 +785,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":40}"#),
     )
@@ -806,7 +803,7 @@ async fn statuscodes_404_409_422() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":40}"#),
     )
@@ -824,7 +821,7 @@ async fn statuscodes_404_409_422() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{st:?}");
 
     // 422: dieselbe Belegungsmeldung zweimal zurücknehmen (LFH-682)
-    let belegung_ruecknahme = format!("{}/belegungen/{belegung_40}/zuruecknehmen", pfad(e));
+    let belegung_ruecknahme = format!("{}/occupancies/{belegung_40}/undo", pfad(e));
     let (s, _) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, j) = anfrage(&app, "POST", &belegung_ruecknahme, &admin, None).await;
@@ -834,7 +831,7 @@ async fn statuscodes_404_409_422() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":12}"#),
     )
@@ -845,20 +842,20 @@ async fn statuscodes_404_409_422() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":5,"erhebung":"geschaetzt"}"#),
     )
     .await;
     let mid = m["meldung_id"].as_i64().unwrap();
-    let ruecknahme = format!("{}/staende/{mid}/zuruecknehmen", pfad_evak(e));
+    let ruecknahme = format!("{}/progress/{mid}/undo", pfad_evak(e));
     let (s, _) = anfrage(&app, "POST", &ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &ruecknahme, &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 
     // 409: storniert — ändern, melden, erneut stornieren
-    let stornieren = format!("{}/bezirke/{bid}/stornieren", pfad_evak(e));
+    let stornieren = format!("{}/districts/{bid}/annul", pfad_evak(e));
     let (s, _) = anfrage(&app, "POST", &stornieren, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &stornieren, &admin, None).await;
@@ -866,7 +863,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(e)),
+        &format!("{}/districts/{bid}", pfad_evak(e)),
         &admin,
         Some(r#"{"plan_personen":900}"#),
     )
@@ -875,14 +872,14 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":5,"erhebung":"geschaetzt"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT);
     // 409: stornierte Stelle — erneut stornieren, ändern, belegen, Belegung zurücknehmen
-    let stelle_stornieren = format!("{}/stellen/{sid}/stornieren", pfad(e));
+    let stelle_stornieren = format!("{}/positions/{sid}/annul", pfad(e));
     let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &stelle_stornieren, &admin, None).await;
@@ -899,7 +896,7 @@ async fn statuscodes_404_409_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &admin,
         Some(r#"{"belegt":1}"#),
     )
@@ -908,7 +905,7 @@ async fn statuscodes_404_409_422() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/belegungen/{belegung_12}/zuruecknehmen", pfad(e)),
+        &format!("{}/occupancies/{belegung_12}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -929,7 +926,7 @@ async fn statuscodes_404_fremder_einsatz_und_unbekannte_stelle() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{fremde_stelle}/belegungen", pfad(e2)),
+        &format!("{}/positions/{fremde_stelle}/occupancies", pfad(e2)),
         &admin,
         Some(r#"{"belegt":40}"#),
     )
@@ -940,7 +937,7 @@ async fn statuscodes_404_fremder_einsatz_und_unbekannte_stelle() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{fremder_bezirk}/staende", pfad_evak(e2)),
+        &format!("{}/districts/{fremder_bezirk}/progress", pfad_evak(e2)),
         &admin,
         Some(r#"{"evakuiert":7,"erhebung":"gezaehlt"}"#),
     )
@@ -1027,7 +1024,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung", pfad(e)),
+        &format!("{}/occupancy", pfad(e)),
         &beob_cookie,
         None,
     )
@@ -1036,7 +1033,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &beob_cookie,
         Some(r#"{"evakuiert":5,"erhebung":"gezaehlt"}"#),
     )
@@ -1045,7 +1042,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &beob_cookie,
         Some(r#"{"bezeichnung":"X","plan_personen":10,"plan_erhebung":"gezaehlt"}"#),
     )
@@ -1092,7 +1089,7 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &frieda,
         Some(r#"{"bezeichnung":"X","art":"anlaufstelle"}"#),
     )
@@ -1107,7 +1104,7 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &frieda,
         Some(r#"{"bezeichnung":"X","plan_personen":10,"plan_erhebung":"gezaehlt"}"#),
     )
@@ -1124,17 +1121,17 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
         ("GET", pfad_evak(e), None),
         (
             "POST",
-            format!("{}/bezirke", pfad_evak(e)),
+            format!("{}/districts", pfad_evak(e)),
             Some(r#"{"bezeichnung":"Y","plan_personen":10,"plan_erhebung":"gezaehlt"}"#),
         ),
         (
             "POST",
-            format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+            format!("{}/districts/{bid}/progress", pfad_evak(e)),
             Some(r#"{"evakuiert":5,"erhebung":"gezaehlt"}"#),
         ),
         (
             "GET",
-            format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+            format!("{}/districts/{bid}/progress", pfad_evak(e)),
             None,
         ),
     ] {
@@ -1190,10 +1187,10 @@ async fn fremde_organisation_wird_abgewiesen() {
 
     for (methode, uri, body) in [
         ("GET", pfad(e), None),
-        ("GET", format!("{}/belegung", pfad(e)), None),
+        ("GET", format!("{}/occupancy", pfad(e)), None),
         (
             "POST",
-            format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+            format!("{}/districts/{bid}/progress", pfad_evak(e)),
             Some(r#"{"evakuiert":5,"erhebung":"gezaehlt"}"#),
         ),
     ] {
@@ -1242,7 +1239,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":4711,"erhebung":"gezaehlt"}"#),
     )
@@ -1252,7 +1249,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1317,7 +1314,7 @@ async fn verortung_speichert_ohne_etb_und_ist_live() {
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
     let vorher = etb_eintraege(&app, &admin, e).await.len();
-    let url = format!("{}/stellen/{sid}", pfad(e));
+    let url = format!("{}/positions/{sid}", pfad(e));
 
     let feed = live_oeffnen(&app, &admin, e).await;
     let (s, j) = anfrage(
@@ -1382,7 +1379,7 @@ async fn verortung_halbes_paar_oder_bereich_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
-    let url = format!("{}/stellen/{sid}", pfad(e));
+    let url = format!("{}/positions/{sid}", pfad(e));
     for body in [
         r#"{"lat":51.93}"#,
         r#"{"lat":91,"lon":8}"#,
@@ -1408,7 +1405,7 @@ async fn stelle_mit_koordinate_anlegen() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(
             r#"{"bezeichnung":"NU Turnhalle Nord","art":"notunterkunft",
@@ -1437,7 +1434,7 @@ async fn stelle_anlegen_halbes_paar_oder_bereich_ist_422() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let url = format!("{}/stellen", pfad(e));
+    let url = format!("{}/positions", pfad(e));
     for koordinate in [
         r#""lat":51.93"#,
         r#""lon":8.87"#,
@@ -1463,7 +1460,7 @@ async fn sammelstelle_mit_koordinate_anlegen_aendern_entfernen() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &admin,
         Some(
             r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt",
@@ -1481,7 +1478,7 @@ async fn sammelstelle_mit_koordinate_anlegen_aendern_entfernen() {
         52.1
     );
 
-    let url = format!("{}/bezirke/{bid}", pfad_evak(e));
+    let url = format!("{}/districts/{bid}", pfad_evak(e));
     let vorher = etb_eintraege(&app, &admin, e).await.len();
     let feed = live_oeffnen(&app, &admin, e).await;
     let (s, j) = anfrage(
@@ -1540,7 +1537,7 @@ async fn sammelstelle_halbes_paar_oder_bereich_ist_422() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/bezirke", pfad_evak(e)),
+            &format!("{}/districts", pfad_evak(e)),
             &admin,
             Some(&body),
         )
@@ -1548,7 +1545,7 @@ async fn sammelstelle_halbes_paar_oder_bereich_ist_422() {
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {j:?}");
     }
     let bid = bezirk(&app, &admin, e, "Deichweg").await;
-    let url = format!("{}/bezirke/{bid}", pfad_evak(e));
+    let url = format!("{}/districts/{bid}", pfad_evak(e));
     for body in [
         r#"{"sammelstelle_lon":9.35}"#,
         r#"{"sammelstelle_lat":52.1,"sammelstelle_lon":-181}"#,
@@ -1613,7 +1610,7 @@ async fn raeumung(app: &axum::Router, cookie: &str, einsatz: i64, bid: i64, zust
     let (s, b) = anfrage(
         app,
         "PATCH",
-        &format!("{}/bezirke/{bid}", pfad_evak(einsatz)),
+        &format!("{}/districts/{bid}", pfad_evak(einsatz)),
         cookie,
         Some(&format!(r#"{{"raeumung":"{zustand}"}}"#)),
     )
@@ -1655,7 +1652,7 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         Some(r#"{"evakuiert":0,"erhebung":"gezaehlt"}"#),
     )
@@ -1666,7 +1663,7 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/staende/{mid}/zuruecknehmen", pfad_evak(e)),
+        &format!("{}/progress/{mid}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -1696,7 +1693,7 @@ async fn bezirk_schaltet_die_lagekennzahl_am_einsatz() {
     let (s, b) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{zweiter}/stornieren", pfad_evak(e)),
+        &format!("{}/districts/{zweiter}/annul", pfad_evak(e)),
         &admin,
         None,
     )
@@ -1726,7 +1723,7 @@ async fn replay_liefert_die_bestehende_meldung_ohne_zweiten_etb_eintrag() {
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
     let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
 
-    let url_stand = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let url_stand = format!("{}/districts/{bid}/progress", pfad_evak(e));
     let (s, erst) = anfrage(
         &app,
         "POST",
@@ -1741,7 +1738,7 @@ async fn replay_liefert_die_bestehende_meldung_ohne_zweiten_etb_eintrag() {
     assert_eq!(wieder["meldung_id"], erst["meldung_id"]);
     assert_eq!(wieder["bezirk"]["stand"]["evakuiert"], 480);
 
-    let url_beleg = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let url_beleg = format!("{}/positions/{sid}/occupancies", pfad(e));
     let (s, erst_b) = anfrage(
         &app,
         "POST",
@@ -1774,7 +1771,7 @@ async fn client_id_leer_oder_zu_lang() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße").await;
-    let url = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let url = format!("{}/districts/{bid}/progress", pfad_evak(e));
 
     let (s, a) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(1, "  "))).await;
     assert_eq!(s, StatusCode::CREATED);
@@ -1789,7 +1786,7 @@ async fn client_id_leer_oder_zu_lang() {
     let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(3, &lang))).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let url_b = format!(
-        "{}/stellen/{}/belegungen",
+        "{}/positions/{}/occupancies",
         pfad(e),
         stelle(&app, &admin, e, "Halle").await
     );
@@ -1809,8 +1806,8 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_bezirks() {
     let e = einsatz_anlegen(&app, &admin).await;
     let a = bezirk(&app, &admin, e, "Uferstraße").await;
     let b = bezirk(&app, &admin, e, "Deichweg").await;
-    let url_a = format!("{}/bezirke/{a}/staende", pfad_evak(e));
-    let url_b = format!("{}/bezirke/{b}/staende", pfad_evak(e));
+    let url_a = format!("{}/districts/{a}/progress", pfad_evak(e));
+    let url_b = format!("{}/districts/{b}/progress", pfad_evak(e));
     let (s, erst) = anfrage(&app, "POST", &url_a, &admin, Some(&stand_body(12, "a3"))).await;
     assert_eq!(s, StatusCode::CREATED);
 
@@ -1848,7 +1845,7 @@ async fn gates_vor_dem_replay() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
-    let url = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let url = format!("{}/positions/{sid}/occupancies", pfad(e));
     let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&belegung_body(37, "b5"))).await;
     assert_eq!(s, StatusCode::CREATED);
 
@@ -1880,7 +1877,7 @@ async fn gates_vor_dem_replay() {
         &app,
         "POST",
         &format!(
-            "{}/bezirke/{}/staende",
+            "{}/districts/{}/progress",
             pfad_evak(e),
             bezirk(&app, &admin, e, "Ufer").await
         ),
@@ -1900,7 +1897,7 @@ async fn replay_verteilt_kein_live_ereignis() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße").await;
-    let url = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let url = format!("{}/districts/{bid}/progress", pfad_evak(e));
     let mut events = live.abonniere(e);
 
     let (s, _) = anfrage(&app, "POST", &url, &admin, Some(&stand_body(5, "a6"))).await;
@@ -1938,7 +1935,7 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     let e = einsatz_anlegen(&app, &admin).await;
 
     let bid = bezirk(&app, &admin, e, "Uferstraße").await;
-    let url_stand = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let url_stand = format!("{}/districts/{bid}/progress", pfad_evak(e));
     let (s, erst) = anfrage(
         &app,
         "POST",
@@ -1951,7 +1948,7 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/stornieren", pfad_evak(e)),
+        &format!("{}/districts/{bid}/annul", pfad_evak(e)),
         &admin,
         Some("{}"),
     )
@@ -1978,7 +1975,7 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     assert_eq!(s, StatusCode::CONFLICT);
 
     let sid = stelle(&app, &admin, e, "Turnhalle Ost").await;
-    let url_beleg = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let url_beleg = format!("{}/positions/{sid}/occupancies", pfad(e));
     let (s, erst) = anfrage(
         &app,
         "POST",
@@ -1991,7 +1988,7 @@ async fn replay_am_stornierten_bezirk_und_an_der_geschlossenen_stelle() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )
@@ -2036,7 +2033,7 @@ async fn verlauf_liefert_die_reihen_mit_ruecknahme_und_draht_form() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let bid = bezirk(&app, &admin, e, "Uferstraße 12–40").await;
-    let staende = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let staende = format!("{}/districts/{bid}/progress", pfad_evak(e));
     let m212 = melden(
         &app,
         &admin,
@@ -2054,7 +2051,7 @@ async fn verlauf_liefert_die_reihen_mit_ruecknahme_und_draht_form() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/staende/{m212}/zuruecknehmen", pfad_evak(e)),
+        &format!("{}/progress/{m212}/undo", pfad_evak(e)),
         &admin,
         None,
     )
@@ -2083,13 +2080,13 @@ async fn verlauf_liefert_die_reihen_mit_ruecknahme_und_draht_form() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"status":"in_betrieb"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{j:?}");
-    let belegungen = format!("{}/stellen/{sid}/belegungen", pfad(e));
+    let belegungen = format!("{}/positions/{sid}/occupancies", pfad(e));
     let (s, leer) = anfrage(&app, "GET", &belegungen, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
@@ -2115,17 +2112,17 @@ async fn verlauf_statuscodes_und_rechte() {
     melden(
         &app,
         &admin,
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         r#"{"evakuiert":212,"erhebung":"gezaehlt"}"#,
     )
     .await;
 
     // Objekt eines anderen Einsatzes und unbekanntes Objekt: 404; kaputte Sub-ID: 400.
     for uri in [
-        format!("{}/bezirke/{bid}/staende", pfad_evak(e2)),
-        format!("{}/stellen/{sid}/belegungen", pfad(e2)),
-        format!("{}/bezirke/99999/staende", pfad_evak(e)),
-        format!("{}/stellen/99999/belegungen", pfad(e)),
+        format!("{}/districts/{bid}/progress", pfad_evak(e2)),
+        format!("{}/positions/{sid}/occupancies", pfad(e2)),
+        format!("{}/districts/99999/progress", pfad_evak(e)),
+        format!("{}/positions/99999/occupancies", pfad(e)),
     ] {
         let (s, j) = anfrage(&app, "GET", &uri, &admin, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{uri}: {j:?}");
@@ -2133,7 +2130,7 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/bezirke/abc/staende", pfad_evak(e)),
+        &format!("{}/districts/abc/progress", pfad_evak(e)),
         &admin,
         None,
     )
@@ -2144,7 +2141,7 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke/{bid}/stornieren", pfad_evak(e)),
+        &format!("{}/districts/{bid}/annul", pfad_evak(e)),
         &admin,
         None,
     )
@@ -2153,7 +2150,7 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &admin,
         None,
     )
@@ -2168,7 +2165,7 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
+        &format!("{}/districts/{bid}/progress", pfad_evak(e)),
         &beob_cookie,
         None,
     )
@@ -2179,8 +2176,8 @@ async fn verlauf_statuscodes_und_rechte() {
     fremde_org_anlegen(&pool, "Fremd-Orga", "fremd", "fremdpw1", "fuehrungskraft").await;
     let fremd = login_cookie(&app, "fremd", "fremdpw1").await;
     for uri in [
-        format!("{}/bezirke/{bid}/staende", pfad_evak(e)),
-        format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        format!("{}/districts/{bid}/progress", pfad_evak(e)),
+        format!("{}/positions/{sid}/occupancies", pfad(e)),
     ] {
         let (s, j) = anfrage(&app, "GET", &uri, &fremd, None).await;
         assert!(
@@ -2198,13 +2195,13 @@ async fn verlauf_statuscodes_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/stellen/{sid}/belegungen", pfad(e)),
+        &format!("{}/positions/{sid}/occupancies", pfad(e)),
         &beob_cookie,
         None,
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let staende = format!("{}/bezirke/{bid}/staende", pfad_evak(e));
+    let staende = format!("{}/districts/{bid}/progress", pfad_evak(e));
     let (s, _) = anfrage(&app, "GET", &staende, &beob_cookie, None).await;
     assert_eq!(s, StatusCode::OK, "Evakuierung bleibt lesbar");
     override_setzen(&app, &admin, e, "evakuierung", false, None).await;
@@ -2222,7 +2219,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, st) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(
             r#"{"bezeichnung":"Gesamtschule","art":"notunterkunft","leitung":" Frau Schulz ","kontaktweg":"Kanal 42"}"#,
@@ -2242,7 +2239,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, st) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"leitung":"Herr Brandt"}"#),
     )
@@ -2261,7 +2258,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, st) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(r#"{"kontaktweg":null}"#),
     )
@@ -2274,7 +2271,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(&format!(r#"{{"leitung":"{}"}}"#, "x".repeat(200))),
     )
@@ -2283,7 +2280,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(e)),
+        &format!("{}/positions/{sid}", pfad(e)),
         &admin,
         Some(&format!(r#"{{"kontaktweg":"{}"}}"#, "x".repeat(201))),
     )
@@ -2296,7 +2293,7 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"Zweite","art":"anlaufstelle","leitung":"{}"}}"#,
@@ -2310,12 +2307,12 @@ async fn leitung_und_kontaktweg_anlegen_aendern_leeren_und_grenze() {
     for (methode, ziel, body) in [
         (
             "POST",
-            format!("{}/stellen", pfad(e)),
+            format!("{}/positions", pfad(e)),
             r#"{"bezeichnung":"Dritte","art":"anlaufstelle","erreichbarkeit":"Kanal 1"}"#,
         ),
         (
             "PATCH",
-            format!("{}/stellen/{sid}", pfad(e)),
+            format!("{}/positions/{sid}", pfad(e)),
             r#"{"erreichbarkeit":null}"#,
         ),
     ] {
@@ -2350,7 +2347,7 @@ async fn stelle_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/stellen", pfad(e)),
+            &format!("{}/positions", pfad(e)),
             &admin,
             Some(&body.to_string()),
         )
@@ -2373,7 +2370,7 @@ async fn stelle_freitexte_haben_grenzen() {
     let (s, st) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(&body.to_string()),
     )
@@ -2389,7 +2386,7 @@ async fn stelle_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "PATCH",
-            &format!("{}/stellen/{sid}", pfad(e)),
+            &format!("{}/positions/{sid}", pfad(e)),
             &admin,
             Some(&json!({ feld: "y".repeat(max + 1) }).to_string()),
         )
@@ -2416,7 +2413,7 @@ async fn stelle_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "PATCH",
-            &format!("{}/stellen/{sid}", pfad(e)),
+            &format!("{}/positions/{sid}", pfad(e)),
             &admin,
             Some(&json!({ feld: "y".repeat(max) }).to_string()),
         )
@@ -2440,9 +2437,9 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_stellen_und_bezirke() {
     let sued = abschnitt(&app, &admin, e, "Süd").await;
     let im_abschnitt = |art: &str, id: i64, ab: i64| {
         let uri = if art == "stelle" {
-            format!("{}/stellen/{id}", pfad(e))
+            format!("{}/positions/{id}", pfad(e))
         } else {
-            format!("{}/bezirke/{id}", pfad_evak(e))
+            format!("{}/districts/{id}", pfad_evak(e))
         };
         (uri, format!(r#"{{"abschnitt_id":{ab}}}"#))
     };
@@ -2535,7 +2532,7 @@ async fn bezirk_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/bezirke", pfad_evak(e)),
+            &format!("{}/districts", pfad_evak(e)),
             &admin,
             Some(&anlegen(feld, "x".repeat(max + 1))),
         )
@@ -2560,7 +2557,7 @@ async fn bezirk_freitexte_haben_grenzen() {
     let (s, b) = anfrage(
         &app,
         "POST",
-        &format!("{}/bezirke", pfad_evak(e)),
+        &format!("{}/districts", pfad_evak(e)),
         &admin,
         Some(&body.to_string()),
     )
@@ -2576,7 +2573,7 @@ async fn bezirk_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "PATCH",
-            &format!("{}/bezirke/{bid}", pfad_evak(e)),
+            &format!("{}/districts/{bid}", pfad_evak(e)),
             &admin,
             Some(&json!({ feld: "y".repeat(max + 1) }).to_string()),
         )
@@ -2598,7 +2595,7 @@ async fn bezirk_freitexte_haben_grenzen() {
         let (s, j) = anfrage(
             &app,
             "PATCH",
-            &format!("{}/bezirke/{bid}", pfad_evak(e)),
+            &format!("{}/districts/{bid}", pfad_evak(e)),
             &admin,
             Some(&json!({ feld: "y".repeat(max) }).to_string()),
         )
@@ -2619,7 +2616,7 @@ async fn angabe_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
-    let url = format!("{}/stellen/{sid}", pfad(e));
+    let url = format!("{}/positions/{sid}", pfad(e));
     // A ändert die Kapazität und die Leitung.
     let (s, j) = anfrage(
         &app,
@@ -2689,7 +2686,7 @@ async fn andere_angabe_dazwischen_ist_kein_konflikt() {
     let e = einsatz_anlegen(&app, &admin).await;
     let ab = abschnitt(&app, &admin, e, "EA Nord").await;
     let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
-    let url = format!("{}/stellen/{sid}", pfad(e));
+    let url = format!("{}/positions/{sid}", pfad(e));
     let (s, j) = anfrage(
         &app,
         "PATCH",
@@ -2751,7 +2748,7 @@ async fn altwert_ohne_aenderung_oder_halbes_paar_ist_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = stelle(&app, &admin, e, "NU Turnhalle Nord").await;
-    let url = format!("{}/stellen/{sid}", pfad(e));
+    let url = format!("{}/positions/{sid}", pfad(e));
     for body in [
         r#"{"notiz":"x","erwartet":{"leitung":null}}"#,
         r#"{"status":"in_betrieb","erwartet":{"kapazitaet_personen":150}}"#,

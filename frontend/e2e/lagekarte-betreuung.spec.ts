@@ -130,7 +130,7 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: sid } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
+  const { id: sid } = await senden(page, 'post', `${basis}/care/positions`, {
     bezeichnung: 'NU Turnhalle Nord',
     art: 'notunterkunft',
     kapazitaet_personen: 150,
@@ -212,7 +212,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: bid } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
+  const { id: bid } = await senden(page, 'post', `${basis}/evacuation/districts`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',
@@ -247,7 +247,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   // Räumung aus einer anderen Sitzung → die Beschriftung folgt live.
   await liveOffen(page);
   const andere = await zweiteSitzung(browser);
-  await senden(andere, 'patch', `${basis}/evakuierung/bezirke/${bid}`, { raeumung: 'laeuft' });
+  await senden(andere, 'patch', `${basis}/evacuation/districts/${bid}`, { raeumung: 'laeuft' });
   await expect
     .poll(() => zonenLabel(page), { timeout: 30_000 })
     .toContain('Uferstraße 12–40 · Räumung: läuft');
@@ -265,7 +265,7 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   // Storno löst die Fläche; sie bleibt als nicht zugeordnete Bezirksfläche stehen. Nach dem
   // Neuladen verbindet der Strom neu, das Storno darf ihm nicht zuvorkommen.
   await liveOffen(page);
-  await senden(andere, 'post', `${basis}/evakuierung/bezirke/${bid}/stornieren`);
+  await senden(andere, 'post', `${basis}/evacuation/districts/${bid}/annul`);
   await expect.poll(() => zonenLabel(page), { timeout: 30_000 }).toEqual(['Evakuierungsbezirk']);
   await andere.context().close();
 });
@@ -287,7 +287,7 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: bid } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
+  const { id: bid } = await senden(page, 'post', `${basis}/evacuation/districts`, {
     bezeichnung: 'Uferstraße 12–40',
     plan_personen: 640,
     plan_erhebung: 'geschaetzt',

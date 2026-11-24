@@ -92,15 +92,15 @@ function quellen(freigaben = freigabenFixture()) {
       return HttpResponse.json(berichte.find((b) => b.id === Number(params.lid)));
     }),
     http.get(`/api/einsaetze/${E}/lageberichte/:lid/anlagen`, () => HttpResponse.json([])),
-    json('/personen', () => wert(roh, 'personen')),
-    json('/personen/verbleib-angaben', () => wert(roh, 'personenVerbleibAngaben')),
-    json('/personen/druck', () => [person()]),
+    json('/persons', () => wert(roh, 'personen')),
+    json('/persons/whereabouts-details', () => wert(roh, 'personenVerbleibAngaben')),
+    json('/persons/print', () => [person()]),
     json('/uhs', () => []),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/damages', () => wert(roh, 'schaeden')),
-    json('/evakuierung', () => wert(roh, 'evakuierung')),
-    json('/betreuung', () => wert(roh, 'betreuung')),
-    json('/verpflegung', () => wert(roh, 'verpflegung')),
+    json('/schaeden', () => wert(roh, 'schaeden')),
+    json('/evacuation', () => wert(roh, 'evakuierung')),
+    json('/care', () => wert(roh, 'betreuung')),
+    json('/catering', () => wert(roh, 'verpflegung')),
     json('/etb/zaehler', () => wert(roh, 'etbZaehler')),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
@@ -175,7 +175,7 @@ describe('EinsatzakteDruckPage', () => {
     for (const k of kapitel()) expect(k.querySelector('[data-lfh="druckkopf"]')).not.toBeNull();
     // Betroffene mit Namen, genau ein protokollierter Abruf.
     expect(kapitel()[2]).toHaveTextContent('Quastenflosser');
-    expect(aufrufe.get('/personen/druck')).toBe(1);
+    expect(aufrufe.get('/persons/print')).toBe(1);
     // Volles ETB, Auftragsliste mit aufgehobenem Auftrag.
     expect(kapitel()[1]).toHaveTextContent('Erstmeldung Halle 3');
     expect(kapitel()[3]).toHaveTextContent('Riegelstellung aufbauen');
@@ -208,7 +208,7 @@ describe('EinsatzakteDruckPage', () => {
     expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Anhänge und Tabellen (ZIP)' })).toBeNull();
-    expect(aufrufe.get('/personen/druck')).toBeUndefined();
+    expect(aufrufe.get('/persons/print')).toBeUndefined();
   });
 
   it('ausgeblendetes Modul: Kapitel „nicht genutzt“, Akte druckbar', async () => {

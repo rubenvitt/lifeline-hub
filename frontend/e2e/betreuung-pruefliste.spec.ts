@@ -131,31 +131,31 @@ async function saeLage(page: Page, name: string) {
   const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `${name} ${Date.now()}`,
   });
-  const evak = `/api/einsaetze/${einsatzId}/evakuierung`;
+  const evak = `/api/einsaetze/${einsatzId}/evacuation`;
   const bezirke: Record<string, number> = {};
   for (const b of BEZIRKE) {
-    const { id } = await senden(page, 'post', `${evak}/bezirke`, {
+    const { id } = await senden(page, 'post', `${evak}/districts`, {
       bezeichnung: b.name,
       ...b.plan,
     });
     bezirke[b.name] = id;
-    if (b.stand) await senden(page, 'post', `${evak}/bezirke/${id}/staende`, b.stand);
+    if (b.stand) await senden(page, 'post', `${evak}/districts/${id}/progress`, b.stand);
     if (b.raeumung !== 'angeordnet')
-      await senden(page, 'patch', `${evak}/bezirke/${id}`, { raeumung: b.raeumung });
+      await senden(page, 'patch', `${evak}/districts/${id}`, { raeumung: b.raeumung });
   }
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+  const basis = `/api/einsaetze/${einsatzId}/care`;
   const stellen: Record<string, number> = {};
   for (const s of STELLEN) {
-    const { id } = await senden(page, 'post', `${basis}/stellen`, {
+    const { id } = await senden(page, 'post', `${basis}/positions`, {
       bezeichnung: s.name,
       art: s.art,
       ...(s.kap != null ? { kapazitaet_personen: s.kap } : {}),
     });
     stellen[s.name] = id;
     if (s.status !== 'vorbereitet')
-      await senden(page, 'patch', `${basis}/stellen/${id}`, { status: s.status });
+      await senden(page, 'patch', `${basis}/positions/${id}`, { status: s.status });
     if (s.belegt != null)
-      await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: s.belegt });
+      await senden(page, 'post', `${basis}/positions/${id}/occupancies`, { belegt: s.belegt });
   }
   return { einsatzId, bezirke, stellen };
 }
@@ -512,14 +512,14 @@ for (const [viewport, dichte] of [
     const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
       bezeichnung: `E2E 677 Fokus ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/betreuung`;
+    const basis = `/api/einsaetze/${einsatzId}/care`;
     for (let i = 1; i <= 20; i += 1) {
-      const { id } = await senden(page, 'post', `${basis}/stellen`, {
+      const { id } = await senden(page, 'post', `${basis}/positions`, {
         bezeichnung: `Turnhalle ${String(i).padStart(2, '0')}`,
         art: 'notunterkunft',
         kapazitaet_personen: 100,
       });
-      await senden(page, 'post', `${basis}/stellen/${id}/belegungen`, { belegt: 40 + i });
+      await senden(page, 'post', `${basis}/positions/${id}/occupancies`, { belegt: 40 + i });
     }
     await ladeInDichte(page, `/einsaetze/${einsatzId}/betreuung`, dichte);
     await expect(page.getByRole('button', { name: /^Belegung melden für / })).toHaveCount(20);
