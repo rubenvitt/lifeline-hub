@@ -6688,6 +6688,11 @@ export interface components {
             nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
+            /**
+             * Format: int64
+             * @description Ortung auch bei hauptamtlicher Besatzung (LLH-2091): `1` = an, sonst aus.
+             */
+            ortung_hauptamt?: number | null;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
             /**

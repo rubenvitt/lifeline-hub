@@ -63,6 +63,9 @@ pub struct OrgEinstellungenUpdate {
     /// Auto-ETB: `false` schaltet ab (gespeichert als 0), `true`/fehlend = an. Wie
     /// `EinstellungenUpdate.auto_etb_eintraege`: bool auf dem Draht, i64 intern.
     pub auto_etb_eintraege: Option<bool>,
+    /// Ortung auch bei hauptamtlicher Besatzung (LLH-2091): bool auf dem Draht, 0/1 intern;
+    /// fehlend = aus (Vollersatz).
+    pub ortung_hauptamt: Option<bool>,
     /// Geocoder-Basis-URL (nur http/https) für die Ort-Vorschau.
     pub geocoder_url: Option<String>,
 }
@@ -228,6 +231,7 @@ pub async fn setzen(
             rueckmeldung_frist_min: req.rueckmeldung_frist_min,
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
+            ortung_hauptamt: req.ortung_hauptamt.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
             aufbewahrung_kategorien: kategorien.as_deref(),
         },

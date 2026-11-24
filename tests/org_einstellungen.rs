@@ -910,3 +910,65 @@ async fn nachbereitung_tage_setzen_grenzen_und_leeren() {
         "Vollersatz leert: body={body}"
     );
 }
+
+/// Ohne gespeicherte Zeile ist die Ortung bei hauptamtlicher Besatzung aus (Wire `null`).
+#[tokio::test]
+async fn ortung_hauptamt_ist_standardmaessig_aus() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["ortung_hauptamt"].is_null(), "body={body}");
+}
+
+/// Nur ein Admin schaltet den Schalter; er wird persistiert, 0/1 sind die einzigen Werte.
+#[tokio::test]
+async fn nur_admin_schaltet_ortung_hauptamt() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin_cookie, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk_cookie = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &fk_cookie,
+        serde_json::json!({"ortung_hauptamt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_hauptamt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    assert_eq!(body["ortung_hauptamt"], 1);
+    let (_, get_body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(get_body["ortung_hauptamt"], 1);
+
+    // Vollersatz: ohne das Feld ist der Schalter wieder aus (null).
+    let (status, body) = put_einstellungen(&app, &admin_cookie, serde_json::json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body["ortung_hauptamt"].is_null(), "body={body}");
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_hauptamt": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ortung_hauptamt"], 0);
+}
+
+/// Der Schalter bleibt lokal: er steht nicht in der Spaltenliste der Stammdaten-Synchronisation.
+#[test]
+fn ortung_hauptamt_geht_nicht_in_die_stammdaten() {
+    use lifeline_hub::instanz::stammdaten::art::beschreibung;
+    use lifeline_hub::instanz::stammdaten::StammdatenArt;
+    let spalten = beschreibung(StammdatenArt::OrgEinstellungen).spalten;
+    assert!(!spalten.contains(&"ortung_hauptamt"));
+}

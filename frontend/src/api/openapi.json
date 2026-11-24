@@ -16453,6 +16453,14 @@
             "type": "integer",
             "format": "int64"
           },
+          "ortung_hauptamt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Ortung auch bei hauptamtlicher Besatzung (LLH-2091): `1` = an, sonst aus."
+          },
           "retention_dauer_tage": {
             "type": [
               "integer",

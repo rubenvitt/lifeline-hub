@@ -40,6 +40,9 @@ pub struct OrgEinstellungen {
     pub rueckmeldung_frist_min: Option<i64>,
     // Auto-ETB-Schalter: 0 = aus; NULL/1 = an.
     pub auto_etb_eintraege: Option<i64>,
+    // Fahrzeugortung auch bei hauptamtlicher Besatzung (LLH-2091): nur `1` = an, sonst aus.
+    // Bleibt lokal: nicht in der Stammdaten-Synchronisation (`instanz/stammdaten/art.rs`).
+    pub ortung_hauptamt: Option<i64>,
     // Geocoder-Basis-URL (serverseitig; kein Leak an Mitglieder).
     pub geocoder_url: Option<String>,
     pub geaendert_at: Option<String>,
@@ -65,10 +68,16 @@ impl OrgEinstellungen {
             auftrag_quittierung_frist_min: None,
             rueckmeldung_frist_min: None,
             auto_etb_eintraege: None,
+            ortung_hauptamt: None,
             geocoder_url: None,
             geaendert_at: None,
             geaendert_von: None,
         }
+    }
+
+    /// Ortung auch bei hauptamtlicher Besatzung (LLH-2091): nur `Some(1)` ist an.
+    pub fn is_ortung_hauptamt(&self) -> bool {
+        self.ortung_hauptamt == Some(1)
     }
 
     /// API-Darstellung: flache 1:1-Spiegelung aller Felder inkl. Audit (Admin-Endpunkt), dazu
@@ -95,6 +104,7 @@ impl OrgEinstellungen {
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
             rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
+            ortung_hauptamt: self.ortung_hauptamt,
             geocoder_url: self.geocoder_url.clone(),
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
@@ -153,6 +163,8 @@ pub struct OrgEinstellungenAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    /// Ortung auch bei hauptamtlicher Besatzung (LLH-2091): `1` = an, sonst aus.
+    pub ortung_hauptamt: Option<i64>,
     pub geocoder_url: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
@@ -200,6 +212,7 @@ pub struct OrgEinstellungenDaten<'a> {
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
+    pub ortung_hauptamt: Option<i64>,
     pub geocoder_url: Option<&'a str>,
     /// Kategorie-Vorgaben (LFH-749), bereits geprüft: `Some` ersetzt die Liste, `None` lässt sie
     /// unverändert (anders als die übrigen Felder kein Vollersatz, damit ein älterer Client sie
@@ -217,7 +230,7 @@ pub async fn laden_oder_default(
         "SELECT org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
                 retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
                 meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
+                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, ortung_hauptamt, geocoder_url, \
                 geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
     )
@@ -243,8 +256,8 @@ pub async fn speichern(
              retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
              meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, \
              meldung_bestaetigung_frist_min, auftrag_quittierung_frist_min, rueckmeldung_frist_min, \
-             auto_etb_eintraege, geocoder_url, geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+             auto_etb_eintraege, ortung_hauptamt, geocoder_url, geaendert_at, geaendert_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitdarstellung = excluded.zeitdarstellung, \
@@ -261,6 +274,7 @@ pub async fn speichern(
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
              rueckmeldung_frist_min = excluded.rueckmeldung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
+             ortung_hauptamt = excluded.ortung_hauptamt, \
              geocoder_url = excluded.geocoder_url, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
@@ -281,6 +295,7 @@ pub async fn speichern(
     .bind(daten.auftrag_quittierung_frist_min)
     .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
+    .bind(daten.ortung_hauptamt)
     .bind(daten.geocoder_url)
     .bind(erfasser_id)
     .execute(&mut *tx)
@@ -312,6 +327,16 @@ mod tests {
         .fetch_one(pool)
         .await
         .unwrap()
+    }
+
+    #[test]
+    fn is_ortung_hauptamt_ist_nur_bei_eins_an() {
+        let mut e = OrgEinstellungen::leer(1);
+        assert!(!e.is_ortung_hauptamt());
+        e.ortung_hauptamt = Some(0);
+        assert!(!e.is_ortung_hauptamt());
+        e.ortung_hauptamt = Some(1);
+        assert!(e.is_ortung_hauptamt());
     }
 
     #[tokio::test]
@@ -369,6 +394,7 @@ mod tests {
                 auftrag_quittierung_frist_min: Some(45),
                 rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
+                ortung_hauptamt: Some(1),
                 geocoder_url: Some("https://nominatim.example.org"),
                 aufbewahrung_kategorien: Some(&vorgaben),
             },
@@ -397,6 +423,7 @@ mod tests {
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
         assert_eq!(g.rueckmeldung_frist_min, Some(90));
         assert_eq!(g.auto_etb_eintraege, Some(0));
+        assert_eq!(g.ortung_hauptamt, Some(1));
         assert_eq!(
             g.geocoder_url.as_deref(),
             Some("https://nominatim.example.org")
