@@ -358,6 +358,9 @@ pub(crate) struct Produkt {
     pub geliefert: Option<String>,
     /// Bekannte Ebenen im Format `vt`: Art und URL des GeoJSON.
     pub ebenen: Vec<(EbenenArt, String)>,
+    /// Vector Package eines Produkts aus dem Altbestand (`copernicus_alt`); dann ist `ebenen`
+    /// leer, die Ebenen stehen im ZIP.
+    pub zip: Option<String>,
 }
 
 /// Auswertungsgebiet (AOI) einer Aktivierung.
@@ -460,6 +463,7 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
             .and_then(Value::as_str)
             .and_then(format_zeitpunkt),
         ebenen,
+        zip: None,
     })
 }
 
@@ -1105,6 +1109,7 @@ mod tests {
                 EbenenArt::Beobachtet,
                 format!("{typ}{monitoring}v{version}"),
             )],
+            zip: None,
         }
     }
 
