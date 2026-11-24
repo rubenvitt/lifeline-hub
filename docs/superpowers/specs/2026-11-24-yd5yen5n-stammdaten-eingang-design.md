@@ -151,23 +151,23 @@ Neue Migration (nächste freie Nummer gegen `origin/alpha`, `scripts/check-migra
 ```sql
 CREATE TABLE stammdaten_kennung (
     id               INTEGER PRIMARY KEY,
-    org_id           INTEGER NOT NULL REFERENCES org(id) ON DELETE CASCADE,
+    org_id           INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,
     herkunft         TEXT    NOT NULL,           -- normalisiert wie herkunft_norm
     kennung          TEXT    NOT NULL,
     fahrzeug_id      INTEGER REFERENCES fahrzeug(id)      ON DELETE CASCADE,
     personal_id      INTEGER REFERENCES personal(id)      ON DELETE CASCADE,
     qualifikation_id INTEGER REFERENCES qualifikation(id) ON DELETE CASCADE,
-    angelegt_am      TEXT    NOT NULL,
+    angelegt_at      TEXT    NOT NULL,
     CHECK ((fahrzeug_id IS NOT NULL) + (personal_id IS NOT NULL) + (qualifikation_id IS NOT NULL) = 1)
 );
 -- je Org, Art, Herkunft und Kennung höchstens ein Ziel
 CREATE UNIQUE INDEX uq_stammdaten_kennung_fz ON stammdaten_kennung(org_id, herkunft, kennung) WHERE fahrzeug_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_stammdaten_kennung_p  ON stammdaten_kennung(org_id, herkunft, kennung) WHERE personal_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_stammdaten_kennung_q  ON stammdaten_kennung(org_id, herkunft, kennung) WHERE qualifikation_id IS NOT NULL;
--- je Ziel und Herkunft höchstens eine Kennung
+-- je Fahrzeug bzw. Person und Herkunft höchstens eine Kennung; eine Qualifikation darf mehrere
+-- Kennungen derselben Quelle tragen (Aliasse wie „San-A“ und „SanH“ → „Sanitäter“)
 CREATE UNIQUE INDEX uq_stammdaten_kennung_fz_ziel ON stammdaten_kennung(herkunft, fahrzeug_id)      WHERE fahrzeug_id IS NOT NULL;
 CREATE UNIQUE INDEX uq_stammdaten_kennung_p_ziel  ON stammdaten_kennung(herkunft, personal_id)      WHERE personal_id IS NOT NULL;
-CREATE UNIQUE INDEX uq_stammdaten_kennung_q_ziel  ON stammdaten_kennung(herkunft, qualifikation_id) WHERE qualifikation_id IS NOT NULL;
 ```
 
 Drei echte Fremdschlüssel statt `art` + `ziel_id`, damit Löschen kaskadiert und keine Waise
@@ -181,8 +181,9 @@ Die Tabelle gehört **nicht** zu den verteilten Stammdatenarten; ein ELW sieht s
 ## Ablauf und Schnittstelle
 
 Rechte: wer Stammdaten der Org verwalten darf (dasselbe Recht wie Anlegen unter `/api/vehicles`
-und `/api/personnel`). Auf einer gekoppelten Instanz (ELW) antworten beide Routen mit 409 und der
-Meldung, dass Stammdaten am Hub gepflegt werden.
+und `/api/personnel`). Meldet sich die Org bei einem Hub (`public_api::zugang::hub_fuer_org`, wie
+`routes/adapter.rs`), antworten beide Routen mit 409 und der Meldung, dass Stammdaten am Hub
+gepflegt werden. Der Hub selbst und eine ungekoppelte Instanz lesen ein.
 
 - `POST /api/master-data/import/preview` — multipart: `datei`, optional `herkunft` (Text),
   optional `entscheidungen` (JSON). Schreibt nichts. Liefert `StammdatenVorschau`.
@@ -203,7 +204,11 @@ vor (aus `stammdaten_kennung`, häufigste bzw. jüngste).
 
 - `mehrdeutig` → Kandidat wählen oder „neu anlegen“ oder „auslassen“.
 - `weicht_ab` → „Datei übernehmen“ (je Zeile, für alle abweichenden Felder der Zeile) — Standard
-  ist „Lifeline behalten“.
+  ist „Lifeline behalten“. **Erkennungsfelder** (Fahrzeug: `funkrufname`, `opta`, `issi`;
+  Personal: `name`, `personalnummer`) sind nur dann Teil von „Datei übernehmen“, wenn die Zeile
+  über Kennung+Herkunft gefunden wurde; sonst bleibt ihre Abweichung ein reiner Hinweis
+  (Entscheidung Ruben, 24.11.2026: schützt vor Umbenennen durch einen Fehltreffer). Eine
+  Umbenennung, die mit einem anderen Datensatz im Dienst kollidiert, ist `fehler` der Zeile.
 - Unbekannte Qualifikation (Kennung/Bezeichnung ohne Treffer) → „neu anlegen“ (Standard) oder
   „zuordnen zu <eigene Qualifikation>“ oder „auslassen“. Eine Zuordnung schreibt eine Zeile
   `stammdaten_kennung` mit `qualifikation_id` und gilt in späteren Läufen ohne Rückfrage.
@@ -216,7 +221,15 @@ vor (aus `stammdaten_kennung`, häufigste bzw. jüngste).
   ausgelassen (Entscheidung des Entwurfs: kein stilles Reaktivieren).
 - OPTA, ISSI und Personalnummer werden für den Vergleich normalisiert (Leerzeichen raus,
   Kleinschreibung). Mehr als ein Treffer auf einer Stufe → `mehrdeutig`, keine Stufe tiefer.
-- Name: Normalisierung und `name_passt` aus LLH-1556.
+- Name: Die Spalte `name` ist frei. Enthält sie ein Komma, gilt „Nachname, Vorname“; sonst das
+  letzte Wort als Nachname, der Rest als Vorname. Dann `namensformen`/`name_passt` aus LLH-1556.
+- Qualifikation über Bezeichnung: normalisiert verglichen; mehr als ein Treffer (die Datenbank
+  vergleicht `label` exakt, normalisiert können zwei gleich sein) → `mehrdeutig`. Eine **inaktive**
+  Qualifikation (`aktiv = 0`) wird gefunden und verknüpft, bleibt aber inaktiv (Hinweis); „neu
+  anlegen“ wird für eine gleichlautende inaktive nicht angeboten (Unique `(org_id, label)`).
+- Qualifikation ohne Quell-Kennung (die Personalzeile nennt nur Bezeichnungen): Als Kennung wird
+  die normalisierte Bezeichnung gemerkt, damit eine Zuordnung „zuordnen zu …“ beim nächsten Lauf
+  wieder greift.
 - Zwei Zeilen derselben Datei mit gleicher Kennung+Herkunft → beide `fehler`.
 - Ein gefundener Datensatz ohne gemerkte Kennung bekommt sie beim Übernehmen (so wird ein von
   Hand angelegtes Fahrzeug beim ersten Lauf verknüpft).
@@ -225,12 +238,14 @@ vor (aus `stammdaten_kennung`, häufigste bzw. jüngste).
   **andere** Kennung trägt, ist das `mehrdeutig` mit Hinweis (die Quelle hat den Datensatz neu
   angelegt oder zwei Datensätze beschreiben dasselbe), nie ein stilles Umhängen.
 - Qualifikationen am Personal werden **hinzugefügt**, nie entfernt.
-- Eindeutigkeit des Funkrufnamens (`(org_id, funkrufname) WHERE in_dienst`) und der Personalnummer
+- Eindeutigkeit des Funkrufnamens (`idx_fahrzeug_funkrufname`, `dienststatus = 'in_dienst'`; `idx_personal_personalnummer`) und der Personalnummer
   bleibt Sache der Datenbank; eine Verletzung ist ein `fehler` der Zeile in der Vorschau (vorher
   geprüft), nicht ein 500.
 
-**Prüfspur:** Jeder Lauf schreibt einen Eintrag ins Admin-Protokoll (wie andere Stammdaten-
-Änderungen, s. Migration 0361): wer, wann, Herkunft, Zählungen. Keine Feldwerte.
+**Prüfspur (Entscheidung des Entwurfs):** kein Eintrag in `admin_audit`. Heute schreibt keine
+Stammdaten-Änderung dorthin, und ein neuer `AdminAktion`-Wert bräuchte einen weiteren Umbau der
+`aktion`-CHECK (Stand 0367). Der Lauf protokolliert per `tracing` (Org, Nutzer, Herkunft,
+Zählungen, keine Feldwerte); die Kopplung verteilt die Änderungen wie jede andere.
 
 ## Code-Ort
 
@@ -241,8 +256,10 @@ vor (aus `stammdaten_kennung`, häufigste bzw. jüngste).
   dasselbe Paket.
 - **Wiederverwendung:** `lies_tabelle` (CSV/XLSX, CP1252, Zip-Grenze) und die Namens-Helfer
   (`norm`, `namensformen`, `name_passt`, `herkunft_norm`) ziehen in ein gemeinsames Modul
-  `src/einlesen/`, das LLH-1556 und dieser Task nutzen. Verhalten von LLH-1556 bleibt gleich; seine
-  Tests laufen unverändert.
+  `src/einlesen/`, das LLH-1556 und dieser Task nutzen. Der Leser liest heute nur ein Blatt
+  („Austausch“, sonst das erste) und zählt `ZEILEN_MAX` über die ganze Tabelle; er bekommt
+  zusätzlich „alle Blätter nach Namen“ mit der Grenze je Blatt. Verhalten von LLH-1556 bleibt
+  gleich; seine Tests laufen unverändert.
 - Frontend: Knopf „Stammdaten einlesen“ in der Stammdaten-Verwaltung (Kopf von Fahrzeuge- und
   Personal-Tab), Modal in drei Schritten (Datei + Herkunft → Vorschau mit Entscheidungen →
   Ergebnis) nach dem Muster von `abloesung/schichtplan/SchichtplanEinlesen.tsx` und
