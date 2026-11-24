@@ -279,15 +279,15 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `export async function renderZeichenPng(drawing: Drawing, groesse = 64): Promise<Blob>` (Canvas mit `renderCanvas` aus `@einsatzzeichen/core` ohne Theme, vorher `document.fonts.load` für die Zeichenschrift);
   - `export async function packKmz(objekte: ExportObjekt[], meta, render = renderZeichenPng): Promise<Blob>` mit `doc.kml` zuerst, PNGs `level: 0`, MIME `application/vnd.google-earth.kmz`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - KML: Wurzel `<kml xmlns="http://www.opengis.net/kml/2.2">`; `Document/name` mit Einsatzname; ein `Style` je Zeichenschlüssel mit `IconStyle/Icon/href` = `files/….png`; ein `Folder` je Art.
   - Farbe `#ff0000` mit Deckkraft 0.5 → `7f0000ff` (aabbggrr).
   - Texte mit `<&>"'` werden escaped.
   - Keine `description`.
   - Kreis- bzw. Polygonzonen als `Polygon/outerBoundaryIs`.
   - KMZ mit Stub-Renderer: `unzipSync` liefert als ersten Eintrag `doc.kml` und je Zeichenschlüssel genau ein PNG; zweimal derselbe Schlüssel ergibt ein PNG.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen (`renderZeichenPng` nicht in Unit-Tests, jsdom hat kein Canvas). **Step 4:** vitest → PASS.
-- [ ] **Step 5:** Commit `feat: Lagekarte als KMZ mit Zeichen schreiben` (Zunder A).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen (`renderZeichenPng` nicht in Unit-Tests, jsdom hat kein Canvas). **Step 4:** vitest → PASS.
+- [x] **Step 5:** Commit `feat: Lagekarte als KMZ mit Zeichen schreiben` (Zunder A).
 
 ### Task 10: Exporteinträge in der Lagekarte
 
