@@ -12289,9 +12289,17 @@
           "online_styles",
           "offline_verfuegbar",
           "offline_regionen",
-          "karten_bau_verfuegbar"
+          "karten_bau_verfuegbar",
+          "fachebenen_abgeschaltet"
         ],
         "properties": {
+          "fachebenen_abgeschaltet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit\n`--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet\n404. Leer, wenn alle Ebenen an sind."
+          },
           "karten_bau_verfuegbar": {
             "type": "boolean",
             "description": "True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds\nanstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret."

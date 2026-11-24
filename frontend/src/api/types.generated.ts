@@ -4931,6 +4931,12 @@ export interface components {
          */
         KarteConfigAntwort: {
             /**
+             * @description Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit
+             *     `--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet
+             *     404. Leer, wenn alle Ebenen an sind.
+             */
+            fachebenen_abgeschaltet: string[];
+            /**
              * @description True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
              *     anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
              */

@@ -411,6 +411,7 @@ function basisHandler(
     // Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
     offline_regionen: [],
     karten_bau_verfuegbar: false,
+    fachebenen_abgeschaltet: [],
   },
 ) {
   // extra zuerst: MSW nimmt den ersten Treffer → Tests überschreiben einzelne GET-Defaults gezielt.
@@ -1019,6 +1020,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1045,6 +1047,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1105,6 +1108,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1126,6 +1130,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1312,6 +1317,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();

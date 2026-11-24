@@ -15,7 +15,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/mldrihmesop4hlx1vdi243mr
 ## Global Constraints
 
 - Vorgabe des Flags: **an** (`default_value_t = true`); Env nimmt `true`/`false` (`clap::ArgAction::Set`).
-- Abgeschaltete Route: `AppError::NotFound("Fachebene abgeschaltet")`, vor jedem Cache- oder Netzzugriff.
+- Abgeschaltete Route: `AppError::NotFound` (Variante ohne Text), vor jedem Cache- oder Netzzugriff.
 - Neues Config-Feld heißt `fachebenen_abgeschaltet: Vec<String>` (Sprache des Bestandstyps `KarteConfigAntwort`).
 - Gespeicherte Sichtbarkeiten (`fachebenen_sichtbar`, Ansichten) werden nicht umgeschrieben.
 - Nach der DTO-Änderung `scripts/check-typ-codegen.sh` und beide generierten Dateien mitcommitten.
