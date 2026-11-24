@@ -3481,6 +3481,15 @@ async fn bestaetigung_erweitert_die_rechte_des_geraets_nicht() {
         ("GET", format!("/api/einsaetze/{einsatz}/etb")),
         ("GET", format!("/api/einsaetze/{einsatz}/personnel")),
         ("GET", format!("/api/einsaetze/{einsatz}/persons/export")),
+        // PASS-Liste (LLH-1198): nur die Einsatzleitung, nie ein Gerät.
+        (
+            "GET",
+            format!("/api/einsaetze/{einsatz}/persons/export?profile=pass"),
+        ),
+        (
+            "GET",
+            format!("/api/einsaetze/{einsatz}/persons/print?profile=pass"),
+        ),
         (
             "POST",
             format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),

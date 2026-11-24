@@ -3562,3 +3562,229 @@ async fn person_anlegen_etb_eintraege_gehen_live_hinaus() {
     person_anlegen(&app, &admin, e, r#"{"sichtung":"sk2"}"#).await;
     etb.pruefe(&app, &admin, e, "anlegen mit Sichtung").await;
 }
+
+// ---------- PASS-Liste (LLH-1198, Entwurf 2026-11-24-sco62ku3-pass-liste) ----------
+
+async fn roh_get(app: &axum::Router, cookie: &str, uri: &str) -> (StatusCode, String) {
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri(uri)
+                .header(header::COOKIE, cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+    (status, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
+async fn protokoll_arten(pool: &sqlx::SqlitePool, e: i64) -> Vec<String> {
+    sqlx::query_scalar("SELECT art FROM person_zugriff_audit WHERE einsatz_id = ? ORDER BY id")
+        .bind(e)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn pass_export_liefert_bom_kopf_und_betroffenheit() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let p = person_anlegen(&app, &admin, e, r#"{"name":"Verletzt"}"#).await;
+    sichten(&app, &admin, e, p, r#"{"kategorie":"sk2"}"#).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Heil"}"#).await;
+
+    let (status, csv) = roh_get(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/persons/export?profile=pass"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(
+        csv.starts_with("\u{FEFF}Kennung;Name;Vorname;Geburtsdatum;Alter (geschätzt);Geschlecht;Anschrift;Art der Betroffenheit;Verbleib;Erfasst am\r\n"),
+        "{csv}"
+    );
+    assert!(csv.contains("\"verletzt/erkrankt\""), "{csv}");
+    assert!(csv.contains("\"unverletzt\""), "{csv}");
+}
+
+#[tokio::test]
+async fn pass_export_schreibt_pass_export_ins_protokoll() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let (status, _) = roh_get(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{e}/persons/export?profile=pass"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(protokoll_arten(&pool, e).await, vec!["pass_export"]);
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/persons/list-accesses"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json[0]["art"], "pass_export");
+}
+
+#[tokio::test]
+async fn pass_druck_liefert_zeilen_und_protokolliert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Muster","vorname":"Erika"}"#).await;
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/persons/print?profile=pass"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let zeilen = json.as_array().expect("Array von PassZeile");
+    assert_eq!(zeilen.len(), 1);
+    assert_eq!(zeilen[0]["last_name"], "Muster");
+    assert_eq!(zeilen[0]["first_name"], "Erika");
+    assert_eq!(zeilen[0]["affectedness"], "unverletzt");
+    assert_eq!(protokoll_arten(&pool, e).await, vec!["pass_druck"]);
+}
+
+#[tokio::test]
+async fn pass_profil_nur_fuer_einsatzleitung() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let fueh_id = benutzer_anlegen(&app, &admin, "fuehrung", "keine").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    rolle_setzen(&app, &admin, e, fueh_id, "fuehrungspersonal").await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let fuehrung = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
+    for pfad in ["export", "print"] {
+        let (status, _) = roh_get(
+            &app,
+            &fuehrung,
+            &format!("/api/einsaetze/{e}/persons/{pfad}?profile=pass"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{pfad}");
+    }
+    assert!(
+        protokoll_arten(&pool, e).await.is_empty(),
+        "eine Abweisung schreibt keinen Protokolleintrag"
+    );
+    // Ohne Profil bleibt der Export für Führungspersonal offen wie bisher.
+    let (status, _) = roh_get(
+        &app,
+        &fuehrung,
+        &format!("/api/einsaetze/{e}/persons/export"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn unbekanntes_profil_ist_400() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    for pfad in ["export", "print"] {
+        let (status, _) = roh_get(
+            &app,
+            &admin,
+            &format!("/api/einsaetze/{e}/persons/{pfad}?profile=xyz"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{pfad}");
+    }
+    assert!(protokoll_arten(&pool, e).await.is_empty());
+}
+
+#[tokio::test]
+async fn pass_export_ohne_stornierte_und_aufgehobene_massnahme_zaehlt_nicht() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let weg = person_anlegen(&app, &admin, e, r#"{"name":"Storniert"}"#).await;
+    let (status, _) = anfrage(
+        &app,
+        "DELETE",
+        &format!("/api/einsaetze/{e}/persons/{weg}"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let aufgehoben = person_anlegen(&app, &admin, e, r#"{"name":"Aufgehoben"}"#).await;
+    let offen = person_anlegen(&app, &admin, e, r#"{"name":"Offen"}"#).await;
+    for p in [aufgehoben, offen] {
+        let (status, m) = anfrage(
+            &app,
+            "POST",
+            &format!("/api/einsaetze/{e}/persons/{p}/interventions"),
+            &admin,
+            Some(r#"{"art":"blutstillung"}"#),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{m}");
+        if p == aufgehoben {
+            let (status, v) = anfrage(
+                &app,
+                "POST",
+                &format!(
+                    "/api/einsaetze/{e}/persons/{p}/interventions/{}/void",
+                    m["id"].as_i64().unwrap()
+                ),
+                &admin,
+                Some("{}"),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{v}");
+        }
+    }
+
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{e}/persons/print?profile=pass"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let art = |name: &str| {
+        json.as_array()
+            .unwrap()
+            .iter()
+            .find(|z| z["last_name"] == name)
+            .map(|z| z["affectedness"].as_str().unwrap().to_string())
+    };
+    assert_eq!(art("Storniert"), None);
+    assert_eq!(art("Aufgehoben").as_deref(), Some("unverletzt"));
+    assert_eq!(art("Offen").as_deref(), Some("verletzt/erkrankt"));
+}
+
+#[tokio::test]
+async fn export_ohne_profil_unveraendert() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    person_anlegen(&app, &admin, e, r#"{"name":"Test"}"#).await;
+    let (status, csv) = roh_get(&app, &admin, &format!("/api/einsaetze/{e}/persons/export")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(csv.starts_with("registrier_nr;status;"), "{csv}");
+    assert_eq!(protokoll_arten(&pool, e).await, vec!["export"]);
+}

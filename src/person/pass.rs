@@ -225,6 +225,47 @@ pub fn pass_csv(zeilen: &[PassZeile]) -> String {
     csv
 }
 
+/// Die PASS-Zeilen eines Einsatzes: alle nicht stornierten Personen (`repo::liste`), die
+/// Bezeichnungen seiner UHS, die Personen mit nicht aufgehobener Maßnahme oder Verletzung und
+/// die Zone der Servertexte (`zeitdarstellung::zeitstil_laden`). Protokolliert nicht: das tut,
+/// wer die Daten ausliefert, und zwar vorher.
+pub async fn pass_liste(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+) -> Result<Vec<PassZeile>, crate::error::AppError> {
+    let personen = super::repo::liste(pool, einsatz_id, None).await?;
+    let zone = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id)
+        .await?
+        .zone;
+    let uhs_namen: HashMap<i64, String> =
+        sqlx::query_as::<_, (i64, String)>("SELECT id, bezeichnung FROM uhs WHERE einsatz_id = ?")
+            .bind(einsatz_id)
+            .fetch_all(pool)
+            .await?
+            .into_iter()
+            .collect();
+    let mit_versorgung: HashSet<i64> = sqlx::query_scalar::<_, i64>(
+        "SELECT person_id FROM person_massnahme \
+          WHERE einsatz_id = ? AND aufgehoben_at IS NULL \
+         UNION \
+         SELECT person_id FROM person_verletzung \
+          WHERE einsatz_id = ? AND aufgehoben_at IS NULL",
+    )
+    .bind(einsatz_id)
+    .bind(einsatz_id)
+    .fetch_all(pool)
+    .await?
+    .into_iter()
+    .collect();
+    let eingaben: Vec<PassEingabe> = personen.iter().map(PassEingabe::from).collect();
+    let k = PassKontext {
+        zone,
+        uhs_namen: &uhs_namen,
+        mit_versorgung: &mit_versorgung,
+    };
+    Ok(pass_zeilen(&eingaben, &k))
+}
+
 /// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
 /// Entschärft zusätzlich Formel-Injektion (Excel/LibreOffice): Felder, die mit
 /// =,+,-,@,Tab oder CR beginnen, werden mit einem führenden Apostroph neutralisiert.
