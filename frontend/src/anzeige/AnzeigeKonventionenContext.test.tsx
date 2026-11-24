@@ -11,9 +11,9 @@ import { setzeZeitdarstellung, zeitdarstellungVergessenFuerTests } from './zeitD
 import type { EinsatzEinstellungen, OrgEinstellungen } from '../api/types';
 import { ApiError } from '../api/client';
 
-vi.mock('../api/incidents', () => ({ ladeEinstellungen: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn() }));
 vi.mock('../api/orgEinstellungen', () => ({ ladeOrgEinstellungen: vi.fn() }));
-import { ladeEinstellungen } from '../api/incidents';
+import { ladeEinstellungen } from '../api/einsaetze';
 import { ladeOrgEinstellungen } from '../api/orgEinstellungen';
 
 /** Zeigt die effektive Zeitzone des Kontexts. */

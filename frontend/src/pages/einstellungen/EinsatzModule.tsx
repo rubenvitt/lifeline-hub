@@ -11,7 +11,7 @@ import {
   ladeModulOverrides,
   fetchModulVorgaben,
   setzeModulOverride,
-} from '../../api/incidents';
+} from '../../api/einsaetze';
 import { orgVorgabe } from '../../components/vorgabeText';
 import { rollenName } from './optionen';
 import { NUR_LEITUNG_ORG_ADMIN } from '../../components/nurAnsicht';

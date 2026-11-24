@@ -15,7 +15,7 @@ import {
 } from 'react-router';
 import AuftraegePage from './AuftraegePage';
 import type { Auftrag } from '../api/types';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { ApiError } from '../api/client';
 import { CommandPaletteProvider } from '../command-palette/CommandPaletteProvider';
@@ -28,7 +28,7 @@ vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ benutzer: { id: 1 } }),
   useAuthOptional: () => ({ benutzer: { id: 1 } }),
 }));
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',

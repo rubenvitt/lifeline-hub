@@ -8,7 +8,7 @@ import {
   nimmBelegungZurueck,
   storniereStelle,
 } from '../api/betreuung';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { einsatzKeys } from '../api/queryKeys';
 import {

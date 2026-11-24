@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import EvakuierungPage from './EvakuierungPage';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
@@ -22,7 +22,7 @@ const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
 }));
 const freigaben = vi.hoisted(() => ({ wert: undefined as unknown }));
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   // Freigaben für die Sprung-Sperre (LFH-888); Vorgabe: alles frei.
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),

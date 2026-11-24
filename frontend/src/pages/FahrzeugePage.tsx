@@ -5,7 +5,7 @@ import { useBemerkungMitAltwert } from '../components/useBemerkungMitAltwert';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';

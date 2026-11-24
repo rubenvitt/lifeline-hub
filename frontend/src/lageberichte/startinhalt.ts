@@ -1,4 +1,4 @@
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LageberichtAbschnitt, LageberichtVorlageKey, ModulFreigaben } from '../api/types';
 import { ZUSTAND_GRUND } from '../api/abrufZustand';

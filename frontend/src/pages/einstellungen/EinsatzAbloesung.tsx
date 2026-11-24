@@ -4,7 +4,7 @@ import { useId, useState } from 'react';
 import { useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchEinsatzSchichtmodell, setEinsatzSchichtmodell } from '../../api/abloesungen';
-import { ladeModulFreigaben } from '../../api/incidents';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { fetchSchichtmodelle, werteBodyOf } from '../../api/schichtmodelle';
 import type { AbloesungEinsatzVorgabe, EinsatzSchichtmodellBody } from '../../api/types';

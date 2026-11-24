@@ -15,7 +15,7 @@ import {
   ladeFuehrungsstelle,
   ladeMitglieder,
   ladeModulFreigaben,
-} from '../api/incidents';
+} from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeFuehrungsfunktionen } from '../api/fuehrungsfunktionen';
@@ -45,7 +45,7 @@ import type {
   Sprechgruppe,
 } from '../api/types';
 
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),
   ladeMitglieder: vi.fn(),

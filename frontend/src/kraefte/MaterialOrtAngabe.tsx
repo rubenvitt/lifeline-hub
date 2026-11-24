@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../api/einheiten';

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, useParams } from 'react-router';
 import { aendereStelle, ladeBetreuung } from '../api/betreuung';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import ErgebnisAnzeige, { menge } from '../betreuung/unterkunft/ErgebnisAnzeige';
 import GrundlageEingabe, { leereEingabe } from '../betreuung/unterkunft/GrundlageEingabe';

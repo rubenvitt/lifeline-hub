@@ -5,7 +5,7 @@ import { Breadcrumb } from 'antd';
 import { listeAbloesungVorgaben } from '../api/abloesungen';
 import { ApiError } from '../api/client';
 import { listeEinheiten } from '../api/einheiten';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeUhs } from '../api/einsatzUhs';
 import { listeQualifikationen } from '../api/qualifikationen';
 import { einsatzKeys } from '../api/queryKeys';

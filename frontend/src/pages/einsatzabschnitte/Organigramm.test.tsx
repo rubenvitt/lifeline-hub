@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, fireEvent, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
-import { ladeFuehrungsstelle, ladeMitglieder, ladeModulFreigaben } from '../../api/incidents';
+import { ladeFuehrungsstelle, ladeMitglieder, ladeModulFreigaben } from '../../api/einsaetze';
 import { freigabenFixture } from '../../test/fixtures';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { ApiError } from '../../api/client';
@@ -27,7 +27,7 @@ import { contrastSurface } from '@einsatzzeichen/core/blocks';
 import { ConfigProvider, theme } from 'antd';
 import { ZEICHEN_THEME_DUNKEL } from '../../zeichen/zeichenTheme';
 
-vi.mock('../../api/incidents', () => ({
+vi.mock('../../api/einsaetze', () => ({
   ladeModulFreigaben: vi.fn(),
   ladeMitglieder: vi.fn(async () => []),
   ladeFuehrungsstelle: vi.fn(async () => ({

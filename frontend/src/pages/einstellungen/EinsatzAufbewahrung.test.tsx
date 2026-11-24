@@ -16,7 +16,7 @@ vi.mock('../../auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
-vi.mock('../../api/incidents', () => ({
+vi.mock('../../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
   speichereEinstellungen: vi.fn(),
@@ -27,7 +27,7 @@ vi.mock('../../api/aufbewahrung', () => ({
   setzeNachbereitung: vi.fn(),
 }));
 
-import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/incidents';
+import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/einsaetze';
 import { setzeAufbewahrungsfrist } from '../../api/aufbewahrung';
 
 /**

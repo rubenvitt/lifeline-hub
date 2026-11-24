@@ -1,5 +1,5 @@
 import type { AbrufZustand } from '../api/abrufZustand';
-import { ladeFuehrungsstelle, ladeMitglieder } from '../api/incidents';
+import { ladeFuehrungsstelle, ladeMitglieder } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';

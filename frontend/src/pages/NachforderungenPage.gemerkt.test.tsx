@@ -29,7 +29,7 @@ vi.mock('../kommunikation/KommKarte', async (original) => {
   };
 });
 
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',

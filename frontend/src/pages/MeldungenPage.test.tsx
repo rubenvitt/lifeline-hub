@@ -8,7 +8,7 @@ import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-rou
 import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import {
@@ -26,7 +26,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',

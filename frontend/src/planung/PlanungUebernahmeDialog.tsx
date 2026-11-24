@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { istKonflikt } from '../api/client';
-import { listeEinsaetze } from '../api/incidents';
+import { listeEinsaetze } from '../api/einsaetze';
 import { useAuth } from '../auth/AuthContext';
 import { listeEinsatzVorlagen } from '../api/einsatzVorlagen';
 import { planungUebernahmeVorschau, planungUebernehmen } from '../api/planungen';

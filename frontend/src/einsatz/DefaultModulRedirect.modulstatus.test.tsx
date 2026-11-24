@@ -23,8 +23,8 @@ vi.mock('./modulRegistry', async (importOriginal) => {
   };
 });
 
-vi.mock('../api/incidents', () => ({ ladeEinstellungen: vi.fn(), ladeModulFreigaben: vi.fn() }));
-import { ladeEinstellungen, ladeModulFreigaben } from '../api/incidents';
+vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn(), ladeModulFreigaben: vi.fn() }));
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 
 describe('DefaultModulRedirect — Modul im Ziel nicht fertig', () => {
   it('fällt still aufs Standardmodul zurück, obwohl der Server das Modul freigibt', async () => {

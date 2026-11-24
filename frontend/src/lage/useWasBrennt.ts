@@ -14,7 +14,7 @@ import {
   zustandNachFreigabe,
   type AbrufZustand,
 } from '../api/abrufZustand';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listEinsatzMaterial } from '../api/einsatzMaterial';

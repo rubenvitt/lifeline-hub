@@ -7,7 +7,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { listeDokumente } from '../api/dokumente';
 import { istKeyFreigegeben, istSprungGesperrt, modulName } from '../einsatz/modulRegistry';
 import {

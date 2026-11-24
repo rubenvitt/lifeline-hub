@@ -39,7 +39,7 @@ const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
   freigaben: {} as ModulFreigaben,
 }));
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(einsatz.freigaben)),
 }));

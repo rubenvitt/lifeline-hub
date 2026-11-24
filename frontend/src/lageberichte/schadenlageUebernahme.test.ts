@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listePersonen } from '../api/einsatzPerson';
 import { listeSchadenMarker } from '../api/einsatzSchaden';
 import { ladeGefahrengebiete, ladeMatrix } from '../api/gefahren';
@@ -20,7 +20,7 @@ import { ausKennzahl, sichtungText, warnstufeAngabe } from '../lagebesprechung/v
 import { freigabenFixture } from '../test/fixtures';
 import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 
-vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/einsatzPerson', () => ({ listePersonen: vi.fn() }));
 vi.mock('../api/einsatzSchaden', () => ({ listeSchadenMarker: vi.fn() }));
 vi.mock('../api/gefahren', async (original) => ({

@@ -12,7 +12,7 @@ import {
 } from '../abloesung/zufluss';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import type {

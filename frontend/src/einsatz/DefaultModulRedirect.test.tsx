@@ -6,8 +6,8 @@ import { freigabenFixture } from '../test/fixtures';
 import type { EinsatzEinstellungen, ModulFreigaben } from '../api/types';
 import DefaultModulRedirect from './DefaultModulRedirect';
 
-vi.mock('../api/incidents', () => ({ ladeEinstellungen: vi.fn(), ladeModulFreigaben: vi.fn() }));
-import { ladeEinstellungen, ladeModulFreigaben } from '../api/incidents';
+vi.mock('../api/einsaetze', () => ({ ladeEinstellungen: vi.fn(), ladeModulFreigaben: vi.fn() }));
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 
 /** Jede Adresse, die der Router zeigt, in der Reihenfolge des Erscheinens. */
 const besucht: string[] = [];

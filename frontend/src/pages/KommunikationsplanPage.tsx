@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
 import { mitgliederAbfrage } from '../fuehrung/besetzungAusMitgliedern';
-import { ladeEinsatz, ladeFuehrungsstelle } from '../api/incidents';
+import { ladeEinsatz, ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';

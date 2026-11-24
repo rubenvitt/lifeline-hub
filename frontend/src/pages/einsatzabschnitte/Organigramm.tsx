@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
-import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/incidents';
+import { ladeFuehrungsstelle, ladeModulFreigaben } from '../../api/einsaetze';
 import { abrufZustand } from '../../api/abrufZustand';
 import { legeLageberichtAn } from '../../api/lageberichte';
 import { einsatzKeys } from '../../api/queryKeys';

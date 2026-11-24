@@ -8,11 +8,11 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { AuthProvider } from '../auth/AuthContext';
 import type { PegelAnzeige, PegelVerlauf, WetterAnzeige } from '../api/types';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import type { EinsatzAnzeige, Lagekennzahl } from '../api/types';
 import WetterPegelPage, { verlaufLuecke, warnungenMeta } from './WetterPegelPage';
 
-vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
 
 /** Der Einsatz; `lagekennzahlen` trägt die Entscheidung „Pegel festgelegt“ (LFH-640). */
 const einsatz = (lagekennzahlen: Lagekennzahl[]) =>

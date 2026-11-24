@@ -51,7 +51,7 @@ const einsatz = vi.hoisted(() => ({
   /** Modul-Freigaben des Servers; `beforeEach` setzt „alles frei“. */
   freigaben: {} as ModulFreigaben,
 }));
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(einsatz.freigaben)),
 }));

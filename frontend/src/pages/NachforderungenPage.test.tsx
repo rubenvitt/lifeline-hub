@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 import NachforderungenPage from './NachforderungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import { ApiError, NetzFehler } from '../api/client';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { nachforderungenPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzMaterial, Nachforderung, NeueNachforderung } from '../api/types';
@@ -78,7 +78,7 @@ async function waehleImMenue(eintrag: string, karte?: HTMLElement) {
   );
 }
 
-vi.mock('../api/incidents', () => ({
+vi.mock('../api/einsaetze', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',

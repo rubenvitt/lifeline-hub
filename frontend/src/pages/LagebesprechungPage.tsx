@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { fetchLagebesprechungStand } from '../api/lagebesprechung';
 import type { EinsatzAnzeige, LagebesprechungStand } from '../api/types';
 import { einsatzKeys } from '../api/queryKeys';

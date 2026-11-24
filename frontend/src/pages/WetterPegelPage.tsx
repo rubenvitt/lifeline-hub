@@ -2,7 +2,7 @@ import { Alert, Breadcrumb, Spin } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import type { PegelAnzeige, PegelVerlauf } from '../api/types';
 import { pegelAbfrage, pegelVerlaufAbfrage } from '../api/pegel';
 import { einsatzKeys } from '../api/queryKeys';

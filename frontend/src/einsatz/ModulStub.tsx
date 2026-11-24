@@ -8,7 +8,7 @@ import {
   modulZuRoute,
   type ModulEintrag,
 } from './modulRegistry';
-import { ladeEinstellungen, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsatzModulPfad, parseRouteId } from '../routing/deeplinks';
 

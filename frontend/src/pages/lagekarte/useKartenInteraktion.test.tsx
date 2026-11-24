@@ -45,7 +45,7 @@ const einsaetzeApi = vi.hoisted(() => ({
   patcheEinsatz: vi.fn(() => Promise.resolve({ id: 1 })),
   ladeEinsatz: vi.fn(() => Promise.resolve({ id: 1 })),
 }));
-vi.mock('../../api/incidents', () => einsaetzeApi);
+vi.mock('../../api/einsaetze', () => einsaetzeApi);
 
 // Betroffene verorten: der Platzier-Auftrag `person` schreibt die Fundort-Koordinate.
 const einsatzPersonApi = vi.hoisted(() => ({

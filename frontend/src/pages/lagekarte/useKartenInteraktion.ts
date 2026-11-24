@@ -1,6 +1,6 @@
 import { useCallback, useReducer, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { patcheEinsatz, type KopfdatenPatch } from '../../api/incidents';
+import { patcheEinsatz, type KopfdatenPatch } from '../../api/einsaetze';
 import { aktualisiereUhs } from '../../api/einsatzUhs';
 import { aktualisiereSchaden } from '../../api/einsatzSchaden';
 import { verorteEinheit, type PositionPatch } from '../../api/einheiten';

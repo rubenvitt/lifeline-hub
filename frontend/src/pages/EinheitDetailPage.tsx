@@ -4,7 +4,7 @@ import { Paneel, Stapel } from '../components/instrument';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useModulFreigaben } from '../einsatz/useSprungSperre';
 import KraftZeitachse from '../kraefte/KraftZeitachse';

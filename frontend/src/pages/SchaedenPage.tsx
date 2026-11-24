@@ -7,7 +7,7 @@ import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { Breadcrumb, Button, Typography, theme } from 'antd';
 import { Segmentleiste, Textstufe, monoStil } from '../components/instrument';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';
 import { einsatzRechteGrund } from '../components/nurAnsicht';
 import {

@@ -27,8 +27,8 @@ vi.mock('../../api/schichtplan', async (orig) => ({
 }));
 
 const freigaben = vi.hoisted(() => ({ wert: undefined as ModulFreigaben | undefined }));
-vi.mock('../../api/incidents', async (orig) => ({
-  ...(await orig<typeof import('../../api/incidents')>()),
+vi.mock('../../api/einsaetze', async (orig) => ({
+  ...(await orig<typeof import('../../api/einsaetze')>()),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));
 vi.mock('../../api/einheiten', async (orig) => ({

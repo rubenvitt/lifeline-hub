@@ -239,7 +239,7 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
         ]),
       ),
     );
-    expect(abgerufen.filter((a) => /^\/api\/(personal|einsaetze\/1\/personnel)/.test(a))).toEqual(
+    expect(abgerufen.filter((a) => /^\/api\/(personnel|incidents\/1\/personnel)/.test(a))).toEqual(
       [],
     );
   });
@@ -311,7 +311,7 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
         ]),
       ),
     );
-    expect(abgerufen.filter((a) => /^\/api\/(fahrzeuge|einsaetze\/1\/vehicles)/.test(a))).toEqual(
+    expect(abgerufen.filter((a) => /^\/api\/(vehicles|incidents\/1\/vehicles)/.test(a))).toEqual(
       [],
     );
   });

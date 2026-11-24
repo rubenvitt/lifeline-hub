@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography, theme } from 'antd';
 import { ApiError } from '../api/client';
 import { dokumentAnlageDateiPfad, type AnlagenDokument } from '../api/dokumentAnlagen';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import type { DokumentAnlage, Einsatzart } from '../api/types';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';

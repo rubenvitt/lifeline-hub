@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderMitProviders } from '../test/utils';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { ApiError } from '../api/client';
 import { modulFreigabeAnzeige, useModulFreigabe } from './useModulFreigabe';
 import { freigabenFixture } from '../test/fixtures';
 
-vi.mock('../api/incidents', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const SEITE = { titel: 'Kommunikationsplan', mitArtikel: 'der Kommunikationsplan' };
 

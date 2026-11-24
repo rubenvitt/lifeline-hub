@@ -1,6 +1,6 @@
 import { App, Form, Input } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { oeffneEinsatzWieder } from '../../api/incidents';
+import { oeffneEinsatzWieder } from '../../api/einsaetze';
 import { ETB_INHALT_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import { ErfassungsModal } from '../../components/Erfassung';

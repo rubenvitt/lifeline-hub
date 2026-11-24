@@ -6,7 +6,7 @@ import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge, listEntlasseneFahrzeuge } from '../api/einsatzFahrzeuge';
 import { listEinsatzMaterial, listEntlassenesMaterial } from '../api/einsatzMaterial';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
-import { ladeFuehrungsstelle, ladeMitglieder } from '../api/incidents';
+import { ladeFuehrungsstelle, ladeMitglieder } from '../api/einsaetze';
 import type {
   Einheit,
   EinsatzFahrzeug,
@@ -37,7 +37,7 @@ vi.mock('../api/einsatzMaterial', () => ({
   listEinsatzMaterial: vi.fn(),
   listEntlassenesMaterial: vi.fn(),
 }));
-vi.mock('../api/incidents', () => ({ ladeFuehrungsstelle: vi.fn(), ladeMitglieder: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn(), ladeMitglieder: vi.fn() }));
 
 const ABSCHNITTE = [
   {

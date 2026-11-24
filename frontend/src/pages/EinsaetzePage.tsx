@@ -5,7 +5,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { Link, useLinkClickHandler, useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Einsatzart, EinsatzAnzeige } from '../api/types';
-import { legeEinsatzAn, listeEinsaetze } from '../api/incidents';
+import { legeEinsatzAn, listeEinsaetze } from '../api/einsaetze';
 import { sucheOrtInOrg } from '../api/ortSuche';
 import { Ortsfeld, type OrtsfeldWert } from '../anzeige/Ortsfeld';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';

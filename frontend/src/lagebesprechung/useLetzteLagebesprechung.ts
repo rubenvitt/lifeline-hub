@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { fetchLagebesprechungStand } from '../api/lagebesprechung';
 import { einsatzKeys } from '../api/queryKeys';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';

@@ -1,6 +1,6 @@
 import type { AbrufZustand } from '../api/abrufZustand';
 import { listeAuftraege } from '../api/auftraege';
-import { ladeFuehrungsstelle } from '../api/incidents';
+import { ladeFuehrungsstelle } from '../api/einsaetze';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { ladeFernmeldeskizze } from '../api/fernmeldeskizze';

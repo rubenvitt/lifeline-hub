@@ -5,7 +5,7 @@ import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
 import { useViewport } from '../../components/useViewport';
-import { speichereEinstellungen } from '../../api/incidents';
+import { speichereEinstellungen } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import {

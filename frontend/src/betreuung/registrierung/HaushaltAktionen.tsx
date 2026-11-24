@@ -2,7 +2,7 @@ import { App, Button, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { type CSSProperties, useId, useState } from 'react';
 import { sendBezugsperson } from '../../api/betreuungRegistrierung';
-import { ladeModulFreigaben } from '../../api/incidents';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { PersonDetail } from '../../api/types';
 import { registrierNummer } from '../../anzeige/registrierNummer';

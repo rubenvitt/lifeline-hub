@@ -9,7 +9,7 @@ import { uhrzeitAmTag } from '../anzeige/uhrzeit';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { heuteInZone, tagInZone } from '../anzeige/zeitEingabe';
 import { adminSektionPfad } from '../admin/adminNav';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
 import { VERPFLEGUNG_AUS_VORLAGE_MAX } from '../api/eingabegrenzen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import type { ModulFreigaben, TagAusVorlageEingabe } from '../api/types';

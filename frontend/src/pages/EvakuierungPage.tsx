@@ -2,7 +2,7 @@ import { Breadcrumb, Button } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { Link, Navigate, useParams, useSearchParams } from 'react-router';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { ladeEvakuierung } from '../api/evakuierung';
 import { einsatzKeys } from '../api/queryKeys';
 import BezirkTabelle from '../betreuung/BezirkTabelle';

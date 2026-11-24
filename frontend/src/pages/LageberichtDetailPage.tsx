@@ -4,7 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { parseRouteId, lageberichtePfad, lageberichtDetailPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';

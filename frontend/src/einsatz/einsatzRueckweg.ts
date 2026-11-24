@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { listeEinsaetze } from '../api/incidents';
+import { listeEinsaetze } from '../api/einsaetze';
 import { globalKeys } from '../api/queryKeys';
 import { isUebung } from './einsatzart';
 import { leseLetztenOrt, type LetzterOrt } from './letzterOrt';

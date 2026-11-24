@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuthOptional } from '../auth/AuthContext';
 import { darfOriginalLaden } from './schreibrecht';

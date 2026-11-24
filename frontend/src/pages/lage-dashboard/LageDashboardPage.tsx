@@ -64,7 +64,7 @@ import {
   wetterPegelPfad,
 } from '../../routing/deeplinks';
 import { abonniereLiveStatus, leseLiveStatus } from '../../live/liveStatusStore';
-import { ladeModulFreigaben } from '../../api/incidents';
+import { ladeModulFreigaben } from '../../api/einsaetze';
 import {
   KEINE_BERECHTIGUNG,
   istKeyFreigegeben,

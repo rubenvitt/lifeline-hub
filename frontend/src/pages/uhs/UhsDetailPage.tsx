@@ -7,7 +7,7 @@ import { Alert, App, Breadcrumb, Button, Flex, Modal, Spin } from 'antd';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Fragment, useEffect, useId, useState } from 'react';
-import { ladeEinsatz } from '../../api/incidents';
+import { ladeEinsatz } from '../../api/einsaetze';
 import { darfImEinsatzSchreiben, istEinsatzLeitung } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {

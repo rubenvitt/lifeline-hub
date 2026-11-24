@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Alert, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz } from '../api/incidents';
+import { ladeEinsatz } from '../api/einsaetze';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeFahrzeugStatus } from '../api/fahrzeugStatus';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';

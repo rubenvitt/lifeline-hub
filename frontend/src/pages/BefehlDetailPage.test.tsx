@@ -7,7 +7,7 @@ import { App as AntApp } from 'antd';
 import BefehlDetailPage from './BefehlDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
 import * as befehleApi from '../api/befehle';
-import * as einsaetzeApi from '../api/incidents';
+import * as einsaetzeApi from '../api/einsaetze';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
@@ -17,7 +17,7 @@ import { server } from '../test/server';
 import { erwarteNichtGefunden } from '../test/nichtGefunden';
 
 vi.mock('../api/befehle');
-vi.mock('../api/incidents');
+vi.mock('../api/einsaetze');
 
 const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'einsatzleitung' };
 

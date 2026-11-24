@@ -18,7 +18,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { EXTERNE_STELLE_BEZEICHNUNG_MAX } from '../api/eingabegrenzen';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
 import { createExterneStelle } from '../api/externeStellen';

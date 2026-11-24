@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input, type FormInstance } from 'antd';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { freigabenFixture } from '../test/fixtures';
 import { renderMitProviders } from '../test/utils';
 import LeereAbschnitteFuellen, { LEERE_FUELLEN } from './LeereAbschnitteFuellen';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 import { standFeld } from './standFeld';
 
-vi.mock('../api/incidents', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const geaendert = vi.fn();
 

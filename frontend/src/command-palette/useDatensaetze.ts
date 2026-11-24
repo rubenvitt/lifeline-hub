@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeModulFreigaben } from '../api/incidents';
+import { ladeModulFreigaben } from '../api/einsaetze';
 import { listeEtb, zaehleEtb } from '../api/etb';
 import { datensatzAbfrage, ETB_SUCH_GC_MS, etbNummerAbfrage, FRISCH_MS } from './datensatzAbfrage';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';

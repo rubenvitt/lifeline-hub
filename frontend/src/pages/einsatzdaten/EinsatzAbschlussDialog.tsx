@@ -1,7 +1,7 @@
 import { App, Button, Form, Input } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useId, type ReactNode } from 'react';
-import { loadAbschlussPruefung, schliesseEinsatzAb } from '../../api/incidents';
+import { loadAbschlussPruefung, schliesseEinsatzAb } from '../../api/einsaetze';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
 import type {
   AbschlussEintrag,
