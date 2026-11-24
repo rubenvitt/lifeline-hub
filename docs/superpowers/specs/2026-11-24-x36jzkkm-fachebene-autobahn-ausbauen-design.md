@@ -3,7 +3,7 @@
 Stand: 24.11.2026 · Zunder: https://zunder.rubeen.dev/#/aufgabe/x36jzkkm0bhvbnayeqvlxyiw ·
 Abgestimmt: Ruben im Chat, 24.11.2026 (Phase-1-Checkpoint: Umfang „Warnungen + Lkw-Parken“,
 Lizenz „Doku + Anfrage an die GmbH“, Live-Abruf freigegeben; Folgefrage: Lkw-Parken als „eigene
-Ebene“) · Freigabe des Entwurfs: offen
+Ebene“) · Freigabe des Entwurfs: Ruben im Chat, 24.11.2026 („Entwurf passt, go“)
 
 ## Absicht
 
