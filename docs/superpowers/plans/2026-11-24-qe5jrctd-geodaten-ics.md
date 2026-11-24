@@ -254,14 +254,14 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 **Interfaces:**
 - Produces: `export function writeGeojson(objekte: ExportObjekt[], meta: { stand: Date; einsatzName: string }): string` (JSON-Text, `FeatureCollection`).
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Jedes Feature hat `properties.name`, `properties['lfh:art']`, und bei vorhandenem Zeichen `properties['lfh:zeichen']`.
   - Simplestyle-Felder `stroke`, `fill`, `fill-opacity` für Flächen und `marker-color` für Punkte.
   - Polygonringe geschlossen.
   - Wurzel: `lfh:stand` im UTC-Format `YYYY-MM-DD HH:MM:SS`, `lfh:quelle` = `'Lifeline Hub'`, kein `crs`.
   - Gefahrengebiet: `lfh:warnstufe`.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest → PASS.
-- [ ] **Step 5:** Commit `feat: Lagekarte als GeoJSON schreiben` (Zunder A).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest → PASS.
+- [x] **Step 5:** Commit `feat: Lagekarte als GeoJSON schreiben` (Zunder A).
 
 ### Task 9: KML schreiben, Zeichen rastern, KMZ packen
 
