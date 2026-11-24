@@ -127,4 +127,49 @@ mod tests {
         let min = DateTime::<Utc>::MIN_UTC;
         assert_eq!(naechste_faelligkeit(min, 1, max), None);
     }
+
+    /// Property-Tests (LLH-2090): der Planer verlässt sich darauf, dass der nächste Slot echt in
+    /// der Zukunft liegt, auf dem Raster der Erinnerung sitzt und kein Slot übersprungen wird, der
+    /// noch nach `jetzt` läge.
+    mod eigenschaften {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// Zeitpunkte über den ganzen darstellbaren Bereich, gehäuft um die Gegenwart.
+        fn zeitpunkt() -> impl Strategy<Value = DateTime<Utc>> {
+            let min = DateTime::<Utc>::MIN_UTC.timestamp();
+            let max = DateTime::<Utc>::MAX_UTC.timestamp();
+            prop_oneof![min..=max, 1_700_000_000i64..1_900_000_000,]
+                .prop_map(|s| DateTime::from_timestamp(s, 0).expect("im Bereich"))
+        }
+
+        proptest! {
+            #[test]
+            fn der_naechste_slot_liegt_nach_jetzt_auf_dem_raster_und_ist_der_erste(
+                faellig in zeitpunkt(),
+                jetzt in zeitpunkt(),
+                intervall in prop_oneof![1i64..=10_080, 1i64..=i64::MAX],
+            ) {
+                let Some(r) = naechste_faelligkeit(faellig, intervall, jetzt) else {
+                    return Ok(());
+                };
+                prop_assert!(r > jetzt, "{r} nicht nach jetzt {jetzt}");
+                prop_assert!(r > faellig, "{r} nicht nach fällig {faellig}");
+                let abstand = (r - faellig).num_minutes();
+                prop_assert_eq!(abstand % intervall, 0, "{} Minuten nicht auf dem Raster", abstand);
+                // Der Slot davor läge nicht mehr nach `jetzt` (oder wäre `faellig` selbst).
+                let davor = r - TimeDelta::minutes(intervall);
+                prop_assert!(davor <= jetzt.max(faellig), "Slot {davor} übersprungen");
+            }
+
+            #[test]
+            fn ohne_positives_intervall_gibt_es_keinen_slot(
+                faellig in zeitpunkt(),
+                jetzt in zeitpunkt(),
+                intervall in i64::MIN..=0,
+            ) {
+                prop_assert_eq!(naechste_faelligkeit(faellig, intervall, jetzt), None);
+            }
+        }
+    }
 }
