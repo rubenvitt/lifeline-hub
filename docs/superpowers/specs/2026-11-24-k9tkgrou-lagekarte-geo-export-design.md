@@ -63,8 +63,7 @@ Zeichnungen als Geodaten: lagerichtig, mit Beschriftung und mit dem taktischen Z
 
 ### Was hineinkommt
 
-Quelle ist die Menge, die die Karte gerade zeichnet: dieselben Arrays, die an `useLageplan`
-gehen, also Sichtbarkeit (`LayerSichtbar`), Modulfreigabe, Fokus und Ansicht. In der
+Quelle ist die Menge, die die Karte gerade zeichnet: `sichtbareMarker`, `kartenFlaechen` (Abschnittsflächen, `LagekartePage.tsx`; `useLageplan` bekommt davon nur die Anzahl) und `zonenFeatures`, also Sichtbarkeit (`LayerSichtbar`), Modulfreigabe, Fokus und Ansicht. In der
 Historienansicht ist es der gezeigte Stand.
 
 | `lfh:art` | Herkunft | Geometrie | `name` |
@@ -78,6 +77,17 @@ Historienansicht ist es der gezeigte Stand.
 | `abschnitt` | Einsatzabschnitte | Polygon (Fläche) und Point (Marker) | Name |
 | `fahrzeug` | Fahrzeuge mit Position | Point | Funkrufname bzw. Anzeigename |
 | `einheit` | Einheiten mit Position | Point | Anzeigename |
+| `einsatzort` | Einsatzort | Point | „Einsatzort“ |
+| `fuehrungsstelle` | Führungsstelle | Point | Name |
+| `bereitstellungsraum` | Bereitstellungsräume | Point | Name |
+| `sammelstelle` | Sammelstellen | Point | Name |
+| `evakuierungsbezirk` | Evakuierungsbezirke | Polygon | `label` |
+
+**Meine Wahl (nach Builder-Check):** Die Tabelle ist abschließend. Andere Markertypen von
+`marker.ts` bleiben draußen, ausdrücklich `fuehrung` (trägt den Personennamen), `tier`
+(Halterbezug) und `lagemeldung` (Meldungsinhalt). Ein neuer Markertyp kommt nur durch eine
+Zeile hier hinein (Test über die Liste der `KarteMarker`-Arten, damit kein Typ unbemerkt fehlt
+oder hineinrutscht). Gedämpfte Abschnitte im Abschnittsfokus sind sichtbar und kommen mit.
 
 Nicht hinein: Personen bzw. Betroffene, einzelne Personal-Marker (Kräfte gehen über Einheit
 oder Fahrzeug), Notiz-, Auftrags- und Beschreibungsfelder, Fachebenen, Bilder, Messungen,
@@ -85,22 +95,24 @@ Suchnadel.
 
 ### Ein Zwischenmodell, zwei Schreiber
 
-Reine Funktionen unter `frontend/src/pages/lagekarte/` (kein neues Verzeichnis unter
+Reine Funktionen (Namen nach „Bezeichner-Sprache“: Abläufe englisch) unter `frontend/src/pages/lagekarte/` (kein neues Verzeichnis unter
 `frontend/src/`):
 
-- `geoExport.ts`: `sammleExportObjekte(eingabe) → ExportObjekt[]`, mit `{art, name, geometrie
-  (GeoJSON, [lon,lat], 6 Nachkommastellen), zeichen?: {schluessel, spec}, stil: {linie, fuellung,
+- `geoExport.ts`: `collectExportObjekte(eingabe) → ExportObjekt[]`, mit `{art, name, geometrie
+  (GeoJSON, [lon,lat], 6 Nachkommastellen), zeichen?: {schluessel, spec}` — die Spec wird aus dem Schlüssel `ez|<Spec>` zurückgelesen, `markerZeichen` liefert nur `{schluessel, drawing}`; `, stil: {linie, fuellung,
   deckkraft, markerFarbe}}`. Die Farben kommen als Hex aus der `PALETTE` von
   `@einsatzzeichen/schema` bzw. aus `zonenStil`. Gefahrengebiete bekommen eine feste Exportfarbe
-  je Warnstufe statt des Theme-Tokens (Tabelle in `geoExport.ts`, gleiche Töne wie das helle
-  Theme).
-- `geojsonSchreiben.ts`: `FeatureCollection` mit
+  je Warnrolle statt des Theme-Tokens (gleiche Töne wie die Karte am Tag). Die Warnstufe selbst
+  trägt der Text (LFH-357): GeoJSON hat `name` = rohes `label` und `lfh:warnstufe`; KML-`name`
+  ist die Kartenbeschriftung mit „· Warnstufe …“. Die Stufe wird dafür in den Eingabetyp
+  durchgereicht (meine Wahl).
+- `geojsonWriter.ts` (`writeGeojson`): `FeatureCollection` mit
   - **je Feature** `properties`: `name`, `lfh:art`, `lfh:zeichen` (die kanonische Spec, falls
     vorhanden), `lfh:kreis` (`{mitte:[lon,lat], radius_m}` bei Kreiszonen) und die simplestyle-
     Felder `marker-color`, `stroke`, `stroke-width`, `stroke-opacity`, `fill`, `fill-opacity`;
   - **am Wurzelobjekt** `lfh:stand` (UTC, ADR-0012) und `lfh:quelle: "Lifeline Hub"`.
   - Medientyp `application/geo+json`, Endung `.geojson`.
-- `kmlSchreiben.ts`: KML 2.2 mit
+- `kmlWriter.ts` (`writeKml`): KML 2.2 mit
   - **`Document`**: `name` = Einsatzbezeichnung und Stand.
   - **`Style`** je Zeichenschlüssel: `IconStyle` mit `href` `files/<hash>.png`, `LabelStyle`,
     `LineStyle`/`PolyStyle` in `aabbggrr`.
@@ -108,13 +120,13 @@ Reine Funktionen unter `frontend/src/pages/lagekarte/` (kein neues Verzeichnis u
   - **`Placemark`**: `name`, `ExtendedData` mit `lfh:art` und `lfh:zeichen`, Geometrie mit
     `clampToGround`, Polygone mit `outerBoundaryIs`/`innerBoundaryIs`.
   - Alle Texte XML-escaped, keine `description` (Anti-Ziel Freitext).
-- `kmzPacken.ts`: `fflate.zipSync`. `doc.kml` steht als erster Eintrag, gepackt, die PNGs ungepackt
+- `kmzPacker.ts` (`packKmz`): `fflate.zipSync`. `doc.kml` steht als erster Eintrag, gepackt, die PNGs ungepackt
   (`level: 0`). Medientyp `application/vnd.google-earth.kmz`.
 
 ### Zeichen als PNG
 
 Je verschiedenem Zeichenschlüssel (`ez|<Spec>` aus `markerZeichen`) einmal
-`renderCanvas` → `canvas.toBlob('image/png')`. Gerendert wird mit 64 px Kantenlänge im **hellen**
+`renderCanvas` → `canvas.toBlob('image/png')`. Gerendert wird mit 64 px Kantenlänge wie die Karte am Tag (ohne Theme, `zeichenDichte.ts`), nie im dunklen
 Theme (`frontend/src/pages/lagekarte/AGENTS.md`: dunkel nur mit Theme `dark`, nie selbst
 einfärben). Vorher muss die Zeichenschrift geladen sein (README von `@einsatzzeichen/core`,
 `TEXT_FONT_FAMILY_ATTR`). Der Dateiname ist ein kurzer Hash des Schlüssels. Objekte ohne Zeichen
@@ -154,13 +166,13 @@ Seitenfehler an die Seite. Lesen genügt, also an kein Schreibrecht gebunden.
 
 - **Anwenderdoku:** Kapitel Lagekarte, Abschnitt „Lagekarte exportieren“ (Mitänderungsregel
   `docs/anwender/AGENTS.md`).
-- **ADR:** die gemeinsame ADR mit den Fremdebenen. Sie hält fest, dass Geodaten das System aus dem
+- **ADR:** die gemeinsame ADR mit den Fremdebenen; sie entsteht in der ersten Aufgabe des Plans, vollständig für A bis C. Sie hält fest, dass Geodaten das System aus dem
   Client verlassen und nur sichtbare, nicht personenbezogene Objekte enthalten.
 - **Abhängigkeit:** `fflate` in `frontend/package.json` (MIT, ohne Abhängigkeiten).
 
 ## Dem Bauenden überlassen
 
-- **Genauer Zuschnitt des Eingabetyps von `sammleExportObjekte`:** nah an dem, was `useLageplan`
+- **Genauer Zuschnitt des Eingabetyps von `collectExportObjekte`:** nah an dem, was `useLageplan`
   bekommt.
 - **Hashfunktion für PNG-Namen:** etwa FNV-1a. Kryptografische Güte ist nicht nötig.
-- **Exakte Farbwerte der Gefahrengebiete:** aus dem hellen Theme abgelesen.
+- **Exakte Farbwerte der Gefahrengebiete:** wie die Karte am Tag.

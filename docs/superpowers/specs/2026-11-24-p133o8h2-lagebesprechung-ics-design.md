@@ -15,8 +15,8 @@ Einsatzleitung auf dem Handy, soll ihn mit einem Knopf übernehmen können.
 
 - Ein Knopf am Termin lädt eine `.ics`-Datei nach RFC 5545 mit genau diesem Termin.
 - Import in Outlook, Apple-Kalender und Thunderbird ohne Warnung.
-- Wird der Termin verschoben und die Datei erneut importiert, aktualisiert der Kalender den
-  Eintrag, statt einen zweiten anzulegen.
+- Derselbe Termin zweimal importiert ergibt keinen zweiten Eintrag. Ein verschobener Termin ist ein
+  neuer Eintrag (abgestimmt, weil Thunderbird bekannte UIDs nicht aktualisiert).
 
 ## Nicht-Ziele
 
@@ -35,7 +35,8 @@ Einsatzleitung auf dem Handy, soll ihn mit einem Knopf übernehmen können.
 - **Dauer 30 min:** Das Modell kennt nur den Start, `einsatz.naechste_lagebesprechung_at`.
 - **Erinnerung 10 min vorher:** `VALARM` 10 min vorher.
 - **Titel:** SUMMARY „Lagebesprechung – <Einsatzbezeichnung>“, ohne Ort.
-- **UID:** bleibt je Einsatz und Instanz gleich.
+- **UID:** je Termin (Ruben, 24.11.2026, nach dem Builder-Check): `lagebesprechung-<einsatz_id>-<YYYYMMDDTHHMMSSZ>@<instanz_kennung>`.
+  Ein verschobener Termin ist ein neuer Eintrag; der alte bleibt im Kalender stehen.
 - **Erzeugung:** im Backend, der Knopf im TerminPaneel ist nur an Lesen gebunden.
 - **Ohne Termin:** Der Knopf ist gesperrt, die Route antwortet 404.
 
@@ -66,9 +67,9 @@ PRODID:-//Lifeline Hub//Lagebesprechung//DE
 CALSCALE:GREGORIAN
 METHOD:PUBLISH
 BEGIN:VEVENT
-UID:lagebesprechung-<einsatz_id>@<instanz_kennung>
+UID:lagebesprechung-<einsatz_id>-<termin>Z@<instanz_kennung>
 DTSTAMP:<jetzt>Z
-SEQUENCE:<Minuten seit 2026-01-01T00:00Z, aus jetzt>
+SEQUENCE:0
 DTSTART:<termin>Z
 DTEND:<termin + 30 min>Z
 SUMMARY:Lagebesprechung – <bezeichnung>
@@ -86,24 +87,28 @@ END:VCALENDAR
 - **Zeitformat:** alle Zeiten in UTC als `YYYYMMDDTHHMMSSZ` (ADR-0012). Es braucht kein
   `VTIMEZONE`. Der Auftrag nennt Europe/Berlin, das Konzept hat am 10.11.2026 auf UTC entschieden;
   die Kalender zeigen in ihrer eigenen Zone.
-- **UID:** Die Instanzkennung wird auf `[A-Za-z0-9.-]` beschränkt, damit die UID eine gültige
-  Adresse bildet.
-- **SEQUENCE:** wächst mit jedem Export, also auch nach einer Verschiebung. Dadurch übernimmt
-  ein Kalender beim erneuten Import den neuen Stand. In int32 reicht es für Jahrtausende.
+- **UID:** Die Instanzkennung ist eine UUIDv4 (`instanz/identitaet.rs`); gelesen wird sie ohne
+  `load_or_create`, damit der Export kein Schlüsselpaar anlegt (fehlt sie, gilt die Org-Kennung).
+- **SEQUENCE:** immer 0, die UID wechselt mit dem Termin.
 - **Textregeln:**
   - Escaping nach RFC 5545 3.3.11: `\` → `\\`, `;` → `\;`, `,` → `\,`, Zeilenumbruch → `\n`;
   - Zeilen enden mit CRLF;
   - Faltung bei 75 Oktetten, ohne ein UTF-8-Zeichen zu teilen (Fortsetzung mit Leerzeichen);
-  - die Bezeichnung wird vor dem Escaping auf 200 Zeichen gekürzt.
+  - die Bezeichnung wird vor dem Escaping auf 200 Zeichen gekürzt;
+  - `\r\n` und `\r` werden zu `\n`, andere Steuerzeichen außer HTAB entfernt;
+  - das führende Leerzeichen einer Fortsetzungszeile zählt zu deren 75 Oktetten;
+  - kein ORGANIZER und kein ATTENDEE (sonst wird die Datei zur Einladung).
 
 ### Route
 
-- **Pfad:** `GET /api/einsaetze/{id}/briefing/schedule/export`. `schedule` und `export` stehen
-  schon im Glossar.
-- **Gate:** `EinsatzLesezugriff<Lagebesprechung>`.
-- **Statuscodes:** ohne Termin 404, sonst 200.
+- **Pfad:** `GET /api/incidents/{id}/briefing/schedule/export`. `schedule` und `export` stehen
+  schon im Glossar. Das Präfix `incidents` gilt nach der Entscheidung vom 24.11.2026 (siehe
+  Fremdebenen-Design, „Routen“): Der Bestand unter `/api/einsaetze` darf nicht wachsen.
+- **Gate:** `EinsatzLesezugriff<Lagebesprechung>` (meine Wahl: wie die übrigen Lagebesprechungsrouten; wer das Modul nicht hat, sieht auch das Paneel nicht).
+- **Statuscodes:** ohne Termin 404, sonst 200, auch bei einem überfälligen Termin (meine Wahl: er
+  steht noch an).
 - **Antwort:**
-  - `Content-Type: text/calendar; charset=utf-8`;
+  - `Content-Type: text/calendar; charset=utf-8; method=PUBLISH`;
   - `Content-Disposition` über `anhang::content_disposition` mit
     `lagebesprechung-einsatz-<id>-<YYYY-MM-DD-HHMM>.ics` (Terminzeit);
   - `Cache-Control: no-store`.
@@ -116,19 +121,24 @@ END:VCALENDAR
 
   ```
   Nächste Lagebesprechung  14:30 (in 25 min)
-  [+15] [+30] [+60] [Kein Termin] [Zeit wählen …]
+  [+30] [+60] [+120] [Kein Termin] [Zeit wählen …]
   [In Kalender übernehmen]
   ```
 
 - **Sperren:**
   - an Lesen gebunden, nicht an `darfSchreiben` oder `isGesperrt`;
   - gesperrt ohne Termin, sichtbar mit „Kein Termin“ am Knopf;
-  - gesperrt ohne Netz, sichtbar mit „Offline“.
+  - ohne Netz wie der CSV-Export (`useCsvExport`, `networkMode: 'always'`): Der Klick scheitert
+    sofort und meldet „Keine Verbindung zum Server“ am Paneel.
 - **Ablauf:** `apiDatei` → `speichereDatei` (`components/dateiSpeichern.ts`). Den Dateinamen
   liefert `exportDateiname`, erweitert um Inhalt und Endung, gemeinsam mit Teil A.
 - **Fehler:** Ein Fehler erscheint im Paneel wie `SpeicherFehler`.
-- **Mobil:** Auf Android und iOS öffnet die Hülle die Datei über Teilen bzw. den Download. Dort
-  bietet das System die Kalender-App an; dafür sind keine eigenen Änderungen nötig.
+- **Android (Ruben, 24.11.2026, in diesem Lauf):** Die Hülle öffnet eine Datei mit
+  `text/calendar` bzw. Endung `.ics` per `ACTION_VIEW` mit Auswahl (Kalender-App), sonst bleibt
+  `ACTION_SEND`. Die Entscheidung „welcher Intent“ ist eine reine Funktion im Kern
+  (`android/AGENTS.md`: keine Anwendungslogik in der Hülle, Kern ohne SDK), mit Test dort.
+  Gilt für jeden Download, nicht nur diesen (allgemein „Kalenderdatei öffnen“).
+- **iOS:** Folgeaufgabe (Teilen-Blatt zeigt den Kalender meist nicht; Bauen nur auf macOS).
 
 ### Prüfungen
 

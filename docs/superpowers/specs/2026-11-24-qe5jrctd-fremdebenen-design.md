@@ -95,10 +95,17 @@ karte_fremdebene_daten
 
 ### Routen (englisch, Glossar um `foreign-layers	Fremdebenen` ergänzt)
 
+**Präfix `/api/incidents` (Ruben, 24.11.2026):** Neue Einsatzrouten können nicht unter
+`/api/einsaetze/{id}/…` entstehen, weil der Bestand des Routen-Wächters nicht wachsen darf
+(ADR-0097). Sie liegen deshalb schon unter `/api/incidents/{id}/…`, bis das Präfix-Paket die
+übrigen nachzieht. Der Einsatz-Gate-Wächter (`tests/einsatz_kontext_guard.rs`, ADR-0005) prüft
+dafür beide Präfixe, und der Extractor für die Einsatz-ID muss unter beiden greifen. Gemeinsam
+mit LLH-2101; der Schritt kommt als erste Aufgabe in den Plan.
+
 | Methode und Pfad | Gate | Zweck |
 |---|---|---|
-| `GET /api/einsaetze/{id}/map/foreign-layers` | `EinsatzLesezugriff<Lagekarte>` | Liste mit Metadaten, Stand, Fehler, Zahl der Objekte |
-| `POST /api/einsaetze/{id}/map/foreign-layers` | `EinsatzSchreibzugriff<Lagekarte>` | multipart: `name`, und genau eines von `file` (Datei) oder `url` |
+| `GET /api/incidents/{id}/map/foreign-layers` | `EinsatzLesezugriff<Lagekarte>` | Liste mit Metadaten, Stand, Fehler, Zahl der Objekte |
+| `POST /api/incidents/{id}/map/foreign-layers` | `EinsatzSchreibzugriff<Lagekarte>` | multipart: `name`, und genau eines von `file` (Datei) oder `url` |
 | `GET …/foreign-layers/{ebeneId}/data` | `EinsatzLesezugriff<Lagekarte>` | normiertes GeoJSON, `ETag` = sha256, 304 bei `If-None-Match` (Vorbild `karte::fachebene_antwort`, ungepackt nach LFH-940) |
 | `PATCH …/foreign-layers/{ebeneId}` | `EinsatzSchreibzugriff<Lagekarte>` | `name`, `farbe` |
 | `DELETE …/foreign-layers/{ebeneId}` | `EinsatzSchreibzugriff<Lagekarte>` | entfernen |
@@ -173,7 +180,7 @@ Für eine URL kommen hinzu (gespeichert in `fehler`, angezeigt an der Ebene): `n
 ### URL-Ebene (C)
 
 - **Anlegen:**
-  - `check_url(url, lan_erlaubt)` vor dem Speichern, nur `https`;
+  - `check_url(url, lan_erlaubt)` (liegt in `public_api::webhook::ziel`, `adapter::ziel` nutzt es) vor dem Speichern, nur `https`;
   - der erste Abruf läuft synchron in der Anlage-Anfrage, damit ein Tippfehler sofort als
     Fehler zurückkommt (nach dem Ablauf beim Adapter-Probelauf).
 - **Abruf** über einen neuen öffentlichen Helfer in `adapter::ziel`, etwa
@@ -219,7 +226,7 @@ Für eine URL kommen hinzu (gespeichert in `fehler`, angezeigt an der Ebene): `n
     Rückgängig-Hinweis nur, wenn der Rückweg den Zustand herstellt. Sonst eine Bestätigung mit einem
     Folgesatz.
 - **Sichtbarkeit ist je Arbeitsplatz** (`LayerSichtbar`, über `lib/sichererSpeicher`), nicht am
-  Datensatz. Wer eine Fremdebene ausblendet, blendet sie nicht für den Lagemonitor aus. Neue
+  Datensatz. Wer eine Fremdebene ausblendet, blendet sie nicht für die anderen aus. Neue
   Ebenen sind sichtbar. Ein neuer Speicherort steht in `GERAETESPEICHER`
   (`frontend/src/offline/AGENTS.md`).
 - **Zeichnen:**
@@ -272,6 +279,21 @@ das System aus dem Client, fremde Geodaten kommen nur geprüft über den Server�
   - Kapitel 12: Begriff „Fremdebene“.
 - **`src/AGENTS.md`:** Satz im Abschnitt Adapter.
 
+### Festlegungen nach dem Builder-Check (meine Wahl)
+
+- **Gekoppelte Instanzen:** Nur die führende Seite eines Einsatzes holt nach. Auf einem Spiegel
+  zeigt die Ebene den gespiegelten Stand mit dessen `abgerufen_at`; der Abruf beim Lesen
+  entfällt dort (Schutz-Trigger, eigenes Netz). `url` wird mitgespiegelt.
+- **Abgeschlossener oder gesperrter Einsatz:** kein Nachholen mehr; der letzte Stand bleibt
+  Teil der Akte.
+- **URL mit Geheimnis im Query:**
+  - Die volle `url` sehen nur Schreiber (Wire-Feld `url` nur mit Schreibrecht), Leser bekommen
+    `url_host`.
+  - Die URL geht nie in Log, Fehlertext oder Admin-Spur; ein Abruffehler trägt nur den Code.
+  - Für `url` gilt die Schwärzung wie für `name`.
+- **Fehlercodes der URL-Ebene** sind `FremdebeneFehler`, eigene Werte, keine Wiederverwendung
+  von `AdapterFehler` (andere Einteilung, keine Meldung an Admins).
+
 ## Dem Bauenden überlassen
 
 - Ob die Bereichsprüfung in `lage_zone` verallgemeinert oder neben ihr ergänzt wird.
@@ -281,6 +303,14 @@ das System aus dem Client, fremde Geodaten kommen nur geprüft über den Server�
 - Ob `adapter::ziel` einen eigenen `Zweck` für die Fremdebene bekommt (für den User-Agent bzw. das
   Log).
 
-## Offen für Ruben
+## LAN-Ziele (Ruben, 24.11.2026)
 
-- **LAN-Ziele für die URL-Ebene** (die Suchlage läuft oft im eigenen Netz). Siehe Freigabefrage.
+- Eine **Org-Einstellung** „Fremdebenen dürfen das eigene Netz abrufen“ (Standard aus), die nur
+  Admins setzen. Jede Änderung geht in die Admin-Spur (neue `AdminAktion`, Vorbild
+  `AdapterLanErlaubt`).
+- Ist sie an, nimmt der Abruf den Client mit LAN-Ausnahme (`adapter::ziel`, `lan_erlaubt =
+  true`). Loopback, Link-Local und Multicast bleiben immer gesperrt (`WebhookResolver`).
+- Die Einstellung wird bei jedem Abruf gelesen, nicht an der Ebene gespeichert: Wird sie
+  abgeschaltet, scheitert der nächste Abruf eines LAN-Ziels mit `ziel_intern`.
+- Die Oberfläche zeigt den Schalter in der Verwaltung der Organisation; im Dialog erscheint
+  nichts zusätzlich.
