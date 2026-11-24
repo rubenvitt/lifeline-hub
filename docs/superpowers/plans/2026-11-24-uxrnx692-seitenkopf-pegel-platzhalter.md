@@ -1,6 +1,6 @@
 # Seitenkopf im Überblick: Platz für die Pegel-Notiz — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Das Eintreffen des Pegels verschiebt den Überblick in keiner Breite um mehr als 0,1 CLS.
 
@@ -38,7 +38,7 @@ Notiz sind zwei Knoten. Die Pegel-Spec misst zusätzlich den ungünstigen Fall.
 
 **Interfaces:** Produces `data-lfh="kopf-pegel-platzhalter"` (Task 2 nutzt es nicht, nur Tests).
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `it('Pegel lädt: unsichtbarer Platzhalter „Pegel 0,00 m steigend“ hält die Stelle der Notiz (LLH-2085)')`:
     Einsatz mit `lagekennzahlen: ['pegel']` (Override `http.get('/api/einsaetze/1', …)`),
     `gauges` mit `await delay('infinite')`. Erwartung nach `koerperDa()`: `kopf-pegel-platzhalter`
@@ -46,10 +46,10 @@ Notiz sind zwei Knoten. Die Pegel-Spec misst zusätzlich den ungünstigen Fall.
     `kopf-pegel` fehlt.
   - `it('Einsatz ohne Pegel: kein Platzhalter im Kopf (LLH-2085)')`: `lagekennzahlen: []`, `gauges`
     unendlich verzögert, Erwartung nach `koerperDa()`: kein `kopf-pegel-platzhalter`.
-- [ ] **Step 2:** `mise exec -- pnpm vitest run src/pages/fuehrung/UeberblickPage.test.tsx -t LLH-2085` → der erste Test schlägt fehl.
-- [ ] **Step 3:** `pegelErwartet` berechnen (Bedingung aus Global Constraints). `kopfLage` entsteht auch dann, wenn nur `pegelErwartet` gilt. Die Notiz als `<span key="pegel" data-lfh="kopf-pegel">`, sonst der Platzhalter als `<span key="pegel-platzhalter" …>` an derselben Stelle. Die Konstante `PEGEL_PLATZHALTER = 'Pegel 0,00 m steigend'` steht mit Kommentar neben `pegelNotizKurz` in `pegel/pegelKennzahl.ts`.
-- [ ] **Step 4:** Dieselbe Datei komplett: `mise exec -- pnpm vitest run src/pages/fuehrung/UeberblickPage.test.tsx` → grün.
-- [ ] **Step 5:** Commit `fix(ueberblick): Platz für die Pegel-Notiz im Seitenkopf, solange der Pegel lädt (LLH-2085)`.
+- [x] **Step 2:** `mise exec -- pnpm vitest run src/pages/fuehrung/UeberblickPage.test.tsx -t LLH-2085` → der erste Test schlägt fehl.
+- [x] **Step 3:** `pegelErwartet` berechnen (Bedingung aus Global Constraints). `kopfLage` entsteht auch dann, wenn nur `pegelErwartet` gilt. Die Notiz als `<span key="pegel" data-lfh="kopf-pegel">`, sonst der Platzhalter als `<span key="pegel-platzhalter" …>` an derselben Stelle. Die Konstante `PEGEL_PLATZHALTER = 'Pegel 0,00 m steigend'` steht mit Kommentar neben `pegelNotizKurz` in `pegel/pegelKennzahl.ts`.
+- [x] **Step 4:** Dieselbe Datei komplett: `mise exec -- pnpm vitest run src/pages/fuehrung/UeberblickPage.test.tsx` → grün.
+- [x] **Step 5:** Commit `fix(ueberblick): Platz für die Pegel-Notiz im Seitenkopf, solange der Pegel lädt (LLH-2085)`.
 
 ### Task 2: Pegel-Spec misst den ungünstigen Fall
 
@@ -58,16 +58,17 @@ Notiz sind zwei Knoten. Die Pegel-Spec misst zusätzlich den ungünstigen Fall.
 
 **Interfaces:** Consumes die vorhandenen Helfer `anmelden`, `einsatzAnlegen`, `legePegelFest`, `verschiebungenAufzeichnen`, `zurueckhalten`, `wartenBisRuhig`, `beitragAb`, `pegelListe`.
 
-- [ ] **Step 1: Test schreiben.** Zwei Fälle in einer Schleife, je ein `test(…)`:
+- [x] **Step 1: Test schreiben.** Zwei Fälle in einer Schleife, je ein `test(…)`:
   - `ueberblick, langer Einsatzname: der Pegel als erste Lage-Angabe trägt ≤ 0,1 zur CLS bei (LLH-2085)` mit Breite 1024 und Messung frisch (`pegelListe(10)`, Text `/Pegel 6,84 m steigend/`).
   - `ueberblick, langer Einsatzname, Warnstufe akut, unbestätigt und Pegel veraltet: ≤ 0,1 (LLH-2085)` mit Breiten 768 und 1024, drei Gefahrengebiete mit `warnstufe: 'akut'` und ohne Bestätigung (Zone `gefahrengebiet` anlegen, dann `PUT …/matrix/rating`), `pegelListe(120)`, Text `/veraltet/`.
+    *Beim Bauen geändert:* Fall 1 misst sieben Namensstufen (`NAMENSSTUFEN`) an einem umbenannten Einsatz. Der veraltete Pegel wird nur bei 1024 px gemessen, 768 px mit frischem Pegel; 768 px veraltet ist LLH-2102 (Nachtrag im Entwurf).
   - Einsatzname `Hochwasser Elbe Dresden Abschnitt Nord-Süd ${Date.now()}`, Viewport-Höhe 844. Die Spec setzt per `test.use` nichts an der Schriftsetzung; die CI-Setzung kommt beim lokalen Lauf über die Startoption (Step 2).
-- [ ] **Step 2: Mutationsprobe.** Den Platzhalter kurz ausschalten (Bedingung auf `false`) und lokal mit `--font-render-hinting=full` laufen lassen (vorinstalliertes Chromium). Beide neuen Fälle müssen rot sein. Danach zurücksetzen.
-- [ ] **Step 3:** Mit Fix alle CLS-Tests der Spec laufen lassen (`-g CLS`) → grün. Ist „Pegel veraltet“ rot, nimmt der Platzhalter „· veraltet“ auf (Spec, „Dem Bauenden überlassen“), und es folgt erneut Step 1 von Task 1.
-- [ ] **Step 4:** Commit `test(e2e): Pegel-Spec misst langen Einsatznamen und lange Meta im Überblick (LLH-2085)`.
+- [x] **Step 2: Mutationsprobe.** Den Platzhalter kurz ausschalten (Bedingung auf `false`) und lokal mit `--font-render-hinting=full` laufen lassen (vorinstalliertes Chromium). Beide neuen Fälle müssen rot sein. Danach zurücksetzen.
+- [x] **Step 3:** Mit Fix alle CLS-Tests der Spec laufen lassen (`-g CLS`) → grün. Ist „Pegel veraltet“ rot, nimmt der Platzhalter „· veraltet“ auf (Spec, „Dem Bauenden überlassen“), und es folgt erneut Step 1 von Task 1.
+- [x] **Step 4:** Commit `test(e2e): Pegel-Spec misst langen Einsatznamen und lange Meta im Überblick (LLH-2085)`.
 
 ### Task 3: Regel und Gates
 
-- [ ] In `frontend/AGENTS.md`, „Seitenkopf“, einen Halbsatz ergänzen: Eine Meta, die aus mehreren späten Abrufen zusammenwächst, hält den Platz der späten Teile selbst; Beispiel Pegel im Überblick (LLH-2085).
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] Commit `docs(frontend): Seitenkopf-Regel nennt den Platzhalter für späte Teile der Meta (LLH-2085)`.
+- [x] In `frontend/AGENTS.md`, „Seitenkopf“, einen Halbsatz ergänzen: Eine Meta, die aus mehreren späten Abrufen zusammenwächst, hält den Platz der späten Teile selbst; Beispiel Pegel im Überblick (LLH-2085).
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] Commit `docs(frontend): Seitenkopf-Regel nennt den Platzhalter für späte Teile der Meta (LLH-2085)`.

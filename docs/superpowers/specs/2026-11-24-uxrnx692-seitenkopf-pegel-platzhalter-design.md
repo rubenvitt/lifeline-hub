@@ -63,3 +63,16 @@ wenn der Einsatz keinen Pegel trägt.
 - **Restrisiko, meine Entscheidung:** Mit „· veraltet“ wird die Notiz rund 70 px breiter als
   der Platzhalter und kann an einer Kante noch umbrechen. Die Spec misst den Fall bei 768 und
   1024 px. Ist er dort rot, nimmt der Platzhalter den Zusatz auf.
+
+## Nachtrag beim Bauen (24.11.2026, mit Ruben abgestimmt)
+
+- **Die Namenslänge entscheidet über ein Band.** Der Kopf springt bei 1024 px nur, wenn der
+  Datenstand ohne Pegel gerade noch neben den Titel passt und mit Pegel nicht mehr. Ein fester
+  Name trifft das Band zufällig (sogar die Ziffern der Uhrzeit verschieben es). Die Spec misst
+  deshalb sieben Namensstufen an einem Einsatz: ohne Platzhalter 0,34 bis 0,40, mit 0,00.
+- **„· veraltet“ bleibt draußen.** Mit dem Zusatz im Platzhalter sprang der frische Pegel, also
+  der Normalfall, bei zwei Namensstufen nach oben (0,29 und 0,32). Ohne ihn bleibt 768 px mit
+  Warnstufe, unbestätigten Gebieten und veraltetem Pegel bei 0,25. Das ist als LLH-2102 auf dem
+  Board, die Spec misst den veralteten Pegel nur bei 1024 px (0,0001).
+- Der Fall bei 768 px mit frischem Pegel ist ohne Platzhalter 0,07, er sichert ab und belegt
+  nichts. Die Mutationsprobe tragen die Namensstufen.
