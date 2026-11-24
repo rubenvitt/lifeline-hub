@@ -488,6 +488,14 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
     })
 }
 
+impl Produkt {
+    /// Zeit, die zählt: die Aufnahme, ersatzweise die Lieferung (Altbestand ohne Aufnahmezeit,
+    /// ADR-0098).
+    pub(crate) fn zeit(&self) -> Option<&String> {
+        self.aufnahme.as_ref().or(self.geliefert.as_ref())
+    }
+}
+
 /// Je Produktart der jüngste fertige Stand mit Ebenen: höchste Monitoring-Nummer, dann höchste
 /// Version. Die erste Abschätzung (FEP) nur, solange es keine Abgrenzung (DEL) gibt. Reihenfolge
 /// nach Produktart.
@@ -533,14 +541,29 @@ fn herkunft_props(d: &Details, g: &Gebiet, p: &Produkt) -> serde_json::Map<Strin
     m
 }
 
-/// Features einer Ebene der Quelle → einheitliche Features der Fachebene. Ohne Geometrie fällt
-/// ein Feature weg; ohne `features`-Liste ist das Ergebnis leer.
+/// Ausschnitt, gegen den die Features gefiltert werden: der gerundete Ausschnitt des
+/// Cache-Schlüssels ([`Bbox::cache_key_mit`], 2 Stellen) um eine halbe Rundungsstufe nach außen.
+/// So deckt eine gespeicherte Antwort jeden Ausschnitt, der auf denselben Schlüssel rundet.
+pub(crate) fn filter_ausschnitt(bbox: &Bbox) -> Bbox {
+    let r = |x: f64| (x * 100.0).round() / 100.0;
+    Bbox {
+        west: r(bbox.west) - 0.005,
+        sued: r(bbox.sued) - 0.005,
+        ost: r(bbox.ost) + 0.005,
+        nord: r(bbox.nord) + 0.005,
+    }
+}
+
+/// Features einer Ebene der Quelle → einheitliche Features der Fachebene. Ohne Geometrie oder
+/// außerhalb von `ausschnitt` ([`filter_ausschnitt`]) fällt ein Feature weg; ohne
+/// `features`-Liste ist das Ergebnis leer.
 pub(crate) fn normalize_ebene(
     fc: &Value,
     art: EbenenArt,
     d: &Details,
     g: &Gebiet,
     p: &Produkt,
+    ausschnitt: &Bbox,
 ) -> Vec<Value> {
     let basis = herkunft_props(d, g, p);
     fc.get("features")
@@ -549,6 +572,9 @@ pub(crate) fn normalize_ebene(
         .flatten()
         .filter_map(|f| {
             let geometrie = f.get("geometry").filter(|g| g.is_object())?;
+            if !bounding_box(geometrie).is_some_and(|h| intersects(&h, ausschnitt)) {
+                return None;
+            }
             let roh = f.get("properties").cloned().unwrap_or(Value::Null);
             let mut props = basis.clone();
             props.insert("art".into(), art.wire_value().into());
@@ -579,7 +605,7 @@ pub(crate) fn gebiet_feature(
     unvollstaendig: bool,
     gekuerzt: bool,
 ) -> Value {
-    let juengstes = gewaehlt.iter().max_by(|a, b| a.aufnahme.cmp(&b.aufnahme));
+    let juengstes = gewaehlt.iter().max_by(|a, b| a.zeit().cmp(&b.zeit()));
     let mut props = match juengstes {
         Some(p) => herkunft_props(d, g, p),
         None => {
@@ -658,6 +684,7 @@ where
     .await?;
     let liste = parse_liste(&liste_roh)?;
     let kandidaten = select_kandidaten(&liste, &bbox, jetzt, archiv);
+    let ausschnitt = filter_ausschnitt(&bbox);
 
     let fetch = &fetch;
     // Eigene Werte statt Referenzen in den Futures: sonst verlangt `Send` für den gespawnten
@@ -755,7 +782,7 @@ where
             vollstaendig = false;
             continue;
         };
-        let neu = normalize_ebene(fc, *art, d, &d.gebiete[t.gebiet], p);
+        let neu = normalize_ebene(fc, *art, d, &d.gebiete[t.gebiet], p, &ausschnitt);
         let groesse: usize = neu
             .iter()
             .map(|f| serde_json::to_vec(f).map_or(0, |b| b.len()))
@@ -783,8 +810,8 @@ where
             t.gekuerzt,
         ));
         for p in &t.gewaehlt {
-            if p.aufnahme > stand {
-                stand = p.aufnahme.clone();
+            if p.zeit() > stand.as_ref() {
+                stand = p.zeit().cloned();
             }
         }
     }
@@ -902,7 +929,66 @@ mod tests {
 
     /// Ausschnitt um Stuttgart, Gebiet 1 von EMSR728.
     fn stuttgart() -> Bbox {
-        Bbox::parse("9.10,48.70,9.40,48.90").unwrap()
+        Bbox::parse("9.10,48.70,9.40,48.95").unwrap()
+    }
+
+    /// Ganze Welt: Tests der Normalform, die nicht vom Ausschnitt handeln.
+    fn welt() -> Bbox {
+        Bbox::parse("-180,-90,180,90").unwrap()
+    }
+
+    fn punkt(lon: f64, lat: f64) -> Value {
+        json!({ "type": "Feature", "properties": {},
+                "geometry": { "type": "Point", "coordinates": [lon, lat] } })
+    }
+
+    #[test]
+    fn laesst_features_ausserhalb_des_ausschnitts_weg() {
+        let d = emsr728();
+        let g = &d.gebiete[0];
+        let fc = json!({ "type": "FeatureCollection",
+                         "features": [punkt(9.2, 48.8), punkt(10.0, 53.55)] });
+        let f = normalize_ebene(
+            &fc,
+            EbenenArt::Beobachtet,
+            &d,
+            g,
+            &g.produkte[0],
+            &stuttgart(),
+        );
+        assert_eq!(f.len(), 1);
+        assert_eq!(f[0]["geometry"]["coordinates"], json!([9.2, 48.8]));
+    }
+
+    #[test]
+    fn filtert_gegen_den_gerundeten_ausschnitt() {
+        let bbox = Bbox::parse("9.101,48.70,9.40,48.95").unwrap();
+        let a = filter_ausschnitt(&bbox);
+        assert!((a.west - 9.095).abs() < 1e-9, "{}", a.west);
+        assert!((a.ost - 9.405).abs() < 1e-9, "{}", a.ost);
+        let d = emsr728();
+        let g = &d.gebiete[0];
+        let fc = json!({ "type": "FeatureCollection", "features": [punkt(9.096, 48.8)] });
+        assert_eq!(
+            normalize_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0], &a).len(),
+            1
+        );
+    }
+
+    #[test]
+    fn ohne_aufnahme_zaehlt_die_lieferung() {
+        let mut p = produkt("GRA", 1, 3, true);
+        p.geliefert = Some("2021-08-11 12:48:47".into());
+        assert_eq!(p.zeit().map(String::as_str), Some("2021-08-11 12:48:47"));
+        let mut q = produkt("GRA", 0, 1, true);
+        q.geliefert = Some("2021-07-19 11:36:42".into());
+        let d = emsr728();
+        let g = &d.gebiete[0];
+        let f = gebiet_feature(&d, g, &[&q, &p], false, false);
+        assert_eq!(f["properties"]["monitoring"], 1);
+        assert_eq!(f["properties"]["geliefert"], "2021-08-11 12:48:47");
+        p.aufnahme = Some("2021-08-10 10:00:00".into());
+        assert_eq!(p.zeit().map(String::as_str), Some("2021-08-10 10:00:00"));
     }
 
     #[test]
@@ -1182,7 +1268,7 @@ mod tests {
         let g = &d.gebiete[0];
         let p = select_produkte(g)[0];
         let fc: Value = serde_json::from_str(EBENE_TIEFE).unwrap();
-        let f = normalize_ebene(&fc, EbenenArt::Wassertiefe, &d, g, p);
+        let f = normalize_ebene(&fc, EbenenArt::Wassertiefe, &d, g, p, &welt());
         assert_eq!(f.len(), 5);
         let pr = &f[0]["properties"];
         assert_eq!(pr["art"], "wassertiefe");
@@ -1208,6 +1294,7 @@ mod tests {
             &d,
             g9,
             select_produkte(g9)[0],
+            &welt(),
         );
         assert_eq!(f[0]["properties"]["art"], "schaden_verkehr");
         assert_eq!(f[0]["properties"]["klasse"], "schaden_moeglich");
@@ -1225,7 +1312,7 @@ mod tests {
             { "type": "Feature", "properties": {}, "geometry": { "type": "Point", "coordinates": [9.2, 48.8] } }
         ]});
         assert_eq!(
-            normalize_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0]).len(),
+            normalize_ebene(&fc, EbenenArt::Beobachtet, &d, g, &g.produkte[0], &welt()).len(),
             1
         );
         assert!(normalize_ebene(
@@ -1233,7 +1320,8 @@ mod tests {
             EbenenArt::Beobachtet,
             &d,
             g,
-            &g.produkte[0]
+            &g.produkte[0],
+            &welt()
         )
         .is_empty());
     }
@@ -1245,7 +1333,14 @@ mod tests {
         let d = emsr728();
         let g = &d.gebiete[0];
         let fc: Value = serde_json::from_str(EBENE_TIEFE).unwrap();
-        let f = normalize_ebene(&fc, EbenenArt::Wassertiefe, &d, g, select_produkte(g)[0]);
+        let f = normalize_ebene(
+            &fc,
+            EbenenArt::Wassertiefe,
+            &d,
+            g,
+            select_produkte(g)[0],
+            &welt(),
+        );
         assert!(!f.is_empty());
         for feature in &f {
             let h = bounding_box(&feature["geometry"]).unwrap();
