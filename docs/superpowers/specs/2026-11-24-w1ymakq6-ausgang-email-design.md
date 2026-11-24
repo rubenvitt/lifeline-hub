@@ -132,8 +132,10 @@ Neue Art im `Verzeichnis::produktiv()`:
   geprüfte Adressauflösung für Nicht-HTTP-Ziele (`filter_adressen` aus
   `public_api/webhook/ziel.rs` herausziehen oder mitnutzen). Der SMTP-Client verbindet sich mit
   der **geprüften IP**, nicht erneut mit dem Namen (kein DNS-Rebinding). Das Zertifikat wird
-  gegen den Hostnamen geprüft (SNI), über die gemeinsame TLS-Konfiguration
-  (`instanz::zertifikat::tls_config`, rustls mit `aws_lc_rs`). Zeitlimits: Verbindung 5 s, jede
+  gegen den Hostnamen geprüft (SNI), mit dem gemeinsamen Crypto-Provider
+  (`instanz::zertifikat::provider()`, rustls mit `aws_lc_rs`) und dem Plattform-Verifier
+  (`rustls-platform-verifier`, schon im Lockfile). **Nicht** `tls_config(None)`: die nimmt jedes
+  Zertifikat an und ist nur für die Erfassung bei der Kopplung gedacht. Zeitlimits: Verbindung 5 s, jede
   Antwort 30 s, gesamte Sitzung 120 s.
 - **Ein kleiner eigener SMTP-Client** in `adapter::ziel` (bzw. `adapter::smtp`) über
   `tokio` + `tokio-rustls` mit `tls_config`: EHLO, STARTTLS oder implizites TLS, AUTH PLAIN
@@ -147,11 +149,10 @@ Neue Art im `Verzeichnis::produktiv()`:
   Hostname der Instanz, falls konfiguriert, sonst `lifeline-hub`.
 - **Testbarkeit des Clients:** ein Wegwerf-SMTP-Server im Test (Loopback, mit Testschalter am
   Zielschutz wie bei den Webhook-Tests), der Antworten skriptet, auch Abbruch nach DATA.
-- **Fehlercodes der Anbindung** (neu in `AdapterFehler`, mit Einteilung in `braucht_eingriff`,
-  Text in `benachrichtigung::adapter::fehler_text` und `frontend/src/api/adapter.ts`): nur was
-  die **Verbindung** betrifft: `smtp_anmeldung` (535 u. ä., Eingriff), `smtp_tls`
-  (Zertifikat/Handshake, Eingriff); Netz, Zeitüberschreitung, Zielschutz mit den bestehenden
-  Codes. Fehler einer **einzelnen Nachricht** sind keine Adapterfehler, sondern Codes des
+- **Fehlercodes der Anbindung:** die bestehenden `AdapterFehler` reichen und werden
+  wiederverwendet: Anmeldung abgelehnt (535 u. ä.) → `abgelehnt`, Zertifikat/Handshake → `tls`,
+  Netz, Zeitüberschreitung, DNS, Zielschutz, unlesbare Antwort mit ihren Codes. Kein neuer Code,
+  also keine Änderung an Enum-Kontrakt und Texten der Anbindungen. Fehler einer **einzelnen Nachricht** sind keine Adapterfehler, sondern Codes des
   Ausgangskorbs (Abschnitt 3).
 - Höchstens **eine SMTP-Anbindung je Org**, gezählt werden alle, auch angehaltene. Eine zweite
   anzulegen ist 422. Grund: der Absender soll nicht vom Zufall abhängen.
