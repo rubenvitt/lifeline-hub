@@ -173,8 +173,8 @@ for (const modus of ['light', 'dark']) {
       faelle.push({ modul: 'material', kennung, rolle });
     }
     for (const [modul, katalog, feld] of [
-      ['fahrzeuge', 'fahrzeug-status', 'funkrufname'],
-      ['personal', 'personal-status', 'name'],
+      ['fahrzeuge', 'vehicle-statuses', 'funkrufname'],
+      ['personal', 'personnel-statuses', 'name'],
     ] as const) {
       const neutral = `Messkraft ${modul} neutral`;
       const neutralId = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: neutral } });
