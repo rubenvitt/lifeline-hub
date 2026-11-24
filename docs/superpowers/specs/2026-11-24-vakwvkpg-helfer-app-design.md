@@ -35,6 +35,14 @@ Stufe 1.
 4. Aus LLH-1636: Empfänger in Stufe 2 sind eine Einheit oder ein Trupp, auf Wunsch eine
    Einzelperson. Der Pager arbeitet nur im laufenden Einsatz. Die Alarmierung in den Einsatz
    bleibt bei Divera und aPager.
+5. **Eigenes Konto:** Ist auf dem Serverprofil schon eine Person angemeldet, sagt die
+   Helfer-Seite „Du bist als <Name> angemeldet. Für die Helfer-Anmeldung erst abmelden.“ und löst
+   nicht ein. Die Helfer-Anmeldung läuft immer über ein Gerätekonto.
+6. **Schalter und Positionsbaustein legt dieser Entwurf fest** (Abschnitt „Ortung der
+   Organisation und Positionsbaustein“). LLH-2091 nutzt sie.
+7. **Ein Ortungsgerät je Ziel:** Je Einheit oder Fahrzeug sendet genau ein Gerät. Die Leitung legt
+   es beim Bestätigen fest, Vorgabe ist das erste. Weitere Helfer derselben Einheit orten nur
+   ihre Person oder senden nichts.
 
 ## Ziele
 
@@ -187,7 +195,12 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
    - Bestätigen, Ablehnen, Widerruf und Ende schreiben ins ETB wie heute der Widerruf einer
      Kopplung. Die Positionen selbst schreiben nicht ins ETB.
 5. **Orten.**
-   - Nach der Bestätigung ruft die Seite über die Brücke `helfer_ortung_start` auf.
+   - Schon beim Einlösen, also im Vordergrund, ruft die Seite über die Brücke
+     `helfer_ortung_start` auf. So beginnt die Ortung auch dann, wenn die Bestätigung kommt,
+     während das Handy in der Tasche steckt.
+   - Im Zustand `wartet` antwortet der Server auf eine Sendung mit 409 und speichert nichts. Der
+     Dienst läuft weiter, und die Anzeige in der App sagt „wartet auf Bestätigung“
+     (Entscheidung des Bauenden, siehe „Getroffene Festlegungen“).
    - Die Hülle fragt den Standort an, falls noch nicht geschehen: iOS „When in Use“, Android fein.
    - Dann startet der Ortungsdienst (siehe „Apps“). Er sendet mit dem Sitzungs-Cookie der
      Kopplung an `PUT /api/devices/me/position`.
@@ -202,7 +215,13 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
      Dienst stoppt sofort.
    - Läuft die Seite, beendet sie den Dienst schon beim Live-Ereignis über
      `helfer_ortung_stop`.
-   - Eine Antwort, die nicht 2xx ist, nimmt der Kern nie als Grund zum Weitersenden.
+   - **Stoppen** lassen den Dienst nur 401, 403 und 404 (Sitzung weg, nicht mehr berechtigt,
+     Einsatz weg). Dazu kommen das Ende einer Wartezeit (`wartet` länger als 2 h) und die
+     Ablehnung.
+   - Bei 409 (`wartet`) läuft er weiter. Bei 5xx, 429 und Netzfehlern behält er nur die letzte
+     Position und versucht es mit wachsendem Abstand erneut, höchstens jede Minute. Bei 422
+     verwirft er die eine Position.
+   - So legt ein Neustart des Servers nicht die Ortung aller Helfer still.
 
 ### Server
 
@@ -224,33 +243,72 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
 - **Routenliste `helfer`:**
   - im Zustand `wartet`: eigener Zustand, Zielliste, Ziel ändern, Abmelden, die gemeinsamen
     Routen `auth/me` und `live`;
-  - im Zustand `aktiv` zusätzlich `PUT /api/devices/me/position`.
+  - im Zustand `aktiv` zusätzlich `PUT /api/devices/me/position`, aber nicht mehr „Ziel
+    ändern“. Ein neues Ziel setzt dann nur die Leitung, mit ETB-Eintrag.
+  - `PUT /api/devices/me/position` steht auch im Zustand `wartet` in der Liste, antwortet dort
+    aber 409 ohne zu speichern (siehe „Ablauf“, Schritt 5).
   - Nichts sonst. Stufe 2 ergänzt Aufträge und Quittung.
   - Neue Fähigkeit nach `frontend/src/geraet/AGENTS.md`: erst Eintrag in der Routenliste und Test
     in `tests/geraet_kopplung.rs`, dann `geraetDarf`. `ist_verfuegbar` wird erst gesetzt, wenn
     Server, Seite und mindestens eine Hülle stehen.
-- **Positionsschreiben:**
-  - Dieselbe Stelle wie für LLH-2091: Position am Lageobjekt mit `position_aktualisiert_at` und
-    `position_quelle` (`manuell`, `einwurf`, `helfer`). Die Lagekarte zeigt das Alter und blendet
-    „veraltet“ ein.
-  - Den Baustein (Spalten, Vorrang, Anzeige) legt LLH-2091 fest. Wird LLH-2092 zuerst gebaut,
-    baut es ihn mit, und LLH-2091 nutzt ihn.
-  - **Vorrang:** Eine manuelle Position überschreibt bis zur nächsten automatischen; die Lagekarte
-    zeigt die Quelle.
+- **Positionsschreiben:** über den Baustein im Abschnitt „Ortung der Organisation und
+  Positionsbaustein“.
+- **Ein Ortungsgerät je Ziel** (Entscheidung 7):
+  - Je Einheit und je Fahrzeug ist höchstens eine aktive Helfer-Kopplung „Ortungsgerät“; eine
+    eindeutige Teilbedingung in der Datenbank sichert das.
+  - Beim Bestätigen schlägt die Maske „Ortungsgerät für <Ziel>“ vor, wenn das Ziel noch keines
+    hat. Hat es eines, bestätigt die Leitung den neuen Helfer nur für seine Person oder ohne
+    Ortung, oder sie ersetzt das bisherige Gerät, mit ETB-Eintrag.
+  - Ein Helfer ohne Ortungsrolle und ohne Person bekommt auf `PUT …/position` 403 und stoppt.
+    Ihn gibt es, damit Stufe 2 ihm Aufträge zustellen kann.
+  - Endet das Ortungsgerät, kann die Leitung einen anderen Helfer desselben Ziels nachrücken
+    lassen.
 - **Personenposition:** Endet die Helfer-Kopplung, löscht der Server die Position an der Person
   (`lat`/`lon` auf NULL, Quelle bleibt als Hinweis). Die Position an Einheit und Fahrzeug bleibt
   als letzter Lagestand. Eine Person ist nach dem Abmelden nicht mehr auf der Karte, ein
   Fahrzeug schon.
-- **Org-Schalter:**
-  - Ist die Ortung der Organisation aus (Schalter aus LLH-2091; bei Hauptamt Vorgabe aus), gibt
-    es keine Helfer-Einladung (Knopf gesperrt mit Grund) und `PUT …/position` antwortet 403.
-  - Personenortung braucht zusätzlich die Freigabe „Personen orten“ im selben Schalter.
-  - Wie der Schalter genau heißt und wo er steht, legt LLH-2091 fest.
+- **Org-Schalter:** siehe „Ortung der Organisation und Positionsbaustein“.
+- **Eigenes Konto** (Entscheidung 5): Einlösen mit einer Personensitzung antwortet 409 mit
+  Grund. Die Seite zeigt „erst abmelden“ und einen Knopf dafür.
 - **Fehlerwerte:**
   - 401 Sitzung ungültig, 403 nicht `aktiv` oder Ortung der Org aus, 404 fremder Einsatz.
   - 422 Koordinate unplausibel; als Rahmen dient die Prüfung des Einwurfs (`ablage.rs`).
   - Konvention: `src/AGENTS.md`, Statuscodes.
+- **Dauer:**
+  - Eine Helfer-Kopplung im Zustand `wartet` läuft nach 2 h ab.
+  - Eine bestätigte gilt bis zum Einsatzende, technisch höchstens 72 h ab der Bestätigung.
+    Die Leitung kann sie verlängern wie heute (`…/extend`).
+  - Die Gültigkeit der Einladung begrenzt nur, wie lange man sich anmelden kann, nicht, wie
+    lange eine Anmeldung gilt.
+  - 30 Minuten vor dem technischen Ablauf meldet der Ablauf-Takt (`src/geraet/ablauf.rs`) der
+    Leitung, dass die Kopplung endet.
+- **Zustandsname:** `KopplungStatus::Wartend` bedeutet heute „Code noch nicht eingelöst“. Der
+  neue Zustand braucht deshalb einen eigenen Wire-Namen, Vorschlag `unbestaetigt`. Im Text
+  heißt er weiter „wartet“.
 - **Abwärts:** Die alte einmalige Kopplung bleibt unverändert.
+
+### Ortung der Organisation und Positionsbaustein (für LLH-2091 mit)
+
+- **Schalter je Organisation** in den Org-Einstellungen (Admin):
+  - „Ortung im Einsatz“ mit dem Unterpunkt „Auch Personen orten“; Vorgabe für beide ist aus, für
+    jede Organisation.
+  - Ein Merkmal Hauptamt oder Ehrenamt gibt es nicht. Wer einschaltet, bestätigt in einem
+    Dialog, dass eine Einwilligung bzw. Betriebsvereinbarung vorliegt, und der Dialog verweist auf
+    die DSFA-Vorlage. Wer wann geschaltet hat, wird gespeichert.
+  - Ist der Schalter aus, gibt es keine Helfer-Einladung (Knopf gesperrt mit Grund), und
+    `PUT …/position` antwortet 403.
+  - Ohne „Personen orten“ fehlt das Häkchen auf der Helfer-Seite, und die Leitung kann keine
+    Person zuordnen.
+  - Der Schalter gilt ebenso für den Einwurf auf der Lagekarte (LLH-2091).
+- **Positionsbaustein** an `einsatz_einheit`, `einsatz_fahrzeug` und `einsatz_personal`:
+  - zwei neue Spalten, `position_aktualisiert_at` und `position_quelle` (`manuell`, `einwurf`,
+    `helfer`);
+  - eine Schreibstelle im Server für alle Quellen, die ältere Zeitstempel verwirft und das
+    Live-Ereignis der Lagekarte auslöst.
+  - **Vorrang:** Eine manuelle Position gilt, bis die nächste automatische kommt; die Lagekarte
+    zeigt die Quelle.
+  - **Anzeige:** Alter am Symbol und „veraltet“ (blass) ab 5 Minuten.
+  - Der Bestand bekommt `manuell` und keinen Zeitpunkt.
 
 ### Oberfläche
 
@@ -290,6 +348,11 @@ oder stoppen“ ab.
     ohne eigene Logik.
   - Unter iOS ist das die vierte native Anfrage, die `ios/AGENTS.md` ausdrücklich an eine neue
     Entscheidung bindet; die ADR unten trifft sie.
+- **Pausieren** (in der Seite, unter Android auch in der Benachrichtigung): Der Dienst sendet
+  einmal `PUT /api/devices/me/position` mit `paused: true` und ohne Koordinate und hört dann auf
+  zu orten. Der Server löscht dann die Personenposition und zeigt der Leitung „pausiert“; die
+  Position an Einheit oder Fahrzeug bleibt als letzter Stand. „Fortsetzen“ geht nur in der
+  geöffneten App. So bleibt es bei einem einzigen Endpunkt.
 - **Takt:**
   - Gesendet wird höchstens alle 30 s und nur bei einer Bewegung über 25 m. Ohne Bewegung kommt
     alle 5 min ein Lebenszeichen, damit die Karte nicht „veraltet“ zeigt.
@@ -312,7 +375,9 @@ oder stoppen“ ab.
     `FOREGROUND_SERVICE` und `FOREGROUND_SERVICE_LOCATION`, weiter **ohne**
     `ACCESS_BACKGROUND_LOCATION`.
   - Er startet nur aus der Vordergrund-App. Seine dauerhafte Benachrichtigung „Lifeline ortet
-    dich für Einsatz …“ hat „Pausieren“ und „Abmelden“.
+    dich für Einsatz …“ hat nur „Pausieren“; das Tippen öffnet die App.
+  - Abmelden gibt es nur in der Seite (`POST /api/auth/logout` wie heute), damit die Hülle
+    weiter nur einen Endpunkt selbst anspricht.
   - Positionen kommen vom `LocationManager` des Systems (Fused Provider nur, wenn Play-Dienste
     da sind), weil die App ohne Play verteilt wird.
 - **QR und Deeplink:**
@@ -334,7 +399,8 @@ senden dann selbst an den aktiven Server“.
 - MUST: Die Ortung ist sichtbar, unter iOS mit der Standortanzeige, unter Android mit der
   Benachrichtigung des Dienstes.
 - MUST: Die Hülle sendet nur an `/api/devices/me/position` des aktiven Servers und nur mit dessen
-  Sitzung. Jede Antwort außer 2xx (außer Netzfehlern) beendet den Dienst.
+  Sitzung. 401, 403 und 404 beenden den Dienst; 5xx, 429 und Netzfehler führen zu Wiederholung
+  mit wachsendem Abstand und behalten nur die letzte Position.
 - MUST NOT: Verlauf speichern, mehr als die letzte Position puffern, auf die Platte schreiben.
 - Die übrigen Regeln von ADR-0093 gelten weiter. Die Prüfung wird angepasst: `verbiete` für
   Always und Background-Location bleibt, `UIBackgroundModes location` wird erlaubt, und ein
@@ -372,9 +438,10 @@ senden dann selbst an den aktiven Server“.
    - Einladung: anlegen, widerrufen, einlösen; Drosselung.
    - Helfer-Kopplung: Zustände, Ziel, Bestätigen, Ablehnen, ETB.
    - Routenliste `helfer`; Tests in `tests/geraet_kopplung.rs`.
-3. **Server:** `PUT /api/devices/me/position` mit Schreiben ans Ziel, Quelle und Zeitstempel
-   (Baustein gemeinsam mit LLH-2091), Live-Ereignis, Löschen der Personenposition am Ende und
-   Org-Schalter.
+3. **Server:** Org-Schalter „Ortung im Einsatz“ und Positionsbaustein (Quelle, Zeitpunkt,
+   eine Schreibstelle; von LLH-2091 mitgenutzt), dann `PUT /api/devices/me/position` mit
+   Schreiben ans Ziel, einem Ortungsgerät je Ziel, Pausieren und Löschen der Personenposition am
+   Ende.
 4. **Frontend, Leitung:** Helfer einladen (QR, Druck), wartende und angemeldete Helfer, Hinweis
    im Einsatzkopf, Alter und Quelle auf der Lagekarte.
 5. **Frontend, Helfer-Seite** `/helfer`: Anmelden, Warten, Angemeldet, Beendet, Weg zur App;
@@ -387,6 +454,16 @@ senden dann selbst an den aktiven Server“.
 
 Reihenfolge: 1 → 2 → 3 → (4, 5 parallel) → (6, 7 parallel) → 8. Mit 2–5 ist der Weg im
 Browser testbar, auch wenn dort im Hintergrund nicht geortet wird.
+
+## Getroffene Festlegungen (aus der Prüfung, vom Entwurf gesetzt, nicht vom Menschen)
+
+- Ortung startet schon beim Einlösen, `wartet` antwortet 409 ohne Speichern.
+- Nur 401, 403 und 404 stoppen den Dienst; 5xx, 429 und Netzfehler werden wiederholt.
+- „Ziel ändern“ nur im Zustand `wartet`, danach nur durch die Leitung.
+- Pausieren über denselben Endpunkt mit `paused: true`; in der Android-Benachrichtigung gibt es
+  kein „Abmelden“.
+- Dauer: `wartet` 2 h, bestätigt bis Einsatzende bzw. höchstens 72 h, verlängerbar.
+- Eigener Wire-Name für den neuen Zustand (`unbestaetigt`).
 
 ## Dem Bauenden überlassen
 
