@@ -2176,9 +2176,9 @@ async fn etb_eintraege_des_personals_gehen_live_hinaus() {
         .await;
 
     for (kraft, was, erwartet) in [
-        (ep, "entlassen", StatusCode::OK),
-        (ep, "reaktivieren", StatusCode::OK),
-        (fehl, "stornieren", StatusCode::NO_CONTENT),
+        (ep, "stand-down", StatusCode::OK),
+        (ep, "reactivate", StatusCode::OK),
+        (fehl, "annul", StatusCode::NO_CONTENT),
     ] {
         let (s, json) = aktion(&app, &admin, einsatz, kraft, was).await;
         assert_eq!(s, erwartet, "{was}: {json}");

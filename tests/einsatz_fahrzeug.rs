@@ -833,7 +833,7 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     for (pfad, body) in [
         ("status".to_string(), r#"{"status":"aktiv"}"#.to_string()),
         (
-            "belegung".to_string(),
+            "occupancy".to_string(),
             format!(r#"{{"objekt_typ":"fahrzeug","objekt_id":{im_br},"art":"eintritt"}}"#),
         ),
     ] {
@@ -2419,9 +2419,9 @@ async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
     etb.pruefe(&app, &admin, einsatz, "zurücknehmen").await;
 
     for (fz, was, erwartet) in [
-        (ef, "entlassen", StatusCode::OK),
-        (ef, "reaktivieren", StatusCode::OK),
-        (fehl, "stornieren", StatusCode::NO_CONTENT),
+        (ef, "stand-down", StatusCode::OK),
+        (ef, "reactivate", StatusCode::OK),
+        (fehl, "annul", StatusCode::NO_CONTENT),
     ] {
         let (s, json) = aktion(&app, &admin, einsatz, fz, was).await;
         assert_eq!(s, erwartet, "{was}: {json}");

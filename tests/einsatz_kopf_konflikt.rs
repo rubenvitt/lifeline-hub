@@ -319,7 +319,7 @@ async fn geraet_bekommt_keine_vermerke() {
         }
     }
     assert!(
-        gelesen.contains("einheiten"),
+        gelesen.contains("units"),
         "ein Gerät liest die Einheiten: {gelesen:?}"
     );
 }
