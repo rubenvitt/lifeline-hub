@@ -5,7 +5,7 @@
  * Empfänger ist höchstens EINER: eine Einheit (Abholung, steht für ihren Teilbaum), ein
  * Abschnitt (Zuführung) oder eine Betreuungsstelle (Ausgabe an Betreute, LLH-1295), nie eine
  * Person. Namen, Gliederung, Stärke und Eintreffen kommen allein aus der Projektion `empfaenger`
- * in `GET …/verpflegung`, nie aus `GET …/einheiten` oder `GET …/betreuung` (das Gerät darf sie
+ * in `GET …/catering`, nie aus `GET …/einheiten` oder `GET …/care` (das Gerät darf sie
  * nicht lesen).
  *
  * {@link verpflegungsstand} leitet je Zeitfenster ab, wer noch nicht verpflegt ist. Der Server

@@ -397,7 +397,7 @@ async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )

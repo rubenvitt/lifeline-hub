@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0085, Wurzel-`AGENTS.md`,
+# API-Routen sind englisch, nach Glossar (LLH-1979, ADR-0097, Wurzel-`AGENTS.md`,
 # „Bezeichner-Sprache“). Herleitung:
 # `docs/superpowers/specs/2026-11-22-demuxo3r-api-routen-englisch-design.md`.
 #
@@ -137,7 +137,7 @@ ohne_bestand="$(comm -23 <(printf '%s\n' "$deutsch_pfade" | awk 'NF') <(printf '
 if [ -n "$ohne_bestand" ]; then
   while IFS="$(printf '\t')" read -r pfad seg; do
     melde "$pfad: Segment '$seg' steht nicht im Glossar (scripts/api-routen-woerter.tsv)." \
-      "Englisch benennen und den Begriff eintragen (ADR-0085)."
+      "Englisch benennen und den Begriff eintragen (ADR-0097)."
   done <<< "$(printf '%s\n' "$unbekannt" | awk -F'\t' 'NR == FNR { neu[$0] = 1; next } ($1 in neu)' \
     <(printf '%s\n' "$ohne_bestand") -)"
 fi
@@ -163,7 +163,7 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
     if [ "$neu_n" -gt "$alt_n" ]; then
       while IFS= read -r pfad; do
         melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base), der Bestand wächst" \
-          "($neu_n statt $alt_n Zeilen); er darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+          "($neu_n statt $alt_n Zeilen); er darf nur schrumpfen (ADR-0097). Die Route englisch benennen."
       done <<< "$neu_zeilen"
     fi
     # b) Jede neue Zeile übersetzt eine weggefallene: gleich viele Segmente, und wo sie sich
@@ -200,7 +200,7 @@ if git -C "$ROOT" rev-parse --verify --quiet "$BASIS^{commit}" > /dev/null; then
       if [ -n "$ohne_vorbild" ]; then
         while IFS= read -r pfad; do
           melde "$pfad: neu im Bestand gegenüber $BASIS (Merge-Base) und keine Übersetzung einer" \
-            "weggefallenen Zeile; der Bestand darf nur schrumpfen (ADR-0085). Die Route englisch benennen."
+            "weggefallenen Zeile; der Bestand darf nur schrumpfen (ADR-0097). Die Route englisch benennen."
         done <<< "$ohne_vorbild"
       fi
     fi
@@ -210,7 +210,7 @@ else
 fi
 
 if [ "$fehler" -gt 0 ]; then
-  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0085)." >&2
+  echo "FEHLER: $fehler Befund(e) zu englischen API-Routen (ADR-0097)." >&2
   exit 1
 fi
 echo "OK: $(registrierte_pfade | wc -l | tr -d ' ') API-Routen geprüft, $(printf '%s\n' "$bestand" | awk 'NF' | wc -l | tr -d ' ') im deutschen Bestand."

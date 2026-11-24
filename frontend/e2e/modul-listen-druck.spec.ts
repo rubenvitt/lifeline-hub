@@ -45,11 +45,11 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
   const einsatzId = await einsatzAnlegen(page, `E2E Listen-Druck ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
   // Zwei Betroffene (Sichtung hebt auf „betroffen"), eine vermisste Person.
-  await saeen(page, `${basis}/personen`, { name: 'Albers', sichtung: 'sk1' });
-  await saeen(page, `${basis}/personen`, { name: 'Brandt', sichtung: 'sk3' });
-  await saeen(page, `${basis}/personen`, { name: 'Cordes', status: 'vermisst' });
-  await saeen(page, `${basis}/tiere`, { spezies: 'hund', rufname: 'Rex' });
-  await saeen(page, `${basis}/tiere`, { spezies: 'katze', rufname: 'Mimi' });
+  await saeen(page, `${basis}/persons`, { name: 'Albers', sichtung: 'sk1' });
+  await saeen(page, `${basis}/persons`, { name: 'Brandt', sichtung: 'sk3' });
+  await saeen(page, `${basis}/persons`, { name: 'Cordes', status: 'vermisst' });
+  await saeen(page, `${basis}/animals`, { spezies: 'hund', rufname: 'Rex' });
+  await saeen(page, `${basis}/animals`, { spezies: 'katze', rufname: 'Mimi' });
   await saeen(page, `${basis}/schaeden`, { typ: 'sachschaden', ausmass: 'gering', ort: 'Deich' });
 
   await page.setViewportSize({ width: 1280, height: 900 });

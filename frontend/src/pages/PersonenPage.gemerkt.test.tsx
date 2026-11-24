@@ -89,8 +89,8 @@ describe('PersonenPage rendert gemerkt (LFH-949)', () => {
     server.use(
       meHandler(benutzerFixture()),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json(zehn)),
-      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json(zehn)),
+      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(

@@ -9,7 +9,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  * Sichtung hält den Textboden auf der Marke (Tag ≥ 7 : 1, Nacht ≥ 5 : 1, wie
  * `betroffene-kontrast.spec.ts`).
  *
- * Seeding als Admin über die API: `POST …/personen` mit `uhs_id` legt die Person in den
+ * Seeding als Admin über die API: `POST …/persons` mit `uhs_id` legt die Person in den
  * Wartebereich, die Anlagefolge ist die Folge der Eintritte. Kein `networkidle` (LFH-385).
  *
  * Mutationsprobe: in `Grundriss.tsx` `nachDringlichkeit` am Wartebereich entfernt → SK III steht
@@ -42,12 +42,12 @@ for (const modus of ['light', 'dark'] as const) {
     });
     await anlegen(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
     // Zuerst der SK III: er wartet länger und stünde nach Zeit vorn.
-    await anlegen(page, `/api/einsaetze/${e}/personen`, {
+    await anlegen(page, `/api/einsaetze/${e}/persons`, {
       name: 'Gruen',
       sichtung: 'sk3',
       uhs_id: uhs.id,
     });
-    await anlegen(page, `/api/einsaetze/${e}/personen`, {
+    await anlegen(page, `/api/einsaetze/${e}/persons`, {
       name: 'Rot',
       sichtung: 'sk1',
       uhs_id: uhs.id,

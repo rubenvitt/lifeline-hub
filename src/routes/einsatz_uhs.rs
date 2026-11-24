@@ -429,7 +429,7 @@ pub struct PlatzAnlegenBody {
     pub pos_y: Option<f64>,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/plaetze — Platz anlegen. KEIN ETB. SSE.
+/// POST /api/einsaetze/{id}/uhs/{uid}/seats — Platz anlegen. KEIN ETB. SSE.
 pub async fn platz_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Unfallhilfsstellen>,
@@ -464,7 +464,7 @@ pub struct PlatzBulkBody {
     pub menge: i64,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/plaetze/bulk — mehrere Plätze eines Typs mit
+/// POST /api/einsaetze/{id}/uhs/{uid}/seats/bulk — mehrere Plätze eines Typs mit
 /// automatisch fortlaufenden Bezeichnungen anlegen (LFH-16, „nach Typ statt Name").
 /// KEIN ETB (interne Logistik). SSE.
 pub async fn plaetze_bulk_anlegen(
@@ -507,7 +507,7 @@ pub struct PlatzPatchBody {
     pub pos_y: Option<Option<f64>>,
 }
 
-/// PATCH /api/einsaetze/{id}/uhs/{uid}/plaetze/{pid} — Bezeichnung / pos_x / pos_y.
+/// PATCH /api/einsaetze/{id}/uhs/{uid}/seats/{pid} — Bezeichnung / pos_x / pos_y.
 /// KEIN ETB (interne Logistik). SSE.
 pub async fn platz_aktualisieren(
     State(state): State<AppState>,
@@ -541,7 +541,7 @@ pub struct VerfuegbarkeitBody {
     pub reserviert_fuer_person_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit — setzt
+/// POST /api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability — setzt
 /// Verfügbarkeit (+ ggf. Reservierungs-Ziel). KEIN ETB. SSE.
 pub async fn platz_verfuegbarkeit(
     State(state): State<AppState>,
@@ -578,7 +578,7 @@ pub async fn platz_verfuegbarkeit(
     Ok(Json(platz))
 }
 
-/// DELETE /api/einsaetze/{id}/uhs/{uid}/plaetze/{pid} — Platz-Soft-Delete.
+/// DELETE /api/einsaetze/{id}/uhs/{uid}/seats/{pid} — Platz-Soft-Delete.
 /// 409 bei aktiver Belegung. KEIN ETB. SSE.
 pub async fn platz_stornieren(
     State(state): State<AppState>,
@@ -604,7 +604,7 @@ pub struct BelegungBody {
     pub notiz: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/personen/{pid}/uhs-belegung — Belegungs-Event.
+/// POST /api/einsaetze/{id}/persons/{pid}/uhs-occupancy — Belegungs-Event.
 /// Repo macht alles transaktional inkl. ETB-relevanter Effekte. Hier nur die
 /// pseudonyme ETB-Spur (Spec ETB-Tabelle) + zwei SSE-Events (`uhs` + `person`).
 pub async fn belegung(
@@ -697,7 +697,7 @@ pub async fn belegung(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
-/// POST /api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen — den
+/// POST /api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo — den
 /// Austritt einer Person aus einer UHS zurücknehmen (LLH-1924, Spec `personen-detail`, „Austritt
 /// aus der UHS zurücknehmen“, design.md D3). Rechte und Stellenbindung wie der Austritt: ein
 /// UHS-Gerät nur für die eigene UHS. Pseudonymer ETB-Eintrag, Live für UHS und Person.

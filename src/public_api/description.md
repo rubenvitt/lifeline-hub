@@ -14,7 +14,7 @@ eigene Skripte). Grundlage: ADR-0096.
 
 ## Namen
 
-Pfade sind englisch, auch für Fachbegriffe (ADR-0085). In Feldern, Werten, Scopes und
+Pfade sind englisch, auch für Fachbegriffe (ADR-0097). In Feldern, Werten, Scopes und
 Ereignisarten sind Fachbegriffe deutsch und alles Technische englisch. Umlaute werden
 umschrieben (`einsaetze`).
 

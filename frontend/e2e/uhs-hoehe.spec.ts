@@ -23,7 +23,7 @@ async function aufbauenMitEinsatz(page: Page) {
     typ: 'behandlungsplatz',
     bezeichnung: 'BHP Höhenprüfung',
   });
-  await anlegen(`/api/einsaetze/${einsatz.id}/uhs/${uhs.id}/plaetze/bulk`, {
+  await anlegen(`/api/einsaetze/${einsatz.id}/uhs/${uhs.id}/seats/bulk`, {
     typ: 'bett',
     menge: 2,
   });

@@ -190,7 +190,7 @@ export function holeZertifikat(
   url: string,
   lanErlaubt: boolean,
 ): Promise<WebhookZertifikat> {
-  // Neue Routen sind englisch (ADR-0085); die übrigen Webhook-Routen stehen noch im Bestand.
+  // Neue Routen sind englisch (ADR-0097); die übrigen Webhook-Routen stehen noch im Bestand.
   return apiSend<WebhookZertifikat>(
     `/api/admin/integrations/${encodeURIComponent(id)}/webhook/fetch-certificate`,
     'POST',

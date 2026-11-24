@@ -37,10 +37,10 @@ const TOUCH_BREIT = { width: 1920, height: 900 };
 /** Mobil: ~390 px, einhändig. Hier greift die Reiter-Weiche. */
 const HANDSCHIRM = { width: 390, height: 844 };
 
-/** Der Belegungs-Endpunkt: `uhs-belegung`, NICHT `belegung`. */
-const BELEGUNG = /\/api\/einsaetze\/\d+\/personen\/\d+\/uhs-belegung$/;
-/** Die Personen-LISTE. Das `(\?|$)` grenzt sie gegen `…/personen/7/uhs-belegung` ab. */
-const PERSONEN_LISTE = /\/api\/einsaetze\/\d+\/personen(\?|$)/;
+/** Der Belegungs-Endpunkt: `uhs-occupancy`, NICHT `occupancy`. */
+const BELEGUNG = /\/api\/einsaetze\/\d+\/persons\/\d+\/uhs-occupancy$/;
+/** Die Personen-LISTE. Das `(\?|$)` grenzt sie gegen `…/persons/7/uhs-occupancy` ab. */
+const PERSONEN_LISTE = /\/api\/einsaetze\/\d+\/persons(\?|$)/;
 
 // Touch-Kontext: erst mit `hasTouch` erlaubt Playwright `tap()`. Damit trifft
 // `(pointer: coarse)` zu, und die Dichte ist per Vorgabe „komfortabel" — gewollt.
@@ -83,9 +83,9 @@ async function setupPatientUndPlatz(page: Page, fuellPersonen = 0): Promise<Aufb
   const einsatzId = einsatz.id;
 
   const personName = `TouchPat${stempel}`;
-  await seede(page, `/api/einsaetze/${einsatzId}/personen`, { name: personName }, 'Person');
+  await seede(page, `/api/einsaetze/${einsatzId}/persons`, { name: personName }, 'Person');
   for (let i = 0; i < fuellPersonen; i++) {
-    await seede(page, `/api/einsaetze/${einsatzId}/personen`, {}, `Füllperson ${i}`);
+    await seede(page, `/api/einsaetze/${einsatzId}/persons`, {}, `Füllperson ${i}`);
   }
 
   const uhs = await seede<{ id: number }>(
@@ -97,7 +97,7 @@ async function setupPatientUndPlatz(page: Page, fuellPersonen = 0): Promise<Aufb
   const uhsId = uhs.id;
   await seede(
     page,
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`,
     { typ: 'bett', menge: 1 },
     'Plätze',
   );
@@ -526,7 +526,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
 
     // 1) Personen-Zug: per API belegen, dann die Marke in den Wartebereich ziehen.
     const personen = (await (
-      await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+      await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
     ).json()) as { id: number; name: string | null }[];
     const person = personen.find((p) => p.name === personName)!;
     const detail = (await (
@@ -534,7 +534,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     ).json()) as { plaetze: { id: number }[] };
     await seede(
       page,
-      `/api/einsaetze/${einsatzId}/personen/${person.id}/uhs-belegung`,
+      `/api/einsaetze/${einsatzId}/persons/${person.id}/uhs-occupancy`,
       { art: 'eintritt', uhs_id: uhsId, platz_id: detail.plaetze[0].id },
       'Belegung',
     );
@@ -559,7 +559,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     const karte = bett1(page);
     const vorher = (await karte.boundingBox())!;
     const patch = page.waitForRequest(
-      (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/plaetze\/\d+$/.test(r.url()),
+      (r) => r.method() === 'PATCH' && /\/uhs\/\d+\/seats\/\d+$/.test(r.url()),
     );
     await page.mouse.move(vorher.x + vorher.width / 2, vorher.y + 14);
     await page.mouse.down();
@@ -591,7 +591,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     await page.setViewportSize(TABLET);
     const { einsatzId, uhsId, personName } = await setupPatientUndPlatz(page);
     const personen = (await (
-      await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+      await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
     ).json()) as { id: number; name: string | null }[];
     const person = personen.find((p) => p.name === personName)!;
     const detail = (await (
@@ -599,7 +599,7 @@ test.describe('UHS-Grundriss unter Touch', () => {
     ).json()) as { plaetze: { id: number }[] };
     await seede(
       page,
-      `/api/einsaetze/${einsatzId}/personen/${person.id}/uhs-belegung`,
+      `/api/einsaetze/${einsatzId}/persons/${person.id}/uhs-occupancy`,
       { art: 'eintritt', uhs_id: uhsId, platz_id: detail.plaetze[0].id },
       'Belegung',
     );
@@ -735,7 +735,7 @@ async function setupBeobachter(page: Page): Promise<Aufbau> {
     'Einsatz',
   );
   const personName = `TouchLes${stempel}`;
-  await seede(page, `/api/einsaetze/${einsatzId}/personen`, { name: personName }, 'Person');
+  await seede(page, `/api/einsaetze/${einsatzId}/persons`, { name: personName }, 'Person');
   const { id: uhsId } = await seede<{ id: number }>(
     page,
     `/api/einsaetze/${einsatzId}/uhs`,
@@ -744,7 +744,7 @@ async function setupBeobachter(page: Page): Promise<Aufbau> {
   );
   await seede(
     page,
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`,
     { typ: 'bett', menge: 2 },
     'Plätze',
   );
@@ -758,7 +758,7 @@ async function setupBeobachter(page: Page): Promise<Aufbau> {
     await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
   ).json()) as { plaetze: { id: number; bezeichnung: string }[] };
   const personen = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/personen`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
   ).json()) as { id: number; name: string | null }[];
   const person = personen.find((p) => p.name === personName);
   expect(person, 'Seeding: die benannte Person existiert').toBeDefined();
@@ -767,7 +767,7 @@ async function setupBeobachter(page: Page): Promise<Aufbau> {
   expect(platz, 'Seeding: „Bett 1" existiert').toBeDefined();
   await seede(
     page,
-    `/api/einsaetze/${einsatzId}/personen/${person!.id}/uhs-belegung`,
+    `/api/einsaetze/${einsatzId}/persons/${person!.id}/uhs-occupancy`,
     { art: 'eintritt', uhs_id: uhsId, platz_id: platz!.id },
     'Belegung',
   );

@@ -63,7 +63,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
   `List`, `Count`). Also `load_einsatz`, `isGeraetekonto`, `EinsatzKopfProps`, nicht
   `lade_einsatz`, `istGeraetekonto`. Im Zweifel deutsch, wenn die Oberfläche dasselbe Wort zeigt.
   Umlaute werden umschrieben (`kraefte`); Dateinamen folgen den Bezeichnern, die sie tragen.
-- **API-Routen englisch** (LLH-1979, ADR-0085): jedes feste Segment einer Route ist englisch, auch
+- **API-Routen englisch** (LLH-1979, ADR-0097): jedes feste Segment einer Route ist englisch, auch
   Fachbegriffe, nach dem Glossar `scripts/api-routen-woerter.tsv` (`/api/incidents`, nicht
   `/api/einsaetze`); Abkürzungen wie `etb`, `uhs` bleiben. Kleinbuchstaben, `-` verbindet,
   Sammlungen im Plural, eine Aktion als Verb am Ende (`/acknowledge`). Pfadparameter
@@ -75,7 +75,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 - **Grenzwerte bleiben:** Wire-Felder und -Werte, Tabellen und Spalten, Migrationen, generierte
   Typen, gespeicherte Schlüssel und Ereignisnamen nicht wegen dieser Regel umbenennen, auch nicht
   per `#[serde(rename)]`; dafür braucht es eine eigene Change mit Übergangsweg. Routen benennen
-  die Pakete von LLH-1979 um (ADR-0085; für `/api/v1/` mit ADR-0096).
+  die Pakete von LLH-1979 um (ADR-0097; für `/api/v1/` mit ADR-0096).
 - **Bestand beim Anfassen umstellen, nie in einem Zug:** Neue Bezeichner folgen der Regel sofort.
   Ein bestehender wird umgestellt, wenn der Task Code ändert, der ihn deklariert, und seine
   Verwendungen im Diff liegen oder sich mechanisch mitziehen lassen; eine Namensfamilie in

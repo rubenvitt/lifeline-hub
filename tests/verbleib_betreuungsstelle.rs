@@ -12,14 +12,14 @@ mod common;
 use common::*;
 
 fn betreuung(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/betreuung")
+    format!("/api/einsaetze/{einsatz}/care")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen", betreuung(einsatz)),
+        &format!("{}/positions", betreuung(einsatz)),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","art":"notunterkunft","kapazitaet_personen":150}}"#
@@ -34,7 +34,7 @@ async fn person(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some("{}"),
     )
@@ -53,7 +53,7 @@ async fn verbleib(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}/verbleib"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
         cookie,
         Some(body),
     )
@@ -64,7 +64,7 @@ async fn person_detail(app: &axum::Router, cookie: &str, einsatz: i64, person: i
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{person}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
         cookie,
         None,
     )
@@ -239,7 +239,7 @@ async fn stornierte_stelle_ist_409_geschlossene_ist_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{storniert}/stornieren", betreuung(e)),
+        &format!("{}/positions/{storniert}/annul", betreuung(e)),
         &admin,
         None,
     )
@@ -249,7 +249,7 @@ async fn stornierte_stelle_ist_409_geschlossene_ist_erlaubt() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{geschlossen}", betreuung(e)),
+        &format!("{}/positions/{geschlossen}", betreuung(e)),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )
@@ -332,7 +332,7 @@ async fn lage_mit_zwei_namentlichen(app: &axum::Router, admin: &str) -> (i64, i6
     let (s, j) = anfrage(
         app,
         "PATCH",
-        &format!("{}/stellen/{sid}", betreuung(e)),
+        &format!("{}/positions/{sid}", betreuung(e)),
         admin,
         Some(r#"{"status":"in_betrieb"}"#),
     )
@@ -341,7 +341,7 @@ async fn lage_mit_zwei_namentlichen(app: &axum::Router, admin: &str) -> (i64, i6
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen/{sid}/belegungen", betreuung(e)),
+        &format!("{}/positions/{sid}/occupancies", betreuung(e)),
         admin,
         Some(r#"{"belegt":40}"#),
     )
@@ -389,7 +389,7 @@ async fn uebersicht_nennt_namentliche_zahl_und_laesst_mengen_unveraendert() {
     let (s, k) = anfrage(
         &app,
         "GET",
-        &format!("{}/belegung", betreuung(e)),
+        &format!("{}/occupancy", betreuung(e)),
         &admin,
         None,
     )
@@ -468,7 +468,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
-    let personen = format!("/api/einsaetze/{e}/personen");
+    let personen = format!("/api/einsaetze/{e}/persons");
     let hier = personen_ids(&app, &admin, &personen).await;
     assert_eq!(hier.len(), 2, "Vorbedingung: zwei Personen an der Stelle");
 
@@ -562,7 +562,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen/{andere}/stornieren", betreuung(e)),
+        &format!("{}/positions/{andere}/annul", betreuung(e)),
         &admin,
         Some("{}"),
     )
@@ -588,7 +588,7 @@ async fn filter_nach_stelle_ohne_personenrecht_ist_403() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personen?betreuungsstelle_id={sid}"),
+        &format!("/api/einsaetze/{e}/persons?betreuungsstelle_id={sid}"),
         &bernd,
         None,
     )
@@ -605,7 +605,7 @@ async fn gesicherter_lagestand_enthaelt_keine_leitung_und_keinen_kontaktweg() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/stellen/{sid}", betreuung(e)),
+        &format!("{}/positions/{sid}", betreuung(e)),
         &admin,
         Some(r#"{"leitung":"Frau Schulz","kontaktweg":"0171 2345678"}"#),
     )

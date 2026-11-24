@@ -62,7 +62,7 @@ pub fn darf_uebergehen(von: VerpflegungsstelleStatus, nach: VerpflegungsstelleSt
     }
 }
 
-/// Eine Verpflegungsstelle in `GET …/verpflegung` und als Antwort der Schreibrouten. **Ohne
+/// Eine Verpflegungsstelle in `GET …/catering` und als Antwort der Schreibrouten. **Ohne
 /// Benutzerkennungen** (Spec `funktionsansichten`: das Verpflegungsgerät erhält keine Namen und
 /// keine Kennungen von Benutzern). Stornierte Stellen kommen nicht vor.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]

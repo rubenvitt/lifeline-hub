@@ -25,7 +25,7 @@ const KAPITEL = 'betroffene';
 
 /** Kennung einer Demo-Person über ihren Nachnamen. */
 async function personId(page: Page, einsatzId: number, name: string): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/personen`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/persons`);
   expect(antwort.ok(), `Personen des Demo-Einsatzes: ${antwort.status()}`).toBe(true);
   const personen = (await antwort.json()) as { id: number; name: string | null }[];
   const person = personen.find((p) => p.name === name);
@@ -107,7 +107,7 @@ test.describe(KAPITEL, () => {
   test('Patientenkopf mit vollem PAT-Kern und Paneel „Verletzung markieren“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}/personen`;
+    const basis = `/api/einsaetze/${demo.id}/persons`;
     const person = await fuelle<{ id: number }>(page, 'post', basis, {
       name: 'Brandt',
       vorname: 'Jonas',
@@ -124,13 +124,13 @@ test.describe(KAPITEL, () => {
       fachrichtung: 'unfallchirurgie',
     });
     for (const art of ['blutstillung', 'immobilisation']) {
-      await fuelle(page, 'post', `${pfad}/massnahmen`, { art });
+      await fuelle(page, 'post', `${pfad}/interventions`, { art });
     }
     for (const verletzung of [
       { ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung', schwere: 'leicht' },
       { ansicht: 'hinten', region: 'ruecken', art: 'prellung_schwellung' },
     ]) {
-      await fuelle(page, 'post', `${pfad}/verletzungen`, verletzung);
+      await fuelle(page, 'post', `${pfad}/injuries`, verletzung);
     }
     // Höher als der Fükw, damit der Patientenkopf samt Körperschema ohne Bildlauf ganz steht:
     // sonst setzt Playwright die Aufnahme beim Scrollen zusammen, und die klebende Kopfleiste mit

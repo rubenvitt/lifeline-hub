@@ -111,7 +111,7 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   test.slow();
   await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Personendaten ${Date.now()}`);
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, { name: 'Claasen' });
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, { name: 'Claasen' });
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const daten = page.locator('[data-lfh="personendaten"]');
   const ohne = daten.locator('[data-lfh="ohne-angabe"]');
@@ -134,7 +134,7 @@ test('Personendaten: leeres Feld ergänzen, Wert ändern, Rückfrage beim Verlas
   await expect(daten.locator('dl[aria-label="Personendaten"]')).toContainText('Claasen-Meyer');
 
   const gespeichert = await (
-    await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`)
+    await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
   ).json();
   expect(gespeichert).toMatchObject({ name: 'Claasen-Meyer', geburtsdatum: '1980-02-01' });
 
@@ -170,7 +170,7 @@ test('Patientenkopf bei 1280 × 800 und 1440 × 900 ohne Bildlauf ganz im Bild, 
     bezeichnung: 'Turnhalle',
   });
   await senden(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, {
     name: 'Kopftest',
     vorname: 'Karla',
     geschlecht: 'weiblich',
@@ -182,7 +182,7 @@ test('Patientenkopf bei 1280 × 800 und 1440 × 900 ohne Bildlauf ganz im Bild, 
     zustand: 'Verdacht auf Hüftfraktur',
     uhs_id: uhs.id,
   });
-  await senden(page, `/api/einsaetze/${e}/personen/${person.id}/notizen`, {
+  await senden(page, `/api/einsaetze/${e}/persons/${person.id}/notes`, {
     text: 'Schmerzmittel gegeben',
   });
 
@@ -263,7 +263,7 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
     bezeichnung: 'Turnhalle',
   });
   await senden(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, {
     name: 'Kerntest',
     vorname: 'Kai',
     geschlecht: 'maennlich',
@@ -273,7 +273,7 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
     zustand: 'Verdacht auf Unterarmfraktur links',
     uhs_id: uhs.id,
   });
-  const pfad = `/api/einsaetze/${e}/personen/${person.id}`;
+  const pfad = `/api/einsaetze/${e}/persons/${person.id}`;
   await aendern(page, pfad, { pat_nummer: 'A-4711', kontamination: true });
   await senden(page, `${pfad}/transport`, {
     prioritaet: 'dringlich',
@@ -281,7 +281,7 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
     fachrichtung: 'unfallchirurgie',
   });
   for (const art of ['zugang', 'sauerstoff', 'immobilisation']) {
-    await senden(page, `${pfad}/massnahmen`, { art });
+    await senden(page, `${pfad}/interventions`, { art });
   }
   for (const verletzung of [
     { ansicht: 'vorn', region: 'kopf', art: 'wunde_blutung' },
@@ -289,9 +289,9 @@ test('Voller PAT-Kern bei 1280 × 800 und 1440 × 900 ohne Bildlauf, als Admin u
     { ansicht: 'vorn', region: 'thorax', art: 'prellung_schwellung' },
     { ansicht: 'hinten', region: 'ruecken', art: 'schmerz' },
   ]) {
-    await senden(page, `${pfad}/verletzungen`, verletzung);
+    await senden(page, `${pfad}/injuries`, verletzung);
   }
-  await senden(page, `${pfad}/notizen`, { text: 'Arm geschient' });
+  await senden(page, `${pfad}/notes`, { text: 'Arm geschient' });
 
   const pruefeKopf = async (rolle: string) => {
     for (const viewport of [TABLET_QUER, DESKTOP]) {
@@ -373,10 +373,10 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
   const e = await einsatzPerApi(page, `E2E PAT-Paneele ${Date.now()}`);
   const person = await senden<{ id: number; registrier_nr: number }>(
     page,
-    `/api/einsaetze/${e}/personen`,
+    `/api/einsaetze/${e}/persons`,
     { name: 'Paneeltest', geschlecht: 'weiblich', sichtung: 'sk2' },
   );
-  const pfad = `/api/einsaetze/${e}/personen/${person.id}`;
+  const pfad = `/api/einsaetze/${e}/persons/${person.id}`;
   await page.setViewportSize(TABLET_QUER);
   await page.goto(`/einsaetze/${e}/personen/${person.id}`);
   const kopf = patientenkopf(page);
@@ -472,7 +472,7 @@ test('Transport festlegen, Maßnahme erfassen, Verletzung markieren und aufheben
 test('Nachsichten im Patientenkopf ohne Dialog', async ({ page }) => {
   await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Nachsichten ${Date.now()}`);
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, {
     antreff_ort: 'Brücke',
     sichtung: 'sk2',
   });
@@ -498,7 +498,7 @@ test('Nachsichten im Patientenkopf ohne Dialog', async ({ page }) => {
   await expect(kopf.locator('[data-lfh="sichtung-zeit"]')).toContainText('gesichtet');
 
   // Der Server trägt die Sichtung (sonst zeigte der Kopf nur einen Zwischenstand).
-  const detail = await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`);
+  const detail = await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`);
   expect(detail.ok()).toBeTruthy();
   expect(((await detail.json()) as { aktuelle_sichtung: string }).aktuelle_sichtung).toBe('sk1');
 });
@@ -516,7 +516,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
   await expect(feld).toHaveValue('');
   await expect(page.locator('tr.ant-table-row')).toHaveCount(1);
 
-  const liste = await page.request.get(`/api/einsaetze/${e}/personen`);
+  const liste = await page.request.get(`/api/einsaetze/${e}/persons`);
   const [person] = (await liste.json()) as { id: number; anlass?: string }[];
   expect(person.anlass).toBe('intoxikation');
 
@@ -533,7 +533,7 @@ test('Anlass: per Kurzeingabe „!intox“ erfassen, im Patientenkopf wechseln (
 
   await expect(paneel).toHaveCount(0);
   await expect(kopf.locator('[data-lfh="anlass"]')).toHaveText('Hitze / Kälte');
-  const detail = await page.request.get(`/api/einsaetze/${e}/personen/${person.id}`);
+  const detail = await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`);
   const d = (await detail.json()) as { anlass?: string; anlaesse: unknown[] };
   expect(d.anlass).toBe('hitze_kaelte');
   expect(d.anlaesse).toHaveLength(2);
@@ -544,13 +544,13 @@ test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „
 }) => {
   await anmelden(page, { startseite: false });
   const e = await einsatzPerApi(page, `E2E Bezüge ${Date.now()}`);
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, {
     name: 'Halterin',
     sichtung: 'sk3',
   });
   const tier = await senden<{ id: number; registrier_nr: number }>(
     page,
-    `/api/einsaetze/${e}/tiere`,
+    `/api/einsaetze/${e}/animals`,
     { spezies: 'hund', rufname: 'Bello' },
   );
   const kennung = `T-${String(tier.registrier_nr).padStart(3, '0')}`;
@@ -579,7 +579,7 @@ test('Bezug hinzufügen: ein Tier über die gemeinsame Suche, die Liste sagt „
   await expect(bezuege.getByRole('button', { name: `Bezug zu ${kennung} lösen` })).toBeVisible();
 
   // Die Gegenrichtung: das Tier nennt die Person als Halter.
-  const t = await page.request.get(`/api/einsaetze/${e}/tiere/${tier.id}`);
+  const t = await page.request.get(`/api/einsaetze/${e}/animals/${tier.id}`);
   expect(t.ok(), await t.text()).toBeTruthy();
   expect(((await t.json()) as { halter_person_id: number | null }).halter_person_id).toBe(
     person.id,
@@ -633,7 +633,7 @@ for (const { viewport, dichten } of KOERPERSCHEMA_WAHL_FAELLE) {
     test.slow();
     await anmelden(page);
     const e = await einsatzPerApi(page, `E2E Körperschema Wahl ${Date.now()}`);
-    const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+    const person = await senden(page, `/api/einsaetze/${e}/persons`, {
       name: 'Wahltest',
       geschlecht: 'maennlich',
       sichtung: 'sk2',
@@ -684,14 +684,14 @@ test('Patientenkopf bei 390 × 844 mit Schreibrecht und PAT-Zeile: Sichtung, Zus
     bezeichnung: 'Turnhalle',
   });
   await senden(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
-  const person = await senden(page, `/api/einsaetze/${e}/personen`, {
+  const person = await senden(page, `/api/einsaetze/${e}/persons`, {
     name: 'Handytest',
     geschlecht: 'weiblich',
     sichtung: 'sk2',
     zustand: 'Verdacht auf Hüftfraktur',
     uhs_id: uhs.id,
   });
-  await aendern(page, `/api/einsaetze/${e}/personen/${person.id}`, {
+  await aendern(page, `/api/einsaetze/${e}/persons/${person.id}`, {
     pat_nummer: 'A-4711',
     kontamination: true,
   });

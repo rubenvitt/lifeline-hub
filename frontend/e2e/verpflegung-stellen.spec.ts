@@ -38,15 +38,15 @@ async function saeen(page: Page) {
   const { id: e } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `E2E Stellen ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/verpflegung`;
-  const { id: mittag } = await senden(page, 'post', `${basis}/zeitfenster`, {
+  const basis = `/api/einsaetze/${e}/catering`;
+  const { id: mittag } = await senden(page, 'post', `${basis}/time-slots`, {
     bezeichnung: 'Mittag Stellen',
     von_at: zeit(-20),
     bis_at: zeit(100),
     bedarf_kraefte: 200,
     bedarf_betreute: 0,
   });
-  await senden(page, 'post', `${basis}/zeitfenster`, {
+  await senden(page, 'post', `${basis}/time-slots`, {
     bezeichnung: 'Abend Stellen',
     von_at: zeit(300),
     bis_at: zeit(400),
@@ -99,11 +99,11 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     test.setTimeout(90_000);
     const { e, mittag, basis } = await saeen(page);
     // Eine zweite, schon aktive Stelle über die API: sie macht die Aufstellung zu zwei Zeilen.
-    const { id: turnhalle } = await senden(page, 'post', `${basis}/stellen`, {
+    const { id: turnhalle } = await senden(page, 'post', `${basis}/positions`, {
       bezeichnung: 'Ausgabe Turnhalle Nord',
       art: 'ausgabestelle',
     });
-    await senden(page, 'post', `${basis}/stellen/${turnhalle}/status`, { status: 'aktiv' });
+    await senden(page, 'post', `${basis}/positions/${turnhalle}/status`, { status: 'aktiv' });
 
     await page.goto(`/einsaetze/${e}/verpflegung`);
     await setzeDichte(page, dichte);
@@ -149,7 +149,7 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     // Die Auswahlliste schließen, ohne etwas zu wählen: ein Klick auf ein Etikett daneben.
     await bedarf.getByText('Weitere Personen (EP)').click();
     const patch = page.waitForResponse(
-      (r) => r.request().method() === 'PATCH' && r.url().endsWith(`/zeitfenster/${mittag}`),
+      (r) => r.request().method() === 'PATCH' && r.url().endsWith(`/time-slots/${mittag}`),
     );
     await bedarf.getByRole('button', { name: 'Speichern' }).click();
     const antwort = await patch;
@@ -178,7 +178,7 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
     await expect(nachtrag.getByLabel('Zuführungsziel')).toHaveCount(0);
     await nachtrag.getByRole('button', { name: 'Nachtragen' }).click();
     await expect(nachtrag).toHaveCount(0);
-    await senden(page, 'post', `${basis}/zeitfenster/${mittag}/ausgaben`, {
+    await senden(page, 'post', `${basis}/time-slots/${mittag}/distributions`, {
       menge: 80,
       verpflegungsstelle_id: turnhalle,
     });
@@ -236,7 +236,7 @@ for (const dichte of ['kompakt', 'handschuh'] as const) {
 
 test('Beobachter: Stellen ohne Aktionen, „Stelle anlegen“ gesperrt', async ({ page }) => {
   const { e, basis } = await saeen(page);
-  await senden(page, 'post', `${basis}/stellen`, {
+  await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: 'Zuführung Deich',
     art: 'zufuehrung',
   });
@@ -262,19 +262,19 @@ test('390 px im Handschuh-Betrieb: Stellen, Karte je Stelle und Stellenwahl ohne
     ['Feldküche BR Sportplatz mit einem langen Namen am Deich', 'feldkueche'],
     ['Ausgabe Turnhalle Nord', 'ausgabestelle'],
   ] as const) {
-    const { id } = await senden(page, 'post', `${basis}/stellen`, {
+    const { id } = await senden(page, 'post', `${basis}/positions`, {
       bezeichnung,
       art,
       standort: 'Sportplatz am Deich, Musterstadt',
     });
-    await senden(page, 'post', `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    await senden(page, 'post', `${basis}/positions/${id}/status`, { status: 'aktiv' });
     ids.push(id);
   }
-  await senden(page, 'patch', `${basis}/zeitfenster/${mittag}`, {
+  await senden(page, 'patch', `${basis}/time-slots/${mittag}`, {
     stelle_ids: ids,
     verpflegungsart: 'getraenke',
   });
-  await senden(page, 'post', `${basis}/zeitfenster/${mittag}/ausgaben`, {
+  await senden(page, 'post', `${basis}/time-slots/${mittag}/distributions`, {
     menge: 30,
     verpflegungsstelle_id: ids[0],
   });

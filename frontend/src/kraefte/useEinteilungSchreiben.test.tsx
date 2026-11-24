@@ -20,11 +20,11 @@ beforeEach(() => {
     http.delete('/api/einsaetze/1/einheiten/:eid/personal/:ep', merke),
     http.put('/api/einsaetze/1/fahrzeuge/:ef/besatzung/:ep', merke),
     http.delete('/api/einsaetze/1/fahrzeuge/:ef/besatzung/:ep', merke),
-    http.put('/api/einsaetze/1/uhs/:uid/kraefte/:ep', ({ request }) => {
+    http.put('/api/einsaetze/1/uhs/:uid/forces/:ep', ({ request }) => {
       aufrufe.push(`PUT ${new URL(request.url).pathname}`);
       return HttpResponse.json({ id: 9 });
     }),
-    http.delete('/api/einsaetze/1/uhs/:uid/kraefte/:ep', merke),
+    http.delete('/api/einsaetze/1/uhs/:uid/forces/:ep', merke),
   );
 });
 
@@ -56,8 +56,8 @@ describe('useEinteilungSchreiben (LLH-1060, D3)', () => {
     expect(aufrufe).toEqual([
       'PUT /api/einsaetze/1/fahrzeuge/5/besatzung/9',
       'DELETE /api/einsaetze/1/fahrzeuge/5/besatzung/9',
-      'PUT /api/einsaetze/1/uhs/3/kraefte/9',
-      'DELETE /api/einsaetze/1/uhs/3/kraefte/9',
+      'PUT /api/einsaetze/1/uhs/3/forces/9',
+      'DELETE /api/einsaetze/1/uhs/3/forces/9',
     ]);
   });
 

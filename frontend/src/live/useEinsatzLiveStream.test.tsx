@@ -160,7 +160,7 @@ describe('useEinsatzLiveStream', () => {
     });
   });
 
-  // LLH-1055 D4: die Empfängerliste ist eine Projektion in `GET …/verpflegung`; der Server
+  // LLH-1055 D4: die Empfängerliste ist eine Projektion in `GET …/catering`; der Server
   // verteilt Einheiten- und Abschnittsänderungen deshalb auch an Leser der Verpflegung.
   it.each(['einheit', 'abschnitt'])(
     'Ereignis `%s` lädt die Verpflegung neu (LLH-1055)',
@@ -483,7 +483,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/3/personen/:pid/zeile', ({ params }) => {
+      http.get('/api/einsaetze/3/persons/:pid/row', ({ params }) => {
         abrufe.push(String(params.pid));
         return HttpResponse.json({
           id: 9,

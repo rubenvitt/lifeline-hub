@@ -18,7 +18,7 @@ import type {
  * Schreibwege mit `client_id` (Replay liefert den ersten Stand) und Erfassungszeit; ohne Netz
  * vormerken nur über `offline/schreiben.ts`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/betreuung`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/care`;
 
 /** Haushalt registrieren oder Personen anhängen (`haushalt_id`); 201 mit dem Haushalt. */
 export function sendRegistrierung(
@@ -28,7 +28,7 @@ export function sendRegistrierung(
   optionen?: ApiSendOptionen,
 ): Promise<Haushalt> {
   return apiSend<Haushalt>(
-    `${basis(einsatzId)}/stellen/${stelleId}/registrierungen`,
+    `${basis(einsatzId)}/positions/${stelleId}/registrations`,
     'POST',
     body,
     optionen,
@@ -37,7 +37,7 @@ export function sendRegistrierung(
 
 /** Registrierliste einer Stelle; personenbezogen, ohne Modul Personen 403. */
 export function loadRegistrierListe(einsatzId: number, stelleId: number): Promise<RegistrierListe> {
-  return apiGet<RegistrierListe>(`${basis(einsatzId)}/stellen/${stelleId}/registrierungen`);
+  return apiGet<RegistrierListe>(`${basis(einsatzId)}/positions/${stelleId}/registrations`);
 }
 
 /**
@@ -52,7 +52,7 @@ export function loadRegistrierlisteDruck(
 ): Promise<RegistrierListe> {
   const query = hasUnvertraeglichkeiten ? '?unvertraeglichkeiten=1' : '';
   return apiGet<RegistrierListe>(
-    `${basis(einsatzId)}/stellen/${stelleId}/registrierungen/druck${query}`,
+    `${basis(einsatzId)}/positions/${stelleId}/registrations/print${query}`,
   );
 }
 
@@ -64,7 +64,7 @@ export function sendAbmeldung(
   optionen?: ApiSendOptionen,
 ): Promise<Abmeldung> {
   return apiSend<Abmeldung>(
-    `${basis(einsatzId)}/stellen/${stelleId}/abmeldungen`,
+    `${basis(einsatzId)}/positions/${stelleId}/departures`,
     'POST',
     body,
     optionen,
@@ -82,7 +82,7 @@ export function sendBezugsperson(
   personId: number,
 ): Promise<Haushalt> {
   return apiSend<Haushalt>(
-    `${basis(einsatzId)}/stellen/${stelleId}/haushalte/${haushaltId}/bezugsperson`,
+    `${basis(einsatzId)}/positions/${stelleId}/households/${haushaltId}/contact-person`,
     'PUT',
     { person_id: personId },
   );
@@ -99,7 +99,7 @@ export function sendHaushaltWechsel(
   ziel: HaushaltZielEingabe,
 ): Promise<Haushalt> {
   return apiSend<Haushalt>(
-    `${basis(einsatzId)}/stellen/${stelleId}/personen/${personId}/haushalt`,
+    `${basis(einsatzId)}/positions/${stelleId}/persons/${personId}/household`,
     'PUT',
     ziel,
   );
@@ -107,5 +107,5 @@ export function sendHaushaltWechsel(
 
 /** Kostformen aller Registrierten des Einsatzes, ohne Personenbezug; nur Modul Betreuung. */
 export function loadKostformZaehlung(einsatzId: number): Promise<KostformZaehlung> {
-  return apiGet<KostformZaehlung>(`${basis(einsatzId)}/kostformen`);
+  return apiGet<KostformZaehlung>(`${basis(einsatzId)}/diets`);
 }

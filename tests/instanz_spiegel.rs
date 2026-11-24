@@ -845,7 +845,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Ansprechbar", "client_id": "n-1" })),
     )
@@ -918,7 +918,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p_spiegel}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Später", "client_id": "n-2" })),
     )
@@ -982,7 +982,7 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p}/notizen"),
+        &format!("/api/einsaetze/{s}/persons/{p}/notes"),
         &erika,
         Some(&json!({ "text": "Notiz", "client_id": "v-1" })),
     )
@@ -1067,7 +1067,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/999999/sichtung"),
+        &format!("/api/einsaetze/{s}/persons/999999/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "weg-2"})),
     )
@@ -1103,7 +1103,7 @@ async fn eine_zeile_die_hier_steht_wartet_auf_ihre_herkunft() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen/{p}/sichtung"),
+        &format!("/api/einsaetze/{s}/persons/{p}/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "da-1"})),
     )
@@ -2133,7 +2133,7 @@ async fn mitarbeit_beantragt_keine_person_am_spiegel() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/personen"),
+        &format!("/api/einsaetze/{s}/persons"),
         &erika,
         Some(&json!({ "name": "Max", "client_id": "m-p-1" })),
     )

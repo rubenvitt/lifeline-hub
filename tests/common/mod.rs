@@ -372,7 +372,7 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(body),
     )
@@ -919,7 +919,7 @@ impl Erfassung {
     /// Pfadsegment unter `/api/einsaetze/{id}/`.
     pub fn segment(self) -> &'static str {
         match self {
-            Erfassung::Tier => "tiere",
+            Erfassung::Tier => "animals",
             Erfassung::Uhs => "uhs",
         }
     }

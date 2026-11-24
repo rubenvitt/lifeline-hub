@@ -1043,7 +1043,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
         assert_eq!(s, StatusCode::OK, "{art:?}: Dokumente sieht sie");
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/anhaenge",
+            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments",
             art.segment()
         );
         let (s, _) = anfrage(&app, "GET", &modul_pfad, &frieda, None).await;
@@ -1051,7 +1051,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("{modul_pfad}/{lid}/datei"),
+            &format!("{modul_pfad}/{lid}/file"),
             &frieda,
             None,
         )
@@ -1106,13 +1106,13 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let person_pfad = format!("/api/einsaetze/{einsatz}/personen/{pid}/anhaenge");
+    let person_pfad = format!("/api/einsaetze/{einsatz}/persons/{pid}/attachments");
     let (s, _) = anfrage(&app, "GET", &person_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Personenroute");
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{person_pfad}/{lid}/datei"),
+        &format!("{person_pfad}/{lid}/file"),
         &frieda,
         None,
     )

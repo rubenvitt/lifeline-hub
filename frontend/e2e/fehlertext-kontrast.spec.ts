@@ -53,7 +53,7 @@ for (const modus of ['light', 'dark'] as const) {
     });
 
     // Ein Bezirk mit einer Fläche: nur dann ruft das Paneel „Gebiet“ die Zonen ab.
-    const bezirkId = await post(page, `/api/einsaetze/${einsatzId}/evakuierung/bezirke`, {
+    const bezirkId = await post(page, `/api/einsaetze/${einsatzId}/evacuation/districts`, {
       bezeichnung: 'Uferstraße 12–40',
       plan_personen: 120,
       plan_erhebung: 'geschaetzt',

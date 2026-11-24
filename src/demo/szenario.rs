@@ -613,7 +613,7 @@ pub struct BrVorlage {
     pub standort: &'static str,
 }
 
-/// Betroffene Person, angelegt wie über `POST …/personen`: Status `erfasst`, optional mit
+/// Betroffene Person, angelegt wie über `POST …/persons`: Status `erfasst`, optional mit
 /// Erst-Sichtung (hebt auf `betroffen`) und UHS-Eintritt (Inbox).
 #[derive(Debug, Clone, Copy)]
 pub struct PersonVorlage {
@@ -638,7 +638,7 @@ pub struct PersonVorlage {
     pub platz: Option<&'static str>,
 }
 
-/// Verbleib einer früher erfassten Person wie über `POST …/personen/{pid}/verbleib`
+/// Verbleib einer früher erfassten Person wie über `POST …/persons/{pid}/whereabouts`
 /// (LLH-1576): Erfassungszeit = Schrittzeit, Auto-Austritt aus der UHS wie in der Route. Die
 /// Paarung von Art, Fahrer-Angabe und Angaben aus LLH-1568 prüft der Import mit den Regeln der
 /// Route.

@@ -19,7 +19,7 @@ import { freigabenFixture } from '../test/fixtures';
 /** Modul-Freigaben des Servers: alles frei. */
 const freigaben = freigabenFixture();
 
-const PFAD = '/api/einsaetze/7/evakuierung';
+const PFAD = '/api/einsaetze/7/evacuation';
 
 const UEBERSICHT: EvakuierungUebersicht = {
   bezirke: [

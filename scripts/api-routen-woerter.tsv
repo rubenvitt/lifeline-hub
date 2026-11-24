@@ -1,8 +1,9 @@
-# Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0097): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
 access	Zugang
 access-changes	Zugangsänderungen
 access-log	Zugangsprotokoll
+accesses	Zugriffe
 accommodation	Unterkunft
 accommodation-guidelines	Unterkunft-Richtwerte
 acknowledge	quittieren
@@ -14,15 +15,19 @@ agenda-items	Programmpunkte
 alarm	Alarmmeldung
 also-local	auch lokal
 animals	Tiere
+annul	stornieren
 api	-
 app-code	-
 archive	Archiv
 areas	Bereiche
+attachments	Anhänge
 attachments.zip	Anlagen
 attempts	Versuche
 audit	-
 auth	-
 auto-update	automatische Aktualisierung
+availability	Verfügbarkeit
+available	verfügbar
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
@@ -57,17 +62,24 @@ comms-sketch	Fernmeldeskizze
 components	Komponenten
 config	-
 confirm	bestätigen
+confirmers	Bestätiger
 connections	Verbindungen
+contact-person	Bezugsperson
 countersign	gegenzeichnen
 counts	Zähler
 damages	Schäden
 deactivate	deaktivieren
+decision	Entscheidung
 decline	ablehnen
 demo-data	Demo-Daten
+departures	Abmeldungen
 dev	-
 devices	Geräte
+diets	Kostformen
 discard	verwerfen
 discoverable	-
+distributions	Ausgaben
+districts	Bezirke
 download	-
 emergency-takeover	Notübernahme
 end	beenden
@@ -82,10 +94,13 @@ export	-
 external	extern
 external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
+file	Datei
 finish	-
 follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
+from-attachment	aus Anhang
+from-template	aus Vorlage
 gauges	Pegel
 generate	erzeugen
 glyphs	-
@@ -94,15 +109,20 @@ hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
+household	Haushalt
+households	Haushalte
+image	Bild
 import	-
 in-service	in Dienst
 incident-templates	Einsatzvorlagen
 incidents	Einsätze
 info-line	Infotelefon
+injuries	Verletzungen
 instance	Instanz
 intake	Einwurf
 intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
+interventions	Maßnahmen
 inventory	Bestand
 ios-push	-
 jwks.json	-
@@ -111,6 +131,7 @@ keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
 layout	Anordnung
+list-accesses	Listenzugriffe
 live	-
 login	-
 logins	Anmeldungen
@@ -120,6 +141,7 @@ lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
+matches	Abgleich
 material	Material
 material-categories	Materialkategorien
 matrix	-
@@ -130,9 +152,12 @@ module-access	Modulfreigaben
 module-counts	Modulzähler
 module-defaults	Modulvorgaben
 module-overrides	Modul-Overrides
+notes	Notizen
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
 object	widersprechen
+occupancies	Belegungen
+occupancy	Belegung
 offline	-
 offline-maps	Offline-Karten
 oidc	-
@@ -168,17 +193,21 @@ positions	Stellen
 posts	Posten
 presence	Präsenz
 preview	Vorschau
+print	Druck
+progress	Stände
 providers	-
 proxy	-
 qualifications	Qualifikationen
 raster	-
 read	gelesen
+reason	Anlass
 reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
 reference-values	Richtwerte
 register	-
 registration	-
+registrations	Registrierungen
 reimport	neu importieren
 reject	zurückweisen
 rejected	abgelehnt
@@ -197,10 +226,12 @@ retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
 revoke	widerrufen
+row	Zeile
 schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
+selection	Auswahl
 sessions	Sitzungen
 set	festlegen
 settings	Einstellungen
@@ -217,6 +248,7 @@ sprites	-
 staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
+state	Stand
 status	-
 storage	Datenträger
 style.json	-
@@ -229,13 +261,17 @@ test	-
 tile	-
 tilejson	-
 tiles	-
+time-slots	Zeitfenster
 title-block	Schriftfeld
 totp	-
 transfer	Übernahme
 transport	-
+transport-means	Transportmittel
 triage	Sichtung
 uhs	UHS
+uhs-occupancy	UHS-Belegung
 undo	zurücknehmen
+unit	Einheit
 unit-templates	Einheitsvorlagen
 unit-types	Einheitstypen
 units	Einheiten
@@ -247,8 +283,10 @@ v1	-
 vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
+void	aufheben
 web-push	-
 webauthn	-
 webhook	-
 whereabouts	Verbleib
+whereabouts-details	Verbleib-Angaben
 world	Welt
