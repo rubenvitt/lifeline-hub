@@ -120,18 +120,18 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `pub fn build_ics(eingabe: &IcsEingabe<'_>, jetzt: DateTime<Utc>) -> String`;
   - `pub fn build_dateiname(einsatz_id: i64, termin: DateTime<Utc>) -> String`, ergibt `lagebesprechung-einsatz-<id>-<YYYY-MM-DD-HHMM>.ics`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `jede_zeile_endet_mit_crlf_und_ist_hoechstens_75_oktette`: lange Umlaut-Bezeichnung; jede Zeile `.len() <= 75` ohne CRLF, Fortsetzungen beginnen mit `' '`, `String::from_utf8` jeder Zeile ok.
   - `escaping_nach_rfc5545`: Bezeichnung `"A, B; C\\D\r\nE"` ergibt entfaltet `SUMMARY:Lagebesprechung – A\, B\; C\\D\nE`; ein Steuerzeichen `\u{7}` fehlt.
   - `dauer_dreissig_minuten_und_alarm`: Termin `2026-11-24T14:30:00Z` → `DTSTART:20261124T143000Z`, `DTEND:20261124T150000Z`, `TRIGGER:-PT10M`, `SEQUENCE:0`, `METHOD:PUBLISH`, kein `ORGANIZER` und kein `ATTENDEE`.
   - `uid_je_termin`: `UID:lagebesprechung-42-20261124T143000Z@<kennung>`; anderer Termin → andere UID.
   - `bezeichnung_wird_auf_200_zeichen_gekuerzt`.
-- [ ] **Step 2:** `cargo test --lib lagebesprechung::ics` → FAIL.
-- [ ] **Step 3:** Implementieren:
+- [x] **Step 2:** `cargo test --lib lagebesprechung::ics` → FAIL.
+- [x] **Step 3:** Implementieren:
   - Faltung auf Bytes, an Zeichengrenzen zurückweichend; die Fortsetzungszeile zählt ihr Leerzeichen mit;
   - Textsäuberung vor dem Escaping: `\r\n` und `\r` → `\n`, andere Steuerzeichen außer `\t` entfernen.
-- [ ] **Step 4:** `cargo test --lib lagebesprechung::ics` → PASS.
-- [ ] **Step 5:** Commit `feat: ICS-Generator für den Lagebesprechungstermin` (Zunder D).
+- [x] **Step 4:** `cargo test --lib lagebesprechung::ics` → PASS.
+- [x] **Step 5:** Commit `feat: ICS-Generator für den Lagebesprechungstermin` (Zunder D).
 
 ### Task 4: ICS-Route
 

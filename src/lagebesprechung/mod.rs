@@ -15,6 +15,7 @@ use utoipa::ToSchema;
 use crate::zeitdarstellung::Zeitstil;
 
 pub mod ankuendigung;
+pub mod ics;
 pub mod repo;
 
 /// Höchstlänge des Entschlusses (LLH-1111, design.md D10), wie der Auftragstext. Nicht die
