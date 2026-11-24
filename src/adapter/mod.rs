@@ -11,6 +11,7 @@ pub mod art;
 pub mod geheimnis;
 pub mod lauf;
 pub mod repo;
+pub mod smtp;
 pub mod ziel;
 pub mod zustand;
 

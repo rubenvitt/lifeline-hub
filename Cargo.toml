@@ -39,6 +39,12 @@ mdns-sd = { version = "=0.22.0", default-features = false }
 # Nur zum Bauen und Prüfen von Mailnachrichten und -adressen (LLH-2093), ohne Transport: den SMTP-Weg
 # trägt `adapter::smtp` über tokio-rustls, damit der Crypto-Provider und die geprüfte IP gelten.
 lettre = { version = "0.11", default-features = false, features = ["builder"] }
+# TLS des SMTP-Clients (LLH-2093, `src/adapter/smtp.rs`): ohne Vorgabe-Features, damit kein
+# zweiter Crypto-Provider (`ring`) mitkommt; der Provider kommt aus `instanz::zertifikat::provider()`.
+tokio-rustls = { version = "0.26", default-features = false }
+# Zertifikatsprüfung gegen die Vertrauensanker des Systems mit unserem Provider
+# (`instanz::zertifikat::webpki_config`); dieselbe Version, die reqwest mitbringt.
+rustls-platform-verifier = "0.7"
 futures = "0.3"
 tracing = "0.1"
 # Nicht blockierendes Log auf stdout (LFH-925, `src/main.rs`).
