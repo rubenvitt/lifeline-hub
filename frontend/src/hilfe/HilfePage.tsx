@@ -1,7 +1,7 @@
 import { Button, Input } from 'antd';
 import type { InputRef } from 'antd';
 import type { MouseEvent } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
 import Markdown from '../components/Markdown';
@@ -25,6 +25,9 @@ import { GRUPPEN, gruppenName, type Gruppe } from './gruppen';
 import HilfeBild from './HilfeBild';
 import { KAPITEL, findeKapitel, kapitelDerGruppe, verlinke, type Kapitel } from './kapitel';
 import './Hilfe.css';
+
+/** Anfangswert der verzögerten Mappe (LLH-2087): fest, damit React ihn als „noch nichts“ erkennt. */
+const KEINE_KAPITEL: readonly Kapitel[] = [];
 
 /** Der Lizenzhinweis der eingebetteten Bibliotheken (`public/lizenzen/`, HEIC-Decoder LFH-1000). */
 const LIZENZ_HINWEIS = '/lizenzen/HEIC-DECODER.txt';
@@ -84,13 +87,24 @@ export default function HilfePage() {
   const [suche, setSuche] = useState('');
   const suchfeld = useRef<InputRef>(null);
   const woerter = falte(suche).split(/\s+/).filter(Boolean);
-  const liste = kapitelDerGruppe(gruppe).filter((k) => {
-    if (woerter.length === 0) return true;
-    const text = falte(`${k.titel} ${k.text}`);
-    return woerter.every((w) => text.includes(w));
-  });
+  // Fest je Gruppe und Suche: die verzögerte Mappe unten vergleicht die Liste per Identität.
+  const liste = useMemo(() => {
+    const suchwoerter = falte(suche).split(/\s+/).filter(Boolean);
+    return kapitelDerGruppe(gruppe).filter((k) => {
+      if (suchwoerter.length === 0) return true;
+      const text = falte(`${k.titel} ${k.text}`);
+      return suchwoerter.every((w) => text.includes(w));
+    });
+  }, [gruppe, suche]);
   const einzeln = findeKapitel(slug);
+  // „Alle Kapitel am Stück“ rendert React erst nach Kopf, Kapitelliste und Übersicht, im
+  // Hintergrund und unterbrechbar (LLH-2087): je Gruppe bis zu rund 1 MB Markdown hielt sonst
+  // schon das Öffnen der Hilfe aus dem Benutzermenü sekundenlang auf, ohne Rückmeldung (4× CPU:
+  // 3,7 s gebaut, 12,9 s im Dev-Server). Ein einzelnes Kapitel steht sofort.
+  const mappe = useDeferredValue(slug === undefined ? liste : KEINE_KAPITEL, KEINE_KAPITEL);
   const gezeigt: Kapitel[] = slug === undefined ? liste : einzeln ? [einzeln] : [];
+  const dargestellt = slug === undefined ? mappe : gezeigt;
+  const isVollstaendig = dargestellt === gezeigt;
   const bereichAktuell = einzeln ? bereichVon(einzeln.reihenfolge) : undefined;
   const bereiche = BEREICHE.map((name, i) => ({
     name,
@@ -319,7 +333,8 @@ export default function HilfePage() {
           <h1 className="hilfe-kopf__titel">Hilfe</h1>
         </div>
         <div className="hilfe-kopf__aktionen">
-          <DruckKnopf ohneOrganisation gesperrt={gezeigt.length === 0} />
+          {/* Gedruckt wird erst die vollständige Mappe. */}
+          <DruckKnopf ohneOrganisation gesperrt={gezeigt.length === 0 || !isVollstaendig} />
           {/* Ein langer Einsatzname kürzt, statt die Hilfe bei 390 px quer zu sprengen (Muster von
               `RueckwegKnopf` in `AdminPage`, LLH-1731): `maxWidth` am Knopf, Auslassung innen. */}
           <Button
@@ -428,7 +443,7 @@ export default function HilfePage() {
               Lifeline Hub · Anwenderdokumentation · {einzeln ? einzeln.titel : gruppenName(gruppe)}{' '}
               · Version {__APP_VERSION__}
             </div>
-            {gezeigt.map((k) => (
+            {dargestellt.map((k) => (
               <article key={k.slug} className="hilfe-kapitel" data-lfh="druck-kapitel">
                 <p className="hilfe-kapitel__bereich">{bereichVon(k.reihenfolge)}</p>
                 <Markdown
