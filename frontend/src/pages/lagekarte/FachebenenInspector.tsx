@@ -21,6 +21,7 @@ import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
+import { useOnline } from '../../offline/useOnline';
 import {
   capSchwereVon,
   dwdStufeAusSeverity,
@@ -124,6 +125,45 @@ const WARNQUELLE_RUECKFALL: Record<'nina' | 'dwd', string> = {
   dwd: 'Deutscher Wetterdienst',
 };
 
+/**
+ * Vollmeldung einer NINA-Warnung bei warnung.bund.de (LLH-2103). Die Ebene trägt nur einen Auszug;
+ * Echtheit, Beschreibung und Handlungsanweisung stehen dort (MoWaS-Auflage,
+ * `docs/fachebenen-quellen.md`). `/meldungen/<id>/` ist die Form, die die NINA-Seite selbst
+ * verlinkt. Der Link geht ans Internet, nicht an den Server: ohne Netz gesperrt mit Grund.
+ */
+function ninaVollmeldungUrl(id: string): string {
+  return `https://warnung.bund.de/meldungen/${encodeURIComponent(id)}/`;
+}
+
+function NinaVollmeldung({ id }: { id: string }) {
+  const { token } = theme.useToken();
+  const online = useOnline();
+  return (
+    <div style={{ marginTop: token.marginSM }}>
+      {online ? (
+        <Button
+          type="link"
+          href={ninaVollmeldungUrl(id)}
+          target="_blank"
+          rel="noreferrer noopener"
+          style={{ paddingInline: 0 }}
+        >
+          Vollmeldung bei warnung.bund.de
+        </Button>
+      ) : (
+        <>
+          <Button type="link" disabled style={{ paddingInline: 0 }}>
+            Vollmeldung bei warnung.bund.de
+          </Button>
+          <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+            Ohne Netz nicht abrufbar
+          </Textstufe>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
   const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
@@ -142,6 +182,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
   const quelle = pick(p, 'SENDERNAME') ?? WARNQUELLE_RUECKFALL[ebene];
   const beschreibung = pick(p, 'DESCRIPTION', 'description');
   const hinweis = pick(p, 'INSTRUCTION', 'instruction');
+  const ninaId = ebene === 'nina' ? s(p.id) : null;
 
   return (
     <>
@@ -197,6 +238,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
           </Stapel>
         </div>
       )}
+      {ninaId && <NinaVollmeldung id={ninaId} />}
     </>
   );
 }
