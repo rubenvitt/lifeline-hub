@@ -5303,7 +5303,11 @@ async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_a
         "Spalten, FKs und Indizes unverändert"
     );
     assert_eq!(
-        neue_arten.iter().fold(ddl().await, |ddl, art| ddl.replacen(&format!(",'{art}'"), "", 1)),
+        neue_arten.iter().fold(ddl().await, |ddl, art| ddl.replacen(
+            &format!(",'{art}'"),
+            "",
+            1
+        )),
         ddl_vorher,
         "die DDL unterscheidet sich ausschließlich im art-CHECK"
     );
