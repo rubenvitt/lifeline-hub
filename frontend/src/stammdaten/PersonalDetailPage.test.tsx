@@ -56,7 +56,7 @@ function handler(
     http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
     ),
-    http.get('/api/benutzer', () => HttpResponse.json([])),
+    http.get('/api/users', () => HttpResponse.json([])),
     http.patch('/api/personnel/5', async ({ request }) => {
       onPatch(await request.json());
       return HttpResponse.json(person);

@@ -1,7 +1,8 @@
 ---
 id: ADR-0022
 titel: Fremdsysteme sprechen signiert und mit festen Scopes mit der öffentlichen API unter /api/v1
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0096
 datum: 2026-11-11
 gilt_fuer:
   - src/app.rs

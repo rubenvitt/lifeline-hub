@@ -1,4 +1,4 @@
-//! Abgleich der Einsätze über `POST /api/instanz/spiegel` (design.md D6, D7, D12).
+//! Abgleich der Einsätze über `POST /api/instance/mirror` (design.md D6, D7, D12).
 //!
 //! Die meldende Seite ruft, die erreichte antwortet; beide schicken dasselbe [`SpiegelPaket`].
 //! Führt die meldende Seite einen Einsatz, liefert sie ihn in der Anfrage und merkt sich den Stand
@@ -444,7 +444,7 @@ pub async fn melde_live(pool: &SqlitePool, u: &Uebernommen) {
 
 // ── Erreichte Seite ──────────────────────────────────────────────────────────────────────────
 
-/// Beantwortet einen Abgleich (Handler `POST /api/instanz/spiegel`).
+/// Beantwortet einen Abgleich (Handler `POST /api/instance/mirror`).
 pub async fn handle_abgleich(
     pool: &SqlitePool,
     live: &crate::live::LiveHub,

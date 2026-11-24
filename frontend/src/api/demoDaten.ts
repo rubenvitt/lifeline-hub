@@ -9,31 +9,31 @@ import { apiGet, apiSend } from './client';
  * Ohne `--demo-daten` am Backend sind die Routen nicht registriert: 404 heißt „nicht
  * freigeschaltet“, es gibt dafür bewusst keine zweite Quelle.
  *
- * Statuscodes: GET 200 · POST 201 · POST `/neu` 200 · DELETE 200; 409 bei „schon importiert“
+ * Statuscodes: GET 200 · POST 201 · POST `/reimport` 200 · DELETE 200; 409 bei „schon importiert“
  * (POST) bzw. „nichts importiert“ (DELETE), 422 bei fehlendem Katalogeintrag. Fehler kommen als
  * {@link ApiError} mit dem Servertext.
  */
 
-const PFAD = '/api/demo-daten';
+const PFAD = '/api/demo-data';
 
-/** `GET /api/demo-daten` — Stand aller Lagen; 404 ohne Freischaltung. */
+/** `GET /api/demo-data` — Stand aller Lagen; 404 ohne Freischaltung. */
 export function ladeDemoDatenStatus(): Promise<DemoDatenStatus> {
   return apiGet<DemoDatenStatus>(PFAD);
 }
 
-/** `POST /api/demo-daten/{lage}` — erstmaliger Import der Lage; 409, wenn sie schon importiert
+/** `POST /api/demo-data/{lage}` — erstmaliger Import der Lage; 409, wenn sie schon importiert
  *  ist. Die andere Lage bleibt unberührt (LLH-1576). */
 export function importiereDemoDaten(lage: DemoLage): Promise<DemoDatenStatus> {
   return apiSend<DemoDatenStatus>(`${PFAD}/${lage}`, 'POST');
 }
 
-/** `POST /api/demo-daten/{lage}/neu` — ersetzt den aktiven Import der Lage in EINER
+/** `POST /api/demo-data/{lage}/reimport` — ersetzt den aktiven Import der Lage in EINER
  *  Transaktion; ohne aktiven Import ist es ein erstmaliger Import. */
 export function importiereDemoDatenNeu(lage: DemoLage): Promise<DemoDatenStatus> {
-  return apiSend<DemoDatenStatus>(`${PFAD}/${lage}/neu`, 'POST');
+  return apiSend<DemoDatenStatus>(`${PFAD}/${lage}/reimport`, 'POST');
 }
 
-/** `DELETE /api/demo-daten/{lage}` — entfernt den Demo-Einsatz der Lage und ihre unbenutzten
+/** `DELETE /api/demo-data/{lage}` — entfernt den Demo-Einsatz der Lage und ihre unbenutzten
  *  Demo-Stammdaten; 409, wenn die Lage nicht importiert ist. */
 export function entferneDemoDaten(lage: DemoLage): Promise<DemoDatenStatus> {
   return apiSend<DemoDatenStatus>(`${PFAD}/${lage}`, 'DELETE');

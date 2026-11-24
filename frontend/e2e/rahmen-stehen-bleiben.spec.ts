@@ -305,7 +305,7 @@ test('Tabellenkopf steht beim Rollen unter dem klebenden Kopf, nicht dahinter', 
   await anmeldenAlsAdmin(page);
   const lauf = Date.now();
   for (let i = 0; i < 20; i += 1) {
-    const antwort = await page.request.post('/api/benutzer', {
+    const antwort = await page.request.post('/api/users', {
       data: {
         anzeigename: `Rahmen ${i}`,
         benutzername: `e2e-rahmen-${lauf}-${i}`,
@@ -454,7 +454,7 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     if (ziel === 'verwaltung') {
       const lauf = Date.now();
       for (let i = 0; i < 20; i += 1) {
-        const antwort = await page.request.post('/api/benutzer', {
+        const antwort = await page.request.post('/api/users', {
           data: {
             anzeigename: `Seitenkopf ${i}`,
             benutzername: `e2e-seitenkopf-${lauf}-${i}`,
@@ -537,7 +537,7 @@ test('Fokus rückwärts unter dem klebenden Seitenkopf, Fokus im Seitenkopf roll
   await anmeldenAlsAdmin(page);
   const lauf = Date.now();
   for (let i = 0; i < 30; i += 1) {
-    const antwort = await page.request.post('/api/benutzer', {
+    const antwort = await page.request.post('/api/users', {
       data: {
         anzeigename: `Fokus ${i}`,
         benutzername: `e2e-fokus-sk-${lauf}-${i}`,

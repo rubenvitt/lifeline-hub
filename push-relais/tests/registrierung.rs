@@ -8,6 +8,7 @@ use http_body_util::BodyExt;
 mod gemeinsam;
 use push_relais::{
     api::{router, RelaisState},
+    client_ip::ClientIpSource,
     speicher::{self, Pruefung},
 };
 use sqlx::SqlitePool;
@@ -19,7 +20,7 @@ async fn aufbau() -> (Router, SqlitePool) {
     let app = router(RelaisState::neu(
         pool.clone(),
         10,
-        false,
+        ClientIpSource::Peer,
         gemeinsam::apns_client("http://127.0.0.1:9"),
         600,
     ));
@@ -137,7 +138,7 @@ async fn hinter_proxy_zaehlt_der_rechte_forwarded_for_eintrag() {
     let app = router(RelaisState::neu(
         pool,
         1,
-        true,
+        ClientIpSource::SingleProxy,
         gemeinsam::apns_client("http://127.0.0.1:9"),
         600,
     ));
@@ -164,6 +165,113 @@ async fn hinter_proxy_zaehlt_der_rechte_forwarded_for_eintrag() {
     assert_eq!(a.status(), StatusCode::TOO_MANY_REQUESTS);
     let a = app.oneshot(mit_xff("203.0.113.6")).await.unwrap();
     assert_eq!(a.status(), StatusCode::OK);
+}
+
+fn cloudflare() -> ClientIpSource {
+    ClientIpSource::TrustedProxies {
+        proxies: vec!["10.0.1.0/24".parse().unwrap()],
+        cdn: vec![
+            "173.245.48.0/20".parse().unwrap(),
+            "2a06:98c0::/29".parse().unwrap(),
+        ],
+    }
+}
+
+/// LLH-2080: Ein eigener Cloudflare Worker setzt `X-Forwarded-For` selbst und schickt aus einem
+/// Cloudflare-Bereich. Gezählt wird der Worker; ein anderer linker Eintrag umgeht die Grenze nicht.
+#[tokio::test]
+async fn worker_kann_die_grenze_nicht_umgehen() {
+    let pool = speicher::oeffnen(":memory:").await.unwrap();
+    let app = router(RelaisState::neu(
+        pool,
+        1,
+        cloudflare(),
+        gemeinsam::apns_client("http://127.0.0.1:9"),
+        600,
+    ));
+    let anfrage = |xff: &str| {
+        let mut r = registrierung("10.0.1.5");
+        r.headers_mut()
+            .insert("x-forwarded-for", xff.parse().unwrap());
+        r
+    };
+    let a = app
+        .clone()
+        .oneshot(anfrage("198.51.100.1, 2a06:98c0:3600::103, 173.245.48.10"))
+        .await
+        .unwrap();
+    assert_eq!(a.status(), StatusCode::OK);
+    let a = app
+        .oneshot(anfrage("198.51.100.2, 2a06:98c0:3600::103, 173.245.48.11"))
+        .await
+        .unwrap();
+    assert_eq!(a.status(), StatusCode::TOO_MANY_REQUESTS);
+}
+
+/// LLH-2080: hinter Cloudflare und Traefik zählt der Client, nicht der Cloudflare-Knoten. Der
+/// linke, vom Client gesetzte Eintrag zählt nicht; eine Gegenstelle außerhalb der Liste zählt
+/// selbst, ihr Header nicht.
+#[tokio::test]
+async fn hinter_cloudflare_zaehlt_die_adresse_des_clients() {
+    let pool = speicher::oeffnen(":memory:").await.unwrap();
+    let app = router(RelaisState::neu(
+        pool,
+        1,
+        cloudflare(),
+        gemeinsam::apns_client("http://127.0.0.1:9"),
+        600,
+    ));
+    let anfrage = |gegenstelle: &str, xff: &str| {
+        let mut r = registrierung(gegenstelle);
+        r.headers_mut()
+            .insert("x-forwarded-for", xff.parse().unwrap());
+        r
+    };
+    let status = |a: axum::response::Response| a.status();
+    let a = app
+        .clone()
+        .oneshot(anfrage(
+            "10.0.1.5",
+            "198.51.100.1, 203.0.113.7, 173.245.48.10",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::OK);
+    // Derselbe Client über einen anderen Knoten, mit anderem gefälschtem Eintrag.
+    let a = app
+        .clone()
+        .oneshot(anfrage(
+            "10.0.1.5",
+            "198.51.100.2, 203.0.113.7, 173.245.48.11",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::TOO_MANY_REQUESTS);
+    // Ein anderer Client über denselben Knoten ist unberührt.
+    let a = app
+        .clone()
+        .oneshot(anfrage("10.0.1.5", "203.0.113.8, 173.245.48.10"))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::OK);
+    // Eine fremde Gegenstelle zählt selbst, ihr Header nicht.
+    let a = app
+        .clone()
+        .oneshot(anfrage("192.0.2.1", "203.0.113.9"))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::OK);
+    let a = app
+        .clone()
+        .oneshot(anfrage("192.0.2.1", "203.0.113.10"))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::TOO_MANY_REQUESTS);
+    let a = app
+        .oneshot(anfrage("192.0.2.2", "203.0.113.9"))
+        .await
+        .unwrap();
+    assert_eq!(status(a), StatusCode::OK);
 }
 
 /// Review B-I2: IPv6 zählt je /64; jeder VPS hat eines und wechselte sonst einfach die Adresse.

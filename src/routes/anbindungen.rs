@@ -214,7 +214,7 @@ fn check_eingabe(
     ))
 }
 
-/// Body von `PATCH /api/admin/anbindungen/{id}`: nur geänderte Felder (LLH-1139).
+/// Body von `PATCH /api/admin/integrations/{id}`: nur geänderte Felder (LLH-1139).
 #[derive(Debug, Deserialize)]
 pub struct AnbindungAenderung {
     #[serde(default)]
@@ -271,7 +271,7 @@ async fn neuer_code(
     Ok((kcode::format_anzeige(&code), laeuft_ab_at))
 }
 
-/// GET /api/admin/anbindungen — alle Zugänge der eigenen Org, widerrufene eingeschlossen.
+/// GET /api/admin/integrations — alle Zugänge der eigenen Org, widerrufene eingeschlossen.
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -295,7 +295,7 @@ pub async fn liste(
     }))
 }
 
-/// POST /api/admin/anbindungen — legt einen Zugang an und stellt seinen ersten Code aus.
+/// POST /api/admin/integrations — legt einen Zugang an und stellt seinen ersten Code aus.
 /// Admin-Spur `maschinenzugang_angelegt`.
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -352,7 +352,7 @@ pub async fn anlegen(
     ))
 }
 
-/// PATCH /api/admin/anbindungen/{id} — nur die gesendeten Felder (LLH-1139); Konflikt über
+/// PATCH /api/admin/integrations/{id} — nur die gesendeten Felder (LLH-1139); Konflikt über
 /// `basis_geaendert_at` (409). Ein widerrufener Zugang: 409. Admin-Spur
 /// `maschinenzugang_geaendert` nur bei einer wirksamen Änderung.
 pub async fn aendern(
@@ -454,7 +454,7 @@ pub async fn aendern(
     Ok(Json(anzeige))
 }
 
-/// GET /api/admin/anbindungen/{id} — ein Zugang der eigenen Org (Ansicht, Deeplink).
+/// GET /api/admin/integrations/{id} — ein Zugang der eigenen Org (Ansicht, Deeplink).
 pub async fn laden(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -472,7 +472,7 @@ pub async fn laden(
     ))
 }
 
-/// POST /api/admin/anbindungen/{id}/code — neuer Einmal-Code für einen bestehenden Zugang
+/// POST /api/admin/integrations/{id}/code — neuer Einmal-Code für einen bestehenden Zugang
 /// (Schlüsselwechsel, oder der erste Code lief ab). Ein früherer offener Code verfällt.
 pub async fn code(
     State(state): State<AppState>,
@@ -524,7 +524,7 @@ pub async fn code(
     ))
 }
 
-/// POST /api/admin/anbindungen/{id}/widerrufen — wirkt sofort und berührt nichts anderes.
+/// POST /api/admin/integrations/{id}/revoke — wirkt sofort und berührt nichts anderes.
 /// Idempotent; die Admin-Spur schreibt nur die Wirkung.
 pub async fn widerrufen(
     State(state): State<AppState>,

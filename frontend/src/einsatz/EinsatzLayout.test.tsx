@@ -98,7 +98,7 @@ function pfad(): string {
 }
 
 /**
- * `freigaben` ist die Antwort des Servers auf `/modul-freigaben` (LFH-669). `fehler` schaltet die
+ * `freigaben` ist die Antwort des Servers auf `/module-access` (LFH-669). `fehler` schaltet die
  * beiden Abrufe einzeln auf 500: der Einsatz-Abruf ersetzt die ganze Seite, der Freigaben-Abruf
  * nur ein Banner darüber.
  */
@@ -121,10 +121,10 @@ function setup(
           ? new HttpResponse(null, { status: 500 })
           : HttpResponse.json(einsatz),
     ),
-    http.get('/api/einsaetze/7/modul-freigaben', () =>
+    http.get('/api/einsaetze/7/module-access', () =>
       fehler.freigaben ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(freigaben),
     ),
-    http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>
@@ -157,7 +157,7 @@ function setupRoute(route: string, childPath: string) {
     meHandler(admin),
     http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>
@@ -501,7 +501,7 @@ describe('EinsatzLayout', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s4'], meine_funktion: 'S2/S3' }),
       ),
-      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
     );
     renderMitProviders(
       <CommandPaletteProvider>
@@ -1191,7 +1191,7 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json({})),
+      http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
       http.get('/api/einsaetze/7/gefahrengebiete', () =>
         HttpResponse.json([
           { id: 1, einsatz_id: 7, hoechste_warnstufe: stufe, label: 'Deich', zonen_ids: [] },
@@ -1279,12 +1279,12 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       meHandler(benutzer),
       http.get('/api/einsaetze', () => HttpResponse.json([meinEinsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(meinEinsatz)),
-      http.get('/api/einsaetze/7/modul-freigaben', async () => {
+      http.get('/api/einsaetze/7/module-access', async () => {
         if (freigaben === 'laden') await new Promise(() => {});
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
         return HttpResponse.json(freigaben);
       }),
-      http.get('/api/einsaetze/7/einstellungen', () => HttpResponse.json(einstellungen)),
+      http.get('/api/einsaetze/7/settings', () => HttpResponse.json(einstellungen)),
     );
     return renderMitProviders(
       <CommandPaletteProvider>
@@ -1542,7 +1542,7 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
 
   it('stellt die Zahl der ungelesenen Eingänge voran, dieselbe wie am Knopf (LLH-1143)', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/benachrichtigungen', () =>
+      http.get('/api/einsaetze/:id/notifications', () =>
         HttpResponse.json({ eintraege: [], ungelesen: 3 }),
       ),
     );
@@ -1579,7 +1579,7 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
     );
     renderMitProviders(
       <CommandPaletteProvider>
@@ -1687,7 +1687,7 @@ describe('EinsatzLayout · Rundgang (LLH-1990)', () => {
     setup();
     server.use(
       http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
-      http.get('/api/benutzer-einstellungen', () =>
+      http.get('/api/user-settings', () =>
         HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
       ),
     );

@@ -1,5 +1,5 @@
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Verwaltung unter
-//! `/api/admin/anbindungen`, Aufräumen im Purge-Lauf. Die Anmeldung unter `/api/v1/` prüfen die
+//! `/api/admin/integrations`, Aufräumen im Purge-Lauf. Die Anmeldung unter `/api/v1/` prüfen die
 //! Tests weiter unten, sobald das v1-Gerüst steht.
 
 use axum::http::StatusCode;
@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 mod common;
 use common::{anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
-const LISTE: &str = "/api/admin/anbindungen";
+const LISTE: &str = "/api/admin/integrations";
 
 async fn anlegen(app: &axum::Router, admin: &str, body: Value) -> (StatusCode, Value) {
     anfrage_json(app, "POST", LISTE, admin, Some(&body)).await
@@ -136,7 +136,7 @@ async fn nur_der_system_admin_schreibt_und_nur_in_der_eigenen_org() {
     let fk = login_cookie(&app, "erika", "erikapw1").await;
     let (s, _) = anlegen(&app, &fk, json!({ "name": "x", "scopes": ["lage:read"] })).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/widerrufen"), &fk, None).await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &fk, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 
     // Ein Admin einer anderen Org sieht den Zugang nicht und erreicht ihn nicht.
@@ -157,7 +157,7 @@ async fn nur_der_system_admin_schreibt_und_nur_in_der_eigenen_org() {
             Some(json!({ "name": "y", "scopes": ["lage:read"] })),
         ),
         ("POST", format!("{LISTE}/{id}/code"), None),
-        ("POST", format!("{LISTE}/{id}/widerrufen"), None),
+        ("POST", format!("{LISTE}/{id}/revoke"), None),
     ] {
         let (s, v) = anfrage_json(&app, methode, &pfad, &fremd, body.as_ref()).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "{methode} {pfad}: {v}");
@@ -226,14 +226,7 @@ async fn aendern_neuer_code_und_widerruf() {
     .unwrap();
     assert_eq!(offen, 1, "nur der jüngste Code ist offen");
 
-    let (s, v) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["zustand"], "widerrufen");
     assert!(v["widerrufen_at"].is_string());
@@ -244,14 +237,7 @@ async fn aendern_neuer_code_und_widerruf() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let nachher: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM admin_audit")
         .fetch_one(&pool)
@@ -310,14 +296,7 @@ async fn am_gekoppelten_elw_ist_anlegen_gesperrt() {
     let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/code"), &admin, None).await;
     assert_eq!(s, StatusCode::CONFLICT);
     // Widerrufen bleibt möglich.
-    let (s, _) = anfrage_json(
-        &app,
-        "POST",
-        &format!("{LISTE}/{id}/widerrufen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/revoke"), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
 }
 
@@ -469,7 +448,7 @@ async fn code_einloesen_und_signiert_me_abrufen() {
     let (s, _, b) = senden(
         &app,
         "GET",
-        "/api/v1/instanz/jwks.json",
+        "/api/v1/instance/jwks.json",
         None,
         vec![],
         "198.51.100.10",
@@ -500,7 +479,7 @@ async fn code_gilt_einmal_und_ein_falscher_pruefwert_laesst_ihn_offen() {
     let (s, _, b) = senden(
         &app,
         "POST",
-        "/api/v1/zugang/redeem",
+        "/api/v1/access/redeem",
         None,
         serde_json::to_vec(&anfrage).unwrap(),
         "198.51.100.20",
@@ -758,7 +737,7 @@ async fn fehlender_scope_403_widerruf_und_ablauf_401() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{LISTE}/{}/widerrufen", cred.zugang_id),
+        &format!("{LISTE}/{}/revoke", cred.zugang_id),
         &admin,
         None,
     )
@@ -1058,7 +1037,7 @@ async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &admin,

@@ -384,7 +384,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     let (status, overrides) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-overrides"),
+        &format!("/api/einsaetze/{eid}/module-overrides"),
         &fk,
         None,
     )
@@ -417,7 +417,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-freigaben"),
+        &format!("/api/einsaetze/{eid}/module-access"),
         &fk,
         None,
     )
@@ -441,7 +441,7 @@ async fn sanitaetsdienst_zeigt_funk_und_wetter() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-freigaben"),
+        &format!("/api/einsaetze/{eid}/module-access"),
         &admin,
         None,
     )
@@ -464,7 +464,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        "/api/org-modul-einstellungen/fernmeldewesen",
+        "/api/org-module-settings/fernmeldewesen",
         &admin,
         Some(r#"{"benoetigte_rolle":null,"sichtbar":false}"#),
     )
@@ -478,7 +478,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-freigaben"),
+        &format!("/api/einsaetze/{eid}/module-access"),
         &admin,
         None,
     )
@@ -487,7 +487,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (_, overrides) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/modul-overrides"),
+        &format!("/api/einsaetze/{eid}/module-overrides"),
         &admin,
         None,
     )
@@ -515,7 +515,7 @@ async fn ohne_vorlage_keine_modulwerte() {
         let (_, overrides) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{eid}/modul-overrides"),
+            &format!("/api/einsaetze/{eid}/module-overrides"),
             &admin,
             None,
         )
@@ -576,7 +576,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
     let (_, a) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{alt}/modul-overrides"),
+        &format!("/api/einsaetze/{alt}/module-overrides"),
         &admin,
         None,
     )
@@ -584,7 +584,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
     let (_, n) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{neu}/modul-overrides"),
+        &format!("/api/einsaetze/{neu}/module-overrides"),
         &admin,
         None,
     )

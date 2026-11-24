@@ -37,7 +37,7 @@ async fn schluessel_eintragen(app: &axum::Router, admin: &str) -> age::x25519::I
     let (s, v) = anfrage_json(
         app,
         "POST",
-        "/api/org-archiv-schluessel",
+        "/api/org-archive-keys",
         admin,
         Some(&json!({
             "schluessel": identitaet.to_public().to_string(),
@@ -52,7 +52,7 @@ async fn schluessel_eintragen(app: &axum::Router, admin: &str) -> age::x25519::I
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/org-archiv-schluessel/{id}/pruefen"),
+        &format!("/api/org-archive-keys/{id}/check"),
         admin,
         Some(&json!({ "code": code.trim() })),
     )
@@ -69,12 +69,12 @@ async fn schluessel_mit_probe_nur_fuer_admins_und_in_der_admin_spur() {
     benutzer_anlegen(&app, &admin, "fuehrung", "fuehrungskraft").await;
     let fk = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
 
-    let (s, _) = anfrage(&app, "GET", "/api/org-archiv-schluessel", &fk, None).await;
+    let (s, _) = anfrage(&app, "GET", "/api/org-archive-keys", &fk, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        "/api/org-archiv-schluessel",
+        "/api/org-archive-keys",
         &fk,
         Some(&json!({ "schluessel": "age1x", "bezeichnung": "x" })),
     )
@@ -88,7 +88,7 @@ async fn schluessel_mit_probe_nur_fuer_admins_und_in_der_admin_spur() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/org-archiv-schluessel",
+        "/api/org-archive-keys",
         &admin,
         Some(&json!({ "schluessel": privat, "bezeichnung": "x" })),
     )
@@ -96,7 +96,7 @@ async fn schluessel_mit_probe_nur_fuer_admins_und_in_der_admin_spur() {
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
 
     schluessel_eintragen(&app, &admin).await;
-    let (s, v) = anfrage(&app, "GET", "/api/org-archiv-schluessel", &admin, None).await;
+    let (s, v) = anfrage(&app, "GET", "/api/org-archive-keys", &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v.as_array().unwrap().len(), 1);
     assert_eq!(spur(&pool, "archiv_schluessel_eingetragen").await.len(), 1);
@@ -108,7 +108,7 @@ async fn schluessel_mit_probe_nur_fuer_admins_und_in_der_admin_spur() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/org-archiv-schluessel/{id}"),
+        &format!("/api/org-archive-keys/{id}"),
         &admin,
         None,
     )
@@ -149,7 +149,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/abschliessen"),
+        &format!("/api/einsaetze/{id}/close"),
         &admin,
         None,
     )
@@ -170,7 +170,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let (s, akte) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{id}"),
+        &format!("/api/retention/incidents/{id}"),
         &admin,
         None,
     )
@@ -186,7 +186,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
 
     let (s, bytes, name) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &admin,
     )
     .await;
@@ -226,7 +226,7 @@ async fn purge_archiviert_und_die_archivakte_liefert_den_block() {
     let fremd = login_cookie(&app, "fremdadmin", "fremdpw12").await;
     let (s, _, _) = roh(
         &app,
-        &format!("/api/aufbewahrung/einsaetze/{id}/archiv"),
+        &format!("/api/retention/incidents/{id}/archive"),
         &fremd,
     )
     .await;

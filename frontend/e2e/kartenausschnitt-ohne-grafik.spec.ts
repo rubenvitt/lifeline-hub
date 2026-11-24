@@ -75,7 +75,7 @@ test('Einsatzliste: Anlegedialog mit Treffer ohne Kartengrafik, Anlegen geht', a
     name: 'Bahnhofstraße 1, Musterstadt, Landkreis X, Niedersachsen, 12345, Deutschland',
     kurz: 'Bahnhofstraße 1, 12345 Musterstadt',
   };
-  await page.route(/\/api\/location-search\?/, (route) =>
+  await page.route(/\/api\/place-search\?/, (route) =>
     route.fulfill({ json: { zustand: 'ok', treffer: [treffer] } }),
   );
   await page.goto('/einsaetze');

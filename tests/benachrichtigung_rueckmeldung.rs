@@ -139,14 +139,7 @@ async fn ueberfaellige_rueckmeldung_meldet_einen_eingang() {
     assert!(zeilen.iter().all(|z| z.0 != w.carla), "{zeilen:?}");
 
     let anna = login_cookie(&w.app, "annika", "annikapw1").await;
-    let (s, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &anna,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &anna, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let eintrag = v
         .as_array()

@@ -118,6 +118,8 @@ fun configureWebview(webView: WebView, begleitung: Webviewbegleitung) {
         allowContentAccess = false
         mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
         setSupportMultipleWindows(true)
+        // Standort der Oberfläche (LLH-2071); ob er freigegeben wird, entscheidet `HuellenChromeClient`.
+        setGeolocationEnabled(true)
     }
     webView.overScrollMode = View.OVER_SCROLL_NEVER
     webView.setBackgroundColor(Farben.kopfSchwarz.toArgb())

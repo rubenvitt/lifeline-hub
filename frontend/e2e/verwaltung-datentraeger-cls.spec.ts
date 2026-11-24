@@ -85,7 +85,7 @@ for (const liste of LISTEN) {
       oeffne = fertig;
     });
     let angefragt = false;
-    await page.route('**/api/system/datentraeger', async (route) => {
+    await page.route('**/api/system/storage', async (route) => {
       angefragt = true;
       await tor;
       await route.fulfill({ json: UNVERSCHLUESSELT });

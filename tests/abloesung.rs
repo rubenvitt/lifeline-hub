@@ -1379,7 +1379,7 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1448,7 +1448,7 @@ async fn vollzug_uebergabe_ohne_wirkung_braucht_keine_freigabe_einheiten() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1649,7 +1649,7 @@ async fn besatzungswechsel_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1661,7 +1661,7 @@ async fn besatzungswechsel_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/einheiten"),
+        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":null}"#),
     )
@@ -1807,7 +1807,7 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{e}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

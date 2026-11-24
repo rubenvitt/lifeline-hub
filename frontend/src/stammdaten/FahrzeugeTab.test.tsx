@@ -379,7 +379,7 @@ describe('FahrzeugeTab · Sortieren und Filtern (LLH-1096)', () => {
 describe('FahrzeugeTab mit Stammdaten vom Hub (LLH-1493)', () => {
   it('sperrt die Zeile vom Hub und lässt die Ergänzung vor Ort bearbeitbar', async () => {
     server.use(
-      http.get('/api/instanz/stammdaten/herkunft', () =>
+      http.get('/api/instance/master-data/origin', () =>
         HttpResponse.json({
           quelle: 'Hub DRK Landesverband',
           vom_hub: { fahrzeug: ['1'] },

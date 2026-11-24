@@ -287,9 +287,9 @@ pub const STAMMDATEN_PFADE: &[&str] = &[
     "/api/etb-snippets",
     "/api/keyword-suggestions",
     "/api/external-agencies",
-    "/api/org-fuehrungsfunktionen",
-    "/api/org-unterkunft-richtwerte",
-    "/api/organisation",
+    "/api/org-command-roles",
+    "/api/org-accommodation-guidelines",
+    "/api/organization",
 ];
 
 /// Ob `pfad` (das `MatchedPath`-Muster) unter einem Stammdaten-Präfix liegt.
@@ -341,10 +341,10 @@ mod tests {
     fn stammdaten_praefix_ist_segmentgenau() {
         assert!(ist_stammdaten_pfad("/api/vehicles"));
         assert!(ist_stammdaten_pfad("/api/vehicles/{id}/out-of-service"));
-        assert!(ist_stammdaten_pfad("/api/organisation/logo"));
+        assert!(ist_stammdaten_pfad("/api/organization/logo"));
         assert!(!ist_stammdaten_pfad("/api/fahrzeuge-x"));
         assert!(!ist_stammdaten_pfad("/api/vehicle-suggestions"));
         assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/sprechgruppen"));
-        assert!(!ist_stammdaten_pfad("/api/org-einstellungen"));
+        assert!(!ist_stammdaten_pfad("/api/org-settings"));
     }
 }

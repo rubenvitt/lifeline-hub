@@ -102,7 +102,7 @@ async fn shape_mit_peilung_und_ortsname_null() {
     // Anfrage 0.1° südlich des Einsatzorts → Peilung Richtung Norden.
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -137,7 +137,7 @@ async fn ohne_marker_ist_peilung_null() {
     .unwrap();
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -156,7 +156,7 @@ async fn exclude_schliesst_einsatzort_aus() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Einsatzort ausschließen → kein weiterer Marker → peilung null.
     let uri =
-        format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
+        format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
     let (s, v) = get(&app, &uri, &cookie).await;
     assert_eq!(s, StatusCode::OK);
     // LFH-265: ABSENT statt present-null (contains_key, sonst blind — s. o.).
@@ -173,7 +173,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Regulärer Benutzer (keine Org-Rolle), KEIN Einsatz-Mitglied → kein Lesezugriff.
     // Deterministisch unabhängig von etwaiger Cross-Org-/Admin-Lesepolitik.
-    let (s, _v) = post_json(&app, "/api/benutzer", &admin, serde_json::json!({
+    let (s, _v) = post_json(&app, "/api/users", &admin, serde_json::json!({
         "anzeigename": "gast", "benutzername": "gast", "passwort": "gastpw12", "org_rolle": "keine"
     })).await;
     assert_eq!(s, StatusCode::CREATED);
@@ -181,7 +181,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
     let gast = login_cookie(&app, "gast", "gastpw12").await;
     let (s, _v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
         &gast,
     )
     .await;
@@ -201,7 +201,7 @@ async fn ohne_login_ist_401() {
             Request::builder()
                 .method("GET")
                 .uri(format!(
-                    "/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"
+                    "/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"
                 ))
                 .body(Body::empty())
                 .unwrap(),
@@ -224,7 +224,7 @@ async fn ortsname_aus_cache_ohne_netz() {
 
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=50.9&lon=10.0"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -241,7 +241,7 @@ async fn out_of_range_koordinate_ist_400() {
     // lat=999 liegt außerhalb des gültigen Bereichs (-90..=90) → Handler gibt 400 zurück.
     let (s, _v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=999&lon=10.0"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=999&lon=10.0"),
         &cookie,
     )
     .await;
@@ -249,7 +249,7 @@ async fn out_of_range_koordinate_ist_400() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Einstieg ohne Einsatz: GET /api/location-preview?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname
+// Einstieg ohne Einsatz: GET /api/place-preview?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname
 // als Vorschlag“). Wer Einsätze anlegen darf; nur der Ortsname, keine Peilung (kein Bezugspunkt).
 // ---------------------------------------------------------------------------------------------
 
@@ -299,8 +299,8 @@ async fn org_vorschau_ohne_anlegerecht_ist_403_ohne_geocoder() {
 
     // Das Recht kommt vor der Koordinate: auch eine ungültige ist ohne Recht 403, nie 400.
     for uri in [
-        "/api/location-preview?lat=50.71&lon=9.71",
-        "/api/location-preview?lat=999&lon=9.71",
+        "/api/place-preview?lat=50.71&lon=9.71",
+        "/api/place-preview?lat=999&lon=9.71",
     ] {
         let (s, _v) = get(&app, uri, &helfer).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{uri}");
@@ -320,7 +320,7 @@ async fn org_vorschau_liefert_den_ortsnamen_ohne_peilung() {
     common::benutzer_anlegen(&app, &admin, "fuehrung", "fuehrungskraft").await;
     let fk = login_cookie(&app, "fuehrung", "fuehrungpw1").await;
 
-    let (s, v) = get(&app, "/api/location-preview?lat=50.72&lon=9.72", &fk).await;
+    let (s, v) = get(&app, "/api/place-preview?lat=50.72&lon=9.72", &fk).await;
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v["ortsname"].as_str(), Some("Lindenweg 2, Musterdorf"));
     assert!(
@@ -338,7 +338,7 @@ async fn org_vorschau_ausgelastet_oder_nicht_erreichbar_ist_200_ohne_ortsname() 
     let admin = login_cookie(&app, "admin", "startpw12").await;
 
     // Nicht erreichbar (geschlossener Port aus `setup_mit_pool`).
-    let (s, v) = get(&app, "/api/location-preview?lat=50.73&lon=9.73", &admin).await;
+    let (s, v) = get(&app, "/api/place-preview?lat=50.73&lon=9.73", &admin).await;
     assert_eq!(s, StatusCode::OK, "{v:?}");
     assert_eq!(v, serde_json::json!({}));
 
@@ -346,8 +346,8 @@ async fn org_vorschau_ausgelastet_oder_nicht_erreichbar_ist_200_ohne_ortsname() 
     let (base, aufrufe) = reverse_stub("Am Anger 1, Musterdorf").await;
     geocoder_setzen(&pool, &base).await;
     let (a, b) = tokio::join!(
-        get(&app, "/api/location-preview?lat=50.74&lon=9.74", &admin),
-        get(&app, "/api/location-preview?lat=50.75&lon=9.75", &admin),
+        get(&app, "/api/place-preview?lat=50.74&lon=9.74", &admin),
+        get(&app, "/api/place-preview?lat=50.75&lon=9.75", &admin),
     );
     assert_eq!((a.0, b.0), (StatusCode::OK, StatusCode::OK));
     assert!(aufrufe.load(std::sync::atomic::Ordering::SeqCst) <= 1);
@@ -365,9 +365,9 @@ async fn org_vorschau_ausgelastet_oder_nicht_erreichbar_ist_200_ohne_ortsname() 
 async fn org_vorschau_ungueltige_koordinate_ist_400_ohne_login_401() {
     let (app, _pool, _kd) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (s, _v) = get(&app, "/api/location-preview?lat=10&lon=181", &admin).await;
+    let (s, _v) = get(&app, "/api/place-preview?lat=10&lon=181", &admin).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
-    let (s, _v) = get(&app, "/api/location-preview?lat=50.7&lon=9.7", "").await;
+    let (s, _v) = get(&app, "/api/place-preview?lat=50.7&lon=9.7", "").await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
 
@@ -386,7 +386,7 @@ async fn ortsname_aus_dem_adressindex_der_offline_karte() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=52.6201&lon=13.78"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=52.6201&lon=13.78"),
         &cookie,
     )
     .await;
@@ -399,7 +399,7 @@ async fn ortsname_aus_dem_adressindex_der_offline_karte() {
     // Fern jeder Adresse im Index: kein Ortsname (Geocoder unerreichbar).
     let (_, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/ort-vorschau?lat=52.70&lon=13.70"),
+        &format!("/api/einsaetze/{eid}/place-preview?lat=52.70&lon=13.70"),
         &cookie,
     )
     .await;

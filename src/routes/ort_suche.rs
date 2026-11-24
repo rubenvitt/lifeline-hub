@@ -4,9 +4,9 @@
 //!
 //! - `GET /api/einsaetze/:id/karte/ort-suche` — Lagekarte, am Modul gegatet
 //!   (`routes::karte_ort_suche`);
-//! - `GET /api/einsaetze/:id/ort-suche` — Ortsfeld im Einsatz, Recht der Einsatzdaten
+//! - `GET /api/einsaetze/:id/place-search` — Ortsfeld im Einsatz, Recht der Einsatzdaten
 //!   ([`im_einsatz`]);
-//! - `GET /api/location-search` — Ortsfeld ohne Einsatz, wer Einsätze anlegen darf ([`in_org`]).
+//! - `GET /api/place-search` — Ortsfeld ohne Einsatz, wer Einsätze anlegen darf ([`in_org`]).
 //!
 //! Ein Ausfall oder das erschöpfte Rate-Limit kommen als `zustand` mit 200, nie als Fehlerstatus.
 //! 400 gibt es nur für den Suchtext selbst (`src/AGENTS.md`, Statuscode-Konvention). Takt und
@@ -128,7 +128,7 @@ pub(crate) fn ausschnitt_um(lat: Option<f64>, lon: Option<f64>) -> Option<suche:
     }
 }
 
-/// GET /api/einsaetze/:id/ort-suche?q= — Ortsfeld im Einsatz (LFH-1175). Dasselbe Recht wie der
+/// GET /api/einsaetze/:id/place-search?q= — Ortsfeld im Einsatz (LFH-1175). Dasselbe Recht wie der
 /// PATCH der Kopfdaten, für den die Suche da ist; kein Modul-Gate. Bevorzugt die Umgebung des
 /// Einsatzorts.
 pub async fn im_einsatz(
@@ -149,7 +149,7 @@ pub async fn im_einsatz(
     ))
 }
 
-/// GET /api/location-search?q= — Ortsfeld ohne Einsatz, etwa beim Anlegen (LFH-1175). Nur wer Einsätze
+/// GET /api/place-search?q= — Ortsfeld ohne Einsatz, etwa beim Anlegen (LFH-1175). Nur wer Einsätze
 /// anlegen darf; Geocoder der eigenen Organisation, ohne bevorzugte Umgebung (die Organisation
 /// hat keinen Standort). Das Recht wird vor dem Suchtext geprüft: ohne Recht 403, nie 400.
 pub async fn in_org(

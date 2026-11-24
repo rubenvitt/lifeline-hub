@@ -5,6 +5,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- QR-Code im Onboarding und Kamera der Oberfläche (WebView). -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+      Standort der Oberfläche (LLH-2071): nur im Vordergrund und nur für den aktiven Server, gefragt
+      erst, wenn die Seite ihn abfragt. Fein und grob zusammen, die Person darf „ungefähr“ wählen.
+      Kein Recht für den Hintergrund (ADR-0093).
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Benachrichtigungen der Oberfläche und Hinweis auf ein bereites Update. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Updater: installiert die APK aus dem eigenen Kanal (Entwurf D9). -->
@@ -28,6 +35,8 @@
 
     <!-- Kamera ist kein Muss: ohne sie bleibt die Eingabe der Adresse. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Standort ist kein Muss: ohne ihn bleibt die Karte ohne Eigenposition. -->
+    <uses-feature android:name="android.hardware.location" android:required="false" />
 
     <!--
       Keine Sicherung der App-Daten: die WebView-Profile tragen die Sitzungen der Server, und die

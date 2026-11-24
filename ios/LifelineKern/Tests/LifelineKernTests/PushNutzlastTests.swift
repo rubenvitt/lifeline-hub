@@ -34,7 +34,7 @@ final class PushNutzlastTests: XCTestCase {
         let text: String?
         let thread: String
         let pfad: String
-        let einsatz_id: Int
+        let einsatz_id: Int?
     }
 
     private struct InhaltFall: Decodable {
@@ -65,7 +65,7 @@ final class PushNutzlastTests: XCTestCase {
 
     func testMeldungPasstZuDenGemeinsamenFaellenDesKlartexts() throws {
         let faelle = try GemeinsameFaelle.load("push-inhalt.json", as: InhaltFaelle.self).faelle
-        XCTAssertEqual(faelle.count, 4)
+        XCTAssertEqual(faelle.count, 5)
         for fall in faelle {
             let daten = try JSONEncoder().encode(fall.klartext)
             let m = try XCTUnwrap(
@@ -164,7 +164,29 @@ final class PushNutzlastTests: XCTestCase {
     func testKaputterKlartextGibtNil() {
         XCTAssertNil(PushNutzlast.meldung(aus: Data("kein json".utf8), serverAnzahl: 1))
         XCTAssertNil(PushNutzlast.meldung(aus: Data("[1]".utf8), serverAnzahl: 1))
-        XCTAssertNil(PushNutzlast.meldung(aus: Data("{\"titel\":\"x\"}".utf8), serverAnzahl: 1))
         XCTAssertNil(PushNutzlast.meldung(aus: Data("{\"e\":1}".utf8), serverAnzahl: 1))
+    }
+
+    /// Ohne Einsatz (Störung einer Anbindung, LLH-2077): ein Thread je Server für alles ohne
+    /// Einsatz, der Pfad aus dem Klartext.
+    func testOhneEinsatzThreadJeServerUndPfadAusDemKlartext() throws {
+        let m = try XCTUnwrap(
+            PushNutzlast.meldung(
+                aus: Data(
+                    #"{"v":1,"s":"Kreis Nord","b":3,"stufe":"hinweis","titel":"Anbindung gestört","pfad":"/admin/einstellungen/anbindungen?adapter=a1"}"#
+                        .utf8),
+                serverAnzahl: 1, kennung: "k-1"))
+        XCTAssertNil(m.einsatzId)
+        XCTAssertEqual(m.thread, "k-1-org")
+        XCTAssertEqual(m.pfad, "/admin/einstellungen/anbindungen?adapter=a1")
+    }
+
+    /// Ohne Einsatz und ohne Pfad wie der Service Worker (`alarm-sw.js`): zu den Anbindungen.
+    func testOhneEinsatzUndOhnePfadFuehrtZuDenAnbindungen() throws {
+        let m = try XCTUnwrap(
+            PushNutzlast.meldung(aus: Data(#"{"titel":"x","e":null}"#.utf8), serverAnzahl: 1))
+        XCTAssertNil(m.einsatzId)
+        XCTAssertEqual(m.thread, "org")
+        XCTAssertEqual(m.pfad, "/admin/einstellungen/anbindungen")
     }
 }

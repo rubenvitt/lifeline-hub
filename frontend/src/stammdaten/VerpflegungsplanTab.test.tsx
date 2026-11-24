@@ -96,7 +96,7 @@ describe('VerpflegungsplanTab (LLH-1058)', () => {
 
     it('folgt der Darstellung der Organisation, wenn das Gerät nichts wählt', async () => {
       server.use(
-        http.get('/api/org-einstellungen', () =>
+        http.get('/api/org-settings', () =>
           HttpResponse.json({ zeitdarstellung: 'datum_uhrzeit' }),
         ),
       );

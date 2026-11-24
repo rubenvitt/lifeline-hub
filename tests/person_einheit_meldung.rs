@@ -538,7 +538,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
         app.clone(),
         axum::http::Request::builder()
             .method("POST")
-            .uri("/api/geraete/koppeln")
+            .uri("/api/devices/pair")
             .header(axum::http::header::CONTENT_TYPE, "application/json")
             .body(axum::body::Body::from(json!({ "code": code }).to_string()))
             .unwrap(),

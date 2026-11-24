@@ -11,7 +11,7 @@ describe('Ortssuche des Ortsfelds', () => {
   it('sucht im Einsatz an der Route ohne /karte', async () => {
     let angekommen: URL | null = null;
     server.use(
-      http.get('/api/einsaetze/7/ort-suche', ({ request }) => {
+      http.get('/api/einsaetze/7/place-search', ({ request }) => {
         angekommen = new URL(request.url);
         return HttpResponse.json({ zustand: 'ok', treffer: [] });
       }),
@@ -25,7 +25,7 @@ describe('Ortssuche des Ortsfelds', () => {
   it('sucht ohne Einsatz an der Route der Organisation', async () => {
     let angekommen: URL | null = null;
     server.use(
-      http.get('/api/location-search', ({ request }) => {
+      http.get('/api/place-search', ({ request }) => {
         angekommen = new URL(request.url);
         return HttpResponse.json({ zustand: 'ausgelastet', treffer: [] });
       }),

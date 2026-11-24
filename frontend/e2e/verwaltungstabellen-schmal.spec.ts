@@ -57,7 +57,7 @@ const TABELLEN: Tabelle[] = [
     schalter: 'Benutzer',
     saeen: async (page, marke) => {
       const kennung = `Maximiliane Kirchgassner-Wohlfahrt ${marke}`;
-      await saeen(page, '/api/benutzer', {
+      await saeen(page, '/api/users', {
         anzeigename: kennung,
         benutzername: `e2e-verwaltung-${marke}`,
         passwort: 'e2e-verwaltung-pw-123',
@@ -359,7 +359,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
       // „Demo-Daten“ erscheint nur bei freigeschalteten Demo-Daten; ohne Backend-Schalter so belegt
       // wie in `hinweis-kontrast.spec.ts`. Es ist der unterste Eintrag des Menüs.
       await page.route(
-        (url) => url.pathname === '/api/demo-daten',
+        (url) => url.pathname === '/api/demo-data',
         (route) =>
           route.request().method() === 'GET'
             ? route.fulfill({
@@ -417,7 +417,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
   }) => {
     await page.setViewportSize({ width: 1180, height: 820 });
     await page.route(
-      (url) => url.pathname === '/api/demo-daten',
+      (url) => url.pathname === '/api/demo-data',
       (route) =>
         route.request().method() === 'GET' ? route.fulfill({ status: 404 }) : route.fallback(),
     );

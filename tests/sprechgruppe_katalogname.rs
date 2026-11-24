@@ -70,7 +70,7 @@ async fn abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         admin,
         None,
     )

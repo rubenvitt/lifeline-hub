@@ -101,7 +101,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &self.pfad(&format!("modul-overrides/{modul}")),
+            &self.pfad(&format!("module-overrides/{modul}")),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -580,7 +580,7 @@ async fn abloesung_meldet_vorwarnung_und_faelligkeit_an_die_modul_leser() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &w.cookie("annika").await,
         None,
     )

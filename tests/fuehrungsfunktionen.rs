@@ -11,7 +11,7 @@ use common::*;
 const KATALOG: &str = "/api/command-roles";
 
 fn setzen_pfad(funktion: &str) -> String {
-    format!("/api/org-fuehrungsfunktionen/{funktion}")
+    format!("/api/org-command-roles/{funktion}")
 }
 
 fn codes(json: &Value) -> Vec<String> {
@@ -430,7 +430,7 @@ async fn auftrag_funktion_statuscodes() {
     anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s7",
+        "/api/org-command-roles/s7",
         &admin,
         Some(r#"{"aktiv":true}"#),
     )
@@ -457,7 +457,7 @@ async fn mandantenlabel_im_snapshot() {
     anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s4",
+        "/api/org-command-roles/s4",
         &admin,
         Some(r#"{"label":"Versorgung (Logistik)"}"#),
     )
@@ -686,7 +686,7 @@ async fn mandantenlabel_in_mitgliederliste_und_kopf() {
     anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s4",
+        "/api/org-command-roles/s4",
         &admin,
         Some(r#"{"label":"Versorgung (Logistik)"}"#),
     )
@@ -748,7 +748,7 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

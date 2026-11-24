@@ -137,7 +137,7 @@ impl Welt {
 
     /// Die Benachrichtigungen, wie `cookie` sie über die Route liest.
     async fn lesen(&self, cookie: &str) -> Vec<Value> {
-        let (s, v) = anfrage(&self.app, "GET", "/api/benachrichtigungen", cookie, None).await;
+        let (s, v) = anfrage(&self.app, "GET", "/api/notifications", cookie, None).await;
         assert_eq!(s, StatusCode::OK, "{v}");
         v.as_array().unwrap().clone()
     }
@@ -147,7 +147,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/modul-overrides/chat", self.einsatz),
+            &format!("/api/einsaetze/{}/module-overrides/chat", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
         )

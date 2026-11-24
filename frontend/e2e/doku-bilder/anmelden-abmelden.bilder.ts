@@ -63,12 +63,12 @@ test.describe(KAPITEL, () => {
     // Einmalpasswort führt die erste Anmeldung in die Stufe. Der Admin legt an und meldet ab.
     await anmelden(page);
     const person = { benutzername: 'n.beispiel', passwort: 'anfangs-passwort-123' };
-    const liste = await page.request.get('/api/benutzer');
+    const liste = await page.request.get('/api/users');
     const vorhanden = ((await liste.json()) as { benutzername: string }[]).some(
       (b) => b.benutzername === person.benutzername,
     );
     if (!vorhanden) {
-      await fuelle(page, 'post', '/api/benutzer', { anzeigename: 'Nora Beispiel', ...person });
+      await fuelle(page, 'post', '/api/users', { anzeigename: 'Nora Beispiel', ...person });
     }
     expect((await page.request.post('/api/auth/logout')).ok()).toBe(true);
 

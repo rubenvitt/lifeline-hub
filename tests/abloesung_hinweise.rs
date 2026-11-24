@@ -155,7 +155,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &self.pfad(&format!("modul-overrides/{modul}")),
+            &self.pfad(&format!("module-overrides/{modul}")),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -238,7 +238,7 @@ async fn planungshinweis_feuert_einmal_zwei_stunden_vor_der_faelligkeit() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &w.cookie("annika").await,
         None,
     )
@@ -401,7 +401,7 @@ async fn eintreffen_der_geplanten_einheit_erreicht_nur_die_leser_des_moduls() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &w.admin,
         None,
     )
@@ -599,7 +599,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/benachrichtigungen?einsatz_id={}", self.einsatz),
+            &format!("/api/notifications?einsatz_id={}", self.einsatz),
             &self.admin,
             None,
         )

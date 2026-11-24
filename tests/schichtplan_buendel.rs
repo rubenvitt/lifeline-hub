@@ -196,7 +196,7 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/benachrichtigungen/{b}"),
+        &format!("/api/notifications/{b}"),
         &admin,
         None,
     )
@@ -227,7 +227,7 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     let (_, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/benachrichtigungen/{b2}"),
+        &format!("/api/notifications/{b2}"),
         &admin,
         None,
     )

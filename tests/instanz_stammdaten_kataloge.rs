@@ -220,7 +220,7 @@ async fn jede_neue_art_ist_am_elw_nur_lesbar() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PUT",
-        "/api/org-unterkunft-richtwerte/flaeche_je_person_m2",
+        "/api/org-accommodation-guidelines/flaeche_je_person_m2",
         &elw.admin,
         Some(&json!({"wert": 6})),
     )
@@ -229,7 +229,7 @@ async fn jede_neue_art_ist_am_elw_nur_lesbar() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PUT",
-        "/api/org-unterkunft-richtwerte/feldbett_je_person",
+        "/api/org-accommodation-guidelines/feldbett_je_person",
         &elw.admin,
         Some(&json!({"wert": 2})),
     )

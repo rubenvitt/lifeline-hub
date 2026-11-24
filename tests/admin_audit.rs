@@ -89,7 +89,7 @@ async fn deaktivieren_steht_in_der_spur() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{id}/deaktivieren"),
+        &format!("/api/users/{id}/deactivate"),
         &admin,
         None,
     )
@@ -111,7 +111,7 @@ async fn zweitfaktor_zuruecksetzen_steht_mit_quell_ip_in_der_spur() {
     // Mit `ConnectInfo` wie der echte Server, damit die IP in der Spur ankommt.
     let mut req = Request::builder()
         .method("POST")
-        .uri(format!("/api/benutzer/{id}/totp/reset"))
+        .uri(format!("/api/users/{id}/totp/reset"))
         .header(header::COOKIE, &admin)
         .body(Body::empty())
         .unwrap();
@@ -161,7 +161,7 @@ async fn bearbeiten_mit_rollenwechsel_steht_in_der_spur() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{id}"),
+        &format!("/api/users/{id}"),
         &admin,
         Some(r#"{"system_rolle":"admin"}"#),
     )
@@ -194,7 +194,7 @@ async fn bearbeiten_mit_aktiv_wechsel_steht_in_der_spur() {
         let (status, _) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/benutzer/{id}"),
+            &format!("/api/users/{id}"),
             &admin,
             Some(body),
         )
@@ -228,7 +228,7 @@ async fn bearbeiten_ohne_zugangsaenderung_schreibt_nichts() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{id}"),
+        &format!("/api/users/{id}"),
         &admin,
         Some(
             r#"{"anzeigename":"Max M.","system_rolle":"keiner","org_rolle":"keine","aktiv":true}"#,
@@ -253,7 +253,7 @@ async fn abgewiesene_aktion_schreibt_nichts() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{admin_id}/deaktivieren"),
+        &format!("/api/users/{admin_id}/deactivate"),
         &admin,
         None,
     )
@@ -261,7 +261,7 @@ async fn abgewiesene_aktion_schreibt_nichts() {
     assert_eq!(status, StatusCode::CONFLICT);
 
     // Unbekanntes Konto: 404.
-    let (status, _) = anfrage(&app, "POST", "/api/benutzer/9999/totp/reset", &admin, None).await;
+    let (status, _) = anfrage(&app, "POST", "/api/users/9999/totp/reset", &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     // Nicht-Admin: 403.
@@ -271,7 +271,7 @@ async fn abgewiesene_aktion_schreibt_nichts() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{admin_id}/totp/reset"),
+        &format!("/api/users/{admin_id}/totp/reset"),
         &marlene,
         None,
     )
@@ -304,7 +304,7 @@ async fn audit_fehler_verhindert_die_aktion_nicht() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{id}/totp/reset"),
+        &format!("/api/users/{id}/totp/reset"),
         &admin,
         None,
     )

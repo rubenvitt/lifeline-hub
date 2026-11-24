@@ -62,7 +62,7 @@ test('LFH-734: im Einsatz verliert der Switcher einen anderswo abgeschlossenen E
   await page.locator(`button[title="${hier}"]`).click();
   await expect(page.getByRole('menuitem', { name: dort })).toBeVisible();
 
-  const abschluss = await page.request.post(`/api/einsaetze/${dortId}/abschliessen`);
+  const abschluss = await page.request.post(`/api/einsaetze/${dortId}/close`);
   expect(abschluss.ok()).toBeTruthy();
 
   await expect(page.getByRole('menuitem', { name: dort })).toHaveCount(0);

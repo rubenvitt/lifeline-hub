@@ -23,7 +23,7 @@ import { anmelden, FUEKW } from './trefflaeche-kern';
 const offeneErinnerungen = (url: URL) =>
   /\/api\/einsaetze\/\d+\/erinnerungen$/.test(url.pathname) && url.search === '';
 
-const istBericht = (r: Request) => r.method() === 'POST' && r.url().endsWith('/api/client-fehler');
+const istBericht = (r: Request) => r.method() === 'POST' && r.url().endsWith('/api/client-errors');
 
 test('ein Modul stürzt ab: der Rahmen bleibt, deutscher Text, ein Bericht an den Server', async ({
   page,

@@ -11,7 +11,7 @@ async fn liste_ohne_admin_session_ist_401() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -31,7 +31,7 @@ async fn nicht_admin_bekommt_403_auf_benutzerliste() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(
@@ -49,7 +49,7 @@ async fn nicht_admin_bekommt_403_auf_benutzerliste() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::COOKIE, erika_cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -69,7 +69,7 @@ async fn admin_legt_benutzer_an_und_listet() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie.clone())
                 .body(Body::from(
@@ -84,7 +84,7 @@ async fn admin_legt_benutzer_an_und_listet() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -104,7 +104,7 @@ async fn admin_benutzerliste_enthaelt_totp_aktiviert() {
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
 
-    let (status, json) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     let liste = json.as_array().unwrap();
     assert_eq!(
@@ -132,7 +132,7 @@ async fn benutzeranzeige_traegt_org_id() {
     let (status, angelegt) = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin_cookie,
         Some(r#"{"benutzername":"olga","anzeigename":"Olga","passwort":"olgapw123"}"#),
     )
@@ -144,7 +144,7 @@ async fn benutzeranzeige_traegt_org_id() {
     let (status, geaendert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{id}"),
+        &format!("/api/users/{id}"),
         &admin_cookie,
         Some(r#"{"anzeigename":"Olga O."}"#),
     )
@@ -152,7 +152,7 @@ async fn benutzeranzeige_traegt_org_id() {
     assert_eq!(status, StatusCode::OK, "{geaendert}");
     assert_eq!(geaendert["org_id"], org, "patch: {geaendert}");
 
-    let (status, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (status, liste) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     for b in liste.as_array().unwrap() {
         assert_eq!(b["org_id"], org, "liste: {b}");
@@ -169,7 +169,7 @@ async fn doppelter_benutzername_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(neu))
@@ -189,7 +189,7 @@ async fn zu_kurzes_passwort_ist_400() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(
@@ -216,14 +216,14 @@ async fn anlegen_mit_zu_langem_anzeigenamen_ist_400() {
         "passwort": "langespw1",
     });
     let (status, json) =
-        common::anfrage_json(&app, "POST", "/api/benutzer", &admin_cookie, Some(&body)).await;
+        common::anfrage_json(&app, "POST", "/api/users", &admin_cookie, Some(&body)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
         json["error"],
         format!("Anzeigename darf höchstens {max} Zeichen lang sein")
     );
 
-    let (_, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     assert!(
         liste
             .as_array()
@@ -247,7 +247,7 @@ async fn anlegen_mit_anzeigename_genau_an_der_grenze_gelingt() {
         "passwort": "grenzepw1",
     });
     let (status, json) =
-        common::anfrage_json(&app, "POST", "/api/benutzer", &admin_cookie, Some(&body)).await;
+        common::anfrage_json(&app, "POST", "/api/users", &admin_cookie, Some(&body)).await;
     assert_eq!(status, StatusCode::CREATED);
     assert_eq!(json["anzeigename"], name);
 }
@@ -258,7 +258,7 @@ async fn patch_mit_zu_langem_anzeigenamen_ist_400_und_aendert_nichts() {
     let app = setup().await;
     let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
     let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
-    let (_, vorher) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (_, vorher) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     let vorher = vorher
         .as_array()
         .unwrap()
@@ -275,7 +275,7 @@ async fn patch_mit_zu_langem_anzeigenamen_ist_400_und_aendert_nichts() {
     let (status, json) = common::anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(&body),
     )
@@ -286,7 +286,7 @@ async fn patch_mit_zu_langem_anzeigenamen_ist_400_und_aendert_nichts() {
         format!("Anzeigename darf höchstens {max} Zeichen lang sein")
     );
 
-    let (_, nachher) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (_, nachher) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     let nachher = nachher
         .as_array()
         .unwrap()
@@ -308,7 +308,7 @@ async fn letzter_admin_kann_nicht_deaktiviert_werden() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer/1/deaktivieren")
+                .uri("/api/users/1/deactivate")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -329,7 +329,7 @@ async fn deaktivierter_benutzer_kann_sich_nicht_mehr_anmelden() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie.clone())
                 .body(Body::from(
@@ -347,7 +347,7 @@ async fn deaktivierter_benutzer_kann_sich_nicht_mehr_anmelden() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer/2/deaktivieren")
+                .uri("/api/users/2/deactivate")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -382,7 +382,7 @@ async fn admin_legt_fuehrungskraft_an_und_org_rolle_erscheint() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(
@@ -408,7 +408,7 @@ async fn ungueltige_org_rolle_ist_400() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie)
                 .body(Body::from(
@@ -421,7 +421,7 @@ async fn ungueltige_org_rolle_ist_400() {
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
 }
 
-// ===== Admin-TOTP-Reset: POST /api/benutzer/{id}/totp/reset (LFH-43) =====
+// ===== Admin-TOTP-Reset: POST /api/users/{id}/totp/reset (LFH-43) =====
 
 /// Aktiviert TOTP für den durch `cookie` authentifizierten Nutzer über den echten Enroll-Flow
 /// (`/api/auth/totp/enroll/start` + `/finish`) — funktioniert für JEDEN angemeldeten Nutzer
@@ -520,7 +520,7 @@ async fn admin_totp_reset_loescht_secret_aktiviert_recovery_codes_und_sessions()
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{erika_id}/totp/reset"),
+        &format!("/api/users/{erika_id}/totp/reset"),
         &admin_cookie,
         None,
     )
@@ -588,7 +588,7 @@ async fn admin_totp_reset_ohne_session_ist_401_und_ohne_admin_ist_403() {
     let (status_ohne_session, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{erika_id}/totp/reset"),
+        &format!("/api/users/{erika_id}/totp/reset"),
         "",
         None,
     )
@@ -600,7 +600,7 @@ async fn admin_totp_reset_ohne_session_ist_401_und_ohne_admin_ist_403() {
     let (status_nicht_admin, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{erika_id}/totp/reset"),
+        &format!("/api/users/{erika_id}/totp/reset"),
         &erika_cookie,
         None,
     )
@@ -616,7 +616,7 @@ async fn admin_totp_reset_unbekannter_benutzer_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/benutzer/999999/totp/reset",
+        "/api/users/999999/totp/reset",
         &admin_cookie,
         None,
     )
@@ -624,7 +624,7 @@ async fn admin_totp_reset_unbekannter_benutzer_ist_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-// ===== Benutzer bearbeiten: PATCH /api/benutzer/{id} (LFH-286) =====
+// ===== Benutzer bearbeiten: PATCH /api/users/{id} (LFH-286) =====
 
 #[tokio::test]
 async fn admin_patch_system_rolle_macht_nutzer_zum_admin() {
@@ -636,7 +636,7 @@ async fn admin_patch_system_rolle_macht_nutzer_zum_admin() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"system_rolle":"admin"}"#),
     )
@@ -654,7 +654,7 @@ async fn admin_patch_org_rolle_und_anzeigename() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"org_rolle":"fuehrungskraft","anzeigename":"Erika Neu"}"#),
     )
@@ -678,7 +678,7 @@ async fn patch_nur_anzeigename_laesst_org_rolle_unveraendert() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"anzeigename":"Nur Name"}"#),
     )
@@ -701,7 +701,7 @@ async fn patch_reaktiviert_deaktivierten_benutzer() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{erika_id}/deaktivieren"),
+        &format!("/api/users/{erika_id}/deactivate"),
         &admin_cookie,
         None,
     )
@@ -711,7 +711,7 @@ async fn patch_reaktiviert_deaktivierten_benutzer() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"aktiv":true}"#),
     )
@@ -740,7 +740,7 @@ async fn patch_letzter_admin_downgrade_ist_409() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/benutzer/1",
+        "/api/users/1",
         &admin_cookie,
         Some(r#"{"system_rolle":"keiner"}"#),
     )
@@ -748,7 +748,7 @@ async fn patch_letzter_admin_downgrade_ist_409() {
     assert_eq!(status, StatusCode::CONFLICT);
 
     // Rolle bleibt unverändert admin.
-    let (_, json) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (_, json) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     let admin = json
         .as_array()
         .unwrap()
@@ -766,7 +766,7 @@ async fn patch_letzter_admin_deaktivieren_ist_409() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/benutzer/1",
+        "/api/users/1",
         &admin_cookie,
         Some(r#"{"aktiv":false}"#),
     )
@@ -784,7 +784,7 @@ async fn patch_admin_downgrade_erlaubt_wenn_zweiter_admin_existiert() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin_cookie,
         Some(r#"{"anzeigename":"Zwei","benutzername":"zwei","passwort":"zweipw12","system_rolle":"admin"}"#),
     )
@@ -796,7 +796,7 @@ async fn patch_admin_downgrade_erlaubt_wenn_zweiter_admin_existiert() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{zwei_id}"),
+        &format!("/api/users/{zwei_id}"),
         &admin_cookie,
         Some(r#"{"system_rolle":"keiner"}"#),
     )
@@ -814,7 +814,7 @@ async fn patch_ungueltige_system_rolle_ist_400() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"system_rolle":"chef"}"#),
     )
@@ -831,7 +831,7 @@ async fn patch_leerer_anzeigename_ist_400() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &admin_cookie,
         Some(r#"{"anzeigename":"   "}"#),
     )
@@ -849,7 +849,7 @@ async fn patch_ohne_admin_ist_403_und_ohne_session_401() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         "",
         Some(r#"{"anzeigename":"X"}"#),
     )
@@ -861,7 +861,7 @@ async fn patch_ohne_admin_ist_403_und_ohne_session_401() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/benutzer/{erika_id}"),
+        &format!("/api/users/{erika_id}"),
         &erika_cookie,
         Some(r#"{"anzeigename":"X"}"#),
     )
@@ -877,7 +877,7 @@ async fn patch_unbekannter_benutzer_ist_404() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/benutzer/999999",
+        "/api/users/999999",
         &admin_cookie,
         Some(r#"{"anzeigename":"X"}"#),
     )
@@ -902,7 +902,7 @@ async fn admin_endpunkte_liefern_passwort_gesetzt() {
         .await
         .unwrap();
 
-    let (status, liste) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (status, liste) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     let eintrag = |name: &str| {
         liste
@@ -925,7 +925,7 @@ async fn admin_endpunkte_liefern_passwort_gesetzt() {
     let (status, einzeln) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{sso_id}/totp/reset"),
+        &format!("/api/users/{sso_id}/totp/reset"),
         &admin_cookie,
         None,
     )
@@ -944,7 +944,7 @@ async fn liste_zeigt_nur_konten_der_eigenen_org() {
     let erika_id = benutzer_anlegen(&app, &admin_cookie, "erika", "keine").await;
     let (_, fremd_id) = fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw12", "keine").await;
 
-    let (status, json) = anfrage(&app, "GET", "/api/benutzer", &admin_cookie, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/users", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     let ids: Vec<i64> = json
         .as_array()
@@ -968,15 +968,11 @@ async fn konto_einer_fremden_org_ist_in_jeder_route_404() {
     for (methode, uri, body) in [
         (
             "PATCH",
-            format!("/api/benutzer/{fremd_id}"),
+            format!("/api/users/{fremd_id}"),
             Some(r#"{"anzeigename":"Übernommen","system_rolle":"admin","aktiv":false}"#),
         ),
-        (
-            "POST",
-            format!("/api/benutzer/{fremd_id}/deaktivieren"),
-            None,
-        ),
-        ("POST", format!("/api/benutzer/{fremd_id}/totp/reset"), None),
+        ("POST", format!("/api/users/{fremd_id}/deactivate"), None),
+        ("POST", format!("/api/users/{fremd_id}/totp/reset"), None),
     ] {
         let (status, _) = anfrage(&app, methode, &uri, &admin_cookie, body).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "{methode} {uri}");
@@ -1017,19 +1013,12 @@ async fn letzter_admin_zaehlt_nur_in_der_eigenen_org() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        "/api/benutzer/1",
+        "/api/users/1",
         &admin_cookie,
         Some(r#"{"system_rolle":"keiner"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
-    let (status, _) = anfrage(
-        &app,
-        "POST",
-        "/api/benutzer/1/deaktivieren",
-        &admin_cookie,
-        None,
-    )
-    .await;
+    let (status, _) = anfrage(&app, "POST", "/api/users/1/deactivate", &admin_cookie, None).await;
     assert_eq!(status, StatusCode::CONFLICT);
 }

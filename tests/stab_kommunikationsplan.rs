@@ -188,7 +188,7 @@ async fn funktion_label_traegt_das_mandantenlabel() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s4",
+        "/api/org-command-roles/s4",
         &admin,
         Some(r#"{"label":"Versorgung (Logistik)"}"#),
     )
@@ -320,7 +320,7 @@ async fn statuscodes_beim_anlegen() {
     anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s7",
+        "/api/org-command-roles/s7",
         &admin,
         Some(r#"{"aktiv":true}"#),
     )
@@ -888,7 +888,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

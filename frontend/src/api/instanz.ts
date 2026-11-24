@@ -19,20 +19,20 @@ import { apiGet, apiSend } from './client';
 // Verwaltung durch den Admin der Org. Die Routen, die eine andere Instanz ruft, kennt das Frontend nicht.
 
 export function loadInstanzUebersicht(): Promise<InstanzUebersicht> {
-  return apiGet<InstanzUebersicht>('/api/admin/instanz');
+  return apiGet<InstanzUebersicht>('/api/admin/instance');
 }
 
 /** Stellt einen Kopplungscode aus; der Code steht nur in dieser Antwort. `vorOrt`: Code für eine
  *  Direktkopplung zweier Instanzen im selben Netz (LLH-1497). */
 export function issueKopplungscode(vorOrt = false): Promise<KopplungscodeAntwort> {
   return vorOrt
-    ? apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST', { art: 'vor_ort' })
-    : apiSend<KopplungscodeAntwort>('/api/admin/instanz/codes', 'POST');
+    ? apiSend<KopplungscodeAntwort>('/api/admin/instance/codes', 'POST', { art: 'vor_ort' })
+    : apiSend<KopplungscodeAntwort>('/api/admin/instance/codes', 'POST');
 }
 
 /** Sucht einige Sekunden nach angekündigten Instanzen im lokalen Netz (LLH-1497). */
 export function searchInstanzenImNetz(): Promise<InstanzLanAntwort> {
-  return apiGet<InstanzLanAntwort>('/api/admin/instanz/lan');
+  return apiGet<InstanzLanAntwort>('/api/admin/instance/lan');
 }
 
 /** Koppelt diese Instanz mit dem Code einer anderen unter `adresse`. */
@@ -40,33 +40,30 @@ export function redeemKopplungscode(
   adresse: string,
   code: string,
 ): Promise<InstanzKopplungAnzeige> {
-  return apiSend<InstanzKopplungAnzeige>('/api/admin/instanz/einloesen', 'POST', {
+  return apiSend<InstanzKopplungAnzeige>('/api/admin/instance/redeem', 'POST', {
     adresse,
     code,
   });
 }
 
 export function widerrufeKopplung(id: number): Promise<InstanzKopplungAnzeige> {
-  return apiSend<InstanzKopplungAnzeige>(`/api/admin/instanz/kopplungen/${id}/widerrufen`, 'POST');
+  return apiSend<InstanzKopplungAnzeige>(`/api/admin/instance/pairings/${id}/revoke`, 'POST');
 }
 
 /** „ELW verloren“ an der erreichten Seite (LLH-1493): Widerruf, Geheimnisse der dorthin verteilten
  *  Konten ungültig, Sitzungen beendet. */
 export function meldeElwVerloren(id: number): Promise<ElwVerlorenAntwort> {
-  return apiSend<ElwVerlorenAntwort>(`/api/admin/instanz/kopplungen/${id}/verloren`, 'POST');
+  return apiSend<ElwVerlorenAntwort>(`/api/admin/instance/pairings/${id}/lost`, 'POST');
 }
 
 /** „Erneut abgleichen“ an der meldenden Seite (LLH-1493): holt alle Stammdaten neu. */
 export function gleicheStammdatenNeuAb(id: number): Promise<InstanzKopplungAnzeige> {
-  return apiSend<InstanzKopplungAnzeige>(
-    `/api/admin/instanz/kopplungen/${id}/stammdaten-neu`,
-    'POST',
-  );
+  return apiSend<InstanzKopplungAnzeige>(`/api/admin/instance/pairings/${id}/resync`, 'POST');
 }
 
 /** Welche Stammdaten der eigenen Org vom Hub kommen (LLH-1493, design.md D9). */
 export function loadStammdatenHerkunft(): Promise<StammdatenHerkunftAnzeige> {
-  return apiGet<StammdatenHerkunftAnzeige>('/api/instanz/stammdaten/herkunft');
+  return apiGet<StammdatenHerkunftAnzeige>('/api/instance/master-data/origin');
 }
 
 /**
@@ -77,14 +74,14 @@ export async function registriereUnterschriftsschluessel(
   bezeichnung: string,
 ): Promise<UnterschriftSchluesselAnzeige> {
   const start = await apiSend<UnterschriftRegistrierenStart>(
-    '/api/admin/instanz/unterschrift/registrieren/start',
+    '/api/admin/instance/signing-keys/register/start',
     'POST',
     { bezeichnung },
   );
   const optionen = start.optionen as unknown as WebauthnCreationChallenge;
   const antwort = await startRegistration({ optionsJSON: optionen.publicKey });
   return apiSend<UnterschriftSchluesselAnzeige>(
-    '/api/admin/instanz/unterschrift/registrieren/abschluss',
+    '/api/admin/instance/signing-keys/register/finish',
     'POST',
     { zeremonie: start.zeremonie, antwort },
   );
@@ -133,8 +130,8 @@ export async function unterschreibeErklaerung<R>(
  */
 export function gegenzeichne(id: number): Promise<UnterschriftSchluesselAnzeige> {
   return unterschreibeErklaerung<UnterschriftSchluesselAnzeige>(
-    `/api/admin/instanz/unterschrift/${id}/gegenzeichnen/start`,
-    `/api/admin/instanz/unterschrift/${id}/gegenzeichnen/abschluss`,
+    `/api/admin/instance/signing-keys/${id}/countersign/start`,
+    `/api/admin/instance/signing-keys/${id}/countersign/finish`,
   );
 }
 
@@ -142,7 +139,7 @@ export function widerrufeUnterschriftsschluessel(
   id: number,
 ): Promise<UnterschriftSchluesselAnzeige> {
   return apiSend<UnterschriftSchluesselAnzeige>(
-    `/api/admin/instanz/unterschrift/${id}/widerrufen`,
+    `/api/admin/instance/signing-keys/${id}/revoke`,
     'POST',
   );
 }
@@ -156,7 +153,7 @@ export function confirmUnterschriftsschluessel(
   ende: string,
 ): Promise<UnterschriftSchluesselAnzeige> {
   return apiSend<UnterschriftSchluesselAnzeige>(
-    `/api/admin/instanz/unterschrift/${id}/bestaetigen`,
+    `/api/admin/instance/signing-keys/${id}/confirm`,
     'POST',
     { fingerabdruck_ende: ende },
   );
@@ -165,7 +162,7 @@ export function confirmUnterschriftsschluessel(
 /** Weist einen vom Gegenüber nachgelieferten, wartenden Schlüssel zurück; er wird nie gültig. */
 export function rejectUnterschriftsschluessel(id: number): Promise<UnterschriftSchluesselAnzeige> {
   return apiSend<UnterschriftSchluesselAnzeige>(
-    `/api/admin/instanz/unterschrift/${id}/zurueckweisen`,
+    `/api/admin/instance/signing-keys/${id}/reject`,
     'POST',
   );
 }
@@ -175,5 +172,5 @@ export function rejectUnterschriftsschluessel(id: number): Promise<UnterschriftS
  * Unterschriftsschlüssel zurückließe (LLH-1605); die Benutzerverwaltung warnt davor.
  */
 export function loadLetzteSchluessel(): Promise<LetzterSchluesselHalter[]> {
-  return apiGet<LetzterSchluesselHalter[]>('/api/admin/instanz/letzte-schluessel');
+  return apiGet<LetzterSchluesselHalter[]>('/api/admin/instance/last-keys');
 }

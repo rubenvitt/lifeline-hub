@@ -57,7 +57,7 @@ pub struct NeuerBenutzer {
 /// Partielle Änderung eines bestehenden Benutzers (PATCH, LFH-286). `None` = Feld nicht
 /// ändern. `benutzername` (Login-Identität) und Passwort sind hier bewusst nicht änderbar; das
 /// Passwort wechselt sein Inhaber selbst, mit dem alten (`POST /api/auth/password`, LFH-471), oder
-/// die Administration vergibt ein Einmalpasswort (`POST /api/benutzer/{id}/einmalpasswort`,
+/// die Administration vergibt ein Einmalpasswort (`POST /api/users/{id}/one-time-password`,
 /// LFH-1121).
 #[derive(Debug, Deserialize)]
 pub struct PatchBenutzer {
@@ -111,7 +111,7 @@ async fn anzeige_laden(pool: &sqlx::SqlitePool, id: i64) -> Result<BenutzerAnzei
     )
 }
 
-/// GET /api/benutzer — Liste der Benutzer der eigenen Organisation (ohne Passwort-Hashes,
+/// GET /api/users — Liste der Benutzer der eigenen Organisation (ohne Passwort-Hashes,
 /// LFH-1123). Admin-only. Enthält den MFA-Status (`totp_aktiviert`, LFH-43 Increment 5 Task 6)
 /// und `passwort_gesetzt` (LFH-828).
 pub async fn liste(
@@ -132,7 +132,7 @@ pub async fn liste(
     Ok(Json(benutzer))
 }
 
-/// POST /api/benutzer — neuen Benutzer anlegen. Admin-only. Steht in der Admin-Spur (LFH-1005).
+/// POST /api/users — neuen Benutzer anlegen. Admin-only. Steht in der Admin-Spur (LFH-1005).
 ///
 /// Das Konto steht danach unter Änderungszwang (LFH-1121): Das Passwort aus der Anlage gilt wie
 /// ein Einmalpasswort, der erste Passwort-Login führt in den Schritt „Neues Passwort festlegen“.
@@ -208,7 +208,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
-/// Das Zielkonto einer Admin-Route unter `/api/benutzer/{id}…`: eine Person der Organisation des
+/// Das Zielkonto einer Admin-Route unter `/api/users/{id}…`: eine Person der Organisation des
 /// Admins (LFH-1123). Ein Konto einer fremden Organisation ist 404 wie ein unbekanntes, sonst
 /// sähe und änderte der Admin einer Org die Konten aller anderen. Ein Gerätekonto (LFH-892)
 /// verwaltet die Einsatzleitung über seine Kopplung, nicht der Admin: auch 404. Ebenso ein
@@ -285,7 +285,7 @@ async fn verweigere_admin_lockout(
     Ok(())
 }
 
-/// POST /api/benutzer/{id}/deaktivieren — Benutzer deaktivieren + Sessions löschen.
+/// POST /api/users/{id}/deactivate — Benutzer deaktivieren + Sessions löschen.
 /// Verweigert die Deaktivierung des letzten aktiven Admins. Admin-only. Steht in der Admin-Spur
 /// (LFH-1005).
 pub async fn deaktivieren(
@@ -365,7 +365,7 @@ async fn write_schluessel_widerruf_spur(
     }
 }
 
-/// PATCH /api/benutzer/{id} — bestehenden Benutzer bearbeiten (LFH-286). Admin-only.
+/// PATCH /api/users/{id} — bestehenden Benutzer bearbeiten (LFH-286). Admin-only.
 /// Partielle Semantik: nur mitgeschickte Felder ändern sich (`None` = unverändert).
 /// `benutzername` (Login-Identität) und Passwort sind bewusst NICHT änderbar. Rollen werden
 /// wie in `anlegen` validiert (400 bei ungültig). Der letzte aktive Admin ist gegen
@@ -492,7 +492,7 @@ pub async fn bearbeiten(
     Ok(Json(aktualisiert))
 }
 
-/// POST /api/benutzer/{id}/totp/reset — Admin-Reset des TOTP-Zweitfaktors eines Nutzers
+/// POST /api/users/{id}/totp/reset — Admin-Reset des TOTP-Zweitfaktors eines Nutzers
 /// (LFH-43, Increment 5 Task 6, `AdminUser`-gegated). Setzt `totp_secret = NULL` und
 /// `totp_aktiviert = 0` UND löscht die Recovery-Codes des Nutzers (`storage::loesche_recovery_codes`
 /// — Plan-MUST: keine stale Codes nach einem Reset) sowie dessen Sessions (analog `deaktivieren`
@@ -544,14 +544,14 @@ pub async fn totp_reset(
     Ok(Json(aktualisiert))
 }
 
-/// Antwort von `POST /api/benutzer/{id}/einmalpasswort` (LFH-1121): das erzeugte Einmalpasswort,
+/// Antwort von `POST /api/users/{id}/one-time-password` (LFH-1121): das erzeugte Einmalpasswort,
 /// genau dieses eine Mal.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct Einmalpasswort {
     pub einmalpasswort: String,
 }
 
-/// POST /api/benutzer/{id}/einmalpasswort — die Administration vergibt einer Person ein
+/// POST /api/users/{id}/one-time-password — die Administration vergibt einer Person ein
 /// Einmalpasswort (LFH-1121, Spec `konto-einmalpasswort`). Der Server erzeugt es, setzt es als
 /// Passwort, stellt das Konto unter Änderungszwang und beendet alle Sitzungen der Person; der
 /// nächste Passwort-Login führt in den Schritt „Neues Passwort festlegen“.

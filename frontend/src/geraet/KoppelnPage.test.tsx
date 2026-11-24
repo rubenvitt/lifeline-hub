@@ -53,7 +53,7 @@ describe('KoppelnPage (LFH-892)', () => {
   it('löst den Code ein, merkt sich das Gerät und lädt die Hülle', async () => {
     const gesendet = vi.fn();
     server.use(
-      http.post('/api/geraete/koppeln', async ({ request }) => {
+      http.post('/api/devices/pair', async ({ request }) => {
         gesendet(await request.json());
         return HttpResponse.json(GERAET);
       }),
@@ -70,7 +70,7 @@ describe('KoppelnPage (LFH-892)', () => {
   it('sagt bei 401 nur, dass der Code nicht gilt, und bleibt auf der Seite', async () => {
     server.use(
       http.post(
-        '/api/geraete/koppeln',
+        '/api/devices/pair',
         () => new HttpResponse(JSON.stringify({ error: 'Nicht angemeldet' }), { status: 401 }),
       ),
     );
@@ -88,7 +88,7 @@ describe('KoppelnPage (LFH-892)', () => {
   it('verlangt einen Code, bevor es etwas schickt', async () => {
     const gesendet = vi.fn();
     server.use(
-      http.post('/api/geraete/koppeln', () => {
+      http.post('/api/devices/pair', () => {
         gesendet();
         return HttpResponse.json(GERAET);
       }),

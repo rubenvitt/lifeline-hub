@@ -63,7 +63,7 @@ test('Katalogtabelle bei 390 px: scrollt in sich, drückt die Seite nicht breit,
   // Vorbedingung hinge an der Reihenfolge anderer Specs.
   const LAUF = Date.now();
   for (let i = 0; i < 8; i += 1) {
-    const antwort = await page.request.post('/api/benutzer', {
+    const antwort = await page.request.post('/api/users', {
       data: {
         anzeigename: `E2E Katalog ${LAUF}-${i}`,
         benutzername: `e2e-katalog-${LAUF}-${i}`,

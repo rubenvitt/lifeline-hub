@@ -129,7 +129,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, benutzername: &str) -> (Statu
         "passwort": "geheim1234",
     })
     .to_string();
-    anfrage(app, "POST", "/api/benutzer", cookie, Some(&body)).await
+    anfrage(app, "POST", "/api/users", cookie, Some(&body)).await
 }
 
 /// Spec: „Zweiter Name in anderer Schreibweise“, „Anlage mit Leerzeichen“, „Anlage mit
@@ -192,7 +192,7 @@ async fn anlage_begrenzt_das_passwort_auf_128_zeichen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin,
         Some(&anlage("lang", "ü".repeat(129))),
     )
@@ -203,7 +203,7 @@ async fn anlage_begrenzt_das_passwort_auf_128_zeichen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin,
         Some(&anlage("grenze", grenze.clone())),
     )

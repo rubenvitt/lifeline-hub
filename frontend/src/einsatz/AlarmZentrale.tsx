@@ -74,13 +74,23 @@ type UnwetterDetail = {
  * Vor der ersten Bediengeste sperrt der Browser den Ton; nach der Frist erscheint das Wort ohne
  * Zutun, und ohne Platz sprang der Kopf an seiner Umbruchkante um eine Zeile. Auch im
  * Ruhezustand bleibt der Platz deshalb frei, leer. Ist das Wort breiter („Benachrichtigung
- * blockiert“ in der gebündelten Bauform), gilt das Wort.
+ * blockiert“ in der gebündelten Bauform), gilt das Wort; die gebündelte Marke hält es dann auch,
+ * solange der Ton es ablöst (`platz`).
  */
 const TON_WORT_PLATZ = 'Ton blockiert';
 
-function WortPlatz({ style, children }: { style?: CSSProperties; children: ReactNode }) {
+function WortPlatz({
+  style,
+  platz = TON_WORT_PLATZ,
+  children,
+}: {
+  style?: CSSProperties;
+  /** Das Wort, dessen Breite gehalten wird; ohne Angabe „Ton blockiert“. */
+  platz?: string;
+  children: ReactNode;
+}) {
   return (
-    <span aria-hidden="true" className="ton-wort-platz" data-platz={TON_WORT_PLATZ} style={style}>
+    <span aria-hidden="true" className="ton-wort-platz" data-platz={platz} style={style}>
       {children}
     </span>
   );
@@ -467,12 +477,30 @@ export default function AlarmZentrale({
               flexShrink: 0,
             }}
           >
+            {/* Ist die Benachrichtigung blockiert, hält die Marke die Breite IHRES Worts, auch
+                wenn der Ton es ablöst: Die Berechtigung steht vom ersten Bild an fest, die
+                Tonprüfung meldet „blockiert“ erst nach der Frist (`ALARM_TON_FRIST_MS`). Ohne den
+                Platz wurde die Marke beim Wechsel auf das kürzere „Ton blockiert“ schmaler, der
+                Kopf fiel auf 390 px in `komfortabel` von zwei Zeilen auf eine, und alles darunter
+                sprang 52 px (`e2e/gate1-ueberlauf.spec.ts`, stehendes Sammelbanner). */}
             {istSchmal ? (
               sammelAuffaellig ? (
-                <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
+                desktopAuffaellig ? (
+                  <WortPlatz
+                    platz={desktopText}
+                    style={sammelWortStil(token.controlHeight, istSchmal)}
+                  >
+                    {sammelText}
+                  </WortPlatz>
+                ) : (
+                  <span style={sammelWortStil(token.controlHeight, istSchmal)}>{sammelText}</span>
+                )
               ) : null
             ) : (
-              <WortPlatz style={sammelWortStil(token.controlHeight, istSchmal)}>
+              <WortPlatz
+                platz={desktopAuffaellig ? desktopText : TON_WORT_PLATZ}
+                style={sammelWortStil(token.controlHeight, istSchmal)}
+              >
                 {sammelAuffaellig ? sammelText : null}
               </WortPlatz>
             )}

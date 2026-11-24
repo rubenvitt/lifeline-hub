@@ -483,7 +483,7 @@ describe('LageberichtDetailPage — Druckkopf (LFH-22)', () => {
       freigeben = fertig;
     });
     server.use(
-      http.get('/api/organisation', async () => {
+      http.get('/api/organization', async () => {
         await tor;
         return HttpResponse.json({ id: 1, name: 'Testorganisation', tz_organisation: null });
       }),

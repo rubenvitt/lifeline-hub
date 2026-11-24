@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 mod common;
 use common::*;
 
-const PFAD: &str = "/api/planungen";
+const PFAD: &str = "/api/plans";
 
 async fn admin(app: &axum::Router) -> String {
     login_cookie(app, "admin", "startpw12").await
@@ -38,7 +38,7 @@ async fn planung(app: &axum::Router, cookie: &str, name: &str) -> i64 {
 
 /// Legt einen freien Posten an und liefert seine Kennung.
 async fn posten(app: &axum::Router, cookie: &str, p: i64, body: Value) -> i64 {
-    let (s, json) = post(app, cookie, &format!("{PFAD}/{p}/posten"), body.clone()).await;
+    let (s, json) = post(app, cookie, &format!("{PFAD}/{p}/posts"), body.clone()).await;
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let name = body["bezeichnung"].as_str().unwrap();
     json["posten"]
@@ -52,7 +52,7 @@ async fn posten(app: &axum::Router, cookie: &str, p: i64, body: Value) -> i64 {
 }
 
 async fn block(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (StatusCode, Value) {
-    post(app, cookie, &format!("{PFAD}/{p}/bloecke"), body).await
+    post(app, cookie, &format!("{PFAD}/{p}/blocks"), body).await
 }
 
 fn bloecke(plan: &Value) -> &Vec<Value> {
@@ -106,7 +106,7 @@ async fn ohne_recht_403_fremde_planung_404() {
     let (s, _) = post(
         &app,
         &fremd,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "X", "art": "einheit"}),
     )
     .await;
@@ -243,7 +243,7 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
     let (s, plan) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "Trupp", "art": "einheit", "einheit_vorlage_id": vorlage}),
     )
     .await;
@@ -251,7 +251,7 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
     let (s, plan) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "KTW", "art": "einheit", "fahrzeug_id": fahrzeug}),
     )
     .await;
@@ -269,13 +269,13 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
         json!({"bezeichnung": "X", "art": "uhs"}),
         json!({"bezeichnung": "X", "art": "abschnitt"}),
     ] {
-        let (s, _) = post(&app, &admin, &format!("{PFAD}/{p}/posten"), body.clone()).await;
+        let (s, _) = post(&app, &admin, &format!("{PFAD}/{p}/posts"), body.clone()).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{body}");
     }
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/posten"),
+        &format!("{PFAD}/{p}/posts"),
         json!({"bezeichnung": "ktw", "art": "einheit"}),
     )
     .await;
@@ -284,7 +284,7 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
     let (s, plan) = anfrage_json(
         &app,
         "PUT",
-        &format!("{PFAD}/{p}/posten/reihenfolge"),
+        &format!("{PFAD}/{p}/posts/order"),
         &admin,
         Some(&json!({"posten_ids": [posten[1]["id"], posten[0]["id"]]})),
     )
@@ -294,7 +294,7 @@ async fn posten_aus_vorlage_und_fahrzeug_uebernimmt_das_soll() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("{PFAD}/{p}/posten/reihenfolge"),
+        &format!("{PFAD}/{p}/posts/order"),
         &admin,
         Some(&json!({"posten_ids": [posten[1]["id"]]})),
     )
@@ -393,7 +393,7 @@ async fn erzeugen_fuellt_den_zeitraum_ohne_laenge_422() {
     let (s, plan) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/erzeugen"),
+        &format!("{PFAD}/{p}/generate"),
         json!({"posten_id": mit, "von": "2027-03-13 11:00:00", "bis": "2027-03-13 23:00:00"}),
     )
     .await;
@@ -415,7 +415,7 @@ async fn erzeugen_fuellt_den_zeitraum_ohne_laenge_422() {
     let (s, json) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/erzeugen"),
+        &format!("{PFAD}/{p}/generate"),
         json!({"posten_id": ohne, "von": "2027-03-13 11:00:00", "bis": "2027-03-13 23:00:00"}),
     )
     .await;
@@ -424,7 +424,7 @@ async fn erzeugen_fuellt_den_zeitraum_ohne_laenge_422() {
     let (s, json) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/erzeugen"),
+        &format!("{PFAD}/{p}/generate"),
         json!({"posten_id": mit, "von": "2027-03-13 12:00:00", "bis": "2027-03-13 15:00:00"}),
     )
     .await;
@@ -483,7 +483,7 @@ async fn erzeugen_nennt_jeden_ueberschnittenen_block_einmal() {
         let (s, json) = post(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/erzeugen"),
+            &format!("{PFAD}/{p}/generate"),
             json!({"posten_id": streife, "von": "2027-03-13 10:00:00",
                    "bis": "2027-03-13 14:00:00", "laenge_minuten": laenge}),
         )
@@ -505,7 +505,7 @@ async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
     let (s, helfer) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/helfer"),
+        &format!("{PFAD}/{p}/helpers"),
         json!({"name": "Nora Exempel", "organisation": "Helferkreis"}),
     )
     .await;
@@ -562,7 +562,7 @@ async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
         .find(|x| x["posten_id"] == b)
         .unwrap()
         .clone();
-    let pfad = format!("{PFAD}/{p}/bloecke/{}", block_b["id"]);
+    let pfad = format!("{PFAD}/{p}/blocks/{}", block_b["id"]);
     let (s, _) = patch(
         &app,
         &admin,
@@ -592,7 +592,7 @@ async fn befunde_ohne_ist_doppelt_und_kennzahlen() {
     let (s, h) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{andere}/helfer"),
+        &format!("{PFAD}/{andere}/helpers"),
         json!({"name": "Finn Platzhalter"}),
     )
     .await;
@@ -653,7 +653,7 @@ async fn posten_mit_eingeteilten_personen_nur_mit_bloecken_loeschen() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
 
-    let pfad = format!("{PFAD}/{p}/posten/{a}");
+    let pfad = format!("{PFAD}/{p}/posts/{a}");
     let (s, _) = anfrage(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     let (s, _) = anfrage(
@@ -689,7 +689,7 @@ async fn liste_mit_zwanzig_vollen_planungen() {
             let (s, json) = post(
                 &app,
                 &admin,
-                &format!("{PFAD}/{p}/erzeugen"),
+                &format!("{PFAD}/{p}/generate"),
                 json!({"posten_id": a, "von": "2027-03-13 08:00:00", "bis": "2027-03-13 20:00:00"}),
             )
             .await;
@@ -700,7 +700,7 @@ async fn liste_mit_zwanzig_vollen_planungen() {
         let (s, _) = patch(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/bloecke/{}", erster["id"]),
+            &format!("{PFAD}/{p}/blocks/{}", erster["id"]),
             json!({"version": erster["version"], "personen": [{"art": "stamm", "personal_id": mia}]}),
         )
         .await;
@@ -858,7 +858,7 @@ async fn ueberschneidung_nennt_die_zeit_der_organisation_und_cas_text_ist_wortgl
         .unwrap()["id"]
         .as_i64()
         .unwrap();
-    let zweiter_pfad = format!("{PFAD}/{p}/bloecke/{zweiter}");
+    let zweiter_pfad = format!("{PFAD}/{p}/blocks/{zweiter}");
     erwarte(
         patch(
             &app,
@@ -874,7 +874,7 @@ async fn ueberschneidung_nennt_die_zeit_der_organisation_und_cas_text_ist_wortgl
     let (s, json) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/erzeugen"),
+        &format!("{PFAD}/{p}/generate"),
         json!({"posten_id": streife, "von": "2027-03-13 09:00:00",
                "bis": "2027-03-13 11:00:00", "laenge_minuten": 60}),
     )
@@ -956,7 +956,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     let (s, fremder_helfer) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{andere}/helfer"),
+        &format!("{PFAD}/{andere}/helpers"),
         json!({"name": "Finn"}),
     )
     .await;
@@ -1030,7 +1030,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     let (s, plan) = block(&app, &admin, p, zeit.clone()).await;
     assert_eq!(s, StatusCode::CREATED, "{plan}");
     let bid = bloecke(&plan)[0]["id"].as_i64().unwrap();
-    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
+    let block_pfad = format!("{PFAD}/{p}/blocks/{bid}");
     for (body, text) in [
         (
             json!({"version": 1, "soll_anzahl": 3}),
@@ -1058,7 +1058,7 @@ async fn texte_zu_soll_posten_personen_und_qualifikationen_sind_wortgleich() {
     }
 
     // Fremde Qualifikation am Helfer: beim Anlegen und beim Ändern.
-    let helfer = format!("{PFAD}/{p}/helfer");
+    let helfer = format!("{PFAD}/{p}/helpers");
     let quali_text = "Qualifikation gehört nicht zur Organisation";
     erwarte(
         post(
@@ -1104,7 +1104,7 @@ async fn erzeugen_ohne_laenge_nennt_die_schichtlaenge_des_postens() {
             post(
                 &app,
                 &admin,
-                &format!("{PFAD}/{p}/erzeugen"),
+                &format!("{PFAD}/{p}/generate"),
                 json!({"posten_id": posten_id, "von": "2027-03-13 11:00:00",
                        "bis": "2027-03-13 23:00:00"}),
             )
@@ -1149,7 +1149,7 @@ async fn stand_steigt_auf_jedem_block_und_helferweg() {
     assert_eq!(s, StatusCode::CREATED, "Block anlegen");
     stand_pruefen(&pool, p, &mut vorher, true, "Block anlegen").await;
     let bid = bloecke(&plan)[0]["id"].as_i64().unwrap();
-    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
+    let block_pfad = format!("{PFAD}/{p}/blocks/{bid}");
     let (s, _) = patch(
         &app,
         &admin,
@@ -1171,7 +1171,7 @@ async fn stand_steigt_auf_jedem_block_und_helferweg() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/erzeugen"),
+        &format!("{PFAD}/{p}/generate"),
         json!({"posten_id": streife, "von": "2027-03-13 12:00:00",
                "bis": "2027-03-13 14:00:00", "laenge_minuten": 60}),
     )
@@ -1189,7 +1189,7 @@ async fn stand_steigt_auf_jedem_block_und_helferweg() {
     assert_eq!(s, StatusCode::NO_CONTENT, "Block löschen");
     stand_pruefen(&pool, p, &mut vorher, true, "Block löschen").await;
 
-    let helfer = format!("{PFAD}/{p}/helfer");
+    let helfer = format!("{PFAD}/{p}/helpers");
     let (s, cem) = post(&app, &admin, &helfer, json!({"name": "Cem"})).await;
     assert_eq!(s, StatusCode::CREATED, "Helfer anlegen");
     stand_pruefen(&pool, p, &mut vorher, true, "Helfer anlegen").await;
@@ -1228,7 +1228,7 @@ async fn uebernommene_planung_ist_auf_allen_block_und_helferwegen_409() {
     let (s, cem) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/helfer"),
+        &format!("{PFAD}/{p}/helpers"),
         json!({"name": "Cem"}),
     )
     .await;
@@ -1241,12 +1241,12 @@ async fn uebernommene_planung_ist_auf_allen_block_und_helferwegen_409() {
     let stand_vorher = stand(&pool, p).await;
 
     let text = "Die Planung ist in einen Einsatz übernommen und schreibgeschützt";
-    let block_pfad = format!("{PFAD}/{p}/bloecke/{bid}");
-    let helfer_pfad = format!("{PFAD}/{p}/helfer/{}", cem["id"]);
+    let block_pfad = format!("{PFAD}/{p}/blocks/{bid}");
+    let helfer_pfad = format!("{PFAD}/{p}/helpers/{}", cem["id"]);
     let wege: [(&str, String, Option<Value>); 7] = [
         (
             "POST",
-            format!("{PFAD}/{p}/bloecke"),
+            format!("{PFAD}/{p}/blocks"),
             Some(json!({"posten_id": streife, "von": "2027-03-13 12:00:00",
                         "bis": "2027-03-13 13:00:00"})),
         ),
@@ -1258,13 +1258,13 @@ async fn uebernommene_planung_ist_auf_allen_block_und_helferwegen_409() {
         ("DELETE", format!("{block_pfad}?version=1"), None),
         (
             "POST",
-            format!("{PFAD}/{p}/erzeugen"),
+            format!("{PFAD}/{p}/generate"),
             Some(json!({"posten_id": streife, "von": "2027-03-13 14:00:00",
                         "bis": "2027-03-13 16:00:00"})),
         ),
         (
             "POST",
-            format!("{PFAD}/{p}/helfer"),
+            format!("{PFAD}/{p}/helpers"),
             Some(json!({"name": "Dana"})),
         ),
         ("PATCH", helfer_pfad.clone(), Some(json!({"name": "Cemal"}))),
@@ -1280,7 +1280,7 @@ async fn uebernommene_planung_ist_auf_allen_block_und_helferwegen_409() {
         patch(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/bloecke/999999"),
+            &format!("{PFAD}/{p}/blocks/999999"),
             json!({"version": 1, "notiz": "x"}),
         )
         .await,
@@ -1314,7 +1314,7 @@ async fn reihenfolge_der_bloecke_und_personen_in_der_planung() {
     let (s, json) = anfrage_json(
         &app,
         "PUT",
-        &format!("{PFAD}/{p}/posten/reihenfolge"),
+        &format!("{PFAD}/{p}/posts/order"),
         &admin,
         Some(&json!({"posten_ids": [c, a, b]})),
     )
@@ -1379,7 +1379,7 @@ async fn reihenfolge_der_bloecke_und_personen_in_der_planung() {
     let (s, h) = post(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/helfer"),
+        &format!("{PFAD}/{p}/helpers"),
         json!({"name": "Cem"}),
     )
     .await;
@@ -1429,7 +1429,7 @@ async fn reihenfolge_der_bloecke_und_personen_in_der_planung() {
     let (s, plan) = patch(
         &app,
         &admin,
-        &format!("{PFAD}/{p}/bloecke/{bid}"),
+        &format!("{PFAD}/{p}/blocks/{bid}"),
         json!({"version": 1,
                "personen": [{"art": "stamm", "personal_id": ada},
                             {"art": "helfer", "helfer_id": cem},
@@ -1471,7 +1471,7 @@ async fn hoechstzahlen_je_planung() {
         post(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/erzeugen"),
+            &format!("{PFAD}/{p}/generate"),
             json!({"posten_id": streife, "von": "2027-03-13 14:00:00",
                    "bis": "2027-03-13 16:00:00", "laenge_minuten": 60}),
         )
@@ -1500,7 +1500,7 @@ async fn hoechstzahlen_je_planung() {
         post(
             &app,
             &admin,
-            &format!("{PFAD}/{p}/helfer"),
+            &format!("{PFAD}/{p}/helpers"),
             json!({"name": "Einer zu viel"}),
         )
         .await,

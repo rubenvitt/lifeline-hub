@@ -90,7 +90,7 @@ function Adresse() {
 function setup(p: Planung = planung(), route = planungPfad(5), steuerhoehe?: number) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/planungen/5', () => HttpResponse.json(p)),
+    http.get('/api/plans/5', () => HttpResponse.json(p)),
     http.get('/api/personnel', () => HttpResponse.json([])),
     http.get('/api/qualifications', () => HttpResponse.json([])),
   );
@@ -133,8 +133,8 @@ describe('PlanungPage (LLH-1586)', () => {
     let stand = planung();
     setup();
     server.use(
-      http.get('/api/planungen/5', () => HttpResponse.json(stand)),
-      http.patch('/api/planungen/5', async ({ request }) => {
+      http.get('/api/plans/5', () => HttpResponse.json(stand)),
+      http.patch('/api/plans/5', async ({ request }) => {
         body = await request.json();
         const antwort = planung({ kopf: { ...planung().kopf, version: 4, ort: 'Rathaus' } });
         // Gleich danach ändert jemand anderes die Bezeichnung: die Antwort ist schon überholt.
@@ -159,7 +159,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup(planung(), planungPfad(5, 'posten'));
     server.use(
-      http.put('/api/planungen/5/posten/reihenfolge', async ({ request }) => {
+      http.put('/api/plans/5/posts/order', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(planung());
       }),
@@ -176,7 +176,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let url = '';
     setup(planung(), planungPfad(5, 'posten'));
     server.use(
-      http.delete('/api/planungen/5/posten/2', ({ request }) => {
+      http.delete('/api/plans/5/posts/2', ({ request }) => {
         url = request.url;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -206,7 +206,7 @@ describe('PlanungPage (LLH-1586)', () => {
           },
         ]),
       ),
-      http.post('/api/planungen/5/posten', async ({ request }) => {
+      http.post('/api/plans/5/posts', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(planung(), { status: 201 });
       }),
@@ -233,7 +233,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup(planung(), planungPfad(5, 'helfer'));
     server.use(
-      http.post('/api/planungen/5/helfer', async ({ request }) => {
+      http.post('/api/plans/5/helpers', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: 10, name: 'Carl', qualifikationen: [] }, { status: 201 });
       }),
@@ -251,7 +251,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup(planung(), planungPfad(5, 'ablauf'));
     server.use(
-      http.post('/api/planungen/5/programmpunkte', async ({ request }) => {
+      http.post('/api/plans/5/agenda-items', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(
           { id: 32, bezeichnung: 'Einlass', zeitpunkt_at: '2027-06-12 16:00:00' },
@@ -279,7 +279,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let geloescht = false;
     setup(planung(), planungPfad(5, 'ablauf'));
     server.use(
-      http.delete('/api/planungen/5/programmpunkte/31', () => {
+      http.delete('/api/plans/5/agenda-items/31', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -293,7 +293,7 @@ describe('PlanungPage (LLH-1586)', () => {
     const bodies: unknown[] = [];
     setup(planung(), planungPfad(5, 'helfer'));
     server.use(
-      http.post('/api/planungen/5/helfer', async ({ request }) => {
+      http.post('/api/plans/5/helpers', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json({ id: 10, name: 'Carl', qualifikationen: [] }, { status: 201 });
       }),
@@ -321,7 +321,7 @@ describe('PlanungPage (LLH-1586)', () => {
     let body: unknown;
     setup();
     server.use(
-      http.post('/api/planungen/5/erzeugen', async ({ request }) => {
+      http.post('/api/plans/5/generate', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(planung());
       }),
@@ -385,7 +385,7 @@ describe('PlanungPage (LLH-1586)', () => {
 
   it('Planung löschen fragt einmal nach und führt zur Liste', async () => {
     setup();
-    server.use(http.delete('/api/planungen/5', () => new HttpResponse(null, { status: 204 })));
+    server.use(http.delete('/api/plans/5', () => new HttpResponse(null, { status: 204 })));
     await waehleMenueEintrag(
       await screen.findByRole('button', { name: 'Aktionen zu Stadtfest' }),
       'Planung löschen',
@@ -398,7 +398,7 @@ describe('PlanungPage (LLH-1586)', () => {
   it('eine fremde oder gelöschte Planung (404) sagt, dass es sie nicht gibt', async () => {
     setup();
     server.use(
-      http.get('/api/planungen/5', () =>
+      http.get('/api/plans/5', () =>
         HttpResponse.json({ fehler: 'nicht gefunden' }, { status: 404 }),
       ),
     );
@@ -407,7 +407,7 @@ describe('PlanungPage (LLH-1586)', () => {
   it('„Druckansicht“ im Seitenkopf führt zur Druckansicht, „Excel“ speichert die Mappe der Planung (LLH-1593, LLH-1836)', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     setup();
-    server.use(http.get('/api/planungen/5/export', () => new HttpResponse('PK-planung')));
+    server.use(http.get('/api/plans/5/export', () => new HttpResponse('PK-planung')));
     const drucken = await screen.findByRole('link', { name: 'Druckansicht' });
     expect(drucken).toHaveAttribute('href', '/planungen/5/druck');
     // Im Kopf neben „In Einsatz übernehmen“, nicht in der Werkzeugzeile des Rasters.
@@ -482,11 +482,11 @@ describe('PlanungPage (LLH-1586)', () => {
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
-        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+        http.post('/api/plans/5/transfer/preview', async ({ request }) => {
           anfragen.push(await request.json());
           return HttpResponse.json(vorschau());
         }),
-        http.post('/api/planungen/5/uebernahme', async ({ request }) => {
+        http.post('/api/plans/5/transfer', async ({ request }) => {
           uebernahmeBody = await request.json();
           return HttpResponse.json({
             einsatz_id: 42,
@@ -528,7 +528,7 @@ describe('PlanungPage (LLH-1586)', () => {
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
-        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+        http.post('/api/plans/5/transfer/preview', async ({ request }) => {
           anfragen.push(await request.json());
           // Die zweite Vorschau sieht den geänderten Stand: ein Block mehr.
           return HttpResponse.json(
@@ -540,7 +540,7 @@ describe('PlanungPage (LLH-1586)', () => {
                 }),
           );
         }),
-        http.post('/api/planungen/5/uebernahme', async ({ request }) => {
+        http.post('/api/plans/5/transfer', async ({ request }) => {
           uebernahmen.push(await request.json());
           if (uebernahmen.length === 1) {
             return HttpResponse.json(
@@ -587,13 +587,13 @@ describe('PlanungPage (LLH-1586)', () => {
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
-        http.post('/api/planungen/5/uebernahme/vorschau', () => {
+        http.post('/api/plans/5/transfer/preview', () => {
           vorschauen += 1;
           return vorschauen === 1
             ? HttpResponse.json(vorschau())
             : HttpResponse.json({ error: 'Die Planung ist schon übernommen' }, { status: 409 });
         }),
-        http.post('/api/planungen/5/uebernahme', () =>
+        http.post('/api/plans/5/transfer', () =>
           HttpResponse.json({ error: 'Die Planung ist schon übernommen' }, { status: 409 }),
         ),
       );
@@ -649,7 +649,7 @@ describe('PlanungPage (LLH-1586)', () => {
             },
           ]),
         ),
-        http.post('/api/planungen/5/uebernahme/vorschau', async ({ request }) => {
+        http.post('/api/plans/5/transfer/preview', async ({ request }) => {
           anfragen.push(await request.json());
           return HttpResponse.json(vorschau());
         }),
@@ -695,7 +695,7 @@ describe('PlanungPage (LLH-1586)', () => {
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
         http.get('/api/einsaetze', () => HttpResponse.json([])),
-        http.post('/api/planungen/5/uebernahme/vorschau', () =>
+        http.post('/api/plans/5/transfer/preview', () =>
           HttpResponse.json(
             vorschau({
               uebernehmbar: false,

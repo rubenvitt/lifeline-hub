@@ -23,11 +23,11 @@ beforeEach(() => {
   zaehler = {};
   freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/modul-freigaben', () => {
+    http.get('/api/einsaetze/:id/module-access', () => {
       zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/einstellungen', () => HttpResponse.json({})),
+    http.get('/api/einsaetze/:id/settings', () => HttpResponse.json({})),
     http.get('/api/einsaetze/:id/karte/ort-suche', () => {
       zaehler.ortSuche = (zaehler.ortSuche ?? 0) + 1;
       return HttpResponse.json({ zustand: 'ok', treffer: [] });

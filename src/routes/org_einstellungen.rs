@@ -1,10 +1,10 @@
 //! HTTP-Routen für die org-weiten Einstellungen.
 //!
-//! GET  /api/org-einstellungen — Lesen: system_rolle=admin ODER org_rolle=fuehrungskraft.
-//! PUT  /api/org-einstellungen — Schreiben: nur system_rolle=admin (sonst 403).
+//! GET  /api/org-settings — Lesen: system_rolle=admin ODER org_rolle=fuehrungskraft.
+//! PUT  /api/org-settings — Schreiben: nur system_rolle=admin (sonst 403).
 //!
-//! GET  /api/org-modul-einstellungen — Lesen: admin ODER fuehrungskraft.
-//! PUT  /api/org-modul-einstellungen/:modul_key — Schreiben: nur system_rolle=admin (sonst 403).
+//! GET  /api/org-module-settings — Lesen: admin ODER fuehrungskraft.
+//! PUT  /api/org-module-settings/:modul_key — Schreiben: nur system_rolle=admin (sonst 403).
 //!
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
@@ -67,7 +67,7 @@ pub struct OrgEinstellungenUpdate {
     pub geocoder_url: Option<String>,
 }
 
-/// GET /api/org-einstellungen — Org-weite Einstellungen lesen.
+/// GET /api/org-settings — Org-weite Einstellungen lesen.
 /// Berechtigung: system_rolle=admin ODER org_rolle=fuehrungskraft.
 pub async fn lesen(
     State(state): State<AppState>,
@@ -81,7 +81,7 @@ pub async fn lesen(
     Ok(Json(einst.anzeige(kategorien)))
 }
 
-/// PUT /api/org-einstellungen — Org-weite Einstellungen setzen (Vollersatz).
+/// PUT /api/org-settings — Org-weite Einstellungen setzen (Vollersatz).
 /// Berechtigung: nur system_rolle=admin (fuehrungskraft → 403).
 pub async fn setzen(
     State(state): State<AppState>,
@@ -260,7 +260,7 @@ pub struct ModulRolleUpdate {
     pub sichtbar: Option<bool>,
 }
 
-/// GET /api/org-modul-einstellungen — Alle Modul-Vorgaben lesen.
+/// GET /api/org-module-settings — Alle Modul-Vorgaben lesen.
 /// Berechtigung: system_rolle=admin ODER org_rolle=fuehrungskraft.
 /// Antwort: `{ <modul_key>: { benoetigte_rolle, sichtbar } }` — sparse (nur Keys mit Zeile).
 pub async fn modul_einstellungen_lesen(
@@ -278,7 +278,7 @@ pub async fn modul_einstellungen_lesen(
     ))
 }
 
-/// PUT /api/org-modul-einstellungen/:modul_key — Vorgabe für ein Modul setzen.
+/// PUT /api/org-module-settings/:modul_key — Vorgabe für ein Modul setzen.
 /// Berechtigung: nur system_rolle=admin (fuehrungskraft → 403).
 /// Validierung: modul_key muss bekannt sein; benoetigte_rolle None (frei) oder gültige Rolle;
 /// `sichtbar: false` nur für ausblendbare Module (Selbst-Aussperr-Schutz).

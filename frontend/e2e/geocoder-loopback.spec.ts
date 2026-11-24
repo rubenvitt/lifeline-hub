@@ -12,14 +12,14 @@ test('der Lauf fragt keinen öffentlichen Geocoder: Ort-Vorschau ohne Ortsnamen'
 }) => {
   await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
 
-  const einstellungen = await page.request.get('/api/org-einstellungen');
+  const einstellungen = await page.request.get('/api/org-settings');
   expect(einstellungen.ok(), await einstellungen.text()).toBe(true);
   expect(((await einstellungen.json()) as { geocoder_url: string | null }).geocoder_url).toBe(
     GEOCODER_LOOPBACK,
   );
 
   // Berlin, Pariser Platz: der öffentliche Nominatim kennt hier eine Adresse.
-  const vorschau = await page.request.get('/api/location-preview?lat=52.5163&lon=13.3777');
+  const vorschau = await page.request.get('/api/place-preview?lat=52.5163&lon=13.3777');
   expect(vorschau.ok(), await vorschau.text()).toBe(true);
   expect(await vorschau.json()).not.toHaveProperty('ortsname');
 });

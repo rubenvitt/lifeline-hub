@@ -1,6 +1,6 @@
 //! Bestand der Bereitschaft (LLH-1820, Entwurf
 //! `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`):
-//! `GET /api/verwaltung/bereitschaft` zählt, was die eigene Organisation für einen Einsatz hat —
+//! `GET /api/administration/inventory` zählt, was die eigene Organisation für einen Einsatz hat —
 //! nur Zahlen, nur mit Verwaltungszugang, ohne Gerätekonten, Stellvertreter und Demo-Zeilen.
 
 use axum::http::StatusCode;
@@ -10,7 +10,7 @@ use sqlx::SqlitePool;
 mod common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
-const URI: &str = "/api/verwaltung/bereitschaft";
+const URI: &str = "/api/administration/inventory";
 
 async fn fahrzeug(app: &axum::Router, admin: &str, name: &str) -> i64 {
     let (s, j) = anfrage(
@@ -116,7 +116,7 @@ async fn zaehlt_den_bestand_der_eigenen_org() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/benutzer/{inaktiv}/deaktivieren"),
+        &format!("/api/users/{inaktiv}/deactivate"),
         &admin,
         None,
     )

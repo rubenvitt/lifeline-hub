@@ -504,7 +504,7 @@ async fn verbleib_angaben_fuer_den_bericht() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/personen", w.einsatz),
+        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

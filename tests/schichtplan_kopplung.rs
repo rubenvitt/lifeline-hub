@@ -460,7 +460,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personal"),
+        &format!("/api/einsaetze/{e}/module-overrides/personal"),
         &admin,
         Some(&override_personal(false)),
     )
@@ -482,7 +482,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/personal"),
+        &format!("/api/einsaetze/{e}/module-overrides/personal"),
         &admin,
         Some(&override_personal(true)),
     )

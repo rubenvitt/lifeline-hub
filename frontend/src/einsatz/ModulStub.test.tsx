@@ -63,7 +63,7 @@ describe('ModulStub', () => {
 
   it('führt über den Rückweg auf das konfigurierte Standardmodul (LFH-328)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({ einsatz_id: 7, standard_modul: 'einheiten' }),
       ),
     );
@@ -84,7 +84,7 @@ describe('ModulStub', () => {
    */
   it('fällt bei nicht auflösbarem Standardmodul auf den Überblick zurück (LFH-328, Neuentwurf)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({ einsatz_id: 7, standard_modul: 'wip-probe' }),
       ),
     );
@@ -95,10 +95,10 @@ describe('ModulStub', () => {
 
   it('überspringt ein gesperrtes Standardmodul im Rückweg (LFH-888)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/einstellungen', () =>
+      http.get('/api/einsaetze/7/settings', () =>
         HttpResponse.json({ einsatz_id: 7, standard_modul: 'einheiten' }),
       ),
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );

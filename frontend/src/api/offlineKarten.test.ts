@@ -14,7 +14,7 @@ import {
 describe('Aktualisierung', () => {
   it('lädt den Status', async () => {
     server.use(
-      http.get('/api/karte/offline-karten/aktualisierung', () =>
+      http.get('/api/map/offline-maps/auto-update', () =>
         HttpResponse.json({
           automatisch: true,
           intervall_stunden: 6,
@@ -32,7 +32,7 @@ describe('Aktualisierung', () => {
   it('stößt die Aktualisierung einer Karte an', async () => {
     let getroffen = false;
     server.use(
-      http.post('/api/karte/offline-karten/7/jetzt-aktualisieren', () => {
+      http.post('/api/map/offline-maps/7/update-now', () => {
         getroffen = true;
         return HttpResponse.json({ phase: 'bau_wartet' }, { status: 202 });
       }),
@@ -45,7 +45,7 @@ describe('Aktualisierung', () => {
   it('speichert die Einstellung', async () => {
     let body: unknown;
     server.use(
-      http.put('/api/karte/offline-karten/aktualisierung/einstellung', async ({ request }) => {
+      http.put('/api/map/offline-maps/auto-update/settings', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({
           automatisch: false,
@@ -62,10 +62,10 @@ describe('Aktualisierung', () => {
 });
 
 describe('starteRegionBau', () => {
-  it('postet den slug an /api/karte/offline-karten/bauen und liefert die job_id', async () => {
+  it('postet den slug an /api/map/offline-maps/build und liefert die job_id', async () => {
     let gesehen: unknown;
     server.use(
-      http.post('/api/karte/offline-karten/bauen', async ({ request }) => {
+      http.post('/api/map/offline-maps/build', async ({ request }) => {
         gesehen = await request.json();
         return HttpResponse.json({ job_id: 7 });
       }),
@@ -79,7 +79,7 @@ describe('starteRegionBau', () => {
 describe('ladeBauStatus', () => {
   it('parst die Job-Liste mit verschachteltem status-Objekt', async () => {
     server.use(
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -98,7 +98,7 @@ describe('ladeBauStatus', () => {
 
   it('parst einen fehlgeschlagenen Job inkl. fehler-Text', async () => {
     server.use(
-      http.get('/api/karte/offline-karten/bau-status', () =>
+      http.get('/api/map/offline-maps/build-status', () =>
         HttpResponse.json([
           {
             id: 2,
@@ -123,7 +123,7 @@ describe('ladeBauStatus', () => {
 describe('ladeBaubareRegionen', () => {
   it('parst die Liste baubarer Regionen', async () => {
     server.use(
-      http.get('/api/karte/offline-karten/baubare-regionen', () =>
+      http.get('/api/map/offline-maps/buildable-regions', () =>
         HttpResponse.json([
           { slug: 'bayern', name: 'Bayern', region: 'DE-BY', gruppe: 'Bundesländer' },
         ]),

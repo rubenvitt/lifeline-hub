@@ -11,9 +11,5 @@ export function setzeFuehrungsfunktion(
   funktion: Fuehrungsfunktion,
   daten: FuehrungsfunktionUpdate,
 ): Promise<FuehrungsfunktionEintrag[]> {
-  return apiSend<FuehrungsfunktionEintrag[]>(
-    `/api/org-fuehrungsfunktionen/${funktion}`,
-    'PUT',
-    daten,
-  );
+  return apiSend<FuehrungsfunktionEintrag[]>(`/api/org-command-roles/${funktion}`, 'PUT', daten);
 }

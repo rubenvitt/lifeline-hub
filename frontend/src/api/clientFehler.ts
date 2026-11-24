@@ -12,7 +12,7 @@ import { apiSendKeepalive } from './client';
  * Wiederholen, keine Offline-Warteschlange, keine Fehleranzeige. Was beim Senden scheitert, wird
  * verschluckt; ohne Sitzung lehnt der Server mit 401 ab, und der Bericht ist verloren.
  */
-export const CLIENT_FEHLER_PFAD = '/api/client-fehler';
+export const CLIENT_FEHLER_PFAD = '/api/client-errors';
 
 /** Höchstlänge der Meldung in Zeichen; `routes::client_fehler::MELDUNG_MAX` im Server. */
 export const CLIENT_FEHLER_MELDUNG_MAX = 500;

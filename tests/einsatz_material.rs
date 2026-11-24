@@ -187,7 +187,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/abschliessen"),
+            &format!("/api/einsaetze/{einsatz}/close"),
             &admin,
             None
         )
@@ -2686,7 +2686,7 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -3540,7 +3540,7 @@ async fn verknuepfen_ohne_freigabe_der_nachforderungen_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -3830,7 +3830,7 @@ async fn loesen_ohne_freigabe_der_nachforderungen_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -4031,7 +4031,7 @@ async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
     let (s, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/material"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/material"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

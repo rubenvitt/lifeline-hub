@@ -40,7 +40,7 @@ pub struct OnlineQuelleEingabe {
 // sqlx 0.9: `query_as` nimmt nur `&'static str`; die Spaltenliste steht deshalb je Query als
 // Literal.
 
-/// Aktive Online-Quelle für `GET /api/karte/config` mit `id` und `proxy`, die der Handler für
+/// Aktive Online-Quelle für `GET /api/map/config` mit `id` und `proxy`, die der Handler für
 /// den Proxy-URL-Rewrite braucht (LFH-182).
 #[derive(Debug, sqlx::FromRow)]
 pub struct OnlineQuelleConfig {
@@ -715,7 +715,7 @@ pub async fn finde_offline_karte(
     .await
 }
 
-/// Ausspielungs-Infos der aktiven Offline-Karte für `GET /api/karte/config`.
+/// Ausspielungs-Infos der aktiven Offline-Karte für `GET /api/map/config`.
 pub struct AktiveOfflineKarte {
     pub pfad: String,
     /// Cache-Bust-Token (`?v=…`): `sha256`, sonst `geaendert_at` (registrierte Dateien haben kein
@@ -753,7 +753,7 @@ pub async fn aktive_offline_karte(
     }))
 }
 
-/// Eine sichtbare Offline-Region für `GET /api/karte/config` (LFH-188), mit `id` für den
+/// Eine sichtbare Offline-Region für `GET /api/map/config` (LFH-188), mit `id` für den
 /// region-adressierten Tile-Endpoint.
 pub struct SichtbareOfflineKarte {
     pub id: i64,
@@ -798,7 +798,7 @@ pub async fn sichtbare_offline_karten(
 }
 
 /// Pfad und Kachel-Format einer bereiten Offline-Karte per `id` für
-/// `GET /api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}`. `None` bei unbekannter oder nicht
+/// `GET /api/map/offline/{karte_id}/tiles/{z}/{x}/{y}`. `None` bei unbekannter oder nicht
 /// bereiter Region → der Handler antwortet 204.
 pub async fn offline_karte_pfad_und_format(
     pool: &SqlitePool,

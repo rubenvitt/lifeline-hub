@@ -13,12 +13,14 @@ import dev.rubeen.lifeline.android.web.Webzugriffe
 import dev.rubeen.lifeline.android.web.dateiwahlErgebnis
 
 /**
- * Dateiwahl und Recht `CAMERA` der Oberfläche über Activity-Ergebnisse (Review W4). Anmelden
+ * Dateiwahl, Recht `CAMERA` und Recht auf den Standort (LLH-2071) der Oberfläche über
+ * Activity-Ergebnisse (Review W4). Anmelden
  * muss die Activity sie in `onCreate`, vor ihrem Start (wie [Anmeldebrowser]).
  */
 class Activityzugriffe(private val activity: ComponentActivity) : Webzugriffe {
     private var dateiFertig: ((Array<Uri>?) -> Unit)? = null
     private val kameraFertig = mutableListOf<(Boolean) -> Unit>()
+    private val standortFertig = mutableListOf<(Boolean) -> Unit>()
 
     private val dateiwahl = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { ergebnis ->
         val fertig = dateiFertig ?: return@registerForActivityResult
@@ -29,6 +31,14 @@ class Activityzugriffe(private val activity: ComponentActivity) : Webzugriffe {
     private val kameraRecht = activity.registerForActivityResult(ActivityResultContracts.RequestPermission()) { erlaubt ->
         val wartend = kameraFertig.toList()
         kameraFertig.clear()
+        wartend.forEach { it(erlaubt) }
+    }
+
+    // „Erlaubt“ heißt fein oder grob: ab Android 12 darf die Person „ungefähr“ wählen.
+    private val standortRecht = activity.registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { rechte ->
+        val wartend = standortFertig.toList()
+        standortFertig.clear()
+        val erlaubt = rechte.values.any { it }
         wartend.forEach { it(erlaubt) }
     }
 
@@ -53,5 +63,18 @@ class Activityzugriffe(private val activity: ComponentActivity) : Webzugriffe {
         }
         kameraFertig += fertig
         if (kameraFertig.size == 1) kameraRecht.launch(Manifest.permission.CAMERA)
+    }
+
+    override fun standort(fertig: (Boolean) -> Unit) {
+        if (STANDORTRECHTE.any { ContextCompat.checkSelfPermission(activity, it) == PackageManager.PERMISSION_GRANTED }) {
+            fertig(true)
+            return
+        }
+        standortFertig += fertig
+        if (standortFertig.size == 1) standortRecht.launch(STANDORTRECHTE)
+    }
+
+    private companion object {
+        val STANDORTRECHTE = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
     }
 }

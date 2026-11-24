@@ -66,7 +66,7 @@ function setup() {
 // sie geschlossen, damit Tab-Reihenfolge und Hinweise der Seite unverändert geprüft werden.
 beforeEach(() => {
   server.use(
-    http.get('/api/benutzer-einstellungen', () =>
+    http.get('/api/user-settings', () =>
       HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 08:00:00' } }),
     ),
   );
@@ -84,7 +84,7 @@ describe('EinsaetzePage — Willkommenskarte schiebt nichts', () => {
       oeffne = r;
     });
     server.use(
-      http.get('/api/benutzer-einstellungen', async () => {
+      http.get('/api/user-settings', async () => {
         await tor;
         return antwort();
       }),
@@ -923,7 +923,7 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     const zaehler = { get: 0 };
     let stand = antwort;
     server.use(
-      http.get('/api/demo-daten', () => {
+      http.get('/api/demo-data', () => {
         zaehler.get += 1;
         return stand === 'aus'
           ? HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 })
@@ -1072,7 +1072,7 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
     expect(hinweisLink()).toBeNull();
   });
 
-  it('andere Rolle: kein Hinweis und keine Anfrage an /api/demo-daten', async () => {
+  it('andere Rolle: kein Hinweis und keine Anfrage an /api/demo-data', async () => {
     const { zaehler } = demoStatus({ importiert: false });
     rendern(fuehrungskraft);
     // Ankerpunkt: die Anmeldung ist aufgelöst (Führungskraft sieht die Anlegen-Kachel).
@@ -1109,7 +1109,7 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(admin),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
@@ -1145,7 +1145,7 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(admin),
-      http.get('/api/org-einstellungen', () =>
+      http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
@@ -1232,7 +1232,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
-      http.get('/api/location-search', ({ request }) => {
+      http.get('/api/place-search', ({ request }) => {
         begriffe.push(new URL(request.url).searchParams.get('q')!);
         return HttpResponse.json({
           zustand: 'ok',
@@ -1247,7 +1247,7 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
         });
       }),
       // Ort-Vorschau ohne Einsatz (LLH-1376): nur der Ortsname.
-      http.get('/api/location-preview', () =>
+      http.get('/api/place-preview', () =>
         HttpResponse.json({ ortsname: 'Marktplatz 3, 12345 Musterstadt' }),
       ),
     );
@@ -1519,14 +1519,14 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
   });
 
   it('ein Erstnutzer bekommt Teil „Liste“ von selbst', async () => {
-    server.use(http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })));
+    server.use(http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })));
     renderMitProviders(<EinsaetzePage />);
     await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('liste', true));
   });
 
   it('solange die Liste lädt, startet nichts (sonst fehlte der Schritt „Einsätze“)', async () => {
     server.use(
-      http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
+      http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
       http.get('/api/einsaetze', () => new Promise<never>(() => {})),
     );
     renderMitProviders(<EinsaetzePage />);
@@ -1537,7 +1537,7 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
 
   it('wer die Willkommenskarte geschlossen hat, nicht', async () => {
     server.use(
-      http.get('/api/benutzer-einstellungen', () =>
+      http.get('/api/user-settings', () =>
         HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
       ),
     );

@@ -201,7 +201,7 @@ async function seedePlanung(page: Page): Promise<number> {
   const beginn = Math.ceil((Date.now() + 7 * 24 * 3_600_000) / 3_600_000) * 3_600_000;
   const wire = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
   const halbe = 30 * 60_000;
-  const neu = await page.request.post('/api/planungen', {
+  const neu = await page.request.post('/api/plans', {
     data: {
       bezeichnung: `E2E Planung Druck ${Date.now()}`,
       von: wire(beginn),
@@ -211,22 +211,22 @@ async function seedePlanung(page: Page): Promise<number> {
   expect(neu.ok(), `Planung: ${neu.status()} ${await neu.text()}`).toBeTruthy();
   const planungId = ((await neu.json()) as { kopf: { id: number } }).kopf.id;
   const sende = async (pfad: string, data: unknown) => {
-    const a = await page.request.post(`/api/planungen/${planungId}/${pfad}`, { data });
+    const a = await page.request.post(`/api/plans/${planungId}/${pfad}`, { data });
     expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();
     return (await a.json()) as { id: number; posten: { id: number; bezeichnung: string }[] };
   };
-  await sende('posten', { bezeichnung: 'RTW 1', art: 'einheit' });
-  const mitFuss = await sende('posten', { bezeichnung: 'Fußtrupp', art: 'einheit' });
+  await sende('posts', { bezeichnung: 'RTW 1', art: 'einheit' });
+  const mitFuss = await sende('posts', { bezeichnung: 'Fußtrupp', art: 'einheit' });
   const rtw = mitFuss.posten.find((p) => p.bezeichnung === 'RTW 1')!.id;
   const fuss = mitFuss.posten.find((p) => p.bezeichnung === 'Fußtrupp')!.id;
-  const helfer = await sende('helfer', {
+  const helfer = await sende('helpers', {
     name: 'Paul Planer',
     telefon: '0170 1112233',
     organisation: 'Bereitschaft Nord',
   });
   const personen = [{ art: 'helfer', helfer_id: helfer.id }];
   for (let i = 0; i < 20; i++) {
-    await sende('bloecke', {
+    await sende('blocks', {
       posten_id: rtw,
       von: wire(beginn + i * halbe),
       bis: wire(beginn + (i + 1) * halbe),
@@ -234,7 +234,7 @@ async function seedePlanung(page: Page): Promise<number> {
       personen,
     });
   }
-  await sende('bloecke', {
+  await sende('blocks', {
     posten_id: fuss,
     von: wire(beginn + 20 * halbe),
     bis: wire(beginn + 24 * halbe),

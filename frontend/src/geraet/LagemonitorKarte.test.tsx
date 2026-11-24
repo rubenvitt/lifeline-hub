@@ -111,7 +111,7 @@ beforeEach(() => {
   karte.versatz = new Map();
   karte.orte = new Map();
   server.use(
-    http.get('/api/karte/config', () =>
+    http.get('/api/map/config', () =>
       HttpResponse.json({
         online_styles: [],
         offline_verfuegbar: false,
@@ -181,17 +181,17 @@ describe('LagemonitorKarte Quellenangabe (LLH-1496)', () => {
   const ODBL = '© OpenStreetMap contributors (ODbL)';
   beforeEach(() => {
     server.use(
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [],
           offline_verfuegbar: true,
-          offline_tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}',
+          offline_tiles_url: '/api/map/offline/1/tiles/{z}/{x}/{y}',
           offline_attribution: ODBL,
           offline_regionen: [
             {
               karte_id: 1,
               name: 'R1',
-              tiles_url: '/api/karte/offline/1/tiles/{z}/{x}/{y}',
+              tiles_url: '/api/map/offline/1/tiles/{z}/{x}/{y}',
               attribution: ODBL,
               format: 'vektor',
               maxzoom: 14,

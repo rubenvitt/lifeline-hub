@@ -1205,7 +1205,7 @@ fn fuehrungsfunktion_besetzungszustand_wire() {
     } in lifeline_hub::fuehrung::aufloesung::BesetzungsZustand::ALLE);
 }
 
-/// LFH-1100: Datenträgerprüfung, Wire-Vertrag von `GET /api/system/datentraeger`.
+/// LFH-1100: Datenträgerprüfung, Wire-Vertrag von `GET /api/system/storage`.
 #[test]
 fn datentraeger_wire() {
     enum_wire!(lifeline_hub::datentraeger::Wert {
@@ -2123,7 +2123,7 @@ fn public_api_error_code_wire() {
     } in lifeline_hub::public_api::ErrorCode::ALLE);
 }
 
-/// `GET /api/v1/lage` (LLH-1638): eigene Enums der öffentlichen API. Ihre Werte sind Vertrag; ein
+/// `GET /api/v1/situation` (LLH-1638): eigene Enums der öffentlichen API. Ihre Werte sind Vertrag; ein
 /// Wert kommt nur hinzu.
 #[test]
 fn public_api_lage_wire() {

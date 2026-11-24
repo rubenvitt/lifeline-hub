@@ -459,7 +459,7 @@ impl Anlass {
 
 /// Nutzlast des Live-Ereignisses `benachrichtigung` (Einsatz-Strom) und
 /// `org_benachrichtigung` (Org-Kanal). Nur Kennungen und Kataloge (F01): den Text holt der
-/// Client über `GET /api/benachrichtigungen/{id}`.
+/// Client über `GET /api/notifications/{id}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenachrichtigungEreignis {
     /// Der Einsatz; `null` bei der Störung einer Anbindung (LLH-2026). Immer mitgesendet, damit
@@ -476,7 +476,7 @@ pub struct BenachrichtigungEreignis {
     pub quittiert: bool,
     /// „Alle gelesen“ (LLH-1143, design.md D4): der Empfänger hat seine Eingänge dieses Einsatzes
     /// bis einschließlich dieser Kennung gelesen. Steht nur am Quittier-Ereignis von
-    /// `POST …/benachrichtigungen/gelesen`; die übrigen Felder nennen die jüngste davon, ein
+    /// `POST …/notifications/read`; die übrigen Felder nennen die jüngste davon, ein
     /// älterer Client liest es als deren Einzelquittung.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gelesen_bis: Option<i64>,
@@ -735,17 +735,14 @@ async fn ausliefern(
         );
     }
     // iOS-Push an die angemeldeten Geräte (LLH-2040), mit denselben Filtern, in einem eigenen
-    // Task; ohne `--ios-push` nichts. Den Text bildet der Versand je Empfänger. Eine Meldung ohne
-    // Einsatz (Störung einer Anbindung, LLH-2026) geht nicht per iOS-Push: der Klartext braucht
-    // den Einsatz (`ios_push::inhalt::Klartext::e`).
+    // Task; ohne `--ios-push` nichts. Den Text bildet der Versand je Empfänger, auch ohne Einsatz
+    // (Störung einer Anbindung, LLH-2077).
     if let Some(ios_push) = live.ios_push() {
         ios_push.versenden(
             ereignisse
                 .iter()
                 .filter(|(b, e)| {
-                    e.stufe != BenachrichtigungStufe::Still
-                        && e.einsatz_id.is_some()
-                        && !ueber_hub.ios_push.contains(b)
+                    e.stufe != BenachrichtigungStufe::Still && !ueber_hub.ios_push.contains(b)
                 })
                 .map(|(benutzer_id, e)| crate::ios_push::IosSendung {
                     benutzer_id: *benutzer_id,

@@ -79,7 +79,7 @@ function antwort(extra: Partial<LagebildExtern> = {}): LagebildExtern {
 function bereit(...antworten: (LagebildExtern | number)[]) {
   const anfragen: { auth: string | null; oeffnung: string | null; uri: string }[] = [];
   server.use(
-    http.get('/api/extern/v1/lagebild', ({ request }) => {
+    http.get('/api/external/v1/situation-picture', ({ request }) => {
       anfragen.push({
         auth: request.headers.get('authorization'),
         oeffnung: request.headers.get('x-lagebild-oeffnung'),

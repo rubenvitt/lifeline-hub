@@ -652,7 +652,7 @@ async fn posten_felder_und_rechte() {
             let (s, _) = anfrage(
                 &app,
                 "PUT",
-                &format!("/api/einsaetze/{e}/modul-overrides/{modul}"),
+                &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
                 &admin,
                 Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
             )

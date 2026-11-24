@@ -115,7 +115,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

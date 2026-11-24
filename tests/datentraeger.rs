@@ -1,4 +1,4 @@
-//! LFH-1100: `GET /api/system/datentraeger` — Rechte, Stand vor der ersten Prüfung und die
+//! LFH-1100: `GET /api/system/storage` — Rechte, Stand vor der ersten Prüfung und die
 //! Warnregel samt Zusicherung externer Verschlüsselung, über HTTP.
 
 mod common;
@@ -9,7 +9,7 @@ use lifeline_hub::datentraeger::{Befund, Ergebnis, Grund, OrtArt, OrtErgebnis, S
 use serde_json::Value;
 use tower::ServiceExt;
 
-const PFAD: &str = "/api/system/datentraeger";
+const PFAD: &str = "/api/system/storage";
 
 fn ergebnis(befunde: &[(OrtArt, &str, Befund)]) -> Ergebnis {
     Ergebnis {
