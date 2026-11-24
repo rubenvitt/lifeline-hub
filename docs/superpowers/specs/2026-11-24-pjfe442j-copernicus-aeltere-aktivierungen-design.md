@@ -4,7 +4,8 @@ Stand: 24.11.2026 · Zunder: https://zunder.rubeen.dev/#/aufgabe/pjfe442jcok05be
 Folgeaufgabe aus LLH-1200 (Entwurf
 `docs/superpowers/specs/2026-11-21-wqafyn8u-copernicus-ems-fachebene-design.md`, ADR-0079) ·
 Abgestimmt: Ruben im Chat, 24.11.2026 (Bedarf ja, kleiner Katalog; ZIP zur Laufzeit; Filter
-auf den Ausschnitt für alle Copernicus-Ebenen)
+auf den Ausschnitt für alle Copernicus-Ebenen) · Freigabe des Entwurfs: Ruben im Chat,
+24.11.2026 („Entwurf passt, go“)
 
 ## Absicht
 
