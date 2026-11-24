@@ -146,13 +146,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
             "frist_at": "2026-06-01 10:00:00",
             "empfaenger": empfaenger,
         });
-        post(
-            &app,
-            &cookie,
-            &format!("{basis}/auftraege"),
-            &body.to_string(),
-        )
-        .await;
+        post(&app, &cookie, &format!("{basis}/tasks"), &body.to_string()).await;
     }
     for i in 0..300 {
         let body = json!({
@@ -162,7 +156,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         let m = post(
             &app,
             &cookie,
-            &format!("{basis}/meldungen"),
+            &format!("{basis}/reports"),
             &body.to_string(),
         )
         .await;
@@ -172,7 +166,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
             post(
                 &app,
                 &cookie,
-                &format!("{basis}/meldungen/{mid}/lagerelevant"),
+                &format!("{basis}/reports/{mid}/situation-relevant"),
                 "{}",
             )
             .await;
@@ -183,7 +177,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         post(
             &app,
             &cookie,
-            &format!("{basis}/erinnerungen"),
+            &format!("{basis}/reminders"),
             &body.to_string(),
         )
         .await;
@@ -197,7 +191,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         let nf = post(
             &app,
             &cookie,
-            &format!("{basis}/nachforderungen"),
+            &format!("{basis}/resource-requests"),
             &body.to_string(),
         )
         .await;
@@ -206,13 +200,20 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
             post(
                 &app,
                 &cookie,
-                &format!("{basis}/nachforderungen/{nid}/status"),
+                &format!("{basis}/resource-requests/{nid}/status"),
                 &json!({ "status": status }).to_string(),
             )
             .await;
         }
     }
-    let (_, kanaele) = anfrage(&app, "GET", &format!("{basis}/chat/kanaele"), &cookie, None).await;
+    let (_, kanaele) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/chat/channels"),
+        &cookie,
+        None,
+    )
+    .await;
     let kid = kanaele[0]["id"].as_i64().unwrap();
     // Nachrichten eines anderen Autors, damit sie für den Admin ungelesen sind.
     let autor = benutzer_anlegen(&app, &cookie, "karla", "keine").await;

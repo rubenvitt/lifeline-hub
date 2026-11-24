@@ -200,7 +200,7 @@ function sitzungsWerte(s: Betreuungsstelle): StelleWerte {
  * Zahlen, Bedarf (LLH-1082), Unterkunft (LLH-1520), Stammdaten, Meldeverlauf, Betroffene hier und Verpflegung auf einer
  * Seite.
  *
- * Die Stelle kommt aus `GET …/betreuung` (derselbe Cache wie Übersicht und Gerät, live über das
+ * Die Stelle kommt aus `GET …/care` (derselbe Cache wie Übersicht und Gerät, live über das
  * `betreuung`-Ereignis); es gibt keinen Einzel-Endpunkt. Eine unbekannte, fremde oder stornierte
  * Stelle zeigt nach dem Laden „Diese Betreuungsstelle gibt es nicht (mehr)“, ebenso eine unlesbare
  * Kennung; die Adresse bleibt stehen (LLH-1827, `betreuung/StelleNichtGefunden.tsx`).

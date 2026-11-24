@@ -42,7 +42,7 @@ type MenueAktion = string;
  * DIESEM Bezirk ist — Anordnung, Stand, Gebiet, Stammdaten, Verlauf — an einer Stelle statt auf
  * Tabellenzeile, Aufklappbereich und vier Dialoge verteilt.
  *
- * - Gelesen wird aus der Übersicht `GET …/evakuierung` (kein Einzel-Endpunkt, die Listenform trägt
+ * - Gelesen wird aus der Übersicht `GET …/evacuation` (kein Einzel-Endpunkt, die Listenform trägt
  *   jedes Feld; design.md D1). Ungültige, unbekannte, fremde oder stornierte Kennung → zurück zur
  *   Übersicht (`replace`).
  * - Kopf (D3): genau eine Primäraktion „Stand melden“, daneben höchstens EIN Räumungsschritt und

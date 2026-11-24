@@ -38,7 +38,7 @@ const STAFFEL = 'Rettungsstaffel';
 
 /** Zwei Zeitfenster (eines läuft, eines steht an) und eine Ausgabe, einmal je Lauf. */
 async function zeitfensterAnlegen(page: Page, einsatz: number) {
-  const basis = `/api/einsaetze/${einsatz}/verpflegung`;
+  const basis = `/api/einsaetze/${einsatz}/catering`;
   const stand = (await (await page.request.get(basis)).json()) as {
     zeitfenster: { bezeichnung: string }[];
     empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
@@ -54,17 +54,17 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
     });
   }
   const stelle = async (bezeichnung: string, standort: string) => {
-    const { id } = await fuelle<{ id: number }>(page, 'post', `${basis}/stellen`, {
+    const { id } = await fuelle<{ id: number }>(page, 'post', `${basis}/positions`, {
       bezeichnung,
       art: 'ausgabestelle',
       standort,
     });
-    await fuelle(page, 'post', `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    await fuelle(page, 'post', `${basis}/positions/${id}/status`, { status: 'aktiv' });
     return id;
   };
   const gesamtschule = await stelle(STELLE, 'Gesamtschule, Mensa');
   await stelle('Ausgabe Turnhalle Nord', 'Turnhalle Nord');
-  const mittag = await fuelle<{ id: number }>(page, 'post', `${basis}/zeitfenster`, {
+  const mittag = await fuelle<{ id: number }>(page, 'post', `${basis}/time-slots`, {
     bezeichnung: MITTAG,
     von_at: new Date(jetzt - stunde).toISOString(),
     bis_at: new Date(jetzt + 2 * stunde).toISOString(),
@@ -72,16 +72,16 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
     bedarf_betreute: 90,
     sonderkost: { vegetarisch: 12 },
   });
-  await fuelle(page, 'patch', `${basis}/zeitfenster/${mittag.id}`, {
+  await fuelle(page, 'patch', `${basis}/time-slots/${mittag.id}`, {
     stelle_ids: [gesamtschule],
     verpflegungsart: 'warm',
   });
-  await fuelle(page, 'post', `${basis}/zeitfenster/${mittag.id}/ausgaben`, {
+  await fuelle(page, 'post', `${basis}/time-slots/${mittag.id}/distributions`, {
     menge: 80,
     verpflegungsstelle_id: gesamtschule,
     sonderkost: { vegetarisch: 6 },
   });
-  await fuelle(page, 'post', `${basis}/zeitfenster`, {
+  await fuelle(page, 'post', `${basis}/time-slots`, {
     bezeichnung: ABEND,
     von_at: new Date(jetzt + 6 * stunde).toISOString(),
     bis_at: new Date(jetzt + 8 * stunde).toISOString(),

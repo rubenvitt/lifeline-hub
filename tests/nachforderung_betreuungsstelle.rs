@@ -12,14 +12,14 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/nachforderungen")
+    format!("/api/einsaetze/{einsatz}/resource-requests")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        &format!("/api/einsaetze/{einsatz}/care/positions"),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","art":"notunterkunft","kapazitaet_personen":150}}"#
@@ -65,7 +65,7 @@ async fn stellen_der_uebersicht(app: &axum::Router, cookie: &str, einsatz: i64) 
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/betreuung"),
+        &format!("/api/einsaetze/{einsatz}/care"),
         cookie,
         None,
     )
@@ -78,7 +78,7 @@ async fn stelle_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, sid: 
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}/stornieren"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -176,7 +176,7 @@ async fn geschlossene_stelle_ist_zulaessig() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/betreuung/stellen/{sid}"),
+        &format!("/api/einsaetze/{e}/care/positions/{sid}"),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )

@@ -662,7 +662,7 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     feld: 'Typ',
     seite: async (page: Page) => {
       const einsatzId = await einsatzPerApi(page);
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
         data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
       });
       expect(
@@ -679,7 +679,7 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     feld: 'Rufname',
     seite: async (page: Page) => {
       const einsatzId = await einsatzPerApi(page);
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/tiere`, {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/animals`, {
         data: { spezies: 'hund', rufname: 'Rex' },
       });
       expect(
@@ -1558,8 +1558,8 @@ test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabb
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const basis = `/api/einsaetze/${einsatzId}/verpflegung`;
-  const zfAntwort = await page.request.post(`${basis}/zeitfenster`, {
+  const basis = `/api/einsaetze/${einsatzId}/catering`;
+  const zfAntwort = await page.request.post(`${basis}/time-slots`, {
     data: {
       bezeichnung: 'Mittag Fokus',
       von_at: zeit(-60),
@@ -1573,7 +1573,7 @@ test('Ausgabeansicht (LLH-1032): kein „Zurücknehmen“ verschwindet beim Tabb
   const { id: zfId } = (await zfAntwort.json()) as { id: number };
   const ANZAHL = 10;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const a = await page.request.post(`${basis}/zeitfenster/${zfId}/ausgaben`, {
+    const a = await page.request.post(`${basis}/time-slots/${zfId}/distributions`, {
       data: { menge: n, zeitpunkt_at: zeit(-55 + n) },
     });
     expect(a.ok(), await a.text()).toBeTruthy();
@@ -1644,7 +1644,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 16;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/staff/info-line`, {
       data: {
         anliegen: 'hinweis',
         notiz: `Probe ${n}: Wasser im Keller`,
@@ -1713,7 +1713,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
+/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zones` nicht). */
 async function matrixEinsatz(page: Page): Promise<number> {
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `Fokus 373 Sued ${Date.now()}` },
@@ -1722,7 +1722,7 @@ async function matrixEinsatz(page: Page): Promise<number> {
   const { id } = (await antwort.json()) as { id: number };
   for (const [i, label] of ['Sektor Sued 1', 'Sektor Sued 2'].entries()) {
     const x = 10 + i / 20;
-    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${id}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',
@@ -1882,7 +1882,7 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
       data: { bezeichnung },
     });
     expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -1958,7 +1958,7 @@ test('Personenkarte (LFH-373): kein Fokusziel liegt unter den Kartenaufbauten', 
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   for (const [i, name] of ['Einzeln West', 'Fern West'].entries()) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name, antreff_lat: 53 + i * 0.3, antreff_lon: 8.8 + i * 0.5 },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2045,7 +2045,7 @@ test('Personenliste (LFH-373): kein Fokusziel verschwindet hinter der stehenden 
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 14;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name: `Person ${String(n).padStart(2, '0')}` },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2233,7 +2233,7 @@ test('Erste Zeile (LLH-1358): Personenliste — rückwärts steht kein Ziel unte
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   const ANZAHL = 14;
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
       data: { name: `Person ${String(n).padStart(2, '0')}` },
     });
     expect(person.ok(), await person.text()).toBeTruthy();
@@ -2400,31 +2400,28 @@ for (const viewport of [
         const { id: einsatzId } = (await einsatz.json()) as { id: number };
         // Zwei Stände: erst dann trägt die Zeitachse ihre volle Bedienung (Leiste, Stand-Knöpfe).
         for (const bezeichnung of ['Stand A', 'Stand B']) {
-          const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+          const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
             data: { bezeichnung },
           });
           expect(stand.ok(), await stand.text()).toBeTruthy();
         }
-        const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+        const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
           data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
         });
         expect(schaden.ok(), await schaden.text()).toBeTruthy();
         const { id: schadenId } = (await schaden.json()) as { id: number };
-        const bild = await page.request.post(
-          `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`,
-          {
-            multipart: {
-              datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
-              ecken: JSON.stringify([
-                [8.796, 53.08],
-                [8.804, 53.08],
-                [8.804, 53.075],
-                [8.796, 53.075],
-              ]),
-              name: MODUS_BILD,
-            },
+        const bild = await page.request.post(`/api/einsaetze/${einsatzId}/map/background-images`, {
+          multipart: {
+            datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
+            ecken: JSON.stringify([
+              [8.796, 53.08],
+              [8.804, 53.08],
+              [8.804, 53.075],
+              [8.796, 53.075],
+            ]),
+            name: MODUS_BILD,
           },
-        );
+        });
         expect(bild.ok(), await bild.text()).toBeTruthy();
 
         // Dichte ZUERST: `stelleDichte` lädt neu, und `?platzieren=` ist ein Auftrag, den die Karte
@@ -2605,7 +2602,7 @@ const UNTERKUNFT_STELLE = 'Sporthalle Fokusweg';
 
 async function unterkunftSeite(page: Page, dichte: string) {
   const einsatzId = await einsatzAnlegenPerApi(page, `Fokus Unterkunft ${Date.now()}`);
-  const stelle = await page.request.post(`/api/einsaetze/${einsatzId}/betreuung/stellen`, {
+  const stelle = await page.request.post(`/api/einsaetze/${einsatzId}/care/positions`, {
     data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
   });
   expect(stelle.ok(), await stelle.text()).toBeTruthy();

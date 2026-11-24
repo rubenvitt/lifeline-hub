@@ -102,7 +102,7 @@ async function einsatzAnlegen(page: Page): Promise<string> {
   const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: einsatzName() } });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   const id = String(((await r.json()) as { id: number }).id);
-  const p = await page.request.put(`/api/einsaetze/${id}/pegel`, {
+  const p = await page.request.put(`/api/einsaetze/${id}/gauges`, {
     data: { stationen: [{ station_uuid: STATION, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }] },
   });
   expect(p.ok(), `Pegel festlegen: ${p.status()} ${await p.text()}`).toBeTruthy();
@@ -110,7 +110,7 @@ async function einsatzAnlegen(page: Page): Promise<string> {
 }
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ im Überblick (`abschnittZeilen`). */
-const UEBERBLICK_GLIEDERUNG = ['abschnitte', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+const UEBERBLICK_GLIEDERUNG = ['sectors', 'einheiten', 'personal', 'fahrzeuge', 'material'];
 
 type Folge = 'Einsatz zuerst' | 'Einsatz zuletzt' | 'natürlich';
 const FOLGEN: Folge[] = ['Einsatz zuerst', 'Einsatz zuletzt', 'natürlich'];
@@ -150,7 +150,7 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
       gehalten += 1;
       await tor;
     }
-    if (pfad === `${kopf}/pegel`) return route.fulfill({ json: PEGEL });
+    if (pfad === `${kopf}/gauges`) return route.fulfill({ json: PEGEL });
     return route.continue();
   });
   return {

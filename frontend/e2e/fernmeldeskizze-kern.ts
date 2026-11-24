@@ -141,9 +141,9 @@ export async function seedeGrund(
   { zug = true } = {},
 ): Promise<Grundnetz> {
   const a = api(page, einsatzId);
-  const bnBos = (await a.post('sprechgruppen', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
-  const f314 = (await a.post('sprechgruppen', { bezeichnung: '314_F*', betriebsart: 'DMO' })).id;
-  await a.patch('fuehrungsstelle', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
+  const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
+  const f314 = (await a.post('talk-groups', { bezeichnung: '314_F*', betriebsart: 'DMO' })).id;
+  await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea: number[] = [];
   for (const [i, name] of [
     'Einsatzabschnitt Nord',
@@ -152,7 +152,7 @@ export async function seedeGrund(
   ].entries()) {
     ea.push(
       (
-        await a.post('abschnitte', {
+        await a.post('sectors', {
           name,
           kurzbezeichnung: `EA ${i + 1}`,
           sprechgruppe_ids: i === 1 ? [bnBos, f314] : [bnBos],

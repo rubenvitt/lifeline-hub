@@ -299,7 +299,7 @@ pub struct EtbEintragAnzeige {
     #[sqlx(skip)]
     pub folgeauftraege: Vec<FolgeauftragVerweis>,
     /// Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach
-    /// `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`.
+    /// `id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/attachments/{aid}`.
     // Nicht Teil des SELECT: `repo::laden`/`repo::abfrage` füllen die Liste je Seite mit einer
     // gebündelten Abfrage nach, wie `folgeauftraege`.
     #[sqlx(skip)]

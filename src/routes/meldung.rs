@@ -55,7 +55,7 @@ fn status_und_richtung(status: Option<&str>, richtung: Option<&str>) -> Result<(
     Ok(())
 }
 
-/// GET /api/einsaetze/{id}/meldungen — Posteingang listen (Lesezugriff, auch Beobachter).
+/// GET /api/einsaetze/{id}/reports — Posteingang listen (Lesezugriff, auch Beobachter).
 /// Mit `phase=abgeschlossen` seitenweise (LFH-940, Spec `meldungen-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
@@ -101,7 +101,7 @@ pub struct KennzahlenParams {
     pub richtung: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/meldungen/kennzahlen — Zahlen der Meldungsseite (LFH-940, D3).
+/// GET /api/einsaetze/{id}/reports/metrics — Zahlen der Meldungsseite (LFH-940, D3).
 pub async fn kennzahlen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Meldungen>,
@@ -119,7 +119,7 @@ pub async fn kennzahlen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/meldungen/{mid} — eine Meldung des Einsatzes (LFH-940, Deeplink auf
+/// GET /api/einsaetze/{id}/reports/{mid} — eine Meldung des Einsatzes (LFH-940, Deeplink auf
 /// eine nicht geladene Seite). Einsatzfremd → 404.
 pub async fn detail(
     State(state): State<AppState>,
@@ -248,7 +248,7 @@ pub(crate) async fn empfaenger_funktion_pruefen(
     Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
 }
 
-/// POST /api/einsaetze/{id}/meldungen — Meldung erfassen (Erfassungsrecht + aktiv; die Mitarbeit
+/// POST /api/einsaetze/{id}/reports — Meldung erfassen (Erfassungsrecht + aktiv; die Mitarbeit
 /// meldet keine Lagemeldung, LLH-1817).
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -459,7 +459,7 @@ pub struct StatusReq {
     pub status: String,
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/status — NUR den Triage-Status setzen.
+/// POST /api/einsaetze/{id}/reports/{mid}/status — NUR den Triage-Status setzen.
 /// Die Bearbeiter-Zuweisung läuft über `zuweisen` (getrennte Achse).
 pub async fn status(
     State(state): State<AppState>,
@@ -480,7 +480,7 @@ pub async fn status(
     Ok(Json(m))
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/bestaetigen — Sofortmeldung aktiv bestätigen
+/// POST /api/einsaetze/{id}/reports/{mid}/confirm — Sofortmeldung aktiv bestätigen
 /// (LFH-97). Setzt die Quittungs-Achse (Zeitstempel + Person) und schließt die Nachfass-
 /// Erinnerung; der Triage-Status bleibt unberührt. Doppel-Bestätigung → 422.
 pub async fn bestaetigen(
@@ -518,7 +518,7 @@ pub struct ZuweisenReq {
     pub bearbeiter_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/zuweisen — Bearbeiter zuweisen/freigeben (LFH-94).
+/// POST /api/einsaetze/{id}/reports/{mid}/assign — Bearbeiter zuweisen/freigeben (LFH-94).
 pub async fn zuweisen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
@@ -550,7 +550,7 @@ pub struct LagerelevantReq {
     pub lon: Option<f64>,
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/lagerelevant — in die Lage übernehmen (LFH-95). Für
+/// POST /api/einsaetze/{id}/reports/{mid}/situation-relevant — in die Lage übernehmen (LFH-95). Für
 /// eine Lagemeldung, die schon ab Anlage in der Lage steht (LLH-1031), ändert sie nur Lage-Text
 /// und eine noch fehlende Verortung.
 pub async fn lagerelevant(
@@ -600,7 +600,7 @@ pub async fn lagerelevant(
     Ok(Json(m))
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/auftrag — aus einer eingegangenen Meldung direkt
+/// POST /api/einsaetze/{id}/reports/{mid}/task — aus einer eingegangenen Meldung direkt
 /// einen Auftrag/Befehl erteilen (Meldung→Auftrag, LFH-113). Erzeugt einen formalen Auftrag
 /// (inkl. ETB-Anordnung, Pattern B) und setzt den Rückbezug `meldung.auftrag_id` first-write-wins.
 /// Auftragsfelder durchlaufen dieselbe Validierung wie POST /auftraege (geteilt, kein zweiter Pfad).
@@ -653,7 +653,7 @@ pub async fn auftrag_erteilen(
     Ok((StatusCode::CREATED, Json(m)))
 }
 
-/// GET /api/einsaetze/{id}/meldungen/rueckmeldungen — letzte Rückmeldung je Einheit und je
+/// GET /api/einsaetze/{id}/reports/check-ins — letzte Rückmeldung je Einheit und je
 /// direkt gebundenem Abschnitt samt Fälligkeit (LFH-610). Lesezugriff Meldungen: die
 /// Antwort trägt den Wortlaut der Meldung, sie ist also genauso vertraulich wie die Liste.
 pub async fn rueckmeldungen(
@@ -678,7 +678,7 @@ pub async fn rueckmeldungen(
     }))
 }
 
-/// GET /api/einsaetze/{id}/lage/meldungen — die Lagemeldungen: alle lagerelevanten Meldungen
+/// GET /api/einsaetze/{id}/situation/reports — die Lagemeldungen: alle lagerelevanten Meldungen
 /// (LFH-95, LLH-1031, Spec `meldungseingang`).
 pub async fn lage_liste(
     State(state): State<AppState>,
@@ -689,7 +689,7 @@ pub async fn lage_liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/meldungen/{mid}/lage-gesehen — eine Lagemeldung als gesehen
+/// POST /api/einsaetze/{id}/reports/{mid}/situation-seen — eine Lagemeldung als gesehen
 /// kennzeichnen (LLH-1206, Spec `lagemeldung-kenntnisnahme`). `{mid}` ist die Kennung der Meldung
 /// (LLH-1031: der frühere Pfad mit der Kennung des Lageobjekts entfällt, ein altes Bundle träfe
 /// sonst eine fremde Meldung). Für alle gleich; die erste Kenntnisnahme gewinnt, eine zweite
@@ -729,13 +729,13 @@ pub struct LageGesehenReq {
     pub meldung_ids: Vec<i64>,
 }
 
-/// Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.
+/// Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LageGesehenAnzeige {
     pub gesehen: u64,
 }
 
-/// POST /api/einsaetze/{id}/lage/gesehen — die angezeigten neuen Lagemeldungen als gesehen
+/// POST /api/einsaetze/{id}/situation/seen — die angezeigten neuen Lagemeldungen als gesehen
 /// kennzeichnen (LLH-1206, LLH-1031). Kennungen, die keine lagerelevante Meldung des Einsatzes
 /// sind, bleiben unberührt.
 pub async fn lage_angezeigte_gesehen(

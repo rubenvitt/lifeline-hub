@@ -44,7 +44,7 @@ beforeEach(() => {
   etbFenster = [eintrag(9, 12, 'Lage erkundet')];
   etbBestand = [...etbFenster, eintrag(5, 3, 'Deichbruch gemeldet'), eintrag(7, 412, 'Pumpe 2')];
   server.use(
-    http.get('/api/einsaetze/1/abschnitte', () =>
+    http.get('/api/einsaetze/1/sectors', () =>
       HttpResponse.json([
         { id: 3, einsatz_id: 1, name: 'EA Nord' },
         { id: 5, einsatz_id: 1, name: 'EA Süd' },

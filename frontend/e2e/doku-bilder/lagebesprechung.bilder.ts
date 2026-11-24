@@ -30,11 +30,11 @@ test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
     const { id } = await demoEinsatz(api);
-    const stand = (await (await api.get(`/api/einsaetze/${id}/lagebesprechung`)).json()) as {
+    const stand = (await (await api.get(`/api/einsaetze/${id}/briefing`)).json()) as {
       anzahl_lagebesprechungen: number;
     };
     if (stand.anzahl_lagebesprechungen === 0) {
-      await fuelle(api, 'post', `/api/einsaetze/${id}/lagebesprechungen`, {
+      await fuelle(api, 'post', `/api/einsaetze/${id}/briefings`, {
         entschluss: 'Evakuierung Ortsteil Nord fortführen, UHS Turnhalle verstärken',
         abgehalten_at: new Date(Date.now() - 30 * 60_000).toISOString(),
         naechste_at: new Date(Date.now() + 60 * 60_000).toISOString(),
@@ -42,7 +42,7 @@ test.describe(KAPITEL, () => {
     }
     // Auf die Minute, damit das Bild „in 25 min“ zeigt und keinen Sekundenrest.
     const termin = new Date(Math.ceil(Date.now() / 60_000) * 60_000 + 25 * 60_000);
-    await fuelle(api, 'put', `/api/einsaetze/${id}/lagebesprechung/termin`, {
+    await fuelle(api, 'put', `/api/einsaetze/${id}/briefing/schedule`, {
       naechste_at: termin.toISOString(),
     });
     await api.dispose();

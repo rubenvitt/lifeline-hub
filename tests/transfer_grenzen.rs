@@ -84,7 +84,7 @@ async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 
     let (s, v) = common::anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/damages"),
         cookie,
         Some(r#"{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1"}"#),
     )
@@ -114,10 +114,10 @@ async fn eine_upload_grenze_ueber_alle_upload_routen() {
     let schaden = schaden_anlegen(&app, &admin, einsatz).await;
 
     let belegend = [
-        format!("/api/einsaetze/{einsatz}/anhaenge"),
-        format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
-        format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge"),
-        format!("/api/einsaetze/{einsatz}/karte/hintergrundbilder"),
+        format!("/api/einsaetze/{einsatz}/attachments"),
+        format!("/api/einsaetze/{einsatz}/etb/attachments"),
+        format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments"),
+        format!("/api/einsaetze/{einsatz}/map/background-images"),
     ];
     let (liest_tx, mut liest) = tokio::sync::mpsc::unbounded_channel();
     let mut halten = Vec::new();
@@ -144,7 +144,7 @@ async fn eine_upload_grenze_ueber_alle_upload_routen() {
         );
     }
 
-    let dokumente = format!("/api/einsaetze/{einsatz}/dokumente");
+    let dokumente = format!("/api/einsaetze/{einsatz}/documents");
     let dokument_hochladen = || {
         app.clone().oneshot(post(
             &dokumente,
@@ -208,7 +208,7 @@ async fn gedrosselter_etb_upload_ueberlebt_das_budget() {
     let antwort = app
         .clone()
         .oneshot(post(
-            &format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
+            &format!("/api/einsaetze/{einsatz}/etb/attachments"),
             &admin,
             gedrosselt(multipart("foto.jpg", MINI_JPEG), STUECKE, PAUSE),
         ))
@@ -225,7 +225,7 @@ async fn gedrosselter_schaden_upload_ueberlebt_das_budget() {
     let antwort = app
         .clone()
         .oneshot(post(
-            &format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge"),
+            &format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments"),
             &admin,
             gedrosselt(multipart("foto.jpg", MINI_JPEG), STUECKE, PAUSE),
         ))

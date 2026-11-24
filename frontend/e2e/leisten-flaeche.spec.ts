@@ -379,7 +379,7 @@ test('Informationstelefon (LFH-1067): auf 390 × 844 stehen beim Öffnen zwei An
     'sonstiges',
   ];
   for (let n = 1; n <= 10; n += 1) {
-    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/stab/infotelefon`, {
+    const anruf = await page.request.post(`/api/einsaetze/${einsatzId}/staff/info-line`, {
       data: {
         anliegen: anliegen[n % anliegen.length],
         notiz: `Probe ${n}: Wasser im Keller`,
@@ -486,7 +486,7 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Flaeche 373 Ost ${Date.now()}`);
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
       data: { bezeichnung },
     });
     expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -650,7 +650,7 @@ test('Lagekarte (LLH-1936): ohne Stände ist die Zeitachse nur der Knopf „Stan
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Einsatz mit zwei Gefahrengebieten per API (`POST …/zonen`, ohne WebGL). */
+/** Einsatz mit zwei Gefahrengebieten per API (`POST …/zones`, ohne WebGL). */
 async function matrixEinsatz(
   page: Page,
   bezeichnung: string,
@@ -658,7 +658,7 @@ async function matrixEinsatz(
   const id = await einsatzAnlegen(page, bezeichnung);
   for (const [i, label] of ['Sektor Sprung 1', 'Sektor Sprung 2'].entries()) {
     const x = 10 + i / 20;
-    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${id}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',
@@ -679,9 +679,7 @@ async function matrixEinsatz(
     });
     expect(zone.ok(), await zone.text()).toBeTruthy();
   }
-  const gebiete = (await (
-    await page.request.get(`/api/einsaetze/${id}/gefahrengebiete`)
-  ).json()) as {
+  const gebiete = (await (await page.request.get(`/api/einsaetze/${id}/hazard-areas`)).json()) as {
     id: number;
     label: string;
   }[];
@@ -722,7 +720,7 @@ test('Laden ohne Sprung (LFH-373): ETB, Lagekarte und Gefahrenmatrix auf dem Han
     {
       name: 'ETB',
       pfad: `/einsaetze/${matrixId}/etb`,
-      verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/zaehler)/,
+      verzoegern: /\/api\/einsaetze\/\d+\/etb(\?|$|\/counters)/,
       anker: async () =>
         // 8 gesäte Meldungen; die 2 Systemeinträge der beiden angelegten Gefahrengebiete sind in
         // der Vorgabe ausgeblendet (kwc2yszv D6).
@@ -803,7 +801,7 @@ test('Fremdänderung (LFH-373): eine live eintreffende Bewertung verschiebt die 
 
     const stufe = flaeche.width < 768 ? 'akut' : 'hoch';
     const antwort = await page.request.put(
-      `/api/einsaetze/${id}/gefahrengebiete/${gid}/matrix/bewertung`,
+      `/api/einsaetze/${id}/hazard-areas/${gid}/matrix/rating`,
       { data: { gefahrentyp: 'atemgifte', schutzobjekt: 'menschen', warnstufe: stufe } },
     );
     expect(antwort.ok(), await antwort.text()).toBeTruthy();
@@ -845,7 +843,7 @@ test('Lagekarte (LFH-373): die Zeitachse belegt höchstens die halbe Karte und l
   const einsatzId = await einsatzAnlegen(page, `Flaeche 435 Ost ${Date.now()}`);
   // Gesät als Admin; der Beobachter darf keine Stände sichern.
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
       data: { bezeichnung },
     });
     expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -1036,7 +1034,7 @@ test('Gefahrenmatrix (LFH-373): Hinweis über der Matrix — Laden ohne Sprung, 
       await setzeShiftsZurueck(page);
 
       const antwort = await schreiber.request.put(
-        `/api/einsaetze/${id}/gefahrengebiete/${gid}/matrix/bewertung`,
+        `/api/einsaetze/${id}/hazard-areas/${gid}/matrix/rating`,
         { data: { gefahrentyp: 'atemgifte', schutzobjekt: 'menschen', warnstufe: stufe } },
       );
       expect(antwort.ok(), await antwort.text()).toBeTruthy();
@@ -1081,18 +1079,18 @@ test('Lagekarte (LLH-1057): auf 390 px stehen Fokus-Band, Messband und Zeitachse
   test.setTimeout(300_000);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `Flaeche 1057 Fokus ${Date.now()}`);
-  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
     data: { bezeichnung: 'Stand A' },
   });
   expect(stand.ok(), await stand.text()).toBeTruthy();
   // Langer Name: das Band bricht ihn um, statt über den Rand zu laufen.
-  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
     data: { name: 'EA 3 Deichverteidigung Unterstadt Hafenkante Süd' },
   });
   expect(abschnitt.ok(), await abschnitt.text()).toBeTruthy();
   const abschnittId = ((await abschnitt.json()) as { id: number }).id;
   const flaeche = await page.request.patch(
-    `/api/einsaetze/${einsatzId}/abschnitte/${abschnittId}/flaeche`,
+    `/api/einsaetze/${einsatzId}/sectors/${abschnittId}/area`,
     { data: { flaeche_geojson: rechteckText(8.6, 50.1, 8.62, 50.11) } },
   );
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();

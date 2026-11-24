@@ -292,7 +292,7 @@ pub struct WetterAktuellTeil {
     pub daten: Option<WetterAktuell>,
 }
 
-/// Antwort von `GET /api/einsaetze/{id}/wetter`.
+/// Antwort von `GET /api/einsaetze/{id}/weather`.
 #[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 pub struct WetterAnzeige {
     /// Warnzelle des Einsatzorts. Fehlt ohne Einsatzort und solange kein Warnstand vorliegt.

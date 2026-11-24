@@ -57,7 +57,7 @@ function setup(antraege: unknown[]) {
     meHandler(adminFixture()),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
-    http.get('/api/einsaetze/7/etb/zaehler', () =>
+    http.get('/api/einsaetze/7/etb/counts', () =>
       HttpResponse.json({
         gesamt: 1,
         je_typ: { meldung: 1, anordnung: 0, lage: 0, entscheidung: 0, system: 0, berichtigung: 0 },
@@ -66,7 +66,7 @@ function setup(antraege: unknown[]) {
     http.get('/api/etb-snippets', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },

@@ -25,12 +25,12 @@ function setup(freigaben: ModulFreigaben) {
   const abrufe = { mitglieder: 0 };
   server.use(
     http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/sprechgruppen', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/stab/kommunikationsplan', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/stab/fernmeldeskizze', () =>
+    http.get('/api/einsaetze/7/talk-groups', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/staff/comms-plan', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/staff/comms-sketch', () =>
       HttpResponse.json({
         lage: [],
         komponenten: [],

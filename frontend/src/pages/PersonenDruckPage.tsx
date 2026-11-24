@@ -17,7 +17,7 @@ import { parsePersonenDruckAuswahl, personenPfad } from '../routing/deeplinks';
  * Druckansicht der Betroffenenliste (LFH-727, `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/`
  * design.md D1/D4).
  *
- * Die Daten kommen AUSSCHLIESSLICH über `GET …/personen/druck`: jeder Abruf schreibt serverseitig
+ * Die Daten kommen AUSSCHLIESSLICH über `GET …/persons/print`: jeder Abruf schreibt serverseitig
  * einen `druck`-Eintrag ins Zugriffsprotokoll. Deshalb kein Retry (jeder Versuch wäre ein
  * Eintrag), nicht live, beim Öffnen immer frisch statt aus dem Cache der Liste oder eines
  * früheren Besuchs, und ohne Verbindung ein Fehler statt des alten Stands (`DRUCK_ABFRAGE`). Die UHS-Namen für den Verbleib gehören zum selben Schnappschuss; fehlen sie

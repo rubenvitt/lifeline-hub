@@ -342,21 +342,21 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 
     // Je Modul die Zahl aus dem Drehbuch.
     for (pfad, n) in [
-        ("/abschnitte", 4),
+        ("/sectors", 4),
         ("/einheiten", 5),
         ("/fahrzeuge", 8),
         ("/personal", 12),
-        ("/personen", 12),
+        ("/persons", 12),
         ("/uhs", 1),
         ("/bereitstellungsraeume", 1),
-        ("/zonen", 2),
-        ("/gefahrengebiete", 2),
-        ("/meldungen", 8),
-        ("/auftraege", 5),
-        ("/befehle", 1),
-        ("/lageberichte", 1),
+        ("/zones", 2),
+        ("/hazard-areas", 2),
+        ("/reports", 8),
+        ("/tasks", 5),
+        ("/orders", 1),
+        ("/situation-reports", 1),
         // Ohne Parameter nur offene (LFH-940); das Drehbuch zählt alle.
-        ("/erinnerungen?nur_offen=false", 3),
+        ("/reminders?nur_offen=false", 3),
     ] {
         assert_eq!(liste(&app, &admin, e, pfad).await.len(), n, "{pfad}");
     }
@@ -366,7 +366,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, betreuung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/care"),
         &admin,
         None,
     )
@@ -376,7 +376,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, evakuierung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evakuierung"),
+        &format!("/api/einsaetze/{e}/evacuation"),
         &admin,
         None,
     )
@@ -385,7 +385,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     assert_eq!(evakuierung["bezirke"].as_array().unwrap().len(), 1);
 
     // Sichtung nach BBK: jede Kategorie SK I–IV mindestens einmal.
-    let personen = liste(&app, &admin, e, "/personen").await;
+    let personen = liste(&app, &admin, e, "/persons").await;
     for sk in ["sk1", "sk2", "sk3", "sk4"] {
         assert!(
             personen.iter().any(|p| p["aktuelle_sichtung"] == sk),
@@ -397,7 +397,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, rm) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen/rueckmeldungen"),
+        &format!("/api/einsaetze/{e}/reports/check-ins"),
         &admin,
         None,
     )
@@ -414,11 +414,11 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 
     // Befehl und Lagebericht freigegeben.
     assert_eq!(
-        liste(&app, &admin, e, "/befehle").await[0]["status"],
+        liste(&app, &admin, e, "/orders").await[0]["status"],
         "freigegeben"
     );
     assert_eq!(
-        liste(&app, &admin, e, "/lageberichte").await[0]["status"],
+        liste(&app, &admin, e, "/situation-reports").await[0]["status"],
         "freigegeben"
     );
 }
@@ -1296,7 +1296,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/personen"),
+        format!("/api/einsaetze/{e}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#.into(),
     )
     .await;

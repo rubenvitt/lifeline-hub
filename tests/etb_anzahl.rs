@@ -1,4 +1,4 @@
-//! `GET /api/einsaetze/{id}/etb/anzahl` (LFH-619): die Trefferzahl des ETB-Filters, für den
+//! `GET /api/einsaetze/{id}/etb/count` (LFH-619): die Trefferzahl des ETB-Filters, für den
 //! Sammeltreffer der Sprungpalette („ETB · Einträge zu „Deich“ — 31 Treffer“).
 //!
 //! Die Zahl MUSS denselben Filter zählen wie die Liste — ein eigener WHERE-Zweig für die
@@ -86,7 +86,7 @@ async fn zaehlt_volltexttreffer_wie_die_liste() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?q=Deich"),
+        &format!("/api/einsaetze/{e}/etb/count?q=Deich"),
         None,
     )
     .await;
@@ -117,7 +117,7 @@ async fn zaehlt_ohne_limit() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?q=Deich&limit=1"),
+        &format!("/api/einsaetze/{e}/etb/count?q=Deich&limit=1"),
         None,
     )
     .await;
@@ -134,7 +134,7 @@ async fn filter_werden_verknuepft() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?q=Deich&typ=anordnung"),
+        &format!("/api/einsaetze/{e}/etb/count?q=Deich&typ=anordnung"),
         None,
     )
     .await;
@@ -143,7 +143,7 @@ async fn filter_werden_verknuepft() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl"),
+        &format!("/api/einsaetze/{e}/etb/count"),
         None,
     )
     .await;
@@ -160,7 +160,7 @@ async fn kein_treffer_ist_null_nicht_404() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?q=Pegel"),
+        &format!("/api/einsaetze/{e}/etb/count?q=Pegel"),
         None,
     )
     .await;
@@ -178,7 +178,7 @@ async fn ungueltiger_typ_ist_400() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?typ=unsinn"),
+        &format!("/api/einsaetze/{e}/etb/count?typ=unsinn"),
         None,
     )
     .await;
@@ -197,7 +197,7 @@ async fn nur_fuer_mitglieder() {
         &app,
         &fremd,
         "GET",
-        &format!("/api/einsaetze/{e}/etb/anzahl?q=Deich"),
+        &format!("/api/einsaetze/{e}/etb/count?q=Deich"),
         None,
     )
     .await;
@@ -215,7 +215,7 @@ async fn zaehlt_nur_den_eigenen_einsatz() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e2}/etb/anzahl?q=Deich"),
+        &format!("/api/einsaetze/{e2}/etb/count?q=Deich"),
         None,
     )
     .await;
@@ -224,7 +224,7 @@ async fn zaehlt_nur_den_eigenen_einsatz() {
         &app,
         &admin,
         "GET",
-        &format!("/api/einsaetze/{e1}/etb/anzahl?q=Deich"),
+        &format!("/api/einsaetze/{e1}/etb/count?q=Deich"),
         None,
     )
     .await;

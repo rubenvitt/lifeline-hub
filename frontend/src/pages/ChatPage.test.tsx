@@ -55,7 +55,7 @@ function setup(ungelesen = 0, onGelesen?: () => void, mitglieder: unknown[] = []
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/chat/kanaele', () =>
+    http.get('/api/einsaetze/7/chat/channels', () =>
       HttpResponse.json([
         {
           ...kanal,
@@ -63,13 +63,13 @@ function setup(ungelesen = 0, onGelesen?: () => void, mitglieder: unknown[] = []
         },
       ]),
     ),
-    http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+    http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
     http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
-    http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
+    http.post('/api/einsaetze/7/chat/channels/1/read', () => {
       onGelesen?.();
       return new HttpResponse(null, { status: 204 });
     }),
-    http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
+    http.post('/api/einsaetze/7/chat/channels/1/messages', async ({ request }) => {
       const body = (await request.json()) as { inhalt: string };
       const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: body.inhalt };
       nachrichten.push(neu);
@@ -113,7 +113,7 @@ describe('ChatPage', () => {
       },
     ]);
     server.use(
-      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
+      http.post('/api/einsaetze/7/chat/channels/1/messages', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(
           { ...nachricht, id: 6, inhalt: '@Bert Brandt hallo' },
@@ -143,15 +143,15 @@ describe('ChatPage', () => {
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/chat/kanaele', () =>
+      http.get('/api/einsaetze/7/chat/channels', () =>
         HttpResponse.json([kanal, { ...kanal, id: 2, name: 'Versorgung' }]),
       ),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
-      http.get('/api/einsaetze/7/chat/kanaele/2/nachrichten', () =>
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json([nachricht])),
+      http.get('/api/einsaetze/7/chat/channels/2/messages', () =>
         HttpResponse.json([{ ...nachricht, id: 9, kanal_id: 2, inhalt: '@S4 bitte klären' }]),
       ),
       http.post(
-        '/api/einsaetze/7/chat/kanaele/:kid/gelesen',
+        '/api/einsaetze/7/chat/channels/:kid/read',
         () => new HttpResponse(null, { status: 204 }),
       ),
     );
@@ -168,7 +168,7 @@ describe('ChatPage', () => {
   it('behält die Nachricht im Feld, wenn der Server das Senden ablehnt (LFH-795)', async () => {
     setup();
     server.use(
-      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', () =>
+      http.post('/api/einsaetze/7/chat/channels/1/messages', () =>
         HttpResponse.json({ error: 'Zu groß' }, { status: 413 }),
       ),
     );
@@ -186,7 +186,7 @@ describe('ChatPage', () => {
     expect(alarm).toHaveTextContent('Zu groß');
     expect(document.querySelector('.ant-message')).toBeNull();
     server.use(
-      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => new Promise(() => undefined)),
+      http.post('/api/einsaetze/7/chat/channels/1/messages', () => new Promise(() => undefined)),
     );
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
@@ -197,7 +197,7 @@ describe('ChatPage', () => {
     let versucht = 0;
     setup();
     server.use(
-      http.post('/api/einsaetze/7/chat/kanaele', () => {
+      http.post('/api/einsaetze/7/chat/channels', () => {
         versucht += 1;
         return HttpResponse.json({ error: 'Name vergeben' }, { status: 409 });
       }),
@@ -260,8 +260,8 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', ({ request }) => {
         const beforeId = new URL(request.url).searchParams.get('before_id');
         if (beforeId) {
           zweiteSeiteAngefragtMit = beforeId;
@@ -303,15 +303,15 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () =>
+      http.get('/api/einsaetze/7/chat/channels', () =>
         HttpResponse.json([{ ...kanal, ungelesen_anzahl: 1 }]),
       ),
       http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/7/chat/kanaele/1/gelesen', () => {
+      http.post('/api/einsaetze/7/chat/channels/1/read', () => {
         markiert += 1;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', ({ request }) => {
+      http.get('/api/einsaetze/7/chat/channels/1/messages', ({ request }) => {
         const q = new URL(request.url).searchParams;
         anfragen.push(q.toString());
         const vor = q.get('before_id');
@@ -386,8 +386,8 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json([nachricht])),
       spy('schaeden/auswahl'),
       spy('uhs'),
       spy('personen/auswahl'),
@@ -412,17 +412,17 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.get('/api/einsaetze/7/schaeden/auswahl', () =>
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
+      http.get('/api/einsaetze/7/damages/selection', () =>
         HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }]),
       ),
       http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/personen/auswahl', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/lageberichte', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([])),
-      http.put('/api/einsaetze/7/chat/nachrichten/5/bezug', async ({ request }) => {
+      http.get('/api/einsaetze/7/persons/selection', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/situation-reports', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),
+      http.put('/api/einsaetze/7/chat/messages/5/reference', async ({ request }) => {
         gesetzt = (await request.json()) as { typ: string; ziel_id: number };
         nachrichten[0] = { ...nachricht, bezug_typ: 'schaden', bezug_id: gesetzt.ziel_id };
         return HttpResponse.json(nachrichten[0]);
@@ -457,9 +457,9 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.patch('/api/einsaetze/7/chat/nachrichten/5', async ({ request }) => {
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
+      http.patch('/api/einsaetze/7/chat/messages/5', async ({ request }) => {
         bearbeitet = (await request.json()) as { inhalt: string };
         nachrichten[0] = {
           ...nachricht,
@@ -516,9 +516,9 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([mitFoto])),
-      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-etb', async ({ request }) => {
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json([mitFoto])),
+      http.post('/api/einsaetze/7/chat/messages/5/promote-to-etb', async ({ request }) => {
         gesendet = await request.json();
         return HttpResponse.json({ ...mitFoto, etb_eintrag_id: 40 });
       }),
@@ -591,8 +591,8 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, status: 'abgeschlossen' }),
       ),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
       <Routes>
@@ -614,8 +614,8 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
       ),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json([nachricht])),
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json([nachricht])),
     );
     renderMitProviders(
       <Routes>
@@ -639,9 +639,9 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
-      http.post('/api/einsaetze/7/chat/kanaele/1/nachrichten', async ({ request }) => {
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
+      http.post('/api/einsaetze/7/chat/channels/1/messages', async ({ request }) => {
         gesendet = (await request.json()) as { inhalt: string; anhang_ids: number[] };
         const neu: ChatNachricht = { ...nachricht, id: 6, inhalt: gesendet.inhalt };
         nachrichten.push(neu);
@@ -673,7 +673,7 @@ describe('ChatPage', () => {
       const { anfragen, gesendet } = anhangSetup();
       await sendeMitAnhang();
       await waitFor(() => expect(anfragen).toHaveLength(1));
-      expect(anfragen[0].url).toBe('/api/einsaetze/7/anhaenge');
+      expect(anfragen[0].url).toBe('/api/einsaetze/7/attachments');
       expect(anfragen[0].timeout).toBe(120_000);
       act(() =>
         anfragen[0].antworten(201, [
@@ -762,16 +762,16 @@ describe('ChatPage', () => {
         const zielId = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatz, id: zielId, bezeichnung: `Einsatz ${zielId}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/chat/kanaele', ({ params }) =>
+      http.get('/api/einsaetze/:einsatzId/chat/channels', ({ params }) =>
         HttpResponse.json(params.einsatzId === '8' ? [kanalB] : kanaeleA),
       ),
-      http.get('/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten', ({ params }) => {
+      http.get('/api/einsaetze/:einsatzId/chat/channels/:kanalId/messages', ({ params }) => {
         const ziel = `${params.einsatzId}/${params.kanalId}`;
         nachrichtenRequests.push(ziel);
         return HttpResponse.json(nachrichtenNachKanal.get(ziel) ?? []);
       }),
       http.post(
-        '/api/einsaetze/:einsatzId/chat/kanaele/:kanalId/nachrichten',
+        '/api/einsaetze/:einsatzId/chat/channels/:kanalId/messages',
         async ({ params, request }) => {
           const ziel = `${params.einsatzId}/${params.kanalId}`;
           gesendetAn.push(ziel);
@@ -825,8 +825,8 @@ describe('ChatPage — Mitarbeit (LLH-1817)', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: 'mitarbeit' }),
       ),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json([kanal])),
-      http.get('/api/einsaetze/7/chat/kanaele/1/nachrichten', () => HttpResponse.json(nachrichten)),
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json([kanal])),
+      http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
     );
     renderMitProviders(
       <Routes>
@@ -871,11 +871,11 @@ describe('ChatPage — Kanal anlegen unter md (LFH-976)', () => {
       http.get('/api/einsaetze/7', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: meineRolle }),
       ),
-      http.get('/api/einsaetze/7/chat/kanaele', () => HttpResponse.json(kanaele)),
-      http.get('/api/einsaetze/7/chat/kanaele/:kanalId/nachrichten', ({ params }) =>
+      http.get('/api/einsaetze/7/chat/channels', () => HttpResponse.json(kanaele)),
+      http.get('/api/einsaetze/7/chat/channels/:kanalId/messages', ({ params }) =>
         HttpResponse.json(params.kanalId === '1' ? [nachricht] : []),
       ),
-      http.post('/api/einsaetze/7/chat/kanaele', async ({ request }) => {
+      http.post('/api/einsaetze/7/chat/channels', async ({ request }) => {
         const body = (await request.json()) as { name: string; beschreibung?: string };
         angelegt.push(body);
         const neu: ChatKanal = {
@@ -961,10 +961,10 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
       http.get('/api/einsaetze/:id', ({ params }) =>
         HttpResponse.json({ ...einsatz, id: Number(params.id) }),
       ),
-      http.get('/api/einsaetze/:id/chat/kanaele', ({ params }) =>
+      http.get('/api/einsaetze/:id/chat/channels', ({ params }) =>
         HttpResponse.json([{ ...kanal, einsatz_id: Number(params.id) }]),
       ),
-      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) =>
+      http.get('/api/einsaetze/:id/chat/channels/1/messages', ({ params }) =>
         HttpResponse.json(params.id === '7' ? nachrichten : []),
       ),
       ...[
@@ -1013,7 +1013,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
   it('Bearbeiten: der Grund steht im Dialog, der Text bleibt, kein Toast', async () => {
     setupFehler();
     server.use(
-      http.patch('/api/einsaetze/7/chat/nachrichten/5', () =>
+      http.patch('/api/einsaetze/7/chat/messages/5', () =>
         HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 }),
       ),
     );
@@ -1034,7 +1034,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     let aufrufe = 0;
     setupFehler();
     server.use(
-      http.patch('/api/einsaetze/7/chat/nachrichten/5', () => {
+      http.patch('/api/einsaetze/7/chat/messages/5', () => {
         aufrufe += 1;
         return aufrufe === 2
           ? gehalten()
@@ -1054,7 +1054,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
   it('Bearbeiten: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     setupFehler();
     server.use(
-      http.patch('/api/einsaetze/7/chat/nachrichten/5', () =>
+      http.patch('/api/einsaetze/7/chat/messages/5', () =>
         HttpResponse.json({ error: 'Zu spät zum Bearbeiten' }, { status: 409 }),
       ),
     );
@@ -1072,7 +1072,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     setupFehler();
     server.use(
       http.delete(
-        '/api/einsaetze/7/chat/nachrichten/5',
+        '/api/einsaetze/7/chat/messages/5',
         () =>
           new Promise<Response>((r) => {
             lehneAb = () =>
@@ -1101,7 +1101,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     let aufrufe = 0;
     setupFehler();
     server.use(
-      http.delete('/api/einsaetze/7/chat/nachrichten/5', () => {
+      http.delete('/api/einsaetze/7/chat/messages/5', () => {
         aufrufe += 1;
         return aufrufe === 2
           ? gehalten()
@@ -1125,7 +1125,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     const nachrichten = [nachricht];
     setupFehler(nachrichten);
     server.use(
-      http.delete('/api/einsaetze/7/chat/nachrichten/5', () => {
+      http.delete('/api/einsaetze/7/chat/messages/5', () => {
         nachrichten[0] = { ...nachricht, geloescht_at: '2026-06-10 11:00:00' };
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1139,7 +1139,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
   it('Kanal anlegen: der Grund steht im Dialog, kein Toast', async () => {
     setupFehler();
     server.use(
-      http.post('/api/einsaetze/7/chat/kanaele', () =>
+      http.post('/api/einsaetze/7/chat/channels', () =>
         HttpResponse.json({ error: 'Name vergeben' }, { status: 409 }),
       ),
     );
@@ -1158,7 +1158,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
   it('Zu ETB: der Grund steht im Dialog, kein Toast', async () => {
     setupFehler();
     server.use(
-      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-etb', () =>
+      http.post('/api/einsaetze/7/chat/messages/5/promote-to-etb', () =>
         HttpResponse.json({ error: 'ETB gesperrt' }, { status: 409 }),
       ),
     );
@@ -1176,7 +1176,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     let aufrufe = 0;
     setupFehler();
     server.use(
-      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-auftrag', () => {
+      http.post('/api/einsaetze/7/chat/messages/5/promote-to-task', () => {
         aufrufe += 1;
         return aufrufe === 2
           ? gehalten()
@@ -1204,7 +1204,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
   it('Zu Auftrag: Schließen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     setupFehler();
     server.use(
-      http.post('/api/einsaetze/7/chat/nachrichten/5/heraufstufen-auftrag', () =>
+      http.post('/api/einsaetze/7/chat/messages/5/promote-to-task', () =>
         HttpResponse.json({ error: 'Empfänger unbekannt' }, { status: 422 }),
       ),
     );
@@ -1227,7 +1227,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
       http.get('/api/einsaetze/:id/uhs', () =>
         HttpResponse.json([{ id: 3, bezeichnung: 'BHP 1', typ: 'behandlungsplatz' }]),
       ),
-      http.put('/api/einsaetze/7/chat/nachrichten/5/bezug', () =>
+      http.put('/api/einsaetze/7/chat/messages/5/reference', () =>
         HttpResponse.json({ error: 'Objekt storniert' }, { status: 422 }),
       ),
     );
@@ -1247,14 +1247,14 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     let loesen5 = 0;
     setupFehler([mitBezug(nachricht), mitBezug(eigene2)]);
     server.use(
-      http.delete('/api/einsaetze/7/chat/nachrichten/5/bezug', () => {
+      http.delete('/api/einsaetze/7/chat/messages/5/reference', () => {
         loesen5 += 1;
         if (loesen5 > 1) return gehalten();
         return new Promise<Response>((r) => {
           lehneAb = () => r(HttpResponse.json({ error: 'Bezug gesperrt' }, { status: 409 }));
         });
       }),
-      http.delete('/api/einsaetze/7/chat/nachrichten/6/bezug', () => HttpResponse.json(eigene2)),
+      http.delete('/api/einsaetze/7/chat/messages/6/reference', () => HttpResponse.json(eigene2)),
     );
     await screen.findByText('Zweite Lage');
     const schliessen = (text: string) => zeile(text).querySelector('button') as HTMLElement;
@@ -1283,12 +1283,12 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     const client = neuerQueryClient();
     setupFehler([mitBezug(nachricht)], client);
     server.use(
-      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) => {
+      http.get('/api/einsaetze/:id/chat/channels/1/messages', ({ params }) => {
         geladen.push(String(params.id));
         return HttpResponse.json([mitBezug(nachricht)]);
       }),
       http.delete(
-        '/api/einsaetze/7/chat/nachrichten/5/bezug',
+        '/api/einsaetze/7/chat/messages/5/reference',
         () =>
           new Promise<Response>((r) => {
             lehneAb = () => r(HttpResponse.json({ error: 'Bezug gesperrt' }, { status: 409 }));
@@ -1315,12 +1315,12 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
     const client = neuerQueryClient();
     setupFehler([nachricht], client);
     server.use(
-      http.get('/api/einsaetze/:id/chat/kanaele/1/nachrichten', ({ params }) => {
+      http.get('/api/einsaetze/:id/chat/channels/1/messages', ({ params }) => {
         geladen.push(String(params.id));
         return HttpResponse.json([nachricht]);
       }),
       http.patch(
-        '/api/einsaetze/7/chat/nachrichten/5',
+        '/api/einsaetze/7/chat/messages/5',
         () =>
           new Promise<Response>((r) => {
             lehneAb = () =>

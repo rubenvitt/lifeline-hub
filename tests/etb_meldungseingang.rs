@@ -44,7 +44,7 @@ async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
 }
 
 async fn meldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
-    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/meldungen"))
+    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/reports"))
         .await
         .as_array()
         .unwrap()
@@ -55,7 +55,7 @@ async fn lagemeldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/situation/reports"),
     )
     .await
     .as_array()

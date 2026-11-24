@@ -44,7 +44,7 @@ test('Sofortmeldung von einem zweiten Schirm: Alarm mit Inhalt, „Öffnen“ ze
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
   // Ein paar gewöhnliche Meldungen davor: die Karte muss gesucht und ins Bild gerollt werden.
   for (let i = 1; i <= 8; i += 1) {
-    const m = await page.request.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+    const m = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
       data: {
         absender: `Florian ${i}`,
         meldeweg: 'funk',
@@ -68,7 +68,7 @@ test('Sofortmeldung von einem zweiten Schirm: Alarm mit Inhalt, „Öffnen“ ze
       data: { benutzername: konto.benutzername, passwort: konto.passwort },
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
-    const sofort = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+    const sofort = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
       data: {
         absender: ABSENDER,
         meldeweg: 'funk',

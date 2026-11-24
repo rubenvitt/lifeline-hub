@@ -1,6 +1,6 @@
 //! LFH-937: Geometrien von Zonen und Abschnittsflächen (Spec `eingabegrenzen`, design.md D7):
 //! Grenzen und Struktur sind 400, kaputtes JSON und ein falscher Typ bleiben 422. Zugleich der
-//! erste Integrationstest für `PATCH …/abschnitte/{aid}/flaeche`.
+//! erste Integrationstest für `PATCH …/sectors/{aid}/area`.
 
 use axum::http::StatusCode;
 use serde_json::{json, Value};
@@ -28,7 +28,7 @@ async fn zone(app: &axum::Router, cookie: &str, e: i64, geometrie: &str) -> (Sta
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         cookie,
         Some(
             &json!({ "typ": "gefahrengebiet", "geometrie_typ": "Polygon", "geometrie": geometrie }),
@@ -68,7 +68,7 @@ async fn zone_mit_5001_punkten_ist_400_und_kaputtes_json_bleibt_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         Some(
             &json!({ "typ": "gefahrengebiet", "geometrie_typ": "LineString", "geometrie": riesig }),
@@ -80,7 +80,7 @@ async fn zone_mit_5001_punkten_ist_400_und_kaputtes_json_bleibt_422() {
     let (_, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         &admin,
         None,
     )
@@ -96,13 +96,13 @@ async fn abschnittsflaeche_gueltig_400_und_422() {
     let (_, a) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         &admin,
         Some(&json!({ "name": "Nord" })),
     )
     .await;
     let aid = a["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{e}/abschnitte/{aid}/flaeche");
+    let uri = format!("/api/einsaetze/{e}/sectors/{aid}/area");
     let setze = |geo: String| json!({ "flaeche_geojson": geo });
 
     let (s, j) = anfrage_json(&app, "PATCH", &uri, &admin, Some(&setze(polygon(6)))).await;

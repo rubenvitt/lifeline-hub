@@ -1,4 +1,4 @@
-//! `POST /api/einsaetze/{id}/personen/{pid}/transport` — Transportstand festlegen (LLH-1325,
+//! `POST /api/einsaetze/{id}/persons/{pid}/transport` — Transportstand festlegen (LLH-1325,
 //! Change `y18v58dt-pat-kern`, Spec `personen-transport`, design.md D2/D5–D7).
 
 use crate::app::AppState;

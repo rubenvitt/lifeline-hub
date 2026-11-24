@@ -38,7 +38,7 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
         meHandler(nutzer),
         http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz('aktiv'))),
         http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
-        http.get('/api/einsaetze/7/etb/zaehler', () =>
+        http.get('/api/einsaetze/7/etb/counts', () =>
           HttpResponse.json({
             gesamt: 0,
             je_typ: {
@@ -72,7 +72,7 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
       ),
       http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/etb/zaehler', () =>
+      http.get('/api/einsaetze/7/etb/counts', () =>
         HttpResponse.json({
           gesamt: 0,
           je_typ: {

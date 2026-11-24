@@ -27,7 +27,7 @@ function serverMitStand(start: PersonDetail) {
   const koerper: Body[] = [];
   let stand = { ...start };
   server.use(
-    http.patch('/api/einsaetze/1/personen/10', async ({ request }) => {
+    http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
       const body = (await request.json()) as Body;
       koerper.push(body);
       const alt = stand as unknown as Record<string, unknown>;
@@ -39,7 +39,7 @@ function serverMitStand(start: PersonDetail) {
       stand = { ...stand, ...rest };
       return HttpResponse.json(stand);
     }),
-    http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(stand)),
+    http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(stand)),
   );
   return {
     koerper,

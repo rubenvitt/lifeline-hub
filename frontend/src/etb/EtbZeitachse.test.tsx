@@ -1112,7 +1112,7 @@ describe('EtbZeitachse – Anhänge (LFH-117)', () => {
     const verweis = within(z).getByRole('link', {
       name: 'IMG_0412.HEIC, 3,1 MB, Anhang zu Nr. 1 herunterladen',
     });
-    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/etb/1/anhaenge/9');
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/etb/1/attachments/9');
   });
 
   it.each([
@@ -1181,7 +1181,7 @@ describe('EtbZeitachse – Dokumente mit ETB-Bezug (LFH-743)', () => {
     const verweis = within(zeileVon(container, 'eintrag-2')).getByRole('link', {
       name: 'Dokument „Lageplan Nord“, 2,0 KB, zu Nr. 2 herunterladen',
     });
-    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/dokumente/3/datei');
+    expect(verweis).toHaveAttribute('href', '/api/einsaetze/1/documents/3/file');
     expect(within(zeileVon(container, 'eintrag-1')).queryByRole('link')).toBeNull();
   });
 

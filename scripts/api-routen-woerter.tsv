@@ -1,8 +1,10 @@
-# Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
+# Glossar der API-Routen (ADR-0097): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+accept	abnehmen
 access	Zugang
 access-changes	Zugangsänderungen
 access-log	Zugangsprotokoll
+accesses	Zugriffe
 accommodation	Unterkunft
 accommodation-guidelines	Unterkunft-Richtwerte
 acknowledge	quittieren
@@ -14,17 +16,27 @@ agenda-items	Programmpunkte
 alarm	Alarmmeldung
 also-local	auch lokal
 animals	Tiere
+annul	stornieren
 api	-
 app-code	-
 archive	Archiv
+area	Fläche
+areas	Bereiche
+assessment	Beurteilung
+assign	zuweisen
+attachments	Anhänge
 attachments.zip	Anlagen
 attempts	Versuche
 audit	-
 auth	-
 auto-update	automatische Aktualisierung
+availability	Verfügbarkeit
+available	verfügbar
+background-images	Hintergrundbilder
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
+briefing	Lagebesprechung
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
@@ -39,9 +51,11 @@ catalog	Katalog
 catering	Verpflegung
 catering-templates	Verpflegungsvorlagen
 certificate	Zertifikat
+channels	Kanäle
 chat	-
 check	prüfen
 check-in	melden
+check-ins	Rückmeldungen
 client-errors	Client-Fehler
 close	abschließen
 closure	Abschluss
@@ -50,21 +64,38 @@ codes	-
 command	Führung
 command-post	Führungsstelle
 command-roles	Führungsfunktionen
+commanders	Führungskräfte
+commitment	Zusage
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
+complete	erledigen
+components	Komponenten
 config	-
 confirm	bestätigen
+confirmers	Bestätiger
+connections	Verbindungen
+contact-person	Bezugsperson
+count	Anzahl
 countersign	gegenzeichnen
+counts	Zähler
 damages	Schäden
 deactivate	deaktivieren
+decision	Entscheidung
 decline	ablehnen
 demo-data	Demo-Daten
+departures	Abmeldungen
 dev	-
 devices	Geräte
+diets	Kostformen
 discard	verwerfen
 discoverable	-
+distribution	Verteiler
+distributions	Ausgaben
+districts	Bezirke
+documents	Dokumente
 download	-
 emergency-takeover	Notübernahme
+enclosures	Anlagen eines Dokuments
 end	beenden
 end-others	andere beenden
 enroll	-
@@ -72,15 +103,21 @@ etb	ETB
 etb-snippets	ETB-Bausteine
 evacuation	Evakuierung
 events	-
+execution	Vollzug
 existing	vorhandene
 export	-
 external	extern
 external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
+file	Datei
 finish	-
 follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
+forecast	Prognose
+free-symbols	freie Zeichen
+from-attachment	aus Anhang
+from-template	aus Vorlage
 gauges	Pegel
 generate	erzeugen
 glyphs	-
@@ -89,15 +126,21 @@ hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
+history	Verlauf
+household	Haushalt
+households	Haushalte
+image	Bild
 import	-
 in-service	in Dienst
 incident-templates	Einsatzvorlagen
 incidents	Einsätze
 info-line	Infotelefon
+injuries	Verletzungen
 instance	Instanz
 intake	Einwurf
 intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
+interventions	Maßnahmen
 inventory	Bestand
 ios-push	-
 jwks.json	-
@@ -105,6 +148,8 @@ key	Schlüssel
 keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
+layout	Anordnung
+list-accesses	Listenzugriffe
 live	-
 login	-
 logins	Anmeldungen
@@ -112,21 +157,28 @@ logo	-
 logout	-
 lost	verloren
 map	Karte
+map-views	Kartenansichten
 marker	-
 master-data	Stammdaten
+matches	Abgleich
 material	Material
 material-categories	Materialkategorien
 matrix	-
 me	-
 member-selection	Mitglied-Auswahl
+messages	Nachrichten
+metrics	Kennzahlen
 mirror	Spiegel
 module-access	Modulfreigaben
 module-counts	Modulzähler
 module-defaults	Modulvorgaben
 module-overrides	Modul-Overrides
+notes	Notizen
 notification-defaults	Benachrichtigungsvorgaben
 notifications	Benachrichtigungen
 object	widersprechen
+occupancies	Belegungen
+occupancy	Belegung
 offline	-
 offline-maps	Offline-Karten
 oidc	-
@@ -160,24 +212,37 @@ plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+prediction	Vorhersage
 presence	Präsenz
 preview	Vorschau
+print	Druck
+progress	Stände
+promote-to-etb	zum ETB heraufstufen
+promote-to-task	zum Auftrag heraufstufen
 providers	-
 proxy	-
 qualifications	Qualifikationen
 raster	-
+rating	Bewertung
 read	gelesen
+read-marker	Lesemarke
+reason	Anlass
+recipients	Empfänger
 reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference	Bezug
 reference-values	Richtwerte
 register	-
 registration	-
+registrations	Registrierungen
 reimport	neu importieren
 reject	zurückweisen
 rejected	abgelehnt
+release	freigeben
 release-notes	Versionsstand
 reliefs	Ablösungen
+reminders	Erinnerungen
 reopen	wiedereröffnen
 reports	Meldungen
 request	Antrag, anfragen
@@ -190,10 +255,15 @@ resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
+revise	fortschreiben
 revoke	widerrufen
+row	Zeile
+schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
+seen	gesehen
+selection	Auswahl
 sessions	Sitzungen
 set	festlegen
 settings	Einstellungen
@@ -202,32 +272,45 @@ shift-models	Schichtmodelle
 shift-plan	Schichtplan
 signing-keys	Unterschriftsschlüssel
 situation	Lage
+situation-metric-selection	Lagekennzahl-Wahl
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
+situation-picture-shares	Lagebild-Freigaben
+situation-relevant	lagerelevant
 situation-reports	Lageberichte
+situation-seen	Lage gesehen
+situation-snapshots	Lage-Snapshots
 sprite	-
 sprites	-
 staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
+state	Stand
 status	-
 storage	Datenträger
 style.json	-
 subscription	Abo
 system	-
 talk-groups	Sprechgruppen
+task	Auftrag
 tasks	Aufträge
 template	Vorlage
 test	-
 tile	-
 tilejson	-
 tiles	-
+time-slots	Zeitfenster
+title-block	Schriftfeld
 totp	-
 transfer	Übernahme
 transport	-
+transport-means	Transportmittel
 triage	Sichtung
+types	Arten
 uhs	UHS
+uhs-occupancy	UHS-Belegung
 undo	zurücknehmen
+unit	Einheit
 unit-templates	Einheitsvorlagen
 unit-types	Einheitstypen
 units	Einheiten
@@ -239,8 +322,13 @@ v1	-
 vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
+void	aufheben
+weather	Wetter
 web-push	-
 webauthn	-
 webhook	-
 whereabouts	Verbleib
+whereabouts-details	Verbleib-Angaben
+withdraw	zurückziehen
 world	Welt
+zones	Zonen

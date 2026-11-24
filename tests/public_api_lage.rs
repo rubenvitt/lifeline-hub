@@ -121,7 +121,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
         let person = post(
             &app,
             &admin,
-            &format!("{basis}/personen"),
+            &format!("{basis}/persons"),
             json!({"name": "Muster", "vorname": "Max", "uhs_id": uhs}),
         )
         .await["id"]
@@ -131,7 +131,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
             post(
                 &app,
                 &admin,
-                &format!("{basis}/personen/{person}/sichtung"),
+                &format!("{basis}/persons/{person}/triage"),
                 json!({"kategorie": "sk1"}),
             )
             .await;
@@ -140,7 +140,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     post(
         &app,
         &admin,
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"}),
     )
     .await;
@@ -181,7 +181,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let lid = post(
         &app,
         &admin,
-        &format!("{basis}/lageberichte"),
+        &format!("{basis}/situation-reports"),
         json!({"vorlage": "lagebericht", "titel": "Lage 10:00"}),
     )
     .await["id"]
@@ -190,7 +190,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{basis}/lageberichte/{lid}"),
+        &format!("{basis}/situation-reports/{lid}"),
         &admin,
         Some(&json!({"abschnitte": [
             {"schluessel": "zusammenfassung", "text": "Lage stabil."},
@@ -212,7 +212,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/lageberichte/{lid}/freigeben"),
+        &format!("{basis}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -226,7 +226,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (s, r) = anfrage_json(
         &app,
         "PUT",
-        &format!("{basis}/lagekennzahl-wahl"),
+        &format!("{basis}/situation-metric-selection"),
         &admin,
         Some(&json!({"gewaehlt": ["sanitaetsdienst"]})),
     )
@@ -338,7 +338,7 @@ async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
         post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{einsatz}/meldungen"),
+            &format!("/api/einsaetze/{einsatz}/reports"),
             json!({
                 "absender": "Melder Unbekannt",
                 "empfaenger": "Empfaengerin Vertraulich",
@@ -389,7 +389,7 @@ async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
     post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         json!({
             "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
             "meldungsart": "sofortmeldung", "prioritaet": "sofort",
@@ -572,7 +572,7 @@ async fn karte_kommt_mit_fassung_und_nur_wenn_sie_sich_geaendert_hat() {
     let (s, z) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zonen"),
+        &format!("{basis}/zones"),
         &admin,
         Some(
             &json!({"typ": "absperrbereich", "geometrie_typ": "Polygon", "geometrie": POLY,
@@ -653,14 +653,14 @@ async fn lage_traegt_keine_namen_freitexte_oder_personenkennungen() {
     post(
         &app,
         &admin,
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         json!({"name": "Beispiel", "vorname": "Erika", "uhs_id": uhs}),
     )
     .await;
     post(
         &app,
         &admin,
-        &format!("{basis}/freie-zeichen"),
+        &format!("{basis}/free-symbols"),
         json!({
             "lat": 52.95, "lon": 10.55,
             "zeichen_spec": STELLE_SANITAET,

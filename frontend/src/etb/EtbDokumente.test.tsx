@@ -25,10 +25,10 @@ describe('EtbDokumente (LFH-743)', () => {
     );
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/dokumente/3/datei');
+    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/documents/3/file');
     expect(links[0]).toHaveAttribute('download', 'plan.pdf');
     expect(links[0]).toHaveTextContent('Dokument „Lageplan Nord“ · 2,0 KB');
-    expect(links[1]).toHaveAttribute('href', '/api/einsaetze/5/dokumente/4/datei');
+    expect(links[1]).toHaveAttribute('href', '/api/einsaetze/5/documents/4/file');
   });
 
   it('nennt im zugänglichen Namen Titel, Nummer des Eintrags und die Handlung', () => {
@@ -64,7 +64,7 @@ describe('EtbDokumente (LFH-743)', () => {
       });
       expect(original).toHaveAttribute(
         'href',
-        '/api/einsaetze/5/dokumente/4/datei?fassung=original',
+        '/api/einsaetze/5/documents/4/file?fassung=original',
       );
       expect(original).toHaveAttribute('download', 'lage.original.jpg');
       expect(screen.getAllByRole('link')).toHaveLength(3);
@@ -94,7 +94,7 @@ describe('EtbDokumente — Vorschau (LFH-759)', () => {
     });
     expect(knopf.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/einsaetze/5/dokumente/4/datei?fassung=vorschau',
+      '/api/einsaetze/5/documents/4/file?fassung=vorschau',
     );
     expect(screen.getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
   });

@@ -13,7 +13,7 @@ import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test, uhrAnhalten 
 
 const KAPITEL = 'meldungen';
 
-/** Was die Szene aus `GET …/meldungen` braucht. */
+/** Was die Szene aus `GET …/reports` braucht. */
 interface Meldung {
   id: number;
   inhalt: string;
@@ -60,7 +60,7 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     const basis = `/api/einsaetze/${demo.id}`;
     // Die Rückmeldung der UHS aus dem Demo-Szenario; ihr ETB-Eintrag entstand beim Import.
-    const antwort = await page.request.get(`${basis}/meldungen`);
+    const antwort = await page.request.get(`${basis}/reports`);
     expect(antwort.ok(), `Meldungen: ${antwort.status()}`).toBe(true);
     const meldung = ((await antwort.json()) as Meldung[]).find((m) =>
       m.inhalt.startsWith('UHS Turnhalle: acht Patienten'),

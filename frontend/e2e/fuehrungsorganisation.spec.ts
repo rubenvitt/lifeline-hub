@@ -28,7 +28,7 @@ import {
  *   mehreren Zeilen von Spalten, bei 1024, 768 und 390 px ebenso ohne waagerechten Überhang von
  *   Seite und Organigramm.
  * - LIVE: ein per API umgehängter Unterabschnitt steht ohne Neuladen unter dem neuen Abschnitt.
- * - ÜBERNAHME: genau EIN POST auf `…/lageberichte`, kein PATCH, danach der Bericht offen.
+ * - ÜBERNAHME: genau EIN POST auf `…/situation-reports`, kein PATCH, danach der Bericht offen.
  *
  * Der Druckpfad bei A4-Breite steht in `fuehrungsorganisation-druck.spec.ts` und läuft dort auch
  * in Firefox und WebKit (`DRUCK_SPECS`, LFH-915). Hier bleibt „Schleuse im Druck“: er prüft die
@@ -48,7 +48,7 @@ test('Messung vor dem Bau: Contentbreite am Fükw und Laufweiten langer Werte', 
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Organigramm Messung ${Date.now()}`);
-  const abschnitt = await post(page, einsatzId, 'abschnitte', {
+  const abschnitt = await post(page, einsatzId, 'sectors', {
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
   });
@@ -183,7 +183,7 @@ test('live: ein umgehängter Unterabschnitt steht ohne Neuladen am neuen Ort', a
       .filter({ has: page.getByRole('link', { name, exact: true }) });
   await expect(spalte(ABSCHNITT).getByRole('link', { name: 'Unterabschnitt Deich' })).toBeVisible();
 
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/abschnitte/${unter}`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();
@@ -205,13 +205,13 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
 
   const anfragen: string[] = [];
   page.on('request', (r) => {
-    if (/\/lageberichte(\/\d+)?$/.test(new URL(r.url()).pathname) && r.method() !== 'GET') {
+    if (/\/situation-reports(\/\d+)?$/.test(new URL(r.url()).pathname) && r.method() !== 'GET') {
       anfragen.push(`${r.method()} ${new URL(r.url()).pathname}`);
     }
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/lageberichte`]);
+  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
 });
 
@@ -228,13 +228,13 @@ async function seedeKlein(page: Page, einsatzId: string) {
   const abschnitte: number[] = [];
   for (let i = 1; i <= 3; i++) {
     abschnitte.push(
-      await post(page, einsatzId, 'abschnitte', {
+      await post(page, einsatzId, 'sectors', {
         name: i === 1 ? ABSCHNITT : `Einsatzabschnitt ${i}`,
         kurzbezeichnung: `EA-${i}`,
       }),
     );
   }
-  const unter = await post(page, einsatzId, 'abschnitte', {
+  const unter = await post(page, einsatzId, 'sectors', {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: abschnitte[0],
   });
@@ -268,7 +268,7 @@ test('Schleuse, Fokus: ein live angelegter Unterabschnitt schiebt den fokussiert
 
   await ziel(page).focus();
   const vorher = await rechteck(page);
-  await post(page, einsatzId, 'abschnitte', {
+  await post(page, einsatzId, 'sectors', {
     name: 'Unterabschnitt Neu',
     ueber_abschnitt_id: abschnitte[0],
   });
@@ -303,9 +303,7 @@ test('Schleuse, Fokus: ein aufgelöster Abschnitt unter dem Fokus bleibt als Pla
   const vorher = await spalten
     .filter({ has: page.getByRole('link', { name: 'Einsatzabschnitt 3', exact: true }) })
     .boundingBox();
-  const antwort = await page.request.delete(
-    `/api/einsaetze/${einsatzId}/abschnitte/${abschnitte[2]}`,
-  );
+  const antwort = await page.request.delete(`/api/einsaetze/${einsatzId}/sectors/${abschnitte[2]}`);
   expect(antwort.ok(), `Auflösen: ${await antwort.text()}`).toBeTruthy();
 
   // Der Link wird zum Platzhalter ohne Link; der Fokus fällt nicht auf `body`, sondern auf die
@@ -335,7 +333,7 @@ test('Schleuse, Zeiger: ein umgehängter Unterabschnitt springt nicht unter dem 
   await ziel(page).hover();
   await expect(stand(page)).toHaveText('Live pausiert');
   const vorher = await rechteck(page);
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/abschnitte/${unter}`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();
@@ -372,7 +370,7 @@ for (const groesse of [FUEKW, { width: 390, height: 844 }]) {
 
     await ziel(page).focus();
     const ruhe = await oben();
-    await post(page, einsatzId, 'abschnitte', { name: 'Einsatzabschnitt Neu' });
+    await post(page, einsatzId, 'sectors', { name: 'Einsatzabschnitt Neu' });
     await expect(stand(page).getByRole('status')).toContainText('1 neu');
     expect(await oben(), 'Banner erscheint: erste Ebene bleibt').toBe(ruhe);
     const ueberhang = await page.evaluate(
@@ -418,7 +416,7 @@ test('Schleuse im Druck: ein wartender Abschnitt steht auf dem Papier, die Stand
   // Gehalten über den Fokus: der Zeiger hielte nicht, das Druckmedium baut das Layout um und
   // Chromium meldet dann `pointerleave` — die Schleuse öffnete auch ohne Druckweiche.
   await ziel(page).focus();
-  await post(page, einsatzId, 'abschnitte', { name: 'Einsatzabschnitt Neu' });
+  await post(page, einsatzId, 'sectors', { name: 'Einsatzabschnitt Neu' });
   await expect(stand(page).getByRole('status')).toContainText('1 neu');
 
   // Strg+P: der Browser feuert `beforeprint`, der Fokus bleibt im Organigramm.

@@ -73,7 +73,7 @@ async function entwurfBereit(
   });
   expect(einsatz.ok(), await einsatz.text()).toBe(true);
   const einsatzId = (await einsatz.json()).id as number;
-  const befehl = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
+  const befehl = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Einsatzbefehl Übung' },
   });
   expect(befehl.ok(), await befehl.text()).toBe(true);

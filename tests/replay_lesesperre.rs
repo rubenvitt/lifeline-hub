@@ -99,7 +99,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-ETB",
     });
 
-    let url = format!("{basis}/personen");
+    let url = format!("{basis}/persons");
     let body = json!({"name":"Geheim-Person Muster","status":"vermisst","client_id":"r-person"});
     angelegt(app, cookie, &url, &body.to_string(), "Person").await;
     faelle.push(Fall {
@@ -110,7 +110,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Person",
     });
 
-    let url = format!("{basis}/meldungen");
+    let url = format!("{basis}/reports");
     let body = json!({
         "absender":"Florian Nord 1","meldeweg":"funk","ereigniszeit":"2026-06-12 09:00:00",
         "inhalt":"Geheim-Meldung Verletzte","client_id":"r-meldung"
@@ -131,14 +131,14 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let bezirk = angelegt(
         app,
         cookie,
-        &format!("{basis}/evakuierung/bezirke"),
+        &format!("{basis}/evacuation/districts"),
         r#"{"bezeichnung":"Geheim-Bezirk Ufer","plan_personen":640,"plan_erhebung":"geschaetzt"}"#,
         "Bezirk",
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let url = format!("{basis}/evakuierung/bezirke/{bezirk}/staende");
+    let url = format!("{basis}/evacuation/districts/{bezirk}/progress");
     let body = json!({"evakuiert":12,"erhebung":"gezaehlt","client_id":"r-stand"});
     angelegt(app, cookie, &url, &body.to_string(), "Stand").await;
     faelle.push(Fall {
@@ -153,14 +153,14 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let stelle = angelegt(
         app,
         cookie,
-        &format!("{basis}/betreuung/stellen"),
+        &format!("{basis}/care/positions"),
         r#"{"bezeichnung":"Geheim-Stelle Halle","art":"notunterkunft","kapazitaet_personen":150}"#,
         "Stelle",
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let url = format!("{basis}/betreuung/stellen/{stelle}/belegungen");
+    let url = format!("{basis}/care/positions/{stelle}/occupancies");
     let body = json!({"belegt":40,"client_id":"r-belegung"});
     angelegt(app, cookie, &url, &body.to_string(), "Belegung").await;
     faelle.push(Fall {
@@ -174,14 +174,14 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let zid = angelegt(
         app,
         cookie,
-        &format!("{basis}/verpflegung/zeitfenster"),
+        &format!("{basis}/catering/time-slots"),
         r#"{"bezeichnung":"Geheim-Fenster Mittag","von_at":"2026-09-24T10:00:00Z","bis_at":"2026-09-24T11:30:00Z","bedarf_kraefte":180,"bedarf_betreute":70}"#,
         "Zeitfenster",
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let url = format!("{basis}/verpflegung/zeitfenster/{zid}/ausgaben");
+    let url = format!("{basis}/catering/time-slots/{zid}/distributions");
     let body = json!({"menge":120,"client_id":"r-ausgabe"});
     angelegt(app, cookie, &url, &body.to_string(), "Ausgabe").await;
     faelle.push(Fall {
@@ -197,14 +197,14 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     let p = angelegt(
         app,
         cookie,
-        &format!("{basis}/personen"),
+        &format!("{basis}/persons"),
         r#"{"name":"Gesichtet"}"#,
         "Person",
     )
     .await["id"]
         .as_i64()
         .unwrap();
-    let url = format!("{basis}/personen/{p}/sichtung");
+    let url = format!("{basis}/persons/{p}/triage");
     let body =
         json!({"kategorie":"sk2","notiz":"Geheim-Sichtung Atemnot","client_id":"r-sichtung"});
     angelegt(app, cookie, &url, &body.to_string(), "Sichtung").await;
@@ -216,7 +216,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Sichtung",
     });
 
-    let url = format!("{basis}/personen/{p}/verbleib");
+    let url = format!("{basis}/persons/{p}/whereabouts");
     let body = json!({"art":"transport","ziel":"Geheim-Klinik Nord","client_id":"r-verbleib"});
     angelegt(app, cookie, &url, &body.to_string(), "Verbleib").await;
     faelle.push(Fall {
@@ -227,7 +227,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "Geheim-Klinik",
     });
 
-    let url = format!("{basis}/personen/{p}/notizen");
+    let url = format!("{basis}/persons/{p}/notes");
     let body = json!({"text":"Geheim-Befund Platzwunde","client_id":"r-notiz"});
     angelegt(app, cookie, &url, &body.to_string(), "Notiz").await;
     faelle.push(Fall {
@@ -239,7 +239,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
     });
 
     // Change y18v58dt-pat-kern: Transport, Maßnahme und Verletzung folgen demselben Muster.
-    let url = format!("{basis}/personen/{p}/transport");
+    let url = format!("{basis}/persons/{p}/transport");
     let body = json!({"prioritaet":"dringlich","fachrichtung":"psychiatrie","client_id":"r-tr"});
     angelegt(app, cookie, &url, &body.to_string(), "Transport").await;
     faelle.push(Fall {
@@ -250,7 +250,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "psychiatrie",
     });
 
-    let url = format!("{basis}/personen/{p}/massnahmen");
+    let url = format!("{basis}/persons/{p}/interventions");
     let body = json!({"art":"analgesie","client_id":"r-massnahme"});
     angelegt(app, cookie, &url, &body.to_string(), "Maßnahme").await;
     faelle.push(Fall {
@@ -261,7 +261,7 @@ async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
         geheim: "analgesie",
     });
 
-    let url = format!("{basis}/personen/{p}/verletzungen");
+    let url = format!("{basis}/persons/{p}/injuries");
     let body = json!({"ansicht":"vorn","region":"thorax","art":"wunde_blutung",
                       "notiz":"Geheim-Verletzung","client_id":"r-verletzung"});
     angelegt(app, cookie, &url, &body.to_string(), "Verletzung").await;

@@ -18,7 +18,7 @@ describe('lagebesprechungAbschliessen', () => {
   function faengeBody() {
     const bodies: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/1/lagebesprechungen', async ({ request }) => {
+      http.post('/api/einsaetze/1/briefings', async ({ request }) => {
         bodies.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(antwort, { status: 201 });
       }),
@@ -51,7 +51,7 @@ describe('setLagebesprechungTermin', () => {
   it('schickt den Termin per PUT, null als null', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.put('/api/einsaetze/1/lagebesprechung/termin', async ({ request }) => {
+      http.put('/api/einsaetze/1/briefing/schedule', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json(antwort);
       }),
@@ -65,8 +65,8 @@ describe('setLagebesprechungTermin', () => {
 describe('Lesen', () => {
   it('liest Stand und Verlauf unter dem Modulpfad', async () => {
     server.use(
-      http.get('/api/einsaetze/1/lagebesprechung', () => HttpResponse.json(antwort)),
-      http.get('/api/einsaetze/1/lagebesprechungen', () => HttpResponse.json([{ id: 3 }])),
+      http.get('/api/einsaetze/1/briefing', () => HttpResponse.json(antwort)),
+      http.get('/api/einsaetze/1/briefings', () => HttpResponse.json([{ id: 3 }])),
     );
     await expect(fetchLagebesprechungStand(1)).resolves.toEqual(antwort);
     await expect(fetchLagebesprechungen(1)).resolves.toEqual([{ id: 3 }]);

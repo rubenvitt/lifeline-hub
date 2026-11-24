@@ -1,5 +1,5 @@
 //! Adresssuche der Lagekarte (LFH-638, Spec `lagekarte-ortssuche`):
-//! `GET /api/einsaetze/{id}/karte/ort-suche?q=`.
+//! `GET /api/einsaetze/{id}/map/place-search?q=`.
 //!
 //! Der Token-Bucket des Geocoders ist prozessweit (1 Anfrage/s) und gilt für alle Tests dieser
 //! Binärdatei. Deshalb fragt genau EIN Test den Geocoder, und das der Reihe nach mit Pausen; die
@@ -70,7 +70,7 @@ async fn einsatzort_setzen(pool: &sqlx::SqlitePool, einsatz: i64, lat: f64, lon:
 
 fn uri(einsatz: i64, q: &str) -> String {
     let kodiert: String = url_kodieren(q);
-    format!("/api/einsaetze/{einsatz}/karte/ort-suche?q={kodiert}")
+    format!("/api/einsaetze/{einsatz}/map/place-search?q={kodiert}")
 }
 
 /// Minimal-Kodierung für die Testeingaben (Leerzeichen, Komma, Umlaute).
@@ -108,7 +108,7 @@ async fn suchtext_unter_drei_oder_ueber_200_zeichen_ist_400_ohne_geocoder() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/karte/ort-suche"),
+        &format!("/api/einsaetze/{einsatz}/map/place-search"),
         &admin,
         None,
     )

@@ -9,8 +9,14 @@ import { UPLOAD_TIMEOUT_MS } from './upload';
  */
 export type AnlagenDokument = 'lageberichte' | 'befehle';
 
+/** Sammlung der Route je Dokument (ADR-0085, englische API-Routen). */
+const SAMMLUNG: Record<AnlagenDokument, string> = {
+  lageberichte: 'situation-reports',
+  befehle: 'orders',
+};
+
 const basis = (dokument: AnlagenDokument, einsatzId: number, dokumentId: number) =>
-  `/api/einsaetze/${einsatzId}/${dokument}/${dokumentId}/anlagen`;
+  `/api/einsaetze/${einsatzId}/${SAMMLUNG[dokument]}/${dokumentId}/enclosures`;
 
 /** Anlagen in ihrer Reihenfolge (Nummer 1, 2, …). */
 export function listeDokumentAnlagen(
@@ -56,7 +62,7 @@ export function entferneDokumentAnlage(
 }
 
 /**
- * Bild der Anlage über die Dokumentroute, nie über `/anhaenge/{aid}` des Einsatzes (dort 404).
+ * Bild der Anlage über die Dokumentroute, nie über `/attachments/{aid}` des Einsatzes (dort 404).
  * Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
  */
 export function dokumentAnlageDateiPfad(
@@ -65,5 +71,5 @@ export function dokumentAnlageDateiPfad(
   dokumentId: number,
   anlageId: number,
 ): string {
-  return `${basis(dokument, einsatzId, dokumentId)}/${anlageId}/datei`;
+  return `${basis(dokument, einsatzId, dokumentId)}/${anlageId}/file`;
 }

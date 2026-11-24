@@ -27,7 +27,7 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = (await antwort.json()) as { id: number };
 
     const einzelabruf = page.waitForResponse((r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/meldungen/99999`),
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/reports/99999`),
     );
     await page.goto(meldungenPfad(einsatzId, { meldung: 99999 }));
     expect((await einzelabruf).status()).toBe(404);

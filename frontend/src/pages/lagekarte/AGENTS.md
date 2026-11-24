@@ -98,7 +98,7 @@ diese Zusage.
 - **Ortssuche im Objektsuchfeld** (LFH-638, Spec `lagekarte-ortssuche`,
   `openspec/changes/archive/2026-10-01-lfh-638-lagekarte-ort-suche/design.md`): `MarkerSuche` erkennt
   eine Koordinate beim Tippen (`anzeige/koordinatenErkennung.ts`, dieselbe Quelle wie die
-  Sprungpalette) und sucht eine Adresse **nur auf Enter** (`AdressGruppe`, Route `…/karte/ort-suche`;
+  Sprungpalette) und sucht eine Adresse **nur auf Enter** (`AdressGruppe`, Route `…/map/place-search`;
   kein Autovervollständigen, Nominatim-Regeln; die Zustandstexte teilt sie mit dem Ortsfeld über
   `anzeige/ortssuche.ts`). Die Suchnadel (`suchnadelLayer.ts`) ist **keine
   Klickebene** (keine Rolle in `ordneKlickebene`, Guard in `suchnadelLayer.test.ts`), liegt unter

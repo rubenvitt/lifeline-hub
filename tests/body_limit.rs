@@ -110,7 +110,7 @@ async fn zone(app: &axum::Router, cookie: &str, e: i64, body: &str) -> (StatusCo
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/zonen"),
+        &format!("/api/einsaetze/{e}/zones"),
         cookie,
         Some(body),
     )
@@ -148,7 +148,7 @@ async fn geometrie_routen_haben_ein_eigenes_limit() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/abschnitte/1/flaeche"),
+        &format!("/api/einsaetze/{e}/sectors/1/area"),
         &admin,
         Some(&flaeche),
     )
@@ -159,7 +159,7 @@ async fn geometrie_routen_haben_ein_eigenes_limit() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/abschnitte/1/flaeche"),
+        &format!("/api/einsaetze/{e}/sectors/1/area"),
         &admin,
         Some(&flaeche),
     )

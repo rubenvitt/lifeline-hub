@@ -68,7 +68,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   `rtw_angefordert` (nur dann zeigt die Liste den RTW-Stand; `meldung_id` allein ist auch die
   Herkunftsmeldung aus LLH-1567). Der RTW geht nie über die Warteschlange (Server 422 bei
   Queue-Header, Client ruft `legePersonAn` direkt mit fester `client_id`; ohne Netz oder ohne
-  Meldungen „RTW über Funk“ gesperrt). UHS-Ziele über `GET …/personen/uhs` (das Gerät hat kein Modul UHS,
+  Meldungen „RTW über Funk“ gesperrt). UHS-Ziele über `GET …/persons/uhs` (das Gerät hat kein Modul UHS,
   bekommt also kein `uhs`-Ereignis: beim Öffnen frisch laden).
 - **Eine Ansicht wird verfügbar, wenn sie fertig ist:** `Funktionsansicht::ist_verfuegbar` erst
   setzen, wenn Routenliste, Stellenfilter, Server-Test und Hülle stehen. Vorher ist das Koppeln
@@ -135,7 +135,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
 - **Kopfzeile und Navigation** (`geraet/GeraeteKopf.tsx`): Stelle, Gerät, Verbindung und
   Kopplungsende stehen immer, unter einer Stunde mit Wort und Farbe; ohne Netz der jüngste
   Datenstand. Den Namen der Stelle liest `useStellenName` (`geraet/stellenName.ts`) aus der live
-  geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/verpflegung`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
+  geführten Abfrage der Stelle (Verpflegungsstelle aus `GET …/catering`), `geraet.stelle` aus `/me` nur als Rückfall: die Sitzung lädt nach
   einer Umbenennung nicht neu (LLH-1155). Auch Seitenkopf und Meldungsabsender lesen dort. Die Navigation sitzt am unteren Rand in Daumenreichweite, Ziele mindestens
   `Math.max(56, controlHeight)`. Die Hülle rollt nur in `main`, die Navigation steht direkt
   darunter: eine Inline-Erfassung klebt dort ihren Fuß über ihr (`ErfassungsFormular` mit
@@ -154,12 +154,12 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe. Wirft eine Kachel, fällt nur sie
   aus (`KachelGrenze` in Form `gross`, ohne Knopf, neuer Versuch mit dem nächsten Datenstand;
   Regel in `frontend/AGENTS.md`, „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“).
-  Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/lagemonitor` (`src/routes/lagemonitor.rs`,
+  Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/situation-monitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
   `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und
   Abschnittsflächen (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen
   Sofortmeldungen nur als Zahl (`sofortmeldungen_offen`, D12 der Change
-  `kcjecn9e-benachrichtigungskonzept`); `/zonen`, `/abschnitte` und `/gefahrengebiete` bleiben ihm
+  `kcjecn9e-benachrichtigungskonzept`); `/zones`, `/sectors` und `/hazard-areas` bleiben ihm
   gesperrt, sie tragen Notizen, Leiternamen und den Namen dessen, der beurteilt hat. Beschriftung
   und Notiz einer Zone erreichen ihn nie. Die Karte beschriftet Gefahrenzonen mit Marken in
   Großbild-Schrift (`geraet/lagemonitorFlaechen.ts`, `zonenMarkenTeile`: Name und Stufe getrennt,
@@ -214,7 +214,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Stamm-Fahrzeugen, ohne Besatzung und Material (`src/bereitstellungsraum/stamm_treffer.rs`).
   Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum (LLH-1387, Gruppe „Aus
   Nachforderungen“) liest das Gerät nur über `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
-  nur Art und Rufnamen); `GET …/nachforderungen` und `nachforderungen` in den Lese-Modulen bleiben
+  nur Art und Rufnamen); `GET …/resource-requests` und `nachforderungen` in den Lese-Modulen bleiben
   gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit (ein einheitenloses
   Fahrzeug wird dabei serverseitig zur Einheit, LLH-1444); eine Stufe schaltet das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
   `frontend/src/offline/AGENTS.md`, „Schreiben ohne Netz“). Abrufen ist eine Führungsentscheidung
@@ -258,7 +258,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   Stelle über den Anzeigenamen des Gerätekontos und `geraet.stelle`. Oberfläche (LLH-1048 Teil
   II): die Kopplungsmaske liest das Feld aus `stellenFeldVon` (`stellenart` und `stelle_pflicht`);
   eine wahlweise Stelle hat die Vorgabe „ohne Stelle (einsatzweit)“ als eigene Option (kein
-  Löschkreuz, Handschuh), zur Wahl stehen die Stellen aus `GET …/verpflegung`. Am gebundenen Gerät
+  Löschkreuz, Handschuh), zur Wahl stehen die Stellen aus `GET …/catering`. Am gebundenen Gerät
   steht die Stelle fest (`verpflegung/stellenKern.ts:eigeneStelle`): keine Stellenwahl in
   Ausgabeansicht und Nachtrag, jedes Bündel trägt sie; „Noch nicht verpflegt“ verrechnet
   `verpflegt_anderswo` nur so, wie der Server es liefert. Eine geplante Stelle mit laufender
@@ -266,11 +266,11 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   `geraet_gekoppelt` der Stelle, Nachweis `tests/geraet_kopplung.rs`).
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
-  (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/verpflegung`, **nie**
+  (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/catering`, **nie**
   `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
   Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Ebenso
   Betreuungsstellen als Empfänger (LLH-1295): nur Kennung, Bezeichnung und „geschlossen“ aus
-  `empfaenger.betreuungsstellen`, **nie** `GET …/betreuung` (bleibt 403); das Ereignis `betreuung`
+  `empfaenger.betreuungsstellen`, **nie** `GET …/care` (bleibt 403); das Ereignis `betreuung`
   erreicht das Gerät über das Lese-Modul `verpflegung`. Das
   Gerät wählt den Empfänger wie der Stab (Ausgabeansicht und Nachtrag) und zeigt daraus „Noch
   nicht verpflegt“; gemerkt wird auch der Empfänger nicht. Den

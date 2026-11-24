@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/nachforderungen")
+    format!("/api/einsaetze/{einsatz}/resource-requests")
 }
 
 /// „RTW“ für eine Person, mit zusätzlichen Feldern aus `extra`.
@@ -45,7 +45,7 @@ async fn person(app: &axum::Router, cookie: &str, einsatz: i64, pid: i64) -> Val
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personen/{pid}"),
+        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
         cookie,
         None,
     )
@@ -118,7 +118,7 @@ async fn mehr_als_ein_rettungsmittel_oder_zweiter_bezug_ist_422() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/betreuung/stellen"),
+        &format!("/api/einsaetze/{e}/care/positions"),
         serde_json::json!({"bezeichnung": "NU", "art": "notunterkunft"}),
     )
     .await;
@@ -155,7 +155,7 @@ async fn fremde_unbekannte_und_stornierte_person_sind_404_und_409() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{pid}"),
+        &format!("/api/einsaetze/{e}/persons/{pid}"),
         &admin,
         None,
     )
@@ -214,7 +214,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, z) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({"rufnamen": ["RTW 1/83-1"], "leitstelle_einsatznummer": " 2611-0815 "}),
     )
     .await;
@@ -248,7 +248,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid2}/ablehnen", nachforderungen(e)),
+        &format!("{}/{nid2}/decline", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;
@@ -272,7 +272,7 @@ async fn person_zeigt_den_stand_des_rettungsmittels() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid3}/zurueckziehen", nachforderungen(e)),
+        &format!("{}/{nid3}/withdraw", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;
@@ -293,7 +293,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("{}/{ohne_id}/zusage", nachforderungen(e)),
+        &format!("{}/{ohne_id}/commitment", nachforderungen(e)),
         serde_json::json!({"leitstelle_einsatznummer": "4711"}),
     )
     .await;
@@ -306,7 +306,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({"leitstelle_einsatznummer": zu_lang}),
     )
     .await;
@@ -325,7 +325,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, _) = post(
         &app,
         &admin,
-        &format!("{}/{nid}/zusage", nachforderungen(e)),
+        &format!("{}/{nid}/commitment", nachforderungen(e)),
         serde_json::json!({}),
     )
     .await;

@@ -2491,7 +2491,7 @@ async fn nachforderung_bis(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         Some(
             &serde_json::json!({
@@ -2524,7 +2524,7 @@ async fn nachforderung_status(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen/{id}/status"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -2536,7 +2536,7 @@ async fn load_nachforderung(app: &axum::Router, cookie: &str, einsatz: i64, id: 
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         cookie,
         None,
     )

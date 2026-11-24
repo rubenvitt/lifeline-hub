@@ -76,7 +76,7 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/1/abschnitte', () =>
+    http.get('/api/einsaetze/1/sectors', () =>
       HttpResponse.json([
         { id: 3, name: 'EA Nord' },
         { id: 4, name: 'EA Süd' },
@@ -95,7 +95,7 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
     // Stamm im Dienst (Gruppe „Aus dem Stamm“, LLH-1036 Teil II): leer.
     http.get('/api/personnel', () => HttpResponse.json([])),
     http.get('/api/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sprechgruppen', () =>
+    http.get('/api/einsaetze/1/talk-groups', () =>
       HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
     ),
     http.get('/api/vehicle-statuses', () =>

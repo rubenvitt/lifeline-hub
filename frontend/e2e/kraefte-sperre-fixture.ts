@@ -48,7 +48,7 @@ export async function seedKraefteGesperrt(
     expect(antwort.ok(), `${ziel}: ${antwort.status()} ${await antwort.text()}`).toBe(true);
     return ((await antwort.json()) as { id: number }).id;
   };
-  await post('auftraege', {
+  await post('tasks', {
     auftrag_text: 'Deich sichern',
     empfaenger: [{ empfaenger_typ: 'einheit', einheit_id: einheitId }],
   });

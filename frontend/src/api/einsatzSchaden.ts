@@ -73,7 +73,7 @@ export function listeSchaeden(
   filter: SchaedenListenFilter = {},
 ): Promise<Schaden[]> {
   return apiGet<Schaden[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/damages`, {
       status: filter.status,
       typ: filter.typ,
       ausmass: filter.ausmass,
@@ -179,7 +179,7 @@ export function listeSchaedenSeite(
   limit: number = SCHAEDEN_SEITE,
 ): Promise<Schaden[]> {
   return apiGet<Schaden[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/schaeden`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/damages`, {
       status: sicht.status,
       ...sichtParameter(sicht),
       sortierung: `${sortierung.spalte}_${sortierung.richtung}`,
@@ -196,7 +196,7 @@ export function ladeSchadenKennzahlen(
   sicht: Omit<SchaedenFilter, 'status'>,
 ): Promise<SchadenKennzahlen> {
   return apiGet<SchadenKennzahlen>(
-    mitParametern(`/api/einsaetze/${einsatzId}/schaeden/kennzahlen`, sichtParameter(sicht)),
+    mitParametern(`/api/einsaetze/${einsatzId}/damages/metrics`, sichtParameter(sicht)),
   );
 }
 
@@ -227,7 +227,7 @@ export function passtZurSicht(s: Schaden, sicht: SchaedenFilter): boolean | null
  * Nummer zuerst, ohne Beschreibung und ohne Geschädigten-Angaben; `frei` = kein Geschädigter.
  */
 export function listeSchadenAuswahl(einsatzId: number): Promise<SchadenAuswahl[]> {
-  return apiGet<SchadenAuswahl[]>(`/api/einsaetze/${einsatzId}/schaeden/auswahl`);
+  return apiGet<SchadenAuswahl[]>(`/api/einsaetze/${einsatzId}/damages/selection`);
 }
 
 /** Die Auswahlzeile einer vollen Zeile; `null`, wenn sie nicht in die Auswahl gehört. */
@@ -253,7 +253,7 @@ export function alsSchadenAuswahl(s: Schaden): SchadenAuswahl | null {
  * Status und Lage aller nicht stornierten Schäden, neueste Nummer zuerst. Ohne Freitexte.
  */
 export function listeSchadenMarker(einsatzId: number): Promise<SchadenMarker[]> {
-  return apiGet<SchadenMarker[]>(`/api/einsaetze/${einsatzId}/schaeden/marker`);
+  return apiGet<SchadenMarker[]>(`/api/einsaetze/${einsatzId}/damages/marker`);
 }
 
 /** Der Marker einer vollen Zeile; ein nachgeladener Schaden aktualisiert so auch die Karte. */
@@ -281,11 +281,11 @@ export function vergleicheSchaeden(
 }
 
 export function ladeSchaden(einsatzId: number, schadenId: number): Promise<Schaden> {
-  return apiGet<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`);
+  return apiGet<Schaden>(`/api/einsaetze/${einsatzId}/damages/${schadenId}`);
 }
 
 export function legeSchadenAn(einsatzId: number, daten: SchadenEingabe): Promise<Schaden> {
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden`, 'POST', daten);
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/damages`, 'POST', daten);
 }
 
 /**
@@ -300,7 +300,7 @@ export function aktualisiereSchaden(
   basisGeaendertAt?: string,
 ): Promise<Schaden> {
   const body = basisGeaendertAt ? { ...daten, basis_geaendert_at: basisGeaendertAt } : daten;
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'PATCH', body);
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/damages/${schadenId}`, 'PATCH', body);
 }
 
 export function uebergebeSchaden(
@@ -308,7 +308,7 @@ export function uebergebeSchaden(
   schadenId: number,
   uebergeben_an: string,
 ): Promise<Schaden> {
-  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}/uebergeben`, 'POST', {
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/damages/${schadenId}/hand-over`, 'POST', {
     uebergeben_an,
   });
 }
@@ -319,23 +319,19 @@ export function schliesseSchadenAb(
   abschluss_grund: string,
   notiz?: string,
 ): Promise<Schaden> {
-  return apiSend<Schaden>(
-    `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/abschliessen`,
-    'POST',
-    {
-      abschluss_grund,
-      notiz: notiz ?? null,
-    },
-  );
+  return apiSend<Schaden>(`/api/einsaetze/${einsatzId}/damages/${schadenId}/close`, 'POST', {
+    abschluss_grund,
+    notiz: notiz ?? null,
+  });
 }
 
 export function storniereSchaden(einsatzId: number, schadenId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/schaeden/${schadenId}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/damages/${schadenId}`, 'DELETE');
 }
 
 /** CSV aller nicht stornierten Schäden des Einsatzes (`routes/einsatz_schaden.rs`, `export`). */
 export function ladeSchaedenExport(einsatzId: number): Promise<Blob> {
-  return apiDatei(`/api/einsaetze/${einsatzId}/schaeden/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
+  return apiDatei(`/api/einsaetze/${einsatzId}/damages/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 /** Registriernummer-Anzeige wie im Backend (S-007). */
@@ -346,7 +342,7 @@ export function schadenRegistrierAnzeige(nr: number): string {
 // ---------- Fotos und Dateien ----------
 
 const anhangBasis = (einsatzId: number, schadenId: number) =>
-  `/api/einsaetze/${einsatzId}/schaeden/${schadenId}/anhaenge`;
+  `/api/einsaetze/${einsatzId}/damages/${schadenId}/attachments`;
 
 /** Lebende Anhänge eines Schadens, neueste zuerst. */
 export function listeSchadenAnhaenge(
@@ -385,7 +381,7 @@ export function entferneSchadenAnhang(
 }
 
 /**
- * Download über die modul-gegatete Schadensroute, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * Download über die modul-gegatete Schadensroute, nie über `/attachments/{aid}` des Einsatzes (dort
  * 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb nicht in
  * `routing/deeplinks.ts`.
  */
@@ -394,5 +390,5 @@ export function schadenAnhangDownloadPfad(
   schadenId: number,
   anhangId: number,
 ): string {
-  return `${anhangBasis(einsatzId, schadenId)}/${anhangId}/datei`;
+  return `${anhangBasis(einsatzId, schadenId)}/${anhangId}/file`;
 }

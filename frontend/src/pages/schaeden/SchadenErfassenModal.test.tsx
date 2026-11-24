@@ -39,7 +39,7 @@ beforeEach(() => {
 
 function oeffne() {
   server.use(
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   renderMitProviders(
@@ -79,7 +79,7 @@ describe('SchadenErfassenModal — Eingabegrenzen (LFH-937)', () => {
   it('sperrt einen Ort über 500 Zeichen, ohne ihn zu kürzen', async () => {
     const gesendet = vi.fn();
     server.use(
-      http.post('/api/einsaetze/1/schaeden', () => {
+      http.post('/api/einsaetze/1/damages', () => {
         gesendet();
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),
@@ -120,9 +120,9 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
 
   function rendere(antwort: Parameters<typeof http.post>[1]) {
     server.use(
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/schaeden', antwort),
+      http.post('/api/einsaetze/1/damages', antwort),
     );
     const onClose = vi.fn();
     renderMitProviders(<Harness onClose={onClose} />);
@@ -184,9 +184,9 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
     let antwortFreigeben!: () => void;
     const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
     server.use(
-      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:eid/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/:eid/personal', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/schaeden', async () => {
+      http.post('/api/einsaetze/1/damages', async () => {
         await antwortGate;
         return ablehnen();
       }),
@@ -276,7 +276,7 @@ describe('SchadenErfassenModal — Gefahr und Schadensgrad (LLH-1115)', () => {
   it('sendet Gefahr und Schadensgrad mit', async () => {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),
@@ -302,7 +302,7 @@ describe('SchadenErfassenModal — Gefahr und Schadensgrad (LLH-1115)', () => {
   it('ohne Gefahr sendet es keine Angabe', async () => {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),
@@ -348,7 +348,7 @@ describe('SchadenErfassenModal — Schadensort über die Ortssuche (LLH-1121)', 
           ],
         }),
       ),
-      http.post('/api/einsaetze/1/schaeden', async ({ request }) => {
+      http.post('/api/einsaetze/1/damages', async ({ request }) => {
         gesendet.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ id: 1 }, { status: 201 });
       }),

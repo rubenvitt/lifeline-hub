@@ -71,9 +71,9 @@ function quellen(freigaben = freigabenFixture()) {
     meHandler(kraft),
     json('', () => wert(roh, 'einsatz')),
     json('/module-access', () => freigaben),
-    json('/fuehrungsstelle', () => wert(roh, 'fuehrungsstelle')),
+    json('/command-post', () => wert(roh, 'fuehrungsstelle')),
     json('/mitglieder', () => wert(roh, 'mitglieder')),
-    json('/lagebesprechungen', () => wert(roh, 'lagebesprechungen')),
+    json('/briefings', () => wert(roh, 'lagebesprechungen')),
     mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/einheiten/zeitachse', () => wert(roh, 'einheitenPerioden')),
     // Die Anlage „Personal je Kopf“ steht in der Akte immer; sie braucht Namen.
@@ -86,22 +86,22 @@ function quellen(freigaben = freigabenFixture()) {
     ),
     json('/personal/zeitachse', () => wert(roh, 'personalPerioden')),
     json('/fahrzeuge', () => wert(roh, 'fahrzeuge')),
-    json('/lageberichte', () => berichte),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid`, ({ params }) => {
+    json('/situation-reports', () => berichte),
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, ({ params }) => {
       zaehle(`/lageberichte/${String(params.lid)}`);
       return HttpResponse.json(berichte.find((b) => b.id === Number(params.lid)));
     }),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid/anlagen`, () => HttpResponse.json([])),
-    json('/personen', () => wert(roh, 'personen')),
-    json('/personen/verbleib-angaben', () => wert(roh, 'personenVerbleibAngaben')),
-    json('/personen/druck', () => [person()]),
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid/enclosures`, () => HttpResponse.json([])),
+    json('/persons', () => wert(roh, 'personen')),
+    json('/persons/whereabouts-details', () => wert(roh, 'personenVerbleibAngaben')),
+    json('/persons/print', () => [person()]),
     json('/uhs', () => []),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/schaeden', () => wert(roh, 'schaeden')),
-    json('/evakuierung', () => wert(roh, 'evakuierung')),
-    json('/betreuung', () => wert(roh, 'betreuung')),
-    json('/verpflegung', () => wert(roh, 'verpflegung')),
-    json('/etb/zaehler', () => wert(roh, 'etbZaehler')),
+    json('/damages', () => wert(roh, 'schaeden')),
+    json('/evacuation', () => wert(roh, 'evakuierung')),
+    json('/care', () => wert(roh, 'betreuung')),
+    json('/catering', () => wert(roh, 'verpflegung')),
+    json('/etb/counts', () => wert(roh, 'etbZaehler')),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
@@ -111,7 +111,7 @@ function quellen(freigaben = freigabenFixture()) {
           : [etbEintrag({ id: 200, lfd_nr: 1, typ: 'meldung', inhalt: 'Erstmeldung Halle 3' })],
       );
     }),
-    json('/auftraege', () => [
+    json('/tasks', () => [
       {
         id: 1,
         lfd_nr: 3,
@@ -122,15 +122,15 @@ function quellen(freigaben = freigabenFixture()) {
         empfaenger: [{ snap_anzeige: 'Zug 1' }],
       },
     ]),
-    json('/befehle', () => [
+    json('/orders', () => [
       befehl({}),
       befehl({ id: 12, titel: 'Befehl Entwurf', status: 'entwurf' }),
     ]),
-    http.get(`/api/einsaetze/${E}/befehle/:bid`, ({ params }) => {
+    http.get(`/api/einsaetze/${E}/orders/:bid`, ({ params }) => {
       zaehle(`/befehle/${String(params.bid)}`);
       return HttpResponse.json(befehl({ id: Number(params.bid) }));
     }),
-    http.get(`/api/einsaetze/${E}/befehle/:bid/anlagen`, () => HttpResponse.json([])),
+    http.get(`/api/einsaetze/${E}/orders/:bid/enclosures`, () => HttpResponse.json([])),
   );
   return { aufrufe, lageQuelle: wert<LageberichtQuelle>(roh, 'lageberichte') };
 }
@@ -175,7 +175,7 @@ describe('EinsatzakteDruckPage', () => {
     for (const k of kapitel()) expect(k.querySelector('[data-lfh="druckkopf"]')).not.toBeNull();
     // Betroffene mit Namen, genau ein protokollierter Abruf.
     expect(kapitel()[2]).toHaveTextContent('Quastenflosser');
-    expect(aufrufe.get('/personen/druck')).toBe(1);
+    expect(aufrufe.get('/persons/print')).toBe(1);
     // Volles ETB, Auftragsliste mit aufgehobenem Auftrag.
     expect(kapitel()[1]).toHaveTextContent('Erstmeldung Halle 3');
     expect(kapitel()[3]).toHaveTextContent('Riegelstellung aufbauen');
@@ -208,7 +208,7 @@ describe('EinsatzakteDruckPage', () => {
     expect(await screen.findByText('Kein Zugriff: Betroffene')).toBeInTheDocument();
     expect(druckKnopf()).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Anhänge und Tabellen (ZIP)' })).toBeNull();
-    expect(aufrufe.get('/personen/druck')).toBeUndefined();
+    expect(aufrufe.get('/persons/print')).toBeUndefined();
   });
 
   it('ausgeblendetes Modul: Kapitel „nicht genutzt“, Akte druckbar', async () => {
@@ -225,7 +225,7 @@ describe('EinsatzakteDruckPage', () => {
   it('scheitert ein Kapitel, ist Drucken gesperrt und das Kapitel genannt', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/auftraege`, () =>
+      http.get(`/api/einsaetze/${E}/tasks`, () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 422 }),
       ),
     );

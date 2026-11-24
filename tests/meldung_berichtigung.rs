@@ -20,7 +20,7 @@ async fn melden(app: &axum::Router, cookie: &str, einsatz: i64, art: &str) -> Va
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -57,7 +57,7 @@ async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> Vec<Value> {
 }
 
 async fn meldung(app: &axum::Router, cookie: &str, einsatz: i64, mid: i64) -> Value {
-    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/meldungen"))
+    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/reports"))
         .await
         .into_iter()
         .find(|m| m["id"] == mid)
@@ -68,7 +68,7 @@ async fn lagemeldung(app: &axum::Router, cookie: &str, einsatz: i64, mid: i64) -
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/situation/reports"),
     )
     .await
     .into_iter()

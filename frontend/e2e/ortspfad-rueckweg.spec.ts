@@ -23,7 +23,7 @@ async function einsatzMitSchaeden(page: Page): Promise<string> {
     { ausmass: 'gering', ort: 'Bachstraße 1' },
     { ausmass: 'gross', ort: 'Deichweg 2' },
   ]) {
-    const a = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+    const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
       data: { typ: 'sachschaden', ...s },
     });
     expect(a.ok(), `POST schaeden: ${a.status()} ${await a.text()}`).toBe(true);
@@ -62,7 +62,7 @@ test.describe('Ortspfad der Detailseite', () => {
   test('führt direkt geöffnet auf die Liste mit ihrer Vorgabe', async ({ page }) => {
     await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
-    const liste = await page.request.get(`/api/einsaetze/${einsatzId}/schaeden`);
+    const liste = await page.request.get(`/api/einsaetze/${einsatzId}/damages`);
     const [erster] = (await liste.json()) as { id: number }[];
 
     await page.goto(`/einsaetze/${einsatzId}/schaeden/${erster.id}`);
@@ -82,7 +82,7 @@ test.describe('Ortspfad der Detailseite', () => {
     await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     for (let i = 0; i < 40; i++) {
-      const a = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+      const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
         data: { typ: 'sachschaden', ausmass: 'gross', ort: `Uferweg ${i + 10}` },
       });
       expect(a.ok(), `POST schaeden: ${a.status()}`).toBe(true);

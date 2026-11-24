@@ -56,7 +56,7 @@ Handler (`JsonBody`, LFH-1074).
   `ohne_treffer` zu 409 `Veraltet` oder 404). Die Stärke-Position vergleicht den wirksamen Wert,
   der Material-Ort ist eine Gruppe aller vier Spalten. Kein Eintrag in `einsatz_feld_vermerk`.
 - **Personendaten nutzen Feld-CAS** (LLH-1103, design.md D1 der Change
-  `f8218h1i-personendaten-feldweise`): der PATCH `…/personen/{pid}` trägt in `erwartet` je
+  `f8218h1i-personendaten-feldweise`): der PATCH `…/persons/{pid}` trägt in `erwartet` je
   geändertem Feld den Wert beim Öffnen (`null` = leer, Koordinate nur als Paar), und
   `person::repo::aktualisiere` hängt je Feld `AND <spalte> IS ?` an. Sichtung, Status, PAT oder
   ein anderes Feld lösen so keinen 409 aus; ein Altwert ohne Änderung desselben Felds und eine
@@ -273,8 +273,8 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Guard `jeder_fremdschluessel_auf_anhang_ist_registriert`. **Abschottungstests laufen als die
   ablegende Person** (`admin`, `common::schaden_anhang`), sonst sind sie ohne Eintrag grün.
 - Kreuzsperren: ETB nimmt keine Chat-/modulgebundene Datei (422, `gebunden_meldung()`), Chat keine
-  modulgebundene (400). Upload `POST …/etb/anhaenge` (Dokument-Allowlist, eine Datei je Anfrage),
-  Download `GET …/etb/{eintrag_id}/anhaenge/{aid}`; Binden über `anhang_ids` in derselben
+  modulgebundene (400). Upload `POST …/etb/attachments` (Dokument-Allowlist, eine Datei je Anfrage),
+  Download `GET …/etb/{eintrag_id}/attachments/{aid}`; Binden über `anhang_ids` in derselben
   Transaktion (`anlegen_idempotent`, `write_retry!`). **Append-only**, nur die Schwärzung löscht.
 - **Heraufstufen aus dem Chat kopiert** (LFH-700): `anhang_ids` der Nachricht (explizit, leer =
   keine, ≤ 10, fremd → 400) gehen als neue `anhang`-Zeile an den Eintrag
@@ -304,13 +304,13 @@ Lese-Audit (wie Tiere insgesamt).
   `original_freigeben`; scheitert sie, geht nichts hinaus. Abgewiesene Anfragen, Liste und
   Ablegen protokollieren nichts. `anhang_id` dort **ohne FK** (sonst wäre die Tabelle für den
   Linker-Guard ein Linker, und die Schwärzung nähme das Protokoll mit); `ablage` hält den Ort
-  lesbar. Einsicht `GET …/uhs/{uid}/anhaenge/zugriffe` nur Einsatzleitung, selbst nicht
+  lesbar. Einsicht `GET …/uhs/{uid}/attachments/accesses` nur Einsatzleitung, selbst nicht
   protokolliert. Getrennt von `person_zugriff_audit` (LFH-757).
 - **UHS-Plan (LFH-999)** (Spec `uhs-plan`, Herleitung
   `openspec/changes/archive/2026-10-05-lfh-999-uhs-plan-hintergrund/design.md`): der Plan unter
   dem Platz-Layout ist **kein Anhang**, sondern eigene, bereinigte Bytes in `uhs_plan` (einer je
-  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/bild`) schreibt
-  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/aus-anhang`) ist
+  UHS, `uhs::plan`, `routes::uhs_plan`). Seine Anzeige (`GET …/uhs/{uid}/plan/image`) schreibt
+  weder Lese-Audit noch ETB; nur die Übernahme aus einem UHS-Anhang (`…/plan/from-attachment`) ist
   EIN protokollierter Abruf, vor dem Lesen der Bytes über `support::anhang_bereinigt_kopieren`.
   Keinen Verweis vom Plan auf einen Anhang einführen: das Audit verlöre seine Aussage.
 
@@ -419,8 +419,8 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 - **In einer geblätterten Liste steht jede Einschränkung, die Zeilen ausblendet**
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
-- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/personen/auswahl`,
-  `…/schaeden/auswahl`), nicht die Vollliste.
+- **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/persons/selection`,
+  `…/damages/selection`), nicht die Vollliste.
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
   `…/infotelefon` liefert immer eine Seite (`kommunikation::parse_page`, Cursor `eingang_at` + `id`),
@@ -433,7 +433,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   wie die Kennzahlen. Ohne `limit` bleibt die Vollliste (Druck, Bericht, Snapshot).
 - **Suche einer geblätterten Liste: `q` getrimmt, leer = keine Suche, über 200 Zeichen 400**,
   Muster nur aus `db::suche::like_muster`. Die Auftragsliste trägt sie wie die Schadenliste
-  (`…/auftraege?q=` und `…/auftraege/kennzahlen?q=`: Kennung `#n`, Text, Empfänger).
+  (`…/tasks?q=` und `…/tasks/metrics?q=`: Kennung `#n`, Text, Empfänger).
 
 ## Backend — Benutzername und KDF (LFH-921, LFH-981)
 
@@ -492,7 +492,7 @@ Herleitung in
 - **`instanz::PROTOKOLL` erhöhen** heißt: die vorige Version bleibt im Code, bis die übernächste
   kommt; Melden geht über alle Versionen (`extractor::check_protokoll`) und sein Schema
   (`melden::MeldenAnfrage`, `MeldenAntwort`) wächst nur additiv. Einzige Ausnahme ist der Sprung
-  4 → 6 mit den englischen Wegen (LLH-2053, harter Schnitt in der Alpha, ADR-0085): Zwischen 4
+  4 → 6 mit den englischen Wegen (LLH-2053, harter Schnitt in der Alpha, ADR-0097): Zwischen 4
   und 6 geht auch Melden nicht; ein unsigniertes 404 beim Melden oder Einlösen heißt „anderer
   Softwarestand“ (`melden::deute_unsigniert`, `routes::instanz`). Ab 1.0.0 bleibt ein umbenannter Weg als Alias erreichbar.
 - **Unterschriftsschlüssel** (`auth::unterschrift`) liegen getrennt von `webauthn_credential` und
@@ -951,7 +951,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
-  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
+  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/reports/{mid}` lesen
   dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
 - **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
   4096 Byte für den ganzen Push, das Relais weist einen größeren Push mit 400 ab). Zu langes kürzt
@@ -1036,11 +1036,11 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   protokolliert. Live wie beim ETB über `meldung::live_publikation_sicherstellen`. Nachweis
   `tests/chat_meldungseingang.rs`.
 - **Kenntnisnahme über die Meldung:** `POST …/meldungen/{mid}/lage-gesehen` und
-  `POST …/lage/gesehen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
+  `POST …/situation/seen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
 - **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
   `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten).
-- **Korrektur (LLH-1066):** `PATCH …/meldungen/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
+- **Korrektur (LLH-1066):** `PATCH …/reports/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
   in `meldung/korrektur.rs`, eine Transaktion) ändert Art, Priorität, Richtung, Von-Bezug (als
   Paar; eine id außerhalb des Einsatzes 422, anders als beim Erfassen), Empfänger und die
   Lage-Angaben. Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang → 422, ein unbekanntes Feld

@@ -35,14 +35,14 @@ async function seed(page: Page) {
   const einsatzId = String(id);
   const basis = `/api/einsaetze/${einsatzId}`;
   await post(page, `${basis}/einheiten`, { name: 'Staffel A' });
-  const nf = await post(page, `${basis}/nachforderungen`, {
+  const nf = await post(page, `${basis}/resource-requests`, {
     art: 'Tauchpumpe',
     bezeichnung: BEDARF,
     anzahl: 3,
     adressat_kategorie: 'leitstelle',
   });
   for (const status of ['zugesagt', 'unterwegs', 'eingetroffen']) {
-    await post(page, `${basis}/nachforderungen/${nf.id}/status`, { status });
+    await post(page, `${basis}/resource-requests/${nf.id}/status`, { status });
   }
   return { einsatzId, nfId: nf.id };
 }
@@ -145,7 +145,7 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
     .toContain(`Material «Tauchpumpe THW» (×1) mit Nachforderung «${BEDARF}» verknüpft`);
 
   // Die Rücknahme auf „Unterwegs“ ist gesperrt, wie nach einer Übernahme.
-  const ruecknahme = await page.request.post(`${basis}/nachforderungen/${nfId}/status`, {
+  const ruecknahme = await page.request.post(`${basis}/resource-requests/${nfId}/status`, {
     data: { status: 'unterwegs' },
   });
   expect(ruecknahme.status()).toBe(422);
@@ -213,7 +213,7 @@ test('Fehlzuordnung in der Materialliste lösen: der Posten bleibt, die Rücknah
   await karte.getByRole('button', { name: /^Aktionen zu Nachforderung / }).click();
   const ruecknahme = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`${basis}/nachforderungen/${nfId}/status`) &&
+      r.url().endsWith(`${basis}/resource-requests/${nfId}/status`) &&
       r.request().method() === 'POST',
   );
   await page.getByRole('menuitem', { name: 'Eintreffen zurücknehmen' }).click();

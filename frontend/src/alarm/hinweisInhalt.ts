@@ -23,15 +23,15 @@ import { INHALT_FRIST_MS, ladeMeldungInhalt, wortlautAnfang } from './meldungInh
  *
  * | Art | Abruf | zeigt |
  * |---|---|---|
- * | Meldung (`meldungInhalt.ts`) | `GET …/meldungen/{id}` | Absender im Titel, Wortlautanfang |
+ * | Meldung (`meldungInhalt.ts`) | `GET …/reports/{id}` | Absender im Titel, Wortlautanfang |
  * | Erinnerung (`erinnerungInhalt.ts`) | offene Erinnerungen | Titel als Gegenstand |
- * | Auftrag | `GET …/auftraege/{id}` | „#12 · Textanfang“; bei Quittung, wer quittiert hat |
+ * | Auftrag | `GET …/tasks/{id}` | „#12 · Textanfang“; bei Quittung, wer quittiert hat |
  * | Befehl, Lagebericht | Einzelabruf | Dokumenttitel als Gegenstand |
  * | Gefahr | Zonen der Lagekarte | Bezeichnung als Gegenstand |
  * | Nachforderung | Liste der Nachforderungen | Art und Bezeichnung als Gegenstand |
  * | Chat-Erwähnung | Nachrichten des Kanals bis zur Nachricht | Absender, Textanfang |
  *
- * Für Gefahr gibt es keinen Einzelabruf, und `/gefahrengebiete` verlangt das Modul
+ * Für Gefahr gibt es keinen Einzelabruf, und `/hazard-areas` verlangt das Modul
  * `gefahrenzonen`, der Empfänger hat sicher nur `lagekarte`. Die Zone trägt beim Anlegen
  * dieselbe Bezeichnung wie ihr Gebiet, und nur das Anlegen meldet. Die Quittung eines Auftrags
  * zeigt auf die Empfängerzeile und eine Erwähnung auf die Nachricht; Auftrag und Kanal stehen nur

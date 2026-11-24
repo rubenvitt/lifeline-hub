@@ -89,7 +89,7 @@ test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Off
 
     const feld = page.getByLabel('Kartenobjekte suchen');
     await feld.fill('Hauptstraße 12, Musterstadt');
-    const antwort = page.waitForResponse((r) => r.url().includes('/karte/ort-suche?'));
+    const antwort = page.waitForResponse((r) => r.url().includes('/map/place-search?'));
     await feld.press('Enter');
     const json = (await (await antwort).json()) as {
       zustand: string;

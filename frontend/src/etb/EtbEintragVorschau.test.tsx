@@ -138,7 +138,7 @@ describe('EtbEintragVorschau (LFH-664)', () => {
 
     expect(
       await screen.findByRole('link', { name: 'fax.pdf, 2,0 KB, Anhang zu Nr. 12 herunterladen' }),
-    ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
+    ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/attachments/9');
   });
 
   it('zeigt ein Foto als Vorschaubild ohne Bedienziel (LFH-759)', async () => {
@@ -162,7 +162,7 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     const bild = await screen.findByRole('img', { name: 'Vorschau: dach.jpg, Anhang zu Nr. 12' });
     expect(bild.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=vorschau',
+      '/api/einsaetze/5/etb/40/attachments/9?fassung=vorschau',
     );
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });

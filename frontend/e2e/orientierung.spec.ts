@@ -130,7 +130,7 @@ test.describe('Orientierung (LFH-954)', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page, `Rückweg Detail ${Date.now()}`);
-    const antwort = await page.request.post(`/api/einsaetze/${id}/personen`, {
+    const antwort = await page.request.post(`/api/einsaetze/${id}/persons`, {
       data: { name: 'Rückweg', vorname: 'Rita', antreff_ort: 'Brücke' },
     });
     expect(antwort.ok(), `Person: ${antwort.status()}`).toBe(true);

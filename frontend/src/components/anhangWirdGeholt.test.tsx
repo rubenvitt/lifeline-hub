@@ -17,7 +17,7 @@ import * as dateiSpeichern from './dateiSpeichern';
  * `einsatz-spiegel`, „Öffnen am Hub“): statt eines Fehlers das Wort, nach dem nächsten Abgleich
  * (neuer Stand des Einsatzkopfs) ein neuer Versuch. Ohne Spiegel unverändert.
  */
-const HREF = '/api/einsaetze/5/schaeden/3/anhaenge/9/datei';
+const HREF = '/api/einsaetze/5/damages/3/attachments/9/file';
 const spiegel = {
   gegenstelle: 'ELW 1',
   beendet: false,

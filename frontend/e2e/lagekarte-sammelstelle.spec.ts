@@ -109,7 +109,7 @@ test('Sammelstelle: Zeichen, Sprung vom Bezirk ohne Fläche, Setzen ohne ETB', a
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: nord } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
+  const { id: nord } = await senden(page, 'post', `${basis}/evacuation/districts`, {
     bezeichnung: 'Nord',
     plan_personen: 120,
     plan_erhebung: 'geschaetzt',
@@ -117,7 +117,7 @@ test('Sammelstelle: Zeichen, Sprung vom Bezirk ohne Fläche, Setzen ohne ETB', a
     sammelstelle_lat: SAMMEL_ORT[1],
     sammelstelle_lon: SAMMEL_ORT[0],
   });
-  const { id: sued } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
+  const { id: sued } = await senden(page, 'post', `${basis}/evacuation/districts`, {
     bezeichnung: 'Süd',
     plan_personen: 80,
     plan_erhebung: 'geschaetzt',
@@ -169,7 +169,7 @@ test('Sammelstelle: ohne Modul Evakuierung keine Ebene und kein Marker', async (
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: nord } = await senden(page, 'post', `${basis}/evakuierung/bezirke`, {
+  const { id: nord } = await senden(page, 'post', `${basis}/evacuation/districts`, {
     bezeichnung: 'Nord',
     plan_personen: 120,
     plan_erhebung: 'geschaetzt',

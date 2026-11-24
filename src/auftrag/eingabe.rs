@@ -497,7 +497,7 @@ pub(crate) fn ziel_punkt(
     }
 }
 
-/// Body von `PATCH …/auftraege/{aid}` (LLH-1098, design.md D6): Teil-Patch. Ein fehlendes Feld
+/// Body von `PATCH …/tasks/{aid}` (LLH-1098, design.md D6): Teil-Patch. Ein fehlendes Feld
 /// bleibt; `null` (oder leer) leert ein optionales Feld. Empfänger ersetzen die ganze Liste.
 #[derive(Debug, Default, Deserialize)]
 pub struct AuftragPatch {

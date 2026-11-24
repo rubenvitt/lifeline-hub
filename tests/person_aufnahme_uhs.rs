@@ -38,7 +38,7 @@ async fn aufnehmen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (St
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -269,7 +269,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
             let (s, d) = anfrage(
                 &app,
                 "GET",
-                &format!("/api/einsaetze/{e}/personen/{p}"),
+                &format!("/api/einsaetze/{e}/persons/{p}"),
                 &admin,
                 None,
             )
@@ -299,7 +299,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, platz) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{u}/plaetze"),
+        &format!("/api/einsaetze/{e}/uhs/{u}/seats"),
         &admin,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"Platz 2"}"#),
     )
@@ -317,7 +317,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/uhs-occupancy"),
         &admin,
         Some(&json!({ "art": "wechsel", "uhs_id": u, "platz_id": platz_id }).to_string()),
     )
@@ -332,7 +332,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen/{p}/uhs-belegung"),
+        &format!("/api/einsaetze/{e}/persons/{p}/uhs-occupancy"),
         &admin,
         Some(r#"{"art":"austritt"}"#),
     )

@@ -136,21 +136,21 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
     http.get('/api/einsaetze/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([NORD, NORD_OST])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([NORD, NORD_OST])),
     http.get('/api/einsaetze/7/einheiten', () =>
       HttpResponse.json([
         einheit(5, { name: '2. Zug', abschnitt_id: 21, abschnitt_name: 'UA Nord-Ost' }),
         einheit(4, { name: '1. Zug', abschnitt_id: 20, abschnitt_name: 'EA Nord' }),
       ]),
     ),
-    http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([auftrag])),
-    http.post('/api/einsaetze/7/auftraege/:aid/empfaenger/:eid/quittieren', ({ params }) => {
+    http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([auftrag])),
+    http.post('/api/einsaetze/7/tasks/:aid/recipients/:eid/acknowledge', ({ params }) => {
       quittiert.push(`${params.aid}/${params.eid}`);
       return HttpResponse.json(auftrag);
     }),
-    http.get('/api/einsaetze/7/befehle', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json([])),
-    http.post('/api/einsaetze/7/meldungen', async ({ request }) => {
+    http.get('/api/einsaetze/7/orders', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
+    http.post('/api/einsaetze/7/reports', async ({ request }) => {
       gesendet.push(await request.json());
       return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
     }),
@@ -323,7 +323,7 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
 
     stelleBereit(geraet({ ansicht: 'uhs-tablet', uhs_id: 2, stelle_id: 2, stelle: 'UHS Nord' }));
     server.use(
-      http.get('/api/einsaetze/7/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/uhs/2', () => HttpResponse.json({ id: 2, plaetze: [] })),
     );
     const zweiter = renderApp('/geraet/7/auftraege');
@@ -477,17 +477,17 @@ function befehleBereit() {
   const aufrufe: string[] = [];
   let quittiert: string | null = null;
   server.use(
-    http.get('/api/einsaetze/7/befehle', () => HttpResponse.json([befehlKopf(quittiert)])),
-    http.get('/api/einsaetze/7/befehle/51', () => {
+    http.get('/api/einsaetze/7/orders', () => HttpResponse.json([befehlKopf(quittiert)])),
+    http.get('/api/einsaetze/7/orders/51', () => {
       aufrufe.push('detail');
       return HttpResponse.json(befehlAnzeige(quittiert));
     }),
-    http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/quittieren', ({ params }) => {
+    http.post('/api/einsaetze/7/orders/:bid/distribution/:vid/acknowledge', ({ params }) => {
       aufrufe.push(`quittieren ${params.bid}/${params.vid}`);
       quittiert = '2026-10-04 09:30:00';
       return HttpResponse.json(befehlAnzeige(quittiert));
     }),
-    http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/zuruecknehmen', ({ params }) => {
+    http.post('/api/einsaetze/7/orders/:bid/distribution/:vid/undo', ({ params }) => {
       aufrufe.push(`zuruecknehmen ${params.bid}/${params.vid}`);
       quittiert = null;
       return HttpResponse.json(befehlAnzeige(null));
@@ -548,7 +548,7 @@ describe('Abschnittsgerät — Einsatzbefehle (LLH-1190)', () => {
     stelleBereit();
     befehleBereit();
     server.use(
-      http.post('/api/einsaetze/7/befehle/:bid/verteiler/:vid/quittieren', () =>
+      http.post('/api/einsaetze/7/orders/:bid/distribution/:vid/acknowledge', () =>
         HttpResponse.json({ error: 'Eine neuere Fassung ist freigegeben' }, { status: 422 }),
       ),
     );
@@ -580,13 +580,13 @@ describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
 
   function mitZweiAuftraegen() {
     stelleBereit();
-    server.use(http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([auftrag, zweiter])));
+    server.use(http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([auftrag, zweiter])));
   }
 
   it('Quittieren: der Grund steht an der Karte, die andere bleibt leer', async () => {
     mitZweiAuftraegen();
     server.use(
-      http.post('/api/einsaetze/7/auftraege/31/empfaenger/1/quittieren', () =>
+      http.post('/api/einsaetze/7/tasks/31/recipients/1/acknowledge', () =>
         HttpResponse.json({ error: 'Bereits quittiert' }, { status: 409 }),
       ),
     );
@@ -606,7 +606,7 @@ describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
   it('In Bearbeitung: der Grund steht an der Karte', async () => {
     mitZweiAuftraegen();
     server.use(
-      http.post('/api/einsaetze/7/auftraege/31/vollzug', () =>
+      http.post('/api/einsaetze/7/tasks/31/execution', () =>
         HttpResponse.json({ error: 'Auftrag ist bereits vollzogen' }, { status: 422 }),
       ),
     );
@@ -626,7 +626,7 @@ describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
     mitZweiAuftraegen();
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/7/auftraege/31/vollzug', () => {
+      http.post('/api/einsaetze/7/tasks/31/execution', () => {
         versuch += 1;
         // Der zweite Versuch bleibt offen: geräumt wird beim Absenden, nicht erst beim Erfolg.
         return versuch === 1
@@ -650,7 +650,7 @@ describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
     let gibFrei: () => void = () => {};
     const freigabe = new Promise<void>((r) => (gibFrei = r));
     server.use(
-      http.post('/api/einsaetze/7/auftraege/31/vollzug', async () => {
+      http.post('/api/einsaetze/7/tasks/31/execution', async () => {
         await freigabe;
         return HttpResponse.json({ ...auftrag, bearbeitungsstatus: 'vollzogen' });
       }),
@@ -677,7 +677,7 @@ describe('Abschnittsgerät — Speicherfehler am Ort (LFH-1077)', () => {
   it('Vollzug melden: der Grund steht im Dialog, der Text bleibt', async () => {
     mitZweiAuftraegen();
     server.use(
-      http.post('/api/einsaetze/7/auftraege/31/vollzug', () =>
+      http.post('/api/einsaetze/7/tasks/31/execution', () =>
         HttpResponse.json({ error: 'Auftrag ist bereits abgenommen' }, { status: 422 }),
       ),
     );

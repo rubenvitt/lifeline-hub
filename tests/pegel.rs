@@ -68,7 +68,7 @@ async fn setup_mit_pegel_basis(basis: &str) -> Umgebung {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/pegel")
+    format!("/api/einsaetze/{einsatz}/gauges")
 }
 
 fn station(uuid: &str, name: &str) -> String {
@@ -542,7 +542,7 @@ async fn put_und_post_warten_nicht_auf_den_abruf() {
 // ---------- Prognose (LFH-628) ----------
 
 fn prognose_pfad(einsatz: i64, pegel_id: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/prognose")
+    format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/forecast")
 }
 
 const PROGNOSE: &str = r#"{"hoechststand_cm":709.6,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#;
@@ -767,7 +767,7 @@ async fn wv_basis(reihe: Value) -> (String, std::sync::Arc<std::sync::atomic::At
 }
 
 fn vorhersage_pfad(einsatz: i64, pegel_id: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/vorhersage")
+    format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/prediction")
 }
 
 #[tokio::test]
@@ -838,7 +838,7 @@ async fn vorhersage_ohne_quelle_und_cache_ist_502_fremder_pegel_404() {
 // ---------- Verlauf (LFH-633) ----------
 
 fn verlauf_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/pegel/verlauf")
+    format!("/api/einsaetze/{einsatz}/gauges/history")
 }
 
 /// Verlauf aus dem vorbelegten Cache, in der Reihenfolge der Pegel; eine Station ohne Stand
@@ -1060,7 +1060,7 @@ async fn pegel_und_evakuierung_schalten_beide_lagekennzahlen() {
     let (status, b) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
         &admin,
         Some(
             r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"gezaehlt"}"#,

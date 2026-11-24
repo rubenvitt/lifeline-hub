@@ -95,7 +95,7 @@ async fn einheit_mit_fuehrer(l: &Lage, name: &str, person: &str) -> (i64, i64) {
 async fn entlassen_des_fuehrers_vermerkt_fuehrer_und_einsatzleiter() {
     let l = lage().await;
     let (eid, ep) = einheit_mit_fuehrer(&l, "1. Zug", "Anna").await;
-    let fs = format!("/api/einsaetze/{}/fuehrungsstelle", l.einsatz);
+    let fs = format!("/api/einsaetze/{}/command-post", l.einsatz);
     senden(
         &l.app,
         &l.admin,
@@ -133,7 +133,7 @@ async fn entlassen_eines_fahrzeugs_der_fuehrungsstelle_vermerkt_ihre_fahrzeuge()
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let ef = v["id"].as_i64().unwrap();
-    let fs = format!("/api/einsaetze/{}/fuehrungsstelle", l.einsatz);
+    let fs = format!("/api/einsaetze/{}/command-post", l.einsatz);
     senden(
         &l.app,
         &l.admin,
@@ -200,7 +200,7 @@ async fn abruf_mit_abschnitt_vermerkt_den_abschnitt_nur_bei_wechsel() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/abschnitte", l.einsatz),
+        &format!("/api/einsaetze/{}/sectors", l.einsatz),
         &l.admin,
         Some(&json!({"name": "EA Deich"})),
     )
@@ -305,7 +305,7 @@ async fn zuordnen_und_freigeben_vermerken_den_fuehrer() {
 async fn ruecknahme_der_entlassung_vermerkt_fuehrer_und_einsatzleiter() {
     let l = lage().await;
     let (eid, ep) = einheit_mit_fuehrer(&l, "1. Zug", "Anna").await;
-    let fs = format!("/api/einsaetze/{}/fuehrungsstelle", l.einsatz);
+    let fs = format!("/api/einsaetze/{}/command-post", l.einsatz);
     senden(
         &l.app,
         &l.admin,

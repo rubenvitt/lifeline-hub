@@ -146,15 +146,15 @@ for (const modus of ['light', 'dark'] as const) {
     }
     const schaeden = [];
     for (const label of ['offen', 'übergeben', 'abgeschlossen']) {
-      const s = await post(page, `${basis}/schaeden`, {
+      const s = await post(page, `${basis}/damages`, {
         typ: 'sachschaden',
         ausmass: 'gering',
         ort: `Kontrast ${label}`,
       });
       if (label === 'übergeben')
-        await post(page, `${basis}/schaeden/${s.id}/uebergeben`, { uebergeben_an: 'Teststelle' });
+        await post(page, `${basis}/damages/${s.id}/hand-over`, { uebergeben_an: 'Teststelle' });
       if (label === 'abgeschlossen')
-        await post(page, `${basis}/schaeden/${s.id}/abschliessen`, { abschluss_grund: 'behoben' });
+        await post(page, `${basis}/damages/${s.id}/close`, { abschluss_grund: 'behoben' });
       schaeden.push({ id: s.id, label });
     }
     for (const [modul, saetze] of [
@@ -327,7 +327,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Fehler an der Zeile: der PATCH scheitert, die Zelle trägt Marke und Satz.
-    await page.route('**/api/einsaetze/*/personen/*', (r) =>
+    await page.route('**/api/einsaetze/*/persons/*', (r) =>
       r.request().method() === 'PATCH'
         ? r.fulfill({ status: 500, json: { error: 'Speicher nicht erreichbar' } })
         : r.continue(),

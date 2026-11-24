@@ -204,7 +204,7 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     });
     let erreichbar = false;
     server.use(
-      http.get('/api/einsaetze/:id/meldungen/:mid', ({ params }) =>
+      http.get('/api/einsaetze/:id/reports/:mid', ({ params }) =>
         erreichbar
           ? HttpResponse.json({ id: Number(params.mid), absender: 'RTW 3', inhalt: 'Lage stabil' })
           : HttpResponse.json({ error: 'weg' }, { status: 503 }),
@@ -246,14 +246,14 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       ungelesen: 1,
     });
     server.use(
-      http.get('/api/einsaetze/:id/meldungen/:mid', ({ params }) =>
+      http.get('/api/einsaetze/:id/reports/:mid', ({ params }) =>
         HttpResponse.json({
           id: Number(params.mid),
           absender: 'RTW 2',
           inhalt: 'Patient ansprechbar, Transport ins Klinikum',
         }),
       ),
-      http.get('/api/einsaetze/:id/erinnerungen', () =>
+      http.get('/api/einsaetze/:id/reminders', () =>
         HttpResponse.json([{ id: 5, einsatz_id: 1, titel: 'Pegel prüfen' }]),
       ),
     );
@@ -292,10 +292,10 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       ungelesen: 2,
     });
     server.use(
-      http.get('/api/einsaetze/:id/nachforderungen', () =>
+      http.get('/api/einsaetze/:id/resource-requests', () =>
         HttpResponse.json([{ id: 3, anzahl: 2, art: 'RTW', bezeichnung: 'Transport aus der UHS' }]),
       ),
-      http.get('/api/einsaetze/:id/zonen', () =>
+      http.get('/api/einsaetze/:id/zones', () =>
         HttpResponse.json([{ id: 2, gefahrengebiet_id: 9, label: 'Gasaustritt Halle 3' }]),
       ),
     );

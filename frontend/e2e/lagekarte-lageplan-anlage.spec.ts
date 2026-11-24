@@ -53,7 +53,7 @@ test('Als Anlage an …: an einen offenen Entwurf und an einen neuen Lagevortrag
   await anmeldenAls(page, ADMIN, ADMIN_PW);
   const einsatzId = await einsatzMitLage(page, `E2E Lageplan Anlage ${Date.now()}`);
   const a = api(page, einsatzId);
-  const { id: entwurf } = await a.post('lageberichte', {
+  const { id: entwurf } = await a.post('situation-reports', {
     vorlage: 'lagebericht',
     titel: 'Lage 1200',
   });
@@ -68,11 +68,11 @@ test('Als Anlage an …: an einen offenen Entwurf und an einen neuen Lagevortrag
   await expect(page.getByText('Lageplan an „Lagebericht · Lage 1200“ angefügt')).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lagekarte`));
 
-  const [anlage] = await a.get<Anlage[]>(`lageberichte/${entwurf}/anlagen`);
+  const [anlage] = await a.get<Anlage[]>(`situation-reports/${entwurf}/enclosures`);
   expect(anlage).toMatchObject({ nummer: 1, art: 'lageplan', titel: 'Lageplan' });
   const bild = await bildDerAnlage(
     page,
-    `/api/einsaetze/${einsatzId}/lageberichte/${entwurf}/anlagen/${anlage.id}/datei`,
+    `/api/einsaetze/${einsatzId}/situation-reports/${entwurf}/enclosures/${anlage.id}/file`,
   );
   test.info().annotations.push({
     type: 'messwert',
@@ -94,7 +94,8 @@ test('Als Anlage an …: an einen offenen Entwurf und an einen neuen Lagevortrag
   const neuId = Number(new URL(page.url()).pathname.split('/').pop());
   expect(neuId).not.toBe(entwurf);
   await expect(page.getByRole('link', { name: 'Anlage 1: Lageplan herunterladen' })).toBeVisible();
-  const berichte = await a.get<{ id: number; titel: string; vorlage: string }[]>('lageberichte');
+  const berichte =
+    await a.get<{ id: number; titel: string; vorlage: string }[]>('situation-reports');
   expect(berichte.find((b) => b.id === neuId)).toMatchObject({
     vorlage: 'lagebericht',
     titel: expect.stringMatching(/^Lageüberblick \d{4}$/),

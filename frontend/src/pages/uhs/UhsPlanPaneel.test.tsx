@@ -91,14 +91,14 @@ function planServer(anhaenge: UhsAnhang[] = [], patchStatus = 200) {
     });
   };
   server.use(
-    http.get('/api/einsaetze/1/uhs/1/anhaenge', () => HttpResponse.json(anhaenge)),
+    http.get('/api/einsaetze/1/uhs/1/attachments', () => HttpResponse.json(anhaenge)),
     http.patch('/api/einsaetze/1/uhs/1/plan', async ({ request }) => {
       await merke(request);
       return patchStatus === 200
         ? HttpResponse.json(PLAN)
         : HttpResponse.json({ error: 'Plan nicht gefunden' }, { status: patchStatus });
     }),
-    http.post('/api/einsaetze/1/uhs/1/plan/aus-anhang', async ({ request }) => {
+    http.post('/api/einsaetze/1/uhs/1/plan/from-attachment', async ({ request }) => {
       await merke(request);
       return HttpResponse.json(PLAN);
     }),
@@ -169,7 +169,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
       expect(anfragen).toEqual([
         {
           methode: 'POST',
-          pfad: '/api/einsaetze/1/uhs/1/plan/aus-anhang',
+          pfad: '/api/einsaetze/1/uhs/1/plan/from-attachment',
           body: { anhang_id: 32 },
         },
       ]),

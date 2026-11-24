@@ -39,7 +39,7 @@ pub struct ListeParams {
     pub halter_person_id: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/tiere — Liste (Filter `?status=`, `?spezies=`, `?halter_person_id=`).
+/// GET /api/einsaetze/{id}/animals — Liste (Filter `?status=`, `?spezies=`, `?halter_person_id=`).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Tiere>,
@@ -89,7 +89,7 @@ pub struct AnlegenBody {
     pub notiz: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/tiere — Anlegen. Status ∈ {aktiv, vermisst}
+/// POST /api/einsaetze/{id}/animals — Anlegen. Status ∈ {aktiv, vermisst}
 /// (`abgeschlossen` → 422). Halter-Exklusivität → 422. Pseudonyme ETB-Spur + SSE.
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -196,7 +196,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(tier)))
 }
 
-/// GET /api/einsaetze/{id}/tiere/{tid} — Detail (voller Datensatz). NICHT auditiert.
+/// GET /api/einsaetze/{id}/animals/{tid} — Detail (voller Datensatz). NICHT auditiert.
 pub async fn detail(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Tiere>,
@@ -248,7 +248,7 @@ pub struct PatchBody {
     pub basis_geaendert_at: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id}/tiere/{tid} — Stammfelder (Identität, Halter,
+/// PATCH /api/einsaetze/{id}/animals/{tid} — Stammfelder (Identität, Halter,
 /// Antreffort, Notiz). Halter-Exklusivität → 422. Storniert → 409. KEIN ETB
 /// (Stammfelder sind nicht lagerelevant; vgl. E‑1-PATCH). SSE.
 pub async fn aktualisieren(
@@ -349,7 +349,7 @@ pub struct StatusBody {
     pub abschluss_ziel: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/tiere/{tid}/status — validierter Status-Wechsel.
+/// POST /api/einsaetze/{id}/animals/{tid}/status — validierter Status-Wechsel.
 /// Unbekannter Zielstatus → 400; ungültiger Übergang → 422; `→ abgeschlossen`
 /// ohne `abschluss_grund` → 422 (Pflicht nur im Zusammenhang mit dem Zielstatus),
 /// mit unbekanntem `abschluss_grund` → 400 (Enum-Wert scheitert am Feld selbst);
@@ -451,7 +451,7 @@ pub async fn status_wechsel(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/tiere/{tid} — Stornieren (Soft-Delete).
+/// DELETE /api/einsaetze/{id}/animals/{tid} — Stornieren (Soft-Delete).
 /// Bereits storniert → 409. Pseudonyme ETB-Spur + SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
@@ -486,7 +486,7 @@ fn csv_feld(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// CSV der Tiere wie `GET …/tiere/export`; geteilt mit dem ZIP der Einsatzakte
+/// CSV der Tiere wie `GET …/animals/export`; geteilt mit dem ZIP der Einsatzakte
 /// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6).
 pub fn tiere_csv(tiere: &[TierAnzeige]) -> String {
     let mut csv =
@@ -511,7 +511,7 @@ pub fn tiere_csv(tiere: &[TierAnzeige]) -> String {
     csv
 }
 
-/// GET /api/einsaetze/{id}/tiere/export — CSV aller (nicht-stornierten) Tiere.
+/// GET /api/einsaetze/{id}/animals/export — CSV aller (nicht-stornierten) Tiere.
 /// NICHT auditiert (Tiere sind keine besondere Kategorie).
 pub async fn export(
     State(state): State<AppState>,

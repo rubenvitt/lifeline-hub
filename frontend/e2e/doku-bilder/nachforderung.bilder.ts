@@ -54,7 +54,7 @@ async function vorhandene(
   api: APIRequestContext,
   einsatzId: number,
 ): Promise<{ id: number; bezeichnung: string }[]> {
-  const pfad = `/api/einsaetze/${einsatzId}/nachforderungen`;
+  const pfad = `/api/einsaetze/${einsatzId}/resource-requests`;
   const antwort = await api.get(pfad);
   expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
   return (await antwort.json()) as { id: number; bezeichnung: string }[];
@@ -81,7 +81,7 @@ async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
   expect(da, 'Nachforderungen nur zum Teil gesät; Lauf mit frischer Datenbank wiederholen').toEqual(
     [],
   );
-  const basis = `/api/einsaetze/${demo.id}/nachforderungen`;
+  const basis = `/api/einsaetze/${demo.id}/resource-requests`;
   const anlegen = (daten: Record<string, unknown>) =>
     fuelle<{ id: number }>(api, 'post', basis, daten);
   const linden = await anlegen({
@@ -104,7 +104,7 @@ async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
     prioritaet: 'sofort',
     angefordert_at: draht(40),
   });
-  await fuelle(api, 'post', `${basis}/${rtw.id}/zusage`, {
+  await fuelle(api, 'post', `${basis}/${rtw.id}/commitment`, {
     anzahl: 1,
     rufnamen: ['Rotkreuz Musterstadt 83-1'],
     eintreffen_erwartet_at: draht(10),
@@ -200,7 +200,7 @@ async function einheitNachforderung(
     await lies<{ id: number; bezeichnung: string }[]>(`${basis}/bereitstellungsraeume`)
   ).find((r) => r.bezeichnung === 'Parkplatz Stadion Nord');
   expect(raum, 'Demo-Bereitstellungsraum „Parkplatz Stadion Nord“ fehlt').toBeTruthy();
-  const nf = await fuelle<{ id: number }>(api, 'post', `${basis}/nachforderungen`, {
+  const nf = await fuelle<{ id: number }>(api, 'post', `${basis}/resource-requests`, {
     art,
     anzahl: rufnamen.length,
     bezeichnung,
@@ -209,9 +209,9 @@ async function einheitNachforderung(
     adressat_bezeichnung: 'Kreisbereitschaftsleitung',
     prioritaet: 'dringend',
   });
-  await fuelle(api, 'post', `${basis}/nachforderungen/${nf.id}/zusage`, { rufnamen });
+  await fuelle(api, 'post', `${basis}/resource-requests/${nf.id}/commitment`, { rufnamen });
   for (const status of ['unterwegs', 'eingetroffen']) {
-    await fuelle(api, 'post', `${basis}/nachforderungen/${nf.id}/status`, { status });
+    await fuelle(api, 'post', `${basis}/resource-requests/${nf.id}/status`, { status });
   }
   if (uebernommen > 0) {
     await fuelle(api, 'post', `${basis}/einheiten/aus-nachforderung`, {

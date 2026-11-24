@@ -498,41 +498,41 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
 /// (modul_key, GET-Pfad-Suffix) je Modul-Gruppe. Pfade liefern für einen leeren
 /// Einsatz normal 200; bei verstecktem Modul muss ein Mitglied 403 bekommen.
 const MODUL_GET_PFADE: &[(&str, &str)] = &[
-    ("chat", "chat/kanaele"),
-    ("erinnerungen", "erinnerungen"),
-    ("auftraege", "auftraege"),
+    ("chat", "chat/channels"),
+    ("erinnerungen", "reminders"),
+    ("auftraege", "tasks"),
     ("abloesung", "abloesungen"),
-    ("betreuung", "betreuung"),
+    ("betreuung", "care"),
     // LLH-1034: die Bezirke sind ein eigenes Modul.
-    ("evakuierung", "evakuierung"),
-    ("verpflegung", "verpflegung"),
-    ("meldungen", "meldungen"),
-    ("nachforderungen", "nachforderungen"),
+    ("evakuierung", "evacuation"),
+    ("verpflegung", "catering"),
+    ("meldungen", "reports"),
+    ("nachforderungen", "resource-requests"),
     ("fahrzeuge", "fahrzeuge"),
     ("personal", "personal"),
     ("material", "material"),
-    ("personen", "personen"),
-    ("tiere", "tiere"),
-    ("schaeden", "schaeden"),
+    ("personen", "persons"),
+    ("tiere", "animals"),
+    ("schaeden", "damages"),
     ("unfallhilfsstellen", "uhs"),
     ("bereitstellungsraeume", "bereitstellungsraeume"),
     ("einheiten", "einheiten"),
-    ("einsatzabschnitte", "abschnitte"),
-    ("lageberichte", "lageberichte"),
-    ("gefahrenzonen", "gefahrengebiete"),
-    ("wetter-pegel", "wetter"),
-    ("lagekarte", "zonen"),
-    ("lagekarte", "karte/fuehrungskraefte"),
-    ("lagemeldungen", "lage/meldungen"),
-    ("dokumente", "dokumente"),
-    ("lagebesprechung", "lagebesprechung"),
-    ("lagebesprechung", "lagebesprechungen"),
-    // LLH-1180: die S6-Pfade bleiben unter `…/stab`, gehören aber dem Fernmeldewesen.
-    ("fernmeldewesen", "stab/kommunikationsplan"),
-    ("fernmeldewesen", "stab/fernmeldeskizze"),
-    // i6k6mzed (design.md D3): das Informationstelefon behält seinen Pfad unter `…/stab`, ist
+    ("einsatzabschnitte", "sectors"),
+    ("lageberichte", "situation-reports"),
+    ("gefahrenzonen", "hazard-areas"),
+    ("wetter-pegel", "weather"),
+    ("lagekarte", "zones"),
+    ("lagekarte", "map/commanders"),
+    ("lagemeldungen", "situation/reports"),
+    ("dokumente", "documents"),
+    ("lagebesprechung", "briefing"),
+    ("lagebesprechung", "briefings"),
+    // LLH-1180: die S6-Pfade liegen unter `…/staff`, gehören aber dem Fernmeldewesen.
+    ("fernmeldewesen", "staff/comms-plan"),
+    ("fernmeldewesen", "staff/comms-sketch"),
+    // i6k6mzed (design.md D3): das Informationstelefon liegt unter `…/staff`, ist
     // aber ein eigenes Modul.
-    ("infotelefon", "stab/infotelefon"),
+    ("infotelefon", "staff/info-line"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
@@ -658,7 +658,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{eid}/personen"))
+                .uri(format!("/api/einsaetze/{eid}/persons"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"name":"Muster","vorname":"Max"}"#))
@@ -718,16 +718,11 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
         StatusCode::OK
     );
     assert_eq!(
-        get_status(
-            &app,
-            &frieda,
-            &format!("/api/einsaetze/{eid}/lagebesprechung")
-        )
-        .await,
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/briefing")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: Frieda sieht die Lagebesprechung nicht"
     );
-    let besprechungen = format!("/api/einsaetze/{eid}/lagebesprechungen");
+    let besprechungen = format!("/api/einsaetze/{eid}/briefings");
     admin_post(
         &app,
         &admin,
@@ -937,7 +932,7 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;
@@ -1029,7 +1024,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Erste","vorname":"Person"}"#,
     )
     .await;
@@ -1048,7 +1043,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Zweite","vorname":"Person"}"#,
     )
     .await;
@@ -1093,14 +1088,14 @@ async fn live_payloads_tragen_keinen_klartext() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/kanaele"),
+        &format!("/api/einsaetze/{eid}/chat/channels"),
         r#"{"name":"Lagekanal"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/kanaele/1/nachrichten"),
+        &format!("/api/einsaetze/{eid}/chat/channels/1/messages"),
         r#"{"inhalt":"Chat-Klartext-Kanarienvogel"}"#,
     )
     .await;
@@ -1270,7 +1265,7 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/personen"),
+        &format!("/api/einsaetze/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;

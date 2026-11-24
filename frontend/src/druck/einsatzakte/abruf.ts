@@ -35,7 +35,7 @@ import {
  * Kapitel parallel in EINEN Schnappschuss. Jedes Kapitel trägt seinen Zustand wie eine Quelle des
  * Berichts; die Seite druckt nur, wenn alles da ist.
  *
- * Die Betroffenen kommen nur über `GET …/personen/druck` (protokolliert), nie aus einem Cache;
+ * Die Betroffenen kommen nur über `GET …/persons/print` (protokolliert), nie aus einem Cache;
  * deshalb ruft die Seite ohne Retry und mit `gcTime: 0` ab.
  */
 

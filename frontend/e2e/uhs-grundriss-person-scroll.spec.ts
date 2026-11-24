@@ -424,7 +424,7 @@ test('UHS Grundriss: Person-Drop auf einen Platz löst die Belegung weiterhin au
   await expect(platzFrei).toBeVisible();
 
   // POST auf den Belegungs-Endpoint einsammeln.
-  const belegRegex = /\/api\/einsaetze\/\d+\/personen\/\d+\/uhs-belegung$/;
+  const belegRegex = /\/api\/einsaetze\/\d+\/persons\/\d+\/uhs-occupancy$/;
   const belegungPromise = page.waitForRequest(
     (req) => req.method() === 'POST' && belegRegex.test(req.url()),
   );

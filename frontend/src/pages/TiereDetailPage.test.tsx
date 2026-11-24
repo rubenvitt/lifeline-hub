@@ -85,9 +85,9 @@ function render(
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tier)),
-    http.get('/api/einsaetze/1/personen/auswahl', () => HttpResponse.json([einePerson])),
-    http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(tier)),
+    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([einePerson])),
+    http.get('/api/einsaetze/1/animals/10/attachments', () => HttpResponse.json([])),
   );
   // extra-Handler separat voranstellen, damit sie Vorrang vor den Defaults haben.
   if (extra.length > 0) server.use(...extra);
@@ -152,7 +152,7 @@ describe('TiereDetailPage — Stammdaten', () => {
 
   // LLH-1947: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleiben Seite und Eingabe stehen, der Hinweis sagt es.
-  it.each(['/tiere/10', ''] as const)(
+  it.each(['/animals/10', ''] as const)(
     'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite und offene Eingabe bleiben, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = render(einsatzAktiv, tierBasis);
@@ -183,7 +183,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     // Edit-Modus öffnen, das vorbefüllte Formular direkt speichern und den PATCH prüfen.
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } | null = null;
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as NonNullable<typeof body>;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -199,7 +199,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('Enter ohne Änderung schließt den Bearbeiten-Modus, ohne PATCH (LLH-1829)', async () => {
     let aufrufe = 0;
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', () => {
+      http.patch('/api/einsaetze/1/animals/10', () => {
         aufrufe += 1;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -216,7 +216,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('sendet beim Speichern den beim Laden gelesenen Stand als Baseline (LFH-299/F10)', async () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -236,8 +236,8 @@ describe('TiereDetailPage — Stammdaten', () => {
     let stand: Tier = tierBasis;
     let body: Record<string, unknown> | null = null;
     const { client } = render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(stand)),
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -263,7 +263,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('zeigt bei 409 den Konfliktdialog; „Überschreiben" sendet ohne Baseline (LFH-299/F10)', async () => {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         // Erster Save (mit Baseline) → 409; der Overwrite (ohne Baseline) → Erfolg.
         if (koerper.length === 1) {
@@ -287,7 +287,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     // umgeht. Ohne den `!v.overwrite`-Zweig ginge derselbe Dialog endlos wieder auf.
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(
           { error: 'Storniertes Tier kann nicht geändert werden' },
@@ -323,7 +323,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('Edit: Halter-Combobox auf betroffene Person setzen → halter_person_id', async () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -343,7 +343,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('Edit: Freitext in der Halter-Combobox → externer Kontakt (halter_kontakt)', async () => {
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -372,7 +372,7 @@ describe('TiereDetailPage — Stammdaten', () => {
     };
     let body: { halter_person_id?: number | null; halter_kontakt?: string | null } = {};
     const { container } = render(einsatzAktiv, mitHalter, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({ ...mitHalter });
       }),
@@ -392,7 +392,7 @@ describe('TiereDetailPage — Stammdaten', () => {
   it('Stornieren über das Menü fragt im Dialog nach, ruft DELETE und navigiert zur Liste', async () => {
     let geloescht = false;
     render(einsatzAktiv, tierBasis, [
-      http.delete('/api/einsaetze/1/tiere/10', () => {
+      http.delete('/api/einsaetze/1/animals/10', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -423,7 +423,7 @@ describe('TiereDetailPage — Status/Verbleib', () => {
   it('„Als vermisst melden“ aus dem Menü ruft die Status-Mutation', async () => {
     let body: { status?: string } = {};
     render(einsatzAktiv, tierBasis, [
-      http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals/10/status', async ({ request }) => {
         body = (await request.json()) as { status?: string };
         return HttpResponse.json({ ...tierBasis, status: 'vermisst' });
       }),
@@ -435,7 +435,7 @@ describe('TiereDetailPage — Status/Verbleib', () => {
   it('„Verbleib erfassen“ erzwingt einen Verbleib und schickt ihn', async () => {
     let body: { status?: string; abschluss_grund?: string } = {};
     render(einsatzAktiv, tierBasis, [
-      http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals/10/status', async ({ request }) => {
         body = (await request.json()) as { status?: string; abschluss_grund?: string };
         return HttpResponse.json({
           ...tierBasis,
@@ -526,7 +526,7 @@ describe('TiereDetailPage — Kopfaktionen', () => {
   it('„Wieder aufnehmen“ setzt ein abgeschlossenes Tier zurück auf aktiv', async () => {
     let body: { status?: string } = {};
     render(einsatzAktiv, { ...tierBasis, status: 'abgeschlossen', abschluss_grund: 'verstorben' }, [
-      http.post('/api/einsaetze/1/tiere/10/status', async ({ request }) => {
+      http.post('/api/einsaetze/1/animals/10/status', async ({ request }) => {
         body = (await request.json()) as { status?: string };
         return HttpResponse.json(tierBasis);
       }),
@@ -567,12 +567,12 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
 
   it('zeigt das Paneel mit Anker auf die Tier-Route, außerhalb jedes Formulars', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+      http.get('/api/einsaetze/1/animals/10/attachments', () => HttpResponse.json([anhang])),
     ]);
     const anker = await screen.findByRole('link', {
       name: /hund\.jpg, .*Datei von Tier T-001 herunterladen/,
     });
-    expect(anker).toHaveAttribute('href', '/api/einsaetze/1/tiere/10/anhaenge/4/datei');
+    expect(anker).toHaveAttribute('href', '/api/einsaetze/1/animals/10/attachments/4/file');
     expect(anker.closest('form')).toBeNull();
     expect(screen.getByRole('button', { name: 'Datei ablegen' })).toBeInTheDocument();
     expect(
@@ -589,7 +589,7 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
 
   it('am stornierten Tier: lesbar, aber ohne Ablegen und Entfernen', async () => {
     render(einsatzAktiv, { ...tierBasis, storniert_at: '2026-05-29 11:00:00' }, [
-      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+      http.get('/api/einsaetze/1/animals/10/attachments', () => HttpResponse.json([anhang])),
     ]);
     expect(
       await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
@@ -600,7 +600,7 @@ describe('TiereDetailPage — Fotos und Dateien', () => {
 
   it('Beobachter: lesbar, ohne Aktionen', async () => {
     render(einsatzBeobachter, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10/anhaenge', () => HttpResponse.json([anhang])),
+      http.get('/api/einsaetze/1/animals/10/attachments', () => HttpResponse.json([anhang])),
     ]);
     expect(
       await screen.findByRole('link', { name: /hund\.jpg, .*herunterladen/ }),
@@ -622,7 +622,7 @@ describe('TiereDetailPage — Robustheit', () => {
 
   it('zeigt bei 404 „Dieses Tier gibt es nicht (mehr)“ mit dem Weg zu den Tieren', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () =>
+      http.get('/api/einsaetze/1/animals/10', () =>
         HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     ]);
@@ -635,7 +635,7 @@ describe('TiereDetailPage — Robustheit', () => {
 
   it('zeigt eine Fehleranzeige, wenn der Detail-Abruf scheitert', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () =>
+      http.get('/api/einsaetze/1/animals/10', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -688,7 +688,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: der Grund steht am Formular, kein Toast', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
+      http.patch('/api/einsaetze/1/animals/10', abgelehnt('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereNotiz();
@@ -700,7 +700,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: das nächste Speichern räumt den Grund', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', erstAblehnenDannWarten('Rufname zu lang')),
+      http.patch('/api/einsaetze/1/animals/10', erstAblehnenDannWarten('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereNotiz();
@@ -717,7 +717,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: Abbrechen und erneutes Bearbeiten zeigen keinen alten Grund', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Rufname zu lang')),
+      http.patch('/api/einsaetze/1/animals/10', abgelehnt('Rufname zu lang')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereNotiz();
@@ -732,7 +732,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bearbeiten: der Sperrkonflikt bleibt beim Konfliktdialog, nicht am Formular', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', abgelehnt('Zwischenzeitlich geändert', 409)),
+      http.patch('/api/einsaetze/1/animals/10', abgelehnt('Zwischenzeitlich geändert', 409)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await aendereNotiz();
@@ -748,7 +748,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   it('Bearbeiten: ein 409 auf das Überschreiben steht am Formular', async () => {
     render(einsatzAktiv, tierBasis, [
       http.patch(
-        '/api/einsaetze/1/tiere/10',
+        '/api/einsaetze/1/animals/10',
         abgelehnt('Storniertes Tier kann nicht geändert werden', 409),
       ),
     ]);
@@ -766,7 +766,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
   it('Status: der Grund steht im Seitenhinweis, der nächste Wechsel räumt ihn', async () => {
     render(einsatzAktiv, tierBasis, [
       http.post(
-        '/api/einsaetze/1/tiere/10/status',
+        '/api/einsaetze/1/animals/10/status',
         erstAblehnenDannWarten('Übergang nicht erlaubt'),
       ),
     ]);
@@ -791,8 +791,8 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     let stornoAntwort: () => void = () => {};
     const stornoGehalten = new Promise<void>((r) => (stornoAntwort = r));
     render(einsatzAktiv, tierBasis, [
-      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Übergang nicht erlaubt')),
-      http.delete('/api/einsaetze/1/tiere/10', async () => {
+      http.post('/api/einsaetze/1/animals/10/status', abgelehnt('Übergang nicht erlaubt')),
+      http.delete('/api/einsaetze/1/animals/10', async () => {
         await stornoGehalten;
         return HttpResponse.json({ error: 'Tier ist einer UHS zugeordnet' }, { status: 409 });
       }),
@@ -817,7 +817,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Stornieren: Abbrechen räumt den Grund, das erneute Öffnen zeigt keinen alten', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.delete('/api/einsaetze/1/tiere/10', abgelehnt('Tier ist einer UHS zugeordnet', 409)),
+      http.delete('/api/einsaetze/1/animals/10', abgelehnt('Tier ist einer UHS zugeordnet', 409)),
     ]);
     await ausMenue('Stornieren');
     const dialog = await stornoDialog();
@@ -833,7 +833,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Verbleib: der Grund steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.post('/api/einsaetze/1/tiere/10/status', erstAblehnenDannWarten('Tier ist vermisst')),
+      http.post('/api/einsaetze/1/animals/10/status', erstAblehnenDannWarten('Tier ist vermisst')),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
     const dialog = await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
@@ -853,7 +853,7 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Verbleib: nach Abbrechen und erneutem Öffnen kein alter Grund', async () => {
     render(einsatzAktiv, tierBasis, [
-      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Tier ist vermisst')),
+      http.post('/api/einsaetze/1/animals/10/status', abgelehnt('Tier ist vermisst')),
     ]);
     const oeffnen = await screen.findByRole('button', { name: 'Verbleib erfassen' });
     await userEvent.click(oeffnen);
@@ -884,13 +884,13 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/tiere/10', () =>
+      http.get('/api/einsaetze/1/animals/10', () =>
         HttpResponse.json({ ...tierBasis, halter_person_id: 5, halter_registrier_nr: 7 }),
       ),
-      http.get('/api/einsaetze/1/tiere/11', () =>
+      http.get('/api/einsaetze/1/animals/11', () =>
         HttpResponse.json({ ...tierBasis, id: 11, registrier_nr: 2 }),
       ),
-      http.get('/api/einsaetze/1/tiere/:tid/anhaenge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/animals/:tid/attachments', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -928,12 +928,12 @@ describe('TiereDetailPage — Speicherfehler am Ort (LFH-1077)', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(tierBasis)),
-      http.get('/api/einsaetze/1/tiere/11', () =>
+      http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(tierBasis)),
+      http.get('/api/einsaetze/1/animals/11', () =>
         HttpResponse.json({ ...tierBasis, id: 11, registrier_nr: 2 }),
       ),
-      http.get('/api/einsaetze/1/tiere/:tid/anhaenge', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/tiere/10/status', abgelehnt('Übergang nicht erlaubt')),
+      http.get('/api/einsaetze/1/animals/:tid/attachments', () => HttpResponse.json([])),
+      http.post('/api/einsaetze/1/animals/10/status', abgelehnt('Übergang nicht erlaubt')),
     );
     renderMitProviders(
       <>
@@ -962,7 +962,7 @@ describe('TiereDetailPage — Prüfung am Feld (LLH-1101)', () => {
   function mitPatch() {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, tierBasis, [
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ ...tierBasis });
       }),
@@ -1131,7 +1131,7 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, verortet, [
       ortVorschau,
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(verortet);
       }),
@@ -1148,7 +1148,7 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, verortet, [
       ortVorschau,
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(tierBasis);
       }),
@@ -1166,7 +1166,7 @@ describe('TiereDetailPage — Verortung (LLH-1123)', () => {
     let body: Record<string, unknown> | null = null;
     render(einsatzAktiv, tierBasis, [
       ortVorschau,
-      http.patch('/api/einsaetze/1/tiere/10', async ({ request }) => {
+      http.patch('/api/einsaetze/1/animals/10', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(tierBasis);
       }),
@@ -1202,7 +1202,7 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
   it('wird es während der Bearbeitung storniert, bleibt der Entwurf lesbar, Speichern entfällt', async () => {
     let stand: Tier = tierBasis;
     const { client } = render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+      http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(stand)),
     ]);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
@@ -1229,7 +1229,7 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
   it('ein offener Dialog schließt beim Storno', async () => {
     let stand: Tier = tierBasis;
     const { client } = render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+      http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(stand)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Verbleib erfassen' }));
     await screen.findByRole('dialog', { name: 'Verbleib von T-001' });
@@ -1247,7 +1247,7 @@ describe('TiereDetailPage — Storno-Sperre (LLH-1832, Spec storno-sperre)', () 
   it('eine unberührte Bearbeitung schließt beim Storno', async () => {
     let stand: Tier = tierBasis;
     const { client } = render(einsatzAktiv, tierBasis, [
-      http.get('/api/einsaetze/1/tiere/10', () => HttpResponse.json(stand)),
+      http.get('/api/einsaetze/1/animals/10', () => HttpResponse.json(stand)),
     ]);
     await userEvent.click(await screen.findByRole('button', { name: 'Bearbeiten' }));
     await screen.findByRole('textbox', { name: 'Rufname' });

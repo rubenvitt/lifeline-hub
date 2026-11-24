@@ -1509,7 +1509,7 @@ und `pages/personen/`.
 
 - **Erst die Umkehrbarkeit, dann der Rückgängig-Knopf** (LFH-343): eine Rückfrage fällt nur, wenn
   es einen **serverseitigen** Rückweg gibt (`POST …/vollzug` → `offen`,
-  `POST …/erinnerungen/{eid}/oeffnen`, `uebergang_erlaubt` eine Stufe zurück); sonst bleibt sie.
+  `POST …/reminders/{eid}/reopen`, `uebergang_erlaubt` eine Stufe zurück); sonst bleibt sie.
   Toast `kommunikation/rueckgaengig.tsx` mit festem Schlüssel; nach einer Nutzeraktion ist er
   keine Alarmmeldung (EEMUA 191). Ein Rückgängig stellt den Zustand **vor** der Handlung her, nicht
   nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im
@@ -1991,7 +1991,7 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   abgeglichene Liste sortiert wie ihr SQL (Vergleichsfunktion neben dem Fetcher). Der Zeilenabruf
   ist so wenig protokolliert wie die Liste; eine auditierte Detail-Route ist keine Zeilenquelle,
   jeder Tab schriebe bei jedem Ereignis eine Protokollzeile. Personen haben deshalb eine eigene
-  Zeilen-Route (`…/personen/{pid}/zeile`, LLH-1682), die nur liefert, was die Liste zeigt; dort
+  Zeilen-Route (`…/persons/{pid}/row`, LLH-1682), die nur liefert, was die Liste zeigt; dort
   heißt ein 404 mit `grund: "nicht_in_liste"` (`ApiError.grund`) „gehört nicht hinein“ und nimmt
   die Zeile heraus. Jeder andere 404 (unbekannte Route) und bei Schäden jeder 404 geht an den
   Sammler. Hat sich eine abgerufene Zeile während ihres Abrufs geändert (optimistische Änderung),

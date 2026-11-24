@@ -98,18 +98,18 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     });
     expect(einsatz.ok(), await einsatz.text()).toBeTruthy();
     const einsatzId = ((await einsatz.json()) as { id: number }).id;
-    const basis = `/api/einsaetze/${einsatzId}/stab/kommunikationsplan`;
-    await page.request.post(`${basis}/stellen`, {
+    const basis = `/api/einsaetze/${einsatzId}/staff/comms-plan`;
+    await page.request.post(`${basis}/positions`, {
       data: { stellenart: 'funktion', funktion: 's2' },
     });
-    const plan = await page.request.post(`${basis}/stellen`, {
+    const plan = await page.request.post(`${basis}/positions`, {
       data: { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' },
     });
     expect(plan.ok(), await plan.text()).toBeTruthy();
     const ils = ((await plan.json()) as { id: number; bezeichnung?: string }[]).find(
       (s) => s.bezeichnung === 'ILS Nord',
     )!;
-    const v = await page.request.post(`${basis}/stellen/${ils.id}/verbindungen`, {
+    const v = await page.request.post(`${basis}/positions/${ils.id}/connections`, {
       data: { mittel: 'festnetz', wert: NUMMER },
     });
     expect(v.ok(), await v.text()).toBeTruthy();

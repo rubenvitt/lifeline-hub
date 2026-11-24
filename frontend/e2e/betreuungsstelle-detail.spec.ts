@@ -25,14 +25,14 @@ async function saeStelle(page: Page): Promise<{ einsatzId: number; stelleId: num
   const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `Stelle Detail ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
-  const { id: stelleId } = await senden(page, 'post', `${basis}/stellen`, {
+  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const { id: stelleId } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',
     kapazitaet_personen: 120,
   });
-  await senden(page, 'patch', `${basis}/stellen/${stelleId}`, { status: 'in_betrieb' });
-  await senden(page, 'post', `${basis}/stellen/${stelleId}/belegungen`, { belegt: 40 });
+  await senden(page, 'patch', `${basis}/positions/${stelleId}`, { status: 'in_betrieb' });
+  await senden(page, 'post', `${basis}/positions/${stelleId}/occupancies`, { belegt: 40 });
   return { einsatzId, stelleId };
 }
 

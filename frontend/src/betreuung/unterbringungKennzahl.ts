@@ -1,7 +1,7 @@
 import { personenZahl } from './betreuungText';
 /**
  * „Unterbringung in Zahlen" der Betreuungsübersicht (LLH-1050) — reine Ableitung aus den Stellen
- * von `GET …/betreuung`. Beantwortet die Leitfrage der Abschnittsleitung Betreuung: wie viele
+ * von `GET …/care`. Beantwortet die Leitfrage der Abschnittsleitung Betreuung: wie viele
  * sind untergebracht, wo ist noch Platz, welche Stelle ist voll?
  *
  * Gleiche Festlegungen wie `evakuierungKennzahl.ts` — Abwesenheit statt 0 —, jede in

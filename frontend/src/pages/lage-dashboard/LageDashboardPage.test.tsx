@@ -189,29 +189,29 @@ function mockEndpunkte(d: Daten) {
         lagekennzahlen: d.lagekennzahlen ?? einsatz.lagekennzahlen,
       });
     }),
-    http.get('/api/einsaetze/1/personen', () => {
+    http.get('/api/einsaetze/1/persons', () => {
       if (!d.personenStatus) return json(d.personen, 'personen');
       zaehle('personen');
       return new HttpResponse(null, { status: d.personenStatus });
     }),
     http.get('/api/einsaetze/1/uhs', () => json(d.uhs, 'uhs')),
-    http.get('/api/einsaetze/1/schaeden', () => json(d.schaeden, 'schaeden')),
-    http.get('/api/einsaetze/1/gefahrengebiete', () => {
+    http.get('/api/einsaetze/1/damages', () => json(d.schaeden, 'schaeden')),
+    http.get('/api/einsaetze/1/hazard-areas', () => {
       if (!d.gefahrenStatus) return json(d.gefahren, 'gefahrengebiete');
       zaehle('gefahrengebiete');
       return new HttpResponse(null, { status: d.gefahrenStatus });
     }),
-    http.get('/api/einsaetze/1/gefahrengebiete/:gid/matrix', ({ params }) => {
+    http.get('/api/einsaetze/1/hazard-areas/:gid/matrix', ({ params }) => {
       if (!d.matrixStatus) return json(d.matrix?.[Number(params.gid)], 'matrix');
       zaehle('matrix');
       return new HttpResponse(null, { status: d.matrixStatus });
     }),
-    http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte, 'lageberichte')),
+    http.get('/api/einsaetze/1/situation-reports', () => json(d.lageberichte, 'lageberichte')),
     http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten, 'einheiten')),
     http.get('/api/einsaetze/1/personal', () => json(d.personal, 'personal')),
     http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge, 'fahrzeuge')),
     http.get('/api/einsaetze/1/material', () => json(d.material, 'material')),
-    http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte, 'abschnitte')),
+    http.get('/api/einsaetze/1/sectors', () => json(d.abschnitte, 'abschnitte')),
     http.get('/api/einsaetze/1/module-counts', () =>
       HttpResponse.json(
         d.zaehler ?? {
@@ -229,10 +229,10 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/etb', () =>
       d.etbStatus ? new HttpResponse(null, { status: d.etbStatus }) : json(d.etb, 'etb'),
     ),
-    http.get('/api/einsaetze/1/pegel', () =>
+    http.get('/api/einsaetze/1/gauges', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
     ),
-    http.get('/api/einsaetze/1/evakuierung', () => {
+    http.get('/api/einsaetze/1/evacuation', () => {
       if (d.betreuungAbrufe) d.betreuungAbrufe.n += 1;
       return d.betreuungStatus
         ? new HttpResponse(null, { status: d.betreuungStatus })
@@ -489,7 +489,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       let abrufe = 0;
       mockEndpunkte({});
       server.use(
-        http.get('/api/einsaetze/1/personen', () => {
+        http.get('/api/einsaetze/1/persons', () => {
           abrufe++;
           // 3 h 59 min vor „jetzt" — eine Minute unter der Schwelle.
           return HttpResponse.json([
@@ -1051,7 +1051,7 @@ describe('LageDashboardPage — Wetterwarnung im Seitenkopf (LLH-1117)', () => {
   /** Wetter-Antwort mit verwertbarem Warnstand; zählt die Abrufe. */
   function stelleWetter(daten: unknown[], abrufe = { n: 0 }) {
     server.use(
-      http.get('/api/einsaetze/1/wetter', () => {
+      http.get('/api/einsaetze/1/weather', () => {
         abrufe.n += 1;
         return HttpResponse.json({
           ort: { name: 'Musterstadt' },
@@ -1486,10 +1486,10 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     mockEndpunkte(daten);
     // Ohne Antwort hielte die Seite den Server für unerreichbar und sagte „offline“ statt „live“.
     server.use(
-      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+      http.get('/api/einsaetze/1/reports/check-ins', () =>
         HttpResponse.json({ abschnitte: [], einheiten: [], frist_min: 60 }),
       ),
-      http.get('/api/einsaetze/1/schaeden/marker', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages/marker', () => HttpResponse.json([])),
     );
     const { client } = render();
     const box = paneel('Jüngste ETB-Einträge');
@@ -1518,9 +1518,9 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       http.get('/api/einsaetze/2/etb', () =>
         HttpResponse.json([1, 2, 3, 4, 5, 6, 7].map((n) => etb(n, { id: 2000 + n }))),
       ),
-      http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/hazard-areas/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/einsaetze/2/evacuation', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
@@ -1554,9 +1554,9 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       http.get('/api/einsaetze/2', () =>
         HttpResponse.json({ ...einsatz, id: 2, lagekennzahlen: zweiter }),
       ),
-      http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/2/hazard-areas/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/einsaetze/2/evacuation', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
@@ -1771,11 +1771,11 @@ describe('LageDashboardPage — Stand und Alarmzeile (LLH-1743)', () => {
     const listen: string[] = [];
     mockEndpunkte({});
     server.use(
-      http.get('/api/einsaetze/1/auftraege', () => {
+      http.get('/api/einsaetze/1/tasks', () => {
         listen.push('auftraege');
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/1/meldungen', () => {
+      http.get('/api/einsaetze/1/reports', () => {
         listen.push('meldungen');
         return HttpResponse.json([]);
       }),

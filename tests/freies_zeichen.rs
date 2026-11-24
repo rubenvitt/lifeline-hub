@@ -60,7 +60,7 @@ async fn liste(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (status, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         cookie,
         None,
     )
@@ -74,7 +74,7 @@ async fn spec_zeichen_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, sp
     let (status, z) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         cookie,
         Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec, "label": "BHP"}).to_string()),
     )
@@ -99,7 +99,7 @@ async fn anlegen_und_liste() {
     let (status, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -135,7 +135,7 @@ async fn ohne_zeichenform_ist_400() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols"),
             &admin,
             Some(&body.to_string()),
         )
@@ -160,7 +160,7 @@ async fn leere_zeichenform_ist_400() {
     let (status, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": "  "}).to_string()),
     )
@@ -174,7 +174,7 @@ async fn leere_zeichenform_ist_400() {
     let (status, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&json!({"zeichen_spec": "  "}).to_string()),
     )
@@ -241,7 +241,7 @@ async fn altes_format_ist_400() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols"),
             &admin,
             Some(&body.to_string()),
         )
@@ -265,7 +265,7 @@ async fn altes_format_ist_400() {
         let (status, v) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
             &admin,
             Some(&body.to_string()),
         )
@@ -306,7 +306,7 @@ async fn ungueltige_spec_ist_400() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols"),
             &admin,
             Some(&json!({"lat": 50.1, "lon": 8.6, "zeichen_spec": spec}).to_string()),
         )
@@ -323,7 +323,7 @@ async fn ungueltige_spec_ist_400() {
     let (status, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&json!({"zeichen_spec": r#"{"v":1,"spec":{"kind":"raumschiff"}}"#}).to_string()),
     )
@@ -364,7 +364,7 @@ async fn altzeile_bleibt_huelle_bis_zur_neuen_beschreibung() {
     let (status, n) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&json!({"label": "B"}).to_string()),
     )
@@ -376,7 +376,7 @@ async fn altzeile_bleibt_huelle_bis_zur_neuen_beschreibung() {
     let (status, n) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&json!({"zeichen_spec": STELLE_SANITAET}).to_string()),
     )
@@ -414,7 +414,7 @@ async fn patch_nur_bezeichnung_laesst_form_unberuehrt() {
         let (status, n) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
             &admin,
             Some(&body.to_string()),
         )
@@ -437,7 +437,7 @@ async fn crud_teil_patch_haelt_lat_lon() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -448,7 +448,7 @@ async fn crud_teil_patch_haelt_lat_lon() {
     let (status, n) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&spec_patch()),
     )
@@ -464,7 +464,7 @@ async fn crud_teil_patch_haelt_lat_lon() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         None,
     )
@@ -483,7 +483,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a}/freie-zeichen"),
+        &format!("/api/einsaetze/{a}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -496,7 +496,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{b}/freie-zeichen/{zid}"),
+            &format!("/api/einsaetze/{b}/free-symbols/{zid}"),
             &admin,
             Some(&patch)
         )
@@ -508,7 +508,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{b}/freie-zeichen/{zid}"),
+            &format!("/api/einsaetze/{b}/free-symbols/{zid}"),
             &admin,
             None
         )
@@ -522,7 +522,7 @@ async fn patch_und_delete_fremder_einsatz_oder_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{a}/freie-zeichen/999999"),
+            &format!("/api/einsaetze/{a}/free-symbols/999999"),
             &admin,
             Some(&patch)
         )
@@ -540,7 +540,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -552,7 +552,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
     let get = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &fremd_c,
         None,
     )
@@ -565,7 +565,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
     let post = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &fremd_c,
         Some(&neu_body()),
     )
@@ -578,7 +578,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
     let patch = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &fremd_c,
         Some(&spec_patch()),
     )
@@ -591,7 +591,7 @@ async fn org_isolation_fremder_nutzer_kann_nicht_lesen_oder_schreiben() {
     let del = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &fremd_c,
         None,
     )
@@ -613,7 +613,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -627,7 +627,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&spec_patch()),
     )
@@ -637,7 +637,7 @@ async fn sse_feuert_bei_post_patch_delete() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         None,
     )
@@ -655,7 +655,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let (_, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -679,7 +679,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let post = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&neu_body()),
     )
@@ -694,7 +694,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let patch = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         Some(&spec_patch()),
     )
@@ -709,7 +709,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let del = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
         &admin,
         None,
     )
@@ -737,7 +737,7 @@ async fn zeichen_anlegen(
     let (s, z) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         cookie,
         Some(&body.to_string()),
     )
@@ -757,7 +757,7 @@ async fn anlegen_mit_ansicht_id_stempelt_zugehoerigkeit() {
     let (s, z) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         Some(&json!({"lat":50.1,"lon":8.6,"zeichen_spec":DREHLEITER,"ansicht_id":aid}).to_string()),
     )
@@ -783,7 +783,7 @@ async fn liste_ansicht_filtert_fremde_aus_haelt_null() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen?ansicht={x}"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols?ansicht={x}"),
         &admin,
         None,
     )
@@ -818,7 +818,7 @@ async fn fremde_ansicht_id_ist_404() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols"),
             &admin,
             Some(
                 &json!({"lat":50.1,"lon":8.6,"zeichen_spec":DREHLEITER,"ansicht_id":aid})
@@ -834,7 +834,7 @@ async fn fremde_ansicht_id_ist_404() {
         let (s, v) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/freie-zeichen/{zid}"),
+            &format!("/api/einsaetze/{einsatz}/free-symbols/{zid}"),
             &admin,
             Some(&json!({"ansicht_id": aid}).to_string()),
         )
@@ -845,7 +845,7 @@ async fn fremde_ansicht_id_ist_404() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/freie-zeichen"),
+        &format!("/api/einsaetze/{einsatz}/free-symbols"),
         &admin,
         None,
     )

@@ -68,7 +68,7 @@ beforeEach(() => {
     http.get('/api/einsaetze/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/:eid/personen/einheiten', () =>
+    http.get('/api/einsaetze/:eid/persons/units', () =>
       HttpResponse.json([
         { id: 4, name: 'Streife 2', abschnitt_id: 1, abschnitt_name: 'Bühne' },
         { id: 5, name: 'RTW 1' },

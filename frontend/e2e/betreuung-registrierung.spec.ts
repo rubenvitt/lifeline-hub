@@ -34,14 +34,14 @@ async function saeStelle(page: Page): Promise<{ einsatzId: number; stelleId: num
   const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
     bezeichnung: `Registrierung ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
-  const { id: stelleId } = await senden(page, 'post', `${basis}/stellen`, {
+  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const { id: stelleId } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',
     kapazitaet_personen: 150,
     belegungsart: 'namentlich',
   });
-  await senden(page, 'patch', `${basis}/stellen/${stelleId}`, { status: 'in_betrieb' });
+  await senden(page, 'patch', `${basis}/positions/${stelleId}`, { status: 'in_betrieb' });
   return { einsatzId, stelleId };
 }
 
@@ -164,7 +164,7 @@ test('Zeitfenster anlegen schlägt die Sonderkost aus der Registrierung vor', as
   await senden(
     page,
     'post',
-    `/api/einsaetze/${einsatzId}/betreuung/stellen/${stelleId}/registrierungen`,
+    `/api/einsaetze/${einsatzId}/care/positions/${stelleId}/registrations`,
     {
       personen: [
         { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' },
@@ -191,7 +191,7 @@ test('Zeitfenster anlegen schlägt die Sonderkost aus der Registrierung vor', as
 
 /** Familie Weber und Haushalt Yilmaz an der Stelle, per API. */
 async function saeHaushalte(page: Page, einsatzId: number, stelleId: number): Promise<void> {
-  const pfad = `/api/einsaetze/${einsatzId}/betreuung/stellen/${stelleId}/registrierungen`;
+  const pfad = `/api/einsaetze/${einsatzId}/care/positions/${stelleId}/registrations`;
   await senden(page, 'post', pfad, {
     personen: [
       { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' },

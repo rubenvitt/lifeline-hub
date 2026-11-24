@@ -56,7 +56,7 @@ interface Stelle {
 async function seede(page: Page, einsatzId: string) {
   const basis = `/api/einsaetze/${einsatzId}`;
   const stelle = async (data: unknown): Promise<Stelle[]> => {
-    const a = await page.request.post(`${basis}/stab/kommunikationsplan/stellen`, { data });
+    const a = await page.request.post(`${basis}/staff/comms-plan/positions`, { data });
     expect(a.status(), `Stelle: ${await a.text()}`).toBe(201);
     return (await a.json()) as Stelle[];
   };
@@ -69,12 +69,12 @@ async function seede(page: Page, einsatzId: string) {
     { mittel: 'fax', wert: '+49 421 361-12399' },
   ]) {
     const a = await page.request.post(
-      `${basis}/stab/kommunikationsplan/stellen/${behoerde.id}/verbindungen`,
+      `${basis}/staff/comms-plan/positions/${behoerde.id}/connections`,
       { data },
     );
     expect(a.status(), `Verbindung: ${await a.text()}`).toBe(201);
   }
-  const ab = await page.request.post(`${basis}/abschnitte`, {
+  const ab = await page.request.post(`${basis}/sectors`, {
     data: { name: ABSCHNITT, verbindungen: [{ mittel: 'festnetz', wert: '0421 500' }] },
   });
   expect(ab.ok(), `Abschnitt: ${await ab.text()}`).toBeTruthy();
@@ -277,7 +277,7 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     expect(vorher, 'Zeile sichtbar').not.toBeNull();
 
     const antwort = await page.request.post(
-      `/api/einsaetze/${einsatzId}/stab/kommunikationsplan/stellen`,
+      `/api/einsaetze/${einsatzId}/staff/comms-plan/positions`,
       { data: { stellenart: 'funktion', funktion: 's3' } },
     );
     expect(antwort.status(), `Stelle: ${await antwort.text()}`).toBe(201);

@@ -47,7 +47,7 @@ fn kanal_ids(einsatz_id: i64, kanal_id: i64) -> String {
 
 // ---- Kanäle ----
 
-/// GET /api/einsaetze/{id}/chat/kanaele — Kanäle listen (Default wird sichergestellt).
+/// GET /api/einsaetze/{id}/chat/channels — Kanäle listen (Default wird sichergestellt).
 pub async fn kanaele_liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Chat>,
@@ -64,7 +64,7 @@ pub struct NeuerKanal {
     pub beschreibung: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/chat/kanaele — Kanal anlegen. Schreibrecht + aktiv.
+/// POST /api/einsaetze/{id}/chat/channels — Kanal anlegen. Schreibrecht + aktiv.
 pub async fn kanal_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Chat>,
@@ -90,7 +90,7 @@ pub async fn kanal_anlegen(
     Ok((StatusCode::CREATED, Json(kanal)))
 }
 
-/// POST /api/einsaetze/{id}/chat/kanaele/{kid}/gelesen — aktuellen Kanal persistent
+/// POST /api/einsaetze/{id}/chat/channels/{kid}/read — aktuellen Kanal persistent
 /// für den angemeldeten Benutzer als gelesen markieren. Auch Beobachter dürfen lesen.
 pub async fn kanal_gelesen_markieren(
     State(state): State<AppState>,
@@ -124,7 +124,7 @@ pub struct NachrichtenParams {
     pub limit: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten — Nachrichten eines Kanals.
+/// GET /api/einsaetze/{id}/chat/channels/{kid}/messages — Nachrichten eines Kanals.
 /// Lesezugriff (inkl. Beobachter). Cursor über `before_id` (ältere Seite) oder `after_id`
 /// (die Seite direkt darüber, LLH-1886); beide zugleich → 422.
 pub async fn nachrichten_liste(
@@ -172,7 +172,7 @@ pub struct NeueNachricht {
     pub erwaehnungen: Vec<ErwaehnungEingabe>,
 }
 
-/// POST /api/einsaetze/{id}/chat/kanaele/{kid}/nachrichten — Nachricht senden.
+/// POST /api/einsaetze/{id}/chat/channels/{kid}/messages — Nachricht senden.
 /// Schreibrecht + aktiv. Cross-Einsatz-Schutz auf den Kanal. Nach dem Commit erhalten die
 /// Erwähnten den Hinweis `chat_erwaehnung` (`chat::erwaehnung::melden`).
 pub async fn nachricht_erfassen(
@@ -248,7 +248,7 @@ async fn fordere_autor(
     }
 }
 
-/// PATCH /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht bearbeiten.
+/// PATCH /api/einsaetze/{id}/chat/messages/{mid} — eigene Nachricht bearbeiten.
 pub async fn nachricht_bearbeiten(
     State(state): State<AppState>,
     ctx: EinsatzErfassungszugriff<Chat>,
@@ -263,7 +263,7 @@ pub async fn nachricht_bearbeiten(
     Ok(Json(nachricht))
 }
 
-/// DELETE /api/einsaetze/{id}/chat/nachrichten/{mid} — eigene Nachricht soft-löschen.
+/// DELETE /api/einsaetze/{id}/chat/messages/{mid} — eigene Nachricht soft-löschen.
 pub async fn nachricht_loeschen(
     State(state): State<AppState>,
     ctx: EinsatzErfassungszugriff<Chat>,
@@ -288,7 +288,7 @@ pub struct BezugBody {
     pub ziel_id: i64,
 }
 
-/// PUT /api/einsaetze/{id}/chat/nachrichten/{mid}/bezug — polymorphen Sachbezug
+/// PUT /api/einsaetze/{id}/chat/messages/{mid}/reference — polymorphen Sachbezug
 /// setzen/ändern. Schreibrecht + aktiv (nicht nur Autor, anders als Bearbeiten);
 /// der Typ ist server-validiert, das Ziel muss zum Einsatz gehören (im Repo geprüft).
 pub async fn bezug_setzen(
@@ -310,7 +310,7 @@ pub async fn bezug_setzen(
     Ok(Json(nachricht))
 }
 
-/// DELETE /api/einsaetze/{id}/chat/nachrichten/{mid}/bezug — Sachbezug lösen.
+/// DELETE /api/einsaetze/{id}/chat/messages/{mid}/reference — Sachbezug lösen.
 /// Schreibrecht + aktiv.
 pub async fn bezug_loeschen(
     State(state): State<AppState>,
@@ -346,7 +346,7 @@ pub struct HeraufstufenBody {
     pub in_meldungseingang: Option<bool>,
 }
 
-/// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-etb — Nachricht → ETB.
+/// POST /api/einsaetze/{id}/chat/messages/{mid}/promote-to-etb — Nachricht → ETB.
 ///
 /// Mit `in_meldungseingang: true` (nur Typ `meldung`/`lage`, sonst 422) entsteht im selben Commit
 /// die Meldung (Art `sonstige` bzw. `lagemeldung`); das verlangt zusätzlich die Freigabe des
@@ -485,7 +485,7 @@ pub async fn heraufstufen(
     Ok(Json(nachricht))
 }
 
-/// POST /api/einsaetze/{id}/chat/nachrichten/{mid}/heraufstufen-auftrag — Nachricht → Auftrag (LFH-101).
+/// POST /api/einsaetze/{id}/chat/messages/{mid}/promote-to-task — Nachricht → Auftrag (LFH-101).
 /// Schreibrecht + aktiv + Freigabe des Moduls `auftraege`. Erzeugt aus der Nachricht einen formalen
 /// Auftrag (inkl. ETB-Anordnung,
 /// Pattern B) und markiert die Nachricht als „heraufgestuft zu Auftrag". Auftragsfelder (Empfänger,

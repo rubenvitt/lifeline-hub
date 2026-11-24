@@ -24,7 +24,7 @@ async fn uebergeben(app: &axum::Router, cookie: &str, e: i64, inhalt: &str) -> i
     let m = post(
         app,
         cookie,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
             "inhalt": inhalt, "ereigniszeit": "2026-06-12 09:00:00"
@@ -36,7 +36,7 @@ async fn uebergeben(app: &axum::Router, cookie: &str, e: i64, inhalt: &str) -> i
     let m = post(
         app,
         cookie,
-        &format!("/api/einsaetze/{e}/meldungen/{mid}/lagerelevant"),
+        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
         "{}",
     )
     .await;
@@ -46,19 +46,19 @@ async fn uebergeben(app: &axum::Router, cookie: &str, e: i64, inhalt: &str) -> i
 
 /// Pfad der einzelnen Kenntnisnahme.
 fn einzeln(e: i64, mid: i64) -> String {
-    format!("/api/einsaetze/{e}/meldungen/{mid}/lage-gesehen")
+    format!("/api/einsaetze/{e}/reports/{mid}/situation-seen")
 }
 
 /// Pfad des Sammelwegs.
 fn sammel(e: i64) -> String {
-    format!("/api/einsaetze/{e}/lage/gesehen")
+    format!("/api/einsaetze/{e}/situation/seen")
 }
 
 async fn liste(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage/meldungen"),
+        &format!("/api/einsaetze/{e}/situation/reports"),
         cookie,
         None,
     )
@@ -130,7 +130,7 @@ async fn alle_angezeigten_gesehen_laesst_die_waehrenddessen_uebernommene_neu() {
     let m = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "drei",
             "ereigniszeit": "2026-06-12 08:00:00"
@@ -144,7 +144,7 @@ async fn alle_angezeigten_gesehen_laesst_die_waehrenddessen_uebernommene_neu() {
     post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen/{drei}/lagerelevant"),
+        &format!("/api/einsaetze/{e}/reports/{drei}/situation-relevant"),
         "{}",
     )
     .await;
@@ -179,7 +179,7 @@ async fn erfasste_lagemeldung_steht_neu_in_der_liste() {
     let lm = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "lagemeldung",
             "prioritaet": "dringend", "inhalt": "Brand unter Kontrolle",
@@ -193,7 +193,7 @@ async fn erfasste_lagemeldung_steht_neu_in_der_liste() {
     post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "rueckmeldung",
             "inhalt": "Einsatzbereit", "ereigniszeit": "2026-06-12 09:01:00"
@@ -239,7 +239,7 @@ async fn verortung_beim_erfassen_nur_fuer_lagemeldung() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/meldungen"),
+            &format!("/api/einsaetze/{e}/reports"),
             &admin,
             Some(&body.to_string()),
         )
@@ -258,11 +258,11 @@ async fn alte_pfade_der_kenntnisnahme_sind_404() {
     let mid = uebergeben(&app, &admin, e, "Brücke gesperrt").await;
     for (pfad, body) in [
         (
-            format!("/api/einsaetze/{e}/lage/meldungen/{mid}/gesehen"),
+            format!("/api/einsaetze/{e}/situation/reports/{mid}/gesehen"),
             "{}".to_string(),
         ),
         (
-            format!("/api/einsaetze/{e}/lage/meldungen/gesehen"),
+            format!("/api/einsaetze/{e}/situation/reports/gesehen"),
             json!({ "bis_id": mid }).to_string(),
         ),
     ] {
@@ -281,7 +281,7 @@ async fn meldung_ausserhalb_der_lage_ist_404() {
     let m = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "X",
             "ereigniszeit": "2026-06-12 09:00:00"
@@ -403,7 +403,7 @@ async fn zaehler_neu_entspricht_der_liste_und_fehlt_ohne_freigabe() {
     post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "lagemeldung",
             "inhalt": "vier", "ereigniszeit": "2026-06-12 09:00:00"
