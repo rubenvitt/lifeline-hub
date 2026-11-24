@@ -16,7 +16,7 @@ export interface BewertungEingabe {
 }
 
 export function ladeGefahrengebiete(einsatzId: number): Promise<Gefahrengebiet[]> {
-  return apiGet<Gefahrengebiet[]>(`/api/einsaetze/${einsatzId}/gefahrengebiete`);
+  return apiGet<Gefahrengebiet[]>(`/api/einsaetze/${einsatzId}/hazard-areas`);
 }
 
 export function ladeMatrix(
@@ -24,7 +24,7 @@ export function ladeMatrix(
   gefahrengebietId: number,
 ): Promise<GefahrBewertung[]> {
   return apiGet<GefahrBewertung[]>(
-    `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}/matrix`,
+    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebietId}/matrix`,
   );
 }
 
@@ -34,7 +34,7 @@ export function setzeBewertung(
   daten: BewertungEingabe,
 ): Promise<GefahrBewertung> {
   return apiSend<GefahrBewertung>(
-    `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}/matrix/bewertung`,
+    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebietId}/matrix/rating`,
     'PUT',
     daten,
   );
@@ -46,7 +46,7 @@ export function bestaetigeBeurteilung(
   gefahrengebietId: number,
 ): Promise<Gefahrengebiet> {
   return apiSend<Gefahrengebiet>(
-    `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}/beurteilung`,
+    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebietId}/assessment`,
     'POST',
   );
 }
@@ -63,7 +63,7 @@ export function benenneGefahrengebiet(
   erwartet?: { label: string | null },
 ): Promise<Gefahrengebiet> {
   return apiSend<Gefahrengebiet>(
-    `/api/einsaetze/${einsatzId}/gefahrengebiete/${gefahrengebietId}`,
+    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebietId}`,
     'PATCH',
     erwartet ? { label, erwartet } : { label },
   );

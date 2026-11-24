@@ -139,7 +139,7 @@ export type EinsatzRolle = S['EinsatzRolle'];
 export type Einsatzart = S['Einsatzart'];
 /** Aktive lagebezogene Kennzahl am Einsatz (LFH-640) — Auslöser eines Lageplatzes im Lage-Dashboard. */
 export type Lagekennzahl = S['Lagekennzahl'];
-/** Antwort der Wahl der Lagekennzahlen (LLH-1371, `PUT …/lagekennzahl-wahl`). */
+/** Antwort der Wahl der Lagekennzahlen (LLH-1371, `PUT …/situation-metric-selection`). */
 export type LagekennzahlWahl = S['LagekennzahlWahl'];
 export type EinsatzAnzeige = S['EinsatzAnzeige'];
 /** Offene Punkte vor dem Einsatzabschluss (LLH-1814). */
@@ -1848,7 +1848,7 @@ type LageMeldungSeit1031 =
 export type LageMeldungStand = Omit<LageMeldung, LageMeldungSeit1031> &
   Partial<Pick<LageMeldung, LageMeldungSeit1031>>;
 export type LageGesehen = S['LageGesehenAnzeige'];
-/** Kein Backend-Schema: Eingabe-Body von `POST …/lage/gesehen`, FE-lokal. */
+/** Kein Backend-Schema: Eingabe-Body von `POST …/situation/seen`, FE-lokal. */
 export interface LageGesehenBody {
   meldung_ids: number[];
 }

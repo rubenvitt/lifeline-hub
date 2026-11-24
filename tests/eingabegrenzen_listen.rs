@@ -32,7 +32,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         cookie,
         Some(&json!({ "name": "Nord" })),
     )
@@ -68,7 +68,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/abschnitte/{aid}"),
+        &format!("/api/einsaetze/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -123,7 +123,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, j) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         &admin,
         Some(&json!({ "name": "Voll", "sprechgruppe_ids": &sg[..32] })),
     )
@@ -139,7 +139,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/abschnitte/{aid}"),
+        &format!("/api/einsaetze/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": [sg[5], sg[32]] }),
     )
     .await;
@@ -153,7 +153,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, j) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         &admin,
         Some(&json!({ "name": "Zu viel", "sprechgruppe_ids": sg })),
     )
@@ -209,7 +209,7 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/abschnitte/{aid}"),
+        &format!("/api/einsaetze/{e}/sectors/{aid}"),
         json!({ "lagezustand": "kritisch", "sprechgruppe_ids": sg }),
     )
     .await;
@@ -255,7 +255,7 @@ async fn fremde_sprechgruppe_bleibt_422_mit_der_id() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/abschnitte/{aid}"),
+        &format!("/api/einsaetze/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": [eigen, fremd, fremd] }),
     )
     .await;

@@ -804,7 +804,7 @@ async fn pegel_anfuegen(app: &axum::Router, cookie: &str, einsatz: i64, uuid: &s
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         cookie,
         Some(&pegel_station(uuid)),
     )
@@ -816,7 +816,7 @@ async fn pegel_ersetzen(app: &axum::Router, cookie: &str, einsatz: i64, uuids: &
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         cookie,
         Some(&pegel_liste(uuids)),
     )
@@ -877,7 +877,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/pegel"),
+        &format!("/api/einsaetze/{einsatz}/gauges"),
         &admin,
         None,
     )
@@ -888,7 +888,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/pegel/{pegel_id}/prognose"),
+        &format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/forecast"),
         &admin,
         Some(r#"{"hoechststand_cm":420,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#),
     )

@@ -105,7 +105,7 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/persons/whereabouts-details — `EinsatzLesezugriff<Personen>`
   // (src/routes/einsatz_person.rs, `verbleib_angaben`, LLH-1575 D3).
   { schluessel: 'personenVerbleibAngaben', bloecke: nur('hilfeleistungen'), modul: 'personen' },
-  // GET …/schaeden — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
+  // GET …/damages — `EinsatzLesezugriff<Schaeden>` (src/routes/einsatz_schaden.rs:45).
   { schluessel: 'schaeden', bloecke: nur('bilanz'), modul: 'schaeden' },
   // GET …/evacuation — `EinsatzLesezugriff<Evakuierung>` (src/routes/evakuierung.rs, LLH-1034).
   { schluessel: 'evakuierung', bloecke: nur('bilanz'), modul: 'evakuierung' },

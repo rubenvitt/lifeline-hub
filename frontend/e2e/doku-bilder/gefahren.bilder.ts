@@ -27,7 +27,7 @@ const KAPITEL = 'gefahren';
 
 /** Füllt die Matrix der „Überflutung Unterstadt“ und gibt die Kennung des Gebiets zurück. */
 async function gebietMitBewertungen(page: Page, einsatzId: number): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/gefahrengebiete`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/hazard-areas`);
   expect(antwort.ok()).toBe(true);
   const gebiete = (await antwort.json()) as { id: number; label: string | null }[];
   const gebiet = gebiete.find((g) => g.label === 'Überflutung Unterstadt');
@@ -45,7 +45,7 @@ async function gebietMitBewertungen(page: Page, einsatzId: number): Promise<numb
     await fuelle(
       page,
       'put',
-      `/api/einsaetze/${einsatzId}/gefahrengebiete/${gebiet!.id}/matrix/bewertung`,
+      `/api/einsaetze/${einsatzId}/hazard-areas/${gebiet!.id}/matrix/rating`,
       { gefahrentyp, schutzobjekt, warnstufe },
     );
   }
@@ -67,11 +67,11 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     const gebiete = (await (
-      await page.request.get(`/api/einsaetze/${demo.id}/gefahrengebiete`)
+      await page.request.get(`/api/einsaetze/${demo.id}/hazard-areas`)
     ).json()) as { id: number; label: string | null }[];
     const hang = gebiete.find((g) => g.label === 'Hangrutsch Kirchberg');
     expect(hang, 'Demo-Gefahrengebiet „Hangrutsch Kirchberg“ fehlt').toBeTruthy();
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/gefahrengebiete/${hang!.id}/beurteilung`);
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/hazard-areas/${hang!.id}/assessment`);
     await oeffneGefahren(page);
     await expect(page.getByText(/^1 Gefahr · /)).toBeVisible();
     await fotografiere(page, KAPITEL, 'gefahren');

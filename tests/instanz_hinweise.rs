@@ -869,7 +869,7 @@ async fn die_kenntnisnahme_reist_nur_mit_gesehenen_meldungen_des_einsatzes() {
     let (s, v) = common::anfrage_json(
         &w.elw.i.app,
         "POST",
-        &format!("/api/einsaetze/{}/lage/gesehen", w.einsatz),
+        &format!("/api/einsaetze/{}/situation/seen", w.einsatz),
         &w.elw.i.admin,
         Some(&json!({ "meldung_ids": [mid, 99_999] })),
     )

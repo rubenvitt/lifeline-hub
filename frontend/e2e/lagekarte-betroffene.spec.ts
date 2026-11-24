@@ -135,12 +135,12 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
     });
   }
   // Die geteilte Standardansicht trägt die Ebene EINGESCHALTET.
-  const ansichten = (await (await page.request.get(`${basis}/karten-ansichten`)).json()) as {
+  const ansichten = (await (await page.request.get(`${basis}/map-views`)).json()) as {
     id: number;
     ist_standard: boolean;
   }[];
   const standard = ansichten.find((a) => a.ist_standard)!;
-  await senden(page, 'patch', `${basis}/karten-ansichten/${standard.id}`, {
+  await senden(page, 'patch', `${basis}/map-views/${standard.id}`, {
     layer_sichtbar: {
       einsatzort: true,
       uhs: true,
@@ -295,12 +295,12 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
     lat: mitte[1],
     lon: mitte[0] + 0.0117,
   });
-  const ansichten = (await (await page.request.get(`${basis}/karten-ansichten`)).json()) as {
+  const ansichten = (await (await page.request.get(`${basis}/map-views`)).json()) as {
     id: number;
     ist_standard: boolean;
   }[];
   const standard = ansichten.find((a) => a.ist_standard)!;
-  await senden(page, 'patch', `${basis}/karten-ansichten/${standard.id}`, {
+  await senden(page, 'patch', `${basis}/map-views/${standard.id}`, {
     layer_sichtbar: { einheit: true, person: true },
   });
 
@@ -397,7 +397,7 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
   // Jeder schreibende Zugriff auf eine Kartenansicht wäre ein gespeicherter Vorrang.
   const ansichtGeschrieben: string[] = [];
   page.on('request', (r) => {
-    if (r.url().includes('/karten-ansichten') && r.method() !== 'GET') {
+    if (r.url().includes('/map-views') && r.method() !== 'GET') {
       ansichtGeschrieben.push(`${r.method()} ${r.url()}`);
     }
   });
@@ -465,18 +465,13 @@ test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungs
       ).id,
     );
   }
-  const ansichten = (await (await page.request.get(`${basis}/karten-ansichten`)).json()) as {
+  const ansichten = (await (await page.request.get(`${basis}/map-views`)).json()) as {
     id: number;
     ist_standard: boolean;
   }[];
-  await senden(
-    page,
-    'patch',
-    `${basis}/karten-ansichten/${ansichten.find((a) => a.ist_standard)!.id}`,
-    {
-      layer_sichtbar: { einsatzort: true, person: true },
-    },
-  );
+  await senden(page, 'patch', `${basis}/map-views/${ansichten.find((a) => a.ist_standard)!.id}`, {
+    layer_sichtbar: { einsatzort: true, person: true },
+  });
   await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
   await karteBereit(page);
   await springe(page, FERN, 12);

@@ -439,7 +439,7 @@ describe('MaterialPage', () => {
   it('Einheiten stehen in der Folge des Kräftebaums: der Rang der Abschnitte, nicht die Anlage (D3/D4)', async () => {
     // Staffel B (Abschnitt B) ist zuerst angelegt; Abschnitt A steht im Baum vor B.
     server.use(
-      http.get('/api/einsaetze/1/abschnitte', () =>
+      http.get('/api/einsaetze/1/sectors', () =>
         HttpResponse.json([
           { id: 32, name: 'Abschnitt A', ueber_abschnitt_id: null },
           { id: 31, name: 'Abschnitt B', ueber_abschnitt_id: null },
@@ -1613,7 +1613,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     expect(ort(12)).toHaveTextContent(/^ohne Ort$/);
     // Gesperrte Ortsarten erzeugen keinen Abruf (D3), die freien je einen.
     expect(abrufe('/api/einsaetze/1/einheiten')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
     expect(abrufe('/api/einsaetze/1/uhs')).toBe(0);
     expect(abrufe('/api/einsaetze/1/fahrzeuge')).toBeGreaterThan(0);
     expect(abrufe('/api/einsaetze/1/bereitstellungsraeume')).toBeGreaterThan(0);
@@ -1750,7 +1750,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(knopf).toHaveTextContent(/^zugeordnet$/));
     await waitFor(() => expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0));
     expect(abrufe('/api/einsaetze/1/einheiten')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/abschnitte')).toBe(0);
+    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
     await userEvent.click(knopf);
     await oeffne('Ort zu Wolldecke');
     const gruppen = [

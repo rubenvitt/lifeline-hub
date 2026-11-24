@@ -78,7 +78,7 @@ async function seedeAusstattung(page: Page, einsatzId: string) {
   const n = await seedeGrund(page, einsatzId);
   const a = api(page, einsatzId);
   const leitung = (await a.post('personal', { adhoc: { name: LEITUNG } })).id;
-  await a.patch(`abschnitte/${n.ea[0]}`, { leiter_id: leitung });
+  await a.patch(`sectors/${n.ea[0]}`, { leiter_id: leitung });
   const elw = (
     await a.post('fahrzeuge', {
       adhoc: { funkrufname: 'Florian Musterstadt 11/1', fahrzeugtyp: 'ELW 1' },
@@ -219,7 +219,7 @@ test('Messung: Schriftgrad der Ausstattung im Druck A4 und A3 quer bei acht ober
   for (let i = 1; i <= 8; i++) {
     const leitung = (await a.post('personal', { adhoc: { name: `Leitung ${i}` } })).id;
     const ab = (
-      await a.post('abschnitte', {
+      await a.post('sectors', {
         name: `Einsatzabschnitt ${i} Nordwest`,
         kurzbezeichnung: `EA ${i}`,
         leiter_id: leitung,

@@ -46,8 +46,8 @@ const gebiet = { id: 7, einsatz_id: 1, label: 'Nord', zonen_ids: [9], hoechste_w
 function handlers(gebiete: unknown[] = [gebiet], matrix: unknown[] = [], e = einsatz) {
   return [
     http.get('/api/einsaetze/1', () => HttpResponse.json(e)),
-    http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(gebiete)),
-    http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json(matrix)),
+    http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json(gebiete)),
+    http.get('/api/einsaetze/1/hazard-areas/7/matrix', () => HttpResponse.json(matrix)),
   ];
 }
 function renderPage() {
@@ -119,7 +119,7 @@ describe('GefahrenPage', () => {
     };
     server.use(
       ...handlers([gebiet, sued]),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas/8/matrix', () => HttpResponse.json([])),
     );
     const user = userEvent.setup();
     renderPage();
@@ -234,7 +234,7 @@ describe('GefahrenPage', () => {
     let patch: unknown = null;
     server.use(
       ...handlers(),
-      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+      http.patch('/api/einsaetze/1/hazard-areas/7', async ({ request }) => {
         patch = await request.json();
         return HttpResponse.json({ ...gebiet, label: 'Nord-Ost' });
       }),
@@ -257,9 +257,9 @@ describe('GefahrenPage', () => {
     let stand = { ...gebiet };
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([stand])),
-      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
-      http.patch('/api/einsaetze/1/gefahrengebiete/7', async ({ request }) => {
+      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([stand])),
+      http.get('/api/einsaetze/1/hazard-areas/7/matrix', () => HttpResponse.json([])),
+      http.patch('/api/einsaetze/1/hazard-areas/7', async ({ request }) => {
         const body = (await request.json()) as { label: string; erwartet?: { label: string } };
         anfragen.push(body);
         if (body.erwartet && body.erwartet.label !== stand.label) {
@@ -305,7 +305,7 @@ describe('GefahrenPage', () => {
     let patches = 0;
     server.use(
       ...handlers(),
-      http.patch('/api/einsaetze/1/gefahrengebiete/7', () => {
+      http.patch('/api/einsaetze/1/hazard-areas/7', () => {
         patches += 1;
         return HttpResponse.json(gebiet);
       }),
@@ -323,7 +323,7 @@ describe('GefahrenPage', () => {
   it('abgelehntes Umbenennen: Entwurf bleibt offen, Fehler an der Zeile, kein zweiter Toast', async () => {
     server.use(
       ...handlers(),
-      http.patch('/api/einsaetze/1/gefahrengebiete/7', () =>
+      http.patch('/api/einsaetze/1/hazard-areas/7', () =>
         HttpResponse.json({ error: 'Konflikt' }, { status: 409 }),
       ),
     );
@@ -393,12 +393,12 @@ describe('GefahrenPage', () => {
       let gebiete = 0;
       // Vor `handlers()`: der erste passende Handler antwortet.
       server.use(
-        http.get('/api/einsaetze/1/gefahrengebiete', () => {
+        http.get('/api/einsaetze/1/hazard-areas', () => {
           gebiete += 1;
           return HttpResponse.json([gebiet]);
         }),
         ...handlers(),
-        http.post('/api/einsaetze/1/gefahrengebiete/7/beurteilung', () => {
+        http.post('/api/einsaetze/1/hazard-areas/7/assessment', () => {
           posts += 1;
           return HttpResponse.json({ ...gebiet, beurteilt_at: '2026-10-20 13:15:00' });
         }),
@@ -416,7 +416,7 @@ describe('GefahrenPage', () => {
     it('zeigt ein abgelehntes Bestätigen an der Stelle', async () => {
       server.use(
         ...handlers(),
-        http.post('/api/einsaetze/1/gefahrengebiete/7/beurteilung', () =>
+        http.post('/api/einsaetze/1/hazard-areas/7/assessment', () =>
           HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 }),
         ),
       );
@@ -457,9 +457,9 @@ describe('GefahrenPage', () => {
     let matrix8Angefragt = false;
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json(aktuelle)),
-      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => {
+      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json(aktuelle)),
+      http.get('/api/einsaetze/1/hazard-areas/7/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas/8/matrix', () => {
         matrix8Angefragt = true;
         return HttpResponse.json([]);
       }),
@@ -504,9 +504,9 @@ describe('GefahrenPage', () => {
     client.setQueryData(['gefahrengebiete', 1], [nord, sued]);
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([nord, sued])),
-      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([nord, sued])),
+      http.get('/api/einsaetze/1/hazard-areas/7/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas/8/matrix', () => HttpResponse.json([])),
     );
     // StrictMode wie in `main.tsx`: Effekte laufen doppelt — deckt das Race zwischen Default aufs
     // erste Gebiet und Deeplink-Selektion auf.
@@ -531,7 +531,7 @@ describe('GefahrenPage', () => {
     client.setQueryData(einsatzKeys.gefahrengebiete(1), [gebiet], { updatedAt: 0 });
     server.use(
       ...handlers([gebiet, sued]),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas/8/matrix', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -566,7 +566,7 @@ describe('GefahrenPage', () => {
     };
     server.use(
       ...handlers([gebiet, sued]),
-      http.get('/api/einsaetze/1/gefahrengebiete/8/matrix', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/hazard-areas/8/matrix', () => HttpResponse.json([])),
     );
     // Der Data Router übernimmt das Räumen verzögert; ein Klick in diesem Fenster sprang zurück
     // auf das Ziel aus der Adresse.
@@ -594,7 +594,7 @@ describe('GefahrenPage', () => {
     let put: Record<string, unknown> | null = null;
     server.use(
       ...handlers(),
-      http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', async ({ request }) => {
+      http.put('/api/einsaetze/1/hazard-areas/7/matrix/rating', async ({ request }) => {
         put = (await request.json()) as typeof put;
         return HttpResponse.json({
           id: 1,
@@ -766,8 +766,8 @@ describe('GefahrenPage · Druck (LLH-1364)', () => {
   it('bietet keinen Druck an, solange die Matrix lädt', async () => {
     server.use(
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/gefahrengebiete', () => HttpResponse.json([gebiet])),
-      http.get('/api/einsaetze/1/gefahrengebiete/7/matrix', () => new Promise<never>(() => {})),
+      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([gebiet])),
+      http.get('/api/einsaetze/1/hazard-areas/7/matrix', () => new Promise<never>(() => {})),
     );
     renderPage();
     expect(await screen.findByText('Bewertungen laden …')).toBeInTheDocument();
@@ -849,7 +849,7 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
       let versuch = 0;
       server.use(
         ...handlers(),
-        http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', () => {
+        http.put('/api/einsaetze/1/hazard-areas/7/matrix/rating', () => {
           versuch += 1;
           return versuch === 1
             ? HttpResponse.json({ error: 'Bewertung abgelehnt' }, { status: 409 })
@@ -883,7 +883,7 @@ describe('GefahrenPage · Lagekarte gesperrt (LFH-888)', () => {
       };
       server.use(
         ...handlers([gebiet], [bewertung]),
-        http.put('/api/einsaetze/1/gefahrengebiete/7/matrix/bewertung', () =>
+        http.put('/api/einsaetze/1/hazard-areas/7/matrix/rating', () =>
           HttpResponse.json({ error: 'Details abgelehnt' }, { status: 422 }),
         ),
       );

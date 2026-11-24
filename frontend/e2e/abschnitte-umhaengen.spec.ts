@@ -24,9 +24,9 @@ const WEST = 'Umhang West';
 
 async function seede(page: Page) {
   const einsatzId = await einsatzAnlegen(page, `E2E Umhängen ${Date.now()}`);
-  const nord = await post(page, einsatzId, 'abschnitte', { name: NORD });
-  const sued = await post(page, einsatzId, 'abschnitte', { name: SUED });
-  const ost = await post(page, einsatzId, 'abschnitte', { name: OST, ueber_abschnitt_id: nord });
+  const nord = await post(page, einsatzId, 'sectors', { name: NORD });
+  const sued = await post(page, einsatzId, 'sectors', { name: SUED });
+  const ost = await post(page, einsatzId, 'sectors', { name: OST, ueber_abschnitt_id: nord });
   return { einsatzId, nord, sued, ost };
 }
 
@@ -37,7 +37,7 @@ async function oeffneGliederung(page: Page, einsatzId: string) {
 
 /** Über-Abschnitt laut Server — die Wahrheit, nicht die Anzeige. */
 async function ueberAbschnitt(page: Page, einsatzId: string, id: number) {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/abschnitte`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/sectors`);
   const liste = (await antwort.json()) as { id: number; ueber_abschnitt_id: number | null }[];
   return liste.find((a) => a.id === id)?.ueber_abschnitt_id ?? null;
 }
@@ -110,8 +110,8 @@ test('Gliederung: der verschobene Abschnitt zieht wieder und nimmt selbst einen 
   // Süd hat keine Kinder, erst der Umhang klappt es auf; Mitte steht zwischen Süd und West, so
   // rückt West in der Folge des Baums nach vorn (nur dann bleibt sein Knoten eingehängt).
   const { einsatzId, nord, sued, ost } = await seede(page);
-  await post(page, einsatzId, 'abschnitte', { name: MITTE });
-  const west = await post(page, einsatzId, 'abschnitte', { name: WEST });
+  await post(page, einsatzId, 'sectors', { name: MITTE });
+  const west = await post(page, einsatzId, 'sectors', { name: WEST });
   await oeffneGliederung(page, einsatzId);
   // Erst nach der Aufklapp-Animation: die Kopie steht so lange neben dem Knoten. Der Toast kommt
   // mit dem neuen Baum, der Server allein sagt nichts über die Anzeige.
@@ -205,7 +205,7 @@ test('Gliederung: ein Umhang am anderen Arbeitsplatz wartet unter dem Zeiger im 
   await expect(zweiter.getByText('Live pausiert')).toBeVisible();
   const vorher = await zweiter.getByRole('tree').getByText(OST, { exact: true }).boundingBox();
 
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/abschnitte/${ost}`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${ost}`, {
     data: { ueber_abschnitt_id: sued },
   });
   expect(antwort.ok()).toBeTruthy();

@@ -426,7 +426,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       return (await antwort.json()) as { id: number };
     };
     const abschnitt = await post(
-      'abschnitte',
+      'sectors',
       { name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2' },
       'Abschnitt (Ablösung)',
     );
@@ -563,7 +563,7 @@ async function gate1Vorbereiten(
 
 /** Wetter per Stub, sonst ginge das Backend an Bright Sky. Langer Gemeindename als Stoff. */
 async function wetterStub(page: Page, einsatzId: string) {
-  await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
+  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
     route.fulfill({
       json: {
         ort: { name: 'Samtgemeinde Sottrum-Hellwege-Horstedt-Reeßum', kreis: 'Rotenburg (Wümme)' },
@@ -1365,7 +1365,7 @@ test.describe('Gate 1', () => {
         };
         let abschnittId = 0;
         if (modul === 'abloesung') {
-          abschnittId = (await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt')).id;
+          abschnittId = (await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt')).id;
           for (let i = 1; i <= 12; i += 1) await schicht(abschnittId, `Florian Nord ${i}`, 360);
         } else {
           for (let i = 1; i <= 12; i += 1) await zeitfenster(`Mittag ${i}`, -60, 180);
@@ -2133,7 +2133,7 @@ async function seedeFahrzeugMitBesatzung(page: Page): Promise<string> {
  */
 async function seedeDokumente(page: Page): Promise<string> {
   const einsatzId = await neuerEinsatz(page, `E2E Fükw-Dokumente ${Date.now()}`);
-  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/abschnitte`, {
+  const abschnitt = await seedeJson(page, 'post', `/api/einsaetze/${einsatzId}/sectors`, {
     name: 'Sanitätsdienst',
   });
   for (const [titel, kategorie, dateiname, mimeType, buffer, bezug] of [
@@ -2380,7 +2380,7 @@ async function seedEigeneEinheit(page: Page): Promise<string> {
       `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
     ).toBeTruthy();
   };
-  await post('abschnitte', {
+  await post('sectors', {
     name: 'Deichverteidigung Nordwestring zwischen Kilometer 4,7 und 6,2',
   });
   const ohneEinheit = await post('fahrzeuge', { adhoc: { funkrufname: EIGENE_EINHEIT_FAHRZEUG } });

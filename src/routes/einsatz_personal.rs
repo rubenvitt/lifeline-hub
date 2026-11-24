@@ -971,7 +971,7 @@ pub async fn position(
     Ok(Json(nachher))
 }
 
-/// GET /api/einsaetze/{id}/karte/fuehrungskraefte — alle aktiven Personen des Einsatzes
+/// GET /api/einsaetze/{id}/map/commanders — alle aktiven Personen des Einsatzes
 /// (Führung via `ist_einheitsfuehrer`/`ist_abschnittsleiter`-Flags kenntlich, LFH-276).
 pub async fn karte_fuehrungskraefte(
     State(state): State<AppState>,

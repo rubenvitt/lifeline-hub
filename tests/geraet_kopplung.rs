@@ -313,7 +313,7 @@ async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"EA Nord"}"#),
     )
@@ -361,7 +361,7 @@ async fn aufgeloester_abschnitt_beendet_seine_kopplung() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/abschnitte/{abschnitt}"),
+        &format!("/api/einsaetze/{einsatz}/sectors/{abschnitt}"),
         &admin,
         None,
     )
@@ -405,7 +405,7 @@ async fn abschnitt_anlegen(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name, "ueber_abschnitt_id": ueber})),
     )
@@ -518,7 +518,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
     let basis = format!("/api/einsaetze/{}", l.einsatz);
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/abschnitte"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/sectors"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v, "name"), ["EA Nord", "UA Nord-Ost"]);
     let (s, v) = anfrage(&app, "GET", &format!("{basis}/einheiten"), &geraet, None).await;
@@ -543,7 +543,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{basis}/abschnitte/{}", l.ost),
+        &format!("{basis}/sectors/{}", l.ost),
         &admin,
         Some(&json!({"ueber_abschnitt_id": l.sued})),
     )
@@ -558,7 +558,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
         ("GET", format!("{basis}/persons")),
         ("GET", format!("{basis}/uhs")),
         ("GET", format!("{basis}/personal")),
-        ("PATCH", format!("{basis}/abschnitte/{}", l.nord)),
+        ("PATCH", format!("{basis}/sectors/{}", l.nord)),
         ("PUT", format!("{basis}/einheiten/{}/status", l.zug_nord)),
         ("POST", format!("{basis}/auftraege")),
     ] {
@@ -1141,7 +1141,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
         let (s, liste) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+            &format!("/api/einsaetze/{einsatz}/situation/reports"),
             &admin,
             None,
         )
@@ -1164,7 +1164,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
     for (methode, pfad, body) in [
         (
             "GET",
-            format!("/api/einsaetze/{}/lage/meldungen", l.einsatz),
+            format!("/api/einsaetze/{}/situation/reports", l.einsatz),
             None,
         ),
         (
@@ -1174,7 +1174,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{}/lage/gesehen", l.einsatz),
+            format!("/api/einsaetze/{}/situation/seen", l.einsatz),
             Some(json!({ "meldung_ids": [mid] }).to_string()),
         ),
     ] {
@@ -1189,7 +1189,7 @@ async fn abschnittsgeraet_sieht_gefahrenzonen_aber_keine_bezirke() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let zonen = format!("/api/einsaetze/{}/zonen", l.einsatz);
+    let zonen = format!("/api/einsaetze/{}/zones", l.einsatz);
     for typ in ["absperrbereich", "evakuierungsbezirk", "freie_skizze"] {
         let (s, v) = anfrage_json(
             &app,
@@ -3011,7 +3011,7 @@ async fn lagemonitor_zaehlt_abgeschlossene_nicht_als_patienten() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &format!("/api/einsaetze/{einsatz}/situation-monitor"),
         &monitor,
         None,
     )
@@ -3043,7 +3043,7 @@ async fn lagemonitor_zaehlt_hilfeleistungen_nur_in_der_reihe_sanitaetsdienst() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+    let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -3055,7 +3055,7 @@ async fn lagemonitor_zaehlt_hilfeleistungen_nur_in_der_reihe_sanitaetsdienst() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/lagekennzahl-wahl"),
+        &format!("/api/einsaetze/{einsatz}/situation-metric-selection"),
         &admin,
         Some(&json!({"gewaehlt": ["sanitaetsdienst"]})),
     )
@@ -3094,7 +3094,7 @@ async fn lagemonitor_antwort_traegt_keine_personen() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+    let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -4151,7 +4151,7 @@ async fn br_geraet_liest_die_kraefteliste_und_sonst_nichts() {
         ),
         ("GET", format!("/api/einsaetze/{einsatz}/etb"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/persons"), None),
-        ("GET", format!("/api/einsaetze/{einsatz}/abschnitte"), None),
+        ("GET", format!("/api/einsaetze/{einsatz}/sectors"), None),
         ("GET", format!("/api/einsaetze/{einsatz}/uhs"), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
@@ -4742,7 +4742,7 @@ async fn br_geraet_sieht_abruf_bestaetigt_ausruecken_ruft_nicht_ab() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(&json!({"name": "EA Deich"})),
     )
@@ -5084,7 +5084,7 @@ async fn lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let monitor = lagemonitor(&app, &admin, einsatz).await;
-    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+    let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
     let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
     let offen = |v: &Value| v["sofortmeldungen_offen"].clone();
 
@@ -5237,7 +5237,7 @@ async fn lagemonitor_zeigt_kraefte_je_uhs_nur_als_zahl() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &format!("/api/einsaetze/{einsatz}/situation-monitor"),
         &monitor,
         None,
     )
@@ -5266,7 +5266,7 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/zonen"),
+            &format!("{basis}/zones"),
             &admin,
             Some(&json!({
                 "typ": typ,
@@ -5285,7 +5285,7 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/abschnitte"),
+            &format!("{basis}/sectors"),
             &admin,
             Some(&json!({
                 "name": name,
@@ -5302,14 +5302,21 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{basis}/abschnitte/{}/flaeche", abschnitte[0]),
+        &format!("{basis}/sectors/{}/area", abschnitte[0]),
         &admin,
         Some(&json!({"flaeche_geojson": ZONE_POLY})),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/lagemonitor"), &monitor, None).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/situation-monitor"),
+        &monitor,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(namen(&v["zonen"], "typ"), ["absperrbereich"]);
     assert_eq!(v["zonen"][0]["geometrie"], json!(ZONE_POLY));
@@ -5338,7 +5345,7 @@ async fn lagemonitor_zeigt_gefahrenzonen_und_abschnittsflaechen() {
     }
 
     // Die Listen der Personen tragen Notizen und Leiter; der Monitor liest sie nicht.
-    for pfad in ["zonen", "abschnitte", "gefahrengebiete"] {
+    for pfad in ["zones", "sectors", "hazard-areas"] {
         let (s, _) = anfrage(&app, "GET", &format!("{basis}/{pfad}"), &monitor, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
     }
@@ -5365,7 +5372,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/zonen"),
+            &format!("{basis}/zones"),
             &admin,
             Some(&json!({
                 "typ": typ,
@@ -5382,7 +5389,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
     let gebiet = zonen[0]["gefahrengebiet_id"]
         .as_i64()
         .expect("Gebiet zur Zone");
-    let gebiet_pfad = format!("{basis}/gefahrengebiete/{gebiet}");
+    let gebiet_pfad = format!("{basis}/hazard-areas/{gebiet}");
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
@@ -5396,7 +5403,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("{gebiet_pfad}/matrix/bewertung"),
+            &format!("{gebiet_pfad}/matrix/rating"),
             &admin,
             Some(&json!({"gefahrentyp": "einsturz", "schutzobjekt": objekt, "warnstufe": stufe})),
         )
@@ -5404,7 +5411,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
         assert_eq!(s, StatusCode::OK, "{v}");
     }
 
-    let lagebild = format!("{basis}/lagemonitor");
+    let lagebild = format!("{basis}/situation-monitor");
     let zone_von = |v: &Value, id: &Value| {
         v["zonen"]
             .as_array()
@@ -5428,7 +5435,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
     let (s, b) = anfrage(
         &app,
         "POST",
-        &format!("{gebiet_pfad}/beurteilung"),
+        &format!("{gebiet_pfad}/assessment"),
         &admin,
         None,
     )
@@ -5446,7 +5453,7 @@ async fn lagemonitor_zeigt_gefahrengebiet_mit_stufe_ohne_freitext_der_zone() {
     let (s, ohne) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/zonen"),
+        &format!("{basis}/zones"),
         &admin,
         Some(&json!({
             "typ": "gefahrengebiet",
@@ -7039,7 +7046,7 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
         ("GET", format!("{e}/etb"), None),
         ("GET", format!("{e}/uhs"), None),
         ("GET", format!("{e}/einheiten"), None),
-        ("GET", format!("{e}/lagemonitor"), None),
+        ("GET", format!("{e}/situation-monitor"), None),
     ] {
         let (s, _) = anfrage_json(&app, m, &pfad, &geraet, body.as_ref()).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {pfad}");
@@ -7363,7 +7370,7 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(&json!({"name": "Deich"})),
     )
@@ -7378,7 +7385,7 @@ async fn live_kanal_des_verpflegungsgeraets_traegt_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/abschnitte/{deich}"),
+        &format!("/api/einsaetze/{einsatz}/sectors/{deich}"),
         &admin,
         Some(&json!({"name": "Deich Nord"})),
     )
@@ -7567,7 +7574,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(&json!({"name": "Nord"})),
     )
@@ -7814,9 +7821,9 @@ async fn einheitengeraet_sieht_nur_die_eigene_einheit() {
 
     // Nicht gelistet: 403. Keine Abschnitte, keine Befehle, keine Karte in dieser Stufe.
     for (m, p) in [
-        ("GET", format!("{basis}/abschnitte")),
+        ("GET", format!("{basis}/sectors")),
         ("GET", format!("{basis}/befehle")),
-        ("GET", format!("{basis}/zonen")),
+        ("GET", format!("{basis}/zones")),
         ("GET", format!("{basis}/etb")),
         ("GET", format!("{basis}/personal")),
         ("PATCH", format!("{basis}/einheiten/{}", l.zug_ost)),
@@ -8885,7 +8892,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let basis = format!("/api/einsaetze/{einsatz}");
     let monitor = lagemonitor(&app, &admin, einsatz).await;
-    let lagebild = format!("{basis}/lagemonitor");
+    let lagebild = format!("{basis}/situation-monitor");
 
     // Ruhige Lage: alles 0, Listen leer, kein Zeitpunkt der ältesten Sofortmeldung.
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
@@ -8908,7 +8915,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/abschnitte"),
+            &format!("{basis}/sectors"),
             &admin,
             Some(&json!({ "name": name, "lagezustand": zustand })),
         )
@@ -9087,7 +9094,14 @@ async fn lagemonitor_alarm_nennt_ausfall_ohne_personennamen() {
     .await
     .unwrap();
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/lagemonitor"), &monitor, None).await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("{basis}/situation-monitor"),
+        &monitor,
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["alarm"]["ausfall"], json!(["Logistiktrupp"]), "{v}");
     assert!(!v.to_string().contains("Anna Muster"), "{v}");
@@ -9160,7 +9174,7 @@ async fn lagemonitor_alarm_laesst_ausgeblendetes_material_weg() {
     .execute(&pool)
     .await
     .unwrap();
-    let lagebild = format!("{basis}/lagemonitor");
+    let lagebild = format!("{basis}/situation-monitor");
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -9189,7 +9203,7 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/abschnitte"),
+        &format!("{basis}/sectors"),
         &admin,
         Some(&json!({ "name": "UHS Turnhalle", "lagezustand": "kritisch" })),
     )
@@ -9231,7 +9245,7 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let lagebild = format!("{basis}/lagemonitor");
+    let lagebild = format!("{basis}/situation-monitor");
     let (_, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(v["alarm"]["sofort_offen"], json!(1), "{v}");
     assert_eq!(v["alarm"]["auftraege_ueberfaellig"], json!(1), "{v}");
@@ -9321,7 +9335,7 @@ async fn lagemonitor_kacheln_lassen_ausgeblendete_module_weg() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
-    let lagebild = format!("{basis}/lagemonitor");
+    let lagebild = format!("{basis}/situation-monitor");
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -9360,7 +9374,7 @@ async fn lagemonitor_kraefte_fehlt_schon_wenn_nur_einheiten_ausgeblendet() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &format!("/api/einsaetze/{einsatz}/situation-monitor"),
         &monitor,
         None,
     )

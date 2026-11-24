@@ -1107,7 +1107,7 @@ async fn entfernte_schaden_datei_bleibt_generisch_gesperrt() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    let schaden_pfad = format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge/{lid}");
+    let schaden_pfad = format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments/{lid}");
 
     let (s, _) = anfrage(&app, "DELETE", &schaden_pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "über die Schadensroute entfernt");

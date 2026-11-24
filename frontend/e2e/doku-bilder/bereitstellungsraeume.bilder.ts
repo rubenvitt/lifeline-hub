@@ -122,7 +122,7 @@ test.describe(KAPITEL, () => {
       }
       // Die Betreuungsgruppe ist abgerufen, aber noch nicht ausgerückt (LLH-1085): raum.png zeigt
       // sie unter „Abgerufen“, verlauf.png den Abruf.
-      const abschnitte = await liste(api, `/api/einsaetze/${demo.id}/abschnitte`);
+      const abschnitte = await liste(api, `/api/einsaetze/${demo.id}/sectors`);
       const betreuung = abschnitte.find((a) => a.name === ZIEL_ABRUF);
       expect(betreuung, `Abschnitt „${ZIEL_ABRUF}“`).toBeDefined();
       await fuelle(api, 'post', `/api/einsaetze/${demo.id}/bereitstellungsraeume/${br.id}/abruf`, {

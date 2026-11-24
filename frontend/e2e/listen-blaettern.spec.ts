@@ -40,13 +40,13 @@ async function saeen(page: Page, pfad: string, anzahl: number, daten: (i: number
 async function einsatzMitSchaeden(page: Page): Promise<{ einsatzId: string; schwerNr: number }> {
   const einsatzId = await einsatz(page, 'Schäden blättern');
   const SCHWER = 17;
-  await saeen(page, `/api/einsaetze/${einsatzId}/schaeden`, SCHAEDEN, (i) => ({
+  await saeen(page, `/api/einsaetze/${einsatzId}/damages`, SCHAEDEN, (i) => ({
     typ: 'sachschaden',
     ausmass: i === SCHWER ? 'katastrophal' : 'gering',
     ort: `Deichweg ${i + 1}`,
   }));
   // Registriernummern laufen ab 1 in Anlagefolge; parallel angelegt also nicht sicher i + 1.
-  const auswahl = await page.request.get(`/api/einsaetze/${einsatzId}/schaeden/auswahl`);
+  const auswahl = await page.request.get(`/api/einsaetze/${einsatzId}/damages/selection`);
   const schwer = ((await auswahl.json()) as { registrier_nr: number; ort: string }[]).find(
     (s) => s.ort === `Deichweg ${SCHWER + 1}`,
   )!;

@@ -168,7 +168,7 @@ function setupMSW() {
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     // Auftrags-Ziele für das ETB→Auftrag-Formular.
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     // Standard-Rufname gesetzt (LFH-894): ohne ihn sperrte die Von/An-Pflicht jedes Absenden.
     http.get('/api/user-settings', () =>
       HttpResponse.json({
@@ -497,7 +497,7 @@ describe('EtbPage', () => {
       zaehlung({ meldung: 412 }),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
       <>
@@ -538,7 +538,7 @@ describe('EtbPage', () => {
       zaehlung({ meldung: 1 }),
       http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
       <>
@@ -2006,7 +2006,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
           }),
         ),
       ),
-      http.get('/api/einsaetze/7/abschnitte', () => {
+      http.get('/api/einsaetze/7/sectors', () => {
         abgefragt.push('abschnitte');
         return HttpResponse.json([]);
       }),

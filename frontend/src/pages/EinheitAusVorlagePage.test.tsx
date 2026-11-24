@@ -142,7 +142,7 @@ function handlers({
     ),
     http.get('/api/einsaetze/1/einheiten/aus-vorlage/5', () => HttpResponse.json(vorschau)),
     http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/1/abschnitte', () =>
+    http.get('/api/einsaetze/1/sectors', () =>
       HttpResponse.json([{ id: 3, einsatz_id: 1, name: 'Nord', sortier: 0 }]),
     ),
   ];

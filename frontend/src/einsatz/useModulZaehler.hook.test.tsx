@@ -54,7 +54,7 @@ describe('useModulZaehler (LFH-612)', () => {
       '/api/einsaetze/7/care',
       '/api/einsaetze/7/evacuation',
       '/api/einsaetze/7/module-counts',
-      '/api/einsaetze/7/wetter',
+      '/api/einsaetze/7/weather',
     ]);
   });
 

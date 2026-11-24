@@ -304,7 +304,7 @@ async fn lagemonitor_traegt_die_naechsten_drei_programmpunkte() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let lagebild = format!("/api/einsaetze/{einsatz}/lagemonitor");
+    let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
     let monitor = lagemonitor(&app, &admin, einsatz).await;
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;

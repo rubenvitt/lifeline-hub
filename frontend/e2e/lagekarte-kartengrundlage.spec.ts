@@ -204,17 +204,17 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
   await anmelden(page, { startseite: false });
   const eid = await einsatzMitOrt(page, `E2E Grundlagewechsel ${Date.now()}`);
   const basis = `/api/einsaetze/${eid}`;
-  await senden(page, 'post', `${basis}/zonen`, {
+  await senden(page, 'post', `${basis}/zones`, {
     typ: 'absperrbereich',
     geometrie_typ: 'Polygon',
     geometrie: JSON.stringify(rechteck(0.002, 0.001, 0.003)),
     label: 'Sperrzone Wechsel',
   });
-  const abschnitt = await senden(page, 'post', `${basis}/abschnitte`, { name: 'Deich Wechsel' });
-  await senden(page, 'patch', `${basis}/abschnitte/${abschnitt.id}/flaeche`, {
+  const abschnitt = await senden(page, 'post', `${basis}/sectors`, { name: 'Deich Wechsel' });
+  await senden(page, 'patch', `${basis}/sectors/${abschnitt.id}/area`, {
     flaeche_geojson: JSON.stringify(rechteck(0.002, 0.001, -0.003)),
   });
-  await senden(page, 'post', `${basis}/freie-zeichen`, {
+  await senden(page, 'post', `${basis}/free-symbols`, {
     lat: ORT.lat + 0.001,
     lon: ORT.lon,
     zeichen_spec: ZEICHEN_SPEC,

@@ -136,7 +136,7 @@ function stelleBereit(g: GeraetAnzeige = geraet()) {
     http.get('/api/einsaetze/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([NORD, NORD_OST])),
+    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([NORD, NORD_OST])),
     http.get('/api/einsaetze/7/einheiten', () =>
       HttpResponse.json([
         einheit(5, { name: '2. Zug', abschnitt_id: 21, abschnitt_name: 'UA Nord-Ost' }),

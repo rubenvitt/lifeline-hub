@@ -59,7 +59,7 @@ async function seedeAlles(page: Page, einsatzId: string) {
   await seede(
     page,
     einsatzId,
-    'schaeden',
+    'damages',
     { typ: 'sachschaden', ausmass: 'gering', ort: 'Hauptstr. 17', beschreibung: 'Dachziegel' },
     'Schaden',
   );

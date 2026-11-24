@@ -2,7 +2,7 @@
 //! Organisation fragen, Antwort bauen. Drei Einstiege teilen ihn (Spec `lagekarte-ortssuche`,
 //! „Adresssuche über den Server mit Grenzen“; Spec `ortsfeld`):
 //!
-//! - `GET /api/einsaetze/:id/karte/ort-suche` — Lagekarte, am Modul gegatet
+//! - `GET /api/einsaetze/:id/map/place-search` — Lagekarte, am Modul gegatet
 //!   (`routes::karte_ort_suche`);
 //! - `GET /api/einsaetze/:id/place-search` — Ortsfeld im Einsatz, Recht der Einsatzdaten
 //!   ([`im_einsatz`]);

@@ -11,10 +11,10 @@ import type { ObjektEintrag } from './objektsuche';
 
 /**
  * Ortssuche im Suchfeld der Kartenleiste (LFH-638, Spec `lagekarte-ortssuche`): Koordinate beim
- * Tippen ohne Server, Adresse erst auf Enter über `…/karte/ort-suche`.
+ * Tippen ohne Server, Adresse erst auf Enter über `…/map/place-search`.
  */
 
-const PFAD = '/api/einsaetze/7/karte/ort-suche';
+const PFAD = '/api/einsaetze/7/map/place-search';
 const BERLIN = { lat: 52.52194, lon: 13.41321 };
 
 function marker(typ: MarkerTyp, id: number, label: string): ObjektEintrag {

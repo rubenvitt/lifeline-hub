@@ -27,7 +27,7 @@ async fn umgebung_mit(app: axum::Router) -> Umgebung {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"EA Süd"}"#),
     )

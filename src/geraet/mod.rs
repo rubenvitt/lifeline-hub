@@ -387,7 +387,7 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
-const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor")];
+const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/situation-monitor")];
 /// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
 /// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, die
 /// geltenden Einsatzbefehle an den Bereich lesen und ihre eigenen Verteiler-Einträge quittieren
@@ -396,7 +396,7 @@ const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/lagemonitor"
 /// Abschnitte und Einheiten ändern, Aufträge erteilen oder abnehmen, Befehle schreiben und ihre
 /// Anlagen, ETB, Personen und Stellen fehlen bewusst.
 const EINSATZABSCHNITT: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/abschnitte"),
+    ("GET", "/api/einsaetze/{id}/sectors"),
     ("GET", "/api/einsaetze/{id}/einheiten"),
     ("GET", "/api/einsaetze/{id}/auftraege"),
     ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
@@ -417,7 +417,7 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
     ),
     ("GET", "/api/einsaetze/{id}/meldungen"),
     ("POST", "/api/einsaetze/{id}/meldungen"),
-    ("GET", "/api/einsaetze/{id}/zonen"),
+    ("GET", "/api/einsaetze/{id}/zones"),
 ];
 
 /// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum samt Verlauf
@@ -980,7 +980,7 @@ mod tests {
             // Empfänger nur über die Projektion in `GET …/catering` (LLH-1055 D3): die
             // Einheitenliste trägt Führer, Verbindungen und Personalnamen.
             ("GET", "/api/einsaetze/{id}/einheiten"),
-            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/sectors"),
         ] {
             assert!(!darf_route(v, m, p), "Verpflegungsgerät darf {m} {p} nicht");
         }
@@ -991,7 +991,7 @@ mod tests {
         let a = Funktionsansicht::Einsatzabschnitt;
         assert!(a.ist_verfuegbar());
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/sectors"),
             ("GET", "/api/einsaetze/{id}/einheiten"),
             ("GET", "/api/einsaetze/{id}/auftraege"),
             ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
@@ -1001,15 +1001,15 @@ mod tests {
             ),
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
             ("POST", "/api/einsaetze/{id}/meldungen"),
-            ("GET", "/api/einsaetze/{id}/zonen"),
+            ("GET", "/api/einsaetze/{id}/zones"),
         ] {
             assert!(darf_route(a, m, p), "Abschnittsgerät darf {m} {p}");
         }
         for (m, p) in [
-            ("POST", "/api/einsaetze/{id}/abschnitte"),
-            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}"),
-            ("PATCH", "/api/einsaetze/{id}/abschnitte/{aid}/flaeche"),
-            ("DELETE", "/api/einsaetze/{id}/abschnitte/{aid}"),
+            ("POST", "/api/einsaetze/{id}/sectors"),
+            ("PATCH", "/api/einsaetze/{id}/sectors/{aid}"),
+            ("PATCH", "/api/einsaetze/{id}/sectors/{aid}/area"),
+            ("DELETE", "/api/einsaetze/{id}/sectors/{aid}"),
             ("POST", "/api/einsaetze/{id}/einheiten"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
             ("PUT", "/api/einsaetze/{id}/einheiten/{eid}/status"),
@@ -1023,13 +1023,13 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
             ("PATCH", "/api/einsaetze/{id}/auftraege/{aid}"),
             ("GET", "/api/einsaetze/{id}/auftraege/kennzahlen"),
-            ("POST", "/api/einsaetze/{id}/zonen"),
-            ("GET", "/api/einsaetze/{id}/freie-zeichen"),
+            ("POST", "/api/einsaetze/{id}/zones"),
+            ("GET", "/api/einsaetze/{id}/free-symbols"),
             ("GET", "/api/einsaetze/{id}/personal"),
             ("GET", "/api/einsaetze/{id}/persons"),
             ("GET", "/api/einsaetze/{id}/uhs"),
             ("GET", "/api/einsaetze/{id}/bereitstellungsraeume"),
-            ("GET", "/api/einsaetze/{id}/lagemonitor"),
+            ("GET", "/api/einsaetze/{id}/situation-monitor"),
         ] {
             assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
         }
@@ -1072,9 +1072,9 @@ mod tests {
             assert!(darf_route(e, m, p), "Einheitengerät darf {m} {p}");
         }
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/abschnitte"),
+            ("GET", "/api/einsaetze/{id}/sectors"),
             ("GET", "/api/einsaetze/{id}/befehle"),
-            ("GET", "/api/einsaetze/{id}/zonen"),
+            ("GET", "/api/einsaetze/{id}/zones"),
             ("GET", "/api/einsaetze/{id}/fahrzeuge"),
             ("GET", "/api/einsaetze/{id}/personal"),
             ("GET", "/api/einsaetze/{id}/persons/{pid}"),

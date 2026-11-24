@@ -41,7 +41,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -81,7 +81,7 @@ impl Ziel {
     fn pfad(self, einsatz: i64, sg: i64) -> String {
         let b = format!("/api/einsaetze/{einsatz}");
         match self {
-            Ziel::Abschnitt(id) => format!("{b}/abschnitte/{id}/sprechgruppen/{sg}"),
+            Ziel::Abschnitt(id) => format!("{b}/sectors/{id}/talk-groups/{sg}"),
             Ziel::Einheit(id) => format!("{b}/einheiten/{id}/sprechgruppen/{sg}"),
             Ziel::Fuehrungsstelle => format!("{b}/command-post/talk-groups/{sg}"),
             Ziel::Stelle(id) => {
@@ -112,7 +112,7 @@ impl Ziel {
         let liste: Vec<Value> = match self {
             Ziel::Abschnitt(id) | Ziel::Einheit(id) => {
                 let pfad = match self {
-                    Ziel::Abschnitt(_) => format!("{b}/abschnitte"),
+                    Ziel::Abschnitt(_) => format!("{b}/sectors"),
                     _ => format!("{b}/einheiten"),
                 };
                 let (_, json) = anfrage(app, "GET", &pfad, cookie, None).await;
@@ -289,7 +289,7 @@ async fn gleiches_live_und_etb_ausser_an_der_stelle() {
         anfrage_json(
             &a.app,
             "PATCH",
-            &format!("{b}/abschnitte/{id}"),
+            &format!("{b}/sectors/{id}"),
             &a.admin,
             Some(&ids),
         )

@@ -246,7 +246,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         HttpResponse.json({ id: 5, bezeichnung: 'T', status: 'aktiv' }),
       ),
       http.get('/api/einsaetze/5/uhs', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/einsaetze/5/zonen', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/5/zones', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/organization', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/map/config', () => new HttpResponse(null, { status: 500 })),
       http.get('/api/einsaetze/5/settings', () => new HttpResponse(null, { status: 500 })),
@@ -257,14 +257,14 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         () => new HttpResponse(null, { status: 403 }),
       ),
       ...[
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
@@ -302,15 +302,15 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
@@ -368,14 +368,14 @@ describe('useLagekarteDaten markerLaden', () => {
       }),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
@@ -436,15 +436,15 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
@@ -611,15 +611,15 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
         HttpResponse.json(RUECKMELDUNGEN),
@@ -754,7 +754,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       evakuierungsbezirk_id: 31,
     };
     handler({}, () => HttpResponse.json({ bezirke: [BEZIRK], stellen: [] }));
-    server.use(http.get('/api/einsaetze/5/zonen', () => HttpResponse.json([ZONE])));
+    server.use(http.get('/api/einsaetze/5/zones', () => HttpResponse.json([ZONE])));
     const live = render();
     await waitFor(() =>
       expect(live.result.current.zonenFeatures[0]?.label).toBe('Uferstraße 12–40 · Räumung: läuft'),
@@ -879,7 +879,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
   it('Bezirksfläche ohne Modulrecht: nur das Typwort, keine Bezirksangaben', async () => {
     handler({}, () => new HttpResponse(null, { status: 403 }));
     server.use(
-      http.get('/api/einsaetze/5/zonen', () =>
+      http.get('/api/einsaetze/5/zones', () =>
         HttpResponse.json([
           {
             id: 41,
@@ -960,14 +960,14 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/einheiten', () => HttpResponse.json([EINHEIT])),
       http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
@@ -1159,15 +1159,15 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
       ),
       ...[
         '/api/einsaetze/5/uhs',
-        '/api/einsaetze/5/schaeden/marker',
+        '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
         '/api/einsaetze/5/fahrzeuge',
-        '/api/einsaetze/5/abschnitte',
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/gefahrengebiete',
-        '/api/einsaetze/5/lage/meldungen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
+        '/api/einsaetze/5/sectors',
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/hazard-areas',
+        '/api/einsaetze/5/situation/reports',
+        '/api/einsaetze/5/map/commanders',
         '/api/einsaetze/5/meldungen/rueckmeldungen',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/module-access', () =>
@@ -1317,12 +1317,12 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
 describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
   const GEBUNDEN = [
     '/api/einsaetze/5/uhs',
-    '/api/einsaetze/5/schaeden/marker',
+    '/api/einsaetze/5/damages/marker',
     '/api/einsaetze/5/einheiten',
     '/api/einsaetze/5/fahrzeuge',
-    '/api/einsaetze/5/abschnitte',
-    '/api/einsaetze/5/gefahrengebiete',
-    '/api/einsaetze/5/lage/meldungen',
+    '/api/einsaetze/5/sectors',
+    '/api/einsaetze/5/hazard-areas',
+    '/api/einsaetze/5/situation/reports',
     '/api/einsaetze/5/meldungen/rueckmeldungen',
   ];
 
@@ -1356,18 +1356,18 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
         HttpResponse.json({ einsatz_id: 5, org_defaults: { org_id: 1 } }),
       ),
       ...[
-        '/api/einsaetze/5/zonen',
-        '/api/einsaetze/5/freie-zeichen',
-        '/api/einsaetze/5/karte/fuehrungskraefte',
-        ...GEBUNDEN.filter((p) => !p.endsWith('/schaeden/marker')),
+        '/api/einsaetze/5/zones',
+        '/api/einsaetze/5/free-symbols',
+        '/api/einsaetze/5/map/commanders',
+        ...GEBUNDEN.filter((p) => !p.endsWith('/damages/marker')),
       ].map((pfad) =>
         http.get(pfad, () => {
           zaehle(pfad);
           return HttpResponse.json([]);
         }),
       ),
-      http.get('/api/einsaetze/5/schaeden/marker', () => {
-        zaehle('/api/einsaetze/5/schaeden/marker');
+      http.get('/api/einsaetze/5/damages/marker', () => {
+        zaehle('/api/einsaetze/5/damages/marker');
         return schaeden();
       }),
       http.get('/api/einsaetze/5/module-access', async () => {
@@ -1391,7 +1391,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     await waitFor(() => expect(result.current.markerLaden).toBe(false));
     // Vorbedingung: die freien Quellen liefen — sonst wäre „kein Request" trivial.
     expect(aufrufe['/api/einsaetze/5/uhs']).toBe(1);
-    expect(aufrufe['/api/einsaetze/5/schaeden/marker']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/5/damages/marker']).toBeUndefined();
     expect(result.current.rohdaten.schaeden).toEqual([]);
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });
@@ -1403,7 +1403,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     });
     const { result } = render();
     await waitFor(() => expect(result.current.markerLaden).toBe(false));
-    expect(aufrufe['/api/einsaetze/5/schaeden/marker']).toBe(1);
+    expect(aufrufe['/api/einsaetze/5/damages/marker']).toBe(1);
     expect(aufrufe['/api/einsaetze/5/uhs']).toBeUndefined();
     // Rückmeldungen hängen am Modul „Meldungen": ohne Recht keine Anfrage, keine Daten.
     expect(aufrufe['/api/einsaetze/5/meldungen/rueckmeldungen']).toBeUndefined();
@@ -1416,7 +1416,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     const { result } = render();
     await waitFor(() => expect(result.current.ladt).toBe(false));
     // Die Quellen der Seite selbst laufen; die gebundenen warten.
-    await waitFor(() => expect(aufrufe['/api/einsaetze/5/zonen']).toBe(1));
+    await waitFor(() => expect(aufrufe['/api/einsaetze/5/zones']).toBe(1));
     await new Promise((r) => setTimeout(r, 50));
     for (const pfad of GEBUNDEN) expect(aufrufe[pfad], pfad).toBeUndefined();
     // Das Markerbild steht noch nicht fest: die Startansicht wartet.
@@ -1503,7 +1503,7 @@ describe('useLagekarteDaten freie Zeichen im Altformat (LFH-836)', () => {
   });
 
   it('ein Offline-Stand mit Altfeldern zeichnet ebenso', async () => {
-    server.use(http.get('/api/einsaetze/5/freie-zeichen', () => HttpResponse.error()));
+    server.use(http.get('/api/einsaetze/5/free-symbols', () => HttpResponse.error()));
     // Der wiederhergestellte Stand (LFH-723): ein eigener Client, sonst räumt `gcTime: 0` ihn ab.
     const quelle = new QueryClient();
     quelle.setQueryData(['einsatz-freie-zeichen', 5], [ALTZEICHEN]);

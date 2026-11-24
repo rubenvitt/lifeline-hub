@@ -446,7 +446,7 @@ async fn schaden_anlegen(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/damages"),
         cookie,
         Some(r#"{"typ":"sachschaden","ausmass":"gering","ort":"B5 km12"}"#),
     )

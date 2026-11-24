@@ -55,7 +55,7 @@ async fn lage(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/situation/reports"),
         cookie,
         None,
     )

@@ -102,7 +102,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     ['evakuierungsbezirk', 0.004],
     ['freie_skizze', 0.008],
   ] as const) {
-    await anlegen(page, `/api/einsaetze/${e}/zonen`, {
+    await anlegen(page, `/api/einsaetze/${e}/zones`, {
       typ,
       geometrie_typ: 'Polygon',
       geometrie: rechteck(13.4 + versatz, 52.518, 13.403 + versatz, 52.52),
@@ -110,29 +110,26 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     });
   }
   // LLH-1746: ein Gefahrengebiet mit Stufe „hoch“; die Beschriftung der Zone bleibt draußen.
-  const gefahr = await anlegen<{ gefahrengebiet_id: number }>(page, `/api/einsaetze/${e}/zonen`, {
+  const gefahr = await anlegen<{ gefahrengebiet_id: number }>(page, `/api/einsaetze/${e}/zones`, {
     typ: 'gefahrengebiet',
     geometrie_typ: 'Polygon',
     geometrie: rechteck(13.406, 52.521, 13.409, 52.523),
     label: 'Garten Familie Erste',
   });
-  const gebiet = `/api/einsaetze/${e}/gefahrengebiete/${gefahr.gefahrengebiet_id}`;
+  const gebiet = `/api/einsaetze/${e}/hazard-areas/${gefahr.gefahrengebiet_id}`;
   const umbenannt = await page.request.patch(gebiet, { data: { label: 'Hangrutsch' } });
   expect(umbenannt.ok(), await umbenannt.text()).toBeTruthy();
-  const bewertet = await page.request.put(`${gebiet}/matrix/bewertung`, {
+  const bewertet = await page.request.put(`${gebiet}/matrix/rating`, {
     data: { gefahrentyp: 'einsturz', schutzobjekt: 'menschen', warnstufe: 'hoch' },
   });
   expect(bewertet.ok(), await bewertet.text()).toBeTruthy();
-  const abschnitt = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+  const abschnitt = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
   });
-  const flaeche = await page.request.patch(
-    `/api/einsaetze/${e}/abschnitte/${abschnitt.id}/flaeche`,
-    {
-      data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
-    },
-  );
+  const flaeche = await page.request.patch(`/api/einsaetze/${e}/sectors/${abschnitt.id}/area`, {
+    data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
+  });
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
   // D12 (Change `kcjecn9e-benachrichtigungskonzept`): eine offene Sofortmeldung kommt nur als Zahl.
   await anlegen(page, `/api/einsaetze/${e}/meldungen`, {
@@ -170,7 +167,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // Einheit mit überfälliger Rückmeldung, überfälliger Auftrag (samt fälliger Erinnerung an die
   // Quittierfrist), dringende Meldung, dazu die Sofortmeldung oben.
   await anlegen(page, `/api/einsaetze/${e}/persons`, { name: 'Vermisst', status: 'vermisst' });
-  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+  await anlegen(page, `/api/einsaetze/${e}/sectors`, {
     name: 'UHS Turnhalle Nordufer',
     lagezustand: 'kritisch',
   });

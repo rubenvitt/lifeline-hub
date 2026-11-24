@@ -83,7 +83,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/zonen", self.einsatz),
+            &format!("/api/einsaetze/{}/zones", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -183,21 +183,21 @@ async fn aenderung_einer_bestehenden_gefahr_bleibt_still() {
     w.schreiben(
         &anna,
         "PATCH",
-        &format!("/zonen/{zone_id}"),
+        &format!("/zones/{zone_id}"),
         json!({ "label": "Gasaustritt Nord", "notiz": "Wind aus West" }),
     )
     .await;
     w.schreiben(
         &anna,
         "PATCH",
-        &format!("/gefahrengebiete/{gebiet}"),
+        &format!("/hazard-areas/{gebiet}"),
         json!({ "label": "Gasaustritt Nordstadt" }),
     )
     .await;
     w.schreiben(
         &anna,
         "PUT",
-        &format!("/gefahrengebiete/{gebiet}/matrix/bewertung"),
+        &format!("/hazard-areas/{gebiet}/matrix/rating"),
         json!({ "gefahrentyp": "atemgifte", "schutzobjekt": "menschen", "warnstufe": "hoch" }),
     )
     .await;

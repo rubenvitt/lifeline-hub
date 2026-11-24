@@ -420,7 +420,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   (Gerätebindung), im SQL vor dem `LIMIT`. Ein `retain` danach machte Seiten kurz und den
   Cursor falsch.
 - **Auswahlfelder lesen eine Projektion ohne Freitexte** (`…/persons/selection`,
-  `…/schaeden/auswahl`), nicht die Vollliste.
+  `…/damages/selection`), nicht die Vollliste.
 - **Ausnahme: das Informationstelefon blättert ohne Phase** (LLH-732): ein Protokoll ist eine
   gemischte Zeitachse, und bei einer Großlage gehen auch die offenen Rückrufe in die Hunderte.
   `…/infotelefon` liefert immer eine Seite (`kommunikation::parse_page`, Cursor `eingang_at` + `id`),
@@ -1036,7 +1036,7 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   protokolliert. Live wie beim ETB über `meldung::live_publikation_sicherstellen`. Nachweis
   `tests/chat_meldungseingang.rs`.
 - **Kenntnisnahme über die Meldung:** `POST …/meldungen/{mid}/lage-gesehen` und
-  `POST …/lage/gesehen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
+  `POST …/situation/seen` mit `meldung_ids` (höchstens `LAGE_GESEHEN_MAX`); beide stehen in
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
 - **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
   `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten).

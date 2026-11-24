@@ -84,7 +84,7 @@ function renderInspector(opts: {
 let matrixAbrufe: string[] = [];
 function matrixAntwort(matrix: GefahrBewertung[] | 'fehler') {
   server.use(
-    http.get('/api/einsaetze/:eid/gefahrengebiete/:gid/matrix', ({ request }) => {
+    http.get('/api/einsaetze/:eid/hazard-areas/:gid/matrix', ({ request }) => {
       matrixAbrufe.push(new URL(request.url).pathname);
       return matrix === 'fehler'
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
@@ -749,7 +749,7 @@ describe('ZonenInspector — Gefahren und Erläuterungen des Gebiets (LLH-1110)'
     // Kompakt: kein Meldeweg auf der Karte, und unter fünf Zeilen kein Sprung.
     expect(abschnitt).not.toHaveTextContent('Rettungsstaffel');
     expect(within(abschnitt).queryByRole('link', { name: /alle in Gefahren/ })).toBeNull();
-    expect(matrixAbrufe).toEqual(['/api/einsaetze/1/gefahrengebiete/10/matrix']);
+    expect(matrixAbrufe).toEqual(['/api/einsaetze/1/hazard-areas/10/matrix']);
   });
 
   it('zeigt höchstens fünf Zeilen, darunter „alle in Gefahren ↗“', async () => {

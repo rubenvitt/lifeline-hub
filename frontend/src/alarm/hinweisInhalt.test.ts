@@ -145,7 +145,7 @@ describe('ladeHinweisInhalt', () => {
 
   it('Gefahr: die Bezeichnung aus den Zonen der Lagekarte', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/zonen', () =>
+      http.get('/api/einsaetze/:id/zones', () =>
         HttpResponse.json([
           { id: 1, gefahrengebiet_id: null, label: 'Bereitstellung' },
           { id: 2, gefahrengebiet_id: 9, label: 'Gasaustritt Halle 3' },
@@ -159,7 +159,7 @@ describe('ladeHinweisInhalt', () => {
 
   it('Gefahr ohne Bezeichnung: kein Inhalt', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/zonen', () =>
+      http.get('/api/einsaetze/:id/zones', () =>
         HttpResponse.json([{ id: 2, gefahrengebiet_id: 9, label: null }]),
       ),
     );

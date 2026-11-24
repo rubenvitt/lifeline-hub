@@ -295,7 +295,7 @@ async fn stadtfest_bringt_sein_programm_in_den_neuen_einsatz() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &format!("/api/einsaetze/{einsatz}/situation-monitor"),
         &monitor,
         None,
     )

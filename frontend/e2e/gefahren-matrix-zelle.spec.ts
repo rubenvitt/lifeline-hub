@@ -36,7 +36,7 @@ test('jede Matrix-Zelle misst auf dem Tablet mindestens 44 px', async ({ page })
 
   // Gefahrengebiet über die API. `geometrie` ist ein GeoJSON-STRING, dessen `type` zu
   // `geometrie_typ` passen muss ('Polygon', großgeschrieben).
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/zonen`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
     data: {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
@@ -85,7 +85,7 @@ async function matrixEinsatz(page: Page): Promise<number> {
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id } = (await antwort.json()) as { id: number };
-  const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+  const zone = await page.request.post(`/api/einsaetze/${id}/zones`, {
     data: {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',

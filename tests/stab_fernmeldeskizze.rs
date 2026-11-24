@@ -38,7 +38,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -1207,7 +1207,7 @@ async fn abschnitt_stelle_und_komponente_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/abschnitte/{ab}"),
+        &format!("/api/einsaetze/{einsatz}/sectors/{ab}"),
         &admin,
         None,
     )

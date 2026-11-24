@@ -95,7 +95,7 @@ test.describe(KAPITEL, () => {
     await fuehrungsstelleOrtFuellen(api, id);
 
     // Die Zuordnung ersetzt die Menge: wiederholt ist sie dieselbe.
-    const abschnitte = `${e}/abschnitte`;
+    const abschnitte = `${e}/sectors`;
     await fuelle(
       api,
       'patch',

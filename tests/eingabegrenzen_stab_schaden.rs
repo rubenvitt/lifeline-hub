@@ -62,7 +62,7 @@ async fn schaden_ort_beschreibung_kontakt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/schaeden");
+    let uri = format!("/api/einsaetze/{e}/damages");
     let schaden = |ort: String, beschreibung: String| json!({ "typ": "sachschaden", "ausmass": "gering", "ort": ort, "beschreibung": beschreibung });
 
     let (s, j) = post(&app, &admin, &uri, schaden(x(500), x(8_000))).await;

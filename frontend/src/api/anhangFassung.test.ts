@@ -80,7 +80,7 @@ describe('anhangFassung — Vorschau (LFH-759)', () => {
 describe('einsatzIdAusPfad (LFH-759)', () => {
   it('liest die Einsatz-ID aus jedem Anhang-Weg', () => {
     expect(einsatzIdAusPfad('/api/einsaetze/5/etb/40/anhaenge/9')).toBe(5);
-    expect(einsatzIdAusPfad('/api/einsaetze/12/schaeden/3/anhaenge/9/datei')).toBe(12);
+    expect(einsatzIdAusPfad('/api/einsaetze/12/damages/3/attachments/9/file')).toBe(12);
     expect(einsatzIdAusPfad('/a/1')).toBeNull();
   });
 });

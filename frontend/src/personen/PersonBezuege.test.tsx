@@ -72,8 +72,8 @@ beforeEach(() => {
         tier({ id: 42, registrier_nr: 10, rufname: 'Fremd', halter_person_id: 99 }),
       ]);
     }),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json(schaedenDerPerson)),
-    http.get('/api/einsaetze/1/schaeden/auswahl', () =>
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json(schaedenDerPerson)),
+    http.get('/api/einsaetze/1/damages/selection', () =>
       HttpResponse.json([
         {
           id: 51,
@@ -97,7 +97,7 @@ beforeEach(() => {
       patches.push({ pfad: `tiere/${String(params.id)}`, body: (await request.json()) as never });
       return tierPatchAntwort();
     }),
-    http.patch('/api/einsaetze/1/schaeden/:id', async ({ request, params }) => {
+    http.patch('/api/einsaetze/1/damages/:id', async ({ request, params }) => {
       patches.push({
         pfad: `schaeden/${String(params.id)}`,
         body: (await request.json()) as never,

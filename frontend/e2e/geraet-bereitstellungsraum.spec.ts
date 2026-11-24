@@ -243,7 +243,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
     status: 'aktiv',
   });
-  await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
+  await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
   await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Musterstadt' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
@@ -459,7 +459,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
   await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/status`, {
     status: 'aktiv',
   });
-  const deich = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Deich' });
+  const deich = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Deich' });
   const hlf = await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'HLF Deich' });
   await anlegen(page, `/api/einsaetze/${e}/bereitstellungsraeume/${raum.id}/belegung`, {
     objekt_typ: 'einheit',

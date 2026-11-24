@@ -49,7 +49,7 @@ function liefere(
 ) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/abschnitte', () => {
+    http.get('/api/einsaetze/5/sectors', () => {
       abrufe += 1;
       return HttpResponse.json(abschnitte);
     }),

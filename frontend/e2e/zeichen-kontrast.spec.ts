@@ -29,7 +29,7 @@ import {
  * und eine der Feuerwehr (Farbe nach DV 102).
  */
 async function seede(page: Page, einsatzId: string) {
-  const abschnitt = await post(page, einsatzId, 'abschnitte', { name: 'Deich Nord' });
+  const abschnitt = await post(page, einsatzId, 'sectors', { name: 'Deich Nord' });
   await post(page, einsatzId, 'einheiten', {
     name: 'Gruppe ohne Organisation',
     abschnitt_id: abschnitt,
