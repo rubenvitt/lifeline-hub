@@ -425,10 +425,16 @@ einem Kern:
   - zweites App-Ziel `LifelineHelfer` im XcodeGen-Projekt `ios/project.yml` (Quellen
     `ios/Helfer/`, Paket `ios/HelferKern/`), eigene Bundle-ID und eigene TestFlight-App.
   - Gebaut wird wie die Hülle nur auf macOS; `HelferKern` testet auch unter Linux.
+  - Kennungen: Bundle-ID `dev.rubeen.lifeline.helfer`, für die Live-Aktivität die
+    Widget-Erweiterung `dev.rubeen.lifeline.helfer.aktivitaet`. Team `H95J852PKP` und Signierung
+    wie bei der Hülle (Ruben, 24.11.2026). App-Name in App Store Connect „Lifeline Helfer“.
 - **Android:**
   - Modul `:helfer` neben `:app` in `android/`, Kern `android/helferkern` per `includeBuild`.
-  - Eigene Application-ID, signierte APK über GitHub-Releases mit dem vorhandenen Updater
-    (eigener Kanal).
+  - Application-ID `dev.rubeen.lifeline.helfer`, signierte APK über GitHub-Releases mit dem
+    vorhandenen Updater (eigener Kanal).
+  - **Derselbe Signierschlüssel wie die Lifeline-App** (Ruben, 24.11.2026): Keystore und die
+    vier Geheimnisse `ANDROID_KEY*` werden mitbenutzt (`android/AGENTS.md`, „Signierschlüssel
+    wechselt nie“). Ein zweiter Keystore entsteht nicht.
 - **Regeln:** je eine `AGENTS.md` unter `ios/Helfer/` und `android/helfer/`. Sie sagen, dass die
   Helfer-App eine native App ist, für die „keine Anwendungslogik in der Hülle“ nicht gilt, und
   dass ihre Logik im Kern steht. Die Tabelle in der Wurzel-`AGENTS.md` bekommt beide Einträge.
