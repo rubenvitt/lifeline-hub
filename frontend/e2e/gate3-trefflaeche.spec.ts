@@ -1478,7 +1478,7 @@ async function lagebesprechungenSaeen(page: Page, einsatzId: string) {
     await anlegen(
       page,
       einsatzId,
-      'lagebesprechungen',
+      'briefings',
       {
         entschluss: `Lage unverändert, Maßnahmen fortführen (${nr})`,
         ...(nr === 2 ? { naechste_at: new Date(Date.now() + 60 * 60_000).toISOString() } : {}),
@@ -1657,7 +1657,7 @@ async function infotelefonSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
-    'stab/infotelefon',
+    'staff/info-line',
     {
       anliegen: 'vermisstensuche',
       notiz: 'sucht Vater',
@@ -1968,13 +1968,13 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
 
 async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
   const basis = `/api/einsaetze/${einsatzId}`;
-  const plan = await page.request.post(`${basis}/stab/kommunikationsplan/stellen`, {
+  const plan = await page.request.post(`${basis}/staff/comms-plan/positions`, {
     data: { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' },
   });
   expect(plan.ok(), `Seeding Stelle: ${await plan.text()}`).toBeTruthy();
   const [stelle] = (await plan.json()) as { id: number }[];
   const verbindung = await page.request.post(
-    `${basis}/stab/kommunikationsplan/stellen/${stelle.id}/verbindungen`,
+    `${basis}/staff/comms-plan/positions/${stelle.id}/connections`,
     { data: { mittel: 'festnetz', wert: '0421 112' } },
   );
   expect(verbindung.ok(), `Seeding Verbindung: ${await verbindung.text()}`).toBeTruthy();
@@ -2170,7 +2170,7 @@ async function skizzeSaeen(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
-    'sprechgruppen',
+    'talk-groups',
     { bezeichnung: 'BN_BOS', betriebsart: 'TMO' },
     'Sprechgruppe',
   );

@@ -362,7 +362,7 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   // Bedingung statt Betriebsart (LFH-1030): lange Angaben brechen um, statt zu überhängen.
   await expect(tmo).toContainText(`TMO · ${SG_NETZ} · ${SG_SICHERHEIT}`);
   await expect(tmo).toContainText(EINHEIT_RUF);
-  // `POST …/einsaetze/{id}/sprechgruppen` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
+  // `POST …/einsaetze/{id}/talk-groups` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
   await expect(tmo).toContainText('einsatzlokal');
   // TMO vor DMO, die lokale ohne Zuordnung mit „keine“.
   await expect(sprechgruppenSicht(page).locator('tr.ant-table-row').first()).toContainText(SG_LANG);
@@ -455,11 +455,11 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen FS ${Date.now()}`);
   await seedeSprechgruppen(page, einsatzId);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const sg = await page.request.post(`${basis}/sprechgruppen`, {
+  const sg = await page.request.post(`${basis}/talk-groups`, {
     data: { bezeichnung: NUR_FS, betriebsart: 'DMO' },
   });
   expect(sg.ok(), `Seeding Sprechgruppe: ${sg.status()}`).toBeTruthy();
-  const fs = await page.request.patch(`${basis}/fuehrungsstelle`, {
+  const fs = await page.request.patch(`${basis}/command-post`, {
     data: {
       rufname: 'Florian Musterstadt 10/1',
       sprechgruppe_ids: [((await sg.json()) as { id: number }).id],
@@ -479,7 +479,7 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/einsatzdaten$`));
 
   // Führungsstelle abgelehnt: weder ihre noch die übrige lokale Sprechgruppe heißt „keine“.
-  await page.route(`**${basis}/fuehrungsstelle`, (route) =>
+  await page.route(`**${basis}/command-post`, (route) =>
     route.request().method() === 'GET'
       ? route.fulfill({ status: 403, json: { error: 'verboten' } })
       : route.continue(),

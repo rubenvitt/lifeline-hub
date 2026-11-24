@@ -12,7 +12,7 @@ import type {
  * Aufrufer setzt ihn per `setQueryData` (design.md D3).
  */
 function basis(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}/stab/kommunikationsplan`;
+  return `/api/einsaetze/${einsatzId}/staff/comms-plan`;
 }
 
 export function ladeKommunikationsplan(einsatzId: number): Promise<KommunikationsStelle[]> {
@@ -23,7 +23,7 @@ export function legeKommunikationsStelleAn(
   einsatzId: number,
   daten: NeueKommunikationsStelle,
 ): Promise<KommunikationsStelle[]> {
-  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/stellen`, 'POST', daten);
+  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/positions`, 'POST', daten);
 }
 
 /**
@@ -36,7 +36,7 @@ export function legeKommunikationsStelleEinzelnAn(
   daten: NeueKommunikationsStelle,
 ): Promise<KommunikationsStelle> {
   return apiSend<KommunikationsStelle>(
-    mitParametern(`${basis(einsatzId)}/stellen`, { antwort: 'stelle' }),
+    mitParametern(`${basis(einsatzId)}/positions`, { antwort: 'stelle' }),
     'POST',
     daten,
   );
@@ -48,7 +48,7 @@ export function benenneKommunikationsStelleUm(
   stelleId: number,
   bezeichnung: string,
 ): Promise<KommunikationsStelle[]> {
-  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/stellen/${stelleId}`, 'PATCH', {
+  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/positions/${stelleId}`, 'PATCH', {
     bezeichnung,
   });
 }
@@ -58,7 +58,7 @@ export function entferneKommunikationsStelle(
   einsatzId: number,
   stelleId: number,
 ): Promise<KommunikationsStelle[]> {
-  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/stellen/${stelleId}`, 'DELETE');
+  return apiSend<KommunikationsStelle[]>(`${basis(einsatzId)}/positions/${stelleId}`, 'DELETE');
 }
 
 export function legeVerbindungAn(
@@ -67,7 +67,7 @@ export function legeVerbindungAn(
   daten: NeueVerbindung,
 ): Promise<KommunikationsStelle[]> {
   return apiSend<KommunikationsStelle[]>(
-    `${basis(einsatzId)}/stellen/${stelleId}/verbindungen`,
+    `${basis(einsatzId)}/positions/${stelleId}/connections`,
     'POST',
     daten,
   );
@@ -79,7 +79,7 @@ export function aendereVerbindung(
   daten: VerbindungPatch,
 ): Promise<KommunikationsStelle[]> {
   return apiSend<KommunikationsStelle[]>(
-    `${basis(einsatzId)}/verbindungen/${verbindungId}`,
+    `${basis(einsatzId)}/connections/${verbindungId}`,
     'PATCH',
     daten,
   );
@@ -90,7 +90,7 @@ export function entferneVerbindung(
   verbindungId: number,
 ): Promise<KommunikationsStelle[]> {
   return apiSend<KommunikationsStelle[]>(
-    `${basis(einsatzId)}/verbindungen/${verbindungId}`,
+    `${basis(einsatzId)}/connections/${verbindungId}`,
     'DELETE',
   );
 }

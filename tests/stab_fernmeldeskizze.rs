@@ -15,7 +15,7 @@ mod common;
 use common::*;
 
 fn basis(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/stab/fernmeldeskizze")
+    format!("/api/einsaetze/{einsatz}/staff/comms-sketch")
 }
 
 async fn skizze(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -57,7 +57,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -70,7 +70,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, body: Value) -> 
     let (status, plan) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen"),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions"),
         cookie,
         Some(&body),
     )
@@ -89,7 +89,7 @@ async fn komponente(app: &axum::Router, cookie: &str, einsatz: i64, body: Value)
         app,
         cookie,
         "POST",
-        &format!("{}/komponenten", basis(einsatz)),
+        &format!("{}/components", basis(einsatz)),
         Some(body),
     )
     .await;
@@ -102,7 +102,7 @@ async fn verbindung(app: &axum::Router, cookie: &str, einsatz: i64, body: Value)
         app,
         cookie,
         "POST",
-        &format!("{}/verbindungen", basis(einsatz)),
+        &format!("{}/connections", basis(einsatz)),
         Some(body),
     )
     .await;
@@ -164,7 +164,7 @@ async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
         &app,
         &frieda,
         "PUT",
-        &format!("{}/lage/fs", basis(einsatz)),
+        &format!("{}/layout/fs", basis(einsatz)),
         Some(json!({"x": 8, "y": 16, "version": null})),
     )
     .await;
@@ -190,7 +190,7 @@ async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
         &app,
         &frieda,
         "POST",
-        &format!("{}/komponenten", basis(einsatz)),
+        &format!("{}/components", basis(einsatz)),
         Some(json!({"art": "repeater"})),
     )
     .await;
@@ -218,36 +218,36 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     for (methode, pfad, body) in [
         (
             "PUT",
-            format!("{b}/lage/fs"),
+            format!("{b}/layout/fs"),
             Some(json!({"x": 0, "y": 0, "version": null})),
         ),
-        ("DELETE", format!("{b}/lage"), None),
+        ("DELETE", format!("{b}/layout"), None),
         (
             "PUT",
-            format!("{b}/schriftfeld"),
+            format!("{b}/title-block"),
             Some(json!({"gez_name": "x"})),
         ),
         (
             "POST",
-            format!("{b}/komponenten"),
+            format!("{b}/components"),
             Some(json!({"art": "antenne"})),
         ),
         (
             "PATCH",
-            format!("{b}/komponenten/{kid}"),
+            format!("{b}/components/{kid}"),
             Some(json!({"art": "antenne"})),
         ),
-        ("DELETE", format!("{b}/komponenten/{kid}"), None),
+        ("DELETE", format!("{b}/components/{kid}"), None),
         (
             "POST",
-            format!("{b}/verbindungen"),
+            format!("{b}/connections"),
             Some(json!({"von": {"art": "fuehrungsstelle", "id": null},
                         "nach": {"art": "komponente", "id": kid},
                         "art": "daten", "medium": "leitung", "status": "geplant"})),
         ),
         (
             "POST",
-            format!("{b}/bereiche"),
+            format!("{b}/areas"),
             Some(json!({"x": 0, "y": 0, "breite": 80, "hoehe": 40})),
         ),
     ] {
@@ -264,7 +264,7 @@ async fn zwei_personen_ziehen_dieselbe_einheit() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
-    let pfad = format!("{}/lage/eh-{eh}", basis(einsatz));
+    let pfad = format!("{}/layout/eh-{eh}", basis(einsatz));
 
     // Erstes Verschieben: noch keine Zeile erwartet.
     let (status, a0) = senden(
@@ -332,7 +332,7 @@ async fn lage_mit_version_ohne_zeile_ist_409_mit_leerem_stand() {
         &app,
         &admin,
         "PUT",
-        &format!("{}/lage/fs", basis(einsatz)),
+        &format!("{}/layout/fs", basis(einsatz)),
         Some(json!({"x": 1, "y": 1, "version": 3})),
     )
     .await;
@@ -357,7 +357,7 @@ async fn lage_prueft_element_und_werte() {
             &app,
             &admin,
             "PUT",
-            &format!("{b}/lage/{element}"),
+            &format!("{b}/layout/{element}"),
             Some(ok.clone()),
         )
         .await;
@@ -368,7 +368,7 @@ async fn lage_prueft_element_und_werte() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/eh-{fremde_einheit}"),
+        &format!("{b}/layout/eh-{fremde_einheit}"),
         Some(ok.clone()),
     )
     .await;
@@ -378,7 +378,7 @@ async fn lage_prueft_element_und_werte() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/sg-{sg}"),
+        &format!("{b}/layout/sg-{sg}"),
         Some(json!({"x": 0, "y": 320, "breite": 640, "version": null})),
     )
     .await;
@@ -388,7 +388,7 @@ async fn lage_prueft_element_und_werte() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/ab-{ab}"),
+        &format!("{b}/layout/ab-{ab}"),
         Some(json!({"x": 0, "y": 0, "breite": 0, "version": null})),
     )
     .await;
@@ -397,7 +397,7 @@ async fn lage_prueft_element_und_werte() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/ab-{ab}"),
+        &format!("{b}/layout/ab-{ab}"),
         Some(json!({"x": 0, "version": null})),
     )
     .await;
@@ -426,7 +426,7 @@ async fn neu_anordnen_verwirft_nur_die_lagen() {
             &app,
             &admin,
             "PUT",
-            &format!("{b}/lage/{element}"),
+            &format!("{b}/layout/{element}"),
             Some(json!({"x": 16, "y": 16, "version": null})),
         )
         .await;
@@ -439,7 +439,7 @@ async fn neu_anordnen_verwirft_nur_die_lagen() {
             .len(),
         3
     );
-    let (status, _) = senden(&app, &admin, "DELETE", &format!("{b}/lage"), None).await;
+    let (status, _) = senden(&app, &admin, "DELETE", &format!("{b}/layout"), None).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let s = skizze(&app, &admin, einsatz).await;
     assert_eq!(s["lage"], json!([]));
@@ -450,7 +450,7 @@ async fn neu_anordnen_verwirft_nur_die_lagen() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/fs"),
+        &format!("{b}/layout/fs"),
         Some(json!({"x": 0, "y": 0, "version": null})),
     )
     .await;
@@ -473,13 +473,13 @@ async fn einzelne_lage_verwerfen_mit_version() {
             &app,
             &admin,
             "PUT",
-            &format!("{b}/lage/{element}"),
+            &format!("{b}/layout/{element}"),
             Some(json!({"x": 16, "y": 16, "version": null})),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
     }
-    let pfad = format!("{b}/lage/eh-{eh}");
+    let pfad = format!("{b}/layout/eh-{eh}");
     let mut rx = live.abonniere(einsatz);
 
     // Abweichende Version: 409 mit dem gespeicherten Stand, nichts gelöscht, kein Ereignis.
@@ -517,7 +517,7 @@ async fn einzelne_lage_verwerfen_mit_version() {
         &app,
         &admin,
         "DELETE",
-        &format!("{b}/lage/xx-1"),
+        &format!("{b}/layout/xx-1"),
         Some(json!({"version": 1})),
     )
     .await;
@@ -533,7 +533,7 @@ async fn einzelne_lage_verwerfen_braucht_schreibrecht_am_fernmeldewesen() {
     let id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, einsatz, id, "beobachter").await;
     let frieda = login_cookie(&app, "frieda", "friedapw1").await;
-    let pfad = format!("{}/lage/fs", basis(einsatz));
+    let pfad = format!("{}/layout/fs", basis(einsatz));
     let (status, _) = senden(
         &app,
         &admin,
@@ -561,7 +561,7 @@ async fn schriftfeld_tri_state_und_zeiten() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Hochwasser Elbe").await;
-    let pfad = format!("{}/schriftfeld", basis(einsatz));
+    let pfad = format!("{}/title-block", basis(einsatz));
 
     let (status, json) = senden(
         &app,
@@ -644,7 +644,7 @@ async fn repeater_zwischen_zwei_dmo_gruppen() {
     assert_eq!(k["bezeichnung"], "RP 1");
     assert_eq!(k["sprechgruppen"], json!([]));
     let kid = k["id"].as_i64().unwrap();
-    let kanal = |sg: i64| format!("{}/komponenten/{kid}/sprechgruppen/{sg}", basis(einsatz));
+    let kanal = |sg: i64| format!("{}/components/{kid}/talk-groups/{sg}", basis(einsatz));
 
     for sg in [dmo314, dmo315, dmo314] {
         let (status, _) = senden(&app, &admin, "PUT", &kanal(sg), None).await;
@@ -679,7 +679,7 @@ async fn repeater_zwischen_zwei_dmo_gruppen() {
     );
 
     // PATCH: Art und Bezeichnung (null leert), unbekannte Art 400.
-    let pfad = format!("{}/komponenten/{kid}", basis(einsatz));
+    let pfad = format!("{}/components/{kid}", basis(einsatz));
     let (status, json) = senden(
         &app,
         &admin,
@@ -704,7 +704,7 @@ async fn repeater_zwischen_zwei_dmo_gruppen() {
         &app,
         &admin,
         "POST",
-        &format!("{}/komponenten", basis(einsatz)),
+        &format!("{}/components", basis(einsatz)),
         Some(json!({"art": "funkturm"})),
     )
     .await;
@@ -715,7 +715,7 @@ async fn repeater_zwischen_zwei_dmo_gruppen() {
         &app,
         &admin,
         "PATCH",
-        &format!("{}/komponenten/{kid}", basis(anderer)),
+        &format!("{}/components/{kid}", basis(anderer)),
         Some(json!({"art": "antenne"})),
     )
     .await;
@@ -796,7 +796,7 @@ async fn melder_als_uebergang_und_validierung() {
             &app,
             &admin,
             "POST",
-            &format!("{b}/verbindungen"),
+            &format!("{b}/connections"),
             Some(body.clone()),
         )
         .await;
@@ -822,7 +822,7 @@ async fn melder_als_uebergang_und_validierung() {
             &app,
             &admin,
             "POST",
-            &format!("{b}/verbindungen"),
+            &format!("{b}/connections"),
             Some(body.clone()),
         )
         .await;
@@ -842,7 +842,7 @@ async fn melder_als_uebergang_und_validierung() {
     );
 
     // PATCH ohne von/nach.
-    let pfad = format!("{b}/verbindungen/{vid}");
+    let pfad = format!("{b}/connections/{vid}");
     let (status, json) = senden(
         &app,
         &admin,
@@ -871,7 +871,7 @@ async fn melder_als_uebergang_und_validierung() {
         &app,
         &admin,
         "PATCH",
-        &format!("{}/verbindungen/{vid}", basis(anderer)),
+        &format!("{}/connections/{vid}", basis(anderer)),
         Some(json!({"status": "bestehend"})),
     )
     .await;
@@ -894,7 +894,7 @@ async fn bereich_aufziehen_mit_version() {
         &app,
         &admin,
         "POST",
-        &format!("{b}/bereiche"),
+        &format!("{b}/areas"),
         Some(json!({"x": 800, "y": 0, "breite": 240, "hoehe": 320})),
     )
     .await;
@@ -902,7 +902,7 @@ async fn bereich_aufziehen_mit_version() {
     assert_eq!(json["bezeichnung"], "Rückwärtiger Bereich", "Vorgabe");
     assert_eq!(json["version"], 1);
     let bid = json["id"].as_i64().unwrap();
-    let pfad = format!("{b}/bereiche/{bid}");
+    let pfad = format!("{b}/areas/{bid}");
 
     let (status, json) = senden(
         &app,
@@ -943,7 +943,7 @@ async fn bereich_aufziehen_mit_version() {
             &app,
             &admin,
             "POST",
-            &format!("{b}/bereiche"),
+            &format!("{b}/areas"),
             Some(body.clone()),
         )
         .await;
@@ -983,7 +983,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
             &app,
             &admin,
             "PUT",
-            &format!("{b}/lage/fs"),
+            &format!("{b}/layout/fs"),
             Some(json!({"x": i * 8, "y": 0, "version": version})),
         )
         .await;
@@ -996,7 +996,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/komponenten/{kid}/sprechgruppen/{sg}"),
+        &format!("{b}/components/{kid}/talk-groups/{sg}"),
         None,
     )
     .await;
@@ -1012,7 +1012,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/schriftfeld"),
+        &format!("{b}/title-block"),
         Some(json!({"gez_name": "M. Muster"})),
     )
     .await;
@@ -1020,11 +1020,11 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
         &app,
         &admin,
         "DELETE",
-        &format!("{b}/verbindungen/{}", v["id"]),
+        &format!("{b}/connections/{}", v["id"]),
         None,
     )
     .await;
-    senden(&app, &admin, "DELETE", &format!("{b}/lage"), None).await;
+    senden(&app, &admin, "DELETE", &format!("{b}/layout"), None).await;
     assert_eq!(
         zaehle(&mut rx),
         (16, 0),
@@ -1042,7 +1042,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
         &app,
         &admin,
         "POST",
-        &format!("{b}/komponenten"),
+        &format!("{b}/components"),
         Some(json!({"art": "funkturm"})),
     )
     .await;
@@ -1050,7 +1050,7 @@ async fn jede_skizzenaenderung_sendet_fernmeldewesen_und_nie_etb() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/lage/fs"),
+        &format!("{b}/layout/fs"),
         Some(json!({"x": 0, "y": 0, "version": 99})),
     )
     .await;
@@ -1075,7 +1075,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
         &app,
         &admin,
         "POST",
-        &format!("{}/komponenten", basis(einsatz)),
+        &format!("{}/components", basis(einsatz)),
         Some(json!({"art": "antenne"})),
     )
     .await;
@@ -1096,7 +1096,7 @@ async fn lage_setzen(app: &axum::Router, cookie: &str, einsatz: i64, element: &s
         app,
         cookie,
         "PUT",
-        &format!("{}/lage/{element}", basis(einsatz)),
+        &format!("{}/layout/{element}", basis(einsatz)),
         Some(json!({"x": 8, "y": 8, "version": null})),
     )
     .await;
@@ -1220,7 +1220,7 @@ async fn abschnitt_stelle_und_komponente_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen/{ils}"),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}"),
         &admin,
         None,
     )
@@ -1234,7 +1234,7 @@ async fn abschnitt_stelle_und_komponente_geloescht() {
         &app,
         &admin,
         "DELETE",
-        &format!("{}/komponenten/{kid}", basis(einsatz)),
+        &format!("{}/components/{kid}", basis(einsatz)),
         None,
     )
     .await;
@@ -1262,9 +1262,7 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
         &app,
         &admin,
         "PUT",
-        &format!(
-            "/api/einsaetze/{einsatz}/stab/kommunikationsplan/stellen/{ils}/sprechgruppen/{sg}"
-        ),
+        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}/talk-groups/{sg}"),
         Some(json!({"status": "geplant"})),
     )
     .await;
@@ -1291,7 +1289,7 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
         &app,
         &admin,
         "POST",
-        &format!("{b}/bereiche"),
+        &format!("{b}/areas"),
         Some(json!({"bezeichnung": "Hof Müller", "x": 1, "y": 2, "breite": 3, "hoehe": 4})),
     )
     .await;
@@ -1299,7 +1297,7 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
         &app,
         &admin,
         "PUT",
-        &format!("{b}/schriftfeld"),
+        &format!("{b}/title-block"),
         Some(
             json!({"gez_name": "M. Muster", "gez_at": "2026-10-04 18:00", "vs_vermerk": "vs_nfd"}),
         ),
@@ -1381,7 +1379,7 @@ async fn aufgeloeste_einheit_bekommt_keine_lage() {
         &app,
         &admin,
         "PUT",
-        &format!("{}/lage/eh-{eh}", basis(einsatz)),
+        &format!("{}/layout/eh-{eh}", basis(einsatz)),
         Some(json!({"x": 0, "y": 0, "version": null})),
     )
     .await;

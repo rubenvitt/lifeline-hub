@@ -13,8 +13,8 @@ den Mitgliedern (`GET …/mitglieder`, ohne eigenes Modulrecht, über
 (`fernmeldewesen/useNetzQuellen.ts`, Quelle „Mitglieder“): fehlt sie, steht „—“ mit Grund bzw.
 „Mitglieder: nicht geladen“, nie die ganze Seite.
 Seiten prüfen `useModulFreigabe(einsatzId, 'fernmeldewesen')` fail-closed (der Rahmen rendert bei
-gescheitertem Freigabeabruf). Die API-Pfade bleiben `…/stab/kommunikationsplan…` und
-`…/stab/fernmeldeskizze…` (Marker `Fernmeldewesen`, `PFAD_KEY`), live über `fernmeldewesen`, Keys
+gescheitertem Freigabeabruf). Die API-Pfade liegen unter `…/staff/comms-plan…` und
+`…/staff/comms-sketch…` (Marker `Fernmeldewesen`, `PFAD_KEY`), live über `fernmeldewesen`, Keys
 unter `einsatzKeys.fernmeldewesen*`. Reiter nur über `fernmeldewesen/FernmeldewesenReiter.tsx`; die
 Darstellung des Funkplans ist Zustand der Adresse (`?ansicht=`, per `replace`, Vorgabe „Funkplan“
 ohne Parameter, wie `?reiter=` der Aufträge, LLH-1432), Zurück landet im selben Reiter. Die

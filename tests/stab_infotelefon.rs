@@ -1,5 +1,5 @@
 //! Integrationstests des Informationstelefons (LFH-554) unter
-//! `/api/einsaetze/{id}/stab/infotelefon`: Statuscodes, Rechte, Lebenszyklus, Live. Seit
+//! `/api/einsaetze/{id}/staff/info-line`: Statuscodes, Rechte, Lebenszyklus, Live. Seit
 //! i6k6mzed (design.md D3) ist es das eigene Modul `infotelefon`; der Pfad bleibt. Die
 //! Fachlogik prüft `src/infotelefon/repo/tests.rs`.
 
@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn pfad(e: i64) -> String {
-    format!("/api/einsaetze/{e}/stab/infotelefon")
+    format!("/api/einsaetze/{e}/staff/info-line")
 }
 
 const RUECKRUF: &str = r#"{"anliegen":"vermisstensuche","notiz":"sucht Vater","anrufer_name":"K. Meyer","rueckruf":"0171 000000","rueckruf_noetig":true}"#;
@@ -141,7 +141,7 @@ async fn beobachter_liest_aber_erfasst_nicht() {
 
     for uri in [
         pfad(e),
-        format!("{}/zaehler", pfad(e)),
+        format!("{}/counts", pfad(e)),
         format!("{}/{id}", pfad(e)),
     ] {
         let (s, _) = anfrage(&app, "GET", &uri, &beob, None).await;
@@ -280,7 +280,7 @@ async fn override_setzen(
 fn alle_routen(e: i64, id: i64) -> Vec<(&'static str, String, Option<&'static str>)> {
     vec![
         ("GET", pfad(e), None),
-        ("GET", format!("{}/zaehler", pfad(e)), None),
+        ("GET", format!("{}/counts", pfad(e)), None),
         ("GET", format!("{}/{id}", pfad(e)), None),
         ("POST", pfad(e), Some(RUECKRUF)),
         (
@@ -330,7 +330,7 @@ async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/stab"),
+        &format!("/api/einsaetze/{e}/staff"),
         &frieda,
         None,
     )

@@ -25,7 +25,7 @@ async function anmeldenUndAnlegen(page: Page): Promise<number> {
 }
 
 async function fuehrungsstelle(page: Page, id: number): Promise<Record<string, unknown>> {
-  return (await (await page.request.get(`/api/einsaetze/${id}/fuehrungsstelle`)).json()) as Record<
+  return (await (await page.request.get(`/api/einsaetze/${id}/command-post`)).json()) as Record<
     string,
     unknown
   >;
