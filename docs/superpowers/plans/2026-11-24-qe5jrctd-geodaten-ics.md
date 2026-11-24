@@ -197,18 +197,18 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `enum class Oeffnen { ANZEIGEN, TEILEN }`;
   - `fun Downloadablage.oeffnenAls(mimetyp: String, endung: String): Oeffnen` → `ANZEIGEN` für `text/calendar` oder Endung `ics` (Groß- und Kleinschreibung egal), sonst `TEILEN`.
 
-- [ ] **Step 1:** Failing Kern-Test `kalenderdatei_wird_angezeigt_sonst_geteilt`:
+- [x] **Step 1:** Failing Kern-Test `kalenderdatei_wird_angezeigt_sonst_geteilt`:
   - `("text/calendar","ics")` → ANZEIGEN;
   - `("application/octet-stream","ICS")` → ANZEIGEN;
   - `("text/csv","csv")` → TEILEN.
-- [ ] **Step 2:** `LC_ALL=C.UTF-8 android/gradlew -p android/kern test` → FAIL.
-- [ ] **Step 3:** Kernfunktion umsetzen.
+- [x] **Step 2:** `LC_ALL=C.UTF-8 android/gradlew -p android/kern test` → FAIL.
+- [x] **Step 3:** Kernfunktion umsetzen.
   - In `teilen` bei ANZEIGEN `Intent(Intent.ACTION_VIEW).setDataAndType(adresse, "text/calendar")` mit `FLAG_GRANT_READ_URI_PERMISSION` im Chooser.
   - Fehlt eine Activity (`ActivityNotFoundException`), fällt es auf den bisherigen `ACTION_SEND` zurück.
-- [ ] **Step 4:** Kern-Tests → PASS.
+- [x] **Step 4:** Kern-Tests → PASS.
   - Lässt sich `android/app` hier bauen (`LC_ALL=C.UTF-8 android/gradlew -p android :app:compileDebugKotlin`), ebenfalls → ok.
   - Sonst im Ledger vermerken: „App-Teil nicht gebaut: <Grund>“.
-- [ ] **Step 5:** Commit `feat(android): Kalenderdateien direkt öffnen` (Zunder D).
+- [x] **Step 5:** Commit `feat(android): Kalenderdateien direkt öffnen` (Zunder D).
 
 ## Teil A — Export (LLH-2098)
 
