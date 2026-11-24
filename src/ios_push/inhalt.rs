@@ -5,7 +5,7 @@
 //! `GET /api/notifications/{id}` (`routes::benachrichtigung::anzeige`). Absender und
 //! Wortlaut kommen nur mit der Wahl „Mit Absender und Wortlaut“, nur für die Arten und Bezüge, zu
 //! denen der Service Worker sie holt (`pushInhalt` in `frontend/public/alarm-sw.js`), und nur,
-//! wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/reports/{mid}` lesen dürfte:
+//! wenn der Empfänger die Meldung über `GET /api/incidents/{e}/reports/{mid}` lesen dürfte:
 //! dieselbe Prüfung wie der Extractor `EinsatzLesezugriff<Meldungen>` samt Filter in
 //! `meldung::repo::laden_im_einsatz`, je Empfänger auf dem Server wiederholt. Wo die Route
 //! 404/403 gäbe, fehlen beide Felder.
@@ -163,7 +163,7 @@ pub fn hat_inhalt(art: BenachrichtigungArt, bezug: BenachrichtigungBezugTyp) -> 
 }
 
 /// Absender und Wortlaut der Meldung `meldung_id`, wenn `benutzer` sie über
-/// `GET /api/einsaetze/{e}/reports/{mid}` lesen dürfte; jede Ablehnung der Route ist hier ein
+/// `GET /api/incidents/{e}/reports/{mid}` lesen dürfte; jede Ablehnung der Route ist hier ein
 /// Fehler, und der Aufrufer lässt beide Felder weg. Leere Felder fehlen.
 async fn meldung_inhalt(
     pool: &SqlitePool,

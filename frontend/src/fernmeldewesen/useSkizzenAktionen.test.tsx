@@ -17,7 +17,7 @@ import {
 } from '../api/fernmeldeskizze';
 import { listeAbschnitte, patcheAbschnitt } from '../api/einsatzabschnitte';
 import { patcheEinheit } from '../api/einheiten';
-import { patcheFuehrungsstelle } from '../api/einsaetze';
+import { patcheFuehrungsstelle } from '../api/incidents';
 import {
   entferneKommunikationsStelle,
   legeKommunikationsStelleEinzelnAn,
@@ -55,7 +55,7 @@ vi.mock('../api/fernmeldeskizze', () => ({
 }));
 vi.mock('../api/einsatzabschnitte', () => ({ patcheAbschnitt: vi.fn(), listeAbschnitte: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ patcheEinheit: vi.fn(), listeEinheiten: vi.fn() }));
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   patcheFuehrungsstelle: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),
 }));

@@ -28,13 +28,13 @@ interface PersonWire {
 }
 
 async function personen(page: Page, e: number): Promise<PersonWire[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${e}/persons`);
+  const antwort = await page.request.get(`/api/incidents/${e}/persons`);
   expect(antwort.ok()).toBeTruthy();
   return (await antwort.json()) as PersonWire[];
 }
 
 async function etbTexte(page: Page, e: number): Promise<string[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${e}/etb`);
+  const antwort = await page.request.get(`/api/incidents/${e}/etb`);
   expect(antwort.ok()).toBeTruthy();
   return ((await antwort.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
@@ -43,14 +43,14 @@ test('LLH-1572: Liste — versorgt und entlassen in drei Griffen, ein ETB-Eintra
   page,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
-  const { id: e } = await anlegen(page, '/api/einsaetze', {
+  const { id: e } = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Leichter Fall ${Date.now()}`,
   });
   await page.goto(`/einsaetze/${e}/personen`);
 
   const posts: string[] = [];
   page.on('request', (r) => {
-    if (r.method() === 'POST' && r.url().includes(`/api/einsaetze/${e}/persons`))
+    if (r.method() === 'POST' && r.url().includes(`/api/incidents/${e}/persons`))
       posts.push(r.url());
   });
 
@@ -69,7 +69,7 @@ test('LLH-1572: Liste — versorgt und entlassen in drei Griffen, ein ETB-Eintra
     aktuelle_sichtung: null,
     anlass: 'allergie',
   });
-  expect(posts.filter((u) => u.endsWith(`/api/einsaetze/${e}/persons`))).toHaveLength(1);
+  expect(posts.filter((u) => u.endsWith(`/api/incidents/${e}/persons`))).toHaveLength(1);
   const reg = `R-${String(p.registrier_nr).padStart(3, '0')}`;
   const zurPerson = (await etbTexte(page, e)).filter((t) => t.includes(reg));
   expect(zurPerson).toEqual([`Person ${reg} versorgt und entlassen`]);
@@ -80,15 +80,15 @@ test('LLH-1572: UHS-Tablet ohne Netz — vorgemerkt, mit Netz einmal angelegt un
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const { id: e } = await anlegen(page, '/api/einsaetze', {
+  const { id: e } = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Leichter Fall Tablet ${Date.now()}`,
   });
-  const uhs = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const uhs = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Bühne',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: uhs.id,
     bezeichnung: 'Tablet 1',
@@ -124,7 +124,7 @@ test('LLH-1572: UHS-Tablet ohne Netz — vorgemerkt, mit Netz einmal angelegt un
       anlass: 'hitze_kaelte',
     });
     // Die vorgemerkte Maßnahme kommt mit dem Replay an.
-    const detail = await page.request.get(`/api/einsaetze/${e}/persons/${p.id}`);
+    const detail = await page.request.get(`/api/incidents/${e}/persons/${p.id}`);
     expect(detail.ok()).toBeTruthy();
     const { massnahmen } = (await detail.json()) as { massnahmen: { art: string }[] };
     expect(massnahmen.map((m) => m.art)).toEqual(['kuehlung']);

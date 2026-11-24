@@ -127,7 +127,7 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
 
     // Elf Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
     let leer = statements_von_berechne(&pool, einsatz, &admin).await.len();

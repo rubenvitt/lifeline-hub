@@ -2,7 +2,7 @@ import { Alert, App, Breadcrumb, Button, Col, Row, Spin } from 'antd';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import {
   CHAT_SEITENGROESSE,
   bearbeiteNachricht,

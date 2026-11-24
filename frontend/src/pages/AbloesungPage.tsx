@@ -15,7 +15,7 @@ import {
   setzeAbloesungVorgabe,
   vollzieheAbloesung,
 } from '../api/abloesungen';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeEinheitenPerioden } from '../api/kraefteZeitachse';

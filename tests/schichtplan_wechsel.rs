@@ -12,7 +12,7 @@ use common::*;
 const PAUSE_OFFEN: &str = "Erst die Pause beenden oder ihren Beginn zurücknehmen";
 
 fn plan(e: i64) -> String {
-    format!("/api/einsaetze/{e}/reliefs/shift-plan")
+    format!("/api/incidents/{e}/reliefs/shift-plan")
 }
 
 fn wechsel_pfad(e: i64, bid: i64) -> String {
@@ -27,7 +27,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, e: i64, bez: &str) -> i64
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs"),
+        &format!("/api/incidents/{e}/uhs"),
         cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": bez})),
     )
@@ -40,7 +40,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name}})),
     )
@@ -53,7 +53,7 @@ async fn an_uhs(app: &axum::Router, cookie: &str, e: i64, uhs: i64, ep: i64) {
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{e}/uhs/{uhs}/forces/{ep}"),
+        &format!("/api/incidents/{e}/uhs/{uhs}/forces/{ep}"),
         cookie,
         None,
     )
@@ -65,7 +65,7 @@ async fn kraft(app: &axum::Router, cookie: &str, e: i64, ep: i64) -> Value {
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         cookie,
         None,
     )
@@ -84,7 +84,7 @@ async fn kraft_von_stamm(app: &axum::Router, cookie: &str, e: i64, pid: i64) -> 
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         cookie,
         None,
     )
@@ -191,7 +191,7 @@ async fn status_setzen(app: &axum::Router, cookie: &str, e: i64, ep: i64, status
     let (s, v) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/personnel/{ep}"),
+        &format!("/api/incidents/{e}/personnel/{ep}"),
         cookie,
         Some(&json!({"status_id": status})),
     )
@@ -338,7 +338,7 @@ async fn uhs_einheit_bleibt_und_ruecknahme_nur_beim_stand_des_wechsels() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/units/{rtw}/personnel/{eva}"),
+        &format!("/api/incidents/{e}/units/{rtw}/personnel/{eva}"),
         &admin,
         None,
     )
@@ -652,7 +652,7 @@ async fn posten_felder_und_rechte() {
             let (s, _) = anfrage(
                 &app,
                 "PUT",
-                &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
+                &format!("/api/incidents/{e}/module-overrides/{modul}"),
                 &admin,
                 Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
             )

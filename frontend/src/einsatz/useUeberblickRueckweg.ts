@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
 import { freiesRueckwegModul, modulZielRoute, redirectZiel } from './modulRegistry';

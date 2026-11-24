@@ -50,7 +50,7 @@ import {
   loeseFuehrungsstelleSprechgruppe,
   ordneFuehrungsstelleSprechgruppeZu,
   type KopfdatenPatch,
-} from '../api/einsaetze';
+} from '../api/incidents';
 import { listeStichwortVorschlaege } from '../api/stichwortVorschlaege';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import { useFeldKonflikt } from '../components/useFeldKonflikt';

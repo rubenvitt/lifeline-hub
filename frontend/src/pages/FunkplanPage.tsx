@@ -14,7 +14,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import type { AbrufZustand } from '../api/abrufZustand';
 import { legeBefehlAn } from '../api/befehle';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { legeLageberichtAn } from '../api/lageberichte';
 import { einsatzKeys } from '../api/queryKeys';

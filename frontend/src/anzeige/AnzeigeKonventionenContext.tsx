@@ -5,7 +5,7 @@
  */
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinstellungen } from '../api/einsaetze';
+import { ladeEinstellungen } from '../api/incidents';
 import { ladeOrgEinstellungen } from '../api/orgEinstellungen';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { useKoordinatenSystemOverride } from './koordinatenSystemStore';

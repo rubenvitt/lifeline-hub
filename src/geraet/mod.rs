@@ -107,18 +107,18 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
 /// Live-Kanal. Zähler, Freigaben und Live-Ereignisse schneiden die Handler zusätzlich auf
 /// [`Funktionsansicht::lese_module`] zu.
 pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}"),
-    ("GET", "/api/einsaetze/{id}/module-access"),
-    ("GET", "/api/einsaetze/{id}/module-counts"),
-    ("GET", "/api/einsaetze/{id}/live"),
+    ("GET", "/api/incidents/{id}"),
+    ("GET", "/api/incidents/{id}/module-access"),
+    ("GET", "/api/incidents/{id}/module-counts"),
+    ("GET", "/api/incidents/{id}/live"),
     // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
-    ("GET", "/api/einsaetze/{id}/requests"),
+    ("GET", "/api/incidents/{id}/requests"),
 ];
 
 /// Einsatzrouten jeder schreibenden Ansicht (alle außer dem Lagemonitor): einen eigenen,
 /// abgelehnten Antrag am Spiegel verwerfen (LLH-1492).
 pub const SCHREIBENDE_ANSICHTEN: &[(&str, &str)] =
-    &[("DELETE", "/api/einsaetze/{id}/requests/{antrag_id}")];
+    &[("DELETE", "/api/incidents/{id}/requests/{antrag_id}")];
 
 impl Funktionsansicht {
     /// Anzeigename der Ansicht (ETB-Text, Oberfläche).
@@ -270,47 +270,47 @@ impl Funktionsansicht {
 /// von“ (LFH-1046). Jeder Handler hier prüft die Stelle über [`stelle`]; Grundriss, Stammdaten der UHS,
 /// Material, Status, Storno, Export, Druck, Abgleich und Anhänge fehlen bewusst.
 const UHS_TABLET: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/uhs"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}"),
+    ("GET", "/api/incidents/{id}/uhs"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}"),
     // Den Plan unter dem Grundriss sehen, nicht ändern (LFH-999).
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/image"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}/plan/image"),
     (
         "POST",
-        "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability",
+        "/api/incidents/{id}/uhs/{uid}/seats/{pid}/availability",
     ),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/uhs-occupancy"),
     // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
+        "/api/incidents/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
-    ("POST", "/api/einsaetze/{id}/persons"),
-    ("GET", "/api/einsaetze/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/row"),
+    ("POST", "/api/incidents/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons/{pid}"),
     // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/state"),
-    ("PATCH", "/api/einsaetze/{id}/persons/{pid}"),
-    ("GET", "/api/einsaetze/{id}/persons/confirmers"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/state"),
+    ("PATCH", "/api/incidents/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/confirmers"),
     // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
-    ("GET", "/api/einsaetze/{id}/persons/transport-means"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/triage"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/notes"),
+    ("GET", "/api/incidents/{id}/persons/transport-means"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/triage"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/whereabouts"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/notes"),
     // PAT-Kern (Change y18v58dt-pat-kern, Spec `funktionsansichten`).
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/transport"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/transport"),
     // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/reason"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/interventions"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/reason"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/interventions"),
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/interventions/{mid}/void",
+        "/api/incidents/{id}/persons/{pid}/interventions/{mid}/void",
     ),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/injuries"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/injuries"),
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void",
+        "/api/incidents/{id}/persons/{pid}/injuries/{vid}/void",
     ),
 ];
 /// Zusätzliche Einsatzrouten des UHS-Laptops: alles des Tablets, dazu Plätze, Stammdaten,
@@ -318,76 +318,76 @@ const UHS_TABLET: &[(&str, &str)] = &[
 /// über das UHS-Detail. Status, Stornieren, UHS anlegen und die Zugriffsliste der Anhänge fehlen
 /// bewusst; jeder UHS-Handler hier prüft die Stelle über [`stelle`].
 const UHS_LAPTOP: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/uhs"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}"),
-    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}"),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/seats"),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/seats/bulk"),
-    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}"),
-    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}"),
+    ("GET", "/api/incidents/{id}/uhs"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}"),
+    ("PATCH", "/api/incidents/{id}/uhs/{uid}"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/seats"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/seats/bulk"),
+    ("PATCH", "/api/incidents/{id}/uhs/{uid}/seats/{pid}"),
+    ("DELETE", "/api/incidents/{id}/uhs/{uid}/seats/{pid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability",
+        "/api/incidents/{id}/uhs/{uid}/seats/{pid}/availability",
     ),
     // Plan des Grundrisses (LFH-999): wer Plätze bearbeitet, setzt auch den Plan.
-    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-    ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/image"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
-    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}"),
+    ("PUT", "/api/incidents/{id}/uhs/{uid}/plan"),
+    ("PATCH", "/api/incidents/{id}/uhs/{uid}/plan"),
+    ("DELETE", "/api/incidents/{id}/uhs/{uid}/plan"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/plan/from-attachment"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}/plan/image"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}/attachments"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/attachments"),
+    ("DELETE", "/api/incidents/{id}/uhs/{uid}/attachments/{aid}"),
     (
         "GET",
-        "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
+        "/api/incidents/{id}/uhs/{uid}/attachments/{aid}/file",
     ),
     // Kräfte der eigenen UHS (LFH-1045): zuordnen, ad hoc erfassen, lösen. „Einheit zuordnen“
     // bleibt der Leitung.
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/forces/available"),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/forces"),
-    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}"),
-    ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}/forces/available"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/forces"),
+    ("PUT", "/api/incidents/{id}/uhs/{uid}/forces/{epid}"),
+    ("DELETE", "/api/incidents/{id}/uhs/{uid}/forces/{epid}"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/uhs-occupancy"),
     // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
+        "/api/incidents/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
-    ("POST", "/api/einsaetze/{id}/persons"),
-    ("GET", "/api/einsaetze/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/row"),
+    ("POST", "/api/incidents/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons/{pid}"),
     // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/state"),
-    ("PATCH", "/api/einsaetze/{id}/persons/{pid}"),
-    ("GET", "/api/einsaetze/{id}/persons/confirmers"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/state"),
+    ("PATCH", "/api/incidents/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/confirmers"),
     // Vorschläge zum Rettungsmittel (LLH-1332): Fahrzeuge im Einsatz ohne Modul Fahrzeuge.
-    ("GET", "/api/einsaetze/{id}/persons/transport-means"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/triage"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/notes"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/transport"),
+    ("GET", "/api/incidents/{id}/persons/transport-means"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/triage"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/whereabouts"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/notes"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/transport"),
     // Anlass der Hilfeleistung (LLH-1566), wie die Sichtung nur an der UHS.
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/reason"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/interventions"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/reason"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/interventions"),
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/interventions/{mid}/void",
+        "/api/incidents/{id}/persons/{pid}/interventions/{mid}/void",
     ),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/injuries"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/injuries"),
     (
         "POST",
-        "/api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void",
+        "/api/incidents/{id}/persons/{pid}/injuries/{vid}/void",
     ),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
 ];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
 /// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
-const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/situation-monitor")];
+const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/incidents/{id}/situation-monitor")];
 /// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
 /// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, die
 /// geltenden Einsatzbefehle an den Bereich lesen und ihre eigenen Verteiler-Einträge quittieren
@@ -396,28 +396,28 @@ const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/situation-mo
 /// Abschnitte und Einheiten ändern, Aufträge erteilen oder abnehmen, Befehle schreiben und ihre
 /// Anlagen, ETB, Personen und Stellen fehlen bewusst.
 const EINSATZABSCHNITT: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/sectors"),
-    ("GET", "/api/einsaetze/{id}/units"),
-    ("GET", "/api/einsaetze/{id}/tasks"),
-    ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
+    ("GET", "/api/incidents/{id}/sectors"),
+    ("GET", "/api/incidents/{id}/units"),
+    ("GET", "/api/incidents/{id}/tasks"),
+    ("GET", "/api/incidents/{id}/tasks/{aid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+        "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
     ),
-    ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
-    ("GET", "/api/einsaetze/{id}/orders"),
-    ("GET", "/api/einsaetze/{id}/orders/{bid}"),
+    ("POST", "/api/incidents/{id}/tasks/{aid}/execution"),
+    ("GET", "/api/incidents/{id}/orders"),
+    ("GET", "/api/incidents/{id}/orders/{bid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/acknowledge",
+        "/api/incidents/{id}/orders/{bid}/distribution/{vid}/acknowledge",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/undo",
+        "/api/incidents/{id}/orders/{bid}/distribution/{vid}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
-    ("GET", "/api/einsaetze/{id}/zones"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
+    ("GET", "/api/incidents/{id}/zones"),
 ];
 
 /// Zusätzliche Einsatzrouten des Bereitstellungsraums (LFH-1042): den eigenen Raum samt Verlauf
@@ -433,35 +433,35 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 /// Übernehmen und Abweisen) fehlen ebenso, außer dem Anlegen einer unangemeldeten Kraft beim
 /// Eintreffen.
 const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/staging-areas"),
-    ("GET", "/api/einsaetze/{id}/staging-areas/{bid}"),
-    ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/history"),
+    ("GET", "/api/incidents/{id}/staging-areas"),
+    ("GET", "/api/incidents/{id}/staging-areas/{bid}"),
+    ("GET", "/api/incidents/{id}/staging-areas/{bid}/history"),
     // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte außer Art und
     // Rufnamen (LLH-1387 design.md D1/D2); die Nachforderungsliste bleibt gesperrt.
-    ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/expected"),
+    ("GET", "/api/incidents/{id}/staging-areas/{bid}/expected"),
     // Einheiten-Vorlagen als Treffer zum eigenen Raum, nur Namen und Funkrufnamen (LLH-1300
     // design.md D2); der Stammdaten-Katalog bleibt gesperrt.
     (
         "GET",
-        "/api/einsaetze/{id}/staging-areas/{bid}/master-data-matches",
+        "/api/incidents/{id}/staging-areas/{bid}/master-data-matches",
     ),
-    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/occupancy"),
+    ("POST", "/api/incidents/{id}/staging-areas/{bid}/occupancy"),
     // Rücknahme eines Austritts, wie das Austragen selbst (LLH-1924, design.md D3).
     (
         "POST",
-        "/api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
+        "/api/incidents/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
     ),
-    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/arrival"),
-    ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/status"),
-    ("GET", "/api/einsaetze/{id}/units"),
-    ("GET", "/api/einsaetze/{id}/units/timeline"),
-    ("GET", "/api/einsaetze/{id}/vehicles"),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/incidents/{id}/staging-areas/{bid}/arrival"),
+    ("POST", "/api/incidents/{id}/staging-areas/{bid}/status"),
+    ("GET", "/api/incidents/{id}/units"),
+    ("GET", "/api/incidents/{id}/units/timeline"),
+    ("GET", "/api/incidents/{id}/vehicles"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
     // Material des eigenen Raums nur lesen (LLH-1252, Entscheidung 22.10.2026): der Handler
     // schneidet auf `br_id` = eigener Raum. Zuordnen, Lösen, Status, Aufteilen und Erfassen
     // bleiben der Führungsstelle; ein Schreibweg käme als eigener Eintrag mit Stellenprüfung.
-    ("GET", "/api/einsaetze/{id}/material"),
+    ("GET", "/api/incidents/{id}/material"),
 ];
 
 /// Zusätzliche Einsatzrouten der Betreuungsstelle (LFH-1041): die eigene Stelle in der
@@ -471,61 +471,61 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
 /// Export, Druck, Abgleich und Anhänge fehlen bewusst; jeder Handler hier prüft die Stelle über
 /// [`stelle`].
 const BETREUUNGSSTELLE: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/care"),
+    ("GET", "/api/incidents/{id}/care"),
     // Storno-Stand der offenen Detailseite (LLH-1832).
-    ("GET", "/api/einsaetze/{id}/care/positions/{sid}/state"),
+    ("GET", "/api/incidents/{id}/care/positions/{sid}/state"),
     (
         "GET",
-        "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
+        "/api/incidents/{id}/care/positions/{sid}/occupancies",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
+        "/api/incidents/{id}/care/positions/{sid}/occupancies",
     ),
-    ("POST", "/api/einsaetze/{id}/care/occupancies/{mid}/undo"),
-    ("GET", "/api/einsaetze/{id}/persons"),
+    ("POST", "/api/incidents/{id}/care/occupancies/{mid}/undo"),
+    ("GET", "/api/incidents/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
-    ("POST", "/api/einsaetze/{id}/persons"),
-    ("GET", "/api/einsaetze/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/row"),
+    ("POST", "/api/incidents/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons/{pid}"),
     // Storno-Stand der offenen Detailseite (LLH-1832), dieselbe Bindung wie das Detail.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/state"),
-    ("PATCH", "/api/einsaetze/{id}/persons/{pid}"),
-    ("GET", "/api/einsaetze/{id}/persons/transport-means"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/notes"),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/state"),
+    ("PATCH", "/api/incidents/{id}/persons/{pid}"),
+    ("GET", "/api/incidents/{id}/persons/transport-means"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/whereabouts"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/notes"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
     // Registrierstelle (LLH-1612): Haushalte an der eigenen Stelle registrieren, ihre Liste
     // lesen und abmelden; der Handler prüft die eigene Stelle (fremd 403).
     (
         "GET",
-        "/api/einsaetze/{id}/care/positions/{sid}/registrations",
+        "/api/incidents/{id}/care/positions/{sid}/registrations",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/care/positions/{sid}/registrations",
+        "/api/incidents/{id}/care/positions/{sid}/registrations",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/care/positions/{sid}/departures",
+        "/api/incidents/{id}/care/positions/{sid}/departures",
     ),
     // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen; nur Personen der
     // eigenen Stelle (der Handler prüft die Stelle, fremd 403).
     (
         "PUT",
-        "/api/einsaetze/{id}/care/positions/{sid}/households/{hid}/contact-person",
+        "/api/incidents/{id}/care/positions/{sid}/households/{hid}/contact-person",
     ),
     (
         "PUT",
-        "/api/einsaetze/{id}/care/positions/{sid}/persons/{pid}/household",
+        "/api/incidents/{id}/care/positions/{sid}/persons/{pid}/household",
     ),
     // Registrierliste drucken (LLH-1616): nur die eigene Stelle (der Handler prüft, fremd 403),
     // je Person protokolliert. Bewusste Ausnahme zu „Personendruck nie am Gerät“
     // (`frontend/src/druck/AGENTS.md`); die Personendruckansicht bleibt draußen.
     (
         "GET",
-        "/api/einsaetze/{id}/care/positions/{sid}/registrations/print",
+        "/api/incidents/{id}/care/positions/{sid}/registrations/print",
     ),
 ];
 
@@ -541,17 +541,17 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
 /// sie. `GET …/units` fehlt bewusst: sie trägt Personalnamen. Live erreichen es `einheit` und
 /// `abschnitt` über deren Gate-Menge, nicht über ein Lese-Modul `einheiten`.
 const VERPFLEGUNG: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/catering"),
+    ("GET", "/api/incidents/{id}/catering"),
     (
         "POST",
-        "/api/einsaetze/{id}/catering/time-slots/{zid}/distributions",
+        "/api/incidents/{id}/catering/time-slots/{zid}/distributions",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
+        "/api/incidents/{id}/catering/distributions/{aid}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
 ];
 
 /// Zusätzliche Einsatzrouten des Einheitengeräts (LLH-1579, Konzept LLH-1571 S1): die eigene
@@ -562,28 +562,28 @@ const VERPFLEGUNG: &[(&str, &str)] = &[
 /// nur die eine Einheit enthält; Aufträge an ihren Abschnitt sieht es nicht (F4). Abschnitte,
 /// Einsatzbefehle, Karte und Gefahrenzonen, Personal, Fahrzeuge und Material fehlen bewusst.
 const EINHEIT: &[(&str, &str)] = &[
-    ("GET", "/api/einsaetze/{id}/units"),
-    ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
+    ("GET", "/api/incidents/{id}/units"),
+    ("PUT", "/api/incidents/{id}/units/{eid}/status"),
     // Den eigenen Wechsel zurücknehmen (LLH-1986).
-    ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
-    ("GET", "/api/einsaetze/{id}/tasks"),
-    ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
+    ("POST", "/api/incidents/{id}/units/{eid}/status/undo"),
+    ("GET", "/api/incidents/{id}/tasks"),
+    ("GET", "/api/incidents/{id}/tasks/{aid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+        "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
     ),
-    ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
-    ("GET", "/api/einsaetze/{id}/reports"),
-    ("POST", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/incidents/{id}/tasks/{aid}/execution"),
+    ("GET", "/api/incidents/{id}/reports"),
+    ("POST", "/api/incidents/{id}/reports"),
     // Kontakte am Handy (LLH-1580, Konzept LLH-1571 S2): die Personen mit versorgender Einheit =
     // eigene ohne Personalien lesen, einen Kontakt anlegen (Einheit fest, „Zur UHS“ in eine
     // aktive UHS, RTW als Sofortmeldung) und die aktiven UHS als Ziel wählen. Kein Detail, keine
     // Korrektur: das bleibt UHS und Einsatzleitung.
-    ("GET", "/api/einsaetze/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons"),
     // Zeilenabruf des Live-Abgleichs (LLH-1682), dieselbe Stellenbindung wie die Liste.
-    ("GET", "/api/einsaetze/{id}/persons/{pid}/row"),
-    ("POST", "/api/einsaetze/{id}/persons"),
-    ("GET", "/api/einsaetze/{id}/persons/uhs"),
+    ("GET", "/api/incidents/{id}/persons/{pid}/row"),
+    ("POST", "/api/incidents/{id}/persons"),
+    ("GET", "/api/incidents/{id}/persons/uhs"),
 ];
 
 /// Ob eine Gerätesitzung mit dieser Ansicht die Route `(methode, pfad)` aufrufen darf. `pfad`
@@ -676,19 +676,19 @@ mod tests {
     #[test]
     fn nicht_gelistete_route_ist_verboten() {
         for a in Funktionsansicht::ALLE {
-            assert!(!darf_route(a, "GET", "/api/einsaetze/{id}/etb"));
+            assert!(!darf_route(a, "GET", "/api/incidents/{id}/etb"));
             assert!(!darf_route(a, "GET", "/api/users"));
-            assert!(!darf_route(a, "PATCH", "/api/einsaetze/{id}"));
-            assert!(darf_route(a, "GET", "/api/einsaetze/{id}"));
+            assert!(!darf_route(a, "PATCH", "/api/incidents/{id}"));
+            assert!(darf_route(a, "GET", "/api/incidents/{id}"));
             assert!(darf_route(a, "GET", "/api/auth/me"));
         }
     }
 
     #[test]
     fn antraege_liest_jede_ansicht_verwerfen_nur_eine_schreibende() {
-        let verwerfen = "/api/einsaetze/{id}/requests/{antrag_id}";
+        let verwerfen = "/api/incidents/{id}/requests/{antrag_id}";
         for a in Funktionsansicht::ALLE {
-            assert!(darf_route(a, "GET", "/api/einsaetze/{id}/requests"));
+            assert!(darf_route(a, "GET", "/api/incidents/{id}/requests"));
             assert_eq!(
                 darf_route(a, "DELETE", verwerfen),
                 a != Funktionsansicht::Lagemonitor,
@@ -714,28 +714,28 @@ mod tests {
     #[test]
     fn tablet_bearbeitet_den_grundriss_nicht() {
         let t = Funktionsansicht::UhsTablet;
-        assert!(darf_route(t, "GET", "/api/einsaetze/{id}/uhs/{uid}"));
+        assert!(darf_route(t, "GET", "/api/incidents/{id}/uhs/{uid}"));
         assert!(darf_route(
             t,
             "POST",
-            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability"
+            "/api/incidents/{id}/uhs/{uid}/seats/{pid}/availability"
         ));
         for (m, p) in [
-            ("POST", "/api/einsaetze/{id}/uhs/{uid}/seats"),
-            ("POST", "/api/einsaetze/{id}/uhs/{uid}/seats/bulk"),
-            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}"),
-            ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}"),
-            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}"),
-            ("POST", "/api/einsaetze/{id}/uhs/{uid}/status"),
-            ("POST", "/api/einsaetze/{id}/uhs"),
-            ("DELETE", "/api/einsaetze/{id}/persons/{pid}"),
-            ("GET", "/api/einsaetze/{id}/persons/export"),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/matches"),
-            ("GET", "/api/einsaetze/{id}/persons/{pid}/attachments"),
-            ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-            ("PATCH", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-            ("DELETE", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-            ("POST", "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment"),
+            ("POST", "/api/incidents/{id}/uhs/{uid}/seats"),
+            ("POST", "/api/incidents/{id}/uhs/{uid}/seats/bulk"),
+            ("PATCH", "/api/incidents/{id}/uhs/{uid}/seats/{pid}"),
+            ("DELETE", "/api/incidents/{id}/uhs/{uid}/seats/{pid}"),
+            ("PATCH", "/api/incidents/{id}/uhs/{uid}"),
+            ("POST", "/api/incidents/{id}/uhs/{uid}/status"),
+            ("POST", "/api/incidents/{id}/uhs"),
+            ("DELETE", "/api/incidents/{id}/persons/{pid}"),
+            ("GET", "/api/incidents/{id}/persons/export"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/matches"),
+            ("GET", "/api/incidents/{id}/persons/{pid}/attachments"),
+            ("PUT", "/api/incidents/{id}/uhs/{uid}/plan"),
+            ("PATCH", "/api/incidents/{id}/uhs/{uid}/plan"),
+            ("DELETE", "/api/incidents/{id}/uhs/{uid}/plan"),
+            ("POST", "/api/incidents/{id}/uhs/{uid}/plan/from-attachment"),
         ] {
             assert!(!darf_route(t, m, p), "Tablet darf {m} {p} nicht");
         }
@@ -743,7 +743,7 @@ mod tests {
         assert!(darf_route(
             t,
             "GET",
-            "/api/einsaetze/{id}/uhs/{uid}/plan/image"
+            "/api/incidents/{id}/uhs/{uid}/plan/image"
         ));
     }
 
@@ -806,37 +806,37 @@ mod tests {
         assert!(b.ist_verfuegbar());
         assert!(b.rolle().darf_schreiben());
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/staging-areas/{bid}"),
-            ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/history"),
-            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/occupancy"),
-            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/status"),
-            ("POST", "/api/einsaetze/{id}/staging-areas/{bid}/arrival"),
-            ("GET", "/api/einsaetze/{id}/units"),
-            ("GET", "/api/einsaetze/{id}/units/timeline"),
-            ("POST", "/api/einsaetze/{id}/reports"),
+            ("GET", "/api/incidents/{id}/staging-areas/{bid}"),
+            ("GET", "/api/incidents/{id}/staging-areas/{bid}/history"),
+            ("POST", "/api/incidents/{id}/staging-areas/{bid}/occupancy"),
+            ("POST", "/api/incidents/{id}/staging-areas/{bid}/status"),
+            ("POST", "/api/incidents/{id}/staging-areas/{bid}/arrival"),
+            ("GET", "/api/incidents/{id}/units"),
+            ("GET", "/api/incidents/{id}/units/timeline"),
+            ("POST", "/api/incidents/{id}/reports"),
             // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte
             // (LLH-1387 design.md D1).
-            ("GET", "/api/einsaetze/{id}/staging-areas/{bid}/expected"),
+            ("GET", "/api/incidents/{id}/staging-areas/{bid}/expected"),
             // Stamm-Treffer zum eigenen Raum (LLH-1300 design.md D2).
             (
                 "GET",
-                "/api/einsaetze/{id}/staging-areas/{bid}/master-data-matches",
+                "/api/incidents/{id}/staging-areas/{bid}/master-data-matches",
             ),
         ] {
             assert!(darf_route(b, m, p), "BR-Gerät darf {m} {p}");
         }
         for (m, p) in [
-            ("POST", "/api/einsaetze/{id}/staging-areas"),
-            ("PATCH", "/api/einsaetze/{id}/staging-areas/{bid}"),
-            ("DELETE", "/api/einsaetze/{id}/staging-areas/{bid}"),
-            ("PATCH", "/api/einsaetze/{id}/units/{eid}"),
-            ("PATCH", "/api/einsaetze/{id}/units/{eid}/position"),
-            ("POST", "/api/einsaetze/{id}/units/{eid}/take-over"),
-            ("POST", "/api/einsaetze/{id}/units/{eid}/reject"),
-            ("GET", "/api/einsaetze/{id}/units/{eid}/timeline"),
-            ("POST", "/api/einsaetze/{id}/units"),
-            ("GET", "/api/einsaetze/{id}/persons"),
-            ("GET", "/api/einsaetze/{id}/uhs"),
+            ("POST", "/api/incidents/{id}/staging-areas"),
+            ("PATCH", "/api/incidents/{id}/staging-areas/{bid}"),
+            ("DELETE", "/api/incidents/{id}/staging-areas/{bid}"),
+            ("PATCH", "/api/incidents/{id}/units/{eid}"),
+            ("PATCH", "/api/incidents/{id}/units/{eid}/position"),
+            ("POST", "/api/incidents/{id}/units/{eid}/take-over"),
+            ("POST", "/api/incidents/{id}/units/{eid}/reject"),
+            ("GET", "/api/incidents/{id}/units/{eid}/timeline"),
+            ("POST", "/api/incidents/{id}/units"),
+            ("GET", "/api/incidents/{id}/persons"),
+            ("GET", "/api/incidents/{id}/uhs"),
             // Nachforderungen bleiben der Führung, auch mit Ziel = eigener Raum (LLH-1383
             // design.md D11): weder die Liste lesen noch „Eintreffen melden“ noch als Einheit
             // übernehmen. Was erwartet wird, liest das Gerät nur über `…/erwartet` (LLH-1387).
@@ -845,14 +845,14 @@ mod tests {
             ("GET", "/api/unit-templates"),
             (
                 "GET",
-                "/api/einsaetze/{id}/units/from-template/{vorlage_id}",
+                "/api/incidents/{id}/units/from-template/{vorlage_id}",
             ),
-            ("POST", "/api/einsaetze/{id}/units/from-template"),
-            ("GET", "/api/einsaetze/{id}/resource-requests"),
-            ("POST", "/api/einsaetze/{id}/resource-requests/{nid}/status"),
-            ("POST", "/api/einsaetze/{id}/units/from-resource-request"),
+            ("POST", "/api/incidents/{id}/units/from-template"),
+            ("GET", "/api/incidents/{id}/resource-requests"),
+            ("POST", "/api/incidents/{id}/resource-requests/{nid}/status"),
+            ("POST", "/api/incidents/{id}/units/from-resource-request"),
             // Ebenso der Storno einer Fehlübernahme (LLH-1388 D5).
-            ("POST", "/api/einsaetze/{id}/units/{eid}/annul-takeover"),
+            ("POST", "/api/incidents/{id}/units/{eid}/annul-takeover"),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }
@@ -864,7 +864,7 @@ mod tests {
     fn kein_geraet_liest_die_ueblichen_arten_der_organisation() {
         for a in Funktionsansicht::ALLE {
             assert!(
-                !darf_route(a, "GET", "/api/einsaetze/{id}/resource-requests/types"),
+                !darf_route(a, "GET", "/api/incidents/{id}/resource-requests/types"),
                 "{a:?} darf die üblichen Arten nicht lesen"
             );
         }
@@ -877,8 +877,8 @@ mod tests {
     fn kein_geraet_ruft_ab_oder_nimmt_zurueck() {
         for a in Funktionsansicht::ALLE {
             for p in [
-                "/api/einsaetze/{id}/staging-areas/{bid}/dispatch",
-                "/api/einsaetze/{id}/staging-areas/{bid}/dispatch/void",
+                "/api/incidents/{id}/staging-areas/{bid}/dispatch",
+                "/api/incidents/{id}/staging-areas/{bid}/dispatch/void",
             ] {
                 assert!(!darf_route(a, "POST", p), "{a:?} darf POST {p} nicht");
             }
@@ -886,12 +886,12 @@ mod tests {
         assert!(darf_route(
             Funktionsansicht::Bereitstellungsraum,
             "POST",
-            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy"
+            "/api/incidents/{id}/staging-areas/{bid}/occupancy"
         ));
         assert!(darf_route(
             Funktionsansicht::Bereitstellungsraum,
             "POST",
-            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo"
+            "/api/incidents/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo"
         ));
     }
 
@@ -901,50 +901,50 @@ mod tests {
         assert!(v.ist_verfuegbar());
         assert!(v.rolle().darf_schreiben());
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/catering"),
+            ("GET", "/api/incidents/{id}/catering"),
             (
                 "POST",
-                "/api/einsaetze/{id}/catering/time-slots/{zid}/distributions",
+                "/api/incidents/{id}/catering/time-slots/{zid}/distributions",
             ),
             (
                 "POST",
-                "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
+                "/api/incidents/{id}/catering/distributions/{aid}/undo",
             ),
-            ("GET", "/api/einsaetze/{id}/reports"),
-            ("POST", "/api/einsaetze/{id}/reports"),
+            ("GET", "/api/incidents/{id}/reports"),
+            ("POST", "/api/incidents/{id}/reports"),
         ] {
             assert!(darf_route(v, m, p), "Verpflegungsgerät darf {m} {p}");
         }
         for (m, p) in [
-            ("POST", "/api/einsaetze/{id}/catering/time-slots"),
-            ("PATCH", "/api/einsaetze/{id}/catering/time-slots/{zid}"),
-            ("DELETE", "/api/einsaetze/{id}/catering/time-slots/{zid}"),
+            ("POST", "/api/incidents/{id}/catering/time-slots"),
+            ("PATCH", "/api/incidents/{id}/catering/time-slots/{zid}"),
+            ("DELETE", "/api/incidents/{id}/catering/time-slots/{zid}"),
             // Verpflegungsstellen planen (LLH-1040 D12): liest sie über `GET …/catering`,
             // legt aber keine an, ändert, storniert und wechselt keinen Status.
-            ("POST", "/api/einsaetze/{id}/catering/positions"),
-            ("PATCH", "/api/einsaetze/{id}/catering/positions/{sid}"),
-            ("DELETE", "/api/einsaetze/{id}/catering/positions/{sid}"),
+            ("POST", "/api/incidents/{id}/catering/positions"),
+            ("PATCH", "/api/incidents/{id}/catering/positions/{sid}"),
+            ("DELETE", "/api/incidents/{id}/catering/positions/{sid}"),
             (
                 "POST",
-                "/api/einsaetze/{id}/catering/positions/{sid}/status",
+                "/api/incidents/{id}/catering/positions/{sid}/status",
             ),
             // Tag aus der Vorlage (LLH-1058 D12): planen bleibt der Führung, den
             // Verpflegungsplan liest das Gerät nicht.
             (
                 "POST",
-                "/api/einsaetze/{id}/catering/time-slots/from-template",
+                "/api/incidents/{id}/catering/time-slots/from-template",
             ),
             ("GET", "/api/catering-templates"),
-            ("GET", "/api/einsaetze/{id}/resource-requests"),
-            ("POST", "/api/einsaetze/{id}/resource-requests"),
-            ("GET", "/api/einsaetze/{id}/personnel"),
-            ("GET", "/api/einsaetze/{id}/care"),
-            ("GET", "/api/einsaetze/{id}/persons"),
-            ("GET", "/api/einsaetze/{id}/etb"),
+            ("GET", "/api/incidents/{id}/resource-requests"),
+            ("POST", "/api/incidents/{id}/resource-requests"),
+            ("GET", "/api/incidents/{id}/personnel"),
+            ("GET", "/api/incidents/{id}/care"),
+            ("GET", "/api/incidents/{id}/persons"),
+            ("GET", "/api/incidents/{id}/etb"),
             // Empfänger nur über die Projektion in `GET …/catering` (LLH-1055 D3): die
             // Einheitenliste trägt Führer, Verbindungen und Personalnamen.
-            ("GET", "/api/einsaetze/{id}/units"),
-            ("GET", "/api/einsaetze/{id}/sectors"),
+            ("GET", "/api/incidents/{id}/units"),
+            ("GET", "/api/incidents/{id}/sectors"),
         ] {
             assert!(!darf_route(v, m, p), "Verpflegungsgerät darf {m} {p} nicht");
         }
@@ -955,42 +955,42 @@ mod tests {
         let a = Funktionsansicht::Einsatzabschnitt;
         assert!(a.ist_verfuegbar());
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/sectors"),
-            ("GET", "/api/einsaetze/{id}/units"),
-            ("GET", "/api/einsaetze/{id}/tasks"),
-            ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
+            ("GET", "/api/incidents/{id}/sectors"),
+            ("GET", "/api/incidents/{id}/units"),
+            ("GET", "/api/incidents/{id}/tasks"),
+            ("GET", "/api/incidents/{id}/tasks/{aid}"),
             (
                 "POST",
-                "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+                "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
             ),
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
-            ("POST", "/api/einsaetze/{id}/reports"),
-            ("GET", "/api/einsaetze/{id}/zones"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/execution"),
+            ("POST", "/api/incidents/{id}/reports"),
+            ("GET", "/api/incidents/{id}/zones"),
         ] {
             assert!(darf_route(a, m, p), "Abschnittsgerät darf {m} {p}");
         }
         for (m, p) in [
-            ("POST", "/api/einsaetze/{id}/sectors"),
-            ("PATCH", "/api/einsaetze/{id}/sectors/{aid}"),
-            ("PATCH", "/api/einsaetze/{id}/sectors/{aid}/area"),
-            ("DELETE", "/api/einsaetze/{id}/sectors/{aid}"),
-            ("POST", "/api/einsaetze/{id}/units"),
-            ("PATCH", "/api/einsaetze/{id}/units/{eid}"),
-            ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
-            ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
-            ("POST", "/api/einsaetze/{id}/tasks"),
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/accept"),
+            ("POST", "/api/incidents/{id}/sectors"),
+            ("PATCH", "/api/incidents/{id}/sectors/{aid}"),
+            ("PATCH", "/api/incidents/{id}/sectors/{aid}/area"),
+            ("DELETE", "/api/incidents/{id}/sectors/{aid}"),
+            ("POST", "/api/incidents/{id}/units"),
+            ("PATCH", "/api/incidents/{id}/units/{eid}"),
+            ("PUT", "/api/incidents/{id}/units/{eid}/status"),
+            ("POST", "/api/incidents/{id}/units/{eid}/status/undo"),
+            ("POST", "/api/incidents/{id}/tasks"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/accept"),
             // Aufheben und Berichtigen gehören der Führung (LLH-1098).
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/void"),
-            ("PATCH", "/api/einsaetze/{id}/tasks/{aid}"),
-            ("GET", "/api/einsaetze/{id}/tasks/metrics"),
-            ("POST", "/api/einsaetze/{id}/zones"),
-            ("GET", "/api/einsaetze/{id}/free-symbols"),
-            ("GET", "/api/einsaetze/{id}/personnel"),
-            ("GET", "/api/einsaetze/{id}/persons"),
-            ("GET", "/api/einsaetze/{id}/uhs"),
-            ("GET", "/api/einsaetze/{id}/staging-areas"),
-            ("GET", "/api/einsaetze/{id}/situation-monitor"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/void"),
+            ("PATCH", "/api/incidents/{id}/tasks/{aid}"),
+            ("GET", "/api/incidents/{id}/tasks/metrics"),
+            ("POST", "/api/incidents/{id}/zones"),
+            ("GET", "/api/incidents/{id}/free-symbols"),
+            ("GET", "/api/incidents/{id}/personnel"),
+            ("GET", "/api/incidents/{id}/persons"),
+            ("GET", "/api/incidents/{id}/uhs"),
+            ("GET", "/api/incidents/{id}/staging-areas"),
+            ("GET", "/api/incidents/{id}/situation-monitor"),
         ] {
             assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
         }
@@ -1011,44 +1011,44 @@ mod tests {
         );
         for (m, p) in [
             ("GET", "/api/vehicle-statuses"),
-            ("GET", "/api/einsaetze/{id}/units"),
-            ("PUT", "/api/einsaetze/{id}/units/{eid}/status"),
-            ("POST", "/api/einsaetze/{id}/units/{eid}/status/undo"),
-            ("GET", "/api/einsaetze/{id}/tasks"),
-            ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
+            ("GET", "/api/incidents/{id}/units"),
+            ("PUT", "/api/incidents/{id}/units/{eid}/status"),
+            ("POST", "/api/incidents/{id}/units/{eid}/status/undo"),
+            ("GET", "/api/incidents/{id}/tasks"),
+            ("GET", "/api/incidents/{id}/tasks/{aid}"),
             (
                 "POST",
-                "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+                "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
             ),
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
-            ("GET", "/api/einsaetze/{id}/reports"),
-            ("POST", "/api/einsaetze/{id}/reports"),
-            ("GET", "/api/einsaetze/{id}/persons"),
-            ("POST", "/api/einsaetze/{id}/persons"),
-            ("GET", "/api/einsaetze/{id}/persons/uhs"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/execution"),
+            ("GET", "/api/incidents/{id}/reports"),
+            ("POST", "/api/incidents/{id}/reports"),
+            ("GET", "/api/incidents/{id}/persons"),
+            ("POST", "/api/incidents/{id}/persons"),
+            ("GET", "/api/incidents/{id}/persons/uhs"),
         ] {
             assert!(darf_route(e, m, p), "Einheitengerät darf {m} {p}");
         }
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/sectors"),
-            ("GET", "/api/einsaetze/{id}/orders"),
-            ("GET", "/api/einsaetze/{id}/zones"),
-            ("GET", "/api/einsaetze/{id}/vehicles"),
-            ("GET", "/api/einsaetze/{id}/personnel"),
-            ("GET", "/api/einsaetze/{id}/persons/{pid}"),
-            ("PATCH", "/api/einsaetze/{id}/persons/{pid}"),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/reason"),
-            ("GET", "/api/einsaetze/{id}/persons/units"),
-            ("GET", "/api/einsaetze/{id}/uhs"),
-            ("POST", "/api/einsaetze/{id}/units"),
-            ("PATCH", "/api/einsaetze/{id}/units/{eid}"),
-            ("PATCH", "/api/einsaetze/{id}/units/{eid}/position"),
-            ("DELETE", "/api/einsaetze/{id}/units/{eid}"),
-            ("POST", "/api/einsaetze/{id}/tasks"),
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/accept"),
-            ("POST", "/api/einsaetze/{id}/tasks/{aid}/void"),
-            ("PATCH", "/api/einsaetze/{id}/reports/{mid}"),
+            ("GET", "/api/incidents/{id}/sectors"),
+            ("GET", "/api/incidents/{id}/orders"),
+            ("GET", "/api/incidents/{id}/zones"),
+            ("GET", "/api/incidents/{id}/vehicles"),
+            ("GET", "/api/incidents/{id}/personnel"),
+            ("GET", "/api/incidents/{id}/persons/{pid}"),
+            ("PATCH", "/api/incidents/{id}/persons/{pid}"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/whereabouts"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/reason"),
+            ("GET", "/api/incidents/{id}/persons/units"),
+            ("GET", "/api/incidents/{id}/uhs"),
+            ("POST", "/api/incidents/{id}/units"),
+            ("PATCH", "/api/incidents/{id}/units/{eid}"),
+            ("PATCH", "/api/incidents/{id}/units/{eid}/position"),
+            ("DELETE", "/api/incidents/{id}/units/{eid}"),
+            ("POST", "/api/incidents/{id}/tasks"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/accept"),
+            ("POST", "/api/incidents/{id}/tasks/{aid}/void"),
+            ("PATCH", "/api/incidents/{id}/reports/{mid}"),
             ("POST", "/api/vehicle-statuses"),
         ] {
             assert!(!darf_route(e, m, p), "Einheitengerät darf {m} {p} nicht");
@@ -1072,43 +1072,43 @@ mod tests {
         assert!(b.ist_verfuegbar());
         assert!(b.rolle().darf_schreiben());
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/care"),
+            ("GET", "/api/incidents/{id}/care"),
             (
                 "POST",
-                "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
+                "/api/incidents/{id}/care/positions/{sid}/occupancies",
             ),
-            ("POST", "/api/einsaetze/{id}/persons"),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-            ("POST", "/api/einsaetze/{id}/reports"),
+            ("POST", "/api/incidents/{id}/persons"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/whereabouts"),
+            ("POST", "/api/incidents/{id}/reports"),
         ] {
             assert!(darf_route(b, m, p), "Betreuungsstelle darf {m} {p}");
         }
         for (m, p) in [
-            ("GET", "/api/einsaetze/{id}/care/occupancy"),
-            ("POST", "/api/einsaetze/{id}/care/positions"),
-            ("PATCH", "/api/einsaetze/{id}/care/positions/{sid}"),
-            ("POST", "/api/einsaetze/{id}/care/positions/{sid}/annul"),
+            ("GET", "/api/incidents/{id}/care/occupancy"),
+            ("POST", "/api/incidents/{id}/care/positions"),
+            ("PATCH", "/api/incidents/{id}/care/positions/{sid}"),
+            ("POST", "/api/incidents/{id}/care/positions/{sid}/annul"),
             // Bezirke sind das eigene Modul Evakuierung (LLH-1034); die Stelle sieht keins davon.
-            ("GET", "/api/einsaetze/{id}/evacuation"),
-            ("POST", "/api/einsaetze/{id}/evacuation/districts"),
+            ("GET", "/api/incidents/{id}/evacuation"),
+            ("POST", "/api/incidents/{id}/evacuation/districts"),
             (
                 "POST",
-                "/api/einsaetze/{id}/evacuation/districts/{bid}/progress",
+                "/api/incidents/{id}/evacuation/districts/{bid}/progress",
             ),
             (
                 "GET",
-                "/api/einsaetze/{id}/evacuation/districts/{bid}/progress",
+                "/api/incidents/{id}/evacuation/districts/{bid}/progress",
             ),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/triage"),
-            ("POST", "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/triage"),
+            ("POST", "/api/incidents/{id}/persons/{pid}/uhs-occupancy"),
             // Rücknahme eines Austritts, wie der Austritt selbst (LLH-1924, design.md D3).
             (
                 "POST",
-                "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
+                "/api/incidents/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
             ),
-            ("GET", "/api/einsaetze/{id}/uhs"),
-            ("GET", "/api/einsaetze/{id}/persons/export"),
-            ("GET", "/api/einsaetze/{id}/etb"),
+            ("GET", "/api/incidents/{id}/uhs"),
+            ("GET", "/api/incidents/{id}/persons/export"),
+            ("GET", "/api/incidents/{id}/etb"),
         ] {
             assert!(!darf_route(b, m, p), "Betreuungsstelle darf {m} {p} nicht");
         }

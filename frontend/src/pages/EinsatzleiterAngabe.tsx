@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { Dayjs } from 'dayjs';
 import { abrufZustand, type AbrufZustand } from '../api/abrufZustand';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { einsatzKeys } from '../api/queryKeys';
 import type {

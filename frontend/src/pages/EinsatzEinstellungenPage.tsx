@@ -13,7 +13,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { SeitenFehler } from '../components/SeitenZustand';
-import { ladeEinsatz, ladeEinstellungen } from '../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import { darfEinsatzVerwalten } from '../einsatz/schreibrecht';

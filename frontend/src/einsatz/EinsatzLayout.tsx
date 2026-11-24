@@ -9,7 +9,7 @@ import {
   ladeEinstellungen,
   ladeMitglieder,
   ladeModulFreigaben,
-} from '../api/einsaetze';
+} from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import { useAuth } from '../auth/AuthContext';
 import {

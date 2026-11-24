@@ -24,7 +24,7 @@ async fn welt() -> (axum::Router, sqlx::SqlitePool, String, i64, i64) {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{},"menge":10}}"#, mat["id"])),
     )
@@ -38,7 +38,7 @@ async fn patch(app: &axum::Router, c: &str, einsatz: i64, em: i64, body: &str) -
     let (s, json) = anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         c,
         Some(body),
     )
@@ -57,7 +57,7 @@ async fn zuruecknehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/status/undo"),
+        &format!("/api/incidents/{einsatz}/material/{em}/status/undo"),
         c,
         Some(&beleg.to_string()),
     )
@@ -112,7 +112,7 @@ async fn materialstatus_nach_mengenaenderung_409() {
     let (_, zeile) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -142,7 +142,7 @@ async fn materialstatus_nach_aufteilen_409_und_teilzeile_ohne_beleg() {
     let (s, teil) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/split"),
+        &format!("/api/incidents/{einsatz}/material/{em}/split"),
         &admin,
         Some(r#"{"menge":3}"#),
     )

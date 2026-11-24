@@ -4,7 +4,7 @@ import { Select } from '../components/Select';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import {

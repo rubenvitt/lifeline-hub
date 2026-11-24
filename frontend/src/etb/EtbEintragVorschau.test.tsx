@@ -39,7 +39,7 @@ function eintrag(over: Partial<EtbEintragAnzeige> = {}): EtbEintragAnzeige {
 /** Der Nummernzweig fragt `before_lfd_nr = n + 1, limit = 1` — geprüft, nicht nur beantwortet. */
 function etbHandler(antwort: EtbEintragAnzeige[], zaehler?: { n: number }) {
   server.use(
-    http.get('/api/einsaetze/5/etb', ({ request }) => {
+    http.get('/api/incidents/5/etb', ({ request }) => {
       if (zaehler) zaehler.n += 1;
       const url = new URL(request.url);
       expect(url.searchParams.get('before_lfd_nr')).toBe('13');
@@ -138,7 +138,7 @@ describe('EtbEintragVorschau (LFH-664)', () => {
 
     expect(
       await screen.findByRole('link', { name: 'fax.pdf, 2,0 KB, Anhang zu Nr. 12 herunterladen' }),
-    ).toHaveAttribute('href', '/api/einsaetze/5/etb/40/attachments/9');
+    ).toHaveAttribute('href', '/api/incidents/5/etb/40/attachments/9');
   });
 
   it('zeigt ein Foto als Vorschaubild ohne Bedienziel (LFH-759)', async () => {
@@ -162,7 +162,7 @@ describe('EtbEintragVorschau (LFH-664)', () => {
     const bild = await screen.findByRole('img', { name: 'Vorschau: dach.jpg, Anhang zu Nr. 12' });
     expect(bild.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/einsaetze/5/etb/40/attachments/9?fassung=vorschau',
+      '/api/incidents/5/etb/40/attachments/9?fassung=vorschau',
     );
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });

@@ -22,7 +22,7 @@ interface BildPatch {
   ansicht_id?: number | null;
 }
 
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/map/background-images`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/map/background-images`;
 
 export function listeHintergrundbilder(einsatzId: number): Promise<Hintergrundbild[]> {
   return apiGet<Hintergrundbild[]>(basis(einsatzId));

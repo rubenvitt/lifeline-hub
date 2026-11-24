@@ -36,9 +36,9 @@ async function geocoder(page: Page) {
     anfragen.push(new URL(route.request().url()).searchParams.get('q') ?? '');
     await route.fulfill({ json: { zustand: 'ok', treffer: [TREFFER] } });
   };
-  await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, antwort);
+  await page.route(/\/api\/incidents\/\d+\/place-search\?/, antwort);
   await page.route(/\/api\/place-search\?/, antwort);
-  await page.route(/\/api\/einsaetze\/\d+\/place-preview\?/, (route) =>
+  await page.route(/\/api\/incidents\/\d+\/place-preview\?/, (route) =>
     route.fulfill({
       json: {
         ortsname: ORTSNAME,
@@ -66,7 +66,7 @@ async function nadelZiehen(page: Page, nadel: Locator) {
 }
 
 async function einsatzAnlegenApi(page: Page, ort: Record<string, unknown> = {}): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Einsatzort ${Date.now()}`, ...ort },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
@@ -74,7 +74,7 @@ async function einsatzAnlegenApi(page: Page, ort: Record<string, unknown> = {}):
 }
 
 async function einsatzLesen(page: Page, id: number) {
-  const r = await page.request.get(`/api/einsaetze/${id}`);
+  const r = await page.request.get(`/api/incidents/${id}`);
   expect(r.ok()).toBeTruthy();
   return (await r.json()) as {
     einsatzort: string | null;

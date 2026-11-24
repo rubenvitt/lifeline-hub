@@ -1,5 +1,5 @@
 //! Adresssuche der Lagekarte (LFH-638, Spec `lagekarte-ortssuche`):
-//! `GET /api/einsaetze/{id}/map/place-search?q=`.
+//! `GET /api/incidents/{id}/map/place-search?q=`.
 //!
 //! Der Token-Bucket des Geocoders ist prozessweit (1 Anfrage/s) und gilt für alle Tests dieser
 //! Binärdatei. Deshalb fragt genau EIN Test den Geocoder, und das der Reihe nach mit Pausen; die
@@ -70,7 +70,7 @@ async fn einsatzort_setzen(pool: &sqlx::SqlitePool, einsatz: i64, lat: f64, lon:
 
 fn uri(einsatz: i64, q: &str) -> String {
     let kodiert: String = url_kodieren(q);
-    format!("/api/einsaetze/{einsatz}/map/place-search?q={kodiert}")
+    format!("/api/incidents/{einsatz}/map/place-search?q={kodiert}")
 }
 
 /// Minimal-Kodierung für die Testeingaben (Leerzeichen, Komma, Umlaute).
@@ -108,7 +108,7 @@ async fn suchtext_unter_drei_oder_ueber_200_zeichen_ist_400_ohne_geocoder() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/map/place-search"),
+        &format!("/api/incidents/{einsatz}/map/place-search"),
         &admin,
         None,
     )
@@ -136,7 +136,7 @@ async fn ohne_lagekarte_modul_ist_403_ohne_geocoder() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/lagekarte"),
+        &format!("/api/incidents/{einsatz}/module-overrides/lagekarte"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

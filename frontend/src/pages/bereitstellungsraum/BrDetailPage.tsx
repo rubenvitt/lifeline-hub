@@ -5,7 +5,7 @@ import { Liste, ListenEintrag } from '../../components/Liste';
 import { Link, useParams } from 'react-router';
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/incidents';
 import { darfBeantragen, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useAuth } from '../../auth/AuthContext';
 import {

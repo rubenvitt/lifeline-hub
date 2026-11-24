@@ -3,14 +3,14 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Form, Input, type FormInstance } from 'antd';
 import { renderMitProviders } from '../test/utils';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { freigabenFixture } from '../test/fixtures';
 import AbschnittUebernahme from './AbschnittUebernahme';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
 import { standFeld } from './standFeld';
 
-vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const erzeuge = vi.fn<UebernahmeQuelle['erzeuge']>();
 const geaendert = vi.fn();

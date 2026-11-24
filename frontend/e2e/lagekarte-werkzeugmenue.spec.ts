@@ -72,7 +72,7 @@ for (const viewport of [
       await anmelden(page);
       const einsatzId = await einsatzAnlegen(page, `E2E Werkzeugmenü ${Date.now()}`);
       // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur ein Knopf (LLH-1936).
-      const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
+      const stand = await page.request.post(`/api/incidents/${einsatzId}/situation-snapshots`, {
         data: { bezeichnung: 'Stand vor Ort' },
       });
       expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -163,7 +163,7 @@ for (const viewport of [
       const einsatzId = await einsatzAnlegen(page, `E2E Werkzeugmenü Außen ${Date.now()}`);
       // Mit verortetem Einsatzort: sonst läge das Band „Einsatzort fehlt“ (LLH-1953) bei 390 px
       // auf der freien Karte, die der Tipp hier sucht.
-      const ort = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+      const ort = await page.request.patch(`/api/incidents/${einsatzId}`, {
         data: { einsatzort: 'Marktplatz', einsatzort_lat: 53.0775, einsatzort_lon: 8.8 },
       });
       expect(ort.ok(), `Einsatzort: ${ort.status()}`).toBeTruthy();

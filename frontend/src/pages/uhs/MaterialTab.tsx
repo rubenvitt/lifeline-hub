@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeModulFreigaben } from '../../api/incidents';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
 import { einsatzKeys } from '../../api/queryKeys';
 import type { UhsDetail } from '../../api/types';

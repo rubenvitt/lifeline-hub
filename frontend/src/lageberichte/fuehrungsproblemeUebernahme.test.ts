@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
 import { listeAuftraege } from '../api/auftraege';
-import { ladeFuehrungsstelle } from '../api/einsaetze';
+import { ladeFuehrungsstelle } from '../api/incidents';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { listeMeldungen } from '../api/meldungen';
@@ -30,7 +30,7 @@ vi.mock('../api/modulZaehler', () => ({ ladeModulZaehler: vi.fn() }));
 vi.mock('../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn() }));
 vi.mock('../api/sprechgruppen', () => ({ listeEinsatzSprechgruppen: vi.fn() }));
-vi.mock('../api/einsaetze', () => ({ ladeFuehrungsstelle: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeFuehrungsstelle: vi.fn() }));
 vi.mock('../api/kommunikationsplan', () => ({ ladeKommunikationsplan: vi.fn() }));
 vi.mock('../api/fernmeldeskizze', () => ({ ladeFernmeldeskizze: vi.fn() }));
 

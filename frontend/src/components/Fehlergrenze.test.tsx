@@ -146,7 +146,7 @@ describe('Fehlergrenze je Rahmen', () => {
     it(`${rahmen}: deutscher Titel, genau „Neu laden“ und „${ausweg}“, kein Fehlertext, der Rahmen bleibt`, async () => {
       stillerKonsole();
       server.use(
-        http.get('/api/einsaetze/:id/module-access', () => HttpResponse.json(freigabenFixture())),
+        http.get('/api/incidents/:id/module-access', () => HttpResponse.json(freigabenFixture())),
       );
       const router = renderRouten(
         rahmenRouten(rahmen, basis, [{ path: '*', element: <Kaputt /> }]),
@@ -188,7 +188,7 @@ describe('Fehlergrenze je Rahmen', () => {
   it('Einsatz: ist der Überblick gesperrt, führt „Zum Überblick“ ins erste freie Modul', async () => {
     stillerKonsole();
     const gesperrt = freigabenFixture({ ueberblick: { zugriff: false } });
-    server.use(http.get('/api/einsaetze/:id/module-access', () => HttpResponse.json(gesperrt)));
+    server.use(http.get('/api/incidents/:id/module-access', () => HttpResponse.json(gesperrt)));
     // Die Freigaben hat der Rahmen längst geladen (derselbe Schlüssel wie in `EinsatzLayout`).
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.modulFreigaben(7), gesperrt);

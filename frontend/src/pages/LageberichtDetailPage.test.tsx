@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import LageberichtDetailPage from './LageberichtDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
-import * as einsaetzeApi from '../api/einsaetze';
+import * as einsaetzeApi from '../api/incidents';
 import * as lageberichteApi from '../api/lageberichte';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
@@ -17,7 +17,7 @@ import { freigabenFixture } from '../test/fixtures';
 import { setzeViewportBreite, setzeViewportZurueck } from '../test/viewport';
 import { erwarteNichtGefunden } from '../test/nichtGefunden';
 
-vi.mock('../api/einsaetze');
+vi.mock('../api/incidents');
 vi.mock('../api/lageberichte');
 
 function bericht(over: Record<string, unknown> = {}) {
@@ -699,7 +699,7 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
       bezeichnung: 'Übung',
     } as never);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/sectors', () =>
+      http.get('/api/incidents/:einsatzId/sectors', () =>
         HttpResponse.json([{ id: 3, name: 'EA Süd' }]),
       ),
     );

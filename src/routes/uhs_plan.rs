@@ -90,7 +90,7 @@ async fn hinterlegen_und_melden(
     Ok(anzeige)
 }
 
-/// PUT /api/einsaetze/{id}/uhs/{uid}/plan — Bild hochladen (Multipart, Feld `datei`), ersetzt
+/// PUT /api/incidents/{id}/uhs/{uid}/plan — Bild hochladen (Multipart, Feld `datei`), ersetzt
 /// einen vorhandenen Plan. Reihenfolge: Gate → UHS im Einsatz (404) → storniert (409) → Datei
 /// (400) → Größe und Format (400) → Scan (422/503) → Bereinigung und Maße (422) → Transaktion.
 pub async fn hinterlegen(
@@ -117,7 +117,7 @@ pub struct UebernahmeBody {
     pub anhang_id: i64,
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/plan/from-attachment — einen Bild-Anhang DIESER UHS als Plan
+/// POST /api/incidents/{id}/uhs/{uid}/plan/from-attachment — einen Bild-Anhang DIESER UHS als Plan
 /// kopieren (design.md D4). Reihenfolge: Gate → UHS (404/409) → Linker-Lookup (fremd oder
 /// entfernt 404) → Typ des Anhangs (kein Bild 422, ohne Protokoll) → **Lese-Audit** (scheitert
 /// es, kein Plan) → bereinigte Bytes → Annahme → Transaktion. Der Anhang bleibt unverändert.
@@ -164,7 +164,7 @@ pub struct PlanPatchBody {
     pub nacht_umkehren: Option<bool>,
 }
 
-/// PATCH /api/einsaetze/{id}/uhs/{uid}/plan — Lage und Darstellung. Versatz und Breite rasten
+/// PATCH /api/incidents/{id}/uhs/{uid}/plan — Lage und Darstellung. Versatz und Breite rasten
 /// auf 10 px ein; Werte außerhalb der Grenzen 400. KEIN ETB (wie das Verschieben von Plätzen).
 pub async fn aendern(
     State(state): State<AppState>,
@@ -191,7 +191,7 @@ pub async fn aendern(
     Ok(Json(anzeige))
 }
 
-/// DELETE /api/einsaetze/{id}/uhs/{uid}/plan — Plan entfernen, mit ETB „Plan entfernt“ in
+/// DELETE /api/incidents/{id}/uhs/{uid}/plan — Plan entfernen, mit ETB „Plan entfernt“ in
 /// derselben Transaktion. Ohne Plan 404, storniert 409.
 pub async fn entfernen(
     State(state): State<AppState>,
@@ -219,7 +219,7 @@ pub async fn entfernen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/plan/image — das Bild zur Anzeige. ETag aus sha256,
+/// GET /api/incidents/{id}/uhs/{uid}/plan/image — das Bild zur Anzeige. ETag aus sha256,
 /// 304-Kurzschluss ohne BLOB. **Kein Lese-Audit und kein ETB** (Spec „Anzeige ohne
 /// Protokoll“): der Plan ist kein Anhang. `inline`, `nosniff` und [`ANHANG_CSP`] wie bei
 /// Anhang-Antworten.

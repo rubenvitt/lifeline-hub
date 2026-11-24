@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lageberichtDetailPfad } from '../routing/deeplinks';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys } from '../api/queryKeys';
 import { legeLageberichtAn, listeLageberichte, schreibeLageberichtFort } from '../api/lageberichte';

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LatLon } from './koordinaten';
 

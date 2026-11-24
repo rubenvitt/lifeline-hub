@@ -382,7 +382,7 @@ async fn write_vorlage_overrides_tx(
 /// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
 /// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
 /// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
-/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Zeile korreliert, damit `GET /api/incidents` die Anträge einmal liest und nicht einmal je
 /// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
 macro_rules! teilschwaerzungen_spalte {
     () => {

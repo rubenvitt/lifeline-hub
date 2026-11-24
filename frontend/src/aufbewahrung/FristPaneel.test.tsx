@@ -27,7 +27,7 @@ beforeEach(() => {
   gesendet = [];
   antwort = () => HttpResponse.json({ id: 1 });
   server.use(
-    http.put('/api/einsaetze/1/retention-period', async ({ request }) => {
+    http.put('/api/incidents/1/retention-period', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return antwort();
     }),

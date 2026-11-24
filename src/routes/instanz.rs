@@ -943,7 +943,7 @@ pub async fn spiegel_abgleich(
     Ok(anfrage.antwort(StatusCode::OK, &antwort))
 }
 
-/// GET /api/einsaetze/{id}/requests — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
+/// GET /api/incidents/{id}/requests — die eigenen Anträge an einem Spiegel (LLH-1492, Spec
 /// `spiegel-antraege`); an einem eigenen Einsatz leer.
 pub async fn antraege_liste(
     State(state): State<AppState>,
@@ -955,7 +955,7 @@ pub async fn antraege_liste(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/requests/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
+/// DELETE /api/incidents/{id}/requests/{antrag_id} — verwirft einen eigenen, abgelehnten Antrag.
 /// Lese- statt Schreib-Gate: der Antrag ist Buchführung dieser Instanz, keine Einsatzdaten, und
 /// gehört dem Konto, das ihn gestellt hat.
 pub async fn antrag_verwerfen(
@@ -1003,7 +1003,7 @@ async fn modul_freigabe_fuer(
     })
 }
 
-/// GET /api/einsaetze/{id}/breaks — die nicht übernommenen Erfassungen eines Spiegels nach
+/// GET /api/incidents/{id}/breaks — die nicht übernommenen Erfassungen eines Spiegels nach
 /// einer Notübernahme (LLH-1646, N2): offen, nach Zeit; Inhalte nur mit Freigabe des Moduls.
 pub async fn bruchstelle_liste(
     State(state): State<AppState>,
@@ -1020,7 +1020,7 @@ async fn bruchstelle_geaendert(state: &AppState, einsatz_id: i64) {
     crate::live::org::kopf_melden(&state.pool, &state.live, einsatz_id, &[]).await;
 }
 
-/// POST /api/einsaetze/{id}/breaks/{bruch_id}/request — stellt eine nicht übernommene
+/// POST /api/incidents/{id}/breaks/{bruch_id}/request — stellt eine nicht übernommene
 /// Erfassung als Antrag an den Führer (LLH-1646, N1, N3). 202 mit dem Antrag wie eine Erfassung
 /// am Spiegel; ein zweites Stellen liefert denselben Antrag.
 pub async fn bruchstelle_stellen(
@@ -1062,7 +1062,7 @@ pub async fn bruchstelle_stellen(
     )))
 }
 
-/// POST /api/einsaetze/{id}/breaks/requests — stellt alle nachreichbaren Erfassungen in der
+/// POST /api/incidents/{id}/breaks/requests — stellt alle nachreichbaren Erfassungen in der
 /// Reihenfolge ihrer Zeit (LLH-1646, N5). Was noch nicht geht, bleibt offen und steht mit Grund in
 /// der Antwort.
 pub async fn bruchstelle_alle_stellen(
@@ -1083,7 +1083,7 @@ pub async fn bruchstelle_alle_stellen(
     Ok(Json(ergebnis))
 }
 
-/// POST /api/einsaetze/{id}/breaks/{bruch_id}/discard — legt eine nicht übernommene
+/// POST /api/incidents/{id}/breaks/{bruch_id}/discard — legt eine nicht übernommene
 /// Erfassung ab (LLH-1646, N6). Auch am abgeschlossenen Einsatz und nach beendetem Abgleich.
 pub async fn bruchstelle_verwerfen(
     State(state): State<AppState>,

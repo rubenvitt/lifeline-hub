@@ -22,8 +22,8 @@ import { useOfflineSync } from './useOfflineSync';
  */
 
 const BENUTZER = 11;
-const REG = '/api/einsaetze/7/care/positions/8/registrations';
-const AB = '/api/einsaetze/7/care/positions/8/departures';
+const REG = '/api/incidents/7/care/positions/8/registrations';
+const AB = '/api/incidents/7/care/positions/8/departures';
 
 function wrapper(client: QueryClient) {
   return ({ children }: PropsWithChildren) => (

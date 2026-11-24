@@ -8,7 +8,7 @@ import { listeEinheiten, uebernehmeAusNachforderung } from '../api/einheiten';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { listeBr } from '../api/einsatzBereitstellungsraum';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { ladeModulZaehler } from '../api/modulZaehler';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';

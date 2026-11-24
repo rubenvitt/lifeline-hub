@@ -56,7 +56,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
   await expect(panel(page).getByRole('link', { name: /^Unfallhilfsstellen/ })).toBeVisible();
 
   // Ein Einsatz ohne Vorlage zeigt das „Informationstelefon“ (Gegenprobe zur Ausblendung).
-  const ohne = await page.request.post('/api/einsaetze', {
+  const ohne = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E ohne Vorlage ${Date.now()}` },
   });
   expect(ohne.ok(), `Einsatz ohne Vorlage: ${ohne.status()}`).toBe(true);

@@ -48,7 +48,7 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
 import { verfasserText } from '../../etb/verfasser';
 import BerichtigtMarke from '../../etb/BerichtigtMarke';
-import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/incidents';
 import type { ModulFreigaben } from '../../api/types';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';

@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useId, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useUhr } from '../abloesung/useUhr';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Kostform, VerpflegungAusgabe, VerpflegungZeitfenster } from '../api/types';
 import { ladeVerpflegung, nimmAusgabeZurueck } from '../api/verpflegung';

@@ -8,7 +8,7 @@ import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { heuteInZone } from '../../anzeige/zeitEingabe';
 import { loadRegistrierlisteDruck } from '../../api/betreuungRegistrierung';
 import { ApiError } from '../../api/client';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz } from '../../api/incidents';
 import { einsatzKeys } from '../../api/queryKeys';
 import EinsatzSeite from '../../components/EinsatzSeite';
 import type { PlatzhalterRueckweg } from '../../components/Platzhalter';

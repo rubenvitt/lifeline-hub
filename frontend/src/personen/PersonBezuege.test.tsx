@@ -57,7 +57,7 @@ beforeEach(() => {
   patches = [];
   tierPatchAntwort = () => HttpResponse.json(tier({ halter_person_id: null }));
   server.use(
-    http.get('/api/einsaetze/1/animals', ({ request }) => {
+    http.get('/api/incidents/1/animals', ({ request }) => {
       const halter = new URL(request.url).searchParams.get('halter_person_id');
       if (halter === '10') return HttpResponse.json(tiereDerPerson);
       return HttpResponse.json([
@@ -72,8 +72,8 @@ beforeEach(() => {
         tier({ id: 42, registrier_nr: 10, rufname: 'Fremd', halter_person_id: 99 }),
       ]);
     }),
-    http.get('/api/einsaetze/1/damages', () => HttpResponse.json(schaedenDerPerson)),
-    http.get('/api/einsaetze/1/damages/selection', () =>
+    http.get('/api/incidents/1/damages', () => HttpResponse.json(schaedenDerPerson)),
+    http.get('/api/incidents/1/damages/selection', () =>
       HttpResponse.json([
         {
           id: 51,
@@ -93,11 +93,11 @@ beforeEach(() => {
         },
       ]),
     ),
-    http.patch('/api/einsaetze/1/animals/:id', async ({ request, params }) => {
+    http.patch('/api/incidents/1/animals/:id', async ({ request, params }) => {
       patches.push({ pfad: `tiere/${String(params.id)}`, body: (await request.json()) as never });
       return tierPatchAntwort();
     }),
-    http.patch('/api/einsaetze/1/damages/:id', async ({ request, params }) => {
+    http.patch('/api/incidents/1/damages/:id', async ({ request, params }) => {
       patches.push({
         pfad: `schaeden/${String(params.id)}`,
         body: (await request.json()) as never,

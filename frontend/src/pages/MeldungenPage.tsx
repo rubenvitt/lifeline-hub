@@ -6,7 +6,7 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinsatz, ladeMitglieder } from '../api/einsaetze';
+import { ladeEinsatz, ladeMitglieder } from '../api/incidents';
 import {
   darfErfassungBeantragen,
   darfImEinsatzSchreiben,

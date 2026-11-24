@@ -83,7 +83,7 @@ async fn uebernehmen(app: &axum::Router, cookie: &str, p: i64, body: Value) -> (
 }
 
 async fn einsatz_anzahl(app: &axum::Router, cookie: &str) -> usize {
-    get(app, cookie, "/api/einsaetze")
+    get(app, cookie, "/api/incidents")
         .await
         .as_array()
         .unwrap()
@@ -215,14 +215,14 @@ async fn stadtfest_in_neuen_einsatz_danach_schreibgeschuetzt_und_zweiter_aufruf_
     assert_eq!(s, StatusCode::OK, "{ergebnis}");
     let einsatz = ergebnis["einsatz_id"].as_i64().unwrap();
     assert_eq!(einsatz_anzahl(&app, &admin).await, einsaetze + 1);
-    let e = get(&app, &admin, &format!("/api/einsaetze/{einsatz}")).await;
+    let e = get(&app, &admin, &format!("/api/incidents/{einsatz}")).await;
     assert_eq!(e["bezeichnung"], "Stadtfest Musterstadt");
     assert_eq!(e["einsatzart"], vorher["kopf"]["einsatzart"]);
     assert_eq!(e["meine_rolle"], "einsatzleitung");
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
+        &format!("/api/incidents/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     assert_eq!(
@@ -379,7 +379,7 @@ async fn in_laufenden_einsatz_helfer_mit_herkunft_und_bestehende_einheit() {
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
+        &format!("/api/incidents/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     let bloecke = plan["bloecke"].as_array().unwrap();
@@ -547,7 +547,7 @@ async fn ziel_und_rechte() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -679,7 +679,7 @@ async fn block_ohne_soll_bleibt_ohne_soll_auch_mit_vorlage() {
     let plan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
+        &format!("/api/incidents/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     let bloecke = plan["bloecke"].as_array().unwrap();
@@ -718,7 +718,7 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         json!({"bezeichnung": "UHS Bühne", "typ": "behandlungsplatz"}),
     )
     .await;
@@ -744,9 +744,9 @@ async fn posten_ohne_block_wird_einheit_und_laufender_einsatz_ohne_aenderung_ist
     assert_eq!(ergebnis["zaehlung"]["einheiten_neu"], 1, "{ergebnis}");
     assert_eq!(ergebnis["zaehlung"]["uhs_neu"], 1, "{ergebnis}");
     let neu = ergebnis["einsatz_id"].as_i64().unwrap();
-    let einheiten = get(&app, &admin, &format!("/api/einsaetze/{neu}/units")).await;
+    let einheiten = get(&app, &admin, &format!("/api/incidents/{neu}/units")).await;
     assert!(einheiten.to_string().contains("\"Reserve\""), "{einheiten}");
-    let uhs = get(&app, &admin, &format!("/api/einsaetze/{neu}/uhs")).await;
+    let uhs = get(&app, &admin, &format!("/api/incidents/{neu}/uhs")).await;
     assert!(uhs.to_string().contains("\"UHS Bühne\""), "{uhs}");
 }
 
@@ -914,7 +914,7 @@ async fn geaenderte_planung_seit_der_vorschau_ist_409_und_bleibt_beschreibbar() 
     let schichtplan = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/reliefs/shift-plan"),
+        &format!("/api/incidents/{einsatz}/reliefs/shift-plan"),
     )
     .await;
     assert_eq!(
@@ -1095,7 +1095,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = post(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         json!({"name": name, "sortier": 0}),
     )
     .await;
@@ -1217,7 +1217,7 @@ async fn ohne_modul_abschnitte_bleibt_der_hinweis() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/einsatzabschnitte"),
+        &format!("/api/incidents/{einsatz}/module-overrides/einsatzabschnitte"),
         &admin,
         Some(&json!({"sichtbar": false})),
     )

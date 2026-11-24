@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/incidents';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';
@@ -19,7 +19,7 @@ import type { ModulFreigaben } from '../../api/types';
 import { freigabenFixture } from '../../test/fixtures';
 import { LAGEBILD_QUELLEN, ladeLagebasis, useLagebild, type GebundeneQuelle } from './useLagebild';
 
-vi.mock('../../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
+vi.mock('../../api/incidents', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../../api/einsatzabschnitte', () => ({ listeAbschnitte: vi.fn() }));
 vi.mock('../../api/einsatzFahrzeuge', () => ({ listeEinsatzFahrzeuge: vi.fn() }));
 vi.mock('../../api/einsatzMaterial', () => ({ listEinsatzMaterial: vi.fn() }));

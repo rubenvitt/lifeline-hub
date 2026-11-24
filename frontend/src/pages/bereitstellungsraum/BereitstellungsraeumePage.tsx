@@ -9,7 +9,7 @@ import { MODUL_EINHEITEN_GESPERRT } from '../../components/nurAnsicht';
 import { useEffect, useMemo, useState } from 'react';
 import { bereitstellungsraumDetailPfad, einsaetzePfad, einsatzPfad } from '../../routing/deeplinks';
 import { useLinkAuftrag } from '../../routing/useLinkAuftrag';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz } from '../../api/incidents';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeBr } from '../../api/einsatzBereitstellungsraum';
 import { listeEinheiten } from '../../api/einheiten';

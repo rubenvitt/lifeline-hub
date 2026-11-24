@@ -8,7 +8,7 @@ import utc from 'dayjs/plugin/utc';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router';
 import AbloesungPage, { SCHICHT_HERVORHEBUNG_MS } from './AbloesungPage';
 import { ApiError } from '../api/client';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Abloesung, ModulFreigaben } from '../api/types';
@@ -24,7 +24,7 @@ const einsatz = vi.hoisted(() => ({
   wert: { id: 1, bezeichnung: 'Hochwasser', status: 'aktiv', meine_rolle: 'einsatzleitung' },
 }));
 const freigaben = vi.hoisted(() => ({ wert: undefined as ModulFreigaben | undefined }));
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatz.wert)),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigaben.wert)),
 }));

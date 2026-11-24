@@ -2,7 +2,7 @@ import { Button, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Suspense, lazy, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz } from '../../api/incidents';
 import { einsatzKeys } from '../../api/queryKeys';
 import { verwerfeAntrag } from '../../api/spiegelAntraege';
 import type { EinsatzAnzeige, EtbTyp, MeldeWeg, SpiegelAntragAnzeige } from '../../api/types';

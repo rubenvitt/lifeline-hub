@@ -79,7 +79,7 @@ test.describe(KAPITEL, () => {
         expect(m, `Stammmaterial „${bezeichnung}“`).toBeDefined();
         return m!.id;
       };
-      const pfad = `/api/einsaetze/${demo.id}/material`;
+      const pfad = `/api/incidents/${demo.id}/material`;
       const strom = await fuelle<EinsatzMaterial>(api, 'post', pfad, {
         material_id: posten('Stromerzeuger 8 kVA'),
         menge: 1,
@@ -105,11 +105,11 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
       // Ein Ort je Posten (LLH-1224 D6), gesetzt über den einen Weg (LLH-1225 D2).
       const einheiten = (await (
-        await api.get(`/api/einsaetze/${demo.id}/units`)
+        await api.get(`/api/incidents/${demo.id}/units`)
       ).json()) as Einheit[];
       const einheit = einheiten.find((e) => !e.aufgeloest_at);
       expect(einheit, 'Demo-Einheit').toBeDefined();
-      const uhsListe = (await (await api.get(`/api/einsaetze/${demo.id}/uhs`)).json()) as Uhs[];
+      const uhsListe = (await (await api.get(`/api/incidents/${demo.id}/uhs`)).json()) as Uhs[];
       const uhs = uhsListe.find(
         (u) => (u.status === 'geplant' || u.status === 'aktiv') && !u.storniert_at,
       );

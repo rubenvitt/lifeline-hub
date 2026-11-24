@@ -8,7 +8,7 @@ import {
   darfImEinsatzSchreiben,
 } from '../einsatz/schreibrecht';
 import { useDichte, useHelligkeit, useThemeMode } from '../theme/ThemeModeProvider';
-import { listeEinsaetze, ladeModulFreigaben, ladeEinsatz } from '../api/einsaetze';
+import { listeEinsaetze, ladeModulFreigaben, ladeEinsatz } from '../api/incidents';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
 import { setzeOverride } from '../anzeige/koordinatenSystemStore';
 import { setzeZeitdarstellung } from '../anzeige/zeitDarstellungStore';

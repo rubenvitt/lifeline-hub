@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Breadcrumb, Button, Typography, theme } from 'antd';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';

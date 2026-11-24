@@ -6,7 +6,7 @@ import { App as AntApp } from 'antd';
 import BefehlDetailPage from './BefehlDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
 import * as befehleApi from '../api/befehle';
-import * as einsaetzeApi from '../api/einsaetze';
+import * as einsaetzeApi from '../api/incidents';
 
 /**
  * LFH-627: „Instance created by `useForm` is not connected to any Form element". Ein
@@ -20,7 +20,7 @@ import * as einsaetzeApi from '../api/einsaetze';
  */
 
 vi.mock('../api/befehle');
-vi.mock('../api/einsaetze');
+vi.mock('../api/incidents');
 
 const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'einsatzleitung' };
 

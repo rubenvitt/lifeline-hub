@@ -29,10 +29,10 @@ const posten = (over: Partial<ZuordnenPosten> & Pick<ZuordnenPosten, 'id'>): Zuo
 
 function zeige(p: Partial<PostenZuordnenModalProps> = {}) {
   server.use(
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([{ id: 3, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
   );
   const alle: PostenZuordnenModalProps = {
     einsatzId: 1,

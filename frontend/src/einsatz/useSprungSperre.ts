@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { ModulFreigaben } from '../api/types';
 import { istSprungGesperrt } from './modulRegistry';
@@ -30,7 +30,7 @@ export function useModulFreigabenStand(einsatzId: number): {
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
     // Eine verbogene Routen-ID (LFH-438) fragt nichts ab: die Seite leitet ohnehin um, und ein
-    // Abruf gegen `/api/einsaetze/NaN/…` wäre Rauschen.
+    // Abruf gegen `/api/incidents/NaN/…` wäre Rauschen.
     enabled: Number.isInteger(einsatzId) && einsatzId > 0,
   });
   const { refetch } = query;

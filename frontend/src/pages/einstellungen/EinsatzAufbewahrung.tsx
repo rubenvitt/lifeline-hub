@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'react-router';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
-import { speichereEinstellungen } from '../../api/einsaetze';
+import { speichereEinstellungen } from '../../api/incidents';
 import { einsatzKeys } from '../../api/queryKeys';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';
 import {

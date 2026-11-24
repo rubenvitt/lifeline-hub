@@ -99,10 +99,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 634 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/catering`;
+    const basis = `/api/incidents/${einsatzId}/catering`;
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
 
@@ -443,10 +443,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 1032 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/catering`;
+    const basis = `/api/incidents/${einsatzId}/catering`;
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
     const ids: Record<string, number> = {};
@@ -490,11 +490,11 @@ for (const modus of ['light', 'dark'] as const) {
     ).id;
     // Empfänger (LLH-1055): eine eingetroffene Gruppe und eine Einheit ohne Eintreffen, damit
     // Empfängerwahl und „Noch nicht verpflegt“ samt „Wählen“ gemessen werden.
-    const { id: gruppe } = await post(page, `/api/einsaetze/${einsatzId}/units`, {
+    const { id: gruppe } = await post(page, `/api/incidents/${einsatzId}/units`, {
       name: 'Gruppe Kontrast',
     });
-    await post(page, `/api/einsaetze/${einsatzId}/units`, { name: 'Wasserrettung Kontrast' });
-    await post(page, `/api/einsaetze/${einsatzId}/units/${gruppe}/timeline`, {
+    await post(page, `/api/incidents/${einsatzId}/units`, { name: 'Wasserrettung Kontrast' });
+    await post(page, `/api/incidents/${einsatzId}/units/${gruppe}/timeline`, {
       art: 'eintreffen',
       zeitpunkt_at: zeit(-60),
     });

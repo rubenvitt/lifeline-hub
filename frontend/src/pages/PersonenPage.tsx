@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { lagekartePfad, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { darfBeantragen, darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {

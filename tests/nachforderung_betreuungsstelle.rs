@@ -12,14 +12,14 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/resource-requests")
+    format!("/api/incidents/{einsatz}/resource-requests")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions"),
+        &format!("/api/incidents/{einsatz}/care/positions"),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","art":"notunterkunft","kapazitaet_personen":150}}"#
@@ -65,7 +65,7 @@ async fn stellen_der_uebersicht(app: &axum::Router, cookie: &str, einsatz: i64) 
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/care"),
+        &format!("/api/incidents/{einsatz}/care"),
         cookie,
         None,
     )
@@ -78,7 +78,7 @@ async fn stelle_stornieren(app: &axum::Router, cookie: &str, einsatz: i64, sid: 
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
+        &format!("/api/incidents/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -90,7 +90,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -176,7 +176,7 @@ async fn geschlossene_stelle_ist_zulaessig() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/care/positions/{sid}"),
+        &format!("/api/incidents/{e}/care/positions/{sid}"),
         &admin,
         Some(r#"{"status":"geschlossen"}"#),
     )

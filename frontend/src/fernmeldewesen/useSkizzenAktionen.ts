@@ -1,7 +1,7 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 import { ApiError } from '../api/client';
-import { ladeFuehrungsstelle, patcheFuehrungsstelle } from '../api/einsaetze';
+import { ladeFuehrungsstelle, patcheFuehrungsstelle } from '../api/incidents';
 import { listeEinheiten, patcheEinheit } from '../api/einheiten';
 import { listeAbschnitte, patcheAbschnitt } from '../api/einsatzabschnitte';
 import {

@@ -26,7 +26,7 @@ const person = (o: Partial<EinsatzPersonal> = {}): EinsatzPersonal =>
   }) as EinsatzPersonal;
 
 function liefere(liste: EinsatzPersonal[]) {
-  server.use(http.get('/api/einsaetze/5/personnel', () => HttpResponse.json(liste)));
+  server.use(http.get('/api/incidents/5/personnel', () => HttpResponse.json(liste)));
 }
 
 describe('PersonalVorschau (LFH-664)', () => {
@@ -82,7 +82,7 @@ describe('PersonalVorschau (LFH-664)', () => {
   it('holt bei warmem Fach der Palette nicht neu', () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/5/personnel', () => {
+      http.get('/api/incidents/5/personnel', () => {
         abrufe += 1;
         return HttpResponse.json([]);
       }),

@@ -763,7 +763,7 @@ Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitgli
 - **Die anlegende Person ist immer Einsatzleitung** und steht nicht in der Liste (sonst 400).
 - **Dieselbe Menge wie unter „Zugriff“:** aufnehmbar ist, was `einsatz::repo::auswahl_sql` liefert
   (aktiv, eigene Org, ohne Geräte-, Stellvertreter- und Archivkonten). Die Auswahl beim Anlegen
-  (`GET /api/einsaetze/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
+  (`GET /api/incidents/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
   Eine fremde oder unbekannte Person nennt die Meldung nur mit Kennung.
 - **Jede aufgenommene Person bekommt nach dem Commit den Hinweis `einsatz_aufnahme`** wie bei
   `mitglied_setzen`; die anlegende Person nicht.
@@ -886,7 +886,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   stellt (EL als Einsatzleiter der Führungsstelle ∪ Funktion der Mitgliedschaft, leer = `ohne`);
   lauter gewinnt. Ohne Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
   `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
-  Verlauf `GET …/einsaetze/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
+  Verlauf `GET …/incidents/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
   nach der Rechteprüfung), „alle gelesen“ `POST …/notifications/read` nur über
   `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines
   je Zeile.
@@ -951,7 +951,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
-  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/reports/{mid}` lesen
+  mit), und nur, wenn der Empfänger die Meldung über `GET /api/incidents/{e}/reports/{mid}` lesen
   dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
 - **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
   4096 Byte für den ganzen Push, das Relais weist einen größeren Push mit 400 ab). Zu langes kürzt

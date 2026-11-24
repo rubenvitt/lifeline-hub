@@ -12,7 +12,7 @@ import {
   ladeFuehrungsstelle,
   ladeMitglieder,
   ladeModulFreigaben,
-} from '../api/einsaetze';
+} from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import { listeEinsatzPersonal } from '../api/einsatzPersonal';
 import { listeEinsatzFahrzeuge } from '../api/einsatzFahrzeuge';
@@ -38,7 +38,7 @@ import type {
 import type { Fernmeldenetz } from '../fernmeldewesen/fernmeldeskizze';
 import type { SkizzenAktionen } from '../fernmeldewesen/skizzenAktionen';
 
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: vi.fn(),
   ladeModulFreigaben: vi.fn(),
   ladeFuehrungsstelle: vi.fn(),

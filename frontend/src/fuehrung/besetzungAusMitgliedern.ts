@@ -1,4 +1,4 @@
-import { ladeMitglieder } from '../api/einsaetze';
+import { ladeMitglieder } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Fuehrungsfunktion, MitgliedAnzeige, Sachgebiet } from '../api/types';
 import { SACHGEBIETE } from './sachgebiete';

@@ -446,7 +446,7 @@ export interface components {
          * @enum {string}
          */
         AbschlussKraftArt: "einheit" | "fahrzeug";
-        /** @description Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe. */
+        /** @description Antwort von `GET /api/incidents/{id}/closure/check`: die offenen Punkte je Gruppe. */
         AbschlussPruefung: {
             auftraege: components["schemas"]["AbschlussGruppe"];
             /** @description Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen. */
@@ -1639,7 +1639,7 @@ export interface components {
             /** @description In der Reihenfolge von [`BenachrichtigungVorgaben::funktionen`]. */
             still: components["schemas"]["VorgabeFunktion"][];
         };
-        /** @description `GET /api/einsaetze/{id}/notification-defaults` (design.md D4). */
+        /** @description `GET /api/incidents/{id}/notification-defaults` (design.md D4). */
         BenachrichtigungVorgaben: {
             /** @description Jede einstellbare Art in Katalogreihenfolge. */
             arten: components["schemas"]["BenachrichtigungVorgabeArt"][];
@@ -3674,7 +3674,7 @@ export interface components {
             /** @description `zugesagt` oder `unterwegs`. */
             status: components["schemas"]["NachforderungStatus"];
         };
-        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`). */
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/incidents/{id}/etb/count`). */
         EtbAnzahlAnzeige: {
             /**
              * Format: int64
@@ -3852,7 +3852,7 @@ export interface components {
             /** Format: int64 */
             system: number;
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counts`. */
+        /** @description Antwort von `GET /api/incidents/{id}/etb/counts`. */
         EtbZaehlerAnzeige: {
             /**
              * Format: int64
@@ -4677,7 +4677,7 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
-        /** @description Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`. */
+        /** @description Antwort von `GET /api/incidents/{id}/staff/info-line/counts`. */
         InfotelefonZaehler: {
             /**
              * Format: int64
@@ -6240,7 +6240,7 @@ export interface components {
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
-         *     `GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter
+         *     `GET /api/incidents/{id}/module-access` und die EINE Auswertung hinter
          *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
          */
         ModulFreigabe: {
@@ -6257,7 +6257,7 @@ export interface components {
             zugriff: boolean;
         };
         /**
-         * @description Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys
+         * @description Antwort von `GET /api/incidents/{id}/module-counts`. Feldnamen = Modul-Keys
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */
         ModulZaehlerAnzeige: {
@@ -9839,7 +9839,7 @@ export interface components {
             daten?: components["schemas"]["WetterAktuell"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/weather`. */
+        /** @description Antwort von `GET /api/incidents/{id}/weather`. */
         WetterAnzeige: {
             aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;

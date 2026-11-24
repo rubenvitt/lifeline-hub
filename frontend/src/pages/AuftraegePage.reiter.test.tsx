@@ -5,14 +5,14 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import AuftraegePage from './AuftraegePage';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => ({ benutzer: { id: 1 } }),
   useAuthOptional: () => ({ benutzer: { id: 1 } }),
 }));
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn() }));
 vi.mock('../api/befehle', () => ({
   listeBefehle: vi.fn().mockResolvedValue([]),
   legeBefehlAn: vi.fn(),

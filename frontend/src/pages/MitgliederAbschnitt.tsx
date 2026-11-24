@@ -9,7 +9,7 @@ import {
   ladeMitglieder,
   setzeMitglied,
   type FuehrungsstelleUpdate,
-} from '../api/einsaetze';
+} from '../api/incidents';
 import { EinWertAuswahl, letzterWert } from '../fuehrung/EinWertAuswahl';
 import { dekodiere, kodiere } from '../fuehrung/funktionsOptionenKern';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';

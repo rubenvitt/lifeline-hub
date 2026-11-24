@@ -3,7 +3,7 @@ import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, NavLink, Outlet, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Funktionsansicht, GeraetAnzeige, ModulFreigaben } from '../api/types';
 import {

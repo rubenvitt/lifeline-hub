@@ -1,5 +1,5 @@
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz } from '../../api/incidents';
 import { listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeFuehrungskraefte } from '../../api/einsatzPersonal';

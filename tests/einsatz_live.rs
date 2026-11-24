@@ -37,7 +37,7 @@ fn anzahl(nachrichten: &[LiveNachricht], event: LiveEvent) -> usize {
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/briefings")
+    format!("/api/incidents/{einsatz}/briefings")
 }
 
 /// Schliesst eine Lagebesprechung mit dem gegebenen Rumpf ab (Vorbedingung: 201).
@@ -65,7 +65,7 @@ async fn patch_der_kopfdaten_feuert_einsatz_nur_mit_der_kennung() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(r#"{"stichwort":"H1","sachverhalt":"Geheim"}"#),
     )
@@ -92,7 +92,7 @@ async fn abgelehnter_patch_feuert_nichts() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(r#"{"bezeichnung":"   "}"#),
     )
@@ -111,7 +111,7 @@ async fn abschluss_des_einsatzes_feuert_einsatz() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -125,7 +125,7 @@ async fn frist_setzen_feuert_einsatz_unveraendert_nicht() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/retention-period");
+    let pfad = format!("/api/incidents/{einsatz}/retention-period");
     let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
 
     let mut rx = live.abonniere(einsatz);
@@ -178,7 +178,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         cookie,
         None,
     )
@@ -194,7 +194,7 @@ async fn abschluss_mit_dauer_politik_meldet_den_frist_eintrag_im_etb() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/settings"),
+        &format!("/api/incidents/{einsatz}/settings"),
         &admin,
         Some(r#"{"retention_dauer_tage":365}"#),
     )
@@ -253,7 +253,7 @@ async fn frist_setzen_meldet_den_audit_eintrag_im_etb() {
     let (app, pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/retention-period");
+    let pfad = format!("/api/incidents/{einsatz}/retention-period");
     let rumpf = r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#;
     let vorher = system_eintraege(&pool, einsatz).await;
 
@@ -392,7 +392,7 @@ async fn lagebesprechung_ohne_terminaenderung_feuert_kein_einsatz() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         None,
     )
@@ -441,7 +441,7 @@ async fn termin_setzen_feuert_einsatz_nur_bei_aenderung() {
     let (app, _pool, live) = setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/briefing/schedule");
+    let pfad = format!("/api/incidents/{einsatz}/briefing/schedule");
     let mut rx = live.abonniere(einsatz);
 
     let (status, _) = anfrage(
@@ -488,7 +488,7 @@ async fn kopf_patch_mit_termin_feuert_nichts() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(r#"{"naechste_lagebesprechung_at":"2099-01-01 10:00:00"}"#),
     )
@@ -500,7 +500,7 @@ async fn kopf_patch_mit_termin_feuert_nichts() {
 // ---------- Mitgliedschaft (LFH-854) ----------
 
 fn mitglied_pfad(einsatz: i64, benutzer: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/members/{benutzer}")
+    format!("/api/incidents/{einsatz}/members/{benutzer}")
 }
 
 /// Setzt die Rolle eines Mitglieds (Vorbedingung: 200).
@@ -669,7 +669,7 @@ async fn fuehrungsfunktion_setzen_feuert_einsatz_und_mitglieder() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &cookie,
         None,
     )
@@ -733,7 +733,7 @@ async fn mitglieder_erreicht_jeden_leser_und_keine_fremde_org() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+            &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
             &admin,
             Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
         )
@@ -758,7 +758,7 @@ async fn mitglieder_erreicht_jeden_leser_und_keine_fremde_org() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/live"),
+        &format!("/api/incidents/{einsatz}/live"),
         &fremd_cookie,
         None,
     )
@@ -804,7 +804,7 @@ async fn pegel_anfuegen(app: &axum::Router, cookie: &str, einsatz: i64, uuid: &s
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/gauges"),
+        &format!("/api/incidents/{einsatz}/gauges"),
         cookie,
         Some(&pegel_station(uuid)),
     )
@@ -816,7 +816,7 @@ async fn pegel_ersetzen(app: &axum::Router, cookie: &str, einsatz: i64, uuids: &
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gauges"),
+        &format!("/api/incidents/{einsatz}/gauges"),
         cookie,
         Some(&pegel_liste(uuids)),
     )
@@ -877,7 +877,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gauges"),
+        &format!("/api/incidents/{einsatz}/gauges"),
         &admin,
         None,
     )
@@ -888,7 +888,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/forecast"),
+        &format!("/api/incidents/{einsatz}/gauges/{pegel_id}/forecast"),
         &admin,
         Some(r#"{"hoechststand_cm":420,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#),
     )
@@ -898,7 +898,7 @@ async fn prognose_eines_pegels_feuert_kein_einsatz() {
 }
 
 fn evakuierung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evacuation")
+    format!("/api/incidents/{einsatz}/evacuation")
 }
 
 async fn bezirk_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
@@ -1035,7 +1035,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"Florian Extern 1"}}"#),
     )
@@ -1046,7 +1046,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Nord"}"#),
     )
@@ -1077,7 +1077,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
         let (s, json) = anfrage(
             &app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &format!("/api/incidents/{einsatz}/{pfad}"),
             &admin,
             body.as_deref(),
         )
@@ -1090,7 +1090,7 @@ async fn fahrzeug_angaben_melden_einheit_bereitstellungsraum_und_kopf() {
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
+                &format!("/api/incidents/{einsatz}/vehicles/{ef}"),
                 &admin,
                 Some(body),
             )

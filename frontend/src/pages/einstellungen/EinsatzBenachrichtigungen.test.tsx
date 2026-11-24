@@ -14,7 +14,7 @@ vi.mock('../../auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
-vi.mock('../../api/einsaetze', () => ({
+vi.mock('../../api/incidents', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
 }));
@@ -24,7 +24,7 @@ vi.mock('../../api/benachrichtigungen', () => ({
   setzeBenachrichtigungVorgabe: vi.fn(),
 }));
 
-import { ladeEinsatz, ladeEinstellungen } from '../../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen } from '../../api/incidents';
 import {
   ladeBenachrichtigungVorgaben,
   setzeBenachrichtigungVorgabe,

@@ -83,15 +83,15 @@ function stelleBereit({
   const gesendet: Gesendet[] = [];
   server.use(
     meHandler({ ...benutzerFixture({ id: 60, anzeigename: 'Streife 2 · Handy' }), geraet: GERAET }),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([EINHEIT])),
-    http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/reports', () => HttpResponse.json(meldungen)),
-    http.get('/api/einsaetze/7/persons', () => HttpResponse.json(personen)),
-    http.get('/api/einsaetze/7/persons/uhs', () => HttpResponse.json(uhs)),
-    http.post('/api/einsaetze/7/persons', async ({ request }) => {
+    http.get('/api/incidents/7/units', () => HttpResponse.json([EINHEIT])),
+    http.get('/api/incidents/7/tasks', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/reports', () => HttpResponse.json(meldungen)),
+    http.get('/api/incidents/7/persons', () => HttpResponse.json(personen)),
+    http.get('/api/incidents/7/persons/uhs', () => HttpResponse.json(uhs)),
+    http.post('/api/incidents/7/persons', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       gesendet.push({ body, ausQueue: request.headers.has(OFFLINE_QUEUE_BENUTZER_HEADER) });
       return HttpResponse.json(kontakt(12, { registrier_nr: 12 }), { status: 201 });
@@ -218,13 +218,13 @@ describe('Einheitengerät — Kontakte', () => {
     function amSpiegel(antraege: unknown[] = []) {
       const { gesendet } = stelleBereit();
       server.use(
-        http.get('/api/einsaetze/7', () =>
+        http.get('/api/incidents/7', () =>
           HttpResponse.json(
             einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', spiegel: SPIEGEL }),
           ),
         ),
-        http.get('/api/einsaetze/7/requests', () => HttpResponse.json(antraege)),
-        http.post('/api/einsaetze/7/persons', async ({ request }) => {
+        http.get('/api/incidents/7/requests', () => HttpResponse.json(antraege)),
+        http.post('/api/incidents/7/persons', async ({ request }) => {
           const body = (await request.json()) as Record<string, unknown>;
           gesendet.push({ body, ausQueue: false });
           return HttpResponse.json({ antrag: { id: 4, zustand: 'ausstehend' } }, { status: 202 });
@@ -265,7 +265,7 @@ describe('Einheitengerät — Kontakte', () => {
     const { gesendet } = stelleBereit();
     let ersterVersuch = true;
     server.use(
-      http.post('/api/einsaetze/7/persons', async ({ request }) => {
+      http.post('/api/incidents/7/persons', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         gesendet.push({ body, ausQueue: request.headers.has(OFFLINE_QUEUE_BENUTZER_HEADER) });
         if (ersterVersuch) {
@@ -297,7 +297,7 @@ describe('Einheitengerät — Kontakte', () => {
     const { gesendet } = stelleBereit();
     let ersterVersuch = true;
     server.use(
-      http.post('/api/einsaetze/7/persons', async ({ request }) => {
+      http.post('/api/incidents/7/persons', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         gesendet.push({ body, ausQueue: false });
         if (ersterVersuch) {
@@ -333,7 +333,7 @@ describe('Einheitengerät — Kontakte', () => {
     stelleBereit();
     const freigaben = freigabenFixture();
     server.use(
-      http.get('/api/einsaetze/7/module-access', () =>
+      http.get('/api/incidents/7/module-access', () =>
         HttpResponse.json({ ...freigaben, meldungen: { ...freigaben.meldungen, zugriff: false } }),
       ),
     );
@@ -352,7 +352,7 @@ describe('Einheitengerät — Kontakte', () => {
       nachladen = r;
     });
     server.use(
-      http.get('/api/einsaetze/7/persons/uhs', async () => {
+      http.get('/api/incidents/7/persons/uhs', async () => {
         abrufe += 1;
         if (!eingangZu) {
           return HttpResponse.json([

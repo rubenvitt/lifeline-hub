@@ -8,15 +8,15 @@ mod common;
 use common::*;
 
 fn stand_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/briefing")
+    format!("/api/incidents/{einsatz}/briefing")
 }
 
 fn termin_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/briefing/schedule")
+    format!("/api/incidents/{einsatz}/briefing/schedule")
 }
 
 fn besprechungen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/briefings")
+    format!("/api/incidents/{einsatz}/briefings")
 }
 
 /// Zählt ETB-Einträge, deren Inhalt `nadel` enthält.
@@ -24,7 +24,7 @@ async fn etb_treffer(app: &axum::Router, cookie: &str, einsatz: i64, nadel: &str
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -43,7 +43,7 @@ async fn ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: &str) 
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -72,7 +72,7 @@ async fn ohne_stab_bleibt_die_lagebesprechung_voll_nutzbar() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/staff"),
+        &format!("/api/incidents/{einsatz}/staff"),
         &kraft,
         None,
     )
@@ -193,7 +193,7 @@ async fn entscheidungen(app: &axum::Router, cookie: &str, einsatz: i64) -> usize
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -318,7 +318,7 @@ async fn abschluss_schreibt_etb_entscheidung_zeile_und_termin() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         None,
     )
@@ -528,7 +528,7 @@ async fn abschluss_rollt_bei_inaktivem_einsatz_vollstaendig_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -595,7 +595,7 @@ async fn abschluss_auf_abgeschlossenem_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -673,7 +673,7 @@ async fn abschluss_ohne_termin_rollt_bei_inaktivem_einsatz_ebenfalls_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -782,7 +782,7 @@ async fn termin_setzen_und_leeren_ohne_etb_eintrag() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         None,
     )
@@ -803,7 +803,7 @@ async fn termin_setzen_und_leeren_ohne_etb_eintrag() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -851,7 +851,7 @@ async fn termin_beobachter_403_und_abgeschlossener_einsatz_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -877,7 +877,7 @@ async fn termin_rollt_bei_inaktivem_einsatz_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -915,7 +915,7 @@ async fn kopf_patch_mit_termin_ist_400_und_aendert_nichts() {
         let (status, json) = anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}"),
+            &format!("/api/incidents/{einsatz}"),
             &admin,
             Some(body),
         )
@@ -925,7 +925,7 @@ async fn kopf_patch_mit_termin_ist_400_und_aendert_nichts() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         None,
     )

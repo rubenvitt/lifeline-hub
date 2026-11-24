@@ -19,7 +19,7 @@ async fn tier_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &Val
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/animals"),
+        &format!("/api/incidents/{einsatz}/animals"),
         cookie,
         Some(body),
     )
@@ -32,7 +32,7 @@ async fn einsatz_abschliessen(app: &axum::Router, cookie: &str, einsatz: i64) {
     let (s, _) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         cookie,
         None,
     )
@@ -50,7 +50,7 @@ async fn anlegen_vergibt_t_nummer_und_status_aktiv() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","rufname":"Rex"})),
     )
@@ -72,7 +72,7 @@ async fn registriernummer_fortlaufend_und_lueckenlos() {
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t1}"),
+        &format!("/api/incidents/{e}/animals/{t1}"),
         &admin,
         None,
     )
@@ -80,7 +80,7 @@ async fn registriernummer_fortlaufend_und_lueckenlos() {
     let (_, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"wildtier"})),
     )
@@ -96,7 +96,7 @@ async fn anlegen_als_vermisst_erlaubt() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"katze","status":"vermisst"})),
     )
@@ -113,7 +113,7 @@ async fn anlegen_als_abgeschlossen_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","status":"abgeschlossen"})),
     )
@@ -129,7 +129,7 @@ async fn anlegen_ohne_spezies_ist_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"dinosaurier"})),
     )
@@ -146,7 +146,7 @@ async fn gueltiger_status_wechsel_aktiv_vermisst_aktiv() {
     let (s1, v1) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"vermisst"})),
     )
@@ -156,7 +156,7 @@ async fn gueltiger_status_wechsel_aktiv_vermisst_aktiv() {
     let (s2, v2) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"aktiv"})),
     )
@@ -174,7 +174,7 @@ async fn ungueltiger_status_wechsel_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"aktiv"})),
     )
@@ -195,7 +195,7 @@ async fn unbekannter_zielstatus_ist_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"entlaufen"})),
     )
@@ -212,13 +212,13 @@ async fn abschluss_ohne_grund_ist_422_und_mit_grund_ok() {
     let (s_ohne, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"abgeschlossen"})),
     )
     .await;
     assert_eq!(s_ohne, StatusCode::UNPROCESSABLE_ENTITY);
-    let (s_mit, v) = anfrage_json(&app, "POST", &format!("/api/einsaetze/{e}/animals/{t}/status"), &admin,
+    let (s_mit, v) = anfrage_json(&app, "POST", &format!("/api/incidents/{e}/animals/{t}/status"), &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"uebergabe_tierarzt","abschluss_ziel":"Tierarzt Müller"}))).await;
     assert_eq!(s_mit, StatusCode::OK);
     assert_eq!(v["status"], "abgeschlossen");
@@ -236,7 +236,7 @@ async fn abschluss_mit_unbekanntem_grund_ist_400() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"quatsch"})),
     )
@@ -265,7 +265,7 @@ async fn abschluss_mit_leerem_grund_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"   "})),
     )
@@ -284,7 +284,7 @@ async fn halter_beide_felder_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","halter_person_id":p,"halter_kontakt":"Frau Müller"})),
     )
@@ -309,7 +309,7 @@ async fn patch_zweites_halter_feld_bei_bestehendem_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"halter_person_id": p})),
     )
@@ -338,7 +338,7 @@ async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         &admin,
         None,
     )
@@ -346,7 +346,7 @@ async fn halter_fk_auf_stornierte_person_bleibt_zulaessig() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -369,7 +369,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
     let (s1, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -378,7 +378,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
     let (_, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         None,
     )
@@ -391,7 +391,7 @@ async fn soft_delete_blendet_aus_liste_und_doppelt_ist_409() {
     let (s2, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -408,7 +408,7 @@ async fn patch_auf_storniertem_tier_ist_409() {
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -416,7 +416,7 @@ async fn patch_auf_storniertem_tier_ist_409() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"rufname":"Bello"})),
     )
@@ -435,7 +435,7 @@ async fn halter_aus_fremdem_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e1}/animals"),
+        &format!("/api/incidents/{e1}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","halter_person_id":p_fremd})),
     )
@@ -460,7 +460,7 @@ async fn liste_filtert_nach_halter_person_id() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals?halter_person_id={p}"),
+        &format!("/api/incidents/{e}/animals?halter_person_id={p}"),
         &admin,
         None,
     )
@@ -505,7 +505,7 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"vermisst"})),
     )
@@ -513,17 +513,17 @@ async fn lifecycle_etb_kein_leak_von_ziel_und_kennzeichnung() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"aktiv"})),
     )
     .await;
-    anfrage_json(&app, "POST", &format!("/api/einsaetze/{e}/animals/{t}/status"), &admin,
+    anfrage_json(&app, "POST", &format!("/api/incidents/{e}/animals/{t}/status"), &admin,
         Some(&json!({"status":"abgeschlossen","abschluss_grund":"uebergabe_tierarzt","abschluss_ziel":"GEHEIM_ZIEL_TIERARZT"}))).await;
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -570,7 +570,7 @@ async fn verbleib_und_wiederaufnahme_stehen_als_handlung_im_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let t = tier_anlegen(&app, &admin, e, &json!({"spezies":"hund"})).await;
-    let status = format!("/api/einsaetze/{e}/animals/{t}/status");
+    let status = format!("/api/incidents/{e}/animals/{t}/status");
     for body in [
         json!({"status":"abgeschlossen","abschluss_grund":"sonstiges"}),
         json!({"status":"aktiv"}),
@@ -610,7 +610,7 @@ async fn beobachter_kann_nicht_schreiben_aber_lesen() {
     let (s_get, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &beob,
         None,
     )
@@ -620,7 +620,7 @@ async fn beobachter_kann_nicht_schreiben_aber_lesen() {
     let (s_post, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &beob,
         Some(&json!({"spezies":"katze"})),
     )
@@ -638,7 +638,7 @@ async fn fremder_einsatz_detail_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{anderer}/animals/{t}"),
+        &format!("/api/incidents/{anderer}/animals/{t}"),
         &admin,
         None,
     )
@@ -657,7 +657,7 @@ async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &fremd,
         None,
     )
@@ -676,7 +676,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     let (s_get, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         None,
     )
@@ -685,7 +685,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     let (s_post, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"katze"})),
     )
@@ -694,7 +694,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     let (s_patch, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"rufname":"X"})),
     )
@@ -703,7 +703,7 @@ async fn abgeschlossener_einsatz_ist_readonly_409() {
     let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -722,7 +722,7 @@ async fn export_liefert_csv_ohne_audit() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{e}/animals/export"))
+                .uri(format!("/api/incidents/{e}/animals/export"))
                 .header(header::COOKIE, &admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -764,7 +764,7 @@ async fn patch_null_leert_identitaetsfeld() {
     let (status, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"rufname":null})),
     )
@@ -792,7 +792,7 @@ async fn patch_leerstring_leert_identitaetsfeld() {
     let (status, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"kennzeichnung":"  "})),
     )
@@ -821,7 +821,7 @@ async fn patch_identitaet_laesst_halter_unberuehrt() {
     let (status, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"rufname":null})),
     )
@@ -851,7 +851,7 @@ async fn patch_leeres_objekt_laesst_tier_unveraendert() {
     let (status, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({})),
     )
@@ -882,7 +882,7 @@ async fn koordinate_setzen_und_entfernen_ohne_etb() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"antreff_lat": 52.25, "antreff_lon": 9.125})),
     )
@@ -895,7 +895,7 @@ async fn koordinate_setzen_und_entfernen_ohne_etb() {
     let (_, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         None,
     )
@@ -905,7 +905,7 @@ async fn koordinate_setzen_und_entfernen_ohne_etb() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"antreff_lat": null, "antreff_lon": null})),
     )
@@ -933,7 +933,7 @@ async fn anlegen_mit_koordinate() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","antreff_lat": 51.93, "antreff_lon": 8.87})),
     )
@@ -960,7 +960,7 @@ async fn halbes_paar_und_bereich_sind_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals"),
+        &format!("/api/incidents/{e}/animals"),
         &admin,
         Some(&json!({"spezies":"hund","antreff_lat": 52.0})),
     )
@@ -976,7 +976,7 @@ async fn halbes_paar_und_bereich_sind_422() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{e}/animals/{t}"),
+            &format!("/api/incidents/{e}/animals/{t}"),
             &admin,
             Some(&body),
         )
@@ -988,7 +988,7 @@ async fn halbes_paar_und_bereich_sind_422() {
     anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
     )
@@ -996,7 +996,7 @@ async fn halbes_paar_und_bereich_sind_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"antreff_lat": null})),
     )
@@ -1005,7 +1005,7 @@ async fn halbes_paar_und_bereich_sind_422() {
     let (_, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )
@@ -1027,7 +1027,7 @@ async fn verorten_aendert_keine_anderen_angaben() {
     anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"notiz":"neu"})),
     )
@@ -1035,7 +1035,7 @@ async fn verorten_aendert_keine_anderen_angaben() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
     )
@@ -1057,7 +1057,7 @@ async fn beobachter_kann_nicht_verorten() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &beob,
         Some(&json!({"antreff_lat": 52.0, "antreff_lon": 9.0})),
     )
@@ -1077,7 +1077,7 @@ async fn tier_etb_eintraege_gehen_live_hinaus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/animals/{t}/status"),
+        &format!("/api/incidents/{e}/animals/{t}/status"),
         &admin,
         Some(&json!({"status":"vermisst"})),
     )
@@ -1087,7 +1087,7 @@ async fn tier_etb_eintraege_gehen_live_hinaus() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/animals/{t}"),
+        &format!("/api/incidents/{e}/animals/{t}"),
         &admin,
         None,
     )

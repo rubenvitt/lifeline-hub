@@ -19,7 +19,7 @@ vi.mock('../../auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
-vi.mock('../../api/einsaetze', () => ({
+vi.mock('../../api/incidents', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
   ladeModulOverrides: vi.fn(),
@@ -41,7 +41,7 @@ import {
   ladeModulOverrides,
   fetchModulVorgaben,
   setzeModulOverride,
-} from '../../api/einsaetze';
+} from '../../api/incidents';
 import { ladeOrgModulEinstellungen } from '../../api/orgEinstellungen';
 import { ApiError } from '../../api/client';
 

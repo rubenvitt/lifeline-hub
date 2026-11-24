@@ -7,7 +7,7 @@ import {
   ladeEinstellungen,
   ladeFuehrungsstelle,
   ladeModulFreigaben,
-} from '../../api/einsaetze';
+} from '../../api/incidents';
 import { ApiError } from '../../api/client';
 import { listePersonen } from '../../api/einsatzPerson';
 import { ladeBetreuung } from '../../api/betreuung';

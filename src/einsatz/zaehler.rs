@@ -304,7 +304,7 @@ pub struct LagemeldungsZaehler {
     pub neu: i64,
 }
 
-/// Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys
+/// Antwort von `GET /api/incidents/{id}/module-counts`. Feldnamen = Modul-Keys
 /// (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ModulZaehlerAnzeige {

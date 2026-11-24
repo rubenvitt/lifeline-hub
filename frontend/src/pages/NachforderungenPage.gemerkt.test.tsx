@@ -29,7 +29,7 @@ vi.mock('../kommunikation/KommKarte', async (original) => {
   };
 });
 
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',
@@ -133,7 +133,7 @@ describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
 
   it('mit übernommenem Material bleiben die Karten gemerkt (LLH-1226)', async () => {
     server.use(
-      http.get('/api/einsaetze/1/material', ({ request }) =>
+      http.get('/api/incidents/1/material', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('entlassene')
             ? []
@@ -153,8 +153,8 @@ describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
               ],
         ),
       ),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     const zehn = Array.from({ length: 10 }, (_, i) =>
       nf({

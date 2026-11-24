@@ -48,7 +48,7 @@ beforeEach(async () => {
   vi.stubGlobal('BroadcastChannel', StummerKanal);
   setzeOnline(true);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-  server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
+  server.use(http.get('/api/incidents/:einsatzId/uhs', () => HttpResponse.json([])));
   await queueLeerenFuerTests();
 });
 afterEach(() => {
@@ -104,8 +104,8 @@ const abgleich = (vermisstId: number) => ({
 function render(personen: unknown[]) {
   server.use(
     meHandler(benutzerFixture()),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture())),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json(personen)),
   );
   return renderMitProviders(
     <Routes>
@@ -139,7 +139,7 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
   }
 
   it('nennt den Grund im Dialog, behält die Eingabe, kein Toast', async () => {
-    server.use(http.post('/api/einsaetze/1/persons', () => abgelehnt('Sichtung unbekannt')));
+    server.use(http.post('/api/incidents/1/persons', () => abgelehnt('Sichtung unbekannt')));
     render([]);
     const dialog = await erfasseImDialog();
 
@@ -156,7 +156,7 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
   it('das nächste Absenden räumt den Grund; Abbrechen ist bis zur Antwort gesperrt', async () => {
     let zweiter = false;
     server.use(
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.post('/api/incidents/1/persons', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Sichtung unbekannt');
@@ -172,7 +172,7 @@ describe('PersonenPage — Maske „Betroffene erfassen“ (LFH-1077)', () => {
   });
 
   it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
-    server.use(http.post('/api/einsaetze/1/persons', () => abgelehnt('Sichtung unbekannt')));
+    server.use(http.post('/api/incidents/1/persons', () => abgelehnt('Sichtung unbekannt')));
     render([]);
     const dialog = await erfasseImDialog();
     await within(dialog).findByRole('alert');
@@ -205,11 +205,11 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
   it('zwei Zeilen nebenläufig: die Ablehnung steht an ihrer Zeile, der Erfolg im Toast', async () => {
     let lehneAb: () => void = () => {};
     server.use(
-      http.post('/api/einsaetze/1/persons/11/matches', async () => {
+      http.post('/api/incidents/1/persons/11/matches', async () => {
         await new Promise<void>((r) => (lehneAb = r));
         return abgelehnt('Abgleich besteht schon', 409);
       }),
-      http.post('/api/einsaetze/1/persons/12/matches', () =>
+      http.post('/api/incidents/1/persons/12/matches', () =>
         HttpResponse.json(abgleich(12), { status: 201 }),
       ),
     );
@@ -232,7 +232,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
   it('die nächste Wahl an derselben Zeile räumt den Grund', async () => {
     let zweiter = false;
     server.use(
-      http.post('/api/einsaetze/1/persons/11/matches', async () => {
+      http.post('/api/incidents/1/persons/11/matches', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Abgleich besteht schon', 409);
@@ -250,7 +250,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
 
   it('ist die Zeile weggefiltert, steht der Grund im Seitenhinweis', async () => {
     server.use(
-      http.post('/api/einsaetze/1/persons/11/matches', () =>
+      http.post('/api/incidents/1/persons/11/matches', () =>
         abgelehnt('Abgleich besteht schon', 409),
       ),
     );
@@ -283,14 +283,14 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
     }
     server.use(
       meHandler(benutzerFixture()),
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json(einsatzFixture({ id: Number(params.eid) })),
       ),
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([vermisstA, vermisstB, gefunden]),
       ),
-      http.get('/api/einsaetze/2/persons', () => HttpResponse.json([gefunden])),
-      http.post('/api/einsaetze/1/persons/11/matches', () =>
+      http.get('/api/incidents/2/persons', () => HttpResponse.json([gefunden])),
+      http.post('/api/incidents/1/persons/11/matches', () =>
         abgelehnt('Abgleich besteht schon', 409),
       ),
     );
@@ -333,16 +333,16 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
       let angefragt = false;
       server.use(
         meHandler(benutzerFixture()),
-        http.get('/api/einsaetze/:eid', ({ params }) =>
+        http.get('/api/incidents/:eid', ({ params }) =>
           HttpResponse.json(einsatzFixture({ id: Number(params.eid) })),
         ),
-        http.get('/api/einsaetze/1/persons', () =>
+        http.get('/api/incidents/1/persons', () =>
           HttpResponse.json([vermisstA, vermisstB, gefunden]),
         ),
-        http.get('/api/einsaetze/2/persons', () =>
+        http.get('/api/incidents/2/persons', () =>
           HttpResponse.json([{ ...vermisstB, einsatz_id: 2 }, gefunden]),
         ),
-        http.post('/api/einsaetze/1/persons/11/matches', async () => {
+        http.post('/api/incidents/1/persons/11/matches', async () => {
           angefragt = true;
           await new Promise<void>((r) => (gibFrei = r));
           return antwort();
@@ -434,7 +434,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
   it('der Erfolg eines Zeilenvorschlags schließt keinen offenen Dialog', async () => {
     let gibFrei: () => void = () => {};
     server.use(
-      http.post('/api/einsaetze/1/persons/11/matches', async () => {
+      http.post('/api/incidents/1/persons/11/matches', async () => {
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json(abgleich(11), { status: 201 });
       }),
@@ -472,7 +472,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
 
     it('nennt die Ablehnung im Dialog, der Dialog bleibt offen, kein Toast', async () => {
       server.use(
-        http.post('/api/einsaetze/1/persons/11/matches', () =>
+        http.post('/api/incidents/1/persons/11/matches', () =>
           abgelehnt('Abgleich besteht schon', 409),
         ),
       );
@@ -491,7 +491,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
     it('wartet auf die Antwort: Abbrechen gesperrt, das nächste Absenden räumt', async () => {
       let zweiter = false;
       server.use(
-        http.post('/api/einsaetze/1/persons/11/matches', async () => {
+        http.post('/api/incidents/1/persons/11/matches', async () => {
           if (zweiter) return nie();
           zweiter = true;
           return abgelehnt('Abgleich besteht schon', 409);
@@ -507,7 +507,7 @@ describe('PersonenPage — Abgleich vorschlagen (LFH-1077)', () => {
 
     it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
       server.use(
-        http.post('/api/einsaetze/1/persons/11/matches', () =>
+        http.post('/api/incidents/1/persons/11/matches', () =>
           abgelehnt('Abgleich besteht schon', 409),
         ),
       );
@@ -543,14 +543,14 @@ describe('PersonenPage — Erfassungszeile nach dem Einsatzwechsel (LLH-1154)', 
     let angefragt = false;
     server.use(
       meHandler(benutzerFixture()),
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json(einsatzFixture({ id: Number(params.eid) })),
       ),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([basis])),
-      http.get('/api/einsaetze/2/persons', () =>
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([basis])),
+      http.get('/api/incidents/2/persons', () =>
         HttpResponse.json([{ ...basis, id: 30, einsatz_id: 2, registrier_nr: 9 }]),
       ),
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.post('/api/incidents/1/persons', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return abgelehnt('Sichtung passt nicht zum Status');

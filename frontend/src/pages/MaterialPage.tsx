@@ -20,7 +20,7 @@ import {
 import { Link, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { listeNachforderungen } from '../api/nachforderungen';
 import { KennungsLink } from '../components/kennungsLink';
 import { darfImEinsatzSchreiben, isEinsatzGesperrt } from '../einsatz/schreibrecht';

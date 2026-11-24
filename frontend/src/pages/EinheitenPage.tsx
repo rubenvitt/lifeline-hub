@@ -14,7 +14,7 @@ import {
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Fragment, useMemo, useState, type Key } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheitTypen } from '../api/einheitTypen';
 import { bildeEinheit, listAufgeloesteEinheiten, listeEinheiten } from '../api/einheiten';

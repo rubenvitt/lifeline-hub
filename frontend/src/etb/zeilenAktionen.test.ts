@@ -268,7 +268,7 @@ describe('zeilenMenue — Vermerke und Verfasser hinter den Handlungen', () => {
       text: 'Anhang dach.jpg',
       ton: 'verweis',
       datei: {
-        href: '/api/einsaetze/7/etb/1/attachments/3',
+        href: '/api/incidents/7/etb/1/attachments/3',
         dateiname: 'dach.jpg',
         name: 'dach.jpg herunterladen',
         mime: 'image/jpeg',

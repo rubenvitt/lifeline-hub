@@ -19,13 +19,13 @@ vi.mock('../../auth/AuthContext', () => ({
   AuthProvider: ({ children }: { children?: unknown }) => children,
 }));
 
-vi.mock('../../api/einsaetze', () => ({
+vi.mock('../../api/incidents', () => ({
   ladeEinsatz: vi.fn(),
   ladeEinstellungen: vi.fn(),
   speichereEinstellungen: vi.fn(),
 }));
 
-import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/einsaetze';
+import { ladeEinsatz, ladeEinstellungen, speichereEinstellungen } from '../../api/incidents';
 import { ApiError } from '../../api/client';
 
 const BASIS = {

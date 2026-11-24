@@ -37,8 +37,8 @@ afterEach(() => vi.restoreAllMocks());
 function renderApp(route: string) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
   );
   const router = createMemoryRouter(appRouten, { initialEntries: [route] });
   render(
@@ -161,8 +161,8 @@ describe('Sprunglink zum Inhalt in den Rahmen', () => {
     // Statt des Rahmens steht dann nur die Sackgasse; ohne Ziel täte der Link nichts.
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () =>
         HttpResponse.json({ error: 'Serverfehler' }, { status: 500 }),
       ),
     );

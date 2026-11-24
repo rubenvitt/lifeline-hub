@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Link, Route, Routes, useLocation, useNavigate } from 'react-router';
 import { AdresseSteht } from '../test/adresseSteht';
 import { neuerQueryClient, renderMitProviders } from '../test/utils';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import {
   ANRUFE_PAGE_SIZE,
   erfasseAnruf,
@@ -22,7 +22,7 @@ import { meHandler, server } from '../test/server';
 import { modulName } from '../einsatz/modulRegistry';
 import { setzeViewportBreite } from '../test/viewport';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/infotelefon', async (original) => ({
   ...(await original<typeof import('../api/infotelefon')>()),
   loadAnrufe: vi.fn(),

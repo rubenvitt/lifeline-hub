@@ -13,7 +13,7 @@ import {
   ladeGefahrengebiete,
   setzeBewertung,
 } from '../../api/gefahren';
-import { ladeEinsatz } from '../../api/einsaetze';
+import { ladeEinsatz } from '../../api/incidents';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { useViewport } from '../../components/useViewport';
 import { lagekartePfad } from '../../routing/deeplinks';

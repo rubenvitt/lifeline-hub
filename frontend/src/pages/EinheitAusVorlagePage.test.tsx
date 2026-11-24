@@ -137,12 +137,12 @@ function handlers({
   rolle = 'einsatzleitung' as EinsatzAnzeige['meine_rolle'],
 } = {}) {
   return [
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json(einsatzFixture({ bezeichnung: 'Lage', meine_rolle: rolle })),
     ),
-    http.get('/api/einsaetze/1/units/from-template/5', () => HttpResponse.json(vorschau)),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/1/sectors', () =>
+    http.get('/api/incidents/1/units/from-template/5', () => HttpResponse.json(vorschau)),
+    http.get('/api/incidents/1/units', () => HttpResponse.json(einheiten)),
+    http.get('/api/incidents/1/sectors', () =>
       HttpResponse.json([{ id: 3, einsatz_id: 1, name: 'Nord', sortier: 0 }]),
     ),
   ];
@@ -199,10 +199,10 @@ describe('EinheitAusVorlagePage · Kopf', () => {
   it('warnt bei gleichem aktiven Namen, sperrt aber nicht (D15)', async () => {
     let body: AusVorlageEingabe | null = null;
     zeige(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([einheit(40, 'sanitätszug musterstadt ')]),
       ),
-      http.post('/api/einsaetze/1/units/from-template', async ({ request }) => {
+      http.post('/api/incidents/1/units/from-template', async ({ request }) => {
         body = (await request.json()) as AusVorlageEingabe;
         return HttpResponse.json(
           { einheit_id: 50, einheit_ids: [50, 51], fahrzeuge: [], personal: [] },
@@ -219,7 +219,7 @@ describe('EinheitAusVorlagePage · Kopf', () => {
 
   it('eine aufgelöste Einheit gleichen Namens warnt nicht', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           einheit(40, 'Sanitätszug Musterstadt', { aufgeloest_at: '2026-10-14 08:00:00' }),
         ]),
@@ -262,7 +262,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
 
   it('nennt den Zustand als Wort; eine gebundene Kraft kommt nur mit „umhängen“ (D14)', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () =>
+      http.get('/api/incidents/1/units/from-template/5', () =>
         HttpResponse.json(
           sanitaetszug(
             { 21: { zustand: 'gebunden', einheit_id: 9, einheit_name: '2. Zug' } },
@@ -308,7 +308,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
 
   it('eine freie Person auf ihrem Fahrzeug verlässt es, wenn es abgewählt ist (14.10.2026)', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () =>
+      http.get('/api/incidents/1/units/from-template/5', () =>
         HttpResponse.json(
           sanitaetszug(
             { 20: { zustand: 'frei' } },
@@ -328,7 +328,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
 
   it('ein gebundener Einheitsführer trägt die Marke „Einheitsführer“', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () =>
+      http.get('/api/incidents/1/units/from-template/5', () =>
         HttpResponse.json(
           sanitaetszug(
             {},
@@ -354,7 +354,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
     const ohnePersonal = sanitaetszug({}, {}, { personal_gesperrt: true });
     for (const k of ohnePersonal.knoten) k.personal = [];
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () => HttpResponse.json(ohnePersonal)),
+      http.get('/api/incidents/1/units/from-template/5', () => HttpResponse.json(ohnePersonal)),
     );
     await warteAufBaum();
     expect(screen.getByText('Personal gesperrt')).toBeInTheDocument();
@@ -380,7 +380,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
 
   it('eine unbekannte Vorlage (404): „gibt es nicht (mehr)“ mit Rückweg zur Gliederung', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () =>
+      http.get('/api/incidents/1/units/from-template/5', () =>
         HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     );
@@ -403,7 +403,7 @@ describe('EinheitAusVorlagePage · Baum', () => {
   it('ein anderer Fehler (500) bietet „Erneut abrufen“ an', async () => {
     let fehler = true;
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () =>
+      http.get('/api/incidents/1/units/from-template/5', () =>
         fehler ? HttpResponse.json({ error: 'kaputt' }, { status: 500 }) : undefined,
       ),
     );
@@ -419,7 +419,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
   it('sendet Name, Abschnitt und die Wahl und springt ins Meldebild mit der Einheit', async () => {
     let body: AusVorlageEingabe | null = null;
     zeige(
-      http.post('/api/einsaetze/1/units/from-template', async ({ request }) => {
+      http.post('/api/incidents/1/units/from-template', async ({ request }) => {
         body = (await request.json()) as AusVorlageEingabe;
         return HttpResponse.json(
           { einheit_id: 50, einheit_ids: [50, 51], fahrzeuge: [], personal: [] },
@@ -457,10 +457,10 @@ describe('EinheitAusVorlagePage · Absenden', () => {
 
   it('ohne Freigabe des Meldebilds führt der Sprung in die Ansicht der Einheit', async () => {
     zeige(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ kraefteuebersicht: { zugriff: false } })),
       ),
-      http.post('/api/einsaetze/1/units/from-template', () =>
+      http.post('/api/incidents/1/units/from-template', () =>
         HttpResponse.json(
           { einheit_id: 50, einheit_ids: [50], fahrzeuge: [], personal: [] },
           { status: 201 },
@@ -477,7 +477,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
   it('wer die Seite während des Bildens verlässt, wird danach nicht zurückgerissen', async () => {
     let freigeben: () => void = () => {};
     zeige(
-      http.post('/api/einsaetze/1/units/from-template', async () => {
+      http.post('/api/incidents/1/units/from-template', async () => {
         await new Promise<void>((r) => (freigeben = r));
         return HttpResponse.json(
           { einheit_id: 50, einheit_ids: [50], fahrzeuge: [], personal: [] },
@@ -498,7 +498,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
   it('eine Ablehnung steht an der Zeile, ohne Toast; die Vorschau wird abgeglichen (D14)', async () => {
     let abrufe = 0;
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () => {
+      http.get('/api/incidents/1/units/from-template/5', () => {
         abrufe += 1;
         return HttpResponse.json(
           abrufe === 1
@@ -508,7 +508,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
               }),
         );
       }),
-      http.post('/api/einsaetze/1/units/from-template', () =>
+      http.post('/api/incidents/1/units/from-template', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Kräfte lassen sich übernehmen',
@@ -539,7 +539,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
     let abrufe = 0;
     const bodies: AusVorlageEingabe[] = [];
     zeige(
-      http.get('/api/einsaetze/1/units/from-template/5', () => {
+      http.get('/api/incidents/1/units/from-template/5', () => {
         abrufe += 1;
         return HttpResponse.json(
           abrufe === 1
@@ -549,7 +549,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
               }),
         );
       }),
-      http.post('/api/einsaetze/1/units/from-template', async ({ request }) => {
+      http.post('/api/incidents/1/units/from-template', async ({ request }) => {
         bodies.push((await request.json()) as AusVorlageEingabe);
         return bodies.length === 1
           ? HttpResponse.json(
@@ -585,7 +585,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
   it('Abbrechen ist gesperrt, solange das Bilden läuft, und führt sonst zurück', async () => {
     let freigeben: () => void = () => {};
     zeige(
-      http.post('/api/einsaetze/1/units/from-template', async () => {
+      http.post('/api/incidents/1/units/from-template', async () => {
         await new Promise<void>((r) => (freigeben = r));
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),
@@ -602,7 +602,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
   it('über dem Deckel bleibt „Einheit bilden“ gesperrt und nennt den Grund (D7)', async () => {
     const gross = sanitaetszug();
     gross.knoten[1].fahrzeuge = Array.from({ length: 51 }, (_, i) => fz(1000 + i, `RTW ${i + 3}`));
-    zeige(http.get('/api/einsaetze/1/units/from-template/5', () => HttpResponse.json(gross)));
+    zeige(http.get('/api/incidents/1/units/from-template/5', () => HttpResponse.json(gross)));
     await warteAufBaum();
     expect(screen.getByText('Höchstens 50 Fahrzeuge je Bildung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Einheit bilden' })).toBeDisabled();
@@ -617,7 +617,7 @@ describe('EinheitAusVorlagePage · Material (LLH-1261)', () => {
     mat(3, 'Stromerzeuger', { bestandsnummer: 'SE-1', zustand: 'im_einsatz' }),
   ];
   const mitMaterial = (modul: Parameters<typeof sanitaetszug>[2] = {}) =>
-    http.get('/api/einsaetze/1/units/from-template/5', () =>
+    http.get('/api/incidents/1/units/from-template/5', () =>
       HttpResponse.json(sanitaetszug({}, {}, modul, MATERIAL)),
     );
 
@@ -645,7 +645,7 @@ describe('EinheitAusVorlagePage · Material (LLH-1261)', () => {
     let body: AusVorlageEingabe | null = null;
     zeige(
       mitMaterial(),
-      http.post('/api/einsaetze/1/units/from-template', async ({ request }) => {
+      http.post('/api/incidents/1/units/from-template', async ({ request }) => {
         body = (await request.json()) as AusVorlageEingabe;
         return HttpResponse.json(
           {
@@ -667,7 +667,7 @@ describe('EinheitAusVorlagePage · Material (LLH-1261)', () => {
 
   it('ein gesperrtes Modul Material steht als Wort, ohne Zeilen und ohne Zählung', async () => {
     const ohne = sanitaetszug({}, {}, { material_gesperrt: true });
-    zeige(http.get('/api/einsaetze/1/units/from-template/5', () => HttpResponse.json(ohne)));
+    zeige(http.get('/api/incidents/1/units/from-template/5', () => HttpResponse.json(ohne)));
     await warteAufBaum();
     expect(screen.getByText('Material gesperrt')).toBeInTheDocument();
     expect(screen.getByText('1 Zug, 1 Staffel, 3 Fahrzeuge, 0 Kräfte')).toBeInTheDocument();

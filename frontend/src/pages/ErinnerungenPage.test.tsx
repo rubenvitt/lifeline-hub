@@ -18,12 +18,12 @@ import { ApiError } from '../api/client';
 import type { Erinnerung } from '../api/types';
 import { erinnerungenPfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { setzeOnline } from '../test/utils';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
 vi.mock('../auth/AuthContext', () => ({ useAuth: () => ({ benutzer: { id: 1 } }) }));
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Hochwasser',

@@ -1,7 +1,7 @@
 import { Collapse, Form, Input, type FormInstance } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { ladeBetreuung } from '../api/betreuung';
 import { ApiError } from '../api/client';
 import { useAuthOptional } from '../auth/AuthContext';

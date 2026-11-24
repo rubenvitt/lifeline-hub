@@ -2,7 +2,7 @@ import { Collapse, Form, theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useId } from 'react';
 import type { EinsatzRolle } from '../api/types';
-import { loadMitgliedAuswahlAnlage } from '../api/einsaetze';
+import { loadMitgliedAuswahlAnlage } from '../api/incidents';
 import { globalKeys } from '../api/queryKeys';
 import { anzahl } from '../anzeige/anzahl';
 import { Select } from '../components/Select';

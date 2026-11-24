@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
-import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/incidents';
 import { istModulFreigegeben, modulRegistry } from '../einsatz/modulRegistry';
 import type { Koordinatenformat } from '../api/types';
 

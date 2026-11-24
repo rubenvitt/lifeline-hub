@@ -21,7 +21,7 @@ import {
   nimmBelegungZurueck,
   storniereStelle,
 } from '../api/betreuung';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import {
   BETREUUNG_KONTAKTWEG_MAX,

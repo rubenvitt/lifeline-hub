@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { darfBeantragen } from '../einsatz/schreibrecht';

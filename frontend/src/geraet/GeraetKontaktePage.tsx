@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Alert, App, Button, Flex, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import {
   ladeUhsZiele,

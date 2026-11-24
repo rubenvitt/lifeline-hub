@@ -38,7 +38,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, n: usize) -> Vec<i64>
         let (s, v) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             cookie,
             Some(&body),
         )
@@ -141,7 +141,7 @@ async fn seiten_ergeben_die_vollliste_in_jeder_sortierung() {
     let e = einsatz_anlegen(&app, &admin).await;
     let angelegt = anlegen(&app, &admin, e, 23).await;
 
-    let (s, voll) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages")).await;
+    let (s, voll) = get(&app, &admin, &format!("/api/incidents/{e}/damages")).await;
     assert_eq!(s, StatusCode::OK);
     let mut erwartet: Vec<i64> = angelegt.clone();
     erwartet.reverse();
@@ -153,7 +153,7 @@ async fn seiten_ergeben_die_vollliste_in_jeder_sortierung() {
 
     for spalte in ["nr", "typ", "ausmass", "ort", "erfasst", "verortet"] {
         for richtung in ["ab", "auf"] {
-            let basis = format!("/api/einsaetze/{e}/damages?sortierung={spalte}_{richtung}");
+            let basis = format!("/api/incidents/{e}/damages?sortierung={spalte}_{richtung}");
             let seiten = alle_seiten(&app, &admin, &basis, spalte, 4).await;
             let gelesen: Vec<i64> = seiten.iter().map(|s| s["id"].as_i64().unwrap()).collect();
             assert_eq!(
@@ -189,14 +189,14 @@ async fn erste_seite_traegt_die_hoechsten_nummern() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     anlegen(&app, &admin, e, 12).await;
-    let (s, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages?limit=5")).await;
+    let (s, v) = get(&app, &admin, &format!("/api/incidents/{e}/damages?limit=5")).await;
     assert_eq!(s, StatusCode::OK);
     let nr: Vec<i64> = zeilen(&v)
         .iter()
         .map(|s| s["registrier_nr"].as_i64().unwrap())
         .collect();
     assert_eq!(nr, vec![12, 11, 10, 9, 8]);
-    let (_, v) = get(&app, &admin, &format!("/api/einsaetze/{e}/damages?limit=0")).await;
+    let (_, v) = get(&app, &admin, &format!("/api/incidents/{e}/damages?limit=0")).await;
     assert_eq!(zeilen(&v).len(), 1, "limit wird auf mindestens 1 geklemmt");
 }
 
@@ -205,7 +205,7 @@ async fn unstimmige_parameter_werden_abgelehnt() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let b = format!("/api/einsaetze/{e}/damages");
+    let b = format!("/api/incidents/{e}/damages");
     for (q, code) in [
         ("vor_nr=3", StatusCode::UNPROCESSABLE_ENTITY),
         ("sortierung=ort_ab", StatusCode::UNPROCESSABLE_ENTITY),
@@ -245,7 +245,7 @@ async fn filter_und_suche_wirken_vor_der_seitengrenze() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&json!({
             "typ": "sonstige", "ausmass": "gering", "ort": "Lager",
@@ -256,7 +256,7 @@ async fn filter_und_suche_wirken_vor_der_seitengrenze() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let sonder = v["id"].as_i64().unwrap();
 
-    let b = format!("/api/einsaetze/{e}/damages");
+    let b = format!("/api/incidents/{e}/damages");
     let anzahl = |v: &Value| zeilen(v).len();
 
     // Ort ohne Unterschied der Groß-/Kleinschreibung: „Hauptstraße 3“ und „hauptstraße 9“.
@@ -321,7 +321,7 @@ async fn kennzahlen_zaehlen_den_bestand_zum_filter() {
         .await
         .unwrap();
 
-    let b = format!("/api/einsaetze/{e}/damages");
+    let b = format!("/api/incidents/{e}/damages");
     let (s, k) = get(&app, &admin, &format!("{b}/metrics")).await;
     assert_eq!(s, StatusCode::OK, "{k}");
     assert_eq!(
@@ -354,7 +354,7 @@ async fn auswahl_ohne_freitext_und_ohne_stornierte() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&json!({
             "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstraße 3",
@@ -373,7 +373,7 @@ async fn auswahl_ohne_freitext_und_ohne_stornierte() {
     let (s, v) = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/damages/selection"),
+        &format!("/api/incidents/{e}/damages/selection"),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -421,7 +421,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
     rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
-    let b = format!("/api/einsaetze/{e}/damages");
+    let b = format!("/api/incidents/{e}/damages");
     for pfad in [format!("{b}/metrics"), format!("{b}/selection")] {
         let (s, _) = get(&app, &gustav, &pfad).await;
         assert_eq!(s, StatusCode::OK, "Vorbedingung: {pfad} lesbar");
@@ -429,7 +429,7 @@ async fn kennzahlen_und_auswahl_hinter_dem_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/schaeden"),
+        &format!("/api/incidents/{e}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

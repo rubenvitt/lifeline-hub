@@ -1,4 +1,4 @@
-//! `POST /api/einsaetze/{id}/persons/{pid}/reason` — Anlass der Hilfeleistung festlegen
+//! `POST /api/incidents/{id}/persons/{pid}/reason` — Anlass der Hilfeleistung festlegen
 //! (LLH-1566, Konzept LLH-1562 Abschnitt 5.1; Muster `person_transport`).
 
 use crate::app::AppState;

@@ -4,7 +4,7 @@ import { useParams } from 'react-router';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { SeitenHinweise } from '../../components/SpeicherHinweis';
-import { speichereEinstellungen } from '../../api/einsaetze';
+import { speichereEinstellungen } from '../../api/incidents';
 import { einsatzKeys } from '../../api/queryKeys';
 import { modulRegistry, modulZuRoute, redirectZiel } from '../../einsatz/modulRegistry';
 import { useEinstellungenDaten } from '../EinsatzEinstellungenPage';

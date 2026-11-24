@@ -15,7 +15,7 @@ import { useAnzeigeKonventionen, useUhrDarstellung } from '../anzeige/AnzeigeKon
 import { datenstandText } from '../components/Datenstand';
 import { formatiereUhr } from '../anzeige/zeitDarstellung';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { ladeLagemonitor } from '../api/lagemonitor';
 import { einsatzKeys } from '../api/queryKeys';
 import type {

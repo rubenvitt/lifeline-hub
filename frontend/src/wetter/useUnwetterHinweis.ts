@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { spieleAlarmTon } from '../alarm/alarmTon';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { ladeEinstellungen } from '../api/einsaetze';
+import { ladeEinstellungen } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { BenutzerAnzeige, ModulFreigaben } from '../api/types';
 import { wetterAbfrage } from '../api/wetter';

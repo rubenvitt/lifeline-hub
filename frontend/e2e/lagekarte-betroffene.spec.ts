@@ -111,10 +111,10 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
   // ── Aufbau als Admin ────────────────────────────────────────────────────────────────
   await anmeldenAls(page, ADMIN, PW);
   // Kein Modulname im Einsatznamen (die Palette sucht Module und Einsätze gemeinsam).
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Fundlage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const { id: einheitId } = await senden(page, 'post', `${basis}/units`, { name: 'Zug Mitte' });
   await senden(page, 'patch', `${basis}/units/${einheitId}/position`, {
     lat: MITTE[1],
@@ -277,10 +277,10 @@ test('Betroffene (LFH-711): die Trefferzone einer Einheit daneben nimmt dem Pers
 }) => {
   test.setTimeout(120_000);
   await anmeldenAls(page, ADMIN, PW);
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Zonenlage ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const ort: [number, number] = [8.4, 52.0];
   for (let i = 0; i < 3; i++) {
     await senden(page, 'post', `${basis}/persons`, {
@@ -383,10 +383,10 @@ test('Betroffene (LLH-1125): verorten bei ausgeschalteter Ebene zeigt den Marker
 }) => {
   test.setTimeout(120_000);
   await anmeldenAls(page, ADMIN, PW);
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Rueckweg ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   // Ohne Fundort: genau der Fall, für den „Auf Lagekarte verorten“ da ist.
   const person = (await senden(page, 'post', `${basis}/persons`, { name: 'Rückweg' })) as {
     id: number;
@@ -449,10 +449,10 @@ test('Betroffene (LFH-668): ein aufgefächertes Bündel überlebt eine Sichtungs
 }) => {
   test.setTimeout(120_000);
   await anmeldenAls(page, ADMIN, PW);
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Spider Lage ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const ids: number[] = [];
   for (let i = 0; i < 3; i++) {
     ids.push(

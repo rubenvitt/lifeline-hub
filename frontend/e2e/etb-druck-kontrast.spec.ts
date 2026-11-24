@@ -54,10 +54,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 730 ETB-Druck-Kontrast ${modus} ${Date.now()}`,
     });
-    const etb = `/api/einsaetze/${einsatzId}/etb`;
+    const etb = `/api/incidents/${einsatzId}/etb`;
     const grund = await post(page, etb, {
       typ: 'meldung',
       inhalt:

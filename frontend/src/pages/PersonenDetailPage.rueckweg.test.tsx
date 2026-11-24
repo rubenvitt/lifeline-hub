@@ -68,15 +68,15 @@ function Liste() {
 function render(route: string) {
   server.use(
     meHandler(benutzerFixture()),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-    http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(detail)),
-    http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/persons/transport-means', () =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture())),
+    http.get('/api/incidents/1/persons/10', () => HttpResponse.json(detail)),
+    http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
-    http.get('/api/einsaetze/1/persons/10/audit', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/persons/10/audit', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>

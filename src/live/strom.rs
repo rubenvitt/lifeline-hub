@@ -1,6 +1,6 @@
 //! Zulassung und Lebensdauer der Live-Ströme (LFH-920).
 //!
-//! Die beiden SSE-Routen (`GET /api/einsaetze/{id}/live`, `GET /api/live`) stehen in
+//! Die beiden SSE-Routen (`GET /api/incidents/{id}/live`, `GET /api/live`) stehen in
 //! [`crate::zulassung::OHNE_ZULASSUNGSGRENZE`]: eine Dauerverbindung bände sonst einen Platz des
 //! routerweiten Caps und liefe ins Zeitbudget. Ihre eigene Grenze steht hier.
 //!

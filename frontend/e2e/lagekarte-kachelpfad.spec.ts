@@ -71,10 +71,10 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 /** Einsatz über die API. Kein Modulname im Namen: die Kommandopalette durchsucht Module und
  *  Einsätze gemeinsam. */
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Kachelpfad ${Date.now()}` },
   });
-  expect(antwort.ok(), `POST /api/einsaetze: ${antwort.status()} ${await antwort.text()}`).toBe(
+  expect(antwort.ok(), `POST /api/incidents: ${antwort.status()} ${await antwort.text()}`).toBe(
     true,
   );
   return ((await antwort.json()) as { id: number }).id;

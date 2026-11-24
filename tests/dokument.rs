@@ -9,7 +9,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/documents")
+    format!("/api/incidents/{einsatz}/documents")
 }
 
 /// Multipart mit Datei + beliebigen Textfeldern. `datei = None` lässt das Dateifeld weg.
@@ -64,7 +64,7 @@ async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -77,7 +77,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -356,7 +356,7 @@ async fn chat_allowlist_bleibt_ohne_heic() {
     let (app, admin, einsatz) = start().await;
     let (status, json) = multipart_post(
         &app,
-        &format!("/api/einsaetze/{einsatz}/attachments"),
+        &format!("/api/incidents/{einsatz}/attachments"),
         &admin,
         Some(("foto.heic", b"x")),
         &[],
@@ -444,7 +444,7 @@ async fn entfernen_ist_soft_delete() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )
@@ -516,7 +516,7 @@ async fn abgeschlossener_einsatz_ablegen_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -798,7 +798,7 @@ async fn aendern_braucht_schreibrecht_und_aktiven_einsatz() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -977,7 +977,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/schaeden"),
+        &format!("/api/incidents/{einsatz}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -986,7 +986,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let schaden_pfad = format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments");
+    let schaden_pfad = format!("/api/incidents/{einsatz}/damages/{sid}/attachments");
     let (s, _) = anfrage(&app, "GET", &schaden_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Schadensroute");
     let (s, _) = anfrage(
@@ -1001,7 +1001,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )
@@ -1032,7 +1032,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
             &app,
             "PUT",
             &format!(
-                "/api/einsaetze/{einsatz}/module-overrides/{}",
+                "/api/incidents/{einsatz}/module-overrides/{}",
                 art.modul_key()
             ),
             &admin,
@@ -1043,7 +1043,7 @@ async fn tier_und_uhs_anhang_nicht_in_der_ablage_und_dokumentenrecht_genuegt_nic
         let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
         assert_eq!(s, StatusCode::OK, "{art:?}: Dokumente sieht sie");
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments",
+            "/api/incidents/{einsatz}/{}/{besitzer}/attachments",
             art.segment()
         );
         let (s, _) = anfrage(&app, "GET", &modul_pfad, &frieda, None).await;
@@ -1097,7 +1097,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1106,7 +1106,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
 
     let (s, _) = anfrage(&app, "GET", &pfad(einsatz), &frieda, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: Dokumente sieht sie");
-    let person_pfad = format!("/api/einsaetze/{einsatz}/persons/{pid}/attachments");
+    let person_pfad = format!("/api/incidents/{einsatz}/persons/{pid}/attachments");
     let (s, _) = anfrage(&app, "GET", &person_pfad, &frieda, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Liste an der Personenroute");
     let (s, _) = anfrage(
@@ -1121,7 +1121,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )
@@ -1136,7 +1136,7 @@ async fn bezug_auf_aufgeloeste_einheit_ist_409() {
     let (app, admin, einsatz) = start().await;
     let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
-    let einheit = format!("/api/einsaetze/{einsatz}/units/{eh}");
+    let einheit = format!("/api/incidents/{einsatz}/units/{eh}");
     let (status, _) = anfrage(
         &app,
         "PUT",

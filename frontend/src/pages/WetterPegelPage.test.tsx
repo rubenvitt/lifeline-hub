@@ -8,11 +8,11 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { server } from '../test/server';
 import { AuthProvider } from '../auth/AuthContext';
 import type { PegelAnzeige, PegelVerlauf, WetterAnzeige } from '../api/types';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import type { EinsatzAnzeige, Lagekennzahl } from '../api/types';
 import WetterPegelPage, { verlaufLuecke, warnungenMeta } from './WetterPegelPage';
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn() }));
 
 /** Der Einsatz; `lagekennzahlen` trägt die Entscheidung „Pegel festgelegt“ (LFH-640). */
 const einsatz = (lagekennzahlen: Lagekennzahl[]) =>
@@ -116,13 +116,13 @@ function antworten({
   wetter = wetterOk() as WetterAnzeige,
 } = {}) {
   server.use(
-    http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(liste)),
-    http.get('/api/einsaetze/1/gauges/history', () =>
+    http.get('/api/incidents/1/gauges', () => HttpResponse.json(liste)),
+    http.get('/api/incidents/1/gauges/history', () =>
       reihen === 'fehler'
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(reihen),
     ),
-    http.get('/api/einsaetze/1/weather', () => HttpResponse.json(wetter)),
+    http.get('/api/incidents/1/weather', () => HttpResponse.json(wetter)),
   );
 }
 

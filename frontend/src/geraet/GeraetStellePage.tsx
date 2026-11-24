@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { IconKachelraster } from '../icons';
 import { useAuth } from '../auth/AuthContext';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { ladeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';
 import type { UhsDetail } from '../api/types';

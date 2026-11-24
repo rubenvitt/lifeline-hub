@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../api/client';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { createEinheitAusVorlage, listeEinheiten, loadEinheitAusVorlage } from '../api/einheiten';
 import { EINHEIT_NAME_MAX } from '../api/eingabegrenzen';

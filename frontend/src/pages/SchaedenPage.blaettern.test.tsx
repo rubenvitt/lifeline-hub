@@ -88,7 +88,7 @@ function render(route = '/einsaetze/1/schaeden') {
   const attrappe = schaedenAttrappe(1, () => BESTAND);
   server.use(
     meHandler(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatz)),
     ...attrappe.handler,
   );
   renderMitProviders(

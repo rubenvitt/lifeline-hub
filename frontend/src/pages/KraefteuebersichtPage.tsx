@@ -24,7 +24,7 @@ import {
 import { useQueryParamSelektion } from '../routing/useQueryParamSelektion';
 import { DeeplinkHinweis } from '../components/DeeplinkHinweis';
 import { einsatzKeys, globalKeys } from '../api/queryKeys';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';

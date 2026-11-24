@@ -156,7 +156,7 @@ async fn mitglied(i: &Instanz, einsatz: i64, benutzer: i64, rolle: &str, stelle:
     let (s, v) = common::anfrage(
         &i.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{benutzer}"),
+        &format!("/api/incidents/{einsatz}/members/{benutzer}"),
         &i.admin,
         Some(
             &json!({"einsatz_rolle": rolle, "fuehrungsfunktion": null, "fuehrungsstelle": stelle})
@@ -201,7 +201,7 @@ async fn rueckgabe_an_den_alten_hub() -> (Instanz, Instanz, i64) {
     );
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/hand-over"),
+        &format!("/api/incidents/{e}/command/hand-over"),
         json!({"an": hub.kennung}),
     )
     .await;

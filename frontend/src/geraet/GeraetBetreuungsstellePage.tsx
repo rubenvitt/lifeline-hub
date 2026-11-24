@@ -3,7 +3,7 @@ import { Alert, App, Button, Spin, Typography, theme } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { ladeBetreuung } from '../api/betreuung';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import type { Betreuungsstelle, BelegungsmeldungEingabe } from '../api/types';
 import { BelegungMeldenDialog } from '../betreuung/BetreuungDialoge';

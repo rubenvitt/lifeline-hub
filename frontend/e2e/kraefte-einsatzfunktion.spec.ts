@@ -20,8 +20,8 @@ test('Einsatzfunktion setzen: Meldebild nennt sie vor der Qualifikation, das ETB
   page,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E ${NAME}` });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const einsatzId = await post(page, '/api/incidents', { bezeichnung: `E2E ${NAME}` });
+  const basis = `/api/incidents/${einsatzId}`;
   const einheitId = await post(page, `${basis}/units`, { name: 'Sanitätsgruppe' });
   const epId = await post(page, `${basis}/personnel`, {
     adhoc: { name: NAME, funktion: 'Notfallsanitäterin' },
@@ -85,8 +85,8 @@ for (const { dichte, soll } of [
   }) => {
     await anmeldenAlsAdmin(page, { startseite: false });
     const name = `Stift ${dichte} ${Date.now()}`;
-    const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E ${name}` });
-    await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
+    const einsatzId = await post(page, '/api/incidents', { bezeichnung: `E2E ${name}` });
+    await post(page, `/api/incidents/${einsatzId}/personnel`, {
       adhoc: { name, funktion: 'Zugführer, Sprechfunker' },
     });
     await page.addInitScript((d) => localStorage.setItem('lifeline-hub.dichte', d), dichte);

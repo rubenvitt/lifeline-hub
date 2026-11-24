@@ -77,7 +77,7 @@ test('ohne Netz: Ortssuche findet „Hauptstraße 12, Musterstadt“ aus der Off
   await anmelden(page, { startseite: false });
   const vorher = await setGeocoderUrl(page.request, GEOCODER_LOOPBACK);
   try {
-    const einsatz = await page.request.post('/api/einsaetze', {
+    const einsatz = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Offline-Adresse ${Date.now()}` },
     });
     expect(einsatz.ok(), await einsatz.text()).toBeTruthy();

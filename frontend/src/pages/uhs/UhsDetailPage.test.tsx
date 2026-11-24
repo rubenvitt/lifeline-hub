@@ -14,7 +14,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App as AntApp } from 'antd';
 import UhsDetailPage from './UhsDetailPage';
 import { AuthProvider } from '../../auth/AuthContext';
-import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/incidents';
 import { freigabenFixture } from '../../test/fixtures';
 import { ladeUhs, setzeUhsStatus, storniereUhs } from '../../api/einsatzUhs';
 import { listePersonen } from '../../api/einsatzPerson';
@@ -25,7 +25,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 
 // Auto-Mocks: bei ungültiger ID wird ohnehin vor jedem Laden auf die Liste umgeleitet.
-vi.mock('../../api/einsaetze');
+vi.mock('../../api/incidents');
 vi.mock('../../api/einsatzUhs');
 // Belegung der UHS für die Sperre von „Auflösen“; ohne Vorgabe ist niemand belegt.
 vi.mock('../../api/einsatzPerson', () => ({ listePersonen: vi.fn(async () => []) }));

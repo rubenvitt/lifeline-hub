@@ -96,7 +96,7 @@ async fn freigegebener_einsatz_traegt_kopf_zahlen_uhs_und_lagemeldung() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
     freigeben(&pool, &cred, einsatz).await;
 
@@ -304,7 +304,7 @@ async fn ohne_scope_403_mit_bearer_401_und_ein_abgeschlossener_einsatz_ist_null(
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -338,7 +338,7 @@ async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
         post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{einsatz}/reports"),
+            &format!("/api/incidents/{einsatz}/reports"),
             json!({
                 "absender": "Melder Unbekannt",
                 "empfaenger": "Empfaengerin Vertraulich",
@@ -389,7 +389,7 @@ async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
     post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/reports"),
+        &format!("/api/incidents/{einsatz}/reports"),
         json!({
             "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
             "meldungsart": "sofortmeldung", "prioritaet": "sofort",
@@ -400,7 +400,7 @@ async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/meldungen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/meldungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -535,7 +535,7 @@ async fn karte_kommt_mit_fassung_und_nur_wenn_sie_sich_geaendert_hat() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
     freigeben(&pool, &cred, einsatz).await;
     let (s, v) = anfrage_json(
@@ -615,7 +615,7 @@ async fn lage_traegt_keine_namen_freitexte_oder_personenkennungen() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
     freigeben(&pool, &cred, einsatz).await;
 

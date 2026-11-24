@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery, type QueryClient } from '@tanstack/react-query';
 import { abrufZustand, schlechtesterZustand, type AbrufZustand } from '../../api/abrufZustand';
-import { ladeEinsatz, ladeModulFreigaben } from '../../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../../api/incidents';
 import { listeAbschnitte } from '../../api/einsatzabschnitte';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listEinsatzMaterial } from '../../api/einsatzMaterial';

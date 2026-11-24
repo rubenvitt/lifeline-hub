@@ -16,7 +16,7 @@ import KraefteuebersichtPage, {
 import { Routes, Route, useLocation } from 'react-router';
 import { einsatzKeys } from '../api/queryKeys';
 import { HERVORGEHOBEN } from '../components/Datensicht';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { freigabenFixture } from '../test/fixtures';
 import { listeEinheiten, setzeEinheitStatus } from '../api/einheiten';
 import { listeEinsatzPersonal, listEntlassenesPersonal } from '../api/einsatzPersonal';
@@ -46,7 +46,7 @@ import type {
 
 dayjs.extend(utc);
 
-vi.mock('../api/einsaetze', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeEinsatz: vi.fn(), ladeModulFreigaben: vi.fn() }));
 vi.mock('../api/einheiten', () => ({ listeEinheiten: vi.fn(), setzeEinheitStatus: vi.fn() }));
 vi.mock('../api/einsatzPersonal', () => ({
   listeEinsatzPersonal: vi.fn(),

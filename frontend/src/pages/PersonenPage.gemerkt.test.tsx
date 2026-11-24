@@ -52,7 +52,7 @@ beforeEach(async () => {
   vi.stubGlobal('EventSource', FakeEventSource);
   vi.stubGlobal('BroadcastChannel', StummerKanal);
   setzeOnline(true);
-  server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
+  server.use(http.get('/api/incidents/:einsatzId/uhs', () => HttpResponse.json([])));
   await queueLeerenFuerTests();
 });
 afterEach(() => {
@@ -88,10 +88,10 @@ describe('PersonenPage rendert gemerkt (LFH-949)', () => {
     const zehn = Array.from({ length: 10 }, (_, i) => P(i + 1));
     server.use(
       meHandler(benutzerFixture()),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json(zehn)),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture())),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json(zehn)),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <Routes>

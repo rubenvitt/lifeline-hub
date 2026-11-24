@@ -19,7 +19,7 @@ export interface AdhocEingabe {
 }
 
 export function listeEinsatzPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
-  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel`);
+  return apiGet<EinsatzPersonal[]>(`/api/incidents/${einsatzId}/personnel`);
 }
 
 /** Ziele und Auswahl einer Sammel-Disposition (LLH-1100). */
@@ -38,7 +38,7 @@ export function disponierePersonalSammel(
   einsatzId: number,
   eingabe: SammelPersonalEingabe,
 ): Promise<EinsatzPersonal[]> {
-  return apiSend<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel/bulk`, 'POST', {
+  return apiSend<EinsatzPersonal[]>(`/api/incidents/${einsatzId}/personnel/bulk`, 'POST', {
     personal_ids: eingabe.personal_ids,
     einheit_id: eingabe.einheit_id ?? null,
     fahrzeug_id: eingabe.fahrzeug_id ?? null,
@@ -46,7 +46,7 @@ export function disponierePersonalSammel(
 }
 
 export function disponiereAdhoc(einsatzId: number, adhoc: AdhocEingabe): Promise<EinsatzPersonal> {
-  return apiSend<EinsatzPersonal>(`/api/einsaetze/${einsatzId}/personnel`, 'POST', { adhoc });
+  return apiSend<EinsatzPersonal>(`/api/incidents/${einsatzId}/personnel`, 'POST', { adhoc });
 }
 
 /**
@@ -85,7 +85,7 @@ export function updateDisposition(
   erwartet?: DispositionErwartet,
 ): Promise<PersonalPatchAntwort> {
   return apiSend<PersonalPatchAntwort>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}`,
+    `/api/incidents/${einsatzId}/personnel/${epId}`,
     'PATCH',
     erwartet ? { ...felder, erwartet } : felder,
   );
@@ -102,7 +102,7 @@ export function nimmPersonalStatuswechselZurueck(
   beleg: HandStatusRuecknahmeBeleg,
 ): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/status/undo`,
+    `/api/incidents/${einsatzId}/personnel/${epId}/status/undo`,
     'POST',
     beleg,
   );
@@ -110,7 +110,7 @@ export function nimmPersonalStatuswechselZurueck(
 
 /** Entlassene Kräfte des Einsatzes (LLH-1079, Block „Entlassen“); Stornierte liefert keine Liste. */
 export function listEntlassenesPersonal(einsatzId: number): Promise<EinsatzPersonal[]> {
-  return apiGet<EinsatzPersonal[]>(`/api/einsaetze/${einsatzId}/personnel?entlassene=1`);
+  return apiGet<EinsatzPersonal[]>(`/api/incidents/${einsatzId}/personnel?entlassene=1`);
 }
 
 /**
@@ -123,7 +123,7 @@ export function entlasseDisposition(
   epId: number,
 ): Promise<PersonalEntlassungAntwort> {
   return apiSend<PersonalEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/stand-down`,
+    `/api/incidents/${einsatzId}/personnel/${epId}/stand-down`,
     'POST',
   );
 }
@@ -140,7 +140,7 @@ export function nimmEntlassungZurueck(
   vorzustand: PersonalEntlassungVorzustand,
 ): Promise<PersonalEntlassungRuecknahmeAntwort> {
   return apiSend<PersonalEntlassungRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/stand-down/undo`,
+    `/api/incidents/${einsatzId}/personnel/${epId}/stand-down/undo`,
     'POST',
     vorzustand,
   );
@@ -148,20 +148,20 @@ export function nimmEntlassungZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Bindung und Spur in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/personnel/${epId}/annul`, 'POST');
+  return apiSend<void>(`/api/incidents/${einsatzId}/personnel/${epId}/annul`, 'POST');
 }
 
 /** Eine entlassene oder stornierte Kraft erneut disponieren (Block „Entlassen“). */
 export function reaktiviereDisposition(einsatzId: number, epId: number): Promise<EinsatzPersonal> {
   return apiSend<EinsatzPersonal>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/reactivate`,
+    `/api/incidents/${einsatzId}/personnel/${epId}/reactivate`,
     'POST',
   );
 }
 
 /** L‑2: Lädt die Führungskräfte-Marker für die Lagekarte. */
 export function listeFuehrungskraefte(einsatzId: number): Promise<FuehrungskraftKarte[]> {
-  return apiGet<FuehrungskraftKarte[]>(`/api/einsaetze/${einsatzId}/map/commanders`);
+  return apiGet<FuehrungskraftKarte[]>(`/api/incidents/${einsatzId}/map/commanders`);
 }
 
 /**
@@ -175,7 +175,7 @@ export function verortePerson(
   erwartet?: PositionPatch,
 ): Promise<FuehrungskraftKarte> {
   return apiSend<FuehrungskraftKarte>(
-    `/api/einsaetze/${einsatzId}/personnel/${epId}/position`,
+    `/api/incidents/${einsatzId}/personnel/${epId}/position`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );

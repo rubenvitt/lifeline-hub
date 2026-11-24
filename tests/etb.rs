@@ -22,7 +22,7 @@ async fn eintrag_erfassen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/etb"))
+                .uri(format!("/api/incidents/{einsatz_id}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -44,9 +44,9 @@ async fn etb_abrufen(
     query: &str,
 ) -> (StatusCode, Value) {
     let uri = if query.is_empty() {
-        format!("/api/einsaetze/{einsatz_id}/etb")
+        format!("/api/incidents/{einsatz_id}/etb")
     } else {
-        format!("/api/einsaetze/{einsatz_id}/etb?{query}")
+        format!("/api/incidents/{einsatz_id}/etb?{query}")
     };
     let resp = app
         .clone()
@@ -116,7 +116,7 @@ async fn etb_auftrag_beobachter_ist_403() {
     let (status, _) = post_json(
         &app,
         &beob,
-        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/task"),
+        &format!("/api/incidents/{einsatz}/etb/{etb_id}/task"),
         &auftrag_body("X"),
     )
     .await;
@@ -146,7 +146,7 @@ async fn etb_auftrag_cross_einsatz_ist_404() {
     let (status, _) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{b}/etb/{etb_id_a}/task"),
+        &format!("/api/incidents/{b}/etb/{etb_id_a}/task"),
         &auftrag_body("X"),
     )
     .await;
@@ -170,7 +170,7 @@ async fn etb_auftrag_happy_path_setzt_quellbezug() {
     let (status, json) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task"),
+        &format!("/api/incidents/{einsatz}/etb/{quell_id}/task"),
         &auftrag_body("Riegelstellung aufbauen"),
     )
     .await;
@@ -207,7 +207,7 @@ async fn etb_auftrag_mehrfach_aus_einem_eintrag_erlaubt() {
     )
     .await;
     let quell_id = etb["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task");
+    let uri = format!("/api/incidents/{einsatz}/etb/{quell_id}/task");
 
     let (s1, _) = post_json(&app, &admin, &uri, &auftrag_body("erster")).await;
     assert_eq!(s1, StatusCode::CREATED);
@@ -248,7 +248,7 @@ async fn etb_liste_fuehrt_folgeauftraege_am_quell_eintrag() {
     );
     assert_eq!(etb["folgeauftraege"], serde_json::json!([]));
 
-    let uri = format!("/api/einsaetze/{einsatz}/etb/{quell_id}/task");
+    let uri = format!("/api/incidents/{einsatz}/etb/{quell_id}/task");
     let (_, a1) = post_json(&app, &admin, &uri, &auftrag_body("Betreuung")).await;
     let (_, a2) = post_json(&app, &admin, &uri, &auftrag_body("Transport")).await;
 
@@ -401,7 +401,7 @@ async fn get_auftraege(app: &axum::Router, cookie: &str, einsatz: i64) -> (Statu
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/tasks"))
+                .uri(format!("/api/incidents/{einsatz}/tasks"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -450,7 +450,7 @@ async fn beobachter_darf_nicht_erfassen() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/members/{erika_id}"))
+                .uri(format!("/api/incidents/{einsatz}/members/{erika_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
@@ -648,7 +648,7 @@ async fn erfassen_in_abgeschlossenem_einsatz_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/close"))
+                .uri(format!("/api/incidents/{einsatz}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -676,7 +676,7 @@ async fn erfassen_ohne_session_ist_401() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/etb"))
+                .uri(format!("/api/incidents/{einsatz}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"X"}"#,
@@ -814,7 +814,7 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/close"))
+                .uri(format!("/api/incidents/{einsatz}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -872,7 +872,7 @@ async fn etb_offline_replay_mit_falschem_queue_besitzer_ist_412() {
     let (status, _) = anfrage_mit_offline_queue_benutzer(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(body),
         i64::MAX,
@@ -1033,7 +1033,7 @@ async fn admin_nicht_mitglied_darf_stream_abonnieren() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/live"))
+                .uri(format!("/api/incidents/{einsatz}/live"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -1066,7 +1066,7 @@ async fn beobachter_darf_lesen() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/members/{beob_id}"))
+                .uri(format!("/api/incidents/{einsatz}/members/{beob_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
@@ -1198,7 +1198,7 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
     let (app, _live) = setup_mit_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage").await;
-    let einheiten = format!("/api/einsaetze/{einsatz}/units");
+    let einheiten = format!("/api/incidents/{einsatz}/units");
     let zug = anlegen_id(
         &app,
         &admin,
@@ -1217,7 +1217,7 @@ async fn liste_einheit_filter_ueber_auftrag_und_von_an() {
     anlegen_id(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/tasks"),
+        &format!("/api/incidents/{einsatz}/tasks"),
         serde_json::json!({
             "auftrag_text": "Deich sichern",
             "empfaenger": [{ "empfaenger_typ": "einheit", "einheit_id": zug }]
@@ -1254,7 +1254,7 @@ async fn liste_einheit_filter_fremder_einsatz_ist_leer() {
     let fremde_einheit = anlegen_id(
         &app,
         &admin,
-        &format!("/api/einsaetze/{fremd}/units"),
+        &format!("/api/incidents/{fremd}/units"),
         serde_json::json!({"name": "1. Zug"}),
     )
     .await;
@@ -1306,7 +1306,7 @@ async fn stream_fuer_mitglied_liefert_event_stream() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/live"))
+                .uri(format!("/api/incidents/{einsatz}/live"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -1339,7 +1339,7 @@ async fn stream_fuer_beobachter_ist_200() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/members/{beob_id}"))
+                .uri(format!("/api/incidents/{einsatz}/members/{beob_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"beobachter"}"#))
@@ -1353,7 +1353,7 @@ async fn stream_fuer_beobachter_ist_200() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/live"))
+                .uri(format!("/api/incidents/{einsatz}/live"))
                 .header(header::COOKIE, beob)
                 .body(Body::empty())
                 .unwrap(),
@@ -1378,7 +1378,7 @@ async fn stream_fuer_nicht_mitglied_ist_403() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/live"))
+                .uri(format!("/api/incidents/{einsatz}/live"))
                 .header(header::COOKIE, fremd)
                 .body(Body::empty())
                 .unwrap(),
@@ -1396,7 +1396,7 @@ async fn stream_unbekannter_einsatz_ist_404() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze/999/live")
+                .uri("/api/incidents/999/live")
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -1415,7 +1415,7 @@ async fn stream_ohne_session_ist_401() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz}/live"))
+                .uri(format!("/api/incidents/{einsatz}/live"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -1442,7 +1442,7 @@ async fn etb_auftrag_traegt_den_weg() {
     let (status, json) = post_json(
         &app,
         &admin,
-        &format!("/api/einsaetze/{einsatz}/etb/{etb_id}/task"),
+        &format!("/api/incidents/{einsatz}/etb/{etb_id}/task"),
         r#"{"auftrag_text":"Deich sichern","weg":" über B 3 ","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,
     )
     .await;

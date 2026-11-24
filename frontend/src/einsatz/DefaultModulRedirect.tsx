@@ -1,7 +1,7 @@
 import { Navigate, useParams, useSearchParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Spin } from 'antd';
-import { ladeEinstellungen, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinstellungen, ladeModulFreigaben } from '../api/incidents';
 import { einsatzKeys } from '../api/queryKeys';
 import { einsaetzePfad, parseModulHinweis, parseRouteId } from '../routing/deeplinks';
 import {

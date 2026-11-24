@@ -8,7 +8,7 @@ import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-rou
 import MeldungenPage from './MeldungenPage';
 import { AuthProvider } from '../auth/AuthContext';
 import type { Meldung } from '../api/types';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeEinheiten } from '../api/einheiten';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
 import {
@@ -26,7 +26,7 @@ import { einsatzKeys } from '../api/queryKeys';
 import { bestaetigeVerwerfen } from '../test/verwerfen';
 
 vi.mock('../live/useEinsatzLiveStream', () => ({ useEinsatzLiveStream: () => {} }));
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: vi.fn().mockResolvedValue({
     id: 1,
     bezeichnung: 'Lage',
@@ -814,7 +814,7 @@ describe('MeldungenPage', () => {
     const antwort = new Promise<void>((r) => (freigeben = r));
     let angefragt = false;
     server.use(
-      http.get('/api/einsaetze/:eid/persons/units', async () => {
+      http.get('/api/incidents/:eid/persons/units', async () => {
         angefragt = true;
         await antwort;
         return HttpResponse.json([]);
@@ -834,7 +834,7 @@ describe('MeldungenPage', () => {
     client.setQueryData(einsatzKeys.personenEinheiten(1), [
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
-    server.use(http.get('/api/einsaetze/:eid/persons/units', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/:eid/persons/units', () => HttpResponse.json([])));
     renderPage(undefined, client);
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
@@ -854,7 +854,7 @@ describe('MeldungenPage', () => {
     client.setQueryData(einsatzKeys.personenEinheiten(1), [
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
-    server.use(http.get('/api/einsaetze/:eid/persons/units', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/:eid/persons/units', () => HttpResponse.json([])));
     renderPage(undefined, client);
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
@@ -872,7 +872,7 @@ describe('MeldungenPage', () => {
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
     server.use(
-      http.get('/api/einsaetze/:eid/persons/units', () =>
+      http.get('/api/incidents/:eid/persons/units', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );

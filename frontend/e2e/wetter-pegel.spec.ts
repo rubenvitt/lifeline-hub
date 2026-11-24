@@ -162,20 +162,20 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   return String(((await r.json()) as { id: number }).id);
 }
 
 /** Stellt Pegel, Verlauf und Wetter auf Literale. */
 async function stelle(page: Page, einsatzId: string, wetterAntwort: unknown) {
-  await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/gauges`, (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: PEGEL }) : route.continue(),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/gauges/history`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/gauges/history`, (route) =>
     route.fulfill({ json: VERLAUF }),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/weather`, (route) =>
     route.fulfill({ json: wetterAntwort }),
   );
 }

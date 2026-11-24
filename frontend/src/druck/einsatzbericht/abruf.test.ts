@@ -30,7 +30,7 @@ const api = vi.hoisted(() => ({
   ladeEtbVollstaendig: vi.fn(),
 }));
 
-vi.mock('../../api/einsaetze', () => ({
+vi.mock('../../api/incidents', () => ({
   ladeEinsatz: api.ladeEinsatz,
   ladeFuehrungsstelle: api.ladeFuehrungsstelle,
   ladeMitglieder: api.ladeMitglieder,

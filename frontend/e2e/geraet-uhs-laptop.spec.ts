@@ -26,18 +26,18 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Laptop ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'uhs-laptop', uhs_id: nord.id, bezeichnung: 'Laptop 1' },
   );
 
@@ -82,7 +82,7 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     await expect(laptop.getByText('Decken werden knapp')).toBeVisible();
 
     // Die Einsatzleitung sieht die Meldung mit der Stelle als Absender.
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
+    const meldungen = await page.request.get(`/api/incidents/${e}/reports`);
     expect(meldungen.ok()).toBeTruthy();
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(liste.find((m) => m.inhalt === 'Decken werden knapp')?.absender).toBe(
@@ -105,21 +105,21 @@ test('LFH-1045: Leitung ordnet eine Kraft zu, der Laptop sieht die Stärke', asy
   browser,
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Stärke ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/incidents/${e}/personnel`, {
     adhoc: { name: 'Anna Arzt', funktion: 'Notarzt', staerke_position: 'fuehrer' },
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'uhs-laptop', uhs_id: nord.id, bezeichnung: 'Laptop 1' },
   );
 

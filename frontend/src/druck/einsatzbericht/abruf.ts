@@ -1,7 +1,7 @@
 import { ApiError } from '../../api/client';
 import { ladeBetreuung } from '../../api/betreuung';
 import { ladeEvakuierung } from '../../api/evakuierung';
-import { ladeEinsatz, ladeFuehrungsstelle, ladeMitglieder } from '../../api/einsaetze';
+import { ladeEinsatz, ladeFuehrungsstelle, ladeMitglieder } from '../../api/incidents';
 import { listAufgeloesteEinheiten, listeEinheiten } from '../../api/einheiten';
 import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { ladeVerbleibAngaben, listePersonen } from '../../api/einsatzPerson';

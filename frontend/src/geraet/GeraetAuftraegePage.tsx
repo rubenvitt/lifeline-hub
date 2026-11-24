@@ -3,7 +3,7 @@ import { Alert, App, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../auth/AuthContext';
 import { listeOffeneAuftraege, quittiereEmpfaenger, setzeVollzug } from '../api/auftraege';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { listeAbschnitte } from '../api/einsatzabschnitte';
 import { listeEinheiten } from '../api/einheiten';
 import { einsatzKeys } from '../api/queryKeys';

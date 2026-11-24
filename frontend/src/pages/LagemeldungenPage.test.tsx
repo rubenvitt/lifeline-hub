@@ -20,7 +20,7 @@ vi.mock('../auth/AuthContext', () => ({
 }));
 const ladeEinsatz = vi.fn();
 const ladeModulFreigaben = vi.fn();
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   ladeEinsatz: (...a: unknown[]) => ladeEinsatz(...a),
   ladeModulFreigaben: (...a: unknown[]) => ladeModulFreigaben(...a),
 }));

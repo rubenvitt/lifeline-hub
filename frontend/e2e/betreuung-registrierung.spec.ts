@@ -31,10 +31,10 @@ async function senden<T = { id: number }>(
 /** Einsatz mit einer namentlich geführten Notunterkunft in Betrieb. */
 async function saeStelle(page: Page): Promise<{ einsatzId: number; stelleId: number }> {
   await anmeldenAlsAdmin(page);
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `Registrierung ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const { id: stelleId } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',
@@ -164,7 +164,7 @@ test('Zeitfenster anlegen schlägt die Sonderkost aus der Registrierung vor', as
   await senden(
     page,
     'post',
-    `/api/einsaetze/${einsatzId}/care/positions/${stelleId}/registrations`,
+    `/api/incidents/${einsatzId}/care/positions/${stelleId}/registrations`,
     {
       personen: [
         { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' },
@@ -191,7 +191,7 @@ test('Zeitfenster anlegen schlägt die Sonderkost aus der Registrierung vor', as
 
 /** Familie Weber und Haushalt Yilmaz an der Stelle, per API. */
 async function saeHaushalte(page: Page, einsatzId: number, stelleId: number): Promise<void> {
-  const pfad = `/api/einsaetze/${einsatzId}/care/positions/${stelleId}/registrations`;
+  const pfad = `/api/incidents/${einsatzId}/care/positions/${stelleId}/registrations`;
   await senden(page, 'post', pfad, {
     personen: [
       { name: 'Weber', vorname: 'Anna', kostform: 'vegetarisch' },

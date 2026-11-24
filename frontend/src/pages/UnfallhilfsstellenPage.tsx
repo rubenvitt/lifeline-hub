@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { einsaetzePfad, einsatzPfad, uhsDetailPfad } from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useEffect, useState } from 'react';
-import { ladeEinsatz } from '../api/einsaetze';
+import { ladeEinsatz } from '../api/incidents';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { listeUhs } from '../api/einsatzUhs';
 import { einsatzKeys } from '../api/queryKeys';

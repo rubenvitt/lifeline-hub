@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient } from '@tanstack/react-query';
-import { ladeModulFreigaben } from '../api/einsaetze';
+import { ladeModulFreigaben } from '../api/incidents';
 import { modulRegistry } from '../einsatz/modulRegistry';
 import { freigabenFixture } from '../test/fixtures';
 import { EIGENE_LAGE_QUELLE } from './eigeneLageUebernahme';
@@ -10,7 +10,7 @@ import { SCHADENLAGE_QUELLE } from './schadenlageUebernahme';
 import { loadAbschnittTexte, loadStartinhalt } from './startinhalt';
 import type { UebernahmeQuelle } from './uebernahmeQuelle';
 
-vi.mock('../api/einsaetze', () => ({ ladeModulFreigaben: vi.fn() }));
+vi.mock('../api/incidents', () => ({ ladeModulFreigaben: vi.fn() }));
 
 const dtg = (iso: string) => `DTG(${iso})`;
 /** Feste Uhr: der Stand der Übernahme (LLH-1357) ist der Zeitpunkt, an dem der Text entsteht. */

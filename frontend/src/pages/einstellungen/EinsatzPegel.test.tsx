@@ -96,11 +96,11 @@ function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { methode: string; body: unknown }[] = [];
   let liste = a.liste ?? [HMUE, WAHN];
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
-    http.get('/api/einsaetze/1/settings', () =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
+    http.get('/api/incidents/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/gauges', () =>
+    http.get('/api/incidents/1/gauges', () =>
       a.pegelStatus ? new HttpResponse(null, { status: a.pegelStatus }) : HttpResponse.json(liste),
     ),
     http.get('/api/map/overlays/pegelonline', () =>
@@ -114,7 +114,7 @@ function stelleBereit(a: Aufbau = {}) {
                 : antwort('ok', FEATURES),
           ),
     ),
-    http.put('/api/einsaetze/1/gauges', async ({ request }) => {
+    http.put('/api/incidents/1/gauges', async ({ request }) => {
       const body = (await request.json()) as {
         stationen: { station_uuid: string; name: string; gewaesser?: string | null }[];
       };
@@ -132,7 +132,7 @@ function stelleBereit(a: Aufbau = {}) {
       }));
       return HttpResponse.json(liste);
     }),
-    http.post('/api/einsaetze/1/gauges', async ({ request }) => {
+    http.post('/api/incidents/1/gauges', async ({ request }) => {
       const body = (await request.json()) as {
         station_uuid: string;
         name: string;
@@ -340,7 +340,7 @@ describe('EinsatzPegel', () => {
     stelleBereit();
     let einsatzAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1', () => {
+      http.get('/api/incidents/1', () => {
         einsatzAbrufe++;
         return HttpResponse.json(einsatz());
       }),
@@ -541,7 +541,7 @@ describe('EinsatzPegel', () => {
     stelleBereit();
     server.use(
       meHandler(adminFixture({ org_id: 1 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz(), org_id: 1, meine_rolle: null }),
       ),
     );
@@ -634,8 +634,8 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
     const aufrufe: { methode: string; body?: unknown }[] = [];
     let liste = start as { id: number; prognose?: unknown }[];
     server.use(
-      http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(liste)),
-      http.put('/api/einsaetze/1/gauges/:pid/forecast', async ({ request, params }) => {
+      http.get('/api/incidents/1/gauges', () => HttpResponse.json(liste)),
+      http.put('/api/incidents/1/gauges/:pid/forecast', async ({ request, params }) => {
         const body = (await request.json()) as { hoechststand_cm: number; zeitpunkt: string };
         aufrufe.push({ methode: 'PUT', body });
         liste = liste.map((p) =>
@@ -645,12 +645,12 @@ describe('EinsatzPegel — Prognose (LFH-628)', () => {
         );
         return HttpResponse.json(liste);
       }),
-      http.delete('/api/einsaetze/1/gauges/:pid/forecast', ({ params }) => {
+      http.delete('/api/incidents/1/gauges/:pid/forecast', ({ params }) => {
         aufrufe.push({ methode: 'DELETE' });
         liste = liste.map((p) => (p.id === Number(params.pid) ? { ...p, prognose: undefined } : p));
         return HttpResponse.json(liste);
       }),
-      http.get('/api/einsaetze/1/gauges/:pid/prediction', () =>
+      http.get('/api/incidents/1/gauges/:pid/prediction', () =>
         vorhersage === 'fehler'
           ? HttpResponse.json({ error: 'weg' }, { status: 502 })
           : HttpResponse.json(

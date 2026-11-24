@@ -7,7 +7,7 @@ import { App as AntApp } from 'antd';
 import BefehlDetailPage from './BefehlDetailPage';
 import { AuthProvider } from '../auth/AuthContext';
 import * as befehleApi from '../api/befehle';
-import * as einsaetzeApi from '../api/einsaetze';
+import * as einsaetzeApi from '../api/incidents';
 import { EinsatzAnzeigeProvider } from '../anzeige/AnzeigeKonventionenContext';
 import { einsatzKeys } from '../api/queryKeys';
 import { setzeViewportBreite } from '../test/viewport';
@@ -17,7 +17,7 @@ import { server } from '../test/server';
 import { erwarteNichtGefunden } from '../test/nichtGefunden';
 
 vi.mock('../api/befehle');
-vi.mock('../api/einsaetze');
+vi.mock('../api/incidents');
 
 const einsatz = { id: 1, bezeichnung: 'Übung', status: 'aktiv', meine_rolle: 'einsatzleitung' };
 
@@ -1199,7 +1199,7 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
   const ABSCHNITT = { id: 3, name: 'EA Süd' };
 
   beforeEach(() => {
-    server.use(http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])));
+    server.use(http.get('/api/incidents/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])));
     vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
   });

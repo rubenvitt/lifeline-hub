@@ -10,7 +10,7 @@ import {
   einsatzFixture,
   freigabenFixture,
 } from '../test/fixtures';
-import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
+import { ladeEinsatz, ladeModulFreigaben } from '../api/incidents';
 import { merkeModulBesuch } from '../einsatz/zuletztModule';
 import { useBefehle } from './useBefehle';
 
@@ -20,7 +20,7 @@ const ICH = benutzerFixture().id;
 vi.mock('../auth/AuthContext', () => ({
   useAuth: () => authWertFixture(benutzerFixture({ org_rolle: 'fuehrungskraft' })),
 }));
-vi.mock('../api/einsaetze', () => ({
+vi.mock('../api/incidents', () => ({
   listeEinsaetze: vi.fn(() => Promise.resolve([])),
   ladeModulFreigaben: vi.fn(() => Promise.resolve(freigabenFixture())),
   ladeEinsatz: vi.fn(() => Promise.resolve(einsatzFixture({ id: 5 }))),
