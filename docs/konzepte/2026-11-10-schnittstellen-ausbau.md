@@ -204,7 +204,9 @@ als Adapter aussieht:
   Positionen gehen in den Vertrag „Position“.
 - **Ausgang:** Kurztexte (höchstens 200 Byte) als Kanal im Vertrag „Ausgang“.
 - **Ankopplung:**
-  - über einen eigenen MQTT-Broker (JSON, nicht auf nRF52) oder eine Brücke, die selbst signiert;
+  - über eine Brücke, die selbst signiert; JSON über MQTT hat Meshtastic mit Firmware 2.8
+    entfernt (Machbarkeit 24.11.2026:
+    [`2026-11-24-j7iz8dki-meshtastic-machbarkeit.md`](../superpowers/specs/2026-11-24-j7iz8dki-meshtastic-machbarkeit.md));
   - Serial/TCP nur über die Brücke, damit die GPL-3.0 der Protobufs nicht in Lifeline Hub wirkt.
 - **Grenzen:**
   - Der Kanal-PSK ist nicht authentisiert, Absender sind fälschbar.
