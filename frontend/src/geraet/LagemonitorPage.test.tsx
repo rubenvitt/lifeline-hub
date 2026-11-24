@@ -9,7 +9,7 @@ import { meHandler, server } from '../test/server';
 import { neuerQueryClient } from '../test/utils';
 import { benutzerFixture, einsatzFixture } from '../test/fixtures';
 import { FakeEventSource } from '../test/eventSource';
-import type { GeraetAnzeige, LagemonitorAnzeige } from '../api/types';
+import type { GeraetAnzeige, LagemonitorAnzeige, LagemonitorKachel } from '../api/types';
 import { ThemeModeProvider } from '../theme/ThemeModeProvider';
 import {
   ABRUF_TAKT_MS,
@@ -579,6 +579,36 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     expect(screen.queryByText('Neue Sofortmeldung')).toBeNull();
   });
 
+  it('wieder eingeblendet (LLH-2072): die erste Zahl danach ist kein Anstieg', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    // Ausgeblendet liefert der Server 0; das ist kein Stand, von dem aus etwas „steigt“.
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        sofortmeldungen_offen: 0,
+        betroffene: { ...lage.betroffene, sk1: 0 },
+        ausgeblendet: ['betroffene', 'meldungen'],
+      });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Kräfte' });
+
+    await naechsterStand({
+      ...lage,
+      sofortmeldungen_offen: 3,
+      betroffene: { ...lage.betroffene, sk1: 2 },
+    });
+    await waitFor(() =>
+      expect(zahl('Meldungen', 'Sofortmeldungen offen')).toHaveTextContent(
+        '3Sofortmeldungen offen',
+      ),
+    );
+    expect(hervorgehoben('Meldungen', 'Sofortmeldungen offen')).toBe('nein');
+    expect(hervorgehoben('Betroffene', 'SK I')).toBe('nein');
+    expect(screen.queryByText('Neue Sofortmeldung')).toBeNull();
+    expect(screen.queryByText('Neu in SK I')).toBeNull();
+  });
+
   it('SK I steigt: hervorgehoben mit Wort; sinkt sie, nicht', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
     bereit();
@@ -725,6 +755,78 @@ describe('Lagemonitor — Ablauf der Veranstaltung (LLH-1570)', () => {
     bereit();
     renderApp('/geraet/7/monitor');
     await screen.findByRole('region', { name: 'Betroffene' });
+    expect(screen.queryByRole('region', { name: 'Ablauf' })).toBeNull();
+  });
+});
+
+describe('Lagemonitor — ausgeblendete Module (LLH-2072)', () => {
+  // Wie die Alarmzeile: eine Kachel, deren Modul im Einsatz ausgeblendet ist, fehlt ganz.
+  function mitAusgeblendet(
+    ausgeblendet: LagemonitorKachel[],
+    extra: Partial<LagemonitorAnzeige> = {},
+  ) {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, ...extra, ausgeblendet });
+  }
+
+  it('rechte Spalte fehlt ganz, die linke nimmt die volle Breite', async () => {
+    mitAusgeblendet(['betroffene', 'kraefte', 'uhs']);
+    renderApp('/geraet/7/monitor');
+    const meldungen = await screen.findByRole('region', { name: 'Meldungen' });
+    // Bis das Lagebild da ist, steht rechts „wird geladen“; danach nimmt die linke Spalte alles.
+    await waitFor(() =>
+      expect(meldungen.closest('main')!.style.gridTemplateColumns).toBe('minmax(0px, 1fr)'),
+    );
+    for (const name of ['Betroffene', 'Kräfte', 'Belegung der Unfallhilfsstellen']) {
+      expect(screen.queryByRole('region', { name })).toBeNull();
+    }
+    expect(screen.queryByText('Lagebild wird geladen …')).toBeNull();
+  });
+
+  it('Kräfte fehlt, wenn nur Kräfte genannt ist; Betroffene und Belegung bleiben', async () => {
+    mitAusgeblendet(['kraefte']);
+    renderApp('/geraet/7/monitor');
+    const betroffene = await screen.findByRole('region', { name: 'Betroffene' });
+    expect(screen.queryByRole('region', { name: 'Kräfte' })).toBeNull();
+    expect(
+      screen.getByRole('region', { name: 'Belegung der Unfallhilfsstellen' }),
+    ).toBeInTheDocument();
+    expect(betroffene.closest('main')!.style.gridTemplateColumns).toBe(
+      'minmax(0px, 3fr) minmax(0px, 2fr)',
+    );
+  });
+
+  it('uhs ausgeblendet: Belegung und „an UHS“ fehlen, Kräfte bleibt', async () => {
+    mitAusgeblendet(['uhs'], { uhs: [] });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Kräfte' });
+    expect(screen.queryByRole('region', { name: 'Belegung der Unfallhilfsstellen' })).toBeNull();
+    expect(screen.queryByText(/an UHS/)).toBeNull();
+  });
+
+  it('Betroffene ausgeblendet: auch „Hilfeleistungen“ fehlt', async () => {
+    mitAusgeblendet(['betroffene']);
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Kräfte' });
+    expect(screen.queryByRole('region', { name: 'Betroffene' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Hilfeleistungen' })).toBeNull();
+  });
+
+  it('Meldungen ausgeblendet: Ablauf nimmt die Zeile allein', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    mitAusgeblendet(['meldungen'], {
+      programm: [{ id: 1, bezeichnung: 'Beginn', zeitpunkt_at: '2026-10-04 10:20:30' }],
+    });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Ablauf' });
+    expect(screen.queryByRole('region', { name: 'Meldungen' })).toBeNull();
+  });
+
+  it('Meldungen ausgeblendet ohne Programmpunkt: keine untere Zeile', async () => {
+    mitAusgeblendet(['meldungen']);
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    expect(screen.queryByRole('region', { name: 'Meldungen' })).toBeNull();
     expect(screen.queryByRole('region', { name: 'Ablauf' })).toBeNull();
   });
 });

@@ -9276,7 +9276,102 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     assert_eq!(a["auftraege_ueberfaellig"], json!(0), "{v}");
     assert_eq!(a["abschnitte_kritisch"], json!([]), "{v}");
     assert_eq!(a["ausfall"], json!([]), "{v}");
+    // Seit LLH-2072 fehlt auch die Kachel: der Server liest die Sofortmeldungen nicht mehr.
+    assert_eq!(v["sofortmeldungen_offen"], json!(0), "{v}");
+    assert_eq!(
+        v["ausgeblendet"],
+        json!(["betroffene", "meldungen", "kraefte"]),
+        "{v}"
+    );
+}
+
+/// LLH-2072: Kacheln, deren Modul im Einsatz ausgeblendet ist, liest der Server nicht; er liefert
+/// sie als 0 bzw. leer und nennt sie in `ausgeblendet`. Ohne Ausblendung fehlt das Feld.
+#[tokio::test]
+async fn lagemonitor_kacheln_lassen_ausgeblendete_module_weg() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let basis = format!("/api/einsaetze/{einsatz}");
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/personen"),
+        &admin,
+        Some(&json!({"name": "Vermisstfrau", "status": "vermisst"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/einheiten"),
+        &admin,
+        Some(&json!({ "name": "Logistiktrupp" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let eben = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("{basis}/meldungen"),
+        &admin,
+        Some(&json!({
+            "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
+            "meldungsart": "sofortmeldung", "prioritaet": "sofort", "ereigniszeit": eben,
+        })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let lagebild = format!("{basis}/lagemonitor");
+
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v.get("ausgeblendet").is_none(), "{v}");
+    assert_eq!(v["betroffene"]["vermisst"], json!(1), "{v}");
     assert_eq!(v["sofortmeldungen_offen"], json!(1), "{v}");
+    assert_eq!(v["kraefte"]["einheiten"], json!(1), "{v}");
+    assert_eq!(v["uhs"].as_array().unwrap().len(), 1, "{v}");
+
+    for modul in ["personen", "meldungen", "unfallhilfsstellen", "einheiten"] {
+        modul_ausblenden(&app, &admin, einsatz, modul).await;
+    }
+    let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        v["ausgeblendet"],
+        json!(["betroffene", "meldungen", "kraefte", "uhs"]),
+        "{v}"
+    );
+    assert_eq!(v["betroffene"]["vermisst"], json!(0), "{v}");
+    assert_eq!(v["betroffene"]["gesamt"], json!(0), "{v}");
+    assert_eq!(v["sofortmeldungen_offen"], json!(0), "{v}");
+    assert_eq!(v["kraefte"]["einheiten"], json!(0), "{v}");
+    assert_eq!(v["uhs"], json!([]), "{v}");
+}
+
+/// LLH-2072: die Kachel „Kräfte“ fehlt wie die Kennzahl im Lagebild (`kraefteZustand`), sobald
+/// Personal oder Einheiten ausgeblendet ist, auch wenn das andere sichtbar bleibt.
+#[tokio::test]
+async fn lagemonitor_kraefte_fehlt_schon_wenn_nur_einheiten_ausgeblendet() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let monitor = lagemonitor(&app, &admin, einsatz).await;
+    modul_ausblenden(&app, &admin, einsatz, "einheiten").await;
+    let (s, v) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/lagemonitor"),
+        &monitor,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ausgeblendet"], json!(["kraefte"]), "{v}");
 }
 
 /// Delta-Spec `lagemonitor`, „Sofortmeldungen erreichen den Monitor sofort“ (LLH-1743, D7): der

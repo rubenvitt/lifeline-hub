@@ -5609,6 +5609,12 @@ export interface components {
             /** @description Einsatzabschnitte mit gezeichneter Fläche. */
             abschnitte: components["schemas"]["LagemonitorAbschnitt"][];
             alarm?: components["schemas"]["LagemonitorAlarm"] | null;
+            /**
+             * @description Kacheln, deren Modul im Einsatz ausgeblendet ist (LLH-2072), in der Folge von
+             *     [`LagemonitorKachel`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer, und
+             *     der Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es.
+             */
+            ausgeblendet?: components["schemas"]["LagemonitorKachel"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
@@ -5675,6 +5681,12 @@ export interface components {
             /** @description Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste. */
             warnstufe: components["schemas"]["Warnstufe"];
         };
+        /**
+         * @description Eine Kachel des Lagemonitors, die mit ihrem Modul ausgeblendet wird (LLH-2072). Für
+         *     [`LagemonitorAnzeige::ausgeblendet`]; „Ablauf“ hängt an den Einsatzdaten und fehlt nie.
+         * @enum {string}
+         */
+        LagemonitorKachel: "betroffene" | "meldungen" | "kraefte" | "uhs";
         /** @description Kräfte in Zahlen: Einheiten, disponiertes Personal und seine Stärke. */
         LagemonitorKraefte: {
             /** Format: int64 */
