@@ -55,7 +55,7 @@ interface FormWerte {
  * Felder, ohne die ein Fahrzeug im Einsatz nicht auffindbar ist. Alles Übrige steht hier.
  *
  * **KEIN eigener Backend-Endpunkt.** `FahrzeugAnzeige` trägt bereits jedes Stammdatenfeld —
- * ein `GET /api/fahrzeuge/{id}` läge Byte für Byte auf der Liste. Die Seite liest deshalb
+ * ein `GET /api/vehicles/{id}` läge Byte für Byte auf der Liste. Die Seite liest deshalb
  * DIESELBE Query wie `FahrzeugeTab` und selektiert die Zeile.
  *
  * **Der Schlüssel muss byte-gleich der des Tabs sein.** `globalKeys.fahrzeugeListe('alle')`

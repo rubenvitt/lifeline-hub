@@ -24,11 +24,11 @@ export interface FahrzeugEingabe {
 
 export function listeFahrzeuge(nurImDienst = false): Promise<Fahrzeug[]> {
   const qs = nurImDienst ? '?nur_im_dienst=true' : '';
-  return apiGet<Fahrzeug[]>(`/api/fahrzeuge${qs}`);
+  return apiGet<Fahrzeug[]>(`/api/vehicles${qs}`);
 }
 
 export function ladeFahrzeugVorschlaege(): Promise<FahrzeugVorschlaege> {
-  return apiGet<FahrzeugVorschlaege>('/api/fahrzeug-vorschlaege');
+  return apiGet<FahrzeugVorschlaege>('/api/vehicle-suggestions');
 }
 
 /**
@@ -46,13 +46,13 @@ type FahrzeugNeu = { funkrufname: string } & Partial<Omit<FahrzeugEingabe, 'funk
 type FahrzeugPatch = Partial<FahrzeugEingabe>;
 
 export function legeFahrzeugAn(daten: FahrzeugNeu): Promise<Fahrzeug> {
-  return apiSend<Fahrzeug>('/api/fahrzeuge', 'POST', daten);
+  return apiSend<Fahrzeug>('/api/vehicles', 'POST', daten);
 }
 
 export function aktualisiereFahrzeug(id: number, daten: FahrzeugPatch): Promise<Fahrzeug> {
-  return apiSend<Fahrzeug>(`/api/fahrzeuge/${id}`, 'PATCH', daten);
+  return apiSend<Fahrzeug>(`/api/vehicles/${id}`, 'PATCH', daten);
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Fahrzeug> {
-  return setzeDienststatusUnter<Fahrzeug>('/api/fahrzeuge', id, inDienst);
+  return setzeDienststatusUnter<Fahrzeug>('/api/vehicles', id, inDienst);
 }

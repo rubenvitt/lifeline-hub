@@ -162,7 +162,7 @@ function setupMSW() {
     http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
     http.get('/api/einsaetze/7/etb', () => HttpResponse.json([eintrag])),
     zaehlung({ meldung: 1 }),
-    http.get('/api/etb-bausteine', () => HttpResponse.json([])),
+    http.get('/api/etb-snippets', () => HttpResponse.json([])),
     // Schnellerfassung lädt via useFunkrufnamen disponierte Fahrzeuge/Einheiten
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
@@ -626,7 +626,7 @@ describe('EtbPage', () => {
     const langerText = 'x'.repeat(20_001);
     let gesendet = 0;
     setup('/einsaetze/7/etb', [
-      http.get('/api/etb-bausteine', () =>
+      http.get('/api/etb-snippets', () =>
         HttpResponse.json([
           {
             id: 1,

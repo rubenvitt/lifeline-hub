@@ -21,7 +21,7 @@ export function listeMaterial(nurImDienst = false): Promise<Material[]> {
 
 /** Gibt alle org-weit verwendeten Materialkategorien (DISTINCT) zurück. */
 export function listeKategorien(): Promise<string[]> {
-  return apiGet<string[]>('/api/material-kategorien');
+  return apiGet<string[]>('/api/material-categories');
 }
 
 export function legeMaterialAn(daten: MaterialEingabe): Promise<Material> {

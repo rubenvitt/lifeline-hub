@@ -57,7 +57,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
  * Knöpfe und bliebe fälschlich grün.
  */
 async function fahrzeugAnlegen(page: Page, funkrufname: string) {
-  const antwort = await page.request.post('/api/fahrzeuge', {
+  const antwort = await page.request.post('/api/vehicles', {
     data: { funkrufname, fahrzeugtyp: 'LF 20', kennzeichen: 'X-YZ 123' },
   });
   expect(

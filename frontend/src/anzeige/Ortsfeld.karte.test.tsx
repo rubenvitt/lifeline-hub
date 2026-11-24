@@ -408,7 +408,7 @@ describe('Ortsfeld — Kartenvorschau', () => {
   it('ohne Einsatz: Nadel ziehen fragt die Ort-Vorschau der Organisation und schlägt den Ortsnamen vor', async () => {
     const abfragen: URL[] = [];
     server.use(
-      http.get('/api/ort-vorschau', ({ request }) => {
+      http.get('/api/place-preview', ({ request }) => {
         abfragen.push(new URL(request.url));
         return HttpResponse.json({ ortsname: 'Lindenweg 2, 12345 Musterdorf' });
       }),

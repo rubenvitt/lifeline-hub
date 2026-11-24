@@ -8,7 +8,7 @@ mod common;
 use common::*;
 
 async fn katalog(app: &axum::Router, cookie: &str) -> Vec<Value> {
-    let (s, json) = anfrage(app, "GET", "/api/qualifikationen", cookie, None).await;
+    let (s, json) = anfrage(app, "GET", "/api/qualifications", cookie, None).await;
     assert_eq!(s, StatusCode::OK);
     json.as_array().unwrap().clone()
 }
@@ -41,7 +41,7 @@ async fn startliste_bringt_ketten_und_kreis_ist_422() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/qualifikationen/{san}"),
+        &format!("/api/qualifications/{san}"),
         &admin,
         Some(&format!(r#"{{"schliesst_ein_id":{ns}}}"#)),
     )
@@ -55,7 +55,7 @@ async fn startliste_bringt_ketten_und_kreis_ist_422() {
     benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let setze = format!(r#"{{"schliesst_ein_id":{ns}}}"#);
-    let pfad = format!("/api/qualifikationen/{na}");
+    let pfad = format!("/api/qualifications/{na}");
     assert_eq!(
         anfrage(&app, "PATCH", &pfad, &erika, Some(&setze)).await.0,
         StatusCode::FORBIDDEN
@@ -78,7 +78,7 @@ async fn startliste_bringt_ketten_und_kreis_ist_422() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         &admin,
         Some(r#"{"label":"Sanitätshelfer","sortier":5,"schliesst_ein_id":null}"#),
     )
@@ -88,7 +88,7 @@ async fn startliste_bringt_ketten_und_kreis_ist_422() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/qualifikationen/{san}"),
+        &format!("/api/qualifications/{san}"),
         &admin,
         Some(&format!(r#"{{"schliesst_ein_id":{sanh}}}"#)),
     )
@@ -97,7 +97,7 @@ async fn startliste_bringt_ketten_und_kreis_ist_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         &admin,
         Some(r#"{"label":"X","schliesst_ein_id":987654}"#),
     )
@@ -117,7 +117,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(&format!(
             r#"{{"label":"RTW","quali_soll":[{{"qualifikation_id":{rs},"anzahl":1}},{{"qualifikation_id":{rs},"anzahl":1}}]}}"#
@@ -128,7 +128,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(r#"{"label":"RTW","quali_soll":[{"qualifikation_id":987654,"anzahl":1}]}"#),
     )
@@ -137,7 +137,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, typ) = anfrage(
         &app,
         "POST",
-        "/api/einheit-typen",
+        "/api/unit-types",
         &admin,
         Some(&format!(
             r#"{{"label":"RTW","soll_fuehrer":0,"soll_unterfuehrer":0,"soll_mannschaft":2,"quali_soll":[{{"qualifikation_id":{rs},"anzahl":1}}]}}"#

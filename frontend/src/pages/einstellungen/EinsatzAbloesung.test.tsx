@@ -108,7 +108,7 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
-    http.get('/api/schichtmodelle', () => HttpResponse.json(MODELLE)),
+    http.get('/api/shift-models', () => HttpResponse.json(MODELLE)),
     // Das Paneel „Dienst und Ruhe“ liest nur `grenzwerte` aus dem Plan (LLH-1603, D2).
     http.get('/api/einsaetze/1/abloesungen/schichtplan', () => HttpResponse.json({ grenzwerte })),
     http.patch('/api/einsaetze/1/abloesungen/schichtplan/grenzwerte', async ({ request }) => {

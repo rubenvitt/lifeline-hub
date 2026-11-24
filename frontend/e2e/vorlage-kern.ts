@@ -28,7 +28,7 @@ export async function seedeVorlage(page: Page, kennung = ''): Promise<GesaeteVor
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const typen = (await (await page.request.get('/api/einheit-typen')).json()) as {
+  const typen = (await (await page.request.get('/api/unit-types')).json()) as {
     id: number;
     label: string;
   }[];
@@ -41,7 +41,7 @@ export async function seedeVorlage(page: Page, kennung = ''): Promise<GesaeteVor
   };
   const fz: Record<keyof typeof fahrzeuge, number> = { elw: 0, rtw1: 0, rtw2: 0 };
   for (const [k, funkrufname] of Object.entries(fahrzeuge) as [keyof typeof fahrzeuge, string][]) {
-    fz[k] = (await json('post', '/api/fahrzeuge', { funkrufname, fahrzeugtyp: 'RTW' })).id;
+    fz[k] = (await json('post', '/api/vehicles', { funkrufname, fahrzeugtyp: 'RTW' })).id;
   }
   const personen = {
     fuehrer: `Zugführer-Musterstadt, Zora ${marke}`,
@@ -58,27 +58,27 @@ export async function seedeVorlage(page: Page, kennung = ''): Promise<GesaeteVor
     dirk: 0,
   };
   for (const [k, name] of Object.entries(personen) as [keyof typeof personen, string][]) {
-    ps[k] = (await json('post', '/api/personal', { name })).id;
+    ps[k] = (await json('post', '/api/personnel', { name })).id;
   }
 
   const zug = `Sanitätszug Musterstadt ${marke}`;
   const staffel = `Rettungsstaffel ${marke}`;
-  const zugId = (await json('post', '/api/einheit-vorlagen', { name: zug, typ_id: typ('Zug') })).id;
+  const zugId = (await json('post', '/api/unit-templates', { name: zug, typ_id: typ('Zug') })).id;
   const staffelId = (
-    await json('post', '/api/einheit-vorlagen', {
+    await json('post', '/api/unit-templates', {
       name: staffel,
       typ_id: typ('Staffel'),
       ueber_vorlage_id: zugId,
     })
   ).id;
-  await json('put', `/api/einheit-vorlagen/${zugId}/fahrzeuge`, { fahrzeug_ids: [fz.elw] });
-  await json('put', `/api/einheit-vorlagen/${zugId}/personal`, {
+  await json('put', `/api/unit-templates/${zugId}/vehicles`, { fahrzeug_ids: [fz.elw] });
+  await json('put', `/api/unit-templates/${zugId}/personnel`, {
     personal: [{ personal_id: ps.fuehrer, fahrzeug_id: fz.elw, staerke_position: 'fuehrer' }],
   });
-  await json('put', `/api/einheit-vorlagen/${staffelId}/fahrzeuge`, {
+  await json('put', `/api/unit-templates/${staffelId}/vehicles`, {
     fahrzeug_ids: [fz.rtw1, fz.rtw2],
   });
-  await json('put', `/api/einheit-vorlagen/${staffelId}/personal`, {
+  await json('put', `/api/unit-templates/${staffelId}/personnel`, {
     personal: [
       { personal_id: ps.anna, fahrzeug_id: fz.rtw1 },
       { personal_id: ps.bert, fahrzeug_id: fz.rtw1 },
@@ -116,7 +116,7 @@ export async function seedeVorlagenMaterial(
   };
   const decken = await anlegen(material.decken, 'verbrauchsgut');
   const rucksack = await anlegen(material.rucksack, 'geraet');
-  const antwort = await page.request.put(`/api/einheit-vorlagen/${v.staffelId}/material`, {
+  const antwort = await page.request.put(`/api/unit-templates/${v.staffelId}/material`, {
     data: {
       material: [
         { material_id: decken, menge: 50 },

@@ -65,7 +65,7 @@ export default function FahrzeugFormModal({
       /**
        * NUR die vier sichtbaren Felder — beide Wege.
        *
-       * Beim BEARBEITEN tragend: `PATCH /api/fahrzeuge/{id}` ist ein echter Teil-Patch (LFH-306),
+       * Beim BEARBEITEN tragend: `PATCH /api/vehicles/{id}` ist ein echter Teil-Patch (LFH-306),
        * fehlender Key = unverändert, `null` = leeren. Ein `opta: leerZuNull(undefined)` wäre
        * `null` und löschte die sieben Felder, die diese Maske nicht zeigt. Beim ANLEGEN genügen
        * dieselben vier Keys, `sondersignal` trägt serverseitig ein `#[serde(default)]`.

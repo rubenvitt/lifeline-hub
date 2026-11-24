@@ -4243,7 +4243,7 @@ export interface components {
          * @enum {string}
          */
         Fuehrungsfunktion: "el" | "s1" | "s2" | "s3" | "s4" | "s5" | "s6" | "s7" | "fuehrungshilfspersonal" | "fachberater";
-        /** @description Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert. */
+        /** @description Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert. */
         FuehrungsfunktionAnzeige: {
             art: components["schemas"]["FunktionsArt"];
             bezeichnung_pflicht: boolean;

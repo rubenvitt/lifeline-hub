@@ -298,7 +298,7 @@ test('Ortspfad: die Pfad-Links folgen der Dichte-Staffel 30 / 48 / 72 px, die Sc
 for (const { liste, api, daten, pfad } of [
   {
     liste: 'Fahrzeuge',
-    api: '/api/fahrzeuge',
+    api: '/api/vehicles',
     daten: async () => ({
       funkrufname: `E2E Gate3 Pfad Florian ${Date.now()}`,
       fahrzeugtyp: 'LF 20',
@@ -307,15 +307,15 @@ for (const { liste, api, daten, pfad } of [
   },
   {
     liste: 'Personal',
-    api: '/api/personal',
+    api: '/api/personnel',
     daten: async () => ({ name: `E2E Gate3 Pfad Kraft ${Date.now()}` }),
     pfad: (id: number) => `/admin/stammdaten/personal/${id}`,
   },
   {
     liste: 'Einheiten-Vorlagen',
-    api: '/api/einheit-vorlagen',
+    api: '/api/unit-templates',
     daten: async (request: APIRequestContext) => {
-      const typen = (await (await request.get('/api/einheit-typen')).json()) as { id: number }[];
+      const typen = (await (await request.get('/api/unit-types')).json()) as { id: number }[];
       return { name: `E2E Gate3 Pfad Vorlage ${Date.now()}`, typ_id: typen[0].id };
     },
     pfad: (id: number) => `/admin/stammdaten/einheiten/${id}`,

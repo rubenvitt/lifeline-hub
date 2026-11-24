@@ -113,7 +113,7 @@ async fn personalstatus_schreibt_die_zeitachse() {
     let (_, z) = zeitachse(&w.app, &w.admin, &w.person_pfad()).await;
     assert_eq!(arten(&z), vec![paar("alarmierung", "status")]);
 
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let id_von = |label: &str| {
         katalog
             .as_array()
@@ -173,7 +173,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;
@@ -239,7 +239,7 @@ async fn handstatus_der_einheit_schreibt_die_zeitachse() {
     let alarm = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit alarmiert","kategorie":"gebunden","zeitachse_marke":"alarmierung"}"#,
     )
     .await;
@@ -262,7 +262,7 @@ async fn handstatus_der_einheit_schreibt_die_zeitachse() {
 #[tokio::test]
 async fn katalog_marke_setzen_pruefen_entfernen() {
     let w = welt().await;
-    for katalog in ["personal-status", "fahrzeug-status"] {
+    for katalog in ["personnel-statuses", "vehicle-statuses"] {
         let (s, _) = anfrage(
             &w.app,
             "POST",
@@ -763,7 +763,7 @@ async fn schon_eingetroffen_in_einheit(w: &Welt, name: &str) -> i64 {
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (_, katalog) = anfrage(&w.app, "GET", "/api/personal-status", &w.admin, None).await;
+    let (_, katalog) = anfrage(&w.app, "GET", "/api/personnel-statuses", &w.admin, None).await;
     let im_einsatz = katalog
         .as_array()
         .unwrap()
@@ -798,14 +798,14 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;
     let ohne_marke = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Werkstatt","kategorie":"gebunden","sortier":998}"#,
     )
     .await;
@@ -876,14 +876,14 @@ async fn handstatus_meldet_personal_fuer_den_fan_out() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit am Ort","kategorie":"gebunden","zeitachse_marke":"eintreffen"}"#,
     )
     .await;
     let ohne_marke = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"Einheit frei","kategorie":"gebunden"}"#,
     )
     .await;
@@ -952,7 +952,7 @@ async fn abloesung_bereit(w: &Welt) -> (i64, i64, i64) {
     let entlassen = status_anlegen(
         &w.app,
         &w.admin,
-        "personal-status",
+        "personnel-statuses",
         r#"{"label":"entlassen","kategorie":"gebunden","zeitachse_marke":"entlassung"}"#,
     )
     .await;
@@ -1216,7 +1216,7 @@ async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
     let am_ort = status_anlegen(
         &w.app,
         &w.admin,
-        "fahrzeug-status",
+        "vehicle-statuses",
         r#"{"label":"am Einsatzort","kategorie":"gebunden","sortier":999,"zeitachse_marke":"eintreffen"}"#,
     )
     .await;

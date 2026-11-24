@@ -65,7 +65,7 @@ async fn uebernommene_zeile_ist_nur_lesbar_lokale_ergaenzung_nicht() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/fahrzeuge/{id}"),
+        &format!("/api/vehicles/{id}"),
         &elw.admin,
         Some(&json!({"bemerkung": "geändert"})),
     )
@@ -75,7 +75,7 @@ async fn uebernommene_zeile_ist_nur_lesbar_lokale_ergaenzung_nicht() {
     let (s, _) = common::anfrage(
         &elw.app,
         "POST",
-        &format!("/api/fahrzeuge/{id}/ausser-dienst"),
+        &format!("/api/vehicles/{id}/out-of-service"),
         &elw.admin,
         None,
     )
@@ -86,7 +86,7 @@ async fn uebernommene_zeile_ist_nur_lesbar_lokale_ergaenzung_nicht() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/fahrzeuge",
+        "/api/vehicles",
         &elw.admin,
         Some(&json!({"funkrufname": "Geliehen 1"})),
     )
@@ -96,7 +96,7 @@ async fn uebernommene_zeile_ist_nur_lesbar_lokale_ergaenzung_nicht() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/fahrzeuge/{lokal}"),
+        &format!("/api/vehicles/{lokal}"),
         &elw.admin,
         Some(&json!({"bemerkung": "von KV Süd"})),
     )
@@ -459,7 +459,7 @@ async fn nach_dem_widerruf_gehoeren_die_zeilen_dem_elw() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/fahrzeuge/{id}"),
+        &format!("/api/vehicles/{id}"),
         &elw.admin,
         Some(&json!({"bemerkung": "jetzt unseres"})),
     )

@@ -10,7 +10,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-/// GET /api/stichwort-vorschlaege — Vorschläge der eigenen Organisation.
+/// GET /api/keyword-suggestions — Vorschläge der eigenen Organisation.
 /// Für alle eingeloggten Nutzer (Combobox).
 pub async fn liste(
     State(state): State<AppState>,
@@ -24,7 +24,7 @@ pub struct NeuerVorschlag {
     pub text: String,
 }
 
-/// POST /api/stichwort-vorschlaege — Vorschlag anlegen. Admin-only.
+/// POST /api/keyword-suggestions — Vorschlag anlegen. Admin-only.
 /// Duplikat je Organisation → Conflict (409).
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -36,7 +36,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(vorschlag)))
 }
 
-/// DELETE /api/stichwort-vorschlaege/{id} — Vorschlag löschen. Admin-only.
+/// DELETE /api/keyword-suggestions/{id} — Vorschlag löschen. Admin-only.
 pub async fn loeschen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -57,7 +57,7 @@ pub struct VorlageKopplung {
     pub vorlage_id: Option<Option<i64>>,
 }
 
-/// PUT /api/stichwort-vorschlaege/{id}/vorlage — Vorschlag an eine Einsatz-Vorlage koppeln
+/// PUT /api/keyword-suggestions/{id}/template — Vorschlag an eine Einsatz-Vorlage koppeln
 /// (LLH-1375). Admin-only. Fremder oder unbekannter Vorschlag 404, Vorlage einer anderen
 /// Organisation oder unbekannt 400, Feld fehlt 400.
 pub async fn set_vorlage(

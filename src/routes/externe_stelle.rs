@@ -25,7 +25,7 @@ pub struct ListQuery {
     pub nur_aktive: Option<bool>,
 }
 
-/// GET /api/externe-stellen — Stellen der eigenen Organisation; ohne `nur_aktive=false` nur die
+/// GET /api/external-agencies — Stellen der eigenen Organisation; ohne `nur_aktive=false` nur die
 /// aktiven.
 pub async fn list(
     State(state): State<AppState>,
@@ -48,7 +48,7 @@ pub struct StelleBody {
     pub zustaendig: bool,
 }
 
-/// POST /api/externe-stellen — Admin. Neue Stelle (aktiv).
+/// POST /api/external-agencies — Admin. Neue Stelle (aktiv).
 pub async fn create(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -99,7 +99,7 @@ fn check_kurz_tri(
     Ok(wert)
 }
 
-/// PATCH /api/externe-stellen/{id} — Admin, Teil-Patch. Fremde oder unbekannte id → 404;
+/// PATCH /api/external-agencies/{id} — Admin, Teil-Patch. Fremde oder unbekannte id → 404;
 /// unzulässige Markierung „zuständig“ → 422 (design.md D3).
 pub async fn update(
     State(state): State<AppState>,

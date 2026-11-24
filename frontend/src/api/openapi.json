@@ -10657,7 +10657,7 @@
       },
       "FuehrungsfunktionAnzeige": {
         "type": "object",
-        "description": "Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert.",
+        "description": "Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert.",
         "required": [
           "funktion",
           "label",

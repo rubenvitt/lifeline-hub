@@ -22,11 +22,11 @@ function render(list: EinheitVorlage[] = VORLAGEN) {
   let query = '';
   server.use(
     meHandler(admin),
-    http.get('/api/einheit-vorlagen', ({ request }) => {
+    http.get('/api/unit-templates', ({ request }) => {
       query = new URL(request.url).search;
       return HttpResponse.json(list);
     }),
-    http.get('/api/einheit-typen', () => HttpResponse.json(EINHEIT_TYPEN)),
+    http.get('/api/unit-types', () => HttpResponse.json(EINHEIT_TYPEN)),
   );
   const result = renderMitProviders(
     <Routes>
@@ -74,7 +74,7 @@ describe('EinheitVorlagenTab', () => {
   it('legt eine Vorlage mit Name, Typ und Unterstellung an und öffnet ihre Detailseite', async () => {
     let body: unknown = null;
     server.use(
-      http.post('/api/einheit-vorlagen', async ({ request }) => {
+      http.post('/api/unit-templates', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(einheitVorlageFixture({ id: 21, name: 'Betreuungsgruppe' }), {
           status: 201,
@@ -106,7 +106,7 @@ describe('EinheitVorlagenTab', () => {
   it('ohne Unterstellung geht keine Unterstellung auf den Draht', async () => {
     let body: unknown = null;
     server.use(
-      http.post('/api/einheit-vorlagen', async ({ request }) => {
+      http.post('/api/unit-templates', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(einheitVorlageFixture({ id: 22 }), { status: 201 });
       }),
@@ -124,7 +124,7 @@ describe('EinheitVorlagenTab', () => {
 
   it('eine Ablehnung steht im Dialog, die Felder bleiben', async () => {
     server.use(
-      http.post('/api/einheit-vorlagen', () =>
+      http.post('/api/unit-templates', () =>
         HttpResponse.json(
           { error: 'Eine aktive Einheiten-Vorlage mit diesem Namen gibt es schon' },
           { status: 409 },

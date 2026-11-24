@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-06-12T12:00:00Z'));
   // Vorschläge und Ziele der Erfassung (LLH-1089): leer, wenn ein Test nichts anderes setzt.
   server.use(
-    http.get('/api/einheit-typen', () => HttpResponse.json([])),
+    http.get('/api/unit-types', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
   );
@@ -1614,7 +1614,7 @@ describe('NachforderungenPage — Als Einheit übernehmen (LLH-1383)', () => {
     const koerper: unknown[] = [];
     server.use(
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten())),
-      http.get('/api/einheit-typen', () =>
+      http.get('/api/unit-types', () =>
         HttpResponse.json([
           { id: 1, label: 'KTW', sortier: 1 },
           { id: 2, label: 'RTW', sortier: 2 },

@@ -69,8 +69,8 @@ function setup(vorlagen: EinsatzVorlage[] = VORLAGEN) {
   server.use(
     meHandler(admin),
     http.get('/api/einsaetze', () => HttpResponse.json([])),
-    http.get('/api/einsatz-vorlagen', () => HttpResponse.json(vorlagen)),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(VORSCHLAEGE)),
+    http.get('/api/incident-templates', () => HttpResponse.json(vorlagen)),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json(VORSCHLAEGE)),
     http.post('/api/einsaetze', async ({ request }) => {
       rumpf.wert = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json(
@@ -171,7 +171,7 @@ describe('Anlegedialog · Einsatz-Vorlage (LLH-1375, LLH-1816)', () => {
     let beantwortet = false;
     setup([]);
     server.use(
-      http.get('/api/einsatz-vorlagen', () => {
+      http.get('/api/incident-templates', () => {
         beantwortet = true;
         return HttpResponse.json([]);
       }),
@@ -302,7 +302,7 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
     const mitModell = VORLAGEN.map((v) => (v.id === 2 ? { ...v, schichtmodell_id: 9 } : v));
     const rumpf = setup(mitModell);
     server.use(
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           modell(1, '12-h-Schicht', true),
           modell(9, 'Sanitätsdienst 6 h', false),
@@ -337,7 +337,7 @@ describe('Anlegedialog · Schichtmodell der Vorlage (LLH-1313)', () => {
     const mitModell = VORLAGEN.map((v) => (v.id === 3 ? { ...v, schichtmodell_id: 9 } : v));
     setup(mitModell);
     server.use(
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([modell(9, '12-h-Schicht 0600/1800', false)]),
       ),
     );
@@ -355,7 +355,7 @@ describe('Anlegedialog · Modell der Vorlage fehlt im Cache (LLH-1313)', () => {
     const mitModell = VORLAGEN.map((v) => (v.id === 2 ? { ...v, schichtmodell_id: 77 } : v));
     setup(mitModell);
     server.use(
-      http.get('/api/schichtmodelle', () =>
+      http.get('/api/shift-models', () =>
         HttpResponse.json([
           {
             id: 1,

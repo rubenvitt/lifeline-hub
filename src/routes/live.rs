@@ -272,21 +272,21 @@ pub async fn org_stream(
 /// Route. Bewusst NICHT dabei: Org-Einstellungen und Org-Modul-Einstellungen (enger Lesekreis),
 /// Benutzer, Karten (instanzweit) — Spec `org-live`, „Bewusst nicht live".
 pub const STAMMDATEN_PFADE: &[&str] = &[
-    "/api/fahrzeuge",
-    "/api/fahrzeug-status",
-    "/api/personal",
-    "/api/personal-status",
+    "/api/vehicles",
+    "/api/vehicle-statuses",
+    "/api/personnel",
+    "/api/personnel-statuses",
     "/api/material",
-    "/api/qualifikationen",
-    "/api/einheit-typen",
-    "/api/einheit-vorlagen",
-    "/api/einsatz-vorlagen",
-    "/api/verpflegung-vorlagen",
-    "/api/schichtmodelle",
-    "/api/sprechgruppen",
-    "/api/etb-bausteine",
-    "/api/stichwort-vorschlaege",
-    "/api/externe-stellen",
+    "/api/qualifications",
+    "/api/unit-types",
+    "/api/unit-templates",
+    "/api/incident-templates",
+    "/api/catering-templates",
+    "/api/shift-models",
+    "/api/talk-groups",
+    "/api/etb-snippets",
+    "/api/keyword-suggestions",
+    "/api/external-agencies",
     "/api/org-command-roles",
     "/api/org-accommodation-guidelines",
     "/api/organization",
@@ -339,11 +339,11 @@ mod tests {
 
     #[test]
     fn stammdaten_praefix_ist_segmentgenau() {
-        assert!(ist_stammdaten_pfad("/api/fahrzeuge"));
-        assert!(ist_stammdaten_pfad("/api/fahrzeuge/{id}/ausser-dienst"));
+        assert!(ist_stammdaten_pfad("/api/vehicles"));
+        assert!(ist_stammdaten_pfad("/api/vehicles/{id}/out-of-service"));
         assert!(ist_stammdaten_pfad("/api/organization/logo"));
         assert!(!ist_stammdaten_pfad("/api/fahrzeuge-x"));
-        assert!(!ist_stammdaten_pfad("/api/fahrzeug-vorschlaege"));
+        assert!(!ist_stammdaten_pfad("/api/vehicle-suggestions"));
         assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/sprechgruppen"));
         assert!(!ist_stammdaten_pfad("/api/org-settings"));
     }

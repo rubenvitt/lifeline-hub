@@ -19,7 +19,7 @@ const FUEKW = { width: 1366, height: 768 };
 const panel = (page: Page) => page.locator('[data-lfh="modul-panel"]');
 
 async function vorlageId(page: Page, bezeichnung: string): Promise<number> {
-  const r = await page.request.get('/api/einsatz-vorlagen');
+  const r = await page.request.get('/api/incident-templates');
   expect(r.ok(), `Vorlagen: ${r.status()}`).toBe(true);
   const vorlagen = (await r.json()) as { id: number; bezeichnung: string }[];
   const treffer = vorlagen.find((v) => v.bezeichnung === bezeichnung);
@@ -67,7 +67,7 @@ test('Einsatz mit Vorlage „MANV“: das Modulpanel zeigt „Unfallhilfsstellen
 test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async ({ page }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
   const stichwort = `E2E-MANV-${Date.now()}`;
-  const angelegt = await page.request.post('/api/stichwort-vorschlaege', {
+  const angelegt = await page.request.post('/api/keyword-suggestions', {
     data: { text: stichwort },
   });
   expect(angelegt.ok(), `Stichwort: ${angelegt.status()}`).toBe(true);
@@ -79,7 +79,7 @@ test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async
     const manvId = await vorlageId(page, 'MANV');
     await expect
       .poll(async () => {
-        const r = await page.request.get('/api/stichwort-vorschlaege');
+        const r = await page.request.get('/api/keyword-suggestions');
         const liste = (await r.json()) as { id: number; vorlage_id?: number | null }[];
         return liste.find((v) => v.id === vorschlagId)?.vorlage_id ?? null;
       })
@@ -93,7 +93,7 @@ test('ein gekoppeltes Stichwort stellt im Anlegedialog seine Vorlage ein', async
     await zeigtWahl(module, 'MANV');
     await dialog.getByRole('button', { name: 'Abbrechen' }).click();
   } finally {
-    await page.request.delete(`/api/stichwort-vorschlaege/${vorschlagId}`);
+    await page.request.delete(`/api/keyword-suggestions/${vorschlagId}`);
   }
 });
 

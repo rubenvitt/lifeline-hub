@@ -204,7 +204,7 @@ impl Labelkarte {
     }
 }
 
-/// Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert.
+/// Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FuehrungsfunktionAnzeige {
     pub funktion: Fuehrungsfunktion,

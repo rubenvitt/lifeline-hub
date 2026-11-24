@@ -8,7 +8,7 @@ use serde_json::Value;
 mod common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
-const PFAD: &str = "/api/externe-stellen";
+const PFAD: &str = "/api/external-agencies";
 
 async fn create_stelle(app: &axum::Router, cookie: &str, rumpf: &str) -> (StatusCode, Value) {
     anfrage(app, "POST", PFAD, cookie, Some(rumpf)).await

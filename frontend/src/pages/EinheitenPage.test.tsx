@@ -76,7 +76,7 @@ function handlers(
       HttpResponse.json(new URL(request.url).searchParams.has('aufgeloeste') ? [] : einheiten),
     ),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/einheit-typen', () =>
+    http.get('/api/unit-types', () =>
       HttpResponse.json([
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
       ]),
@@ -86,7 +86,7 @@ function handlers(
     http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json(sprechgruppen)),
     // Ohne aktive Vorlagen zeigt der Dialog „Einheit bilden“ kein Feld „Vorlage“ (LLH-1049).
-    http.get('/api/einheit-vorlagen', () => HttpResponse.json([])),
+    http.get('/api/unit-templates', () => HttpResponse.json([])),
   ];
 }
 
@@ -797,7 +797,7 @@ describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
   function seite() {
     const angelegt: unknown[] = [];
     server.use(
-      http.get('/api/einheit-vorlagen', () => HttpResponse.json(vorlagen)),
+      http.get('/api/unit-templates', () => HttpResponse.json(vorlagen)),
       ...handlers(),
       http.post('/api/einsaetze/1/einheiten', async ({ request }) => {
         angelegt.push(await request.json());
