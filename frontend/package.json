@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "doku:bilder": "node scripts/doku-bilder.mjs",
+    "verify": "playwright test -c playwright.verify.config.ts",
     "zeichen-werte": "node scripts/zeichen-werte.mjs",
     "design-system": "node scripts/design-system/run.mjs"
   },
