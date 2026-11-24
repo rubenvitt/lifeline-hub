@@ -240,6 +240,47 @@ fn slim_feature(f: &Value) -> Value {
     })
 }
 
+/// Download-Deckel eines Vector Package (EMSR517: größtes ZIP 36,6 MB, AOI05 Bonn).
+pub(crate) const DECKEL_PAKET: usize = 48 * 1024 * 1024;
+
+/// Zeitgrenze eines Paket-Abrufs; über dem globalen Takt der Fachebenen, weil ein ZIP groß
+/// ist. Der kalte Abruf läuft ohnehin von der Anfrage gelöst weiter.
+const PAKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
+/// Liegt die Adresse unter [`PAKET_BASIS`]? Gilt vor dem Abruf und für die Adresse nach
+/// Weiterleitungen.
+pub(crate) fn is_paket_url(url: &str) -> bool {
+    url.starts_with(PAKET_BASIS)
+}
+
+/// Holt ein Vector Package und liest es mit [`read_vector_package`] (in `spawn_blocking`).
+pub(crate) async fn fetch_paket(client: &reqwest::Client, url: &str) -> Result<Value, String> {
+    if !is_paket_url(url) {
+        return Err(format!("Adresse außerhalb des Altbestands: {url}"));
+    }
+    let resp = client
+        .get(url)
+        .timeout(PAKET_TIMEOUT)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    if !is_paket_url(resp.url().as_str()) {
+        return Err(format!(
+            "Weiterleitung auf eine fremde Adresse: {}",
+            resp.url()
+        ));
+    }
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
+    }
+    let bytes = crate::http_begrenzt::lies_begrenzt(resp, DECKEL_PAKET)
+        .await
+        .map_err(|e| e.to_string())?;
+    tokio::task::spawn_blocking(move || read_vector_package(&bytes))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

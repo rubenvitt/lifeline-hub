@@ -10,7 +10,7 @@
 
 use crate::error::AppError;
 use crate::karte::typen::{Bbox, FachebeneAntwort};
-use crate::karte::{cache, quellen, FachebenenState};
+use crate::karte::{cache, copernicus_alt, quellen, FachebenenState};
 use chrono::NaiveDateTime;
 use futures::stream::{self, StreamExt};
 use serde_json::Value;
@@ -504,7 +504,8 @@ pub(crate) fn select_produkte(g: &Gebiet) -> Vec<&Produkt> {
     for p in g
         .produkte
         .iter()
-        .filter(|p| p.fertig && !p.ebenen.is_empty())
+        // Ein Produkt des Altbestands hat seine Ebenen im Vector Package.
+        .filter(|p| p.fertig && (!p.ebenen.is_empty() || p.zip.is_some()))
     {
         let besser = je_typ
             .get(p.typ.as_str())
@@ -636,17 +637,23 @@ pub(crate) const DETAIL_URL: &str =
 /// Höchstzahl der Ebenen-Dateien je Antwort; darüber trägt das Gebiet `gekuerzt`.
 pub(crate) const MAX_EBENEN: usize = 40;
 
+/// Höchstzahl der Vector Packages (Altbestand) je Antwort; ein ZIP kostet bis 37 MB Download.
+/// Darüber trägt das Gebiet `gekuerzt`.
+pub(crate) const MAX_ZIPS: usize = 6;
+
 /// Grenzen einer Antwort, in Tests kleiner.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Grenzen {
     pub ebenen: usize,
     pub bytes: usize,
+    pub zips: usize,
 }
 
 impl Grenzen {
     pub(crate) const STANDARD: Grenzen = Grenzen {
         ebenen: MAX_EBENEN,
         bytes: MAX_ANTWORT_BYTES,
+        zips: MAX_ZIPS,
     };
 }
 
@@ -659,11 +666,14 @@ pub(crate) struct Gebaut {
 }
 
 /// Baut die Antwort für einen Ausschnitt. `fetch` lädt eine URL als JSON (im Betrieb
-/// `quellen::hole_json`, in Tests ein Stub). `None`, wenn die Liste fehlt oder keine einzige
+/// `quellen::hole_json`, in Tests ein Stub), `fetch_paket` ein Vector Package des Altbestands
+/// als Ergebnis von `copernicus_alt::read_vector_package` (im Betrieb
+/// `copernicus_alt::fetch_paket`). `None`, wenn die Liste fehlt oder keine einzige
 /// Aktivierung ihre Details liefert: dann ist die Ebene `offline`.
-pub(crate) async fn build_antwort<H, Fut>(
+pub(crate) async fn build_antwort<H, Fut, P, FutP>(
     pool: &SqlitePool,
     fetch: H,
+    fetch_paket: P,
     bbox: Bbox,
     archiv: bool,
     jetzt: NaiveDateTime,
@@ -672,6 +682,8 @@ pub(crate) async fn build_antwort<H, Fut>(
 where
     H: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = Result<Value, String>> + Send,
+    P: Fn(String) -> FutP + Send + Sync,
+    FutP: Future<Output = Result<Value, String>> + Send,
 {
     let liste_roh = load_teilstand(
         pool,
@@ -716,12 +728,22 @@ where
         .buffered(PARALLEL)
         .collect()
         .await;
-    let details: Vec<Details> = geladen.into_iter().flatten().collect();
+    let mut details: Vec<Details> = geladen.into_iter().flatten().collect();
     // Keine einzige Aktivierung lieferte Details: die Quelle ist gestört, nicht leer.
     if !kandidaten.is_empty() && details.is_empty() {
         return None;
     }
     let mut vollstaendig = details.len() == kandidaten.len();
+    // Altbestand nur mit „Ältere Aktivierungen“ (ADR-0098); führt die Liste den Code schon,
+    // gilt sie.
+    if archiv {
+        details.extend(
+            copernicus_alt::load_katalog()
+                .iter()
+                .filter(|k| !liste.iter().any(|a| a.code == k.code))
+                .cloned(),
+        );
+    }
 
     // Gebiete im Ausschnitt mit ihren gewählten Produkten, und die Ebenen, die zu holen sind.
     struct Treffer {
@@ -730,9 +752,12 @@ where
         gewaehlt: Vec<Produkt>,
         gekuerzt: bool,
         unvollstaendig: bool,
+        /// Genauer Umriss aus dem Vector Package (Altbestand), sonst gilt der des Gebiets.
+        umriss: Option<Value>,
     }
     let mut treffer: Vec<Treffer> = Vec::new();
     let mut auftraege: Vec<(usize, Produkt, EbenenArt, String)> = Vec::new();
+    let mut pakete: Vec<(usize, Produkt, String)> = Vec::new();
     for (di, d) in details.iter().enumerate().filter(|(_, d)| !d.sensibel) {
         for (gi, g) in d.gebiete.iter().enumerate() {
             if !intersects(&g.huelle, &bbox) {
@@ -748,6 +773,13 @@ where
                         gekuerzt = true;
                     }
                 }
+                if let Some(url) = &p.zip {
+                    if pakete.len() < grenzen.zips {
+                        pakete.push((treffer.len(), p.clone(), url.clone()));
+                    } else {
+                        gekuerzt = true;
+                    }
+                }
             }
             treffer.push(Treffer {
                 details: di,
@@ -755,6 +787,7 @@ where
                 gewaehlt,
                 gekuerzt,
                 unvollstaendig: false,
+                umriss: None,
             });
         }
     }
@@ -771,24 +804,82 @@ where
         .buffered(PARALLEL)
         .collect()
         .await;
+    let fetch_paket = &fetch_paket;
+    let pakete_geholt: Vec<_> = stream::iter(pakete)
+        .map(|(ti, p, url)| async move {
+            let schluessel = format!("copernicus-teil:paket:{url}");
+            let roh = load_teilstand(
+                pool,
+                &schluessel,
+                COPERNICUS_EBENE_TTL,
+                fetch_paket,
+                &url,
+                |v| v.get("ebenen").is_some_and(Value::is_array),
+            )
+            .await;
+            (ti, p, roh)
+        })
+        .buffered(PARALLEL)
+        .collect()
+        .await;
 
-    let mut features = Vec::new();
-    let mut bytes = 0usize;
-    for (ti, p, art, roh) in &geholt {
-        let t = &treffer[*ti];
-        let d = &details[t.details];
-        let Some(fc) = roh else {
+    // Ebenen-Dateien und Ebenen aus Paketen gleich behandelt: normalisieren, dann gegen die
+    // Byte-Grenze rechnen.
+    let mut ebenen: Vec<(usize, &Produkt, EbenenArt, Option<&Value>)> = geholt
+        .iter()
+        .map(|(ti, p, art, roh)| (*ti, p, *art, roh.as_ref()))
+        .collect();
+    for (ti, p, roh) in &pakete_geholt {
+        let Some(paket) = roh else {
             treffer[*ti].unvollstaendig = true;
             vollstaendig = false;
             continue;
         };
-        let neu = normalize_ebene(fc, *art, d, &d.gebiete[t.gebiet], p, &ausschnitt);
+        // Der Umriss kommt vom jüngsten gezeigten Produkt des Gebiets.
+        let juengstes = treffer[*ti]
+            .gewaehlt
+            .iter()
+            .filter(|q| q.zip.is_some())
+            .max_by_key(|q| (q.monitoring, q.version));
+        if juengstes.is_some_and(|q| q == p) {
+            if let Some(u) = paket.get("umriss").filter(|u| u.is_object()) {
+                treffer[*ti].umriss = Some(u.clone());
+            }
+        }
+        for e in paket["ebenen"].as_array().into_iter().flatten() {
+            let Some(art) = e
+                .get("art")
+                .and_then(Value::as_str)
+                .and_then(EbenenArt::from_wire)
+            else {
+                continue;
+            };
+            // In DEL sind Gebäude und Straßen Referenzdaten ohne Schadensklasse.
+            let schaden = matches!(art, EbenenArt::SchadenGebaeude | EbenenArt::SchadenVerkehr);
+            if schaden && p.typ != "GRA" {
+                continue;
+            }
+            ebenen.push((*ti, p, art, e.get("fc")));
+        }
+    }
+
+    let mut features = Vec::new();
+    let mut bytes = 0usize;
+    for (ti, p, art, roh) in ebenen {
+        let t = &treffer[ti];
+        let d = &details[t.details];
+        let Some(fc) = roh else {
+            treffer[ti].unvollstaendig = true;
+            vollstaendig = false;
+            continue;
+        };
+        let neu = normalize_ebene(fc, art, d, &d.gebiete[t.gebiet], p, &ausschnitt);
         let groesse: usize = neu
             .iter()
             .map(|f| serde_json::to_vec(f).map_or(0, |b| b.len()))
             .sum();
         if bytes + groesse > grenzen.bytes {
-            treffer[*ti].gekuerzt = true;
+            treffer[ti].gekuerzt = true;
             continue;
         }
         bytes += groesse;
@@ -802,9 +893,21 @@ where
     for t in &treffer {
         let d = &details[t.details];
         let gewaehlt: Vec<&Produkt> = t.gewaehlt.iter().collect();
+        let gebiet = &d.gebiete[t.gebiet];
+        let mit_umriss;
+        let gebiet = match &t.umriss {
+            Some(u) => {
+                mit_umriss = Gebiet {
+                    umriss: u.clone(),
+                    ..gebiet.clone()
+                };
+                &mit_umriss
+            }
+            None => gebiet,
+        };
         alle.push(gebiet_feature(
             d,
-            &d.gebiete[t.gebiet],
+            gebiet,
             &gewaehlt,
             t.unvollstaendig,
             t.gekuerzt,
@@ -893,6 +996,7 @@ pub async fn fetch_copernicus(
         "copernicus"
     });
     let (client, p, k) = (s.client.clone(), pool.clone(), key.clone());
+    let paket_client = s.client.clone();
     let antwort = quellen::liefere_geloest(
         pool,
         &s.inflight,
@@ -904,8 +1008,21 @@ pub async fn fetch_copernicus(
                 let c = client.clone();
                 async move { quellen::hole_json(&c, &url).await }
             };
+            let fetch_paket = move |url: String| {
+                let c = paket_client.clone();
+                async move { copernicus_alt::fetch_paket(&c, &url).await }
+            };
             let jetzt = chrono::Utc::now().naive_utc();
-            let gebaut = build_antwort(&p, fetch, bbox, archiv, jetzt, Grenzen::STANDARD).await?;
+            let gebaut = build_antwort(
+                &p,
+                fetch,
+                fetch_paket,
+                bbox,
+                archiv,
+                jetzt,
+                Grenzen::STANDARD,
+            )
+            .await?;
             if gebaut.vollstaendig {
                 cache::setze(&p, &k, &gebaut.antwort).await;
             }
@@ -1425,6 +1542,32 @@ mod tests {
                 std::future::ready(antwort)
             }
         }
+        /// Stub für `fetch_paket`: Ersetzungen und Ausfälle wie oben, Pakete von AOI15 aus der
+        /// Testdatei, alles andere 404.
+        fn fetch_paket(
+            &self,
+        ) -> impl Fn(String) -> std::future::Ready<Result<Value, String>> + Send + Sync {
+            let q = self.clone();
+            move |url: String| {
+                q.aufrufe.lock().unwrap().push(url.clone());
+                let antwort = if q
+                    .fehlt
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|f| url.contains(f.as_str()))
+                {
+                    Err("HTTP 503".to_string())
+                } else if let Some(v) = q.ersetzt.lock().unwrap().get(&url) {
+                    Ok(v.clone())
+                } else if url.contains("_AOI15_") {
+                    crate::karte::copernicus_alt::read_vector_package(AHRTAL_ZIP)
+                } else {
+                    Err("HTTP 404".to_string())
+                };
+                std::future::ready(antwort)
+            }
+        }
         fn count(&self, teil: &str) -> usize {
             self.aufrufe
                 .lock()
@@ -1439,6 +1582,168 @@ mod tests {
         t("2026-11-21 12:00:00")
     }
 
+    // ------------------------------------------------------------------ Altbestand (LLH-2022)
+
+    const AHRTAL_ZIP: &[u8] = include_bytes!("testdaten/copernicus-emsr517-aoi15.zip");
+
+    /// Ausschnitt über Ahrweiler, in AOI15 (und AOI03) von EMSR517.
+    fn ahrtal() -> Bbox {
+        Bbox::parse("7.05,50.52,7.15,50.56").unwrap()
+    }
+
+    fn gebiet_von<'a>(a: &'a FachebeneAntwort, name: &str) -> Option<&'a Value> {
+        a.features["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["properties"]["art"] == "gebiet" && f["properties"]["gebiet"] == name)
+    }
+
+    async fn baue(q: &Quelle, bbox: Bbox, archiv: bool, grenzen: Grenzen) -> Gebaut {
+        let pool = crate::db::test_pool().await;
+        build_antwort(
+            &pool,
+            q.fetch(),
+            q.fetch_paket(),
+            bbox,
+            archiv,
+            heute(),
+            grenzen,
+        )
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn zeigt_emsr517_im_archiv_ueber_dem_ahrtal() {
+        let q = Quelle::default();
+        let a = baue(&q, ahrtal(), true, Grenzen::STANDARD).await.antwort;
+        let g = gebiet_von(&a, "Bad Neuenahr-Ahrweiler").unwrap();
+        let pr = &g["properties"];
+        assert_eq!(pr["emsr"], "EMSR517");
+        assert_eq!(pr["monitoring"], 1);
+        assert_eq!(pr["version"], 3);
+        assert_eq!(pr["geliefert"], "2021-08-11 12:48:47");
+        assert_eq!(pr["unvollstaendig"], false);
+        assert_eq!(g["geometry"]["type"], "Polygon");
+        assert!(g["geometry"]["coordinates"][0].as_array().unwrap().len() > 5);
+        let f = a.features["features"].as_array().unwrap();
+        let gebaeude: Vec<_> = f
+            .iter()
+            .filter(|f| f["properties"]["art"] == "schaden_gebaeude")
+            .collect();
+        assert!(!gebaeude.is_empty());
+        assert!(gebaeude
+            .iter()
+            .any(|f| f["properties"]["klasse"] == "zerstoert"));
+        assert!(gebaeude
+            .iter()
+            .all(|f| f["properties"]["emsr"] == "EMSR517"));
+        // Das Testpaket hat je Ebene ein Feature außerhalb des Ausschnitts: es fällt weg.
+        let ausschnitt = filter_ausschnitt(&ahrtal());
+        assert!(f
+            .iter()
+            .filter(|f| f["properties"]["art"] != "gebiet")
+            .all(|f| { intersects(&bounding_box(&f["geometry"]).unwrap(), &ausschnitt) }));
+        // Hydrographie und Shapefile stehen im ZIP, werden aber nicht gezeigt.
+        assert!(f.iter().all(|f| f["properties"]["art"] != "hydrographie"));
+    }
+
+    #[tokio::test]
+    async fn laedt_ohne_archiv_kein_paket() {
+        let q = Quelle::default();
+        let a = baue(&q, ahrtal(), false, Grenzen::STANDARD).await.antwort;
+        assert_eq!(q.count(".zip"), 0);
+        assert!(gebiet_von(&a, "Bad Neuenahr-Ahrweiler").is_none());
+    }
+
+    #[tokio::test]
+    async fn fehlendes_paket_zeigt_das_rechteck_als_unvollstaendig() {
+        let q = Quelle::default();
+        let erftstadt = Bbox::parse("6.75,50.76,6.80,50.80").unwrap();
+        let gebaut = baue(&q, erftstadt, true, Grenzen::STANDARD).await;
+        let g = gebiet_von(&gebaut.antwort, "Erftstadt").unwrap();
+        assert_eq!(g["properties"]["unvollstaendig"], true);
+        assert_eq!(g["geometry"]["coordinates"][0].as_array().unwrap().len(), 5);
+        assert!(!gebaut.vollstaendig);
+    }
+
+    #[tokio::test]
+    async fn del_paket_liefert_keine_schadensebenen() {
+        let q = Quelle::default();
+        let url = "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI03_DEL_MONIT01_r1_RTP01_v1_vector.zip";
+        let fc = json!({ "type": "FeatureCollection", "features": [punkt(7.05, 50.58)] });
+        q.ersetzt.lock().unwrap().insert(
+            url.into(),
+            json!({ "umriss": null, "ebenen": [
+                { "art": "beobachtet", "fc": fc },
+                { "art": "schaden_gebaeude", "fc": fc },
+            ]}),
+        );
+        let hoenningen = Bbox::parse("7.00,50.575,7.10,50.585").unwrap();
+        let a = baue(&q, hoenningen, true, Grenzen::STANDARD).await.antwort;
+        let f = a.features["features"].as_array().unwrap();
+        assert!(f.iter().any(|f| f["properties"]["art"] == "beobachtet"));
+        assert!(f
+            .iter()
+            .all(|f| f["properties"]["art"] != "schaden_gebaeude"));
+        // Ohne Umriss im Paket bleibt das Rechteck, das Gebiet ist aber vollständig.
+        let g = gebiet_von(&a, "Hönningen").unwrap();
+        assert_eq!(g["properties"]["unvollstaendig"], false);
+    }
+
+    #[tokio::test]
+    async fn katalogeintrag_mit_code_der_liste_kommt_nicht_doppelt() {
+        let q = Quelle::default();
+        let mut liste: Value = serde_json::from_str(LISTE).unwrap();
+        liste["results"].as_array_mut().unwrap().push(json!({
+            "code": "EMSR517", "centroid": "POINT (7.1 50.5)", "closed": true,
+            "n_products": 27, "lastUpdate": "2021-08-11T12:48:47"
+        }));
+        q.ersetzt.lock().unwrap().insert(LISTE_URL.into(), liste);
+        let a = baue(&q, ahrtal(), true, Grenzen::STANDARD).await.antwort;
+        assert_eq!(q.count(".zip"), 0);
+        assert!(gebiet_von(&a, "Bad Neuenahr-Ahrweiler").is_none());
+        assert_eq!(q.count("code=EMSR517"), 1);
+    }
+
+    #[tokio::test]
+    async fn mehr_pakete_als_erlaubt_kuerzen_das_gebiet() {
+        let q = Quelle::default();
+        let grenzen = Grenzen {
+            zips: 0,
+            ..Grenzen::STANDARD
+        };
+        let a = baue(&q, ahrtal(), true, grenzen).await.antwort;
+        assert_eq!(q.count(".zip"), 0);
+        let g = gebiet_von(&a, "Bad Neuenahr-Ahrweiler").unwrap();
+        assert_eq!(g["properties"]["gekuerzt"], true);
+    }
+
+    #[test]
+    fn nur_adressen_unter_dem_paketpraefix_gelten() {
+        use crate::karte::copernicus_alt::is_paket_url;
+        assert!(is_paket_url(
+            "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/x_vector.zip"
+        ));
+        assert!(!is_paket_url("https://example.org/x.zip"));
+        assert!(!is_paket_url(
+            "https://cems-mapping-website.s3.eu-west-1.amazonaws.com.evil.org/static/activations/x.zip"
+        ));
+        assert!(!is_paket_url(
+            "http://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/x.zip"
+        ));
+    }
+
+    #[tokio::test]
+    async fn fetch_paket_lehnt_fremde_adressen_ab() {
+        let client = reqwest::Client::new();
+        let e = crate::karte::copernicus_alt::fetch_paket(&client, "https://example.org/x.zip")
+            .await
+            .unwrap_err();
+        assert!(e.contains("Adresse"), "{e}");
+    }
+
     #[tokio::test]
     async fn zeigt_emsr728_im_archiv_ueber_stuttgart() {
         let pool = crate::db::test_pool().await;
@@ -1446,6 +1751,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1482,6 +1788,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             false,
             heute(),
@@ -1505,6 +1812,7 @@ mod tests {
         assert!(build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1522,6 +1830,7 @@ mod tests {
         assert!(build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1539,6 +1848,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1564,6 +1874,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1591,6 +1902,7 @@ mod tests {
         build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1602,6 +1914,7 @@ mod tests {
         build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1621,6 +1934,7 @@ mod tests {
         build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1637,6 +1951,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1661,6 +1976,7 @@ mod tests {
         let a = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1683,6 +1999,7 @@ mod tests {
         let _ = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1737,6 +2054,7 @@ mod tests {
         let mit_luecke = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
@@ -1748,6 +2066,7 @@ mod tests {
         let ohne = build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             false,
             heute(),
@@ -1766,10 +2085,18 @@ mod tests {
             bytes: 1,
             ..Grenzen::STANDARD
         };
-        let a = build_antwort(&pool, q.fetch(), stuttgart(), true, heute(), grenzen)
-            .await
-            .unwrap()
-            .antwort;
+        let a = build_antwort(
+            &pool,
+            q.fetch(),
+            q.fetch_paket(),
+            stuttgart(),
+            true,
+            heute(),
+            grenzen,
+        )
+        .await
+        .unwrap()
+        .antwort;
         let f = a.features["features"].as_array().unwrap();
         assert!(f.iter().all(|f| f["properties"]["art"] == "gebiet"));
         assert_eq!(f[0]["properties"]["gekuerzt"], true);
@@ -1789,6 +2116,7 @@ mod tests {
         assert!(build_antwort(
             &pool,
             q.fetch(),
+            q.fetch_paket(),
             stuttgart(),
             true,
             heute(),
