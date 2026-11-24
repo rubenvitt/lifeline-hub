@@ -21,6 +21,7 @@ export type Bereitschaft = S['Bereitschaft'];
 export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
 export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
+export type LagemonitorKachel = S['LagemonitorKachel'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
 export type LagemonitorZone = S['LagemonitorZone'];
 export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
@@ -1232,7 +1233,7 @@ export interface PlanungErzeugenBody {
 export type EinsatzVorlage = S['EinsatzVorlage'];
 
 /**
- * Kein Backend-Schema: `POST /api/einsatz-vorlagen`, `PUT /api/einsatz-vorlagen/{id}`
+ * Kein Backend-Schema: `POST /api/incident-templates`, `PUT /api/incident-templates/{id}`
  * (Vollersatz, alle Felder Pflicht). Gespeichert werden die ausgeblendeten Module.
  * `schichtmodell_id: null` = die Vorlage gibt kein Schichtmodell vor.
  */
@@ -1264,7 +1265,7 @@ export interface SchichtmodellWerteBody {
   planungsvorlauf_minuten?: number;
 }
 
-/** Kein Backend-Schema: `POST /api/schichtmodelle`, `PUT /api/schichtmodelle/{id}` (ganzer Satz). */
+/** Kein Backend-Schema: `POST /api/shift-models`, `PUT /api/shift-models/{id}` (ganzer Satz). */
 export interface SchichtmodellBody extends SchichtmodellWerteBody {
   ist_vorgabe: boolean;
 }
@@ -1647,7 +1648,7 @@ export type VerpflegungVorlage = S['VerpflegungVorlage'];
 export type VerpflegungTagErgebnis = S['VerpflegungTagErgebnis'];
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST /api/verpflegung-vorlagen` (`VorlageBody`).
+ * Kein Backend-Schema: Eingabe-Body von `POST /api/catering-templates` (`VorlageBody`).
  * Uhrzeiten als `HH:MM` oder `HHMM`; Ende gleich Beginn 422, gleicher aktiver Name 409.
  */
 export interface VerpflegungVorlageEingabe {
@@ -1658,7 +1659,7 @@ export interface VerpflegungVorlageEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH /api/verpflegung-vorlagen/{vid}`
+ * Kein Backend-Schema: Eingabe-Body von `PATCH /api/catering-templates/{vid}`
  * (`PatchVorlage`). Schlüssel fehlt = unverändert; `verpflegungsart: null` leert die Art,
  * `aktiv` schaltet in beide Richtungen (es gibt kein Löschen).
  */

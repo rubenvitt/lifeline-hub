@@ -82,7 +82,7 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
         { id: 4, name: 'EA Süd' },
       ]),
     ),
-    http.get('/api/einheit-typen', () =>
+    http.get('/api/unit-types', () =>
       HttpResponse.json([
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
       ]),
@@ -93,12 +93,12 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
     // Namen der Orte im Angebot von „Material zuordnen …“ (LLH-1225 D8).
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     // Stamm im Dienst (Gruppe „Aus dem Stamm“, LLH-1036 Teil II): leer.
-    http.get('/api/personal', () => HttpResponse.json([])),
-    http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/personnel', () => HttpResponse.json([])),
+    http.get('/api/vehicles', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sprechgruppen', () =>
       HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
     ),
-    http.get('/api/fahrzeug-status', () =>
+    http.get('/api/vehicle-statuses', () =>
       HttpResponse.json([
         {
           id: 102,
@@ -879,7 +879,7 @@ describe('EinheitDetailPage · Datenzustände', () => {
   });
 
   it('gescheiterter Typkatalog: das Auswahlfeld nennt den Ausfall', async () => {
-    zeige(http.get('/api/einheit-typen', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/unit-types', () => new HttpResponse(null, { status: 500 })));
     await userEvent.click(await screen.findByRole('button', { name: 'Typ bearbeiten' }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Typ' }));
     expect(

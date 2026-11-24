@@ -22,6 +22,7 @@ import {
   Textstufe,
   Zeitachseneintrag,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { useViewport } from '../components/useViewport';
@@ -437,13 +438,23 @@ export default function ZeitfensterKarte({
                       }}
                     >
                       <span style={{ minWidth: '12ch' }}>{KOSTFORM_LABEL[k]}</span>
-                      <span style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
+                      {/* „Bedarf 3 · ausgegeben 0“ trägt Wörter: Textschrift (ADR-0094). */}
+                      <span
+                        style={{
+                          ...schriftStil('textKlein'),
+                          fontVariantNumeric: 'tabular-nums',
+                          color: rollen.text2,
+                        }}
+                      >
                         Bedarf {zf.bedarf.sonderkost[k]} · ausgegeben {zf.ausgegeben.sonderkost[k]}
                       </span>
                       <span
                         data-lfh="sonderkost-fehlt"
                         style={{
-                          ...monoStil('monoKlein', fehlt > 0 ? 500 : 400),
+                          // „fehlt 3 Vegetarisch“, „gedeckt“: Wörter in der Textschrift (ADR-0094).
+                          ...schriftStil('textKlein'),
+                          fontWeight: fehlt > 0 ? 500 : 400,
+                          fontVariantNumeric: 'tabular-nums',
                           color:
                             fehlt > 0 && stufe === 'unterdeckung' ? rollen.alarmText : rollen.text2,
                         }}

@@ -4,7 +4,7 @@ import { screen } from '@testing-library/react';
 import { Input } from 'antd';
 import { describe, expect, it } from 'vitest';
 import { renderMitProviders } from '../../test/utils';
-import { dichten, farbenHell } from '../../theme/tokens';
+import { dichten, farbenHell, schrift } from '../../theme/tokens';
 import Schnellerfassungszeile, {
   schnellerfassungStil,
   zellenStile,
@@ -39,6 +39,25 @@ describe('Schnellerfassungszeile', () => {
     });
     expect(stil('komfortabel').minHeight).toBe(50);
     expect(stil('handschuh').minHeight).toBe(74);
+  });
+
+  it('ein Befehl als Präfix bleibt Mono und Kennung, ein Wort steht in der Textschrift (LLH-2084)', () => {
+    renderMitProviders(
+      <>
+        <Schnellerfassungszeile praefix="/person">
+          <Input aria-label="Person" />
+        </Schnellerfassungszeile>
+        <Schnellerfassungszeile praefix="Notiz">
+          <Input aria-label="Notiz" />
+        </Schnellerfassungszeile>
+      </>,
+    );
+    const befehl = screen.getByText('/person');
+    expect(befehl).toHaveAttribute('data-schrift', 'kennung');
+    expect(befehl).toHaveStyle({ fontFamily: schrift.zahl });
+    const wort = screen.getByText('Notiz');
+    expect(wort).not.toHaveAttribute('data-schrift');
+    expect(wort).toHaveStyle({ fontFamily: schrift.text, fontSize: '14px' });
   });
 
   it('ohne Präfix keine Präfix-Zelle', () => {

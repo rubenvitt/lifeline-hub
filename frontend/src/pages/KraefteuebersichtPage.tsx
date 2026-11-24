@@ -121,6 +121,7 @@ import {
   schriftStil,
   useRollen,
   Knopfreihe,
+  Kennung,
 } from '../components/instrument';
 import { tonVonRolle } from '../components/instrument/statusFlaeche';
 import { PANEEL_FEHLER_TITEL } from '../components/instrument/PaneelZustand';
@@ -457,7 +458,7 @@ function rasterSpalten(
       abBreite: 'xxl',
       render: (_t, z) =>
         z.art === 'einheit' && z.funkrufname ? (
-          <span style={monoStil('monoKlein')}>{z.funkrufname}</span>
+          <Kennung stufe="monoKlein">{z.funkrufname}</Kennung>
         ) : null,
     },
     // Die Mittelverteilung ist Zusatz zum Einheitenstatus, keine Vergleichsachse — sie weicht

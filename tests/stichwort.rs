@@ -11,7 +11,7 @@ async fn post_vorschlag(app: &axum::Router, cookie: &str, text: &str) -> StatusC
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/stichwort-vorschlaege")
+                .uri("/api/keyword-suggestions")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body))
@@ -34,7 +34,7 @@ async fn admin_legt_vorschlag_an_und_alle_sehen_ihn() {
     );
 
     let erika = login_cookie(&app, "erika", "erikapw1").await;
-    let (status, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &erika, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/keyword-suggestions", &erika, None).await;
     assert_eq!(status, StatusCode::OK);
     let texte: Vec<&str> = json
         .as_array()
@@ -81,7 +81,7 @@ async fn admin_loescht_vorschlag() {
         StatusCode::CREATED
     );
 
-    let (_, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &admin, None).await;
+    let (_, json) = anfrage(&app, "GET", "/api/keyword-suggestions", &admin, None).await;
     let id = json
         .as_array()
         .unwrap()
@@ -96,7 +96,7 @@ async fn admin_loescht_vorschlag() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/stichwort-vorschlaege/{id}"))
+                .uri(format!("/api/keyword-suggestions/{id}"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -105,7 +105,7 @@ async fn admin_loescht_vorschlag() {
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
-    let (_, json) = anfrage(&app, "GET", "/api/stichwort-vorschlaege", &admin, None).await;
+    let (_, json) = anfrage(&app, "GET", "/api/keyword-suggestions", &admin, None).await;
     let texte: Vec<&str> = json
         .as_array()
         .unwrap()

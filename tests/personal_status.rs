@@ -9,7 +9,7 @@ use common::*;
 async fn seed_liefert_sechs_aktive_status() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 6);
     assert_eq!(json[0]["label"], "verfügbar");
@@ -23,7 +23,7 @@ async fn admin_crud_kategorie_validierung_dublette() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
 
     assert_eq!(
-        anfrage(&app, "GET", "/api/personal-status", &erika, None)
+        anfrage(&app, "GET", "/api/personnel-statuses", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -32,7 +32,7 @@ async fn admin_crud_kategorie_validierung_dublette() {
         anfrage(
             &app,
             "POST",
-            "/api/personal-status",
+            "/api/personnel-statuses",
             &erika,
             Some(r#"{"label":"X","kategorie":"gebunden"}"#)
         )
@@ -46,7 +46,7 @@ async fn admin_crud_kategorie_validierung_dublette() {
         anfrage(
             &app,
             "POST",
-            "/api/personal-status",
+            "/api/personnel-statuses",
             &admin,
             Some(r#"{"label":"X","kategorie":"quatsch"}"#)
         )
@@ -59,7 +59,7 @@ async fn admin_crud_kategorie_validierung_dublette() {
         anfrage(
             &app,
             "POST",
-            "/api/personal-status",
+            "/api/personnel-statuses",
             &admin,
             Some(r#"{"label":"nachalarmiert","kategorie":"gebunden","sortier":70}"#)
         )
@@ -72,7 +72,7 @@ async fn admin_crud_kategorie_validierung_dublette() {
         anfrage(
             &app,
             "POST",
-            "/api/personal-status",
+            "/api/personnel-statuses",
             &admin,
             Some(r#"{"label":"nachalarmiert","kategorie":"verfuegbar"}"#)
         )
@@ -89,13 +89,13 @@ async fn patch_aktualisiert_und_unbekannte_id_ist_404() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/personal-status",
+        "/api/personnel-statuses",
         &admin,
         Some(r#"{"label":"nachalarmiert","kategorie":"gebunden","sortier":70}"#),
     )
     .await;
     let id = json["id"].as_i64().unwrap();
-    let (status, json) = anfrage(&app, "PATCH", &format!("/api/personal-status/{id}"), &admin, Some(r##"{"label":"nachgefordert","kategorie":"verfuegbar","farbe":"#00ff00","sortier":75}"##)).await;
+    let (status, json) = anfrage(&app, "PATCH", &format!("/api/personnel-statuses/{id}"), &admin, Some(r##"{"label":"nachgefordert","kategorie":"verfuegbar","farbe":"#00ff00","sortier":75}"##)).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["label"], "nachgefordert");
     assert_eq!(json["kategorie"], "verfuegbar");
@@ -104,7 +104,7 @@ async fn patch_aktualisiert_und_unbekannte_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            "/api/personal-status/9999",
+            "/api/personnel-statuses/9999",
             &admin,
             Some(r#"{"label":"X","kategorie":"gebunden"}"#)
         )
@@ -121,7 +121,7 @@ async fn status_mit_farbe(app: &axum::Router, admin: &str, label: &str) -> i64 {
     let (_, json) = anfrage(
         app,
         "POST",
-        "/api/personal-status",
+        "/api/personnel-statuses",
         admin,
         Some(&format!(
             r##"{{"label":"{label}","kategorie":"gebunden","farbe":"#ff0000","sortier":70}}"##
@@ -144,7 +144,7 @@ async fn patch_ohne_farbe_laesst_farbe_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{id}"),
+        &format!("/api/personnel-statuses/{id}"),
         &admin,
         Some(r#"{"label":"umbenannt"}"#),
     )
@@ -167,7 +167,7 @@ async fn patch_farbe_null_loescht_die_farbe() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{id}"),
+        &format!("/api/personnel-statuses/{id}"),
         &admin,
         Some(r#"{"farbe":null}"#),
     )
@@ -188,7 +188,7 @@ async fn patch_farbe_leerstring_loescht_die_farbe() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{id}"),
+        &format!("/api/personnel-statuses/{id}"),
         &admin,
         Some(r#"{"farbe":"   "}"#),
     )
@@ -209,7 +209,7 @@ async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{id}"),
+        &format!("/api/personnel-statuses/{id}"),
         &admin,
         Some(r#"{"label":"umbenannt"}"#),
     )
@@ -234,7 +234,7 @@ async fn patch_leeres_label_ist_400_absentes_laesst_label_stehen() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/personal-status/{id}"),
+            &format!("/api/personnel-statuses/{id}"),
             &admin,
             Some(r#"{"label":"   "}"#)
         )
@@ -247,7 +247,7 @@ async fn patch_leeres_label_ist_400_absentes_laesst_label_stehen() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/personal-status/{id}"),
+            &format!("/api/personnel-statuses/{id}"),
             &admin,
             Some(r#"{"kategorie":"quatsch"}"#)
         )
@@ -258,7 +258,7 @@ async fn patch_leeres_label_ist_400_absentes_laesst_label_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{id}"),
+        &format!("/api/personnel-statuses/{id}"),
         &admin,
         Some(r#"{"sortier":5}"#),
     )
@@ -274,7 +274,7 @@ async fn deaktivieren_entfernt_aus_liste() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/personal-status",
+        "/api/personnel-statuses",
         &admin,
         Some(r#"{"label":"Reserve","kategorie":"verfuegbar"}"#),
     )
@@ -284,7 +284,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/personal-status/{id}/deaktivieren"),
+            &format!("/api/personnel-statuses/{id}/deactivate"),
             &admin,
             None
         )
@@ -292,7 +292,7 @@ async fn deaktivieren_entfernt_aus_liste() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, liste) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
     assert!(!liste
         .as_array()
         .unwrap()

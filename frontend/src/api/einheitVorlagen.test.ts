@@ -20,12 +20,12 @@ describe('api/einheitVorlagen (LLH-1042, LLH-1261)', () => {
       return HttpResponse.json(request.method === 'GET' ? [] : {});
     };
     server.use(
-      http.get('/api/einheit-vorlagen', record),
-      http.post('/api/einheit-vorlagen', record),
-      http.patch('/api/einheit-vorlagen/:id', record),
-      http.put('/api/einheit-vorlagen/:id/fahrzeuge', record),
-      http.put('/api/einheit-vorlagen/:id/personal', record),
-      http.put('/api/einheit-vorlagen/:id/material', record),
+      http.get('/api/unit-templates', record),
+      http.post('/api/unit-templates', record),
+      http.patch('/api/unit-templates/:id', record),
+      http.put('/api/unit-templates/:id/vehicles', record),
+      http.put('/api/unit-templates/:id/personnel', record),
+      http.put('/api/unit-templates/:id/material', record),
     );
 
     await loadEinheitVorlagen('aktiv');
@@ -42,15 +42,15 @@ describe('api/einheitVorlagen (LLH-1042, LLH-1261)', () => {
     ]);
 
     expect(seen).toEqual([
-      'GET /api/einheit-vorlagen',
-      'GET /api/einheit-vorlagen?nur_aktive=false',
-      'POST /api/einheit-vorlagen {"name":"SEG","typ_id":3,"ueber_vorlage_id":null}',
+      'GET /api/unit-templates',
+      'GET /api/unit-templates?nur_aktive=false',
+      'POST /api/unit-templates {"name":"SEG","typ_id":3,"ueber_vorlage_id":null}',
       // `null` heißt beim PATCH „Wurzel“ und muss auf dem Draht stehen bleiben.
-      'PATCH /api/einheit-vorlagen/7 {"ueber_vorlage_id":null,"aktiv":false}',
-      'PUT /api/einheit-vorlagen/7/fahrzeuge {"fahrzeug_ids":[4,2]}',
-      'PUT /api/einheit-vorlagen/7/personal {"personal":[{"personal_id":9,"fahrzeug_id":4,"staerke_position":"fuehrer"}]}',
+      'PATCH /api/unit-templates/7 {"ueber_vorlage_id":null,"aktiv":false}',
+      'PUT /api/unit-templates/7/vehicles {"fahrzeug_ids":[4,2]}',
+      'PUT /api/unit-templates/7/personnel {"personal":[{"personal_id":9,"fahrzeug_id":4,"staerke_position":"fuehrer"}]}',
       // LLH-1261: `null` heißt „an der Einheit“.
-      'PUT /api/einheit-vorlagen/7/material {"material":[{"material_id":5,"menge":50,"fahrzeug_id":null},{"material_id":6,"menge":1,"fahrzeug_id":4}]}',
+      'PUT /api/unit-templates/7/material {"material":[{"material_id":5,"menge":50,"fahrzeug_id":null},{"material_id":6,"menge":1,"fahrzeug_id":4}]}',
     ]);
   });
 });

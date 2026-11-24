@@ -31,6 +31,7 @@ import {
   Stapel,
   Zeitachseneintrag,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../components/instrument';
 import { Select } from '../components/Select';
@@ -625,7 +626,15 @@ function DauerZeile({
   if (dauern.gesamtMinuten != null) teile.push(`gesamt ${dauer(dauern.gesamtMinuten)}`);
   if (teile.length === 0) return <span />;
   return (
-    <span data-lfh="kraft-dauer" style={{ ...monoStil('monoKlein'), color: rollen.text2 }}>
+    // „Ruhe 2 h · gesamt 5 h“ trägt Wörter: Textschrift (ADR-0094).
+    <span
+      data-lfh="kraft-dauer"
+      style={{
+        ...schriftStil('textKlein'),
+        fontVariantNumeric: 'tabular-nums',
+        color: rollen.text2,
+      }}
+    >
       {teile.join(' · ')}
     </span>
   );

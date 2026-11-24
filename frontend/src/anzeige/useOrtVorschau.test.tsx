@@ -126,7 +126,7 @@ describe('useOrtVorschau', () => {
   it('ohne Einsatz fragt sie die Ort-Vorschau der Organisation, ohne `exclude` (LLH-1376)', async () => {
     const abfragen: URL[] = [];
     server.use(
-      http.get('/api/ort-vorschau', ({ request }) => {
+      http.get('/api/place-preview', ({ request }) => {
         abfragen.push(new URL(request.url));
         return HttpResponse.json({ ortsname: 'Am Anger 1, Musterdorf' });
       }),
@@ -161,7 +161,7 @@ describe('useOrtVorschau', () => {
         treffer();
         return HttpResponse.json({ peilung: null, ortsname: 'Hauptstr. 5' });
       }),
-      http.get('/api/ort-vorschau', () => {
+      http.get('/api/place-preview', () => {
         treffer();
         return HttpResponse.json({ ortsname: 'Hauptstr. 5' });
       }),

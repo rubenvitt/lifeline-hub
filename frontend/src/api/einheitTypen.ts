@@ -11,7 +11,7 @@ export interface TypEingabe {
   quali_soll?: QualiSollEingabe[] | null;
 }
 
-const api = katalogApi<EinheitTyp, TypEingabe>('/api/einheit-typen');
+const api = katalogApi<EinheitTyp, TypEingabe>('/api/unit-types');
 
 export const listeEinheitTypen = api.liste;
 export const legeTypAn = api.legeAn;

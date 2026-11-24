@@ -54,7 +54,7 @@ let bodies: unknown[];
 function standardHandler(freigaben = freigabenFixture()) {
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/personal', () => HttpResponse.json(POOL)),
+    http.get('/api/personnel', () => HttpResponse.json(POOL)),
     http.get('/api/einsaetze/1/personal', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? ENTLASSEN : AKTIV),
     ),

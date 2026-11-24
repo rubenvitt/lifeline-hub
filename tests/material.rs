@@ -119,7 +119,7 @@ async fn ausser_dienst_versteckt_aus_nur_im_dienst() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/material/{id}/ausser-dienst"),
+            &format!("/api/material/{id}/out-of-service"),
             &admin,
             None
         )
@@ -366,7 +366,7 @@ async fn kategorien_endpunkt_liefert_distinct() {
         Some(r#"{"bezeichnung":"Sandsack","kategorie":"Hochwasser"}"#),
     )
     .await;
-    let (status, json) = anfrage(&app, "GET", "/api/material-kategorien", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/material-categories", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(
         json.as_array().unwrap().len(),

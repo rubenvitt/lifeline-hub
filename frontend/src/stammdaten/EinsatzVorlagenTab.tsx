@@ -7,7 +7,7 @@ import { globalKeys } from '../api/queryKeys';
 import { fetchSchichtmodelle } from '../api/schichtmodelle';
 import type { EinsatzVorlage } from '../api/types';
 import AdminPage from '../components/AdminPage';
-import { Stapel, monoStil } from '../components/instrument';
+import { Stapel, schriftStil } from '../components/instrument';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
   type KatalogSpalte,
@@ -107,8 +107,12 @@ export default function EinsatzVorlagenTab() {
       title: 'Module',
       key: 'module',
       sorter: (a, b) => sichtbarAnzahl(a.ausgeblendet) - sichtbarAnzahl(b.ausgeblendet),
-      // Zahlen in Mono, die Spalte wird zeilenweise verglichen.
-      render: (_, v) => <span style={monoStil('monoKlein')}>{moduleText(v.ausgeblendet)}</span>,
+      // „12 von 15 Modulen“ ist gemischt: Textschrift mit gleich breiten Ziffern (ADR-0094).
+      render: (_, v) => (
+        <span style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}>
+          {moduleText(v.ausgeblendet)}
+        </span>
+      ),
     },
     ...(istAdmin
       ? ([

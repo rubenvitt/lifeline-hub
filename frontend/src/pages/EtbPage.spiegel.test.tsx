@@ -63,7 +63,7 @@ function setup(antraege: unknown[]) {
         je_typ: { meldung: 1, anordnung: 0, lage: 0, entscheidung: 0, system: 0, berichtigung: 0 },
       }),
     ),
-    http.get('/api/etb-bausteine', () => HttpResponse.json([])),
+    http.get('/api/etb-snippets', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),

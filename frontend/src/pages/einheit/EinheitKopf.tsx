@@ -31,6 +31,7 @@ import {
   monoStil,
   schriftStil,
   useRollen,
+  Kennung,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
 import { Select } from '../../components/Select';
@@ -157,9 +158,11 @@ export default function EinheitKopf({
       praesenz={praesenz(feld)}
       wert={e[feld] ?? ''}
       anzeige={
-        <span style={feld === 'funkrufname' ? monoStil('mono') : { whiteSpace: 'pre-wrap' }}>
-          {e[feld]}
-        </span>
+        feld === 'funkrufname' ? (
+          <Kennung>{e[feld]}</Kennung>
+        ) : (
+          <span style={{ whiteSpace: 'pre-wrap' }}>{e[feld]}</span>
+        )
       }
       leer={isEmptyText}
       gleich={isSameText}
@@ -523,12 +526,16 @@ function IstAnzeige({
 }) {
   return (
     <Stapel als="span" richtung="zeile" umbruch ausrichten="mitte" abstand="xs">
-      <span style={monoStil('mono')}>
-        <StaerkeAnzeige wert={ist} />
+      <span style={schriftStil('text')}>
+        <span style={monoStil('mono')}>
+          <StaerkeAnzeige wert={ist} />
+        </span>
         {kumuliert && (
           <>
             {' · kumuliert '}
-            <StaerkeAnzeige wert={kumuliert} />
+            <span style={monoStil('mono')}>
+              <StaerkeAnzeige wert={kumuliert} />
+            </span>
           </>
         )}
       </span>
@@ -564,8 +571,8 @@ function StatusZeile({
   const [fehler, setFehler] = useState<unknown>(null);
   const s = einheitStatusAnzeige(e.status);
   const seit = e.status.seit ? (
-    <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
-      seit {zeitKurz(e.status.seit, konventionen)}
+    <span style={{ ...schriftStil('textKlein'), color: rollen.gedaempft }}>
+      seit <span style={monoStil('monoKlein')}>{zeitKurz(e.status.seit, konventionen)}</span>
     </span>
   ) : null;
 

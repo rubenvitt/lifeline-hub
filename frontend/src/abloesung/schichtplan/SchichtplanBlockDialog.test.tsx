@@ -52,7 +52,7 @@ function zeige(
   b: SchichtplanBlock | null,
   extra: Partial<Parameters<typeof SchichtplanBlockDialog>[0]> = {},
 ) {
-  server.use(http.get('/api/qualifikationen', () => HttpResponse.json(qualifikationen)));
+  server.use(http.get('/api/qualifications', () => HttpResponse.json(qualifikationen)));
   const onSpeichern = vi.fn<(s: BlockSpeichern) => Promise<unknown>>(() => Promise.resolve());
   const onKopieren = vi.fn();
   renderMitProviders(

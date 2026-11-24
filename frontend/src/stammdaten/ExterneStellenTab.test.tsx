@@ -48,7 +48,7 @@ function render(
   let abgerufen = '';
   server.use(
     meHandler(benutzer),
-    http.get('/api/externe-stellen', ({ request }) => {
+    http.get('/api/external-agencies', ({ request }) => {
       abgerufen = new URL(request.url).search;
       return HttpResponse.json(liste);
     }),
@@ -105,7 +105,7 @@ describe('ExterneStellenTab', () => {
   it('deaktiviert nach Rückfrage und aktiviert wieder', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.patch('/api/externe-stellen/:id', async ({ request, params }) => {
+      http.patch('/api/external-agencies/:id', async ({ request, params }) => {
         bodies.push({ id: Number(params.id), ...((await request.json()) as object) });
         return HttpResponse.json(KATALOG[0]);
       }),
@@ -184,7 +184,7 @@ describe('ExterneStellenTab · Kontextmenü (LLH-1599)', () => {
     setzeViewportBreite(1280);
     let geschaltet: unknown = null;
     server.use(
-      http.patch('/api/externe-stellen/:id', async ({ request, params }) => {
+      http.patch('/api/external-agencies/:id', async ({ request, params }) => {
         geschaltet = { id: params.id, ...((await request.json()) as object) };
         return HttpResponse.json(KATALOG[2]);
       }),

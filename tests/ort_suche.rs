@@ -1,6 +1,6 @@
 //! Ortssuche des Ortsfelds (LFH-1175, Spec `ortsfeld`): Einstieg im Einsatz
 //! `GET /api/einsaetze/{id}/place-search?q=` (Recht der Einsatzdaten, kein Lagekarten-Recht) und in
-//! der Organisation `GET /api/ort-suche?q=` (wer Einsätze anlegen darf).
+//! der Organisation `GET /api/place-search?q=` (wer Einsätze anlegen darf).
 //!
 //! Der Token-Bucket des Geocoders ist prozessweit (1 Anfrage/s) und gilt für alle Tests dieser
 //! Binärdatei. Deshalb fragt genau EIN Test den Geocoder, der Reihe nach mit Pausen; die übrigen
@@ -92,7 +92,7 @@ fn im_einsatz(einsatz: i64, q: &str) -> String {
 }
 
 fn in_org(q: &str) -> String {
-    format!("/api/ort-suche?q={}", url_kodieren(q))
+    format!("/api/place-search?q={}", url_kodieren(q))
 }
 
 /// Minimal-Kodierung für die Testeingaben (Leerzeichen, Komma, Umlaute).
@@ -132,7 +132,7 @@ async fn suchtext_unter_drei_oder_ueber_200_zeichen_ist_400_ohne_geocoder() {
     }
     for pfad in [
         format!("/api/einsaetze/{einsatz}/place-search"),
-        "/api/ort-suche".to_string(),
+        "/api/place-search".to_string(),
     ] {
         let (status, json) = anfrage(&app, "GET", &pfad, &admin, None).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{pfad}: {json:?}");

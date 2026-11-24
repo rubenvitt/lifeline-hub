@@ -366,3 +366,53 @@ die übrigen Mono-Stufen und bringt den e2e-Wächter „kein Wort in Mono“.
   Funkrufname. `frontend/AGENTS.md` „`schriftskala`“ und Seitenkopf nachgezogen.
 - [ ] Design System, Anwender-Bilder (Auswahl gegen einen Lauf des Stands von Teil 3), Gate,
   Risiko-Specs (`stab-schmal`, Kopfzeilen-, Handy-, Dichte-Specs, `kennzahl*`), Bilder, PR `voll`.
+
+## Teil 4b — LLH-2084 übrige Mono-Stufen, Wächter „kein Wort in Mono“
+
+Zunder: https://zunder.rubeen.dev/#/aufgabe/rl6fancwgh0o46urqd86er4k
+
+Stand `alpha` 2fe255d9 (nach #1660). Rest von Teil 4: Die Grenze aus ADR-0094 („Mono nur für
+Zahl, Zeit, Kennung, Funkrufname“) gilt für jede Mono-Stufe. Bestand: 141 × `monoStil('monoKlein')`,
+87 × `'mono'`, 40 × `'monoGross'`, 5 × `'datenwert*'`, dazu `Textstufe`/`schriftStil` mit diesen
+Stufen. Funkrufnamen stehen verstreut als `<span style={monoStil(…)}>{x.funkrufname}</span>`,
+es gibt keinen gemeinsamen Baustein.
+
+**Review Focus (4b):**
+1. Ein Funkrufname („Florian Musterstadt 46/11-1“) fällt in die Textschrift oder reißt den Wächter →
+   der Wächter nimmt `data-schrift="kennung"` aus; der Baustein `Kennung` setzt es (Task 16).
+2. Ein gemischter Knoten („seit 14:32“) geht ganz in die Textschrift, die Zeit verliert gleich breite
+   Ziffern → Textstufen mit `ziffern: 'tabellarisch'` oder eigener Mono-Knoten für die Zeit (Task 17).
+3. Archivo ist schmaler: Specs, die einen Umbruch als Vorbedingung brauchen, werden grün aus dem
+   falschen Grund → Risiko-Specs wie in 4a, mit CI-Schriftsatz (`--font-render-hinting=full`) (Task 18).
+
+### Task 16: Wächter und Baustein `Kennung`
+
+- [ ] e2e `e2e/mono-ohne-worte.spec.ts` (Chromium, `kompakt`, 1366 px): Überblick, ETB, Einsatzdaten,
+  Betroffene, dazu Kräfteübersicht und Fahrzeuge (Funkrufnamen). Für jeden Textknoten, dessen
+  berechnete `font-family` mit `"LFH JetBrains Mono"` beginnt und der nicht in
+  `[data-schrift="kennung"]` liegt: kein Wort `/\p{Ll}{4,}/u`. Fehlermeldung listet Route, Text und
+  den nächsten Vorfahren mit `data-lfh`/Klasse. Erst rot laufen lassen; die Liste ist die Arbeitsliste
+  für Task 17.
+- [ ] Baustein `components/instrument/Kennung.tsx`: `<Kennung stufe="mono">{funkrufname}</Kennung>`
+  rendert `<span data-schrift="kennung" style={monoStil(stufe, gewicht)}>`. Unit-Test: Attribut und
+  Stil. Funkrufnamen-Stellen (`grep 'funkrufname}'` neben `monoStil`) nehmen ihn.
+- [ ] Commit `feat(frontend): Baustein Kennung, e2e-Wächter „kein Wort in Mono“ (LLH-2084)`.
+
+### Task 17: Mono-Aufrufe nach Inhalt sichten
+
+- [ ] Je Aufruf von `monoStil('mono' | 'monoKlein' | 'monoGross' | 'datenwert*')` und den gleichen
+  Stufen in `Textstufe`/`schriftStil`: ganz Zahl, Zeit, Kennung → bleibt (Kennung über `Kennung`);
+  Wort oder gemischter Knoten → Textstufe gleicher Größe (`mono` 13 → `text`-Stufe 13 bzw. nächste
+  Stufe der Skala, `monoKlein` 12 → `textKlein`, `monoGross` 14 → `text`) mit
+  `fontVariantNumeric: 'tabular-nums'`, wo Ziffern mitlaufen. Wo die Zeit ein eigener Knoten werden
+  kann, bleibt sie Mono (`EinsatzleiterAngabe` „seit 14:32“). Kommentar an `schriftskala.mono`
+  nachziehen. Sichtung in zwei Hälften (Subagenten), Ergebnis als Tabelle im Ledger.
+- [ ] Wächter aus Task 16 grün; Typecheck, betroffene Unit-Tests; Pins ziehen nach.
+- [ ] Commit `feat(frontend): Wörter aus Mono in die Textschrift (LLH-2084)`.
+
+### Task 18: Regel, Design System, Bilder, Gate, PR
+
+- [ ] `frontend/AGENTS.md` „`schriftskala`“: Baustein `Kennung` und Wächter nennen. Eine neue ADR
+  nur, wenn die Regel über ADR-0094 hinausgeht (sonst keine).
+- [ ] Design System, Anwender-Bilder (A/B gegen alpha aus derselben Umgebung, Pixelvergleich und
+  Sichtung), Gate, Risiko-Specs mit CI-Schriftsatz, PR-Bilder, PR `voll`.

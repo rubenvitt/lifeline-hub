@@ -344,7 +344,8 @@ describe('EinsatzabschnittePage', () => {
     const knoten = await findInTree('UHS Turnhalle');
     const zeile = knoten.closest<HTMLElement>('.ant-tree-treenode')!;
     expect(within(zeile).getByText('0/1/1//2')).toBeInTheDocument();
-    expect(within(zeile).getByText('1 Einheit direkt')).toBeInTheDocument();
+    // Zahl in Mono, Wörter in der Textschrift (ADR-0094): der Satz steht über zwei Knoten.
+    expect(zeile).toHaveTextContent('1 Einheit direkt');
 
     await userEvent.click(knoten);
     const eigene = screen

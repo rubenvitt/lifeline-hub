@@ -19,7 +19,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::schichtmodell::{repo, Schichtmodell, WerteBody};
 
-/// GET /api/schichtmodelle — die Modelle der eigenen Organisation, die Vorgabe zuerst.
+/// GET /api/shift-models — die Modelle der eigenen Organisation, die Vorgabe zuerst.
 pub async fn list(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -37,7 +37,7 @@ pub struct SchichtmodellBody {
     pub ist_vorgabe: bool,
 }
 
-/// POST /api/schichtmodelle — Admin.
+/// POST /api/shift-models — Admin.
 pub async fn create(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
@@ -50,7 +50,7 @@ pub async fn create(
     ))
 }
 
-/// PUT /api/schichtmodelle/{sid} — Admin, ersetzt den ganzen Satz. Einsätze behalten ihre
+/// PUT /api/shift-models/{sid} — Admin, ersetzt den ganzen Satz. Einsätze behalten ihre
 /// Kopie.
 pub async fn update(
     State(state): State<AppState>,
@@ -64,7 +64,7 @@ pub async fn update(
     ))
 }
 
-/// DELETE /api/schichtmodelle/{sid} — Admin. Einsätze behalten ihre Kopie.
+/// DELETE /api/shift-models/{sid} — Admin. Einsätze behalten ihre Kopie.
 pub async fn delete(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,

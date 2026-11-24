@@ -76,14 +76,14 @@ test.describe(KAPITEL, () => {
         ['Abendessen', '1800', '1930', 'warm'],
         ['Nachtverpflegung', '2300', '0100', 'kalt'],
       ]) {
-        const m = await fuelle<{ id: number }>(api, 'post', '/api/verpflegung-vorlagen', {
+        const m = await fuelle<{ id: number }>(api, 'post', '/api/catering-templates', {
           bezeichnung,
           beginn,
           ende,
           verpflegungsart,
         });
         if (bezeichnung === 'Kaffee') {
-          await fuelle(api, 'patch', `/api/verpflegung-vorlagen/${m.id}`, { aktiv: false });
+          await fuelle(api, 'patch', `/api/catering-templates/${m.id}`, { aktiv: false });
         }
       }
     } finally {
@@ -117,7 +117,7 @@ test.describe(KAPITEL, () => {
 
   test('Katalog „Schichtmodelle“', async ({ page }) => {
     await anmelden(page);
-    const modell = await fuelle<{ id: number }>(page, 'post', '/api/schichtmodelle', {
+    const modell = await fuelle<{ id: number }>(page, 'post', '/api/shift-models', {
       bezeichnung: 'Sanitätsdienst',
       typ: 'rhythmus',
       rhythmus_minuten: 360,
@@ -131,7 +131,7 @@ test.describe(KAPITEL, () => {
       await expect(tabelle.getByText('Vorgabe der Organisation')).toBeVisible();
       await fotografiere(tabelle, KAPITEL, 'schichtmodelle');
     } finally {
-      await fuelle(page, 'delete', `/api/schichtmodelle/${modell.id}`);
+      await fuelle(page, 'delete', `/api/shift-models/${modell.id}`);
     }
   });
 

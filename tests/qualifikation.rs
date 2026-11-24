@@ -9,7 +9,7 @@ use common::*;
 async fn seed_liefert_neun_aktive_qualifikationen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let (status, json) = anfrage(&app, "GET", "/api/qualifikationen", &admin, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/qualifications", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 9, "Bootstrap-Seed");
     assert_eq!(json[0]["label"], "Sanitäter");
@@ -24,7 +24,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
 
     // Lesen für alle.
     assert_eq!(
-        anfrage(&app, "GET", "/api/qualifikationen", &erika, None)
+        anfrage(&app, "GET", "/api/qualifications", &erika, None)
             .await
             .0,
         StatusCode::OK
@@ -34,7 +34,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
         anfrage(
             &app,
             "POST",
-            "/api/qualifikationen",
+            "/api/qualifications",
             &erika,
             Some(r#"{"label":"Hund"}"#)
         )
@@ -45,7 +45,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         &admin,
         Some(r#"{"label":"Drohnenpilot","sortier":100}"#),
     )
@@ -58,7 +58,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
         anfrage(
             &app,
             "POST",
-            "/api/qualifikationen",
+            "/api/qualifications",
             &admin,
             Some(r#"{"label":"Drohnenpilot"}"#)
         )
@@ -72,7 +72,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/qualifikationen/{id}/deaktivieren"),
+            &format!("/api/qualifications/{id}/deactivate"),
             &admin,
             None
         )
@@ -80,7 +80,7 @@ async fn admin_crud_nicht_admin_nur_lesen() {
         .0,
         StatusCode::NO_CONTENT
     );
-    let (_, json) = anfrage(&app, "GET", "/api/qualifikationen", &admin, None).await;
+    let (_, json) = anfrage(&app, "GET", "/api/qualifications", &admin, None).await;
     assert!(json
         .as_array()
         .unwrap()
@@ -96,7 +96,7 @@ async fn patch_aktualisiert_label_und_unbekannte_id_ist_404() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         &admin,
         Some(r#"{"label":"Drohnenpilot","sortier":100}"#),
     )
@@ -105,7 +105,7 @@ async fn patch_aktualisiert_label_und_unbekannte_id_ist_404() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/qualifikationen/{id}"),
+        &format!("/api/qualifications/{id}"),
         &admin,
         Some(r#"{"label":"Drohnenführer","sortier":105}"#),
     )
@@ -118,7 +118,7 @@ async fn patch_aktualisiert_label_und_unbekannte_id_ist_404() {
         anfrage(
             &app,
             "PATCH",
-            "/api/qualifikationen/9999",
+            "/api/qualifications/9999",
             &admin,
             Some(r#"{"label":"X"}"#)
         )
@@ -135,7 +135,7 @@ async fn qualifikation_anlegen(app: &axum::Router, admin: &str, label: &str, sor
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/qualifikationen",
+        "/api/qualifications",
         admin,
         Some(&format!(r#"{{"label":"{label}","sortier":{sortier}}}"#)),
     )
@@ -157,7 +157,7 @@ async fn patch_ohne_sortier_laesst_sortier_stehen() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/qualifikationen/{id}"),
+        &format!("/api/qualifications/{id}"),
         &admin,
         Some(r#"{"label":"Drohnenführer"}"#),
     )
@@ -178,7 +178,7 @@ async fn patch_mit_sortier_setzt_sortier_auch_auf_null() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/qualifikationen/{id}"),
+        &format!("/api/qualifications/{id}"),
         &admin,
         Some(r#"{"sortier":0}"#),
     )
@@ -194,7 +194,7 @@ async fn patch_leeres_label_ist_400_absentes_geht_durch() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let id = qualifikation_anlegen(&app, &admin, "Drohnenpilot", 100).await;
-    let u = format!("/api/qualifikationen/{id}");
+    let u = format!("/api/qualifications/{id}");
 
     assert_eq!(
         anfrage(&app, "PATCH", &u, &admin, Some(r#"{"label":"   "}"#))

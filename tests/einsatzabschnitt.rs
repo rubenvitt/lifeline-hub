@@ -191,7 +191,7 @@ async fn sprechgruppe_anlegen(
     let (s, json) = anfrage(
         app,
         "POST",
-        "/api/sprechgruppen",
+        "/api/talk-groups",
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}","sortier":{sortier}}}"#
@@ -901,7 +901,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_ersten_schreiben() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/sprechgruppen/{sg}/deaktivieren"),
+        &format!("/api/talk-groups/{sg}/deactivate"),
         &admin,
         None,
     )

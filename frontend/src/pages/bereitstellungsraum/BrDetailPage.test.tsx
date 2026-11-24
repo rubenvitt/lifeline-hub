@@ -2529,7 +2529,8 @@ describe('BrDetailPage — Eintreffen ohne Netz (LLH-1075 Teil III)', () => {
 
     const vorgemerkt = await screen.findByTestId('br-vorgemerkt');
     expect(within(vorgemerkt).getByText('Zug Nord')).toBeInTheDocument();
-    expect(within(vorgemerkt).getByText(/^vorgemerkt \d{4}/)).toBeInTheDocument();
+    // Zeit in Mono, Wort in der Textschrift (ADR-0094): zwei Knoten.
+    expect(vorgemerkt).toHaveTextContent(/vorgemerkt \d{4}/);
     // Kennzahlen bleiben die des Servers (Spec `bereitstellungsraum-belegung`).
     expect(kennzahl('Einheiten')).toHaveTextContent('0');
 
