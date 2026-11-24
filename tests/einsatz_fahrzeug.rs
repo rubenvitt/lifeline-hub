@@ -997,7 +997,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
     let ef = json["id"].as_i64().unwrap();
     fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["fahrzeug"]["beendet_als"], "entlassen");
     assert!(json["fahrzeug"]["beendet_at"].is_string() && json["fahrzeug"]["beendet_von"].is_i64());
@@ -1012,11 +1012,11 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
         .any(|t| t == "Fahrzeug «Florian 1» aus dem Einsatz entlassen"));
 
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::CONFLICT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "annul").await.0,
         StatusCode::CONFLICT
     );
     for (methode, pfad, body) in [
@@ -1064,7 +1064,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
         .iter()
         .any(|t| t == "Fahrzeug «Florian 1» erneut disponiert"));
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "reactivate").await.0,
         StatusCode::CONFLICT,
         "ein aktives Fahrzeug wird nicht reaktiviert"
     );
@@ -1140,7 +1140,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     );
     assert_eq!(vorher.0, s2);
 
-    let (s, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, entlassen) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{entlassen}");
     assert_eq!(entlassen["fahrzeug"]["beendet_als"], "entlassen");
     assert_eq!(entlassen["vorzustand"]["einheit_id"], einheit);
@@ -1191,9 +1191,9 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "schon zurückgenommen");
 
-    let (_, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (_, entlassen) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "reactivate").await.0,
         StatusCode::OK
     );
     let (s, _) = anfrage(
@@ -1224,7 +1224,7 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
     .await;
     let fehl = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert!(funkrufnamen(&app, &admin, einsatz, "").await.is_empty());
@@ -1235,7 +1235,7 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
         .await
         .iter()
         .any(|t| t == "Fahrzeug «FW Extern 1» storniert (Fehldisposition)"));
-    let (s, json) = aktion(&app, &admin, einsatz, fehl, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, fehl, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(
         funkrufnamen(&app, &admin, einsatz, "").await,
@@ -1262,7 +1262,7 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, json) = aktion(&app, &admin, einsatz, gewechselt, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, gewechselt, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert!(json["error"]
         .as_str()
@@ -1299,7 +1299,7 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
     .await;
     assert!(s.is_success());
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::OK
     );
 
@@ -1659,7 +1659,7 @@ async fn adhoc_angaben_grenzen_und_entlassenes_fahrzeug() {
         "Florian Extern 1"
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = fahrzeug_patch(
@@ -1891,7 +1891,7 @@ async fn besatzung_uebernehmen_grenzen_und_beendetes_fahrzeug() {
 
     let ktw = adhoc_disponieren(&app, &admin, einsatz, "KTW 1").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, ktw, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ktw, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, ktw, &[anna]).await;
@@ -1944,7 +1944,7 @@ async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
         .iter()
         .any(|t| t == "Material «Stromerzeuger» (×1) disponiert, Ort Fahrzeug «Florian 1/83-1»"));
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert!(
         json["error"]
@@ -1955,7 +1955,7 @@ async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
     );
 
     let mut rx = live.abonniere(einsatz);
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert!(system_etb_inhalte(&app, &admin, einsatz)
         .await
@@ -2404,7 +2404,7 @@ async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
         etb.pruefe(&app, &admin, einsatz, methode).await;
     }
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "entlassen").await;
     let (s, json) = anfrage(

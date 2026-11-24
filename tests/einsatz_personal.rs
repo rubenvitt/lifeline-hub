@@ -1042,7 +1042,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
             .unwrap(),
     );
 
-    let (s, entlassen) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    let (s, entlassen) = aktion(&app, &admin, einsatz, anna, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{entlassen}");
     let v = &entlassen["vorzustand"];
     assert_eq!(v["einheit_id"], einheit);
@@ -1148,7 +1148,7 @@ async fn entlassen_und_erneut_disponieren() {
     let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
     kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     let person = &json["personal"];
     assert_eq!(person["beendet_als"], "entlassen");
@@ -1178,11 +1178,11 @@ async fn entlassen_und_erneut_disponieren() {
 
     // Schreibwege an der Entlassenen: Lebenszyklus.
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::CONFLICT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "annul").await.0,
         StatusCode::CONFLICT
     );
     let (s, _) = anfrage(
@@ -1209,7 +1209,7 @@ async fn entlassen_und_erneut_disponieren() {
     assert_eq!(s, StatusCode::CONFLICT);
 
     // Rückgängig bzw. „Erneut disponieren“.
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert!(
         json.get("beendet_als").is_none_or(|v| v.is_null()),
@@ -1223,7 +1223,7 @@ async fn entlassen_und_erneut_disponieren() {
         .await
         .is_empty());
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "reactivate").await.0,
         StatusCode::CONFLICT,
         "eine aktive Kraft wird nicht reaktiviert"
     );
@@ -1255,7 +1255,7 @@ async fn entlassene_stamm_person_erneut_disponieren_ist_201() {
     let ep = json["id"].as_i64().unwrap();
     assert_eq!(dispo().await.0, StatusCode::CONFLICT, "aktiv: weiter 409");
     assert_eq!(
-        aktion(&app, &admin, einsatz, ep, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ep, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = dispo().await;
@@ -1276,7 +1276,7 @@ async fn stornieren_nur_ohne_spur() {
     einheit_mit(&app, &admin, einsatz, gebunden).await;
 
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(namen(&app, &admin, einsatz, "").await, ["Gebunden"]);
@@ -1284,7 +1284,7 @@ async fn stornieren_nur_ohne_spur() {
         .await
         .is_empty());
 
-    let (s, json) = aktion(&app, &admin, einsatz, gebunden, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, gebunden, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"], "Die Person gehört einer Einheit an; erst lösen oder die Person entlassen",
@@ -1292,7 +1292,7 @@ async fn stornieren_nur_ohne_spur() {
     );
     // Eine stornierte Kraft kommt über „Erneut disponieren“ zurück.
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "reactivate").await.0,
         StatusCode::OK
     );
 }
@@ -1312,15 +1312,15 @@ async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::OK
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "reactivate").await.0,
         StatusCode::OK
     );
 
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"],
@@ -1330,15 +1330,15 @@ async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
     // Ein Storno ist dagegen keine Entlassung: danach bleibt ein neuer Storno möglich.
     let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "reactivate").await.0,
         StatusCode::OK
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
 }
@@ -1367,7 +1367,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let fahrzeug = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::OK
     );
 

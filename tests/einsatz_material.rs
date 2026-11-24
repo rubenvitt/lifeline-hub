@@ -1043,7 +1043,7 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
     let decke = material_disponieren(&app, &admin, einsatz, "Wolldecke").await;
     let trage = material_disponieren(&app, &admin, einsatz, "Trage").await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, decke, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, decke, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["material"]["beendet_als"], "entlassen");
     assert_eq!(bezeichnungen(&app, &admin, einsatz, "").await, ["Trage"]);
@@ -1056,7 +1056,7 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
         .iter()
         .any(|t| t == "Material «Wolldecke» (×1) aus dem Einsatz genommen"));
     assert_eq!(
-        aktion(&app, &admin, einsatz, decke, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, decke, "stand-down").await.0,
         StatusCode::CONFLICT
     );
     let einheit = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
@@ -1068,14 +1068,14 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
         assert_eq!(s, StatusCode::CONFLICT, "{body}: {json}");
     }
 
-    let (s, _) = aktion(&app, &admin, einsatz, decke, "reaktivieren").await;
+    let (s, _) = aktion(&app, &admin, einsatz, decke, "reactivate").await;
     assert_eq!(s, StatusCode::OK);
     let mut aktiv = bezeichnungen(&app, &admin, einsatz, "").await;
     aktiv.sort();
     assert_eq!(aktiv, ["Trage", "Wolldecke"]);
 
     assert_eq!(
-        aktion(&app, &admin, einsatz, trage, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, trage, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
@@ -1086,7 +1086,7 @@ async fn material_aus_dem_einsatz_nehmen_stornieren_reaktivieren() {
         .await
         .is_empty());
     // Wer einmal herausgenommen war, lässt sich nicht stornieren.
-    let (s, json) = aktion(&app, &admin, einsatz, decke, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, decke, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
 }
 
@@ -1119,7 +1119,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     .unwrap();
     let vorher = material_zeile(&app, &admin, einsatz, em).await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     let vorzustand = json["vorzustand"].clone();
     assert_eq!(vorzustand["einheit_id"], einheit, "{json}");
@@ -1198,7 +1198,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    let (_, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (_, json) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     let vorzustand = json["vorzustand"].to_string();
 
     let frieda_id = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
@@ -1523,7 +1523,7 @@ async fn adhoc_angaben_grenzen_und_beendeter_posten() {
         material_zeile(&app, &admin, einsatz, em).await["bezeichnung"],
         "Feldbett"
     );
-    let (s, _) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (s, _) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     assert_eq!(s, StatusCode::OK);
     let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"bezeichnung":"Liege"}"#).await;
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
@@ -1836,7 +1836,7 @@ async fn aufteilen_grenzen_400_422_409_404() {
     }
     let (s, _) = aufteilen(&app, &admin, anderer, em, r#"{"menge":1}"#).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "Zeile eines anderen Einsatzes");
-    let (s, _) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (s, _) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     assert_eq!(s, StatusCode::OK);
     let (s, json) = aufteilen(&app, &admin, einsatz, em, r#"{"menge":1}"#).await;
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
@@ -2444,7 +2444,7 @@ async fn aufgeloester_br_behaelt_den_posten_und_storno_verlangt_ohne_ort() {
         material_patch(&app, &admin, einsatz, em, &format!(r#"{{"br_id":{br}}}"#)).await;
     assert_eq!(s, StatusCode::OK, "{json}");
 
-    let (s, json) = aktion(&app, &admin, einsatz, em, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert!(
         json["error"]
@@ -2472,7 +2472,7 @@ async fn aufgeloester_br_behaelt_den_posten_und_storno_verlangt_ohne_ort() {
     let (s, json) = material_patch(&app, &admin, einsatz, em, r#"{"br_id":null}"#).await;
     assert_eq!(s, StatusCode::OK, "Lösen: {json}");
     assert!(json.get("br_id").is_none_or(|v| v.is_null()));
-    let (s, json) = aktion(&app, &admin, einsatz, em, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "annul").await;
     assert_eq!(s, StatusCode::NO_CONTENT, "ohne Ort: {json}");
 }
 
@@ -2719,7 +2719,7 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
         &admin,
         einsatz,
         json["id"].as_i64().unwrap(),
-        "stornieren",
+        "annul",
     )
     .await;
 
@@ -2940,7 +2940,7 @@ async fn weitere_posten_nur_bewusst() {
     .await;
     let fehl = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert!(material_ids(&load_nachforderung(&app, &admin, einsatz, pumpe).await).is_empty());
@@ -2959,7 +2959,7 @@ async fn weitere_posten_nur_bewusst() {
     let richtig = json["id"].as_i64().unwrap();
 
     // Aus dem Einsatz genommen: war da, zählt weiter.
-    let (s, _) = aktion(&app, &admin, einsatz, richtig, "entlassen").await;
+    let (s, _) = aktion(&app, &admin, einsatz, richtig, "stand-down").await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(
         material_ids(&load_nachforderung(&app, &admin, einsatz, pumpe).await),
@@ -3092,7 +3092,7 @@ async fn lebenszyklus_eines_verknuepften_postens() {
 
     let mut rx = live.abonniere(einsatz);
     assert_eq!(
-        aktion(&app, &admin, einsatz, teil, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, teil, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert!(tags(&mut rx).iter().any(|t| t == "nachforderung"));
@@ -3102,7 +3102,7 @@ async fn lebenszyklus_eines_verknuepften_postens() {
     );
 
     let mut rx = live.abonniere(einsatz);
-    let (s, json) = aktion(&app, &admin, einsatz, teil, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, teil, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(
         json["nachforderung_id"], nid,
@@ -3121,8 +3121,8 @@ async fn lebenszyklus_eines_verknuepften_postens() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let ohne_teil = json[1]["id"].as_i64().unwrap();
     assert!(json[1].get("nachforderung_id").is_none());
-    aktion(&app, &admin, einsatz, ohne_teil, "stornieren").await;
-    aktion(&app, &admin, einsatz, ohne_teil, "reaktivieren").await;
+    aktion(&app, &admin, einsatz, ohne_teil, "annul").await;
+    aktion(&app, &admin, einsatz, ohne_teil, "reactivate").await;
     let t = tags(&mut rx);
     assert!(!t.iter().any(|t| t == "nachforderung"), "{t:?}");
 }
@@ -3249,14 +3249,14 @@ async fn reaktivieren_verlangt_eine_eingetroffene_nachforderung() {
         disponieren_roh(&app, &admin, einsatz, &uebernahme("Tauchpumpe", 1, nid, "")).await;
     let erste = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, erste, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, erste, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     let (s, json) = nachforderung_status(&app, &admin, einsatz, nid, "unterwegs").await;
     assert_eq!(s, StatusCode::OK, "{json}");
 
     let etb_vorher = etb_count(&app, &admin, einsatz).await;
-    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reactivate").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"],
@@ -3275,7 +3275,7 @@ async fn reaktivieren_verlangt_eine_eingetroffene_nachforderung() {
     let (_, json) =
         disponieren_roh(&app, &admin, einsatz, &uebernahme("Tauchpumpe", 1, nid, "")).await;
     let zweite = json["id"].as_i64().unwrap();
-    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(
         material_ids(&load_nachforderung(&app, &admin, einsatz, nid).await),
@@ -3323,13 +3323,13 @@ async fn stamm_geraet_mit_bestandsnummer_nur_einmal_aktiv() {
     assert_eq!(system_etb_anzahl(&app, &admin, einsatz).await, etb_vorher);
 
     // Herausgenommen: das Stück lässt sich wieder disponieren.
-    let (s, _) = aktion(&app, &admin, einsatz, erste, "entlassen").await;
+    let (s, _) = aktion(&app, &admin, einsatz, erste, "stand-down").await;
     assert_eq!(s, StatusCode::OK);
     let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
     assert_eq!(s, StatusCode::CREATED, "nach dem Herausnehmen: {json}");
 
     // Die alte Zeile neben der neuen wieder aufnehmen: dasselbe Stück, also 409.
-    let (s, json) = aktion(&app, &admin, einsatz, erste, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, erste, "reactivate").await;
     assert_eq!(s, StatusCode::CONFLICT, "{json}");
     assert!(
         json["error"]
@@ -3586,14 +3586,14 @@ async fn verknuepfen_prueft_den_posten() {
     let fremd = adhoc_disponieren(&app, &admin, anderer, "Trage", 1).await;
     let storniert = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, storniert, "stornieren")
+        aktion(&app, &admin, einsatz, storniert, "annul")
             .await
             .0,
         StatusCode::NO_CONTENT
     );
     let entlassen = adhoc_disponieren(&app, &admin, einsatz, "Decke", 1).await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, entlassen, "entlassen")
+        aktion(&app, &admin, einsatz, entlassen, "stand-down")
             .await
             .0,
         StatusCode::OK
@@ -3871,7 +3871,7 @@ async fn loesen_prueft_den_posten() {
     let (_, json) = disponieren_roh(&app, &admin, einsatz, &uebernahme("Trage", 1, nid, "")).await;
     let storniert = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, storniert, "stornieren")
+        aktion(&app, &admin, einsatz, storniert, "annul")
             .await
             .0,
         StatusCode::NO_CONTENT
@@ -3885,7 +3885,7 @@ async fn loesen_prueft_den_posten() {
     .await;
     let entlassen = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, entlassen, "entlassen")
+        aktion(&app, &admin, einsatz, entlassen, "stand-down")
             .await
             .0,
         StatusCode::OK
@@ -4282,7 +4282,7 @@ async fn material_etb_eintraege_gehen_live_hinaus() {
     let (s, json) = loesen(&app, &admin, einsatz, em).await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "loesen").await;
-    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "entlassen").await;
     let (s, json) = anfrage(
@@ -4295,16 +4295,16 @@ async fn material_etb_eintraege_gehen_live_hinaus() {
     .await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "zuruecknehmen").await;
-    let (s, json) = aktion(&app, &admin, einsatz, em, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "erneut entlassen").await;
-    let (s, json) = aktion(&app, &admin, einsatz, em, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, em, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "reaktivieren").await;
     let frisch = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
     etb.pruefe(&app, &admin, einsatz, "zweites disponieren")
         .await;
-    let (s, json) = aktion(&app, &admin, einsatz, frisch, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, frisch, "annul").await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{json}");
     etb.pruefe(&app, &admin, einsatz, "stornieren").await;
 }
