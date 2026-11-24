@@ -572,6 +572,36 @@ describe('Copernicus (LLH-1200)', () => {
     ]);
   });
 
+  it('nimmt ohne Aufnahme die Lieferung (Altbestand, LLH-2022)', () => {
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-08-11 12:48:47' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-07-19 11:36:42' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00' },
+        },
+      ],
+    } as never;
+    expect(copernicusAktivierungen(fc)).toEqual([
+      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00', unvollstaendig: false, gekuerzt: false },
+      {
+        emsr: 'EMSR517',
+        aufnahme: undefined,
+        geliefert: '2021-08-11 12:48:47',
+        unvollstaendig: false,
+        gekuerzt: false,
+      },
+    ]);
+  });
+
   it('trägt unvollständige und gekürzte Gebiete an ihre Aktivierung', () => {
     const fc = {
       type: 'FeatureCollection',

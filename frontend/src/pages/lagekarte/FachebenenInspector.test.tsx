@@ -1214,6 +1214,24 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
     expect(screen.getByText(/Aufnahme älter als 24 h/)).toBeInTheDocument();
   });
 
+  it('warnt ohne Aufnahme vor einer alten Lieferung (Altbestand, LLH-2022)', () => {
+    render(
+      <FachebenenInspector
+        quelle="copernicus"
+        properties={{
+          ...tiefe,
+          aufnahme: undefined,
+          sensor: undefined,
+          emsr: 'EMSR517',
+          geliefert: '2021-08-11 12:48:47',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Lieferung älter als 24 h/)).toBeInTheDocument();
+    expect(screen.queryByText(/Aufnahme älter/)).not.toBeInTheDocument();
+  });
+
   it('titelt ein Gebiet mit seinem Namen', () => {
     render(
       <FachebenenInspector
