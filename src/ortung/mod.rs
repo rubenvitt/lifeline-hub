@@ -17,3 +17,5 @@ wire_enum! {
     try_from = |s| format!("Ungültige Positionsquelle: {s}");
     sqlx = |s| format!("Ungültige Positionsquelle: {s}");
 }
+
+pub mod uebernahme;
