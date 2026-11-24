@@ -366,6 +366,12 @@ fn serde_wire_gleich_as_str() {
         Hilfsorganisation,
         Sonstige,
     });
+    enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
+        Email,
+        Fax,
+        Matrix,
+        Threema,
+    });
     enum_wire_as_str!(lifeline_hub::einheit::EinheitStatusQuelle {
         Fahrzeuge,
         Gemischt,
