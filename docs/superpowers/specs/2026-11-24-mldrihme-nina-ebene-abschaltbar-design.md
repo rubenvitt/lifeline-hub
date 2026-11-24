@@ -70,7 +70,7 @@ können, und zwar so, dass die Instanz dann gar nichts mehr bei warnung.bund.de 
 
 - `docs/fachebenen-quellen.md`, Zeile NINA und Abschnitt zur Lizenz: Vorgabe an, Abschalten mit
   `--nina false`, Wirkung (404, Ebene fehlt in der Lagekarte, kein Abruf).
-- `docs/betrieb/env-registry.md` (Liste der `LIFELINE_*`-Variablen) und `CHANGELOG.md`.
+- `CHANGELOG.md`. (`docs/betrieb/env-registry.md` führt nur sicherheitsrelevante Schalter, wie bei `LIFELINE_KRITIS_EXTRAKT` gehört NINA nicht hinein.)
 - arc42-Mitänderungsregel (`docs/architektur/AGENTS.md`) beim Plan prüfen; eine ADR braucht es
   nicht, es entsteht keine übergreifende Regel.
 
