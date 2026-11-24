@@ -144,6 +144,7 @@ const fahrzeugListe = [
   {
     id: 41,
     einsatz_id: 7,
+    ortung_gekoppelt: false,
     funkrufname: 'Florian Musterstadt 10/1',
     fahrzeugtyp: 'ELW 2',
     disponiert_at: '2026-10-09T10:00:00',
@@ -153,6 +154,7 @@ const fahrzeugListe = [
   {
     id: 42,
     einsatz_id: 7,
+    ortung_gekoppelt: false,
     funkrufname: 'Florian Musterstadt 19/1',
     fahrzeugtyp: 'MTW',
     disponiert_at: '2026-10-09T10:00:00',

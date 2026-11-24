@@ -104,6 +104,7 @@ function fahrzeug(over: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug {
   return {
     id: 20,
     einsatz_id: 1,
+    ortung_gekoppelt: false,
     fahrzeug_id: null,
     einheit_id: null,
     ist_adhoc: true,

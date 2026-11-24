@@ -18,6 +18,7 @@ function disponiert(
   return {
     id,
     einsatz_id: 7,
+    ortung_gekoppelt: false,
     funkrufname,
     fahrzeugtyp,
     disponiert_at: '2026-10-09T10:00:00',
