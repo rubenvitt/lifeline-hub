@@ -300,12 +300,12 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 - Consumes: `collectExportObjekte`, `writeGeojson`, `packKmz`, `exportDateiname`, `speichereDatei`.
 - Produces: `export function useGeoExport(eingabe: ExportEingabe | null): { nebenwege: Nebenweg[]; fehler: Error | null }` mit den Schlüsseln `export-kmz` und `export-geojson`; bei leerer Objektliste `gesperrt: true` und Label-Zusatz „(Nichts eingeblendet)“.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Zwei Einträge mit den Labels `Exportieren: Google Earth (KMZ)` und `Exportieren: GIS (GeoJSON)`.
   - Leer → beide gesperrt.
   - GeoJSON-Wahl ruft `speichereDatei` mit einem Blob vom Typ `application/geo+json` und dem Namen `lagekarte-einsatz-<id>-….geojson`.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen und in `nebenwege` vor der Anlage einhängen; ein Fehler geht als Seitenfehler an die Seite (vorhandenes Fehlerband der Lagekarte). **Step 4:** vitest → PASS; `tsc --noEmit` ok.
-- [ ] **Step 5:** Commit `feat: Lagekarte exportieren` (Zunder A).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen und in `nebenwege` vor der Anlage einhängen; ein Fehler geht als Seitenfehler an die Seite (vorhandenes Fehlerband der Lagekarte). **Step 4:** vitest → PASS; `tsc --noEmit` ok.
+- [x] **Step 5:** Commit `feat: Lagekarte exportieren` (Zunder A).
 
 ## Teil B — Fremdebene aus Datei (LLH-2099)
 

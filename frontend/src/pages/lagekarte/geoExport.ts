@@ -83,7 +83,7 @@ export interface ExportObjekt {
 
 export interface ExportEingabe {
   marker: KarteMarker[];
-  flaechen: { id: number; label: string; polygon: GeoJsonPolygon }[];
+  flaechen: readonly { id: number; label: string; polygon: GeoJsonPolygon }[];
   zonen: ZoneFeature[];
   einsatzName: string;
   stand: Date;

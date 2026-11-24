@@ -129,6 +129,7 @@ import type { Standquelle } from './lagekarte/snapshotDaten';
 import Datenstand from '../components/Datenstand';
 import { fehlerText } from '../api/client';
 import { useKartenFehler } from './lagekarte/useKartenFehler';
+import { useGeoExport } from './lagekarte/useGeoExport';
 import { KartenFehlerHinweis } from './lagekarte/KartenFehlerHinweis';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -1311,6 +1312,24 @@ export default function LagekartePage() {
     beginneHandlung: kartenFehler.beginne,
   });
   const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
+  // Export (Spec `lagekarte-geo-export`): nur, was die Karte gerade zeigt; ein Fehler steht im
+  // Hinweis über der Karte. Die Farben der Marker folgen dem aktiven Modus (`rollenFarbe`).
+  const exportEingabe = useMemo(
+    () => ({
+      marker: sichtbareMarker,
+      flaechen: kartenFlaechen,
+      zonen: zonenFeatures,
+      einsatzName: rahmenEinsatz?.bezeichnung ?? '',
+      stand: new Date(),
+    }),
+    [sichtbareMarker, kartenFlaechen, zonenFeatures, rahmenEinsatz?.bezeichnung],
+  );
+  const { beginne: beginneKartenhandlung } = kartenFehler;
+  const beginneExport = useCallback(
+    () => beginneKartenhandlung('export', 'Export nicht erstellt'),
+    [beginneKartenhandlung],
+  );
+  const { nebenwege: exportNebenwege } = useGeoExport(exportEingabe, einsatzId, beginneExport);
   const lageberichteFreigabe = useModulFreigabe(einsatzId, 'lageberichte');
   const befehleFreigabe = useModulFreigabe(einsatzId, 'auftraege');
   const ohneVerbindung = useOhneVerbindung();
@@ -1489,6 +1508,7 @@ export default function LagekartePage() {
     : null;
   const nebenwege: Nebenweg[] = [
     ...druckNebenwege,
+    ...exportNebenwege,
     ...(rahmenEinsatz
       ? [
           {

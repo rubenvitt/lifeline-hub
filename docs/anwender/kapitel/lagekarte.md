@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/useGeoExport.ts, frontend/src/pages/lagekarte/geoExport.ts, frontend/src/pages/lagekarte/geojsonWriter.ts, frontend/src/pages/lagekarte/kmlWriter.ts, frontend/src/pages/lagekarte/kmzPacker.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs]
 ---
 
 ## Überblick
@@ -172,6 +172,18 @@ wer im Einsatz schreiben darf.
    neuer Lagevortrag öffnet sich.
 
    ![Dialog „Lageplan als Anlage“ mit den Entwürfen „Lagebericht · Lage 1400“ (gewählt) und „Befehl · Verlegung Behandlungsplatz“, darunter „Neuer Lagevortrag“ und die Knöpfe „Abbrechen“ und „Anfügen“](../bilder/lagekarte/lageplan-anlage.png)
+
+### Die Lagekarte exportieren
+
+Lesen genügt: jede Person im Einsatz kann exportieren.
+
+1. Die Ebenen so einstellen, dass die gewünschten Objekte auf der Karte stehen; was ausgeblendet
+   ist, kommt nicht in die Datei.
+2. Im Kopf der Seite unter „Weitere Aktionen zur Lagekarte“ (auf schmalen Bildschirmen „Weitere“)
+   „Exportieren: Google Earth (KMZ)“ oder „Exportieren: GIS (GeoJSON)“ wählen.
+3. Der Browser speichert die Datei, etwa `lagekarte-einsatz-42-2026-11-24-1405.kmz`. Steht am
+   Eintrag „(Nichts eingeblendet)“, ist er gesperrt, bis mindestens ein Objekt zu sehen ist.
+4. Scheitert das Erzeugen, steht über der Karte „Export nicht erstellt“ mit dem Grund.
 
 ## Hintergrund
 
@@ -407,9 +419,21 @@ lassen die Handlung verfallen. Das Platzieren endet dann ohne „verortet“, un
 neuen Stand. Eine Änderung an einer anderen Angabe desselben Objekts, etwa am Zeichen statt am
 Ort, löst keine Frage aus.
 
+### Was der Export enthält
+
+Die Datei enthält nur, was die Karte im Moment zeigt: eingeblendete Ebenen mit Abschnittsflächen,
+Zonen, Gefahrengebieten, Evakuierungsbezirken und den Markern von Einsatzort, Führungsstelle,
+Einheiten, Fahrzeugen, Stellen, Bereitstellungsräumen, Sammelstellen, Schäden und freien Zeichen.
+Personen, Tiere, Lagemeldungen und Führungsfunktionen fehlen, ebenso Notizen und frei
+eingetragene Texte; die Beschriftung ist die der Karte. Gefahrengebiete tragen ihre Warnstufe
+in der Beschriftung und haben feste Farben nach Stufe, unabhängig vom Hell- oder Dunkelmodus der
+App. Die KMZ-Datei bringt die taktischen Zeichen als Bilder mit; die GeoJSON-Datei trägt Art
+und Zeichen als Eigenschaften. Mit der Datei verlassen Geodaten das System; wer sie weitergibt,
+verantwortet den Empfängerkreis.
+
 ### Rechte
 
-Lesen, Ebenen schalten und Messen gehen mit jeder Rolle. Verorten, Zeichnen und Zeichen setzen
+Lesen, Ebenen schalten, Messen und Exportieren gehen mit jeder Rolle. Verorten, Zeichnen und Zeichen setzen
 brauchen das Schreibrecht im Einsatz: Einsatzleitung oder Führungspersonal in einem laufenden
 Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf
 „Zeichnen“.
