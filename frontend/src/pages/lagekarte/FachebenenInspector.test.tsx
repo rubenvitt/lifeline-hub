@@ -811,6 +811,39 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByText(/Reisezeitverlust|Stau/)).not.toBeInTheDocument();
   });
 
+  it('Lkw-Parken: Name, Autobahn, Abschnitt, Stellplätze und Ausstattung', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{
+          titel: 'Krummhörens Kuhlen',
+          kategorie: 'rastanlage',
+          strasse: 'A1',
+          abschnitt: 'Puttgarden',
+          pkw_stellplaetze: 18,
+          lkw_stellplaetze: 4,
+          ausstattung: ['Toilette vorhanden', 'Picknickmöglichkeiten'],
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Rastanlage')).toBeInTheDocument();
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByText('Puttgarden')).toBeInTheDocument();
+    expect(screen.getByText('Pkw 18 · Lkw 4')).toBeInTheDocument();
+    expect(screen.getByText('Toilette vorhanden')).toBeInTheDocument();
+    expect(screen.getByText('Picknickmöglichkeiten')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{ titel: 'Rastanlage', kategorie: 'rastanlage', strasse: 'A7' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Pkw k. A. · Lkw k. A.')).toBeInTheDocument();
+  });
+
   it('Punkt-/keine Geometrie zeigt keine Fläche', () => {
     render(
       <FachebenenInspector

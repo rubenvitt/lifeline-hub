@@ -967,6 +967,7 @@ const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
   luftqualitaet: 'luftqualitaet',
   odl: 'odl',
   autobahn: 'autobahn',
+  autobahn_parken: 'autobahn_parken',
   kritis: 'kritis',
   energie: 'energie',
   copernicus: 'copernicus',

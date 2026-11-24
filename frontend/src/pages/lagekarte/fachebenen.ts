@@ -265,6 +265,20 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geltung: 'nur Bundesautobahnen',
     veraltetNachMin: 60,
   },
+  autobahn_parken: {
+    key: 'autobahn_parken',
+    label: 'Lkw-Parkplätze (BAB)',
+    geometrieTyp: 'punkt',
+    // LLH-1637: Rastanlagen sind statisch, der Server holt sie einmal am Tag (TTL 24 h). Ein Poll
+    // ohne neuen Stand kostet nur ein 304; 30 min holen einen neuen Tagesstand ohne Hast.
+    pollMs: 30 * 60_000,
+    bboxAbhaengig: false,
+    // Der erste Lauf hängt wie bei `autobahn` an keinem Request (`fetch_autobahn_parken`).
+    aufwaermPollMs: 20_000,
+    geltung: 'nur Rastanlagen an Bundesautobahnen, ohne Belegung',
+    // Zwei verpasste Tagesläufe.
+    veraltetNachMin: 48 * 60,
+  },
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
@@ -398,6 +412,7 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'kritis',
     'energie',
     'autobahn',
+    'autobahn_parken',
     'copernicus',
   ];
 }

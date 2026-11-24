@@ -22,6 +22,7 @@ export type FachebeneQuelle =
   | 'kritis'
   | 'hochwasser'
   | 'autobahn'
+  | 'autobahn_parken'
   | 'odl'
   | 'luftqualitaet'
   | 'energie'

@@ -77,6 +77,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const [viewportBbox, setViewportBbox] = useState<string | null>(null);
   // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
   const [autobahnStatus, setAutobahnStatus] = useState<FachebeneStatus | undefined>(undefined);
+  // Dasselbe für die Lkw-Parkplätze (LLH-1637), deren erster Lauf ebenfalls im Hintergrund hängt.
+  const [parkenStatus, setParkenStatus] = useState<FachebeneStatus | undefined>(undefined);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis der bbox-Ebenen.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
 
@@ -154,7 +156,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       fachebeneTakt('copernicus', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
-  // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
+  // Acht Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
   // `fachebeneKeys()` ohne kritis, energie und copernicus (nicht Panel-Reihenfolge). `byKey` greift
   // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
@@ -202,12 +204,19 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // verliert seine Typen).
         refetchInterval: fachebeneTakt('autobahn', autobahnStatus),
       },
-      // Letzter Eintrag, bewusst am Ende: `byKey` greift positionsweise ab.
+      // Bewusst hinten: `byKey` greift positionsweise ab.
       {
         queryKey: globalKeys.fachebene('luftqualitaet'),
         queryFn: () => ladeFachebene('luftqualitaet'),
         enabled: fachebenenSichtbar.luftqualitaet,
         refetchInterval: FACHEBENEN.luftqualitaet.pollMs,
+      },
+      // LLH-1637, hinter Luftqualität angehängt: `byKey` greift positionsweise ab.
+      {
+        queryKey: globalKeys.fachebene('autobahn_parken'),
+        queryFn: () => ladeFachebene('autobahn_parken'),
+        enabled: fachebenenSichtbar.autobahn_parken,
+        refetchInterval: fachebeneTakt('autobahn_parken', parkenStatus),
       },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
@@ -223,6 +232,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         copernicus,
         autobahn: ergebnisse[5],
         luftqualitaet: ergebnisse[6],
+        autobahn_parken: ergebnisse[7],
       } as const;
       const leerFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
@@ -289,6 +299,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // Refetch die vorigen `data`, sonst bliebe der Takt der reguläre, während die Ebene schon
         // `offline` zeigt.
         autobahnStatusRoh: byKey.autobahn.isError ? 'offline' : byKey.autobahn.data?.status,
+        parkenStatusRoh: byKey.autobahn_parken.isError
+          ? 'offline'
+          : byKey.autobahn_parken.data?.status,
       };
     },
   });
@@ -322,6 +335,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   useEffect(() => {
     setAutobahnStatus(kombiniert.autobahnStatusRoh);
   }, [kombiniert.autobahnStatusRoh]);
+  useEffect(() => {
+    setParkenStatus(kombiniert.parkenStatusRoh);
+  }, [kombiniert.parkenStatusRoh]);
 
   // „Zu weit herausgezoomt" bzw. „Ausschnitt zu groß" je Quelle, nur für sichtbare Ebenen mit
   // `minZoom` (heute allein Energie). Die Sidebar liest es für jede bbox-Ebene gleich.

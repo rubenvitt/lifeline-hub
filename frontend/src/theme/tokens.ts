@@ -573,6 +573,7 @@ export type FachebeneTon =
   | 'luftqualitaet'
   | 'odl'
   | 'autobahn'
+  | 'autobahn_parken'
   | 'kritis'
   | 'energie'
   | 'copernicus';
@@ -586,6 +587,9 @@ export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   luftqualitaet: '#5b6b82',
   odl: '#7cb305',
   autobahn: '#c41d7f',
+  // LLH-1637: Rastanlagen derselben Quelle; ruhiges Grau-Blau, weit weg vom BAB-Magenta und vom
+  // Schiefer der Luftqualität.
+  autobahn_parken: '#3f6e8c',
   kritis: '#531dab',
   // Gelb liegt nah am DWD-Gold, ist aber unterscheidbar und war die letzte freie Tonlücke (LFH-81).
   energie: '#d4b106',
@@ -602,6 +606,7 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
   luftqualitaet: '#8c9bb3',
   odl: '#a0d911',
   autobahn: '#f759ab',
+  autobahn_parken: '#7fb0cf',
   kritis: '#9254de',
   energie: '#fadb14',
   copernicus: '#c48a5a',

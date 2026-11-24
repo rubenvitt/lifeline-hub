@@ -747,6 +747,54 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/** Stellplatzzahl oder „k. A.“; die Quelle führt sie nur als Text, nicht bei jeder Anlage. */
+function stellplaetze(v: unknown): string {
+  return typeof v === 'number' ? String(v) : 'k. A.';
+}
+
+/** Lkw-Parkplätze an Bundesautobahnen (LLH-1637). Die Quelle liefert keine Belegung. */
+function RastanlageInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
+  const ausstattung = Array.isArray(p.ausstattung)
+    ? p.ausstattung.filter((a): a is string => typeof a === 'string' && a.trim() !== '')
+    : [];
+  const beschreibung = s(p.beschreibung);
+  return (
+    <>
+      <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel('rastanlage')}</Marke>
+      <Descriptions column={1}>
+        {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
+        {s(p.abschnitt) && (
+          <Descriptions.Item label="Abschnitt">{s(p.abschnitt)}</Descriptions.Item>
+        )}
+        <Descriptions.Item label="Stellplätze">
+          {`Pkw ${stellplaetze(p.pkw_stellplaetze)} · Lkw ${stellplaetze(p.lkw_stellplaetze)}`}
+        </Descriptions.Item>
+      </Descriptions>
+      {ausstattung.length > 0 && (
+        <ul
+          style={{
+            marginTop: token.marginSM,
+            marginBottom: 0,
+            paddingInlineStart: token.paddingLG,
+          }}
+        >
+          {ausstattung.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      )}
+      {beschreibung && (
+        <Typography.Paragraph
+          style={{ marginTop: token.marginSM, marginBottom: 0, whiteSpace: 'pre-line' }}
+        >
+          {beschreibung}
+        </Typography.Paragraph>
+      )}
+    </>
+  );
+}
+
 /** Produktarten von Copernicus Rapid Mapping. */
 const COPERNICUS_PRODUKT: Record<string, string> = {
   DEL: 'Abgrenzung',
@@ -900,6 +948,8 @@ export default function FachebenenInspector({
         <OdlInhalt p={p} />
       ) : quelle === 'autobahn' ? (
         <AutobahnInhalt p={p} />
+      ) : quelle === 'autobahn_parken' ? (
+        <RastanlageInhalt p={p} />
       ) : quelle === 'luftqualitaet' ? (
         <LuftqualitaetInhalt p={p} />
       ) : quelle === 'copernicus' ? (

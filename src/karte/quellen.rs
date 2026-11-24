@@ -658,7 +658,7 @@ const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
 /// kostet aber je Runde ~450 Abrufe gegen eine fremde Behörden-API.
 const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
 /// Rastanlagen ändern sich selten; einmal am Tag reicht (LLH-1637).
-const AUTOBAHN_PARKEN_TTL: Duration = Duration::from_secs(24 * 3600);
+const AUTOBAHN_PARKEN_TTL: Duration = Duration::from_secs(86_400);
 const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
 /// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80, Verkehrsmeldungen seit LLH-1637).
 /// Ladesäulen tragen nichts bei und kosteten je ~113 weitere Abrufe pro Runde; die Lkw-Parkplätze

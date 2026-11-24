@@ -49,8 +49,20 @@ describe('Fachebenen-Registry', () => {
       'kritis',
       'energie',
       'autobahn',
+      'autobahn_parken',
       'copernicus',
     ]);
+  });
+  it('führt die Lkw-Parkplätze als eigene, selten getaktete Ebene neben der BAB-Lage (LLH-1637)', () => {
+    const def = FACHEBENEN.autobahn_parken;
+    expect(def.label).toBe('Lkw-Parkplätze (BAB)');
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.geltung).toBe('nur Rastanlagen an Bundesautobahnen, ohne Belegung');
+    expect(istBboxAbhaengig('autobahn_parken')).toBe(false);
+    // Erster Lauf im Hintergrund wie bei `autobahn`: kurz takten, solange `offline`.
+    expect(fachebeneTakt('autobahn_parken', 'offline')).toBe(20_000);
+    expect(fachebeneTakt('autobahn_parken', 'ok')).toBe(30 * 60_000);
+    expect(defaultFachebenenSichtbar().autobahn_parken).toBe(false);
   });
   it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
     expect(FACHEBENEN.energie.label).toBe('Energieanlagen');
@@ -183,11 +195,18 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
-  it('nur ODL, Luftqualität, KRITIS, Autobahn und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+  it('nur ODL, Luftqualität, KRITIS, Autobahn, Lkw-Parken und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn', 'copernicus']);
+    expect(mitGeltung).toEqual([
+      'odl',
+      'luftqualitaet',
+      'kritis',
+      'autobahn',
+      'autobahn_parken',
+      'copernicus',
+    ]);
   });
   it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
     // Seit LFH-594 kostet ein Poll ohne neuen Stand nur ein 304. Mit `pollMs == TTL` verschenkte
@@ -207,6 +226,7 @@ describe('Fachebenen-Registry', () => {
       odl: 'ODL_TTL',
       luftqualitaet: 'LUFTQUALITAET_TTL',
       autobahn: 'AUTOBAHN_TTL',
+      autobahn_parken: 'AUTOBAHN_PARKEN_TTL',
       copernicus: 'COPERNICUS_TTL',
     };
     // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL.
@@ -511,6 +531,7 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
+      autobahn_parken: 48 * 60,
       copernicus: 120,
     });
   });
