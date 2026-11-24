@@ -36,11 +36,11 @@ import { useLagekarteDaten } from './useLagekarteDaten';
 // überlagern.
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/5/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/5/persons', () => HttpResponse.json([])),
     // Ebene „Betreuungsstellen": dieselbe Lage, ohne Benutzer ist das Modul frei.
-    http.get('/api/einsaetze/5/betreuung', () => HttpResponse.json({ stellen: [] })),
+    http.get('/api/einsaetze/5/care', () => HttpResponse.json({ stellen: [] })),
     // Bezirke für die Bezirksflächen: Modul Evakuierung (LLH-1034).
-    http.get('/api/einsaetze/5/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+    http.get('/api/einsaetze/5/evacuation', () => HttpResponse.json({ bezirke: [] })),
   );
 });
 
@@ -442,7 +442,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
         zaehler.freigaben += 1;
         return HttpResponse.json(freigabenFixture(freigaben));
       }),
-      http.get('/api/einsaetze/5/personen', () => {
+      http.get('/api/einsaetze/5/persons', () => {
         zaehler.personen += 1;
         return personen();
       }),
@@ -614,13 +614,13 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
-      http.get('/api/einsaetze/5/betreuung', () => {
+      http.get('/api/einsaetze/5/care', () => {
         zaehler.betreuung += 1;
         return betreuung();
       }),
       // Dieselbe Antwort trägt die Bezirke; seit LLH-1034 liest die Karte sie aus dem Modul
       // Evakuierung. Ein Feld zu viel stört keine der beiden Abfragen.
-      http.get('/api/einsaetze/5/evakuierung', () => {
+      http.get('/api/einsaetze/5/evacuation', () => {
         zaehler.evakuierung += 1;
         return betreuung();
       }),
@@ -1158,7 +1158,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
-      http.get('/api/einsaetze/5/tiere', () => {
+      http.get('/api/einsaetze/5/animals', () => {
         zaehler.tiere += 1;
         return tiere();
       }),
@@ -1246,7 +1246,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
       expect(result.current.alleVerortet.some((m) => m.schluessel === 'tier-21')).toBe(true),
     );
     // Die Leitung bricht weg; der nächste Abruf scheitert, react-query lässt `data` stehen.
-    server.use(http.get('/api/einsaetze/5/tiere', () => HttpResponse.error()));
+    server.use(http.get('/api/einsaetze/5/animals', () => HttpResponse.error()));
     await client.invalidateQueries({ queryKey: ['einsatz-tiere', 5] });
     await waitFor(() => expect(result.current.fehlerhafteQuellen).toEqual(['Tiere']));
     expect(result.current.alleVerortet.some((m) => m.schluessel === 'tier-21')).toBe(true);

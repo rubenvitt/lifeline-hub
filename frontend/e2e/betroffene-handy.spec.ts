@@ -37,7 +37,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 
 /** Seeding per `page.request` (Cookie-Jar geteilt). Gibt die Id der Person zurück. */
 async function seedePerson(page: Page, einsatzId: string, data: unknown): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data });
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data });
   expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }

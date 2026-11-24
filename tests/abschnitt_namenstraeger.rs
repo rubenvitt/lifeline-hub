@@ -330,7 +330,7 @@ async fn versorgte_person(app: &axum::Router, cookie: &str, einsatz: i64, einhei
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personen"),
+        &format!("/api/einsaetze/{einsatz}/persons"),
         cookie,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
     )
@@ -383,7 +383,7 @@ async fn einheit_umbenennen_und_umhaengen_meldet_versorgte_personen() {
         ids.sort_unstable();
         assert_eq!(ids, erwartet, "{fall}");
     }
-    let personen = format!("/api/einsaetze/{eid}/personen");
+    let personen = format!("/api/einsaetze/{eid}/persons");
     assert_eq!(
         feld_in_liste(&app, &admin, &personen, p1, "versorgende_einheit_name").await,
         "1. Zug neu"
@@ -406,7 +406,7 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_versorgte_personen() {
     let mut rx = live.abonniere(eid);
     umbenennen(&app, &admin, eid, nord, json!({"name": "Nordost"})).await;
     assert_eq!(gemeldete_personen(&mut rx), vec![p], "Umbenennen");
-    let personen = format!("/api/einsaetze/{eid}/personen");
+    let personen = format!("/api/einsaetze/{eid}/persons");
     assert_eq!(
         feld_in_liste(
             &app,
@@ -502,7 +502,7 @@ async fn einheit_patch_mit_unbekannter_sprechgruppe_speichert_und_meldet_nichts(
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
-    let personen = format!("/api/einsaetze/{eid}/personen");
+    let personen = format!("/api/einsaetze/{eid}/persons");
     assert_eq!(
         feld_in_liste(&app, &admin, &personen, p, "versorgende_einheit_name").await,
         "1. Zug",

@@ -814,7 +814,7 @@ describe('MeldungenPage', () => {
     const antwort = new Promise<void>((r) => (freigeben = r));
     let angefragt = false;
     server.use(
-      http.get('/api/einsaetze/:eid/personen/einheiten', async () => {
+      http.get('/api/einsaetze/:eid/persons/units', async () => {
         angefragt = true;
         await antwort;
         return HttpResponse.json([]);
@@ -834,7 +834,7 @@ describe('MeldungenPage', () => {
     client.setQueryData(einsatzKeys.personenEinheiten(1), [
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
-    server.use(http.get('/api/einsaetze/:eid/personen/einheiten', () => HttpResponse.json([])));
+    server.use(http.get('/api/einsaetze/:eid/persons/units', () => HttpResponse.json([])));
     renderPage(undefined, client);
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
@@ -854,7 +854,7 @@ describe('MeldungenPage', () => {
     client.setQueryData(einsatzKeys.personenEinheiten(1), [
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
-    server.use(http.get('/api/einsaetze/:eid/personen/einheiten', () => HttpResponse.json([])));
+    server.use(http.get('/api/einsaetze/:eid/persons/units', () => HttpResponse.json([])));
     renderPage(undefined, client);
     await screen.findByText('Florian Nord 1');
     await userEvent.click(
@@ -872,7 +872,7 @@ describe('MeldungenPage', () => {
       { id: 5, name: 'Streife 1', abschnitt_name: null },
     ]);
     server.use(
-      http.get('/api/einsaetze/:eid/personen/einheiten', () =>
+      http.get('/api/einsaetze/:eid/persons/units', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );

@@ -462,7 +462,7 @@ pub struct AufhebenReq {
     pub grund: String,
 }
 
-/// POST /api/einsaetze/{id}/tasks/{aid}/rescind — Auftrag mit Grund aufheben (LLH-1098,
+/// POST /api/einsaetze/{id}/tasks/{aid}/void — Auftrag mit Grund aufheben (LLH-1098,
 /// Spec `auftrag-aufheben-berichtigen`). Unumkehrbar; schreibt eine Anordnung ins ETB.
 pub async fn aufheben(
     State(state): State<AppState>,

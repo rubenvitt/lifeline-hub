@@ -189,7 +189,7 @@ function mockEndpunkte(d: Daten) {
         lagekennzahlen: d.lagekennzahlen ?? einsatz.lagekennzahlen,
       });
     }),
-    http.get('/api/einsaetze/1/personen', () => {
+    http.get('/api/einsaetze/1/persons', () => {
       if (!d.personenStatus) return json(d.personen, 'personen');
       zaehle('personen');
       return new HttpResponse(null, { status: d.personenStatus });
@@ -232,7 +232,7 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/pegel', () =>
       d.pegelStatus ? new HttpResponse(null, { status: d.pegelStatus }) : json(d.pegel),
     ),
-    http.get('/api/einsaetze/1/evakuierung', () => {
+    http.get('/api/einsaetze/1/evacuation', () => {
       if (d.betreuungAbrufe) d.betreuungAbrufe.n += 1;
       return d.betreuungStatus
         ? new HttpResponse(null, { status: d.betreuungStatus })
@@ -489,7 +489,7 @@ describe('LageDashboardPage — Kennzahlenband', () => {
       let abrufe = 0;
       mockEndpunkte({});
       server.use(
-        http.get('/api/einsaetze/1/personen', () => {
+        http.get('/api/einsaetze/1/persons', () => {
           abrufe++;
           // 3 h 59 min vor „jetzt" — eine Minute unter der Schwelle.
           return HttpResponse.json([
@@ -1520,7 +1520,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/einsaetze/2/evacuation', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
@@ -1556,7 +1556,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       ),
       http.get('/api/einsaetze/2/gefahrengebiete/:gid/matrix', () => HttpResponse.json([])),
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
-      http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/einsaetze/2/evacuation', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
       http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),

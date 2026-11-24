@@ -287,7 +287,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
   server.use(
     ...ueberschreiben,
     http.get('/api/einsaetze/1', json(einsatz)),
-    http.get('/api/einsaetze/1/personen', json(d.personen)),
+    http.get('/api/einsaetze/1/persons', json(d.personen)),
     http.get('/api/einsaetze/1/personal', json(d.personal)),
     http.get('/api/einsaetze/1/fahrzeuge', json(d.fahrzeuge)),
     http.get('/api/einsaetze/1/material', json(d.material)),
@@ -1611,7 +1611,7 @@ describe('UeberblickPage', () => {
     };
     // Die Meldungsliste hält die Reihen nicht auf (anders als die Quellen der Marken, LLH-1748).
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/personen', haengt),
+      http.get('/api/einsaetze/1/persons', haengt),
       http.get('/api/einsaetze/1/reports', haengt),
     ]);
     rendern();
@@ -2057,7 +2057,7 @@ describe('UeberblickPage', () => {
  */
 describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   const GEBUNDEN = [
-    '/api/einsaetze/1/personen',
+    '/api/einsaetze/1/persons',
     '/api/einsaetze/1/personal',
     '/api/einsaetze/1/fahrzeuge',
     '/api/einsaetze/1/material',
@@ -2129,7 +2129,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
     await nordDa();
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
-    expect(aufrufe['/api/einsaetze/1/personen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/persons']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/resource-requests']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/etb']).toBeUndefined();
@@ -2254,7 +2254,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
 
   it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {
     mitFreigaben({}, [
-      http.get('/api/einsaetze/1/personen', () =>
+      http.get('/api/einsaetze/1/persons', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);

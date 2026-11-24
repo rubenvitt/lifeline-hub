@@ -43,7 +43,7 @@ async function saeen(page: Page) {
     bezeichnung: `E2E Empfänger ${Date.now()}`,
   });
   const basis = `/api/einsaetze/${e}`;
-  const { id: zf } = await senden(page, 'post', `${basis}/verpflegung/zeitfenster`, {
+  const { id: zf } = await senden(page, 'post', `${basis}/catering/time-slots`, {
     bezeichnung: 'Mittag Empfänger',
     von_at: zeit(-20),
     bis_at: zeit(100),

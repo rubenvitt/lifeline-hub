@@ -3,7 +3,7 @@
 Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` und
 `pages/PersonenDetailPage.tsx`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`.
 
-- **Sichtung geht mit dem Anlegen mit** (`POST …/personen` mit `sichtung`, eine Transaktion,
+- **Sichtung geht mit dem Anlegen mit** (`POST …/persons` mit `sichtung`, eine Transaktion,
   unter `war_neu`) — kein nachgeschobener Request (Offline-Idempotenz). Mit `vermisst` 422,
   unbekannte Kategorie 400.
 - **Eine Sichtungswahl für jeden Ort** (LLH-1083, Spec `sichtungswahl`): `personen/SichtungsWahl.tsx`
@@ -88,7 +88,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   `personen/LeichterFallModal.tsx` auf `ErfassungsModal` (Anlass Pflicht, ≤ 3 Maßnahmen über
   `FlaechenMehrfachWahl`, Kurzliste `LEICHTE_MASSNAHMEN`), in der Liste als Nebenweg des Kopfes
   (`weitere`: ab `md` Knopf, unter `md` hinter „Weitere“, damit die erste Person bei 390 px im
-  ersten Bild bleibt) und am UHS-Gerät (`stelle` = eigene UHS). EIN `POST …/personen` mit `massnahmen` und `entlassen: true`, Status
+  ersten Bild bleibt) und am UHS-Gerät (`stelle` = eigene UHS). EIN `POST …/persons` mit `massnahmen` und `entlassen: true`, Status
   `betroffen`, ohne Sichtung, offlinefähig wie jede Anlage; der Server schreibt Maßnahmen,
   Verbleib und UHS-Ein-/Austritt zur Erfassungszeit und EINEN ETB-Eintrag. Kurzeingabe `+kürzel`
   (`MASSNAHME_KUERZEL`) und `>entl` (`ENTLASSEN_KUERZEL`) in `personBefehl.ts`, Hinweiszeile aus
@@ -204,7 +204,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
 - **Detail nicht live, Stand schon** (LLH-1832, Spec `storno-sperre`): jeder Detailabruf schreibt
   eine Zeile ins Zugriffsprotokoll. Das Detail lädt deshalb weder live noch beim Fensterwechsel
   neu (`refetchOnWindowFocus: false`, kein Retry). Ob die Person inzwischen storniert ist, sagt der
-  protokollfreie Stand (`GET …/personen/{pid}/stand`, `einsatzKeys.personStand`), live über das
+  protokollfreie Stand (`GET …/persons/{pid}/state`, `einsatzKeys.personStand`), live über das
   `person`-Ereignis; beim Öffnen trägt das Detail ihn schon (`initialData`). Meldet er einen
   Storno, führt die Seite ihn mit dem Detail zusammen; eine Notiz in Arbeit bleibt lesbar.
 - **Zugriffsprotokoll** (LFH-916, Spec `personen-zugriffsprotokoll`): nur die Einsatzleitung sieht

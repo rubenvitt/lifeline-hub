@@ -62,7 +62,7 @@ async fn bild(
     if_none_match: Option<&str>,
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut req = Request::builder()
-        .uri(format!("{}/bild", plan(einsatz, uhs)))
+        .uri(format!("{}/image", plan(einsatz, uhs)))
         .header(header::COOKIE, cookie);
     if let Some(e) = if_none_match {
         req = req.header(header::IF_NONE_MATCH, e);
@@ -103,7 +103,7 @@ async fn anhang_ablegen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge"))
+                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -130,7 +130,7 @@ async fn uebernehmen(
     anfrage(
         app,
         "POST",
-        &format!("{}/aus-anhang", plan(einsatz, uhs)),
+        &format!("{}/from-attachment", plan(einsatz, uhs)),
         cookie,
         Some(&format!(r#"{{"anhang_id":{linker}}}"#)),
     )
@@ -236,7 +236,7 @@ async fn hochladen_liefert_den_plan_und_steht_im_detail_und_im_etb() {
     let (_, l) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments"),
         &admin,
         None,
     )
@@ -382,7 +382,7 @@ async fn uebernahme_kopiert_mit_genau_einer_auditzeile() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge/{linker}"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments/{linker}"),
         &admin,
         None,
     )
@@ -414,7 +414,7 @@ async fn uebernahme_fremder_oder_entfernter_anhaenge_ist_404() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge/{weg}"),
+        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments/{weg}"),
         &admin,
         None,
     )
@@ -625,12 +625,12 @@ fn upload_und_bild_sind_vom_zeitbudget_ausgenommen() {
     assert!(ist_ausgenommen(&Method::PUT, plan));
     assert!(ist_ausgenommen(
         &Method::GET,
-        "/api/einsaetze/{id}/uhs/{uid}/plan/bild"
+        "/api/einsaetze/{id}/uhs/{uid}/plan/image"
     ));
     assert!(!ist_ausgenommen(&Method::PATCH, plan));
     assert!(!ist_ausgenommen(&Method::DELETE, plan));
     assert!(!ist_ausgenommen(
         &Method::POST,
-        "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang"
+        "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment"
     ));
 }

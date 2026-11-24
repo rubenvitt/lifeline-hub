@@ -418,7 +418,7 @@ describe('ChatPage', () => {
         HttpResponse.json([{ id: 3, registrier_nr: 3, typ: 'sachschaden', ort: 'B5 km12' }]),
       ),
       http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/personen/auswahl', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/persons/selection', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/situation-reports', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),

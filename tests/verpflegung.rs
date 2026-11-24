@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/verpflegung")
+    format!("/api/einsaetze/{einsatz}/catering")
 }
 
 /// „Mittag“ am 24.09., 10:00–11:30 UTC (12:00–13:30 in Berlin), 180 Kräfte, 70 Betreute.
@@ -26,7 +26,7 @@ async fn zeitfenster(app: &axum::Router, cookie: &str, einsatz: i64, body: &str)
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/zeitfenster", pfad(einsatz)),
+        &format!("{}/time-slots", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -39,7 +39,7 @@ async fn ausgabe(app: &axum::Router, cookie: &str, einsatz: i64, zid: i64, body:
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(einsatz)),
+        &format!("{}/time-slots/{zid}/distributions", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -142,7 +142,7 @@ async fn aendern_und_loeschen_nennen_den_zeitraum_in_der_zone_des_einsatzes() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("{}/zeitfenster/{zid}", pfad(e)),
+        &format!("{}/time-slots/{zid}", pfad(e)),
         &admin,
         None,
     )
@@ -190,7 +190,7 @@ async fn durchstich_anlegen_ausgabe_ruecknahme_loeschen() {
     let (s, zf) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &admin,
         Some(
             r#"{"bezeichnung":"Mittag","von_at":"2026-09-24T12:00:00+02:00","bis_at":"2026-09-24T11:30:00Z","bedarf_kraefte":180,"bedarf_betreute":70,"sonderkost":{"vegetarisch":12,"vegan":3}}"#,
@@ -242,7 +242,7 @@ async fn durchstich_anlegen_ausgabe_ruecknahme_loeschen() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/ausgaben/{aid}/zuruecknehmen", pfad(e)),
+        &format!("{}/distributions/{aid}/undo", pfad(e)),
         &admin,
         None,
     )
@@ -263,7 +263,7 @@ async fn durchstich_anlegen_ausgabe_ruecknahme_loeschen() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("{}/zeitfenster/{zid}", pfad(e)),
+        &format!("{}/time-slots/{zid}", pfad(e)),
         &admin,
         None,
     )
@@ -283,7 +283,7 @@ async fn patch_aendert_bedarf_und_leerlauf_schreibt_nichts() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let zid = zeitfenster(&app, &admin, e, MITTAG).await;
-    let uri = format!("{}/zeitfenster/{zid}", pfad(e));
+    let uri = format!("{}/time-slots/{zid}", pfad(e));
 
     let (s, zf) = anfrage(
         &app,
@@ -334,7 +334,7 @@ async fn patch_auf_veraltetem_stand_ist_409() {
     .execute(&pool)
     .await
     .unwrap();
-    let uri = format!("{}/zeitfenster/{zid}", pfad(e));
+    let uri = format!("{}/time-slots/{zid}", pfad(e));
     let (_, liste) = anfrage(&app, "GET", &pfad(e), &admin, None).await;
     let zf = liste["zeitfenster"]
         .as_array()
@@ -383,9 +383,9 @@ async fn statuscodes_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let zid = zeitfenster(&app, &admin, e, MITTAG).await;
-    let neu = format!("{}/zeitfenster", pfad(e));
-    let aus = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
-    let patch = format!("{}/zeitfenster/{zid}", pfad(e));
+    let neu = format!("{}/time-slots", pfad(e));
+    let aus = format!("{}/time-slots/{zid}/distributions", pfad(e));
+    let patch = format!("{}/time-slots/{zid}", pfad(e));
 
     for (methode, uri, body) in [
         // Spec „Leere Bezeichnung oder negativer Bedarf“
@@ -488,9 +488,9 @@ async fn statuscodes_422() {
         r#"{"bezeichnung":"Mittag","von_at":"2026-09-24T10:00:00Z","bis_at":"2026-09-24T11:30:00Z","bedarf_kraefte":180,"bedarf_betreute":70,"sonderkost":{"vegan":15}}"#,
     )
     .await;
-    let neu = format!("{}/zeitfenster", pfad(e));
-    let patch = format!("{}/zeitfenster/{zid}", pfad(e));
-    let aus = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let neu = format!("{}/time-slots", pfad(e));
+    let patch = format!("{}/time-slots/{zid}", pfad(e));
+    let aus = format!("{}/time-slots/{zid}/distributions", pfad(e));
 
     for (methode, uri, body) in [
         // Spec „Ende nicht nach Beginn“ — Anlegen und Ändern (nur ein Zeitpunkt übergeben).
@@ -537,7 +537,7 @@ async fn statuscodes_422() {
     let aid = a["ausgabe_id"].as_i64().unwrap();
     let (s, _) = anfrage(&app, "DELETE", &patch, &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
-    let zurueck = format!("{}/ausgaben/{aid}/zuruecknehmen", pfad(e));
+    let zurueck = format!("{}/distributions/{aid}/undo", pfad(e));
     let (s, _) = anfrage(&app, "POST", &zurueck, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = anfrage(&app, "POST", &zurueck, &admin, None).await;
@@ -571,32 +571,32 @@ async fn statuscodes_404_fremder_einsatz() {
     for (methode, uri, body) in [
         (
             "PATCH",
-            format!("{}/zeitfenster/{fremd_zid}", pfad(e)),
+            format!("{}/time-slots/{fremd_zid}", pfad(e)),
             Some(r#"{"bedarf_betreute":90}"#),
         ),
         (
             "DELETE",
-            format!("{}/zeitfenster/{fremd_zid}", pfad(e)),
+            format!("{}/time-slots/{fremd_zid}", pfad(e)),
             None,
         ),
         (
             "POST",
-            format!("{}/zeitfenster/{fremd_zid}/ausgaben", pfad(e)),
+            format!("{}/time-slots/{fremd_zid}/distributions", pfad(e)),
             Some(r#"{"menge":5}"#),
         ),
         (
             "POST",
-            format!("{}/ausgaben/{fremd_aid}/zuruecknehmen", pfad(e)),
+            format!("{}/distributions/{fremd_aid}/undo", pfad(e)),
             None,
         ),
         (
             "POST",
-            format!("{}/zeitfenster/{eigene_zid}/ausgaben", pfad(e)),
+            format!("{}/time-slots/{eigene_zid}/distributions", pfad(e)),
             Some(&*format!(r#"{{"menge":5,"nachforderung_id":{fremd_nf}}}"#)),
         ),
         (
             "POST",
-            format!("{}/zeitfenster/{eigene_zid}/ausgaben", pfad(e)),
+            format!("{}/time-slots/{eigene_zid}/distributions", pfad(e)),
             Some(r#"{"menge":5,"nachforderung_id":999999}"#),
         ),
     ] {
@@ -705,16 +705,16 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     for (methode, uri, body) in [
         (
             "POST",
-            format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+            format!("{}/time-slots/{zid}/distributions", pfad(e)),
             Some(r#"{"menge":5}"#),
         ),
-        ("POST", format!("{}/zeitfenster", pfad(e)), Some(MITTAG)),
+        ("POST", format!("{}/time-slots", pfad(e)), Some(MITTAG)),
         (
             "PATCH",
-            format!("{}/zeitfenster/{zid}", pfad(e)),
+            format!("{}/time-slots/{zid}", pfad(e)),
             Some(r#"{"bedarf_betreute":90}"#),
         ),
-        ("DELETE", format!("{}/zeitfenster/{zid}", pfad(e)), None),
+        ("DELETE", format!("{}/time-slots/{zid}", pfad(e)), None),
     ] {
         let (s, _) = anfrage(&app, methode, &uri, &beob_cookie, body).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{methode} {uri}");
@@ -760,7 +760,7 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &frieda,
         Some(MITTAG),
     )
@@ -769,7 +769,7 @@ async fn ausgeblendetes_modul_ist_403_fuer_mitglieder() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &frieda,
         Some(FELDKUECHE),
     )
@@ -795,7 +795,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &admin,
         Some(MITTAG),
     )
@@ -804,7 +804,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &admin,
         Some(FELDKUECHE),
     )
@@ -859,7 +859,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -940,7 +940,7 @@ async fn leerlauf_patch_publiziert_kein_ereignis() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("{}/zeitfenster/{zid}", pfad(e)),
+        &format!("{}/time-slots/{zid}", pfad(e)),
         &admin,
         Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
     )
@@ -950,7 +950,7 @@ async fn leerlauf_patch_publiziert_kein_ereignis() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1005,7 +1005,7 @@ async fn client_id_zu_lang_ist_400() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &format!("{}/time-slots/{zid}/distributions", pfad(e)),
         &admin,
         Some(&ausgabe_body(5, &"x".repeat(65))),
     )
@@ -1029,7 +1029,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster/{abend}/ausgaben", pfad(e)),
+        &format!("{}/time-slots/{abend}/distributions", pfad(e)),
         &admin,
         Some(&ausgabe_body(120, "v4")),
     )
@@ -1045,7 +1045,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
     )
     .await;
     assert!(s.is_success(), "Einsatz abschließen: {s}");
-    let url = format!("{}/zeitfenster/{mittag}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{mittag}/distributions", pfad(e));
     let (s, wieder) = anfrage(&app, "POST", &url, &admin, Some(&ausgabe_body(120, "v4"))).await;
     assert_eq!(s, StatusCode::CREATED, "{wieder:?}");
     assert_eq!(wieder["ausgabe_id"], erst["ausgabe_id"]);
@@ -1063,7 +1063,7 @@ async fn gates_vor_dem_replay() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let zid = zeitfenster(&app, &admin, e, MITTAG).await;
-    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     ausgabe(&app, &admin, e, zid, &ausgabe_body(120, "v6")).await;
 
     let beob = benutzer_anlegen(&app, &admin, "beobachter", "keine").await;
@@ -1139,7 +1139,7 @@ async fn grenzen_der_freitexte_sind_400() {
         })
         .to_string()
     };
-    let zf_url = format!("{}/zeitfenster", pfad(e));
+    let zf_url = format!("{}/time-slots", pfad(e));
 
     // Zeitfenster-Bezeichnung beim Anlegen: 200 geht, 201 nicht (Leerraum zählt nicht).
     let (s, _) = anfrage(
@@ -1183,7 +1183,7 @@ async fn grenzen_der_freitexte_sind_400() {
     assert_eq!(s, StatusCode::BAD_REQUEST, "Grenze vor dem Zusammenhang");
 
     // Zeitfenster-Bezeichnung beim Ändern, auch vor dem 422.
-    let zid_url = format!("{}/zeitfenster/{zid}", pfad(e));
+    let zid_url = format!("{}/time-slots/{zid}", pfad(e));
     for body in [
         serde_json::json!({ "bezeichnung": "m".repeat(201) }),
         serde_json::json!({ "bezeichnung": "m".repeat(201), "bis_at": "2026-09-24T09:00:00Z" }),
@@ -1202,7 +1202,7 @@ async fn grenzen_der_freitexte_sind_400() {
     assert_eq!(s, StatusCode::OK);
 
     // Ort (500) und Bemerkung (2 000) einer Ausgabe.
-    let aus_url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let aus_url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     for (feld, max) in [("ort", 500), ("bemerkung", 2_000)] {
         let (s, _) = anfrage(
             &app,
@@ -1291,7 +1291,7 @@ async fn stelle_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &s
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("{}/stellen", pfad(einsatz)),
+        &format!("{}/positions", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -1318,7 +1318,7 @@ async fn stelle_status(
     anfrage(
         app,
         "POST",
-        &format!("{}/stellen/{sid}/status", pfad(einsatz)),
+        &format!("{}/positions/{sid}/status", pfad(einsatz)),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -1335,7 +1335,7 @@ async fn stelle_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("{}/stellen/{sid}", pfad(einsatz)),
+        &format!("{}/positions/{sid}", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -1346,7 +1346,7 @@ async fn stelle_storno(app: &axum::Router, cookie: &str, einsatz: i64, sid: i64)
     anfrage(
         app,
         "DELETE",
-        &format!("{}/stellen/{sid}", pfad(einsatz)),
+        &format!("{}/positions/{sid}", pfad(einsatz)),
         cookie,
         None,
     )
@@ -1371,7 +1371,7 @@ async fn zf_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("{}/zeitfenster/{zid}", pfad(einsatz)),
+        &format!("{}/time-slots/{zid}", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -1559,7 +1559,7 @@ async fn stelle_statuscodes() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let url = format!("{}/stellen", pfad(e));
+    let url = format!("{}/positions", pfad(e));
 
     let b200 = "B".repeat(200);
     let s500 = "S".repeat(500);
@@ -1671,7 +1671,7 @@ async fn beobachter_plant_keine_stelle() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/stellen", pfad(e)),
+        &format!("{}/positions", pfad(e)),
         &beob_cookie,
         Some(FELDKUECHE),
     )
@@ -1753,7 +1753,7 @@ async fn live_ereignis_bei_stellen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personen"),
+        &format!("/api/einsaetze/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1803,7 +1803,7 @@ async fn verpflegungsart_anlegen_aendern_leeren() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &admin,
         Some(&body.to_string()),
     )
@@ -1906,7 +1906,7 @@ async fn zuordnung_statuscodes() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("{}/zeitfenster", pfad(e)),
+            &format!("{}/time-slots", pfad(e)),
             &admin,
             Some(&mittag_an(liste)),
         )
@@ -1923,7 +1923,7 @@ async fn zuordnung_statuscodes() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &admin,
         Some(&mittag_an(&zwanzig)),
     )
@@ -1939,7 +1939,7 @@ async fn zuordnung_statuscodes() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("{}/zeitfenster", pfad(e)),
+            &format!("{}/time-slots", pfad(e)),
             &admin,
             Some(&mittag_an(&[nord, sid])),
         )
@@ -2110,7 +2110,7 @@ async fn ausgabe_an_stelle_statuscodes() {
         stelle_status(&app, &admin, e, sport, "aufgeloest").await.0,
         StatusCode::OK
     );
-    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     let an = |sid: i64, menge: i64, zeitpunkt: Option<&str>| {
         let mut b = serde_json::json!({ "menge": menge, "verpflegungsstelle_id": sid });
         if let Some(z) = zeitpunkt {
@@ -2187,7 +2187,7 @@ async fn ausgabe_an_stelle_grenze_der_aufloesung() {
         "%Y-%m-%d %H:%M:%S",
     )
     .unwrap();
-    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     let an = |t: chrono::NaiveDateTime| {
         serde_json::json!({
             "menge": 5,
@@ -2249,7 +2249,7 @@ async fn replay_nach_aufloesen_der_stelle() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &format!("{}/time-slots/{zid}/distributions", pfad(e)),
         &admin,
         Some(&neu),
     )
@@ -2392,7 +2392,7 @@ async fn ausgabe_empfaenger_statuscodes() {
     let e = einsatz_anlegen(&app, &admin).await;
     let e2 = einsatz_anlegen_mit(&app, &admin, "Andere Lage").await;
     let zid = zeitfenster(&app, &admin, e, MITTAG).await;
-    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
     let leer = einheit_bilden(&app, &admin, e, "Leere Gruppe").await;
     let deich = abschnitt(&app, &admin, e, "Deich").await;
@@ -2538,7 +2538,7 @@ async fn replay_mit_empfaenger_nach_aufloesen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster/{zid}/ausgaben", pfad(e)),
+        &format!("{}/time-slots/{zid}/distributions", pfad(e)),
         &admin,
         Some(&neu),
     )
@@ -2743,7 +2743,7 @@ async fn betreuungsstelle(
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen"),
+        &format!("/api/einsaetze/{einsatz}/care/positions"),
         cookie,
         Some(&serde_json::json!({
             "bezeichnung": bezeichnung,
@@ -2770,7 +2770,7 @@ async fn betreuungsstelle_status(
     let (s, j) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}"),
         cookie,
         Some(&serde_json::json!({ "status": status })),
     )
@@ -2782,7 +2782,7 @@ async fn betreuungsstelle_stornieren(app: &axum::Router, cookie: &str, einsatz: 
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/betreuung/stellen/{sid}/stornieren"),
+        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -2857,7 +2857,7 @@ async fn ausgabe_an_betreuungsstelle_statuscodes() {
     let e = einsatz_anlegen(&app, &admin).await;
     let e2 = einsatz_anlegen_mit(&app, &admin, "Andere Lage").await;
     let zid = zeitfenster(&app, &admin, e, MITTAG).await;
-    let url = format!("{}/zeitfenster/{zid}/ausgaben", pfad(e));
+    let url = format!("{}/time-slots/{zid}/distributions", pfad(e));
     let gruppe = einheit_bilden(&app, &admin, e, "2. Gruppe").await;
     let deich = abschnitt(&app, &admin, e, "Deich").await;
     let turnhalle = betreuungsstelle(&app, &admin, e, "Turnhalle Nord").await;
@@ -2987,7 +2987,7 @@ async fn betreuungsstellen_fuer_verpflegungsleser_ohne_modul_betreuung() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/care"),
         &frieda,
         None,
     )
@@ -3425,7 +3425,7 @@ async fn create_tag(
     anfrage(
         app,
         "POST",
-        &format!("{}/zeitfenster/aus-vorlage", pfad(einsatz)),
+        &format!("{}/time-slots/from-template", pfad(einsatz)),
         cookie,
         Some(body),
     )
@@ -3670,7 +3670,7 @@ async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
     let (einzeln, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/zeitfenster", pfad(e)),
+        &format!("{}/time-slots", pfad(e)),
         &bert,
         Some(MITTAG),
     )

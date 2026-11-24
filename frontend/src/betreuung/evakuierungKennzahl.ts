@@ -1,6 +1,6 @@
 /**
  * Die Kennzahl „Evakuiert N · von M geplant" — reine Ableitung aus den Bezirken der Übersicht
- * (`GET …/evakuierung`, Modul Evakuierung seit LLH-1034), für Modulseite, Modulzähler und
+ * (`GET …/evacuation`, Modul Evakuierung seit LLH-1034), für Modulseite, Modulzähler und
  * Lage-Dashboard.
  *
  * Das Prädikat {@link istAktiverBezirk} steht wortgleich im Backend als Auslöser der

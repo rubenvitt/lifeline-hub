@@ -560,7 +560,7 @@ describe('Grundriss DnD', () => {
           material: [],
         }),
       ),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     );
     renderPage();
     await userEvent.click(await screen.findByText('BHP 50'));
@@ -614,7 +614,7 @@ describe('UhsDetailPage', () => {
           material: [],
         }),
       ),
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/7');
     // Der Wechsler im Titel, nicht das ⋮ des Kopfs („Weitere Aktionen zu BHP 50“, LLH-1722).

@@ -30,7 +30,7 @@ test('Storno an Platz A sperrt die offene Personen-Detailseite an Platz B', asyn
 }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Storno-Sperre ${Date.now()}`);
-  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, {
+  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
     data: { name: 'Storno', vorname: 'Probe' },
   });
   expect(angelegt.ok(), await angelegt.text()).toBe(true);
@@ -47,7 +47,7 @@ test('Storno an Platz A sperrt die offene Personen-Detailseite an Platz B', asyn
   try {
     const a = await platzA.newPage();
     await anmeldenAlsAdmin(a, { startseite: false });
-    const storno = await a.request.delete(`/api/einsaetze/${einsatzId}/personen/${pid}`);
+    const storno = await a.request.delete(`/api/einsaetze/${einsatzId}/persons/${pid}`);
     expect(storno.status(), await storno.text()).toBe(204);
   } finally {
     await platzA.close();
@@ -60,7 +60,7 @@ test('Storno an Platz A sperrt die offene Personen-Detailseite an Platz B', asyn
   await expect(notiz).toHaveValue('Klagt über Schwindel');
   await expect(notiz).toHaveAttribute('readonly', '');
 
-  const audit = await page.request.get(`/api/einsaetze/${einsatzId}/personen/${pid}/audit`);
+  const audit = await page.request.get(`/api/einsaetze/${einsatzId}/persons/${pid}/audit`);
   expect(audit.ok()).toBe(true);
   const eintraege = (await audit.json()) as { art: string; person_id: number | null }[];
   expect(eintraege.filter((e) => e.person_id === pid)).toHaveLength(1);

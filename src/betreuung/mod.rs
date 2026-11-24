@@ -328,7 +328,7 @@ pub struct BetreuungsstelleAnzeige {
     pub geaendert_at: Option<String>,
 }
 
-/// Die eine Lesequelle des Moduls Evakuierung (`GET …/evakuierung`, LLH-1034): alle nicht
+/// Die eine Lesequelle des Moduls Evakuierung (`GET …/evacuation`, LLH-1034): alle nicht
 /// stornierten Bezirke eines Einsatzes. Ein Objekt statt einer Liste, damit spätere Felder ohne
 /// Bruch des Drahts dazukommen.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -336,7 +336,7 @@ pub struct EvakuierungUebersicht {
     pub bezirke: Vec<EvakuierungsbezirkAnzeige>,
 }
 
-/// Die eine Lesequelle des Moduls Betreuung (`GET …/betreuung`): alle nicht stornierten Stellen
+/// Die eine Lesequelle des Moduls Betreuung (`GET …/care`): alle nicht stornierten Stellen
 /// eines Einsatzes. Die Bezirke liegen seit LLH-1034 in [`EvakuierungUebersicht`].
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct BetreuungUebersicht {

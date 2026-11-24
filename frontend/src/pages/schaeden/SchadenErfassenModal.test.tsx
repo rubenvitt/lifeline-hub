@@ -39,7 +39,7 @@ beforeEach(() => {
 
 function oeffne() {
   server.use(
-    http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
   );
   renderMitProviders(
@@ -120,7 +120,7 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
 
   function rendere(antwort: Parameters<typeof http.post>[1]) {
     server.use(
-      http.get('/api/einsaetze/1/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/schaeden', antwort),
     );
@@ -184,7 +184,7 @@ describe('SchadenErfassenModal — Ablehnung im Dialog (LFH-1077)', () => {
     let antwortFreigeben!: () => void;
     const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
     server.use(
-      http.get('/api/einsaetze/:eid/personen', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/:eid/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/:eid/personal', () => HttpResponse.json([])),
       http.post('/api/einsaetze/1/schaeden', async () => {
         await antwortGate;

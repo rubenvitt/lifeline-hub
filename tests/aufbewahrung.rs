@@ -322,7 +322,7 @@ async fn regulaere_routen_gesperrt(app: &axum::Router, admin: &str, id: i64, aid
     for uri in [
         format!("/api/einsaetze/{id}"),
         format!("/api/einsaetze/{id}/etb"),
-        format!("/api/einsaetze/{id}/personen"),
+        format!("/api/einsaetze/{id}/persons"),
         format!("/api/einsaetze/{id}/attachments/{aid}"),
         format!("/api/einsaetze/{id}/live"),
     ] {

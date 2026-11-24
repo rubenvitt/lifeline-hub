@@ -1,5 +1,5 @@
 //! Integrationstests der UHS-Anhänge (LFH-758, Spec `uhs-anhaenge`): je Spec-Szenario ein Test
-//! über die Routen `/api/einsaetze/{id}/uhs/{uid}/anhaenge…` — Ablegen, Allowlist und Größe,
+//! über die Routen `/api/einsaetze/{id}/uhs/{uid}/attachments…` — Ablegen, Allowlist und Größe,
 //! Rechte über das Modul Unfallhilfsstellen, Zugehörigkeit zu Einsatz und UHS, Lebenszyklus,
 //! Entfernen, Download mit ETag, pseudonyme ETB-Spur, Live-Verteilung und das Lese-Audit samt
 //! Einsicht für die Einsatzleitung.
@@ -19,7 +19,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, uhs: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/anhaenge")
+    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).
@@ -101,7 +101,7 @@ async fn download(
     if_none_match: Option<&str>,
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut req = Request::builder()
-        .uri(format!("{}/{id}/datei", pfad(einsatz, uhs)))
+        .uri(format!("{}/{id}/file", pfad(einsatz, uhs)))
         .header(header::COOKIE, cookie);
     if let Some(etag) = if_none_match {
         req = req.header(header::IF_NONE_MATCH, etag);
@@ -763,7 +763,7 @@ async fn download_original(
     anfrage(
         app,
         "GET",
-        &format!("{}/{id}/datei?fassung=original", pfad(einsatz, uhs)),
+        &format!("{}/{id}/file?fassung=original", pfad(einsatz, uhs)),
         cookie,
         None,
     )
@@ -775,7 +775,7 @@ async fn zugriffe(app: &axum::Router, einsatz: i64, uhs: i64, cookie: &str) -> (
     anfrage(
         app,
         "GET",
-        &format!("{}/zugriffe", pfad(einsatz, uhs)),
+        &format!("{}/accesses", pfad(einsatz, uhs)),
         cookie,
         None,
     )
@@ -912,7 +912,7 @@ async fn vorschau_und_grossansicht_sind_422_und_protokollieren_nichts() {
         let (s, body) = anfrage(
             &app,
             "GET",
-            &format!("{}/{id}/datei?fassung={fassung}", pfad(einsatz, uhs)),
+            &format!("{}/{id}/file?fassung={fassung}", pfad(einsatz, uhs)),
             &admin,
             None,
         )

@@ -28,7 +28,7 @@ use crate::person::{audit_repo, repo as person_repo};
 use super::einsatz_person::sse_person;
 use super::support::{anhang_antwort, genau_eine_datei, original_freigeben, Fassung, FassungParam};
 
-/// GET /api/einsaetze/{id}/personen/{pid}/anhaenge — lebende Anhänge, neueste zuerst. Eine
+/// GET /api/einsaetze/{id}/persons/{pid}/attachments — lebende Anhänge, neueste zuerst. Eine
 /// stornierte Person bleibt lesbar; eine Person eines anderen Einsatzes ist 404. Kein Audit.
 pub async fn liste(
     State(state): State<AppState>,
@@ -40,7 +40,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/personen/{pid}/anhaenge — eine Datei ablegen (Multipart, Feld
+/// POST /api/einsaetze/{id}/persons/{pid}/attachments — eine Datei ablegen (Multipart, Feld
 /// `datei`). Reihenfolge wie am Schaden: Gate (403/409) → Person im Einsatz (404) → storniert
 /// (409) → Datei lesen (400) → Typ, Größe, Scan (400/422/503) → EINE Transaktion aus Anhang,
 /// Linker und ETB-Nachweis (Storno dort erneut geprüft).
@@ -81,7 +81,7 @@ pub async fn ablegen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei — Download (ETag/304) mit
+/// GET /api/einsaetze/{id}/persons/{pid}/attachments/{aid}/file — Download (ETag/304) mit
 /// Lese-Audit. Reihenfolge (design.md D3): Fassung (400) → Linker-Lookup als Zugriffsprüfung
 /// (404) → beim Original die Freigabe (403, sonst ETB-Vermerk) → Audit-Zeile → Auslieferung.
 /// Scheitert die Audit-Zeile, endet der Handler mit dem Fehler, ohne Bytes.
@@ -112,7 +112,7 @@ pub async fn datei(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// DELETE /api/einsaetze/{id}/personen/{pid}/anhaenge/{aid} — Soft-Delete mit ETB-Nachweis.
+/// DELETE /api/einsaetze/{id}/persons/{pid}/attachments/{aid} — Soft-Delete mit ETB-Nachweis.
 /// Die Datei bleibt bis zur Schwärzung gespeichert.
 pub async fn entfernen(
     State(state): State<AppState>,

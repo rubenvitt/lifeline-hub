@@ -55,7 +55,7 @@ const detail = {
  */
 describe('PersonVorschau', () => {
   it('zeigt oben die Patientenfragen, darunter Personendaten und Verlauf (LLH-1137)', async () => {
-    server.use(http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(detail)));
+    server.use(http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(detail)));
     const { container } = renderMitProviders(<PersonVorschau einsatzId={1} personId={10} />);
     const kopf = await screen.findByRole('region', { name: 'Patientenkopf' });
     // Sichtung, Zustand / Verdacht und Aufenthalt aus dem Patientenkopf in der Lesefassung.
@@ -80,7 +80,7 @@ describe('PersonVorschau', () => {
 
   it('zeigt Geburtsdatum als TT.MM.JJJJ und das Geschlecht als Wort (LLH-1103)', async () => {
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () =>
+      http.get('/api/einsaetze/1/persons/10', () =>
         HttpResponse.json({ ...detail, geburtsdatum: '1980-07-14' }),
       ),
     );
@@ -92,7 +92,7 @@ describe('PersonVorschau', () => {
 
   it('zeigt das Körperschema nur lesend: Figur und Liste, kein Markieren (LLH-1120)', async () => {
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () =>
+      http.get('/api/einsaetze/1/persons/10', () =>
         HttpResponse.json({
           ...detail,
           verletzungen: [
@@ -126,7 +126,7 @@ describe('PersonVorschau', () => {
 
   it('nennt einen Ladefehler, statt leer zu bleiben', async () => {
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () =>
+      http.get('/api/einsaetze/1/persons/10', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -139,7 +139,7 @@ describe('PersonVorschau', () => {
   it('Fokuswechsel ruft das Detail nicht neu ab (Zugriffsprotokoll)', async () => {
     let detailAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () => {
+      http.get('/api/einsaetze/1/persons/10', () => {
         detailAbrufe += 1;
         return HttpResponse.json(detail);
       }),
@@ -164,7 +164,7 @@ describe('PersonVorschau', () => {
   it('wiederholt einen gescheiterten Detailabruf nicht von selbst (Zugriffsprotokoll)', async () => {
     let detailAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/personen/10', () => {
+      http.get('/api/einsaetze/1/persons/10', () => {
         detailAbrufe += 1;
         return HttpResponse.error();
       }),

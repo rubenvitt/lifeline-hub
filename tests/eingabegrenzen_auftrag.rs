@@ -350,7 +350,7 @@ async fn zu_langer_aufhebungsgrund_ist_400() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/rescind"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
         &admin,
         Some(&json!({ "grund": x(2_001) }).to_string()),
     )

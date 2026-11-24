@@ -89,9 +89,9 @@ function stelleBereit({
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([EINHEIT])),
     http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/reports', () => HttpResponse.json(meldungen)),
-    http.get('/api/einsaetze/7/personen', () => HttpResponse.json(personen)),
-    http.get('/api/einsaetze/7/personen/uhs', () => HttpResponse.json(uhs)),
-    http.post('/api/einsaetze/7/personen', async ({ request }) => {
+    http.get('/api/einsaetze/7/persons', () => HttpResponse.json(personen)),
+    http.get('/api/einsaetze/7/persons/uhs', () => HttpResponse.json(uhs)),
+    http.post('/api/einsaetze/7/persons', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       gesendet.push({ body, ausQueue: request.headers.has(OFFLINE_QUEUE_BENUTZER_HEADER) });
       return HttpResponse.json(kontakt(12, { registrier_nr: 12 }), { status: 201 });
@@ -224,7 +224,7 @@ describe('Einheitengerät — Kontakte', () => {
           ),
         ),
         http.get('/api/einsaetze/7/requests', () => HttpResponse.json(antraege)),
-        http.post('/api/einsaetze/7/personen', async ({ request }) => {
+        http.post('/api/einsaetze/7/persons', async ({ request }) => {
           const body = (await request.json()) as Record<string, unknown>;
           gesendet.push({ body, ausQueue: false });
           return HttpResponse.json({ antrag: { id: 4, zustand: 'ausstehend' } }, { status: 202 });
@@ -265,7 +265,7 @@ describe('Einheitengerät — Kontakte', () => {
     const { gesendet } = stelleBereit();
     let ersterVersuch = true;
     server.use(
-      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         gesendet.push({ body, ausQueue: request.headers.has(OFFLINE_QUEUE_BENUTZER_HEADER) });
         if (ersterVersuch) {
@@ -297,7 +297,7 @@ describe('Einheitengerät — Kontakte', () => {
     const { gesendet } = stelleBereit();
     let ersterVersuch = true;
     server.use(
-      http.post('/api/einsaetze/7/personen', async ({ request }) => {
+      http.post('/api/einsaetze/7/persons', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         gesendet.push({ body, ausQueue: false });
         if (ersterVersuch) {
@@ -352,7 +352,7 @@ describe('Einheitengerät — Kontakte', () => {
       nachladen = r;
     });
     server.use(
-      http.get('/api/einsaetze/7/personen/uhs', async () => {
+      http.get('/api/einsaetze/7/persons/uhs', async () => {
         abrufe += 1;
         if (!eingangZu) {
           return HttpResponse.json([

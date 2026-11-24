@@ -408,11 +408,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/unterkunft-richtwerte",
+            "/api/einsaetze/{id}/accommodation-guidelines",
             get(routes::unterkunft_richtwerte::einsatz_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/unterkunft-richtwerte/{schluessel}",
+            "/api/einsaetze/{id}/accommodation-guidelines/{schluessel}",
             put(routes::unterkunft_richtwerte::einsatz_setzen),
         )
         .route(
@@ -615,7 +615,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::auftrag::abnehmen),
         )
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}/rescind",
+            "/api/einsaetze/{id}/tasks/{aid}/void",
             post(routes::auftrag::aufheben),
         )
         // Gewählte Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, Gate `OhneModul`.
@@ -744,131 +744,131 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // Betreuung: Betreuungsstellen mit ihrer Belegungsreihe. Rücknahmen hängen an der Meldung;
         // die Stelle kennt die Route erst aus ihr.
         .route(
-            "/api/einsaetze/{id}/betreuung",
+            "/api/einsaetze/{id}/care",
             get(routes::betreuung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/belegung",
+            "/api/einsaetze/{id}/care/occupancy",
             get(routes::betreuung::kopfzahl),
         )
         // Modul Evakuierung (LLH-1034): die Bezirksrouten sind aus `…/betreuung` umgezogen.
         .route(
-            "/api/einsaetze/{id}/evakuierung",
+            "/api/einsaetze/{id}/evacuation",
             get(routes::evakuierung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/evakuierung/bezirke",
+            "/api/einsaetze/{id}/evacuation/districts",
             post(routes::evakuierung::bezirk_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}",
+            "/api/einsaetze/{id}/evacuation/districts/{bid}",
             patch(routes::evakuierung::bezirk_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/stornieren",
+            "/api/einsaetze/{id}/evacuation/districts/{bid}/annul",
             post(routes::evakuierung::bezirk_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/evakuierung/bezirke/{bid}/staende",
+            "/api/einsaetze/{id}/evacuation/districts/{bid}/progress",
             get(routes::evakuierung::stand_verlauf).post(routes::evakuierung::stand_melden),
         )
         .route(
-            "/api/einsaetze/{id}/evakuierung/staende/{sid}/zuruecknehmen",
+            "/api/einsaetze/{id}/evacuation/progress/{sid}/undo",
             post(routes::evakuierung::stand_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen",
+            "/api/einsaetze/{id}/care/positions",
             post(routes::betreuung::stelle_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}",
+            "/api/einsaetze/{id}/care/positions/{sid}",
             patch(routes::betreuung::stelle_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/stornieren",
+            "/api/einsaetze/{id}/care/positions/{sid}/annul",
             post(routes::betreuung::stelle_stornieren),
         )
         // Storno-Stand für die offene Detailseite (LLH-1832).
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/stand",
+            "/api/einsaetze/{id}/care/positions/{sid}/state",
             get(routes::betreuung::stelle_stand),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/belegungen",
+            "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
             get(routes::betreuung::belegung_verlauf).post(routes::betreuung::belegung_melden),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/belegungen/{mid}/zuruecknehmen",
+            "/api/einsaetze/{id}/care/occupancies/{mid}/undo",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
         // Registrierstelle (LLH-1612, Spec `betreuung-registrierung`).
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen",
+            "/api/einsaetze/{id}/care/positions/{sid}/registrations",
             get(routes::betreuung_registrierung::liste)
                 .post(routes::betreuung_registrierung::registrieren),
         )
         // Registrierliste drucken (LLH-1616): je Person protokolliert.
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/registrierungen/druck",
+            "/api/einsaetze/{id}/care/positions/{sid}/registrations/print",
             get(routes::betreuung_registrierung::druck),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/abmeldungen",
+            "/api/einsaetze/{id}/care/positions/{sid}/departures",
             post(routes::betreuung_registrierung::abmelden),
         )
         // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen.
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/haushalte/{hid}/bezugsperson",
+            "/api/einsaetze/{id}/care/positions/{sid}/households/{hid}/contact-person",
             put(routes::betreuung_registrierung::bezugsperson_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/stellen/{sid}/personen/{pid}/haushalt",
+            "/api/einsaetze/{id}/care/positions/{sid}/persons/{pid}/household",
             put(routes::betreuung_registrierung::haushalt_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/betreuung/kostformen",
+            "/api/einsaetze/{id}/care/diets",
             get(routes::betreuung_registrierung::kostformen),
         )
         // Verpflegung: Zeitfenster mit Bedarf, Ausgaben dagegen.
         .route(
-            "/api/einsaetze/{id}/verpflegung",
+            "/api/einsaetze/{id}/catering",
             get(routes::verpflegung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/zeitfenster",
+            "/api/einsaetze/{id}/catering/time-slots",
             post(routes::verpflegung::zeitfenster_anlegen),
         )
         // Tag aus der Vorlage (LLH-1058): mehrere Zeitfenster eines Tages in einer Transaktion.
         .route(
-            "/api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage",
+            "/api/einsaetze/{id}/catering/time-slots/from-template",
             post(routes::verpflegung::zeitfenster_aus_vorlage),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}",
+            "/api/einsaetze/{id}/catering/time-slots/{zid}",
             patch(routes::verpflegung::zeitfenster_aendern)
                 .delete(routes::verpflegung::zeitfenster_loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben",
+            "/api/einsaetze/{id}/catering/time-slots/{zid}/distributions",
             post(routes::verpflegung::ausgabe_erfassen),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen",
+            "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
             post(routes::verpflegung::ausgabe_zuruecknehmen),
         )
         // Verpflegungsstellen (LLH-1040): keine eigene Leseroute, `stellen[]` kommt mit
-        // `GET …/verpflegung`.
+        // `GET …/catering`.
         .route(
-            "/api/einsaetze/{id}/verpflegung/stellen",
+            "/api/einsaetze/{id}/catering/positions",
             post(routes::verpflegung::create_stelle),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/stellen/{sid}",
+            "/api/einsaetze/{id}/catering/positions/{sid}",
             patch(routes::verpflegung::update_stelle)
                 .delete(routes::verpflegung::stelle_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/verpflegung/stellen/{sid}/status",
+            "/api/einsaetze/{id}/catering/positions/{sid}/status",
             post(routes::verpflegung::update_stelle_status),
         )
         // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
@@ -1248,39 +1248,39 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_material::aufteilen),
         )
         .route(
-            "/api/einsaetze/{id}/personen",
+            "/api/einsaetze/{id}/persons",
             get(routes::einsatz_person::liste),
         )
         .route(
-            "/api/einsaetze/{id}/personen",
+            "/api/einsaetze/{id}/persons",
             post(routes::einsatz_person::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/auswahl",
+            "/api/einsaetze/{id}/persons/selection",
             get(routes::einsatz_person::auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/personen/transportmittel",
+            "/api/einsaetze/{id}/persons/transport-means",
             get(routes::einsatz_person::transportmittel),
         )
         .route(
-            "/api/einsaetze/{id}/personen/verbleib-angaben",
+            "/api/einsaetze/{id}/persons/whereabouts-details",
             get(routes::einsatz_person::verbleib_angaben),
         )
         .route(
-            "/api/einsaetze/{id}/personen/einheiten",
+            "/api/einsaetze/{id}/persons/units",
             get(routes::einsatz_person::einheiten),
         )
         .route(
-            "/api/einsaetze/{id}/personen/uhs",
+            "/api/einsaetze/{id}/persons/uhs",
             get(routes::einsatz_person::uhs_ziele),
         )
         .route(
-            "/api/einsaetze/{id}/personen/bestaetiger",
+            "/api/einsaetze/{id}/persons/confirmers",
             get(routes::einsatz_person::bestaetiger),
         )
         .route(
-            "/api/einsaetze/{id}/personen/export",
+            "/api/einsaetze/{id}/persons/export",
             get(routes::einsatz_person::export),
         )
         .route(
@@ -1288,157 +1288,157 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::einsatzakte::anlagen_zip),
         )
         .route(
-            "/api/einsaetze/{id}/personen/druck",
+            "/api/einsaetze/{id}/persons/print",
             get(routes::einsatz_person::druck),
         )
         .route(
-            "/api/einsaetze/{id}/personen/listenzugriffe",
+            "/api/einsaetze/{id}/persons/list-accesses",
             get(routes::einsatz_person::listenzugriffe),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/druck",
+            "/api/einsaetze/{id}/persons/{pid}/print",
             get(routes::einsatz_person::detail_druck),
         )
         // Zeilenabruf des Live-Abgleichs (LLH-1682): nicht protokolliert wie die Liste.
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/zeile",
+            "/api/einsaetze/{id}/persons/{pid}/row",
             get(routes::einsatz_person::zeile),
         )
         // Storno-Stand für die offene Detailseite, ohne Zugriffsprotokoll (LLH-1832).
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/stand",
+            "/api/einsaetze/{id}/persons/{pid}/state",
             get(routes::einsatz_person::stand),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}",
+            "/api/einsaetze/{id}/persons/{pid}",
             get(routes::einsatz_person::detail),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}",
+            "/api/einsaetze/{id}/persons/{pid}",
             patch(routes::einsatz_person::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/status",
+            "/api/einsaetze/{id}/persons/{pid}/status",
             post(routes::einsatz_person::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/sichtung",
+            "/api/einsaetze/{id}/persons/{pid}/triage",
             post(routes::einsatz_person::sichten),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/verbleib",
+            "/api/einsaetze/{id}/persons/{pid}/whereabouts",
             post(routes::einsatz_person::verbleib),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/notizen",
+            "/api/einsaetze/{id}/persons/{pid}/notes",
             post(routes::einsatz_person::notiz),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/transport",
+            "/api/einsaetze/{id}/persons/{pid}/transport",
             post(routes::person_transport::festlegen),
         )
         // LLH-1566: Anlass der Hilfeleistung (Kategorie Behandlung, kein ETB).
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/anlass",
+            "/api/einsaetze/{id}/persons/{pid}/reason",
             post(routes::person_anlass::festlegen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/massnahmen",
+            "/api/einsaetze/{id}/persons/{pid}/interventions",
             post(routes::person_massnahme::erfassen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/massnahmen/{mid}/aufheben",
+            "/api/einsaetze/{id}/persons/{pid}/interventions/{mid}/void",
             post(routes::person_massnahme::aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/verletzungen",
+            "/api/einsaetze/{id}/persons/{pid}/injuries",
             post(routes::person_verletzung::markieren),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/verletzungen/{vid}/aufheben",
+            "/api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void",
             post(routes::person_verletzung::aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/abgleich",
+            "/api/einsaetze/{id}/persons/{pid}/matches",
             post(routes::einsatz_person::abgleich_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/abgleich/{aid}/entscheidung",
+            "/api/einsaetze/{id}/persons/{pid}/matches/{aid}/decision",
             post(routes::einsatz_person::abgleich_entscheiden),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/audit",
+            "/api/einsaetze/{id}/persons/{pid}/audit",
             get(routes::einsatz_person::audit),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}",
+            "/api/einsaetze/{id}/persons/{pid}",
             delete(routes::einsatz_person::stornieren),
         )
         // Personen-Anhänge (LFH-757): Modul-Gate `personen`; Upload/Download wie am Schaden,
         // der Download schreibt je Abruf eine Zeile ins Zugriffsprotokoll der Person.
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/anhaenge",
+            "/api/einsaetze/{id}/persons/{pid}/attachments",
             get(routes::person_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/anhaenge",
+            "/api/einsaetze/{id}/persons/{pid}/attachments",
             post(routes::person_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}",
+            "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}",
             delete(routes::person_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/anhaenge/{aid}/datei",
+            "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}/file",
             get(routes::person_anhang::datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/tiere",
+            "/api/einsaetze/{id}/animals",
             get(routes::einsatz_tier::liste),
         )
         .route(
-            "/api/einsaetze/{id}/tiere",
+            "/api/einsaetze/{id}/animals",
             post(routes::einsatz_tier::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/export",
+            "/api/einsaetze/{id}/animals/export",
             get(routes::einsatz_tier::export),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}",
+            "/api/einsaetze/{id}/animals/{tid}",
             get(routes::einsatz_tier::detail),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}",
+            "/api/einsaetze/{id}/animals/{tid}",
             patch(routes::einsatz_tier::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}/status",
+            "/api/einsaetze/{id}/animals/{tid}/status",
             post(routes::einsatz_tier::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}",
+            "/api/einsaetze/{id}/animals/{tid}",
             delete(routes::einsatz_tier::stornieren),
         )
         // Tier-Anhänge (LFH-758): Modul-Gate `tiere`; Upload/Download wie die Schaden-Anhänge.
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
+            "/api/einsaetze/{id}/animals/{tid}/attachments",
             get(routes::tier_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}/anhaenge",
+            "/api/einsaetze/{id}/animals/{tid}/attachments",
             post(routes::tier_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}",
+            "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}",
             delete(routes::tier_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/tiere/{tid}/anhaenge/{aid}/datei",
+            "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file",
             get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
@@ -1612,46 +1612,46 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Kräfte der UHS (LFH-1045, Spec `uhs-staerke`): Zuordnung aus `einsatz_personal`.
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/kraefte",
+            "/api/einsaetze/{id}/uhs/{uid}/forces",
             post(routes::einsatz_uhs_kraefte::adhoc),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/kraefte/verfuegbar",
+            "/api/einsaetze/{id}/uhs/{uid}/forces/available",
             get(routes::einsatz_uhs_kraefte::verfuegbar),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}",
+            "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}",
             put(routes::einsatz_uhs_kraefte::zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/kraefte/{epid}",
+            "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}",
             delete(routes::einsatz_uhs_kraefte::loesen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/kraefte/einheit/{eid}",
+            "/api/einsaetze/{id}/uhs/{uid}/forces/unit/{eid}",
             put(routes::einsatz_uhs_kraefte::einheit_zuordnen),
         )
         // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
+            "/api/einsaetze/{id}/uhs/{uid}/attachments",
             get(routes::uhs_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/anhaenge",
+            "/api/einsaetze/{id}/uhs/{uid}/attachments",
             post(routes::uhs_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/zugriffe",
+            "/api/einsaetze/{id}/uhs/{uid}/attachments/accesses",
             get(routes::uhs_anhang::zugriffe),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}",
+            "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}",
             delete(routes::uhs_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/anhaenge/{aid}/datei",
+            "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
             get(routes::uhs_anhang::datei).route_layer(download_grenze()),
         )
         // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
@@ -1664,39 +1664,39 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::uhs_plan::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plan/aus-anhang",
+            "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment",
             post(routes::uhs_plan::uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plan/bild",
+            "/api/einsaetze/{id}/uhs/{uid}/plan/image",
             get(routes::uhs_plan::bild).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plaetze",
+            "/api/einsaetze/{id}/uhs/{uid}/seats",
             post(routes::einsatz_uhs::platz_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plaetze/bulk",
+            "/api/einsaetze/{id}/uhs/{uid}/seats/bulk",
             post(routes::einsatz_uhs::plaetze_bulk_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}",
+            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}",
             patch(routes::einsatz_uhs::platz_aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}/verfuegbarkeit",
+            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability",
             post(routes::einsatz_uhs::platz_verfuegbarkeit),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plaetze/{pid}",
+            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}",
             delete(routes::einsatz_uhs::platz_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/uhs-belegung",
+            "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy",
             post(routes::einsatz_uhs::belegung),
         )
         .route(
-            "/api/einsaetze/{id}/personen/{pid}/uhs-belegung/{belegung_id}/zuruecknehmen",
+            "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
             post(routes::einsatz_uhs::belegung_zuruecknehmen),
         )
         .route(

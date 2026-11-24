@@ -45,7 +45,7 @@ export function ladeUhs(einsatzId: number, uhsId: number): Promise<UhsDetail> {
 
 /** Einsatzkräfte ohne UHS: die Auswahl beim Zuordnen. */
 export function listeKraefteOhneUhs(einsatzId: number, uhsId: number): Promise<UhsKraft[]> {
-  return apiGet<UhsKraft[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/verfuegbar`);
+  return apiGet<UhsKraft[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/available`);
 }
 
 /**
@@ -59,7 +59,7 @@ export function ordneKraftZu(
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<UhsKraft> {
   return apiSend<UhsKraft>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}${zuruecknahmeQuery(optionen)}`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/${kraftId}${zuruecknahmeQuery(optionen)}`,
     'PUT',
   );
 }
@@ -76,12 +76,12 @@ export function erfasseAdhocKraft(
   uhsId: number,
   daten: AdhocKraftEingabe,
 ): Promise<UhsKraft> {
-  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte`, 'POST', daten);
+  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces`, 'POST', daten);
 }
 
 /** Kraft von der UHS abziehen; sie bleibt im Einsatz. */
 export function zieheKraftAb(einsatzId: number, uhsId: number, kraftId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/${kraftId}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/${kraftId}`, 'DELETE');
 }
 
 /** Alle Kräfte einer Einheit ohne UHS zuordnen (nur Einsatzleitung, kein Gerät). */
@@ -91,7 +91,7 @@ export function ordneEinheitZu(
   einheitId: number,
 ): Promise<UhsKraft[]> {
   return apiSend<UhsKraft[]>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/kraefte/einheit/${einheitId}`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/unit/${einheitId}`,
     'PUT',
   );
 }
@@ -157,11 +157,7 @@ export function legePlaetzeAn(
   uhsId: number,
   daten: PlatzBulkEingabe,
 ): Promise<UhsPlatz[]> {
-  return apiSend<UhsPlatz[]>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/bulk`,
-    'POST',
-    daten,
-  );
+  return apiSend<UhsPlatz[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`, 'POST', daten);
 }
 
 interface PlatzPatch {
@@ -177,7 +173,7 @@ export function aktualisierePlatz(
   daten: PlatzPatch,
 ): Promise<UhsPlatz> {
   return apiSend<UhsPlatz>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/${platzId}`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}`,
     'PATCH',
     daten,
   );
@@ -191,14 +187,14 @@ export function setzePlatzVerfuegbarkeit(
   reserviertFuerPersonId?: number | null,
 ): Promise<UhsPlatz> {
   return apiSend<UhsPlatz>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/${platzId}/verfuegbarkeit`,
+    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}/availability`,
     'POST',
     { verfuegbarkeit, reserviert_fuer_person_id: reserviertFuerPersonId ?? null },
   );
 }
 
 export function stornierePlatz(einsatzId: number, uhsId: number, platzId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/plaetze/${platzId}`, 'DELETE');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}`, 'DELETE');
 }
 
 // ---------- Belegung ----------
@@ -216,7 +212,7 @@ export function aenderePersonBelegung(
   daten: BelegungEingabe,
 ): Promise<UhsBelegung> {
   return apiSend<UhsBelegung>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/uhs-belegung`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy`,
     'POST',
     daten,
   );
@@ -233,7 +229,7 @@ export function nimmUhsAustrittZurueck(
   belegungId: number,
 ): Promise<UhsBelegungRuecknahme> {
   return apiSend<UhsBelegungRuecknahme>(
-    `/api/einsaetze/${einsatzId}/personen/${personId}/uhs-belegung/${belegungId}/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy/${belegungId}/undo`,
     'POST',
   );
 }
@@ -241,7 +237,7 @@ export function nimmUhsAustrittZurueck(
 // ---------- Fotos, Pläne und Dateien (LFH-758) ----------
 
 const anhangBasis = (einsatzId: number, uhsId: number) =>
-  `/api/einsaetze/${einsatzId}/uhs/${uhsId}/anhaenge`;
+  `/api/einsaetze/${einsatzId}/uhs/${uhsId}/attachments`;
 
 /** Lebende Anhänge einer UHS, neueste zuerst. Die Liste selbst wird nicht protokolliert. */
 export function listeUhsAnhaenge(einsatzId: number, uhsId: number): Promise<UhsAnhang[]> {
@@ -277,11 +273,11 @@ export function entferneUhsAnhang(
  * ein 304). Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
  */
 export function uhsAnhangDownloadPfad(einsatzId: number, uhsId: number, anhangId: number): string {
-  return `${anhangBasis(einsatzId, uhsId)}/${anhangId}/datei`;
+  return `${anhangBasis(einsatzId, uhsId)}/${anhangId}/file`;
 }
 
 /** Zugriffsprotokoll der Dateien einer UHS, neueste zuerst — nur für die Einsatzleitung (sonst
  *  403). Die Einsicht selbst wird nicht protokolliert. */
 export function ladeUhsAnhangZugriffe(einsatzId: number, uhsId: number): Promise<AnhangZugriff[]> {
-  return apiGet<AnhangZugriff[]>(`${anhangBasis(einsatzId, uhsId)}/zugriffe`);
+  return apiGet<AnhangZugriff[]>(`${anhangBasis(einsatzId, uhsId)}/accesses`);
 }

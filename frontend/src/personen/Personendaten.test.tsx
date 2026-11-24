@@ -45,7 +45,7 @@ const TOM = {
 function mitschnitt() {
   const koerper: Record<string, unknown>[] = [];
   server.use(
-    http.patch('/api/einsaetze/1/personen/22', async ({ request }) => {
+    http.patch('/api/einsaetze/1/persons/22', async ({ request }) => {
       const k = (await request.json()) as Record<string, unknown>;
       koerper.push(k);
       const aenderung = { ...k };
@@ -183,7 +183,7 @@ describe('Personendaten — Haushalt umbauen (LLH-1615)', () => {
     const gesendet: unknown[] = [];
     server.use(
       http.put(
-        '/api/einsaetze/1/betreuung/stellen/8/haushalte/3/bezugsperson',
+        '/api/einsaetze/1/care/positions/8/households/3/contact-person',
         async ({ request }) => {
           gesendet.push(await request.json());
           return HttpResponse.json({ id: 3, nummer: 1, bezugsperson_id: 22, personen: [] });

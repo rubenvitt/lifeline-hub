@@ -112,7 +112,7 @@ fn parse_verpflegungsart(s: Option<&str>) -> Result<Option<Verpflegungsart>, App
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/verpflegung — alle Zeitfenster nach Beginn, je mit Deckung und
+/// GET /api/einsaetze/{id}/catering — alle Zeitfenster nach Beginn, je mit Deckung und
 /// Ausgaben, dazu die Stellen und die Empfängerliste (LLH-1055 D3, auch ohne Modul `einheiten`).
 pub async fn uebersicht(
     State(state): State<AppState>,
@@ -176,7 +176,7 @@ pub struct ZeitfensterAnlegen {
     stelle_ids: Option<Vec<i64>>,
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/zeitfenster
+/// POST /api/einsaetze/{id}/catering/time-slots
 pub async fn zeitfenster_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Verpflegung>,
@@ -234,7 +234,7 @@ pub struct TagAusVorlage {
     zeitfenster: Vec<TagZeitfenster>,
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/zeitfenster/aus-vorlage — legt die Zeitfenster eines
+/// POST /api/einsaetze/{id}/catering/time-slots/from-template — legt die Zeitfenster eines
 /// Tages an (LLH-1058). 201 mit angelegten und übersprungenen; 200, wenn alles übersprungen ist.
 pub async fn zeitfenster_aus_vorlage(
     State(state): State<AppState>,
@@ -360,7 +360,7 @@ pub struct ZeitfensterAendern {
     basis_geaendert_at: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}
+/// PATCH /api/einsaetze/{id}/catering/time-slots/{zid}
 pub async fn zeitfenster_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Verpflegung>,
@@ -414,7 +414,7 @@ pub async fn zeitfenster_aendern(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/verpflegung/zeitfenster/{zid} — 422, solange eine gültige
+/// DELETE /api/einsaetze/{id}/catering/time-slots/{zid} — 422, solange eine gültige
 /// Ausgabe daran hängt.
 pub async fn zeitfenster_loeschen(
     State(state): State<AppState>,
@@ -471,7 +471,7 @@ pub struct AusgabeErfassen {
     client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/zeitfenster/{zid}/ausgaben — ohne ETB-Eintrag.
+/// POST /api/einsaetze/{id}/catering/time-slots/{zid}/distributions — ohne ETB-Eintrag.
 ///
 /// Idempotent über `client_id` (LFH-688, design.md D2): Reihenfolge wie `routes/meldung.rs`
 /// — Gates im Extractor (Org, Schreibrecht, Modul, Lesezugriff), Queue-Besitzer, Replay-Lookup,
@@ -586,7 +586,7 @@ async fn antwort(
     ))
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/ausgaben/{aid}/zuruecknehmen — endgültig, ohne
+/// POST /api/einsaetze/{id}/catering/distributions/{aid}/undo — endgültig, ohne
 /// ETB-Eintrag; 422 beim zweiten Mal.
 pub async fn ausgabe_zuruecknehmen(
     State(state): State<AppState>,
@@ -636,7 +636,7 @@ fn parse_stelle_art(s: &str) -> Result<VerpflegungsstelleArt, AppError> {
     )
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/stellen — legt eine Stelle `geplant` an, ohne ETB.
+/// POST /api/einsaetze/{id}/catering/positions — legt eine Stelle `geplant` an, ohne ETB.
 pub async fn create_stelle(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Verpflegung>,
@@ -680,7 +680,7 @@ pub struct StelleAendern {
     abschnitt_id: Option<Option<i64>>,
 }
 
-/// PATCH /api/einsaetze/{id}/verpflegung/stellen/{sid} — ohne ETB; auch eine aufgelöste Stelle.
+/// PATCH /api/einsaetze/{id}/catering/positions/{sid} — ohne ETB; auch eine aufgelöste Stelle.
 pub async fn update_stelle(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Verpflegung>,
@@ -711,7 +711,7 @@ pub struct StelleStatus {
     status: String,
 }
 
-/// POST /api/einsaetze/{id}/verpflegung/stellen/{sid}/status — ETB bei `aktiv` und
+/// POST /api/einsaetze/{id}/catering/positions/{sid}/status — ETB bei `aktiv` und
 /// `aufgeloest` in derselben Transaktion.
 pub async fn update_stelle_status(
     State(state): State<AppState>,
@@ -734,7 +734,7 @@ pub async fn update_stelle_status(
     Ok(Json(repo::load_stelle(&state.pool, einsatz_id, sid).await?))
 }
 
-/// DELETE /api/einsaetze/{id}/verpflegung/stellen/{sid} — Storno einer geplanten Stelle ohne
+/// DELETE /api/einsaetze/{id}/catering/positions/{sid} — Storno einer geplanten Stelle ohne
 /// Ausgabe, ohne ETB.
 pub async fn stelle_stornieren(
     State(state): State<AppState>,

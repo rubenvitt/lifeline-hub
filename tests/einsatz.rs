@@ -1317,7 +1317,7 @@ async fn abgelaufene_frist_sperrt_auch_personen_export() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{id}/personen/export"))
+                .uri(format!("/api/einsaetze/{id}/persons/export"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -1542,7 +1542,7 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
 
     for uri in [
         format!("/api/einsaetze/{id}"),
-        format!("/api/einsaetze/{id}/personen/export"),
+        format!("/api/einsaetze/{id}/persons/export"),
         format!("/api/einsaetze/{id}/live"),
     ] {
         let resp = app
@@ -2196,7 +2196,7 @@ async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
     for uri in [
         format!("/api/einsaetze/{id}"),
         format!("/api/einsaetze/{id}/etb"),
-        format!("/api/einsaetze/{id}/personen"),
+        format!("/api/einsaetze/{id}/persons"),
         format!("/api/einsaetze/{id}/attachments/{aid}"),
         format!("/api/einsaetze/{id}/live"),
     ] {

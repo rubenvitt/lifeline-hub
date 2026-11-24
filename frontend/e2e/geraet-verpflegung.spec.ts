@@ -38,7 +38,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
   const e = einsatz.id;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  await anlegen(page, `/api/einsaetze/${e}/verpflegung/zeitfenster`, {
+  await anlegen(page, `/api/einsaetze/${e}/catering/time-slots`, {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(-30),
     bis_at: zeit(90),
@@ -72,7 +72,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
     // Zählen an der Ausgabe (LLH-1032): Sprung von der Karte in die Ausgabeansicht.
     const anfragen: string[] = [];
     tablet.on('request', (r) => {
-      if (r.method() === 'POST' && /\/verpflegung\/zeitfenster\/\d+\/ausgaben$/.test(r.url())) {
+      if (r.method() === 'POST' && /\/catering\/time-slots\/\d+\/distributions$/.test(r.url())) {
         anfragen.push(r.url());
       }
     });
@@ -133,7 +133,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
 
     // Die Einsatzleitung sieht die Ausgabe in der Deckung und die Meldung mit dem Gerät als
     // Absender.
-    const verpflegung = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
+    const verpflegung = await page.request.get(`/api/einsaetze/${e}/catering`);
     const zf = ((await verpflegung.json()) as { zeitfenster: { ausgegeben: { gesamt: number } }[] })
       .zeitfenster[0];
     // 20 gezählt und zurückgenommen, 50 nachgetragen.
@@ -166,24 +166,24 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
   const { id: e } = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Verpflegung Stellen ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/verpflegung`;
+  const basis = `/api/einsaetze/${e}/catering`;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   const stelle = async (bezeichnung: string, art: string) => {
-    const { id } = await anlegen(page, `${basis}/stellen`, { bezeichnung, art });
-    await anlegen(page, `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    const { id } = await anlegen(page, `${basis}/positions`, { bezeichnung, art });
+    await anlegen(page, `${basis}/positions/${id}/status`, { status: 'aktiv' });
     return id;
   };
   const feldkueche = await stelle('Feldküche BR Sportplatz', 'feldkueche');
   const turnhalle = await stelle('Ausgabe Turnhalle Nord', 'ausgabestelle');
-  const { id: mittag } = await anlegen(page, `${basis}/zeitfenster`, {
+  const { id: mittag } = await anlegen(page, `${basis}/time-slots`, {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(-30),
     bis_at: zeit(90),
     bedarf_kraefte: 60,
     bedarf_betreute: 20,
   });
-  const zuordnung = await page.request.patch(`${basis}/zeitfenster/${mittag}`, {
+  const zuordnung = await page.request.patch(`${basis}/time-slots/${mittag}`, {
     data: { stelle_ids: [feldkueche] },
   });
   expect(zuordnung.ok(), `Zuordnung: ${zuordnung.status()}`).toBeTruthy();
@@ -228,7 +228,7 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
     await expect(tablet.getByText('Gebucht: 5 EP zu ‚Mittag Deich‘')).toBeVisible();
     await expect(wahl.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText('an der Stelle 5 EP');
 
-    const antwort = await page.request.get(`/api/einsaetze/${e}/verpflegung`);
+    const antwort = await page.request.get(`/api/einsaetze/${e}/catering`);
     const stand = (await antwort.json()) as {
       zeitfenster: {
         ausgaben: { menge: number; verpflegungsstelle_id: number | null }[];
@@ -270,18 +270,18 @@ test('LLH-1048: Gerät an der Feldküche sieht die Turnhalle nicht und bucht an 
   const { id: e } = await anlegen(page, '/api/einsaetze', {
     bezeichnung: `E2E Verpflegung an Stelle ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/verpflegung`;
+  const basis = `/api/einsaetze/${e}/catering`;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   const stelle = async (bezeichnung: string, art: string) => {
-    const { id } = await anlegen(page, `${basis}/stellen`, { bezeichnung, art });
-    await anlegen(page, `${basis}/stellen/${id}/status`, { status: 'aktiv' });
+    const { id } = await anlegen(page, `${basis}/positions`, { bezeichnung, art });
+    await anlegen(page, `${basis}/positions/${id}/status`, { status: 'aktiv' });
     return id;
   };
   const feldkueche = await stelle('Feldküche BR Sportplatz', 'feldkueche');
   const turnhalle = await stelle('Ausgabe Turnhalle Nord', 'ausgabestelle');
   const zeitfenster = (bezeichnung: string, stelle_ids: number[]) =>
-    anlegen(page, `${basis}/zeitfenster`, {
+    anlegen(page, `${basis}/time-slots`, {
       bezeichnung,
       von_at: zeit(-30),
       bis_at: zeit(90),

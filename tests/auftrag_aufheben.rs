@@ -50,7 +50,7 @@ async fn aufheben(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/rescind"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
         cookie,
         Some(body),
     )

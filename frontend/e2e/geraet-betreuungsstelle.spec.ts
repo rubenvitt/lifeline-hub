@@ -26,12 +26,12 @@ async function senden<T = { id: number }>(
 }
 
 async function stelleInBetrieb(page: Page, e: number, bezeichnung: string): Promise<number> {
-  const stelle = await senden(page, 'post', `/api/einsaetze/${e}/betreuung/stellen`, {
+  const stelle = await senden(page, 'post', `/api/einsaetze/${e}/care/positions`, {
     bezeichnung,
     art: 'notunterkunft',
     kapazitaet_personen: 80,
   });
-  await senden(page, 'patch', `/api/einsaetze/${e}/betreuung/stellen/${stelle.id}`, {
+  await senden(page, 'patch', `/api/einsaetze/${e}/care/positions/${stelle.id}`, {
     status: 'in_betrieb',
   });
   return stelle.id;
@@ -48,8 +48,8 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
   const e = einsatz.id;
   const nord = await stelleInBetrieb(page, e, 'NU Turnhalle Nord');
   const sued = await stelleInBetrieb(page, e, 'NU Schule Süd');
-  const fremd = await senden(page, 'post', `/api/einsaetze/${e}/personen`, { name: 'Südmann' });
-  await senden(page, 'post', `/api/einsaetze/${e}/personen/${fremd.id}/verbleib`, {
+  const fremd = await senden(page, 'post', `/api/einsaetze/${e}/persons`, { name: 'Südmann' });
+  await senden(page, 'post', `/api/einsaetze/${e}/persons/${fremd.id}/whereabouts`, {
     art: 'notunterkunft',
     betreuungsstelle_id: sued,
   });
@@ -107,12 +107,12 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
 
     // Die Einsatzleitung sieht die Belegung, die Person in der Stelle und die Meldung mit der
     // Stelle als Absender.
-    const uebersicht = await page.request.get(`/api/einsaetze/${e}/betreuung`);
+    const uebersicht = await page.request.get(`/api/einsaetze/${e}/care`);
     const stellen = (
       (await uebersicht.json()) as { stellen: { id: number; belegung?: { belegt: number } }[] }
     ).stellen;
     expect(stellen.find((s) => s.id === nord)?.belegung?.belegt).toBe(12);
-    const personen = (await (await page.request.get(`/api/einsaetze/${e}/personen`)).json()) as {
+    const personen = (await (await page.request.get(`/api/einsaetze/${e}/persons`)).json()) as {
       name: string | null;
       aktuelle_verbleib_betreuungsstelle_id: number | null;
     }[];
@@ -143,7 +143,7 @@ test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigen
   const nord = await stelleInBetrieb(page, e, 'NU Turnhalle Nord');
   const sued = await stelleInBetrieb(page, e, 'NU Schule Süd');
   const registrieren = (stelle: number, name: string) =>
-    senden(page, 'post', `/api/einsaetze/${e}/betreuung/stellen/${stelle}/registrierungen`, {
+    senden(page, 'post', `/api/einsaetze/${e}/care/positions/${stelle}/registrations`, {
       personen: [{ name, vorname: 'Ida', kostform: 'vegan' }],
     });
   await registrieren(nord, 'Nordhoff');

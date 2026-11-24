@@ -75,13 +75,13 @@ function stelleBereit(a: Aufbau = {}) {
     http.get('/api/einsaetze/1/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
-    http.get('/api/einsaetze/1/betreuung', () =>
+    http.get('/api/einsaetze/1/care', () =>
       HttpResponse.json({ stellen: [stelle], namentlich: [] } satisfies BetreuungUebersicht),
     ),
-    http.get('/api/einsaetze/1/unterkunft-richtwerte', () =>
+    http.get('/api/einsaetze/1/accommodation-guidelines', () =>
       HttpResponse.json(richtwerteAntwort({}, a.einsatzWerte)),
     ),
-    http.patch('/api/einsaetze/1/betreuung/stellen/8', async ({ request }) => {
+    http.patch('/api/einsaetze/1/care/positions/8', async ({ request }) => {
       const body = (await request.json()) as { kapazitaet_personen: number };
       patches.push(body);
       stelle = { ...stelle, ...body };

@@ -27,14 +27,14 @@ afterEach(() => {
 
 // LFH-727: Der Personendruck lädt über den protokollierenden Druck-Endpunkt, nie über die Liste.
 describe('ladePersonenDruck', () => {
-  it('ruft genau GET /api/einsaetze/{id}/personen/druck', async () => {
+  it('ruft genau GET /api/einsaetze/{id}/persons/print', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('[]', { status: 200 }));
     await expect(ladePersonenDruck(7)).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/personen/druck');
+    expect(pfad).toBe('/api/einsaetze/7/persons/print');
     expect(init?.method ?? 'GET').toBe('GET');
   });
 });
@@ -42,14 +42,14 @@ describe('ladePersonenDruck', () => {
 // LLH-1682: Der Live-Abgleich lädt eine Zeile über die eigene Zeilen-Route, nie über das
 // protokollierende Detail.
 describe('loadPersonZeile', () => {
-  it('ruft genau GET /api/einsaetze/{id}/personen/{pid}/zeile', async () => {
+  it('ruft genau GET /api/einsaetze/{id}/persons/{pid}/row', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{"id":3}', { status: 200 }));
     await expect(loadPersonZeile(7, 3)).resolves.toEqual({ id: 3 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/personen/3/zeile');
+    expect(pfad).toBe('/api/einsaetze/7/persons/3/row');
     expect(init?.method ?? 'GET').toBe('GET');
   });
 });
@@ -91,7 +91,7 @@ describe('Personen-Anhänge-API', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('[]', { status: 200 }));
     await listePersonAnhaenge(7, 3);
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/personen/3/anhaenge');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/persons/3/attachments');
   });
 
   it('legt EINE Datei im Feld `datei` ab, mit dem 120-s-Upload-Timeout', async () => {
@@ -99,7 +99,7 @@ describe('Personen-Anhänge-API', () => {
     const datei = new File(['x'], 'verletzung.jpg', { type: 'image/jpeg' });
     const ergebnis = legePersonAnhangAb(7, 3, datei);
     const [xhr] = anfragen;
-    expect(xhr.url).toBe('/api/einsaetze/7/personen/3/anhaenge');
+    expect(xhr.url).toBe('/api/einsaetze/7/persons/3/attachments');
     expect(xhr.methode).toBe('POST');
     const fd = xhr.body as FormData;
     expect(fd.get('datei')).toBe(datei);
@@ -124,13 +124,13 @@ describe('Personen-Anhänge-API', () => {
       .mockResolvedValue(new Response(null, { status: 204 }));
     await entfernePersonAnhang(7, 3, 42);
     const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/personen/3/anhaenge/42');
+    expect(pfad).toBe('/api/einsaetze/7/persons/3/attachments/42');
     expect(init?.method).toBe('DELETE');
   });
 
   it('baut den Download-Pfad an der Personenroute, nie an /anhaenge des Einsatzes', () => {
     const p = personAnhangDownloadPfad(7, 3, 42);
-    expect(p).toBe('/api/einsaetze/7/personen/3/anhaenge/42/datei');
+    expect(p).toBe('/api/einsaetze/7/persons/3/attachments/42/file');
     expect(p.startsWith('/api/einsaetze/7/attachments')).toBe(false);
   });
 });
@@ -156,7 +156,7 @@ describe('PAT-Kern-Schreibwege', () => {
     const f = antwort();
     await saveTransport(7, 3, { prioritaet: 'dringlich', art: null, fachrichtung: null });
     expect(aufruf(f)).toEqual({
-      pfad: '/api/einsaetze/7/personen/3/transport',
+      pfad: '/api/einsaetze/7/persons/3/transport',
       methode: 'POST',
       body: { prioritaet: 'dringlich', art: null, fachrichtung: null },
     });
@@ -182,7 +182,7 @@ describe('PAT-Kern-Schreibwege', () => {
     const f = antwort();
     await createMassnahme(7, 3, { art: 'blutstillung', zeitpunkt_at: '2026-10-18T12:05:00Z' });
     expect(aufruf(f)).toEqual({
-      pfad: '/api/einsaetze/7/personen/3/massnahmen',
+      pfad: '/api/einsaetze/7/persons/3/interventions',
       methode: 'POST',
       body: { art: 'blutstillung', zeitpunkt_at: '2026-10-18T12:05:00Z' },
     });
@@ -190,7 +190,7 @@ describe('PAT-Kern-Schreibwege', () => {
     f.mockResolvedValue(new Response(JSON.stringify({ id: 4 }), { status: 200 }));
     await revokeMassnahme(7, 3, 4);
     expect(aufruf(f)).toEqual({
-      pfad: '/api/einsaetze/7/personen/3/massnahmen/4/aufheben',
+      pfad: '/api/einsaetze/7/persons/3/interventions/4/void',
       methode: 'POST',
       body: undefined,
     });
@@ -206,28 +206,28 @@ describe('PAT-Kern-Schreibwege', () => {
       y: 0.45,
     });
     expect(aufruf(f)).toEqual({
-      pfad: '/api/einsaetze/7/personen/3/verletzungen',
+      pfad: '/api/einsaetze/7/persons/3/injuries',
       methode: 'POST',
       body: { ansicht: 'vorn', region: 'unterarm_l', art: 'fraktur_verdacht', x: 0.8, y: 0.45 },
     });
     f.mockClear();
     f.mockResolvedValue(new Response(JSON.stringify({ id: 9 }), { status: 200 }));
     await revokeVerletzung(7, 3, 9);
-    expect(aufruf(f).pfad).toBe('/api/einsaetze/7/personen/3/verletzungen/9/aufheben');
+    expect(aufruf(f).pfad).toBe('/api/einsaetze/7/persons/3/injuries/9/void');
     expect(aufruf(f).methode).toBe('POST');
   });
 });
 // Die Druckansicht einer Person (LLH-1120) lädt über den protokollierenden Druck-Endpunkt der
 // Person, nie über das Detail: das Öffnen steht als `druck` im Zugriffsprotokoll.
 describe('loadPersonDruck', () => {
-  it('ruft genau GET /api/einsaetze/{id}/personen/{pid}/druck', async () => {
+  it('ruft genau GET /api/einsaetze/{id}/persons/{pid}/print', async () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{"id":3}', { status: 200 }));
     await expect(loadPersonDruck(7, 3)).resolves.toEqual({ id: 3 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/personen/3/druck');
+    expect(pfad).toBe('/api/einsaetze/7/persons/3/print');
     expect(init?.method ?? 'GET').toBe('GET');
   });
 });
@@ -250,7 +250,7 @@ describe('savePersonFeld', () => {
   it('schickt genau ein Feld mit seinem Altwert', async () => {
     const fetchMock = attrappe();
     await savePersonFeld(7, 3, 'name', 'Müller', 'Meier');
-    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/personen/3');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/einsaetze/7/persons/3');
     expect(body(fetchMock)).toEqual({
       methode: 'PATCH',
       daten: { name: 'Müller', erwartet: { name: 'Meier' } },

@@ -148,7 +148,7 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
    */
   let letztePerson = { registrier_nr: 0 };
   for (let i = 1; i <= ziel.lfd_nr; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personen`, { data: {} });
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data: {} });
     expect(
       antwort.ok(),
       `Seeding Person: ${antwort.status()} ${await antwort.text()}`,

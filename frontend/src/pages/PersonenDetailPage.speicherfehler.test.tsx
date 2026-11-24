@@ -153,14 +153,14 @@ function render(
   server.use(
     meHandler(benutzerFixture()),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-    http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
-    http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)),
+    http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
-    http.get('/api/einsaetze/1/personen/transportmittel', () =>
+    http.get('/api/einsaetze/1/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
-    http.get('/api/einsaetze/1/personen/10/audit', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/persons/10/audit', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   const client = cacheBehalten
@@ -237,7 +237,7 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
 
   it('nennt den Grund im Paneel, das Paneel bleibt offen, kein Dialog, kein Toast', async () => {
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/sichtung', () => abgelehnt('Person storniert')),
+      http.post('/api/einsaetze/1/persons/10/triage', () => abgelehnt('Person storniert')),
     ]);
     const bereich = await sichte();
 
@@ -254,7 +254,7 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
   it('das nächste Absenden räumt den Grund, Abbrechen ist bis zur Antwort gesperrt', async () => {
     let zweiter = false;
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/sichtung', async () => {
+      http.post('/api/einsaetze/1/persons/10/triage', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Person storniert');
@@ -273,7 +273,7 @@ describe('PersonenDetailPage — Sichtung im Patientenkopf (LFH-1077, LLH-1094)'
 
   it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/sichtung', () => abgelehnt('Person storniert')),
+      http.post('/api/einsaetze/1/persons/10/triage', () => abgelehnt('Person storniert')),
     ]);
     const bereich = await sichte();
     await within(bereich).findByRole('alert');
@@ -311,7 +311,7 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
 
   it('nennt den Grund im Paneel, die Eingaben bleiben, die übrigen Paneele bleiben bedienbar', async () => {
     render(angetroffen, [
-      http.post('/api/einsaetze/1/personen/10/verbleib', () => abgelehnt('Person storniert')),
+      http.post('/api/einsaetze/1/persons/10/whereabouts', () => abgelehnt('Person storniert')),
     ]);
     const bereich = await erfasseVerbleib();
 
@@ -330,7 +330,7 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
   it('das nächste Absenden räumt den Grund, Abbrechen ist bis zur Antwort gesperrt', async () => {
     let zweiter = false;
     render(angetroffen, [
-      http.post('/api/einsaetze/1/personen/10/verbleib', async () => {
+      http.post('/api/einsaetze/1/persons/10/whereabouts', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Person storniert');
@@ -348,7 +348,7 @@ describe('PersonenDetailPage — Verbleib im Patientenkopf (LFH-1077, LLH-1094)'
 describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', () => {
   it('In UHS aufnehmen: Grund im Dialog; Abbrechen und Wiederöffnen räumen ihn', async () => {
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('UHS ist voll')),
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy', () => abgelehnt('UHS ist voll')),
     ]);
     await kopfueberschrift();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'In UHS aufnehmen' }));
@@ -370,12 +370,12 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
 
   it('Bezug zu einem Tier: Grund im Dialog, kein Toast', async () => {
     render(detail, [
-      http.get('/api/einsaetze/1/tiere', ({ request }) =>
+      http.get('/api/einsaetze/1/animals', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('halter_person_id') ? [] : [freiesTier],
         ),
       ),
-      http.patch('/api/einsaetze/1/tiere/40', () => abgelehnt('Tier hat schon einen Halter')),
+      http.patch('/api/einsaetze/1/animals/40', () => abgelehnt('Tier hat schon einen Halter')),
     ]);
     await klappeBezuegeAuf();
     await userEvent.click(await screen.findByRole('button', { name: 'Bezug hinzufügen' }));
@@ -416,7 +416,7 @@ describe('PersonenDetailPage — Aufnehmen und Bezüge im Dialog (LFH-1077)', ()
 describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
   it('ein umkehrbarer Wechsel aus dem Kopf meldet die Ablehnung im Seitenhinweis', async () => {
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/status', () => abgelehnt('Übergang nicht erlaubt')),
+      http.post('/api/einsaetze/1/persons/10/status', () => abgelehnt('Übergang nicht erlaubt')),
     ]);
     await kopfueberschrift();
     await ausMenue(/vermisst/);
@@ -434,7 +434,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
   it('der nächste Wechsel räumt den Seitenhinweis', async () => {
     let zweiter = false;
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/status', async () => {
+      http.post('/api/einsaetze/1/persons/10/status', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Übergang nicht erlaubt');
@@ -450,7 +450,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
 
   it('die Rückfrage öffnet ohne den Grund eines früheren Wechsels', async () => {
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/status', () => abgelehnt('Übergang nicht erlaubt')),
+      http.post('/api/einsaetze/1/persons/10/status', () => abgelehnt('Übergang nicht erlaubt')),
     ]);
     await kopfueberschrift();
     await ausMenue(/vermisst/);
@@ -472,7 +472,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
     it('die Rückfrage wartet auf die Antwort und schließt erst beim Erfolg', async () => {
       let antworte: () => void = () => {};
       render(detail, [
-        http.post('/api/einsaetze/1/personen/10/status', async () => {
+        http.post('/api/einsaetze/1/persons/10/status', async () => {
           await new Promise<void>((r) => (antworte = r));
           return HttpResponse.json({ ...detail, status: 'verstorben' });
         }),
@@ -489,7 +489,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
 
     it('eine Ablehnung steht in der Rückfrage, nicht im Seitenhinweis, kein Toast', async () => {
       render(detail, [
-        http.post('/api/einsaetze/1/personen/10/status', () => abgelehnt('Sichtung fehlt')),
+        http.post('/api/einsaetze/1/persons/10/status', () => abgelehnt('Sichtung fehlt')),
       ]);
       const dialog = await bestaetige();
 
@@ -504,7 +504,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
     it('das nächste Bestätigen räumt den Grund', async () => {
       let zweiter = false;
       render(detail, [
-        http.post('/api/einsaetze/1/personen/10/status', async () => {
+        http.post('/api/einsaetze/1/persons/10/status', async () => {
           if (zweiter) return nie();
           zweiter = true;
           return abgelehnt('Sichtung fehlt');
@@ -519,7 +519,7 @@ describe('PersonenDetailPage — Statuswechsel (LFH-1077)', () => {
 
     it('Abbrechen räumt den Grund, auch aus dem Seitenhinweis; Wiederöffnen zeigt keinen', async () => {
       render(detail, [
-        http.post('/api/einsaetze/1/personen/10/status', () => abgelehnt('Sichtung fehlt')),
+        http.post('/api/einsaetze/1/persons/10/status', () => abgelehnt('Sichtung fehlt')),
       ]);
       const dialog = await bestaetige();
       await within(dialog).findByRole('alert');
@@ -545,7 +545,7 @@ describe('PersonenDetailPage — Stornieren mit Rückfrage (LFH-1077)', () => {
 
   it('die Rückfrage wartet und nennt eine Ablehnung, kein Toast', async () => {
     render(detail, [
-      http.delete('/api/einsaetze/1/personen/10', () => abgelehnt('Bereits storniert')),
+      http.delete('/api/einsaetze/1/persons/10', () => abgelehnt('Bereits storniert')),
     ]);
     const dialog = await storniere();
 
@@ -560,7 +560,7 @@ describe('PersonenDetailPage — Stornieren mit Rückfrage (LFH-1077)', () => {
   it('Abbrechen ist bis zur Antwort gesperrt; das nächste Absenden räumt den Grund', async () => {
     let zweiter = false;
     render(detail, [
-      http.delete('/api/einsaetze/1/personen/10', async () => {
+      http.delete('/api/einsaetze/1/persons/10', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Bereits storniert');
@@ -577,7 +577,7 @@ describe('PersonenDetailPage — Stornieren mit Rückfrage (LFH-1077)', () => {
 
   it('Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     render(detail, [
-      http.delete('/api/einsaetze/1/personen/10', () => abgelehnt('Bereits storniert')),
+      http.delete('/api/einsaetze/1/persons/10', () => abgelehnt('Bereits storniert')),
     ]);
     const dialog = await storniere();
     await within(dialog).findByRole('alert');
@@ -590,7 +590,7 @@ describe('PersonenDetailPage — Stornieren mit Rückfrage (LFH-1077)', () => {
 
 describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', () => {
   it('Personendaten: der Grund steht am Feld, das Feld bleibt offen, kein Toast', async () => {
-    render(detail, [http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang'))]);
+    render(detail, [http.patch('/api/einsaetze/1/persons/10', () => abgelehnt('Name zu lang'))]);
     await kopfueberschrift();
     await aendereName();
 
@@ -604,7 +604,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
   it('Personendaten: das nächste Speichern räumt den Grund; Abbrechen ist bis dahin gesperrt', async () => {
     let zweiter = false;
     render(detail, [
-      http.patch('/api/einsaetze/1/personen/10', async () => {
+      http.patch('/api/einsaetze/1/persons/10', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Name zu lang');
@@ -620,7 +620,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
   });
 
   it('Personendaten: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
-    render(detail, [http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang'))]);
+    render(detail, [http.patch('/api/einsaetze/1/persons/10', () => abgelehnt('Name zu lang'))]);
     await kopfueberschrift();
     await aendereName();
     await screen.findByText('Name zu lang');
@@ -634,10 +634,10 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
   it('Personendaten: der Feldkonflikt (409) fragt nach und steht nicht am Feld', async () => {
     let geaendert = false;
     render(detail, [
-      http.get('/api/einsaetze/1/personen/10', () =>
+      http.get('/api/einsaetze/1/persons/10', () =>
         HttpResponse.json(geaendert ? { ...detail, name: 'Meier' } : detail),
       ),
-      http.patch('/api/einsaetze/1/personen/10', () => {
+      http.patch('/api/einsaetze/1/persons/10', () => {
         geaendert = true;
         return abgelehnt('Das Feld wurde zwischenzeitlich geändert. Bitte neu laden.', 409);
       }),
@@ -654,7 +654,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
   it('Notiz: der Grund steht am Notizformular, der Text bleibt; das nächste Absenden räumt', async () => {
     let zweiter = false;
     render(detail, [
-      http.post('/api/einsaetze/1/personen/10/notizen', async () => {
+      http.post('/api/einsaetze/1/persons/10/notes', async () => {
         if (zweiter) return nie();
         zweiter = true;
         return abgelehnt('Person storniert');
@@ -679,7 +679,7 @@ describe('PersonenDetailPage — Personendaten und Notiz (LFH-1077, LLH-1103)', 
 describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', () => {
   it('Austragen: der Grund steht im Kopf am Aufenthalt, kein Toast', async () => {
     render({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
-      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('Bereits entlassen')),
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy', () => abgelehnt('Bereits entlassen')),
     ]);
     await kopfueberschrift();
     await userEvent.click(within(kopf()).getByRole('button', { name: 'Austragen' }));
@@ -701,16 +701,16 @@ describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', (
   it('Tier lösen: zwei Zeilen nebenläufig, die Ablehnung steht an ihrer Zeile', async () => {
     let lehneAb: () => void = () => {};
     render(detail, [
-      http.get('/api/einsaetze/1/tiere', ({ request }) =>
+      http.get('/api/einsaetze/1/animals', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('halter_person_id') ? [tier, zweitesTier] : [],
         ),
       ),
-      http.patch('/api/einsaetze/1/tiere/30', async () => {
+      http.patch('/api/einsaetze/1/animals/30', async () => {
         await new Promise<void>((r) => (lehneAb = r));
         return abgelehnt('Tier storniert');
       }),
-      http.patch('/api/einsaetze/1/tiere/31', () =>
+      http.patch('/api/einsaetze/1/animals/31', () =>
         HttpResponse.json({ ...zweitesTier, halter_person_id: null }),
       ),
     ]);
@@ -740,12 +740,12 @@ describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', (
     const { client } = render(
       detail,
       [
-        http.get('/api/einsaetze/1/tiere', ({ request }) =>
+        http.get('/api/einsaetze/1/animals', ({ request }) =>
           HttpResponse.json(
             new URL(request.url).searchParams.has('halter_person_id') ? [tier] : [],
           ),
         ),
-        http.patch('/api/einsaetze/1/tiere/30', () => abgelehnt('Tier storniert')),
+        http.patch('/api/einsaetze/1/animals/30', () => abgelehnt('Tier storniert')),
       ],
       true,
     );
@@ -806,7 +806,7 @@ describe('PersonenDetailPage — Aufenthalt, Bezüge und Abgleich (LFH-1077)', (
       ],
     } as PersonDetail;
     render(vermisst, [
-      http.post('/api/einsaetze/1/personen/10/abgleich/5/entscheidung', () =>
+      http.post('/api/einsaetze/1/persons/10/matches/5/decision', () =>
         abgelehnt('Abgleich bereits entschieden'),
       ),
     ]);
@@ -839,12 +839,12 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
     server.use(
       meHandler(benutzerFixture()),
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/personen/10', () => HttpResponse.json(person)),
-      http.get('/api/einsaetze/1/personen/11', () => HttpResponse.json(zweite)),
-      http.get('/api/einsaetze/1/tiere', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)),
+      http.get('/api/einsaetze/1/persons/11', () => HttpResponse.json(zweite)),
+      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(uhsListe)),
-      http.get('/api/einsaetze/1/personen/:pid/audit', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/persons/:pid/audit', () => HttpResponse.json([])),
     );
     if (extra.length > 0) server.use(...extra);
     return renderMitProviders(
@@ -864,9 +864,9 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
 
   it('räumt Notiz-, Personendaten- und Austrags-Grund und den getippten Notiztext', async () => {
     renderMitWechsel({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
-      http.post('/api/einsaetze/1/personen/10/notizen', () => abgelehnt('Person storniert')),
-      http.post('/api/einsaetze/1/personen/10/uhs-belegung', () => abgelehnt('Bereits entlassen')),
-      http.patch('/api/einsaetze/1/personen/10', () => abgelehnt('Name zu lang')),
+      http.post('/api/einsaetze/1/persons/10/notes', () => abgelehnt('Person storniert')),
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy', () => abgelehnt('Bereits entlassen')),
+      http.patch('/api/einsaetze/1/persons/10', () => abgelehnt('Name zu lang')),
     ]);
     await kopfueberschrift();
     await userEvent.type(screen.getByRole('textbox', { name: /Verlaufsnotiz/ }), 'trinkt Wasser');
@@ -912,12 +912,12 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
   it('eine erst nach dem Wechsel scheiternde Zeilenaktion meldet nicht bei der neuen Person', async () => {
     let lehneAb: () => void = () => {};
     renderMitWechsel(detail, [
-      http.get('/api/einsaetze/1/tiere', ({ request }) =>
+      http.get('/api/einsaetze/1/animals', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.get('halter_person_id') === '10' ? [tier] : [],
         ),
       ),
-      http.patch('/api/einsaetze/1/tiere/30', async () => {
+      http.patch('/api/einsaetze/1/animals/30', async () => {
         await new Promise<void>((r) => (lehneAb = r));
         return abgelehnt('Tier storniert');
       }),
@@ -938,7 +938,7 @@ describe('PersonenDetailPage — Wechsel zu einer anderen Person (LFH-1077)', ()
 describe('PersonenDetailPage — Austragen und neue Verortung (LFH-1077)', () => {
   it('ein gelungenes Verlegen räumt den Grund eines gescheiterten Austragens', async () => {
     render({ ...detail, aktuelle_uhs_id: 5 } as PersonDetail, [
-      http.post('/api/einsaetze/1/personen/10/uhs-belegung', async ({ request }) => {
+      http.post('/api/einsaetze/1/persons/10/uhs-occupancy', async ({ request }) => {
         const body = (await request.json()) as { art: string };
         return body.art === 'austritt'
           ? abgelehnt('Bereits entlassen')

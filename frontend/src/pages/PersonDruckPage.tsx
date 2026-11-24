@@ -29,7 +29,7 @@ import { ListenRueckweg } from '../components/ListenRueckweg';
  * Schreibrecht, nie am Gerät (die Gerätehülle kennt die Route nicht, der Server lehnt sie dort
  * ab).
  *
- * Geladen wird nur über `GET …/personen/{pid}/druck`: jeder Abruf schreibt einen `druck`-Eintrag
+ * Geladen wird nur über `GET …/persons/{pid}/print`: jeder Abruf schreibt einen `druck`-Eintrag
  * mit Person ins Zugriffsprotokoll (`frontend/src/druck/AGENTS.md`, Personendruck). Deshalb die
  * Optionen aus `druck/abfrageOptionen.ts` (kein stiller Retry, offline scheitern) und ein eigener,
  * nicht live geführter Key: das Blatt ist ein Schnappschuss, „Neu laden“ holt den neuen Stand.

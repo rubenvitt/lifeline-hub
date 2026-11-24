@@ -271,7 +271,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/rescind"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
         &admin,
         Some(r#"{"grund":"erledigt"}"#),
     )

@@ -305,7 +305,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   // Ohne Status setzt das Backend `erfasst`, genau der Standardreiter der Personenseite;
   // mit anderem Status fiele die Person aus der Standardsicht.
   await anlegen(
-    'personen',
+    'persons',
     {
       name: 'Oberacher-Dreiszigmark',
       vorname: 'Wolfgang-Sebastian',
@@ -328,7 +328,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
   );
   // Der Status-Default `aktiv` deckt sich mit dem Standardreiter der Tierseite.
   await anlegen(
-    'tiere',
+    'animals',
     {
       spezies: 'grosstier',
       rufname: 'Donnerhall-vom-Wiesengrund',
@@ -444,7 +444,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
     // Belegung „fast voll" neben die Zahl setzt — die breiteste Tabellenzelle. Namen ohne
     // „Betreuung".
     const bezirk = await post(
-      'evakuierung/bezirke',
+      'evacuation/districts',
       {
         bezeichnung: 'Uferstraße 12–40 und Deichweg 1–9 zwischen Schleuse und Pumpwerk Nordwest',
         plan_personen: 1210,
@@ -454,17 +454,17 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Bezirk',
     );
     await post(
-      `evakuierung/bezirke/${bezirk.id}/staende`,
+      `evacuation/districts/${bezirk.id}/progress`,
       { evakuiert: 1180, erhebung: 'geschaetzt' },
       'Stand',
     );
     const antwort = await page.request.patch(
-      `/api/einsaetze/${einsatzId}/evakuierung/bezirke/${bezirk.id}`,
+      `/api/einsaetze/${einsatzId}/evacuation/districts/${bezirk.id}`,
       { data: { raeumung: 'laeuft' } },
     );
     expect(antwort.ok(), `Seeding Räumung: ${antwort.status()}`).toBeTruthy();
     const stelle = await post(
-      'betreuung/stellen',
+      'care/positions',
       {
         bezeichnung: 'Notunterkunft Mehrzweckhalle Gesamtschule Musterstadt-Nordwest',
         art: 'notunterkunft',
@@ -473,14 +473,14 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       },
       'Stelle',
     );
-    await post(`betreuung/stellen/${stelle.id}/belegungen`, { belegt: 1420 }, 'Belegung');
+    await post(`care/positions/${stelle.id}/occupancies`, { belegt: 1420 }, 'Belegung');
     BETREUUNGSSTELLE.set(einsatzId, stelle.id);
 
     // Ein LAUFENDES Zeitfenster (sonst stünde die Karte unter „vergangen") mit Sonderkost und
     // einer Ausgabe mit langem Ort — die breiteste Zeile der Karte.
     const jetzt = Date.now();
     const zeitfenster = await post(
-      'verpflegung/zeitfenster',
+      'catering/time-slots',
       {
         bezeichnung: 'Mittagessen Deichverteidigung Nordwestring Kilometer 4,7 bis 6,2',
         von_at: new Date(jetzt - 3_600_000).toISOString(),
@@ -493,7 +493,7 @@ async function gate1Saeen(page: Page, { vorlage = false } = {}): Promise<string>
       'Zeitfenster',
     );
     await post(
-      `verpflegung/zeitfenster/${zeitfenster.id}/ausgaben`,
+      `catering/time-slots/${zeitfenster.id}/distributions`,
       {
         menge: 120,
         ort: 'Ausgabestelle Mehrzweckhalle Gesamtschule Musterstadt-Nordwest, Eingang Deichweg',
@@ -1015,7 +1015,7 @@ function gate1RoutenVersorgung(einsatzId: string): Gate1Route[] {
       // die erst nach dem Seeding feststeht; deshalb führt `vorbereiten` von der Modulseite hin.
       pfad: `/einsaetze/${einsatzId}/verpflegung`,
       vorbereiten: async (p: Page) => {
-        const r = await p.request.get(`/api/einsaetze/${einsatzId}/verpflegung`);
+        const r = await p.request.get(`/api/einsaetze/${einsatzId}/catering`);
         const [zf] = ((await r.json()) as { zeitfenster: { id: number }[] }).zeitfenster;
         await p.goto(`/einsaetze/${einsatzId}/verpflegung/${zf.id}/ausgabe`);
         await expect(p.locator('[data-lfh="zaehltasten"]')).toBeVisible();
@@ -1347,7 +1347,7 @@ test.describe('Gate 1', () => {
         const jetzt = Date.now();
         const zeitfenster = (bezeichnung: string, vonMin: number, bisMin: number) =>
           post(
-            'verpflegung/zeitfenster',
+            'catering/time-slots',
             {
               bezeichnung,
               von_at: new Date(jetzt + vonMin * 60_000).toISOString(),
@@ -1372,7 +1372,7 @@ test.describe('Gate 1', () => {
           for (let i = 1; i <= 3; i += 1) await zeitfenster(`Frühstück ${i}`, -300, -240);
           for (let i = 1; i <= 12; i += 1)
             await post(
-              'verpflegung/stellen',
+              'catering/positions',
               { bezeichnung: `Ausgabe Deich ${i}`, art: 'ausgabestelle' },
               `Stelle ${i}`,
             );

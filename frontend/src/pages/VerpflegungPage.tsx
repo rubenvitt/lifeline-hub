@@ -192,7 +192,7 @@ type Dialog =
  *
  * Der dritte Wert der Leiste zeigt die Verpflegungsstellen (LLH-1040, `verpflegung/StellenListe`);
  * dort heißt die Primäraktion „Stelle anlegen“, und das Banner der Zeitfenster schweigt. Die Stellen
- * kommen mit derselben Übersicht (`GET …/verpflegung`), es gibt keinen eigenen Abruf.
+ * kommen mit derselben Übersicht (`GET …/catering`), es gibt keinen eigenen Abruf.
  *
  * Auf dem Verpflegungsgerät (LFH-1044) dieselbe Seite ohne Planen (Zeitfenster anlegen, Bedarf
  * ändern, löschen) und ohne Brotkrumen; eine Fehlmenge geht als Meldung an die Einsatzleitung,
@@ -249,7 +249,7 @@ export default function VerpflegungPage() {
   const stellen = useMemo(() => verpflegungQuery.data?.stellen ?? [], [verpflegungQuery.data]);
   // Gebundenes Verpflegungsgerät (LLH-1048): der Nachtrag trägt fest seine Stelle.
   const festeStelle = eigeneStelle(geraet, stellen);
-  // Empfängerliste (LLH-1055): Projektion in `GET …/verpflegung`, auch am Gerät, nie `…/einheiten`.
+  // Empfängerliste (LLH-1055): Projektion in `GET …/catering`, auch am Gerät, nie `…/einheiten`.
   const empfaengerListe = verpflegungQuery.data?.empfaenger ?? LEERE_EMPFAENGER;
   const stellenAnsicht = ansicht === 'stellen';
   // Abschnitte nur für die offene Stellenmaske; ohne Modulzugriff bleibt das Feld weg.

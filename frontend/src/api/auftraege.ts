@@ -139,7 +139,7 @@ export function nimmAb(einsatzId: number, auftragId: number): Promise<Auftrag> {
 /** Hebt einen Auftrag mit Grund auf (LLH-1098); unumkehrbar, der Server schreibt das ETB. */
 export function hebeAuf(einsatzId: number, auftragId: number, grund: string): Promise<Auftrag> {
   const body: AuftragAufhebenBody = { grund };
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}/rescind`, 'POST', body);
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}/void`, 'POST', body);
 }
 
 /** Berichtigt einen Auftrag vor der ersten Quittung (LLH-1098): nur die geänderten Felder. */

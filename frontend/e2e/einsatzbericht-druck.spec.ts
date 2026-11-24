@@ -83,7 +83,7 @@ async function saeen(page: Page, einsatzId: string) {
     an: 'Leitstelle',
     inhalt: 'Bereitstellungsraum Nord einrichten',
   });
-  await sende(page, 'POST', `${basis}/personen`, {
+  await sende(page, 'POST', `${basis}/persons`, {
     name: NAME,
     vorname: VORNAME,
     status: 'betroffen',

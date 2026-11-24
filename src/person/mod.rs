@@ -393,7 +393,7 @@ pub struct PersonAuswahl {
     pub pat_nummer: Option<String>,
 }
 
-/// Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/personen/einheiten`): je aktiver
+/// Wahl der versorgenden Einheit (LLH-1567, design.md D4, `GET …/persons/units`): je aktiver
 /// Einheit des Einsatzes Name und Abschnitt. Am Modul Personen, damit die Wahl ohne Leserecht auf
 /// die Kräfte geht.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
@@ -406,7 +406,7 @@ pub struct VersorgendeEinheitAuswahl {
     pub abschnitt_name: Option<String>,
 }
 
-/// Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/personen/uhs`): je aktiver UHS
+/// Ziel „Zur UHS“ am Einheitengerät (LLH-1580, Entwurf K3, `GET …/persons/uhs`): je aktiver UHS
 /// des Einsatzes nur Kennung und Bezeichnung. Am Modul Personen, damit das Gerät ohne das Modul
 /// Unfallhilfsstellen wählen kann; keine Belegung, keine Plätze.
 #[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]

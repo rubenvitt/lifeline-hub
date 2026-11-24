@@ -346,7 +346,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
         ("/einheiten", 5),
         ("/fahrzeuge", 8),
         ("/personal", 12),
-        ("/personen", 12),
+        ("/persons", 12),
         ("/uhs", 1),
         ("/bereitstellungsraeume", 1),
         ("/zonen", 2),
@@ -366,7 +366,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, betreuung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/betreuung"),
+        &format!("/api/einsaetze/{e}/care"),
         &admin,
         None,
     )
@@ -376,7 +376,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, evakuierung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evakuierung"),
+        &format!("/api/einsaetze/{e}/evacuation"),
         &admin,
         None,
     )
@@ -385,7 +385,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     assert_eq!(evakuierung["bezirke"].as_array().unwrap().len(), 1);
 
     // Sichtung nach BBK: jede Kategorie SK I–IV mindestens einmal.
-    let personen = liste(&app, &admin, e, "/personen").await;
+    let personen = liste(&app, &admin, e, "/persons").await;
     for sk in ["sk1", "sk2", "sk3", "sk4"] {
         assert!(
             personen.iter().any(|p| p["aktuelle_sichtung"] == sk),
@@ -1296,7 +1296,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/personen"),
+        format!("/api/einsaetze/{e}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#.into(),
     )
     .await;

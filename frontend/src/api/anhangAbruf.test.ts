@@ -56,7 +56,7 @@ describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
 
   it('ein UHS-Plan, der geholt wird, ebenso', async () => {
     server.use(
-      http.get('/api/einsaetze/7/uhs/2/plan/bild', () =>
+      http.get('/api/einsaetze/7/uhs/2/plan/image', () =>
         HttpResponse.json({ error: ANHANG_WIRD_GEHOLT_TEXT }, { status: 409 }),
       ),
     );

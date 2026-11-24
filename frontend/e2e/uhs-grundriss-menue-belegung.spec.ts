@@ -101,7 +101,7 @@ test('UHS Grundriss: die Platzmenü-Auslöser überleben eine laufende Belegung'
   // Name auf der Zielkarte stehen schon durch das OPTIMISTISCHE Update — darauf zu warten
   // verpasste eine Regression, die den Auslöser erst in `onSettled`/Refetch abhängt.
   const belegungDurch = page.waitForResponse(
-    (a) => a.url().includes('/uhs-belegung') && a.request().method() === 'POST',
+    (a) => a.url().includes('/uhs-occupancy') && a.request().method() === 'POST',
   );
   // Der nachlaufende Refetch gehört mit ins Fenster: die Mutation bleibt bis dahin `pending`.
   const nachladenDurch = page.waitForResponse((a) => /\/uhs\/\d+$/.test(new URL(a.url()).pathname));

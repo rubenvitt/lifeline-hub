@@ -510,7 +510,7 @@ async fn geschaedigt_fk_auf_storniert_person_bleibt_zulaessig() {
     let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/personen/{p}"),
+        &format!("/api/einsaetze/{e}/persons/{p}"),
         &admin,
         None,
     )

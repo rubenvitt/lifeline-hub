@@ -30,8 +30,8 @@ async function seede(page: Page): Promise<string> {
     await post(page, '/api/einsaetze', { bezeichnung: `E2E Vorbereitung ${Date.now()}` }),
   );
   const basis = `/api/einsaetze/${einsatzId}`;
-  await post(page, `${basis}/personen`, { name: 'Albers' });
-  await post(page, `${basis}/personen`, { name: 'Brandt' });
+  await post(page, `${basis}/persons`, { name: 'Albers' });
+  await post(page, `${basis}/persons`, { name: 'Brandt' });
   const auftrag = (text: string, frist?: string) => ({
     auftrag_text: text,
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],

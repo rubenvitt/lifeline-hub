@@ -32,17 +32,17 @@ async function seede(page: Page): Promise<{ einsatzId: number; stelleId: number 
   const { id: einsatzId } = await sende('post', '/api/einsaetze', {
     bezeichnung: `E2E Registrierliste ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/betreuung`;
-  const { id: stelleId } = await sende('post', `${basis}/stellen`, {
+  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const { id: stelleId } = await sende('post', `${basis}/positions`, {
     bezeichnung: 'Turnhalle Ost',
     art: 'notunterkunft',
     kapazitaet_personen: 150,
     belegungsart: 'namentlich',
   });
-  await sende('patch', `${basis}/stellen/${stelleId}`, { status: 'in_betrieb' });
+  await sende('patch', `${basis}/positions/${stelleId}`, { status: 'in_betrieb' });
   const kostformen = ['normal', 'vegetarisch', 'saeugling_kleinkind', 'vegan'];
   for (let h = 1; h <= HAUSHALTE; h++) {
-    await sende('post', `${basis}/stellen/${stelleId}/registrierungen`, {
+    await sende('post', `${basis}/positions/${stelleId}/registrations`, {
       personen: Array.from({ length: JE_HAUSHALT }, (_, i) => ({
         name: `Haus${h}`,
         vorname: `P${i + 1}`,

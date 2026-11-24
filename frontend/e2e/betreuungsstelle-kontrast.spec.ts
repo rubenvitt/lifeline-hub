@@ -86,16 +86,16 @@ for (const modus of ['light', 'dark'] as const) {
       bezeichnung: `E2E 1347 Kontrast ${Date.now()}`,
     });
     const basis = `/api/einsaetze/${einsatzId}`;
-    const { id: stelleId } = await senden(page, 'post', `${basis}/betreuung/stellen`, {
+    const { id: stelleId } = await senden(page, 'post', `${basis}/care/positions`, {
       bezeichnung: STELLE,
       art: 'notunterkunft',
       kapazitaet_personen: 120,
     });
-    await senden(page, 'patch', `${basis}/betreuung/stellen/${stelleId}`, {
+    await senden(page, 'patch', `${basis}/care/positions/${stelleId}`, {
       status: 'in_betrieb',
     });
     const meldung = (belegt: number, vorMin: number) =>
-      senden(page, 'post', `${basis}/betreuung/stellen/${stelleId}/belegungen`, {
+      senden(page, 'post', `${basis}/care/positions/${stelleId}/occupancies`, {
         belegt,
         zeitpunkt_at: new Date(Date.now() - vorMin * 60_000)
           .toISOString()
@@ -104,9 +104,9 @@ for (const modus of ['light', 'dark'] as const) {
       });
     await meldung(40, 90);
     await meldung(115, 10);
-    const { id: personId } = await senden(page, 'post', `${basis}/personen`, {});
-    await senden(page, 'post', `${basis}/personen/${personId}/sichtung`, { kategorie: 'sk3' });
-    await senden(page, 'post', `${basis}/personen/${personId}/verbleib`, {
+    const { id: personId } = await senden(page, 'post', `${basis}/persons`, {});
+    await senden(page, 'post', `${basis}/persons/${personId}/triage`, { kategorie: 'sk3' });
+    await senden(page, 'post', `${basis}/persons/${personId}/whereabouts`, {
       art: 'notunterkunft',
       ziel: STELLE,
       betreuungsstelle_id: stelleId,

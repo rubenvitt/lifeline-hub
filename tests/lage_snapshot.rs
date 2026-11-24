@@ -559,7 +559,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, stelle) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/betreuung/stellen"),
+        &format!("/api/einsaetze/{e}/care/positions"),
         &admin,
         Some(r#"{"bezeichnung":"NU Turnhalle Nord","art":"notunterkunft"}"#),
     )
@@ -569,7 +569,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/betreuung/stellen/{sid}"),
+        &format!("/api/einsaetze/{e}/care/positions/{sid}"),
         &admin,
         Some(r#"{"lat":51.93,"lon":8.87}"#),
     )
@@ -578,7 +578,7 @@ async fn snapshot_friert_betreuung_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/evakuierung/bezirke"),
+        &format!("/api/einsaetze/{e}/evacuation/districts"),
         &admin,
         Some(r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"geschaetzt"}"#),
     )
@@ -812,7 +812,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, tier) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tiere"),
+        &format!("/api/einsaetze/{e}/animals"),
         &admin,
         Some(
             r#"{"spezies":"hund","rufname":"Bello","antreff_ort":"Garten","antreff_lat":51.93,
@@ -824,7 +824,7 @@ async fn snapshot_friert_tiere_ein_und_redigiert_sie_ohne_modulrecht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tiere"),
+        &format!("/api/einsaetze/{e}/animals"),
         &admin,
         Some(r#"{"spezies":"katze","status":"vermisst"}"#),
     )

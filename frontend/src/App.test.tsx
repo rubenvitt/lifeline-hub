@@ -405,7 +405,7 @@ describe('App-Routing', () => {
         meHandler(admin),
         http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
         http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-        http.get('/api/einsaetze/7/personen/999999', () =>
+        http.get('/api/einsaetze/7/persons/999999', () =>
           HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
         ),
       );
@@ -438,7 +438,7 @@ describe('App-Routing', () => {
         meHandler(admin),
         http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
         http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-        http.get('/api/einsaetze/7/personen/999999', () =>
+        http.get('/api/einsaetze/7/persons/999999', () =>
           HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
         ),
       );
@@ -503,7 +503,7 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/betreuung', () => HttpResponse.json({ stellen: [] })),
+      http.get('/api/einsaetze/7/care', () => HttpResponse.json({ stellen: [] })),
     );
     renderApp('/einsaetze/7/betreuung');
     await waitFor(() =>
@@ -517,7 +517,7 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/evakuierung', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/einsaetze/7/evacuation', () => HttpResponse.json({ bezirke: [] })),
     );
     renderApp('/einsaetze/7/evakuierung');
     await waitFor(() =>
@@ -531,7 +531,7 @@ describe('App-Routing', () => {
       meHandler(admin),
       http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/verpflegung', () =>
+      http.get('/api/einsaetze/7/catering', () =>
         HttpResponse.json({
           zeitfenster: [],
           stellen: [],
