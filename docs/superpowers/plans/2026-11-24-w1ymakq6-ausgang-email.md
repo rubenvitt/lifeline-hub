@@ -73,6 +73,9 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `kanal::list_email_fuer_org(pool, org_id) -> Result<Vec<(ExterneStelle, ExterneStelleKanal)>, AppError>` (nur aktive Stellen)
   - `kanal::load_in_org(conn, org_id, kanal_id) -> Result<(ExterneStelle, ExterneStelleKanal), AppError>`
   - `kanal::create/update/delete` (Org-isoliert, fremd → `NotFound`)
+  - Sammelroute `GET /api/external-agencies/channels?channel=email` → `Vec<KanalMitStelle>` mit
+    `struct KanalMitStelle { channel: ExterneStelleKanal, agency_id: i64, agency_name: String }`
+    (nur aktive Stellen; für den Senden-Dialog in Task 10). Route vor `/{id}` registrieren.
 
 - [ ] **Step 1: Migration schreiben** — Tabelle wie Spec Abschnitt 1, `CHECK (kanal IN ('email','fax','matrix','threema'))`, `UNIQUE(externe_stelle_id, kanal, adresse)`, Index auf `(org_id, externe_stelle_id)`. Hat `org_externe_stelle` Änderungs-Trigger aus 0312, bekommt die Kanaltabelle dieselben; den Hub-Schreibschutz-Trigger aus 0312 für Kanäle einer synchronisierten Stelle mitziehen.
 - [ ] **Step 2: Failing Tests (Unit)** in `src/externe_stelle/tests.rs`:
