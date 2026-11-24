@@ -62,7 +62,7 @@ test('Einheit · Bemerkung: der Hinweis steht an der Zeile und weicht beim Abbre
   test.setTimeout(90_000);
   await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Präsenz Einheit ${Date.now()}`);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
     data: { name: 'Trupp Präsenz' },
   });
   expect(antwort.ok()).toBe(true);

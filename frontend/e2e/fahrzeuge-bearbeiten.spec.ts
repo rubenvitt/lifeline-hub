@@ -23,9 +23,9 @@ async function seede(page: Page, funkrufname: string) {
   const einsatzId = await post('/api/einsaetze', { bezeichnung: `E2E Fahrzeuge ${Date.now()}` });
   const basis = `/api/einsaetze/${einsatzId}`;
   const abschnitt = await post(`${basis}/sectors`, { name: 'Sanitätsdienst' });
-  const zug = await post(`${basis}/einheiten`, { name: 'Zug 1', abschnitt_id: abschnitt });
-  const staffel = await post(`${basis}/einheiten`, { name: 'Staffel A', ueber_einheit_id: zug });
-  const fahrzeug = await post(`${basis}/fahrzeuge`, { adhoc: { funkrufname } });
+  const zug = await post(`${basis}/units`, { name: 'Zug 1', abschnitt_id: abschnitt });
+  const staffel = await post(`${basis}/units`, { name: 'Staffel A', ueber_einheit_id: zug });
+  const fahrzeug = await post(`${basis}/vehicles`, { adhoc: { funkrufname } });
   return { einsatzId, zug, staffel, fahrzeug };
 }
 

@@ -99,70 +99,70 @@ test.describe(KAPITEL, () => {
       const demo = await demoEinsatz(api);
       const basis = `/api/einsaetze/${demo.id}`;
       const jetzt = new Date();
-      const einheiten = await liste<Einheit>(api, `${basis}/einheiten`);
+      const einheiten = await liste<Einheit>(api, `${basis}/units`);
       const einheit = (name: string) => {
         const e = einheiten.find((x) => x.name === name);
         expect(e, `Einheit „${name}“`).toBeDefined();
         return e!.id;
       };
-      const vorgaben = await liste<Vorgabe>(api, `${basis}/abloesungen/vorgaben`);
+      const vorgaben = await liste<Vorgabe>(api, `${basis}/reliefs/defaults`);
       const sanitaetsdienst = vorgaben.find((v) => v.abschnitt_name === 'Sanitätsdienst');
       expect(sanitaetsdienst, 'Abschnitt „Sanitätsdienst“').toBeDefined();
-      await fuelle(api, 'put', `${basis}/abloesungen/vorgaben/${sanitaetsdienst!.abschnitt_id}`, {
+      await fuelle(api, 'put', `${basis}/reliefs/defaults/${sanitaetsdienst!.abschnitt_id}`, {
         rhythmus_minuten: 360,
       });
-      const abloeser = await fuelle<Einheit>(api, 'post', `${basis}/einheiten`, {
+      const abloeser = await fuelle<Einheit>(api, 'post', `${basis}/units`, {
         name: '2. Rettungsstaffel',
       });
 
-      const rettung = await fuelle<Schicht>(api, 'post', `${basis}/abloesungen`, {
+      const rettung = await fuelle<Schicht>(api, 'post', `${basis}/reliefs`, {
         einheit_id: einheit('Rettungsstaffel'),
         beginn_at: draht(vor(jetzt, 380)),
       });
-      await fuelle(api, 'patch', `${basis}/abloesungen/${rettung.id}`, {
+      await fuelle(api, 'patch', `${basis}/reliefs/${rettung.id}`, {
         abloesende_einheit_id: abloeser.id,
       });
-      const sanitaetszug = await fuelle<Schicht>(api, 'post', `${basis}/abloesungen`, {
+      const sanitaetszug = await fuelle<Schicht>(api, 'post', `${basis}/reliefs`, {
         einheit_id: einheit('Sanitätszug Musterstadt'),
         beginn_at: draht(vor(jetzt, 340)),
       });
-      await fuelle(api, 'post', `${basis}/abloesungen`, {
+      await fuelle(api, 'post', `${basis}/reliefs`, {
         einheit_id: einheit('Sanitätsgruppe UHS'),
         beginn_at: draht(vor(jetzt, 240)),
         rhythmus_minuten: 480,
       });
-      await fuelle(api, 'patch', `${basis}/abloesungen/${sanitaetszug.id}`, {
+      await fuelle(api, 'patch', `${basis}/reliefs/${sanitaetszug.id}`, {
         abloeser_ids: [einheit('Sanitätsgruppe UHS')],
       });
-      await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
+      await fuelle(api, 'post', `${basis}/units/${abloeser.id}/timeline`, {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 55)),
       });
-      await fuelle(api, 'post', `${basis}/einheiten/${abloeser.id}/zeitachse`, {
+      await fuelle(api, 'post', `${basis}/units/${abloeser.id}/timeline`, {
         art: 'eintreffen',
         zeitpunkt_at: draht(vor(jetzt, 25)),
       });
-      const raum = await fuelle<{ id: number }>(api, 'post', `${basis}/bereitstellungsraeume`, {
+      const raum = await fuelle<{ id: number }>(api, 'post', `${basis}/staging-areas`, {
         bezeichnung: 'BR Sportplatz',
       });
-      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/status`, {
+      await fuelle(api, 'post', `${basis}/staging-areas/${raum.id}/status`, {
         status: 'aktiv',
       });
-      await fuelle(api, 'post', `${basis}/bereitstellungsraeume/${raum.id}/eintreffen`, {
+      await fuelle(api, 'post', `${basis}/staging-areas/${raum.id}/arrival`, {
         kraft: { objekt_typ: 'einheit', objekt_id: abloeser.id },
       });
-      await fuelle(api, 'post', `${basis}/einheiten/${einheit('Betreuungsgruppe')}/zeitachse`, {
+      await fuelle(api, 'post', `${basis}/units/${einheit('Betreuungsgruppe')}/timeline`, {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 40)),
       });
       for (const name of ['Lena Brandt', 'Tom Weber']) {
-        await fuelle(api, 'post', `${basis}/personal`, { adhoc: { name } });
+        await fuelle(api, 'post', `${basis}/personnel`, { adhoc: { name } });
       }
       for (const helfer of [
         { name: 'Mia Beispiel', organisation: 'DRK OV Nord', telefon: '0151 2345678' },
         { name: 'Jonas Keller', organisation: 'DLRG Musterstadt' },
       ]) {
-        await fuelle(api, 'post', `${basis}/abloesungen/schichtplan/helfer`, helfer);
+        await fuelle(api, 'post', `${basis}/reliefs/shift-plan/helpers`, helfer);
       }
     } finally {
       await api.dispose();

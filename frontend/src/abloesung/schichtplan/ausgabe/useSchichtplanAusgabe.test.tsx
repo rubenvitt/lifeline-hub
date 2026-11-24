@@ -11,7 +11,7 @@ import EinsatzSeite from '../../../components/EinsatzSeite';
 import { setzeViewportBreite, setzeViewportZurueck } from '../../../test/viewport';
 import { useSchichtplanAusgabe } from './useSchichtplanAusgabe';
 
-const EXPORT = '/api/einsaetze/4/abloesungen/schichtplan/export';
+const EXPORT = '/api/einsaetze/4/reliefs/shift-plan/export';
 
 /** Wie die Ablösung: Ausgabewege im Seitenkopf, der Fehler an der Ansicht (LLH-1836). */
 function Seite({ personalFrei }: { personalFrei: boolean | undefined }) {

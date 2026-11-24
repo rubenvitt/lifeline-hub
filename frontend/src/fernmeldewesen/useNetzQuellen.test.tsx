@@ -26,8 +26,8 @@ function setup(freigaben: ModulFreigaben) {
   server.use(
     http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/talk-groups', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/staff/comms-plan', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/staff/comms-sketch', () =>
@@ -46,7 +46,7 @@ function setup(freigaben: ModulFreigaben) {
         stand: null,
       }),
     ),
-    http.get('/api/einsaetze/7/mitglieder', () => {
+    http.get('/api/einsaetze/7/members', () => {
       abrufe.mitglieder += 1;
       return HttpResponse.json([]);
     }),

@@ -144,7 +144,7 @@ async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
     prioritaet: 'dringend',
   });
   await eintreffen(saecke.id);
-  const antwort = await api.get(`/api/einsaetze/${demo.id}/einheiten`);
+  const antwort = await api.get(`/api/einsaetze/${demo.id}/units`);
   expect(antwort.ok(), `Einheiten: ${antwort.status()}`).toBe(true);
   const staffel = ((await antwort.json()) as { id: number; name: string }[]).find(
     (e) => e.name === 'Rettungsstaffel',
@@ -196,9 +196,9 @@ async function einheitNachforderung(
     label: art,
     sortier: 90,
   });
-  const raum = (
-    await lies<{ id: number; bezeichnung: string }[]>(`${basis}/bereitstellungsraeume`)
-  ).find((r) => r.bezeichnung === 'Parkplatz Stadion Nord');
+  const raum = (await lies<{ id: number; bezeichnung: string }[]>(`${basis}/staging-areas`)).find(
+    (r) => r.bezeichnung === 'Parkplatz Stadion Nord',
+  );
   expect(raum, 'Demo-Bereitstellungsraum „Parkplatz Stadion Nord“ fehlt').toBeTruthy();
   const nf = await fuelle<{ id: number }>(api, 'post', `${basis}/resource-requests`, {
     art,
@@ -214,7 +214,7 @@ async function einheitNachforderung(
     await fuelle(api, 'post', `${basis}/resource-requests/${nf.id}/status`, { status });
   }
   if (uebernommen > 0) {
-    await fuelle(api, 'post', `${basis}/einheiten/aus-nachforderung`, {
+    await fuelle(api, 'post', `${basis}/units/from-resource-request`, {
       nachforderung_id: nf.id,
       einheiten: rufnamen.slice(0, uebernommen).map((name) => ({ name })),
       typ_id: typ.id,

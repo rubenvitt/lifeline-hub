@@ -92,7 +92,7 @@ test('LFH-892: widerrufen → „Kopplung beendet“, der Code gilt nicht noch e
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const { einsatz, uhs } = await einsatzMitUhs(page);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatz}/geraete`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatz}/devices`, {
     data: { ansicht: 'uhs-tablet', uhs_id: uhs, bezeichnung: 'Tablet 1' },
   });
   expect(antwort.ok(), `Kopplung: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

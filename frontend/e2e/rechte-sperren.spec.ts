@@ -38,7 +38,7 @@ const zugriff = (page: Page) => page.getByRole('region', { name: 'Zugriff' });
 function zaehleRollenPuts(page: Page): { anzahl: number } {
   const zaehler = { anzahl: 0 };
   page.on('request', (r) => {
-    if (r.method() === 'PUT' && /\/api\/einsaetze\/\d+\/mitglieder\/\d+$/.test(r.url())) {
+    if (r.method() === 'PUT' && /\/api\/einsaetze\/\d+\/members\/\d+$/.test(r.url())) {
       zaehler.anzahl += 1;
     }
   });

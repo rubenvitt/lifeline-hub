@@ -82,7 +82,7 @@ impl Ziel {
         let b = format!("/api/einsaetze/{einsatz}");
         match self {
             Ziel::Abschnitt(id) => format!("{b}/sectors/{id}/talk-groups/{sg}"),
-            Ziel::Einheit(id) => format!("{b}/einheiten/{id}/sprechgruppen/{sg}"),
+            Ziel::Einheit(id) => format!("{b}/units/{id}/talk-groups/{sg}"),
             Ziel::Fuehrungsstelle => format!("{b}/command-post/talk-groups/{sg}"),
             Ziel::Stelle(id) => {
                 format!("{b}/staff/comms-plan/positions/{id}/talk-groups/{sg}")
@@ -113,7 +113,7 @@ impl Ziel {
             Ziel::Abschnitt(id) | Ziel::Einheit(id) => {
                 let pfad = match self {
                     Ziel::Abschnitt(_) => format!("{b}/sectors"),
-                    _ => format!("{b}/einheiten"),
+                    _ => format!("{b}/units"),
                 };
                 let (_, json) = anfrage(app, "GET", &pfad, cookie, None).await;
                 let eintrag = json
@@ -299,7 +299,7 @@ async fn gleiches_live_und_etb_ausser_an_der_stelle() {
         anfrage_json(
             &a.app,
             "PATCH",
-            &format!("{b}/einheiten/{id}"),
+            &format!("{b}/units/{id}"),
             &a.admin,
             Some(&ids),
         )

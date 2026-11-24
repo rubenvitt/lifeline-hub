@@ -127,7 +127,7 @@ function stelleBereit({
     http.get('/api/einsaetze/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([e])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([e])),
     http.get('/api/einsaetze/7/sectors', () => {
       abgerufen.push('abschnitte');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
@@ -142,7 +142,7 @@ function stelleBereit({
       quittiert.push(`${params.aid}/${params.eid}`);
       return HttpResponse.json(stand.auftraege[0]);
     }),
-    http.put('/api/einsaetze/7/einheiten/5/status', async ({ request }) => {
+    http.put('/api/einsaetze/7/units/5/status', async ({ request }) => {
       status.push(await request.json());
       return HttpResponse.json(e);
     }),
@@ -409,9 +409,7 @@ describe('Einheitengerät — Melden', () => {
 
   it('meldet auch, wenn die Einheitenliste nicht kommt', async () => {
     const { gesendet } = stelleBereit();
-    server.use(
-      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json(null, { status: 500 })),
-    );
+    server.use(http.get('/api/einsaetze/7/units', () => HttpResponse.json(null, { status: 500 })));
     renderApp('/geraet/7/melden');
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Lage ruhig');

@@ -41,8 +41,8 @@ function aufzeichnen(ablehnen?: { methode: string; pfad: string }) {
     http.post('/api/shift-models', record),
     http.put('/api/shift-models/:id', record),
     http.delete('/api/shift-models/:id', record),
-    http.get('/api/einsaetze/:id/abloesungen/schichtmodell', record),
-    http.put('/api/einsaetze/:id/abloesungen/schichtmodell', record),
+    http.get('/api/einsaetze/:id/reliefs/shift-model', record),
+    http.put('/api/einsaetze/:id/reliefs/shift-model', record),
   );
   return seen;
 }
@@ -74,9 +74,9 @@ describe('api/schichtmodelle (LLH-1122)', () => {
       'POST /api/shift-models {"bezeichnung":"Hochwasser","typ":"wechselzeiten","wechselzeiten":["06:00","18:00"],"mindestdauer_minuten":240,"ist_vorgabe":false}',
       'PUT /api/shift-models/3 {"bezeichnung":"SanD","typ":"rhythmus","rhythmus_minuten":360,"ist_vorgabe":true}',
       'DELETE /api/shift-models/3',
-      'GET /api/einsaetze/7/abloesungen/schichtmodell',
-      'PUT /api/einsaetze/7/abloesungen/schichtmodell {"schichtmodell_id":3}',
-      'PUT /api/einsaetze/7/abloesungen/schichtmodell {"schichtmodell":null}',
+      'GET /api/einsaetze/7/reliefs/shift-model',
+      'PUT /api/einsaetze/7/reliefs/shift-model {"schichtmodell_id":3}',
+      'PUT /api/einsaetze/7/reliefs/shift-model {"schichtmodell":null}',
     ]);
   });
 

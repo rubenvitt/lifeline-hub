@@ -259,7 +259,7 @@ sequenceDiagram
   participant DB as SQLite
   participant G as frontend Gerät (frontend/src/geraet)
   participant Hub as LiveHub
-  EL->>BE: POST /api/einsaetze/{id}/geraete {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
+  EL->>BE: POST /api/einsaetze/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
@@ -268,7 +268,7 @@ sequenceDiagram
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
   G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
   BE->>BE: CurrentUser: fordere_geraeteroute gegen die Routenliste
-  EL->>BE: POST …/geraete/{gid}/widerrufen
+  EL->>BE: POST …/devices/{gid}/revoke
   BE->>Hub: melde_kopplung_ende
   Hub-->>G: Strom endet, KopplungBeendetPage
 ```

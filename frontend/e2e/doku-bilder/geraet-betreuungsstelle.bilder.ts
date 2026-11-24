@@ -71,7 +71,7 @@ async function stellenTablet(page: Page, browser: Browser) {
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/geraete`,
+    `/api/einsaetze/${demo.id}/devices`,
     { ansicht: 'betreuungsstelle', stelle_id: stelle.id, bezeichnung: 'Tablet Aula' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });

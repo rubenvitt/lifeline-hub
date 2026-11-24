@@ -65,7 +65,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &w.pfad("abloesungen"),
+        &w.pfad("reliefs"),
         &w.admin,
         Some(
             &json!({
@@ -103,7 +103,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad("einheiten"),
+            &self.pfad("units"),
             &self.admin,
             Some(&json!({ "name": name }).to_string()),
         )
@@ -117,7 +117,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PATCH",
-            &self.pfad(&format!("abloesungen/{}", self.schicht)),
+            &self.pfad(&format!("reliefs/{}", self.schicht)),
             &self.admin,
             Some(&json!({ "abloesende_einheit_id": self.abloeser }).to_string()),
         )
@@ -130,7 +130,7 @@ impl Welt {
         let (s, z) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("einheiten/{einheit}/zeitachse")),
+            &self.pfad(&format!("units/{einheit}/timeline")),
             &self.admin,
             Some(&json!({ "art": art, "zeitpunkt_at": wire_vor(vor_minuten) }).to_string()),
         )
@@ -145,7 +145,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &self.pfad(&format!("einheiten/{einheit}/zeitachse/{zid}/streichen")),
+            &self.pfad(&format!("units/{einheit}/timeline/{zid}/strike")),
             &anna,
             Some(r#"{"grund":"falsche Einheit erfasst"}"#),
         )
@@ -302,7 +302,7 @@ async fn gestrichene_entlassung_der_abloesenden_einheit_meldet_wiederhergestellt
         w.empfaenger("abloeser_wiederhergestellt").await,
         vec![w.admin_id, w.bert, w.carl]
     );
-    let (s, v) = anfrage(&w.app, "GET", &w.pfad("abloesungen"), &w.admin, None).await;
+    let (s, v) = anfrage(&w.app, "GET", &w.pfad("reliefs"), &w.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let v = v
         .as_array()

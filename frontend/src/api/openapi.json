@@ -4714,7 +4714,7 @@
       },
       "BrAbrufErgebnis": {
         "type": "object",
-        "description": "Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2).",
+        "description": "Antwort von `POST …/staging-areas/{bid}/dispatch` (LLH-1085, design.md D2).",
         "required": [
           "abruf",
           "mitgenommen"
@@ -5237,7 +5237,7 @@
       },
       "BrVerlaufEintrag": {
         "type": "object",
-        "description": "Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec\n`bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).",
+        "description": "Ein Eintrag im Verlauf eines Raums (`GET …/staging-areas/{bid}/history`, Spec\n`bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).",
         "required": [
           "id",
           "zeitpunkt_at",
@@ -6224,7 +6224,7 @@
               "string",
               "null"
             ],
-            "description": "Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur\n`GET …/einheiten?aufgeloeste=1` liefert aufgelöste."
+            "description": "Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur\n`GET …/units?aufgeloeste=1` liefert aufgelöste."
           },
           "aufgeloest_von": {
             "type": [
@@ -6290,7 +6290,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/LetzteBesetzung",
-                "description": "Wer und was beim Auflösen dazugehörte (LLH-1266, Change\n`oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/einheiten?aufgeloeste=1`\nfüllt es; es fehlt an aktiven Einheiten und an solchen, die aufgelöst wurden, bevor das\nSystem die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit."
+                "description": "Wer und was beim Auflösen dazugehörte (LLH-1266, Change\n`oq1yp0k5-aufgeloeste-einheit-lesend`, design.md D2). Nur `GET …/units?aufgeloeste=1`\nfüllt es; es fehlt an aktiven Einheiten und an solchen, die aufgelöst wurden, bevor das\nSystem die Besetzung festhielt. Stärke und Mitgliederlisten zählen es nie mit."
               },
               {
                 "type": "null"
@@ -6644,7 +6644,7 @@
             }
           }
         ],
-        "description": "Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für\n„Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986)."
+        "description": "Antwort von `PUT …/units/{eid}/status`: die Einheit wie bisher, dazu der Beleg für\n„Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986)."
       },
       "EinheitStatusQuelle": {
         "type": "string",
@@ -7313,7 +7313,7 @@
               "string",
               "null"
             ],
-            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.\nNur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.\nNur `GET …/vehicles?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
           },
           "beendet_von": {
             "type": [
@@ -7736,7 +7736,7 @@
               "string",
               "null"
             ],
-            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.\nNur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
+            "description": "Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.\nNur `GET …/personnel?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene."
           },
           "beendet_von": {
             "type": [
@@ -8516,7 +8516,7 @@
       },
       "EintreffenEingabe": {
         "type": "object",
-        "description": "Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von\n`kraft`, `unangemeldet` und `vorlage` (LLH-1300).",
+        "description": "Körper von `POST …/staging-areas/{bid}/arrival` (design.md D1). Genau eines von\n`kraft`, `unangemeldet` und `vorlage` (LLH-1300).",
         "properties": {
           "client_id": {
             "type": [
@@ -8859,7 +8859,7 @@
           },
           "ist": {
             "$ref": "#/components/schemas/Staerke",
-            "description": "Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`."
+            "description": "Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/units`."
           },
           "ist_kumuliert": {
             "$ref": "#/components/schemas/Staerke",
@@ -8902,7 +8902,7 @@
       },
       "EntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722).",
+        "description": "Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722).",
         "required": [
           "fahrzeug",
           "vorzustand"
@@ -8918,7 +8918,7 @@
       },
       "EntlassungRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).",
+        "description": "Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722).",
         "required": [
           "fahrzeug",
           "ausgelassen"
@@ -8937,7 +8937,7 @@
       },
       "EntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
+        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
         "required": [
           "entlassen_at"
         ],
@@ -10008,7 +10008,7 @@
             }
           }
         ],
-        "description": "Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der\nBeleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781)."
+        "description": "Antwort des Status-PATCH (`PATCH …/vehicles/{ef_id}`): das Fahrzeug wie bisher, dazu der\nBeleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781)."
       },
       "FahrzeugStatus": {
         "type": "object",
@@ -11216,7 +11216,7 @@
       },
       "HandStatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/undo` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "gesetzt_at"
         ],
@@ -14819,7 +14819,7 @@
       },
       "MaterialEntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923).",
+        "description": "Antwort von `POST …/material/{em_id}/stand-down` (LLH-1923).",
         "required": [
           "material",
           "vorzustand"
@@ -14835,7 +14835,7 @@
       },
       "MaterialEntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
+        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an\n`…/stand-down/undo` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
         "required": [
           "entlassen_at"
         ],
@@ -14899,7 +14899,7 @@
       },
       "MaterialRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
+        "description": "Antwort von `POST …/material/{em_id}/stand-down/undo` (LLH-1923): was nicht\nzurückkam, steht in `ausgelassen`.",
         "required": [
           "material",
           "ausgelassen"
@@ -14929,7 +14929,7 @@
       },
       "MaterialStatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "status",
           "gesetzt_at"
@@ -17750,7 +17750,7 @@
       },
       "PersonalEntlassungAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922).",
+        "description": "Antwort von `POST …/personnel/{ep_id}/stand-down` (LLH-1922).",
         "required": [
           "personal",
           "vorzustand"
@@ -17766,7 +17766,7 @@
       },
       "PersonalEntlassungRuecknahmeAntwort": {
         "type": "object",
-        "description": "Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922).",
+        "description": "Antwort von `POST …/personnel/{ep_id}/stand-down/undo` (LLH-1922).",
         "required": [
           "personal",
           "ausgelassen"
@@ -17785,7 +17785,7 @@
       },
       "PersonalEntlassungVorzustand": {
         "type": "object",
-        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
+        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
         "required": [
           "entlassen_at"
         ],
@@ -17862,7 +17862,7 @@
             }
           }
         ],
-        "description": "Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu\nder Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986)."
+        "description": "Antwort des PATCH einer Disposition (`PATCH …/personnel/{ep_id}`): die Kraft wie bisher, dazu\nder Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986)."
       },
       "PersonalStatus": {
         "type": "object",
@@ -21092,7 +21092,7 @@
       },
       "StatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "status_id",
           "status_seit"
@@ -21727,7 +21727,7 @@
       },
       "UebernahmeBody": {
         "type": "object",
-        "description": "Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional.",
+        "description": "Körper von `POST …/units/{eid}/take-over` (LLH-1075, design.md D10): beide optional.",
         "properties": {
           "abschnitt_id": {
             "type": [

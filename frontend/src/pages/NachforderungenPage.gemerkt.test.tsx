@@ -153,7 +153,7 @@ describe('NachforderungenPage rendert gemerkt (LFH-949)', () => {
               ],
         ),
       ),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     );
     const zehn = Array.from({ length: 10 }, (_, i) =>

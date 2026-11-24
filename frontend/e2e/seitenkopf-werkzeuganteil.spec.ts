@@ -38,12 +38,12 @@ async function einsatzMitListen(page: Page): Promise<string> {
   await anlegen(
     page,
     einsatzId,
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: FAHRZEUG, fahrzeugtyp: 'LF 20' } },
     'Fahrzeug',
   );
-  await anlegen(page, einsatzId, 'personal', { adhoc: { name: KRAFT } }, 'Kraft');
-  await anlegen(page, einsatzId, 'einheiten', { name: EINHEIT }, 'Einheit');
+  await anlegen(page, einsatzId, 'personnel', { adhoc: { name: KRAFT } }, 'Kraft');
+  await anlegen(page, einsatzId, 'units', { name: EINHEIT }, 'Einheit');
   await anlegen(
     page,
     einsatzId,

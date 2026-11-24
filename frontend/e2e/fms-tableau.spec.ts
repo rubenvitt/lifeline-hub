@@ -40,16 +40,16 @@ async function seede(page: Page): Promise<number> {
   });
   const basis = `/api/einsaetze/${einsatzId}`;
   const abschnittId = await post(page, `${basis}/sectors`, { name: ABSCHNITT });
-  const einheitId = await post(page, `${basis}/einheiten`, {
+  const einheitId = await post(page, `${basis}/units`, {
     name: EINHEIT,
     abschnitt_id: abschnittId,
   });
-  const efId = await post(page, `${basis}/fahrzeuge`, {
+  const efId = await post(page, `${basis}/vehicles`, {
     adhoc: { funkrufname: FAHRZEUG_EINHEIT, fahrzeugtyp: 'LF 20' },
   });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheitId}/fahrzeug/${efId}`);
+  const zuordnung = await page.request.put(`${basis}/units/${einheitId}/vehicles/${efId}`);
   expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
-  await post(page, `${basis}/fahrzeuge`, { adhoc: { funkrufname: FAHRZEUG_FREI } });
+  await post(page, `${basis}/vehicles`, { adhoc: { funkrufname: FAHRZEUG_FREI } });
   return einsatzId;
 }
 

@@ -156,7 +156,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, einheit) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         Some(&format!(r#"{{"name":"RTW 1","typ_id":{typ_id}}}"#)),
     )
@@ -165,7 +165,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     assert_eq!(einheit["quali_soll_eigen"], false);
     assert_eq!(einheit["quali_soll"][0]["label"], "Rettungssanitäter");
     let eid = einheit["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{einsatz}/einheiten/{eid}");
+    let pfad = format!("/api/einsaetze/{einsatz}/units/{eid}");
     let (s, json) = anfrage(
         &app,
         "PATCH",

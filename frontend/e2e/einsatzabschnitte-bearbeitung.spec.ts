@@ -72,7 +72,7 @@ for (const dichte of DICHTEN) {
     test('Leiter setzen: an der Zeile, genau `leiter_id`', async ({ page }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1208 Leiter ${dichte} ${Date.now()}`);
       await anlegen(page, einsatzId, 'sectors', { name: 'Abschnitt Nord' }, 'Abschnitt');
-      await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Carla Christ' } }, 'Personal');
+      await anlegen(page, einsatzId, 'personnel', { adhoc: { name: 'Carla Christ' } }, 'Personal');
       await ladeInDichte(page, `/einsaetze/${einsatzId}/einsatzabschnitte`, dichte);
       const bodies = recordWrites(page, einsatzId);
 

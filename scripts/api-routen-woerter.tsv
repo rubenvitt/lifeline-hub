@@ -17,11 +17,13 @@ alarm	Alarmmeldung
 also-local	auch lokal
 animals	Tiere
 annul	stornieren
+annul-takeover	Übernahme stornieren
 api	-
 app-code	-
 archive	Archiv
 area	Fläche
 areas	Bereiche
+arrival	Eintreffen
 assessment	Beurteilung
 assign	zuweisen
 attachments	Anhänge
@@ -75,13 +77,16 @@ confirm	bestätigen
 confirmers	Bestätiger
 connections	Verbindungen
 contact-person	Bezugsperson
+correct	berichtigen
 count	Anzahl
 countersign	gegenzeichnen
 counts	Zähler
+crew	Besatzung
 damages	Schäden
 deactivate	deaktivieren
 decision	Entscheidung
 decline	ablehnen
+defaults	Vorgaben
 demo-data	Demo-Daten
 departures	Abmeldungen
 dev	-
@@ -89,6 +94,7 @@ devices	Geräte
 diets	Kostformen
 discard	verwerfen
 discoverable	-
+dispatch	Abruf
 distribution	Verteiler
 distributions	Ausgaben
 districts	Bezirke
@@ -105,7 +111,9 @@ evacuation	Evakuierung
 events	-
 execution	Vollzug
 existing	vorhandene
+expected	erwartet
 export	-
+extend	verlängern
 external	extern
 external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
@@ -117,12 +125,14 @@ forces	Kräfte
 forecast	Prognose
 free-symbols	freie Zeichen
 from-attachment	aus Anhang
+from-resource-request	aus Nachforderung
 from-template	aus Vorlage
 gauges	Pegel
 generate	erzeugen
 glyphs	-
 grant	Freigabe
 hand-over	übergeben
+handovers	Wechsel
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
@@ -149,6 +159,7 @@ keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
 layout	Anordnung
+limits	Grenzwerte
 list-accesses	Listenzugriffe
 live	-
 login	-
@@ -160,12 +171,14 @@ map	Karte
 map-views	Kartenansichten
 marker	-
 master-data	Stammdaten
+master-data-matches	Stamm-Treffer
 matches	Abgleich
 material	Material
 material-categories	Materialkategorien
 matrix	-
 me	-
 member-selection	Mitglied-Auswahl
+members	Mitglieder
 messages	Nachrichten
 metrics	Kennzahlen
 mirror	Spiegel
@@ -200,6 +213,7 @@ pair	koppeln
 pairings	Kopplungen
 password	Passwort
 pause	anhalten
+period	Periode
 person-search	Personensuche
 personnel	Personal
 personnel-statuses	Personalstatus
@@ -208,6 +222,7 @@ persons	Personen
 place-preview	Ortsvorschau
 place-search	Ortssuche
 plan	-
+plan-template	Planvorlage
 plans	Planungen
 position	-
 positions	Stellen
@@ -224,6 +239,7 @@ proxy	-
 qualifications	Qualifikationen
 raster	-
 rating	Bewertung
+reactivate	reaktivieren
 read	gelesen
 read-marker	Lesemarke
 reason	Anlass
@@ -248,6 +264,7 @@ reports	Meldungen
 request	Antrag, anfragen
 requests	Anträge
 reset	-
+resource-request	Nachforderung
 resource-requests	Nachforderungen
 restore	wiederherstellen
 resume	fortsetzen
@@ -268,6 +285,7 @@ sessions	Sitzungen
 set	festlegen
 settings	Einstellungen
 shell	-
+shift-model	Schichtmodell
 shift-models	Schichtmodelle
 shift-plan	Schichtplan
 signing-keys	Unterschriftsschlüssel
@@ -280,17 +298,21 @@ situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
+split	aufteilen
 sprite	-
 sprites	-
 staff	Stab
 staging-areas	Bereitstellungsräume
+stand-down	entlassen
 start	-
 state	Stand
 status	-
 storage	Datenträger
+strike	streichen
 style.json	-
 subscription	Abo
 system	-
+take-over	übernehmen
 talk-groups	Sprechgruppen
 task	Auftrag
 tasks	Aufträge
@@ -300,6 +322,7 @@ tile	-
 tilejson	-
 tiles	-
 time-slots	Zeitfenster
+timeline	Zeitachse
 title-block	Schriftfeld
 totp	-
 transfer	Übernahme

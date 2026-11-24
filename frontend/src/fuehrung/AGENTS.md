@@ -29,11 +29,11 @@ Zuordnung „Funktion → Name“ gibt es nicht. Server: Auflösung (`fuehrung::
 `einsatz::MeineFelder`; „meine Stelle“ im Überblick liest die eigene Funktion von dort,
 `openspec/changes/archive/2026-11-10-pkjvl5iy-eigene-stelle-alle-funktionen/design.md` D1), ETB-Snapshot (`einsatz::funktion`,
 nur Kürzel bzw. Standardlabel, nie die Bezeichnung). Client: nur über
-`fuehrung/besetzungAusMitgliedern.ts` aus `GET …/mitglieder` (Organigramm, Fernmeldeskizze,
+`fuehrung/besetzungAusMitgliedern.ts` aus `GET …/members` (Organigramm, Fernmeldeskizze,
 Kommunikationsplan, Eigene Lage, Einsatzbericht, Empfängerfelder, Chat-Erwähnungen). Kein
 Modulrecht: die Mitgliederliste liest jedes Mitglied. Mehrere Träger einer Funktion gelten alle,
 Namen alphabetisch mit „, “ (`namensliste` hier und im Server). Gekoppelte Geräte bekommen keine
 Auflösung, ein geschwärzter Einsatz keinen Namen (`einsatz.geschwaerzt_at`). Wire-Form
 `AktuelleBesetzung`/`BesetzungsZustand` bleibt; erzeugt werden nur `personal` und `nicht_vergeben`.
-Live: `PUT`/`DELETE …/mitglieder/…` verteilt `mitglieder` (Gate Einsatz-Lesezugriff) neben
+Live: `PUT`/`DELETE …/members/…` verteilt `mitglieder` (Gate Einsatz-Lesezugriff) neben
 `einsatz`; der Client invalidiert damit Mitglieder, Aufträge, Erinnerungen und Modulzähler.

@@ -172,16 +172,17 @@ for (const modus of ['light', 'dark']) {
       expect(r.ok(), await r.text()).toBeTruthy();
       faelle.push({ modul: 'material', kennung, rolle });
     }
-    for (const [modul, katalog, feld] of [
-      ['fahrzeuge', 'vehicle-statuses', 'funkrufname'],
-      ['personal', 'personnel-statuses', 'name'],
+    // Modulschlüssel deutsch, Pfadsegment englisch (ADR-0085).
+    for (const [modul, segment, katalog, feld] of [
+      ['fahrzeuge', 'vehicles', 'vehicle-statuses', 'funkrufname'],
+      ['personal', 'personnel', 'personnel-statuses', 'name'],
     ] as const) {
       const neutral = `Messkraft ${modul} neutral`;
-      const neutralId = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: neutral } });
+      const neutralId = await post(page, `${basis}/${segment}`, { adhoc: { [feld]: neutral } });
       // Die API-Typen erlauben einen fehlenden Status, neue Dispositionen erhalten aber einen
       // Default, den PATCH nicht löschen kann. Nur diesen Null-Fall injizieren; alles andere
       // kommt aus der Test-DB.
-      await page.route(`**${basis}/${modul}`, async (route) => {
+      await page.route(`**${basis}/${segment}`, async (route) => {
         const antwort = await route.fetch();
         const zeilen = (await antwort.json()) as { id: number }[];
         await route.fulfill({
@@ -208,8 +209,8 @@ for (const modus of ['light', 'dark']) {
           kategorie: 'verfuegbar',
           farbe,
         });
-        const id = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: kennung } });
-        const r = await page.request.patch(`${basis}/${modul}/${id}`, {
+        const id = await post(page, `${basis}/${segment}`, { adhoc: { [feld]: kennung } });
+        const r = await page.request.patch(`${basis}/${segment}/${id}`, {
           data: { status_id: statusId },
         });
         expect(r.ok(), await r.text()).toBeTruthy();
@@ -329,7 +330,7 @@ for (const modus of ['light', 'dark'] as const) {
     });
     const basis = `/api/einsaetze/${einsatzId}`;
     // Ohne Daten rendert die Verdichtungszeile `null` und das Band einen Leerzustand.
-    await post(page, `${basis}/personal`, { adhoc: { name: 'Messkraft 515' } });
+    await post(page, `${basis}/personnel`, { adhoc: { name: 'Messkraft 515' } });
 
     // Je Kategorie ein Fahrzeug mit passendem Katalogstatus, sonst blieben zwei Töne
     // ungemessen. Das Band zählt EINHEITEN (Status aus ihren Fahrzeugen abgeleitet), also
@@ -340,15 +341,15 @@ for (const modus of ['light', 'dark'] as const) {
     for (const [i, { kategorie }] of BAND_KATEGORIEN.entries()) {
       const status = katalog.find((k) => k.kategorie === kategorie);
       expect(status, `Katalog ohne Status der Kategorie ${kategorie}`).toBeDefined();
-      const id = await post(page, `${basis}/fahrzeuge`, {
+      const id = await post(page, `${basis}/vehicles`, {
         adhoc: { funkrufname: `Florian Musterstadt 3/44-${i + 1}` },
       });
-      const r = await page.request.patch(`${basis}/fahrzeuge/${id}`, {
+      const r = await page.request.patch(`${basis}/vehicles/${id}`, {
         data: { status_id: status!.id },
       });
       expect(r.ok(), await r.text()).toBeTruthy();
-      const einheit = await post(page, `${basis}/einheiten`, { name: `Messeinheit ${i + 1}` });
-      const z = await page.request.put(`${basis}/einheiten/${einheit}/fahrzeug/${id}`);
+      const einheit = await post(page, `${basis}/units`, { name: `Messeinheit ${i + 1}` });
+      const z = await page.request.put(`${basis}/units/${einheit}/vehicles/${id}`);
       expect(z.ok(), await z.text()).toBeTruthy();
     }
 

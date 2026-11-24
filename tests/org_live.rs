@@ -456,7 +456,7 @@ async fn entferntes_mitglied_erfaehrt_die_aenderung_noch() {
     let (status, json) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{eid}/mitglieder/{}", b.mitglied_id),
+        &format!("/api/einsaetze/{eid}/members/{}", b.mitglied_id),
         &admin,
         None,
     )

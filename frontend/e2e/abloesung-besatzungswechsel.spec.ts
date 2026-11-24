@@ -59,29 +59,29 @@ test('Ablösung: Besatzungswechsel planen, verteilt vollziehen und zurücknehmen
     const text = await antwort.text();
     return (text ? JSON.parse(text) : {}) as { id: number };
   };
-  await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
-  const f1 = await sende('post', 'einheiten', { name: 'Florian 1' }, 'Florian 1');
+  await sende('put', 'reliefs/shift-model', { schichtmodell: null }, 'keine Vorgabe');
+  const f1 = await sende('post', 'units', { name: 'Florian 1' }, 'Florian 1');
   const g1 = await sende(
     'post',
-    'einheiten',
+    'units',
     { name: 'Gruppe 1', ueber_einheit_id: f1.id },
     'Gruppe 1',
   );
   await sende(
     'post',
-    `einheiten/${f1.id}/zeitachse`,
+    `units/${f1.id}/timeline`,
     { art: 'eintreffen', zeitpunkt_at: draht(120) },
     'Eintreffen',
   );
-  const fz = await sende('post', 'fahrzeuge', { adhoc: { funkrufname: 'Florian 1-44' } }, 'Fz');
-  await sende('put', `einheiten/${g1.id}/fahrzeug/${fz.id}`, {}, 'Fahrzeug an Gruppe 1');
-  const anna = await sende('post', 'personal', { adhoc: { name: 'Anna Alt' } }, 'Anna');
-  await sende('put', `einheiten/${f1.id}/personal/${anna.id}`, {}, 'Anna an Florian 1');
-  const cora = await sende('post', 'personal', { adhoc: { name: 'Cora Neu' } }, 'Cora');
-  await sende('post', 'personal', { adhoc: { name: 'Dirk Neu' } }, 'Dirk');
-  await sende('post', 'abloesungen', { einheit_id: f1.id, rhythmus_minuten: 360 }, 'Schicht');
+  const fz = await sende('post', 'vehicles', { adhoc: { funkrufname: 'Florian 1-44' } }, 'Fz');
+  await sende('put', `units/${g1.id}/vehicles/${fz.id}`, {}, 'Fahrzeug an Gruppe 1');
+  const anna = await sende('post', 'personnel', { adhoc: { name: 'Anna Alt' } }, 'Anna');
+  await sende('put', `units/${f1.id}/personnel/${anna.id}`, {}, 'Anna an Florian 1');
+  const cora = await sende('post', 'personnel', { adhoc: { name: 'Cora Neu' } }, 'Cora');
+  await sende('post', 'personnel', { adhoc: { name: 'Dirk Neu' } }, 'Dirk');
+  await sende('post', 'reliefs', { einheit_id: f1.id, rhythmus_minuten: 360 }, 'Schicht');
   const person = async (id: number) => {
-    const antwort = await page.request.get(`${basis}/personal`);
+    const antwort = await page.request.get(`${basis}/personnel`);
     return ((await antwort.json()) as Person[]).find((p) => p.id === id);
   };
 

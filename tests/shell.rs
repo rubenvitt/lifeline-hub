@@ -122,7 +122,7 @@ async fn gekoppeltes_geraet_erreicht_den_vertrag() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &admin,
         Some(&json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"})),
     )

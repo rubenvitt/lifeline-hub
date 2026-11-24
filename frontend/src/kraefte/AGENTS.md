@@ -20,7 +20,7 @@ Disponieren (LLH-1263, `src/routes/zeitachse.rs`): danach ist keine Periode offe
 das ETB vermerkt „berichtigt nach Entlassung“, die stornierte Person und die aufgelöste Einheit
 bleiben bei 409; der Client sperrt das Streichen der abschließenden Entlassung
 (`abschliessendeEntlassungId`). Die Rücknahme der Entlassung einer Person (LLH-1922,
-`…/personal/{ep}/entlassen/zuruecknehmen`, `src/personal/ruecknahme.rs`) streicht genau die
+`…/personnel/{ep}/stand-down/undo`, `src/personal/ruecknahme.rs`) streicht genau die
 Entlassung dieses Entlassens (Quelle `disposition`, Grund „Entlassung zurückgenommen“), nachdem
 die Person wieder aktiv ist: die Periode davor ist wieder offen, eine neue entsteht nicht. Ist
 die Zeitachse der Person seit dem Entlassen berichtigt (ein Ereignis seitdem gestrichen oder

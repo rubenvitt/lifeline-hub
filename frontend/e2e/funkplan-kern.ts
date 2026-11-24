@@ -54,23 +54,23 @@ export async function seede(page: Page, einsatzId: string) {
     kurzbezeichnung: KURZ,
     sprechgruppe_ids: [tmo, dmo],
   });
-  const einheit = await post('einheiten', {
+  const einheit = await post('units', {
     name: EINHEIT,
     funkrufname: EINHEIT_RUF,
     abschnitt_id: abschnitt,
     verbindungen: [{ mittel: 'mobil', wert: TELEFON }],
   });
-  const fahrzeug = await post('fahrzeuge', {
+  const fahrzeug = await post('vehicles', {
     adhoc: { funkrufname: FAHRZEUG, fahrzeugtyp: 'HLF 20' },
   });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheit}/fahrzeug/${fahrzeug}`);
+  const zuordnung = await page.request.put(`${basis}/units/${einheit}/vehicles/${fahrzeug}`);
   expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
-  const fuehrer = await post('personal', {
+  const fuehrer = await post('personnel', {
     adhoc: { name: FUEHRER, staerke_position: 'fuehrer' },
   });
-  const besatzung = await page.request.put(`${basis}/fahrzeuge/${fahrzeug}/besatzung/${fuehrer}`);
+  const besatzung = await page.request.put(`${basis}/vehicles/${fahrzeug}/crew/${fuehrer}`);
   expect(besatzung.ok(), `Besatzung: ${await besatzung.text()}`).toBeTruthy();
-  await post('fahrzeuge', { adhoc: { funkrufname: 'Florian ELW 1' } });
+  await post('vehicles', { adhoc: { funkrufname: 'Florian ELW 1' } });
   return { einheit, abschnitt };
 }
 
@@ -116,13 +116,13 @@ export async function seedeSprechgruppen(page: Page, einsatzId: string) {
     kurzbezeichnung: KURZ,
     sprechgruppe_ids: [tmo, dmo],
   });
-  const einheit = await post('einheiten', {
+  const einheit = await post('units', {
     name: EINHEIT,
     funkrufname: EINHEIT_RUF,
     abschnitt_id: abschnitt,
     sprechgruppe_ids: [tmo],
   });
-  await post('einheiten', {
+  await post('units', {
     name: EINHEIT_ZWEI,
     funkrufname: 'Florian Musterstadt 2/10',
     abschnitt_id: abschnitt,

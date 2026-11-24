@@ -48,11 +48,11 @@ function standardHandler(freigaben = freigabenFixture()) {
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/vehicles', () => HttpResponse.json(POOL)),
-    http.get('/api/einsaetze/1/fahrzeuge', ({ request }) =>
+    http.get('/api/einsaetze/1/vehicles', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? ENTLASSEN : AKTIV),
     ),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
-    http.post('/api/einsaetze/1/fahrzeuge/sammel', async ({ request }) => {
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json(EINHEITEN)),
+    http.post('/api/einsaetze/1/vehicles/bulk', async ({ request }) => {
       const body = (await request.json()) as { fahrzeug_ids: number[] };
       bodies.push(body);
       return HttpResponse.json(
@@ -152,7 +152,7 @@ describe('FahrzeugeDisponierenModal', () => {
   it('nennt den Grund am Fahrzeug im Dialog und behält die Auswahl', async () => {
     standardHandler();
     server.use(
-      http.post('/api/einsaetze/1/fahrzeuge/sammel', () =>
+      http.post('/api/einsaetze/1/vehicles/bulk', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Kräfte lassen sich disponieren',

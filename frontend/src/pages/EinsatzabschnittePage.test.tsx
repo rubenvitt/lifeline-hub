@@ -136,8 +136,8 @@ function handlers(
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(abschnitte)),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
   ];
 }
@@ -232,7 +232,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -333,7 +333,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([
           einheit(1, 'Sanitätszug', 5, null, [1, 0, 2], [1, 1, 3]),
           einheit(2, 'Sanitätsgruppe UHS', 6, 1, [0, 1, 1], [0, 1, 1]),
@@ -399,7 +399,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () =>
+      http.get('/api/einsaetze/1/units', () =>
         HttpResponse.json([
           einheit(1, 'Zug Nord', 5, null, [1, 0, 2], [1, 1, 3]),
           einheit(2, 'Gruppe Nord', null, 1, [0, 1, 1], [0, 1, 1]),
@@ -650,7 +650,7 @@ describe('EinsatzabschnittePage', () => {
   it('Abschnittsleiter ablösen: genau `leiter_id` geht hinaus (LFH-1208)', async () => {
     // Der erste passende Handler gewinnt: das Personal steht vor der Grundausstattung.
     server.use(
-      http.get('/api/einsaetze/1/personal', () =>
+      http.get('/api/einsaetze/1/personnel', () =>
         HttpResponse.json([
           { id: 3, name: 'Carla Christ' },
           { id: 4, name: 'Dora Dreher' },
@@ -1310,7 +1310,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
 
   it('ohne Abschnitte behauptet es keine leere Lage, solange die Einheiten fehlen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })),
       ...handlers('einsatzleitung', 'aktiv', []),
       ...organigrammHandler,
     );
@@ -1341,7 +1341,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
   it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', async () => {
     // Der erste passende Handler gewinnt: der Fehler muss vor der Grundausstattung stehen.
     server.use(
-      http.get('/api/einsaetze/1/einheiten', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })),
       ...handlers(),
       ...organigrammHandler,
     );
@@ -1610,14 +1610,14 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
     const einheitPatches: { id: number; body: unknown }[] = [];
     server.use(
       // Vor den Grund-Handlern: MSW nimmt den ersten passenden.
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
       ...handlers(rolle, 'aktiv', [nord, nordOst, sued]),
       http.patch('/api/einsaetze/1/sectors/:aid', async ({ request, params }) => {
         const body = await request.json();
         abschnittPatches.push({ id: Number(params.aid), body });
         return HttpResponse.json({ ...nordOst, ...(body as object) });
       }),
-      http.patch('/api/einsaetze/1/einheiten/:eid', async ({ request, params }) => {
+      http.patch('/api/einsaetze/1/units/:eid', async ({ request, params }) => {
         const body = await request.json();
         einheitPatches.push({ id: Number(params.eid), body });
         return HttpResponse.json({ ...zug, ...(body as object) });
@@ -1924,8 +1924,8 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       const { einheitPatches } = mitPatches();
       let stand = { ...zug };
       server.use(
-        http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([stand])),
-        http.patch('/api/einsaetze/1/einheiten/:eid', async ({ request, params }) => {
+        http.get('/api/einsaetze/1/units', () => HttpResponse.json([stand])),
+        http.patch('/api/einsaetze/1/units/:eid', async ({ request, params }) => {
           const body = (await request.json()) as {
             abschnitt_id: number | null;
             erwartet?: { abschnitt_id: number | null };

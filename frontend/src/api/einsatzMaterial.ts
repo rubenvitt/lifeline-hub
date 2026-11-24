@@ -156,7 +156,7 @@ export function nimmMaterialStatuswechselZurueck(
   beleg: MaterialStatusRuecknahmeBeleg,
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/status/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/status/undo`,
     'POST',
     beleg,
   );
@@ -176,7 +176,7 @@ export function teileAuf(
   ort?: MaterialOrtPatch | null,
 ): Promise<[EinsatzMaterial, EinsatzMaterial]> {
   return apiSend<[EinsatzMaterial, EinsatzMaterial]>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/aufteilen`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/split`,
     'POST',
     { menge, ...ort },
   );
@@ -195,7 +195,7 @@ export function verknuepfeNachforderung(
   ergaenzen: boolean,
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/nachforderung`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/resource-request`,
     'POST',
     { nachforderung_id: nachforderungId, ...(ergaenzen ? { ergaenzen: true } : {}) },
   );
@@ -207,7 +207,7 @@ export function verknuepfeNachforderung(
  */
 export function loeseNachforderung(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/nachforderung`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/resource-request`,
     'DELETE',
   );
 }
@@ -230,7 +230,7 @@ export function nimmAusDemEinsatz(
   emId: number,
 ): Promise<MaterialEntlassungAntwort> {
   return apiSend<MaterialEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/entlassen`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down`,
     'POST',
   );
 }
@@ -247,7 +247,7 @@ export function nimmHerausnahmeZurueck(
   vorzustand: MaterialEntlassungVorzustand,
 ): Promise<MaterialRuecknahmeAntwort> {
   return apiSend<MaterialRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/entlassen/zuruecknehmen`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down/undo`,
     'POST',
     vorzustand,
   );
@@ -255,13 +255,13 @@ export function nimmHerausnahmeZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Ort (LLH-1224) in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, emId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}/stornieren`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}/annul`, 'POST');
 }
 
 /** Herausgenommenes oder storniertes Material erneut disponieren (Block „Aus dem Einsatz genommen“). */
 export function reaktiviereDisposition(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/reaktivieren`,
+    `/api/einsaetze/${einsatzId}/material/${emId}/reactivate`,
     'POST',
   );
 }

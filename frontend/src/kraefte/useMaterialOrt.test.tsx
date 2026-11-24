@@ -107,7 +107,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
   function renderTeile() {
     const gesendet: { url: string; body: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:emId/aufteilen', async ({ request }) => {
+      http.post('/api/einsaetze/1/material/:emId/split', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
         return HttpResponse.json([{}, {}]);
       }),
@@ -126,7 +126,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
     const { teileAufNach, gesendet } = renderTeile();
     await teileAufNach(posten({ einheit_id: 2 }), 20, { art: 'uhs', id: 7 });
     expect(gesendet).toEqual([
-      { url: '/api/einsaetze/1/material/10/aufteilen', body: { menge: 20, uhs_id: 7 } },
+      { url: '/api/einsaetze/1/material/10/split', body: { menge: 20, uhs_id: 7 } },
     ]);
   });
 

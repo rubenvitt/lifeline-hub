@@ -189,6 +189,6 @@ test.describe(KAPITEL, () => {
     await expect(strom).toContainText('Gartenweg');
     await expect(nordZeile.locator('[data-lfh="kanal-ungelesen"]')).toHaveCount(0);
     await evaApi.dispose();
-    await fuelle(page, 'delete', `${basis}/mitglieder/${evaId}`);
+    await fuelle(page, 'delete', `${basis}/members/${evaId}`);
   });
 });

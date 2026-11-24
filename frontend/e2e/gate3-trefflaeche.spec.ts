@@ -1135,11 +1135,11 @@ test('Kräfteübersicht: Umschalter, Filterzeile und Suchfeld folgen der Dichte-
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Meldebild`);
 
   // Ohne Kräfte hat das Meldebild keinen Baum und der Suchfilter nichts zu treffen.
-  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
+  await anlegen(page, einsatzId, 'personnel', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
   await anlegen(
     page,
     einsatzId,
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: 'Florian Musterstadt 1/44-1' } },
     'Fahrzeug',
   );
@@ -1205,11 +1205,11 @@ test('Kräfteübersicht (Beobachter): Umschalter, Suchfeld und „Filter zurück
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Meldebild Lesend`);
-  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
+  await anlegen(page, einsatzId, 'personnel', { adhoc: { name: 'Messkraft Gate3' } }, 'Personal');
   await anlegen(
     page,
     einsatzId,
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: 'Florian Musterstadt 1/44-2' } },
     'Fahrzeug',
   );
@@ -1284,14 +1284,14 @@ test('Verdichtungszeile: der Meldebild-Link folgt der Dichte-Staffel 30 / 48 / 7
   await anlegen(
     page,
     einsatzId,
-    'personal',
+    'personnel',
     { adhoc: { name: 'Messkraft Verdichtung' } },
     'Personal',
   );
   await anlegen(
     page,
     einsatzId,
-    'fahrzeuge',
+    'vehicles',
     { adhoc: { funkrufname: 'Florian Musterstadt 2/44-1' } },
     'Fahrzeug',
   );
@@ -1388,7 +1388,7 @@ async function messeBesatzungsAusloeser(
 async function besatzungEinsatz(page: Page, bezeichnung: string): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, bezeichnung);
   for (const funkrufname of BESATZUNG_FAHRZEUGE) {
-    await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+    await anlegen(page, einsatzId, 'vehicles', { adhoc: { funkrufname } }, 'Fahrzeug');
   }
   return einsatzId;
 }
@@ -1416,7 +1416,7 @@ test('Fahrzeuge: der Statusknopf ist sichtbar so hoch wie die Dichte-Staffel 30 
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Statusknopf`);
   const funkrufname = 'Florian Musterstadt 3/83-1';
-  await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, 'Fahrzeug');
+  await anlegen(page, einsatzId, 'vehicles', { adhoc: { funkrufname } }, 'Fahrzeug');
 
   const gemessen: string[] = [];
   for (const { dichte, soll } of STAFFEL) {
@@ -1751,10 +1751,10 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
     return ((await antwort.json()) as { id: number }).id;
   };
   const abschnitt = await post('sectors', { name: 'Abschnitt Nord' });
-  const einheit = await post('einheiten', { name: '1. Zug', abschnitt_id: abschnitt });
-  const fahrzeug = await post('fahrzeuge', { adhoc: { funkrufname: 'Florian 1/42-1' } });
+  const einheit = await post('units', { name: '1. Zug', abschnitt_id: abschnitt });
+  const fahrzeug = await post('vehicles', { adhoc: { funkrufname: 'Florian 1/42-1' } });
   const zuordnung = await page.request.put(
-    `/api/einsaetze/${einsatzId}/einheiten/${einheit}/fahrzeug/${fahrzeug}`,
+    `/api/einsaetze/${einsatzId}/units/${einheit}/vehicles/${fahrzeug}`,
   );
   expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
   return { einheit };
@@ -1916,12 +1916,12 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
   await anlegen(
     page,
     einsatzId,
-    'einheiten',
+    'units',
     { name: '1. Gruppe', ueber_einheit_id: einheit },
     'Untereinheit',
   );
   // Eine freie Kraft: das Meldebild trägt dann die Sammelzeile „Ohne Einheit“ als nackten Text.
-  await anlegen(page, einsatzId, 'personal', { adhoc: { name: 'Messkraft Baum' } }, 'Personal');
+  await anlegen(page, einsatzId, 'personnel', { adhoc: { name: 'Messkraft Baum' } }, 'Personal');
 
   const gemessen: string[] = [];
   for (const { modul, bereich, knoepfe, vergleich } of BAUMTABELLEN) {
@@ -2313,8 +2313,8 @@ async function organigrammSaeen(page: Page, einsatzId: string) {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: nord,
   });
-  await post('einheiten', { name: '1. Zug', abschnitt_id: nord });
-  await post('einheiten', { name: 'Gruppe Deich', abschnitt_id: deich });
+  await post('units', { name: '1. Zug', abschnitt_id: nord });
+  await post('units', { name: 'Gruppe Deich', abschnitt_id: deich });
 }
 
 async function messeOrganigramm(page: Page, soll: number, dichte: string, schreibend: boolean) {
@@ -2430,8 +2430,8 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
   };
   const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
-    const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
-    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
+    const einheit = await post('units', { name, abschnitt_id: abschnitt.id }, name);
+    await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
   }
 
   const gemessen: string[] = [];
@@ -2488,8 +2488,8 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
   };
   const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
   for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
-    const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
-    await post('abloesungen', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
+    const einheit = await post('units', { name, abschnitt_id: abschnitt.id }, name);
+    await post('reliefs', { einheit_id: einheit.id, rhythmus_minuten: 360 }, `Schicht ${name}`);
   }
   await wechsleZuRolle(page, 'beobachter', einsatzId);
 
@@ -5572,14 +5572,14 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
   const E = `/api/einsaetze/${einsatzId}`;
   // Drei einheitenlose Fahrzeuge: eine Gruppe „Fahrzeuge ohne Einheit“, Zeile an Zeile.
   for (const funkrufname of ['Florian BR 1', 'Florian BR 2', 'Florian BR 3']) {
-    await anlegen(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname } }, funkrufname);
+    await anlegen(page, einsatzId, 'vehicles', { adhoc: { funkrufname } }, funkrufname);
   }
-  const br = await page.request.post(`${E}/bereitstellungsraeume`, {
+  const br = await page.request.post(`${E}/staging-areas`, {
     data: { bezeichnung: 'BR Festplatz' },
   });
   expect(br.ok(), `Seeding BR: ${br.status()} ${await br.text()}`).toBe(true);
   const { id: brId } = (await br.json()) as { id: number };
-  const aktiv = await page.request.post(`${E}/bereitstellungsraeume/${brId}/status`, {
+  const aktiv = await page.request.post(`${E}/staging-areas/${brId}/status`, {
     data: { status: 'aktiv' },
   });
   expect(aktiv.ok(), 'Vorbedingung: der BR ist in Betrieb, sonst fehlen die Zuweisungen').toBe(
@@ -5664,10 +5664,10 @@ test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entla
     expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const einheitId = await post('einheiten', { name: 'Messeinheit Ansicht' });
-  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const einheitId = await post('units', { name: 'Messeinheit Ansicht' });
+  const epId = await post('personnel', { adhoc: { name: KRAFT_ANSICHT } });
   const zu = await page.request.put(
-    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+    `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`,
   );
   expect(zu.ok(), await zu.text()).toBeTruthy();
 
@@ -5734,10 +5734,10 @@ test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziel
     expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const einheitId = await post('einheiten', { name: 'Messeinheit Lesend' });
-  const epId = await post('personal', { adhoc: { name: KRAFT_ANSICHT } });
+  const einheitId = await post('units', { name: 'Messeinheit Lesend' });
+  const epId = await post('personnel', { adhoc: { name: KRAFT_ANSICHT } });
   const zu = await page.request.put(
-    `/api/einsaetze/${einsatzId}/einheiten/${einheitId}/personal/${epId}`,
+    `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`,
   );
   expect(zu.ok(), await zu.text()).toBeTruthy();
   await wechsleZuRolle(page, 'beobachter', einsatzId);
@@ -5841,7 +5841,7 @@ async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
 
 async function seedPersonal(page: Page, einsatzId: string) {
   for (const name of ['Messkraft Kopf A', 'Messkraft Kopf B']) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
       data: { adhoc: { name } },
     });
     expect(antwort.ok(), `Seeding ${name}: ${await antwort.text()}`).toBeTruthy();

@@ -145,8 +145,8 @@ describe('api/fernmeldeskizze — Einzel-Zuordnungen (D5)', () => {
     expect(a).toEqual([
       { methode: 'PUT', pfad: `${E}/sectors/1/talk-groups/31`, body: undefined },
       { methode: 'DELETE', pfad: `${E}/sectors/1/talk-groups/31`, body: undefined },
-      { methode: 'PUT', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
-      { methode: 'DELETE', pfad: `${E}/einheiten/10/sprechgruppen/31`, body: undefined },
+      { methode: 'PUT', pfad: `${E}/units/10/talk-groups/31`, body: undefined },
+      { methode: 'DELETE', pfad: `${E}/units/10/talk-groups/31`, body: undefined },
       { methode: 'PUT', pfad: `${E}/command-post/talk-groups/31`, body: undefined },
       { methode: 'DELETE', pfad: `${E}/command-post/talk-groups/31`, body: undefined },
       // Nur die externe Stelle trägt einen Status (D7); fehlt er, ist sie bestehend.

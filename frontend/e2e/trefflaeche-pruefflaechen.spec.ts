@@ -984,18 +984,18 @@ async function gliederungSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
   const nord = await seed(page, `${E}/sectors`, { name: 'Abschnitt Nord' });
   await seed(page, `${E}/sectors`, { name: 'UA Nord 1', ueber_abschnitt_id: nord.id });
-  await seed(page, `${E}/einheiten`, { name: 'Zug 1', abschnitt_id: nord.id });
-  await seed(page, `${E}/einheiten`, { name: 'Zug frei' });
-  await seed(page, `${E}/fahrzeuge`, { adhoc: { funkrufname: 'Florian Süd 2' } });
-  const br = await seed(page, `${E}/bereitstellungsraeume`, { bezeichnung: 'BR Sportplatz' });
-  await seed(page, `${E}/bereitstellungsraeume`, { bezeichnung: 'BR Schule' });
-  const status = await page.request.post(`${E}/bereitstellungsraeume/${br.id}/status`, {
+  await seed(page, `${E}/units`, { name: 'Zug 1', abschnitt_id: nord.id });
+  await seed(page, `${E}/units`, { name: 'Zug frei' });
+  await seed(page, `${E}/vehicles`, { adhoc: { funkrufname: 'Florian Süd 2' } });
+  const br = await seed(page, `${E}/staging-areas`, { bezeichnung: 'BR Sportplatz' });
+  await seed(page, `${E}/staging-areas`, { bezeichnung: 'BR Schule' });
+  const status = await page.request.post(`${E}/staging-areas/${br.id}/status`, {
     data: { status: 'aktiv' },
   });
   // Eine bereitgestellte Einheit trägt „Abrufen“ und das Aktionsmenü der Zeile (LLH-1085).
-  const bereit = await seed(page, `${E}/einheiten`, { name: 'Zug BR' });
+  const bereit = await seed(page, `${E}/units`, { name: 'Zug BR' });
   if (status.ok()) {
-    await seed(page, `${E}/bereitstellungsraeume/${br.id}/belegung`, {
+    await seed(page, `${E}/staging-areas/${br.id}/occupancy`, {
       objekt_typ: 'einheit',
       objekt_id: bereit.id,
       art: 'eintritt',
@@ -1290,7 +1290,7 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen 
 
 async function materialSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  const einheit = await seed(page, `${E}/einheiten`, { name: 'Staffel Ost' });
+  const einheit = await seed(page, `${E}/units`, { name: 'Staffel Ost' });
   const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
   const verortet = await seed(page, `${E}/material`, {
     adhoc: { bezeichnung: 'Wolldecke' },
@@ -1380,10 +1380,10 @@ test('C14 · Materialliste (Beobachter): Schreibaktionen fehlen, die Ort-Links h
 
 async function materialAmOrtSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  const einheit = await seed(page, `${E}/einheiten`, { name: 'Staffel West' });
-  const fahrzeug = await seed(page, `${E}/fahrzeuge`, { adhoc: { funkrufname: 'Florian 15' } });
+  const einheit = await seed(page, `${E}/units`, { name: 'Staffel West' });
+  const fahrzeug = await seed(page, `${E}/vehicles`, { adhoc: { funkrufname: 'Florian 15' } });
   const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
-  const br = await seed(page, `${E}/bereitstellungsraeume`, { bezeichnung: 'BR West' });
+  const br = await seed(page, `${E}/staging-areas`, { bezeichnung: 'BR West' });
   const orte = [
     ['Einheit', { einheit_id: einheit.id }],
     ['Fahrzeug', { einsatz_fahrzeug_id: fahrzeug.id }],

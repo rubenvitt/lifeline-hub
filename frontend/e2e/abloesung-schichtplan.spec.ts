@@ -63,11 +63,11 @@ test('Schichtplan: Block aufziehen, verschieben, Kante ziehen, Person ziehen', a
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const streife = await sende('einheiten', { name: 'Streife 2' });
-  const rtw = await sende('einheiten', { name: 'RTW 1' });
-  await sende('personal', { adhoc: { name: 'Anna Plan' } });
+  const streife = await sende('units', { name: 'Streife 2' });
+  const rtw = await sende('units', { name: 'RTW 1' });
+  await sende('personnel', { adhoc: { name: 'Anna Plan' } });
   const bloecke = async () => {
-    const antwort = await page.request.get(`${basis}/abloesungen/schichtplan`);
+    const antwort = await page.request.get(`${basis}/reliefs/shift-plan`);
     return ((await antwort.json()) as { bloecke: Block[] }).bloecke;
   };
 
@@ -158,11 +158,11 @@ test('Schichtplan: derselbe Ablauf nur mit der Tastatur', async ({ page }) => {
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const streife = await sende('einheiten', { name: 'Streife 3' });
+  const streife = await sende('units', { name: 'Streife 3' });
   const uhs = await sende('uhs', { bezeichnung: 'UHS Markt', typ: 'behandlungsplatz' });
-  await sende('personal', { adhoc: { name: 'Ben Plan' } });
+  await sende('personnel', { adhoc: { name: 'Ben Plan' } });
   const bloecke = async () => {
-    const antwort = await page.request.get(`${basis}/abloesungen/schichtplan`);
+    const antwort = await page.request.get(`${basis}/reliefs/shift-plan`);
     return ((await antwort.json()) as { bloecke: Block[] }).bloecke;
   };
 
@@ -238,12 +238,12 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const streife = await sende('einheiten', { name: 'Streife 4' });
-  const rtw = await sende('einheiten', { name: 'RTW 4' });
-  const ktw = await sende('einheiten', { name: 'KTW 4' });
-  const cara = await sende('personal', { adhoc: { name: 'Cara Plan' } });
+  const streife = await sende('units', { name: 'Streife 4' });
+  const rtw = await sende('units', { name: 'RTW 4' });
+  const ktw = await sende('units', { name: 'KTW 4' });
+  const cara = await sende('personnel', { adhoc: { name: 'Cara Plan' } });
   const bloecke = async () => {
-    const antwort = await page.request.get(`${basis}/abloesungen/schichtplan`);
+    const antwort = await page.request.get(`${basis}/reliefs/shift-plan`);
     return (
       (await antwort.json()) as {
         bloecke: (Block & { soll_anzahl?: number | null; notiz?: string | null })[];
@@ -255,7 +255,7 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
   // beginnt zwei Stunden vor jetzt, er steht also im Raster.
   const wire = (t: number) => new Date(t).toISOString().slice(0, 19).replace('T', ' ');
   const stunde = Math.ceil(Date.now() / (60 * MIN)) * 60 * MIN;
-  const original = await sende('abloesungen/schichtplan/bloecke', {
+  const original = await sende('reliefs/shift-plan/blocks', {
     posten: { art: 'einheit', einheit_id: streife.id },
     von: wire(stunde),
     bis: wire(stunde + 60 * MIN),
@@ -364,14 +364,14 @@ test('Schichtplan (LLH-1600): Kontextmenü eines Blocks — kopieren, bearbeiten
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  const streife = await sende('einheiten', { name: 'Streife 6' });
+  const streife = await sende('units', { name: 'Streife 6' });
   const bloecke = async () => {
-    const antwort = await page.request.get(`${basis}/abloesungen/schichtplan`);
+    const antwort = await page.request.get(`${basis}/reliefs/shift-plan`);
     return ((await antwort.json()) as { bloecke: Block[] }).bloecke;
   };
   const wire = (t: number) => new Date(t).toISOString().slice(0, 19).replace('T', ' ');
   const stunde = Math.ceil(Date.now() / (60 * MIN)) * 60 * MIN;
-  await sende('abloesungen/schichtplan/bloecke', {
+  await sende('reliefs/shift-plan/blocks', {
     posten: { art: 'einheit', einheit_id: streife.id },
     von: wire(stunde),
     bis: wire(stunde + 60 * MIN),
@@ -468,8 +468,8 @@ test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nich
     ).toBeTruthy();
     return (await antwort.json()) as { id: number };
   };
-  await sende('einheiten', { name: 'Streife 2' });
-  await sende('abloesungen/schichtplan/bloecke', {
+  await sende('units', { name: 'Streife 2' });
+  await sende('reliefs/shift-plan/blocks', {
     posten: { art: 'pause' },
     von: wireZeit5(Date.now()),
     bis: wireZeit5(Date.now() + 2 * 60 * MIN),
@@ -488,7 +488,7 @@ test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nich
   await unterZeiger.hover();
   const vorher = (await unterZeiger.boundingBox())!;
 
-  const ktw = await sende('einheiten', { name: 'KTW 9' });
+  const ktw = await sende('units', { name: 'KTW 9' });
 
   const banner = page.locator('[data-lfh="schichtplan-schleuse"] [data-lfh="sammelbanner"]');
   await expect(banner, 'die neue Einheit wartet hinter dem Banner').toContainText('1 neuer Posten');

@@ -95,12 +95,12 @@ test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LL
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/kraefteuebersicht$`));
 
   const einheiten = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/einheiten`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/units`)
   ).json()) as { id: number; name: string }[];
   const staffel = einheiten.find((e) => e.name === v.staffel);
   expect(staffel, 'Staffel gebildet').toBeTruthy();
   const fahrzeuge = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/fahrzeuge`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/vehicles`)
   ).json()) as { id: number; funkrufname: string }[];
   const rtw1 = fahrzeuge.find((f) => f.funkrufname === v.fahrzeuge.rtw1);
   const posten = (await (

@@ -122,7 +122,7 @@ export const server = setupServer(
    * nächsten und stellte ihn auf „offline“ (LLH-1412). Tests mit Fahrzeugen überschreiben per
    * `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/fahrzeuge', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/vehicles', () => HttpResponse.json([])),
   http.get('/api/external-agencies', () => HttpResponse.json([])),
   /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
@@ -199,10 +199,10 @@ export const server = setupServer(
    * Meldebild, Einheit-Detail und Personal-Seite fragen sie beim Mount ab; Tests mit Perioden
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/einheiten/zeitachse', () => HttpResponse.json([])),
-  http.get('/api/einsaetze/:einsatzId/personal/zeitachse', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/units/timeline', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/personnel/timeline', () => HttpResponse.json([])),
   // Grenzwerte der Einstufung (LLH-730): die Vorgaben des Schichtplans, wie ohne eigenen Wert.
-  http.get('/api/einsaetze/:einsatzId/:modul/zeitachse/grenzwerte', () =>
+  http.get('/api/einsaetze/:einsatzId/:modul/timeline/limits', () =>
     HttpResponse.json({
       max_dienst_minuten: 720,
       min_ruhe_minuten: 480,
@@ -210,7 +210,7 @@ export const server = setupServer(
       min_ruhe_eigen: false,
     }),
   ),
-  http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/zeitachse', () =>
+  http.get('/api/einsaetze/:einsatzId/:modul/:kraftId/timeline', () =>
     HttpResponse.json({ ereignisse: [], perioden: [] }),
   ),
   /**
@@ -263,7 +263,7 @@ export const server = setupServer(
    * fragen sie beim Mount ab; ohne Handler scheitert der Abruf an der Leitung, und die Seite
    * steht auf „offline“. Tests mit Mitgliedern überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/mitglieder', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/members', () => HttpResponse.json([])),
   /**
    * Stab eines Einsatzes — 403 als Default: der echte Zustand ohne Stab-Freigabe, aus dem die
    * Vorschläge „keine Besetzung lesbar“ machen. Tests des Stabs überschreiben per `server.use()`.
@@ -277,26 +277,24 @@ export const server = setupServer(
    * per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([])),
-  http.get('/api/einsaetze/:einsatzId/einheiten', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/units', () => HttpResponse.json([])),
   /**
    * Bereitstellungsräume — leer als Default, ein echter Serverzustand. Die Lagekarte fragt sie mit
    * Freigabe `bereitstellungsraeume` ab (Ebene „Bereitstellungsräume", LLH-1107); Tests mit Räumen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/staging-areas', () => HttpResponse.json([])),
   /**
    * Erwartete Kräfte eines Raums aus Nachforderungen (LLH-1387) — keine als Default. Der Dialog
    * „Eintreffen buchen“ fragt sie beim Öffnen ab; Tests mit Nachforderungen überschreiben per
    * `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume/:brId/erwartet', () =>
-    HttpResponse.json([]),
-  ),
+  http.get('/api/einsaetze/:einsatzId/staging-areas/:brId/expected', () => HttpResponse.json([])),
   /**
    * Stamm-Treffer eines Raums (LLH-1300) — keine als Default. Der Dialog „Eintreffen buchen“ fragt
    * sie ab drei Zeichen ab; Tests mit Vorlagen überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/bereitstellungsraeume/:brId/stamm-treffer', () =>
+  http.get('/api/einsaetze/:einsatzId/staging-areas/:brId/master-data-matches', () =>
     HttpResponse.json([]),
   ),
   /**

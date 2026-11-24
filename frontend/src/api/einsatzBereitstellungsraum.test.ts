@@ -25,7 +25,7 @@ describe('Bereitstellungsraum — Abruf und Rücknahme', () => {
       auftrag_text: 'Riegelstellung Nord',
       ausgerueckt: true,
     });
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume/9/abruf', 'POST', {
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9/dispatch', 'POST', {
       objekt_typ: 'einheit',
       objekt_id: 12,
       abschnitt_id: 3,
@@ -37,11 +37,10 @@ describe('Bereitstellungsraum — Abruf und Rücknahme', () => {
   it('nimmt den Abruf eines Fahrzeugs zurück', async () => {
     const send = aufrufe();
     await hebtBrAbrufAuf(4, 9, { objekt_typ: 'fahrzeug', objekt_id: 5 });
-    expect(send).toHaveBeenCalledWith(
-      '/api/einsaetze/4/bereitstellungsraeume/9/abruf/aufheben',
-      'POST',
-      { objekt_typ: 'fahrzeug', objekt_id: 5 },
-    );
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9/dispatch/void', 'POST', {
+      objekt_typ: 'fahrzeug',
+      objekt_id: 5,
+    });
   });
 });
 
@@ -52,7 +51,7 @@ describe('Bereitstellungsraum — Koordinate', () => {
   it('PATCH nur Koordinate sendet genau lat und lon', async () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     await aktualisiereBr(4, 9, { lat: 51.93, lon: 8.87 });
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume/9', 'PATCH', {
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9', 'PATCH', {
       lat: 51.93,
       lon: 8.87,
     });
@@ -63,7 +62,7 @@ describe('Bereitstellungsraum — Koordinate', () => {
   it('Verortung entfernen sendet beide als null', async () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     await aktualisiereBr(4, 9, { lat: null, lon: null });
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume/9', 'PATCH', {
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9', 'PATCH', {
       lat: null,
       lon: null,
     });
@@ -77,7 +76,7 @@ describe('Bereitstellungsraum — Koordinate', () => {
       lat: 51.93,
       lon: 8.87,
     });
-    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/bereitstellungsraeume', 'POST', {
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas', 'POST', {
       bezeichnung: 'BR Sportplatz',
       standort: 'Sportplatz Nord',
       lat: 51.93,
@@ -94,7 +93,7 @@ describe('Bereitstellungsraum — Eintreffen', () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     await bucheEintreffen(4, 9, { kraft: { objekt_typ: 'einheit', objekt_id: 12 } });
     expect(send).toHaveBeenCalledWith(
-      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
+      '/api/einsaetze/4/staging-areas/9/arrival',
       'POST',
       { kraft: { objekt_typ: 'einheit', objekt_id: 12 } },
       undefined,
@@ -110,7 +109,7 @@ describe('Bereitstellungsraum — Eintreffen', () => {
     };
     await bucheEintreffen(4, 9, { unangemeldet });
     expect(send).toHaveBeenCalledWith(
-      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
+      '/api/einsaetze/4/staging-areas/9/arrival',
       'POST',
       { unangemeldet },
       undefined,
@@ -121,11 +120,8 @@ describe('Bereitstellungsraum — Eintreffen', () => {
     const send = vi.spyOn(client, 'apiSend').mockResolvedValue({} as never);
     const daten = { kraft: { objekt_typ: 'einheit' as const, objekt_id: 12 }, client_id: 'e1' };
     await bucheEintreffen(4, 9, daten, { offlineQueueBenutzerId: 11 });
-    expect(send).toHaveBeenCalledWith(
-      '/api/einsaetze/4/bereitstellungsraeume/9/eintreffen',
-      'POST',
-      daten,
-      { offlineQueueBenutzerId: 11 },
-    );
+    expect(send).toHaveBeenCalledWith('/api/einsaetze/4/staging-areas/9/arrival', 'POST', daten, {
+      offlineQueueBenutzerId: 11,
+    });
   });
 });

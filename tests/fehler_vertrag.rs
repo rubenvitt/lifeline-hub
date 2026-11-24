@@ -302,7 +302,7 @@ async fn ablehnung_je_zeile_liefert_422_im_fehler_envelope_mit_zeilen() {
     let einsatz = common::einsatz_anlegen(&app, &admin).await;
     let req = Request::builder()
         .method("POST")
-        .uri(format!("/api/einsaetze/{einsatz}/personal/sammel"))
+        .uri(format!("/api/einsaetze/{einsatz}/personnel/bulk"))
         .header(header::CONTENT_TYPE, "application/json")
         .header(header::COOKIE, &admin)
         .body(Body::from(r#"{"personal_ids":[424242]}"#))

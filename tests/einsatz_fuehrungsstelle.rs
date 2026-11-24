@@ -391,7 +391,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(&json!({"adhoc": {"funkrufname": funkrufname, "fahrzeugtyp": "ELW 2"}})),
     )
@@ -483,7 +483,7 @@ async fn entlassen_loest_die_zuordnung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -507,7 +507,7 @@ async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{elw}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -552,7 +552,7 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
                 &admin,
                 None,
             )
@@ -1201,7 +1201,7 @@ async fn entlassene_person_bleibt_mit_vermerk() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )
@@ -1244,7 +1244,7 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -1610,7 +1610,7 @@ async fn liste_traegt_den_vermerk_einer_entlassenen_person() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )

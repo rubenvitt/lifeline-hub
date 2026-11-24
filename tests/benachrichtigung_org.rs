@@ -1,6 +1,6 @@
 //! Benachrichtigungen der Org-Ebene (Change `kcjecn9e-benachrichtigungskonzept`, tasks.md
 //! Gruppe 15, Spec `benachrichtigungen`, „Aufnahme in einen Einsatz“ und „Neuer Einsatz“): die
-//! Schreibwege `PUT /api/einsaetze/{id}/mitglieder/{benutzer_id}` und `POST /api/einsaetze`
+//! Schreibwege `PUT /api/einsaetze/{id}/members/{benutzer_id}` und `POST /api/einsaetze`
 //! melden über `benachrichtigung::melden` in den Org-Kanal (`org_benachrichtigung`), nur an ihre
 //! Empfänger. Geprüft wird auch die Gegenseite: wer nichts bekommt (Auslöser, Nutzer ohne
 //! Leserecht am Einsatz, fremde Org), dass ein Rollenwechsel oder eine wiederholte Anfrage nicht
@@ -68,7 +68,7 @@ async fn mitglied_setzen(
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{benutzer_id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{benutzer_id}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -188,7 +188,7 @@ async fn rollenwechsel_und_wiederholung_melden_nicht_erneut() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{anna}"),
+        &format!("/api/einsaetze/{einsatz}/members/{anna}"),
         &admin,
         None,
     )
@@ -222,7 +222,7 @@ async fn abgewiesene_aufnahme_meldet_nicht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{anna}"),
+        &format!("/api/einsaetze/{einsatz}/members/{anna}"),
         &admin,
         Some(r#"{"einsatz_rolle":"beobachter"}"#),
     )

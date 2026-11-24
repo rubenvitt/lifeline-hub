@@ -92,7 +92,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personal", self.einsatz),
+            &format!("/api/einsaetze/{}/personnel", self.einsatz),
             &self.admin,
             Some(&json!({ "personal_id": v["id"] }).to_string()),
         )

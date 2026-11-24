@@ -29,17 +29,15 @@ async function seed(page: Page) {
     bezeichnung: `E2E Material am Ort ${Date.now()}`,
   });
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheit = await post(page, `${basis}/einheiten`, { name: 'Staffel A' });
-  const fahrzeug = await post(page, `${basis}/fahrzeuge`, { adhoc: { funkrufname: 'Florian 1' } });
-  const zuordnung = await page.request.put(
-    `${basis}/einheiten/${einheit.id}/fahrzeug/${fahrzeug.id}`,
-  );
+  const einheit = await post(page, `${basis}/units`, { name: 'Staffel A' });
+  const fahrzeug = await post(page, `${basis}/vehicles`, { adhoc: { funkrufname: 'Florian 1' } });
+  const zuordnung = await page.request.put(`${basis}/units/${einheit.id}/vehicles/${fahrzeug.id}`);
   expect(zuordnung.ok(), `Fahrzeug zuordnen: ${await zuordnung.text()}`).toBe(true);
   const uhs = await post(page, `${basis}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'Turnhalle',
   });
-  const br = await post(page, `${basis}/bereitstellungsraeume`, { bezeichnung: 'BR Nord' });
+  const br = await post(page, `${basis}/staging-areas`, { bezeichnung: 'BR Nord' });
   await post(page, `${basis}/material`, {
     adhoc: { bezeichnung: 'Trage' },
     einheit_id: einheit.id,
@@ -215,7 +213,7 @@ test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254
 
   // Erst wenn die Einheit neu geladen ist, stünde ohne Halten der fremde Knopf unter dem Zeiger.
   const abgleich = page.waitForResponse(async (r) => {
-    if (r.request().method() !== 'GET' || !/\/einheiten$/.test(new URL(r.url()).pathname)) {
+    if (r.request().method() !== 'GET' || !/\/units$/.test(new URL(r.url()).pathname)) {
       return false;
     }
     const einheiten = (await r.json()) as {

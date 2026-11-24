@@ -1865,7 +1865,7 @@ export interface components {
          * @enum {string}
          */
         BlockZustand: "neu" | "ergaenzt" | "unveraendert" | "fehler";
-        /** @description Antwort von `POST …/bereitstellungsraeume/{bid}/abruf` (LLH-1085, design.md D2). */
+        /** @description Antwort von `POST …/staging-areas/{bid}/dispatch` (LLH-1085, design.md D2). */
         BrAbrufErgebnis: {
             /** @description Das Abruf-Ereignis der abgerufenen Kraft. */
             abruf: components["schemas"]["BrBelegungAnzeige"];
@@ -2097,7 +2097,7 @@ export interface components {
          */
         BrVerlaufArt: "eintritt" | "wechsel_herein" | "wechsel_hinaus" | "austritt" | "abruf" | "abruf_aufgehoben" | "austritt_zurueckgenommen";
         /**
-         * @description Ein Eintrag im Verlauf eines Raums (`GET …/bereitstellungsraeume/{bid}/verlauf`, Spec
+         * @description Ein Eintrag im Verlauf eines Raums (`GET …/staging-areas/{bid}/history`, Spec
          *     `bereitstellungsraum-belegung`, „Verlauf eines Raums lesen“).
          */
         BrVerlaufEintrag: {
@@ -2482,7 +2482,7 @@ export interface components {
             aktueller_br_id?: number | null;
             /**
              * @description Auflösung (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Einheiten. Nur
-             *     `GET …/einheiten?aufgeloeste=1` liefert aufgelöste.
+             *     `GET …/units?aufgeloeste=1` liefert aufgelöste.
              */
             aufgeloest_at?: string | null;
             /** Format: int64 */
@@ -2631,7 +2631,7 @@ export interface components {
             verteilung: components["schemas"]["StatusAnteil"][];
         };
         /**
-         * @description Antwort von `PUT …/einheiten/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
+         * @description Antwort von `PUT …/units/{eid}/status`: die Einheit wie bisher, dazu der Beleg für
          *     „Rückgängig“, wenn der Handstatus gewechselt hat (LLH-1986).
          */
         EinheitStatusAntwort: components["schemas"]["EinheitAnzeige"] & {
@@ -2900,7 +2900,7 @@ export interface components {
             beendet_als?: components["schemas"]["BeendetAls"] | null;
             /**
              * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
-             *     Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+             *     Nur `GET …/vehicles?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
              */
             beendet_at?: string | null;
             /** Format: int64 */
@@ -3077,7 +3077,7 @@ export interface components {
             beendet_als?: components["schemas"]["BeendetAls"] | null;
             /**
              * @description Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Kräften.
-             *     Nur `GET …/personal?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+             *     Nur `GET …/personnel?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
              */
             beendet_at?: string | null;
             /** Format: int64 */
@@ -3377,7 +3377,7 @@ export interface components {
          */
         Einstufung: "planmaessig" | "vorwarnung" | "ueberfaellig";
         /**
-         * @description Körper von `POST …/bereitstellungsraeume/{bid}/eintreffen` (design.md D1). Genau eines von
+         * @description Körper von `POST …/staging-areas/{bid}/arrival` (design.md D1). Genau eines von
          *     `kraft`, `unangemeldet` und `vorlage` (LLH-1300).
          */
         EintreffenEingabe: {
@@ -3509,7 +3509,7 @@ export interface components {
             funkrufname?: string | null;
             /** Format: int64 */
             id: number;
-            /** @description Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/einheiten`. */
+            /** @description Eigene Ist-Stärke, dieselbe Zahl wie in `GET …/units`. */
             ist: components["schemas"]["Staerke"];
             /** @description Eigene plus alle unterstellten Einheiten (`einheit::repo::kumuliere`). */
             ist_kumuliert: components["schemas"]["Staerke"];
@@ -3532,12 +3532,12 @@ export interface components {
          * @enum {string}
          */
         EntlassenAn: "selbst" | "begleitung" | "sorgeberechtigte" | "polizei";
-        /** @description Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722). */
+        /** @description Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722). */
         EntlassungAntwort: {
             fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
             vorzustand: components["schemas"]["EntlassungVorzustand"];
         };
-        /** @description Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722). */
+        /** @description Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722). */
         EntlassungRuecknahmeAntwort: {
             ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
             fahrzeug: components["schemas"]["EinsatzFahrzeugAnzeige"];
@@ -3545,7 +3545,7 @@ export interface components {
         /**
          * @description Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
          *     eines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).
-         *     Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`
          *     zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
          *     Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
          *     Client zu übernehmen.
@@ -4008,7 +4008,7 @@ export interface components {
             traegerorganisation?: string | null;
         };
         /**
-         * @description Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+         * @description Antwort des Status-PATCH (`PATCH …/vehicles/{ef_id}`): das Fahrzeug wie bisher, dazu der
          *     Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
          */
         FahrzeugPatchAntwort: components["schemas"]["EinsatzFahrzeugAnzeige"] & {
@@ -4487,7 +4487,7 @@ export interface components {
         /**
          * @description Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
          *     „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
-         *     und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+         *     und geht als Body an `…/status/undo` zurück. Er trägt nur Prüfwerte: Was
          *     wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         HandStatusRuecknahmeBeleg: {
@@ -5942,7 +5942,7 @@ export interface components {
          * @enum {string}
          */
         MaterialArt: "geraet" | "verbrauchsgut";
-        /** @description Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923). */
+        /** @description Antwort von `POST …/material/{em_id}/stand-down` (LLH-1923). */
         MaterialEntlassungAntwort: {
             material: components["schemas"]["EinsatzMaterialAnzeige"];
             vorzustand: components["schemas"]["MaterialEntlassungVorzustand"];
@@ -5950,8 +5950,8 @@ export interface components {
         /**
          * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
          *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
-         *     D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
-         *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+         *     D1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an
+         *     `…/stand-down/undo` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
          *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
          *     Herausnehmen lässt sie an der Zeile stehen.
          */
@@ -5975,7 +5975,7 @@ export interface components {
             status_ruecknahme?: components["schemas"]["MaterialStatusRuecknahmeBeleg"] | null;
         };
         /**
-         * @description Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
+         * @description Antwort von `POST …/material/{em_id}/stand-down/undo` (LLH-1923): was nicht
          *     zurückkam, steht in `ausgelassen`.
          */
         MaterialRuecknahmeAntwort: {
@@ -5990,7 +5990,7 @@ export interface components {
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
         /**
          * @description Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
-         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück.
          *     Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         MaterialStatusRuecknahmeBeleg: {
@@ -7169,12 +7169,12 @@ export interface components {
             telefon?: string | null;
             traegerorganisation?: string | null;
         };
-        /** @description Antwort von `POST …/personal/{ep_id}/entlassen` (LLH-1922). */
+        /** @description Antwort von `POST …/personnel/{ep_id}/stand-down` (LLH-1922). */
         PersonalEntlassungAntwort: {
             personal: components["schemas"]["EinsatzPersonalAnzeige"];
             vorzustand: components["schemas"]["PersonalEntlassungVorzustand"];
         };
-        /** @description Antwort von `POST …/personal/{ep_id}/entlassen/zuruecknehmen` (LLH-1922). */
+        /** @description Antwort von `POST …/personnel/{ep_id}/stand-down/undo` (LLH-1922). */
         PersonalEntlassungRuecknahmeAntwort: {
             ausgelassen: components["schemas"]["RuecknahmeAusgelassen"][];
             personal: components["schemas"]["EinsatzPersonalAnzeige"];
@@ -7182,7 +7182,7 @@ export interface components {
         /**
          * @description Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
          *     Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
-         *     D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     D1). Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`
          *     zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
          *     Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
          */
@@ -7210,7 +7210,7 @@ export interface components {
             uhs_id?: number | null;
         };
         /**
-         * @description Antwort des PATCH einer Disposition (`PATCH …/personal/{ep_id}`): die Kraft wie bisher, dazu
+         * @description Antwort des PATCH einer Disposition (`PATCH …/personnel/{ep_id}`): die Kraft wie bisher, dazu
          *     der Beleg für „Rückgängig“, wenn der Status gewechselt hat (LLH-1986).
          */
         PersonalPatchAntwort: components["schemas"]["EinsatzPersonalAnzeige"] & {
@@ -8447,7 +8447,7 @@ export interface components {
         /**
          * @description Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
          *     Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
-         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er
+         *     wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück. Er
          *     trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         StatusRuecknahmeBeleg: {
@@ -8716,7 +8716,7 @@ export interface components {
          * @enum {string}
          */
         TrefferGrund: "kennung" | "kennung_name" | "kennung_ohne_name" | "name_telefon" | "name" | "bezug" | "wahl";
-        /** @description Körper von `POST …/einheiten/{eid}/uebernehmen` (LLH-1075, design.md D10): beide optional. */
+        /** @description Körper von `POST …/units/{eid}/take-over` (LLH-1075, design.md D10): beide optional. */
         UebernahmeBody: {
             /** Format: int64 */
             abschnitt_id?: number | null;

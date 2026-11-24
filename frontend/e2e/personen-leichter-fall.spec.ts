@@ -88,7 +88,7 @@ test('LLH-1572: UHS-Tablet ohne Netz — vorgemerkt, mit Netz einmal angelegt un
     bezeichnung: 'UHS Bühne',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: uhs.id,
     bezeichnung: 'Tablet 1',

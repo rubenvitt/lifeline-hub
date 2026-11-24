@@ -97,7 +97,7 @@ function rendere(
       return HttpResponse.json(dokument({ ...(body as object), id: Number(params.dokId) }));
     }),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/etb', () => HttpResponse.json([])),
   );
   const seite = (

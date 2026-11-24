@@ -119,7 +119,7 @@ test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ sc
   test.setTimeout(90_000);
   await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Feld-CAS Einheit ${Date.now()}`);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
     data: { name: 'Trupp 1' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
@@ -131,7 +131,7 @@ test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ sc
     await b.getByRole('button', { name: 'Bemerkung eintragen' }).click();
     await b.getByRole('textbox', { name: 'Bemerkung' }).fill('Halle 2');
 
-    const a = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${eid}`, {
+    const a = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${eid}`, {
       data: { bemerkung: 'Tor 3' },
     });
     expect(a.ok()).toBe(true);

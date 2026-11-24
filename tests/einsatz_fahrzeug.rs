@@ -30,7 +30,7 @@ async fn fahrzeug_disponieren(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -53,7 +53,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
     let (_, personal) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -73,7 +73,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}"),
             &admin,
             None
         )
@@ -84,7 +84,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
     let (_, personal2) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -104,7 +104,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}"),
             &admin,
             None
         )
@@ -115,7 +115,7 @@ async fn besatzung_zuordnen_freigeben_mit_etb() {
     let (_, personal3) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -152,7 +152,7 @@ async fn besatzung_beobachter_darf_nicht_zuordnen() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}"),
             &erika,
             None
         )
@@ -173,7 +173,7 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
         anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}"),
             &admin,
             None
         )
@@ -187,7 +187,7 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+            &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
             &admin,
             None
         )
@@ -198,7 +198,7 @@ async fn fahrzeug_entfernen_gibt_besatzung_frei() {
     let (_, personal) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -227,7 +227,7 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -264,7 +264,7 @@ async fn stamm_fahrzeug_ausser_dienst_ist_422() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -288,7 +288,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &admin,
             Some(&body)
         )
@@ -300,7 +300,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &admin,
             Some(&body)
         )
@@ -319,7 +319,7 @@ async fn adhoc_disposition_ohne_stamm() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
     )
@@ -343,7 +343,7 @@ async fn beobachter_darf_lesen_aber_nicht_disponieren() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &erika,
             None
         )
@@ -356,7 +356,7 @@ async fn beobachter_darf_lesen_aber_nicht_disponieren() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &erika,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -379,7 +379,7 @@ async fn fuehrungspersonal_darf_disponieren_nicht_mitglied_nicht() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &fritz,
             Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#))
         )
@@ -395,7 +395,7 @@ async fn fuehrungspersonal_darf_disponieren_nicht_mitglied_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &norbert,
             None
         )
@@ -427,7 +427,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -444,7 +444,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -465,7 +465,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(&format!(r#"{{"status_id":{am_einsatzort}}}"#)),
     )
@@ -475,7 +475,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -495,7 +495,7 @@ async fn bemerkung_setzen_und_leeren() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -506,7 +506,7 @@ async fn bemerkung_setzen_und_leeren() {
     let (_, gesetzt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":"Tank halb"}"#),
     )
@@ -517,7 +517,7 @@ async fn bemerkung_setzen_und_leeren() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":""}"#),
     )
@@ -545,7 +545,7 @@ async fn disponieren_leerer_body_meldet_entweder_oder() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some("{}"),
     )
@@ -568,7 +568,7 @@ async fn disponieren_beides_meldet_nicht_beides() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&body),
     )
@@ -591,7 +591,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -601,7 +601,7 @@ async fn patch_null_leert_bemerkung() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":"Tank halb"}"#),
     )
@@ -609,7 +609,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":null}"#),
     )
@@ -629,7 +629,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -639,7 +639,7 @@ async fn patch_leerstring_leert_bemerkung() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":"Tank halb"}"#),
     )
@@ -647,7 +647,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":"   "}"#),
     )
@@ -667,7 +667,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -677,7 +677,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{"bemerkung":"Tank halb"}"#),
     )
@@ -685,7 +685,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, unberuehrt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(r#"{}"#),
     )
@@ -708,7 +708,7 @@ async fn status_seit_nur_bei_echtem_statuswechsel() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -736,7 +736,7 @@ async fn status_seit_nur_bei_echtem_statuswechsel() {
             let (s, j) = anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
                 &admin,
                 Some(&body),
             )
@@ -786,7 +786,7 @@ async fn in_einheit(app: &axum::Router, cookie: &str, einsatz: i64, ef: i64) -> 
     let (s, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/fahrzeug/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}/vehicles/{ef}"),
         cookie,
         None,
     )
@@ -813,7 +813,7 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{besetzt}/besatzung/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{besetzt}/crew/{ep}"),
         &admin,
         None,
     )
@@ -823,7 +823,7 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Nord"}"#),
     )
@@ -833,14 +833,14 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
     for (pfad, body) in [
         ("status".to_string(), r#"{"status":"aktiv"}"#.to_string()),
         (
-            "belegung".to_string(),
+            "occupancy".to_string(),
             format!(r#"{{"objekt_typ":"fahrzeug","objekt_id":{im_br},"art":"eintritt"}}"#),
         ),
     ] {
         let (s, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/{pfad}"),
+            &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/{pfad}"),
             &admin,
             Some(&body),
         )
@@ -855,7 +855,7 @@ async fn entfernen_feuert_einheit_und_personal_nur_bei_betroffenem_fahrzeug() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
                 &admin,
                 None,
             )
@@ -914,7 +914,7 @@ async fn statuswechsel_feuert_einheit_nur_fuer_fahrzeug_einer_einheit() {
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
                 &admin,
                 Some(&body),
             )
@@ -953,7 +953,7 @@ async fn aktion(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/{was}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/{was}"),
         cookie,
         None,
     )
@@ -964,7 +964,7 @@ async fn funkrufnamen(app: &axum::Router, cookie: &str, einsatz: i64, query: &st
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles{query}"),
         cookie,
         None,
     )
@@ -989,7 +989,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -997,7 +997,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
     let ef = json["id"].as_i64().unwrap();
     fahrzeug_disponieren(&app, &admin, einsatz, "Florian 2").await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(json["fahrzeug"]["beendet_als"], "entlassen");
     assert!(json["fahrzeug"]["beendet_at"].is_string() && json["fahrzeug"]["beendet_von"].is_i64());
@@ -1012,18 +1012,18 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
         .any(|t| t == "Fahrzeug «Florian 1» aus dem Einsatz entlassen"));
 
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::CONFLICT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "annul").await.0,
         StatusCode::CONFLICT
     );
     for (methode, pfad, body) in [
-        ("PATCH", format!("fahrzeuge/{ef}"), r#"{"bemerkung":"x"}"#),
+        ("PATCH", format!("vehicles/{ef}"), r#"{"bemerkung":"x"}"#),
         (
             "PATCH",
-            format!("fahrzeuge/{ef}/position"),
+            format!("vehicles/{ef}/position"),
             r#"{"lat":52.0,"lon":10.0}"#,
         ),
     ] {
@@ -1040,7 +1040,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         None,
     )
@@ -1051,7 +1051,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -1064,7 +1064,7 @@ async fn fahrzeug_entlassen_und_erneut_disponieren() {
         .iter()
         .any(|t| t == "Fahrzeug «Florian 1» erneut disponiert"));
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "reactivate").await.0,
         StatusCode::CONFLICT,
         "ein aktives Fahrzeug wird nicht reaktiviert"
     );
@@ -1083,8 +1083,8 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let einheit = einheit_bilden(&app, &admin, einsatz, "Zug 1").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna Müller").await;
     for (methode, pfad) in [
-        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}")),
-        ("PUT", format!("fahrzeuge/{ef}/besatzung/{ep}")),
+        ("PUT", format!("units/{einheit}/vehicles/{ef}")),
+        ("PUT", format!("vehicles/{ef}/crew/{ep}")),
     ] {
         let (s, j) = anfrage(
             &app,
@@ -1108,7 +1108,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         &admin,
         Some(&format!(r#"{{"status_id":{s2}}}"#)),
     )
@@ -1125,7 +1125,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         None,
     )
@@ -1140,7 +1140,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     );
     assert_eq!(vorher.0, s2);
 
-    let (s, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, entlassen) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{entlassen}");
     assert_eq!(entlassen["fahrzeug"]["beendet_als"], "entlassen");
     assert_eq!(entlassen["vorzustand"]["einheit_id"], einheit);
@@ -1153,7 +1153,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down/undo"),
         &admin,
         Some(&vorzustand),
     )
@@ -1164,7 +1164,7 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, personal) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1184,22 +1184,22 @@ async fn fahrzeug_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down/undo"),
         &admin,
         Some(&vorzustand),
     )
     .await;
     assert_eq!(s, StatusCode::CONFLICT, "schon zurückgenommen");
 
-    let (_, entlassen) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (_, entlassen) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, ef, "reactivate").await.0,
         StatusCode::OK
     );
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down/undo"),
         &admin,
         Some(&entlassen["vorzustand"].to_string()),
     )
@@ -1217,14 +1217,14 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1"}}"#),
     )
     .await;
     let fehl = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert!(funkrufnamen(&app, &admin, einsatz, "").await.is_empty());
@@ -1235,7 +1235,7 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
         .await
         .iter()
         .any(|t| t == "Fahrzeug «FW Extern 1» storniert (Fehldisposition)"));
-    let (s, json) = aktion(&app, &admin, einsatz, fehl, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, fehl, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert_eq!(
         funkrufnamen(&app, &admin, einsatz, "").await,
@@ -1256,13 +1256,13 @@ async fn fahrzeug_stornieren_und_reaktivieren() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{gewechselt}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{gewechselt}"),
         &admin,
         Some(&format!(r#"{{"status_id":{anderer}}}"#)),
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let (s, json) = aktion(&app, &admin, einsatz, gewechselt, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, gewechselt, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert!(json["error"]
         .as_str()
@@ -1283,7 +1283,7 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas"),
         &admin,
         Some(r#"{"bezeichnung":"BR Nord"}"#),
     )
@@ -1292,14 +1292,14 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/bereitstellungsraeume/{br}/status"),
+        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
         &admin,
         Some(r#"{"status":"aktiv"}"#),
     )
     .await;
     assert!(s.is_success());
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::OK
     );
 
@@ -1311,11 +1311,11 @@ async fn schreibwege_an_einem_entlassenen_fahrzeug_sind_409() {
     })
     .to_string();
     for (methode, pfad, body) in [
-        ("PUT", format!("fahrzeuge/{ef}/besatzung/{ep}"), None),
-        ("PUT", format!("einheiten/{einheit}/fahrzeug/{ef}"), None),
+        ("PUT", format!("vehicles/{ef}/crew/{ep}"), None),
+        ("PUT", format!("units/{einheit}/vehicles/{ef}"), None),
         (
             "POST",
-            format!("bereitstellungsraeume/{br}/belegung"),
+            format!("staging-areas/{br}/occupancy"),
             Some(belegung),
         ),
         ("PATCH", "command-post".to_string(), Some(fuehrungsstelle)),
@@ -1346,7 +1346,7 @@ async fn adhoc_disponieren(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(&body),
     )
@@ -1365,7 +1365,7 @@ async fn fahrzeug_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         cookie,
         Some(body),
     )
@@ -1383,7 +1383,7 @@ async fn fahrzeug_zeile(
         let (s, json) = anfrage(
             app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge{query}"),
+            &format!("/api/einsaetze/{einsatz}/vehicles{query}"),
             cookie,
             None,
         )
@@ -1431,7 +1431,7 @@ async fn adhoc_texte_ueber_der_grenze_sind_400_und_legen_nichts_an() {
         let (s, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+            &format!("/api/einsaetze/{einsatz}/vehicles"),
             &admin,
             Some(&body),
         )
@@ -1659,7 +1659,7 @@ async fn adhoc_angaben_grenzen_und_entlassenes_fahrzeug() {
         "Florian Extern 1"
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, ef, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ef, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = fahrzeug_patch(
@@ -1685,7 +1685,7 @@ async fn adhoc_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str)
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&body),
     )
@@ -1705,7 +1705,7 @@ async fn besatzung_uebernehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew"),
         cookie,
         Some(&body),
     )
@@ -1737,7 +1737,7 @@ async fn besatzung_uebernehmen_ordnet_alle_in_einem_schritt_zu() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ktw}/besatzung/{carl}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ktw}/crew/{carl}"),
         &admin,
         None,
     )
@@ -1824,7 +1824,7 @@ async fn besatzung_uebernehmen_mit_entlassener_person_ist_422_und_ordnet_niemand
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{carl}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{carl}/stand-down"),
         &admin,
         None,
     )
@@ -1891,7 +1891,7 @@ async fn besatzung_uebernehmen_grenzen_und_beendetes_fahrzeug() {
 
     let ktw = adhoc_disponieren(&app, &admin, einsatz, "KTW 1").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, ktw, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ktw, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = besatzung_uebernehmen(&app, &admin, einsatz, ktw, &[anna]).await;
@@ -1944,7 +1944,7 @@ async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
         .iter()
         .any(|t| t == "Material «Stromerzeuger» (×1) disponiert, Ort Fahrzeug «Florian 1/83-1»"));
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert!(
         json["error"]
@@ -1955,7 +1955,7 @@ async fn beladung_sperrt_den_storno_und_bleibt_beim_entlassen_ohne_ort() {
     );
 
     let mut rx = live.abonniere(einsatz);
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert!(system_etb_inhalte(&app, &admin, einsatz)
         .await
@@ -2002,13 +2002,12 @@ async fn besatzung_zuruecknehmen_nur_wenn_frei() {
     let a = fahrzeug_disponieren(&app, &admin, einsatz, "83-1").await;
     let b = fahrzeug_disponieren(&app, &admin, einsatz, "83-2").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
-    let pfad =
-        |ef: i64, q: &str| format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}{q}");
+    let pfad = |ef: i64, q: &str| format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}{q}");
     let fahrzeug_von = || async {
         let (_, personal) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/personal"),
+            &format!("/api/einsaetze/{einsatz}/personnel"),
             &admin,
             None,
         )
@@ -2131,7 +2130,7 @@ async fn status_zuruecknehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/status/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/status/undo"),
         cookie,
         Some(&beleg.to_string()),
     )
@@ -2398,20 +2397,20 @@ async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
     etb.pruefe(&app, &admin, einsatz, "Status und Angaben ändern")
         .await;
 
-    let besatzung = format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/besatzung/{ep}");
+    let besatzung = format!("/api/einsaetze/{einsatz}/vehicles/{ef}/crew/{ep}");
     for methode in ["PUT", "DELETE"] {
         let (s, json) = anfrage(&app, methode, &besatzung, &admin, None).await;
         assert_eq!(s, StatusCode::NO_CONTENT, "{methode}: {json}");
         etb.pruefe(&app, &admin, einsatz, methode).await;
     }
 
-    let (s, json) = aktion(&app, &admin, einsatz, ef, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, ef, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     etb.pruefe(&app, &admin, einsatz, "entlassen").await;
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down/undo"),
         &admin,
         Some(&json["vorzustand"].to_string()),
     )
@@ -2420,9 +2419,9 @@ async fn etb_eintraege_der_fahrzeuge_gehen_live_hinaus() {
     etb.pruefe(&app, &admin, einsatz, "zurücknehmen").await;
 
     for (fz, was, erwartet) in [
-        (ef, "entlassen", StatusCode::OK),
-        (ef, "reaktivieren", StatusCode::OK),
-        (fehl, "stornieren", StatusCode::NO_CONTENT),
+        (ef, "stand-down", StatusCode::OK),
+        (ef, "reactivate", StatusCode::OK),
+        (fehl, "annul", StatusCode::NO_CONTENT),
     ] {
         let (s, json) = aktion(&app, &admin, einsatz, fz, was).await;
         assert_eq!(s, erwartet, "{was}: {json}");
@@ -2442,7 +2441,7 @@ async fn fahrzeug_patch_json(
     anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}"),
         cookie,
         Some(&body),
     )
@@ -2453,7 +2452,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         cookie,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
     )

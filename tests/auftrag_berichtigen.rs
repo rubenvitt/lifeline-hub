@@ -480,7 +480,7 @@ async fn einheit(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )

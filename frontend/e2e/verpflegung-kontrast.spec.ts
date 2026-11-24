@@ -490,11 +490,11 @@ for (const modus of ['light', 'dark'] as const) {
     ).id;
     // Empfänger (LLH-1055): eine eingetroffene Gruppe und eine Einheit ohne Eintreffen, damit
     // Empfängerwahl und „Noch nicht verpflegt“ samt „Wählen“ gemessen werden.
-    const { id: gruppe } = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, {
+    const { id: gruppe } = await post(page, `/api/einsaetze/${einsatzId}/units`, {
       name: 'Gruppe Kontrast',
     });
-    await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name: 'Wasserrettung Kontrast' });
-    await post(page, `/api/einsaetze/${einsatzId}/einheiten/${gruppe}/zeitachse`, {
+    await post(page, `/api/einsaetze/${einsatzId}/units`, { name: 'Wasserrettung Kontrast' });
+    await post(page, `/api/einsaetze/${einsatzId}/units/${gruppe}/timeline`, {
       art: 'eintreffen',
       zeitpunkt_at: zeit(-60),
     });

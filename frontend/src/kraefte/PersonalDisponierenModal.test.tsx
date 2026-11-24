@@ -55,12 +55,12 @@ function standardHandler(freigaben = freigabenFixture()) {
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/personnel', () => HttpResponse.json(POOL)),
-    http.get('/api/einsaetze/1/personal', ({ request }) =>
+    http.get('/api/einsaetze/1/personnel', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? ENTLASSEN : AKTIV),
     ),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(EINHEITEN)),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json(FAHRZEUGE)),
-    http.post('/api/einsaetze/1/personal/sammel', async ({ request }) => {
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json(EINHEITEN)),
+    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json(FAHRZEUGE)),
+    http.post('/api/einsaetze/1/personnel/bulk', async ({ request }) => {
       const body = (await request.json()) as { personal_ids: number[] };
       bodies.push(body);
       return HttpResponse.json(
@@ -230,7 +230,7 @@ describe('PersonalDisponierenModal', () => {
 
   describe('Ablehnung mit Grund je Person', () => {
     const ablehnen = () =>
-      http.post('/api/einsaetze/1/personal/sammel', () =>
+      http.post('/api/einsaetze/1/personnel/bulk', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Kräfte lassen sich disponieren',

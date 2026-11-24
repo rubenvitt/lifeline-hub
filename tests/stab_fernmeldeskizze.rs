@@ -1145,7 +1145,7 @@ async fn einheit_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{zug}"),
+        &format!("/api/einsaetze/{einsatz}/units/{zug}"),
         &admin,
         None,
     )
@@ -1358,11 +1358,11 @@ async fn aufgeloeste_einheit_bekommt_keine_lage() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
-    let einheit = format!("/api/einsaetze/{einsatz}/einheiten/{eh}");
+    let einheit = format!("/api/einsaetze/{einsatz}/units/{eh}");
     let (status, _) = anfrage(
         &app,
         "PUT",
-        &format!("{einheit}/personal/{ep}"),
+        &format!("{einheit}/personnel/{ep}"),
         &admin,
         None,
     )

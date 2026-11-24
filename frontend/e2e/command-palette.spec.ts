@@ -367,10 +367,10 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
   const [start, ziel] = katalog;
   expect(ziel, 'Katalog mit mindestens zwei Status').toBeDefined();
   for (const funkrufname of ['Florian Palette 1', 'Florian Palette 2']) {
-    const r = await page.request.post(`${basis}/fahrzeuge`, { data: { adhoc: { funkrufname } } });
+    const r = await page.request.post(`${basis}/vehicles`, { data: { adhoc: { funkrufname } } });
     expect(r.ok(), await r.text()).toBeTruthy();
     const { id } = (await r.json()) as { id: number };
-    const s = await page.request.patch(`${basis}/fahrzeuge/${id}`, {
+    const s = await page.request.patch(`${basis}/vehicles/${id}`, {
       data: { status_id: start.id },
     });
     expect(s.ok(), await s.text()).toBeTruthy();

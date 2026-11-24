@@ -107,7 +107,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/damages/10', () => HttpResponse.json(schaden)),
     http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([einePerson])),
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/damages/10/attachments', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);

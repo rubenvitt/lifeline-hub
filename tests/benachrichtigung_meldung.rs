@@ -436,7 +436,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{e}/geraete"),
+            &format!("/api/einsaetze/{e}/devices"),
             &self.admin,
             Some(
                 &json!({"ansicht": "uhs-laptop", "uhs_id": uhs, "bezeichnung": "Laptop 1"})

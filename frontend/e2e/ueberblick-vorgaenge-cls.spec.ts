@@ -137,9 +137,9 @@ async function einsatzMitVorgaengen(page: Page): Promise<string> {
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
   });
-  await post(page, `${basis}/einheiten`, { name: 'Florian Nord 1', abschnitt_id: abschnittId });
+  await post(page, `${basis}/units`, { name: 'Florian Nord 1', abschnitt_id: abschnittId });
   for (const name of ['RTW 2', 'Florian Süd 3']) {
-    await post(page, `${basis}/einheiten`, { name });
+    await post(page, `${basis}/units`, { name });
   }
   return einsatzId;
 }
@@ -155,10 +155,10 @@ const FOLGEN: Folge[] = ['Listen zuletzt', 'Marken zuletzt', 'Gliederung zuletzt
 const LISTEN = ['reports', 'resource-requests'];
 
 /** Listen der offenen Vorgänge, aus denen auch „Nächste Marken“ rechnet (LLH-1748). */
-const MARKEN = ['tasks', 'reminders', 'abloesungen'];
+const MARKEN = ['tasks', 'reminders', 'reliefs'];
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ (`abschnittZeilen`), ohne Unterpfade. */
-const GLIEDERUNG = ['sectors', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+const GLIEDERUNG = ['sectors', 'units', 'personnel', 'vehicles', 'material'];
 
 /** Zeilen der Gliederung nach dem Säen: „EA Nord“ und „Ohne Abschnitt“. */
 const GLIEDERUNG_ZEILEN = 2;

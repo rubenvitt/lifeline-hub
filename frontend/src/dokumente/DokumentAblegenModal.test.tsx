@@ -66,7 +66,7 @@ beforeEach(() => {
   legeAb.mockReset();
   server.use(
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(abschnitte)),
-    http.get('/api/einsaetze/1/einheiten', () =>
+    http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 4, einsatz_id: 1, name: 'Florian 1' }]),
     ),
     // Ahmt den Server nach: `q` sucht Wortanfänge im Inhalt, `before_lfd_nr` + `limit` schneidet
@@ -479,7 +479,7 @@ describe('DokumentAblegenModal', () => {
 
     it('friert auch ein, wenn eine Quelle verweigert wird (403 ohne Modulrecht)', async () => {
       server.use(
-        http.get('/api/einsaetze/1/einheiten', () =>
+        http.get('/api/einsaetze/1/units', () =>
           HttpResponse.json({ fehler: 'kein Zugriff' }, { status: 403 }),
         ),
       );

@@ -1,6 +1,6 @@
 //! Einheit aus Vorlage bilden (LLH-1049, Spec `kraefte-disposition`, „Einheit aus Vorlage
-//! bilden“, und `einheit-vorlagen`, „Vorschau im Einsatz“): `GET …/einheiten/aus-vorlage/{id}`
-//! und `POST …/einheiten/aus-vorlage`. Die Regeln der Planung prüfen die Repo-Tests in
+//! bilden“, und `einheit-vorlagen`, „Vorschau im Einsatz“): `GET …/units/from-template/{id}`
+//! und `POST …/units/from-template`. Die Regeln der Planung prüfen die Repo-Tests in
 //! `src/einheit/aus_vorlage/tests.rs`; hier Statuscodes, Rechte, ETB und Ereignisse.
 
 use axum::http::StatusCode;
@@ -191,7 +191,7 @@ async fn vorschau(app: &axum::Router, cookie: &str, einsatz: i64, v: i64) -> (St
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage/{v}"),
+        &format!("/api/einsaetze/{einsatz}/units/from-template/{v}"),
         cookie,
         None,
     )
@@ -207,7 +207,7 @@ async fn bilden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten/aus-vorlage"),
+        &format!("/api/einsaetze/{einsatz}/units/from-template"),
         cookie,
         Some(&body.to_string()),
     )
@@ -238,9 +238,9 @@ async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, art: &str) -> Vec
 /// Einheiten, Fahrzeuge und aktive Personen des Einsatzes, für „nichts angelegt“.
 async fn bestand(app: &axum::Router, cookie: &str, einsatz: i64) -> (usize, usize, usize) {
     (
-        liste(app, cookie, einsatz, "einheiten").await.len(),
-        liste(app, cookie, einsatz, "fahrzeuge").await.len(),
-        liste(app, cookie, einsatz, "personal").await.len(),
+        liste(app, cookie, einsatz, "units").await.len(),
+        liste(app, cookie, einsatz, "vehicles").await.len(),
+        liste(app, cookie, einsatz, "personnel").await.len(),
     )
 }
 
@@ -255,7 +255,7 @@ async fn fahrzeug_im_einsatz(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fid}}}"#)),
     )
@@ -266,7 +266,7 @@ async fn fahrzeug_im_einsatz(
         let (s, _) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{e}/fahrzeug/{ef}"),
+            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
             admin,
             None,
         )
@@ -342,7 +342,7 @@ async fn sanitaetszug_mit_rettungsstaffel_in_einem_schritt() {
     assert_eq!(json["fahrzeuge"].as_array().unwrap().len(), 3);
     assert_eq!(json["personal"].as_array().unwrap().len(), 2);
 
-    let einheiten = liste(&app, &admin, einsatz, "einheiten").await;
+    let einheiten = liste(&app, &admin, einsatz, "units").await;
     let e = |id: i64| einheiten.iter().find(|e| e["id"] == id).unwrap().clone();
     let (z, st) = (e(zug), e(staffel));
     assert_eq!(z["name"], "1. Zug");
@@ -362,7 +362,7 @@ async fn sanitaetszug_mit_rettungsstaffel_in_einem_schritt() {
         json!({"fuehrer":0,"unterfuehrer":1,"mannschaft":5})
     );
 
-    let fahrzeuge = liste(&app, &admin, einsatz, "fahrzeuge").await;
+    let fahrzeuge = liste(&app, &admin, einsatz, "vehicles").await;
     let einheit_von = |name: &str| {
         fahrzeuge
             .iter()
@@ -379,7 +379,7 @@ async fn sanitaetszug_mit_rettungsstaffel_in_einem_schritt() {
         .unwrap()["id"]
         .clone();
 
-    let personal = liste(&app, &admin, einsatz, "personal").await;
+    let personal = liste(&app, &admin, einsatz, "personnel").await;
     assert_eq!(personal.len(), 2);
     for p in &personal {
         assert_eq!(p["einheit_id"], staffel, "{p}");
@@ -464,7 +464,7 @@ async fn gebundenes_fahrzeug_nur_mit_umhaengen() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let staffel = json["einheit_ids"][1].as_i64().unwrap();
-    let rtw2 = liste(&app, &admin, einsatz, "fahrzeuge")
+    let rtw2 = liste(&app, &admin, einsatz, "vehicles")
         .await
         .into_iter()
         .find(|f| f["id"] == ef2)
@@ -625,7 +625,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{}}}"#, v.notarzt)),
     )
@@ -635,7 +635,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
         &admin,
         None,
     )
@@ -655,7 +655,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     assert_eq!(json["personal"], json!([ep]), "dieselbe Zeile");
     let staffel = json["einheit_id"].clone();
-    let personal = liste(&app, &admin, einsatz, "personal").await;
+    let personal = liste(&app, &admin, einsatz, "personnel").await;
     assert_eq!(personal.len(), 1);
     assert_eq!(personal[0]["einheit_id"], staffel);
     assert!(
@@ -678,7 +678,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge/{ef}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -702,13 +702,13 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     assert_eq!(json["fahrzeuge"], json!([ef]), "dieselbe Zeile");
     let staffel = json["einheit_id"].clone();
-    let fahrzeuge = liste(&app, &admin, einsatz, "fahrzeuge").await;
+    let fahrzeuge = liste(&app, &admin, einsatz, "vehicles").await;
     assert_eq!(fahrzeuge.len(), 1, "kein zweiter Datensatz");
     assert_eq!(fahrzeuge[0]["id"], ef);
     assert_eq!(fahrzeuge[0]["einheit_id"], staffel);
-    let personal = liste(&app, &admin, einsatz, "personal").await;
+    let personal = liste(&app, &admin, einsatz, "personnel").await;
     assert_eq!(personal[0]["fahrzeug_id"], ef, "Besatzung nach der Vorlage");
-    let entlassene = liste(&app, &admin, einsatz, "fahrzeuge?entlassene=1").await;
+    let entlassene = liste(&app, &admin, einsatz, "vehicles?entlassene=1").await;
     assert!(entlassene.is_empty(), "{entlassene:?}");
 }
 
@@ -1022,7 +1022,7 @@ async fn material_aus_der_vorlage_am_richtigen_ort_mit_einem_etb_eintrag() {
         .collect();
     assert_eq!(material_ids.len(), 2);
 
-    let fahrzeuge = liste(&app, &admin, einsatz, "fahrzeuge").await;
+    let fahrzeuge = liste(&app, &admin, einsatz, "vehicles").await;
     let ef_rtw1 = fahrzeuge
         .iter()
         .find(|f| f["funkrufname"] == "RTW 1")
@@ -1146,5 +1146,5 @@ async fn material_gesperrt_und_schon_im_einsatz() {
         json["zeilen"],
         json!([{"art": "material", "id": position, "grund": "schon im Einsatz"}])
     );
-    assert_eq!(liste(&app, &admin, einsatz, "einheiten").await.len(), 0);
+    assert_eq!(liste(&app, &admin, einsatz, "units").await.len(), 0);
 }

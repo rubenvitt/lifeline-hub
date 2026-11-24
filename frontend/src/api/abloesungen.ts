@@ -13,7 +13,7 @@ import type {
 } from './types';
 
 /** Ablösung (LFH-635): Schichten von Einheiten, Rhythmus-Vorgaben je Abschnitt. */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/abloesungen`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/reliefs`;
 
 /**
  * Laufende nach Fälligkeit, abgelöste nach Vollzug absteigend, beendete (LLH-1128) nach ihrem
@@ -41,7 +41,7 @@ export function vollzieheAbloesung(
   abloesungId: number,
   body: VollzugBody,
 ): Promise<AbloesungVollzug> {
-  return apiSend<AbloesungVollzug>(`${basis(einsatzId)}/${abloesungId}/vollzug`, 'POST', body);
+  return apiSend<AbloesungVollzug>(`${basis(einsatzId)}/${abloesungId}/execution`, 'POST', body);
 }
 
 /**
@@ -52,16 +52,16 @@ export function ladePlanVorlage(
   einsatzId: number,
   abloesungId: number,
 ): Promise<AbloesungPlanVorlage> {
-  return apiGet<AbloesungPlanVorlage>(`${basis(einsatzId)}/${abloesungId}/plan-vorlage`);
+  return apiGet<AbloesungPlanVorlage>(`${basis(einsatzId)}/${abloesungId}/plan-template`);
 }
 
 /** Rückweg des Vollzugs, solange die Folgeschicht unberührt ist (sonst 422). */
 export function nimmVollzugZurueck(einsatzId: number, abloesungId: number): Promise<Abloesung> {
-  return apiSend<Abloesung>(`${basis(einsatzId)}/${abloesungId}/vollzug/zuruecknehmen`, 'POST', {});
+  return apiSend<Abloesung>(`${basis(einsatzId)}/${abloesungId}/execution/undo`, 'POST', {});
 }
 
 export function listeAbloesungVorgaben(einsatzId: number): Promise<AbloesungVorgabe[]> {
-  return apiGet<AbloesungVorgabe[]>(`${basis(einsatzId)}/vorgaben`);
+  return apiGet<AbloesungVorgabe[]>(`${basis(einsatzId)}/defaults`);
 }
 
 /** `null` entfernt die Vorgabe; laufende Schichten behalten dann ihren Rhythmus. */
@@ -70,14 +70,14 @@ export function setzeAbloesungVorgabe(
   abschnittId: number,
   rhythmusMinuten: number | null,
 ): Promise<AbloesungVorgabe[]> {
-  return apiSend<AbloesungVorgabe[]>(`${basis(einsatzId)}/vorgaben/${abschnittId}`, 'PUT', {
+  return apiSend<AbloesungVorgabe[]>(`${basis(einsatzId)}/defaults/${abschnittId}`, 'PUT', {
     rhythmus_minuten: rhythmusMinuten,
   });
 }
 
 /** Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells, Vorwarnung, folgende Schichten. */
 export function fetchEinsatzSchichtmodell(einsatzId: number): Promise<AbloesungEinsatzVorgabe> {
-  return apiGet<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/schichtmodell`);
+  return apiGet<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/shift-model`);
 }
 
 /**
@@ -89,5 +89,5 @@ export function setEinsatzSchichtmodell(
   einsatzId: number,
   body: EinsatzSchichtmodellBody,
 ): Promise<AbloesungEinsatzVorgabe> {
-  return apiSend<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/schichtmodell`, 'PUT', body);
+  return apiSend<AbloesungEinsatzVorgabe>(`${basis(einsatzId)}/shift-model`, 'PUT', body);
 }

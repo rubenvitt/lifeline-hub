@@ -64,7 +64,7 @@ function setup(ungelesen = 0, onGelesen?: () => void, mitglieder: unknown[] = []
       ]),
     ),
     http.get('/api/einsaetze/7/chat/channels/1/messages', () => HttpResponse.json(nachrichten)),
-    http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json(mitglieder)),
+    http.get('/api/einsaetze/7/members', () => HttpResponse.json(mitglieder)),
     http.post('/api/einsaetze/7/chat/channels/1/read', () => {
       onGelesen?.();
       return new HttpResponse(null, { status: 204 });
@@ -142,7 +142,7 @@ describe('ChatPage', () => {
     server.use(
       meHandler(nutzer),
       http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/members', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/chat/channels', () =>
         HttpResponse.json([kanal, { ...kanal, id: 2, name: 'Versorgung' }]),
       ),
@@ -306,7 +306,7 @@ describe('ChatPage', () => {
       http.get('/api/einsaetze/7/chat/channels', () =>
         HttpResponse.json([{ ...kanal, ungelesen_anzahl: 1 }]),
       ),
-      http.get('/api/einsaetze/7/mitglieder', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/members', () => HttpResponse.json([])),
       http.post('/api/einsaetze/7/chat/channels/1/read', () => {
         markiert += 1;
         return new HttpResponse(null, { status: 204 });
@@ -975,7 +975,7 @@ describe('ChatPage · Ablehnung am Ort (LFH-1077)', () => {
         'meldungen',
         'auftraege',
         'abschnitte',
-        'einheiten',
+        'units',
       ].map((pfad) => http.get(`/api/einsaetze/:id/${pfad}`, () => HttpResponse.json([]))),
     );
     return renderMitProviders(

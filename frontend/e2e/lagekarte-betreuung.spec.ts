@@ -310,7 +310,7 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
     benutzername: NUTZER,
     passwort: NUTZER_PW,
   });
-  await senden(page, 'put', `${basis}/mitglieder/${nutzerId}`, {
+  await senden(page, 'put', `${basis}/members/${nutzerId}`, {
     einsatz_rolle: 'fuehrungspersonal',
   });
   await page.request.post('/api/auth/logout');

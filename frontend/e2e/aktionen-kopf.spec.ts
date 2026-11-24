@@ -33,7 +33,7 @@ for (const { dichte, viewport } of STUFEN) {
     await page.setViewportSize(viewport);
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E Aktionen-Kopf ${dichte} ${Date.now()}`);
-    const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+    const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
       data: { adhoc: { funkrufname: 'Rotkreuz Musterstadt 1/83-1', kennzeichen: 'MU-RK 831' } },
     });
     expect(fahrzeug.ok(), `Seeding Fahrzeug: ${fahrzeug.status()}`).toBeTruthy();

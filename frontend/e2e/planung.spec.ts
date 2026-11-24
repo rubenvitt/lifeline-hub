@@ -234,7 +234,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const einsatzId = Number(/\/einsaetze\/(\d+)/.exec(page.url())![1]);
   const schichtplan = await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/abloesungen/schichtplan`)
+    await page.request.get(`/api/einsaetze/${einsatzId}/reliefs/shift-plan`)
   ).json();
   expect(schichtplan.bloecke).toHaveLength(1);
   expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');

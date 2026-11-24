@@ -86,7 +86,7 @@ function stelleBereit({
     http.get('/api/einsaetze/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([EINHEIT])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([EINHEIT])),
     http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/reports', () => HttpResponse.json(meldungen)),
     http.get('/api/einsaetze/7/persons', () => HttpResponse.json(personen)),

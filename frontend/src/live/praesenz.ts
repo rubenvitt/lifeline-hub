@@ -133,7 +133,7 @@ export function praesenzSatz(andere: readonly string[], eigenesKonto: boolean): 
 
 function pfad(s: PraesenzSchluessel): string {
   return s.objekt === 'einheit'
-    ? `/api/einsaetze/${s.einsatzId}/einheiten/${s.einheitId}/praesenz`
+    ? `/api/einsaetze/${s.einsatzId}/units/${s.einheitId}/presence`
     : `/api/einsaetze/${s.einsatzId}/presence`;
 }
 

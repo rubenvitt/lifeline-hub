@@ -80,7 +80,7 @@ test.describe(KAPITEL, () => {
 
     const fs = await (await api.get(`${e}/command-post`)).json();
     if (!fs.rufname) {
-      const fahrzeuge = (await (await api.get(`${e}/fahrzeuge`)).json()) as {
+      const fahrzeuge = (await (await api.get(`${e}/vehicles`)).json()) as {
         id: number;
         funkrufname: string;
       }[];
@@ -117,7 +117,7 @@ test.describe(KAPITEL, () => {
       sprechgruppe_ids: [el.id],
       verbindungen: [{ mittel: 'mobil', wert: '0170 555 0202' }],
     });
-    const einheiten = `${e}/einheiten`;
+    const einheiten = `${e}/units`;
     for (const name of ['Sanitätszug Musterstadt', 'Rettungsstaffel']) {
       await fuelle(api, 'patch', `${einheiten}/${await idNachName(api, einheiten, name)}`, {
         sprechgruppe_ids: [san.id],

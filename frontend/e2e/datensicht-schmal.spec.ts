@@ -104,7 +104,7 @@ async function seedeKraft(page: Page, einsatzId: string) {
   await anlegen(
     page,
     einsatzId,
-    'personal',
+    'personnel',
     {
       adhoc: {
         name: KRAFT,
@@ -200,7 +200,7 @@ test('Personalseite: Weiche und kein Querlauf auch im Nur-Lese-Zweig (Beobachter
   await anlegen(
     page,
     einsatzId,
-    'personal',
+    'personnel',
     {
       adhoc: {
         name: KRAFT,

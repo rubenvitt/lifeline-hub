@@ -533,7 +533,7 @@ async fn ruecknahme_nach_uebernahme_ist_422() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/material/{em}/entlassen"),
+        &format!("/api/einsaetze/{e}/material/{em}/stand-down"),
         &admin,
         None,
     )
@@ -613,7 +613,7 @@ async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/material/{em}/stornieren"),
+        &format!("/api/einsaetze/{e}/material/{em}/annul"),
         &admin,
         None,
     )

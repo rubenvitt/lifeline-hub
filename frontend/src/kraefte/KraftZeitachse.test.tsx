@@ -15,7 +15,7 @@ import type { Zeitachse } from '../api/types';
 import KraftZeitachse, { ZEITACHSE_RECHTE_TEXT } from './KraftZeitachse';
 import { tippeZeit } from '../test/zeitEingabe';
 
-const PFAD = '/api/einsaetze/1/personal/7/zeitachse';
+const PFAD = '/api/einsaetze/1/personnel/7/timeline';
 
 const ZEITACHSE: Zeitachse = {
   ereignisse: [
@@ -214,7 +214,7 @@ describe('KraftZeitachse (LFH-552)', () => {
   it('Streichen verlangt einen Grund und schickt ihn', async () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
-      http.post(`${PFAD}/1/streichen`, async ({ request }) => {
+      http.post(`${PFAD}/1/strike`, async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(ZEITACHSE);
       }),
@@ -260,7 +260,7 @@ describe('KraftZeitachse (LFH-552)', () => {
     it('leer geöffnet, schickt Alarmierung, Eintreffen und Entlassung als UTC samt Notiz', async () => {
       let rumpf: Record<string, unknown> | null = null;
       server.use(
-        http.post(`${PFAD}/periode`, async ({ request }) => {
+        http.post(`${PFAD}/period`, async ({ request }) => {
           rumpf = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(ZEITACHSE, { status: 201 });
         }),
@@ -303,7 +303,7 @@ describe('KraftZeitachse (LFH-552)', () => {
     it('verlangt Alarmierung oder Eintreffen und die Entlassung; nur das Eintreffen genügt', async () => {
       let rumpf: Record<string, unknown> | null = null;
       server.use(
-        http.post(`${PFAD}/periode`, async ({ request }) => {
+        http.post(`${PFAD}/period`, async ({ request }) => {
           rumpf = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(ZEITACHSE, { status: 201 });
         }),
@@ -342,7 +342,7 @@ describe('KraftZeitachse (LFH-552)', () => {
 
     it('eine 422 steht im Dialog, nicht im Toast, und die Felder bleiben', async () => {
       server.use(
-        http.post(`${PFAD}/periode`, () =>
+        http.post(`${PFAD}/period`, () =>
           HttpResponse.json(
             {
               error:
@@ -381,7 +381,7 @@ describe('KraftZeitachse (LFH-552)', () => {
     it('vorbelegt mit dem alten Zeitpunkt, verlangt einen Grund und schickt Zeitpunkt (UTC) und Grund', async () => {
       let rumpf: Record<string, unknown> | null = null;
       server.use(
-        http.post(`${PFAD}/2/berichtigen`, async ({ request }) => {
+        http.post(`${PFAD}/2/correct`, async ({ request }) => {
           rumpf = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(ZEITACHSE);
         }),
@@ -412,7 +412,7 @@ describe('KraftZeitachse (LFH-552)', () => {
       let rumpf: Record<string, unknown> | null = null;
       server.use(
         http.get(PFAD, () => HttpResponse.json(ZEITACHSE)),
-        http.post(`${PFAD}/2/berichtigen`, async ({ request }) => {
+        http.post(`${PFAD}/2/correct`, async ({ request }) => {
           rumpf = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(ZEITACHSE);
         }),
@@ -438,7 +438,7 @@ describe('KraftZeitachse (LFH-552)', () => {
 
     it('eine 422 steht im Dialog, nicht im Toast, und die Felder bleiben', async () => {
       server.use(
-        http.post(`${PFAD}/1/berichtigen`, () =>
+        http.post(`${PFAD}/1/correct`, () =>
           HttpResponse.json(
             {
               error:
@@ -873,7 +873,7 @@ describe('KraftZeitachse — Zufluss hinter dem Sammelbanner (LFH-861)', () => {
       ],
     };
     server.use(
-      http.post(`${PFAD}/2/berichtigen`, () => {
+      http.post(`${PFAD}/2/correct`, () => {
         server.use(http.get(PFAD, () => HttpResponse.json(NACH)));
         return HttpResponse.json(NACH);
       }),

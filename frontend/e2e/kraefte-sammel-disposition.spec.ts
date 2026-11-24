@@ -22,7 +22,7 @@ async function einsatzMitEinheit(page: Page, einheit: string) {
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Sammel-Disposition ${LAUF}`,
   });
-  const einheitId = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name: einheit });
+  const einheitId = await post(page, `/api/einsaetze/${einsatzId}/units`, { name: einheit });
   return { einsatzId, einheitId };
 }
 
@@ -46,10 +46,10 @@ test('Personal disponieren: drei Personen in einem Absenden in Einheit und auf F
   await anmeldenAlsAdmin(page);
   const { einsatzId, einheitId } = await einsatzMitEinheit(page, 'Rettungsstaffel');
   const basis = `/api/einsaetze/${einsatzId}`;
-  const efId = await post(page, `${basis}/fahrzeuge`, {
+  const efId = await post(page, `${basis}/vehicles`, {
     adhoc: { funkrufname: `Sammel ${LAUF} 83-1`, fahrzeugtyp: 'RTW' },
   });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheitId}/fahrzeug/${efId}`);
+  const zuordnung = await page.request.put(`${basis}/units/${einheitId}/vehicles/${efId}`);
   expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
   const namen = ['Anna', 'Bernd', 'Carla'].map((v) => `Sammel ${LAUF} ${v}`);
   for (const [i, name] of namen.entries()) {
@@ -75,7 +75,7 @@ test('Personal disponieren: drei Personen in einem Absenden in Einheit und auf F
   for (const name of namen) await expect(region.getByText(name)).toBeVisible();
 
   // Im Meldebild sitzen alle drei unter dem Fahrzeug, das Fahrzeug unter der Einheit.
-  const eps = (await (await page.request.get(`${basis}/personal`)).json()) as {
+  const eps = (await (await page.request.get(`${basis}/personnel`)).json()) as {
     id: number;
     name: string;
   }[];
@@ -117,7 +117,7 @@ test('Fahrzeuge disponieren: zwei Fahrzeuge in einem Absenden in eine Einheit', 
   const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
   for (const funkrufname of funkrufnamen) await expect(region.getByText(funkrufname)).toBeVisible();
 
-  const efs = (await (await page.request.get(`/api/einsaetze/${einsatzId}/fahrzeuge`)).json()) as {
+  const efs = (await (await page.request.get(`/api/einsaetze/${einsatzId}/vehicles`)).json()) as {
     id: number;
     einheit_id: number | null;
   }[];

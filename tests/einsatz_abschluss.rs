@@ -157,7 +157,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einheiten/{zug}/status"),
+        &format!("/api/einsaetze/{e}/units/{zug}/status"),
         &admin,
         Some(&json!({ "status_id": anfahrt })),
     )
@@ -167,7 +167,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/einheiten/{weg}"),
+        &format!("/api/einsaetze/{e}/units/{weg}"),
         &admin,
         None,
     )
@@ -338,6 +338,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
                 match modul {
                     "meldungen" => "reports",
                     "auftraege" => "tasks",
+                    "einheiten" => "units",
                     andere => andere,
                 }
             ),
@@ -640,7 +641,7 @@ async fn ein_geraet_bekommt_403() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/geraete"),
+        &format!("/api/einsaetze/{e}/devices"),
         &admin,
         Some(&json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
     )

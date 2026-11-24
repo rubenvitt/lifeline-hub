@@ -87,8 +87,8 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function einheitAn(page: Page, einsatzId: number, name: string, ll: [number, number]) {
-  const id = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name });
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${id}/position`, {
+  const id = await post(page, `/api/einsaetze/${einsatzId}/units`, { name });
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${id}/position`, {
     data: { lat: ll[1], lon: ll[0] },
   });
   expect(antwort.ok(), `Position ${name}: ${await antwort.text()}`).toBeTruthy();
@@ -1160,7 +1160,7 @@ async function einsatzFuerModi(page: Page): Promise<Modussaat> {
   const einsatzId = await einsatzMitLage(page);
   const reserve: Record<string, number> = {};
   for (const name of RESERVE)
-    reserve[name] = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, { name });
+    reserve[name] = await post(page, `/api/einsaetze/${einsatzId}/units`, { name });
   const schadenId = await post(page, `/api/einsaetze/${einsatzId}/damages`, {
     typ: 'sachschaden',
     ausmass: 'gering',
@@ -1267,7 +1267,7 @@ for (const viewport of [
         .poll(
           async () => {
             const einheiten = (await (
-              await page.request.get(`/api/einsaetze/${saat.einsatzId}/einheiten`)
+              await page.request.get(`/api/einsaetze/${saat.einsatzId}/units`)
             ).json()) as { id: number; lat: number | null }[];
             return einheiten.find((e) => e.id === saat.reserve['Reserve 3'])?.lat ?? null;
           },

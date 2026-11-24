@@ -26,7 +26,7 @@ async function seedePerson(page: Page, einsatzId: string, data: unknown): Promis
 }
 
 async function seedeFahrzeug(page: Page, einsatzId: string, funkrufname: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/fahrzeuge`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
     data: { adhoc: { funkrufname } },
   });
   expect(antwort.ok(), `Seeding Fahrzeug: ${antwort.status()}`).toBeTruthy();

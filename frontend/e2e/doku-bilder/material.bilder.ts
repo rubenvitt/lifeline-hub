@@ -105,7 +105,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'patch', `${pfad}/${decken.id}`, { ausgegeben: 20 });
       // Ein Ort je Posten (LLH-1224 D6), gesetzt über den einen Weg (LLH-1225 D2).
       const einheiten = (await (
-        await api.get(`/api/einsaetze/${demo.id}/einheiten`)
+        await api.get(`/api/einsaetze/${demo.id}/units`)
       ).json()) as Einheit[];
       const einheit = einheiten.find((e) => !e.aufgeloest_at);
       expect(einheit, 'Demo-Einheit').toBeDefined();
@@ -120,7 +120,7 @@ test.describe(KAPITEL, () => {
         adhoc: { bezeichnung: 'Faltpavillon 3 × 3 m', kategorie: 'Unterkunft' },
         menge: 2,
       });
-      await fuelle(api, 'post', `${pfad}/${pavillon.id}/entlassen`);
+      await fuelle(api, 'post', `${pfad}/${pavillon.id}/stand-down`);
       // Ein freies Gerät für den Dialog „Material disponieren“: die Demo-Geräte stehen alle im
       // Einsatz, ihre Optionen sind gesperrt (LLH-1487).
       await fuelle(api, 'post', '/api/material', {

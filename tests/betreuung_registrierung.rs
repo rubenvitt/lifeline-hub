@@ -55,7 +55,7 @@ fn reg(e: i64, sid: i64) -> String {
 }
 
 async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
-    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/geraete"), body).await;
+    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/devices"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let code = v["code"]["code"].as_str().unwrap().to_string();
     let resp = app

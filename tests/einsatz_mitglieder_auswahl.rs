@@ -1,6 +1,6 @@
 //! Personenauswahl der Einsatzleitung (LFH-1141, Spec `einsatz-zugriff`):
-//! `GET /api/einsaetze/{id}/mitglieder/auswahl` bietet genau die Personen an, die
-//! `PUT /api/einsaetze/{id}/mitglieder/{benutzer_id}` aufnimmt — ohne Systemrolle, ohne fremde
+//! `GET /api/einsaetze/{id}/members/selection` bietet genau die Personen an, die
+//! `PUT /api/einsaetze/{id}/members/{benutzer_id}` aufnimmt — ohne Systemrolle, ohne fremde
 //! Organisationen, nur mit Kennung und Anzeigename.
 
 use axum::http::StatusCode;
@@ -14,7 +14,7 @@ use common::{
 };
 
 fn auswahl_uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/mitglieder/auswahl")
+    format!("/api/einsaetze/{einsatz}/members/selection")
 }
 
 /// Die Kennungen der Auswahl, in Antwortreihenfolge.

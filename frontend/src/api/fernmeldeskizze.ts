@@ -214,14 +214,12 @@ export type ZuordnungsZiel =
 
 function zuordnungsPfad(einsatzId: number, ziel: ZuordnungsZiel, sprechgruppeId: number): string {
   const e = einsatz(einsatzId);
-  // Abschnitt und Einheit stellen ihre Pakete (LLH-2059, LLH-2056) auf `talk-groups` um.
-  const sg = `sprechgruppen/${sprechgruppeId}`;
   const tg = `talk-groups/${sprechgruppeId}`;
   switch (ziel.art) {
     case 'abschnitt':
-      return `${e}/sectors/${ziel.id}/talk-groups/${sprechgruppeId}`;
+      return `${e}/sectors/${ziel.id}/${tg}`;
     case 'einheit':
-      return `${e}/einheiten/${ziel.id}/${sg}`;
+      return `${e}/units/${ziel.id}/${tg}`;
     case 'fuehrungsstelle':
       return `${e}/command-post/${tg}`;
     case 'stelle':

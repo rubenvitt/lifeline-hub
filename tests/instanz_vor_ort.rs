@@ -1361,7 +1361,7 @@ async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselbe
     let (s, v) = common::anfrage(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/fahrzeuge"),
+        &format!("/api/einsaetze/{e}/vehicles"),
         &elw1.admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz1}}}"#)),
     )
@@ -1381,7 +1381,7 @@ async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselbe
     let (s, v) = common::anfrage(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/fahrzeuge"),
+        &format!("/api/einsaetze/{e}/vehicles"),
         &elw1.admin,
         Some(&format!(r#"{{"fahrzeug_id":{geliehen}}}"#)),
     )

@@ -11,7 +11,7 @@
 //! Einsatz (`einsatz.geschwaerzt_at`) bleibt der Zustand `personal`, aber ohne Namen. Der
 //! Snapshot selbst wird seit LFH-701 mitgeschwärzt; sein Wortlaut bleibt im ETB der Anordnung.
 //!
-//! Die Auflösung braucht kein Modulrecht: dieselben Namen stehen in `GET …/mitglieder`, das jedes
+//! Die Auflösung braucht kein Modulrecht: dieselben Namen stehen in `GET …/members`, das jedes
 //! Mitglied lesen darf. Ein gekoppeltes Gerät (LFH-892) bekommt keine Auflösung (das Feld fehlt).
 
 use super::Fuehrungsfunktion;

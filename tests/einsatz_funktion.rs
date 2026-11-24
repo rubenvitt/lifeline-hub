@@ -153,7 +153,7 @@ async fn fachberater_hat_kein_sachgebiet() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{id}"),
         &admin,
         Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fachberater","fuehrungsstelle":"THW"}"#),
     )
@@ -334,7 +334,7 @@ async fn fuehrungshilfspersonal_traegt_bezeichnung() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{id}"),
         &admin,
         Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fuehrungshilfspersonal","fuehrungsstelle":"  Lotse  "}"#),
     )

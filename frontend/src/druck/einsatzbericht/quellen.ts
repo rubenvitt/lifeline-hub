@@ -69,32 +69,32 @@ export const QUELLEN: readonly Quelle[] = [
   // GET …/command-post — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
   // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
   { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
-  // GET …/mitglieder — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs, `mitglieder`). Sie
+  // GET …/members — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs, `mitglieder`). Sie
   // tragen die Führungsfunktionen EL und S1–S7 (i6k6mzed, D7).
   { schluessel: 'mitglieder', bloecke: nur('fuehrung'), modul: null },
   // GET …/briefings — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
   // `list`), seit LLH-1111 nicht mehr am Stab.
   { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'lagebesprechung' },
-  // GET …/einheiten — `EinsatzLesezugriff<Einheiten>` (src/routes/einsatz_einheit.rs:44).
+  // GET …/units — `EinsatzLesezugriff<Einheiten>` (src/routes/einsatz_einheit.rs:44).
   // Die Personal-Anlage liest daraus den Namen der Einheit je Kraft (LFH-902).
   {
     schluessel: 'einheiten',
     bloecke: ['kraefte', 'einheiten-zeiten', 'personal-kopf'],
     modul: 'einheiten',
   },
-  // GET …/einheiten?aufgeloeste=1 — dasselbe Gate (LLH-1079). Eine aufgelöste Einheit bleibt
+  // GET …/units?aufgeloeste=1 — dasselbe Gate (LLH-1079). Eine aufgelöste Einheit bleibt
   // mit ihrer Zeitachse im Nachweis der Anlage.
   { schluessel: 'einheitenAufgeloest', bloecke: nur('einheiten-zeiten'), modul: 'einheiten' },
-  // GET …/einheiten/zeitachse — `EinsatzLesezugriff<Einheiten>` (src/routes/zeitachse.rs:176).
+  // GET …/units/timeline — `EinsatzLesezugriff<Einheiten>` (src/routes/zeitachse.rs:176).
   { schluessel: 'einheitenPerioden', bloecke: ['kraefte', 'einheiten-zeiten'], modul: 'einheiten' },
-  // GET …/personal — `EinsatzLesezugriff<Personal>` (src/routes/einsatz_personal.rs:46).
+  // GET …/personnel — `EinsatzLesezugriff<Personal>` (src/routes/einsatz_personal.rs:46).
   { schluessel: 'personal', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
-  // GET …/personal?entlassene=1 — dasselbe Gate (LLH-1079). Entlassene sind geführt: sie zählen in
+  // GET …/personnel?entlassene=1 — dasselbe Gate (LLH-1079). Entlassene sind geführt: sie zählen in
   // „insgesamt“ und in der Anlage, nie in der Stärke; Stornierte liefert der Server nicht.
   { schluessel: 'personalEntlassen', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
-  // GET …/personal/zeitachse — `EinsatzLesezugriff<Personal>` (src/routes/zeitachse.rs:237).
+  // GET …/personnel/timeline — `EinsatzLesezugriff<Personal>` (src/routes/zeitachse.rs:237).
   { schluessel: 'personalPerioden', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
-  // GET …/fahrzeuge — `EinsatzLesezugriff<Fahrzeuge>` (src/routes/einsatz_fahrzeug.rs:30).
+  // GET …/vehicles — `EinsatzLesezugriff<Fahrzeuge>` (src/routes/einsatz_fahrzeug.rs:30).
   { schluessel: 'fahrzeuge', bloecke: nur('kraefte'), modul: 'fahrzeuge' },
   // GET …/situation-reports — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
   // (src/routes/lagebericht.rs:20/30, src/routes/vorlagendokument.rs:39).

@@ -60,8 +60,8 @@ function stammHandler() {
       ]),
     ),
     // Die Entlassenen (`?entlassene=1`): keine.
-    http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
   ];
 }
 
@@ -179,7 +179,7 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
   it('Einsatz-Eintrag: ordnet über die Einheit zu', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.put('/api/einsaetze/1/einheiten/10/personal/:epId', ({ params }) => {
+      http.put('/api/einsaetze/1/units/10/personnel/:epId', ({ params }) => {
         aufrufe.push(String(params.epId));
         return new HttpResponse(null, { status: 204 });
       }),
@@ -192,7 +192,7 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
   it('Stamm-Eintrag: Sammel-Disposition mit genau dieser Person und der Einheit, ohne Fahrzeug', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/personal/sammel', async ({ request }) => {
+      http.post('/api/einsaetze/1/personnel/bulk', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json([]);
       }),
@@ -206,7 +206,7 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
 
   it('abgelehnt mit Grund der Zeile: „Nicht zugeordnet“ mit „außer Dienst“ unter der Auswahl, kein Toast', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personal/sammel', () =>
+      http.post('/api/einsaetze/1/personnel/bulk', () =>
         HttpResponse.json(
           {
             error: 'Nicht disponiert',
@@ -235,18 +235,18 @@ describe('ZuordnenAuswahl · Person (D7)', () => {
       expect(abgerufen).toEqual(
         expect.arrayContaining([
           '/api/vehicles?nur_im_dienst=true',
-          '/api/einsaetze/1/fahrzeuge?entlassene=1',
+          '/api/einsaetze/1/vehicles?entlassene=1',
         ]),
       ),
     );
-    expect(abgerufen.filter((a) => /^\/api\/(personal|einsaetze\/1\/personal)/.test(a))).toEqual(
+    expect(abgerufen.filter((a) => /^\/api\/(personal|einsaetze\/1\/personnel)/.test(a))).toEqual(
       [],
     );
   });
 
   it('Rückmeldung vor der Antwort: die Auswahl lädt, bis der Server antwortet', async () => {
     server.use(
-      http.post('/api/einsaetze/1/personal/sammel', async () => {
+      http.post('/api/einsaetze/1/personnel/bulk', async () => {
         await delay('infinite');
         return HttpResponse.json([]);
       }),
@@ -268,7 +268,7 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
   it('Gruppen wie bei Personen; der Stamm-Eintrag geht über die Sammel-Disposition', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/fahrzeuge/sammel', async ({ request }) => {
+      http.post('/api/einsaetze/1/vehicles/bulk', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json([]);
       }),
@@ -288,7 +288,7 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
   it('Einsatz-Eintrag: ordnet über die Einheit zu', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.put('/api/einsaetze/1/einheiten/10/fahrzeug/:efId', ({ params }) => {
+      http.put('/api/einsaetze/1/units/10/vehicles/:efId', ({ params }) => {
         aufrufe.push(String(params.efId));
         return new HttpResponse(null, { status: 204 });
       }),
@@ -307,18 +307,18 @@ describe('ZuordnenAuswahl · Fahrzeug (D8)', () => {
       expect(abgerufen).toEqual(
         expect.arrayContaining([
           '/api/personnel?nur_im_dienst=true',
-          '/api/einsaetze/1/personal?entlassene=1',
+          '/api/einsaetze/1/personnel?entlassene=1',
         ]),
       ),
     );
-    expect(abgerufen.filter((a) => /^\/api\/(fahrzeuge|einsaetze\/1\/fahrzeuge)/.test(a))).toEqual(
+    expect(abgerufen.filter((a) => /^\/api\/(fahrzeuge|einsaetze\/1\/vehicles)/.test(a))).toEqual(
       [],
     );
   });
 
   it('Stamm-Fahrzeug abgelehnt: „Nicht zugeordnet“ mit dem Grund der Zeile unter dem Feld', async () => {
     server.use(
-      http.post('/api/einsaetze/1/fahrzeuge/sammel', () =>
+      http.post('/api/einsaetze/1/vehicles/bulk', () =>
         HttpResponse.json(
           {
             error: 'Nicht disponiert',

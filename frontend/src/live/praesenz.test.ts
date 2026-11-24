@@ -161,7 +161,7 @@ describe('melden und beenden', () => {
     };
     beendePraesenz(einheit, true);
     expect(apiSendKeepalive).toHaveBeenLastCalledWith(
-      '/api/einsaetze/1/einheiten/5/praesenz',
+      '/api/einsaetze/1/units/5/presence',
       { felder: ['bemerkung'], fenster: FENSTER_ID },
       'DELETE',
     );

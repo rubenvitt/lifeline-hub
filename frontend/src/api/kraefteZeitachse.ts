@@ -15,18 +15,18 @@ import type {
 export type KraftArt = 'einheit' | 'person';
 
 function kraftPfad(einsatzId: number, art: KraftArt, id: number): string {
-  const modul = art === 'einheit' ? 'einheiten' : 'personal';
-  return `/api/einsaetze/${einsatzId}/${modul}/${id}/zeitachse`;
+  const segment = art === 'einheit' ? 'units' : 'personnel';
+  return `/api/einsaetze/${einsatzId}/${segment}/${id}/timeline`;
 }
 
 /** Perioden je Einheit (nur Einheiten mit Ereignissen) — Spalte „Im Einsatz" im Meldebild. */
 export function listeEinheitenPerioden(einsatzId: number): Promise<EinheitPerioden[]> {
-  return apiGet<EinheitPerioden[]>(`/api/einsaetze/${einsatzId}/einheiten/zeitachse`);
+  return apiGet<EinheitPerioden[]>(`/api/einsaetze/${einsatzId}/units/timeline`);
 }
 
 /** Perioden je Person (nur Personen mit Ereignissen) — Personal-Seite. */
 export function listePersonalPerioden(einsatzId: number): Promise<PersonPerioden[]> {
-  return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personal/zeitachse`);
+  return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personnel/timeline`);
 }
 
 /**
@@ -37,7 +37,8 @@ export function ladeZeitachseGrenzwerte(
   einsatzId: number,
   modul: 'einheiten' | 'personal',
 ): Promise<SchichtplanGrenzwerte> {
-  return apiGet<SchichtplanGrenzwerte>(`/api/einsaetze/${einsatzId}/${modul}/zeitachse/grenzwerte`);
+  const segment = modul === 'einheiten' ? 'units' : 'personnel';
+  return apiGet<SchichtplanGrenzwerte>(`/api/einsaetze/${einsatzId}/${segment}/timeline/limits`);
 }
 
 export function ladeZeitachse(einsatzId: number, art: KraftArt, id: number): Promise<Zeitachse> {
@@ -64,7 +65,7 @@ export function tragePeriodeNach(
   id: number,
   body: ZeitachsePeriodeBody,
 ): Promise<Zeitachse> {
-  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/periode`, 'POST', body);
+  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/period`, 'POST', body);
 }
 
 /** Streicht ein Ereignis (unumkehrbar, Grund Pflicht); der alte Stand bleibt lesbar. */
@@ -75,7 +76,7 @@ export function streicheEreignis(
   ereignisId: number,
   grund: string,
 ): Promise<Zeitachse> {
-  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/streichen`, 'POST', {
+  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/strike`, 'POST', {
     grund,
   });
 }
@@ -91,9 +92,5 @@ export function berichtigeEreignis(
   ereignisId: number,
   body: { zeitpunkt_at: string; grund: string },
 ): Promise<Zeitachse> {
-  return apiSend<Zeitachse>(
-    `${kraftPfad(einsatzId, art, id)}/${ereignisId}/berichtigen`,
-    'POST',
-    body,
-  );
+  return apiSend<Zeitachse>(`${kraftPfad(einsatzId, art, id)}/${ereignisId}/correct`, 'POST', body);
 }

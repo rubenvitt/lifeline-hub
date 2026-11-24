@@ -23,7 +23,7 @@ function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = 
     http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/mitglieder', () =>
+    http.get('/api/einsaetze/1/members', () =>
       HttpResponse.json([
         {
           benutzer_id: 2,
@@ -34,7 +34,7 @@ function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = 
         },
       ]),
     ),
-    http.get('/api/einsaetze/1/mitglieder/auswahl', () =>
+    http.get('/api/einsaetze/1/members/selection', () =>
       HttpResponse.json([{ benutzer_id: 9, anzeigename: 'Paul Probe' }]),
     ),
   );

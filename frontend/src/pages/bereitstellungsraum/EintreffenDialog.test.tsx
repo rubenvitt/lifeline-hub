@@ -78,7 +78,7 @@ let clientIds: unknown[];
 
 function antwortMit(antwort: () => Response | Promise<Response>) {
   server.use(
-    http.post('/api/einsaetze/1/bereitstellungsraeume/1/eintreffen', async ({ request }) => {
+    http.post('/api/einsaetze/1/staging-areas/1/arrival', async ({ request }) => {
       const { client_id, ...rest } = (await request.json()) as Record<string, unknown>;
       clientIds.push(client_id);
       koerper.push(rest);
@@ -96,9 +96,7 @@ beforeEach(async () => {
   koerper = [];
   clientIds = [];
   server.use(
-    http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
-      HttpResponse.json<EinheitPerioden[]>([]),
-    ),
+    http.get('/api/einsaetze/1/units/timeline', () => HttpResponse.json<EinheitPerioden[]>([])),
   );
   antwortMit(() => HttpResponse.json(ERGEBNIS, { status: 201 }));
 });
@@ -208,7 +206,7 @@ describe('EintreffenDialog — gesperrte Listen (LLH-1462)', () => {
   it('nennt die Sperre über den Gruppen und fragt ohne Einheiten keine Zeitachse ab', async () => {
     const zeitachse: string[] = [];
     server.use(
-      http.get('/api/einsaetze/1/einheiten/zeitachse', ({ request }) => {
+      http.get('/api/einsaetze/1/units/timeline', ({ request }) => {
         zeitachse.push(request.url);
         return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
       }),
@@ -240,7 +238,7 @@ describe('EintreffenDialog — unbekannte Listen (LLH-1462)', () => {
 
 describe('EintreffenDialog — Aus Nachforderungen (LLH-1387, design.md D6)', () => {
   function erwartetMit(antwort: () => Response) {
-    server.use(http.get('/api/einsaetze/1/bereitstellungsraeume/1/erwartet', antwort));
+    server.use(http.get('/api/einsaetze/1/staging-areas/1/expected', antwort));
   }
   const NACHFORDERUNG = {
     nachforderung_id: 4,
@@ -350,7 +348,7 @@ describe('EintreffenDialog — Aus den Stammdaten (LLH-1300, design.md D6)', () 
   function stammMit(antwort: () => Response) {
     suchen = [];
     server.use(
-      http.get('/api/einsaetze/1/bereitstellungsraeume/1/stamm-treffer', ({ request }) => {
+      http.get('/api/einsaetze/1/staging-areas/1/master-data-matches', ({ request }) => {
         suchen.push(new URL(request.url).searchParams.get('suche') ?? '');
         return antwort();
       }),

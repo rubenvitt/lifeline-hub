@@ -12,15 +12,15 @@ use common::*;
 const PAUSE_OFFEN: &str = "Erst die Pause beenden oder ihren Beginn zurücknehmen";
 
 fn plan(e: i64) -> String {
-    format!("/api/einsaetze/{e}/abloesungen/schichtplan")
+    format!("/api/einsaetze/{e}/reliefs/shift-plan")
 }
 
 fn wechsel_pfad(e: i64, bid: i64) -> String {
-    format!("{}/bloecke/{bid}/wechsel", plan(e))
+    format!("{}/blocks/{bid}/handovers", plan(e))
 }
 
 fn ruecknahme_pfad(e: i64, wid: i64) -> String {
-    format!("{}/wechsel/{wid}/zuruecknehmen", plan(e))
+    format!("{}/handovers/{wid}/undo", plan(e))
 }
 
 async fn uhs_anlegen(app: &axum::Router, cookie: &str, e: i64, bez: &str) -> i64 {
@@ -40,7 +40,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name}})),
     )
@@ -65,7 +65,7 @@ async fn kraft(app: &axum::Router, cookie: &str, e: i64, ep: i64) -> Value {
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         cookie,
         None,
     )
@@ -84,7 +84,7 @@ async fn kraft_von_stamm(app: &axum::Router, cookie: &str, e: i64, pid: i64) -> 
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         cookie,
         None,
     )
@@ -101,7 +101,7 @@ async fn block(app: &axum::Router, cookie: &str, e: i64, posten: Value, personen
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("{}/bloecke", plan(e)),
+        &format!("{}/blocks", plan(e)),
         cookie,
         Some(&json!({"posten": posten, "von": "2099-11-14 18:00:00",
                      "bis": "2099-11-14 22:00:00", "personen": personen})),
@@ -191,7 +191,7 @@ async fn status_setzen(app: &axum::Router, cookie: &str, e: i64, ep: i64, status
     let (s, v) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/personal/{ep}"),
+        &format!("/api/einsaetze/{e}/personnel/{ep}"),
         cookie,
         Some(&json!({"status_id": status})),
     )
@@ -338,7 +338,7 @@ async fn uhs_einheit_bleibt_und_ruecknahme_nur_beim_stand_des_wechsels() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einheiten/{rtw}/personal/{eva}"),
+        &format!("/api/einsaetze/{e}/units/{rtw}/personnel/{eva}"),
         &admin,
         None,
     )
@@ -729,7 +729,7 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &format!("{}/blocks/{bid}?version=1", plan(e)),
         &admin,
         None,
     )
@@ -740,7 +740,7 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("{}/bloecke/{bid}", plan(e)),
+        &format!("{}/blocks/{bid}", plan(e)),
         &admin,
         Some(&json!({"version": 1, "posten": {"art": "uhs", "uhs_id": markt}})),
     )
@@ -759,7 +759,7 @@ async fn offene_pause_leerer_status_und_fremde_kommende() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &format!("{}/blocks/{bid}?version=1", plan(e)),
         &admin,
         None,
     )
@@ -811,7 +811,7 @@ async fn pause_ohne_block_bleibt_wie_sie_ist() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("{}/bloecke/{bid}?version=1", plan(e)),
+        &format!("{}/blocks/{bid}?version=1", plan(e)),
         &admin,
         None,
     )
@@ -866,7 +866,7 @@ async fn weitergewechselt_behaelt_eintreffen() {
     let (s, p) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/bloecke", plan(e)),
+        &format!("{}/blocks", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": bahnhof},
                      "von": "2099-11-14 22:00:00", "bis": "2099-11-15 02:00:00",
@@ -931,7 +931,7 @@ async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
     let (s, p) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/bloecke", plan(e)),
+        &format!("{}/blocks", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": bahnhof},
                      "von": "2099-11-14 22:00:00", "bis": "2099-11-15 02:00:00",
@@ -960,7 +960,7 @@ async fn zurueck_an_die_erste_uhs_behaelt_zuordnung() {
     let (s, p) = anfrage_json(
         &app,
         "POST",
-        &format!("{}/bloecke", plan(e)),
+        &format!("{}/blocks", plan(e)),
         &admin,
         Some(&json!({"posten": {"art": "uhs", "uhs_id": markt},
                      "von": "2099-11-15 02:00:00", "bis": "2099-11-15 06:00:00",

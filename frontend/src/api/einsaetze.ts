@@ -70,12 +70,12 @@ export function oeffneEinsatzWieder(id: number, grund: string): Promise<EinsatzA
 }
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
-  return apiGet<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder`);
+  return apiGet<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members`);
 }
 
 /** Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): nur Kennung und Anzeigename. */
 export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
-  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/mitglieder/auswahl`);
+  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/members/selection`);
 }
 
 /**
@@ -102,14 +102,14 @@ export function setzeMitglied(
   rolle: EinsatzRolle,
   stelle?: FuehrungsstelleUpdate,
 ): Promise<MitgliedAnzeige[]> {
-  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'PUT', {
+  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members/${benutzerId}`, 'PUT', {
     einsatz_rolle: rolle,
     ...(stelle ?? {}),
   });
 }
 
 export function entferneMitglied(id: number, benutzerId: number): Promise<MitgliedAnzeige[]> {
-  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/mitglieder/${benutzerId}`, 'DELETE');
+  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members/${benutzerId}`, 'DELETE');
 }
 
 /** Editierbare Kopffelder; geschrieben wird nur als Teil-PATCH (`patcheEinsatz`). */

@@ -53,7 +53,7 @@ function liefere(
       abrufe += 1;
       return HttpResponse.json(abschnitte);
     }),
-    http.get('/api/einsaetze/5/einheiten', einheitenAntwort),
+    http.get('/api/einsaetze/5/units', einheitenAntwort),
   );
   return () => abrufe;
 }

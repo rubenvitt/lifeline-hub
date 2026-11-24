@@ -126,26 +126,26 @@ for (const modus of ['light', 'dark'] as const) {
     const abschnitt_id = await post(page, `${basis}/sectors`, { name: 'Deichwache Kontrast' });
     const kartenIds: { einheit: number; schicht: number }[] = [];
     for (const k of KARTEN) {
-      const einheit = await post(page, `${basis}/einheiten`, { name: k.einheit, abschnitt_id });
-      const schicht = await post(page, `${basis}/abloesungen`, {
+      const einheit = await post(page, `${basis}/units`, { name: k.einheit, abschnitt_id });
+      const schicht = await post(page, `${basis}/reliefs`, {
         einheit_id: einheit,
         rhythmus_minuten: 360,
         beginn_at: new Date(jetzt - k.beginnVorMin * 60_000).toISOString(),
       });
       kartenIds.push({ einheit, schicht });
     }
-    const planung = await page.request.patch(`${basis}/abloesungen/${kartenIds[0].schicht}`, {
+    const planung = await page.request.patch(`${basis}/reliefs/${kartenIds[0].schicht}`, {
       data: { abloeser_ids: [kartenIds[2].einheit] },
     });
     expect(planung.ok(), `Planung: ${planung.status()} ${await planung.text()}`).toBeTruthy();
-    const alt = await post(page, `${basis}/einheiten`, { name: ABGELOEST, abschnitt_id });
-    const neu = await post(page, `${basis}/einheiten`, { name: FOLGE, abschnitt_id });
-    const schicht = await post(page, `${basis}/abloesungen`, {
+    const alt = await post(page, `${basis}/units`, { name: ABGELOEST, abschnitt_id });
+    const neu = await post(page, `${basis}/units`, { name: FOLGE, abschnitt_id });
+    const schicht = await post(page, `${basis}/reliefs`, {
       einheit_id: alt,
       rhythmus_minuten: 360,
       beginn_at: new Date(jetzt - 380 * 60_000).toISOString(),
     });
-    const v = await page.request.post(`${basis}/abloesungen/${schicht}/vollzug`, {
+    const v = await page.request.post(`${basis}/reliefs/${schicht}/execution`, {
       data: { abloesende_einheit_id: neu },
     });
     expect(v.ok(), `Vollzug: ${v.status()} ${await v.text()}`).toBeTruthy();
@@ -153,20 +153,20 @@ for (const modus of ['light', 'dark'] as const) {
     const draht = (vorMin: number) =>
       new Date(jetzt - vorMin * 60_000).toISOString().slice(0, 19).replace('T', ' ');
     const nachtrag = async (einheit: number, art: string, vorMin: number) => {
-      const r = await page.request.post(`${basis}/einheiten/${einheit}/zeitachse`, {
+      const r = await page.request.post(`${basis}/units/${einheit}/timeline`, {
         data: { art, zeitpunkt_at: draht(vorMin) },
       });
       expect(r.ok(), `Nachtrag ${art}: ${r.status()} ${await r.text()}`).toBeTruthy();
     };
     await nachtrag(
-      await post(page, `${basis}/einheiten`, { name: OHNE, abschnitt_id }),
+      await post(page, `${basis}/units`, { name: OHNE, abschnitt_id }),
       'eintreffen',
       50,
     );
     await nachtrag(kartenIds[2].einheit, 'alarmierung', 5);
-    const entlassen = await post(page, `${basis}/einheiten`, { name: ENTLASSEN, abschnitt_id });
+    const entlassen = await post(page, `${basis}/units`, { name: ENTLASSEN, abschnitt_id });
     await nachtrag(entlassen, 'eintreffen', 200);
-    await post(page, `${basis}/abloesungen`, { einheit_id: entlassen, rhythmus_minuten: 360 });
+    await post(page, `${basis}/reliefs`, { einheit_id: entlassen, rhythmus_minuten: 360 });
     await nachtrag(entlassen, 'entlassung', 10);
 
     // Die überfällige Schicht meldet der Erinnerungs-Scheduler im nächsten Takt als Alarm in der

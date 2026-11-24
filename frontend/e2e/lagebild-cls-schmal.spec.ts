@@ -110,7 +110,7 @@ async function einsatzAnlegen(page: Page): Promise<string> {
 }
 
 /** Die Quellen des Paneels „Einsatzabschnitte“ im Überblick (`abschnittZeilen`). */
-const UEBERBLICK_GLIEDERUNG = ['sectors', 'einheiten', 'personal', 'fahrzeuge', 'material'];
+const UEBERBLICK_GLIEDERUNG = ['sectors', 'units', 'personnel', 'vehicles', 'material'];
 
 type Folge = 'Einsatz zuerst' | 'Einsatz zuletzt' | 'natürlich';
 const FOLGEN: Folge[] = ['Einsatz zuerst', 'Einsatz zuletzt', 'natürlich'];

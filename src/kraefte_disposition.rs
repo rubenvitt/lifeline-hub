@@ -259,7 +259,7 @@ pub async fn check_fahrzeuge_tx(
         .collect())
 }
 
-/// Der Einzelweg einer Stamm-Person (`POST …/personal`) behält seine Fehler: die eine
+/// Der Einzelweg einer Stamm-Person (`POST …/personnel`) behält seine Fehler: die eine
 /// abgelehnte Zeile wird zum Fehler der Anfrage — unbekannt 404, schon disponiert 409 (wie der
 /// UNIQUE-Konflikt), außer Dienst 422 (Zustand, `src/AGENTS.md`, Statuscode-Konvention).
 pub fn als_einzelfehler(fehler: AppError) -> AppError {

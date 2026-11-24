@@ -510,7 +510,7 @@ async fn lagemonitor(i: &Instanz, einsatz: i64) -> String {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/geraete"),
+        &format!("/api/einsaetze/{einsatz}/devices"),
         &i.admin,
         Some(&json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"})),
     )

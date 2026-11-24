@@ -165,8 +165,8 @@ function setupMSW() {
     http.get('/api/etb-snippets', () => HttpResponse.json([])),
     // Schnellerfassung lädt via useFunkrufnamen disponierte Fahrzeuge/Einheiten
     // (Absender/Empfänger-Vorschläge). Leere Listen genügen für diesen Test.
-    http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
     // Auftrags-Ziele für das ETB→Auftrag-Formular.
     http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     // Standard-Rufname gesetzt (LFH-894): ohne ihn sperrte die Von/An-Pflicht jedes Absenden.
@@ -495,8 +495,8 @@ describe('EtbPage', () => {
         return HttpResponse.json(url.searchParams.has('before_lfd_nr') ? [ziel] : seite1);
       }),
       zaehlung({ meldung: 412 }),
-      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
@@ -536,8 +536,8 @@ describe('EtbPage', () => {
         return HttpResponse.json([eintrag]); // 1 < SEITENGROESSE → keine weitere Seite
       }),
       zaehlung({ meldung: 1 }),
-      http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
       http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(
@@ -1175,7 +1175,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
     const abrufe: string[] = [];
     setupMSW();
     server.use(
-      http.get('/api/einsaetze/7/einheiten', () =>
+      http.get('/api/einsaetze/7/units', () =>
         HttpResponse.json([
           { id: 5, name: '1. Zug' },
           { id: 6, name: '2. Zug' },
@@ -2010,7 +2010,7 @@ describe('EtbPage — Dokumente mit ETB-Bezug (LFH-743)', () => {
         abgefragt.push('abschnitte');
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/7/einheiten', () => {
+      http.get('/api/einsaetze/7/units', () => {
         abgefragt.push('einheiten');
         return HttpResponse.json([]);
       }),

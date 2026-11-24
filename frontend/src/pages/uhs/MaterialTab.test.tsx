@@ -122,7 +122,7 @@ function render({
   const abrufe: string[] = [];
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/material', () => {

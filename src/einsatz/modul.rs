@@ -184,7 +184,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // D3).
     ("/api/einsaetze/{id}/staff/info-line", Some("infotelefon")),
     ("/api/einsaetze/{id}/documents", Some("dokumente")),
-    ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
+    ("/api/einsaetze/{id}/reliefs", Some("abloesung")),
     ("/api/einsaetze/{id}/care", Some("betreuung")),
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
     ("/api/einsaetze/{id}/evacuation", Some("evakuierung")),
@@ -192,11 +192,11 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/damages", Some("schaeden")),
     ("/api/einsaetze/{id}/animals", Some("tiere")),
     (
-        "/api/einsaetze/{id}/bereitstellungsraeume",
+        "/api/einsaetze/{id}/staging-areas",
         Some("bereitstellungsraeume"),
     ),
-    ("/api/einsaetze/{id}/fahrzeuge", Some("fahrzeuge")),
-    ("/api/einsaetze/{id}/personal", Some("personal")),
+    ("/api/einsaetze/{id}/vehicles", Some("fahrzeuge")),
+    ("/api/einsaetze/{id}/personnel", Some("personal")),
     ("/api/einsaetze/{id}/material", Some("material")),
     ("/api/einsaetze/{id}/uhs", Some("unfallhilfsstellen")),
     // Die UHS-Belegung einer Person hängt am UHS-Modul, nicht an den Personen.
@@ -205,7 +205,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         Some("unfallhilfsstellen"),
     ),
     ("/api/einsaetze/{id}/persons", Some("personen")),
-    ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
+    ("/api/einsaetze/{id}/units", Some("einheiten")),
     ("/api/einsaetze/{id}/chat", Some("chat")),
     ("/api/einsaetze/{id}/etb", Some("etb")),
     ("/api/einsaetze/{id}/reminders", Some("erinnerungen")),
@@ -287,16 +287,16 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modul-Vorgaben der Einsatz-Org (LLH-1183): modul-los wie die Overrides, die Antwort
     // beschreibt die Modulregeln selbst.
     ("/api/einsaetze/{id}/module-defaults", None),
-    ("/api/einsaetze/{id}/mitglieder", None),
+    ("/api/einsaetze/{id}/members", None),
     // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
     ("/api/einsaetze/{id}/command-post", None),
     // Präsenz an Einsatzdaten und Führungsstelle (LLH-1946): Gate wie die Kopfdaten, modul-los;
-    // die Präsenz an einer Einheit liegt unter `/einheiten` und erbt deren Key.
+    // die Präsenz an einer Einheit liegt unter `/units` und erbt deren Key.
     ("/api/einsaetze/{id}/presence", None),
     // Führung je Einsatz (LLH-1491): Zustand der Instanzkopplung, modul-los wie der Abschluss.
     ("/api/einsaetze/{id}/command", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
-    ("/api/einsaetze/{id}/geraete", None),
+    ("/api/einsaetze/{id}/devices", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/einsaetze/{id}/integrations", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.
@@ -509,7 +509,7 @@ mod tests {
     fn einsatz_wurzel_trifft_nur_exakt() {
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}"), Some(None));
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/mitglieder/{benutzer_id}"),
+            key_fuer_pfad("/api/einsaetze/{id}/members/{benutzer_id}"),
             Some(None)
         );
         // Eine unregistrierte Sub-Route erbt die Wurzel NICHT.

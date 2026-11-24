@@ -393,7 +393,7 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
 
 /// Koppelt ein Gerät mit `body` und liefert sein Sitzungscookie.
 async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
-    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/geraete"), body).await;
+    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/devices"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let code = v["code"]["code"].as_str().unwrap().to_string();
     let resp = app
@@ -464,7 +464,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, kraft) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         json!({"adhoc": {"name": "Dr. A. Muster", "funktion": "Notärztin"}}),
     )
     .await;
@@ -606,7 +606,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, kraft) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/personal"),
+            &format!("/api/einsaetze/{e}/personnel"),
             json!({"adhoc": {"name": format!("Bestätigt {name}")}}),
         )
         .await;
@@ -624,7 +624,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, v) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/personal/{}/stornieren", kraft["id"]),
+            &format!("/api/einsaetze/{e}/personnel/{}/annul", kraft["id"]),
             json!({}),
         )
         .await;

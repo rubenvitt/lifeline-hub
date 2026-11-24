@@ -255,8 +255,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/einsaetze/5/reports/check-ins', () => new HttpResponse(null, { status: 403 })),
       ...[
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/einheiten',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/units',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/free-symbols',
         '/api/einsaetze/5/hazard-areas',
@@ -298,8 +298,8 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/einheiten',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/units',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -355,14 +355,14 @@ describe('useLagekarteDaten markerLaden', () => {
           karten_bau_verfuegbar: false,
         }),
       ),
-      http.get('/api/einsaetze/5/einheiten', async () => {
+      http.get('/api/einsaetze/5/units', async () => {
         await gesperrt;
         return HttpResponse.json([]);
       }),
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -428,8 +428,8 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/einheiten',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/units',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -601,8 +601,8 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/einheiten',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/units',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -948,7 +948,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -956,12 +956,12 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/einheiten', () => HttpResponse.json([EINHEIT])),
+      http.get('/api/einsaetze/5/units', () => HttpResponse.json([EINHEIT])),
       http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
-      http.get('/api/einsaetze/5/bereitstellungsraeume', () => {
+      http.get('/api/einsaetze/5/staging-areas', () => {
         zaehler.raeume += 1;
         return raeume();
       }),
@@ -1145,8 +1145,8 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
       ...[
         '/api/einsaetze/5/uhs',
         '/api/einsaetze/5/damages/marker',
-        '/api/einsaetze/5/einheiten',
-        '/api/einsaetze/5/fahrzeuge',
+        '/api/einsaetze/5/units',
+        '/api/einsaetze/5/vehicles',
         '/api/einsaetze/5/sectors',
         '/api/einsaetze/5/zones',
         '/api/einsaetze/5/free-symbols',
@@ -1303,8 +1303,8 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
   const GEBUNDEN = [
     '/api/einsaetze/5/uhs',
     '/api/einsaetze/5/damages/marker',
-    '/api/einsaetze/5/einheiten',
-    '/api/einsaetze/5/fahrzeuge',
+    '/api/einsaetze/5/units',
+    '/api/einsaetze/5/vehicles',
     '/api/einsaetze/5/sectors',
     '/api/einsaetze/5/hazard-areas',
     '/api/einsaetze/5/situation/reports',

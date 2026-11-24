@@ -10,7 +10,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen")
+    format!("/api/einsaetze/{einsatz}/reliefs")
 }
 
 async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
@@ -40,7 +40,7 @@ async fn einheit(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         Some(&body),
     )
@@ -81,7 +81,7 @@ async fn durchstich_beginnen_vorgabe_vollzug_ruecknahme() {
     let (s, json) = anfrage(
         &app,
         "PUT",
-        &format!("{}/vorgaben/{nord}", pfad(e)),
+        &format!("{}/defaults/{nord}", pfad(e)),
         &admin,
         Some(r#"{"rhythmus_minuten":480}"#),
     )
@@ -110,7 +110,7 @@ async fn durchstich_beginnen_vorgabe_vollzug_ruecknahme() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{}/vorgaben/{nord}", pfad(e)),
+        &format!("{}/defaults/{nord}", pfad(e)),
         &admin,
         Some(r#"{"rhythmus_minuten":360}"#),
     )
@@ -132,7 +132,7 @@ async fn durchstich_beginnen_vorgabe_vollzug_ruecknahme() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{}/{id}/vollzug", pfad(e)),
+        &format!("{}/{id}/execution", pfad(e)),
         &admin,
         Some(&format!(
             r#"{{"vollzogen_at":"2026-09-22T15:40:00Z","abloesende_einheit_id":{f2}}}"#
@@ -161,7 +161,7 @@ async fn durchstich_beginnen_vorgabe_vollzug_ruecknahme() {
     let (s, r) = anfrage(
         &app,
         "POST",
-        &format!("{}/{id}/vollzug/zuruecknehmen", pfad(e)),
+        &format!("{}/{id}/execution/undo", pfad(e)),
         &admin,
         None,
     )
@@ -190,7 +190,7 @@ async fn durchstich_beginnen_vorgabe_vollzug_ruecknahme() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/{id}/vollzug/zuruecknehmen", pfad(e)),
+        &format!("{}/{id}/execution/undo", pfad(e)),
         &admin,
         None,
     )
@@ -235,7 +235,7 @@ async fn statuscodes() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{}/vorgaben/{nord}", pfad(e)),
+        &format!("{}/defaults/{nord}", pfad(e)),
         &admin,
         Some("{}"),
     )
@@ -258,7 +258,7 @@ async fn statuscodes() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/999999/vollzug", pfad(e)),
+        &format!("{}/999999/execution", pfad(e)),
         &admin,
         Some("{}"),
     )
@@ -268,7 +268,7 @@ async fn statuscodes() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{}/vorgaben/{fremd_abschnitt}", pfad(e)),
+        &format!("{}/defaults/{fremd_abschnitt}", pfad(e)),
         &admin,
         Some(r#"{"rhythmus_minuten":60}"#),
     )
@@ -299,12 +299,12 @@ async fn statuscodes() {
         ("PATCH", "", r#"{"beginn_at":"2101-01-01 00:00:00"}"#),
         (
             "POST",
-            "/vollzug",
+            "/execution",
             r#"{"vollzogen_at":"+262142-12-31 23:30:00"}"#,
         ),
         (
             "POST",
-            "/vollzug",
+            "/execution",
             r#"{"vollzogen_at":"1999-12-31 23:59:59"}"#,
         ),
     ] {
@@ -339,7 +339,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("{}/vorgaben", pfad(e)),
+        &format!("{}/defaults", pfad(e)),
         &beob_cookie,
         None,
     )
@@ -361,7 +361,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 const MODELLE: &str = "/api/shift-models";
 
 fn vorgabe_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abloesungen/schichtmodell")
+    format!("/api/einsaetze/{einsatz}/reliefs/shift-model")
 }
 
 async fn modell(app: &axum::Router, cookie: &str, body: &str) -> (StatusCode, serde_json::Value) {
@@ -612,7 +612,7 @@ async fn einsatzvorgabe_rangfolge_und_weitergabe() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("{}/vorgaben/{nord}", pfad(e)),
+        &format!("{}/defaults/{nord}", pfad(e)),
         &admin,
         Some(r#"{"rhythmus_minuten":480}"#),
     )
@@ -864,7 +864,7 @@ async fn wechselzeiten_in_der_wirksamen_zone() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{}/{id1}/vollzug", pfad(e)),
+        &format!("{}/{id1}/execution", pfad(e)),
         &admin,
         Some(&format!(
             r#"{{"vollzogen_at":"2026-10-16T16:05:00Z","abloesende_einheit_id":{f4}}}"#
@@ -999,7 +999,7 @@ async fn handstatus(app: &axum::Router, admin: &str, e: i64, einheit: i64, statu
     let (s, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{e}/einheiten/{einheit}/status"),
+        &format!("/api/einsaetze/{e}/units/{einheit}/status"),
         admin,
         Some(&format!(r#"{{"status_id":{status}}}"#)),
     )
@@ -1065,7 +1065,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse"),
+        &format!("/api/einsaetze/{e}/units/{f1}/timeline"),
         &admin,
         None,
     )
@@ -1124,7 +1124,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse"),
+        &format!("/api/einsaetze/{e}/units/{f1}/timeline"),
         &admin,
         None,
     )
@@ -1141,7 +1141,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/{f1}/zeitachse/{entlassung}/streichen"),
+        &format!("/api/einsaetze/{e}/units/{f1}/timeline/{entlassung}/strike"),
         &admin,
         Some(r#"{"grund":"falscher Knopf"}"#),
     )
@@ -1190,7 +1190,7 @@ async fn ohne_vorgabe_oder_bei_fehler_bleibt_es_beim_statuswechsel() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten/{f2}/zeitachse"),
+        &format!("/api/einsaetze/{e}/units/{f2}/timeline"),
         &admin,
         None,
     )
@@ -1220,7 +1220,7 @@ async fn untereinheit_erbt_die_schicht_des_verbands() {
     let (s, gruppe) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         &admin,
         Some(&format!(
             r#"{{"name":"Gruppe 1","ueber_einheit_id":{zug}}}"#
@@ -1242,7 +1242,7 @@ async fn untereinheit_erbt_die_schicht_des_verbands() {
     );
 }
 
-/// Abschnitt einer Einheit laut `GET …/einheiten`.
+/// Abschnitt einer Einheit laut `GET …/units`.
 async fn abschnitt_von(
     app: &axum::Router,
     cookie: &str,
@@ -1252,7 +1252,7 @@ async fn abschnitt_von(
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         cookie,
         None,
     )
@@ -1289,7 +1289,7 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
     let aid = schicht["id"].as_i64().unwrap();
-    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+    let vollzug = format!("{}/{aid}/execution", pfad(e));
 
     let neun = format!(
         r#"{{"abloeser_ids":[{}]}}"#,
@@ -1355,14 +1355,7 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/zuruecknehmen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["folgeschichten"], serde_json::json!([]));
@@ -1439,7 +1432,11 @@ async fn vollzug_uebergabe_ohne_wirkung_braucht_keine_freigabe_einheiten() {
         )
         .await;
         assert_eq!(s, StatusCode::CREATED, "{j:?}");
-        schichten.push(format!("{}/{}/vollzug", pfad(e), j["id"].as_i64().unwrap()));
+        schichten.push(format!(
+            "{}/{}/execution",
+            pfad(e),
+            j["id"].as_i64().unwrap()
+        ));
     }
 
     let fid = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
@@ -1528,7 +1525,7 @@ async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: O
     let (s, p) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personal"),
+        &format!("/api/einsaetze/{e}/personnel"),
         cookie,
         Some(&format!(r#"{{"adhoc":{{"name":"{name}"}}}}"#)),
     )
@@ -1539,7 +1536,7 @@ async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: O
         let (s, j) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{e}/einheiten/{einheit}/personal/{id}"),
+            &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{id}"),
             cookie,
             None,
         )
@@ -1554,7 +1551,7 @@ async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> V
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         cookie,
         None,
     )
@@ -1604,7 +1601,7 @@ async fn besatzungswechsel_ueber_die_route() {
     assert_eq!(schicht["art"], "einheit");
     assert_eq!(schicht["besatzung"], serde_json::json!([]));
     let aid = schicht["id"].as_i64().unwrap();
-    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+    let vollzug = format!("{}/{aid}/execution", pfad(e));
 
     let viele = (0..51).map(|i| i.to_string()).collect::<Vec<_>>().join(",");
     for (body, code) in [
@@ -1701,14 +1698,7 @@ async fn besatzungswechsel_ueber_die_route() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/zuruecknehmen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["art"], "einheit");
@@ -1722,7 +1712,7 @@ async fn besatzungswechsel_ueber_die_route() {
 
 /// LLH-1308: Bereitstellungsraum anlegen und aktivieren.
 async fn raum(app: &axum::Router, cookie: &str, e: i64, bez: &str) -> i64 {
-    let basis = format!("/api/einsaetze/{e}/bereitstellungsraeume");
+    let basis = format!("/api/einsaetze/{e}/staging-areas");
     let (s, j) = anfrage(
         app,
         "POST",
@@ -1764,7 +1754,7 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
     .await;
     assert_eq!(s, StatusCode::CREATED);
     let aid = schicht["id"].as_i64().unwrap();
-    let vollzug = format!("{}/{aid}/vollzug", pfad(e));
+    let vollzug = format!("{}/{aid}/execution", pfad(e));
 
     for (body, erwartet) in [
         (
@@ -1840,14 +1830,7 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
         "{etb:?}"
     );
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/zuruecknehmen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     assert_eq!(r["status"], "laufend");
     assert_eq!(r["verbleib"], "ruhe");
@@ -1912,7 +1895,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{schicht:?}");
-    let vollzug = format!("{}/{}/vollzug", pfad(e), schicht["id"]);
+    let vollzug = format!("{}/{}/execution", pfad(e), schicht["id"]);
 
     let gemeldet =
         |rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>| {
@@ -1941,14 +1924,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     ids.sort_unstable();
     assert_eq!(ids, vec![Some(pid), Some(qid)], "Vollzug");
 
-    let (s, r) = anfrage(
-        &app,
-        "POST",
-        &format!("{vollzug}/zuruecknehmen"),
-        &admin,
-        None,
-    )
-    .await;
+    let (s, r) = anfrage(&app, "POST", &format!("{vollzug}/undo"), &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{r:?}");
     let mut ids = gemeldet(&mut rx);
     ids.sort_unstable();

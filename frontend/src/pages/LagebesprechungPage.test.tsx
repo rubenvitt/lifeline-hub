@@ -142,7 +142,7 @@ function rendere({
       if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/1/personal', () => {
+    http.get('/api/einsaetze/1/personnel', () => {
       zaehle('personal');
       return HttpResponse.json(lage.personal ?? []);
     }),
@@ -162,10 +162,14 @@ function rendere({
       'material',
       'abschnitte',
     ].map((l) =>
-      http.get(`/api/einsaetze/1/${l}`, () => {
-        zaehle(l);
-        return HttpResponse.json([]);
-      }),
+      // Gezählt wird der Modulname, abgefragt der englische Pfad (ADR-0097).
+      http.get(
+        `/api/einsaetze/1/${({ einheiten: 'units', fahrzeuge: 'vehicles' } as Record<string, string>)[l] ?? l}`,
+        () => {
+          zaehle(l);
+          return HttpResponse.json([]);
+        },
+      ),
     ),
     http.get('/api/einsaetze/1/module-counts', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );

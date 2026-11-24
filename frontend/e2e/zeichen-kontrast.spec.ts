@@ -30,15 +30,15 @@ import {
  */
 async function seede(page: Page, einsatzId: string) {
   const abschnitt = await post(page, einsatzId, 'sectors', { name: 'Deich Nord' });
-  await post(page, einsatzId, 'einheiten', {
+  await post(page, einsatzId, 'units', {
     name: 'Gruppe ohne Organisation',
     abschnitt_id: abschnitt,
   });
-  const fw = await post(page, einsatzId, 'einheiten', {
+  const fw = await post(page, einsatzId, 'units', {
     name: 'Gruppe Feuerwehr',
     abschnitt_id: abschnitt,
   });
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/einheiten/${fw}/position`, {
+  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${fw}/position`, {
     data: { tz_organisation: 'feuerwehr' },
   });
   expect(antwort.ok(), `Organisation: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

@@ -58,7 +58,7 @@ const ANGEBOT = [
 function grundHandler() {
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-    http.get('/api/einsaetze/1/einheiten', () =>
+    http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 2, name: 'Staffel A', ueber_einheit_id: null }]),
     ),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
@@ -262,7 +262,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
   function aufteilenMitschnitt(antwort?: () => Response) {
     const gesendet: { url: string; body: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:emId/aufteilen', async ({ request }) => {
+      http.post('/api/einsaetze/1/material/:emId/split', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
         return antwort ? antwort() : HttpResponse.json([{}, {}]);
       }),
@@ -292,7 +292,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/12/aufteilen', body: { menge: 20, uhs_id: 7 } },
+        { url: '/api/einsaetze/1/material/12/split', body: { menge: 20, uhs_id: 7 } },
       ]),
     );
     expect(patches).toEqual([]);

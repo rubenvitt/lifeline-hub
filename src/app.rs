@@ -368,7 +368,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/praesenz",
+            "/api/einsaetze/{id}/units/{eid}/presence",
             put(routes::praesenz::einheit_melden).delete(routes::praesenz::einheit_beenden),
         )
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
@@ -432,20 +432,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::einsatz::modul_override_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/mitglieder",
+            "/api/einsaetze/{id}/members",
             get(routes::einsatz::mitglieder),
         )
         // Statisches Segment vor `{benutzer_id}` (LFH-1141); Kennungen sind Zahlen.
         .route(
-            "/api/einsaetze/{id}/mitglieder/auswahl",
+            "/api/einsaetze/{id}/members/selection",
             get(routes::einsatz::mitglied_auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
+            "/api/einsaetze/{id}/members/{benutzer_id}",
             put(routes::einsatz::mitglied_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/mitglieder/{benutzer_id}",
+            "/api/einsaetze/{id}/members/{benutzer_id}",
             delete(routes::einsatz::mitglied_entfernen),
         )
         .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
@@ -650,95 +650,95 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Stab (S1–S6) und Ablösung. `vorgaben` steht vor `{aid}` nur zur Lesbarkeit.
         .route(
-            "/api/einsaetze/{id}/abloesungen",
+            "/api/einsaetze/{id}/reliefs",
             get(routes::abloesung::liste).post(routes::abloesung::beginnen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/vorgaben",
+            "/api/einsaetze/{id}/reliefs/defaults",
             get(routes::abloesung::vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/vorgaben/{abschnitt_id}",
+            "/api/einsaetze/{id}/reliefs/defaults/{abschnitt_id}",
             put(routes::abloesung::vorgabe_setzen),
         )
         // Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells.
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtmodell",
+            "/api/einsaetze/{id}/reliefs/shift-model",
             get(routes::abloesung::read_einsatz_vorgabe)
                 .put(routes::abloesung::set_einsatz_vorgabe),
         )
         // Schichtplan (LLH-1552): `schichtplan` ist ein festes Segment neben `{aid}`.
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan",
+            "/api/einsaetze/{id}/reliefs/shift-plan",
             get(routes::abloesung_schichtplan::lesen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke",
+            "/api/einsaetze/{id}/reliefs/shift-plan/blocks",
             post(routes::abloesung_schichtplan::create_block),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}",
+            "/api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}",
             patch(routes::abloesung_schichtplan::update_block)
                 .delete(routes::abloesung_schichtplan::delete_block),
         )
         // Wechsel aus dem Plan an einer UHS und in der Pause (LLH-1555).
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/bloecke/{bid}/wechsel",
+            "/api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}/handovers",
             get(routes::abloesung_schichtplan::wechsel_vorlage)
                 .post(routes::abloesung_schichtplan::wechsel_vollziehen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/wechsel/{wid}/zuruecknehmen",
+            "/api/einsaetze/{id}/reliefs/shift-plan/handovers/{wid}/undo",
             post(routes::abloesung_schichtplan::wechsel_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/erzeugen",
+            "/api/einsaetze/{id}/reliefs/shift-plan/generate",
             post(routes::abloesung_schichtplan::erzeugen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/grenzwerte",
+            "/api/einsaetze/{id}/reliefs/shift-plan/limits",
             patch(routes::abloesung_schichtplan::update_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer",
+            "/api/einsaetze/{id}/reliefs/shift-plan/helpers",
             post(routes::abloesung_schichtplan::create_helfer),
         )
         // Schichtplan als Excel-Mappe (LLH-1557): nur Lesen.
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/export",
+            "/api/einsaetze/{id}/reliefs/shift-plan/export",
             get(routes::abloesung_schichtplan::export),
         )
         // Schichtplan einlesen (LLH-1556): Multipart mit der Datei (höchstens 2 MiB) und den
         // Entscheidungen; die Datei-Grenze selbst prüft `uebernahme::datei` (400).
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/import/vorschau",
+            "/api/einsaetze/{id}/reliefs/shift-plan/import/preview",
             post(routes::abloesung_schichtplan::import_vorschau)
                 .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/import",
+            "/api/einsaetze/{id}/reliefs/shift-plan/import",
             post(routes::abloesung_schichtplan::import_uebernehmen)
                 .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/schichtplan/helfer/{hid}",
+            "/api/einsaetze/{id}/reliefs/shift-plan/helpers/{hid}",
             patch(routes::abloesung_schichtplan::update_helfer)
                 .delete(routes::abloesung_schichtplan::delete_helfer),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/{aid}",
+            "/api/einsaetze/{id}/reliefs/{aid}",
             patch(routes::abloesung::aendern),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/{aid}/plan-vorlage",
+            "/api/einsaetze/{id}/reliefs/{aid}/plan-template",
             get(routes::abloesung::plan_vorlage),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug",
+            "/api/einsaetze/{id}/reliefs/{aid}/execution",
             post(routes::abloesung::vollziehen),
         )
         .route(
-            "/api/einsaetze/{id}/abloesungen/{aid}/vollzug/zuruecknehmen",
+            "/api/einsaetze/{id}/reliefs/{aid}/execution/undo",
             post(routes::abloesung::zuruecknehmen),
         )
         // Betreuung: Betreuungsstellen mit ihrer Belegungsreihe. Rücknahmen hängen an der Meldung;
@@ -1071,126 +1071,126 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             patch(routes::nachforderung::bearbeiten),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge",
+            "/api/einsaetze/{id}/vehicles",
             get(routes::einsatz_fahrzeug::liste),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/position",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/position",
             patch(routes::einsatz_fahrzeug::position),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge",
+            "/api/einsaetze/{id}/vehicles",
             post(routes::einsatz_fahrzeug::disponieren),
         )
         // LLH-1100: mehrere Stamm-Fahrzeuge in einem Schritt, optional in eine Einheit.
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/sammel",
+            "/api/einsaetze/{id}/vehicles/bulk",
             post(routes::einsatz_fahrzeug::sammel_disponieren),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}",
+            "/api/einsaetze/{id}/vehicles/{ef_id}",
             patch(routes::einsatz_fahrzeug::update),
         )
         // LLH-1079 Teil II: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/stand-down",
             post(routes::einsatz_fahrzeug::entlassen),
         )
         // LLH-1722: „Rückgängig“ nach dem Entlassen nimmt den Vorzustand vollständig zurück.
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/entlassen/zuruecknehmen",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/stand-down/undo",
             post(routes::einsatz_fahrzeug::zuruecknehmen),
         )
         // LLH-1781: „Rückgängig“ nach einem Statuswechsel.
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/status/zuruecknehmen",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/status/undo",
             post(routes::einsatz_fahrzeug::status_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/stornieren",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/annul",
             post(routes::einsatz_fahrzeug::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/reaktivieren",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/reactivate",
             post(routes::einsatz_fahrzeug::reaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/crew",
             post(routes::einsatz_fahrzeug::besatzung_uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id}",
             put(routes::einsatz_fahrzeug::besatzung_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/fahrzeuge/{ef_id}/besatzung/{ep_id}",
+            "/api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id}",
             delete(routes::einsatz_fahrzeug::besatzung_freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/personal",
+            "/api/einsaetze/{id}/personnel",
             get(routes::einsatz_personal::liste),
         )
         .route(
-            "/api/einsaetze/{id}/personal",
+            "/api/einsaetze/{id}/personnel",
             post(routes::einsatz_personal::disponieren),
         )
         // LLH-1100: mehrere Stamm-Personen in einem Schritt, optional in Einheit und Fahrzeug.
         .route(
-            "/api/einsaetze/{id}/personal/sammel",
+            "/api/einsaetze/{id}/personnel/bulk",
             post(routes::einsatz_personal::sammel_disponieren),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}",
+            "/api/einsaetze/{id}/personnel/{ep_id}",
             patch(routes::einsatz_personal::update),
         )
         // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/status/zuruecknehmen",
+            "/api/einsaetze/{id}/personnel/{ep_id}/status/undo",
             post(routes::einsatz_personal::status_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/entlassen",
+            "/api/einsaetze/{id}/personnel/{ep_id}/stand-down",
             post(routes::einsatz_personal::entlassen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/entlassen/zuruecknehmen",
+            "/api/einsaetze/{id}/personnel/{ep_id}/stand-down/undo",
             post(routes::einsatz_personal::zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/stornieren",
+            "/api/einsaetze/{id}/personnel/{ep_id}/annul",
             post(routes::einsatz_personal::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/reaktivieren",
+            "/api/einsaetze/{id}/personnel/{ep_id}/reactivate",
             post(routes::einsatz_personal::reaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/position",
+            "/api/einsaetze/{id}/personnel/{ep_id}/position",
             patch(routes::einsatz_personal::position),
         )
         // Kräfte-Zeitachse (LFH-552) unter dem Personal-Präfix.
         .route(
-            "/api/einsaetze/{id}/personal/zeitachse",
+            "/api/einsaetze/{id}/personnel/timeline",
             get(routes::zeitachse::personal_perioden),
         )
         .route(
-            "/api/einsaetze/{id}/personal/zeitachse/grenzwerte",
+            "/api/einsaetze/{id}/personnel/timeline/limits",
             get(routes::zeitachse::personal_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse",
+            "/api/einsaetze/{id}/personnel/{ep_id}/timeline",
             get(routes::zeitachse::person_laden).post(routes::zeitachse::person_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/streichen",
+            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/strike",
             post(routes::zeitachse::person_streichen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse/{zid}/berichtigen",
+            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/correct",
             post(routes::zeitachse::person_berichtigen),
         )
         .route(
-            "/api/einsaetze/{id}/personal/{ep_id}/zeitachse/periode",
+            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/period",
             post(routes::zeitachse::person_periode_nachtragen),
         )
         .route(
@@ -1216,35 +1216,35 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LLH-1079 Teil II: aus dem Einsatz nehmen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/entlassen",
+            "/api/einsaetze/{id}/material/{em_id}/stand-down",
             post(routes::einsatz_material::entlassen),
         )
         // LLH-1923: „Rückgängig“ nach dem Herausnehmen, mit dem Vorzustand aus der Antwort.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/entlassen/zuruecknehmen",
+            "/api/einsaetze/{id}/material/{em_id}/stand-down/undo",
             post(routes::einsatz_material::zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/stornieren",
+            "/api/einsaetze/{id}/material/{em_id}/annul",
             post(routes::einsatz_material::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/reaktivieren",
+            "/api/einsaetze/{id}/material/{em_id}/reactivate",
             post(routes::einsatz_material::reaktivieren),
         )
         // LLH-1259: einen vorhandenen Posten nachträglich mit einer Nachforderung verknüpfen;
         // LLH-1403: den Bezug wieder lösen.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/nachforderung",
+            "/api/einsaetze/{id}/material/{em_id}/resource-request",
             post(routes::einsatz_material::verknuepfen).delete(routes::einsatz_material::loesen),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/status/zuruecknehmen",
+            "/api/einsaetze/{id}/material/{em_id}/status/undo",
             post(routes::einsatz_material::status_zuruecknehmen),
         )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/aufteilen",
+            "/api/einsaetze/{id}/material/{em_id}/split",
             post(routes::einsatz_material::aufteilen),
         )
         .route(
@@ -1554,19 +1554,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
-            "/api/einsaetze/{id}/geraete",
+            "/api/einsaetze/{id}/devices",
             get(routes::geraet::liste).post(routes::geraet::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/geraete/{gid}/code",
+            "/api/einsaetze/{id}/devices/{gid}/code",
             post(routes::geraet::code_ausstellen),
         )
         .route(
-            "/api/einsaetze/{id}/geraete/{gid}/verlaengern",
+            "/api/einsaetze/{id}/devices/{gid}/extend",
             post(routes::geraet::verlaengern),
         )
         .route(
-            "/api/einsaetze/{id}/geraete/{gid}/widerrufen",
+            "/api/einsaetze/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
         )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
@@ -1700,59 +1700,59 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::einsatz_uhs::belegung_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume",
+            "/api/einsaetze/{id}/staging-areas",
             get(routes::einsatz_bereitstellungsraum::list),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume",
+            "/api/einsaetze/{id}/staging-areas",
             post(routes::einsatz_bereitstellungsraum::create),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            "/api/einsaetze/{id}/staging-areas/{bid}",
             get(routes::einsatz_bereitstellungsraum::detail),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/verlauf",
+            "/api/einsaetze/{id}/staging-areas/{bid}/history",
             get(routes::einsatz_bereitstellungsraum::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/erwartet",
+            "/api/einsaetze/{id}/staging-areas/{bid}/expected",
             get(routes::einsatz_bereitstellungsraum::erwartet),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/stamm-treffer",
+            "/api/einsaetze/{id}/staging-areas/{bid}/master-data-matches",
             get(routes::einsatz_bereitstellungsraum::stamm_treffer),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            "/api/einsaetze/{id}/staging-areas/{bid}",
             patch(routes::einsatz_bereitstellungsraum::update),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/status",
+            "/api/einsaetze/{id}/staging-areas/{bid}/status",
             post(routes::einsatz_bereitstellungsraum::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}",
+            "/api/einsaetze/{id}/staging-areas/{bid}",
             delete(routes::einsatz_bereitstellungsraum::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung",
+            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy",
             post(routes::einsatz_bereitstellungsraum::belegung),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/belegung/{belegung_id}/zuruecknehmen",
+            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
             post(routes::einsatz_bereitstellungsraum::belegung_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen",
+            "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
             post(routes::einsatz_bereitstellungsraum::eintreffen),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf",
+            "/api/einsaetze/{id}/staging-areas/{bid}/dispatch",
             post(routes::einsatz_bereitstellungsraum::abruf),
         )
         .route(
-            "/api/einsaetze/{id}/bereitstellungsraeume/{bid}/abruf/aufheben",
+            "/api/einsaetze/{id}/staging-areas/{bid}/dispatch/void",
             post(routes::einsatz_bereitstellungsraum::abruf_aufheben),
         )
         .route(
@@ -2572,109 +2572,109 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::sprechgruppe::anlegen_einsatz_lokal),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten",
+            "/api/einsaetze/{id}/units",
             get(routes::einsatz_einheit::liste),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten",
+            "/api/einsaetze/{id}/units",
             post(routes::einsatz_einheit::bilden),
         )
         // Statische Segmente vor `{eid}` (LLH-1049).
         .route(
-            "/api/einsaetze/{id}/einheiten/aus-vorlage",
+            "/api/einsaetze/{id}/units/from-template",
             post(routes::einsatz_einheit::aus_vorlage_bilden),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
+            "/api/einsaetze/{id}/units/from-template/{vorlage_id}",
             get(routes::einsatz_einheit::aus_vorlage_vorschau),
         )
         // LLH-1383: eingetroffene Nachforderung als Einheit übernehmen.
         .route(
-            "/api/einsaetze/{id}/einheiten/aus-nachforderung",
+            "/api/einsaetze/{id}/units/from-resource-request",
             post(routes::einsatz_einheit::aus_nachforderung),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}",
+            "/api/einsaetze/{id}/units/{eid}",
             patch(routes::einsatz_einheit::update),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/position",
+            "/api/einsaetze/{id}/units/{eid}/position",
             patch(routes::einsatz_einheit::position),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/sprechgruppen/{sg}",
+            "/api/einsaetze/{id}/units/{eid}/talk-groups/{sg}",
             put(routes::einsatz_einheit::sprechgruppe_zuordnen)
                 .delete(routes::einsatz_einheit::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/status",
+            "/api/einsaetze/{id}/units/{eid}/status",
             put(routes::einsatz_einheit::status_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
+            "/api/einsaetze/{id}/units/{eid}/status/undo",
             post(routes::einsatz_einheit::status_zuruecknehmen),
         )
         // Kräfte-Zeitachse (LFH-552) unter dem Einheiten-Präfix.
         .route(
-            "/api/einsaetze/{id}/einheiten/zeitachse",
+            "/api/einsaetze/{id}/units/timeline",
             get(routes::zeitachse::einheiten_perioden),
         )
         // Grenzwerte des Schichtplans für die Einstufung (LLH-730).
         .route(
-            "/api/einsaetze/{id}/einheiten/zeitachse/grenzwerte",
+            "/api/einsaetze/{id}/units/timeline/limits",
             get(routes::zeitachse::einheiten_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse",
+            "/api/einsaetze/{id}/units/{eid}/timeline",
             get(routes::zeitachse::einheit_laden).post(routes::zeitachse::einheit_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/streichen",
+            "/api/einsaetze/{id}/units/{eid}/timeline/{zid}/strike",
             post(routes::zeitachse::einheit_streichen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/{zid}/berichtigen",
+            "/api/einsaetze/{id}/units/{eid}/timeline/{zid}/correct",
             post(routes::zeitachse::einheit_berichtigen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/zeitachse/periode",
+            "/api/einsaetze/{id}/units/{eid}/timeline/period",
             post(routes::zeitachse::einheit_periode_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}",
+            "/api/einsaetze/{id}/units/{eid}",
             delete(routes::einsatz_einheit::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/stornieren",
+            "/api/einsaetze/{id}/units/{eid}/annul",
             post(routes::einsatz_einheit::stornieren),
         )
         // LLH-1388: Fehlübernahme aus einer Nachforderung stornieren.
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/uebernahme-stornieren",
+            "/api/einsaetze/{id}/units/{eid}/annul-takeover",
             post(routes::einsatz_einheit::uebernahme_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/uebernehmen",
+            "/api/einsaetze/{id}/units/{eid}/take-over",
             post(routes::einsatz_einheit::uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/abweisen",
+            "/api/einsaetze/{id}/units/{eid}/reject",
             post(routes::einsatz_einheit::abweisen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",
+            "/api/einsaetze/{id}/units/{eid}/personnel/{ep_id}",
             put(routes::einsatz_einheit::personal_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/personal/{ep_id}",
+            "/api/einsaetze/{id}/units/{eid}/personnel/{ep_id}",
             delete(routes::einsatz_einheit::personal_freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}",
+            "/api/einsaetze/{id}/units/{eid}/vehicles/{ef_id}",
             put(routes::einsatz_einheit::fahrzeug_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/einheiten/{eid}/fahrzeug/{ef_id}",
+            "/api/einsaetze/{id}/units/{eid}/vehicles/{ef_id}",
             delete(routes::einsatz_einheit::fahrzeug_freigeben),
         );
 

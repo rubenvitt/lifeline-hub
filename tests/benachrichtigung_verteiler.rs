@@ -100,7 +100,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/mitglieder/{benutzer_id}", self.einsatz),
+            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": "fuehrungspersonal", "fuehrungsfunktion": funktion })),
         )

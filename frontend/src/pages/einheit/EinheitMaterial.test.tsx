@@ -80,7 +80,7 @@ function zeige({
 } = {}) {
   server.use(
     http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
   );
@@ -176,7 +176,7 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     const gesendet = patchMitschnitt();
     const einheitenRoute: string[] = [];
     server.use(
-      http.all('/api/einsaetze/1/einheiten/10/material/:emId', ({ request }) => {
+      http.all('/api/einsaetze/1/units/10/material/:emId', ({ request }) => {
         einheitenRoute.push(request.method);
         return new HttpResponse(null, { status: 204 });
       }),

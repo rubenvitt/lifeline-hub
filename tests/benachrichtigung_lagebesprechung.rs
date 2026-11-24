@@ -87,7 +87,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/mitglieder/{benutzer_id}", self.einsatz),
+            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&funktion.to_string()),
         )

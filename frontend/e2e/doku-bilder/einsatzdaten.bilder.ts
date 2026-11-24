@@ -128,7 +128,7 @@ test.describe(KAPITEL, () => {
     const sg2 = await sprechgruppe(api, id, 'DMO 505', 'DMO');
     const fs = await (await api.get(`/api/einsaetze/${id}/command-post`)).json();
     if (!fs.rufname) {
-      const fahrzeuge = (await (await api.get(`/api/einsaetze/${id}/fahrzeuge`)).json()) as {
+      const fahrzeuge = (await (await api.get(`/api/einsaetze/${id}/vehicles`)).json()) as {
         id: number;
         funkrufname: string;
       }[];

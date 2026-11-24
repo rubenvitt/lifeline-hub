@@ -193,11 +193,11 @@ describe('useFunkrufnamenEinsatz', () => {
           freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
         );
       }),
-      http.get('/api/einsaetze/4/fahrzeuge', () => {
+      http.get('/api/einsaetze/4/vehicles', () => {
         abgefragt.push('fahrzeuge');
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/4/einheiten', () => {
+      http.get('/api/einsaetze/4/units', () => {
         abgefragt.push('einheiten');
         return HttpResponse.json([]);
       }),
@@ -228,8 +228,8 @@ describe('useFunkrufnamenEinsatz', () => {
   it('schlägt mit Modulrecht Funkrufnamen aus Fahrzeugen und Einheiten vor', async () => {
     server.use(
       http.get('/api/einsaetze/4/module-access', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/4/fahrzeuge', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/4/einheiten', () =>
+      http.get('/api/einsaetze/4/vehicles', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/4/units', () =>
         HttpResponse.json([{ id: 1, name: 'Florian 3' } as Einheit]),
       ),
     );

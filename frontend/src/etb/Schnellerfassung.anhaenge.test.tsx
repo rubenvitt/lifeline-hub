@@ -25,8 +25,8 @@ const hochladen = vi.mocked(ladeEtbAnhangHoch);
 
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/:id/fahrzeuge', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/einheiten', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
   );
   hochladen.mockReset();
 });

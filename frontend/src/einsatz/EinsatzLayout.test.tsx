@@ -1377,7 +1377,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       zugewiesen_at: '2026-11-19 08:00:00',
     });
     server.use(
-      http.get('/api/einsaetze/7/mitglieder', () =>
+      http.get('/api/einsaetze/7/members', () =>
         HttpResponse.json([
           mitglied('Anna Muster', 'einsatzleitung', 1),
           mitglied('Fritz Fuehrung', 'fuehrungspersonal', 2),

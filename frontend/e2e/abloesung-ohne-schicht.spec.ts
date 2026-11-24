@@ -49,15 +49,15 @@ test('Ablösung: Einheiten ohne Schicht, vorbelegter Beginn, Vererbung und Ende 
     return (await antwort.json()) as { id: number };
   };
   // Ohne Vorgabe beginnt mit dem Eintreffen keine Schicht (Spec `kraefte-abloesung`).
-  await sende('put', 'abloesungen/schichtmodell', { schichtmodell: null }, 'keine Vorgabe');
-  const zug = await sende('post', 'einheiten', { name: 'Zug Nord' }, 'Zug');
+  await sende('put', 'reliefs/shift-model', { schichtmodell: null }, 'keine Vorgabe');
+  const zug = await sende('post', 'units', { name: 'Zug Nord' }, 'Zug');
   const trupp = await sende(
     'post',
-    'einheiten',
+    'units',
     { name: 'Trupp Nord', ueber_einheit_id: zug.id },
     'Trupp',
   );
-  const sued = await sende('post', 'einheiten', { name: 'Florian Süd' }, 'Florian Süd');
+  const sued = await sende('post', 'units', { name: 'Florian Süd' }, 'Florian Süd');
   for (const [e, vor] of [
     [zug, 120],
     [trupp, 120],
@@ -65,12 +65,12 @@ test('Ablösung: Einheiten ohne Schicht, vorbelegter Beginn, Vererbung und Ende 
   ] as const) {
     await sende(
       'post',
-      `einheiten/${e.id}/zeitachse`,
+      `units/${e.id}/timeline`,
       { art: 'eintreffen', zeitpunkt_at: draht(vor) },
       'Eintreffen',
     );
   }
-  await sende('post', 'abloesungen', { einheit_id: zug.id, rhythmus_minuten: 360 }, 'Schicht Zug');
+  await sende('post', 'reliefs', { einheit_id: zug.id, rhythmus_minuten: 360 }, 'Schicht Zug');
 
   // Der Überblick springt direkt auf „Ohne Schicht“, die Ansicht steht in der Adresse (LLH-1312).
   await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
@@ -117,7 +117,7 @@ test('Ablösung: Einheiten ohne Schicht, vorbelegter Beginn, Vererbung und Ende 
   // ohne Schicht da (er hat seine eigene offene Periode).
   await sende(
     'post',
-    `einheiten/${zug.id}/zeitachse`,
+    `units/${zug.id}/timeline`,
     { art: 'entlassung', zeitpunkt_at: draht(1) },
     'Entlassung Zug',
   );

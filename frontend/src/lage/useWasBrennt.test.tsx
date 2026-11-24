@@ -71,9 +71,9 @@ function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] }
         },
       ]),
     ),
-    http.get(`${BASIS}/einheiten`, () => HttpResponse.json([einheit(10, 'Logistiktrupp')])),
-    http.get(`${BASIS}/personal`, () => HttpResponse.json([])),
-    http.get(`${BASIS}/fahrzeuge`, () => HttpResponse.json([])),
+    http.get(`${BASIS}/units`, () => HttpResponse.json([einheit(10, 'Logistiktrupp')])),
+    http.get(`${BASIS}/personnel`, () => HttpResponse.json([])),
+    http.get(`${BASIS}/vehicles`, () => HttpResponse.json([])),
     http.get(`${BASIS}/material`, () => HttpResponse.json([])),
     http.get(
       `${BASIS}/reports/check-ins`,
@@ -144,10 +144,10 @@ describe('useWasBrennt (LLH-1743)', () => {
       http.get(`${BASIS}/module-access`, () =>
         HttpResponse.json(freigabenFixture({ material: { sichtbar: true, zugriff: false } })),
       ),
-      http.get(`${BASIS}/einheiten`, () =>
+      http.get(`${BASIS}/units`, () =>
         HttpResponse.json([{ ...einheit(10, 'Logistiktrupp'), status: null }]),
       ),
-      http.get(`${BASIS}/fahrzeuge`, () =>
+      http.get(`${BASIS}/vehicles`, () =>
         HttpResponse.json([
           { id: 1, funkrufname: 'Florian 1', einheit_id: 10, status_kategorie: 'nicht_verfuegbar' },
           { id: 2, funkrufname: 'Florian 2', einheit_id: 10, status_kategorie: 'verfuegbar' },
@@ -162,13 +162,13 @@ describe('useWasBrennt (LLH-1743)', () => {
   it('Ausfall in der Folge der Einheitenliste, nicht in der Baumfolge (LLH-1929)', async () => {
     handler();
     server.use(
-      http.get(`${BASIS}/einheiten`, () =>
+      http.get(`${BASIS}/units`, () =>
         HttpResponse.json([
           { ...einheit(20, 'Sanitätszug'), sortier: 2 },
           { ...einheit(21, 'Betreuungsgruppe'), ueber_einheit_id: 20, sortier: 1 },
         ]),
       ),
-      http.get(`${BASIS}/fahrzeuge`, () =>
+      http.get(`${BASIS}/vehicles`, () =>
         HttpResponse.json([
           { id: 1, funkrufname: 'Florian 1', einheit_id: 20, status_kategorie: 'nicht_verfuegbar' },
           { id: 2, funkrufname: 'Florian 2', einheit_id: 21, status_kategorie: 'nicht_verfuegbar' },

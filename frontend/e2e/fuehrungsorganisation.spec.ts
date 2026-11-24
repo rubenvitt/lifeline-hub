@@ -52,7 +52,7 @@ test('Messung vor dem Bau: Contentbreite am Fükw und Laufweiten langer Werte', 
     name: ABSCHNITT,
     kurzbezeichnung: KURZ,
   });
-  await post(page, einsatzId, 'einheiten', {
+  await post(page, einsatzId, 'units', {
     name: EINHEIT,
     funkrufname: EINHEIT_RUF,
     abschnitt_id: abschnitt,
@@ -238,8 +238,8 @@ async function seedeKlein(page: Page, einsatzId: string) {
     name: 'Unterabschnitt Deich',
     ueber_abschnitt_id: abschnitte[0],
   });
-  await post(page, einsatzId, 'einheiten', { name: 'Gruppe Deich', abschnitt_id: unter });
-  await post(page, einsatzId, 'einheiten', {
+  await post(page, einsatzId, 'units', { name: 'Gruppe Deich', abschnitt_id: unter });
+  await post(page, einsatzId, 'units', {
     name: EINHEIT,
     funkrufname: EINHEIT_RUF,
     abschnitt_id: abschnitte[0],

@@ -47,7 +47,7 @@ test('ohne WebGL2: Kachel Lagekarte zeigt den Zustand, die übrigen Kacheln blei
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
     await anlegen(page, `/api/einsaetze/${e}/persons`, { name, uhs_id: nord.id });
   }
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'lagemonitor',
     bezeichnung: 'Monitor ohne Grafik',
   });

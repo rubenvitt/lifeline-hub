@@ -50,25 +50,25 @@ async function saeen(page: Page) {
     bedarf_kraefte: 20,
     bedarf_betreute: 0,
   });
-  const { id: zug } = await senden(page, 'post', `${basis}/einheiten`, { name: 'Zug Nord' });
+  const { id: zug } = await senden(page, 'post', `${basis}/units`, { name: 'Zug Nord' });
   const gruppe = async (name: string, kraft: string) => {
-    const { id } = await senden(page, 'post', `${basis}/einheiten`, {
+    const { id } = await senden(page, 'post', `${basis}/units`, {
       name,
       ueber_einheit_id: zug,
     });
     for (const nr of [1, 2]) {
-      const { id: p } = await senden(page, 'post', `${basis}/personal`, {
+      const { id: p } = await senden(page, 'post', `${basis}/personnel`, {
         adhoc: { name: `${kraft} ${nr}`, staerke_position: 'mannschaft' },
       });
-      await senden(page, 'put', `${basis}/einheiten/${id}/personal/${p}`);
+      await senden(page, 'put', `${basis}/units/${id}/personnel/${p}`);
     }
     return id;
   };
   const eins = await gruppe('Gruppe Eins', 'Kraft Eins');
   const zwei = await gruppe('Gruppe Zwei', 'Kraft Zwei');
-  await senden(page, 'post', `${basis}/einheiten`, { name: 'Wasserrettung' });
+  await senden(page, 'post', `${basis}/units`, { name: 'Wasserrettung' });
   for (const id of [zug, eins, zwei]) {
-    await senden(page, 'post', `${basis}/einheiten/${id}/zeitachse`, {
+    await senden(page, 'post', `${basis}/units/${id}/timeline`, {
       art: 'eintreffen',
       zeitpunkt_at: zeit(-60),
     });

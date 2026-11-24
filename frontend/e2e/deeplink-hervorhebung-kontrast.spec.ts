@@ -39,7 +39,7 @@ async function seede(page: Page, modus: string) {
   });
   const ids: number[] = [];
   for (const name of ['Albers, Anna', 'Brandt, Bernd', 'Claussen, Clara']) {
-    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personal`, {
+    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
       adhoc: { name, funktion: 'Truppführung', traegerorganisation: 'FF Musterstadt' },
     });
     ids.push(kraft.id);

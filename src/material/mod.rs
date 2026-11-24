@@ -511,7 +511,7 @@ pub fn etb_text_ort_gewechselt(
 }
 
 /// Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
-/// PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+/// PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück.
 /// Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
 pub struct MaterialStatusRuecknahmeBeleg {
@@ -618,8 +618,8 @@ pub fn etb_text_herausnahme_zurueckgenommen(
 
 /// Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
 /// von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
-/// D1). Kommt in der Antwort von `…/material/{em}/entlassen` und geht als Body an
-/// `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+/// D1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an
+/// `…/stand-down/undo` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
 /// höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
 /// Herausnehmen lässt sie an der Zeile stehen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
@@ -672,14 +672,14 @@ impl MaterialEntlassungVorzustand {
     }
 }
 
-/// Antwort von `POST …/material/{em_id}/entlassen` (LLH-1923).
+/// Antwort von `POST …/material/{em_id}/stand-down` (LLH-1923).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct MaterialEntlassungAntwort {
     pub material: EinsatzMaterialAnzeige,
     pub vorzustand: MaterialEntlassungVorzustand,
 }
 
-/// Antwort von `POST …/material/{em_id}/entlassen/zuruecknehmen` (LLH-1923): was nicht
+/// Antwort von `POST …/material/{em_id}/stand-down/undo` (LLH-1923): was nicht
 /// zurückkam, steht in `ausgelassen`.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct MaterialRuecknahmeAntwort {

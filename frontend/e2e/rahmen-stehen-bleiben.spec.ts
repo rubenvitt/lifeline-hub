@@ -445,7 +445,7 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     if (ziel === 'etb') await etbDreistellig(page, einsatzId);
     if (ziel === 'personal') {
       for (let i = 0; i < 30; i += 1) {
-        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
           data: { adhoc: { name: `Seitenkopf Kraft ${i}`, funktion: 'Helfer' } },
         });
         expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
@@ -591,7 +591,7 @@ test('Fokus in der klebenden Rail rollt die Seite nicht (1440 × 900)', async ({
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `Rahmen Rail-Fokus ${Date.now()}`);
   for (let i = 0; i < 30; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
       data: { adhoc: { name: `Rail-Fokus Kraft ${i}`, funktion: 'Helfer' } },
     });
     expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);

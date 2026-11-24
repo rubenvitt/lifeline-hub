@@ -69,20 +69,20 @@ async function seede(page: Page, einsatzId: string): Promise<Probe[]> {
     }),
   );
 
-  const einheit = await post(page, einsatzId, 'einheiten', { name: 'Gruppe ohne Organisation' });
+  const einheit = await post(page, einsatzId, 'units', { name: 'Gruppe ohne Organisation' });
   await pruefe(
     'Einheit verorten',
-    await page.request.patch(`${basis}/einheiten/${einheit}/position`, {
+    await page.request.patch(`${basis}/units/${einheit}/position`, {
       data: { lat: ort(1)[1], lon: ort(1)[0] },
     }),
   );
 
-  const fahrzeug = await post(page, einsatzId, 'fahrzeuge', {
+  const fahrzeug = await post(page, einsatzId, 'vehicles', {
     adhoc: { funkrufname: 'Fahrzeug Kontrast' },
   });
   await pruefe(
     'Fahrzeug verorten',
-    await page.request.patch(`${basis}/fahrzeuge/${fahrzeug}/position`, {
+    await page.request.patch(`${basis}/vehicles/${fahrzeug}/position`, {
       data: { lat: ort(2)[1], lon: ort(2)[0] },
     }),
   );

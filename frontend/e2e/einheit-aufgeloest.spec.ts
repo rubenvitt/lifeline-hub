@@ -22,12 +22,12 @@ test.beforeEach(async ({ page }) => {
 test('Sprung aus dem ETB-Eintrag der Auflösung in die lesende Ansicht', async ({ page }) => {
   const einsatzId = await einsatzAnlegen(page, `E2E 1266 Aufgelöst ${Date.now()}`);
   const basis = `/api/einsaetze/${einsatzId}`;
-  const einheitId = await post(page, `${basis}/einheiten`, { name: 'Florian 1' });
+  const einheitId = await post(page, `${basis}/units`, { name: 'Florian 1' });
   // Ein Mitglied ist eine Spur: die Einheit bleibt als aufgelöst stehen, statt gelöscht zu werden.
-  const epId = await post(page, `${basis}/personal`, { adhoc: { name: 'Anna Beck' } });
-  const zuordnung = await page.request.put(`${basis}/einheiten/${einheitId}/personal/${epId}`);
+  const epId = await post(page, `${basis}/personnel`, { adhoc: { name: 'Anna Beck' } });
+  const zuordnung = await page.request.put(`${basis}/units/${einheitId}/personnel/${epId}`);
   expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
-  const aufloesen = await page.request.delete(`${basis}/einheiten/${einheitId}`);
+  const aufloesen = await page.request.delete(`${basis}/units/${einheitId}`);
   expect(aufloesen.ok(), await aufloesen.text()).toBe(true);
 
   await page.goto(etbMitSystem(einsatzId));

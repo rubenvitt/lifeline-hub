@@ -116,18 +116,18 @@ test('Bereitstellungsraum: aus der Detailseite verorten, Marker mit Belegung liv
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  const { id: br } = await senden(page, 'post', `${basis}/bereitstellungsraeume`, {
+  const { id: br } = await senden(page, 'post', `${basis}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await senden(page, 'post', `${basis}/bereitstellungsraeume/${br}/status`, { status: 'aktiv' });
-  const { id: einheit } = await senden(page, 'post', `${basis}/einheiten`, { name: 'LF Nord' });
-  await senden(page, 'post', `${basis}/bereitstellungsraeume/${br}/belegung`, {
+  await senden(page, 'post', `${basis}/staging-areas/${br}/status`, { status: 'aktiv' });
+  const { id: einheit } = await senden(page, 'post', `${basis}/units`, { name: 'LF Nord' });
+  await senden(page, 'post', `${basis}/staging-areas/${br}/occupancy`, {
     objekt_typ: 'einheit',
     objekt_id: einheit,
     art: 'eintritt',
   });
   // Ein geplanter Raum, schon beim Anlegen verortet: er trägt den gestrichelten Ring.
-  const { id: nord } = await senden(page, 'post', `${basis}/bereitstellungsraeume`, {
+  const { id: nord } = await senden(page, 'post', `${basis}/staging-areas`, {
     bezeichnung: 'BR Nord',
     lat: NORD_ORT[1],
     lon: NORD_ORT[0],

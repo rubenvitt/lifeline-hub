@@ -15,7 +15,7 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -41,7 +41,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personal"),
+            &format!("/api/einsaetze/{einsatz}/personnel"),
             &admin,
             Some(&body)
         )
@@ -53,7 +53,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personal"),
+            &format!("/api/einsaetze/{einsatz}/personnel"),
             &admin,
             Some(&body)
         )
@@ -83,7 +83,7 @@ async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -96,7 +96,7 @@ async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(r#"{"personal_id":424242}"#),
     )
@@ -111,7 +111,7 @@ async fn adhoc_ohne_stamm() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/personal"), &admin,
+        &app, "POST", &format!("/api/einsaetze/{einsatz}/personnel"), &admin,
         Some(r#"{"adhoc":{"name":"Notarzt Extern","funktion":"Notarzt","staerke_position":"fuehrer"}}"#),
     ).await;
     assert_eq!(status, StatusCode::CREATED);
@@ -132,7 +132,7 @@ async fn beobachter_liest_disponiert_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/personal"),
+            &format!("/api/einsaetze/{einsatz}/personnel"),
             &erika,
             None
         )
@@ -144,7 +144,7 @@ async fn beobachter_liest_disponiert_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &erika,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -173,7 +173,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -190,7 +190,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -212,7 +212,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
             &admin,
             Some(&format!(r#"{{"status_id":{im_einsatz}}}"#))
         )
@@ -224,7 +224,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+            &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
             &admin,
             None
         )
@@ -254,7 +254,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{ep}"),
+            &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
             &admin,
             None,
         )
@@ -264,7 +264,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
         &admin,
         Some(&format!(r#"{{"fuehrer_id":{chef}}}"#)),
     )
@@ -304,7 +304,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -336,7 +336,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -354,7 +354,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let (_, live) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -372,7 +372,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let (_, snap) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -393,7 +393,7 @@ async fn disponieren_leerer_body_meldet_entweder_oder() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some("{}"),
     )
@@ -416,7 +416,7 @@ async fn disponieren_beides_meldet_nicht_beides() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&body),
     )
@@ -439,7 +439,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -453,7 +453,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, a) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -467,7 +467,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, b) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":null}"#),
     )
@@ -487,7 +487,7 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -497,7 +497,7 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     let (status, body) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":"quatsch"}"#),
     )
@@ -519,7 +519,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -531,7 +531,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, gesetzt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -541,7 +541,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":null}"#),
     )
@@ -565,7 +565,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -575,7 +575,7 @@ async fn patch_leerstring_leert_bemerkung() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -583,7 +583,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"   "}"#),
     )
@@ -603,7 +603,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -613,7 +613,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -621,7 +621,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, unberuehrt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":"fuehrer"}"#),
     )
@@ -639,7 +639,7 @@ async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str, posit
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{name}","staerke_position":"{position}"}}}}"#
@@ -688,7 +688,7 @@ async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) ->
     let (s, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
         cookie,
         None,
     )
@@ -740,7 +740,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -798,7 +798,7 @@ async fn staerke_position_aendern_feuert_einheit_und_uhs_nur_bei_wirksamer_aende
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
                 &admin,
                 Some(body),
             )
@@ -863,7 +863,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{pid}}}"#)),
     )
@@ -892,7 +892,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
                 &admin,
                 Some(&body),
             )
@@ -947,7 +947,7 @@ async fn namen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> V
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal{query}"),
+        &format!("/api/einsaetze/{einsatz}/personnel{query}"),
         cookie,
         None,
     )
@@ -970,7 +970,7 @@ async fn aktion(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}/{was}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/{was}"),
         cookie,
         None,
     )
@@ -991,7 +991,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{anna}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{anna}"),
         &admin,
         None,
     )
@@ -1000,7 +1000,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
         &admin,
         Some(&format!(r#"{{"fuehrer_id":{anna}}}"#)),
     )
@@ -1028,7 +1028,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1042,7 +1042,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
             .unwrap(),
     );
 
-    let (s, entlassen) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    let (s, entlassen) = aktion(&app, &admin, einsatz, anna, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{entlassen}");
     let v = &entlassen["vorzustand"];
     assert_eq!(v["einheit_id"], einheit);
@@ -1058,7 +1058,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personal/{anna}/entlassen/zuruecknehmen"),
+                &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down/undo"),
                 &admin,
                 Some(&body),
             )
@@ -1091,7 +1091,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, einheiten_json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1148,7 +1148,7 @@ async fn entlassen_und_erneut_disponieren() {
     let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
     kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
 
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "entlassen").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "stand-down").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     let person = &json["personal"];
     assert_eq!(person["beendet_als"], "entlassen");
@@ -1169,7 +1169,7 @@ async fn entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal?entlassene=ja"),
+        &format!("/api/einsaetze/{einsatz}/personnel?entlassene=ja"),
         &admin,
         None,
     )
@@ -1178,17 +1178,17 @@ async fn entlassen_und_erneut_disponieren() {
 
     // Schreibwege an der Entlassenen: Lebenszyklus.
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::CONFLICT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "annul").await.0,
         StatusCode::CONFLICT
     );
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}"),
         &admin,
         Some(r#"{"bemerkung":"x"}"#),
     )
@@ -1201,7 +1201,7 @@ async fn entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{anna}/position"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/position"),
         &admin,
         Some(r#"{"lat":52.0,"lon":10.0}"#),
     )
@@ -1209,7 +1209,7 @@ async fn entlassen_und_erneut_disponieren() {
     assert_eq!(s, StatusCode::CONFLICT);
 
     // Rückgängig bzw. „Erneut disponieren“.
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "reaktivieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "reactivate").await;
     assert_eq!(s, StatusCode::OK, "{json}");
     assert!(
         json.get("beendet_als").is_none_or(|v| v.is_null()),
@@ -1223,7 +1223,7 @@ async fn entlassen_und_erneut_disponieren() {
         .await
         .is_empty());
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "reactivate").await.0,
         StatusCode::CONFLICT,
         "eine aktive Kraft wird nicht reaktiviert"
     );
@@ -1243,7 +1243,7 @@ async fn entlassene_stamm_person_erneut_disponieren_ist_201() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personal"),
+                &format!("/api/einsaetze/{einsatz}/personnel"),
                 &admin,
                 Some(&format!(r#"{{"personal_id":{person}}}"#)),
             )
@@ -1255,7 +1255,7 @@ async fn entlassene_stamm_person_erneut_disponieren_ist_201() {
     let ep = json["id"].as_i64().unwrap();
     assert_eq!(dispo().await.0, StatusCode::CONFLICT, "aktiv: weiter 409");
     assert_eq!(
-        aktion(&app, &admin, einsatz, ep, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, ep, "stand-down").await.0,
         StatusCode::OK
     );
     let (s, json) = dispo().await;
@@ -1276,7 +1276,7 @@ async fn stornieren_nur_ohne_spur() {
     einheit_mit(&app, &admin, einsatz, gebunden).await;
 
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(namen(&app, &admin, einsatz, "").await, ["Gebunden"]);
@@ -1284,7 +1284,7 @@ async fn stornieren_nur_ohne_spur() {
         .await
         .is_empty());
 
-    let (s, json) = aktion(&app, &admin, einsatz, gebunden, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, gebunden, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"], "Die Person gehört einer Einheit an; erst lösen oder die Person entlassen",
@@ -1292,7 +1292,7 @@ async fn stornieren_nur_ohne_spur() {
     );
     // Eine stornierte Kraft kommt über „Erneut disponieren“ zurück.
     assert_eq!(
-        aktion(&app, &admin, einsatz, fehl, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, fehl, "reactivate").await.0,
         StatusCode::OK
     );
 }
@@ -1312,15 +1312,15 @@ async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let anna = kraft(&app, &admin, einsatz, "Anna", "mannschaft").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::OK
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, anna, "reactivate").await.0,
         StatusCode::OK
     );
 
-    let (s, json) = aktion(&app, &admin, einsatz, anna, "stornieren").await;
+    let (s, json) = aktion(&app, &admin, einsatz, anna, "annul").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"],
@@ -1330,15 +1330,15 @@ async fn einmal_entlassene_kraft_laesst_sich_nicht_stornieren() {
     // Ein Storno ist dagegen keine Entlassung: danach bleibt ein neuer Storno möglich.
     let bert = kraft(&app, &admin, einsatz, "Bert", "mannschaft").await;
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "reaktivieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "reactivate").await.0,
         StatusCode::OK
     );
     assert_eq!(
-        aktion(&app, &admin, einsatz, bert, "stornieren").await.0,
+        aktion(&app, &admin, einsatz, bert, "annul").await.0,
         StatusCode::NO_CONTENT
     );
 }
@@ -1359,7 +1359,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"Florian 1","fahrzeugtyp":"ELW 2"}}"#),
     )
@@ -1367,7 +1367,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let fahrzeug = json["id"].as_i64().unwrap();
     assert_eq!(
-        aktion(&app, &admin, einsatz, anna, "entlassen").await.0,
+        aktion(&app, &admin, einsatz, anna, "stand-down").await.0,
         StatusCode::OK
     );
 
@@ -1377,12 +1377,8 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{anna}}}"#
     );
     for (methode, pfad, body) in [
-        ("PUT", format!("einheiten/{einheit}/personal/{anna}"), None),
-        (
-            "PUT",
-            format!("fahrzeuge/{fahrzeug}/besatzung/{anna}"),
-            None,
-        ),
+        ("PUT", format!("units/{einheit}/personnel/{anna}"), None),
+        ("PUT", format!("vehicles/{fahrzeug}/crew/{anna}"), None),
         ("PUT", format!("uhs/{uhs}/forces/{anna}"), None),
         ("PATCH", "command-post".to_string(), Some(einsatzleiter)),
         ("POST", "sectors".to_string(), Some(leiter)),
@@ -1412,7 +1408,7 @@ async fn patch_kraft(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         cookie,
         Some(body),
     )
@@ -1424,7 +1420,7 @@ async fn adhoc_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str)
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         cookie,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{name}","funktion":"Sanitäter","traegerorganisation":"ASB"}}}}"#
@@ -1455,7 +1451,7 @@ async fn einsatzfunktion_setzen_und_leeren() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1522,7 +1518,7 @@ async fn einsatzfunktion_ueber_200_zeichen_ist_400_und_aendert_nichts() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1583,7 +1579,7 @@ async fn adhoc_disponieren_prueft_die_grenzen() {
         let (s, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personal"),
+            &format!("/api/einsaetze/{einsatz}/personnel"),
             &admin,
             Some(&body),
         )
@@ -1595,7 +1591,7 @@ async fn adhoc_disponieren_prueft_die_grenzen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{genau}","funktion":"{genau}","traegerorganisation":"{genau}"}}}}"#
@@ -1630,7 +1626,7 @@ async fn adhoc_angaben_im_patch_aenderbar() {
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1686,7 +1682,7 @@ async fn stamm_person_umbenennen_ist_422_im_stamm_pflegen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1772,7 +1768,7 @@ async fn aenderungen_stehen_in_genau_einem_etb_eintrag() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{adhoc}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{adhoc}/stand-down"),
         &admin,
         None,
     )
@@ -1890,7 +1886,7 @@ async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1932,7 +1928,7 @@ async fn personal_patch(
     anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
         cookie,
         Some(&body),
     )
@@ -2069,7 +2065,7 @@ async fn position_vergleicht_den_wirksamen_wert() {
     let (_, d) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal"),
+        &format!("/api/einsaetze/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -2180,9 +2176,9 @@ async fn etb_eintraege_des_personals_gehen_live_hinaus() {
         .await;
 
     for (kraft, was, erwartet) in [
-        (ep, "entlassen", StatusCode::OK),
-        (ep, "reaktivieren", StatusCode::OK),
-        (fehl, "stornieren", StatusCode::NO_CONTENT),
+        (ep, "stand-down", StatusCode::OK),
+        (ep, "reactivate", StatusCode::OK),
+        (fehl, "annul", StatusCode::NO_CONTENT),
     ] {
         let (s, json) = aktion(&app, &admin, einsatz, kraft, was).await;
         assert_eq!(s, erwartet, "{was}: {json}");
@@ -2244,7 +2240,7 @@ async fn personalstatus_zuruecknehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}/status/zuruecknehmen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/status/undo"),
         cookie,
         Some(&beleg.to_string()),
     )
@@ -2437,7 +2433,7 @@ async fn entlassene_person_rueckname_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personal/{ep}/entlassen"),
+        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
         &admin,
         None,
     )

@@ -184,7 +184,7 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
     let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
 
     for (methode, pfad, body) in [
-        ("POST", "einheiten", r#"{"name":"Trupp"}"#),
+        ("POST", "units", r#"{"name":"Trupp"}"#),
         ("POST", "sectors", r#"{"name":"Nord"}"#),
         ("PUT", "settings", r#"{"auftrag_quittierung_frist_min":45}"#),
     ] {

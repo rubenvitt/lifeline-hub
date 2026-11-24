@@ -69,7 +69,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
  * geteilt. Liefert den Pfad der Detailseite.
  */
 async function seedeEinheit(page: Page, einsatzId: string): Promise<string> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
     data: { name: EINHEIT },
   });
   expect(antwort.ok(), `Seeding Einheit: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -259,7 +259,7 @@ for (const { dichte, soll } of STAFFEL) {
     await anmelden(page, { startseite: false });
     const einsatzId = await einsatzPerApi(page, `Trefflaeche Personal ${dichte} ${Date.now()}`);
     await seedeEinheit(page, einsatzId);
-    const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personal`, {
+    const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
       data: { adhoc: { name: KRAFT } },
     });
     expect(kraft.ok(), `Seeding Personal: ${await kraft.text()}`).toBeTruthy();

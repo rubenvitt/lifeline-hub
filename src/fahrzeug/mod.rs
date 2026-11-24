@@ -211,7 +211,7 @@ pub struct EinsatzFahrzeugAnzeige {
     /// `demo_herkunft`, unabhängig von der Live-oder-Snapshot-Regel; Ad-hoc ist nie Demo.
     pub ist_demo: bool,
     /// Ende der Disposition (LLH-1079, Spec `kraefte-entlassung`); fehlt bei aktiven Fahrzeugen.
-    /// Nur `GET …/fahrzeuge?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
+    /// Nur `GET …/vehicles?entlassene=1` liefert beendete Zeilen, und zwar nur entlassene.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub beendet_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,7 +223,7 @@ pub struct EinsatzFahrzeugAnzeige {
 
 /// Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
 /// eines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).
-/// Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+/// Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`
 /// zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
 /// Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
 /// Client zu übernehmen.
@@ -250,7 +250,7 @@ pub struct EntlassungVorzustand {
 /// Besatzung oder Beladung trägt kein Fahrzeug.
 pub const RUECKNAHME_LISTE_MAX: usize = 200;
 
-/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/stand-down` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,
@@ -259,7 +259,7 @@ pub struct EntlassungAntwort {
 
 pub use crate::entlassung::RuecknahmeAusgelassen;
 
-/// Antwort von `POST …/fahrzeuge/{ef_id}/entlassen/zuruecknehmen` (LLH-1722).
+/// Antwort von `POST …/vehicles/{ef_id}/stand-down/undo` (LLH-1722).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct EntlassungRuecknahmeAntwort {
     pub fahrzeug: EinsatzFahrzeugAnzeige,
@@ -390,7 +390,7 @@ pub fn etb_text_status_wechsel(funkrufname: &str, alt: Option<&str>, neu: Option
 
 /// Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
 /// Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
-/// wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er
+/// wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück. Er
 /// trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct StatusRuecknahmeBeleg {
@@ -404,7 +404,7 @@ pub struct StatusRuecknahmeBeleg {
     pub status_seit: String,
 }
 
-/// Antwort des Status-PATCH (`PATCH …/fahrzeuge/{ef_id}`): das Fahrzeug wie bisher, dazu der
+/// Antwort des Status-PATCH (`PATCH …/vehicles/{ef_id}`): das Fahrzeug wie bisher, dazu der
 /// Beleg für die Rücknahme, wenn der Status gewechselt hat (LLH-1781).
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct FahrzeugPatchAntwort {

@@ -216,14 +216,14 @@ describe('Einheiten der Ort-Auswahl nach Abschnittsrang (LLH-1277)', () => {
     const abschnittAbrufe: string[] = [];
     server.use(
       http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(geladeneEinheiten)),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json(geladeneEinheiten)),
       http.get('/api/einsaetze/1/sectors', ({ request }) => {
         abschnittAbrufe.push(request.url);
         return HttpResponse.json(abschnitte);
       }),
-      http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
     );
     return { abschnittAbrufe };
   }

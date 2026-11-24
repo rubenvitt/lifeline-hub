@@ -1271,14 +1271,14 @@ export interface SchichtmodellBody extends SchichtmodellWerteBody {
 }
 
 /**
- * Kein Backend-Schema: `PUT …/abloesungen/schichtmodell`. Genau eine Angabe: ein Modell der
+ * Kein Backend-Schema: `PUT …/reliefs/shift-model`. Genau eine Angabe: ein Modell der
  * Organisation (Kopie), eigene Werte oder `schichtmodell: null` (entfernen).
  */
 export type EinsatzSchichtmodellBody =
   { schichtmodell_id: number } | { schichtmodell: SchichtmodellWerteBody | null };
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen`, FE-lokal. Ohne
+ * Kein Backend-Schema: Eingabe-Body von `POST …/reliefs`, FE-lokal. Ohne
  * `rhythmus_minuten` gilt die Vorgabe des Abschnitts der Einheit (fehlt die, 400); ohne
  * `beginn_at` der Zeitpunkt der Anlage. Zeiten als UTC 'YYYY-MM-DD HH:mm:ss'.
  */
@@ -1289,7 +1289,7 @@ export interface SchichtBeginnenBody {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `PATCH …/abloesungen/{id}`, FE-lokal. DREIWERTIG:
+ * Kein Backend-Schema: Eingabe-Body von `PATCH …/reliefs/{id}`, FE-lokal. DREIWERTIG:
  * Schlüssel fehlt = unverändert · `rhythmus_minuten: null` = zurück zur Abschnittsvorgabe ·
  * `abloeser_ids: []` = Planung aufheben. `abloeser_ids` (LLH-1132, höchstens
  * `ABLOESUNG_ABLOESER_MAX`) ersetzt die Liste der Ablöser; die Einzelangabe
@@ -1318,7 +1318,7 @@ export interface UebernahmeEingabe {
 }
 
 /**
- * Kein Backend-Schema: Eingabe-Body von `POST …/abloesungen/{id}/vollzug`. `abloeser_ids`
+ * Kein Backend-Schema: Eingabe-Body von `POST …/reliefs/{id}/execution`. `abloeser_ids`
  * (LLH-1132): je Knoten-Ablöser eine Folgeschicht, eine schon laufende ohne Vorgänger wird
  * übernommen. `abschnitt_uebergeben` verlangt die Freigabe des Moduls Einheiten (sonst 403).
  * `art: 'besatzung'` (LLH-1150) mit `besatzung_ids` (`einsatz_personal.id`, höchstens
@@ -1568,7 +1568,7 @@ export type VerpflegungsstelleStatus = S['VerpflegungsstelleStatus'];
  *  `stelle_id` der Eintrag „ohne Stelle“. Der Client rechnet je Stelle nichts nach. */
 export type VerpflegungStelleIst = S['StelleIst'];
 /** Empfängerliste der Verpflegung (LLH-1055): Projektion in `GET …/catering`, keine eigene
- *  Leseroute und ohne Personenangaben — nie `GET …/einheiten` für die Verpflegung lesen. */
+ *  Leseroute und ohne Personenangaben — nie `GET …/units` für die Verpflegung lesen. */
 export type VerpflegungEmpfaenger = S['VerpflegungEmpfaenger'];
 /** Eine Einheit als Empfänger: Gliederung, Abschnitt, Ist-Stärke (eigene und kumuliert) und
  *  Eintreffen. Aufgelöste stehen nur drin, wenn eine Ausgabe sie nennt. */
@@ -1950,7 +1950,7 @@ export interface PatchNachforderung {
 }
 
 /**
- * Body von `POST …/einheiten/aus-nachforderung` (LLH-1383 D2), FE-lokal. Je Zeile genau eines:
+ * Body von `POST …/units/from-resource-request` (LLH-1383 D2), FE-lokal. Je Zeile genau eines:
  * `name` legt eine neue Einheit an, `einheit_id` verknüpft eine schon geführte (D3).
  */
 export interface EinheitenAusNachforderungEingabe {

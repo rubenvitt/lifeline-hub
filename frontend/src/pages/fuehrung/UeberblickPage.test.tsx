@@ -20,6 +20,13 @@ import { einsatzKeys } from '../../api/queryKeys';
 import { saveStartlisteAusgeblendet } from './startlisteSpeicher';
 import { pruefeKachelGrenzen } from '../../test/kachelWaechter';
 
+/** Quelle und Modul heißen wie ihr Datenschlüssel, der Pfad ist englisch (ADR-0085). */
+const API_SEGMENT: Record<string, string> = {
+  einheiten: 'units',
+  personal: 'personnel',
+  fahrzeuge: 'vehicles',
+};
+
 dayjs.extend(utc);
 
 /**
@@ -288,10 +295,10 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     ...ueberschreiben,
     http.get('/api/einsaetze/1', json(einsatz)),
     http.get('/api/einsaetze/1/persons', json(d.personen)),
-    http.get('/api/einsaetze/1/personal', json(d.personal)),
-    http.get('/api/einsaetze/1/fahrzeuge', json(d.fahrzeuge)),
+    http.get('/api/einsaetze/1/personnel', json(d.personal)),
+    http.get('/api/einsaetze/1/vehicles', json(d.fahrzeuge)),
     http.get('/api/einsaetze/1/material', json(d.material)),
-    http.get('/api/einsaetze/1/einheiten', json(d.einheiten)),
+    http.get('/api/einsaetze/1/units', json(d.einheiten)),
     http.get('/api/einsaetze/1/sectors', json(d.abschnitte)),
     http.get('/api/einsaetze/1/hazard-areas', json(d.gefahren)),
     http.get('/api/einsaetze/1/tasks', json(d.auftraege)),
@@ -320,9 +327,9 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gauges', json(d.pegel ?? [])),
     // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
     // MSW-Default: alles frei.
-    http.get('/api/einsaetze/1/abloesungen', json([])),
+    http.get('/api/einsaetze/1/reliefs', json([])),
     // Perioden der Einheiten für „n ohne Schicht ↗“ (LLH-1312): ohne offene Periode keine.
-    http.get('/api/einsaetze/1/einheiten/zeitachse', json([])),
+    http.get('/api/einsaetze/1/units/timeline', json([])),
     http.get('/api/einsaetze/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen und (Startliste, LLH-1815) die jüngste Lage ab — ein
@@ -1019,7 +1026,7 @@ describe('UeberblickPage', () => {
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/abloesungen', () =>
+      http.get('/api/einsaetze/1/reliefs', () =>
         HttpResponse.json([schicht(1, vor(10)), schicht(2, nach(20)), schicht(3, nach(120))]),
       ),
     ]);
@@ -1048,7 +1055,7 @@ describe('UeberblickPage', () => {
 
   it('Offene Vorgänge · Ablösungen: „1 ohne Schicht ↗“ springt auf die Ansicht, die Zahl bleibt die der fälligen (LLH-1312)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+      http.get('/api/einsaetze/1/units/timeline', () =>
         HttpResponse.json([
           {
             einheit_id: 10,
@@ -1067,7 +1074,7 @@ describe('UeberblickPage', () => {
 
   it('„n ohne Schicht“ verschwindet, wenn ein Neuabruf scheitert, statt die alte Zahl zu nennen', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+      http.get('/api/einsaetze/1/units/timeline', () =>
         HttpResponse.json([
           {
             einheit_id: 10,
@@ -1080,7 +1087,7 @@ describe('UeberblickPage', () => {
     await waitFor(() => vorgaenge());
     await within(abschnitt('Ablösungen')).findByRole('link', { name: '1 ohne Schicht' });
     server.use(
-      http.get('/api/einsaetze/1/einheiten/zeitachse', () =>
+      http.get('/api/einsaetze/1/units/timeline', () =>
         HttpResponse.json({ fehler: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -1416,7 +1423,7 @@ describe('UeberblickPage', () => {
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/abloesungen', () => HttpResponse.json([schicht(1), schicht(2)])),
+      http.get('/api/einsaetze/1/reliefs', () => HttpResponse.json([schicht(1), schicht(2)])),
       // Die Auto-Frist derselben Ablösung in den Erinnerungen darf keine zweite Marke werden.
       http.get('/api/einsaetze/1/reminders', () =>
         HttpResponse.json([
@@ -1445,7 +1452,7 @@ describe('UeberblickPage', () => {
       http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ abloesung: { sichtbar: false } })),
       ),
-      http.get('/api/einsaetze/1/abloesungen', () => {
+      http.get('/api/einsaetze/1/reliefs', () => {
         abgefragt += 1;
         return HttpResponse.json([]);
       }),
@@ -1676,10 +1683,12 @@ describe('UeberblickPage', () => {
     // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
     const route = (modul: string) =>
       (
-        ({ abschnitte: 'sectors', auftraege: 'tasks', erinnerungen: 'reminders' }) as Record<
-          string,
-          string
-        >
+        ({
+          abschnitte: 'sectors',
+          auftraege: 'tasks',
+          erinnerungen: 'reminders',
+          ...API_SEGMENT,
+        }) as Record<string, string>
       )[modul] ?? modul;
     for (const quelle of [
       'abschnitte',
@@ -1717,7 +1726,7 @@ describe('UeberblickPage', () => {
 
     it('scheitert eine Quelle, stehen die Paneele mit „Stand unbekannt“', async () => {
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/einheiten', () =>
+        http.get('/api/einsaetze/1/units', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       ]);
@@ -2063,11 +2072,11 @@ describe('UeberblickPage', () => {
 describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   const GEBUNDEN = [
     '/api/einsaetze/1/persons',
-    '/api/einsaetze/1/personal',
-    '/api/einsaetze/1/fahrzeuge',
+    '/api/einsaetze/1/personnel',
+    '/api/einsaetze/1/vehicles',
     '/api/einsaetze/1/material',
-    '/api/einsaetze/1/einheiten',
-    '/api/einsaetze/1/einheiten/zeitachse',
+    '/api/einsaetze/1/units',
+    '/api/einsaetze/1/units/timeline',
     '/api/einsaetze/1/sectors',
     '/api/einsaetze/1/hazard-areas',
     '/api/einsaetze/1/tasks',
@@ -2118,7 +2127,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     rendern();
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
     await waitFor(() => vorgaenge());
-    expect(aufrufe['/api/einsaetze/1/einheiten/zeitachse']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/units/timeline']).toBeUndefined();
     expect(document.querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull();
   });
 
@@ -2322,15 +2331,15 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       },
     );
     expect(zeile).toHaveTextContent('1/0/1//2');
-    expect(aufrufe['/api/einsaetze/1/fahrzeuge']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/vehicles']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/material']).toBeUndefined();
   });
 
   it('Abschnittspaneel (LFH-887): leer bei gesperrten Fahrzeugen behauptet nicht „keine Kräfte"', async () => {
     mitFreigaben({ fahrzeuge: { zugriff: false } }, [
       http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
     ]);
     rendern();
@@ -2699,7 +2708,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     const kaputt = () => HttpResponse.json({ error: 'kaputt' }, { status: 502 });
     server.use(
       http.get('/api/einsaetze/1/sectors', kaputt),
-      http.get('/api/einsaetze/1/einheiten', kaputt),
+      http.get('/api/einsaetze/1/units', kaputt),
       http.get('/api/einsaetze/1/etb', ({ request }) =>
         new URL(request.url).searchParams.get('typ') === 'lage' ? kaputt() : undefined,
       ),

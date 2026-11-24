@@ -2264,7 +2264,7 @@ async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, body: &Valu
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         Some(body),
     )
@@ -2291,7 +2291,7 @@ async fn kraft_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, einheit:
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}/personal/{ep}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
         cookie,
         None,
     )
@@ -2304,7 +2304,7 @@ async fn einheit_aufloesen(app: &axum::Router, cookie: &str, einsatz: i64, einhe
     let (s, j) = anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/einheiten/{einheit}"),
+        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
         cookie,
         None,
     )
@@ -2581,7 +2581,7 @@ async fn empfaengerliste_ohne_personenangaben() {
     let (s, j) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/einheiten/{gruppe}"),
+        &format!("/api/einsaetze/{e}/units/{gruppe}"),
         &admin,
         Some(&serde_json::json!({ "fuehrer_id": fuehrer })),
     )
@@ -2591,7 +2591,7 @@ async fn empfaengerliste_ohne_personenangaben() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/einheiten/{gruppe}/zeitachse"),
+        &format!("/api/einsaetze/{e}/units/{gruppe}/timeline"),
         &admin,
         Some(r#"{"art":"eintreffen","zeitpunkt_at":"2026-09-24T04:40:00Z"}"#),
     )
@@ -2654,7 +2654,7 @@ async fn empfaengerliste_ohne_modul_einheiten() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/einheiten"),
+        &format!("/api/einsaetze/{e}/units"),
         &frieda,
         None,
     )

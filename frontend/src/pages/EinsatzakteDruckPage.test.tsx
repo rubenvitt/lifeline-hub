@@ -72,20 +72,20 @@ function quellen(freigaben = freigabenFixture()) {
     json('', () => wert(roh, 'einsatz')),
     json('/module-access', () => freigaben),
     json('/command-post', () => wert(roh, 'fuehrungsstelle')),
-    json('/mitglieder', () => wert(roh, 'mitglieder')),
+    json('/members', () => wert(roh, 'mitglieder')),
     json('/briefings', () => wert(roh, 'lagebesprechungen')),
-    mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
-    json('/einheiten/zeitachse', () => wert(roh, 'einheitenPerioden')),
+    mitBeendeten('/units', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
+    json('/units/timeline', () => wert(roh, 'einheitenPerioden')),
     // Die Anlage „Personal je Kopf“ steht in der Akte immer; sie braucht Namen.
-    http.get(`/api/einsaetze/${E}/personal`, ({ request }) =>
+    http.get(`/api/einsaetze/${E}/personnel`, ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.has('entlassene')
           ? []
           : wert<{ id: number }[]>(roh, 'personal').map((k, i) => ({ ...k, name: `Kraft ${i}` })),
       ),
     ),
-    json('/personal/zeitachse', () => wert(roh, 'personalPerioden')),
-    json('/fahrzeuge', () => wert(roh, 'fahrzeuge')),
+    json('/personnel/timeline', () => wert(roh, 'personalPerioden')),
+    json('/vehicles', () => wert(roh, 'fahrzeuge')),
     json('/situation-reports', () => berichte),
     http.get(`/api/einsaetze/${E}/situation-reports/:lid`, ({ params }) => {
       zaehle(`/lageberichte/${String(params.lid)}`);

@@ -746,7 +746,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/mitglieder/{beob_id}"),
+        &format!("/api/einsaetze/{einsatz}/members/{beob_id}"),
         &admin_cookie,
         Some(&json!({"einsatz_rolle": "beobachter"})),
     )

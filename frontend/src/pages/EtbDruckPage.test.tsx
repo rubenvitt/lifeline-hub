@@ -75,7 +75,7 @@ function rendere(suche = '', client = neuerQueryClient()) {
     http.get('/api/einsaetze/7/settings', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: ZONE, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),
+    http.get('/api/einsaetze/7/units', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),
   );
   client.setQueryData(einsatzKeys.einstellungen(7), {
     einsatz_id: 7,

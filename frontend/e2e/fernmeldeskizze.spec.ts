@@ -90,7 +90,7 @@ async function seedeGross(page: Page, einsatzId: string) {
       })
     ).id;
     for (let j = 1; j <= 3; j++) {
-      await a.post('einheiten', {
+      await a.post('units', {
         name: i === 2 && j === 1 ? LANG_NAME : `Einheit ${i}.${j}`,
         funkrufname: i === 1 && j === 1 ? LANG_RUF : `Florian ${i}/${j}`,
         abschnitt_id: ab,
@@ -322,8 +322,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     const k = (await linie.boundingBox())!;
     const zuordnung = page.waitForResponse(
       (r) =>
-        r.url().endsWith(`/einheiten/${n.zug}/sprechgruppen/${n.f314}`) &&
-        r.request().method() === 'PUT',
+        r.url().endsWith(`/units/${n.zug}/talk-groups/${n.f314}`) && r.request().method() === 'PUT',
     );
     await ziehe(page, await mitte(zug.locator(':scope > rect').first()), {
       x: k.x + k.width * 0.2,
@@ -341,7 +340,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     await zug.focus();
     const loesen = page.waitForResponse(
       (r) =>
-        r.url().endsWith(`/einheiten/${n.zug}/sprechgruppen/${n.f314}`) &&
+        r.url().endsWith(`/units/${n.zug}/talk-groups/${n.f314}`) &&
         r.request().method() === 'DELETE',
     );
     await page.keyboard.press('Control+z');
@@ -397,8 +396,7 @@ test('Tastatur: „1. Zug“ per Tab wählen, „Verbinden mit …“ (V), „31
   await expect(dialog.getByRole('option').first()).toContainText('DMO 314_F*');
   const zuordnung = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/einheiten/${n.zug}/sprechgruppen/${n.f314}`) &&
-      r.request().method() === 'PUT',
+      r.url().endsWith(`/units/${n.zug}/talk-groups/${n.f314}`) && r.request().method() === 'PUT',
   );
   await page.keyboard.press('Enter');
   expect((await zuordnung).ok()).toBe(true);
@@ -406,7 +404,7 @@ test('Tastatur: „1. Zug“ per Tab wählen, „Verbinden mit …“ (V), „31
   await expect(element(page, `sg-${n.f314}~eh-${n.zug}`)).toHaveCount(1);
   const einheiten = await api(page, einsatzId).get<
     { id: number; sprechgruppen: { id: number }[] }[]
-  >('einheiten');
+  >('units');
   expect(einheiten.find((e) => e.id === n.zug)!.sprechgruppen.map((s) => s.id)).toContain(n.f314);
   expect(
     await page.evaluate(() => (window as unknown as { zeiger: number }).zeiger),
@@ -428,7 +426,7 @@ test('Leitstelle: anlegen, in den rückwärtigen Bereich ziehen, über „TMO SL
   await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [slAs] });
   const zaehle = async () => ({
     abschnitte: (await a.get<unknown[]>('sectors')).length,
-    einheiten: (await a.get<unknown[]>('einheiten')).length,
+    einheiten: (await a.get<unknown[]>('units')).length,
   });
   const vorher = await zaehle();
   await oeffneSkizze(page, einsatzId, element(page, 'fs'));
@@ -628,7 +626,7 @@ async function seedeLuecken(page: Page, einsatzId: string) {
     })
   ).id;
   const einheit = async (name: string, funkrufname: string | null, sprechgruppe_ids: number[]) =>
-    (await a.post('einheiten', { name, funkrufname, abschnitt_id: ea, sprechgruppe_ids })).id;
+    (await a.post('units', { name, funkrufname, abschnitt_id: ea, sprechgruppe_ids })).id;
   const mit = await einheit('1. Zug', 'Florian 1/1', [bnBos]);
   const ohne = await einheit('2. Zug', null, []);
   const fremd = await einheit('3. Zug', 'Florian 1/3', [d505]);
@@ -708,7 +706,7 @@ test('Wurzel: ohne erfasste Führungsstelle keine erfundene Einsatzleitung', asy
       sprechgruppe_ids: [bnBos],
     })
   ).id;
-  await a.post('einheiten', {
+  await a.post('units', {
     name: '1. Zug',
     funkrufname: 'Florian 1/1',
     abschnitt_id: ea,
@@ -869,10 +867,10 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
   await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea1 = (await a.post('sectors', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
   const vorne = (
-    await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
+    await a.post('units', { name: 'Zug A', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
   ).id;
   const hinten = (
-    await a.post('einheiten', { name: 'Zug B', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
+    await a.post('units', { name: 'Zug B', abschnitt_id: ea1, sprechgruppe_ids: [bnBos] })
   ).id;
   const ziel = element(page, `eh-${hinten}`);
   await oeffneSkizze(page, einsatzId, ziel);
@@ -880,7 +878,7 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
 
   await ziel.hover();
   // „Zug A“ wird an einem anderen Arbeitsplatz aufgelöst; im Auto-Layout rückte „Zug B“ auf.
-  const weg = await page.request.delete(`/api/einsaetze/${einsatzId}/einheiten/${vorne}`);
+  const weg = await page.request.delete(`/api/einsaetze/${einsatzId}/units/${vorne}`);
   expect(weg.ok(), `Auflösen: ${weg.status()} ${await weg.text()}`).toBe(true);
   // Vorbedingung: das Ereignis ist angekommen — „Zug A“ ist aus dem Bild.
   await expect(element(page, `eh-${vorne}`)).toHaveCount(0);
@@ -921,9 +919,9 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   const bnBos = (await a.post('talk-groups', { bezeichnung: 'BN_BOS', betriebsart: 'TMO' })).id;
   await a.patch('command-post', { rufname: FS_RUF, sprechgruppe_ids: [bnBos] });
   const ea = (await a.post('sectors', { name: 'EA Nord', sprechgruppe_ids: [bnBos] })).id;
-  await a.post('einheiten', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
+  await a.post('units', { name: 'Zug A', abschnitt_id: ea, sprechgruppe_ids: [bnBos] });
   const zugB = (
-    await a.post('einheiten', { name: 'Zug B', abschnitt_id: ea, sprechgruppe_ids: [bnBos] })
+    await a.post('units', { name: 'Zug B', abschnitt_id: ea, sprechgruppe_ids: [bnBos] })
   ).id;
   const key = `eh-${zugB}`;
   const ziel = element(page, key);
@@ -936,7 +934,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   const lageVorher = await lage(ziel);
 
   // An einem anderen Arbeitsplatz entsteht eine Lücke: eine Einheit ohne Sprechgruppe.
-  await a.post('einheiten', { name: 'Zug Ohne', abschnitt_id: ea });
+  await a.post('units', { name: 'Zug Ohne', abschnitt_id: ea });
   // Vorbedingung: das Ereignis ist angekommen — das Paneel nennt die Lücke.
   await expect(
     page.locator('[data-lfh="funkplan-luecke"]', { hasText: 'Einheiten ohne Sprechgruppe' }),
@@ -978,7 +976,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz ob
   // in zwei weiteren Lücken (ohne Funkrufname, ohne Telefon), das Paneel wüchse um eine Zeile mit
   // Betroffenen, und die Fläche begänne unter dem Fenster.
   const ohne = (
-    await a.post('einheiten', {
+    await a.post('units', {
       name: 'Zug Ohne',
       funkrufname: 'Florian Zug Ohne',
       abschnitt_id: ea,
@@ -998,7 +996,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): schließt sich eine Lücke ganz ob
 
   // An einem anderen Arbeitsplatz bekommt „Zug Ohne“ seine Sprechgruppe: die Zeile verliert ihren
   // Betroffenen, das Paneel würde schrumpfen.
-  await a.put(`einheiten/${ohne}/sprechgruppen/${bnBos}`);
+  await a.put(`units/${ohne}/talk-groups/${bnBos}`);
   await expect(lueckeOhne).not.toContainText('Zug Ohne');
   steht(await amSchirm(flaeche(page)), oben, 'die Fläche bleibt am Schirm stehen');
 });
@@ -1082,7 +1080,7 @@ test('Rechte: Schreibrecht im Fernmeldewesen ohne Einheiten — keine Einheit gr
   await expect(paneel(page).locator('[data-lfh="skizze-rechte-grund"]')).toHaveCount(0);
 
   const direkt = await page.request.put(
-    `/api/einsaetze/${einsatzId}/einheiten/${n.zug}/sprechgruppen/${n.f314}`,
+    `/api/einsaetze/${einsatzId}/units/${n.zug}/talk-groups/${n.f314}`,
   );
   expect(direkt.status(), 'direkter Aufruf ohne Recht auf Einheiten').toBe(403);
 });

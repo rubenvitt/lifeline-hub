@@ -99,7 +99,7 @@ test.describe(KAPITEL, () => {
         empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
       };
       for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
-        await fuelle(api, 'post', `/api/einsaetze/${demo.id}/einheiten/${e.id}/zeitachse`, {
+        await fuelle(api, 'post', `/api/einsaetze/${demo.id}/units/${e.id}/timeline`, {
           art: 'eintreffen',
           zeitpunkt_at: eintreffenVor(jetzt, 120).toISOString(),
         });

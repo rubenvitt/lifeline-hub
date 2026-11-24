@@ -55,7 +55,7 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/geraete`,
+    `/api/einsaetze/${e}/devices`,
     { ansicht: 'uhs-tablet', uhs_id: nord.id, bezeichnung: 'Tablet 1' },
   );
 
@@ -107,7 +107,7 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
     );
 
     // Widerruf durch die Einsatzleitung: das Tablet endet von selbst, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/geraete/${kopplung.kopplung.id}/widerrufen`);
+    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/);
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
     await expect(tablet.getByText('UHS Nord')).toHaveCount(0);
@@ -131,14 +131,14 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     bezeichnung: 'UHS Nord',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
   const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
     name: 'Patient',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -201,7 +201,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
     bezeichnung: 'UHS Nord',
   });
   await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personal`, {
+  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
   const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
@@ -210,7 +210,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
     sichtung: 'sk2',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -298,7 +298,7 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
     sichtung: 'sk3',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/geraete`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -435,7 +435,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
   const koppeln = () =>
     anlegen<{ kopplung: { id: number }; code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/geraete`,
+      `/api/einsaetze/${e}/devices`,
       { ansicht: 'uhs-tablet', uhs_id: nord.id, bezeichnung: 'Tablet 1' },
     );
   const erste = await koppeln();
@@ -465,7 +465,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
     const offlineBis = Date.now();
 
     // Die Kopplung endet, während das Tablet kein Netz hat.
-    await anlegen(page, `/api/einsaetze/${e}/geraete/${erste.kopplung.id}/widerrufen`);
+    await anlegen(page, `/api/einsaetze/${e}/devices/${erste.kopplung.id}/revoke`);
     await kontext.setOffline(false);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/, { timeout: 30_000 });
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();

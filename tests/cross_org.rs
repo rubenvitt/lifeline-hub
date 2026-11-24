@@ -78,7 +78,7 @@ async fn mitglied_setzen_lehnt_org_fremden_benutzer_ab() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{eid}/mitglieder/{fremd_id}"))
+                .uri(format!("/api/einsaetze/{eid}/members/{fremd_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"fuehrungspersonal"}"#))

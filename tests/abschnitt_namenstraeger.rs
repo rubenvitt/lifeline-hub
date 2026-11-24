@@ -44,7 +44,7 @@ async fn einheit_im_abschnitt(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/einheiten"),
+        &format!("/api/einsaetze/{einsatz}/units"),
         cookie,
         Some(&json!({"name": name, "abschnitt_id": ab})),
     )
@@ -185,7 +185,7 @@ async fn umbenennen_meldet_einheiten_dokumente_und_abloesung() {
         umbenennen(&app, &admin, eid, ab, body).await;
         assert_eq!(gemeldet(&mut rx), erwartet, "{fall}");
     }
-    let einheiten = format!("/api/einsaetze/{eid}/einheiten");
+    let einheiten = format!("/api/einsaetze/{eid}/units");
     let dokumente = format!("/api/einsaetze/{eid}/documents");
     assert_eq!(
         feld_in_liste(&app, &admin, &einheiten, a, "abschnitt_name").await,
@@ -221,7 +221,7 @@ async fn aufloesen_meldet_einheiten_dokumente_und_abloesung() {
             abloesung: 1,
         }
     );
-    let einheiten = format!("/api/einsaetze/{eid}/einheiten");
+    let einheiten = format!("/api/einsaetze/{eid}/units");
     assert!(feld_in_liste(&app, &admin, &einheiten, a, "abschnitt_name")
         .await
         .is_null());
@@ -272,9 +272,9 @@ async fn umbenennen_erreicht_leser_ohne_abschnittsrecht() {
         .await;
         assert_eq!(s, StatusCode::OK, "Override {modul}: {v}");
     }
-    let einheiten = format!("/api/einsaetze/{eid}/einheiten");
+    let einheiten = format!("/api/einsaetze/{eid}/units");
     let dokumente = format!("/api/einsaetze/{eid}/documents");
-    let vorgaben = format!("/api/einsaetze/{eid}/abloesungen/vorgaben");
+    let vorgaben = format!("/api/einsaetze/{eid}/reliefs/defaults");
     for (pfad, erwartet) in [
         (
             format!("/api/einsaetze/{eid}/sectors"),
@@ -365,7 +365,7 @@ async fn einheit_umbenennen_und_umhaengen_meldet_versorgte_personen() {
     let p2 = versorgte_person(&app, &admin, eid, zug).await;
     versorgte_person(&app, &admin, eid, anderer).await;
 
-    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let pfad = format!("/api/einsaetze/{eid}/units/{zug}");
     let mut rx = live.abonniere(eid);
     for (body, erwartet, fall) in [
         (json!({"name": "1. Zug neu"}), vec![p1, p2], "neuer Name"),
@@ -450,7 +450,7 @@ async fn mehr_als_zehn_versorgte_personen_melden_ein_ereignis_ohne_kennung() {
     }
 
     let mut rx = live.abonniere(eid);
-    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let pfad = format!("/api/einsaetze/{eid}/units/{zug}");
     let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(person_ereignisse(&mut rx), vec![None], "Einheit");
@@ -473,7 +473,7 @@ async fn zehn_versorgte_personen_melden_einzeln() {
     }
 
     let mut rx = live.abonniere(eid);
-    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let pfad = format!("/api/einsaetze/{eid}/units/{zug}");
     let (s, v) = anfrage_json(&app, "PATCH", &pfad, &admin, Some(&json!({"name": "Neu"}))).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(person_ereignisse(&mut rx), erwartet);
@@ -492,7 +492,7 @@ async fn einheit_patch_mit_unbekannter_sprechgruppe_speichert_und_meldet_nichts(
     let p = versorgte_person(&app, &admin, eid, zug).await;
 
     let mut rx = live.abonniere(eid);
-    let pfad = format!("/api/einsaetze/{eid}/einheiten/{zug}");
+    let pfad = format!("/api/einsaetze/{eid}/units/{zug}");
     let (s, v) = anfrage_json(
         &app,
         "PATCH",

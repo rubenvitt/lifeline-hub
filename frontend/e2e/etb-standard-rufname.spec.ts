@@ -95,7 +95,7 @@ test('Abfrage: Tab nimmt den obersten Vorschlag und springt weiter, Enter nimmt 
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
   for (const name of ['Sanitätsgruppe UHS', 'Sanitätszug Musterstadt']) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/einheiten`, { data: { name } });
+    const r = await page.request.post(`/api/einsaetze/${einsatzId}/units`, { data: { name } });
     expect(r.ok(), `Einheit ${name}: ${r.status()}`).toBe(true);
   }
   await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);

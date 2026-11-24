@@ -60,11 +60,11 @@ test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', a
   const einsatzId = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Funkloch Karte ${Date.now()}`,
   });
-  const einheit = await post(page, `/api/einsaetze/${einsatzId}/einheiten`, {
+  const einheit = await post(page, `/api/einsaetze/${einsatzId}/units`, {
     name: 'Offline-Probe Zug',
   });
   const position = await page.request.patch(
-    `/api/einsaetze/${einsatzId}/einheiten/${einheit}/position`,
+    `/api/einsaetze/${einsatzId}/units/${einheit}/position`,
     { data: { lat: 53.0775, lon: 8.8 } },
   );
   expect(position.ok(), await position.text()).toBeTruthy();

@@ -42,8 +42,8 @@ async function seed(page: Page) {
   if (!typen.some((t) => t.label === 'RTW')) {
     await post(page, '/api/unit-types', { label: 'RTW', sortier: 90 });
   }
-  const br = await post(page, `${basis}/bereitstellungsraeume`, { bezeichnung: 'Nord' });
-  await post(page, `${basis}/bereitstellungsraeume/${br.id}/status`, { status: 'aktiv' });
+  const br = await post(page, `${basis}/staging-areas`, { bezeichnung: 'Nord' });
+  await post(page, `${basis}/staging-areas/${br.id}/status`, { status: 'aktiv' });
   const nf = await post(page, `${basis}/resource-requests`, {
     art: 'RTW',
     anzahl: 2,
@@ -88,7 +88,7 @@ test('Eintreffen melden und als Einheit übernehmen mit Ziel BR Nord (LLH-1383)'
   await expect(karte.getByRole('button', { name: 'Als Material übernehmen' })).toHaveCount(0);
 
   // Im Einsatz und im Raum, beide mit Herkunft.
-  const einheiten = await get<EinheitDraht[]>(page, `/api/einsaetze/${einsatzId}/einheiten`);
+  const einheiten = await get<EinheitDraht[]>(page, `/api/einsaetze/${einsatzId}/units`);
   const neu = einheiten.filter((e) => e.nachforderung_id === nfId);
   expect(neu.map((e) => e.name).sort()).toEqual(['83-1', '83-2']);
   for (const e of neu) {
