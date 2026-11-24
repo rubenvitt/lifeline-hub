@@ -15005,10 +15005,10 @@ async fn migration_0366_setzt_die_grenze_bestehender_kopplungen_auf_das_aufruest
 /// `spiegel_antrag.pfad_vorlage`; die Migration schreibt es um, sonst lehnte der Führer ihn als
 /// „Unbekannte Art des Antrags“ ab. Fremde Muster bleiben.
 #[tokio::test]
-async fn migration_0369_schreibt_beantragte_pfade_auf_die_englischen_routen_um() {
+async fn migration_0370_schreibt_beantragte_pfade_auf_die_englischen_routen_um() {
     use crate::instanz::spiegel::antrag::BEANTRAGBAR;
 
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 368).await;
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 369).await;
     let (einsatz, benutzer) = bild_grundlage(&pool).await;
     let alt = [
         "/api/einsaetze/{id}/personen",
@@ -15039,7 +15039,7 @@ async fn migration_0369_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
         .await
         .unwrap();
     }
-    migriere_bis(&pool, 369).await;
+    migriere_bis(&pool, 370).await;
     let neu: Vec<String> =
         sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
             .fetch_all(&pool)
