@@ -171,6 +171,10 @@ async fn ablegen(
             }
             Ok(ergebnis)
         })?;
+        if ergebnis == PositionErgebnis::Uebernommen {
+            // Nach dem Commit, außerhalb von `write_retry!`; Fehler wirken nicht auf die Antwort.
+            crate::ortung::uebernahme::apply_position(&state, &zugang.id, &inhalt.kennung).await;
+        }
         return match ergebnis {
             PositionErgebnis::Uebernommen | PositionErgebnis::Aelter => Ok(StatusCode::NO_CONTENT),
             PositionErgebnis::ZuVieleKennungen => Err(ApiError::new(

@@ -1,12 +1,14 @@
 //! Übernahme eingeworfener Positionen in gekoppelte Einsatzfahrzeuge (LLH-2091). Die Tests rufen
 //! `apply_position_tx` mit gebauten Zeitstempeln auf, ohne zu schlafen.
 
-use axum::http::StatusCode;
+use axum::http::{Request, StatusCode};
+use lifeline_hub::app::RouterOptionen;
 use lifeline_hub::live::LiveHub;
 use lifeline_hub::ortung::uebernahme::{
     apply_position, apply_position_tx, is_nachlauf_vorgemerkt, Uebernahme,
 };
 use sqlx::SqlitePool;
+use tower::ServiceExt;
 
 mod common;
 use common::*;
@@ -15,6 +17,9 @@ const KENNUNG: &str = "geraet-1";
 const T: &str = "2026-11-24 12:00:00";
 
 struct Fix {
+    app: axum::Router,
+    /// Klartext-Schlüssel des Zugangs; leer, wenn der Zugang direkt in die DB geschrieben wurde.
+    schluessel: String,
     pool: SqlitePool,
     org: i64,
     einsatz: i64,
@@ -24,6 +29,24 @@ struct Fix {
 
 async fn fix() -> Fix {
     let (app, pool) = setup_mit_pool().await;
+    fix_auf(app, pool, false).await
+}
+
+/// Wie [`fix`], aber über den echten Einwurf erreichbar: Router ohne TLS-Pflicht und ein Zugang
+/// mit echtem Schlüssel; der Live-Hub wird mitgeliefert.
+async fn fix_fuer_einwurf() -> (Fix, LiveHub) {
+    let opt = RouterOptionen {
+        demo_daten: false,
+        zulassungs_budget: None,
+        heic_decoder_verzeichnis: None,
+        tls: false,
+        einwurf_allow_http: true,
+    };
+    let (app, pool, live) = setup_mit_optionen_und_live(opt).await;
+    (fix_auf(app, pool, true).await, live)
+}
+
+async fn fix_auf(app: axum::Router, pool: SqlitePool, echter_zugang: bool) -> Fix {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (s, v) = anfrage(
@@ -55,17 +78,33 @@ async fn fix() -> Fix {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let zugang = "zugang-ortung".to_string();
-    sqlx::query(
-        "INSERT INTO einwurf_zugang (id, org_id, name, scope, schluessel_hash, angelegt_at) \
-         VALUES (?, ?, 'Tracker', 'positionen:write', 'hash-ortung', ?)",
-    )
-    .bind(&zugang)
-    .bind(org)
-    .bind(T)
-    .execute(&pool)
-    .await
-    .unwrap();
+    let (zugang, schluessel) = if echter_zugang {
+        let (s, v) = anfrage(
+            &app,
+            "POST",
+            "/api/admin/intake-credentials",
+            &admin,
+            Some(r#"{"name":"Tracker","scope":"positionen:write"}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{v}");
+        (
+            v["zugang"]["id"].as_str().unwrap().to_string(),
+            v["schluessel"].as_str().unwrap().to_string(),
+        )
+    } else {
+        sqlx::query(
+            "INSERT INTO einwurf_zugang (id, org_id, name, scope, schluessel_hash, angelegt_at) \
+             VALUES (?, ?, 'Tracker', 'positionen:write', 'hash-ortung', ?)",
+        )
+        .bind("zugang-ortung")
+        .bind(org)
+        .bind(T)
+        .execute(&pool)
+        .await
+        .unwrap();
+        ("zugang-ortung".to_string(), String::new())
+    };
     sqlx::query(
         "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
          ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
@@ -81,6 +120,8 @@ async fn fix() -> Fix {
     .await
     .unwrap();
     Fix {
+        app,
+        schluessel,
         pool,
         org,
         einsatz,
@@ -316,4 +357,107 @@ async fn gedrosselter_fix_merkt_genau_einen_nachlauf_vor() {
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
     assert!(is_nachlauf_vorgemerkt(f.ef));
+}
+
+/// Ein Positions-Einwurf über den echten Router; liefert Status und Header.
+async fn einwurf_position(f: &Fix, lat: f64, lon: f64) -> (StatusCode, axum::http::HeaderMap) {
+    let resp = f
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/intake/{}/position?id={KENNUNG}&lat={lat}&lon={lon}",
+                    f.schluessel
+                ))
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    (resp.status(), resp.headers().clone())
+}
+
+/// Header ohne die je Antwort wechselnden Kennungen.
+fn stabile_header(h: &axum::http::HeaderMap) -> Vec<(String, String)> {
+    let mut v: Vec<_> = h
+        .iter()
+        .filter(|(n, _)| !matches!(n.as_str(), "x-request-id" | "date"))
+        .map(|(n, w)| (n.to_string(), w.to_str().unwrap_or_default().to_string()))
+        .collect();
+    v.sort();
+    v
+}
+
+#[tokio::test]
+async fn einwurf_mit_gekoppelter_kennung_bewegt_das_fahrzeug_und_meldet_live() {
+    let (f, live) = fix_fuer_einwurf().await;
+    let mut rx = live.abonniere(f.einsatz);
+    let (status, _) = einwurf_position(&f, 48.1, 11.5).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let stand = f.stand().await;
+    assert_eq!((stand.0, stand.1), (Some(48.1), Some(11.5)));
+    assert_eq!(stand.2.as_deref(), Some("ortung"));
+    let n = recv_until_tag(&mut rx, "fahrzeug", std::time::Duration::from_secs(2)).await;
+    let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(data["fahrzeug_id"].as_i64(), Some(f.ef));
+}
+
+#[tokio::test]
+async fn einwurf_ohne_kopplung_antwortet_gleich() {
+    let (gekoppelt, _) = fix_fuer_einwurf().await;
+    let (frei, live) = fix_fuer_einwurf().await;
+    sqlx::query("DELETE FROM ortung_kopplung")
+        .execute(&frei.pool)
+        .await
+        .unwrap();
+    let mut rx = live.abonniere(frei.einsatz);
+    let (s1, h1) = einwurf_position(&gekoppelt, 48.1, 11.5).await;
+    let (s2, h2) = einwurf_position(&frei, 48.1, 11.5).await;
+    assert_eq!((s1, s2), (StatusCode::NO_CONTENT, StatusCode::NO_CONTENT));
+    assert_eq!(stabile_header(&h1), stabile_header(&h2));
+    assert_eq!(frei.stand().await.0, None);
+    assert!(objekt_ereignisse(&mut rx, &[("fahrzeug", "fahrzeug_id")]).is_empty());
+}
+
+#[tokio::test]
+async fn einwurf_nach_abschluss_aendert_kein_fahrzeug() {
+    let (f, live) = fix_fuer_einwurf().await;
+    sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+        .bind(f.einsatz)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let mut rx = live.abonniere(f.einsatz);
+    let (status, _) = einwurf_position(&f, 48.1, 11.5).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    assert_eq!(f.stand().await.0, None);
+    assert!(objekt_ereignisse(&mut rx, &[("fahrzeug", "fahrzeug_id")]).is_empty());
+}
+
+#[tokio::test]
+async fn aelterer_fix_stoesst_nichts_an() {
+    let (f, live) = fix_fuer_einwurf().await;
+    let (status, _) = einwurf_position(&f, 48.1, 11.5).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    let vorher = f.stand().await;
+    let mut rx = live.abonniere(f.einsatz);
+    // Ein Fix mit älterer Messzeit wird abgelegt als `Aelter` und darf nichts anstoßen.
+    let resp = f
+        .app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/api/v1/intake/{}/position?id={KENNUNG}&lat=1&lon=2&timestamp=2000-01-01T00:00:00Z",
+                    f.schluessel
+                ))
+                .body(axum::body::Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NO_CONTENT);
+    assert_eq!(f.stand().await, vorher);
+    assert!(objekt_ereignisse(&mut rx, &[("fahrzeug", "fahrzeug_id")]).is_empty());
 }

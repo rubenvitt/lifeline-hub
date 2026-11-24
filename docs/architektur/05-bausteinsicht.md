@@ -210,6 +210,7 @@ Regeln: [frontend/src/infotelefon/AGENTS.md](../../frontend/src/infotelefon/AGEN
 | `src/fernmeldewesen` | Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen | `…/{id}/staff/comms-plan`, `…/{id}/staff/comms-sketch`; Live `fernmeldewesen` |
 | `src/fuehrung` | Geschlossener Katalog der Führungsfunktionen (FwDV 100) mit Org-Labels, Sachgebiete S1–S6 | `/api/command-roles`, `/api/org-command-roles/{funktion}` |
 | `src/lagebesprechung` | Termin, Abschluss mit Entschluss und Verlauf, eigenes Modul | `…/{id}/briefing`, `…/{id}/briefings`; Live `lagebesprechung` |
+| `src/ortung` | Ortung (LLH-2091): Übernahme der eingeworfenen Position (`position_letzte`) in das gekoppelte Einsatzfahrzeug, Vorrang über `position_gesetzt_at`, Drossel 15 s mit einem Nachlauf; angestoßen vom Einwurf in `src/public_api/einwurf/routen.rs` | Live `fahrzeug` |
 | `src/programmpunkt` | Programmpunkte der Veranstaltung (Ablauf), Quelle der nächsten Marken und des Lagemonitors | `…/{id}/agenda-items`, Feld `programm` von `…/{id}/situation-monitor`; Live `einsatz` |
 | `src/lagebericht` | Lageberichte nach Vorlage (Registry synchron zu `frontend/src/lageberichte/vorlagen.ts`) | `…/{id}/lageberichte`; Live `lagebericht` |
 | `src/vorlagendokument` | Gemeinsamer Kern von Befehl und Lagebericht: Entwurf, Freigabe als ETB-Snapshot, Fortschreibung, Anlagen, Verteiler | von `src/befehl`, `src/lagebericht` genutzt |
