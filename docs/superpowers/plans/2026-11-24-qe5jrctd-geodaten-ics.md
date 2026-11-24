@@ -102,9 +102,9 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 - `gilt_fuer`: `frontend/src/pages/lagekarte/geo*`, `frontend/src/pages/lagekarte/kmz*`, `frontend/src/pages/lagekarte/kml*`, `src/karte_fremdebene/**`.
 - `herleitung`: die zwei Design-Docs A und B+C.
 
-- [ ] **Step 1:** ADR schreiben, Nummer nach `docs/architektur/AGENTS.md` vergeben.
-- [ ] **Step 2:** Wächter der ADRs laufen lassen (`./scripts/check-all.sh --geaendert --ohne-e2e`, nur der ADR-Schritt bzw. der Befehl, den `docs/architektur/AGENTS.md` nennt) → grün.
-- [ ] **Step 3:** Commit `docs: ADR Geodaten-Austausch`.
+- [x] **Step 1:** ADR schreiben, Nummer nach `docs/architektur/AGENTS.md` vergeben.
+- [x] **Step 2:** Wächter der ADRs laufen lassen (`./scripts/check-all.sh --geaendert --ohne-e2e`, nur der ADR-Schritt bzw. der Befehl, den `docs/architektur/AGENTS.md` nennt) → grün.
+- [x] **Step 3:** Commit `docs: ADR Geodaten-Austausch`.
 
 ## Teil D — ICS (LLH-2101)
 
