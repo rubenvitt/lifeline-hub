@@ -201,6 +201,13 @@ Quelle nicht laden, steht „—“ statt einer Zahl.
 Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wann ihr Stand ist;
 „offline“, „keine Daten“ oder „näher heranzoomen“ sagen, warum sie gerade nichts zeigt.
 
+„Autobahn-Lage (BAB)“ zeigt Baustellen, Sperrungen und Verkehrsmeldungen an Bundesautobahnen. Eine
+Verkehrsmeldung nennt oben, was los ist, etwa „Stau · +17 min Reisezeitverlust“. „Lkw-Parkplätze
+(BAB)“ zeigt die Rastanlagen mit ihren Pkw- und Lkw-Stellplätzen und der Ausstattung, nützlich bei
+der Suche nach einem Bereitstellungsraum an der Autobahn. Wie voll eine Anlage gerade ist, weiß die
+Quelle nicht. Beide Ebenen holen ihre Daten nach dem Einschalten erst im Hintergrund und zeigen bis
+dahin, etwa eine halbe Minute lang, „offline“.
+
 „Satellitenauswertung (Copernicus EMS)“ zeigt die Karten des europäischen Notfalldienstes, wo er
 für eine Großschadenslage aktiviert wurde: betroffene Flächen, Wassertiefe und Schäden an Gebäuden
 und Straßen, gestrichelt umrandet das ausgewertete Gebiet. Außerhalb dieses Umrisses hat niemand
