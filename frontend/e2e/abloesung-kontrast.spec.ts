@@ -84,6 +84,14 @@ async function textknoten(wurzel: Locator): Promise<Textknoten[]> {
   return funde.map((f, i) => ({ ...f, ziel: wurzel.locator(`[data-kontrastprobe="${i}"]`) }));
 }
 
+/** Liegt in der Mitte von `ziel` etwas anderes obenauf (Dialog, Maske, Drawer)? */
+async function verdeckt(ziel: Locator): Promise<boolean> {
+  return ziel.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    return !el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+  });
+}
+
 test('Randmessung: Rand gegen innen und außen, keine Breite und Durchscheinen werden abgelehnt', async ({
   page,
 }) => {
@@ -167,22 +175,40 @@ for (const modus of ['light', 'dark'] as const) {
     // Mensch über „Gelesen“, sobald die Zone vor einer Aktion oder Zusicherung steht (✕ blendete
     // nur aus, LLH-1736), und nimmt den Zeiger danach aus dem Kopf, sonst mäße er den Hover des
     // Kopfknopfs. Gemessen wird sie nicht: sie hängt nicht im Baum von Kopf und Inhalt.
+    // Kommt der Takt, während ein Dialog offen ist, liegt der Dialog über Zone und Band (LLH-1735,
+    // `alarm-verdeckung.spec.ts`): auch ein Mensch erreicht „Gelesen“ dann erst nach dem Dialog.
+    // Die Handler lassen beides deshalb stehen, solange etwas darüber liegt, und räumen es vor der
+    // nächsten Aktion danach; vorher klickten sie ins Verdeckte, bis die Testfrist ablief
+    // (LLH-2088).
     const zone = page.locator('[data-lfh="alarmzone"]');
-    await page.addLocatorHandler(zone, async () => {
-      while ((await zone.count()) > 0) {
-        await zone.getByRole('button', { name: 'Gelesen', exact: true }).first().click();
-      }
-      await page.mouse.move(0, 0);
-    });
+    await page.addLocatorHandler(
+      zone,
+      async () => {
+        while ((await zone.count()) > 0) {
+          const gelesen = zone.getByRole('button', { name: 'Gelesen', exact: true }).first();
+          if (await verdeckt(gelesen)) return;
+          await gelesen.click();
+        }
+        await page.mouse.move(0, 0);
+      },
+      { noWaitAfter: true },
+    );
     // Vorwarnung und Planung sind Eingänge (LLH-1143): sie stehen im Eingangsband unten rechts,
     // über den Karten. Auch das Band schließt der Test wie ein Mensch.
-    await page.addLocatorHandler(page.locator('[data-lfh="eingangsband"]'), async (band) => {
-      await band
-        .getByRole('button', { name: 'Ausblenden, ohne zu quittieren', exact: true })
-        .click();
-      await expect(band).toHaveCount(0);
-      await page.mouse.move(0, 0);
-    });
+    await page.addLocatorHandler(
+      page.locator('[data-lfh="eingangsband"]'),
+      async (band) => {
+        const ausblenden = band.getByRole('button', {
+          name: 'Ausblenden, ohne zu quittieren',
+          exact: true,
+        });
+        if (await verdeckt(ausblenden)) return;
+        await ausblenden.click();
+        await expect(band).toHaveCount(0);
+        await page.mouse.move(0, 0);
+      },
+      { noWaitAfter: true },
+    );
 
     await page.evaluate((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await page.goto(`/einsaetze/${einsatzId}/abloesung`);
