@@ -104,8 +104,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 | Quelle (`quelle`) | Endpoint | Format / Geometrie | Lizenz | Pflicht-Attribution | Cache-TTL / Aktualisierung | Offline |
 |---|---|---|---|---|---|---|
-| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
-| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
+| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Auflage des BBK je Meldung: „nur inhaltlich unverändert und nicht zu gewerblichen Zwecken“**, keine Lizenz im engeren Sinn. Geprüft am 24.11.2026 (LLH-1203): **unbedenklich**, Begründung unter „Lizenz NINA / MoWaS“. Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
+| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **CC BY 4.0 — offen, auch kommerziell und verändert**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). Laut den rechtlichen Hinweisen des DWD gilt CC BY 4.0 für alle frei zugänglichen Geodaten und Geodatendienste (geprüft 24.11.2026, LLH-1203; vorher GeoNutzV). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
@@ -369,6 +369,32 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     die URL, nicht das Bild) — anders als alle übrigen Fachebenen-Daten läuft es also NICHT
     über den Backend-Proxy. Ohne Internet am Gerät lädt es nicht; das Detailpanel blendet
     das Bild dann aus und nennt den Grund, statt ein kaputtes Bildsymbol stehen zu lassen.
+- **Lizenz NINA / MoWaS (LLH-1203, geprüft 24.11.2026 an den Primärquellen):**
+  * **Wortlaut.** Unter jeder MoWaS-Meldung im RSS-Feed (`/api31/mowas/rss/{ARS}.rss`) steht:
+    „Diese Warnmeldung stammt aus dem Modularen Warnsystem (MoWaS) des Bundesamtes für
+    Bevölkerungsschutz und Katastrophenhilfe. Sie darf nur inhaltlich unverändert und nicht zu
+    gewerblichen Zwecken verwendet werden. Um die Authentizität der Warnmeldung zu überprüfen
+    gehen Sie auf https://warnung.bund.de.“ Die JSON-Endpunkte, die der Adapter abruft
+    (`mapData.json`, `warnings/{id}.geojson`), tragen den Satz nicht. Es sind dieselben
+    Meldungen, deshalb gilt die Auflage auch für sie. Eine Lizenz im engeren Sinn gibt es nicht:
+    Die OpenAPI-Beschreibung (bundesAPI) hat weder `license` noch `termsOfService` und führt den
+    Satz nur im RSS-Beispiel. Das Impressum des BBK regelt die Texte seiner Website, nicht die
+    Warnmeldungen.
+  * **Geltung.** Die Auflage nennt ausdrücklich MoWaS. Die übrigen Quellen in NINA (DWD, LHP,
+    Polizei) betrifft sie nicht, und der Adapter holt sie auch nicht über NINA: DWD und LHP
+    kommen direkt vom Anbieter (eigene Zeilen oben), Polizeimeldungen werden nicht genutzt.
+  * **„Inhaltlich unverändert“: erfüllt.** Die Umrechnung in GeoJSON ändert nur das Format.
+    Titel, Schwere, Dringlichkeit, Meldungstyp, Beginn und Warnpolygon gehen wörtlich durch.
+    Nichts wird umformuliert, zusammengefasst oder neu bewertet. Dass Beschreibung und
+    Handlungsanweisung fehlen, macht die Ebene zu einem Auszug, nicht zu einer veränderten
+    Meldung.
+  * **„Nicht zu gewerblichen Zwecken“: erfüllt.** Die Daten ruft die betreibende Stelle ab
+    (Hilfsorganisation, Behörde, BOS) und nutzt sie für die Gefahrenabwehr im Einsatz, also
+    nicht gewerblich. Lifeline Hub selbst gibt die Meldungen nicht weiter: Jede Instanz holt sie
+    selbst bei warnung.bund.de, und die Software enthält keine Meldungen.
+  * **Folgeaufgaben:** Link zur Vollmeldung auf warnung.bund.de im Inspector (LLH-2103:
+    Authentizität, Handlungsanweisung) und die NINA-Ebene je Instanz abschaltbar machen, etwa
+    für einen gewerblichen Betreiber (LLH-2104).
 - **Lizenz-Vorbehalt Autobahn:** weder die API noch die OpenAPI-Spec (bundesAPI) nennen eine
   Lizenz; die GovData-Eintragung „Die Autobahn App" zeigt im Suchergebnis keinen Lizenzwert.
   Die Pflicht-Attribution `Autobahn GmbH des Bundes` wird unabhängig davon immer mitgeführt
