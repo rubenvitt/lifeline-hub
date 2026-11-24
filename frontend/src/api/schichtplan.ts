@@ -117,10 +117,7 @@ export function nimmSchichtplanWechselZurueck(
   einsatzId: number,
   wechselId: number,
 ): Promise<SchichtplanWechsel> {
-  return apiSend<SchichtplanWechsel>(
-    `${basis(einsatzId)}/handovers/${wechselId}/undo`,
-    'POST',
-  );
+  return apiSend<SchichtplanWechsel>(`${basis(einsatzId)}/handovers/${wechselId}/undo`, 'POST');
 }
 
 function einleseDaten(datei: File, entscheidungen: SchichtplanEntscheidungenEingabe): FormData {
