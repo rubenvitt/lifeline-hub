@@ -137,6 +137,10 @@ Verwerfen würde ich es nicht: Die Knoten kosten wenig, der Weg nutzt vorhandene
 Blackout ist er der einzige Datenweg außer dem Melder zu Fuß. Ein Pilot mit Hardware lohnt aber
 erst, wenn eine Org Knoten stellen will.
 
+**Entscheidung des Menschen (24.11.2026):** Empfehlung angenommen, umgesetzt wird später. Die
+drei Schritte sind angelegt: LLH-2112 (Maschinen-Eingang für Meldungen), LLH-2113 (Mesh-Brücke,
+wartet auf LLH-2112) und LLH-2114 (Kanal „Mesh“, wartet auf LLH-1197 und LLH-2113).
+
 ## Offene Fragen
 
 - **J1 Lizenz:** Darf die Brücke als GPL-Programm neben dem proprietären Server ausgeliefert werden
