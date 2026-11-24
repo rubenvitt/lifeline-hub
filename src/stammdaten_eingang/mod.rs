@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 use crate::abloesung::schichtplan::uebernahme::MeldungStufe;
 use crate::wire_enum::wire_enum;
 
+pub mod abgleich;
 pub mod datei;
 
 wire_enum! {
