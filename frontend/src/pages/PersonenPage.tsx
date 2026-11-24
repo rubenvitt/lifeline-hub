@@ -3,12 +3,18 @@ import { Alert, App, Breadcrumb, Button, Checkbox, Flex, type InputRef } from 'a
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { lagekartePfad, personDetailPfad, personenDruckPfad } from '../routing/deeplinks';
+import {
+  lagekartePfad,
+  passListeDruckPfad,
+  personDetailPfad,
+  personenDruckPfad,
+} from '../routing/deeplinks';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { ladeEinsatz } from '../api/einsaetze';
 import { darfBeantragen, darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
+  ladePassListeExport,
   ladePersonenExport,
   listePersonen,
   registrierAnzeige,
@@ -62,6 +68,7 @@ import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
 import Sichtungsboard from '../personen/Sichtungsboard';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
+import PassExportDialog from '../personen/PassExportDialog';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
 import { UebergabeDialog } from '../personen/UebergabeQuittieren';
@@ -267,6 +274,8 @@ export default function PersonenPage() {
   // Am Einsatz festgemacht wie die Erfassungsmasken: ein Wechsel des Einsatzes schließt die
   // Listenzugriffe, statt sie für den nächsten Einsatz zu laden (LFH-916).
   const [listenzugriffeFuer, setListenzugriffeFuer] = useState<number | null>(null);
+  // Rückfrage vor dem PASS-Export (LLH-1198), am Einsatz festgemacht wie die Listenzugriffe.
+  const [passExportFuer, setPassExportFuer] = useState<number | null>(null);
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => typeof document === 'undefined' || document.visibilityState === 'visible',
   );
@@ -642,6 +651,7 @@ export default function PersonenPage() {
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
 
   const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
+  const passExport = useCsvExport(einsatzId, 'pass-liste', ladePassListeExport);
 
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: {
@@ -1096,8 +1106,24 @@ export default function PersonenPage() {
             laeuft: csvExport.laeuft,
             onWahl: csvExport.exportieren,
           },
+          // PASS-Liste für die Personenauskunftsstelle (LLH-1198): nur die Einsatzleitung, der
+          // Server prüft dasselbe; das CSV erst nach der Rückfrage zur Zweckbindung.
           ...(istEinsatzLeitung(einsatz)
             ? [
+                {
+                  ...druckansichtNebenweg({
+                    ziel: passListeDruckPfad(einsatzId),
+                    navigate,
+                    dokument: 'PASS-Liste',
+                  }),
+                  key: 'pass-druck',
+                },
+                {
+                  key: 'pass-csv',
+                  label: 'PASS-Liste als CSV',
+                  laeuft: passExport.laeuft,
+                  onWahl: () => setPassExportFuer(einsatzId),
+                },
                 {
                   key: 'listenzugriffe',
                   label: 'Listenzugriffe',
@@ -1117,6 +1143,7 @@ export default function PersonenPage() {
       hinweis={
         (nurAnsicht ||
           csvExport.fehler != null ||
+          passExport.fehler != null ||
           abgleichFort.length > 0 ||
           sichtungFort.length > 0) && (
           <Stapel abstand="sm">
@@ -1127,6 +1154,13 @@ export default function PersonenPage() {
               fehlerTitel="Export fehlgeschlagen"
               fehlerFallback="Keine Verbindung zum Server — Export nicht möglich"
             />
+            {passExport.fehler != null && (
+              <SpeicherFehler
+                fehler={passExport.fehler}
+                titel="Export fehlgeschlagen"
+                fallback="Keine Verbindung zum Server — Export nicht möglich"
+              />
+            )}
             {abgleichFort.map((g) => (
               <SpeicherFehler key={g.id} fehler={g.fehler} titel={g.titel} fallback={g.fallback} />
             ))}
@@ -1462,6 +1496,16 @@ export default function PersonenPage() {
           });
         }}
       />
+      {istEinsatzLeitung(einsatz) && (
+        <PassExportDialog
+          offen={passExportFuer === einsatzId}
+          onExportieren={() => {
+            setPassExportFuer(null);
+            passExport.exportieren();
+          }}
+          onAbbrechen={() => setPassExportFuer(null)}
+        />
+      )}
       {istEinsatzLeitung(einsatz) && (
         <ListenzugriffeDrawer
           einsatzId={einsatzId}
