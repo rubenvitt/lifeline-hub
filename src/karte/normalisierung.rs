@@ -733,6 +733,7 @@ fn autobahn_kategorie(dienst: &str) -> Option<&'static str> {
         "webcam" => Some("webcam"),
         "roadworks" => Some("baustelle"),
         "closure" => Some("sperrung"),
+        "warning" => Some("verkehrsmeldung"),
         _ => None,
     }
 }
@@ -742,6 +743,7 @@ fn autobahn_label(kategorie: &str) -> &'static str {
         "webcam" => "Webcam",
         "baustelle" => "Baustelle",
         "sperrung" => "Sperrung",
+        "verkehrsmeldung" => "Verkehrsmeldung",
         _ => "BAB-Lage",
     }
 }
@@ -772,6 +774,28 @@ fn autobahn_beschreibung(item: &Value) -> Option<String> {
     } else {
         Some(zeilen.join("\n"))
     }
+}
+
+/// `abnormalTrafficType` einer Verkehrsmeldung → Wire-Wort, unbekannte Werte fallen weg (der
+/// Titel trägt die Meldung dann allein). Live fehlte das Feld am 24.11.2026 bei 5 von 8 Meldungen.
+fn autobahn_meldungsart(typ: Option<&str>) -> Option<&'static str> {
+    match typ? {
+        "QUEUING_TRAFFIC" => Some("stau"),
+        "SLOW_TRAFFIC" => Some("zaehfliessend"),
+        "STATIONARY_TRAFFIC" => Some("stillstand"),
+        _ => None,
+    }
+}
+
+/// Reisezeitverlust in Minuten; die Quelle schickt ihn als String. `0` und Unlesbares fallen weg,
+/// ein „+0 min“ behauptete eine Messung, die nichts sagt.
+fn autobahn_verzoegerung(v: Option<&Value>) -> Option<u64> {
+    let n = match v? {
+        Value::Number(n) => n.as_u64(),
+        Value::String(s) => s.trim().parse::<u64>().ok(),
+        _ => None,
+    }?;
+    (n > 0).then_some(n)
 }
 
 /// Autobahn-App-API → GeoJSON-Punkte. Eingabe je Eintrag `(strasse, dienst, antwort)` mit der
@@ -810,7 +834,7 @@ pub fn normalisiere_autobahn(roh: &[(String, String, Value)]) -> Value {
                     .filter(|v| !v.is_empty())
             };
             let titel = s("title").unwrap_or_else(|| autobahn_label(kategorie));
-            features.push(json!({
+            let mut feature = json!({
                 "type": "Feature",
                 "geometry": { "type": "Point", "coordinates": [lon, lat] },
                 "properties": {
@@ -825,7 +849,15 @@ pub fn normalisiere_autobahn(roh: &[(String, String, Value)]) -> Value {
                     "betreiber": s("operator"),
                     "id": s("identifier")
                 }
-            }));
+            });
+            // Nur Meldungen tragen Art und Reisezeitverlust (LLH-1637); `source` (eva, inrix)
+            // wird nicht übernommen.
+            if kategorie == "verkehrsmeldung" {
+                let p = &mut feature["properties"];
+                p["art"] = json!(autobahn_meldungsart(s("abnormalTrafficType")));
+                p["verzoegerung_min"] = json!(autobahn_verzoegerung(item.get("delayTimeValue")));
+            }
+            features.push(feature);
         }
     }
     json!({ "type": "FeatureCollection", "features": features })
@@ -999,6 +1031,80 @@ mod autobahn_tests {
             normalisiere_autobahn(&roh)["features"][0]["properties"]["titel"],
             "Webcam"
         );
+    }
+
+    /// Live-Form vom 24.11.2026 (LLH-1637), auf die gelesenen Felder gekürzt.
+    #[test]
+    fn verkehrsmeldung_wird_punkt_mit_art_und_verzoegerung() {
+        let roh = [dienst(
+            "warning",
+            json!([{
+                "title": "A1 | Hamburg-Südost - Norderelbbrücke",
+                "subtitle": " Lübeck -> Hamburg",
+                "coordinate": { "lat": 53.5073792534926, "long": 10.078701430465168 },
+                "startTimestamp": "2026-11-24T22:08:00Z",
+                "delayTimeValue": "17",
+                "abnormalTrafficType": "QUEUING_TRAFFIC",
+                "source": "inrix",
+                "description": ["Ereignismeldung:", "- Im Stillstand"],
+                "future": false
+            }]),
+        )];
+        let p = &normalisiere_autobahn(&roh)["features"][0]["properties"];
+        assert_eq!(p["kategorie"], "verkehrsmeldung");
+        assert_eq!(p["art"], "stau");
+        assert_eq!(p["verzoegerung_min"], 17);
+        assert_eq!(p["beginn"], "2026-11-24T22:08:00Z");
+        assert_eq!(p["richtung"], "Lübeck -> Hamburg");
+        // Der Datenlieferant wird nicht übernommen (Lizenzfrage offen, LLH-1637).
+        assert!(p.get("source").is_none());
+    }
+
+    #[test]
+    fn verkehrsmeldung_ohne_typ_und_mit_null_minuten_traegt_keine_zusaetze() {
+        let roh = [dienst(
+            "warning",
+            json!([
+                { "coordinate": { "lat": 51.0, "long": 7.0 }, "delayTimeValue": "0" },
+                { "coordinate": { "lat": 51.1, "long": 7.1 }, "delayTimeValue": "x",
+                  "abnormalTrafficType": "ACCIDENT" }
+            ]),
+        )];
+        let fc = normalisiere_autobahn(&roh);
+        for f in fc["features"].as_array().unwrap() {
+            let p = &f["properties"];
+            assert!(p["art"].is_null(), "{p}");
+            assert!(p["verzoegerung_min"].is_null(), "{p}");
+            assert_eq!(p["titel"], "Verkehrsmeldung");
+        }
+        assert_eq!(fc["features"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn verkehrsmeldung_slow_und_stationary_traffic() {
+        let roh = [dienst(
+            "warning",
+            json!([
+                { "coordinate": { "lat": 51.0, "long": 7.0 }, "abnormalTrafficType": "SLOW_TRAFFIC" },
+                { "coordinate": { "lat": 51.1, "long": 7.1 },
+                  "abnormalTrafficType": "STATIONARY_TRAFFIC" }
+            ]),
+        )];
+        let fc = normalisiere_autobahn(&roh);
+        assert_eq!(fc["features"][0]["properties"]["art"], "zaehfliessend");
+        assert_eq!(fc["features"][1]["properties"]["art"], "stillstand");
+    }
+
+    #[test]
+    fn baustelle_traegt_keine_meldungsfelder() {
+        let roh = [dienst(
+            "roadworks",
+            json!([{ "coordinate": { "lat": 51.0, "long": 7.0 }, "delayTimeValue": "5",
+                     "abnormalTrafficType": "QUEUING_TRAFFIC" }]),
+        )];
+        let p = &normalisiere_autobahn(&roh)["features"][0]["properties"];
+        assert!(p.get("art").is_none());
+        assert!(p.get("verzoegerung_min").is_none());
     }
 
     /// Siehe `nina_output_passt_auf_den_geojson_anker`.

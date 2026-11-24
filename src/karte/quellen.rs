@@ -655,17 +655,18 @@ fn extrahiere_ki(html: &str) -> Option<String> {
 
 const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
 /// Baustellen und Sperrungen dauern Stunden bis Tage; kürzer zu takten holt nichts Frischeres,
-/// kostet aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
+/// kostet aber je Runde ~450 Abrufe gegen eine fremde Behörden-API.
 const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
 const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
-/// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). Die übrigen tragen nichts bei
-/// und kosteten je 111 weitere Abrufe pro Runde.
-const AUTOBAHN_DIENSTE: [&str; 3] = ["webcam", "roadworks", "closure"];
+/// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80, Verkehrsmeldungen seit LLH-1637).
+/// Ladesäulen tragen nichts bei und kosteten je ~113 weitere Abrufe pro Runde; die Lkw-Parkplätze
+/// sind statisch und laufen als eigene Ebene mit 24 h TTL (`fetch_autobahn_parken`).
+const AUTOBAHN_DIENSTE: [&str; 4] = ["webcam", "roadworks", "closure", "warning"];
 /// Die Quelle drosselt: bei 16 gleichzeitigen Abrufen scheitern deutlich mehr als bei 8. Mehr
 /// Parallelität macht den Lauf nicht schneller, sondern löchriger.
 const AUTOBAHN_PARALLEL: usize = 8;
 /// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne Deckel stünde der
-/// Lauf im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
+/// Lauf im schlechtesten Fall bei ~450/8 × 8 s ≈ 7,5 min.
 const AUTOBAHN_BUDGET: Duration = Duration::from_secs(60);
 
 /// `{"roads":["A1","A2",…]}` → saubere Liste: getrimmt (die Quelle führt `"A60 "`, der Abruf
@@ -721,7 +722,7 @@ pub(crate) fn autobahn_antwort(
 }
 
 /// Nach einem gescheiterten Lauf wird nicht sofort neu versucht: bei `offline` pollt das
-/// Frontend im Aufwärmtakt (20 s), und jeder Poll stieße sonst einen neuen Fächer mit 333
+/// Frontend im Aufwärmtakt (20 s), und jeder Poll stieße sonst einen neuen Fächer mit ~450
 /// Abrufen an.
 const AUTOBAHN_ABKUEHLUNG: Duration = Duration::from_secs(300);
 
@@ -803,7 +804,7 @@ pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> Fachebene
 
 /// Einzelspur für den Fächer, Rückfallebene hinter der `inflight`-Marke (die gilt nur für EINE
 /// `inflight`-Menge). Ohne Riegel startete jeder Bediener, der die Ebene bei leerem Cache
-/// einschaltet, eigene 333 Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus.
+/// einschaltet, eigene ~450 Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus.
 static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
 async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
