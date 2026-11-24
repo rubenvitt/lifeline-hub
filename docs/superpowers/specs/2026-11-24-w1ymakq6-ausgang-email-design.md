@@ -83,9 +83,9 @@ Neue Tabelle `org_externe_stelle_kanal` (nächste freie Migration, heute 0373):
 
 | Spalte | Inhalt |
 |---|---|
-| `id` | TEXT PK |
+| `id` | INTEGER PK (wie `org_externe_stelle`) |
 | `org_id` | FK `organisation`, ON DELETE CASCADE |
-| `externe_stelle_id` | FK `org_externe_stelle`, ON DELETE CASCADE |
+| `externe_stelle_id` | INTEGER, FK `org_externe_stelle`, ON DELETE CASCADE |
 | `kanal` | CHECK `email`, `fax`, `matrix`, `threema` |
 | `adresse` | TEXT, Pflicht, je Kanal geprüft |
 | `bezeichnung` | TEXT, optional („Einsatzpostfach“, „Lagedienst“) |
@@ -133,19 +133,36 @@ Neue Art im `Verzeichnis::produktiv()`:
   `public_api/webhook/ziel.rs` herausziehen oder mitnutzen). Der SMTP-Client verbindet sich mit
   der **geprüften IP**, nicht erneut mit dem Namen (kein DNS-Rebinding). Das Zertifikat wird
   gegen den Hostnamen geprüft (SNI), über die gemeinsame TLS-Konfiguration
-  (`instanz::zertifikat::tls_config`, rustls). Zeitlimits: Verbindung 5 s, gesamte Sitzung 30 s.
-- **Crate:** `lettre` (MIT/Apache-2.0) mit `tokio1`, `rustls`, `builder`,
-  ohne `native-tls` und ohne `sendmail`/`file`-Transport. Advisories und Lizenzprüfung laufen
-  nach `scripts/AGENTS.md`. Ein eigenes `Zweck` für die Kennung entfällt, SMTP hat keinen
-  User-Agent; EHLO-Name ist der öffentliche Hostname der Instanz, falls konfiguriert, sonst
-  `lifeline-hub`.
-- **Fehlercodes** (neu in `AdapterFehler`, mit Einteilung in `braucht_eingriff`, Text in
-  `benachrichtigung::adapter::fehler_text` und `frontend/src/api/adapter.ts`):
-  `smtp_anmeldung` (535 u. ä., Eingriff), `smtp_tls` (Zertifikat/Handshake, Eingriff),
-  `smtp_abgelehnt` (5xx bei MAIL/RCPT/DATA, dauerhaft), `smtp_voruebergehend` (4xx),
-  bestehende Codes für Netz, Zeitüberschreitung und Zielschutz wiederverwenden.
-- Höchstens **eine aktive SMTP-Anbindung je Org**. Eine zweite anzulegen ist 422. Grund: der
-  Absender soll nicht vom Zufall abhängen.
+  (`instanz::zertifikat::tls_config`, rustls mit `aws_lc_rs`). Zeitlimits: Verbindung 5 s, jede
+  Antwort 30 s, gesamte Sitzung 120 s.
+- **Ein kleiner eigener SMTP-Client** in `adapter::ziel` (bzw. `adapter::smtp`) über
+  `tokio` + `tokio-rustls` mit `tls_config`: EHLO, STARTTLS oder implizites TLS, AUTH PLAIN
+  (LOGIN als Rückfall), MAIL, RCPT, DATA mit Dot-Stuffing, QUIT; Antworten mit Größendeckel.
+  **Entscheidung des Entwurfs:** `lettre` dient nur zum **Bauen** der Nachricht (Feature
+  `builder`, ohne Transport). Gründe: lettres Transport nimmt keine fertige rustls-`ClientConfig`
+  und brächte womöglich einen zweiten Crypto-Provider (verboten, `Cargo.toml`); er verbindet sich
+  selbst mit dem Namen statt der geprüften IP; und „ungewiss“ (Abbruch nach DATA) lässt sich nur
+  mit eigener Kontrolle über die Phasen sicher erkennen. Lizenzen und Advisories nach
+  `scripts/AGENTS.md`. Ein `Zweck` für den User-Agent entfällt; EHLO-Name ist der öffentliche
+  Hostname der Instanz, falls konfiguriert, sonst `lifeline-hub`.
+- **Testbarkeit des Clients:** ein Wegwerf-SMTP-Server im Test (Loopback, mit Testschalter am
+  Zielschutz wie bei den Webhook-Tests), der Antworten skriptet, auch Abbruch nach DATA.
+- **Fehlercodes der Anbindung** (neu in `AdapterFehler`, mit Einteilung in `braucht_eingriff`,
+  Text in `benachrichtigung::adapter::fehler_text` und `frontend/src/api/adapter.ts`): nur was
+  die **Verbindung** betrifft: `smtp_anmeldung` (535 u. ä., Eingriff), `smtp_tls`
+  (Zertifikat/Handshake, Eingriff); Netz, Zeitüberschreitung, Zielschutz mit den bestehenden
+  Codes. Fehler einer **einzelnen Nachricht** sind keine Adapterfehler, sondern Codes des
+  Ausgangskorbs (Abschnitt 3).
+- Höchstens **eine SMTP-Anbindung je Org**, gezählt werden alle, auch angehaltene. Eine zweite
+  anzulegen ist 422. Grund: der Absender soll nicht vom Zufall abhängen.
+- **Zustand der Anbindung und Versand:** Senden setzt eine SMTP-Anbindung voraus, die **nicht
+  angehalten** ist (`zustand = 'aktiv'`, gestört ist erlaubt). Ist sie angehalten, lehnt das
+  Anlegen mit 422 ab („Mailserver angehalten“), wartende Versände werden `fehlgeschlagen` mit
+  `anbindung_angehalten`. Ein Versand ändert den Zustand der Anbindung **nie selbst**
+  (ADR-0086: nur der Lauf meldet). Endet eine Zustellung mit einem Verbindungsfehler, der einen
+  Eingriff braucht (Anmeldung, TLS), zieht der Ausgangskorb den nächsten Prüflauf der Anbindung
+  auf „jetzt“ vor (`repo::postpone`); der Lauf stellt den Fehler dann selbst fest und meldet ihn
+  nach den bestehenden Regeln.
 
 ### 3. Ausgangskorb (`src/ausgang/`)
 
@@ -164,18 +181,45 @@ Neue Tabelle `ausgang` (Migration im selben Zug):
 | `betreff`, `inhalt` | Schnappschuss des Textes beim Absenden |
 | `zustand` | CHECK `wartet`, `uebergeben`, `fehlgeschlagen` |
 | `versuche`, `naechster_versuch_at`, `erster_versuch_at` | Wiederholung |
-| `fehler_art`, `fehler_status` | letzter Fehler als Code + SMTP-Code, nie Text des Ziels |
+| `fehler_art`, `fehler_status` | letzter Fehler als `AusgangFehler`-Code + SMTP-Code, nie Text des Ziels |
+| `versuch_begonnen_at` | gesetzt vor der Zustellung, geleert mit dem Ergebnis |
 | `erstellt_von_id`, `erstellt_at`, `uebergeben_at` | wer, wann |
 | `etb_eintrag_id` | letzter ETB-Eintrag dieses Versands |
 
 - **Ein Versand = eine Adresse.** Wer an drei Stellen sendet, erzeugt drei Zeilen (eine
   Anfrage, drei `client_id`-Ableitungen oder eine `client_id` je Zeile vom Client).
-- **Anlegen** (`POST …/dispatches` am Dokument, s. Abschnitt 5) prüft in einer Transaktion:
-  Schreibrecht im Modul, Einsatz aktiv, Quelle im richtigen Zustand (Lagebericht und Befehl
-  `freigegeben`; Nachforderung nicht `zurueckgezogen`), Stelle und Kanaladresse gehören zur Org,
-  Kanal `email`, eine **aktive** SMTP-Anbindung existiert (sonst 422 mit Code, damit die
-  Oberfläche „Kein Mailserver eingerichtet“ zeigen kann). Dann `zustand = wartet`,
+- **Anlegen** (`POST …/deliveries` am Dokument, s. Abschnitt 5) prüft in einer Transaktion:
+  Schreibrecht im Modul, Einsatz aktiv und **kein Spiegel** (s. u.), Quelle im richtigen
+  Zustand, Stelle **aktiv** und Kanaladresse gehören zur Org, Kanal `email`, eine nicht
+  angehaltene SMTP-Anbindung existiert (sonst 422 mit Code, damit die Oberfläche „Kein
+  Mailserver eingerichtet“ zeigen kann). Dann `zustand = wartet`,
   `naechster_versuch_at = jetzt`, und der Lauf wird geweckt.
+- **Quelle im richtigen Zustand:**
+  - Lagebericht und Befehl: freigegeben **und die jüngste freigegebene Version ihrer Kette**
+    (dieselbe Bedingung wie `quittierbar_column` in `vorlagendokument/repo.rs`). Eine überholte
+    Version zu senden ist 422.
+  - Nachforderung: nicht `zurueckgezogen` und nicht `abgelehnt`.
+  - Dieselbe Prüfung läuft bei „Erneut senden“ und **vor jeder Zustellung** im Lauf: ist die
+    Quelle inzwischen überholt oder zurückgezogen, wird der Versand ohne Netz
+    `fehlgeschlagen` mit `ueberholt`. So geht kein überholter Lagebericht im Wiederholungsfenster
+    hinaus.
+- **Fehlercodes des Ausgangskorbs** (`AusgangFehler`, eigener Enum mit Enum-Kontrakt und
+  Texten im Frontend): `voruebergehend` (4xx, Netz, Zeit), `abgelehnt` (5xx bei MAIL/RCPT/DATA),
+  `ungewiss`, `ueberholt`, `anbindung_fehlt`, `anbindung_angehalten`, `anbindung_fehler`
+  (Anmeldung/TLS/Zielschutz, Einzelheit steht an der Anbindung), `zu_gross`, `spiegel`.
+- **Spiegel (ADR-0018):** `ausgang` ist eine Einsatztabelle und wird in
+  `instanz::spiegel::art::AUSGENOMMEN` eingetragen, Grund: „Zustellung ist an die Instanz mit
+  Anbindung und Geheimnis gebunden; der Versand steht über das ETB im Spiegel“. Auf einem
+  Spiegel (Einsatz von einer anderen Instanz geführt) lehnt das Anlegen mit 422 `spiegel` ab.
+  Wird ein Einsatz zwischen Anlegen und Zustellen zum Spiegel (Führungswechsel), stellt der Lauf
+  nicht zu, sondern setzt `fehlgeschlagen` mit `spiegel`, ohne ETB-Eintrag (der wäre gesperrt);
+  die Versandliste zeigt es. Ein Versand ist nie halb: entweder zugestellt **und** im ETB oder
+  sichtbar fehlgeschlagen.
+- **Schwärzung:** `ausgang` kommt in `einsatz::schwaerzung_registry::TABELLEN`; `betreff`,
+  `inhalt`, `adresse` und `stelle_bezeichnung` werden geschwärzt wie der Text des ETB-Eintrags.
+- **Einsatz endet:** Wartende Versände eines Einsatzes, der abgeschlossen oder archiviert wird,
+  laufen weiter bis zum Ergebnis (das ETB nimmt Systemeinträge nach dem Muster der übrigen
+  Systemprotokolle an; prüft der Builder, sonst `fehlgeschlagen` ohne Zustellung).
 - **Lauf** (`ausgang::lauf`): Takt 2 s und Wecken per `Notify` beim Anlegen; höchstens 4
   gleichzeitig, eine Laufmenge gegen Doppelzustellung; **keine DB-Verbindung während SMTP**.
   Ablauf je Versand: fällige Zeile und SMTP-Anbindung der Org laden, Passwort entschlüsseln
@@ -192,8 +236,9 @@ Neue Tabelle `ausgang` (Migration im selben Zug):
   Code `ungewiss` und **ohne** automatische Wiederholung; die Versandliste zeigt „Zustellung
   unklar“, und „Erneut senden“ bleibt eine bewusste Entscheidung des Menschen. (Entscheidung des
   Entwurfs: lieber ein Handgriff als eine doppelte Nachforderung bei der Leitstelle.)
-- **Erneut senden** (`POST /api/einsaetze/{id}/dispatches/{did}/retry`): nur aus
-  `fehlgeschlagen`, gleiche Rechte wie Anlegen, setzt `versuche = 0`, neues
+- **Erneut senden** (`POST /api/einsaetze/{id}/deliveries/{did}/retry`): nur aus
+  `fehlgeschlagen` und nur, solange die Quelle nicht überholt ist (sonst 422), gleiche Rechte
+  wie Anlegen, setzt `versuche = 0`, neues
   `erster_versuch_at`, `zustand = wartet`. Es sendet den **Schnappschuss**, nicht eine neuere
   Fassung des Dokuments; für eine Fortschreibung sendet man die neue Version.
 - **Neustart des Servers:** Zeilen in `wartet` laufen weiter. Eine Zeile, die beim Absturz
@@ -212,8 +257,12 @@ Neue Tabelle `ausgang` (Migration im selben Zug):
   - Nachforderung: `Nachforderung: {anzahl}× {bezeichnung} – {Einsatzname}`
   (Nummer und Feldnamen nimmt der Builder aus den Modellen.)
 - **Text:** `text/plain; charset=utf-8`.
-  - Lagebericht und Befehl: der beim Freigeben gerenderte Schnappschuss
-    (`vorlagendokument::render_snapshot` samt Anlagen- und Verteilerteil, wie er ins ETB ging).
+  - Lagebericht und Befehl: beim Anlegen des Versands **neu gerendert** aus der freigegebenen
+    Version, mit demselben Weg wie beim Freigeben (`render_snapshot` samt Anlagen- und
+    Verteilerteil, also derselbe Code, den `snapshot_freigeben_tx` nutzt; der Builder zieht ihn
+    als Funktion heraus). Die freigegebene Version ist unveränderlich, also ergibt das denselben
+    Text, der ins ETB ging. **Nicht** aus dem ETB-Eintrag gelesen: dessen Text kann seither
+    berichtigt worden sein, und die Mail soll das Dokument tragen, nicht das Protokoll.
     Markdown bleibt als Text stehen; er ist so gebaut, dass er lesbar ist.
   - Nachforderung: ein kleiner Textrenderer aus den Feldern (Art, Bezeichnung, Anzahl,
     Priorität, Begründung, Ziel, benötigt bis, Absender-Einsatz), im Stil von `anlage_text`.
@@ -227,16 +276,17 @@ Neue Tabelle `ausgang` (Migration im selben Zug):
 
 ### 5. Routen und Rechte
 
-Festes Segment `dispatches` (Versand) ins Glossar `scripts/api-routen-woerter.tsv`.
+Festes Segment `deliveries` (Versand) ins Glossar `scripts/api-routen-woerter.tsv`;
+`dispatch` ist dort schon als „Abruf“ belegt.
 
-- `POST /api/einsaetze/{id}/situation-reports/{lid}/dispatches`
-- `POST /api/einsaetze/{id}/orders/{bid}/dispatches`
-- `POST /api/einsaetze/{id}/resource-requests/{nid}/dispatches`
+- `POST /api/einsaetze/{id}/situation-reports/{lid}/deliveries`
+- `POST /api/einsaetze/{id}/orders/{bid}/deliveries`
+- `POST /api/einsaetze/{id}/resource-requests/{nid}/deliveries`
   - Body: `{ client_id, recipients: [{ channel_id }] }` (die Kanaladresse bestimmt Stelle,
     Kanal und Adresse). Antwort: die angelegten Versände.
-- `GET /api/einsaetze/{id}/dispatches?source_kind=…&source_id=…` (Versandliste einer Quelle;
+- `GET /api/einsaetze/{id}/deliveries?source_kind=…&source_id=…` (Versandliste einer Quelle;
   ohne Filter alle des Einsatzes, für spätere Übersichten)
-- `POST /api/einsaetze/{id}/dispatches/{did}/retry`
+- `POST /api/einsaetze/{id}/deliveries/{did}/retry`
 - Rechte: Senden und Erneut senden wie Schreiben im jeweiligen Modul (`fordere_schreiben` für
   Lagebericht/Befehl, `EinsatzSchreibzugriff<Nachforderungen>`); Lesen wie Lesen im Modul.
 - Statuscodes nach `src/AGENTS.md`: 400 Feld (unbekannter Kanal, leere Empfängerliste),
@@ -261,7 +311,7 @@ Festes Segment `dispatches` (Versand) ins Glossar `scripts/api-routen-woerter.ts
 - **Senden-Dialog** (`ErfassungsModal`, Verb „Senden“ mit Begründung im Verb-Wächter):
   - Lagebericht/Befehl: Aktion „Senden“ im Kopf neben „Fortschreiben“, nur bei `freigegeben`.
   - Nachforderung: Eintrag „Senden“ im Menü der Karte.
-  - Inhalt: Liste der Mailadressen der Externen Stellen zum Anhaken. **Vorbelegt** sind die
+  - Inhalt: Liste der Mailadressen der **aktiven** Externen Stellen zum Anhaken. **Vorbelegt** sind die
     Adressen der Stellen, deren Bezeichnung einem externen Verteiler-Eintrag bzw. dem Adressaten
     der Nachforderung gleicht (Vergleich ohne Groß/Klein und Leerraum). Darunter Betreff und der
     Beginn des Textes als Vorschau; Anzahl und Größe der Anhänge.
@@ -298,9 +348,11 @@ Festes Segment `dispatches` (Versand) ins Glossar `scripts/api-routen-woerter.ts
 
 - Ein `Zusteller`-Trait im Ausgangskorb (wie bei den Webhooks) mit echtem `SmtpZusteller` und
   einem skriptbaren Testdoppel; Tests laufen ohne Mailserver.
-- Ein Integrationstest gegen einen lokalen Wegwerf-SMTP-Server (in Rust im Test gestartet,
-  Loopback mit Testschalter für den Zielschutz) für Nachrichtenaufbau und STARTTLS ist
-  erwünscht, aber dem Builder überlassen.
+- Der eigene SMTP-Client wird gegen den Wegwerf-Server im Test geprüft (Abschnitt 2), auch
+  STARTTLS mit selbstsigniertem Testzertifikat, Dot-Stuffing und Abbruch nach DATA.
+- Pflichtfälle des Ausgangskorbs: überholte Version beim Anlegen, beim Erneut senden und im
+  Wiederholungsfenster; Spiegel beim Anlegen und nach Führungswechsel; angehaltene Anbindung;
+  Neustart mit `versuch_begonnen_at`; `client_id` doppelt; fremde Org.
 - e2e: ein Lauf „Lagebericht freigeben → Senden → Versandliste zeigt übergeben“ mit Testdoppel
   im Testbetrieb.
 
