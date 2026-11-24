@@ -21,7 +21,8 @@ git() { command git -c core.quotePath=false "$@"; }
 ist_gate_datei() {
   case "$1" in
     scripts/check-*.sh | scripts/*.test.sh | scripts/*.test.mjs | scripts/lib/* \
-      | scripts/bereiche.sh | scripts/gate-dateien.sh | scripts/ruleset-pruefen.sh) return 0 ;;
+      | scripts/bereiche.sh | scripts/gate-dateien.sh | scripts/ruleset-pruefen.sh \
+      | scripts/e2e-anteile.mjs | scripts/e2e-wackler.mjs) return 0 ;;
     .github/workflows/* | .github/pull_request_template.md) return 0 ;;
     frontend/playwright*.config.ts | frontend/vite.config.ts | frontend/.oxlintrc.json \
       | frontend/lint/*) return 0 ;;
@@ -57,7 +58,10 @@ if [ "${#treffer[@]}" -eq 0 ]; then
   exit 0
 fi
 
-mapfile -t treffer < <(printf '%s\n' "${treffer[@]}" | sort -u)
+# Ohne `mapfile`: das bash 3.2 von macOS kennt es nicht.
+eindeutig=()
+while IFS= read -r pfad; do eindeutig+=("$pfad"); done < <(printf '%s\n' "${treffer[@]}" | sort -u)
+treffer=("${eindeutig[@]}")
 echo "==> ${#treffer[@]} Gate-Dateien geändert — ein Mensch prüft, ob die Prüfung strenger oder lockerer wird:"
 for pfad in "${treffer[@]}"; do
   echo "::warning file=$pfad::Gate-Datei geändert (LLH-2090): braucht die Durchsicht eines Menschen."

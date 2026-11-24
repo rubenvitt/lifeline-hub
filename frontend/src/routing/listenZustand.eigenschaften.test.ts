@@ -10,7 +10,9 @@ import { listenZustandParams, parseListenZustand, type ListenZustandAdresse } fr
  * leeren Wert (`[""]`) als bekannte Grenze. Er kodiert zu `f.x=` und gilt beim Lesen als leer;
  * fast-check fand ihn am 24.11.2026. Ohne Folgen, solange `bereinigeListenZustand`
  * (`components/listenGedaechtnis.ts`) leere Werte ohnehin verwirft und keine Spalte `value: ''`
- * anbietet. Wer das ändert, kodiert den leeren Wert eindeutig und streicht die Ausnahme.
+ * anbietet. Wer das ändert, kodiert den leeren Wert eindeutig und streicht die Ausnahme. Ein
+ * Filter namens `__proto__` fällt mit Absicht weg (fast-check fand, dass er den Prototyp des
+ * Filters verbog; Beispieltest in `listenZustand.test.ts`).
  */
 
 const rundlauf = (zustand: ListenZustandAdresse, vorher: URLSearchParams) =>
@@ -21,7 +23,8 @@ const erwartet = (zustand: ListenZustandAdresse): ListenZustandAdresse => ({
   sortierung: zustand.sortierung,
   filter: Object.fromEntries(
     Object.entries(zustand.filter).filter(
-      ([, werte]) => werte.length > 0 && !(werte.length === 1 && werte[0] === ''),
+      ([spalte, werte]) =>
+        spalte !== '__proto__' && werte.length > 0 && !(werte.length === 1 && werte[0] === ''),
     ),
   ),
   suche: zustand.suche.trim() === '' ? '' : zustand.suche,
