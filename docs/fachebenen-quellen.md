@@ -104,7 +104,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 | Quelle (`quelle`) | Endpoint | Format / Geometrie | Lizenz | Pflicht-Attribution | Cache-TTL / Aktualisierung | Offline |
 |---|---|---|---|---|---|---|
-| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
+| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. **Vorgabe an; ein gewerblicher Betreiber schaltet die Ebene mit `--nina false` ab** (s. u.). Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
 | **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
@@ -125,6 +125,15 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Leitung, jeder Abruf risse die 8-s-Schranke des Clients, und der Cache füllte sich nie.
   Gilt für alle Ebenen über `liefere_mit_swr` (DWD, NINA, PEGELONLINE, ODL, Hochwasser,
   Luftqualität); Energie und Autobahn hatten den Riegel schon.
+- **NINA abschalten (LLH-2104).** Die Auflage des BBK erlaubt MoWaS-Meldungen nur inhaltlich
+  unverändert und nicht zu gewerblichen Zwecken. Hilfsorganisationen, Behörden und BOS betrifft
+  das nicht; ein gewerblicher Betreiber (etwa ein privater Sanitätsdienst) startet den Server mit
+  `--nina false` bzw. `LIFELINE_NINA=false`. **Vorgabe: an.** Abgeschaltet ruft die Instanz
+  warnung.bund.de nie ab: `GET /api/map/overlays/nina` antwortet 404, bevor Cache oder Quelle
+  gefragt werden, `GET /api/map/config` meldet `fachebenen_abgeschaltet: ["nina"]`, und die
+  Lagekarte zeigt die Ebene gar nicht (nicht als offline). Eine gespeicherte Sichtbarkeit bleibt
+  stehen und gilt wieder, sobald die Ebene eingeschaltet ist. Belegt durch
+  `abgeschaltete_nina_ist_404_ohne_abruf` in `tests/karte.rs` (Attrappe zählt 0 Anfragen).
 - **NINA** ist die einzige Quelle mit einem zweistufigen Abruf (Übersichtsliste ohne
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
