@@ -466,10 +466,7 @@ fn kachel_ausdehnung(z: u8, x: u32, y: u32) -> (f64, f64, f64, f64) {
 
 fn merc_nach_wgs84(x: f64, y: f64) -> (f64, f64) {
     let r = 6_378_137.0;
-    (
-        (x / r).to_degrees(),
-        (y / r).sinh().atan().to_degrees(),
-    )
+    ((x / r).to_degrees(), (y / r).sinh().atan().to_degrees())
 }
 
 /// Umriss des Bildes in WGS84: `[west, sued, ost, nord]`.
@@ -534,8 +531,14 @@ pub(crate) fn quellkacheln(k: &Kopf, stufe: usize, z: u8, x: u32, y: u32) -> Vec
     let zeile = |m: f64| ((k.ursprung.1 - m) / py).floor();
     // Pixelbereich der Kachel, auf das Bild geklemmt; das östliche/südliche Ende ist exklusiv.
     let klemme = |v: f64, n: u32| v.clamp(0.0, n as f64 - 1.0) as u32;
-    let (x0, x1) = (klemme(spalte(kw), s.breite), klemme(spalte(ko - 1e-6), s.breite));
-    let (y0, y1) = (klemme(zeile(kn), s.hoehe), klemme(zeile(ks + 1e-6), s.hoehe));
+    let (x0, x1) = (
+        klemme(spalte(kw), s.breite),
+        klemme(spalte(ko - 1e-6), s.breite),
+    );
+    let (y0, y1) = (
+        klemme(zeile(kn), s.hoehe),
+        klemme(zeile(ks + 1e-6), s.hoehe),
+    );
     let spalten = s.breite.div_ceil(s.kachel_breite);
     let mut aus = Vec::new();
     for zr in y0 / s.kachel_hoehe..=y1 / s.kachel_hoehe {
@@ -664,8 +667,8 @@ pub(crate) fn rendere_kachel(
                 let Some(q) = quellen.get(&index) else {
                     continue;
                 };
-                let innen = ((zeile % s.kachel_hoehe) * s.kachel_breite
-                    + spalte % s.kachel_breite) as usize
+                let innen = ((zeile % s.kachel_hoehe) * s.kachel_breite + spalte % s.kachel_breite)
+                    as usize
                     * kanaele;
                 let Some(w) = q.get(innen..innen + kanaele) else {
                     continue;
@@ -785,13 +788,28 @@ pub(crate) mod test_cog {
     type Eintrag = (u16, u16, u32, Vec<u8>);
 
     fn kurz(tag: u16, v: &[u16]) -> Eintrag {
-        (tag, 3, v.len() as u32, v.iter().flat_map(|x| x.to_le_bytes()).collect())
+        (
+            tag,
+            3,
+            v.len() as u32,
+            v.iter().flat_map(|x| x.to_le_bytes()).collect(),
+        )
     }
     fn lang(tag: u16, v: &[u32]) -> Eintrag {
-        (tag, 4, v.len() as u32, v.iter().flat_map(|x| x.to_le_bytes()).collect())
+        (
+            tag,
+            4,
+            v.len() as u32,
+            v.iter().flat_map(|x| x.to_le_bytes()).collect(),
+        )
     }
     fn doppelt(tag: u16, v: &[f64]) -> Eintrag {
-        (tag, 12, v.len() as u32, v.iter().flat_map(|x| x.to_le_bytes()).collect())
+        (
+            tag,
+            12,
+            v.len() as u32,
+            v.iter().flat_map(|x| x.to_le_bytes()).collect(),
+        )
     }
     fn text(tag: u16, s: &str) -> Eintrag {
         let mut b = s.as_bytes().to_vec();
@@ -857,7 +875,10 @@ pub(crate) mod test_cog {
                 if o.rotation {
                     e.push(doppelt(34264, &[o.pixel; 16]));
                 }
-                e.push(kurz(34735, &[1, 1, 0, 2, 1024, 0, 1, 1, 3072, 0, 1, o.epsg]));
+                e.push(kurz(
+                    34735,
+                    &[1, 1, 0, 2, 1024, 0, 1, 1, 3072, 0, 1, o.epsg],
+                ));
                 e.push(text(42113, "0"));
             }
             e.sort_by_key(|x| x.0);
@@ -889,11 +910,7 @@ pub(crate) mod test_cog {
                     extra.extend_from_slice(&wert);
                 }
             }
-            let naechstes = if i + 1 < anzahl {
-                extra_off
-            } else {
-                0
-            };
+            let naechstes = if i + 1 < anzahl { extra_off } else { 0 };
             tab.extend_from_slice(&naechstes.to_le_bytes());
             daten.extend_from_slice(&tab);
             daten.extend_from_slice(&extra);
@@ -1243,7 +1260,12 @@ mod tests {
 
     #[test]
     fn kaputter_kopf_ist_fehler() {
-        for b in [&b"II*\0\xff\xff\xff\x7f"[..], b"XX", b"", b"MM\0*\0\0\0\x08\0"] {
+        for b in [
+            &b"II*\0\xff\xff\xff\x7f"[..],
+            b"XX",
+            b"",
+            b"MM\0*\0\0\0\x08\0",
+        ] {
             match parse_kopf(b) {
                 Err(_) | Ok(KopfErgebnis::BrauchtBytes(_)) => {}
                 Ok(KopfErgebnis::Fertig(k)) => panic!("kaputter Kopf gelesen: {k:?}"),
