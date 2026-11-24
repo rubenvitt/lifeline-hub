@@ -34,7 +34,7 @@ const COPERNICUS_EBENE_TTL: Duration = Duration::from_secs(24 * 3600);
 /// Wartefrist eines kalten Abrufs (Liste, Details, bis zu [`MAX_EBENEN`] Dateien). Deutlich
 /// unter den 15 s, nach denen der Client abbricht (`frontend/src/api/client.ts`): sonst käme
 /// `offline` erst, wenn der Client schon „Server nicht erreichbar“ meldet. Wie Energie.
-const COPERNICUS_WARTE: Duration = Duration::from_secs(10);
+pub(crate) const COPERNICUS_WARTE: Duration = Duration::from_secs(10);
 
 /// Obergrenze der normalisierten Features je Antwort in Byte. Fachebenen-Antworten gehen
 /// ungepackt hinaus (`src/AGENTS.md`, „Antwortkompression“); 6 MiB kommen auch über eine
@@ -43,13 +43,13 @@ const COPERNICUS_WARTE: Duration = Duration::from_secs(10);
 const MAX_ANTWORT_BYTES: usize = 6 * 1024 * 1024;
 
 /// Nur von hier lädt die Ebene GeoJSON: die URLs stehen in fremdem JSON.
-const EBENEN_BASIS: &str = "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/";
+pub(crate) const EBENEN_BASIS: &str = "https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/";
 
 /// Tiefste Verschachtelung einer WKT-Geometrie (MULTIPOLYGON: Polygone, Ringe, Punkte).
 const WKT_MAX_TIEFE: usize = 3;
 
 /// Gleichzeitige Abrufe von Ebenen-Dateien.
-const PARALLEL: usize = 6;
+pub(crate) const PARALLEL: usize = 6;
 
 pub(crate) const COPERNICUS_ATTRIB: &str =
     "© European Union, Copernicus Emergency Management Service";
@@ -358,6 +358,44 @@ pub(crate) struct Produkt {
     pub geliefert: Option<String>,
     /// Bekannte Ebenen im Format `vt`: Art und URL des GeoJSON.
     pub ebenen: Vec<(EbenenArt, String)>,
+    /// Satellitenbilder im Format `cog` (LLH-2021), in der Reihenfolge der Quelle.
+    pub bilder: Vec<Bild>,
+}
+
+/// Ein Satellitenbild eines Produkts: ein Cloud Optimized GeoTIFF unter [`EBENEN_BASIS`].
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Bild {
+    /// Geprüfter Pfad unter [`EBENEN_BASIS`] ([`check_bildpfad`]).
+    pub pfad: String,
+    pub sensor: Option<String>,
+    /// `optical` oder `sar`, wie die Quelle es nennt.
+    pub sensor_art: Option<String>,
+    /// Aufnahmezeit, `zeit::FORMAT`.
+    pub aufnahme: Option<String>,
+}
+
+/// Ob ein Bildpfad der Quelle sicher unter [`EBENEN_BASIS`] liegt: relativ, ohne `..`, ohne
+/// leere Segmente, ohne Schema, Abfrage oder Rückstrich, und ein `.tif`.
+pub(crate) fn check_bildpfad(pfad: &str) -> bool {
+    !pfad.is_empty()
+        && pfad.len() <= 512
+        && pfad.ends_with(".tif")
+        && pfad
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '/' | '_' | '-' | '.'))
+        && pfad
+            .split('/')
+            .all(|seg| !seg.is_empty() && seg != "." && seg != "..")
+}
+
+/// Kennung eines Bildes in der Kachelroute: die ersten 16 Hex-Zeichen von SHA-256 über den Pfad.
+pub(crate) fn bild_kennung(pfad: &str) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(pfad.as_bytes())
+        .iter()
+        .take(8)
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// Auswertungsgebiet (AOI) einer Aktivierung.
@@ -446,6 +484,43 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
                 .then(|| (art, url.to_string()))
         })
         .collect();
+    let bilder_der_quelle: Vec<&Value> = p
+        .get("images")
+        .and_then(Value::as_array)
+        .map(|b| b.iter().collect())
+        .unwrap_or_default();
+    let bilder = p
+        .get("layers")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|l| l.get("format").and_then(Value::as_str) == Some("cog"))
+        .filter_map(|l| {
+            let pfad = l.get("name")?.as_str()?;
+            if !check_bildpfad(pfad) {
+                return None;
+            }
+            let datei = pfad.rsplit('/').next()?;
+            let eintrag = bilder_der_quelle
+                .iter()
+                .find(|b| b.get("fileName").and_then(Value::as_str) == Some(datei));
+            let text = |k: &str| {
+                eintrag
+                    .and_then(|b| b.get(k))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            };
+            Some(Bild {
+                pfad: pfad.to_string(),
+                sensor: text("sensorName"),
+                sensor_art: text("sensorType"),
+                aufnahme: text("acquisitionTime")
+                    .as_deref()
+                    .and_then(parse_zeit)
+                    .map(crate::zeit::formatiere),
+            })
+        })
+        .collect();
     Some(Produkt {
         typ: p.get("type")?.as_str()?.to_string(),
         monitoring: p
@@ -460,6 +535,7 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
             .and_then(Value::as_str)
             .and_then(format_zeitpunkt),
         ebenen,
+        bilder,
     })
 }
 
@@ -610,14 +686,24 @@ pub(crate) struct Gebaut {
 /// Baut die Antwort für einen Ausschnitt. `fetch` lädt eine URL als JSON (im Betrieb
 /// `quellen::hole_json`, in Tests ein Stub). `None`, wenn die Liste fehlt oder keine einzige
 /// Aktivierung ihre Details liefert: dann ist die Ebene `offline`.
-pub(crate) async fn build_antwort<H, Fut>(
+/// Was im Ausschnitt gezeigt wird, für Vektor- und Bilderliste dieselbe Kette (LLH-2021):
+/// Liste → Kandidaten → Details → Gebiete, die den Ausschnitt schneiden → [`select_produkte`].
+/// `None` wie bei [`build_antwort`]: Liste fehlt oder keine Aktivierung liefert Details.
+pub(crate) struct Auswahl {
+    pub details: Vec<Details>,
+    /// Je Gebiet im Ausschnitt: Index in `details`, Index des Gebiets, gewählte Produkte.
+    pub gebiete: Vec<(usize, usize, Vec<Produkt>)>,
+    /// Falsch, wenn eine Kandidatin ohne Details blieb.
+    pub vollstaendig: bool,
+}
+
+pub(crate) async fn select_im_ausschnitt<H, Fut>(
     pool: &SqlitePool,
-    fetch: H,
-    bbox: Bbox,
+    fetch: &H,
+    bbox: &Bbox,
     archiv: bool,
     jetzt: NaiveDateTime,
-    grenzen: Grenzen,
-) -> Option<Gebaut>
+) -> Option<Auswahl>
 where
     H: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = Result<Value, String>> + Send,
@@ -626,15 +712,14 @@ where
         pool,
         "copernicus-teil:liste",
         COPERNICUS_TTL,
-        &fetch,
+        fetch,
         LISTE_URL,
         |v| parse_liste(v).is_some(),
     )
     .await?;
     let liste = parse_liste(&liste_roh)?;
-    let kandidaten = select_kandidaten(&liste, &bbox, jetzt, archiv);
+    let kandidaten = select_kandidaten(&liste, bbox, jetzt, archiv);
 
-    let fetch = &fetch;
     // Eigene Werte statt Referenzen in den Futures: sonst verlangt `Send` für den gespawnten
     // Abruf eine Lebensdauer, die der Compiler nicht beweisen kann.
     let auftraege: Vec<(String, Duration)> = kandidaten
@@ -669,7 +754,40 @@ where
     if !kandidaten.is_empty() && details.is_empty() {
         return None;
     }
-    let mut vollstaendig = details.len() == kandidaten.len();
+    let vollstaendig = details.len() == kandidaten.len();
+    let mut gebiete = Vec::new();
+    for (di, d) in details.iter().enumerate().filter(|(_, d)| !d.sensibel) {
+        for (gi, g) in d.gebiete.iter().enumerate() {
+            if intersects(&g.huelle, bbox) {
+                gebiete.push((di, gi, select_produkte(g).into_iter().cloned().collect()));
+            }
+        }
+    }
+    Some(Auswahl {
+        details,
+        gebiete,
+        vollstaendig,
+    })
+}
+
+pub(crate) async fn build_antwort<H, Fut>(
+    pool: &SqlitePool,
+    fetch: H,
+    bbox: Bbox,
+    archiv: bool,
+    jetzt: NaiveDateTime,
+    grenzen: Grenzen,
+) -> Option<Gebaut>
+where
+    H: Fn(String) -> Fut + Send + Sync,
+    Fut: Future<Output = Result<Value, String>> + Send,
+{
+    let fetch = &fetch;
+    let Auswahl {
+        details,
+        gebiete,
+        mut vollstaendig,
+    } = select_im_ausschnitt(pool, fetch, &bbox, archiv, jetzt).await?;
 
     // Gebiete im Ausschnitt mit ihren gewählten Produkten, und die Ebenen, die zu holen sind.
     struct Treffer {
@@ -681,30 +799,24 @@ where
     }
     let mut treffer: Vec<Treffer> = Vec::new();
     let mut auftraege: Vec<(usize, Produkt, EbenenArt, String)> = Vec::new();
-    for (di, d) in details.iter().enumerate().filter(|(_, d)| !d.sensibel) {
-        for (gi, g) in d.gebiete.iter().enumerate() {
-            if !intersects(&g.huelle, &bbox) {
-                continue;
-            }
-            let gewaehlt: Vec<Produkt> = select_produkte(g).into_iter().cloned().collect();
-            let mut gekuerzt = false;
-            for p in &gewaehlt {
-                for (art, url) in &p.ebenen {
-                    if auftraege.len() < grenzen.ebenen {
-                        auftraege.push((treffer.len(), p.clone(), *art, url.clone()));
-                    } else {
-                        gekuerzt = true;
-                    }
+    for (di, gi, gewaehlt) in gebiete {
+        let mut gekuerzt = false;
+        for p in &gewaehlt {
+            for (art, url) in &p.ebenen {
+                if auftraege.len() < grenzen.ebenen {
+                    auftraege.push((treffer.len(), p.clone(), *art, url.clone()));
+                } else {
+                    gekuerzt = true;
                 }
             }
-            treffer.push(Treffer {
-                details: di,
-                gebiet: gi,
-                gewaehlt,
-                gekuerzt,
-                unvollstaendig: false,
-            });
         }
+        treffer.push(Treffer {
+            details: di,
+            gebiet: gi,
+            gewaehlt,
+            gekuerzt,
+            unvollstaendig: false,
+        });
     }
 
     let geholt: Vec<_> = stream::iter(auftraege)
@@ -865,7 +977,7 @@ pub async fn fetch_copernicus(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use serde_json::json;
 
@@ -1011,7 +1123,7 @@ mod tests {
     const EBENE_TIEFE: &str = include_str!("testdaten/copernicus-ebene-tiefe.json");
     const EBENE_VERKEHR: &str = include_str!("testdaten/copernicus-ebene-verkehr.json");
 
-    fn emsr728() -> Details {
+    fn details_728() -> Details {
         parse_details(&serde_json::from_str(EMSR728).unwrap()).unwrap()
     }
 
@@ -1105,6 +1217,7 @@ mod tests {
                 EbenenArt::Beobachtet,
                 format!("{typ}{monitoring}v{version}"),
             )],
+            bilder: Vec::new(),
         }
     }
 
@@ -1245,14 +1358,14 @@ mod tests {
     /// Stub für `fetch`: bekannte URLs aus den Testdaten, Ebenen nach ihrer Art, alles andere
     /// scheitert. Zählt jeden Abruf.
     #[derive(Clone, Default)]
-    struct Quelle {
-        aufrufe: Arc<Mutex<Vec<String>>>,
-        fehlt: Arc<Mutex<Vec<String>>>,
-        ersetzt: Arc<Mutex<HashMap<String, Value>>>,
+    pub(crate) struct Quelle {
+        pub(crate) aufrufe: Arc<Mutex<Vec<String>>>,
+        pub(crate) fehlt: Arc<Mutex<Vec<String>>>,
+        pub(crate) ersetzt: Arc<Mutex<HashMap<String, Value>>>,
     }
 
     impl Quelle {
-        fn fetch(
+        pub(crate) fn fetch(
             &self,
         ) -> impl Fn(String) -> std::future::Ready<Result<Value, String>> + Send + Sync {
             let q = self.clone();
@@ -1287,7 +1400,7 @@ mod tests {
                 std::future::ready(antwort)
             }
         }
-        fn count(&self, teil: &str) -> usize {
+        pub(crate) fn count(&self, teil: &str) -> usize {
             self.aufrufe
                 .lock()
                 .unwrap()
@@ -1297,8 +1410,118 @@ mod tests {
         }
     }
 
-    fn heute() -> NaiveDateTime {
+    pub(crate) fn heute() -> NaiveDateTime {
         t("2026-11-21 12:00:00")
+    }
+
+    // ------------------------------------------------------------------ Bilder (LLH-2021)
+
+    fn emsr728() -> Details {
+        parse_details(&serde_json::from_str(EMSR728).unwrap()).unwrap()
+    }
+
+    fn gebiet<'a>(d: &'a Details, name: &str) -> &'a Gebiet {
+        d.gebiete.iter().find(|g| g.name == name).unwrap()
+    }
+
+    #[test]
+    fn bilder_mit_sensor_und_aufnahme() {
+        let d = details_728();
+        let monit04 = gebiet(&d, "Stuttgart")
+            .produkte
+            .iter()
+            .find(|p| p.monitoring == 4)
+            .unwrap();
+        let sensoren: Vec<_> = monit04
+            .bilder
+            .iter()
+            .map(|b| {
+                (
+                    b.sensor.as_deref(),
+                    b.aufnahme.as_deref(),
+                    b.sensor_art.as_deref(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            sensoren,
+            vec![
+                (
+                    Some("GeoEye-1"),
+                    Some("2024-06-08 10:53:00"),
+                    Some("optical")
+                ),
+                (
+                    Some("Pleiades"),
+                    Some("2024-06-08 10:29:00"),
+                    Some("optical")
+                ),
+            ]
+        );
+        assert_eq!(
+            monit04.bilder[0].pfad,
+            "EMSR728/AOI01/DEL_MONIT04/EMSR728_AOI01_DEL_MONIT04_GEOEYE1_20240608_1053_ORTHO.tif"
+        );
+    }
+
+    #[test]
+    fn bild_ohne_images_eintrag_bleibt() {
+        let mut v: Value = serde_json::from_str(EMSR728).unwrap();
+        // Bogen, GRA: das Bild verliert seinen images-Eintrag.
+        let aoi = v["results"][0]["aois"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|a| a["name"] == "Bogen")
+            .unwrap();
+        aoi["products"][0]["images"] = json!([]);
+        let d = parse_details(&v).unwrap();
+        let b = &gebiet(&d, "Bogen").produkte[0].bilder;
+        assert_eq!(b.len(), 1);
+        assert_eq!((b[0].sensor.clone(), b[0].aufnahme.clone()), (None, None));
+    }
+
+    #[test]
+    fn bildpfad_pruefung() {
+        for schlecht in [
+            "../x.tif",
+            "EMSR1/../../x.tif",
+            "https://evil.example/x.tif",
+            "a//b.tif",
+            "a/b.json",
+            "/a.tif",
+            "",
+            "a/b.tif?x=1",
+            "a\\b.tif",
+        ] {
+            assert!(!check_bildpfad(schlecht), "{schlecht}");
+        }
+        assert!(check_bildpfad(
+            "EMSR728/AOI01/DEL_MONIT04/EMSR728_AOI01_DEL_MONIT04_GEOEYE1_20240608_1053_ORTHO.tif"
+        ));
+        assert_eq!(bild_kennung("a/b.tif").len(), 16);
+        assert_ne!(bild_kennung("a/b.tif"), bild_kennung("a/c.tif"));
+        assert!(bild_kennung("a/b.tif")
+            .chars()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn nur_bilder_gewaehlter_produkte() {
+        let d = details_728();
+        // Stuttgart zeigt MONIT02 (Sentinel-1, ohne Bild); MONIT03/04 haben Bilder, aber
+        // keine fertige Version mit Vektorebenen.
+        let stuttgart: Vec<_> = select_produkte(gebiet(&d, "Stuttgart"))
+            .iter()
+            .flat_map(|p| p.bilder.clone())
+            .collect();
+        assert!(stuttgart.is_empty());
+        let bogen: Vec<_> = select_produkte(gebiet(&d, "Bogen"))
+            .iter()
+            .flat_map(|p| p.bilder.clone())
+            .collect();
+        assert_eq!(bogen.len(), 1);
+        assert_eq!(bogen[0].sensor.as_deref(), Some("Pleiades"));
     }
 
     #[tokio::test]
