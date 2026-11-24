@@ -213,3 +213,12 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   (`personen/ListenzugriffeDrawer.tsx`, lädt erst offen); das Zugriffs-Audit der Detailseite zeigt
   zusätzlich die Listenzugriffe aus dem Erfassungsfenster der Person (Server:
   `person/audit_repo.rs`, `liste_je_person`).
+- **PASS-Liste** (LLH-1198, Entwurf
+  `docs/superpowers/specs/2026-11-24-sco62ku3-pass-liste-design.md`): die Betroffenen für die
+  Personenauskunftsstelle, als CSV (`…/persons/export?profile=pass`) und als Druckansicht
+  (`pages/PassListeDruckPage.tsx`, `…/persons/print?profile=pass`). Spalten, Reihenfolge und die
+  Ableitung der Art der Betroffenheit stehen nur im Server (`src/person/pass.rs`), er liefert je
+  Spalte fertigen Text; der Client zeigt ihn an und ordnet nichts zu (`personen/passListe.ts`
+  trägt nur Kopfwörter und den Wortlaut der Zweckbindung). Nur die Einsatzleitung, serverseitig
+  geprüft; das CSV erst nach der Rückfrage `personen/PassExportDialog.tsx`. Protokollarten
+  `pass_export` und `pass_druck`, getrennt von `export` und `druck`.

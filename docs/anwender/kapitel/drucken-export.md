@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 170
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/abloesung/schichtplan/ausgabe/useSchichtplanAusgabe.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/betreuung/registrierung/RegistrierungPaneel.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css, frontend/src/pages/EinsatzakteDruckPage.tsx]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/abloesung/schichtplan/ausgabe/useSchichtplanAusgabe.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/betreuung/registrierung/RegistrierungPaneel.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css, frontend/src/pages/EinsatzakteDruckPage.tsx, frontend/src/pages/PassListeDruckPage.tsx, frontend/src/personen/passListe.ts, frontend/src/personen/PassExportDialog.tsx, src/person/pass.rs]
 ---
 
 ## Überblick
@@ -43,7 +43,9 @@ dessen Druck aufs Papier. Die Liste der Lageberichte druckt sich nicht; jeder La
 sich auf seiner eigenen Seite.
 
 Als Datei exportieren lassen sich die Listen der Betroffenen und der Tiere mit „CSV
-exportieren“. Alle Anhänge und Tabellen eines Einsatzes zusammen liefert die Einsatzakte als ZIP.
+exportieren“. Für die Personenauskunftsstelle (PASS) gibt es die Betroffenen zusätzlich als
+PASS-Liste, als Datei und als Druckansicht. Alle Anhänge und Tabellen eines Einsatzes zusammen
+liefert die Einsatzakte als ZIP.
 
 ## Abläufe
 
@@ -94,6 +96,17 @@ Aufbau des Blatts beschreibt [Aufträge und Befehle](auftraege-befehle.md).
 
 Auch jeder CSV-Export der Betroffenen steht im Zugriffsprotokoll. Ohne Verbindung scheitert der
 Export sofort und meldet das an der Seite.
+
+### Die PASS-Liste exportieren oder drucken
+
+Für die Einsatzleitung:
+
+1. In „Betroffene“ im Kopf der Seite „PASS-Liste als CSV“ oder „PASS-Liste – Druckansicht“
+   wählen; auf schmalen Bildschirmen und in der Bediendichte „Komfortabel“ oder „Handschuh“ unter
+   „Weitere“.
+2. Beim CSV fragt ein Dialog nach der Zweckbindung; „Exportieren“ lädt die Datei herunter,
+   „Abbrechen“ lädt nichts.
+3. In der Druckansicht „Drucken / als PDF“ wählen.
 
 ### Ein Dokument oder einen Plan drucken
 
@@ -174,3 +187,19 @@ exportieren, ohne Schreibrecht. Das Zugriffsprotokoll der Betroffenen sieht nur 
 Einsatzleitung, unter „Listenzugriffe“ ([Betroffene und Sichtung](betroffene.md)). Das Öffnen der
 Druckansicht einer Person steht im „Zugriffs-Audit“ der Person als „Blatt gedruckt“; der Druck der
 Liste heißt dort und unter „Listenzugriffe“ „Liste gedruckt“.
+
+### Die PASS-Liste
+
+Die PASS-Liste enthält alle nicht stornierten Betroffenen in der Reihenfolge Name, Vorname,
+Kennung, Namenlose zuletzt. Ihre Spalten sind Kennung, Name, Vorname, Geburtsdatum, Alter
+(geschätzt, nur ohne Geburtsdatum), Geschlecht, Anschrift, Art der Betroffenheit, Verbleib und
+Erfasst am. Die Art der Betroffenheit leitet sich ab, die erste zutreffende Regel gilt:
+„verstorben“ (Status oder Verbleib „verstorben“ oder Sichtung „tot“), „vermisst“,
+„verletzt/erkrankt“ (Sichtung SK I bis SK IV oder eine nicht aufgehobene Maßnahme oder
+Verletzung), „untergebracht“ (Verbleib Notunterkunft), sonst „unverletzt“.
+
+Abrufen darf die PASS-Liste nur die Einsatzleitung, auch an der Schnittstelle; ein gekoppeltes
+Gerät nie. Jeder Abruf steht unter „Listenzugriffe“ als „PASS-Liste exportiert“ oder „PASS-Liste
+gedruckt“, getrennt vom gewöhnlichen Export. Die Datei ist UTF-8 mit Semikolon und öffnet sich in
+Excel per Doppelklick mit Umlauten. Das Format folgt den Feldern des PASS-Erlasses NRW; ein
+Import in GSL.net ist damit nicht zugesagt.
