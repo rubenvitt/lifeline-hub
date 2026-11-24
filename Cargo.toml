@@ -36,6 +36,9 @@ rustls-pki-types = { version = "1", features = ["std"] }
 # flume, kein `log`); fest gepinnt. 0.22.0 war bei der Hebung (21.11.2026, LLH-1617) erst vier
 # Tage alt, auf ausdrücklichen Wunsch trotz der sonst geltenden Zwei-Wochen-Frist.
 mdns-sd = { version = "=0.22.0", default-features = false }
+# Nur zum Bauen und Prüfen von Mailnachrichten und -adressen (LLH-2093), ohne Transport: den SMTP-Weg
+# trägt `adapter::smtp` über tokio-rustls, damit der Crypto-Provider und die geprüfte IP gelten.
+lettre = { version = "0.11", default-features = false, features = ["builder"] }
 futures = "0.3"
 tracing = "0.1"
 # Nicht blockierendes Log auf stdout (LFH-925, `src/main.rs`).

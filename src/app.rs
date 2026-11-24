@@ -2318,9 +2318,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/external-agencies",
             get(routes::externe_stelle::list).post(routes::externe_stelle::create),
         )
+        // Kanaladressen (LLH-2093); die feste Sammelroute vor `{id}`.
+        .route(
+            "/api/external-agencies/channels",
+            get(routes::externe_stelle::kanal_sammlung),
+        )
         .route(
             "/api/external-agencies/{id}",
             patch(routes::externe_stelle::update),
+        )
+        .route(
+            "/api/external-agencies/{id}/channels",
+            get(routes::externe_stelle::kanal_list).post(routes::externe_stelle::kanal_create),
+        )
+        .route(
+            "/api/external-agencies/{id}/channels/{kanal_id}",
+            patch(routes::externe_stelle::kanal_update)
+                .delete(routes::externe_stelle::kanal_delete),
         )
         .route("/api/keyword-suggestions", get(routes::stichwort::liste))
         .route("/api/keyword-suggestions", post(routes::stichwort::anlegen))
