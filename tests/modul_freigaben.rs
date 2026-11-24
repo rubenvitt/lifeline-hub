@@ -108,7 +108,7 @@ async fn org_vorgabe_sperrt_mitglied_wie_die_liste() {
     // Ein nicht betroffenes Modul bleibt frei — und seine Liste antwortet.
     assert_eq!(v["tiere"], json!({ "sichtbar": true, "zugriff": true }));
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "tiere").await,
+        liste_status(&app, &erika, einsatz, "animals").await,
         StatusCode::OK
     );
 }

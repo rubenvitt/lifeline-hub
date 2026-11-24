@@ -400,7 +400,7 @@ async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/meldungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
