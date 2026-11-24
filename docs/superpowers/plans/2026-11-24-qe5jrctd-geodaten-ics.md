@@ -231,7 +231,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `export function collectExportObjekte(eingabe: ExportEingabe): ExportObjekt[]`;
   - `export const EXPORT_MARKER_ARTEN: Partial<Record<MarkerTyp, ExportArt>>`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `jeder_markertyp_ist_entschieden`: Jeder Wert von `MarkerTyp` steht entweder in `EXPORT_MARKER_ARTEN` oder in `AUSGESCHLOSSEN = ['fuehrung','tier','lagemeldung','person']`, nie in beiden.
   - `personen_fuehrung_tier_meldung_fehlen`.
   - `keine_freitexte`: Ein Marker mit `beschriftungZusatz` bzw. `notiz` trägt nur den `label` als `name`.
@@ -239,12 +239,12 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `zeichen_spec_aus_schluessel`: `ez|<spec>` → `spec`.
   - `gefahrengebiet_hat_warnstufe_und_feste_farbe`: `warnstufe` gesetzt, `beschriftung` enthält „Warnstufe“, `stil.linie` ist ein Hex-Wert und keine CSS-Variable.
   - `gedaempfte_abschnitte_bleiben`.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte/geoExport.test.ts` → FAIL.
-- [ ] **Step 3:** `collectExportObjekte` umsetzen.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte/geoExport.test.ts` → FAIL.
+- [x] **Step 3:** `collectExportObjekte` umsetzen.
   - Sichtbarkeit ist schon durch die Eingabe gefiltert, denn Aufrufer übergeben `sichtbareMarker`, `kartenFlaechen` und `zonenFeatures`.
   - Exportfarben der Gefahrengebiete als Konstante `GEFAHR_EXPORT_FARBE` mit den Tagestönen aus `zonenStil.ts:88-91`.
-- [ ] **Step 4:** Test → PASS.
-- [ ] **Step 5:** Commit `feat: Objekte der Lagekarte für den Export sammeln` (Zunder A).
+- [x] **Step 4:** Test → PASS.
+- [x] **Step 5:** Commit `feat: Objekte der Lagekarte für den Export sammeln` (Zunder A).
 
 ### Task 8: GeoJSON schreiben
 

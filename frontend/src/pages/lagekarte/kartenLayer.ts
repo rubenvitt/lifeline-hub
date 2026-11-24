@@ -1,11 +1,11 @@
 import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
-import type { GeoJsonPolygon, GeoJsonGeometry } from './geo';
+import type { GeoJsonPolygon, GeoJsonGeometry, GeoPunkt } from './geo';
 import type { ZoneStil } from './zonenStil';
 import { wendeKartenDatenAn } from './kartenDaten';
 import { sorgeFuerFachebeneLayer, setzeFachebeneDaten } from './fachebenenLayer';
 import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
-import type { ZoneTyp } from '../../api/types';
+import type { Warnstufe, ZoneTyp } from '../../api/types';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
 import { deckkraftImFokus, reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 import { farbenDunkel } from '../../theme/tokens';
@@ -33,7 +33,17 @@ export interface AktiveFachebene {
 export interface ZoneFeature {
   id: number;
   geometrie: GeoJsonGeometry;
+  /** Kartenbeschriftung: Name mit Stufe, Räumungszustand oder Radius (`zonenStil.ts`). */
   label: string | null;
+  /** Gespeicherte Bezeichnung der Zone ohne Zusätze — der Export nimmt sie als Namen. */
+  rohLabel?: string | null;
+  /**
+   * Gefahrenzone mit Gebiet: Stufe aus dem Nachschlag, `'unbekannt'` ohne Nachschlag (LFH-357).
+   * Bei anderen Zonen ungesetzt.
+   */
+  warnstufe?: Warnstufe | 'unbekannt';
+  /** Kreiszone (LLH-1043): Mitte und Radius, die Geometrie ist das Vieleck. */
+  kreis?: { mitte: GeoPunkt; radiusM: number };
   /** Zonentyp — Kennung im Flächen-Auswahlmenü, wenn die Zone keine Bezeichnung trägt (LFH-812). */
   typ?: ZoneTyp;
   stil: ZoneStil;
