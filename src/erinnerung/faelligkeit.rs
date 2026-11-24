@@ -148,7 +148,7 @@ mod tests {
             fn der_naechste_slot_liegt_nach_jetzt_auf_dem_raster_und_ist_der_erste(
                 faellig in zeitpunkt(),
                 jetzt in zeitpunkt(),
-                intervall in prop_oneof![1i64..=10_080, 1i64..=i64::MAX],
+                intervall in prop_oneof![1i64..=10_080, 1i64..=100_000_000, 1i64..=i64::MAX],
             ) {
                 let Some(r) = naechste_faelligkeit(faellig, intervall, jetzt) else {
                     return Ok(());
