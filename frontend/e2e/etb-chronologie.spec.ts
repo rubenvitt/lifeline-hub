@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { einsatzAnlegen, einsatzPerApi } from './einsatz-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { dialogSteht } from './dialog-kern';
 
 /**
  * Die ETB-Chronologie als Layoutmessung: das Tagebuch ist auf ALLEN Breiten eine Zeitachse
@@ -71,7 +72,9 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
         .locator('.ant-dropdown:not(.ant-dropdown-hidden)')
         .getByRole('menuitem', { name: /Wiedervorlage/ })
         .click();
-      return page.getByRole('dialog');
+      // Erst klicken, wenn der Dialog steht: ein Klick in die Einblendung geht verloren, der Knopf
+      // wandert zwischen Drücken und Loslassen unter dem Zeiger weg, und es bliebe die Vorgabe.
+      return dialogSteht(page, 'Wiedervorlage anlegen', { exact: true });
     }
     let dialog = await oeffneWiedervorlage();
     await dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }).click();
