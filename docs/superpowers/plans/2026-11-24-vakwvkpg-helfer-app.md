@@ -89,7 +89,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
 - Modify: `scripts/api-routen-woerter.tsv`: neu `invitations	Einladungen`, `targets	Ziele`
 - Modify: `docs/architektur/` (arc42-Mitänderung nach `docs/architektur/AGENTS.md`: Baustein „Helfer-App“ in Kapitel 5, Verteilung in Kapitel 7)
 
-- [ ] **Step 1:** ADR nach `VORLAGE.md` mit Status `akzeptiert`, datum 2026-11-24, Regeln wörtlich
+- [x] **Step 1:** ADR nach `VORLAGE.md` mit Status `akzeptiert`, datum 2026-11-24, Regeln wörtlich
   aus dem Spec-Abschnitt „ADR (neu)“. `gilt_fuer`: `ios/Helfer/**`, `ios/HelferKern/**`,
   `android/helfer/**`, `android/helferkern/**`.
   Prüfung:
@@ -101,14 +101,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   ```
   Der Prüfblock greift erst, wenn die Dateien existieren. Gelingt das in Task 1 noch nicht,
   setzt Task 11 bzw. 13 die `verlange`-Zeilen.
-- [ ] **Step 2:** `AGENTS.md` beider Helfer-Ordner (je ≤ 25 Zeilen):
+- [x] **Step 2:** `AGENTS.md` beider Helfer-Ordner (je ≤ 25 Zeilen):
   - native App, für die „keine Anwendungslogik in der Hülle“ nicht gilt;
   - Logik im Kern mit Test;
   - nur der Server der Kopplung;
   - Ortungsregeln mit Verweis auf die ADR;
   - Design-Tokens nur aus dem Generator (Task 9).
-- [ ] **Step 3:** Run `scripts/check-architektur.sh && scripts/check-adr-nummern.sh && scripts/check-api-routen.sh` → PASS.
-- [ ] **Step 4:** Commit `docs: ADR und Regeln für die Helfer-App`.
+- [x] **Step 3:** Run `scripts/check-architektur.sh && scripts/check-adr-nummern.sh && scripts/check-api-routen.sh` → PASS.
+- [x] **Step 4:** Commit `docs: ADR und Regeln für die Helfer-App`.
 
 ### Task 2: Migration und Org-Schalter „Ortung im Einsatz“
 

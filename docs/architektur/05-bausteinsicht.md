@@ -469,6 +469,15 @@ Init-Skript `android/app/src/main/assets/huelle.js` meldet der Seite die Kennung
 Wrapper und Versionskatalog `libs.versions.toml`, `android/settings.gradle.kts` bindet den Kern per
 `includeBuild` ein; die Version schreibt `scripts/android/version.sh`.
 
+### Helfer-App (`ios/Helfer`, `android/helfer`)
+
+Die Helfer-App (ADR-0098, Regeln in [ios/Helfer/AGENTS.md](../../ios/Helfer/AGENTS.md) und
+[android/helfer/AGENTS.md](../../android/helfer/AGENTS.md)) ist je Plattform eine eigene native App
+(SwiftUI, Compose) neben den Hüllen: Helfer lösen eine Einladung ein und senden danach die letzte
+Position an den Server ihrer Kopplung. Die Logik steht im Kern (`ios/HelferKern`,
+`android/helferkern`), die App-Ziele bleiben dünn. Die Hüllen `ios` und `android` bleiben
+unverändert.
+
 ### `push-relais`
 
 Eigenes Binary im Workspace (`push-relais/Cargo.toml`, Abbild `push-relais/Dockerfile`), Regeln in
