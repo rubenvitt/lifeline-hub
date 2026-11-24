@@ -683,7 +683,7 @@ pub struct StelleVorlage {
     pub standort: &'static str,
 }
 
-/// Meldung wie über `POST …/meldungen`; `ereigniszeit` und `eingang_at` sind die Schrittzeit.
+/// Meldung wie über `POST …/reports`; `ereigniszeit` und `eingang_at` sind die Schrittzeit.
 /// Eine Sofortmeldung trägt wie im Handler Bestätigungspflicht und Frist und muss `bestaetigt`
 /// sein (Alarmbudget).
 #[derive(Debug, Clone, Copy)]

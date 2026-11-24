@@ -12,7 +12,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/nachforderungen")
+    format!("/api/einsaetze/{einsatz}/resource-requests")
 }
 
 /// „2× RTW“ an die Leitstelle, ergänzt um `extra`.

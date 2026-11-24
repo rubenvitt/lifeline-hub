@@ -189,7 +189,7 @@ async fn einsatz_kontext_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let app = setup().await;
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let auftraege = format!("/api/einsaetze/{einsatz}/auftraege");
+    let auftraege = format!("/api/einsaetze/{einsatz}/tasks");
     let vorher = anzahl(&app, &admin, &auftraege).await;
 
     let body = serde_json::json!({

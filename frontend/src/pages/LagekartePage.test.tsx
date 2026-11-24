@@ -428,7 +428,7 @@ function basisHandler(
     http.get('/api/einsaetze/1/free-symbols', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/map/commanders', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/situation/reports', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+    http.get('/api/einsaetze/1/reports/check-ins', () =>
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
     http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([])),

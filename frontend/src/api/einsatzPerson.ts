@@ -677,7 +677,7 @@ export function entfernePersonAnhang(
 }
 
 /**
- * Download über die Personenroute, nie über `/anhaenge/{aid}` des Einsatzes (dort 404). Jeder
+ * Download über die Personenroute, nie über `/attachments/{aid}` des Einsatzes (dort 404). Jeder
  * Abruf — auch die Revalidierung mit 304 — schreibt serverseitig eine Zeile ins Zugriffsprotokoll
  * der Person; deshalb nur als Verweis, den eine Person bewusst auslöst, nie als Vorschau.
  */

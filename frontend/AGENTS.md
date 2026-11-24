@@ -1509,7 +1509,7 @@ und `pages/personen/`.
 
 - **Erst die Umkehrbarkeit, dann der Rückgängig-Knopf** (LFH-343): eine Rückfrage fällt nur, wenn
   es einen **serverseitigen** Rückweg gibt (`POST …/vollzug` → `offen`,
-  `POST …/erinnerungen/{eid}/oeffnen`, `uebergang_erlaubt` eine Stufe zurück); sonst bleibt sie.
+  `POST …/reminders/{eid}/reopen`, `uebergang_erlaubt` eine Stufe zurück); sonst bleibt sie.
   Toast `kommunikation/rueckgaengig.tsx` mit festem Schlüssel; nach einer Nutzeraktion ist er
   keine Alarmmeldung (EEMUA 191). Ein Rückgängig stellt den Zustand **vor** der Handlung her, nicht
   nur „wieder aktiv“; was inzwischen anders gebunden ist, lässt es aus und nennt es im

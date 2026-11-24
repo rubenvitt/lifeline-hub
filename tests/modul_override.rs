@@ -498,16 +498,16 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
 /// (modul_key, GET-Pfad-Suffix) je Modul-Gruppe. Pfade liefern für einen leeren
 /// Einsatz normal 200; bei verstecktem Modul muss ein Mitglied 403 bekommen.
 const MODUL_GET_PFADE: &[(&str, &str)] = &[
-    ("chat", "chat/kanaele"),
-    ("erinnerungen", "erinnerungen"),
-    ("auftraege", "auftraege"),
+    ("chat", "chat/channels"),
+    ("erinnerungen", "reminders"),
+    ("auftraege", "tasks"),
     ("abloesung", "abloesungen"),
     ("betreuung", "care"),
     // LLH-1034: die Bezirke sind ein eigenes Modul.
     ("evakuierung", "evacuation"),
     ("verpflegung", "catering"),
-    ("meldungen", "meldungen"),
-    ("nachforderungen", "nachforderungen"),
+    ("meldungen", "reports"),
+    ("nachforderungen", "resource-requests"),
     ("fahrzeuge", "fahrzeuge"),
     ("personal", "personal"),
     ("material", "material"),
@@ -518,13 +518,13 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("bereitstellungsraeume", "bereitstellungsraeume"),
     ("einheiten", "einheiten"),
     ("einsatzabschnitte", "sectors"),
-    ("lageberichte", "lageberichte"),
+    ("lageberichte", "situation-reports"),
     ("gefahrenzonen", "hazard-areas"),
     ("wetter-pegel", "weather"),
     ("lagekarte", "zones"),
     ("lagekarte", "map/commanders"),
     ("lagemeldungen", "situation/reports"),
-    ("dokumente", "dokumente"),
+    ("dokumente", "documents"),
     ("lagebesprechung", "briefing"),
     ("lagebesprechung", "briefings"),
     // LLH-1180: die S6-Pfade liegen unter `…/staff`, gehören aber dem Fernmeldewesen.
@@ -1088,14 +1088,14 @@ async fn live_payloads_tragen_keinen_klartext() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/kanaele"),
+        &format!("/api/einsaetze/{eid}/chat/channels"),
         r#"{"name":"Lagekanal"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/kanaele/1/nachrichten"),
+        &format!("/api/einsaetze/{eid}/chat/channels/1/messages"),
         r#"{"inhalt":"Chat-Klartext-Kanarienvogel"}"#,
     )
     .await;

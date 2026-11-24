@@ -22,7 +22,7 @@ async function seed(page: Page) {
   const { id } = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Nachforderungen Board ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${id}/nachforderungen`;
+  const basis = `/api/einsaetze/${id}/resource-requests`;
   const anlegen = (art: string, bezeichnung: string) =>
     post(page, basis, { art, bezeichnung, adressat_kategorie: 'leitstelle' });
   const rtw = await anlegen('RTW', 'RTW Turnhalle');
@@ -106,7 +106,7 @@ test('Teilzusage teilt in zwei Karten; Zurückziehen über das Menü (LLH-1097)'
   const { id } = await post(page, '/api/einsaetze', {
     bezeichnung: `E2E Nachforderung Zusage ${Date.now()}`,
   });
-  const nf = await post(page, `/api/einsaetze/${id}/nachforderungen`, {
+  const nf = await post(page, `/api/einsaetze/${id}/resource-requests`, {
     art: 'RTW',
     anzahl: 2,
     bezeichnung: 'RTW Teilzusage',

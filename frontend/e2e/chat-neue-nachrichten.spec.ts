@@ -23,7 +23,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 
 /** Liefert die id des Standardkanals „Allgemein". */
 async function kanalId(page: Page, einsatzId: string): Promise<number> {
-  const res = await page.request.get(`/api/einsaetze/${einsatzId}/chat/kanaele`);
+  const res = await page.request.get(`/api/einsaetze/${einsatzId}/chat/channels`);
   return (await res.json())[0].id;
 }
 
@@ -34,7 +34,7 @@ async function kanalId(page: Page, einsatzId: string): Promise<number> {
  */
 async function vonAussenSenden(page: Page, einsatzId: string, kanal: number, text: string) {
   const res = await page.request.post(
-    `/api/einsaetze/${einsatzId}/chat/kanaele/${kanal}/nachrichten`,
+    `/api/einsaetze/${einsatzId}/chat/channels/${kanal}/messages`,
     { data: { inhalt: text } },
   );
   expect(res.status()).toBe(201);
@@ -117,7 +117,7 @@ test('Chat: der Kanalwechsel räumt Merker und Zähler', async ({ page }) => {
   await expect(page.getByPlaceholder('Nachricht…')).toBeVisible();
 
   // Zweiter Kanal per API — der Anlege-Weg der Oberfläche ist nicht die Aussage.
-  await page.request.post(`/api/einsaetze/${einsatzId}/chat/kanaele`, {
+  await page.request.post(`/api/einsaetze/${einsatzId}/chat/channels`, {
     data: { name: 'Zweiter' },
   });
   await page.reload();

@@ -695,7 +695,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
   it('Bedarf (LLH-1082): offene Nachforderungen der Stelle, „Bedarf anfordern“ führt in die Erfassung mit Bezug', async () => {
     freigaben.wert = freigabenFixture();
     server.use(
-      http.get('/api/einsaetze/1/nachforderungen', () =>
+      http.get('/api/einsaetze/1/resource-requests', () =>
         HttpResponse.json([
           {
             id: 21,

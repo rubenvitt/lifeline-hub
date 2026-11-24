@@ -3152,7 +3152,7 @@ async fn meldung_nach_dem_bruch_verlaesst_den_spiegel() {
 
     let (s, m) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         json!({"absender": "Florian Nord 1", "meldeweg": "funk", "inhalt": "Deich instabil",
                "ereigniszeit": "2026-06-12 09:00:00"}),
     )
@@ -3898,7 +3898,7 @@ async fn bruch_nach_notuebernahme() -> (Instanz, Instanz, i64, i64, String) {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &erika,
         Some(
             &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -4483,7 +4483,7 @@ async fn eine_person_wartet_mit_422_auf_ihre_meldung() {
     let (s, m) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &erika,
         Some(
             &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",

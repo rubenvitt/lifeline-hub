@@ -257,7 +257,10 @@ describe('Spaltenzeile in kompakter Dichte', () => {
     const gross = within(dialog)
       .getAllByRole('img')
       .find((i) => i.getAttribute('src')?.includes('fassung=grossansicht'));
-    expect(gross).toHaveAttribute('src', '/api/einsaetze/1/etb/1/anhaenge/9?fassung=grossansicht');
+    expect(gross).toHaveAttribute(
+      'src',
+      '/api/einsaetze/1/etb/1/attachments/9?fassung=grossansicht',
+    );
   });
 
   describe('HEIC-Foto: Großansicht aus dem Zeilenmenü mit Gerätedekodierung (LLH-1887)', () => {
@@ -298,7 +301,7 @@ describe('Spaltenzeile in kompakter Dichte', () => {
         .map((i) => i.getAttribute('src') ?? '');
       // `gross` ist die zweite Object-URL (klein, dann gross).
       expect(quellen).toContain('blob:heic-2');
-      expect(heic.dekodiere).toHaveBeenCalledWith('/api/einsaetze/1/etb/1/anhaenge/9');
+      expect(heic.dekodiere).toHaveBeenCalledWith('/api/einsaetze/1/etb/1/attachments/9');
       expect([...quellen, ...heic.dekodiere.mock.calls.flat()].join()).not.toContain(
         'fassung=original',
       );
@@ -482,7 +485,7 @@ describe('Vermerke in eigener Spalte', () => {
       within(spalte).getByRole('link', {
         name: /^Lagefoto\.jpg, .+, Anhang zu Nr\. 7 herunterladen$/,
       }),
-    ).toHaveAttribute('href', '/api/einsaetze/1/etb/3/anhaenge/11');
+    ).toHaveAttribute('href', '/api/einsaetze/1/etb/3/attachments/11');
   });
 
   describe('Überlauf', () => {

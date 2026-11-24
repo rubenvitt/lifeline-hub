@@ -159,11 +159,11 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // LLH-1031: Kenntnisnahme der Lagemeldungen, auch unter der Kennung der Meldung.
     ("/api/einsaetze/{id}/situation/seen", Some("lagemeldungen")),
     (
-        "/api/einsaetze/{id}/meldungen/{mid}/lage-gesehen",
+        "/api/einsaetze/{id}/reports/{mid}/situation-seen",
         Some("lagemeldungen"),
     ),
-    ("/api/einsaetze/{id}/meldungen", Some("meldungen")),
-    ("/api/einsaetze/{id}/auftraege", Some("auftraege")),
+    ("/api/einsaetze/{id}/reports", Some("meldungen")),
+    ("/api/einsaetze/{id}/tasks", Some("auftraege")),
     // LLH-1111: Stand und Termin unter `…/briefing`, Verlauf und Abschluss unter
     // `…/briefings` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
     ("/api/einsaetze/{id}/briefing", Some("lagebesprechung")),
@@ -183,7 +183,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     // Modul `infotelefon` (Herleitung `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md`,
     // D3).
     ("/api/einsaetze/{id}/staff/info-line", Some("infotelefon")),
-    ("/api/einsaetze/{id}/dokumente", Some("dokumente")),
+    ("/api/einsaetze/{id}/documents", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/care", Some("betreuung")),
     // LLH-1034: Evakuierungsbezirke und ihre Standmeldungen gehören dem eigenen Modul.
@@ -208,9 +208,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/einheiten", Some("einheiten")),
     ("/api/einsaetze/{id}/chat", Some("chat")),
     ("/api/einsaetze/{id}/etb", Some("etb")),
-    ("/api/einsaetze/{id}/erinnerungen", Some("erinnerungen")),
+    ("/api/einsaetze/{id}/reminders", Some("erinnerungen")),
     (
-        "/api/einsaetze/{id}/nachforderungen",
+        "/api/einsaetze/{id}/resource-requests",
         Some("nachforderungen"),
     ),
     // Sprechgruppen, Ort-Vorschau und die Ortssuche des Ortsfelds (LFH-1175) gehören keinem
@@ -233,7 +233,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/weather", Some("wetter-pegel")),
     ("/api/einsaetze/{id}/map-views", Some("lagekarte")),
     ("/api/einsaetze/{id}/situation-snapshots", Some("lagekarte")),
-    ("/api/einsaetze/{id}/anhaenge", None),
+    ("/api/einsaetze/{id}/attachments", None),
     // Pegel-Kennzahl (LFH-606): steht auf Dashboard und Überblick — modul-los wie die
     // Einsatz-Kopfdaten.
     ("/api/einsaetze/{id}/gauges", None),
@@ -263,7 +263,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/notification-defaults", None),
     // Eigene Anträge an einem Spiegel (LLH-1492): modul-los. Ein Antrag gehört dem Konto, das ihn
     // gestellt hat; das Modulrecht prüfte schon die Erfassung, aus der er entstand.
-    ("/api/einsaetze/{id}/antraege", None),
+    ("/api/einsaetze/{id}/requests", None),
     // Nicht übernommene Erfassungen nach einer Notübernahme (LLH-1646): modul-los. Jede Zeile
     // gehört einem anderen Modul; der Handler prüft das Modul je Zeile (Inhalt, Stellen,
     // Verwerfen) und das Modul der Antragsart.
@@ -410,11 +410,11 @@ mod tests {
     fn pfad_key_laengster_praefix_gewinnt() {
         // Kind-Pfade erben den Modul-Key des Präfixes.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/meldungen"),
+            key_fuer_pfad("/api/einsaetze/{id}/reports"),
             Some(Some("meldungen"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/meldungen/{mid}/status"),
+            key_fuer_pfad("/api/einsaetze/{id}/reports/{mid}/status"),
             Some(Some("meldungen"))
         );
         // Eigenständiger Lage-Pfad → eigener Key, NICHT "meldungen".
@@ -486,9 +486,9 @@ mod tests {
         );
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/staff"), None);
         // Modul-lose Route: registriert, aber kein Key.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/anhaenge"), Some(None));
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/attachments"), Some(None));
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/anhaenge/{aid}"),
+            key_fuer_pfad("/api/einsaetze/{id}/attachments/{aid}"),
             Some(None)
         );
         // Wetter & Pegel (LFH-633): der Wetter-Endpunkt ist am Modul gegatet, der Pegelverlauf

@@ -575,7 +575,7 @@ describe('NachrichtenStrom', () => {
     const link = screen.getByRole('link', {
       name: 'lage.pdf, 2,0 KB, Anhang der Nachricht von Max herunterladen',
     });
-    expect(link).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/42');
+    expect(link).toHaveAttribute('href', '/api/einsaetze/7/attachments/42');
     // Nativer Download statt neuem Tab: `target="_blank"` läuft in der Desktop-Hülle ins Leere,
     // und ein Datei-Link ohne `download` ersetzte in WKWebView die Anwendung (LFH-720).
     expect(link).toHaveAttribute('download', 'lage.pdf');
@@ -615,7 +615,7 @@ describe('NachrichtenStrom', () => {
       const original = screen.getByRole('link', {
         name: 'Original (mit Standort) herunterladen: lage.jpg, Anhang der Nachricht von Max',
       });
-      expect(original).toHaveAttribute('href', '/api/einsaetze/7/anhaenge/43?fassung=original');
+      expect(original).toHaveAttribute('href', '/api/einsaetze/7/attachments/43?fassung=original');
       expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);
     });
 
@@ -631,12 +631,12 @@ describe('NachrichtenStrom', () => {
       });
       expect(knopf.querySelector('img')).toHaveAttribute(
         'src',
-        '/api/einsaetze/7/anhaenge/43?fassung=vorschau',
+        '/api/einsaetze/7/attachments/43?fassung=vorschau',
       );
       expect(screen.queryByRole('button', { name: /^Vorschau: lage\.pdf/ })).toBeNull();
       expect(screen.getByRole('link', { name: /^lage\.pdf/ })).toHaveAttribute(
         'href',
-        '/api/einsaetze/7/anhaenge/44',
+        '/api/einsaetze/7/attachments/44',
       );
     });
   });
@@ -929,7 +929,7 @@ describe('NachrichtenStrom — Zeiten in der Anzeigezone (LFH-913)', () => {
       strom();
       const anhang = screen
         .getAllByRole('link')
-        .find((a) => a.getAttribute('href')?.includes('/anhaenge/5'))!;
+        .find((a) => a.getAttribute('href')?.includes('/attachments/5'))!;
       expect(fireEvent.contextMenu(anhang, { button: 2 })).toBe(true);
     });
 

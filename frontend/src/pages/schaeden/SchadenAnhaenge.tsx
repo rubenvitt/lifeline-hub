@@ -19,7 +19,7 @@ interface Props {
 /**
  * Paneel „Fotos und Dateien“ auf der Schaden-Detailseite (LFH-21) — die Schaden-Hülle um den
  * modulneutralen Baustein `ErfassungsAnhaenge` (LFH-758). Der Download zeigt auf die
- * modul-gegatete Schadensroute, nie auf `/anhaenge/{aid}` des Einsatzes.
+ * modul-gegatete Schadensroute, nie auf `/attachments/{aid}` des Einsatzes.
  */
 export default function SchadenAnhaenge({ einsatzId, schaden, darfSchreiben }: Props) {
   return (

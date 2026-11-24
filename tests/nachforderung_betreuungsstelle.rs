@@ -12,7 +12,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/nachforderungen")
+    format!("/api/einsaetze/{einsatz}/resource-requests")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {

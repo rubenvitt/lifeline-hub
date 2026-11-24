@@ -485,7 +485,7 @@ describe('EtbEntwurfsTabs', () => {
     };
     server.use(
       http.post(
-        '/api/einsaetze/7/etb/anhaenge',
+        '/api/einsaetze/7/etb/attachments',
         () =>
           new Promise<Response>((r) => {
             s.freigeben = () =>
@@ -680,7 +680,7 @@ describe('EtbEntwurfsTabs', () => {
       .mockRejectedValueOnce(new ApiError(409, konflikt))
       .mockResolvedValue(undefined);
     server.use(
-      http.post('/api/einsaetze/7/etb/anhaenge', () =>
+      http.post('/api/einsaetze/7/etb/attachments', () =>
         HttpResponse.json(
           [
             {

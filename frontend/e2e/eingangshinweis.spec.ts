@@ -56,7 +56,7 @@ test('Lagemeldung von einem zweiten Schirm: Eingangshinweis in zwei Tabs, „Sic
       data: { benutzername: konto.benutzername, passwort: konto.passwort },
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
-    const lage = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+    const lage = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
       data: {
         absender: ABSENDER,
         meldeweg: 'funk',
@@ -115,7 +115,7 @@ test('„Alle gelesen“ im ersten Tab räumt Band und Zahl im zweiten (LLH-1143
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
     for (const n of [1, 2]) {
-      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
         data: {
           absender: `${ABSENDER} ${n}`,
           meldeweg: 'funk',

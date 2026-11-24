@@ -71,12 +71,12 @@ function vorEinerStunde(): string {
 
 async function saeen(page: Page, einsatzId: string) {
   const basis = `/api/einsaetze/${einsatzId}`;
-  const bericht = await sende(page, 'POST', `${basis}/lageberichte`, {
+  const bericht = await sende(page, 'POST', `${basis}/situation-reports`, {
     vorlage: 'lagebericht',
     titel: 'Erstlage Halle 3',
     abschnitte: [{ schluessel: 'eigene_lage', text: 'Zwei Züge im Einsatz.' }],
   });
-  await sende(page, 'POST', `${basis}/lageberichte/${bericht.id}/freigeben`);
+  await sende(page, 'POST', `${basis}/situation-reports/${bericht.id}/release`);
   await sende(page, 'POST', `${basis}/etb`, {
     typ: 'entscheidung',
     von: 'ELW 1',

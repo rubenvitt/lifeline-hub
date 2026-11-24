@@ -1795,7 +1795,7 @@ export type AuftragPatch = {
   ort_lon?: number | null;
 } & Partial<Record<AuftragSchemafeld, string | null>>;
 
-/** Kein Backend-Schema: Body von `POST …/auftraege/{aid}/aufheben` (LLH-1098), FE-lokal. */
+/** Kein Backend-Schema: Body von `POST …/tasks/{aid}/void` (LLH-1098), FE-lokal. */
 export interface AuftragAufhebenBody {
   grund: string;
 }
@@ -1852,7 +1852,7 @@ export type LageGesehen = S['LageGesehenAnzeige'];
 export interface LageGesehenBody {
   meldung_ids: number[];
 }
-/** Korrektur einer Meldung (`PATCH …/meldungen/{mid}`, LLH-1066): nur die geänderten Felder.
+/** Korrektur einer Meldung (`PATCH …/reports/{mid}`, LLH-1066): nur die geänderten Felder.
  * Wortlaut, Absender, Meldeweg und Ereigniszeit bleiben, wie die Meldung einging (422). */
 export interface MeldungKorrekturPatch {
   meldungsart?: Meldungsart;
@@ -1917,7 +1917,7 @@ export interface NeueNachforderung {
 }
 
 /**
- * Body von `POST …/nachforderungen/{nid}/zusage` (LLH-1097 D4), FE-lokal. Eine Anzahl unter der
+ * Body von `POST …/resource-requests/{nid}/commitment` (LLH-1097 D4), FE-lokal. Eine Anzahl unter der
  * angeforderten teilt den Rest als eigene Position ab (D1).
  */
 export interface NachforderungZusageEingabe {
@@ -1932,7 +1932,7 @@ export interface NachforderungZusageEingabe {
 }
 
 /**
- * Body von `PATCH …/nachforderungen/{nid}` (LLH-1097 D9), FE-lokal: nur Geändertes, `null` leert.
+ * Body von `PATCH …/resource-requests/{nid}` (LLH-1097 D9), FE-lokal: nur Geändertes, `null` leert.
  * Steht ein Zielfeld im Body, ersetzt der Body das ganze Ziel. Wer und Eintreffen nur in zugesagt
  * und unterwegs.
  */

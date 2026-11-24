@@ -15055,3 +15055,39 @@ async fn migration_0370_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
     assert_eq!(neu[0], "/api/einsaetze/{id}/persons");
     assert_eq!(neu[13], "/api/einsaetze/{id}/etb", "fremde Muster bleiben");
 }
+
+/// LLH-2058 (API-Routen englisch, Paket 12): Offene Anträge eines Spiegels tragen die Vorlage
+/// ihres Pfads. Nach dem Umbenennen fände der Führer `/meldungen` nicht mehr unter den
+/// beantragbaren Erfassungen und lehnte den Antrag als unbekannte Art ab; die Migration zieht
+/// die gespeicherte Vorlage auf `/reports` um und lässt alle anderen stehen.
+#[tokio::test]
+async fn migration_0371_zieht_die_pfadvorlage_offener_antraege_auf_reports_um() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 370).await;
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO spiegel_antrag (id, einsatz_id, art, methode, pfad_vorlage, daten, \
+         benutzer_id, erfasst_at, geaendert_at) VALUES \
+         (1, 1, 'meldung', 'POST', '/api/einsaetze/{id}/meldungen', '{}', 1, 'x', 'x'), \
+         (2, 1, 'etb', 'POST', '/api/einsaetze/{id}/etb', '{}', 1, 'x', 'x'), \
+         (3, 1, 'person', 'POST', '/api/einsaetze/{id}/persons', '{}', 1, 'x', 'x')",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
+    }
+    migriere_bis(&pool, 371).await;
+    let vorlagen: Vec<String> =
+        sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        vorlagen,
+        [
+            "/api/einsaetze/{id}/reports",
+            "/api/einsaetze/{id}/etb",
+            "/api/einsaetze/{id}/persons",
+        ]
+    );
+}

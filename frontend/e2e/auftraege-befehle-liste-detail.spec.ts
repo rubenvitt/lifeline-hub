@@ -29,7 +29,7 @@ async function einsatz(page: Page): Promise<string> {
 }
 
 async function auftragPerApi(page: Page, einsatzId: string, text: string) {
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const r = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text: text,
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
@@ -162,7 +162,7 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   });
   expect(abschnitt.ok(), `Abschnitt: ${abschnitt.status()}`).toBe(true);
   const abschnittId = ((await abschnitt.json()) as { id: number }).id;
-  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/befehle`, {
+  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
     data: {
       vorlage: 'befehl_lad',
       titel: 'Befehl an EA Süd',
@@ -175,11 +175,11 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   });
   expect(angelegt.ok(), `Befehl: ${angelegt.status()}`).toBe(true);
   const befehlId = ((await angelegt.json()) as { id: number }).id;
-  const verteiler = await page.request.patch(`/api/einsaetze/${einsatzId}/befehle/${befehlId}`, {
+  const verteiler = await page.request.patch(`/api/einsaetze/${einsatzId}/orders/${befehlId}`, {
     data: { verteiler: [{ empfaenger_typ: 'abschnitt', abschnitt_id: abschnittId }] },
   });
   expect(verteiler.ok(), `Verteiler: ${verteiler.status()}`).toBe(true);
-  const frei = await page.request.post(`/api/einsaetze/${einsatzId}/befehle/${befehlId}/freigeben`);
+  const frei = await page.request.post(`/api/einsaetze/${einsatzId}/orders/${befehlId}/release`);
   expect(frei.ok(), `Freigabe: ${frei.status()}`).toBe(true);
 
   await page.goto(`/einsaetze/${einsatzId}/auftraege?reiter=befehle&befehl=${befehlId}`);

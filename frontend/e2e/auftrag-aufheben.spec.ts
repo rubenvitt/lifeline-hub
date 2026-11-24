@@ -17,13 +17,13 @@ async function einsatzMitAuftrag(page: Page): Promise<{ einsatzId: string; nr: n
   });
   expect(e.ok(), `POST /api/einsaetze: ${e.status()} ${await e.text()}`).toBe(true);
   const einsatzId = String(((await e.json()) as { id: number }).id);
-  const a = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const a = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Sandsäcke zum Deich bringen',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
     },
   });
-  expect(a.ok(), `POST …/auftraege: ${a.status()}`).toBe(true);
+  expect(a.ok(), `POST …/tasks: ${a.status()}`).toBe(true);
   return { einsatzId, nr: ((await a.json()) as { lfd_nr: number }).lfd_nr };
 }
 

@@ -20,7 +20,7 @@ async fn anlegen_erzeugt_nachforderung_und_etb() {
     let (status, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -54,7 +54,7 @@ async fn leere_bezeichnung_ist_ohne_details_und_leere_art_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let url = format!("/api/einsaetze/{e}/nachforderungen");
+    let url = format!("/api/einsaetze/{e}/resource-requests");
     let b = serde_json::json!({ "art": "RTW", "bezeichnung": "  ", "adressat_kategorie": "leitstelle" }).to_string();
     let (status, n) = anfrage(&app, "POST", &url, &admin, Some(&b)).await;
     assert_eq!(status, StatusCode::CREATED, "{n:?}");
@@ -81,7 +81,7 @@ async fn betriebsstoff_ist_eine_nachforderung_mit_freier_art() {
     let (status, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&b),
     )
@@ -118,7 +118,7 @@ async fn gleicher_post_mit_gleicher_client_id_ergibt_eine_nachforderung() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let url = format!("/api/einsaetze/{e}/nachforderungen");
+    let url = format!("/api/einsaetze/{e}/resource-requests");
     let mit_schluessel = serde_json::json!({
         "art": "Feldbetten", "anzahl": 50, "adressat_kategorie": "leitstelle",
         "client_id": "  5f0c2b7e-unterkunft-feldbetten  "
@@ -173,7 +173,7 @@ async fn zu_lange_client_id_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&b),
     )
@@ -192,7 +192,7 @@ async fn anlegen_ungueltige_adressat_kategorie_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&b),
     )
@@ -208,7 +208,7 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -219,7 +219,7 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/status"),
         &admin,
         Some(r#"{"status":"unterwegs"}"#),
     )
@@ -231,7 +231,7 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
         let (status, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+            &format!("/api/einsaetze/{e}/resource-requests/{nid}/status"),
             &admin,
             Some(&format!(r#"{{"status":"{ziel}"}}"#)),
         )
@@ -243,7 +243,7 @@ async fn status_workflow_und_ungueltiger_uebergang_ist_422() {
     let (status, j) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         None,
     )
@@ -271,7 +271,7 @@ async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -281,7 +281,7 @@ async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
         let (status, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+            &format!("/api/einsaetze/{e}/resource-requests/{nid}/status"),
             &admin,
             Some(&format!(r#"{{"status":"{ziel}"}}"#)),
         )
@@ -291,7 +291,7 @@ async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
     let (status, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/ablehnen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/decline"),
         &admin,
         Some(r#"{"grund":"keine Reserven"}"#),
     )
@@ -339,7 +339,7 @@ async fn status_abgelehnt_ueber_status_endpoint_ist_422() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -349,7 +349,7 @@ async fn status_abgelehnt_ueber_status_endpoint_ist_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/status"),
         &admin,
         Some(r#"{"status":"abgelehnt"}"#),
     )
@@ -365,7 +365,7 @@ async fn ablehnen_setzt_grund() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -374,7 +374,7 @@ async fn ablehnen_setzt_grund() {
     let (status, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/ablehnen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/decline"),
         &admin,
         Some(r#"{"grund":"keine Reserven"}"#),
     )
@@ -392,7 +392,7 @@ async fn ablehnen_mit_zu_langem_grund_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let nid = absetzen(&app, &admin, e).await;
-    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}/ablehnen");
+    let url = format!("/api/einsaetze/{e}/resource-requests/{nid}/decline");
     let max = lifeline_hub::nachforderung::ABLEHNEN_GRUND_MAX;
 
     let lang = serde_json::json!({ "grund": "x".repeat(max + 1) }).to_string();
@@ -418,7 +418,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &erika_c,
         None,
     )
@@ -427,7 +427,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &erika_c,
         Some(&body()),
     )
@@ -444,7 +444,7 @@ async fn cross_einsatz_status_ist_404() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a}/nachforderungen"),
+        &format!("/api/einsaetze/{a}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -453,7 +453,7 @@ async fn cross_einsatz_status_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b}/nachforderungen/{nid}/status"),
+        &format!("/api/einsaetze/{b}/resource-requests/{nid}/status"),
         &admin,
         Some(r#"{"status":"zugesagt"}"#),
     )
@@ -473,7 +473,7 @@ async fn set_status(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/status"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -485,7 +485,7 @@ async fn eingetroffen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (_, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         cookie,
         Some(&body()),
     )
@@ -549,7 +549,7 @@ async fn ruecknahme_nach_uebernahme_ist_422() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         None,
     )
@@ -567,7 +567,7 @@ async fn ruecknahme_auf_angefordert_geht_und_leert_den_zeitpunkt() {
     let (_, n) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         &admin,
         Some(&body()),
     )
@@ -630,7 +630,7 @@ async fn absetzen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         cookie,
         Some(&body()),
     )
@@ -649,7 +649,7 @@ async fn zusage(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/zusage"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/commitment"),
         cookie,
         Some(&body.to_string()),
     )
@@ -660,7 +660,7 @@ async fn liste(app: &axum::Router, cookie: &str, e: i64) -> Vec<serde_json::Valu
     let (_, l) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/nachforderungen"),
+        &format!("/api/einsaetze/{e}/resource-requests"),
         cookie,
         None,
     )
@@ -792,7 +792,7 @@ async fn zurueckziehen_ist_terminal_und_steht_im_etb() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let nid = absetzen(&app, &admin, e).await;
-    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}/zurueckziehen");
+    let url = format!("/api/einsaetze/{e}/resource-requests/{nid}/withdraw");
 
     let (s, _) = set_status(&app, &admin, e, nid, "zurueckgezogen").await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
@@ -830,7 +830,7 @@ async fn zurueckziehen_ist_terminal_und_steht_im_etb() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{da}/zurueckziehen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{da}/withdraw"),
         &admin,
         Some("{}"),
     )
@@ -845,7 +845,7 @@ async fn bearbeiten_ueber_patch() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let nid = absetzen(&app, &admin, e).await;
-    let url = format!("/api/einsaetze/{e}/nachforderungen/{nid}");
+    let url = format!("/api/einsaetze/{e}/resource-requests/{nid}");
     let patch = |body: serde_json::Value| {
         let (app, admin, url) = (app.clone(), admin.clone(), url.clone());
         async move { anfrage(&app, "PATCH", &url, &admin, Some(&body.to_string())).await }
@@ -920,7 +920,7 @@ async fn bearbeiten_ueber_patch() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/nachforderungen/{nid}/zurueckziehen"),
+        &format!("/api/einsaetze/{e}/resource-requests/{nid}/withdraw"),
         &admin,
         Some("{}"),
     )

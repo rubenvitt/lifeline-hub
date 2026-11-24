@@ -91,13 +91,13 @@ function serverMit(liste: BenachrichtigungAnzeige[], meldungen: Record<number, M
   const quittiert: number[] = [];
   const gesichtet: number[] = [];
   server.use(
-    http.get('/api/einsaetze/:einsatzId/meldungen/:id', ({ params }) => {
+    http.get('/api/einsaetze/:einsatzId/reports/:id', ({ params }) => {
       const m = meldungen[Number(params.id)];
       return m
         ? HttpResponse.json({ id: Number(params.id), status: 'neu', ...m })
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
-    http.post('/api/einsaetze/:einsatzId/meldungen/:id/status', async ({ params, request }) => {
+    http.post('/api/einsaetze/:einsatzId/reports/:id/status', async ({ params, request }) => {
       const body = (await request.json()) as { status: string };
       expect(body.status).toBe('gesichtet');
       gesichtet.push(Number(params.id));
@@ -276,7 +276,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     const b = eingang(1250, 85);
     serverMit([b], { 85: { absender: 'EA West', inhalt: 'Lage ruhig' } });
     server.use(
-      http.post('/api/einsaetze/:einsatzId/meldungen/:id/status', () =>
+      http.post('/api/einsaetze/:einsatzId/reports/:id/status', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -420,7 +420,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     const a = auftragEingang(1902, 12);
     serverMit([a], {});
     server.use(
-      http.get('/api/einsaetze/:id/auftraege/:aid', () =>
+      http.get('/api/einsaetze/:id/tasks/:aid', () =>
         HttpResponse.json({
           id: 12,
           lfd_nr: 4,
@@ -453,7 +453,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     };
     serverMit([b], {});
     server.use(
-      http.get('/api/einsaetze/:id/chat/kanaele/6/nachrichten', () =>
+      http.get('/api/einsaetze/:id/chat/channels/6/messages', () =>
         HttpResponse.json([
           { id: 20, kanal_id: 6, autor_name: 'Anna Berg', inhalt: '@S4 bitte Feldbetten zählen' },
         ]),
@@ -481,7 +481,7 @@ describe('Eingangshinweis (LLH-1062)', () => {
     serverMit([b], {});
     server.use(
       http.get('/api/notifications', () => HttpResponse.json([b])),
-      http.get('/api/einsaetze/:id/befehle/:bid', () =>
+      http.get('/api/einsaetze/:id/orders/:bid', () =>
         HttpResponse.json({ id: 7, titel: 'Räumung Nord' }),
       ),
     );

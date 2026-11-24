@@ -242,7 +242,7 @@ pub struct AuftragAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub aufhebungsgrund: Option<String>,
     /// Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —
-    /// nur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098).
+    /// nur dann nimmt `PATCH …/tasks/{aid}` eine Berichtigung an (LLH-1098).
     pub berichtigbar: bool,
 }
 
@@ -275,7 +275,7 @@ pub struct AuftragEmpfaengerAnzeige {
     pub quittiert_von_id: Option<i64>,
 }
 
-/// Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und
+/// Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und
 /// „Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct AuftragKennzahlen {
@@ -295,7 +295,7 @@ pub struct AuftragDetail {
 
 /// Nach dem Commit eines neu erteilten Auftrags (LLH-1085, design.md D9): Auto-Frist-Erinnerung
 /// bei gesetzter Quittierfrist (LFH-118), ETB-Live der Anordnung, Benachrichtigung `erteilt` und
-/// Live `auftrag`. Gemeinsam für `POST …/auftraege` und den Abruf aus dem Bereitstellungsraum.
+/// Live `auftrag`. Gemeinsam für `POST …/tasks` und den Abruf aus dem Bereitstellungsraum.
 pub async fn nach_erteilung(
     state: &crate::app::AppState,
     einsatz_id: i64,

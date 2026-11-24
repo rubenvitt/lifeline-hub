@@ -92,7 +92,7 @@ test('Ohne Modulrecht steht die Besetzung aus den Mitgliedern da (Führungsperso
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
   await mitgliedMitFunktion(page, einsatzId, 's3', 'Müller');
-  const erteilt = await page.request.post(`/api/einsaetze/${einsatzId}/auftraege`, {
+  const erteilt = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Lage erkunden',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion: 's3' }],

@@ -82,7 +82,7 @@ test('LFH-1025: Laptop bearbeitet den Grundriss, liest Material und meldet an di
     await expect(laptop.getByText('Decken werden knapp')).toBeVisible();
 
     // Die Einsatzleitung sieht die Meldung mit der Stelle als Absender.
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/meldungen`);
+    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
     expect(meldungen.ok()).toBeTruthy();
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(liste.find((m) => m.inhalt === 'Decken werden knapp')?.absender).toBe(

@@ -28,7 +28,7 @@ async fn auftrag_erteilen(
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege"),
+        &format!("/api/einsaetze/{e}/tasks"),
         cookie,
         Some(&body.to_string()),
     )
@@ -50,7 +50,7 @@ async fn aufheben(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}/aufheben"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
         cookie,
         Some(body),
     )
@@ -134,7 +134,7 @@ async fn aufheben_aus_in_arbeit_und_vollzogen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{in_arbeit}/vollzug"),
+        &format!("/api/einsaetze/{e}/tasks/{in_arbeit}/execution"),
         &admin,
         Some(r#"{"status":"in_arbeit"}"#),
     )
@@ -148,7 +148,7 @@ async fn aufheben_aus_in_arbeit_und_vollzogen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{vollzogen}/vollzug"),
+        &format!("/api/einsaetze/{e}/tasks/{vollzogen}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"Säcke liegen"}"#),
     )
@@ -173,7 +173,7 @@ async fn abgenommen_oder_schon_aufgehoben_ist_422_ohne_zweiten_eintrag() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{abgenommen}/vollzug"),
+        &format!("/api/einsaetze/{e}/tasks/{abgenommen}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"ok"}"#),
     )
@@ -181,7 +181,7 @@ async fn abgenommen_oder_schon_aufgehoben_ist_422_ohne_zweiten_eintrag() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{abgenommen}/abnehmen"),
+        &format!("/api/einsaetze/{e}/tasks/{abgenommen}/accept"),
         &admin,
         None,
     )
@@ -300,7 +300,7 @@ async fn aufheben_schliesst_auto_erinnerung_und_laesst_manuelle_stehen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/erinnerungen"),
+        &format!("/api/einsaetze/{e}/reminders"),
         &admin,
         Some(
             &serde_json::json!({
@@ -339,7 +339,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}/empfaenger/{empf}/quittieren"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
         &admin,
         None,
     )
@@ -353,7 +353,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"),
+            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
             &admin,
             Some(body),
         )
@@ -363,7 +363,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}/abnehmen"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}/accept"),
         &admin,
         None,
     )
@@ -373,7 +373,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{aid}"),
+        &format!("/api/einsaetze/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -409,7 +409,7 @@ async fn feldfehler_am_vollzug_bleiben_400_auch_wenn_aufgehoben() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/auftraege/{aid}/vollzug"),
+            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
             &admin,
             Some(body),
         )
@@ -436,7 +436,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &admin,
         Some(&meldung),
     )
@@ -450,7 +450,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
         })
         .to_string()
     };
-    let erteilen_pfad = format!("/api/einsaetze/{e}/meldungen/{mid}/auftrag");
+    let erteilen_pfad = format!("/api/einsaetze/{e}/reports/{mid}/task");
 
     let (s, json) = anfrage(
         &app,
@@ -472,7 +472,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (s, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen/{mid}"),
+        &format!("/api/einsaetze/{e}/reports/{mid}"),
         &admin,
         None,
     )
@@ -497,7 +497,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (_, alt) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/auftraege/{erster}"),
+        &format!("/api/einsaetze/{e}/tasks/{erster}"),
         &admin,
         None,
     )

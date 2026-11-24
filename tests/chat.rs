@@ -9,7 +9,7 @@ async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         cookie,
         None,
     )
@@ -31,7 +31,7 @@ async fn senden_und_lesen() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"Funktionsabstimmung S2/S3"}"#),
     )
@@ -42,7 +42,7 @@ async fn senden_und_lesen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -65,7 +65,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+                &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
                 &admin,
                 Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
             )
@@ -78,7 +78,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
     let (_, kanaele) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &leser,
         None,
     )
@@ -89,7 +89,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/gelesen"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/read"),
         &leser,
         None,
     )
@@ -99,7 +99,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
     let (_, nachher) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &leser,
         None,
     )
@@ -110,7 +110,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"Dritte Lage"}"#),
     )
@@ -118,7 +118,7 @@ async fn kanal_ungelesen_und_gelesenmarke_sind_pro_benutzer_persistent() {
     let (_, neu) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &leser,
         None,
     )
@@ -138,7 +138,7 @@ async fn gelesenmarke_lehnt_fremden_kanal_ab() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz_a}/chat/kanaele/{kid_b}/gelesen"),
+            &format!("/api/einsaetze/{einsatz_a}/chat/channels/{kid_b}/read"),
             &admin,
             None,
         )
@@ -162,7 +162,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+            &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
             &erika,
             None
         )
@@ -174,7 +174,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+            &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
             &erika,
             Some(r#"{"inhalt":"darf nicht"}"#)
         )
@@ -197,7 +197,7 @@ async fn fremde_nachricht_nicht_bearbeitbar_auch_nicht_durch_leitung() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &frank,
         Some(r#"{"inhalt":"von frank"}"#),
     )
@@ -207,7 +207,7 @@ async fn fremde_nachricht_nicht_bearbeitbar_auch_nicht_durch_leitung() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
         &admin,
         Some(r#"{"inhalt":"fremd geändert"}"#),
     )
@@ -218,7 +218,7 @@ async fn fremde_nachricht_nicht_bearbeitbar_auch_nicht_durch_leitung() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
         &frank,
         None,
     )
@@ -237,7 +237,7 @@ async fn kanal_eines_anderen_einsatzes_ist_nicht_erreichbar() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz_a}/chat/kanaele/{kid_b}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz_a}/chat/channels/{kid_b}/messages"),
         &admin,
         Some(r#"{"inhalt":"falscher Einsatz"}"#),
     )
@@ -254,7 +254,7 @@ async fn heraufstufen_erzeugt_etb_und_sperrt_doppelt() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"Deich km12 instabil"}"#),
     )
@@ -264,7 +264,7 @@ async fn heraufstufen_erzeugt_etb_und_sperrt_doppelt() {
     let (s, hoch) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &admin,
         Some(r#"{"typ":"meldung"}"#),
     )
@@ -295,7 +295,7 @@ async fn heraufstufen_erzeugt_etb_und_sperrt_doppelt() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &admin,
         Some(r#"{"typ":"meldung"}"#),
     )
@@ -312,7 +312,7 @@ async fn heraufstufen_lehnt_unzulaessige_typen_ab() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"x"}"#),
     )
@@ -323,7 +323,7 @@ async fn heraufstufen_lehnt_unzulaessige_typen_ab() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+            &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
             &admin,
             Some(&format!(r#"{{"typ":"{typ}"}}"#)),
         )
@@ -345,7 +345,7 @@ async fn heraufstufen_zu_auftrag_erzeugt_auftrag_und_markiert_nachricht() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"Tank 5000 anfordern"}"#),
     )
@@ -357,7 +357,7 @@ async fn heraufstufen_zu_auftrag_erzeugt_auftrag_und_markiert_nachricht() {
     let (s, hoch) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-task"),
         &admin,
         Some(body),
     )
@@ -372,7 +372,7 @@ async fn heraufstufen_zu_auftrag_erzeugt_auftrag_und_markiert_nachricht() {
     let (_, auftraege) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         &admin,
         None,
     )
@@ -390,7 +390,7 @@ async fn heraufstufen_zu_auftrag_erzeugt_auftrag_und_markiert_nachricht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-task"),
         &admin,
         Some(body),
     )
@@ -407,7 +407,7 @@ async fn heraufstufen_zu_auftrag_ohne_empfaenger_wird_abgelehnt() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"x"}"#),
     )
@@ -418,7 +418,7 @@ async fn heraufstufen_zu_auftrag_ohne_empfaenger_wird_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-task"),
         &admin,
         Some(r#"{"auftrag_text":"x","empfaenger":[]}"#),
     )
@@ -428,7 +428,7 @@ async fn heraufstufen_zu_auftrag_ohne_empfaenger_wird_abgelehnt() {
     let (_, nachher) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -465,7 +465,7 @@ async fn nachricht_anlegen(
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
     )
@@ -487,7 +487,7 @@ async fn bezug_setzen_anzeigen_und_loesen() {
     let (s, n) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &admin,
         Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#)),
     )
@@ -500,7 +500,7 @@ async fn bezug_setzen_anzeigen_und_loesen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -512,7 +512,7 @@ async fn bezug_setzen_anzeigen_und_loesen() {
     let (s, n) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &admin,
         None,
     )
@@ -536,7 +536,7 @@ async fn bezug_auf_fremden_einsatz_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz_a}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz_a}/chat/messages/{mid}/reference"),
         &admin,
         Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid_b}}}"#)),
     )
@@ -555,7 +555,7 @@ async fn bezug_ungueltiger_typ_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &admin,
         Some(r#"{"typ":"quatsch","ziel_id":1}"#),
     )
@@ -581,7 +581,7 @@ async fn bezug_durch_schreibberechtigten_nicht_nur_autor() {
     let (s, n) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &frank,
         Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#)),
     )
@@ -605,7 +605,7 @@ async fn bezug_durch_beobachter_verboten() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &erika,
         Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#)),
     )
@@ -624,7 +624,7 @@ async fn bezug_an_geloeschter_nachricht_ist_konflikt() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
         &admin,
         None,
     )
@@ -634,7 +634,7 @@ async fn bezug_an_geloeschter_nachricht_ist_konflikt() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/bezug"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
         &admin,
         Some(&format!(r#"{{"typ":"schaden","ziel_id":{sid}}}"#)),
     )
@@ -670,7 +670,7 @@ async fn nachricht(app: &axum::Router, einsatz: i64, cookie: &str, inhalt: &str)
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
     )
@@ -709,7 +709,7 @@ async fn heraufstufen_etb_ohne_etb_freigabe_ist_403() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &frieda,
         Some(r#"{"typ":"meldung"}"#),
     )
@@ -724,7 +724,7 @@ async fn heraufstufen_etb_ohne_etb_freigabe_ist_403() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -748,7 +748,7 @@ async fn heraufstufen_etb_mit_etb_freigabe_gelingt() {
     let (s, hoch) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-etb"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &frieda,
         Some(r#"{"typ":"meldung"}"#),
     )
@@ -771,7 +771,7 @@ async fn heraufstufen_auftrag_ohne_auftrags_freigabe_ist_403() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-task"),
         &frieda,
         Some(AUFTRAG_BODY),
     )
@@ -781,7 +781,7 @@ async fn heraufstufen_auftrag_ohne_auftrags_freigabe_ist_403() {
     let (_, auftraege) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         &admin,
         None,
     )
@@ -795,7 +795,7 @@ async fn heraufstufen_auftrag_ohne_auftrags_freigabe_ist_403() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -819,7 +819,7 @@ async fn heraufstufen_auftrag_verlangt_kein_etb() {
     let (s, hoch) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/nachrichten/{mid}/heraufstufen-auftrag"),
+        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-task"),
         &frieda,
         Some(AUFTRAG_BODY),
     )
@@ -856,13 +856,13 @@ async fn heraufstufen_ohne_freigabe_ist_403_vor_404() {
     nur_fuer_admins(&app, &admin, einsatz, "auftraege").await;
 
     for (pfad, body) in [
-        ("heraufstufen-etb", r#"{"typ":"meldung"}"#),
-        ("heraufstufen-auftrag", AUFTRAG_BODY),
+        ("promote-to-etb", r#"{"typ":"meldung"}"#),
+        ("promote-to-task", AUFTRAG_BODY),
     ] {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/chat/nachrichten/999999/{pfad}"),
+            &format!("/api/einsaetze/{einsatz}/chat/messages/999999/{pfad}"),
             &frieda,
             Some(body),
         )
@@ -879,7 +879,7 @@ async fn seite_ueber_dem_cursor_und_beide_cursor_zugleich() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kid = default_kanal(&app, einsatz, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten");
+    let pfad = format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages");
     let mut ids = Vec::new();
     for i in 1..=5 {
         let body = format!(r#"{{"inhalt":"N{i}"}}"#);

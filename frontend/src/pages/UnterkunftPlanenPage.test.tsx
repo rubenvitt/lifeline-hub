@@ -87,7 +87,7 @@ function stelleBereit(a: Aufbau = {}) {
       stelle = { ...stelle, ...body };
       return HttpResponse.json(stelle);
     }),
-    http.post('/api/einsaetze/1/nachforderungen', async ({ request }) => {
+    http.post('/api/einsaetze/1/resource-requests', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       nachforderungen.push(body);
       return HttpResponse.json({ id: nachforderungen.length, ...body }, { status: 201 });

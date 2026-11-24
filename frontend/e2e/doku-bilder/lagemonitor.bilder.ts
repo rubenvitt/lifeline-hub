@@ -72,7 +72,7 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   await anmelden(page);
   const demo = await demoEinsatz(page);
   if (sofortmeldung) {
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/meldungen`, {
+    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/reports`, {
       absender: 'EA Nord',
       meldeweg: 'funk',
       inhalt: 'Person unter Trümmern, Rettung läuft',

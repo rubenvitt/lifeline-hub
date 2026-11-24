@@ -96,7 +96,7 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'personalPerioden', bloecke: ['kraefte', 'personal-kopf'], modul: 'personal' },
   // GET …/fahrzeuge — `EinsatzLesezugriff<Fahrzeuge>` (src/routes/einsatz_fahrzeug.rs:30).
   { schluessel: 'fahrzeuge', bloecke: nur('kraefte'), modul: 'fahrzeuge' },
-  // GET …/lageberichte — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
+  // GET …/situation-reports — `fordere_lesen` mit `MODUL_KEY = "lageberichte"`
   // (src/routes/lagebericht.rs:20/30, src/routes/vorlagendokument.rs:39).
   { schluessel: 'lageberichte', bloecke: nur('lage'), modul: 'lageberichte' },
   // GET …/persons — `EinsatzLesezugriff<Personen>` (src/routes/einsatz_person.rs, `liste`).
@@ -113,7 +113,7 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'betreuung', bloecke: nur('bilanz'), modul: 'betreuung' },
   // GET …/catering — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
   { schluessel: 'verpflegung', bloecke: nur('bilanz'), modul: 'verpflegung' },
-  // GET …/etb/zaehler — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
+  // GET …/etb/counts — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
   { schluessel: 'etbZaehler', bloecke: nur('etb'), modul: 'etb' },
   // GET …/etb?typ=entscheidung — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:304).
   { schluessel: 'etbEntscheidungen', bloecke: nur('etb'), modul: 'etb' },

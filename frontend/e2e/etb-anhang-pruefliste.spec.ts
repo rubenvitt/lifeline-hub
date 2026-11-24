@@ -35,7 +35,7 @@ async function saeen(page: Page, modus: string): Promise<number> {
   });
   expect(einsatz.ok()).toBeTruthy();
   const { id } = (await einsatz.json()) as { id: number };
-  const upload = await page.request.post(`/api/einsaetze/${id}/etb/anhaenge`, {
+  const upload = await page.request.post(`/api/einsaetze/${id}/etb/attachments`, {
     multipart: { datei: { name: 'IMG_0412.HEIC', mimeType: 'image/heic', buffer: JPG } },
   });
   expect(upload.ok(), `Upload: ${upload.status()}`).toBeTruthy();

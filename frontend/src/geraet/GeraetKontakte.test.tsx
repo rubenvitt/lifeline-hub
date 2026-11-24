@@ -87,8 +87,8 @@ function stelleBereit({
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([EINHEIT])),
-    http.get('/api/einsaetze/7/auftraege', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/meldungen', () => HttpResponse.json(meldungen)),
+    http.get('/api/einsaetze/7/tasks', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/7/reports', () => HttpResponse.json(meldungen)),
     http.get('/api/einsaetze/7/persons', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/7/persons/uhs', () => HttpResponse.json(uhs)),
     http.post('/api/einsaetze/7/persons', async ({ request }) => {
@@ -223,7 +223,7 @@ describe('Einheitengerät — Kontakte', () => {
             einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal', spiegel: SPIEGEL }),
           ),
         ),
-        http.get('/api/einsaetze/7/antraege', () => HttpResponse.json(antraege)),
+        http.get('/api/einsaetze/7/requests', () => HttpResponse.json(antraege)),
         http.post('/api/einsaetze/7/persons', async ({ request }) => {
           const body = (await request.json()) as Record<string, unknown>;
           gesendet.push({ body, ausQueue: false });

@@ -145,7 +145,7 @@ async fn gespeichert(pool: &sqlx::SqlitePool, anhang: i64) -> (Vec<u8>, String) 
 async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> (String, i64) {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/attachments"),
         cookie,
         Some(("foto.jpg", &foto_mit_gps())),
         &[],
@@ -153,7 +153,7 @@ async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> (String, i
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let aid = v[0]["id"].as_i64().unwrap();
-    (format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"), aid)
+    (format!("/api/einsaetze/{einsatz}/attachments/{aid}"), aid)
 }
 
 /// Dokumentenablage; liefert (Pfad, Anhang-id).
@@ -165,7 +165,7 @@ async fn dokument_foto(
 ) -> (String, i64) {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/dokumente"),
+        &format!("/api/einsaetze/{einsatz}/documents"),
         cookie,
         Some(("lage.jpg", &foto_mit_gps())),
         &[("titel", "Lagefoto"), ("kategorie", "lagekarte_plan")],
@@ -179,7 +179,7 @@ async fn dokument_foto(
         .await
         .unwrap();
     (
-        format!("/api/einsaetze/{einsatz}/dokumente/{did}/datei"),
+        format!("/api/einsaetze/{einsatz}/documents/{did}/file"),
         aid,
     )
 }
@@ -194,7 +194,7 @@ struct EtbFoto {
 async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> EtbFoto {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/etb/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/etb/attachments"),
         cookie,
         Some(("Lagefoto Süd.jpg", &foto_mit_gps())),
         &[],
@@ -215,7 +215,7 @@ async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> EtbFoto {
     assert_eq!(s, StatusCode::CREATED, "{e}");
     let eintrag = e["id"].as_i64().unwrap();
     EtbFoto {
-        pfad: format!("/api/einsaetze/{einsatz}/etb/{eintrag}/anhaenge/{aid}"),
+        pfad: format!("/api/einsaetze/{einsatz}/etb/{eintrag}/attachments/{aid}"),
         anhang: aid,
         lfd_nr: e["lfd_nr"].as_i64().unwrap(),
     }
@@ -507,7 +507,7 @@ async fn chat_anhang_an_einer_nachricht_vermerkt_chat() {
     let (_, kanaele) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         &admin,
         None,
     )
@@ -516,7 +516,7 @@ async fn chat_anhang_an_einer_nachricht_vermerkt_chat() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"Foto","anhang_ids":[{aid}]}}"#)),
     )
@@ -632,7 +632,10 @@ async fn fremder_einsatz_und_falsche_bindung_bleiben_404() {
     // Der generische Download eines ETB-Anhangs bleibt gesperrt, auch für das Original.
     let (s, _, _) = laden(
         &app,
-        &original(&format!("/api/einsaetze/{einsatz}/anhaenge/{}", etb.anhang)),
+        &original(&format!(
+            "/api/einsaetze/{einsatz}/attachments/{}",
+            etb.anhang
+        )),
         &admin,
         None,
     )

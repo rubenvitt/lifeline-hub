@@ -131,7 +131,7 @@ describe('Personen-Anhänge-API', () => {
   it('baut den Download-Pfad an der Personenroute, nie an /anhaenge des Einsatzes', () => {
     const p = personAnhangDownloadPfad(7, 3, 42);
     expect(p).toBe('/api/einsaetze/7/persons/3/attachments/42/file');
-    expect(p.startsWith('/api/einsaetze/7/anhaenge')).toBe(false);
+    expect(p.startsWith('/api/einsaetze/7/attachments')).toBe(false);
   });
 });
 
