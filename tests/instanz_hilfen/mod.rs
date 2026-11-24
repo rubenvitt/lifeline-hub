@@ -128,7 +128,7 @@ pub async fn code_vor_ort(aussteller: &Instanz) -> String {
     let (s, v) = common::anfrage_json(
         &aussteller.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &aussteller.admin,
         Some(&json!({"art": "vor_ort"})),
     )
@@ -147,7 +147,7 @@ pub async fn einloesen(
     common::anfrage_json(
         &einloeser.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &einloeser.admin,
         Some(&json!({"adresse": aussteller.adresse, "code": code})),
     )
@@ -190,7 +190,7 @@ pub async fn koppeln(hub: &Instanz, elw: &Instanz) {
     let (s, v) = common::anfrage(
         &hub.app,
         "POST",
-        "/api/admin/instanz/codes",
+        "/api/admin/instance/codes",
         &hub.admin,
         None,
     )
@@ -200,7 +200,7 @@ pub async fn koppeln(hub: &Instanz, elw: &Instanz) {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        "/api/admin/instanz/einloesen",
+        "/api/admin/instance/redeem",
         &elw.admin,
         Some(&json!({"adresse": hub.adresse, "code": code})),
     )
@@ -244,7 +244,7 @@ where
 }
 
 pub async fn kopplung_elw(elw: &Instanz) -> Value {
-    let (s, v) = common::anfrage(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let (s, v) = common::anfrage(&elw.app, "GET", "/api/admin/instance", &elw.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v["kopplungen"][0].clone()
 }
@@ -265,7 +265,7 @@ pub async fn konto(i: &Instanz, name: &str) -> i64 {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &i.admin,
         Some(&json!({"anzeigename": name, "benutzername": name,
                      "passwort": format!("{name}-pw-123"), "org_rolle": "keine"})),

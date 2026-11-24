@@ -175,7 +175,7 @@ test('Tier: ohne Modul Tiere keine Ebene und kein Marker', async ({ page }) => {
   await oeffneEbenenGruppe(page, 'betroffene');
   await expect(page.locator('[data-ebene="tier"]')).toHaveCount(1, { timeout: 30_000 });
 
-  await senden(page, 'put', `${basis}/modul-overrides/tiere`, {
+  await senden(page, 'put', `${basis}/module-overrides/tiere`, {
     sichtbar: false,
     benoetigte_rolle: null,
   });

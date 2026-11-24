@@ -343,7 +343,7 @@ async fn rechte_und_einsatz_wie_beim_aufheben() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )

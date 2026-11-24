@@ -599,7 +599,7 @@ describe('BereitstellungsraeumePage — Liste zeigt die Belegung (LLH-1095 D13)'
       return new HttpResponse(null, { status: 403 });
     });
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );

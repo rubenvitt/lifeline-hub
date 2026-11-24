@@ -84,7 +84,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
       const typ = new URL(request.url).searchParams.get('typ');
       return HttpResponse.json(typ === 'entscheidung' ? etb.eintraege : []);
     }),
-    http.get(`/api/einsaetze/${E}/modul-freigaben`, () => HttpResponse.json(freigabenFixture())),
+    http.get(`/api/einsaetze/${E}/module-access`, () => HttpResponse.json(freigabenFixture())),
   );
   return aufrufe;
 }
@@ -92,7 +92,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
 /** Modulfreigaben, wie der Server sie für den Benutzer ausrechnet (LFH-669). */
 function freigaben(abweichend: Parameters<typeof freigabenFixture>[0]) {
   server.use(
-    http.get(`/api/einsaetze/${E}/modul-freigaben`, () =>
+    http.get(`/api/einsaetze/${E}/module-access`, () =>
       HttpResponse.json(freigabenFixture(abweichend)),
     ),
   );

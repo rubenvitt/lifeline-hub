@@ -70,13 +70,19 @@ async fn ohne_schalter_antworten_die_routen_404() {
         StatusCode::NOT_FOUND
     );
     assert_eq!(
-        anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM)))
-            .await
-            .0,
+        anfrage(
+            &app,
+            "PUT",
+            "/api/web-push/subscription",
+            &admin,
+            Some(&b.abo(FCM))
+        )
+        .await
+        .0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(
-        anfrage(&app, "DELETE", "/api/web-push/abo", &admin, None)
+        anfrage(&app, "DELETE", "/api/web-push/subscription", &admin, None)
             .await
             .0,
         StatusCode::NOT_FOUND
@@ -96,7 +102,14 @@ async fn anmelden_und_abmelden_fuer_diese_sitzung() {
     assert_eq!(schluessel[0], 0x04);
 
     let b = Browser::neu();
-    let (s, v) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM))).await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/subscription",
+        &admin,
+        Some(&b.abo(FCM)),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
     assert_eq!(
         anfrage(&app, "GET", "/api/web-push", &admin, None).await.1["angemeldet"],
@@ -112,7 +125,7 @@ async fn anmelden_und_abmelden_fuer_diese_sitzung() {
 
     for _ in 0..2 {
         assert_eq!(
-            anfrage(&app, "DELETE", "/api/web-push/abo", &admin, None)
+            anfrage(&app, "DELETE", "/api/web-push/subscription", &admin, None)
                 .await
                 .0,
             StatusCode::NO_CONTENT
@@ -145,7 +158,7 @@ async fn wahl_des_inhalts_haengt_am_abo() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &admin,
         Some(&mit.to_string()),
     )
@@ -157,7 +170,14 @@ async fn wahl_des_inhalts_haengt_am_abo() {
         (json!(true), json!(true))
     );
 
-    let (s, _) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM))).await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/subscription",
+        &admin,
+        Some(&b.abo(FCM)),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let stand = anfrage(&app, "GET", "/api/web-push", &admin, None).await.1;
     assert_eq!(
@@ -191,7 +211,7 @@ async fn stumme_arten_haengen_am_abo() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &admin,
         Some(&mit.to_string()),
     )
@@ -202,7 +222,14 @@ async fn stumme_arten_haengen_am_abo() {
     erwartet.sort_by_key(|a| Art::ALLE.iter().position(|x| x.as_str() == *a).unwrap());
     assert_eq!(stand["stumm"], json!(erwartet));
 
-    let (s, _) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM))).await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/subscription",
+        &admin,
+        Some(&b.abo(FCM)),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(
         anfrage(&app, "GET", "/api/web-push", &admin, None).await.1["stumm"],
@@ -214,7 +241,7 @@ async fn stumme_arten_haengen_am_abo() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        "/api/web-push/abo",
+        "/api/web-push/subscription",
         &admin,
         Some(&zu_viel.to_string()),
     )
@@ -240,7 +267,7 @@ async fn fremde_endpunkte_und_kaputte_schluessel_sind_400() {
             .to_string(),
     ];
     for f in faelle {
-        let (s, v) = anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&f)).await;
+        let (s, v) = anfrage(&app, "PUT", "/api/web-push/subscription", &admin, Some(&f)).await;
         assert_eq!(s, StatusCode::BAD_REQUEST, "{f}: {v}");
     }
     let zahl: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM web_push_abo")
@@ -261,15 +288,27 @@ async fn abo_folgt_der_sitzung_und_faellt_beim_abmelden() {
     let b = Browser::neu();
 
     assert_eq!(
-        anfrage(&app, "PUT", "/api/web-push/abo", &admin, Some(&b.abo(FCM)))
-            .await
-            .0,
+        anfrage(
+            &app,
+            "PUT",
+            "/api/web-push/subscription",
+            &admin,
+            Some(&b.abo(FCM))
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
-        anfrage(&app, "PUT", "/api/web-push/abo", &anna, Some(&b.abo(FCM)))
-            .await
-            .0,
+        anfrage(
+            &app,
+            "PUT",
+            "/api/web-push/subscription",
+            &anna,
+            Some(&b.abo(FCM))
+        )
+        .await
+        .0,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
@@ -310,7 +349,7 @@ async fn geraetekonto_bekommt_kein_abo() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -326,7 +365,14 @@ async fn geraetekonto_bekommt_kein_abo() {
         .unwrap()
         .to_string();
     let b = Browser::neu();
-    let (s, _) = anfrage(&app, "PUT", "/api/web-push/abo", &geraet, Some(&b.abo(FCM))).await;
+    let (s, _) = anfrage(
+        &app,
+        "PUT",
+        "/api/web-push/subscription",
+        &geraet,
+        Some(&b.abo(FCM)),
+    )
+    .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
 

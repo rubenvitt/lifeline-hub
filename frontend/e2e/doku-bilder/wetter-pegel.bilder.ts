@@ -194,7 +194,7 @@ async function stelle(page: Page, einsatzId: number, pegelListe = true) {
   await page.route(`**/api/einsaetze/${einsatzId}/wetter`, (route) =>
     route.fulfill({ json: WETTER }),
   );
-  await page.route('**/api/karte/fachebenen/pegelonline*', (route) =>
+  await page.route('**/api/map/overlays/pegelonline*', (route) =>
     route.fulfill({ json: STATIONEN }),
   );
 }

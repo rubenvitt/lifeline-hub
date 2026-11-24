@@ -212,7 +212,7 @@ function mockEndpunkte(d: Daten) {
     http.get('/api/einsaetze/1/vehicles', () => json(d.fahrzeuge, 'fahrzeuge')),
     http.get('/api/einsaetze/1/material', () => json(d.material, 'material')),
     http.get('/api/einsaetze/1/abschnitte', () => json(d.abschnitte, 'abschnitte')),
-    http.get('/api/einsaetze/1/modul-zaehler', () =>
+    http.get('/api/einsaetze/1/module-counts', () =>
       HttpResponse.json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
@@ -240,7 +240,7 @@ function mockEndpunkte(d: Daten) {
     }),
     // Ohne diesen Handler scheiterte die Abfrage in jedem Test, und die href-Aussagen belegten nur
     // den Fehlerpfad.
-    http.get('/api/einsaetze/1/modul-freigaben', async () => {
+    http.get('/api/einsaetze/1/module-access', async () => {
       if (d.freigabenLaedt) await delay('infinite');
       if (d.freigabenGeliefert) d.freigabenGeliefert.n += 1;
       if (d.freigabenStatus) return new HttpResponse(null, { status: d.freigabenStatus });
@@ -1522,7 +1522,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
-      http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {
@@ -1558,7 +1558,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
       // Die Betreuungs-Übersicht ist ein Objekt, keine Liste.
       http.get('/api/einsaetze/2/evakuierung', () => HttpResponse.json({ bezirke: [] })),
       // Vor dem Sammel-Handler: der lieferte sonst `[]` als Freigaben (LFH-669).
-      http.get('/api/einsaetze/2/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/2/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/2/:modul', () => HttpResponse.json([])),
     );
     function Wechsel() {
@@ -2025,7 +2025,7 @@ describe('Deeplinks des Dashboards (LFH-336 · AK3)', () => {
  */
 function renderMitZone() {
   server.use(
-    http.get('/api/einsaetze/1/einstellungen', () =>
+    http.get('/api/einsaetze/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );

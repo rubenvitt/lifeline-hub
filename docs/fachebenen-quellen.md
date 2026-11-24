@@ -1,7 +1,7 @@
 # Fachebenen — externe Datenquellen (Lizenz, Attribution, Aktualisierung)
 
 Die Lagekarte holt externe Lagedaten über den Backend-Aggregator
-`GET /api/karte/fachebenen/{quelle}`. Das Backend ruft die jeweilige Quelle ab,
+`GET /api/map/overlays/{quelle}`. Das Backend ruft die jeweilige Quelle ab,
 normalisiert sie zu einer GeoJSON-`FeatureCollection` und liefert einen einheitlichen
 Umschlag `{ quelle, status, attribution, stand, abgerufen, features }`.
 

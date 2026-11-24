@@ -781,7 +781,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/cancel — Fehldisposition stornieren (LLH-1079,
+/// POST /api/einsaetze/{id}/vehicles/{ef_id}/annul — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur mit unverändertem Status, ohne Bindung und Spur und in den ersten
 /// 15 Minuten, sonst 422 mit dem Grund; ein beendetes Fahrzeug → 409. ETB-Eintrag.
 pub async fn stornieren(

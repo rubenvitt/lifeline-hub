@@ -137,10 +137,10 @@ export async function benachrichtigungenQuittieren(
       data: { benutzername: konto.benutzername, passwort: konto.passwort },
     });
     expect(login.ok(), `Anmelden ${konto.benutzername}: ${login.status()}`).toBe(true);
-    const liste = await person.get('/api/benachrichtigungen?offen=true');
+    const liste = await person.get('/api/notifications?offen=true');
     expect(liste.ok(), `Benachrichtigungen: ${liste.status()}`).toBe(true);
     for (const { id } of (await liste.json()) as { id: number }[]) {
-      const quittiert = await person.post(`/api/benachrichtigungen/${id}/quittieren`);
+      const quittiert = await person.post(`/api/notifications/${id}/acknowledge`);
       expect(quittiert.ok(), `Quittieren ${id}: ${quittiert.status()}`).toBe(true);
     }
     expect((await person.post('/api/auth/logout')).ok()).toBe(true);

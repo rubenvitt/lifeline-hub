@@ -75,7 +75,7 @@ fn berechne() -> Value {
     let post = anfrage(
         &cred,
         "POST",
-        "/api/v1/alarmmeldungen?dry_run=1",
+        "/api/v1/alarm?dry_run=1",
         post_body,
         1_794_423_740,
         "EBESExQVFhcYGRobHB0eHw",
@@ -106,7 +106,7 @@ fn berechne() -> Value {
     let webhooks = webhook_vektoren(&client, &instanz, &instanz_pub);
 
     json!({
-        "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0022, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
+        "beschreibung": "Testvektoren für den Maschinenzugang (ADR-0096, docs/api/maschinenzugang.md). Schlüssel als Base64url ohne Auffüllung; JSON von Kopf und Claims ohne Leerzeichen, Felder in genau dieser Reihenfolge. Erzeugt von crates/lifeline-machine-client (cargo test), geprüft von Server, TypeScript-Modul und Python-Beispiel.",
         "code": CODE,
         "code_normalized": normalize_code(CODE).unwrap(),
         "salt": String::from_utf8(SALT.to_vec()).unwrap(),

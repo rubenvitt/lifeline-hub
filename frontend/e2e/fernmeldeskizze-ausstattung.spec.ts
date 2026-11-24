@@ -58,7 +58,7 @@ async function mitgliedMitFunktion(
   anzeigename: string,
   funktion: string,
 ) {
-  const antwort = await page.request.post('/api/benutzer', {
+  const antwort = await page.request.post('/api/users', {
     data: {
       anzeigename,
       benutzername: `e2e-ausstattung-${Date.now()}-${funktion}`,

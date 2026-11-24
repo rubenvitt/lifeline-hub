@@ -20,10 +20,10 @@ export function verwerfeAntrag(einsatzId: number, antragId: number): Promise<voi
  * den Einsatz nicht mehr. Einsatzübergreifend, bis die Frist abgelaufen ist.
  */
 export function loadAbgelehnteAntraege(): Promise<AbgelehnterAntragAnzeige[]> {
-  return apiGet<AbgelehnterAntragAnzeige[]>('/api/antraege/abgelehnt');
+  return apiGet<AbgelehnterAntragAnzeige[]>('/api/requests/rejected');
 }
 
 /** Verwirft einen davon (204; sonst 404). */
 export function verwerfeAbgelehntenAntrag(antragId: number): Promise<void> {
-  return apiSend<void>(`/api/antraege/abgelehnt/${antragId}`, 'DELETE');
+  return apiSend<void>(`/api/requests/rejected/${antragId}`, 'DELETE');
 }

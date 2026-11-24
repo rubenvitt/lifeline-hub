@@ -741,7 +741,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/personnel/{ep_id}/cancel — Fehldisposition stornieren (LLH-1079,
+/// POST /api/einsaetze/{id}/personnel/{ep_id}/annul — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur ohne Bindung und Spur und in den ersten 15 Minuten, sonst 422 mit dem
 /// Grund; eine beendete Kraft → 409. Streicht die Ereignisse aus der Disposition. ETB-Eintrag.
 pub async fn stornieren(

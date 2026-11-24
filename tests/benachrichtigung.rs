@@ -116,7 +116,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/modul-overrides/{modul}", self.einsatz),
+            &format!("/api/einsaetze/{}/module-overrides/{modul}", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -492,7 +492,7 @@ async fn abgeschaltete_hinweis_art_entfaellt_alarm_nie() {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        "/api/benutzer-einstellungen/benachrichtigungen_aus",
+        "/api/user-settings/benachrichtigungen_aus",
         &anna,
         Some(r#"{"wert":"[\"meldung\",\"auftrag_erteilt\",\"meldung\"]"}"#),
     )
@@ -549,7 +549,7 @@ async fn einstellung_lehnt_alarm_mit_422_und_unbekanntes_mit_400_ab() {
         let (s, v) = anfrage(
             &w.app,
             "PUT",
-            "/api/benutzer-einstellungen/benachrichtigungen_aus",
+            "/api/user-settings/benachrichtigungen_aus",
             &anna,
             Some(&json!({ "wert": wert }).to_string()),
         )
@@ -816,7 +816,7 @@ async fn lesen_liste_und_quittieren() {
         .fetch_one(&w.pool)
         .await
         .unwrap();
-    let pfad = format!("/api/benachrichtigungen/{id}");
+    let pfad = format!("/api/notifications/{id}");
 
     let (s, v) = anfrage(&w.app, "GET", &pfad, &anna, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -835,25 +835,18 @@ async fn lesen_liste_und_quittieren() {
 
     for (methode, uri) in [
         ("GET", pfad.clone()),
-        ("POST", format!("{pfad}/quittieren")),
+        ("POST", format!("{pfad}/acknowledge")),
     ] {
         let (s, _) = anfrage(&w.app, methode, &uri, &bert, None).await;
         assert_eq!(s, StatusCode::NOT_FOUND, "fremd: {methode} {uri}");
     }
-    let (s, _) = anfrage(&w.app, "GET", "/api/benachrichtigungen/999999", &anna, None).await;
+    let (s, _) = anfrage(&w.app, "GET", "/api/notifications/999999", &anna, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
-    let (s, v) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &bert, None).await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications", &bert, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v, json!([]));
 
-    let (s, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &anna,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &anna, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
     assert_eq!(v[0]["id"], id);
@@ -862,7 +855,7 @@ async fn lesen_liste_und_quittieren() {
     let (s, _) = anfrage_mit_offline_queue_benutzer(
         &w.app,
         "POST",
-        &format!("{pfad}/quittieren"),
+        &format!("{pfad}/acknowledge"),
         &anna,
         None,
         w.bert,
@@ -878,14 +871,14 @@ async fn lesen_liste_und_quittieren() {
     let (s, _) = anfrage_mit_offline_queue_benutzer(
         &w.app,
         "POST",
-        &format!("{pfad}/quittieren"),
+        &format!("{pfad}/acknowledge"),
         &anna,
         None,
         w.anna,
     )
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (s, _) = anfrage(&w.app, "POST", &format!("{pfad}/quittieren"), &anna, None).await;
+    let (s, _) = anfrage(&w.app, "POST", &format!("{pfad}/acknowledge"), &anna, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "idempotent");
     let e = ereignisse(&lesen(zweiter_tab).await);
     let quittungen: Vec<Value> = e
@@ -897,19 +890,12 @@ async fn lesen_liste_und_quittieren() {
     assert_eq!(quittungen[0]["quittiert"], true);
     assert_eq!(quittungen[0]["benachrichtigung_id"], id);
 
-    let (_, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &anna,
-        None,
-    )
-    .await;
+    let (_, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &anna, None).await;
     assert_eq!(v, json!([]));
     let (_, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen?einsatz_id={}", w.einsatz),
+        &format!("/api/notifications?einsatz_id={}", w.einsatz),
         &anna,
         None,
     )
@@ -933,14 +919,14 @@ async fn verlorenes_modulrecht_macht_die_benachrichtigung_unlesbar() {
         .fetch_one(&w.pool)
         .await
         .unwrap();
-    let pfad = format!("/api/benachrichtigungen/{id}");
+    let pfad = format!("/api/notifications/{id}");
     let (s, _) = anfrage(&w.app, "GET", &pfad, &anna, None).await;
     assert_eq!(s, StatusCode::OK);
 
     w.modul_nur_fuer_admins("auftraege").await;
     let (s, _) = anfrage(&w.app, "GET", &pfad, &anna, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
-    let (_, v) = anfrage(&w.app, "GET", "/api/benachrichtigungen", &anna, None).await;
+    let (_, v) = anfrage(&w.app, "GET", "/api/notifications", &anna, None).await;
     assert_eq!(v, json!([]));
 }
 
@@ -966,7 +952,7 @@ async fn entferntes_mitglied_liest_nichts_mehr() {
     let (s, _) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/benachrichtigungen/{id}"),
+        &format!("/api/notifications/{id}"),
         &anna,
         None,
     )
@@ -978,10 +964,10 @@ async fn entferntes_mitglied_liest_nichts_mehr() {
 async fn pfad_id_und_filter_sind_validiert() {
     let w = welt().await;
     let anna = w.cookie("annika").await;
-    let (s, v) = anfrage(&w.app, "GET", "/api/benachrichtigungen/abc", &anna, None).await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications/abc", &anna, None).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
     assert!(v["error"].is_string(), "{v}");
-    let (s, _) = anfrage(&w.app, "GET", "/api/benachrichtigungen", "", None).await;
+    let (s, _) = anfrage(&w.app, "GET", "/api/notifications", "", None).await;
     assert_eq!(s, StatusCode::UNAUTHORIZED);
 }
 
@@ -992,7 +978,7 @@ impl Welt {
         anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/benachrichtigungen", self.einsatz),
+            &format!("/api/einsaetze/{}/notifications", self.einsatz),
             cookie,
             None,
         )
@@ -1003,7 +989,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", self.einsatz),
+            &format!("/api/einsaetze/{}/notifications/read", self.einsatz),
             cookie,
             Some(body),
         )
@@ -1032,7 +1018,7 @@ async fn abgeschaltete_art_steht_still_im_verlauf_und_zaehlt_nicht() {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        "/api/benutzer-einstellungen/benachrichtigungen_aus",
+        "/api/user-settings/benachrichtigungen_aus",
         &anna,
         Some(r#"{"wert":"[\"auftrag_erteilt\"]"}"#),
     )
@@ -1062,14 +1048,7 @@ async fn abgeschaltete_art_steht_still_im_verlauf_und_zaehlt_nicht() {
     assert_eq!(eintraege[0]["titel"], "Neuer Auftrag");
     assert!(eintraege[0]["quittiert_at"].is_string());
 
-    let (_, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &anna,
-        None,
-    )
-    .await;
+    let (_, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &anna, None).await;
     assert_eq!(v, json!([]), "still wird nicht nachgereicht");
 
     // Live geht sie hinaus, damit ein offener Verlauf mitläuft — als still.
@@ -1175,7 +1154,7 @@ async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
     let (s, _) = anfrage_mit_offline_queue_benutzer(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/benachrichtigungen/gelesen", w.einsatz),
+        &format!("/api/einsaetze/{}/notifications/read", w.einsatz),
         &anna,
         Some(&json!({ "bis_id": bis }).to_string()),
         w.bert,

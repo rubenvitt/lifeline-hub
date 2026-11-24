@@ -239,7 +239,7 @@ test('Betroffene: eigene Cluster-Quelle, Kräfte bleiben einzeln, ohne Modulzugr
 
   // ── Ohne Zugriff: Modul „Personen" im Einsatz ausgeblendet ──────────────────────────────
   await anmeldenAls(page, ADMIN, PW);
-  await senden(page, 'put', `${basis}/modul-overrides/personen`, {
+  await senden(page, 'put', `${basis}/module-overrides/personen`, {
     sichtbar: false,
     benoetigte_rolle: null,
   });

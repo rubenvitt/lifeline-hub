@@ -18,7 +18,7 @@ const BENUTZER = adminFixture({ anzeigename: 'Erika Einsatzleiterin' });
 function mitOrganisation(name = 'DRK Kreisverband Musterstadt') {
   server.use(
     meHandler(BENUTZER),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name, tz_organisation: null })),
+    http.get('/api/organization', () => HttpResponse.json({ id: 1, name, tz_organisation: null })),
   );
 }
 
@@ -140,7 +140,7 @@ describe('Druckkopf', () => {
       org_defaults: { org_id: 1 },
     });
     server.use(
-      http.get('/api/einsaetze/1/einstellungen', () =>
+      http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
     );
@@ -176,7 +176,7 @@ describe('Druckkopf', () => {
       org_defaults: { org_id: 1 },
     });
     server.use(
-      http.get('/api/einsaetze/1/einstellungen', () =>
+      http.get('/api/einsaetze/1/settings', () =>
         HttpResponse.json({ einsatz_id: 1, zeitzone: 'Asia/Tokyo', org_defaults: { org_id: 1 } }),
       ),
     );
@@ -248,7 +248,7 @@ describe('Druckkopf', () => {
 
   it('zeigt ein hinterlegtes Logo mit dem sha256 als Cache-Brecher', async () => {
     server.use(
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({
           id: 1,
           name: 'DRK Kreisverband Musterstadt',
@@ -268,13 +268,13 @@ describe('Druckkopf', () => {
     await screen.findByText('DRK Kreisverband Musterstadt');
     const bild = kopf().querySelector('img');
     expect(bild).not.toBeNull();
-    expect(bild).toHaveAttribute('src', '/api/organisation/logo?v=f00d');
+    expect(bild).toHaveAttribute('src', '/api/organization/logo?v=f00d');
     expect(bild).toHaveClass('druckkopf__logo');
   });
 
   it('nimmt ein Logo, das nicht lädt, weg — kein leerer Bildrahmen auf dem Blatt', async () => {
     server.use(
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({
           id: 1,
           name: 'DRK Kreisverband Musterstadt',

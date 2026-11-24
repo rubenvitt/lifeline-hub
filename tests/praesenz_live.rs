@@ -47,7 +47,7 @@ async fn override_setzen(app: &axum::Router, admin: &str, eid: i64, modul: &str)
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{eid}/modul-overrides/{modul}"))
+                .uri(format!("/api/einsaetze/{eid}/module-overrides/{modul}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.to_string())
                 .body(Body::from(r#"{"sichtbar":false,"benoetigte_rolle":null}"#))
@@ -169,7 +169,7 @@ async fn ohne_einheiten_kein_einheit_eintrag() {
 // ---------- Schreibwege (Entwurf D4) ----------
 
 fn pfad(eid: i64) -> String {
-    format!("/api/einsaetze/{eid}/praesenz")
+    format!("/api/einsaetze/{eid}/presence")
 }
 
 fn einheit_pfad(eid: i64, einheit: i64) -> String {

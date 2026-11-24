@@ -1,26 +1,51 @@
 # Glossar der API-Routen (ADR-0085): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+access	Zugang
+access-changes	Zugangsänderungen
+access-log	Zugangsprotokoll
 accommodation	Unterkunft
+acknowledge	quittieren
+activate	aktivieren
 adapter	-
 admin	-
+administration	Verwaltung
+agenda-items	Programmpunkte
+alarm	Alarmmeldung
 animals	Tiere
+annul	stornieren
+annul-takeover	Übernahme stornieren
 api	-
 app-code	-
+archive	Archiv
 arrival	Eintreffen
+attachments.zip	Anlagen
+attempts	Versuche
 audit	-
 auth	-
+auto-update	automatische Aktualisierung
 backup	-
 blocks	Blöcke
+breaks	Bruchstellen
 briefings	Lagebesprechungen
+build	bauen
+build-status	Baustatus
+buildable-regions	baubare Regionen
 bulk	-
+calculators	Rechner
 callback	-
-cancel	stornieren
-cancel-takeover	Übernahme stornieren
+cancel	abbrechen
 candidates	Auswahl
 care	Betreuung
 case-file	Einsatzakte
+catalog	Katalog
 catering	Verpflegung
+certificate	Zertifikat
 chat	-
+check	prüfen
+check-in	melden
+client-errors	Client-Fehler
+close	abschließen
+closure	Abschluss
 code	-
 codes	-
 command	Führung
@@ -29,27 +54,37 @@ command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 config	-
+confirm	bestätigen
 correct	berichtigen
+countersign	gegenzeichnen
 crew	Besatzung
 damages	Schäden
+deactivate	deaktivieren
+decline	ablehnen
 defaults	Vorgaben
+demo-data	Demo-Daten
 dev	-
 devices	Geräte
+discard	verwerfen
 discoverable	-
 dispatch	Abruf
 download	-
 emergency-takeover	Notübernahme
+end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
 evacuation	Evakuierung
 events	-
 execution	Vollzug
+existing	vorhandene
 expected	erwartet
 export	-
 extend	verlängern
+external	extern
 fetch-certificate	Zertifikat abrufen
 finish	-
+follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 from-resource-request	aus Nachforderung
@@ -57,6 +92,8 @@ from-template	aus Vorlage
 gauges	Pegel
 generate	erzeugen
 glyphs	-
+grant	Freigabe
+hand-over	übergeben
 handovers	Wechsel
 hazard-areas	Gefahrengebiete
 health	-
@@ -67,15 +104,21 @@ incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
 intake	Einwurf
+intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
+inventory	Bestand
 ios-push	-
 jwks.json	-
+key	Schlüssel
 lan	-
+last-keys	letzte Schlüssel
 limits	Grenzwerte
 live	-
 login	-
+logins	Anmeldungen
 logo	-
 logout	-
+lost	verloren
 map	Karte
 marker	-
 master-data	Stammdaten
@@ -83,18 +126,43 @@ master-data-matches	Stamm-Treffer
 material	Material
 matrix	-
 me	-
+member-selection	Mitglied-Auswahl
 members	Mitglieder
 mirror	Spiegel
+module-access	Modulfreigaben
+module-counts	Modulzähler
+module-defaults	Modulvorgaben
+module-overrides	Modul-Overrides
+notification-defaults	Benachrichtigungsvorgaben
+notifications	Benachrichtigungen
+object	widersprechen
 occupancy	Belegung
+offline	-
+offline-maps	Offline-Karten
 oidc	-
+one-time-password	Einmalpasswort
+online-sources	Online-Quellen
 openapi.json	-
+order	Reihenfolge
 orders	Befehle
+org-accommodation-guidelines	Org-Unterkunft-Richtwerte
+org-archive-keys	Org-Archiv-Schlüssel
+org-command-roles	Org-Führungsfunktionen
+org-module-settings	Org-Modul-Einstellungen
+org-settings	Org-Einstellungen
+organization	Organisation
+origin	Herkunft
+overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
 password	Passwort
+pause	anhalten
 period	Periode
+person-search	Personensuche
 personnel	Personal
 persons	Personen
+place-preview	Ortsvorschau
+place-search	Ortssuche
 plan	-
 plan-template	Planvorlage
 plans	Planungen
@@ -108,27 +176,42 @@ proxy	-
 raster	-
 reactivate	reaktivieren
 read	gelesen
+reclaim	zurückholen
+redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference-values	Richtwerte
 register	-
 registration	-
-reject	abweisen
+reimport	neu importieren
+reject	zurückweisen
+rejected	abgelehnt
 release	entlassen
 release-notes	Versionsstand
 reliefs	Ablösungen
+reopen	wiedereröffnen
 reports	Meldungen
+request	Antrag, anfragen
 requests	Anträge
 reset	-
 resource-request	Nachforderung
 resource-requests	Nachforderungen
+restore	wiederherstellen
+resume	fortsetzen
+resync	erneut abgleichen
 retention	Aufbewahrung
+retention-categories	Aufbewahrungskategorien
+retention-period	Aufbewahrungsfrist
 revoke	widerrufen
 seats	Plätze
+secrets	Geheimnisse
 sectors	Einsatzabschnitte
 sessions	Sitzungen
 set	festlegen
+settings	Einstellungen
 shell	-
 shift-model	Schichtmodell
 shift-plan	Schichtplan
+signing-keys	Unterschriftsschlüssel
 situation	Lage
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
@@ -140,7 +223,9 @@ staff	Stab
 staging-areas	Bereitstellungsräume
 start	-
 status	-
+storage	Datenträger
 style.json	-
+subscription	Abo
 system	-
 take-over	übernehmen
 talk-groups	Sprechgruppen
@@ -151,12 +236,15 @@ tilejson	-
 tiles	-
 timeline	Zeitachse
 totp	-
+transfer	Übernahme
 transport	-
 triage	Sichtung
 uhs	UHS
 undo	zurücknehmen
 units	Einheiten
 unregister	-
+update-now	jetzt aktualisieren
+user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
 vehicles	Fahrzeuge
@@ -166,3 +254,4 @@ webauthn	-
 webhook	-
 whereabouts	Verbleib
 withdraw	Abruf aufheben
+world	Welt

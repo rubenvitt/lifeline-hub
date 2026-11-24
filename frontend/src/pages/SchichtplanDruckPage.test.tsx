@@ -47,7 +47,7 @@ function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClien
     http.get('/api/einsaetze/5', () =>
       HttpResponse.json({ id: 5, bezeichnung: 'Stadtfest', status: 'aktiv' }),
     ),
-    http.get('/api/organisation', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
+    http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
     http.get('/api/einsaetze/5/reliefs/shift-plan', () => HttpResponse.json(PLAN)),
     http.get('/api/einsaetze/5/reliefs/defaults', () => HttpResponse.json([])),
     http.get('/api/einsaetze/5/units', () => HttpResponse.json([])),
@@ -77,7 +77,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern: Listen trotzdem gefragt, ihr Fehler sperrt den Druck', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
       http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
@@ -88,7 +88,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern, UHS-Liste 403: Blatt trotzdem da, Druck frei', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/modul-freigaben', () =>
+      http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
       http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),

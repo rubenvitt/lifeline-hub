@@ -121,7 +121,7 @@ function stammdatenHandler() {
     http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
     http.get('/api/schichtmodelle', () => HttpResponse.json([])),
     http.get('/api/unterkunft-richtwerte', () => HttpResponse.json({ stand: '', werte: [] })),
-    http.get('/api/organisation', () =>
+    http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'Muster', tz_organisation: 'feuerwehr' }),
     ),
   );

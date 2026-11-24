@@ -303,7 +303,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
     http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
     http.get(
-      '/api/einsaetze/1/modul-zaehler',
+      '/api/einsaetze/1/module-counts',
       json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
@@ -1273,7 +1273,7 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: Programmpunkt neutral, führt in die Einsatzdaten (LLH-1570)', async () => {
     stelleBereit(volleDaten);
     server.use(
-      http.get('/api/einsaetze/1/programmpunkte', () =>
+      http.get('/api/einsaetze/1/agenda-items', () =>
         HttpResponse.json([
           { id: 5, bezeichnung: 'Feuerwerk', zeitpunkt_at: nach(15) },
           { id: 6, bezeichnung: 'Einlass', zeitpunkt_at: vor(30) },
@@ -1332,7 +1332,7 @@ describe('UeberblickPage', () => {
       // Vor der Freigaben-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
       let freigabenGeliefert = 0;
       stelleBereit(daten(), [
-        http.get('/api/einsaetze/1/modul-freigaben', () => {
+        http.get('/api/einsaetze/1/module-access', () => {
           freigabenGeliefert += 1;
           return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
@@ -1389,7 +1389,7 @@ describe('UeberblickPage', () => {
           wetterAbrufe += 1;
           return HttpResponse.json(wetter());
         }),
-        http.get('/api/einsaetze/1/modul-freigaben', () => {
+        http.get('/api/einsaetze/1/module-access', () => {
           freigabenGeliefert += 1;
           return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
@@ -1452,7 +1452,7 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
     let abgefragt = 0;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ abloesung: { sichtbar: false } })),
       ),
       http.get('/api/einsaetze/1/reliefs', () => {
@@ -1575,7 +1575,7 @@ describe('UeberblickPage', () => {
       http.get('/api/einsaetze/1/auftraege', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
-      http.get('/api/einsaetze/1/modul-zaehler', () =>
+      http.get('/api/einsaetze/1/module-counts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -1742,7 +1742,7 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const abrufe = { n: 0 };
         stelleBereit(volleDaten, [
-          http.get('/api/einsaetze/1/modul-freigaben', () =>
+          http.get('/api/einsaetze/1/module-access', () =>
             HttpResponse.json(freigabenFixture({ [modul]: { zugriff: false } })),
           ),
         ]);
@@ -1754,7 +1754,7 @@ describe('UeberblickPage', () => {
         expect(reihe2).not.toBeNull();
 
         server.use(
-          http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+          http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
           http.get(`/api/einsaetze/1/${API_SEGMENT[modul] ?? modul}`, async () => {
             abrufe.n += 1;
             await tor;
@@ -1787,7 +1787,7 @@ describe('UeberblickPage', () => {
       const abschnitteTor = new Promise<void>((f) => (abschnitteLos = f));
       const abrufe = { n: 0 };
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/modul-freigaben', async () => {
+        http.get('/api/einsaetze/1/module-access', async () => {
           await freigabenTor;
           return HttpResponse.json(freigabenFixture());
         }),
@@ -1917,7 +1917,7 @@ describe('UeberblickPage', () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((f) => (freigeben = f));
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/modul-zaehler', async () => {
+      http.get('/api/einsaetze/1/module-counts', async () => {
         await tor;
         return HttpResponse.json({
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
@@ -1946,7 +1946,7 @@ describe('UeberblickPage', () => {
 
   it('ein gescheiterter Modulzähler hält den Körper nicht auf', async () => {
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/modul-zaehler', () =>
+      http.get('/api/einsaetze/1/module-counts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2095,7 +2095,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
           aufrufe[pfad] = (aufrufe[pfad] ?? 0) + 1;
         }),
       ),
-      http.get('/api/einsaetze/1/modul-freigaben', async () => {
+      http.get('/api/einsaetze/1/module-access', async () => {
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
         if (freigaben === 'haengt') {
           await delay('infinite');
@@ -2244,7 +2244,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   it('„Erneut abrufen" nach gescheiterten Freigaben fragt sie neu an, nicht die gesperrten Listen', async () => {
     let freigabenAbrufe = 0;
     const aufrufe = mitFreigaben({}, [
-      http.get('/api/einsaetze/1/modul-freigaben', () => {
+      http.get('/api/einsaetze/1/module-access', () => {
         freigabenAbrufe += 1;
         return freigabenAbrufe === 1
           ? new HttpResponse(null, { status: 500 })
@@ -2361,7 +2361,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
 describe('UeberblickPage Sprungziele (LFH-888)', () => {
   function mitFreigaben(freigaben: Record<string, Partial<ModulFreigabe>> | 'haengt') {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/modul-freigaben', async () => {
+      http.get('/api/einsaetze/1/module-access', async () => {
         if (freigaben === 'haengt') await delay('infinite');
         return HttpResponse.json(freigabenFixture(freigaben === 'haengt' ? {} : freigaben));
       }),
@@ -2644,7 +2644,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('ETB gesperrt: der Punkt steht „—“ mit Grund, ohne Sprung und ohne Abfrage', async () => {
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     ]);
@@ -2661,7 +2661,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   it('ETB gesperrt, alles andere erledigt: kein Paneel', async () => {
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     ]);
@@ -2794,7 +2794,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     const auftraegeTor = new Promise<void>((f) => (auftraegeLos = f));
     const abrufe = { lage: 0, auftraege: 0 };
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } })),
       ),
       http.get('/api/einsaetze/1/etb', async ({ request }) => {
@@ -2810,7 +2810,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
 
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
       http.get('/api/einsaetze/1/auftraege', async () => {
         abrufe.auftraege += 1;
         await auftraegeTor;

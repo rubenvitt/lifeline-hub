@@ -12,7 +12,7 @@ use common::maschine::{angebunden_als, jetzt, schluessel, senden, signiert, ANBI
 use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie, setup_mit_pool};
 
 const IP: &str = "198.51.100.9";
-const EINSAETZE: &str = "/api/v1/einsaetze";
+const EINSAETZE: &str = "/api/v1/incidents";
 const EVENTS: &str = "/api/v1/events";
 
 struct Lage {
@@ -49,7 +49,7 @@ async fn freigeben(l: &Lage, einsatz: i64, cred: &Credentials) {
         &l.app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &l.admin,
@@ -75,7 +75,7 @@ async fn abschliessen(l: &Lage, einsatz: i64) {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &l.admin,
         None,
     )
@@ -340,7 +340,7 @@ async fn einsaetze_lesen_macht_freigebbar_ereignisse_abrufen_allein_nicht() {
     let (s, v) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anbindungen"),
+        &format!("/api/einsaetze/{einsatz}/integrations"),
         &l.admin,
         None,
     )
@@ -363,7 +363,7 @@ async fn einsaetze_lesen_macht_freigebbar_ereignisse_abrufen_allein_nicht() {
         &l.app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/anbindungen/{}/freigabe",
+            "/api/einsaetze/{einsatz}/integrations/{}/grant",
             nur_events.zugang_id
         ),
         &l.admin,
@@ -706,7 +706,7 @@ async fn ein_hinzugefuegtes_recht_mit_einsatzbezug_beendet_die_freigabe() {
     .await;
 
     assert_eq!(freigaben(&l).await, 0, "die Freigabe ist beendet");
-    let v = ok(&l.app, &buch, "/api/v1/lage?karte=none").await;
+    let v = ok(&l.app, &buch, "/api/v1/situation?karte=none").await;
     assert_eq!(
         v.get("einsatz"),
         Some(&Value::Null),
@@ -730,7 +730,7 @@ async fn ein_hinzugefuegtes_recht_mit_einsatzbezug_beendet_die_freigabe() {
 
     // Die neue Freigabe meldet sich wie jede.
     freigeben(&l, einsatz, &buch).await;
-    let v = ok(&l.app, &buch, "/api/v1/lage?karte=none").await;
+    let v = ok(&l.app, &buch, "/api/v1/situation?karte=none").await;
     assert_eq!(v["einsatz"]["id"], json!(einsatz));
 }
 

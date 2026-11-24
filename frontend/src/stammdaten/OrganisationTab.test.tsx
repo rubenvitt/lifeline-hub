@@ -25,10 +25,10 @@ describe('OrganisationTab', () => {
     let patched: unknown = null;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         patched = await request.json();
         return HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'hilfsorganisation' });
       }),
@@ -50,10 +50,10 @@ describe('OrganisationTab', () => {
       // Die Sektion hat ein Rechte-Gate: ohne Admin sind Feld und Knopf gesperrt. Der MSW-Default
       // liefert 401 → benutzer=null → kein Admin.
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         patched = await request.json();
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'feuerwehr' });
       }),
@@ -77,10 +77,10 @@ describe('OrganisationTab', () => {
   it('Nicht-Admin: Knopf gesperrt, Grund genannt, kein Speichern', async () => {
     let gerufen = 0;
     server.use(
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () => {
+      http.patch('/api/organization', () => {
         gerufen += 1;
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'feuerwehr' });
       }),
@@ -104,10 +104,10 @@ describe('OrganisationTab', () => {
     let scheitern = true;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         scheitern
           ? HttpResponse.json({ error: 'Organisation gesperrt' }, { status: 422 })
           : HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'feuerwehr' }),
@@ -137,10 +137,10 @@ describe('OrganisationTab', () => {
     const patches: unknown[] = [];
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         patches.push(await request.json());
         return HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'feuerwehr' });
       }),
@@ -169,11 +169,11 @@ describe('OrganisationTab', () => {
     let patched: unknown = null;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () => {
+      http.get('/api/organization', () => {
         abrufe += 1;
         return HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' });
       }),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         patched = await request.json();
         return HttpResponse.json({ id: 1, name, tz_organisation: 'feuerwehr' });
       }),
@@ -200,10 +200,10 @@ describe('OrganisationTab', () => {
     let gerufen = 0;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () => {
+      http.patch('/api/organization', () => {
         gerufen += 1;
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
       }),
@@ -220,10 +220,10 @@ describe('OrganisationTab', () => {
   it('fragt vor dem Verlassen mit ungespeichertem Namen nach, nach dem Speichern nicht mehr', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK Nord', tz_organisation: 'hilfsorganisation' }),
       ),
     );
@@ -259,7 +259,7 @@ describe('OrganisationTab', () => {
   it('hat genau einen Speichern-Knopf (kein „Namen speichern" daneben)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
     );
@@ -293,10 +293,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let patched: unknown = null;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         patched = await request.json();
         return HttpResponse.json({ id: 1, name: 'DRK KV Musterstadt', tz_organisation: null });
       }),
@@ -312,10 +312,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt einen abgelehnten Namen an der Seite, nicht nur im Toast', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         HttpResponse.json({ error: 'Name ist zu lang (höchstens 120 Zeichen)' }, { status: 400 }),
       ),
     );
@@ -331,7 +331,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   });
 
   it('Nicht-Admin: Namensfeld, Speichern und Logo hochladen gesperrt, Grund genannt', async () => {
-    server.use(http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)));
+    server.use(http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)));
     renderTab();
     expect(await screen.findByText(STAMMDATEN_RECHTE_TEXT)).toBeInTheDocument();
     expect(screen.getByLabelText('Name der Organisation')).toBeDisabled();
@@ -347,7 +347,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('erklärt nichts: kein Zweck-Absatz, kein Leer-Satz, keine Formatzeile', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
     );
@@ -361,11 +361,11 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt ein hinterlegtes Logo mit dem sha256 als Cache-Brecher', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
+      http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)),
     );
     renderTab();
     const bild = await screen.findByRole('img', { name: 'Logo von DRK' });
-    expect(bild).toHaveAttribute('src', '/api/organisation/logo?v=abc123');
+    expect(bild).toHaveAttribute('src', '/api/organization/logo?v=abc123');
   });
 
   /**
@@ -375,7 +375,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('nimmt ein Logo, das nicht lädt, weg und sagt es', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
+      http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)),
     );
     renderTab();
     const bild = await screen.findByRole('img', { name: 'Logo von DRK' });
@@ -394,14 +394,14 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     // prüfbar statt nur des Feldnamens.
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
     );
     const echt = globalThis.fetch;
     const hochgeladen: RequestInit[] = [];
     globalThis.fetch = async (eingabe, init) => {
-      if (String(eingabe) !== '/api/organisation/logo') return echt(eingabe, init);
+      if (String(eingabe) !== '/api/organization/logo') return echt(eingabe, init);
       hochgeladen.push(init!);
       return HttpResponse.json(MIT_LOGO);
     };
@@ -432,10 +432,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let hochgeladen = 0;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.post('/api/organisation/logo', () => {
+      http.post('/api/organization/logo', () => {
         hochgeladen += 1;
         return HttpResponse.json(MIT_LOGO);
       }),
@@ -453,8 +453,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let geloescht = 0;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
-      http.delete('/api/organisation/logo', () => {
+      http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)),
+      http.delete('/api/organization/logo', () => {
         geloescht += 1;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -486,8 +486,8 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt den Grund eines gescheiterten Entfernens im Dialog und räumt ihn beim nächsten Öffnen', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () => HttpResponse.json(MIT_LOGO)),
-      http.delete('/api/organisation/logo', () =>
+      http.get('/api/organization', () => HttpResponse.json(MIT_LOGO)),
+      http.delete('/api/organization/logo', () =>
         HttpResponse.json({ error: 'Logo gerade in Verwendung' }, { status: 409 }),
       ),
     );
@@ -513,13 +513,13 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('zeigt jeden Fehler an seinem Ort, auch wenn zwei Speicherwege nacheinander scheitern', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         HttpResponse.json({ error: 'Name abgelehnt' }, { status: 400 }),
       ),
-      http.post('/api/organisation/logo', () =>
+      http.post('/api/organization/logo', () =>
         HttpResponse.json({ error: 'Kein gültiges PNG' }, { status: 422 }),
       ),
     );
@@ -549,10 +549,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
   it('übernimmt nach dem Speichern wieder den Serverstand ins Namensfeld (auch bei gleichem Namen)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
     );
@@ -569,10 +569,10 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let name = 'DRK';
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () => {
+      http.patch('/api/organization', () => {
         // Ein zweiter Admin hat inzwischen umbenannt; der Server hält danach seinen Stand.
         name = 'DRK Kreisverband';
         return HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' });
@@ -591,7 +591,7 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let name = 'DRK';
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name, tz_organisation: 'hilfsorganisation' }),
       ),
     );
@@ -614,11 +614,11 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let gespeichert = false;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', async () => {
+      http.get('/api/organization', async () => {
         if (gespeichert) await new Promise(() => {}); // Refetch hängt
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
       }),
-      http.patch('/api/organisation', () => {
+      http.patch('/api/organization', () => {
         gespeichert = true;
         return HttpResponse.json({ id: 1, name: 'DRK Neu', tz_organisation: 'hilfsorganisation' });
       }),
@@ -643,12 +643,12 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     const patches: unknown[] = [];
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         gespeichert
           ? HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 })
           : HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', async ({ request }) => {
+      http.patch('/api/organization', async ({ request }) => {
         gespeichert = true;
         const body = (await request.json()) as { name: string };
         patches.push(body);
@@ -676,11 +676,11 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     let hochgeladen = false;
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', async () => {
+      http.get('/api/organization', async () => {
         if (hochgeladen) await new Promise(() => {}); // Refetch hängt
         return HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' });
       }),
-      http.post('/api/organisation/logo', () => {
+      http.post('/api/organization/logo', () => {
         hochgeladen = true;
         return HttpResponse.json(MIT_LOGO);
       }),
@@ -697,17 +697,17 @@ describe('OrganisationTab — Name und Logo (LFH-22)', () => {
     await screen.findByText('Logo gespeichert');
     expect(screen.getByRole('img', { name: 'Logo von DRK' })).toHaveAttribute(
       'src',
-      '/api/organisation/logo?v=abc123',
+      '/api/organization/logo?v=abc123',
     );
   });
 
   it('invalidiert die Organisation auch nach dem Umbenennen', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/organisation', () =>
+      http.get('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
-      http.patch('/api/organisation', () =>
+      http.patch('/api/organization', () =>
         HttpResponse.json({ id: 1, name: 'DRK', tz_organisation: 'hilfsorganisation' }),
       ),
     );

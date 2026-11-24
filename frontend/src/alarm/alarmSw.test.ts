@@ -213,7 +213,7 @@ describe('alarm-sw.js: Web Push (LLH-1223)', () => {
     );
     const { push, gezeigt } = ladeMitPush([]);
     await push(EREIGNIS);
-    expect(f).toHaveBeenCalledWith('/api/benachrichtigungen/42', expect.anything());
+    expect(f).toHaveBeenCalledWith('/api/notifications/42', expect.anything());
     expect(gezeigt).toHaveLength(1);
     expect(gezeigt[0]!.titel).toBe('Sofortmeldung');
     expect(gezeigt[0]!.optionen).toMatchObject({
@@ -301,7 +301,7 @@ describe('alarm-sw.js: Web Push (LLH-1223)', () => {
   /** Server mit Text der Benachrichtigung und einer Meldung; `meldung: Error` lässt sie scheitern. */
   function serverMitMeldung(meldung: Record<string, unknown> | Error | 'haengt') {
     const f = vi.fn(async (pfad: string, init?: RequestInit) => {
-      if (pfad.startsWith('/api/benachrichtigungen/')) {
+      if (pfad.startsWith('/api/notifications/')) {
         return new Response(
           JSON.stringify({ titel: 'Sofortmeldung eingegangen', detail: 'Meldung #3', pfad: '/x' }),
         );

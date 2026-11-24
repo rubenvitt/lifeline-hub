@@ -181,7 +181,7 @@ describe('useUnwetterHinweis', () => {
   it('ein gespeichertes „Unwetterwarnung aus“ hält den Alarm nicht auf (Alarme sind nicht abschaltbar)', async () => {
     liefere();
     server.use(
-      http.get('/api/benutzer-einstellungen', () =>
+      http.get('/api/user-settings', () =>
         HttpResponse.json({
           eintraege: { benachrichtigungen_aus: JSON.stringify(['unwetter', 'gefahr']) },
         }),

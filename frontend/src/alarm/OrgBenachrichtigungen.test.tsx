@@ -79,13 +79,13 @@ function serverMit(offen: BenachrichtigungAnzeige[] = []) {
   const abgerufen: number[] = [];
   const quittiert: number[] = [];
   server.use(
-    http.get('/api/benachrichtigungen/:id', ({ params }) => {
+    http.get('/api/notifications/:id', ({ params }) => {
       abgerufen.push(Number(params.id));
       const b = [NEUER_EINSATZ, NEUER_AUFTRAG].find((x) => x.id === Number(params.id));
       return b ? HttpResponse.json(b) : new HttpResponse(null, { status: 404 });
     }),
-    http.get('/api/benachrichtigungen', () => HttpResponse.json(offen)),
-    http.post('/api/benachrichtigungen/:id/quittieren', ({ params }) => {
+    http.get('/api/notifications', () => HttpResponse.json(offen)),
+    http.post('/api/notifications/:id/acknowledge', ({ params }) => {
       quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),

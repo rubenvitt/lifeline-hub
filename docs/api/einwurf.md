@@ -15,8 +15,8 @@ Ein System-Admin legt den Zugang auf der Seite „Anbindungen“ an und wählt d
 zeigt die Adresse mit dem Schlüssel genau einmal:
 
 ```text
-https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung
-https://hub.example/api/v1/einwurf/llh_ew_Q2x…/position
+https://hub.example/api/v1/intake/llh_ew_Q2x…/alarm
+https://hub.example/api/v1/intake/llh_ew_Q2x…/position
 ```
 
 - Der Schlüssel besteht aus `llh_ew_` und 43 Zeichen (32 Zufallsbytes, base64url). Der Server
@@ -40,7 +40,7 @@ Für ein Netz, das selbst verschlüsselt (Tailnet, WireGuard), gibt es den Schal
 `--einwurf-allow-http`. Einzelheiten: [`docs/betrieb-tls.md`](../betrieb-tls.md).
 
 Bei GET stehen Schlüssel und Inhalt in der URL. Wer POST kann, nimmt POST. Der Reverse-Proxy darf
-unter `/api/v1/einwurf/` weder Pfad noch Abfrage protokollieren.
+unter `/api/v1/intake/` weder Pfad noch Abfrage protokollieren.
 
 ## Alarmmeldung
 
@@ -54,10 +54,10 @@ verloren geht.
 
 ```sh
 # BOSWatch: nur GET, Platzhalter in der Abfrage
-curl -i 'https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung?ric=1234567&subric=a&text=B2%20Wohnung'
+curl -i 'https://hub.example/api/v1/intake/llh_ew_Q2x…/alarm?ric=1234567&subric=a&text=B2%20Wohnung'
 
 # POST mit JSON
-curl -i -X POST 'https://hub.example/api/v1/einwurf/llh_ew_Q2x…/alarmmeldung' \
+curl -i -X POST 'https://hub.example/api/v1/intake/llh_ew_Q2x…/alarm' \
   -H 'Content-Type: application/json' \
   -d '{"external_id": "LS-2026-118833", "message_id": "1", "stichwort": "RD 2"}'
 ```
@@ -95,7 +95,7 @@ Abgelegte Alarmmeldungen werden sieben Tage nach dem ersten Empfang gelöscht.
 Das OsmAnd-Protokoll, das auch der Traccar-Client spricht:
 
 ```sh
-curl -i 'https://hub.example/api/v1/einwurf/llh_ew_Q2x…/position?id=elw1&lat=52.1&lon=9.3&timestamp=1794475200'
+curl -i 'https://hub.example/api/v1/intake/llh_ew_Q2x…/position?id=elw1&lat=52.1&lon=9.3&timestamp=1794475200'
 ```
 
 | Feld | Bedeutung |

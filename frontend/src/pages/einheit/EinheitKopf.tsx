@@ -29,6 +29,7 @@ import {
   Stapel,
   Status,
   monoStil,
+  schriftStil,
   useRollen,
 } from '../../components/instrument';
 import { nichtGefundenInhalt } from '../../components/SeitenZustand';
@@ -79,7 +80,7 @@ interface EinheitKopfProps {
   abschnitte: Katalog<Einsatzabschnitt>;
   /** Schreiben + Freigabe Einheiten (`EinheitRechte.canEditEinheit`). */
   canEdit: boolean;
-  /** Organisations-Vorgabe des Zeichens aus `/api/organisation`. */
+  /** Organisations-Vorgabe des Zeichens aus `/api/organization`. */
   orgDefault: string | null;
   onPatch: EinheitPatchHandler;
   onSetHandStatus: HandStatusHandler;
@@ -610,7 +611,7 @@ function StatusZeile({
         {seit}
       </Stapel>
       {s.verteilung && (
-        <span style={{ ...monoStil('meta'), color: rollen.gedaempft }}>{s.verteilung}</span>
+        <span style={{ ...schriftStil('meta'), color: rollen.gedaempft }}>{s.verteilung}</span>
       )}
       {fehler != null && <ZeilenFehler fehler={fehler} fallback="Status nicht gesetzt" />}
     </Stapel>

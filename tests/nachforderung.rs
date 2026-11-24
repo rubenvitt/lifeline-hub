@@ -613,7 +613,7 @@ async fn ruecknahme_ohne_oder_mit_storniertem_posten_geht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/material/{em}/cancel"),
+        &format!("/api/einsaetze/{e}/material/{em}/annul"),
         &admin,
         None,
     )

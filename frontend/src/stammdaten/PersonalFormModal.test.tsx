@@ -40,7 +40,7 @@ function handler(onPost: (body: unknown) => void = () => {}) {
     http.get('/api/qualifikationen', () =>
       HttpResponse.json([{ id: 1, label: 'Sanitäter', aktiv: true }]),
     ),
-    http.get('/api/benutzer', () => HttpResponse.json([])),
+    http.get('/api/users', () => HttpResponse.json([])),
     http.post('/api/personal', async ({ request }) => {
       onPost(await request.json());
       return HttpResponse.json({ ...person, id: 9 });

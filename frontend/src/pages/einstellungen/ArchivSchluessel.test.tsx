@@ -34,8 +34,8 @@ function stelleBereit(liste: unknown[] = [schluessel(1)]) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   let lauf = 0;
   server.use(
-    http.get('/api/org-archiv-schluessel', () => HttpResponse.json(liste)),
-    http.post('/api/org-archiv-schluessel', async ({ request }) => {
+    http.get('/api/org-archive-keys', () => HttpResponse.json(liste)),
+    http.post('/api/org-archive-keys', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'eintragen', body });
       return HttpResponse.json(
@@ -46,7 +46,7 @@ function stelleBereit(liste: unknown[] = [schluessel(1)]) {
         { status: 201 },
       );
     }),
-    http.post('/api/org-archiv-schluessel/:id/pruefen', async ({ request, params }) => {
+    http.post('/api/org-archive-keys/:id/check', async ({ request, params }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: `pruefen ${String(params.id)}`, body });
       lauf += 1;
@@ -55,7 +55,7 @@ function stelleBereit(liste: unknown[] = [schluessel(1)]) {
       }
       return HttpResponse.json(schluessel(Number(params.id), { bezeichnung: 'Tresor KV' }));
     }),
-    http.delete('/api/org-archiv-schluessel/:id', ({ params }) => {
+    http.delete('/api/org-archive-keys/:id', ({ params }) => {
       aufrufe.push({ pfad: `entfernen ${String(params.id)}`, body: null });
       return new HttpResponse(null, { status: 204 });
     }),
@@ -134,7 +134,7 @@ describe('ArchivSchluessel (LLH-1494)', () => {
     let freigeben: () => void = () => {};
     server.use(
       http.delete(
-        '/api/org-archiv-schluessel/:id',
+        '/api/org-archive-keys/:id',
         () =>
           new Promise<Response>((fertig) => {
             freigeben = () => fertig(new HttpResponse(null, { status: 204 }));
@@ -161,7 +161,7 @@ describe('ArchivSchluessel (LLH-1494)', () => {
     vi.mocked(useAuth).mockReturnValue(authWertFixture(benutzerFixture()));
     const abrufe = vi.fn();
     server.use(
-      http.get('/api/org-archiv-schluessel', () => {
+      http.get('/api/org-archive-keys', () => {
         abrufe();
         return HttpResponse.json([]);
       }),

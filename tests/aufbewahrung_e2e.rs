@@ -943,7 +943,7 @@ async fn pruefe_skelett(
     let (s, akte) = anfrage(
         app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{e}"),
+        &format!("/api/retention/incidents/{e}"),
         admin,
         None,
     )
@@ -966,7 +966,7 @@ async fn pruefe_skelett(
     let (s, archiv_etb) = anfrage(
         app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{e}/etb?limit=500"),
+        &format!("/api/retention/incidents/{e}/etb?limit=500"),
         admin,
         None,
     )
@@ -1028,7 +1028,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PUT",
-        "/api/org-einstellungen",
+        "/api/org-settings",
         json!({ "aufbewahrung_kategorien": [
             { "kategorie": "anhaenge", "dauer_tage": 3650, "rechtsgrundlage": "§ 32b Abs. 3 NKatSG" }
         ] }),
@@ -1038,7 +1038,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
         &app,
         &admin,
         "PUT",
-        &format!("{basis}/einstellungen"),
+        &format!("{basis}/settings"),
         json!({ "retention_dauer_tage": 1 }),
     )
     .await;
@@ -1212,14 +1212,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     .await;
 
     // 3. Abschluss → Frist aus der Dauer.
-    ok(
-        &app,
-        &admin,
-        "POST",
-        &format!("{basis}/abschliessen"),
-        json!({}),
-    )
-    .await;
+    ok(&app, &admin, "POST", &format!("{basis}/close"), json!({})).await;
     let frist: String = sqlx::query_scalar("SELECT retention_bis FROM einsatz WHERE id = ?")
         .bind(e)
         .fetch_one(&pool)
@@ -1312,7 +1305,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     let (s, nur_system) = anfrage(
         &app,
         "GET",
-        &format!("/api/aufbewahrung/einsaetze/{e}/etb?typ=system&limit=500"),
+        &format!("/api/retention/incidents/{e}/etb?typ=system&limit=500"),
         &admin,
         None,
     )

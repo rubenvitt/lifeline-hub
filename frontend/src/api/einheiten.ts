@@ -245,12 +245,12 @@ export function listAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> 
  * verlässt nur den Raum, den die Übernahme gebucht hat. Antwort ist die Nachforderung.
  */
 export function storniereUebernahme(einsatzId: number, eid: number): Promise<Nachforderung> {
-  return apiSend<Nachforderung>(`/api/einsaetze/${einsatzId}/units/${eid}/cancel-takeover`, 'POST');
+  return apiSend<Nachforderung>(`/api/einsaetze/${einsatzId}/units/${eid}/annul-takeover`, 'POST');
 }
 
 /** Fehlanlage stornieren (LLH-1079): nur eine Einheit ohne jede Spur, sie wird gelöscht. */
 export function storniereEinheit(einsatzId: number, eid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/cancel`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/annul`, 'POST');
 }
 
 /**

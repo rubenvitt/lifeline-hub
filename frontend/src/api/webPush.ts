@@ -25,10 +25,10 @@ export interface WebPushAboEingabe {
 
 /** Meldet das Abo dieses Browsers für diese Sitzung an; dasselbe Abo hängt der Server um. */
 export function meldeWebPushAn(abo: WebPushAboEingabe): Promise<void> {
-  return apiSend<void>('/api/web-push/abo', 'PUT', abo);
+  return apiSend<void>('/api/web-push/subscription', 'PUT', abo);
 }
 
 /** Meldet das Abo dieser Sitzung ab; idempotent. */
 export function meldeWebPushAb(): Promise<void> {
-  return apiSend<void>('/api/web-push/abo', 'DELETE');
+  return apiSend<void>('/api/web-push/subscription', 'DELETE');
 }

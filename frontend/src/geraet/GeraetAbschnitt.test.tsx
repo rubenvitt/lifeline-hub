@@ -334,7 +334,7 @@ describe('Abschnittsgerät — Startseite und Navigation', () => {
     stelleBereit();
     const freigaben = freigabenFixture();
     server.use(
-      http.get('/api/einsaetze/7/modul-freigaben', () =>
+      http.get('/api/einsaetze/7/module-access', () =>
         HttpResponse.json({
           ...freigaben,
           auftraege: { ...freigaben.auftraege, zugriff: false },

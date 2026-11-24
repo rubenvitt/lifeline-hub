@@ -132,7 +132,7 @@ async fn aufnahme_ausserhalb_eines_einsatzes_erreicht_nur_den_aufgenommenen() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/benachrichtigungen/{id}"),
+        &format!("/api/notifications/{id}"),
         &anna_c,
         None,
     )
@@ -301,7 +301,7 @@ async fn neuer_einsatz_erreicht_fuehrungskraefte_mit_leserecht_nicht_den_anleger
     .fetch_one(&pool)
     .await
     .unwrap();
-    let pfad = format!("/api/benachrichtigungen/{id}");
+    let pfad = format!("/api/notifications/{id}");
     let (s, v) = anfrage(&app, "GET", &pfad, &f_c, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["titel"], "Neuer Einsatz");
@@ -363,7 +363,7 @@ async fn demo_import_meldet_keinen_neuen_einsatz() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/demo-daten/{lage}"),
+            &format!("/api/demo-data/{lage}"),
             &admin,
             None,
         )

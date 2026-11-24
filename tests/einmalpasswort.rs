@@ -91,7 +91,7 @@ async fn einmalpasswort(app: &axum::Router, admin: &str, id: i64) -> Antwort {
     senden(
         app,
         "POST",
-        &format!("/api/benutzer/{id}/einmalpasswort"),
+        &format!("/api/users/{id}/one-time-password"),
         admin,
         None,
     )
@@ -727,7 +727,7 @@ async fn neu_angelegtes_konto_steht_unter_zwang_der_erste_admin_nicht() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin,
         Some(
             &json!({"anzeigename": "Erika", "benutzername": "erika", "passwort": "startpasswort"}),

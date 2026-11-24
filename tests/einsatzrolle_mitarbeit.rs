@@ -186,11 +186,7 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
     for (methode, pfad, body) in [
         ("POST", "units", r#"{"name":"Trupp"}"#),
         ("POST", "abschnitte", r#"{"name":"Nord"}"#),
-        (
-            "PUT",
-            "einstellungen",
-            r#"{"auftrag_quittierung_frist_min":45}"#,
-        ),
+        ("PUT", "settings", r#"{"auftrag_quittierung_frist_min":45}"#),
     ] {
         let (s, v) = anfrage(
             &app,
@@ -310,7 +306,7 @@ async fn mitarbeit_legt_normale_meldung_an() {
     assert_eq!(m["lagerelevant"], serde_json::json!(false));
 
     // Eine Mitarbeit hört nicht auf „Neue Meldung“ (D5).
-    let (s, hinweise) = anfrage(&app, "GET", "/api/benachrichtigungen", &zweite_cookie, None).await;
+    let (s, hinweise) = anfrage(&app, "GET", "/api/notifications", &zweite_cookie, None).await;
     assert_eq!(s, StatusCode::OK);
     assert!(
         hinweise
@@ -816,7 +812,7 @@ async fn etb_anzeige_nennt_meldung_in_der_lage() {
 
 /// Gibt demselben Benutzer (Cookie `cookie`) in einem weiteren Einsatz die Rolle Mitarbeit.
 async fn mitarbeit_anlegen_in(app: &axum::Router, admin: &str, einsatz: i64, _cookie: &str) {
-    let (s, v) = anfrage(app, "GET", "/api/benutzer", admin, None).await;
+    let (s, v) = anfrage(app, "GET", "/api/users", admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v:?}");
     let id = v
         .as_array()
@@ -970,7 +966,7 @@ async fn mitarbeit_erfasst_nicht_wenn_etb_auf_fuehrung_im_einsatz_steht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/etb"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )

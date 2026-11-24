@@ -28,7 +28,7 @@ const { Sider } = Layout;
  * `<Outlet>`. Menü und Routen stammen aus der `adminNav`-Registry; die aktive Sektion folgt der
  * URL. Gate `darfVerwaltung` (sonst Redirect zu /einsaetze). „Benutzer", „Aufbewahrung" und
  * „Zugangsprotokoll" nur für System-Admins, „Demo-Daten“ zusätzlich nur bei 200 von
- * `GET /api/demo-daten`. Über dem Inhalt steht für System-Admins die Warnleiste der
+ * `GET /api/demo-data`. Über dem Inhalt steht für System-Admins die Warnleiste der
  * Datenträgerprüfung (LFH-1100); der Inhalt erscheint erst mit ihrem Befund (LLH-1229).
  */
 /**

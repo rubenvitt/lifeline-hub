@@ -210,10 +210,9 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   Wurzel-`AGENTS.md`, „Bezeichner-Sprache“, und ADR-0085): jedes Segment einer registrierten Route
   steht im Glossar `scripts/api-routen-woerter.tsv`; deutsche Pfade nur aus
   `scripts/api-routen-bestand.txt`, der gegenüber der Merge-Base mit `origin/alpha` nicht wächst
-  (im Bündel `schnell` fehlt der Ref; durchgesetzt in `migrationen.yml`, Schritt „Bestand der
-  deutschen API-Routen“, ohne eigenen Status). Eine Teilübersetzung gilt nicht als neu: Sie
-  ersetzt eine weggefallene Zeile gleicher Form und behält nur deren deutsche Segmente (LLH-2056;
-  die Einsatz-Pakete übersetzen erst nach `{id}`, `einsaetze` zuletzt). Nach einem
+  (nicht mehr Zeilen; eine neue Zeile übersetzt eine weggefallene, LLH-2060; im
+  Bündel `schnell` fehlt der Ref; durchgesetzt in `migrationen.yml`, Schritt „Bestand der
+  deutschen API-Routen“, ohne eigenen Status). Nach einem
   Umbenennungspaket: `scripts/check-api-routen.sh --bestand > scripts/api-routen-bestand.txt`.
 - **Der Dev-Seed läuft mit seinem Feature** (LFH-912, Schritt 15, Bündel `rust`): Schritt 4
   baut ohne Features und sieht `src/dev/`, `/api/dev/users`, `tests/dev_present.rs` und den

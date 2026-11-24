@@ -25,7 +25,7 @@ fn pool_merken(pool: &sqlx::SqlitePool) {
     TEST_POOL.with(|p| *p.borrow_mut() = Some(pool.clone()));
 }
 
-/// Hebt den Änderungszwang eines per `POST /api/benutzer` angelegten Kontos auf (LFH-1121): Die
+/// Hebt den Änderungszwang eines per `POST /api/users` angelegten Kontos auf (LFH-1121): Die
 /// Anlage stellt jedes Konto unter Zwang, sein erster Passwort-Login führte sonst in den Schritt
 /// „Neues Passwort festlegen“. Direkt in der Datenbank statt über den Wechsel per API, damit kein
 /// Test eine zusätzliche Sitzung oder Audit-Zeile sieht (Design D8 in
@@ -231,7 +231,7 @@ pub async fn login_cookie(app: &axum::Router, benutzername: &str, passwort: &str
             .iter()
             .any(|c| c.as_bytes().starts_with(b"passwort_wechsel=")),
         "`{benutzername}` steht unter Änderungszwang (LFH-1121): nach einer Anlage per \
-         POST /api/benutzer erst common::zwang_aufheben rufen"
+         POST /api/users erst common::zwang_aufheben rufen"
     );
     resp.headers()
         .get(header::SET_COOKIE)
@@ -260,7 +260,7 @@ pub async fn benutzer_anlegen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin_cookie.to_string())
                 .body(Body::from(body))
@@ -529,7 +529,7 @@ pub async fn mitglied_mit_funktion(
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         admin_cookie,
         Some(&body.to_string()),
     )

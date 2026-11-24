@@ -29,7 +29,7 @@ const BESTAND: Bereitschaft = {
 function setup(me: BenutzerAnzeige, antwort: Bereitschaft | 'fehler' = BESTAND) {
   server.use(
     meHandler(me),
-    http.get('/api/verwaltung/bereitschaft', () =>
+    http.get('/api/administration/inventory', () =>
       antwort === 'fehler'
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(antwort),

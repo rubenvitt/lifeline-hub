@@ -71,9 +71,19 @@ export function stammdatenZeile(k: InstanzKopplungAnzeige): string | null {
 export function kopplungHinweise(
   k: InstanzKopplungAnzeige,
   datentraegerBestaetigt = true,
+  zeit: (wert: string) => string = (wert) => wert,
 ): string[] {
   const aus: string[] = [];
   const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
+  // LLH-2074: Der Hub meldet, dass das Push-Relais ihn sperrt; diese Instanz pusht Hub-Konten
+  // trotzdem nicht selbst (die Geräte sind am Hub angemeldet). Nach einem Widerruf meldet niemand
+  // mehr, der Wert wäre veraltet.
+  if (aktiv && k.gegenueber_ios_push_gesperrt_seit != null) {
+    aus.push(
+      'iOS-Push an Hub-Konten kommt nicht an: das Push-Relais sperrt den Hub ' +
+        `(seit ${zeit(k.gegenueber_ios_push_gesperrt_seit)})`,
+    );
+  }
   // Über eine Direktkopplung vor Ort gehen nie Geheimnisse (LLH-1497): dort kein Hinweis dazu.
   const geheimnisse = aktiv && k.art === 'standard';
   // Ohne bestätigte Plattenverschlüsselung kommen Konten ohne Passwort an (D6): hier sagen, warum.
@@ -153,6 +163,22 @@ export function iosPushGesperrtText(seit: string): string {
   return (
     `iOS-Push: Das Relais nimmt diesen Server nicht an (gesperrt seit ${seit}). ` +
     'Bitte den Betreiber des Relais informieren.'
+  );
+}
+
+/** Titel des Bands im Einsatz, wenn das Push-Relais einen Hub sperrt, über den die Hinweise des
+ *  Einsatzes reisen (`ios_push_hub_gesperrt`, LLH-2074). */
+export function iosPushHubBandTitel(hubName: string): string {
+  return `iOS-Push über den Hub „${hubName}“ wird nicht zugestellt`;
+}
+
+/** Text dazu: seit wann, was nicht ankommt, was bleibt und was zu tun ist; `seit` ist schon in
+ *  der Anzeigezone formatiert. */
+export function iosPushHubBandText(seit: string): string {
+  return (
+    `Das Push-Relais sperrt den Hub seit ${seit}. Alarme erreichen iPhones von Hub-Konten nicht; ` +
+    'Web Push und die offene App bleiben. Wichtiges auf anderem Weg absichern und den ' +
+    'Betreiber des Hubs informieren.'
   );
 }
 

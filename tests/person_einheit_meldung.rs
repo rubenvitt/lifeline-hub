@@ -346,7 +346,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{streife}/cancel"),
+        &format!("/api/einsaetze/{e}/units/{streife}/annul"),
         &admin,
         None,
     )
@@ -373,7 +373,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{leer}/cancel"),
+        &format!("/api/einsaetze/{e}/units/{leer}/annul"),
         &admin,
         None,
     )
@@ -538,7 +538,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
         app.clone(),
         axum::http::Request::builder()
             .method("POST")
-            .uri("/api/geraete/koppeln")
+            .uri("/api/devices/pair")
             .header(axum::http::header::CONTENT_TYPE, "application/json")
             .body(axum::body::Body::from(json!({ "code": code }).to_string()))
             .unwrap(),

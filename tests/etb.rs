@@ -648,7 +648,7 @@ async fn erfassen_in_abgeschlossenem_einsatz_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -814,7 +814,7 @@ async fn etb_client_id_replay_nach_abschluss_aber_neuer_insert_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/abschliessen"))
+                .uri(format!("/api/einsaetze/{einsatz}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),

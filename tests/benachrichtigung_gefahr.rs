@@ -109,7 +109,7 @@ impl Welt {
         self.schreiben(
             &self.admin,
             "PUT",
-            "/modul-overrides/lagekarte",
+            "/module-overrides/lagekarte",
             json!({ "sichtbar": true, "benoetigte_rolle": "einsatzfuehrung" }),
         )
         .await;
@@ -154,14 +154,7 @@ async fn gefahr_eingetragen_erreicht_die_leser_der_lagekarte() {
 
     // Bert liest den Text: Titel der Spec, Sprung zum Gebiet auf der Lagekarte.
     let bert = w.cookie("bertram").await;
-    let (s, offen) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &bert,
-        None,
-    )
-    .await;
+    let (s, offen) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &bert, None).await;
     assert_eq!(s, StatusCode::OK, "{offen}");
     let liste = offen.as_array().unwrap();
     assert_eq!(liste.len(), 1, "{offen}");

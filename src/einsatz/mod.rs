@@ -27,6 +27,7 @@ pub mod verbindungen;
 pub mod zaehler;
 
 use crate::fuehrung::Sachgebiet;
+use crate::instanz::spiegel::hinweis::IosPushHubSperre;
 use crate::wire_enum::wire_enum;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -203,6 +204,8 @@ pub struct Einsatz {
     /// Spiegel-Angaben (LLH-1492).
     #[sqlx(flatten)]
     pub spiegel: crate::instanz::spiegel::SpiegelSpalten,
+    /// Gesperrte Hubs für iOS-Push (LLH-2074), über `ios_push_hub_gesperrt_spalte!` in `repo`.
+    pub ios_push_hub_gesperrt: sqlx::types::Json<Vec<IosPushHubSperre>>,
 }
 
 impl Einsatz {
@@ -272,6 +275,7 @@ impl Einsatz {
             einsatzleiter: self.einsatzleiter.clone().anzeige(),
             fuehrung: self.fuehrung.anzeige(),
             spiegel: self.spiegel.anzeige(),
+            ios_push_hub_gesperrt: self.ios_push_hub_gesperrt.0.clone(),
             vermerke: Default::default(),
         }
     }
@@ -387,6 +391,13 @@ pub struct EinsatzAnzeige {
     /// nur beantragbare Erfassungen (`frontend/src/einsatz/schreibrecht.ts`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spiegel: Option<crate::instanz::spiegel::EinsatzSpiegelAnzeige>,
+    /// Hubs, über die die Hinweise dieses Einsatzes reisen und deren iOS-Push das Push-Relais
+    /// gerade sperrt (LLH-2074): iPhones von Hub-Konten bekommen nichts, diese Instanz pusht ihnen
+    /// nicht selbst. Die Oberfläche zeigt es Einsatzleitung und Admins der Einsatz-Org. In Liste und
+    /// Detail dieselbe Aussage; fehlt, wenn kein Hub gesperrt ist (und am Spiegel).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[schema(required = false)]
+    pub ios_push_hub_gesperrt: Vec<IosPushHubSperre>,
     /// Wer welche Kopfangabe zuletzt geändert hat, je Wire-Feldname (LLH-1834, Spec
     /// `aenderungsvermerk`). Nur das Detail und die Antwort des Kopf-PATCH füllen es; es fehlt
     /// in der Liste, an Gerätesitzungen und ohne Änderung seit dem Anlegen.
@@ -566,6 +577,7 @@ mod tests {
             einsatzleiter: Default::default(),
             fuehrung: Default::default(),
             spiegel: Default::default(),
+            ios_push_hub_gesperrt: Default::default(),
         };
         assert!(e.ist_aktiv());
         e.status = EinsatzStatus::Abgeschlossen;

@@ -322,7 +322,7 @@ async fn projektion_verlangt_die_freigabe_nachforderungen() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/modul-overrides/nachforderungen"),
+        &format!("/api/einsaetze/{e}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -920,7 +920,7 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/units/{id}/cancel-takeover"),
+            &format!("/api/einsaetze/{e}/units/{id}/annul-takeover"),
             &admin,
             None,
         )

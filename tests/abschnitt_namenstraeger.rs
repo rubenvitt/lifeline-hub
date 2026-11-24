@@ -265,7 +265,7 @@ async fn umbenennen_erreicht_leser_ohne_abschnittsrecht() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/modul-overrides/{modul}"),
+            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
         )

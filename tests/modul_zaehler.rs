@@ -1,4 +1,4 @@
-//! Modulzähler des Navigationsrahmens (LFH-612): `GET /api/einsaetze/{id}/modul-zaehler`.
+//! Modulzähler des Navigationsrahmens (LFH-612): `GET /api/einsaetze/{id}/module-counts`.
 //!
 //! Zwei Zusicherungen tragen:
 //! - **Parität**: „offen", „überfällig", „fällig", „ungelesen" bedeuten dasselbe wie in den
@@ -17,7 +17,7 @@ use common::{
 };
 
 fn uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/modul-zaehler")
+    format!("/api/einsaetze/{einsatz}/module-counts")
 }
 
 async fn zaehler(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -64,7 +64,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (status, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -951,7 +951,7 @@ async fn org_rollensperre_laesst_modul_fehlen() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        "/api/org-modul-einstellungen/personen",
+        "/api/org-module-settings/personen",
         &admin,
         Some(r#"{"benoetigte_rolle":"fuehrungskraft"}"#),
     )
@@ -1022,7 +1022,7 @@ async fn einsatzfuehrung_zaehlt_fuer_die_einsatzleitung() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/personen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
         &lena,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )

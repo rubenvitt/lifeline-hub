@@ -19,7 +19,7 @@ test('Stammdaten vom Hub: Zeile gesperrt mit Grund, Ergänzung vor Ort bearbeitb
   const stempel = Date.now();
   const hubId = await anlegen(`Hub ${stempel}`);
   await anlegen(`Geliehen ${stempel}`);
-  await page.route('**/api/instanz/stammdaten/herkunft', (route) =>
+  await page.route('**/api/instance/master-data/origin', (route) =>
     route.fulfill({
       json: {
         quelle: 'Hub DRK Landesverband',

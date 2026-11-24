@@ -172,16 +172,17 @@ for (const modus of ['light', 'dark']) {
       expect(r.ok(), await r.text()).toBeTruthy();
       faelle.push({ modul: 'material', kennung, rolle });
     }
-    for (const [modul, katalog, feld] of [
-      ['fahrzeuge', 'fahrzeug-status', 'funkrufname'],
-      ['personal', 'personal-status', 'name'],
+    // Modulschlüssel deutsch, Pfadsegment englisch (ADR-0085).
+    for (const [modul, segment, katalog, feld] of [
+      ['fahrzeuge', 'vehicles', 'fahrzeug-status', 'funkrufname'],
+      ['personal', 'personnel', 'personal-status', 'name'],
     ] as const) {
       const neutral = `Messkraft ${modul} neutral`;
-      const neutralId = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: neutral } });
+      const neutralId = await post(page, `${basis}/${segment}`, { adhoc: { [feld]: neutral } });
       // Die API-Typen erlauben einen fehlenden Status, neue Dispositionen erhalten aber einen
       // Default, den PATCH nicht löschen kann. Nur diesen Null-Fall injizieren; alles andere
       // kommt aus der Test-DB.
-      await page.route(`**${basis}/${modul}`, async (route) => {
+      await page.route(`**${basis}/${segment}`, async (route) => {
         const antwort = await route.fetch();
         const zeilen = (await antwort.json()) as { id: number }[];
         await route.fulfill({
@@ -208,8 +209,8 @@ for (const modus of ['light', 'dark']) {
           kategorie: 'verfuegbar',
           farbe,
         });
-        const id = await post(page, `${basis}/${modul}`, { adhoc: { [feld]: kennung } });
-        const r = await page.request.patch(`${basis}/${modul}/${id}`, {
+        const id = await post(page, `${basis}/${segment}`, { adhoc: { [feld]: kennung } });
+        const r = await page.request.patch(`${basis}/${segment}/${id}`, {
           data: { status_id: statusId },
         });
         expect(r.ok(), await r.text()).toBeTruthy();

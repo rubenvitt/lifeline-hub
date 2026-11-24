@@ -49,7 +49,7 @@ impl Jwk {
     }
 }
 
-/// Body von `POST /api/v1/zugang/redeem`. Der Code selbst geht nie über die Leitung.
+/// Body von `POST /api/v1/access/redeem`. Der Code selbst geht nie über die Leitung.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct RedeemRequest {
     /// Aus dem Code abgeleiteter Suchwert (HKDF-SHA256, Salz `lifeline-machine-client/1`,
@@ -111,7 +111,7 @@ fn unauthorized() -> ApiError {
 /// Einen Einmal-Code einlösen und den Schlüssel des Fremdsystems an den Zugang binden.
 #[utoipa::path(
     post,
-    path = "/api/v1/zugang/redeem",
+    path = "/api/v1/access/redeem",
     tag = "Anmeldung",
     operation_id = "redeem_zugang",
     request_body = RedeemRequest,
@@ -293,7 +293,7 @@ pub async fn me(
 /// Bindung kommt mit dem Einlösen.
 #[utoipa::path(
     get,
-    path = "/api/v1/instanz/jwks.json",
+    path = "/api/v1/instance/jwks.json",
     tag = "Anmeldung",
     operation_id = "get_instanz_jwks",
     responses(

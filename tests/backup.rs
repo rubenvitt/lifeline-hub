@@ -177,7 +177,7 @@ async fn backup_als_nicht_admin_ist_403() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/benutzer")
+                .uri("/api/users")
                 .header(header::COOKIE, &admin_cookie)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(

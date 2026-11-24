@@ -56,10 +56,10 @@ function stelleBereit({ zugaenge = [zugang('a')], gesperrt = null, transport = '
     return z;
   };
   server.use(
-    http.get('/api/admin/einwurf-zugaenge', () =>
+    http.get('/api/admin/intake-credentials', () =>
       HttpResponse.json({ zugaenge: stand, gesperrt_grund: gesperrt, transport }),
     ),
-    http.post('/api/admin/einwurf-zugaenge', async ({ request }) => {
+    http.post('/api/admin/intake-credentials', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'anlegen', body });
       return HttpResponse.json(
@@ -70,14 +70,14 @@ function stelleBereit({ zugaenge = [zugang('a')], gesperrt = null, transport = '
         { status: 201 },
       );
     }),
-    http.post('/api/admin/einwurf-zugaenge/a/schluessel', () => {
+    http.post('/api/admin/intake-credentials/a/key', () => {
       aufrufe.push({ pfad: 'wechseln', body: null });
       return HttpResponse.json({
         zugang: merke(zugang('a', { schluessel_gewechselt_at: '2026-11-12 10:00:00' })),
         schluessel: SCHLUESSEL_NEU,
       });
     }),
-    http.post('/api/admin/einwurf-zugaenge/a/widerrufen', () => {
+    http.post('/api/admin/intake-credentials/a/revoke', () => {
       aufrufe.push({ pfad: 'widerrufen', body: null });
       return HttpResponse.json(
         merke(
@@ -165,7 +165,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
         },
       ]),
     );
-    const adresse = `${window.location.origin}/api/v1/einwurf/${SCHLUESSEL}/position`;
+    const adresse = `${window.location.origin}/api/v1/intake/${SCHLUESSEL}/position`;
     const box = (await screen.findByText(adresse)).closest<HTMLElement>(
       '[data-lfh="einwurf-adresse"]',
     )!;
@@ -215,7 +215,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
   it('lässt einen Speicherfehler im Dialog stehen', async () => {
     stelleBereit({ zugaenge: [] });
     server.use(
-      http.post('/api/admin/einwurf-zugaenge', () =>
+      http.post('/api/admin/intake-credentials', () =>
         HttpResponse.json({ error: 'name: höchstens 80 Zeichen' }, { status: 400 }),
       ),
     );
@@ -244,7 +244,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     expect(aufrufe).toEqual([]);
     await user.click(within(dialog).getByRole('button', { name: 'Schlüssel wechseln' }));
     await waitFor(() => expect(aufrufe).toEqual([{ pfad: 'wechseln', body: null }]));
-    const adresse = `${window.location.origin}/api/v1/einwurf/${SCHLUESSEL_NEU}/alarmmeldung`;
+    const adresse = `${window.location.origin}/api/v1/intake/${SCHLUESSEL_NEU}/alarm`;
     expect(await screen.findByText(adresse)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Fertig' }));
     await waitFor(() =>
@@ -275,7 +275,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
   it('lässt einen gescheiterten Widerruf in der Rückfrage stehen', async () => {
     stelleBereit();
     server.use(
-      http.post('/api/admin/einwurf-zugaenge/a/widerrufen', () =>
+      http.post('/api/admin/intake-credentials/a/revoke', () =>
         HttpResponse.json({ error: 'Datenbank beschäftigt' }, { status: 503 }),
       ),
     );
@@ -364,7 +364,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
     let fehlschlag = false;
     stelleBereit();
     server.use(
-      http.get('/api/admin/einwurf-zugaenge', () =>
+      http.get('/api/admin/intake-credentials', () =>
         fehlschlag
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
           : HttpResponse.json({ zugaenge: [zugang('a')], gesperrt_grund: null, transport: 'tls' }),
@@ -417,7 +417,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
       setzeOnline(false);
       let versuche = 0;
       server.use(
-        http.post('/api/admin/einwurf-zugaenge/a/schluessel', () => {
+        http.post('/api/admin/intake-credentials/a/key', () => {
           versuche += 1;
           return HttpResponse.error();
         }),
@@ -445,7 +445,7 @@ describe('Einwurf-Zugänge (LLH-1654)', () => {
 
   it('ohne Liste kein Anlegen, dafür „Erneut abrufen“', async () => {
     server.use(
-      http.get('/api/admin/einwurf-zugaenge', () =>
+      http.get('/api/admin/intake-credentials', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -490,10 +490,10 @@ describe('Einwurf-Zugänge · Wortlaut und Adresse', () => {
 
   it('die Adresse trägt den Unterpfad des Zwecks', () => {
     expect(einwurfAdresse('https://hub.example', SCHLUESSEL, 'alarmmeldungen:write')).toBe(
-      `https://hub.example/api/v1/einwurf/${SCHLUESSEL}/alarmmeldung`,
+      `https://hub.example/api/v1/intake/${SCHLUESSEL}/alarm`,
     );
     expect(einwurfAdresse('https://hub.example', SCHLUESSEL, 'positionen:write')).toBe(
-      `https://hub.example/api/v1/einwurf/${SCHLUESSEL}/position`,
+      `https://hub.example/api/v1/intake/${SCHLUESSEL}/position`,
     );
   });
 });

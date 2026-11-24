@@ -457,7 +457,7 @@ describe('EinheitAusVorlagePage · Absenden', () => {
 
   it('ohne Freigabe des Meldebilds führt der Sprung in die Ansicht der Einheit', async () => {
     zeige(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ kraefteuebersicht: { zugriff: false } })),
       ),
       http.post('/api/einsaetze/1/units/from-template', () =>

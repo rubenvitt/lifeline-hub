@@ -82,24 +82,24 @@ pub struct Stelle {
 pub const ALLE_GERAETE: &[(&str, &str)] = &[
     ("GET", "/api/auth/me"),
     ("POST", "/api/auth/logout"),
-    ("POST", "/api/client-fehler"),
-    ("GET", "/api/organisation"),
-    ("GET", "/api/organisation/logo"),
+    ("POST", "/api/client-errors"),
+    ("GET", "/api/organization"),
+    ("GET", "/api/organization/logo"),
     ("GET", "/api/fahrzeug-status"),
-    ("GET", "/api/karte/config"),
-    ("GET", "/api/karte/offline/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/welt/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}"),
-    ("GET", "/api/karte/offline/fonts/{fontstack}/{datei}"),
-    ("GET", "/api/karte/offline/sprites/{datei}"),
-    ("GET", "/api/karte/proxy/{id}/style.json"),
-    ("GET", "/api/karte/proxy/{id}/raster/{z}/{x}/{y}"),
-    ("GET", "/api/karte/proxy/{id}/tile/{slot}/{z}/{x}/{y}"),
-    ("GET", "/api/karte/proxy/{id}/tilejson/{slot}"),
-    ("GET", "/api/karte/proxy/{id}/sprite/{rest}"),
+    ("GET", "/api/map/config"),
+    ("GET", "/api/map/offline/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/world/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}"),
+    ("GET", "/api/map/offline/fonts/{fontstack}/{datei}"),
+    ("GET", "/api/map/offline/sprites/{datei}"),
+    ("GET", "/api/map/proxy/{id}/style.json"),
+    ("GET", "/api/map/proxy/{id}/raster/{z}/{x}/{y}"),
+    ("GET", "/api/map/proxy/{id}/tile/{slot}/{z}/{x}/{y}"),
+    ("GET", "/api/map/proxy/{id}/tilejson/{slot}"),
+    ("GET", "/api/map/proxy/{id}/sprite/{rest}"),
     (
         "GET",
-        "/api/karte/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
+        "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
     ),
 ];
 
@@ -108,8 +108,8 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
 /// [`Funktionsansicht::lese_module`] zu.
 pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}"),
-    ("GET", "/api/einsaetze/{id}/modul-freigaben"),
-    ("GET", "/api/einsaetze/{id}/modul-zaehler"),
+    ("GET", "/api/einsaetze/{id}/module-access"),
+    ("GET", "/api/einsaetze/{id}/module-counts"),
     ("GET", "/api/einsaetze/{id}/live"),
     // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
     ("GET", "/api/einsaetze/{id}/antraege"),
@@ -677,7 +677,7 @@ mod tests {
     fn nicht_gelistete_route_ist_verboten() {
         for a in Funktionsansicht::ALLE {
             assert!(!darf_route(a, "GET", "/api/einsaetze/{id}/etb"));
-            assert!(!darf_route(a, "GET", "/api/benutzer"));
+            assert!(!darf_route(a, "GET", "/api/users"));
             assert!(!darf_route(a, "PATCH", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/einsaetze/{id}"));
             assert!(darf_route(a, "GET", "/api/auth/me"));
@@ -852,7 +852,7 @@ mod tests {
             ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/units/from-resource-request"),
             // Ebenso der Storno einer Fehlübernahme (LLH-1388 D5).
-            ("POST", "/api/einsaetze/{id}/units/{eid}/cancel-takeover"),
+            ("POST", "/api/einsaetze/{id}/units/{eid}/annul-takeover"),
         ] {
             assert!(!darf_route(b, m, p), "BR-Gerät darf {m} {p} nicht");
         }

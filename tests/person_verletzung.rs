@@ -370,7 +370,7 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschliessen"),
+        &format!("/api/einsaetze/{e}/close"),
         &admin,
         None,
     )
@@ -401,7 +401,7 @@ async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String 
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/geraete/koppeln")
+                .uri("/api/devices/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(json!({ "code": code }).to_string()))
                 .unwrap(),
@@ -624,7 +624,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, v) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/personnel/{}/cancel", kraft["id"]),
+            &format!("/api/einsaetze/{e}/personnel/{}/annul", kraft["id"]),
             json!({}),
         )
         .await;

@@ -731,7 +731,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        "/api/benutzer",
+        "/api/users",
         &admin_cookie,
         Some(&json!({
             "anzeigename": "Beob",

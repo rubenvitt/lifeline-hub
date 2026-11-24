@@ -986,7 +986,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/cancel — Fehldisposition stornieren (LLH-1079,
+/// POST /api/einsaetze/{id}/material/{em_id}/annul — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur ohne Ort (LLH-1224 D13) und in den ersten 15 Minuten, sonst 422 mit dem
 /// Grund; beendetes Material → 409. ETB-Eintrag.
 pub async fn stornieren(

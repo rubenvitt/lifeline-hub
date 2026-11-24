@@ -286,7 +286,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
         &app,
         &admin,
         "POST",
-        &format!("/api/einsaetze/{eid}/abschliessen"),
+        &format!("/api/einsaetze/{eid}/close"),
         json!({}),
     )
     .await;

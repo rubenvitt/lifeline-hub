@@ -70,7 +70,7 @@ function quellen(freigaben = freigabenFixture()) {
   server.use(
     meHandler(kraft),
     json('', () => wert(roh, 'einsatz')),
-    json('/modul-freigaben', () => freigaben),
+    json('/module-access', () => freigaben),
     json('/fuehrungsstelle', () => wert(roh, 'fuehrungsstelle')),
     json('/members', () => wert(roh, 'mitglieder')),
     json('/lagebesprechungen', () => wert(roh, 'lagebesprechungen')),
@@ -198,7 +198,7 @@ describe('EinsatzakteDruckPage', () => {
     rendere();
     await waitFor(() => expect(druckKnopf()).toBeEnabled());
     const zip = screen.getByRole('link', { name: 'Anhänge und Tabellen (ZIP)' });
-    expect(zip).toHaveAttribute('href', `/api/einsaetze/${E}/einsatzakte/anlagen.zip`);
+    expect(zip).toHaveAttribute('href', `/api/einsaetze/${E}/case-file/attachments.zip`);
     expect(zip).toHaveAttribute('download');
   });
 

@@ -39,7 +39,7 @@ async fn abschliessen(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &i.admin,
         None,
     )
@@ -130,7 +130,7 @@ async fn nach_der_nachbereitung_verwahrt_der_hub_und_der_elw_raeumt_ab() {
     let (s, v) = common::anfrage_json(
         &hub.app,
         "PUT",
-        &format!("/api/einsaetze/{h}/nachbereitung"),
+        &format!("/api/einsaetze/{h}/follow-up"),
         &hub.admin,
         Some(&json!({ "nachbereitung_bis": null })),
     )
@@ -372,7 +372,7 @@ async fn fuehrung_am(i: &Instanz, einsatz: i64) -> serde_json::Value {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/fuehrung"),
+        &format!("/api/einsaetze/{einsatz}/command"),
         &i.admin,
         None,
     )
@@ -468,7 +468,7 @@ async fn mit_fuehrung_fuehrt_der_hub_den_verwahrten_einsatz_mit_nachvollziehbare
     let (s, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{h}/fuehrung/uebergeben"),
+        &format!("/api/einsaetze/{h}/command/hand-over"),
         &hub.admin,
         Some(&json!({ "an": elw_kennung })),
     )

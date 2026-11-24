@@ -45,7 +45,7 @@ const FAELLE: Fall[] = [
     render: () => {
       server.use(
         meHandler(admin),
-        http.get('/api/benutzer', () =>
+        http.get('/api/users', () =>
           // Der angemeldete Admin steht mit in der Liste: sonst wäre Eva der letzte aktive Admin,
           // und „Deaktivieren“ stünde gesperrt (LFH-966).
           HttpResponse.json([
@@ -257,7 +257,7 @@ describe('Verwaltungstabellen: Handlungen im Menü (LFH-980)', () => {
     setzeViewportBreite(390);
     const gesendet: string[] = [];
     server.use(
-      http.post('/api/benutzer/:id/deaktivieren', ({ params }) => {
+      http.post('/api/users/:id/deactivate', ({ params }) => {
         gesendet.push(String(params.id));
         return new HttpResponse(null, { status: 204 });
       }),

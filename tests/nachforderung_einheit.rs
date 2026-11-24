@@ -168,7 +168,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/{modul}"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -532,7 +532,7 @@ async fn ruecknahme_gesperrt_solange_einheiten_verknuepft_sind() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{einheit}/cancel"),
+        &format!("/api/einsaetze/{e}/units/{einheit}/annul"),
         &admin,
         None,
     )
@@ -543,7 +543,7 @@ async fn ruecknahme_gesperrt_solange_einheiten_verknuepft_sind() {
 }
 
 fn storno_url(einsatz: i64, einheit: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/units/{einheit}/cancel-takeover")
+    format!("/api/einsaetze/{einsatz}/units/{einheit}/annul-takeover")
 }
 
 async fn storniere(

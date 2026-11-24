@@ -15,7 +15,7 @@ import {
   Stapel,
   Textstufe,
   listenZeileStil,
-  monoStil,
+  schriftStil,
   useRollen,
   type DashboardZustand,
   type ListenAbschnittZustand,
@@ -197,7 +197,9 @@ export default function OffeneVorgaengePaneel({
     alarm ? { ...zeile, boxShadow: `inset 3px 0 0 ${rollen.alarm}` } : zeile;
 
   const zeit = (text: string) => (
-    <span style={{ ...monoStil('meta'), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}>
+    <span
+      style={{ ...schriftStil('meta'), color: rollen.gedaempft, flex: '0 0 auto', minWidth: 48 }}
+    >
       {text}
     </span>
   );
@@ -206,13 +208,13 @@ export default function OffeneVorgaengePaneel({
       <Textstufe stufe="textKlein" ton="text2" umbruch="ueberall">
         {haupt}
       </Textstufe>
-      {unter && <span style={{ ...monoStil('meta'), color: rollen.schwach }}>{unter}</span>}
+      {unter && <span style={{ ...schriftStil('meta'), color: rollen.schwach }}>{unter}</span>}
     </Stapel>
   );
   const wort = (w: string, t: 'alarm' | 'achtung' | null) => (
     <span
       data-lfh="vorgang-wort"
-      style={{ ...monoStil('meta'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
+      style={{ ...schriftStil('meta'), letterSpacing: '0.06em', color: ton(t), flex: '0 0 auto' }}
     >
       {w}
     </span>
@@ -473,7 +475,7 @@ export default function OffeneVorgaengePaneel({
                       alignItems: 'center',
                       gap: token.marginXXS,
                       minHeight: token.controlHeight,
-                      ...monoStil('meta'),
+                      ...schriftStil('meta'),
                       color: rollen.bedienText,
                       textDecoration: 'none',
                     }}

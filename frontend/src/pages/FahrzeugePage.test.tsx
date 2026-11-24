@@ -471,7 +471,7 @@ describe('FahrzeugePage', () => {
   it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
     let gesendet = 0;
     server.use(
-      http.post('/api/einsaetze/7/vehicles/10/cancel', () => {
+      http.post('/api/einsaetze/7/vehicles/10/annul', () => {
         gesendet += 1;
         return HttpResponse.json(
           {
@@ -1193,7 +1193,7 @@ describe('FahrzeugePage', () => {
     it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {
       setzeViewportBreite(390);
       server.use(
-        http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+        http.get('/api/einsaetze/:einsatzId/module-access', () =>
           HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
         ),
       );
@@ -1423,7 +1423,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     server.events.on('request:start', zaehle);
     // Vor `render`: dessen Handler kennen die Freigaben nicht und überdecken sie deshalb nicht.
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -2253,7 +2253,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
 
   it('ohne Freigabe des Moduls Einheiten ungegliedert, mit Grund (LLH-1073, design.md D5)', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -2502,7 +2502,7 @@ describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.
 
   it('fehlt ohne Freigabe des Moduls Einheiten', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -2664,7 +2664,7 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
 
   it('ohne Freigabe Material: kein Block „Beladung“, und die Materialliste wird nicht abgefragt', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ material: { zugriff: false } })),
       ),
     );
@@ -2914,7 +2914,7 @@ describe('FahrzeugePage · Personal gesperrt (LLH-1462)', () => {
     const abrufe: string[] = [];
     render(einsatz(), [person({ fahrzeug_id: 10 })]);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/modul-freigaben', () =>
+      http.get('/api/einsaetze/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
       ),
       http.get('/api/einsaetze/7/personnel', ({ request }) => {

@@ -1059,7 +1059,7 @@ test('Rechte: Schreibrecht im Fernmeldewesen ohne Einheiten — keine Einheit gr
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze ohne Einheiten ${Date.now()}`);
   const n = await seedeGrund(page, einsatzId);
   // Einheiten nur für Admins (Modulsperre per Override, `e2e/AGENTS.md`); das Fernmeldewesen bleibt frei.
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/modul-overrides/einheiten`, {
+  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/module-overrides/einheiten`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();

@@ -31,7 +31,7 @@ vi.mock('../pages/lagekarte/Kartenflaeche', () => ({
 
 beforeEach(() => {
   server.use(
-    http.get('/api/karte/config', () => HttpResponse.json({})),
+    http.get('/api/map/config', () => HttpResponse.json({})),
     http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
   );
 });
@@ -105,10 +105,10 @@ describe('ohneKoordinateText', () => {
 describe('BetroffeneKarte — Zeichenthema (LLH-1486)', () => {
   it('auf einer dunkel markierten Online-Karte rastern die Zeichen dunkel', async () => {
     server.use(
-      http.get('/api/karte/config', () =>
+      http.get('/api/map/config', () =>
         HttpResponse.json({
           online_styles: [
-            { name: 'Dunkel', typ: 'vektor', url: '/api/karte/proxy/1/style.json', dunkel: true },
+            { name: 'Dunkel', typ: 'vektor', url: '/api/map/proxy/1/style.json', dunkel: true },
           ],
         }),
       ),

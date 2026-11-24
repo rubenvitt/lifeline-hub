@@ -224,7 +224,7 @@ async fn s7_traegt_code_ohne_sachgebiet() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        "/api/org-fuehrungsfunktionen/s7",
+        "/api/org-command-roles/s7",
         &admin,
         Some(r#"{"aktiv":true}"#),
     )

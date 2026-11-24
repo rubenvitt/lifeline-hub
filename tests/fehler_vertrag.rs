@@ -171,7 +171,7 @@ async fn falsche_methode_liefert_405_im_fehler_envelope() {
 
 /// Nicht-numerische Route-ID (LFH-317): axums `Path` lieferte hier `text/plain`,
 /// `crate::extract::PfadParam` liefert 400 im `{error}`-Envelope. Genutzt wird die ÖFFENTLICHE
-/// Offline-Kachelroute (`/api/karte/offline/{karte_id}/tiles/{z}/{x}/{y}`) — sie erreicht den
+/// Offline-Kachelroute (`/api/map/offline/{karte_id}/tiles/{z}/{x}/{y}`) — sie erreicht den
 /// Extractor VOR dem Handler-Rumpf, also ohne Session oder DB-Fixture. Der Status bleibt 400
 /// (axum-Default), nur der Body wird JSON.
 #[tokio::test]
@@ -180,7 +180,7 @@ async fn nicht_numerische_route_id_liefert_400_im_fehler_envelope() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/karte/offline/abc/tiles/1/1/1")
+                .uri("/api/map/offline/abc/tiles/1/1/1")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -224,7 +224,7 @@ async fn zu_grosser_login_body_liefert_413_im_fehler_envelope() {
 const OEFFENTLICHE_CODE_ROUTEN: [&str; 4] = [
     "/api/auth/totp/finish",
     "/api/auth/app-code/redeem",
-    "/api/geraete/koppeln",
+    "/api/devices/pair",
     "/api/auth/password/set",
 ];
 
@@ -317,7 +317,7 @@ async fn ablehnung_je_zeile_liefert_422_im_fehler_envelope_mit_zeilen() {
 }
 
 /// Instanzkopplung (LLH-1490): die Ablehnung einer unsignierten oder zu großen Anfrage an
-/// `/api/instanz/melden` und eines falschen Codes an `/api/instanz/koppeln` kommt im Envelope.
+/// `/api/instance/check-in` und eines falschen Codes an `/api/instance/pair` kommt im Envelope.
 #[tokio::test]
 async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
     let app = common::setup().await;
@@ -326,7 +326,7 @@ async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/melden")
+                .uri("/api/instance/check-in")
                 .header(header::AUTHORIZATION, "Instanz kaputt")
                 .body(Body::from("{}"))
                 .unwrap(),
@@ -340,7 +340,7 @@ async fn instanzkopplung_ablehnungen_im_fehler_envelope() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/instanz/koppeln")
+                .uri("/api/instance/pair")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     r#"{"suche":"x","jti":"j","protokoll":1,"kennung":"k","schluessel":"s",

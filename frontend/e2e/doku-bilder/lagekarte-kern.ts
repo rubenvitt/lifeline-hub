@@ -24,11 +24,11 @@ import {
  * Bereitstellungsraum dazu (Koordinaten im Gebiet des Szenarios, `src/demo/szenario.rs`).
  */
 
-const KACHEL_PRAEFIX = '/api/karte/proxy/9/tile/';
+const KACHEL_PRAEFIX = '/api/map/proxy/9/tile/';
 const KACHEL_LAYER = 'strassen';
 export const GRUNDKARTE = {
   name: 'Grundkarte',
-  stil: '/api/karte/proxy/9/a/style.json',
+  stil: '/api/map/proxy/9/a/style.json',
   quelle: 'grund',
 };
 

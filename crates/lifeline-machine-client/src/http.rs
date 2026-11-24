@@ -7,7 +7,7 @@ fn http_fehler(e: impl std::fmt::Display) -> Error {
 }
 
 /// Löst einen Code an `base_url` ein: erzeugt einen neuen Schlüssel, ruft
-/// `POST /api/v1/zugang/redeem` und prüft die Antwort.
+/// `POST /api/v1/access/redeem` und prüft die Antwort.
 pub async fn redeem(
     client: &reqwest::Client,
     base_url: &str,
@@ -15,7 +15,7 @@ pub async fn redeem(
 ) -> Result<Credentials, Error> {
     let key = generate_key();
     let (d, anfrage) = prepare_redeem(code, &key)?;
-    let url = format!("{}/api/v1/zugang/redeem", base_url.trim_end_matches('/'));
+    let url = format!("{}/api/v1/access/redeem", base_url.trim_end_matches('/'));
     let antwort = client
         .post(url)
         .json(&anfrage)
@@ -33,7 +33,7 @@ pub async fn redeem(
 }
 
 /// Ruft `GET <path_and_query>` signiert auf, prüft die Antwortsignatur und liefert den Body.
-/// `path_and_query` ist der signierte Pfad samt Abfrage (`htu`), etwa `/api/v1/lage?karte=none`.
+/// `path_and_query` ist der signierte Pfad samt Abfrage (`htu`), etwa `/api/v1/situation?karte=none`.
 async fn get_signed(
     client: &reqwest::Client,
     cred: &Credentials,
@@ -75,7 +75,7 @@ pub async fn me(
     get_signed(client, cred, "/api/v1/me", now).await
 }
 
-/// Ruft `GET /api/v1/lage` signiert auf (Scope `lage:read`), prüft die Antwortsignatur und
+/// Ruft `GET /api/v1/situation` signiert auf (Scope `lage:read`), prüft die Antwortsignatur und
 /// liefert den Body: das Lagebild des Einsatzes, den die Einsatzleitung für den Zugang
 /// freigegeben hat, oder `einsatz: null`.
 ///
@@ -93,9 +93,9 @@ pub async fn lage(
             if !k.bytes().all(|b| b.is_ascii_alphanumeric()) {
                 return Err(Error::Http(format!("karte: unzulässiger Wert „{k}“")));
             }
-            format!("/api/v1/lage?karte={k}")
+            format!("/api/v1/situation?karte={k}")
         }
-        None => "/api/v1/lage".to_string(),
+        None => "/api/v1/situation".to_string(),
     };
     get_signed(client, cred, &pfad, now).await
 }

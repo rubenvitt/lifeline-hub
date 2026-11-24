@@ -310,7 +310,7 @@ pub async fn detail(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/abschliessen — Einsatz abschließen (read-only).
+/// POST /api/einsaetze/{id}/close — Einsatz abschließen (read-only).
 /// Nur Einsatzleitung, nur wenn der Einsatz aktuell aktiv ist.
 pub async fn abschliessen(
     State(state): State<AppState>,
@@ -333,7 +333,7 @@ pub async fn abschliessen(
     )))
 }
 
-/// GET /api/einsaetze/{id}/abschluss/pruefung — offene Punkte vor dem Abschluss (LLH-1814, Spec
+/// GET /api/einsaetze/{id}/closure/check — offene Punkte vor dem Abschluss (LLH-1814, Spec
 /// `einsatz-abschluss`, „Offene Punkte vor dem Abschluss“). Nur Einsatzleitung eines aktiven
 /// Einsatzes; gezählt wird über den ganzen Einsatz, ohne Filter nach Modulfreigabe. Texte und
 /// Bezeichnungen nur aus Modulen, die die Person lesen darf (design.md D1).
@@ -360,14 +360,14 @@ pub async fn abschluss_pruefung(
     ))
 }
 
-/// Body von `POST …/wiedereroeffnen`: der Grund ist Pflicht.
+/// Body von `POST …/reopen`: der Grund ist Pflicht.
 #[derive(Debug, Deserialize)]
 pub struct Wiedereroeffnen {
     #[serde(default)]
     pub grund: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/wiedereroeffnen — einen abgeschlossenen Einsatz binnen
+/// POST /api/einsaetze/{id}/reopen — einen abgeschlossenen Einsatz binnen
 /// `NACHLAUF_STUNDEN` wieder öffnen (LLH-1814, Spec `einsatz-abschluss`, design.md D4). Gate
 /// `EinsatzWiedereroeffnungszugriff` (Einsatzleitung oder Admin der Einsatz-Org, kein Gerät).
 /// Grund fehlt, leer oder über `etb::INHALT_MAX` → 400; Zustand, Frist, Aufbewahrung → 422;
@@ -417,7 +417,7 @@ pub struct FristSetzen {
     pub bestaetigt: bool,
 }
 
-/// PUT /api/einsaetze/{id}/aufbewahrungsfrist — Aufbewahrungsfrist setzen, ändern
+/// PUT /api/einsaetze/{id}/retention-period — Aufbewahrungsfrist setzen, ändern
 /// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin der Einsatz-Org. Eine Verkürzung
 /// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
 /// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
@@ -530,7 +530,7 @@ where
     Option::<String>::deserialize(d).map(Some)
 }
 
-/// PUT /api/einsaetze/{id}/nachbereitung — Nachbereitungsfrist setzen, ändern oder aufheben
+/// PUT /api/einsaetze/{id}/follow-up — Nachbereitungsfrist setzen, ändern oder aufheben
 /// (LLH-1494, design.md D1). Rechte wie der Frist-PUT: Einsatzleitung oder System-Admin der
 /// Einsatz-Org. Nur an einem abgeschlossenen Einsatz (laufend 422), der weder vorgemerkt noch
 /// geschwärzt noch übergeben ist (409); am Spiegel 409 aus dem Schutz. Fehlt das Feld, 400.
@@ -575,7 +575,7 @@ pub async fn nachbereitung_setzen(
     )))
 }
 
-/// GET /api/einsaetze/{id}/aufbewahrung-kategorien — Aufbewahrung je Datenkategorie (LFH-749,
+/// GET /api/einsaetze/{id}/retention-categories — Aufbewahrung je Datenkategorie (LFH-749,
 /// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
 /// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein
 /// Personenbezug; lesen darf, wer den Einsatz lesen darf, dazu Einsatzleitung und System-Admin
@@ -621,7 +621,7 @@ pub struct KategorieFristSetzen {
     pub rechtsgrundlage: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/aufbewahrungsfrist/{kategorie} — Frist einer Datenkategorie am
+/// PUT /api/einsaetze/{id}/retention-period/{kategorie} — Frist einer Datenkategorie am
 /// abgeschlossenen Einsatz setzen, verlängern oder aufheben, in der Karenz auch die Vormerkung
 /// zurücknehmen (LFH-749, Spec `aufbewahrung-kategorien`). Rechte wie
 /// [`aufbewahrungsfrist_setzen`]: Einsatzleitung oder System-Admin; kein Lesegate (die Antwort
@@ -763,7 +763,7 @@ pub struct EinstellungenUpdate {
     pub retention_dauer_tage: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/einstellungen — Einsatz-Einstellungen (LFH-131).
+/// GET /api/einsaetze/{id}/settings — Einsatz-Einstellungen (LFH-131).
 /// Lesezugriff gemäß DSGVO-Lese-Policy; existiert keine Zeile → Defaults.
 pub async fn einstellungen_laden(
     State(state): State<AppState>,
@@ -803,7 +803,7 @@ async fn freeze_flags(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/einstellungen — Einstellungen setzen (Vollersatz).
+/// PUT /api/einsaetze/{id}/settings — Einstellungen setzen (Vollersatz).
 /// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (Freeze → 409).
 pub async fn einstellungen_setzen(
     State(state): State<AppState>,
@@ -999,10 +999,10 @@ pub async fn einstellungen_setzen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/modul-overrides — alle Modul-Overrides eines Einsatzes
+/// GET /api/einsaetze/{id}/module-overrides — alle Modul-Overrides eines Einsatzes
 /// (LFH-132), als Map `modul_key → Override`. Lesezugriff gemäß DSGVO-Lese-Policy;
 /// existieren keine Overrides, ist die Map leer (= der Einsatz erbt alles). `sichtbar: null` =
-/// kein eigener Wert (LLH-1179); den wirksamen Wert liefert `…/modul-freigaben`.
+/// kein eigener Wert (LLH-1179); den wirksamen Wert liefert `…/module-access`.
 pub async fn modul_overrides_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -1011,8 +1011,8 @@ pub async fn modul_overrides_laden(
     Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
 }
 
-/// GET /api/einsaetze/{id}/modul-vorgaben — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
-/// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-modul-einstellungen`.
+/// GET /api/einsaetze/{id}/module-defaults — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
+/// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-module-settings`.
 /// Damit sieht der Editor „Module“ die Herkunft auch bei einer Einsatzleitung ohne Org-Rolle.
 ///
 /// Gate (design.md D2 der Change `archive/2026-10-13-g145w6op-modul-vorgaben-einsatzleitung`):
@@ -1035,7 +1035,7 @@ pub async fn load_modul_vorgaben(
     ))
 }
 
-/// GET /api/einsaetze/{id}/modul-freigaben — die effektive Freigabe jedes Moduls für den
+/// GET /api/einsaetze/{id}/module-access — die effektive Freigabe jedes Moduls für den
 /// anfragenden Benutzer (LFH-669), als Map `modul_key → { sichtbar, zugriff }`.
 ///
 /// `EinsatzLesezugriff<OhneModul>`: Org-Floor + Lesezugriff, **kein** Modul-Gate. `zugriff`
@@ -1067,7 +1067,7 @@ pub struct ModulOverrideUpdate {
     pub benoetigte_rolle: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/modul-overrides/{modul_key} — Sichtbarkeit + benötigte
+/// PUT /api/einsaetze/{id}/module-overrides/{modul_key} — Sichtbarkeit + benötigte
 /// Rolle eines Moduls überschreiben (LFH-132); `sichtbar: null` = erbt (LLH-1179). Gate: Einsatzleitung ODER System-Admin der
 /// Einsatz-Org (fremde Org → 403, LFH-995), plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
 /// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
@@ -1153,7 +1153,7 @@ pub async fn mitglied_auswahl(
     ))
 }
 
-/// GET /api/einsaetze/mitglied-auswahl — die Personen, die sich beim Anlegen gleich aufnehmen
+/// GET /api/einsaetze/member-selection — die Personen, die sich beim Anlegen gleich aufnehmen
 /// lassen (LLH-1820): aktive Personen der eigenen Org ohne die anfragende Person, nur Kennung und
 /// Anzeigename. Dieselbe Tür wie [`anlegen`] (`darf_einsatz_anlegen`).
 pub async fn mitglied_auswahl_anlage(

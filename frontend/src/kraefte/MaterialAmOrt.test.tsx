@@ -57,7 +57,7 @@ const ANGEBOT = [
 
 function grundHandler() {
   server.use(
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigabenFixture())),
+    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
     http.get('/api/einsaetze/1/units', () =>
       HttpResponse.json([{ id: 2, name: 'Staffel A', ueber_einheit_id: null }]),
     ),

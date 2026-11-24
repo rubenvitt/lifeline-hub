@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Was ein Anmeldeprofil nach ADR-0034 festlegt: `typ` von Anfrage und Antwort, das Schema im
 /// Kopf `Authorization` und den Kopf der Antwortsignatur. Instanzen und Fremdsysteme
-/// (Maschinenzugang, ADR-0022) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
+/// (Maschinenzugang, ADR-0096) teilen Signatur und Prüfung und unterscheiden sich nur hierin; ein
 /// Token des einen Profils scheitert am anderen schon am `typ`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Profil {
@@ -30,7 +30,7 @@ pub const INSTANZ: Profil = Profil {
     antwort_kopf: "lifeline-instanz-antwort",
 };
 
-/// Fremdsysteme an der öffentlichen API (`/api/v1/`, ADR-0022). Wire-Namen sind Technik und
+/// Fremdsysteme an der öffentlichen API (`/api/v1/`, ADR-0096). Wire-Namen sind Technik und
 /// deshalb englisch (Konzept D9).
 pub const MACHINE: Profil = Profil {
     typ_anfrage: "lifeline-machine+jwt",
@@ -552,7 +552,7 @@ mod tests {
         AnfrageDraft {
             ziel_kennung: "hub",
             methode: "post",
-            pfad: "/api/instanz/melden",
+            pfad: "/api/instance/check-in",
             body,
         }
     }
@@ -563,7 +563,7 @@ mod tests {
             "elw",
             "hub",
             "POST",
-            "/api/instanz/melden",
+            "/api/instance/check-in",
             body,
             jetzt,
         )
@@ -679,7 +679,7 @@ mod tests {
                 "elw",
                 "hub",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -693,7 +693,7 @@ mod tests {
                 "elw",
                 "hub2",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -706,7 +706,7 @@ mod tests {
                 "elw",
                 "hub",
                 "PUT",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),
@@ -719,7 +719,7 @@ mod tests {
                 "elw",
                 "hub",
                 "POST",
-                "/api/instanz/widerruf",
+                "/api/instance/revocation",
                 b"{}",
                 JETZT
             ),
@@ -769,7 +769,7 @@ mod tests {
             exp: JETZT + 61,
             jti: "x".into(),
             htm: "POST".into(),
-            htu: "/api/instanz/melden".into(),
+            htu: "/api/instance/check-in".into(),
             bh: sha256_b64(b"{}"),
             pv: 1,
         };
@@ -951,7 +951,7 @@ mod tests {
             &zugang(),
             "hub",
             "POST",
-            "/api/instanz/melden",
+            "/api/instance/check-in",
             b"{}",
             JETZT,
         );
@@ -962,7 +962,7 @@ mod tests {
                 "zugang-1",
                 "hub",
                 "POST",
-                "/api/instanz/melden",
+                "/api/instance/check-in",
                 b"{}",
                 JETZT
             ),

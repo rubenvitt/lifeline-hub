@@ -207,14 +207,7 @@ async fn gestrichene_alarmierung_der_abloesenden_einheit_meldet_einen_hinweis() 
     assert_eq!(w.anzahl().await, 3 + 3, "alarmiert und gestrichen, je drei");
 
     let bert = login_cookie(&w.app, "bertram", "bertrampw1").await;
-    let (s, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &bert,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &bert, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let eintrag = v
         .as_array()
@@ -322,14 +315,7 @@ async fn gestrichene_entlassung_der_abloesenden_einheit_meldet_wiederhergestellt
     assert!(v["planung_entfallen"].is_null(), "{v}");
 
     let bert = login_cookie(&w.app, "bertram", "bertrampw1").await;
-    let (s, v) = anfrage(
-        &w.app,
-        "GET",
-        "/api/benachrichtigungen?offen=true",
-        &bert,
-        None,
-    )
-    .await;
+    let (s, v) = anfrage(&w.app, "GET", "/api/notifications?offen=true", &bert, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let eintrag = v
         .as_array()

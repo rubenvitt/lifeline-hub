@@ -10,7 +10,7 @@
 //! im Backup enthalten und über die API auswertbar — der Unterschied zwischen einer
 //! Debugging-Hilfe und einem Zugriffsnachweis. Zusätzlich geht jedes Ereignis in den
 //! `tracing`-Log, wo es im Request-Span (Methode, Pfad, Request-ID) landet. Gelesen wird die
-//! Spur über `GET /api/zugangsprotokoll/anmeldungen` (System-Admin, LFH-1097, [`liste`]).
+//! Spur über `GET /api/access-log/logins` (System-Admin, LFH-1097, [`liste`]).
 //!
 //! **Personenbezug:** Benutzername und IP sind personenbezogene Daten. Anders als die
 //! Einsatzdaten hängen sie an keiner Einsatz-Aufbewahrungsfrist, brauchen also eine

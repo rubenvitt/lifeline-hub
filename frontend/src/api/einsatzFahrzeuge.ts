@@ -130,7 +130,7 @@ export function nimmEntlassungZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Spur in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, efId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/cancel`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/vehicles/${efId}/annul`, 'POST');
 }
 
 /** Ein entlassenes oder storniertes Fahrzeug erneut disponieren (Block „Entlassen“): neuer Anfangsstatus, keine Bindung. */

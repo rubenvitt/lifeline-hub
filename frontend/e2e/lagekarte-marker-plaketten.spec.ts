@@ -105,13 +105,13 @@ test('Marker tragen ihre Namensplakette erst ab Zoom 12, offline in Mono', async
   // von außen wischt die Marker-Layer, stößt ihre Re-Anlage aber nicht an — das tut eine leicht
   // verschobene Position, die über den Live-Strom zurückkommt.
   const glyphen = page.waitForResponse((r) =>
-    decodeURIComponent(r.url()).includes('/api/karte/offline/fonts/JetBrains Mono Regular/'),
+    decodeURIComponent(r.url()).includes('/api/map/offline/fonts/JetBrains Mono Regular/'),
   );
   await page.evaluate(() => {
     (window as unknown as { __lfhKarte: MapHaken }).__lfhKarte.setStyle(
       {
         version: 8,
-        glyphs: '/api/karte/offline/fonts/{fontstack}/{range}.pbf',
+        glyphs: '/api/map/offline/fonts/{fontstack}/{range}.pbf',
         sources: {},
         layers: [{ id: 'hintergrund', type: 'background', paint: { 'background-color': '#111' } }],
       },

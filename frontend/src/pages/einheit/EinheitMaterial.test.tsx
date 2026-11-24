@@ -79,7 +79,7 @@ function zeige({
   material?: Einheit;
 } = {}) {
   server.use(
-    http.get('/api/einsaetze/1/modul-freigaben', () => HttpResponse.json(freigaben)),
+    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
     http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),

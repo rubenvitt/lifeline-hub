@@ -59,7 +59,7 @@ test.describe(KAPITEL, () => {
     const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/einsaetze', {
       bezeichnung: 'Ölspur B 27',
     });
-    await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/abschliessen`);
+    await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/close`);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${einsatz.id}/einsatzdaten`);
     const abschluss = page.getByRole('region', { name: 'Einsatzabschluss' });

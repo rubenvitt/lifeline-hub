@@ -152,7 +152,7 @@ describe('SchaedenDetailPage — Stammdaten', () => {
 
   it('gesperrte Lagekarte: „Auf Karte verorten" steht gesperrt mit Grund (LFH-888)', async () => {
     render(einsatzAktiv, basisSchaden({ lat: null, lon: null }), [
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     ]);
@@ -1216,10 +1216,10 @@ describe('SchaedenDetailPage — Schadensort über die Ortssuche (LLH-1121)', ()
   function mitPatch(schaden: Record<string, unknown>) {
     const koerper: Array<Record<string, unknown>> = [];
     render(einsatzAktiv, schaden, [
-      http.get('/api/einsaetze/1/ort-vorschau', () =>
+      http.get('/api/einsaetze/1/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
-      http.get('/api/einsaetze/1/ort-suche', () =>
+      http.get('/api/einsaetze/1/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [

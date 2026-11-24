@@ -141,7 +141,7 @@ function setup(route: string) {
     http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),
-    http.get('/api/benutzer-einstellungen', () =>
+    http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },
       }),

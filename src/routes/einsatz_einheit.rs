@@ -344,7 +344,7 @@ pub async fn aus_nachforderung(
     Ok((StatusCode::CREATED, Json(n)))
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/cancel-takeover — eine Fehlübernahme aus einer
+/// POST /api/einsaetze/{id}/units/{eid}/annul-takeover — eine Fehlübernahme aus einer
 /// Nachforderung rückgängig machen (LLH-1388, design.md D1–D5, Spec `nachforderung-einheit`): den
 /// Verweis lösen, eine angelegte Einheit auflösen (samt Austritt aus dem Raum), eine verknüpfte
 /// aus dem gebuchten Raum austreten lassen, ein ETB-Eintrag. Reihenfolge: Gate Einheiten → 403
@@ -1090,7 +1090,7 @@ pub async fn aufloesen(
     end_einheit(&state, &ctx, eid, einheit_repo::Aufloesung::Aufloesen).await
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/cancel — Fehlanlage löschen (LLH-1079,
+/// POST /api/einsaetze/{id}/units/{eid}/annul — Fehlanlage löschen (LLH-1079,
 /// design.md D3): nur ohne jede Spur, sonst 422 mit dem Grund; aufgelöst → 409. ETB-Eintrag.
 pub async fn stornieren(
     State(state): State<AppState>,

@@ -62,10 +62,10 @@ beforeEach(() => {
     http.get('/api/einsaetze/1', () =>
       HttpResponse.json({ id: 1, einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/1/ort-vorschau', () =>
+    http.get('/api/einsaetze/1/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/1/ort-suche', () =>
+    http.get('/api/einsaetze/1/place-search', () =>
       HttpResponse.json({
         zustand: 'ok',
         treffer: [

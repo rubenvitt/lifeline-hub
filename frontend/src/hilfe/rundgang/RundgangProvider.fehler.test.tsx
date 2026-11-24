@@ -25,8 +25,8 @@ vi.mock('../../components/useViewport', () => ({
 
 beforeEach(() => {
   server.use(
-    http.get('/api/benutzer-einstellungen', () => HttpResponse.json({ eintraege: {} })),
-    http.put('/api/benutzer-einstellungen/:s', () => HttpResponse.json({ eintraege: {} })),
+    http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
+    http.put('/api/user-settings/:s', () => HttpResponse.json({ eintraege: {} })),
   );
   vi.spyOn(Element.prototype, 'getClientRects').mockImplementation(
     () => ({ length: 1 }) as unknown as DOMRectList,

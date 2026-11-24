@@ -321,19 +321,19 @@ function mitBruchServer(liste = bruchliste) {
       HttpResponse.json(einsatzFixture({ spiegel: spiegel({ bruchstelle: liste.length }) })),
     ),
     http.get('/api/einsaetze/1/antraege', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/bruchstelle', () => HttpResponse.json(liste)),
-    http.post('/api/einsaetze/1/bruchstelle/antraege', () => {
+    http.get('/api/einsaetze/1/breaks', () => HttpResponse.json(liste)),
+    http.post('/api/einsaetze/1/breaks/requests', () => {
       aufrufe.push('alle');
       return HttpResponse.json({
         gestellt: 1,
         offen: [{ id: 2, grund: 'Bezug noch nicht beim Führer.' }],
       });
     }),
-    http.post('/api/einsaetze/1/bruchstelle/:bid/antrag', ({ params }) => {
+    http.post('/api/einsaetze/1/breaks/:bid/request', ({ params }) => {
       aufrufe.push(`stellen ${String(params.bid)}`);
       return HttpResponse.json({ antrag: { id: 9, zustand: 'ausstehend' } }, { status: 202 });
     }),
-    http.post('/api/einsaetze/1/bruchstelle/:bid/verwerfen', ({ params }) => {
+    http.post('/api/einsaetze/1/breaks/:bid/discard', ({ params }) => {
       aufrufe.push(`verwerfen ${String(params.bid)}`);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -393,9 +393,7 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     const { user, liste } = await bruchAufklappen();
     // Nach „Alle stellen“ ist nur noch die Meldung offen.
     server.use(
-      http.get('/api/einsaetze/1/bruchstelle', () =>
-        HttpResponse.json([bruchliste[1], bruchliste[2]]),
-      ),
+      http.get('/api/einsaetze/1/breaks', () => HttpResponse.json([bruchliste[1], bruchliste[2]])),
     );
     await user.click(within(liste).getByRole('button', { name: 'Alle stellen' }));
     await waitFor(() =>

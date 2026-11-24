@@ -148,7 +148,7 @@ export function nimmEntlassungZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Bindung und Spur in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/personnel/${epId}/cancel`, 'POST');
+  return apiSend<void>(`/api/einsaetze/${einsatzId}/personnel/${epId}/annul`, 'POST');
 }
 
 /** Eine entlassene oder stornierte Kraft erneut disponieren (Block „Entlassen“). */

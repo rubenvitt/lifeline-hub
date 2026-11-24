@@ -1,7 +1,7 @@
 //! Sitzungsliste und Beenden ohne Deaktivieren (LFH-1092).
 //!
 //! Eine Person sieht und beendet ihre eigenen Sitzungen (`/api/auth/sessions…`), ein Admin die
-//! einer Person seiner Organisation (`/api/benutzer/{id}/sitzungen…`). Beenden löscht nur
+//! einer Person seiner Organisation (`/api/users/{id}/sessions…`). Beenden löscht nur
 //! Sitzungszeilen: Konto, Passwort und Zweitfaktor bleiben, Sitzungen gekoppelter Geräte auch
 //! (die haben ihren eigenen Widerruf). Jede beendete Sitzung steht in der Spur und beendet ihre
 //! offenen Live-Ströme sofort. Herleitung: `/mnt/project-files/lfh-1092/design.md`.
@@ -86,7 +86,7 @@ fn eigene_kennung(admin: &Benutzer, ziel: &Benutzer, aktuell: Option<String>) ->
     aktuell.filter(|_| admin.id == ziel.id)
 }
 
-/// GET /api/benutzer/{id}/sitzungen — die laufenden Sitzungen einer Person. Admin-only.
+/// GET /api/users/{id}/sessions — die laufenden Sitzungen einer Person. Admin-only.
 pub async fn admin_liste(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -100,7 +100,7 @@ pub async fn admin_liste(
     ))
 }
 
-/// DELETE /api/benutzer/{id}/sitzungen/{kennung} — eine Sitzung einer Person beenden.
+/// DELETE /api/users/{id}/sessions/{kennung} — eine Sitzung einer Person beenden.
 /// Admin-only; die eigene aktuelle → 422.
 pub async fn admin_beenden(
     State(state): State<AppState>,
@@ -122,7 +122,7 @@ pub async fn admin_beenden(
     ))
 }
 
-/// POST /api/benutzer/{id}/sitzungen/beenden — alle Sitzungen einer Person; beim eigenen Konto
+/// POST /api/users/{id}/sessions/end — alle Sitzungen einer Person; beim eigenen Konto
 /// alle außer der aktuellen. Admin-only.
 pub async fn admin_alle_beenden(
     State(state): State<AppState>,

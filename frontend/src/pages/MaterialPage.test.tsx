@@ -760,7 +760,7 @@ describe('MaterialPage', () => {
   it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
     let gesendet = 0;
     server.use(
-      http.post('/api/einsaetze/1/material/10/cancel', () => {
+      http.post('/api/einsaetze/1/material/10/annul', () => {
         gesendet += 1;
         return HttpResponse.json(
           {
@@ -1589,7 +1589,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       http.get('/api/einsaetze/1/staging-areas', () =>
         HttpResponse.json([{ id: 6, bezeichnung: 'BR Nord' }]),
       ),
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           einheiten: { sichtbar: true, zugriff: false },
@@ -1621,7 +1621,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   it('Ort: ohne Zugriff auf Fahrzeuge und Bereitstellungsräume kein Abruf, auch mit Posten dort', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           fahrzeuge: { sichtbar: true, zugriff: false },
@@ -1735,7 +1735,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   it('Ort: ohne Zugriff auf Einheiten steht „zugeordnet“; die Angabe bleibt bedienbar, ohne Einheiten', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           einheiten: { sichtbar: true, zugriff: false },
@@ -2334,7 +2334,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
 
   it('ohne Freigabe für Nachforderungen: „aus Nachforderung #4“ ohne Link, kein Abruf', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );
@@ -2407,7 +2407,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
 
   it('„Von Nachforderung lösen“ fehlt ohne Bezug und ohne Freigabe für Nachforderungen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/modul-freigaben', () =>
+      http.get('/api/einsaetze/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );

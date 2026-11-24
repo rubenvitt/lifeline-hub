@@ -347,7 +347,7 @@ async fn bilden_auf_abgeschlossenem_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1708,7 +1708,7 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
 
-    let (s, json) = anfrage(&app, "POST", &pfad(zug, "/cancel"), &admin, None).await;
+    let (s, json) = anfrage(&app, "POST", &pfad(zug, "/annul"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{json}");
     assert_eq!(
         json["error"],
@@ -1727,7 +1727,7 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
     );
     for (methode, rest, body) in [
         ("DELETE", "", None),
-        ("POST", "/cancel", None),
+        ("POST", "/annul", None),
         ("PATCH", "", Some(r#"{"bemerkung":"x"}"#)),
         ("PATCH", "/position", Some(r#"{"lat":52.0,"lon":10.0}"#)),
         ("PUT", "/status", Some(r#"{"status_id":null}"#)),
@@ -1737,7 +1737,7 @@ async fn aufloesen_bleibt_im_nachweis_und_stornieren_nur_ohne_spur() {
         assert_eq!(s, StatusCode::CONFLICT, "{methode} {rest}: {json}");
     }
 
-    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/cancel"), &admin, None).await;
+    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/annul"), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert!(einheiten_namen(&app, &admin, einsatz, "").await.is_empty());
     assert_eq!(
@@ -1773,7 +1773,7 @@ async fn aufgeloeste_einheit_liefert_letzte_besetzung_und_etb_verweis() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage(&app, "DELETE", &pfad(zug, ""), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/cancel"), &admin, None).await;
+    let (s, _) = anfrage(&app, "POST", &pfad(leer, "/annul"), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let (s, _) = anfrage(
         &app,
@@ -2614,7 +2614,7 @@ async fn ohne_freigabe_fahrzeuge_darf_die_rolle_das_fahrzeug_als_einheit_fuehren
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/fahrzeuge"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/fahrzeuge"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )

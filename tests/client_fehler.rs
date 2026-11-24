@@ -12,7 +12,7 @@ use common::{anfrage, anfrage_json, login_cookie, setup};
 use lifeline_hub::app::CLIENT_FEHLER_BODY_MAX;
 use lifeline_hub::routes::client_fehler::{MELDUNG_MAX, ROUTE_MAX, STACK_MAX, VERSION_MAX};
 
-const PFAD: &str = "/api/client-fehler";
+const PFAD: &str = "/api/client-errors";
 
 fn bericht() -> Value {
     json!({

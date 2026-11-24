@@ -593,7 +593,7 @@ async fn rechte_und_modulsperre() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/personal", w.e),
+        &format!("/api/einsaetze/{}/module-overrides/personal", w.e),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -629,7 +629,7 @@ async fn modul_sichtbar(w: &Welt, modul: &str, sichtbar: bool) {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/modul-overrides/{modul}", w.e),
+        &format!("/api/einsaetze/{}/module-overrides/{modul}", w.e),
         &w.admin,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":null}}"#
@@ -1493,7 +1493,7 @@ async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("{bert_pfad}/cancel"),
+        &format!("{bert_pfad}/annul"),
         &w.admin,
         None,
     )
@@ -1887,7 +1887,7 @@ async fn berichtigung_statuscodes() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("{bert_pfad}/cancel"),
+        &format!("{bert_pfad}/annul"),
         &w.admin,
         None,
     )
@@ -2149,7 +2149,7 @@ async fn periode_statuscodes() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("{bert_pfad}/cancel"),
+        &format!("{bert_pfad}/annul"),
         &w.admin,
         None,
     )

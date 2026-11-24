@@ -102,7 +102,7 @@ function renderAnsicht(route = '/einsaetze/7/personal/10', a: Aufbau = {}) {
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(einsatzFixture({ id: 7, bezeichnung: 'Hochwasser', ...a.einsatz })),
     ),
-    http.get('/api/einsaetze/7/modul-freigaben', () =>
+    http.get('/api/einsaetze/7/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
     http.get('/api/einsaetze/7/personnel', ({ request }) =>
@@ -733,7 +733,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
     renderAnsicht('/einsaetze/7/personal/10', { aktiv: [kraft({ disponiert_at: minutesAgo(5) })] });
     let storniert = false;
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/cancel', () => {
+      http.post('/api/einsaetze/7/personnel/10/annul', () => {
         storniert = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -756,7 +756,7 @@ describe('EinsatzkraftPage – Aus dem Einsatz (3.4)', () => {
   it('zeigt eine Ablehnung des Stornos im Abschnitt „Aus dem Einsatz“', async () => {
     renderAnsicht('/einsaetze/7/personal/10', { aktiv: [kraft({ disponiert_at: minutesAgo(5) })] });
     server.use(
-      http.post('/api/einsaetze/7/personnel/10/cancel', () =>
+      http.post('/api/einsaetze/7/personnel/10/annul', () =>
         HttpResponse.json({ error: 'Kraft ist schon eingetroffen' }, { status: 422 }),
       ),
     );

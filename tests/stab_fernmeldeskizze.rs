@@ -174,7 +174,7 @@ async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/modul-overrides/fernmeldewesen"),
+        &format!("/api/einsaetze/{einsatz}/module-overrides/fernmeldewesen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -1066,7 +1066,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschliessen"),
+        &format!("/api/einsaetze/{einsatz}/close"),
         &admin,
         None,
     )

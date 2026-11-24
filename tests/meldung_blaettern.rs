@@ -328,7 +328,7 @@ async fn modulzaehler_zaehlt_weiter_den_gesamtbestand() {
     let alle = anlegen(&app, &admin, e, 105, "intern").await;
     erledigen(&pool, &alle[..2], |i| format!("2026-10-01 10:0{i}:00")).await;
 
-    let (s, z) = get(&app, &admin, &format!("/api/einsaetze/{e}/modul-zaehler")).await;
+    let (s, z) = get(&app, &admin, &format!("/api/einsaetze/{e}/module-counts")).await;
     assert_eq!(s, StatusCode::OK, "{z}");
     assert_eq!(z["meldungen"]["offen"], 103, "{z}");
 }
