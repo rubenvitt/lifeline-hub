@@ -450,8 +450,9 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
         .find(|e| e["id"] == json!(w.einsatz))
         .expect("Einsatz in der Liste");
     assert_eq!(eintrag["ios_push_hub_gesperrt"], erwartet, "Liste");
-    let (_, u) =
-        common::anfrage_json(&elw.app, "GET", "/api/admin/instanz", &elw.admin, None).await;
+    let (s, u) =
+        common::anfrage_json(&elw.app, "GET", "/api/admin/instance", &elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{u}");
     assert_eq!(
         u["kopplungen"][0]["gegenueber_ios_push_gesperrt_seit"],
         json!(SPERRE_SEIT)
