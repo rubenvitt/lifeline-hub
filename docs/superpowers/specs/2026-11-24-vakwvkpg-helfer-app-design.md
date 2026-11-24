@@ -25,9 +25,10 @@ Stufe 1.
 
 ## Entscheidungen des Menschen (24.11.2026)
 
-1. **Grundlage:** Die vorhandene iOS- und Android-App bekommt einen **Helfer-Modus**, eine dritte
-   App gibt es nicht. Eine neue ADR löst ADR-0093 eng ab: Ortung im Hintergrund nur, solange eine
-   Helfer-Kopplung aktiv ist.
+1. **Grundlage (geändert bei der Freigabe, 24.11.2026):** Die Helfer-App ist eine **eigene, ganz
+   native App**, je eine für iOS (SwiftUI) und Android (Jetpack Compose), „sehr modern“ und im
+   **Lifeline Design System**. Die vorhandenen Lifeline-Apps bleiben dünne Hüllen; ADR-0093 gilt
+   dort unverändert. Der erste Stand (Helfer-Modus in den vorhandenen Apps) ist damit überholt.
 2. **Anmeldung:** Ein **Einsatz-QR für viele Kräfte**, befristet und widerrufbar. Jeder Scan legt
    eine eigene Kopplung an, und die gilt erst, wenn die **Einsatzleitung sie bestätigt**.
 3. **Ziel der Position:** Die Kraft wählt nach dem Scan **Einheit oder Fahrzeug** und **optional
@@ -35,9 +36,10 @@ Stufe 1.
 4. Aus LLH-1636: Empfänger in Stufe 2 sind eine Einheit oder ein Trupp, auf Wunsch eine
    Einzelperson. Der Pager arbeitet nur im laufenden Einsatz. Die Alarmierung in den Einsatz
    bleibt bei Divera und aPager.
-5. **Eigenes Konto:** Ist auf dem Serverprofil schon eine Person angemeldet, sagt die
-   Helfer-Seite „Du bist als <Name> angemeldet. Für die Helfer-Anmeldung erst abmelden.“ und löst
-   nicht ein. Die Helfer-Anmeldung läuft immer über ein Gerätekonto.
+5. **Eigenes Konto:** Die Helfer-Anmeldung läuft immer über ein Gerätekonto. Ist in einem
+   Anmeldespeicher schon eine Person angemeldet, wird nicht eingelöst („erst abmelden“). Seit der
+   Helfer-App mit eigenem Speicher betrifft das nur noch Aufrufe aus Browser oder Hülle; die
+   Weiche `/helfer` löst dort ohnehin nicht ein.
 6. **Schalter und Positionsbaustein legt dieser Entwurf fest** (Abschnitt „Ortung der
    Organisation und Positionsbaustein“). LLH-2091 nutzt sie.
 7. **Ein Ortungsgerät je Ziel:** Je Einheit oder Fahrzeug sendet genau ein Gerät. Die Leitung legt
@@ -61,7 +63,7 @@ Stufe 1.
 - Aufträge, Quittung, Push und Status (FMS) an die Helfer-App. Das ist Stufe 2 (LLH-2111). Hier
   wird nur dafür gesorgt, dass Stufe 2 auf derselben Kopplung aufsetzen kann.
 - Alarmierung in den Einsatz (Divera, aPager).
-- Browser oder PWA als Helfer. Im Browser zeigt die Helfer-Seite den Weg zur App (siehe
+- Browser oder PWA als Helfer. Im Browser zeigt die Weiche `/helfer` den Weg zur App (siehe
   „Ablauf“), sie ortet dort aber nicht im Hintergrund.
 - Desktop-App (`src-tauri/`).
 - Verlauf, Wegspur und Auswertung nach dem Einsatz.
@@ -110,9 +112,9 @@ Stufe 1.
 
 | Ansatz | Was er bedeutet | Abwägung |
 | --- | --- | --- |
-| **A. Helfer-Modus in den vorhandenen Apps (gewählt)** | Die Hüllen bekommen einen Ortungsdienst, der nur bei aktiver Helfer-Kopplung läuft. Eine neue ADR löst ADR-0093 für genau diesen Fall ab. | Eine App, die es schon gibt, mit Verteilung, Mehrserverbetrieb und iOS-Push. Kosten: native Logik in beiden Hüllen (im Kern, mit Test) und eine neue Ausnahme von „die Hülle sendet nicht selbst“. |
-| B. Eigene schlanke Helfer-App | Eine dritte App je Plattform nur für Helfer, ADR-0093 bleibt. | Sauber getrennt, aber doppelte Verteilung, Pflege und Signierung, und Stufe 2 müsste Push dort noch einmal bauen. |
-| C. Nur Vordergrund | Die Position kommt, solange die App offen ist. Keine neue ADR. | Am billigsten, verfehlt aber den Kern: Bei gesperrtem Handy bleibt die Karte stehen. |
+| **B. Eigene native Helfer-App (gewählt)** | Je eine neue App „Lifeline Helfer“ für iOS und Android, alle Bildschirme nativ, Ortungsdienst nativ. Sie teilt Kern-Bausteine mit den Hüllen (Serveradresse, Deeplink-Prüfung) und nutzt dieselben Server-Routen. | Erfüllt „nativ und sehr modern“ und hält die Hüllen dünn. Kosten: zwei weitere Apps verteilen (TestFlight, APK) und pflegen, Push für Stufe 2 braucht eine eigene App-Kennung am Relais. |
+| A. Helfer-Modus in den vorhandenen Apps | Die Hüllen bekommen einen Ortungsdienst und einen nativen Helfer-Bereich. | Bei der ersten Abstimmung gewählt, bei der Freigabe verworfen: native Bildschirme widersprechen „keine Anwendungslogik in der Hülle“, und die Hüllen würden deutlich größer. |
+| C. Nur Vordergrund (Web) | Die Position kommt, solange die Seite offen ist. | Verfehlt den Kern: Bei gesperrtem Handy bleibt die Karte stehen. |
 
 Bei der Anmeldung stand auch zur Wahl, einen Einwurf-Zugang je Helfer zu erzeugen. Das ist
 verworfen, weil der Zugang an der Organisation hängt, keinen Einsatzbezug hat und mit dem
@@ -138,18 +140,18 @@ und ETB schon mit.
 ### Ablauf
 
 ```
-Leitung                          Server                         Helfer-App (iOS/Android)
+Leitung                          Server                         Lifeline Helfer (iOS/Android)
 ───────                          ──────                         ────────────────────────
 „Helfer einladen“ am Einsatz ──► Einladung (Code, gültig bis)
 QR zeigen / ausdrucken                                          QR scannen (App-Scanner
                                                                 oder Systemkamera → Link)
-                                 ◄── Einladung einlösen ──────── Server als Profil aktiv
-                                 Helfer-Kopplung „wartet“,       Seite „Anmelden“: Name,
+                                 ◄── Einladung einlösen ──────── Server und Code übernommen
+                                 Helfer-Kopplung „wartet“,       Bildschirm „Anmelden“: Name,
                                  Sitzung mit enger Routenliste   Ziel wählen, optional
                                                                  „mich als Person orten“
 „Wartende Helfer“ (Zähler) ◄──── live
-Bestätigen (Person zuordnen) ──► Kopplung „aktiv“, ETB-Eintrag ─► Seite „Du bist angemeldet“
-                                                                 Brücke: helfer_ortung_start
+Bestätigen (Person zuordnen) ──► Kopplung „aktiv“, ETB-Eintrag ─► Bildschirm „Angemeldet“  
+                                                                 Ortungsdienst läuft (schon ab Scan)
                                  ◄── Position (alle 30 s/25 m) ── Ortungsdienst im Hintergrund
 Lagekarte: Ziel bewegt sich ◄─── Position am Ziel, live
 Einsatz beenden / Widerruf ────► Sitzung ungültig ─────────────► nächste Sendung 401/403 →
@@ -166,14 +168,13 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
 2. **Scannen.**
    - Der QR trägt `https://<server>/helfer#CODE`. Wie bei `/koppeln` steht der Code im Fragment
      und erreicht keine Serverlogs.
-   - Der Scanner in der App erkennt die Form, legt den Server als Profil an oder wählt ihn
-     aus und öffnet die Seite.
-   - Scannt die Kraft mit der Systemkamera, öffnet sich der Browser. Die Seite `/helfer` erkennt,
-     dass sie nicht in der App läuft, und bietet „In der App öffnen“ als
-     `lifeline://helfer?server=…#CODE` an, dazu die Download-Wege.
-   - Universal Links und App Links bleiben außen vor; sie wären eigene Arbeit für die Hüllen.
+   - Der Scanner der Helfer-App erkennt die Form und übernimmt Server und Code.
+   - Scannt die Kraft mit der Systemkamera, öffnet sich der Browser. Die Seite `/helfer` ist nur
+     eine Weiche: „In Lifeline Helfer öffnen“ als `lifeline-helfer://anmelden?server=…#CODE`,
+     dazu die Download-Wege (TestFlight, APK). Sie löst den Code nicht ein.
+   - Universal Links und App Links bleiben außen vor (eigene Arbeit, später möglich).
 3. **Anmelden.**
-   - Die Seite löst den Code ein (`POST /api/devices/helpers/redeem`, Wort `helpers` aus dem
+   - Die App löst den Code ein (`POST /api/devices/helpers/redeem`, Wort `helpers` aus dem
      Glossar). Gefragt werden ein Anzeigename als Freitext (etwa „Max M., San-Trupp 2“) und das
      Ziel.
    - Das Ziel wählt die Kraft aus der Liste der Einheiten und Fahrzeuge des Einsatzes, Name und
@@ -195,14 +196,13 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
    - Bestätigen, Ablehnen, Widerruf und Ende schreiben ins ETB wie heute der Widerruf einer
      Kopplung. Die Positionen selbst schreiben nicht ins ETB.
 5. **Orten.**
-   - Schon beim Einlösen, also im Vordergrund, ruft die Seite über die Brücke
-     `helfer_ortung_start` auf. So beginnt die Ortung auch dann, wenn die Bestätigung kommt,
+   - Schon beim Einlösen, also im Vordergrund, startet die App ihren Ortungsdienst. So beginnt die Ortung auch dann, wenn die Bestätigung kommt,
      während das Handy in der Tasche steckt.
    - Im Zustand `wartet` antwortet der Server auf eine Sendung mit 409 und speichert nichts. Der
      Dienst läuft weiter, und die Anzeige in der App sagt „wartet auf Bestätigung“
      (Entscheidung des Bauenden, siehe „Getroffene Festlegungen“).
-   - Die Hülle fragt den Standort an, falls noch nicht geschehen: iOS „When in Use“, Android fein.
-   - Dann startet der Ortungsdienst (siehe „Apps“). Er sendet mit dem Sitzungs-Cookie der
+   - Die App fragt den Standort an, falls noch nicht geschehen: iOS „When in Use“, Android fein.
+   - Dann läuft der Ortungsdienst (siehe „Die Helfer-App“). Er sendet mit dem Sitzungs-Cookie der
      Kopplung an `PUT /api/devices/me/position`.
    - Der Server schreibt die Position an das Ziel, also Einheit oder Fahrzeug und bei Zuordnung
      zusätzlich die Person. Dazu kommen Zeitpunkt und Quelle, und das bestehende Live-Ereignis
@@ -213,8 +213,7 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
      in der App (`POST /api/auth/logout` wie heute) oder die Kraft entfernt den Server.
    - In jedem Fall ist die Sitzung ungültig. Die nächste Sendung bekommt 401 oder 403, und der
      Dienst stoppt sofort.
-   - Läuft die Seite, beendet sie den Dienst schon beim Live-Ereignis über
-     `helfer_ortung_stop`.
+   - Ist die App offen, beendet sie den Dienst schon beim Live-Ereignis.
    - **Stoppen** lassen den Dienst nur 401, 403 und 404 (Sitzung weg, nicht mehr berechtigt,
      Einsatz weg). Dazu kommen das Ende einer Wartezeit (`wartet` länger als 2 h) und die
      Ablehnung.
@@ -297,7 +296,7 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
     die DSFA-Vorlage. Wer wann geschaltet hat, wird gespeichert.
   - Ist der Schalter aus, gibt es keine Helfer-Einladung (Knopf gesperrt mit Grund), und
     `PUT …/position` antwortet 403.
-  - Ohne „Personen orten“ fehlt das Häkchen auf der Helfer-Seite, und die Leitung kann keine
+  - Ohne „Personen orten“ fehlt das Häkchen in der Helfer-App, und die Leitung kann keine
     Person zuordnen.
   - Der Schalter gilt ebenso für den Einwurf auf der Lagekarte (LLH-2091).
 - **Positionsbaustein** an `einsatz_einheit`, `einsatz_fahrzeug` und `einsatz_personal`:
@@ -324,87 +323,138 @@ Einsatz beenden / Widerruf ────► Sitzung ungültig ──────�
 - **Lagekarte:** Ziele mit Helferposition zeigen am Symbol Alter und Quelle, und die Liste
   „Geortet“ nennt sie. Ein Fahrzeug, dessen Position älter als 5 Minuten ist, wird blass. Die
   Werte richten sich nach LLH-2091.
-- **Helfer-Seite `/helfer`** (Gerätesicht, schmal):
-  - die Zustände „Anmelden“, „Wartet auf Bestätigung“, „Angemeldet“ und „Beendet“;
-  - im Zustand „Angemeldet“ eine große Anzeige „Ortung an“ mit Ziel und letzter Sendung,
-    „Ortung pausieren“ und „Abmelden“;
-  - ohne App (im Browser): Weg zur App, keine Ortung.
+- **Seite `/helfer`** (Weiche im Browser): erkennt den Code im Fragment, bietet „In Lifeline Helfer
+  öffnen“ und die Download-Wege an. Keine Anmeldung, keine Ortung im Browser.
 
-### Apps (Hüllen)
+### Die Helfer-App (iOS und Android, nativ)
 
-Die Logik sitzt im Kern (`ios/LifelineKern`, `android/kern`), mit Tests. Die Fälle stehen
-gemeinsam in `src-tauri/faelle/` und decken Helfer-QR-Form, Deeplink und Entscheidung „senden
-oder stoppen“ ab.
+**Gestalt.** Eine App mit genau einer Aufgabe, ganz nativ, im Lifeline Design System:
 
-- **Brücke:**
-  - neue Befehle `helfer_ortung_start`, `helfer_ortung_stop` und `helfer_ortung_state`;
-  - nur aus dem Hauptframe und nur für die Origin des aktiven Servers, wie alle Befehle;
-  - `start` nimmt keine Zieladresse aus der Seite an. Die Hülle sendet immer an
-    `<aktiver Server>/api/devices/me/position`.
-- **Senden:**
-  - Die Hülle sendet mit dem Sitzungs-Cookie aus dem Datenspeicher des Serverprofils
-    (`WKWebsiteDataStore` bzw. `CookieManager` des Profils), es gibt kein eigenes Geheimnis.
-  - Damit endet das Senden genau mit der Sitzung, und Widerruf, Einsatzende und Ablauf greifen
-    ohne eigene Logik.
-  - Unter iOS ist das die vierte native Anfrage, die `ios/AGENTS.md` ausdrücklich an eine neue
-    Entscheidung bindet; die ADR unten trifft sie.
-- **Pausieren** (in der Seite, unter Android auch in der Benachrichtigung): Der Dienst sendet
-  einmal `PUT /api/devices/me/position` mit `paused: true` und ohne Koordinate und hört dann auf
-  zu orten. Der Server löscht dann die Personenposition und zeigt der Leitung „pausiert“; die
-  Position an Einheit oder Fahrzeug bleibt als letzter Stand. „Fortsetzen“ geht nur in der
-  geöffneten App. So bleibt es bei einem einzigen Endpunkt.
-- **Takt:**
-  - Gesendet wird höchstens alle 30 s und nur bei einer Bewegung über 25 m. Ohne Bewegung kommt
-    alle 5 min ein Lebenszeichen, damit die Karte nicht „veraltet“ zeigt.
-  - Gewünscht ist Genauigkeit „beste für Navigation“ nur bei Bewegung. Die Werte sind ein
-    Vorschlag der Umsetzung (siehe „Dem Bauenden überlassen“).
-- **Ohne Netz:**
-  - Gepuffert wird nur die **letzte** Position, im Speicher, ohne Datei.
-  - Kommt das Netz zurück, geht sie raus, wenn sie jünger als 10 Minuten ist; sonst wird sie
-    verworfen.
-  - Einen Verlauf auf dem Gerät gibt es nicht.
+- **iOS:** SwiftUI mit Observation und Swift 6 (strikte Nebenläufigkeit), gebaut mit dem
+  aktuellen SDK. Auf iOS 26 nutzt sie das Systemaussehen (Liquid Glass) für Leisten und
+  Bedienelemente; ab der Mindestversion der Hülle (iOS 17.4) läuft sie mit gleichem Ablauf. Die
+  laufende Ortung zeigt eine **Live-Aktivität** auf Sperrbildschirm und Dynamic Island mit
+  Einsatz, Ziel, letzter Sendung und „Pausieren“. Das ist sichtbar und modern zugleich.
+- **Android:** Jetpack Compose mit Material 3 (Expressive, wo stabil) und Lifeline-Thema statt
+  dynamischer Systemfarben. Die App läuft von Rand zu Rand und unterstützt die vorausschauende
+  Zurück-Geste; `minSdk` 29 wie die Hülle. Die laufende Ortung zeigt die Benachrichtigung des
+  Vordergrund-Dienstes, ab Android 16 als Live-Update.
+- **Design System:** Farben, Schrift, Abstände und Radien kommen aus
+  `docs/design/design-system/project/tokens.json`. Daraus wird je Plattform eine Token-Datei
+  (Swift, Kotlin) erzeugt und mitcommittet. Eine Prüfung im Gate stellt sicher, dass sie zum
+  JSON passt, wie beim Typ-Codegen. Hell und dunkel, große Schrift (Dynamic Type bzw.
+  Schriftgröße) und VoiceOver/TalkBack gehören zur Abnahme.
+- **Bildschirme:**
+  1. **Start:** „QR-Code scannen“ (Kamera ganzflächig), darunter „Code eingeben“.
+  2. **Anmelden:** Einsatz und Server, Anzeigename, Ziel aus der Liste (Einheiten und
+     Fahrzeuge mit Rufname und taktischem Zeichen), Häkchen „Mich als Person orten“ (nur wenn die
+     Org es erlaubt), Einwilligungssatz, Knopf „Anmelden und Ortung erlauben“.
+  3. **Wartet:** Name des Einsatzes, „Die Einsatzleitung bestätigt dich gleich“, Ortung schon
+     an (sichtbar), „Abbrechen“.
+  4. **Angemeldet:** große Anzeige „Ortung an“ mit Ziel, Alter der letzten Sendung und
+     Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“.
+  5. **Beendet:** Grund (Einsatz beendet, entfernt, abgelaufen, abgelehnt), „Neu anmelden“.
+- **Je Gerät eine Anmeldung.** Die App kennt immer genau einen Server und eine Kopplung. Ein
+  neuer Scan während einer Anmeldung fragt, ob die alte beendet werden soll. „Erst abmelden“
+  (Entscheidung 5) betrifft damit nur die Lifeline-App im Browser oder in der Hülle. Ein Konflikt
+  mit der Helfer-App entsteht nicht, weil sie ein eigenes Gerätekonto hat.
+
+**Logik im Kern, mit Tests.** Wie bei den Hüllen steht alles, was ohne UI und System geht, in
+einem Kern:
+
+- iOS: Swift-Paket `HelferKern` (`swift test`, auch unter Linux), es nutzt `LifelineKern` für
+  Adresse und Deeplink-Prüfung.
+- Android: Modul `helferkern` (Kotlin/JVM, ohne SDK), es nutzt `kern`.
+- Im Kern stehen: Erkennen des QR-Codes und Deeplinks, Zustandsautomat der Anmeldung (`start` →
+  `anmelden` → `wartet` → `aktiv` ⇄ `pausiert` → `beendet`), die Entscheidung „senden, wiederholen
+  oder stoppen“ je Antwort, Takt und Puffer (nur die letzte Position) und die Texte der Gründe.
+- Die Fälle für Deeplink, QR und Antwortcodes stehen gemeinsam unter `src-tauri/faelle/` und
+  gelten für beide Kerne.
+
+**Server-Verbindung.**
+
+- Die App spricht die Routen der Gerätekopplung direkt an: Einlösen, eigener Zustand,
+  Zielliste, Ziel ändern, Position, Abmelden. Sie hält das Sitzungs-Cookie der Kopplung, unter
+  iOS im Schlüsselbund, unter Android verschlüsselt im Keystore, kein weiteres Geheimnis.
+- Damit endet alles mit der Sitzung, und Widerruf, Einsatzende und Ablauf greifen ohne eigene
+  Logik.
+- Live-Zustand (bestätigt, beendet) bekommt die App, solange sie offen ist, über `live` (SSE).
+  Im Hintergrund erfährt sie ihn aus der Antwort auf die nächste Sendung.
+- Prüfung des Hüllen-Vertrags (`GET /api/shell`): Die Helfer-App meldet sich mit eigener
+  Kennung und Version, damit der Server zu alte Helfer-Apps ablehnen kann.
+
+**Senden, Takt, ohne Netz.**
+
+- **Pausieren** (in der App, unter Android auch in der Benachrichtigung, unter iOS in der
+  Live-Aktivität): Der Dienst sendet einmal `PUT /api/devices/me/position` mit `paused: true`
+  und ohne Koordinate und hört dann auf zu orten. Der Server löscht dann die Personenposition
+  und zeigt der Leitung „pausiert“; die Position an Einheit oder Fahrzeug bleibt als letzter
+  Stand. „Fortsetzen“ geht nur in der geöffneten App.
+- **Takt:** Gesendet wird höchstens alle 30 s und nur bei einer Bewegung über 25 m. Ohne
+  Bewegung kommt alle 5 min ein Lebenszeichen, damit die Karte nicht „veraltet“ zeigt. Die
+  Genauigkeit ist hoch nur bei Bewegung. Die Werte schlägt die Umsetzung vor (siehe „Dem
+  Bauenden überlassen“).
+- **Ohne Netz:** Gepuffert wird nur die **letzte** Position, im Speicher, ohne Datei. Kommt das
+  Netz zurück, geht sie raus, wenn sie jünger als 10 Minuten ist; sonst wird sie verworfen. Einen
+  Verlauf auf dem Gerät gibt es nicht.
+
+**Ortung im Hintergrund.**
+
 - **iOS:**
-  - `UIBackgroundModes` `location`, Recht weiter nur „When in Use“, kein Always.
-  - Der Dienst startet nur im Vordergrund, durch den Brückenaufruf nach der Bestätigung.
-  - `allowsBackgroundLocationUpdates = true` und `showsBackgroundLocationIndicator = true`: Die
-    blaue Standortanzeige ist die Sichtbarkeit.
+  - `UIBackgroundModes` `location`, Recht nur „When in Use“, kein Always.
+  - Der Dienst startet nur im Vordergrund, beim Anmelden.
+  - Er nutzt `CLLocationUpdate.liveUpdates` mit `CLBackgroundActivitySession` (ab iOS 17) und
+    zeigt die Standortanzeige des Systems.
   - Wird die App beendet, endet die Ortung. Ein Neustart nimmt sie nicht von selbst wieder auf;
-    die Seite fragt nach und ruft erneut `start`.
+    die App fragt nach.
 - **Android:**
   - Vordergrund-Dienst mit `foregroundServiceType="location"` und den Rechten
-    `FOREGROUND_SERVICE` und `FOREGROUND_SERVICE_LOCATION`, weiter **ohne**
+    `FOREGROUND_SERVICE` und `FOREGROUND_SERVICE_LOCATION`, **ohne**
     `ACCESS_BACKGROUND_LOCATION`.
   - Er startet nur aus der Vordergrund-App. Seine dauerhafte Benachrichtigung „Lifeline ortet
-    dich für Einsatz …“ hat nur „Pausieren“; das Tippen öffnet die App.
-  - Abmelden gibt es nur in der Seite (`POST /api/auth/logout` wie heute), damit die Hülle
-    weiter nur einen Endpunkt selbst anspricht.
+    dich für Einsatz …“ hat „Pausieren“, und Tippen öffnet die App.
   - Positionen kommen vom `LocationManager` des Systems (Fused Provider nur, wenn Play-Dienste
     da sind), weil die App ohne Play verteilt wird.
-- **QR und Deeplink:**
-  - Der Scanner erkennt neben der Serveradresse die Form `https://<server>/helfer#CODE`.
-  - Der Deeplink `lifeline://helfer?server=…` mit dem Code im Fragment legt den Server bei Bedarf
-    an. Das Anlegen bestätigt die Kraft wie im heutigen Onboarding.
-  - Der Code geht an die Seite, nie an die Hülle selbst.
+- **Scanner:**
+  - iOS: `DataScannerViewController` (VisionKit), Rückfall `AVCaptureMetadataOutput`.
+  - Android: ML Kit gebündelt, ohne Play-Dienste, wie im Onboarding der Hülle.
 
-### ADR (neu, ersetzt ADR-0093 teilweise)
+**Ablage im Repo, Bauen, Verteilen.**
 
-Titel-Vorschlag: „Die App-Hüllen orten im Hintergrund nur für eine aktive Helfer-Kopplung und
-senden dann selbst an den aktiven Server“.
+- **iOS:**
+  - zweites App-Ziel `LifelineHelfer` im XcodeGen-Projekt `ios/project.yml` (Quellen
+    `ios/Helfer/`, Paket `ios/HelferKern/`), eigene Bundle-ID und eigene TestFlight-App.
+  - Gebaut wird wie die Hülle nur auf macOS; `HelferKern` testet auch unter Linux.
+- **Android:**
+  - Modul `:helfer` neben `:app` in `android/`, Kern `android/helferkern` per `includeBuild`.
+  - Eigene Application-ID, signierte APK über GitHub-Releases mit dem vorhandenen Updater
+    (eigener Kanal).
+- **Regeln:** je eine `AGENTS.md` unter `ios/Helfer/` und `android/helfer/`. Sie sagen, dass die
+  Helfer-App eine native App ist, für die „keine Anwendungslogik in der Hülle“ nicht gilt, und
+  dass ihre Logik im Kern steht. Die Tabelle in der Wurzel-`AGENTS.md` bekommt beide Einträge.
+- **Gate:** `check-all.sh` bekommt die Kerntests der Helfer-App neben den Schritten 18 und 20,
+  dazu die Token-Prüfung.
 
-- MUST: Ortung im Hintergrund nur, solange der Ortungsdienst läuft. Starten darf ihn nur
-  `helfer_ortung_start` vom aktiven Server, aus dem Vordergrund.
-- MUST: iOS bleibt bei „When in Use“ (`UIBackgroundModes location` erlaubt, `NSLocationAlways…`
-  weiter verboten). Android nutzt einen Vordergrund-Dienst vom Typ `location`
-  (`ACCESS_BACKGROUND_LOCATION` weiter verboten).
-- MUST: Die Ortung ist sichtbar, unter iOS mit der Standortanzeige, unter Android mit der
-  Benachrichtigung des Dienstes.
-- MUST: Die Hülle sendet nur an `/api/devices/me/position` des aktiven Servers und nur mit dessen
-  Sitzung. 401, 403 und 404 beenden den Dienst; 5xx, 429 und Netzfehler führen zu Wiederholung
-  mit wachsendem Abstand und behalten nur die letzte Position.
-- MUST NOT: Verlauf speichern, mehr als die letzte Position puffern, auf die Platte schreiben.
-- Die übrigen Regeln von ADR-0093 gelten weiter. Die Prüfung wird angepasst: `verbiete` für
-  Always und Background-Location bleibt, `UIBackgroundModes location` wird erlaubt, und ein
-  `verlange` prüft `showsBackgroundLocationIndicator`.
+### ADR (neu)
+
+Titel-Vorschlag: „Die Helfer-App ist eine eigene native App und ortet im Hintergrund nur für
+eine aktive Helfer-Kopplung“.
+
+- MUST: Die Helfer-App ist je Plattform eine eigene native App (SwiftUI, Compose) mit Logik im
+  Kern. Die Lifeline-Hüllen bleiben unverändert dünn; ADR-0093 gilt für sie weiter.
+- MUST: Ortung im Hintergrund nur, solange eine Helfer-Kopplung besteht (`wartet`, `aktiv`). Sie
+  startet nur aus dem Vordergrund.
+- MUST: iOS nur „When in Use“ (`UIBackgroundModes location` erlaubt, `NSLocationAlways…`
+  verboten). Android nur ein Vordergrund-Dienst vom Typ `location` (`ACCESS_BACKGROUND_LOCATION`
+  verboten).
+- MUST: Die Ortung ist sichtbar: unter iOS mit Standortanzeige und Live-Aktivität, unter Android
+  mit der Benachrichtigung des Dienstes.
+- MUST: Die App sendet nur an den Server ihrer Kopplung und nur mit deren Sitzung. 401, 403 und
+  404 beenden den Dienst; 5xx, 429 und Netzfehler führen zu Wiederholung mit wachsendem Abstand.
+- MUST NOT: Verlauf speichern, mehr als die letzte Position puffern, Positionen auf die Platte
+  schreiben.
+- Prüfung mit `verbiete` und `verlange` wie in ADR-0093, für `ios/project.yml` (Ziel
+  `LifelineHelfer`) und `android/helfer/src/main/AndroidManifest.xml`.
 - Die Nummer vergibt die Umsetzung nach `docs/architektur/AGENTS.md`.
 
 ### Datenschutz
@@ -414,7 +464,7 @@ senden dann selbst an den aktiven Server“.
   Rechtsgrundlage (Einwilligung bei Ehrenamt, Betriebsvereinbarung bei Hauptamt), Daten (letzte
   Position, Anzeigename), Speicherdauer (bis Ende der Kopplung; an Einheit und Fahrzeug als
   Lagestand bis zur Löschung des Einsatzes), Empfänger (Leitung und Lagekarte des Einsatzes).
-- **Einwilligung:** Die Seite „Anmelden“ sagt in einem Satz, was gesendet wird, an wen und bis
+- **Einwilligung:** Der Bildschirm „Anmelden“ sagt in einem Satz, was gesendet wird, an wen und bis
   wann. Erst „Anmelden und Ortung erlauben“ löst ein. Personenortung ist ein eigenes Häkchen.
 - Anwenderdoku: ein Kapitel „Helfer anmelden“ nach `docs/anwender/AGENTS.md`.
 
@@ -433,7 +483,8 @@ senden dann selbst an den aktiven Server“.
 
 ## Umsetzungsaufgaben (nach Freigabe auf dem Board, unter LLH-2092)
 
-1. **ADR** zur Hintergrund-Ortung (löst ADR-0093 teilweise ab) samt angepasster Prüfung.
+1. **ADR** zur Helfer-App (eigene native App, Hintergrund-Ortung) samt Prüfung; `AGENTS.md` der
+   beiden Helfer-Ordner und Eintrag in der Wurzeltabelle.
 2. **Server:**
    - Einladung: anlegen, widerrufen, einlösen; Drosselung.
    - Helfer-Kopplung: Zustände, Ziel, Bestätigen, Ablehnen, ETB.
@@ -443,25 +494,30 @@ senden dann selbst an den aktiven Server“.
    Schreiben ans Ziel, einem Ortungsgerät je Ziel, Pausieren und Löschen der Personenposition am
    Ende.
 4. **Frontend, Leitung:** Helfer einladen (QR, Druck), wartende und angemeldete Helfer, Hinweis
-   im Einsatzkopf, Alter und Quelle auf der Lagekarte.
-5. **Frontend, Helfer-Seite** `/helfer`: Anmelden, Warten, Angemeldet, Beendet, Weg zur App;
-   Brückenaufrufe.
-6. **iOS:** Ortungsdienst im Kern und in der App, Brückenbefehle, `UIBackgroundModes`,
-   QR-Erkennung und Deeplink `lifeline://helfer`.
-7. **Android:** Vordergrund-Dienst, Brückenbefehle, Rechte, QR-Erkennung und Deeplink.
-8. **Doku:** DSFA-Vorlage, Anwenderkapitel „Helfer anmelden“, arc42-Mitänderung nach
-   `docs/architektur/AGENTS.md`.
+   im Einsatzkopf, Alter und Quelle auf der Lagekarte, Org-Schalter in der Verwaltung, Weiche
+   `/helfer`.
+5. **Design-Tokens nativ:** Erzeugung aus `tokens.json` für Swift und Kotlin, Prüfung im Gate.
+6. **iOS Helfer-App:** `HelferKern` (Zustand, Antwortentscheidung, Takt, QR/Deeplink), App-Ziel
+   `LifelineHelfer` mit fünf Bildschirmen, Ortungsdienst, Live-Aktivität, Scanner.
+7. **Android Helfer-App:** `helferkern`, Modul `:helfer` mit fünf Bildschirmen, Vordergrund-Dienst,
+   Benachrichtigung, Scanner, Updater-Kanal.
+8. **Doku:** DSFA-Vorlage, Anwenderkapitel „Helfer anmelden“, Betriebsdoku zur Verteilung
+   (`docs/betrieb/`), arc42-Mitänderung nach `docs/architektur/AGENTS.md`.
 
-Reihenfolge: 1 → 2 → 3 → (4, 5 parallel) → (6, 7 parallel) → 8. Mit 2–5 ist der Weg im
-Browser testbar, auch wenn dort im Hintergrund nicht geortet wird.
+Reihenfolge: 1 → 2 → 3 → (4, 5 parallel) → (6, 7 parallel) → 8. Mit 2–4 ist der Server-Teil
+vollständig über die Routen testbar. Die Apps prüfen ihre Kerne unter Linux; gebaut und
+ausprobiert werden die iOS-App nur auf macOS und die Android-App mit SDK.
 
 ## Getroffene Festlegungen (aus der Prüfung, vom Entwurf gesetzt, nicht vom Menschen)
 
 - Ortung startet schon beim Einlösen, `wartet` antwortet 409 ohne Speichern.
 - Nur 401, 403 und 404 stoppen den Dienst; 5xx, 429 und Netzfehler werden wiederholt.
 - „Ziel ändern“ nur im Zustand `wartet`, danach nur durch die Leitung.
-- Pausieren über denselben Endpunkt mit `paused: true`; in der Android-Benachrichtigung gibt es
-  kein „Abmelden“.
+- Pausieren über denselben Endpunkt mit `paused: true`; in Benachrichtigung und Live-Aktivität
+  gibt es kein „Abmelden“.
+- Native Gestalt (nach Rubens Vorgabe „sehr modern, nativ, Design System“): Live-Aktivität unter
+  iOS, Live-Update ab Android 16, Liquid Glass ab iOS 26, Tokens aus `tokens.json` erzeugt,
+  Ablage als zweites App-Ziel bzw. Modul neben den Hüllen.
 - Dauer: `wartet` 2 h, bestätigt bis Einsatzende bzw. höchstens 72 h, verlängerbar.
 - Eigener Wire-Name für den neuen Zustand (`unbestaetigt`).
 
