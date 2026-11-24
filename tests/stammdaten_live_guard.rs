@@ -105,7 +105,10 @@ fn jede_schreibende_katalogroute_ist_abgedeckt() {
         let Some(modul) = katalog_modul(block) else {
             continue;
         };
-        if !schreibend(block) || pfad.starts_with("/api/einsaetze/") {
+        if !schreibend(block)
+            || pfad.starts_with("/api/einsaetze/")
+            || pfad.starts_with("/api/incidents/")
+        {
             continue;
         }
         geprueft += 1;

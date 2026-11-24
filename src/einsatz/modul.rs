@@ -308,11 +308,25 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
 /// Guard meldete einen vergessenen [`PFAD_KEY`]-Eintrag nicht mehr.
 const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 
+/// Alle Wurzeln der Einsatzrouten: die deutsche (Bestand) und die englische (ADR-0097, neue
+/// Routen). Guards prüfen jede Route, die mit einer davon beginnt.
+pub const EINSATZ_WURZELN: [&str; 2] = ["/api/einsaetze/{id}", "/api/incidents/{id}"];
+
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
 /// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
 /// ein Präfix trifft nur bei Gleichheit oder wenn direkt danach `/` folgt — sonst würde
 /// z. B. `…/meldungenarchiv` fälschlich als `…/meldungen`-Kind matchen.
 pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
+    // Neue Einsatzrouten liegen unter `/api/incidents/{id}` (ADR-0097) und teilen die Schlüssel
+    // ihrer deutschen Entsprechung; die Tabelle bleibt unter `/api/einsaetze/{id}` geführt.
+    let normiert;
+    let pfad = match pfad.strip_prefix(EINSATZ_WURZELN[1]) {
+        Some(rest) => {
+            normiert = format!("{}{rest}", EINSATZ_WURZELN[0]);
+            normiert.as_str()
+        }
+        None => pfad,
+    };
     PFAD_KEY
         .iter()
         .filter(|(prefix, _)| {
@@ -329,6 +343,18 @@ pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn incidents_praefix_hat_denselben_modulschluessel() {
+        assert_eq!(
+            key_fuer_pfad("/api/incidents/{id}/map/foreign-layers"),
+            key_fuer_pfad("/api/einsaetze/{id}/map/background-images")
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/incidents/{id}/briefing/schedule/export"),
+            key_fuer_pfad("/api/einsaetze/{id}/briefing")
+        );
+    }
 
     #[test]
     fn keys_sind_eindeutig() {

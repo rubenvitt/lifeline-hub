@@ -7,6 +7,7 @@
 //! registrierte Route mit passender Methode in `src/app.rs`, mit demselben Quelltext-Parsing
 //! wie `tests/zulassung_guard.rs`.
 
+use lifeline_hub::einsatz::modul::EINSATZ_WURZELN;
 use lifeline_hub::geraet::{Funktionsansicht, ALLE_ANSICHTEN, ALLE_GERAETE, SCHREIBENDE_ANSICHTEN};
 use std::fs;
 
@@ -134,7 +135,7 @@ fn ansichtslisten_tragen_nur_einsatzrouten() {
     for (herkunft, _, pfad) in alle_eintraege() {
         if herkunft != "ALLE_GERAETE" {
             assert!(
-                pfad.starts_with("/api/einsaetze/{id}"),
+                EINSATZ_WURZELN.iter().any(|w| pfad.starts_with(w)),
                 "{herkunft}: {pfad} ist keine Einsatzroute"
             );
         }
@@ -181,7 +182,7 @@ fn lagemonitor_schreibt_nichts() {
     let mut geprueft = 0usize;
     let mut verstoesse = Vec::new();
     for (pfad, block) in alle_route_bloecke(&quelle) {
-        if !pfad.starts_with("/api/einsaetze/{id}") {
+        if !EINSATZ_WURZELN.iter().any(|w| pfad.starts_with(w)) {
             continue;
         }
         for methode in ["POST", "PATCH", "PUT", "DELETE"] {
