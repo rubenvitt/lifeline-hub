@@ -255,6 +255,12 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert. Seine
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
   `frontend/src/api/adapter.ts`.
+- **Flüchtige Arten** (LLH-2105, `AdapterArt::fluechtig`): was die Art liefert, geht nur in den
+  Speicher, nie in die Datenbank (`uebernehmen` schreibt dort nichts Fachliches). Der Takt zählt ab
+  Laufbeginn (`repo::save_erfolg(…, ab)`, sonst ab Laufende), damit der Abstand der Bilder fest
+  bleibt. Eine Versuchszeile steht nur bei Zustandswechsel: bei Fehlschlag, und bei dem Erfolg, der
+  eine Störung beendet (`fehlversuche > 0` oder Meldung offen); ein Erfolg im Dauerlauf schreibt
+  keine, `letzter_erfolg_at` zeigt das Leben.
 - **Störung melden** (LLH-2026,
   [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   nur der Lauf meldet, über den Merker `adapter.gemeldet` (`repo::mark_gemeldet` in seiner

@@ -117,6 +117,13 @@ pub trait AdapterArt: Send + Sync + 'static {
     /// Vorschlag beim Anlegen.
     fn intervall_vorschlag_s(&self) -> i64;
 
+    /// Ob die Art flüchtige Daten liefert: ihre Übernahme geht nur in den Speicher, der Takt
+    /// zählt ab Laufbeginn, und eine Versuchszeile steht nur bei Zustandswechsel
+    /// (`adapter::lauf::run_one`).
+    fn fluechtig(&self) -> bool {
+        false
+    }
+
     /// Prüfung über die Felder hinaus (Kombinationen); Meldung für die Verwaltung (400).
     fn check_extra(&self, _einstellungen: &Map<String, Value>) -> Result<(), String> {
         Ok(())

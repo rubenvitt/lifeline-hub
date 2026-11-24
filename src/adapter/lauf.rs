@@ -332,6 +332,12 @@ async fn run_one(
         beginn + chrono::Duration::from_std(gestartet.elapsed()).unwrap_or_default(),
     );
     let dauer = dauer_ms(gestartet);
+    // Ab wann das Intervall zählt: bei flüchtigen Arten ab Laufbeginn (fester Takt).
+    let ab = if art.fluechtig() {
+        zeit::formatiere_utc(beginn)
+    } else {
+        jetzt.clone()
+    };
     match ergebnis {
         Ok(uebernahme) => {
             let geliefert = uebernahme.anzahl();
@@ -340,25 +346,31 @@ async fn run_one(
                 // nur der Versuch bleibt stehen.
                 let war_gemeldet = if repo::is_unveraendert(&mut *conn, &a.id, a.stand).await? {
                     uebernahme.uebernehmen(&mut *conn, &a).await?;
-                    repo::save_erfolg(&mut *conn, &a, geliefert, &jetzt).await?;
+                    repo::save_erfolg(&mut *conn, &a, geliefert, &jetzt, &ab).await?;
                     // Die Störung ist vorbei (LLH-2026): nach dem Commit entwarnen.
                     repo::clear_gemeldet(&mut *conn, &a.id).await?
                 } else {
                     false
                 };
-                let versuch_id = repo::save_versuch(
-                    &mut *conn,
-                    &a.id,
-                    &Versuch {
-                        at: jetzt.clone(),
-                        probe: false,
-                        status: None,
-                        fehler_art: None,
-                        dauer_ms: dauer,
-                        anzahl: Some(geliefert),
-                    },
-                )
-                .await?;
+                // Flüchtige Arten schreiben nur den Versuch, der eine Störung beendet; die 0 braucht
+                // niemand, denn die Entwarnung gibt es nur bei `war_gemeldet`, und dann steht er.
+                let versuch_id = if art.fluechtig() && !war_gemeldet && a.fehlversuche == 0 {
+                    0
+                } else {
+                    repo::save_versuch(
+                        &mut *conn,
+                        &a.id,
+                        &Versuch {
+                            at: jetzt.clone(),
+                            probe: false,
+                            status: None,
+                            fehler_art: None,
+                            dauer_ms: dauer,
+                            anzahl: Some(geliefert),
+                        },
+                    )
+                    .await?
+                };
                 Ok((war_gemeldet, versuch_id))
             });
             match uebernommen {
