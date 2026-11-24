@@ -24,6 +24,7 @@ pub mod dev;
 pub mod dokument;
 pub mod einheit;
 pub mod einheit_vorlage;
+pub mod einlesen;
 pub mod einsatz;
 pub mod einsatz_vorlage;
 pub mod einsatzabschnitt;
