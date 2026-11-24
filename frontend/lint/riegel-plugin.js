@@ -11,6 +11,9 @@
  * - LLH-2067: antds Einblend-Klassen kennt nur `e2e/dialog-kern.ts`. Die kopierte seitenweite
  *   Warte-Zeile (`.ant-zoom-appear, .ant-zoom-enter`) übersah Popconfirm und Popover
  *   (`ant-zoom-big-appear`) und wartete auf die ganze Seite statt auf den Dialog.
+ * - LLH-2090: eine feste Wartezeit (`waitForTimeout`) ist auf einem schnellen Rechner zu lang und
+ *   auf einem vollen Runner zu kurz; so entstehen Tests, die nur im Wiederholversuch grün werden.
+ *   Gewartet wird auf einen Zustand. Der Bestand steht in der Ausnahmeliste.
  * - LLH-1665 (Spec `e2e-zuschnitt`): angemeldet wird über die API, nicht über das Formular; jede
  *   Formular-Anmeldung kostete zwei volle App-Starts.
  */
@@ -54,6 +57,15 @@ const E2E_RIEGEL_ANMELDEFORMULAR = [
   },
 ];
 
+/** Riegel gegen feste Wartezeiten (LLH-2090); Bestand in `frontend/.oxlintrc.json`. */
+const E2E_RIEGEL_WARTEZEIT = [
+  {
+    selector: "CallExpression[callee.property.name='waitForTimeout']",
+    message:
+      'Keine feste Wartezeit in e2e (LLH-2090, frontend/e2e/AGENTS.md, „Warten auf einen Zustand“): auf einen Zustand warten (`expect(…).toBeVisible()`, `expect.poll`, `toPass`). Ist das Abwarten selbst der Prüfgegenstand (Doppeltipp-Fenster, „bleibt stehen“), mit `// oxlint-disable-next-line lfh/e2e-wartezeit -- <Grund>` begründen.',
+  },
+];
+
 /** Eine Regel, die jeden Treffer eines der Selektoren mit seiner Meldung meldet. */
 const riegel = (eintraege) => ({
   meta: { type: 'problem' },
@@ -71,5 +83,6 @@ export default {
     'e2e-riegel': riegel(E2E_RIEGEL),
     'e2e-anmeldeformular': riegel(E2E_RIEGEL_ANMELDEFORMULAR),
     'e2e-einblendung': riegel(E2E_RIEGEL_EINBLENDUNG),
+    'e2e-wartezeit': riegel(E2E_RIEGEL_WARTEZEIT),
   },
 };

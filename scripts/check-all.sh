@@ -436,6 +436,9 @@ schritt_11() {
   # Die Verteilung der e2e-Anteile nach Laufzeit (LFH-1117): eine Datei, die in keinem Anteil
   # landet, fährt nie, und keiner der vier Pflicht-Checks wird rot.
   mise exec -- node --test "$ROOT/scripts/e2e-anteile.test.mjs"
+  # Der Wackler-Bericht (LLH-2090): übersieht er einen Test, der erst im Wiederholversuch grün
+  # wurde, wäscht `retries` ihn weiter still.
+  mise exec -- node --test "$ROOT/scripts/e2e-wackler.test.mjs"
   # Das Lauf-Verzeichnis der Playwright-Läufe (LLH-1666): ein vergessenes füllt jeden dauerhaften
   # Rechner, ein zu eifrig gelöschtes zöge einem parallelen Lauf die Datenbank weg.
   mise exec -- node --test "$ROOT/scripts/e2e-run-dir.test.mjs"
