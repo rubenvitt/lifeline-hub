@@ -189,10 +189,10 @@ async function einheitNachforderung(
     return (await antwort.json()) as T;
   };
   // Der Typ steht im Katalog: der Dialog belegt ihn aus der Art vor.
-  let typ = (await lies<{ id: number; label: string }[]>('/api/einheit-typen')).find(
+  let typ = (await lies<{ id: number; label: string }[]>('/api/unit-types')).find(
     (t) => t.label === art,
   );
-  typ ??= await fuelle<{ id: number; label: string }>(api, 'post', '/api/einheit-typen', {
+  typ ??= await fuelle<{ id: number; label: string }>(api, 'post', '/api/unit-types', {
     label: art,
     sortier: 90,
   });

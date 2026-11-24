@@ -90,7 +90,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            "/api/personal",
+            "/api/personnel",
             &self.admin,
             Some(&json!({ "name": name, "benutzer_id": benutzer_id })),
         )

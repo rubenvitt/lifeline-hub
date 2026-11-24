@@ -38,9 +38,9 @@ async function seed(page: Page) {
   const einsatzId = String(id);
   const basis = `/api/einsaetze/${einsatzId}`;
   // Der Typ „RTW“ steht im Katalog (Vorbelegung des Typs aus der Art, D4).
-  const typen = await get<{ label: string }[]>(page, '/api/einheit-typen');
+  const typen = await get<{ label: string }[]>(page, '/api/unit-types');
   if (!typen.some((t) => t.label === 'RTW')) {
-    await post(page, '/api/einheit-typen', { label: 'RTW', sortier: 90 });
+    await post(page, '/api/unit-types', { label: 'RTW', sortier: 90 });
   }
   const br = await post(page, `${basis}/bereitstellungsraeume`, { bezeichnung: 'Nord' });
   await post(page, `${basis}/bereitstellungsraeume/${br.id}/status`, { status: 'aktiv' });

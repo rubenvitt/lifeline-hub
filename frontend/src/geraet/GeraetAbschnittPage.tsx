@@ -9,7 +9,7 @@ import type { Einheit, Einsatzabschnitt } from '../api/types';
 import StaerkeAnzeige from '../anzeige/StaerkeAnzeige';
 import EinsatzSeite from '../components/EinsatzSeite';
 import { gemeinsamerDatenstand } from '../components/Datenstand';
-import { Paneel, Stapel, monoStil, useRollen } from '../components/instrument';
+import { Paneel, Stapel, monoStil, schriftStil, useRollen } from '../components/instrument';
 import { abschnittDerEinheit } from '../kraefte/kraeftebaumKern';
 import { einheitStatusAnzeige } from '../kraefte/meldebildRaster';
 import AbschnittDaten from '../pages/einsatzabschnitte/AbschnittDaten';
@@ -61,7 +61,10 @@ function EinheitZeile({
         <span>
           <strong>{e.name}</strong>
           {e.funkrufname && (
-            <span style={{ ...monoStil('mono'), color: rollen.gedaempft }}> · {e.funkrufname}</span>
+            <span data-schrift="kennung" style={{ ...monoStil('mono'), color: rollen.gedaempft }}>
+              {' '}
+              · {e.funkrufname}
+            </span>
           )}
           {abschnittName && <span style={{ color: rollen.gedaempft }}> · {abschnittName}</span>}
           {ueber && <span style={{ color: rollen.gedaempft }}> · über {ueber}</span>}
@@ -76,8 +79,12 @@ function EinheitZeile({
       </Stapel>
       {/* Eigene Stärke wie „Zugeordnete Einheiten“ der Abschnittsseite (LLH-1744): die Zeilen
           ergeben die Stärke im Kopf, eine Untereinheit zählt nicht zusätzlich bei ihrem Zug. */}
-      <span style={monoStil('mono')}>
-        eigene <StaerkeAnzeige wert={e.ist} />
+      {/* Das Wort in der Textschrift, die Stärke in Mono (ADR-0094). */}
+      <span style={schriftStil('text')}>
+        eigene{' '}
+        <span style={monoStil('mono')}>
+          <StaerkeAnzeige wert={e.ist} />
+        </span>
       </span>
     </li>
   );

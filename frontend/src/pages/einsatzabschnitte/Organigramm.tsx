@@ -14,7 +14,14 @@ import { istKeyFreigegeben } from '../../einsatz/modulRegistry';
 import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import type { Einheit, EinsatzAnzeige, Einsatzabschnitt } from '../../api/types';
 import { STAERKE_AUSGESCHRIEBEN, staerkeText } from '../../anzeige/staerke';
-import { monoStil, Stapel, Status, Textstufe, useRollen } from '../../components/instrument';
+import {
+  monoStil,
+  Stapel,
+  Status,
+  Textstufe,
+  useRollen,
+  schriftStil,
+} from '../../components/instrument';
 import { abschnittLagezustand } from '../../theme/statusFarben';
 import { useViewport } from '../../components/useViewport';
 import HaengenderBaum, {
@@ -138,16 +145,23 @@ function OrganigrammKopf({
         <div style={{ fontWeight: 600 }}>Einsatzleitung</div>
         {fuehrungsstelle?.bezeichnung && <div>{fuehrungsstelle.bezeichnung}</div>}
         {fuehrungsstelle?.rufname && (
-          <div style={monoStil(token.fontSize)}>{fuehrungsstelle.rufname}</div>
+          <div data-schrift="kennung" style={monoStil(token.fontSize)}>
+            {fuehrungsstelle.rufname}
+          </div>
         )}
         {/* Der Einsatzleiter der Führungsstelle (LFH-1199), sonst die benannte Lücke: keine
             erfundene Leitung aus App-Rolle oder Stab. */}
         {einsatzleiter.art === 'erfasst' ? (
           <>
             <div style={{ overflowWrap: 'anywhere' }}>{einsatzleiter.name}</div>
-            <div style={{ ...monoStil('monoKlein', 500), color: rollen.gedaempft }}>
+            <div style={{ ...schriftStil('textKlein'), fontWeight: 500, color: rollen.gedaempft }}>
               {einsatzleiter.nichtMehrDisponiert && <span>nicht mehr disponiert · </span>}
-              <span>{`seit ${zeitKurz(einsatzleiter.seit, konventionen)}`}</span>
+              <span>
+                seit{' '}
+                <span style={monoStil('monoKlein', 500)}>
+                  {zeitKurz(einsatzleiter.seit, konventionen)}
+                </span>
+              </span>
             </div>
           </>
         ) : (
@@ -378,7 +392,14 @@ function KnotenInhalt({
             color: rollen.gedaempft,
           }}
         >
-          <span style={meta}>{knoten.rufname ?? 'kein Rufname'}</span>
+          {/* Der Rufname in Mono, das Wort für seine Lücke in der Textschrift. */}
+          {knoten.rufname != null ? (
+            <span style={meta} data-schrift="kennung">
+              {knoten.rufname}
+            </span>
+          ) : (
+            <span style={schriftStil('textKlein')}>kein Rufname</span>
+          )}
           {/* Fehlt sie, steht das Wort leise da; die Warnung trägt die Sammelzeile (LLH-1742). */}
           <span style={{ overflowWrap: 'anywhere' }}>
             {knoten.leitung ?? 'Leitung nicht besetzt'}

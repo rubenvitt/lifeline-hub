@@ -8,7 +8,7 @@ export interface QualifikationEingabe {
   schliesst_ein_id?: number | null;
 }
 
-const api = katalogApi<Qualifikation, QualifikationEingabe>('/api/qualifikationen');
+const api = katalogApi<Qualifikation, QualifikationEingabe>('/api/qualifications');
 
 export const listeQualifikationen = api.liste;
 export const legeQualifikationAn = api.legeAn;

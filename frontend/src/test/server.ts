@@ -66,7 +66,7 @@ export const server = setupServer(
    * Katalog-Sprechgruppen mit gleichnamiger Einsatz-Sprechgruppe (LLH-1645) — keine als Default.
    * Der Sprechgruppen-Tab fragt sie für Admins mit ab; Tests mit Paaren überschreiben.
    */
-  http.get('/api/sprechgruppen/auch-lokal', () => HttpResponse.json([])),
+  http.get('/api/talk-groups/also-local', () => HttpResponse.json([])),
   /**
    * Versionsstand der Instanz — „nichts Neues" als Default (Lesestand gleich laufende Version,
    * also keine Hinweiskarte und kein Punkt). Tests der Neuigkeiten überschreiben per `server.use()`.
@@ -115,7 +115,7 @@ export const server = setupServer(
    * Dienst und externe Stellen für Von/An bzw. Absender/Empfänger ab; Tests mit Vorschlägen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/fahrzeuge', () => HttpResponse.json([])),
+  http.get('/api/vehicles', () => HttpResponse.json([])),
   /**
    * Fahrzeuge im Einsatz — keine als Default. Das ETB fragt sie für Von/An ab und lädt sie nach
    * einem eigenen Eintrag neu; kam die Antwort erst nach dem Test, lief sie ohne Handler in den
@@ -123,7 +123,7 @@ export const server = setupServer(
    * `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/fahrzeuge', () => HttpResponse.json([])),
-  http.get('/api/externe-stellen', () => HttpResponse.json([])),
+  http.get('/api/external-agencies', () => HttpResponse.json([])),
   /**
    * Aufbewahrung je Datenkategorie (LFH-749) — alle drei Kategorien ohne eigene Frist und ohne
    * Org-Vorgabe als Default (echter Zustand eines aktiven Einsatzes ohne Vorgaben). Das
@@ -154,12 +154,12 @@ export const server = setupServer(
    * Organisation ohne Stammdaten dazu. Die Einsatzanlage fragt sie für die Zeile „Schichtmodell“
    * ab; Tests mit Modellen überschreiben per `server.use()`.
    */
-  http.get('/api/schichtmodelle', () => HttpResponse.json([])),
+  http.get('/api/shift-models', () => HttpResponse.json([])),
   /**
    * Einsatz-Vorlagen der Organisation (LLH-1375) — keine als Default. Anlegedialog und
    * Stichwort-Katalog fragen sie ab; Tests mit Vorlagen überschreiben per `server.use()`.
    */
-  http.get('/api/einsatz-vorlagen', () => HttpResponse.json([])),
+  http.get('/api/incident-templates', () => HttpResponse.json([])),
   /**
    * Stand der Lagebesprechung (LLH-1111) — noch keine abgehalten als Default, der echte Zustand
    * eines neuen Einsatzes. ETB und Lagemeldungen fragen ihn für „Seit letzter Lagebesprechung“
@@ -257,7 +257,7 @@ export const server = setupServer(
    * Funktionskatalog (LFH-549) — leer als Default; Empfängerfelder und ETB-Vorschläge fragen ihn
    * beim Mount ab. Tests mit Katalog überschreiben per `server.use()` oder ersetzen den Hook.
    */
-  http.get('/api/fuehrungsfunktionen', () => HttpResponse.json([])),
+  http.get('/api/command-roles', () => HttpResponse.json([])),
   /**
    * Mitglieder eines Einsatzes — leer als Default. Die Erwähnungsvorschläge im Chat-Eingabefeld
    * fragen sie beim Mount ab; ohne Handler scheitert der Abruf an der Leitung, und die Seite
@@ -304,5 +304,5 @@ export const server = setupServer(
    * LLH-1123); Tests mit Tieren überschreiben per `server.use()`.
    */
   http.get('/api/einsaetze/:einsatzId/tiere', () => HttpResponse.json([])),
-  http.get('/api/externe-stellen', () => HttpResponse.json([])),
+  http.get('/api/external-agencies', () => HttpResponse.json([])),
 );

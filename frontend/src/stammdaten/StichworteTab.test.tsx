@@ -21,7 +21,7 @@ const nichtAdmin = adminFixture({ system_rolle: 'keiner' });
 function renderTab(benutzer: typeof admin, vorschlaege = [{ id: 1, text: 'H1' }]) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
+    http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
   );
   return renderMitProviders(<StichworteTab />);
 }
@@ -69,7 +69,7 @@ describe('StichworteTab', () => {
     let geloescht: number | null = null;
     renderTab(admin);
     server.use(
-      http.delete('/api/stichwort-vorschlaege/:id', ({ params }) => {
+      http.delete('/api/keyword-suggestions/:id', ({ params }) => {
         geloescht = Number(params.id);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -95,7 +95,7 @@ describe('StichworteTab', () => {
       { id: 1, text: 'H1' },
       { id: 2, text: 'H2' },
     ]);
-    server.use(http.delete('/api/stichwort-vorschlaege/:id', () => new Promise(() => {})));
+    server.use(http.delete('/api/keyword-suggestions/:id', () => new Promise(() => {})));
     await screen.findByText('H1');
     const erste = container.querySelector('[data-row-key="1"]') as HTMLElement;
     const zweite = container.querySelector('[data-row-key="2"]') as HTMLElement;
@@ -180,7 +180,7 @@ describe('StichworteTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/stichwort-vorschlaege', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/keyword-suggestions', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<StichworteTab />);
 
@@ -205,7 +205,7 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
   it('Löschen: der Hinweis steht und geht beim nächsten Absenden', async () => {
     let versuch = 0;
     server.use(
-      http.delete('/api/stichwort-vorschlaege/:id', () => {
+      http.delete('/api/keyword-suggestions/:id', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json({ error: 'Stichwort wird gerade verwendet' }, { status: 409 });
@@ -231,10 +231,10 @@ describe('StichworteTab — Fehlschläge als stehender Hinweis (LFH-473)', () =>
 
   it('Hinzufügen: der Hinweis steht, das Feld behält den Text, Löschen räumt ihn', async () => {
     server.use(
-      http.post('/api/stichwort-vorschlaege', () =>
+      http.post('/api/keyword-suggestions', () =>
         HttpResponse.json({ error: 'Stichwort gibt es schon' }, { status: 409 }),
       ),
-      http.delete('/api/stichwort-vorschlaege/:id', () => new Promise<never>(() => {})),
+      http.delete('/api/keyword-suggestions/:id', () => new Promise<never>(() => {})),
     );
     renderTab(admin);
     await screen.findByText('H1');
@@ -272,9 +272,9 @@ describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
     const anfragen: { pfad: string; rumpf: unknown }[] = [];
     server.use(
       meHandler(benutzer),
-      http.get('/api/stichwort-vorschlaege', () => HttpResponse.json(vorschlaege)),
-      http.get('/api/einsatz-vorlagen', () => HttpResponse.json(VORLAGEN)),
-      http.put('/api/stichwort-vorschlaege/:id/vorlage', async ({ request, params }) => {
+      http.get('/api/keyword-suggestions', () => HttpResponse.json(vorschlaege)),
+      http.get('/api/incident-templates', () => HttpResponse.json(VORLAGEN)),
+      http.put('/api/keyword-suggestions/:id/template', async ({ request, params }) => {
         const rumpf = (await request.json()) as { vorlage_id: number | null };
         anfragen.push({ pfad: new URL(request.url).pathname, rumpf });
         return HttpResponse.json({ id: Number(params.id), text: 'MANV15', ...rumpf });
@@ -290,7 +290,7 @@ describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
     await waehle('Vorlage zu MANV15', 'MANV');
     await waitFor(() =>
       expect(anfragen).toEqual([
-        { pfad: '/api/stichwort-vorschlaege/5/vorlage', rumpf: { vorlage_id: 3 } },
+        { pfad: '/api/keyword-suggestions/5/template', rumpf: { vorlage_id: 3 } },
       ]),
     );
     const feld = screen.getByRole('combobox', { name: 'Vorlage zu MANV15' });
@@ -305,7 +305,7 @@ describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
     await waehle('Vorlage zu MANV15', 'keine');
     await waitFor(() =>
       expect(anfragen).toEqual([
-        { pfad: '/api/stichwort-vorschlaege/5/vorlage', rumpf: { vorlage_id: null } },
+        { pfad: '/api/keyword-suggestions/5/template', rumpf: { vorlage_id: null } },
       ]),
     );
     await waitFor(() => expect(feld.closest('.ant-select')?.textContent).toBe('keine'));
@@ -315,7 +315,7 @@ describe('StichworteTab · Vorlage je Stichwort (LLH-1375)', () => {
     mitVorlagen(admin, [{ id: 5, text: 'MANV15' }]);
     let abgelehnt = false;
     server.use(
-      http.put('/api/stichwort-vorschlaege/:id/vorlage', () => {
+      http.put('/api/keyword-suggestions/:id/template', () => {
         abgelehnt = true;
         return HttpResponse.json({ error: 'Vorlage unbekannt' }, { status: 400 });
       }),

@@ -350,7 +350,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, ben) = anfrage_json(
         &app,
         "POST",
-        "/api/personal",
+        "/api/personnel",
         &admin,
         Some(&json!({"name": "Ben"})),
     )

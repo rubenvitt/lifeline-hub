@@ -18,7 +18,7 @@ const KATALOG: ExterneStelle[] = [
 ];
 
 beforeEach(() => {
-  server.use(http.get('/api/externe-stellen', () => HttpResponse.json(KATALOG)));
+  server.use(http.get('/api/external-agencies', () => HttpResponse.json(KATALOG)));
 });
 
 /** Das Feld in einem Formular mit Regel und Absenden, wie auf der Entwurfsseite. */

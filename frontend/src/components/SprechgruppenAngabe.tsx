@@ -114,7 +114,12 @@ export default function SprechgruppenAngabe({
     <InlineAngabe<number[]>
       etikett="Sprechgruppen"
       wert={ids}
-      anzeige={<span style={monoStil('mono')}>{sprechgruppenText(sprechgruppen)}</span>}
+      anzeige={
+        // Sprechgruppen sind Kennungen wie Funkrufnamen (ADR-0094, LLH-2084).
+        <span data-schrift="kennung" style={monoStil('mono')}>
+          {sprechgruppenText(sprechgruppen)}
+        </span>
+      }
       leer={(w) => w.length === 0}
       gleich={isSameIds}
       darfSchreiben={darfSchreiben}

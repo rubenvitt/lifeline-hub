@@ -39,11 +39,11 @@ export interface PersonalEingabe {
 
 export function listePersonal(nurImDienst = false): Promise<Personal[]> {
   const qs = nurImDienst ? '?nur_im_dienst=true' : '';
-  return apiGet<Personal[]>(`/api/personal${qs}`);
+  return apiGet<Personal[]>(`/api/personnel${qs}`);
 }
 
 export function ladePersonalVorschlaege(): Promise<PersonalVorschlaege> {
-  return apiGet<PersonalVorschlaege>('/api/personal-vorschlaege');
+  return apiGet<PersonalVorschlaege>('/api/personnel-suggestions');
 }
 
 /** Anlegen: nur `name` ist Pflicht (`PersonalBody`, alles Weitere `Option<T>`). */
@@ -58,13 +58,13 @@ type PersonalNeu = { name: string } & Partial<Omit<PersonalEingabe, 'name'>>;
 type PersonalPatch = Partial<PersonalEingabe>;
 
 export function legePersonAn(daten: PersonalNeu): Promise<Personal> {
-  return apiSend<Personal>('/api/personal', 'POST', daten);
+  return apiSend<Personal>('/api/personnel', 'POST', daten);
 }
 
 export function aktualisierePerson(id: number, daten: PersonalPatch): Promise<Personal> {
-  return apiSend<Personal>(`/api/personal/${id}`, 'PATCH', daten);
+  return apiSend<Personal>(`/api/personnel/${id}`, 'PATCH', daten);
 }
 
 export function setzeDienststatus(id: number, inDienst: boolean): Promise<Personal> {
-  return setzeDienststatusUnter<Personal>('/api/personal', id, inDienst);
+  return setzeDienststatusUnter<Personal>('/api/personnel', id, inDienst);
 }

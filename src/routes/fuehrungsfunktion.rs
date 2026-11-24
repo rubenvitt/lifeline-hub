@@ -1,6 +1,6 @@
 //! Katalog der Führungsfunktionen (LFH-549).
 //!
-//! GET /api/fuehrungsfunktionen — wirksamer Katalog der eigenen Org, jeder Angemeldete.
+//! GET /api/command-roles — wirksamer Katalog der eigenen Org, jeder Angemeldete.
 //! PUT /api/org-command-roles/{funktion} — Label/S7-Schalter setzen, nur system_rolle=admin.
 //!
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
@@ -15,7 +15,7 @@ use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::fuehrung::{repo, Fuehrungsfunktion, FuehrungsfunktionAnzeige, LABEL_MAX};
 
-/// GET /api/fuehrungsfunktionen
+/// GET /api/command-roles
 pub async fn katalog(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

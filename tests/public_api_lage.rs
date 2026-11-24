@@ -377,6 +377,41 @@ async fn lage_zaehlt_einheiten_kraefte_und_offene_sofortmeldungen() {
     }
 }
 
+/// LLH-2072: Die Lage der API v1 bleibt unverändert, wenn ein Modul im Einsatz ausgeblendet ist;
+/// nur der gekoppelte Lagemonitor lässt dessen Kachel weg.
+#[tokio::test]
+async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(1), IP).await;
+    freigeben(&pool, &cred, einsatz).await;
+    post(
+        &app,
+        &admin,
+        &format!("/api/einsaetze/{einsatz}/reports"),
+        json!({
+            "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
+            "meldungsart": "sofortmeldung", "prioritaet": "sofort",
+            "ereigniszeit": "2026-10-04 10:00:00",
+        }),
+    )
+    .await;
+    let (s, v) = anfrage(
+        &app,
+        "PUT",
+        &format!("/api/einsaetze/{einsatz}/modul-overrides/meldungen"),
+        &admin,
+        Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+
+    let v = lage(&app, &cred, "?karte=none").await;
+    assert_eq!(v["einsatz"]["sofortmeldungen_offen"], json!(1), "{v}");
+    assert!(v["einsatz"].get("ausgeblendet").is_none(), "{v}");
+}
+
 /// ADR-0035: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
 /// ihren Einsatz aus der Freigabe nehmen, laufen nicht auseinander. Kommt eine Route mit einem
 /// solchen Scope dazu, steht sie hier, und der Test darunter belegt, dass sie ohne Freigabe

@@ -10657,7 +10657,7 @@
       },
       "FuehrungsfunktionAnzeige": {
         "type": "object",
-        "description": "Ein Katalogeintrag, wie ihn `GET /api/fuehrungsfunktionen` liefert.",
+        "description": "Ein Katalogeintrag, wie ihn `GET /api/command-roles` liefert.",
         "required": [
           "funktion",
           "label",
@@ -14059,6 +14059,13 @@
               }
             ]
           },
+          "ausgeblendet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LagemonitorKachel"
+            },
+            "description": "Kacheln, deren Modul im Einsatz ausgeblendet ist (LLH-2072), in der Folge von\n[`LagemonitorKachel`]. Ihre Werte liest der Server nicht; sie stehen auf 0 bzw. leer, und\nder Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es."
+          },
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
           },
@@ -14197,6 +14204,16 @@
             "description": "Höchste Warnstufe der Matrix, dieselbe Rang-Regel wie die Gebietsliste."
           }
         }
+      },
+      "LagemonitorKachel": {
+        "type": "string",
+        "description": "Eine Kachel des Lagemonitors, die mit ihrem Modul ausgeblendet wird (LLH-2072). Für\n[`LagemonitorAnzeige::ausgeblendet`]; „Ablauf“ hängt an den Einsatzdaten und fehlt nie.",
+        "enum": [
+          "betroffene",
+          "meldungen",
+          "kraefte",
+          "uhs"
+        ]
       },
       "LagemonitorKraefte": {
         "type": "object",

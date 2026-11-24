@@ -26,7 +26,15 @@ import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useDruckModus } from '../components/druck/useDruckModus';
-import { Paneel, PaneelZeile, Stapel, monoStil, useRollen } from '../components/instrument';
+import {
+  Kennung,
+  Paneel,
+  PaneelZeile,
+  Stapel,
+  monoStil,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
 import { SeitenFehler, SeitenSkeleton } from '../components/SeitenZustand';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { VERBINDUNGSMITTEL_LABEL, verbindungsVerweis } from '../components/verbindungen';
@@ -133,6 +141,11 @@ function Mono({ children }: { children: ReactNode }) {
   return <span style={monoStil('monoKlein')}>{children}</span>;
 }
 
+/** Rufname, Sprechgruppe, Fahrzeug: Kennungen in Mono (ADR-0094, `Kennung`). */
+function Ruf({ children }: { children: ReactNode }) {
+  return <Kennung stufe="monoKlein">{children}</Kennung>;
+}
+
 /** Leerzelle: „—" als Text, gedämpft. Mit Grund, wenn die Quelle fehlt. */
 function Leer({ grund }: { grund?: string }) {
   const { rollen } = useRollen();
@@ -144,7 +157,7 @@ function Untereinander({ werte }: { werte: string[] }) {
   return (
     <Flex vertical>
       {werte.map((w) => (
-        <Mono key={w}>{w}</Mono>
+        <Ruf key={w}>{w}</Ruf>
       ))}
     </Flex>
   );
@@ -179,7 +192,7 @@ function StelleZelle({ zeile: z }: { zeile: FunkplanZeile }) {
     // und zwar hängend unter seinem eigenen Textanfang: der Baum-Zweig von `Datensicht` stellt
     // den Text als eigenen Block neben Einzug und Symbol (LFH-977).
     <span style={{ overflowWrap: 'anywhere' }}>
-      {z.art === 'fahrzeug' ? <Mono>{z.stelle}</Mono> : z.stelle}
+      {z.art === 'fahrzeug' ? <Ruf>{z.stelle}</Ruf> : z.stelle}
       {z.stelleZusatz && (
         <>
           {' · '}
@@ -219,7 +232,7 @@ function funkplanSpalten(druckt: boolean) {
       key: 'rufname' as SpalteKey,
       width: 150,
       render: (_t, z) =>
-        z.art === 'sammel' ? null : z.rufname ? <Mono>{z.rufname}</Mono> : <Leer />,
+        z.art === 'sammel' ? null : z.rufname ? <Ruf>{z.rufname}</Ruf> : <Leer />,
     },
     {
       title: 'Leiter/Führer',
@@ -275,7 +288,7 @@ function TeilnehmerZelle({ angabe }: { angabe: TeilnehmerAngabe }) {
             // Eine Komponente lebt nur in der Skizze: kein Pflegeort außerhalb.
             <span style={linkZeilenzielStil(token)}>{t.name}</span>
           )}
-          {t.rufname && <Mono>{t.rufname}</Mono>}
+          {t.rufname && <Ruf>{t.rufname}</Ruf>}
           {/* Eine geplante Teilnahme ist keine Tatsache (LFH-893 D7): das Wort steht da. */}
           {t.status === 'geplant' && <span style={{ color: rollen.gedaempft }}>geplant</span>}
         </Flex>
@@ -317,7 +330,7 @@ function sprechgruppenSpalten() {
       sortWert: (z) => z.bezeichnung,
       render: (_t, z) => (
         <span style={{ overflowWrap: 'anywhere' }}>
-          <Mono>{z.bezeichnung}</Mono>
+          <Ruf>{z.bezeichnung}</Ruf>
         </span>
       ),
     },
@@ -331,7 +344,10 @@ function sprechgruppenSpalten() {
       filter: { werte: BETRIEBSART_WERTE, trifft: (z, w) => z.betriebsart === w },
       render: (_t, z) => (
         <span style={{ overflowWrap: 'anywhere' }}>
-          <Mono>{z.bedingung}</Mono>
+          {/* Betriebsart, Netz, Sicherheit: Wörter, Textschrift (ADR-0094). */}
+          <span style={{ ...schriftStil('textKlein'), fontVariantNumeric: 'tabular-nums' }}>
+            {z.bedingung}
+          </span>
         </span>
       ),
     },

@@ -95,7 +95,7 @@ function setup(route = planungDruckPfad(5)) {
     meHandler(adminFixture()),
     http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
     http.get('/api/plans/5', () => HttpResponse.json(PLANUNG)),
-    http.get('/api/qualifikationen', () => HttpResponse.json([])),
+    http.get('/api/qualifications', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <>

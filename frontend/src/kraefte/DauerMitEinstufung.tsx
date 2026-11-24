@@ -1,7 +1,7 @@
 import { dauer } from '../anzeige/dauer';
 import type { CSSProperties } from 'react';
 import type { SchichtplanGrenzwerte } from '../api/types';
-import { monoStil, useRollen } from '../components/instrument';
+import { monoStil, schriftStil, useRollen } from '../components/instrument';
 import { EINSTUFUNG_WORT, einstufungText, type Einstufung } from './zeitachse';
 
 /** Nur für Screenreader: sehend steht die Beschreibung im `title`. */
@@ -50,7 +50,11 @@ export default function DauerMitEinstufung({
       {begruendung && einstufung && (
         <>
           {' '}
-          <span data-lfh="dauer-einstufung" style={{ color: rollen.achtungText }}>
+          {/* Die Dauer bleibt Mono, das Wort der Einstufung in der Textschrift (ADR-0094). */}
+          <span
+            data-lfh="dauer-einstufung"
+            style={{ ...schriftStil('textKlein'), color: rollen.achtungText }}
+          >
             {EINSTUFUNG_WORT[einstufung.wort]}
           </span>
         </>

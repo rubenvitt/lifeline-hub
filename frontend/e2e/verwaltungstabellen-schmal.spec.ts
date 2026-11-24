@@ -76,7 +76,7 @@ const TABELLEN: Tabelle[] = [
     schalter: 'Fahrzeuge',
     saeen: async (page, marke) => {
       const kennung = `Florian Musterstadt 11/44-${marke}`;
-      await saeen(page, '/api/fahrzeuge', {
+      await saeen(page, '/api/vehicles', {
         funkrufname: kennung,
         fahrzeugtyp: 'Wechselladerfahrzeug mit Abrollbehälter Hochwasser',
         traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest Löschzug Deichweg',
@@ -94,7 +94,7 @@ const TABELLEN: Tabelle[] = [
     schalter: 'Personal',
     saeen: async (page, marke) => {
       const kennung = `Kirchgassner-Wohlfahrt, Maximiliane ${marke}`;
-      await saeen(page, '/api/personal', {
+      await saeen(page, '/api/personnel', {
         name: kennung,
         personalnummer: `PN-${marke}`,
         traegerorganisation: 'Freiwillige Feuerwehr Musterstadt-Nordwest Löschzug Deichweg',
@@ -111,7 +111,7 @@ const TABELLEN: Tabelle[] = [
     schalter: 'Sprechgruppen',
     saeen: async (page, marke) => {
       const kennung = `412_F_DRK_${marke}`;
-      await saeen(page, '/api/sprechgruppen', {
+      await saeen(page, '/api/talk-groups', {
         bezeichnung: kennung,
         betriebsart: 'TMO',
         hinweis: 'Führungskanal Abschnitt Nord, Rückfallebene DMO 77 bei Netzausfall',
@@ -449,7 +449,7 @@ test.describe('Seitenleiste der Verwaltung', () => {
     await anmeldenAlsAdmin(page, { startseite: false });
     // Lange Seite: genug Fahrzeuge, dass der Inhalt den Schirm überragt.
     for (let i = 0; i < 20; i += 1) {
-      await saeen(page, '/api/fahrzeuge', { funkrufname: `E2E Leiste ${LAUF}-${i}` });
+      await saeen(page, '/api/vehicles', { funkrufname: `E2E Leiste ${LAUF}-${i}` });
     }
     await page.goto('/admin/stammdaten/fahrzeuge');
     await expect(page.locator('tr.ant-table-row').first()).toBeVisible();

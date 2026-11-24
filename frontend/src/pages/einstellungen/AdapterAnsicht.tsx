@@ -17,6 +17,7 @@ import {
   monoStil,
   useRollen,
   type BearbeitbaresFeld,
+  schriftStil,
 } from '../../components/instrument';
 import { SeitenFehler, SeitenLeer, SeitenSkeleton } from '../../components/SeitenZustand';
 import { RechteHinweis, SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
@@ -385,8 +386,9 @@ export default function AdapterAnsicht() {
                     ton={pruefErgebnis.erfolg ? 'normal' : 'achtung'}
                     wort={`Verbindung prüfen: ${adapterVersuchText({ ...pruefErgebnis, probe: false }).replace(/^abgerufen/, 'erreichbar')}`}
                   />
-                  <span style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}>
-                    {`${pruefErgebnis.dauer_ms} ms · nichts übernommen`}
+                  <span style={{ ...schriftStil('textKlein'), color: rollen.gedaempft }}>
+                    <span style={monoStil('monoKlein')}>{`${pruefErgebnis.dauer_ms} ms`}</span>
+                    {' · nichts übernommen'}
                   </span>
                 </Stapel>
               </div>

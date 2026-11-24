@@ -949,7 +949,7 @@ function verwaltungFlaechen(fahrzeugId: number): Flaeche[] {
 test('C11 · Fahrzeug-Detail und Einsatz-Vorgaben halten 72 px, kompakt bleibt kleiner', async ({
   page,
 }) => {
-  const fahrzeug = await seed(page, '/api/fahrzeuge', {
+  const fahrzeug = await seed(page, '/api/vehicles', {
     funkrufname: `E2E 724 Florian ${Date.now()}`,
     fahrzeugtyp: 'LF 20',
     kennzeichen: 'X-YZ 724',

@@ -7,7 +7,7 @@ speichert oder anzeigt (Erinnerung, Auftragsempfänger, Führungsstelle, Meldung
 **Führungsfunktionen** (LFH-549, `openspec/changes/archive/2026-09-30-lfh-549-funktionskatalog/design.md`):
 geschlossener Katalog `fuehrung::Fuehrungsfunktion` (EL, S1–S7, Führungshilfspersonal, Fachberater;
 `art` abgeleitet), Mandantenlabels und S7-Schalter in `org_fuehrungsfunktion`, Client liest nur
-`GET /api/fuehrungsfunktionen` (keine zweite Labelliste). Erinnerung, Auftragsempfänger und
+`GET /api/command-roles` (keine zweite Labelliste). Erinnerung, Auftragsempfänger und
 Führungsstelle tragen eine **Codespalte neben dem Text** (Text = Freitext ohne Code bzw.
 Bezeichnung bei FHP/FB, Prüfung `fuehrung::pruefe_funktion`); die Meldung trägt
 `empfaenger_funktion` ohne Bezeichnung, also nur EL und Sachgebiete (FHP/FB 422, LLH-1214), und

@@ -3,7 +3,7 @@ import { Alert, App, Button, Form, Input, Modal, Spin } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconHaken, IconKreuz, IconPlus } from '../../icons';
 import AdminPage from '../../components/AdminPage';
-import { Feld, monoStil, Paneel, useRollen } from '../../components/instrument';
+import { Feld, monoStil, Paneel, useRollen, schriftStil } from '../../components/instrument';
 import { Liste, ListenEintrag, ListenEintragMeta } from '../../components/Liste';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
@@ -41,17 +41,21 @@ interface Probe {
   probe?: string;
 }
 
+/** Stand der Probe eines Schlüssels: „geprüft …“, „Probe gesperrt“ oder „Probe offen“. */
+function probeZustand(s: ArchivEmpfaengerAnzeige, zeit: (wert: string) => string): string {
+  return s.geprueft_at
+    ? `geprüft ${zeit(s.geprueft_at)}`
+    : s.gesperrt
+      ? 'Probe gesperrt'
+      : 'Probe offen';
+}
+
 /** Zustandszeile eines Schlüssels, rein und exportiert für den Test. */
 export function schluesselZustand(
   s: ArchivEmpfaengerAnzeige,
   zeit: (wert: string) => string,
 ): string {
-  const zustand = s.geprueft_at
-    ? `geprüft ${zeit(s.geprueft_at)}`
-    : s.gesperrt
-      ? 'Probe gesperrt'
-      : 'Probe offen';
-  return `${s.fingerabdruck} · ${zustand}`;
+  return `${s.fingerabdruck} · ${probeZustand(s, zeit)}`;
 }
 
 /**
@@ -204,10 +208,16 @@ export default function ArchivSchluessel() {
                     title={<span data-lfh="archiv-schluessel-titel">{s.bezeichnung}</span>}
                     description={
                       <span
-                        style={{ ...monoStil('mono'), color: rollen.gedaempft }}
+                        style={{
+                          ...schriftStil('text'),
+                          fontVariantNumeric: 'tabular-nums',
+                          color: rollen.gedaempft,
+                        }}
                         data-lfh="archiv-schluessel-zustand"
                       >
-                        {schluesselZustand(s, zeit)}
+                        {/* Der Fingerabdruck in Mono, der Stand der Probe in der Textschrift. */}
+                        <span style={monoStil('mono')}>{s.fingerabdruck}</span>
+                        {` · ${probeZustand(s, zeit)}`}
                       </span>
                     }
                   />

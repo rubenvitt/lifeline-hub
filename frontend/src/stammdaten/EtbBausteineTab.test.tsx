@@ -68,7 +68,7 @@ async function menueEintrag(text: string): Promise<HTMLElement> {
 function render(benutzer: typeof admin, liste: unknown[] = bausteine) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/etb-bausteine', () => HttpResponse.json(liste)),
+    http.get('/api/etb-snippets', () => HttpResponse.json(liste)),
   );
   return renderMitProviders(<EtbBausteineTab />);
 }
@@ -143,7 +143,7 @@ describe('EtbBausteineTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/etb-bausteine', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/etb-snippets', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<EtbBausteineTab />);
 
@@ -211,7 +211,7 @@ describe('EtbBausteineTab — Fehlschlag des Deaktivierens (LFH-473)', () => {
   it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/etb-bausteine/:id/deaktivieren', () => {
+      http.post('/api/etb-snippets/:id/deactivate', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json({ error: 'Baustein wird gerade bearbeitet' }, { status: 409 });

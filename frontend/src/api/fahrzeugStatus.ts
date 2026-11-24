@@ -11,7 +11,7 @@ export interface StatusEingabe {
   zeitachse_marke?: ZeitachseMarke | null;
 }
 
-const api = katalogApi<FahrzeugStatus, StatusEingabe>('/api/fahrzeug-status');
+const api = katalogApi<FahrzeugStatus, StatusEingabe>('/api/vehicle-statuses');
 
 export const listeFahrzeugStatus = api.liste;
 export const legeStatusAn = api.legeAn;

@@ -47,7 +47,7 @@ async function menueEintrag(text: string): Promise<HTMLElement> {
 function render(benutzer: typeof admin, statusListe: typeof status = status) {
   server.use(
     meHandler(benutzer),
-    http.get('/api/personal-status', () => HttpResponse.json(statusListe)),
+    http.get('/api/personnel-statuses', () => HttpResponse.json(statusListe)),
   );
   return renderMitProviders(<PersonalStatusTab />);
 }
@@ -128,7 +128,7 @@ describe('PersonalStatusTab', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/personal-status', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/personnel-statuses', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(<PersonalStatusTab />);
 
@@ -153,7 +153,7 @@ describe('PersonalStatusTab', () => {
   it('die Schnellerfassung legt mit Label und den Vorgaben des alten Dialogs an', async () => {
     const ruempfe: unknown[] = [];
     server.use(
-      http.post('/api/personal-status', async ({ request }) => {
+      http.post('/api/personnel-statuses', async ({ request }) => {
         ruempfe.push(await request.json());
         return HttpResponse.json({
           id: 9,
@@ -225,7 +225,7 @@ describe('PersonalStatusTab', () => {
    */
   it('lässt nach einer Ablehnung Dialog und Wortlaut stehen', async () => {
     server.use(
-      http.patch('/api/personal-status/1', () =>
+      http.patch('/api/personnel-statuses/1', () =>
         HttpResponse.json({ error: 'Label bereits vergeben' }, { status: 422 }),
       ),
     );
@@ -248,7 +248,7 @@ describe('PersonalStatusTab', () => {
   it('zeigt die Zeitachsen-Marke und behält sie beim Speichern ohne Aufklappen', async () => {
     let ruempf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/personal-status/2', async ({ request }) => {
+      http.patch('/api/personnel-statuses/2', async ({ request }) => {
         ruempf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 2 });
       }),
@@ -267,7 +267,7 @@ describe('PersonalStatusTab', () => {
   it('zeigt den Pausenstatus und schaltet ihn um', async () => {
     let ruempf: Record<string, unknown> | null = null;
     server.use(
-      http.patch('/api/personal-status/1', async ({ request }) => {
+      http.patch('/api/personnel-statuses/1', async ({ request }) => {
         ruempf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),

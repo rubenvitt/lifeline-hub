@@ -5,6 +5,7 @@ access	Zugang
 access-changes	Zugangsänderungen
 access-log	Zugangsprotokoll
 accommodation	Unterkunft
+accommodation-guidelines	Unterkunft-Richtwerte
 acknowledge	quittieren
 activate	aktivieren
 adapter	-
@@ -12,6 +13,7 @@ admin	-
 administration	Verwaltung
 agenda-items	Programmpunkte
 alarm	Alarmmeldung
+also-local	auch lokal
 animals	Tiere
 api	-
 app-code	-
@@ -38,6 +40,7 @@ care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
 catering	Verpflegung
+catering-templates	Verpflegungsvorlagen
 certificate	Zertifikat
 channels	Kanäle
 chat	-
@@ -78,12 +81,14 @@ end	beenden
 end-others	andere beenden
 enroll	-
 etb	ETB
+etb-snippets	ETB-Bausteine
 evacuation	Evakuierung
 events	-
 execution	Vollzug
 existing	vorhandene
 export	-
 external	extern
+external-agencies	externe Stellen
 fetch-certificate	Zertifikat abrufen
 file	Datei
 finish	-
@@ -99,6 +104,8 @@ hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
 import	-
+in-service	in Dienst
+incident-templates	Einsatzvorlagen
 incidents	Einsätze
 info-line	Infotelefon
 instance	Instanz
@@ -109,6 +116,7 @@ inventory	Bestand
 ios-push	-
 jwks.json	-
 key	Schlüssel
+keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
 live	-
@@ -121,6 +129,7 @@ map	Karte
 marker	-
 master-data	Stammdaten
 material	Material
+material-categories	Materialkategorien
 matrix	-
 me	-
 member-selection	Mitglied-Auswahl
@@ -149,6 +158,7 @@ org-module-settings	Org-Modul-Einstellungen
 org-settings	Org-Einstellungen
 organization	Organisation
 origin	Herkunft
+out-of-service	außer Dienst
 overlays	Fachebenen
 pair	koppeln
 pairings	Kopplungen
@@ -156,6 +166,8 @@ password	Passwort
 pause	anhalten
 person-search	Personensuche
 personnel	Personal
+personnel-statuses	Personalstatus
+personnel-suggestions	Personalvorschläge
 persons	Personen
 place-preview	Ortsvorschau
 place-search	Ortssuche
@@ -170,6 +182,7 @@ promote-to-etb	zum ETB heraufstufen
 promote-to-task	zum Auftrag heraufstufen
 providers	-
 proxy	-
+qualifications	Qualifikationen
 raster	-
 read	gelesen
 read-marker	Lesemarke
@@ -210,6 +223,7 @@ sessions	Sitzungen
 set	festlegen
 settings	Einstellungen
 shell	-
+shift-models	Schichtmodelle
 shift-plan	Schichtplan
 signing-keys	Unterschriftsschlüssel
 situation	Lage
@@ -231,6 +245,7 @@ system	-
 talk-groups	Sprechgruppen
 task	Auftrag
 tasks	Aufträge
+template	Vorlage
 test	-
 tile	-
 tilejson	-
@@ -242,12 +257,16 @@ triage	Sichtung
 types	Arten
 uhs	UHS
 undo	zurücknehmen
+unit-templates	Einheitsvorlagen
+unit-types	Einheitstypen
 units	Einheiten
 unregister	-
 update-now	jetzt aktualisieren
 user-settings	Benutzereinstellungen
 users	Benutzer
 v1	-
+vehicle-statuses	Fahrzeugstatus
+vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
 web-push	-
 webauthn	-

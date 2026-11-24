@@ -1,6 +1,6 @@
 import { Button, Modal } from 'antd';
 import AdminPage from '../components/AdminPage';
-import { Knopfreihe, Status, monoStil, Stapel } from '../components/instrument';
+import { Knopfreihe, Status, monoStil, schriftStil, Stapel } from '../components/instrument';
 import { SeitenHinweise } from '../components/SpeicherHinweis';
 import KatalogTabelle, {
   KENNUNG_SCHMAL_BREITE,
@@ -149,7 +149,8 @@ export default function SprechgruppenTab() {
       // TMO und DMO Bedeutungen andichtete (blau = Bedienung, orange = Achtung).
       render: (ba: string) => <span style={monoStil('monoKlein', 500)}>{ba}</span>,
     },
-    // Netz und Sicherheit (LFH-1030): kurze Kennzeichnungen wie die Betriebsart, deshalb Mono.
+    // Netz und Sicherheit (LFH-1030): Freitext wie „Gateway“ oder „offen“, deshalb Textschrift
+    // (ADR-0094); nur die Betriebsart ist eine Kennung.
     {
       title: 'Netz',
       dataIndex: 'netz',
@@ -158,7 +159,8 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.netz),
       filters: netzWerte.length > 0 ? netzWerte : undefined,
       onFilter: (wert, sg) => sg.netz === wert,
-      render: (n?: string) => (n ? <span style={monoStil('monoKlein', 500)}>{n}</span> : '—'),
+      render: (n?: string) =>
+        n ? <span style={{ ...schriftStil('textKlein'), fontWeight: 500 }}>{n}</span> : '—',
     },
     {
       title: 'Sicherheit',
@@ -168,7 +170,8 @@ export default function SprechgruppenTab() {
       sorter: nachText((sg: Sprechgruppe) => sg.sicherheit),
       filters: sicherheitWerte.length > 0 ? sicherheitWerte : undefined,
       onFilter: (wert, sg) => sg.sicherheit === wert,
-      render: (n?: string) => (n ? <span style={monoStil('monoKlein', 500)}>{n}</span> : '—'),
+      render: (n?: string) =>
+        n ? <span style={{ ...schriftStil('textKlein'), fontWeight: 500 }}>{n}</span> : '—',
     },
     {
       title: 'Hinweis',

@@ -24,12 +24,12 @@ async function weitereAngabenOeffnen() {
 
 /** Katalog „Externe Stellen“ ohne zuständige Leitstelle, wenn ein Test nichts anderes setzt. */
 function katalog(stellen: ExterneStelle[] = []) {
-  server.use(http.get('/api/externe-stellen', () => HttpResponse.json(stellen)));
+  server.use(http.get('/api/external-agencies', () => HttpResponse.json(stellen)));
 }
 
 /** Einheitstypen der Organisation (zweite Vorschlagsgruppe für „Was“). */
 function typen(liste: EinheitTyp[] = []) {
-  server.use(http.get('/api/einheit-typen', () => HttpResponse.json(liste)));
+  server.use(http.get('/api/unit-types', () => HttpResponse.json(liste)));
 }
 
 beforeEach(() => {
@@ -166,7 +166,7 @@ describe('NachforderungFormular — Adressat aus dem Katalog „Externe Stellen�
     let liefern: () => void = () => {};
     const geliefert = new Promise<void>((r) => (liefern = r));
     server.use(
-      http.get('/api/externe-stellen', async () => {
+      http.get('/api/external-agencies', async () => {
         await geliefert;
         return HttpResponse.json(KATALOG);
       }),

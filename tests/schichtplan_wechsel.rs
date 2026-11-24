@@ -176,7 +176,7 @@ async fn etb_letzter(pool: &sqlx::SqlitePool, e: i64, nadel: &str) -> String {
 }
 
 async fn status_id(app: &axum::Router, cookie: &str, label: &str) -> i64 {
-    let (_, liste) = anfrage(app, "GET", "/api/personal-status", cookie, None).await;
+    let (_, liste) = anfrage(app, "GET", "/api/personnel-statuses", cookie, None).await;
     liste
         .as_array()
         .unwrap()
@@ -533,7 +533,7 @@ async fn pause_kennzeichen_und_sperren() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/personal-status/{pause}"),
+        &format!("/api/personnel-statuses/{pause}"),
         &admin,
         Some(&json!({"pause": false})),
     )
@@ -561,13 +561,13 @@ async fn pause_kennzeichen_und_sperren() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/personal-status/{id}"),
+            &format!("/api/personnel-statuses/{id}"),
             &admin,
             Some(&json!({"pause": true})),
         )
         .await;
         assert_eq!(s, StatusCode::OK, "{v}");
-        let (_, liste) = anfrage(&app, "GET", "/api/personal-status", &admin, None).await;
+        let (_, liste) = anfrage(&app, "GET", "/api/personnel-statuses", &admin, None).await;
         let markiert: Vec<&str> = liste
             .as_array()
             .unwrap()

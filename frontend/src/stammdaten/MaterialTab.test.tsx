@@ -44,7 +44,7 @@ function render(
   server.use(
     meHandler(benutzer),
     http.get('/api/material', () => HttpResponse.json(posten)),
-    http.get('/api/material-kategorien', () => HttpResponse.json(['Betreuung'])),
+    http.get('/api/material-categories', () => HttpResponse.json(['Betreuung'])),
   );
   return renderMitProviders(
     <>
@@ -90,12 +90,12 @@ describe('MaterialTab', () => {
       freigeben = resolve;
     });
     server.use(
-      http.post('/api/material/:id/ausser-dienst', async ({ params }) => {
+      http.post('/api/material/:id/out-of-service', async ({ params }) => {
         gerufen.push(`ausser-dienst/${params.id}`);
         await gate;
         return HttpResponse.json({ ...material, dienststatus: 'ausser_dienst' });
       }),
-      http.post('/api/material/:id/in-dienst', async ({ params }) => {
+      http.post('/api/material/:id/in-service', async ({ params }) => {
         gerufen.push(`in-dienst/${params.id}`);
         await gate;
         return HttpResponse.json({ ...material, id: 2, dienststatus: 'in_dienst' });
@@ -279,7 +279,7 @@ describe('MaterialTab', () => {
     server.use(
       meHandler(admin),
       http.get('/api/material', () => new HttpResponse(null, { status: 500 })),
-      http.get('/api/material-kategorien', () => HttpResponse.json([])),
+      http.get('/api/material-categories', () => HttpResponse.json([])),
     );
     renderMitProviders(<MaterialTab />);
 
@@ -305,7 +305,7 @@ describe('MaterialTab — Fehlschlag des Statuswechsels (LFH-473)', () => {
   it('hinterlässt einen stehenden Hinweis, den das nächste Absenden räumt', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/material/:id/ausser-dienst', () => {
+      http.post('/api/material/:id/out-of-service', () => {
         versuch += 1;
         if (versuch > 1) return new Promise<never>(() => {});
         return HttpResponse.json(

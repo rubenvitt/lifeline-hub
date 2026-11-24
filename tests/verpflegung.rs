@@ -3011,7 +3011,7 @@ async fn betreuungsstellen_fuer_verpflegungsleser_ohne_modul_betreuung() {
 
 // ── Verpflegungsplan der Organisation (LLH-1058) ────────────────────────────────────────────
 
-const PLAN: &str = "/api/verpflegung-vorlagen";
+const PLAN: &str = "/api/catering-templates";
 
 async fn mahlzeit(app: &axum::Router, cookie: &str, body: &str) -> (StatusCode, Value) {
     anfrage(app, "POST", PLAN, cookie, Some(body)).await

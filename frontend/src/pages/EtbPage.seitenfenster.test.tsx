@@ -137,7 +137,7 @@ function setup(route: string) {
         },
       }),
     ),
-    http.get('/api/etb-bausteine', () => HttpResponse.json([])),
+    http.get('/api/etb-snippets', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/fahrzeuge', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/einheiten', () => HttpResponse.json([])),
     http.get('/api/einsaetze/7/abschnitte', () => HttpResponse.json([])),

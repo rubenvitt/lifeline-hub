@@ -30,7 +30,7 @@ pub struct ListQuery {
     pub nur_aktive: Option<bool>,
 }
 
-/// GET /api/verpflegung-vorlagen — der Plan der eigenen Organisation nach Beginn; ohne
+/// GET /api/catering-templates — der Plan der eigenen Organisation nach Beginn; ohne
 /// `nur_aktive=false` nur die aktiven Mahlzeiten.
 pub async fn list(
     State(state): State<AppState>,
@@ -61,7 +61,7 @@ pub struct VorlageBody {
     pub verpflegungsart: Option<String>,
 }
 
-/// POST /api/verpflegung-vorlagen — Admin. Neue aktive Mahlzeit; 400 Feld, 422 Ende gleich
+/// POST /api/catering-templates — Admin. Neue aktive Mahlzeit; 400 Feld, 422 Ende gleich
 /// Beginn, 409 Name schon aktiv vergeben.
 pub async fn create(
     State(state): State<AppState>,
@@ -95,7 +95,7 @@ pub struct PatchVorlage {
     pub aktiv: Option<bool>,
 }
 
-/// PATCH /api/verpflegung-vorlagen/{vid} — Admin, Teiländerung, auch Deaktivieren und
+/// PATCH /api/catering-templates/{vid} — Admin, Teiländerung, auch Deaktivieren und
 /// Aktivieren. Fremd oder unbekannt 404; Ende gleich Beginn im Effektivzustand 422; danach aktiv
 /// mit einem Namen, den eine andere aktive Mahlzeit trägt, 409.
 pub async fn update(
