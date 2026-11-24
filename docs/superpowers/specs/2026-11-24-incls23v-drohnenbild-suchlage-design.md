@@ -114,10 +114,18 @@ zugeschalteten Adapter (`HashSet<adapter_id>`). `Stand` hält die `DrohnenLage`,
 - `code = "suchlage"`, Feld `basis_url` (`Url`, Pflicht), Platz `token` (Pflicht),
   `intervall_min_s = 5`, `intervall_vorschlag_s = 5`.
 - Die Art hält ein `Arc<drohne::Speicher>`. `Verzeichnis::produktiv()` bekommt ihn als Argument
-  (Aufruf in `app.rs`; Tests bauen ihr Verzeichnis weiter selbst).
+  (Aufruf in `src/main.rs`; Tests bauen ihr Verzeichnis weiter selbst; der Test in
+  `src/adapter/art.rs`, der ein leeres Verzeichnis erwartet, wird auf die Art „suchlage“
+  umgestellt).
+- **Quelle der Wahrheit für die Zuschaltung ist die DB** (`adapter_einsatz`); der Merker im
+  Speicher ist nur ihr Abbild (Festlegung Builder-Check): `drohne::Speicher::laden` füllt ihn beim
+  Start aus `adapter_einsatz` ⋈ laufende Einsätze, die Schreibwege (§5.3) setzen ihn sofort, und
+  `uebernehmen` gleicht ihn in jedem Lauf mit derselben Abfrage ab (räumt ab, wenn der Einsatz
+  inzwischen abgeschlossen ist).
 - `abrufen`:
   1. Nicht zugeschaltet (`speicher.ist_zugeschaltet(adapter_id)` falsch) und kein Probelauf →
-     `OhneUebernahme(0)` ohne Netz.
+     `OhneUebernahme(0)` ohne Netz. (Nach einem Neustart greift das nicht fälschlich, weil
+     `laden` den Merker vor dem ersten Lauf setzt.)
   2. `GET {basis_url}/api/lagemonitor/v1/lage?karte=<etag>` mit `Authorization: Bearer`, Deckel
      4 MiB. `api_version != 1` → `Fehlschlag(VersionUnbekannt)`.
   3. Hat sich `photos_latest_ms` gegenüber dem Stand geändert: `GET …/photos` (Deckel 2 MiB).
@@ -128,9 +136,13 @@ zugeschalteten Adapter (`HashSet<adapter_id>`). `Stand` hält die `DrohnenLage`,
   Stand in den Speicher. Schreibt nichts in die DB.
 - Probelauf („Verbindung prüfen“) ruft `lage` ab und prüft die Version; nichts in den Speicher.
 - **Rahmenänderung `fluechtig`:** neue Trait-Methode `fn fluechtig(&self) -> bool { false }`.
-  Bei `true` schreibt `run_one` nach einem Erfolg keinen `save_versuch`; `save_erfolg` (nächster
-  Abruf, Zustand) bleibt. Fehlschläge werden wie bisher protokolliert. So entsteht bei 5 s eine
-  kleine Zeilenaktualisierung je Lauf statt Einfügen + Aufräumen.
+  Für Arten mit `true` (Festlegungen Builder-Check; andere Arten bleiben unverändert):
+  - **Takt:** der nächste Abruf zählt ab dem **Beginn** des Laufs (`beginn + intervall`), nicht
+    ab seinem Ende; so trifft ein 5-s-Intervall jeden Takt, statt jeden zweiten.
+  - **Versuchszeile:** nach einem Erfolg schreibt `run_one` **keinen** `save_versuch`, außer der
+    Lauf beendet eine Störung (`war_gemeldet`) oder der vorige Versuch war ein Fehlschlag; dann
+    bleibt die Zeile, damit `AdapterWiederOk` (ADR-0086) seine `versuch_id` hat. `save_erfolg`
+    (nächster Abruf, Zustand) bleibt immer. Fehlschläge werden wie bisher protokolliert.
 - **Neuer Fehlercode** `AdapterFehler::VersionUnbekannt` (`version_unbekannt`),
   `braucht_eingriff = true`; Text in `benachrichtigung::adapter::fehler_text` und
   `frontend/src/api/adapter.ts` („Unbekannte Schnittstellenversion“), Enum-Kontrakt.
@@ -146,10 +158,17 @@ Kein Personenbezug in der Tabelle; wer zugeschaltet hat, steht im ETB (Systemein
 
 Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 `/api/einsaetze/{id}/map/drone`):
-- `GET  /api/einsaetze/{id}/drone/sources` – Drohnenquellen der Org mit Zustand (Lesezugriff).
+- `GET  /api/einsaetze/{id}/drone/sources` – Drohnenquellen der Org mit Zustand (Lesezugriff):
+  je Quelle Bezeichnung, zugeschaltet an diesem Einsatz ja/nein, belegt durch einen anderen
+  Einsatz (nur dessen Name, wenn der Nutzer ihn lesen darf, sonst „anderer Einsatz“),
+  `lagemonitor`, Adapter-Zustand, Name des laufenden Suchlage-Einsatzes (`mission.name`) und die
+  Video-Kennungen.
 - `PUT  /api/einsaetze/{id}/drone/sources/{aid}` `{ lagemonitor: bool }` – zuschalten oder Flag
   ändern (`fordere_einsatzleitung`, aktiver Einsatz; Adapter derselben Org, Art mit
-  Drohnenvertrag, sonst 422).
+  Drohnenvertrag, sonst 422). **Exklusiv** (Ruben, 24.11.2026): Ist die Quelle an einem anderen
+  laufenden Einsatz zugeschaltet, 409 mit Hinweis; eine Quelle gehört also höchstens einem
+  laufenden Einsatz (Prüfung in der Schreibtransaktion; ein Teilindex o. Ä. ist dem Builder
+  überlassen).
 - `DELETE /api/einsaetze/{id}/drone/sources/{aid}` – abschalten (Einsatzleitung).
 - Beide Schreibwege setzen den Merker im Speicher sofort; beim Abschalten des letzten Einsatzes
   leert der Speicher den Stand des Adapters.
@@ -158,13 +177,19 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 
 ### 5.4 Fachebene „Drohne“ (LLH-2106)
 
-- `GET /api/einsaetze/{id}/map/drone` (`EinsatzLesezugriff<Lagekarte>`): `FachebeneAntwort` wie
-  die übrigen Fachebenen über `fachebene_antwort` (ETag, 304). Ohne Zuschaltung oder ohne Stand:
-  Umschlag „offline“ mit Grund; Stand älter als 30 s: „veraltet“ mit Datenstand.
-- Features mit `art`: `fluggeraet` (Punkt, `heading_deg`, `in_der_luft`, `bezeichnung`),
-  `spur` (Linie), `gebiet` (Fläche), `foto` (Punkt, `kennung`, `aufgenommen_ms`, `linse`,
-  `blickrichtung_deg`) und, falls Videos laufen, `videos: [kennung]` im Umschlag. Fotos nur mit
-  `aufgenommen_ms >= zugeschaltet_at` dieses Einsatzes.
+- `GET /api/einsaetze/{id}/map/drone` (`EinsatzLesezugriff<Lagekarte>`): die **unveränderte**
+  `FachebeneAntwort` über `fachebene_antwort` (ETag, 304), Status `ok`/`leer`/`offline` wie
+  gehabt, `abgerufen` = Zeit des letzten Stands (Festlegung Builder-Check: kein neues Feld im
+  gemeinsamen DTO; Videos und Missionsname liefert `GET …/drone/sources`, „veraltet“ leitet das
+  Frontend wie bei allen Ebenen aus `abgerufen` und `veraltetNachMin = 1` ab). Ohne Zuschaltung
+  oder ohne Stand: `offline`.
+- **Umfang** (Ruben, 24.11.2026): alles des laufenden Suchlage-Einsatzes, auch von Flügen vor dem
+  Zuschalten (Abdeckungsnachweis); nur Fotos erst ab Zuschalten. Features mit `art`:
+  `fluggeraet` (Punkt, `heading_deg`, `in_der_luft`, `bezeichnung`), `spur` (Linie je Flug),
+  `element` (Kartenelement aus Suchlage als Punkt, Linie oder Fläche, mit Bezeichnung) und
+  `foto` (Punkt, `kennung`, `aufgenommen_ms`, `linse`, `blickrichtung_deg`), nur mit
+  `aufgenommen_ms >= zugeschaltet_at` dieses Einsatzes. Unbekannte Feature-Arten aus Suchlage
+  werden verworfen und gezählt (Probelauf zeigt die Zahl).
 - Frontend: neue Quelle `drohne` in `FachebeneQuelle`/`FACHEBENEN` mit eigenem Lader auf die
   Einsatzroute (`queryKeys` mit Einsatz-ID), `pollMs = 5000`, `veraltetNachMin = 1`; Symbol
   Fluggerät mit Blickrichtung, Spur als Linie, Gebiete blass, Fotos als Bildpunkt; Gruppe „Drohne“
@@ -176,7 +201,10 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 - **`adapter::live`** (Rahmenänderung): `live_abruf(pool, rahmen, adapter_id) -> LiveKontext`
   liest Einstellungen und Chiffrat, entschlüsselt das Token **für genau diesen Abruf** und gibt
   einen Kontext mit `request`/`get` über `adapter::ziel` (Zielschutz, LAN-Regel, Deckel). Nichts
-  davon wird zwischengespeichert. Nur Routen der Drohnenquelle nutzen ihn.
+  davon wird zwischengespeichert. Nur Routen der Drohnenquelle nutzen ihn. **Kein Live-Abruf**
+  (Festlegung Builder-Check), wenn der Adapter angehalten ist, einen Eingriff braucht
+  (`zustand::braucht_eingriff`), der Geheimnisspeicher gesperrt ist oder die Org sich bei einem
+  Hub meldet; dann 503 und im Fenster „Kein Livebild“ bzw. „Vorschau nicht abrufbar“.
 - `GET /api/einsaetze/{id}/drone/video/{key}/hls/{*file}` (`EinsatzLesezugriff<Lagekarte>`,
   Zuschaltung des Einsatzes Pflicht, sonst 404): `key` → Adapter und `gateway_sn` aus dem
   Speicher, `file` nur `[A-Za-z0-9._-]`, Query wird verworfen.
@@ -251,6 +279,15 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 - Ob das Fenster mehrere Videos als Reiter zeigt; Datenmodell und Route können es.
 - Zeitüberschreitung des Live-Abrufs (unter `REQUEST_BUDGET`), Größe der Caches im genannten Rahmen.
 - Bei mehreren zugeschalteten Quellen zeigt die UI die zuerst zugeschaltete; die Route liefert alle.
+
+## 11. Festlegungen aus dem Builder-Check (zum Gegenlesen)
+
+Vom Entwurf selbst getroffen, nicht von Ruben: Takt ab Laufbeginn und Versuchszeile nur bei
+Zustandswechsel für `fluechtig` (§5.2); DB als Quelle der Wahrheit für die Zuschaltung mit
+Laden beim Start (§5.2); unveränderte `FachebeneAntwort`, Videos und Missionsname über
+`…/drone/sources` (§5.3, §5.4); kein Live-Abruf bei angehaltenem oder gestörtem Adapter (§5.5).
+Von Ruben am 24.11.2026 entschieden: Zuschaltung exklusiv (§5.3), Kartenumfang „alles des
+Suchlage-Einsatzes, Fotos ab Zuschalten“ (§5.4).
 
 ## 10. Tests
 
