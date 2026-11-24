@@ -374,17 +374,17 @@ test('C7 · ETB (Beobachter): die Schnellerfassung fehlt, der Typfilter hält 72
 
 async function kommunikationSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  await seed(page, `${E}/meldungen`, {
+  await seed(page, `${E}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Nord gesperrt',
     ereigniszeit: new Date().toISOString(),
   });
-  await seed(page, `${E}/erinnerungen`, {
+  await seed(page, `${E}/reminders`, {
     titel: 'Lagemeldung an die Leitstelle',
     faellig_at: '2030-01-01 10:00',
   });
-  await seed(page, `${E}/nachforderungen`, {
+  await seed(page, `${E}/resource-requests`, {
     art: 'Fahrzeug',
     bezeichnung: 'RTW',
     adressat_kategorie: 'leitstelle',
@@ -397,13 +397,13 @@ async function kommunikationSaeen(page: Page, einsatzId: string) {
     von: 'EL',
     an: 'S2',
   });
-  await seed(page, `${E}/etb/${quelle.id}/auftrag`, {
+  await seed(page, `${E}/etb/${quelle.id}/task`, {
     auftrag_text: 'Erkundung Brücke Nord',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
   });
-  await seed(page, `${E}/befehle`, { vorlage: 'befehl_ladef', titel: 'Befehl Brücke Nord' });
-  const kanaele = (await (await page.request.get(`${E}/chat/kanaele`)).json()) as { id: number }[];
-  await seed(page, `${E}/chat/kanaele/${kanaele[0].id}/nachrichten`, { inhalt: 'Funkprobe' });
+  await seed(page, `${E}/orders`, { vorlage: 'befehl_ladef', titel: 'Befehl Brücke Nord' });
+  const kanaele = (await (await page.request.get(`${E}/chat/channels`)).json()) as { id: number }[];
+  await seed(page, `${E}/chat/channels/${kanaele[0].id}/messages`, { inhalt: 'Funkprobe' });
 }
 
 /*
@@ -667,7 +667,7 @@ test('C8 · Aufträge auf dem Handschirm: Auswahlziel und Detailknöpfe halten 7
   const einsatzId = await einsatzAnlegen(page, `E2E oxgob5gk Handschirm ${Date.now()}`);
   const E = `/api/einsaetze/${einsatzId}`;
   for (const auftrag_text of ['Erkundung Brücke Nord', 'Absperrung Brücke Süd']) {
-    await seed(page, `${E}/auftraege`, {
+    await seed(page, `${E}/tasks`, {
       auftrag_text,
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EL' }],
     });
@@ -1111,17 +1111,17 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
 
 async function lageSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  const bericht = await seed(page, `${E}/lageberichte`, {
+  const bericht = await seed(page, `${E}/situation-reports`, {
     vorlage: 'lagebeurteilung',
     titel: 'Lagevortrag zur Entscheidung 1000',
   });
-  const meldung = await seed(page, `${E}/meldungen`, {
+  const meldung = await seed(page, `${E}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Nord gesperrt, Umleitung über die B12',
     ereigniszeit: new Date().toISOString(),
   });
-  await seed(page, `${E}/meldungen/${meldung.id}/lagerelevant`, { lat: 50.11, lon: 8.68 });
+  await seed(page, `${E}/reports/${meldung.id}/situation-relevant`, { lat: 50.11, lon: 8.68 });
   return bericht.id;
 }
 
@@ -1562,14 +1562,14 @@ const TABLET_QUER = { width: 1024, height: 768 };
 
 async function eingetroffeneNachforderung(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  const nf = await seed(page, `${E}/nachforderungen`, {
+  const nf = await seed(page, `${E}/resource-requests`, {
     art: 'Tauchpumpe',
     bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
     anzahl: 3,
     adressat_kategorie: 'leitstelle',
   });
   for (const status of ['zugesagt', 'unterwegs', 'eingetroffen']) {
-    await seed(page, `${E}/nachforderungen/${nf.id}/status`, { status });
+    await seed(page, `${E}/resource-requests/${nf.id}/status`, { status });
   }
   return nf.id;
 }

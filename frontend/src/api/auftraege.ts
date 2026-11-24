@@ -21,7 +21,7 @@ interface AuftragFilter {
  *  nach Phase. */
 export function listeAuftraege(einsatzId: number, filter: AuftragFilter = {}): Promise<Auftrag[]> {
   return apiGet<Auftrag[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/auftraege`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/tasks`, {
       status: filter.status,
       richtung: filter.richtung,
       abschnitt_id: filter.abschnittId,
@@ -60,7 +60,7 @@ export function listeOffeneAuftraege(
   filter: AuftragBoardFilter = {},
 ): Promise<Auftrag[]> {
   return apiGet<Auftrag[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/auftraege`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/tasks`, {
       phase: 'offen',
       ...boardParameter(filter),
     }),
@@ -75,7 +75,7 @@ export function listeAbgeschlosseneAuftraege(
   limit: number = AUFTRAEGE_SEITE,
 ): Promise<Auftrag[]> {
   return apiGet<Auftrag[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/auftraege`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/tasks`, {
       phase: 'abgeschlossen',
       ...boardParameter(filter),
       vor_zeit: vor?.zeit,
@@ -91,17 +91,17 @@ export function ladeAuftragKennzahlen(
   filter: AuftragBoardFilter = {},
 ): Promise<AuftragKennzahlen> {
   return apiGet<AuftragKennzahlen>(
-    mitParametern(`/api/einsaetze/${einsatzId}/auftraege/kennzahlen`, boardParameter(filter)),
+    mitParametern(`/api/einsaetze/${einsatzId}/tasks/metrics`, boardParameter(filter)),
   );
 }
 
 /** Ein Auftrag einzeln, etwa für einen Deeplink auf eine nicht geladene Seite (LFH-1071). */
 export function ladeAuftrag(einsatzId: number, auftragId: number): Promise<Auftrag> {
-  return apiGet<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}`);
+  return apiGet<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}`);
 }
 
 export function legeAuftragAn(einsatzId: number, daten: NeuerAuftrag): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege`, 'POST', daten);
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks`, 'POST', daten);
 }
 
 /** Quittierung pro Empfänger (LFH-90). */
@@ -111,7 +111,7 @@ export function quittiereEmpfaenger(
   empfaengerId: number,
 ): Promise<Auftrag> {
   return apiSend<Auftrag>(
-    `/api/einsaetze/${einsatzId}/auftraege/${auftragId}/empfaenger/${empfaengerId}/quittieren`,
+    `/api/einsaetze/${einsatzId}/tasks/${auftragId}/recipients/${empfaengerId}/acknowledge`,
     'POST',
   );
 }
@@ -125,7 +125,7 @@ export function setzeVollzug(
   status: 'offen' | 'in_arbeit' | 'vollzogen',
   vollzugsmeldung?: string,
 ): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}/vollzug`, 'POST', {
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}/execution`, 'POST', {
     status,
     vollzugsmeldung,
   });
@@ -133,17 +133,13 @@ export function setzeVollzug(
 
 /** Abnahme durch die Führung (LFH-91). */
 export function nimmAb(einsatzId: number, auftragId: number): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}/abnehmen`, 'POST');
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}/accept`, 'POST');
 }
 
 /** Hebt einen Auftrag mit Grund auf (LLH-1098); unumkehrbar, der Server schreibt das ETB. */
 export function hebeAuf(einsatzId: number, auftragId: number, grund: string): Promise<Auftrag> {
   const body: AuftragAufhebenBody = { grund };
-  return apiSend<Auftrag>(
-    `/api/einsaetze/${einsatzId}/auftraege/${auftragId}/aufheben`,
-    'POST',
-    body,
-  );
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}/void`, 'POST', body);
 }
 
 /** Berichtigt einen Auftrag vor der ersten Quittung (LLH-1098): nur die geänderten Felder. */
@@ -152,5 +148,5 @@ export function patcheAuftrag(
   auftragId: number,
   patch: AuftragPatch,
 ): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/auftraege/${auftragId}`, 'PATCH', patch);
+  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/tasks/${auftragId}`, 'PATCH', patch);
 }

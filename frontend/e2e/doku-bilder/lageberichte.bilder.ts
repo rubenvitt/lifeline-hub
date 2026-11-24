@@ -32,7 +32,7 @@ async function entwurfAnlegen(page: Page, einsatzId: number): Promise<number> {
   const bericht = await fuelle<{ id: number }>(
     page,
     'post',
-    `/api/einsaetze/${einsatzId}/lageberichte`,
+    `/api/einsaetze/${einsatzId}/situation-reports`,
     {
       vorlage: 'lagebericht',
       titel: ENTWURF,
@@ -45,7 +45,7 @@ async function entwurfAnlegen(page: Page, einsatzId: number): Promise<number> {
     },
   );
   // Verteiler (LLH-1172): übergeordnete Führung und Einsatzleitung.
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/lageberichte/${bericht.id}`, {
+  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}/situation-reports/${bericht.id}`, {
     verteiler: [
       {
         empfaenger_typ: 'extern',
@@ -63,7 +63,7 @@ async function entwurfAnlegen(page: Page, einsatzId: number): Promise<number> {
  * (dieselbe Datenbank).
  */
 async function freigegebenerBericht(page: Page, einsatzId: number): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/lageberichte`);
+  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/situation-reports`);
   expect(antwort.ok()).toBe(true);
   const liste = (await antwort.json()) as { id: number; status: string; titel: string }[];
   const bericht = liste.find((b) => b.status === 'freigegeben' && b.titel !== ENTWURF);

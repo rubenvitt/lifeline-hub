@@ -91,7 +91,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/meldungen", self.einsatz),
+            &format!("/api/einsaetze/{}/reports", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -151,7 +151,7 @@ async fn empfaengerfunktion_wird_angenommen_und_gelesen() {
     let (s, detail) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/meldungen/{}", w.einsatz, m["id"]),
+        &format!("/api/einsaetze/{}/reports/{}", w.einsatz, m["id"]),
         &w.admin,
         None,
     )
@@ -573,7 +573,7 @@ async fn sichten_raeumt_den_eingang_bei_allen_nicht_den_sofortalarm() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{id}/status", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{id}/status", w.einsatz),
         &w.cookie("carla").await,
         Some(&json!({ "status": "gesichtet" }).to_string()),
     )
@@ -598,7 +598,7 @@ async fn sichten_raeumt_den_eingang_bei_allen_nicht_den_sofortalarm() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{sid}/status", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{sid}/status", w.einsatz),
         &w.admin,
         Some(&json!({ "status": "in_bearbeitung" }).to_string()),
     )
@@ -623,7 +623,7 @@ async fn bestaetigen_raeumt_den_eingang() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{id}/bestaetigen", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{id}/confirm", w.einsatz),
         &w.cookie("bertram").await,
         None,
     )
@@ -638,7 +638,10 @@ async fn uebernehmen(w: &Welt, cookie: &str, id: i64) -> Value {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{id}/lagerelevant", w.einsatz),
+        &format!(
+            "/api/einsaetze/{}/reports/{id}/situation-relevant",
+            w.einsatz
+        ),
         cookie,
         Some("{}"),
     )
@@ -682,7 +685,10 @@ async fn uebernahme_in_die_lage_erreicht_s2_und_einsatzleitung() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{id}/lagerelevant", w.einsatz),
+        &format!(
+            "/api/einsaetze/{}/reports/{id}/situation-relevant",
+            w.einsatz
+        ),
         &bert,
         Some(&json!({ "text": "Deich gesichert" }).to_string()),
     )
@@ -719,7 +725,7 @@ async fn gesehen_raeumt_die_uebernahme() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{eins}/lage-gesehen", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{eins}/situation-seen", w.einsatz),
         &w.admin,
         None,
     )
@@ -757,7 +763,7 @@ async fn korrektur_in_und_aus_der_lage_meldet_und_raeumt_die_uebernahme() {
             let (s, v) = anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/meldungen/{id}"),
+                &format!("/api/einsaetze/{einsatz}/reports/{id}"),
                 &cookie,
                 Some(&body.to_string()),
             )
@@ -789,7 +795,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PATCH",
-            &format!("/api/einsaetze/{}/meldungen/{id}", self.einsatz),
+            &format!("/api/einsaetze/{}/reports/{id}", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -899,7 +905,7 @@ async fn gesichtete_meldung_meldet_nach_der_korrektur_nicht() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen/{id}/status", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{id}/status", w.einsatz),
         &w.cookie("bertram").await,
         Some(&json!({ "status": "gesichtet" }).to_string()),
     )

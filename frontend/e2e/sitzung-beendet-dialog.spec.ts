@@ -58,7 +58,7 @@ test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, bas
   await expect
     .poll(
       async () => {
-        const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
+        const r = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
         const liste = (await r.json()) as { inhalt: string }[];
         return liste.some((m) => m.inhalt === inhalt);
       },

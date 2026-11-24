@@ -31,7 +31,7 @@ describe('EtbAnhaenge (LFH-117)', () => {
     );
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
+    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/attachments/9');
     expect(links[0]).toHaveAttribute('download');
     expect(links[0]).toHaveTextContent('IMG_0412.HEIC · 3,1 MB');
     expect(links[1]).toHaveTextContent('fax.pdf · 2,0 KB');
@@ -100,7 +100,7 @@ describe('EtbAnhaenge (LFH-117)', () => {
       });
       expect(original).toHaveAttribute(
         'href',
-        '/api/einsaetze/5/etb/40/anhaenge/9?fassung=original',
+        '/api/einsaetze/5/etb/40/attachments/9?fassung=original',
       );
       expect(original).toHaveAttribute('download', 'IMG_0412.original.HEIC');
       expect(screen.getAllByRole('link')).toHaveLength(3);
@@ -131,12 +131,12 @@ describe('EtbAnhaenge — Vorschau (LFH-759)', () => {
     const knopf = screen.getByRole('button', { name: 'Vorschau: dach.jpg, Anhang zu Nr. 4' });
     expect(knopf.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=vorschau',
+      '/api/einsaetze/5/etb/40/attachments/9?fassung=vorschau',
     );
     expect(screen.getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
     // Die Verweise bleiben, wie sie sind: ETB-Route, Name und Größe.
     const links = screen.getAllByRole('link');
     expect(links).toHaveLength(2);
-    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/anhaenge/9');
+    expect(links[0]).toHaveAttribute('href', '/api/einsaetze/5/etb/40/attachments/9');
   });
 });

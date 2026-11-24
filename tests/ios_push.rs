@@ -1001,7 +1001,7 @@ async fn mit_inhalt_kommen_absender_und_wortlaut() {
 
 /// Review Focus 5: Absender und Wortlaut nur, wenn der Empfänger die Meldung lesen dürfte. Die
 /// Übernahme in die Lage erreicht die Leser der Lagemeldungen; wer das Modul Meldungen nicht
-/// lesen darf, bekäme von `GET …/meldungen/{mid}` 403 und darum hier keinen Inhalt.
+/// lesen darf, bekäme von `GET …/reports/{mid}` 403 und darum hier keinen Inhalt.
 #[tokio::test]
 async fn ohne_leserecht_fehlen_absender_und_wortlaut() {
     let mut w = versand().await;
@@ -1032,7 +1032,7 @@ async fn ohne_leserecht_fehlen_absender_und_wortlaut() {
     let (s, _) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/meldungen/{m}", w.einsatz),
+        &format!("/api/einsaetze/{}/reports/{m}", w.einsatz),
         &cookie,
         None,
     )

@@ -5,7 +5,7 @@ import { ANHANG_WIRD_GEHOLT_TEXT } from '../api/anhangAbruf';
 import { ladeAnhangHerunter } from './anhangHerunterladen';
 import * as speichern from './dateiSpeichern';
 
-const HREF = '/api/einsaetze/7/etb/1/anhaenge/3';
+const HREF = '/api/einsaetze/7/etb/1/attachments/3';
 
 describe('ladeAnhangHerunter (Review L2)', () => {
   let gespeichert: ReturnType<typeof vi.spyOn>;

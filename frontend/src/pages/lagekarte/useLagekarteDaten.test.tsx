@@ -252,10 +252,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
       http.get('/api/einsaetze/5/settings', () => new HttpResponse(null, { status: 500 })),
       // 403 auf die Rückmeldungen ist für Rollen ohne „Meldungen" der Normalfall und gehört nicht
       // in den Katalog.
-      http.get(
-        '/api/einsaetze/5/meldungen/rueckmeldungen',
-        () => new HttpResponse(null, { status: 403 }),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => new HttpResponse(null, { status: 403 })),
       ...[
         '/api/einsaetze/5/damages/marker',
         '/api/einsaetze/5/einheiten',
@@ -266,9 +263,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),
@@ -312,9 +307,7 @@ describe('useLagekarteDaten fehlerhafteQuellen', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),
@@ -377,9 +370,7 @@ describe('useLagekarteDaten markerLaden', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
     );
     const { result } = renderHook(() => useLagekarteDaten({ einsatzId: 5, zeigeZonen: true }), {
       wrapper: wrapper(),
@@ -446,9 +437,7 @@ describe('useLagekarteDaten Betroffene (LFH-648)', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
       http.get('/api/einsaetze/5/module-access', () => {
         zaehler.freigaben += 1;
         return HttpResponse.json(freigabenFixture(freigaben));
@@ -621,9 +610,7 @@ describe('useLagekarteDaten Betreuungsstellen (LFH-673)', () => {
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
@@ -970,9 +957,7 @@ describe('useLagekarteDaten Bereitstellungsräume (LLH-1107)', () => {
         '/api/einsaetze/5/map/commanders',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/einheiten', () => HttpResponse.json([EINHEIT])),
-      http.get('/api/einsaetze/5/meldungen/rueckmeldungen', () =>
-        HttpResponse.json(RUECKMELDUNGEN),
-      ),
+      http.get('/api/einsaetze/5/reports/check-ins', () => HttpResponse.json(RUECKMELDUNGEN)),
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
       ),
@@ -1168,7 +1153,7 @@ describe('useLagekarteDaten Tiere (LLH-1123)', () => {
         '/api/einsaetze/5/hazard-areas',
         '/api/einsaetze/5/situation/reports',
         '/api/einsaetze/5/map/commanders',
-        '/api/einsaetze/5/meldungen/rueckmeldungen',
+        '/api/einsaetze/5/reports/check-ins',
       ].map((pfad) => http.get(pfad, () => HttpResponse.json([]))),
       http.get('/api/einsaetze/5/module-access', () =>
         HttpResponse.json(freigabenFixture(freigaben)),
@@ -1323,7 +1308,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     '/api/einsaetze/5/sectors',
     '/api/einsaetze/5/hazard-areas',
     '/api/einsaetze/5/situation/reports',
-    '/api/einsaetze/5/meldungen/rueckmeldungen',
+    '/api/einsaetze/5/reports/check-ins',
   ];
 
   /** Alle Quellen gesund; `freigaben` je Fall (`'fehler'` = 500, `'haengt'` = antwortet nie). */
@@ -1406,7 +1391,7 @@ describe('useLagekarteDaten Modulgrenze der Kartenquellen (LFH-669)', () => {
     expect(aufrufe['/api/einsaetze/5/damages/marker']).toBe(1);
     expect(aufrufe['/api/einsaetze/5/uhs']).toBeUndefined();
     // Rückmeldungen hängen am Modul „Meldungen": ohne Recht keine Anfrage, keine Daten.
-    expect(aufrufe['/api/einsaetze/5/meldungen/rueckmeldungen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/5/reports/check-ins']).toBeUndefined();
     expect(result.current.rohdaten.rueckmeldungen).toBeUndefined();
     expect(result.current.fehlerhafteQuellen).toEqual([]);
   });

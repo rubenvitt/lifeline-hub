@@ -1,5 +1,5 @@
 //! Integrationstests der Bild-Anlagen an Lagebericht und Befehl (LFH-1028, Spec
-//! `dokument-anlagen`) über die Routen `/api/einsaetze/{id}/{lageberichte|befehle}/{did}/anlagen…`:
+//! `dokument-anlagen`) über die Routen `/api/einsaetze/{id}/{situation-reports|orders}/{did}/enclosures…`:
 //! Anfügen im Entwurf, Sperre nach der Freigabe, Dateityp, Felder, Rechte, Download in den
 //! Fassungen, Abschottung gegen die generische Route und der Freigabe-Snapshot im ETB.
 //!
@@ -23,17 +23,17 @@ struct Art {
 }
 
 const LAGEBERICHT: Art = Art {
-    praefix: "lageberichte",
+    praefix: "situation-reports",
     anlegen: r#"{"vorlage":"freitext","titel":"Lage 12:00","abschnitte":[{"schluessel":"text","text":"Ruhig"}]}"#,
 };
 
 const BEFEHL: Art = Art {
-    praefix: "befehle",
+    praefix: "orders",
     anlegen: r#"{"vorlage":"befehl_lad","titel":"Befehl 1","abschnitte":[{"schluessel":"lage","text":"L"},{"schluessel":"auftrag","text":"A"},{"schluessel":"durchfuehrung","text":"D"}]}"#,
 };
 
 fn pfad(art: &Art, einsatz: i64, dok: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/{}/{dok}/anlagen", art.praefix)
+    format!("/api/einsaetze/{einsatz}/{}/{dok}/enclosures", art.praefix)
 }
 
 /// Multipart-POST mit Textfeldern und höchstens einer Datei.
@@ -186,7 +186,7 @@ async fn anfuegen_liste_download_fall(art: &Art) {
     assert_eq!(l.as_array().unwrap().len(), 1);
     assert_eq!(l[0]["id"], id);
 
-    let datei = format!("{}/{id}/datei", pfad(art, einsatz, dok));
+    let datei = format!("{}/{id}/file", pfad(art, einsatz, dok));
     let (s, bytes) = get_bytes(&app, &datei, &admin).await;
     assert_eq!(s, StatusCode::OK);
     assert!(bytes.starts_with(b"\x89PNG"), "bereinigte Fassung ist PNG");
@@ -224,7 +224,7 @@ async fn freigabe_fall(art: &Art) {
     let (s, d) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/{}/{dok}/freigeben", art.praefix),
+        &format!("/api/einsaetze/{einsatz}/{}/{dok}/release", art.praefix),
         &admin,
         None,
     )
@@ -348,7 +348,7 @@ async fn anlage_ist_ueber_die_generische_route_weder_lad_noch_loeschbar() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let generisch = format!("/api/einsaetze/{einsatz}/anhaenge/{anhang_id}");
+    let generisch = format!("/api/einsaetze/{einsatz}/attachments/{anhang_id}");
     let (s, _) = get_bytes(&app, &generisch, &admin).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(&app, "DELETE", &generisch, &admin, None).await;
@@ -367,7 +367,7 @@ async fn fremdes_dokument_und_fremder_einsatz_sind_404() {
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = get_bytes(
         &app,
-        &format!("{}/{id}/datei", pfad(&LAGEBERICHT, anderer, dok)),
+        &format!("{}/{id}/file", pfad(&LAGEBERICHT, anderer, dok)),
         &admin,
     )
     .await;
@@ -387,7 +387,7 @@ async fn anfuegen_und_entfernen_melden_je_ein_anlagen_ereignis() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/befehle"),
+        &format!("/api/einsaetze/{einsatz}/orders"),
         &admin,
         Some(BEFEHL.anlegen),
     )

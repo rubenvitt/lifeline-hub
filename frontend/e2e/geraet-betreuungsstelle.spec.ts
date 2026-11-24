@@ -119,7 +119,7 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
     expect(personen.find((p) => p.name === 'Nordhoff')?.aktuelle_verbleib_betreuungsstelle_id).toBe(
       nord,
     );
-    const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/meldungen`)).json()) as {
+    const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/reports`)).json()) as {
       inhalt: string;
       absender: string;
     }[];

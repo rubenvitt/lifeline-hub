@@ -29,7 +29,7 @@ function zaehleAnlegen(page: Page, einsatzId: string): { anzahl: number; bodies:
   page.on('request', (r) => {
     if (
       r.method() === 'POST' &&
-      new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/lageberichte`
+      new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/situation-reports`
     ) {
       zaehler.anzahl += 1;
       zaehler.bodies.push(r.postDataJSON() as AnlegenBody);
@@ -145,7 +145,10 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
     .getByRole('menuitem', { name: 'Leerer Lagevortrag' })
     .click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  const berichtPfad = new URL(page.url()).pathname.replace(/^\/einsaetze/, '/api/einsaetze');
+  // App-Route deutsch, API englisch (ADR-0085): `/einsaetze/1/lageberichte/5` → `…/situation-reports/5`.
+  const berichtPfad = new URL(page.url()).pathname
+    .replace(/^\/einsaetze/, '/api/einsaetze')
+    .replace('/lageberichte/', '/situation-reports/');
 
   const patches: PatchBody[] = [];
   page.on('request', (r) => {
@@ -243,7 +246,7 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
 }) => {
   await anmelden(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag Stand ${Date.now()}`);
-  const E = `/api/einsaetze/${einsatzId}/lageberichte`;
+  const E = `/api/einsaetze/${einsatzId}/situation-reports`;
   const angelegt = await page.request.post(E, {
     data: {
       vorlage: 'lagebericht',
@@ -261,7 +264,7 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
   });
   expect(angelegt.ok(), await angelegt.text()).toBe(true);
   const { id } = (await angelegt.json()) as { id: number };
-  const frei = await page.request.post(`${E}/${id}/freigeben`);
+  const frei = await page.request.post(`${E}/${id}/release`);
   expect(frei.ok(), await frei.text()).toBe(true);
 
   await page.goto(`/einsaetze/${einsatzId}/lageberichte`);

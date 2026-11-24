@@ -853,7 +853,7 @@ async fn die_kenntnisnahme_reist_nur_mit_gesehenen_meldungen_des_einsatzes() {
     let (s, lm) = common::anfrage_json(
         &w.elw.i.app,
         "POST",
-        &format!("/api/einsaetze/{}/meldungen", w.einsatz),
+        &format!("/api/einsaetze/{}/reports", w.einsatz),
         &w.elw.i.admin,
         Some(&json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "lagemeldung",

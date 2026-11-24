@@ -27,21 +27,21 @@ test('Verweise im ETB führen auf die hervorgehobene Meldung und Nachforderung (
     bezeichnung: `E2E ETB-Verweise ${Date.now()}`,
   });
   const basis = `/api/einsaetze/${id}`;
-  const meldung = await post<{ id: number; lfd_nr: number }>(page, `${basis}/meldungen`, {
+  const meldung = await post<{ id: number; lfd_nr: number }>(page, `${basis}/reports`, {
     absender: 'Florian Nord 1',
     empfaenger: 'ELW 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Hauptstraße gesperrt',
     ereigniszeit: new Date().toISOString(),
   });
-  const nf = await post(page, `${basis}/nachforderungen`, {
+  const nf = await post(page, `${basis}/resource-requests`, {
     art: 'RTW',
     bezeichnung: 'Verstärkung Deich',
     anzahl: 2,
     adressat_kategorie: 'leitstelle',
     adressat_bezeichnung: 'ILS Nord',
   });
-  await post(page, `${basis}/nachforderungen/${nf.id}/status`, { status: 'zugesagt' });
+  await post(page, `${basis}/resource-requests/${nf.id}/status`, { status: 'zugesagt' });
 
   // Die Stufen einer Nachforderung sind Systemeinträge, in der Vorgabe ausgeblendet (kwc2yszv D6).
   await page.goto(etbMitSystem(id));

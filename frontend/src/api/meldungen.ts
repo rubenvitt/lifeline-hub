@@ -21,7 +21,7 @@ interface MeldungFilter {
  *  liest getrennt nach Phase. */
 export function listeMeldungen(einsatzId: number, filter: MeldungFilter = {}): Promise<Meldung[]> {
   return apiGet<Meldung[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/reports`, {
       status: filter.status,
       richtung: filter.richtung,
     }),
@@ -47,7 +47,7 @@ export function abschlussCursor(m: Meldung): AbschlussCursor {
 /** Alle offenen Meldungen in der Triage-Ordnung des Servers, ungeblättert (LFH-940). */
 export function listeOffeneMeldungen(einsatzId: number, richtung?: string): Promise<Meldung[]> {
   return apiGet<Meldung[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, { phase: 'offen', richtung }),
+    mitParametern(`/api/einsaetze/${einsatzId}/reports`, { phase: 'offen', richtung }),
   );
 }
 
@@ -59,7 +59,7 @@ export function listeAbgeschlosseneMeldungen(
   limit: number = MELDUNGEN_SEITE,
 ): Promise<Meldung[]> {
   return apiGet<Meldung[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/meldungen`, {
+    mitParametern(`/api/einsaetze/${einsatzId}/reports`, {
       phase: 'abgeschlossen',
       richtung,
       vor_zeit: vor?.zeit,
@@ -75,18 +75,18 @@ export function ladeMeldungKennzahlen(
   richtung?: string,
 ): Promise<MeldungKennzahlen> {
   return apiGet<MeldungKennzahlen>(
-    mitParametern(`/api/einsaetze/${einsatzId}/meldungen/kennzahlen`, { richtung }),
+    mitParametern(`/api/einsaetze/${einsatzId}/reports/metrics`, { richtung }),
   );
 }
 
 /** Eine Meldung einzeln, etwa für einen Deeplink auf eine nicht geladene Seite (LFH-940). */
 export function ladeMeldung(einsatzId: number, meldungId: number): Promise<Meldung> {
-  return apiGet<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}`);
+  return apiGet<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}`);
 }
 
 /** Letzte Rückmeldung je Einheit/Abschnitt samt Frist (LFH-610). Lesezugriff Meldungen. */
 export function holeRueckmeldungen(einsatzId: number): Promise<Rueckmeldungen> {
-  return apiGet<Rueckmeldungen>(`/api/einsaetze/${einsatzId}/meldungen/rueckmeldungen`);
+  return apiGet<Rueckmeldungen>(`/api/einsaetze/${einsatzId}/reports/check-ins`);
 }
 
 export function legeMeldungAn(
@@ -94,7 +94,7 @@ export function legeMeldungAn(
   daten: NeueMeldung,
   optionen?: ApiSendOptionen,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen`, 'POST', daten, optionen);
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports`, 'POST', daten, optionen);
 }
 
 /** Triage-Status setzen (sichten/in Bearbeitung/erledigt) (LFH-94). */
@@ -103,7 +103,7 @@ export function setzeMeldungStatus(
   meldungId: number,
   status: MeldungStatus,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/status`, 'POST', {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}/status`, 'POST', {
     status,
   });
 }
@@ -114,18 +114,14 @@ export function weiseBearbeiterZu(
   meldungId: number,
   bearbeiterId: number | null,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}/zuweisen`, 'POST', {
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}/assign`, 'POST', {
     bearbeiter_id: bearbeiterId,
   });
 }
 
 /** Sofortmeldung aktiv bestätigen (Quittung mit Zeitstempel + Person) (LFH-97). */
 export function bestaetigeMeldung(einsatzId: number, meldungId: number): Promise<Meldung> {
-  return apiSend<Meldung>(
-    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/bestaetigen`,
-    'POST',
-    {},
-  );
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}/confirm`, 'POST', {});
 }
 
 /** In die Lage übernehmen (LFH-95).
@@ -137,7 +133,7 @@ export function markiereLagerelevant(
   daten: { text?: string; lat?: number; lon?: number } = {},
 ): Promise<Meldung> {
   return apiSend<Meldung>(
-    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lagerelevant`,
+    `/api/einsaetze/${einsatzId}/reports/${meldungId}/situation-relevant`,
     'POST',
     daten,
   );
@@ -150,7 +146,7 @@ export function korrigiereMeldung(
   meldungId: number,
   aenderung: MeldungKorrekturPatch,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/meldungen/${meldungId}`, 'PATCH', aenderung);
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}`, 'PATCH', aenderung);
 }
 
 /** Aus einer eingegangenen Meldung direkt einen Auftrag erteilen (Meldung→Auftrag, LFH-113).
@@ -160,11 +156,7 @@ export function erteileAuftragAusMeldung(
   meldungId: number,
   daten: NeuerAuftrag,
 ): Promise<Meldung> {
-  return apiSend<Meldung>(
-    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/auftrag`,
-    'POST',
-    daten,
-  );
+  return apiSend<Meldung>(`/api/einsaetze/${einsatzId}/reports/${meldungId}/task`, 'POST', daten);
 }
 
 /** Lagemeldungen listen: lagerelevante Meldungen in der Sicht der Lage (LFH-95, LLH-1031). */
@@ -176,7 +168,7 @@ export function listeLageMeldungen(einsatzId: number): Promise<LageMeldung[]> {
  *  Kennung ist die Meldung (LLH-1031). */
 export function markLageMeldungGesehen(einsatzId: number, meldungId: number): Promise<LageMeldung> {
   return apiSend<LageMeldung>(
-    `/api/einsaetze/${einsatzId}/meldungen/${meldungId}/lage-gesehen`,
+    `/api/einsaetze/${einsatzId}/reports/${meldungId}/situation-seen`,
     'POST',
     {},
   );

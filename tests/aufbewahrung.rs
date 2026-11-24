@@ -323,7 +323,7 @@ async fn regulaere_routen_gesperrt(app: &axum::Router, admin: &str, id: i64, aid
         format!("/api/einsaetze/{id}"),
         format!("/api/einsaetze/{id}/etb"),
         format!("/api/einsaetze/{id}/persons"),
-        format!("/api/einsaetze/{id}/anhaenge/{aid}"),
+        format!("/api/einsaetze/{id}/attachments/{aid}"),
         format!("/api/einsaetze/{id}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;

@@ -381,7 +381,7 @@ export function entferneSchadenAnhang(
 }
 
 /**
- * Download über die modul-gegatete Schadensroute, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * Download über die modul-gegatete Schadensroute, nie über `/attachments/{aid}` des Einsatzes (dort
  * 404, die Datei ist modulgebunden). Ein API-Pfad, keine Navigation, deshalb nicht in
  * `routing/deeplinks.ts`.
  */

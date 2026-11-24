@@ -138,7 +138,7 @@ test('am Spiegel: Band, Bearbeiten gesperrt, ETB-Erfassung wird beantragt', asyn
 
   // Der Führer lehnt ab: das Band nennt den Grund, „Verwerfen“ räumt den Antrag.
   const antraege = (await (
-    await page.request.get(`/api/einsaetze/${einsatz}/antraege`)
+    await page.request.get(`/api/einsaetze/${einsatz}/requests`)
   ).json()) as { id: number }[];
   expect(antraege).toHaveLength(1);
   ablehnen(antraege[0].id, 'Einsatz ist abgeschlossen.');

@@ -23,7 +23,7 @@ function erinnerung(id: number, titel: string): Erinnerung {
 function serverMit(liste: Erinnerung[]) {
   const abrufe = { anzahl: 0 };
   server.use(
-    http.get('/api/einsaetze/:id/erinnerungen', () => {
+    http.get('/api/einsaetze/:id/reminders', () => {
       abrufe.anzahl += 1;
       return HttpResponse.json(liste);
     }),
@@ -62,7 +62,7 @@ describe('ladeErinnerungTitel', () => {
 
   it('ein Fehler ergibt null', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/erinnerungen', () =>
+      http.get('/api/einsaetze/:id/reminders', () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );
@@ -71,7 +71,7 @@ describe('ladeErinnerungTitel', () => {
 
   it('nach der Frist ergibt es null, auch wenn die Antwort noch kommt', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/erinnerungen', async () => {
+      http.get('/api/einsaetze/:id/reminders', async () => {
         await delay(INHALT_FRIST_MS + 500);
         return HttpResponse.json([erinnerung(5, 'Pegel prüfen')]);
       }),

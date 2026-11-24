@@ -2903,7 +2903,7 @@
           },
           "berichtigbar": {
             "type": "boolean",
-            "description": "Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —\nnur dann nimmt `PATCH …/auftraege/{aid}` eine Berichtigung an (LLH-1098)."
+            "description": "Abgeleitet: der Auftrag ist offen, nicht aufgehoben, und kein Empfänger hat quittiert —\nnur dann nimmt `PATCH …/tasks/{aid}` eine Berichtigung an (LLH-1098)."
           },
           "einsatz_id": {
             "type": "integer",
@@ -3206,7 +3206,7 @@
       },
       "AuftragKennzahlen": {
         "type": "object",
-        "description": "Kennzahlen des Auftragsboards (LFH-1071, `GET …/auftraege/kennzahlen`): „Offen (n)“ und\n„Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "description": "Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und\n„Abgeschlossen (n)“, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
         "required": [
           "offen",
           "abgeschlossen"
@@ -9252,7 +9252,7 @@
       },
       "EtbAnzahlAnzeige": {
         "type": "object",
-        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/anzahl`).",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).",
         "required": [
           "anzahl"
         ],
@@ -9339,7 +9339,7 @@
             "items": {
               "$ref": "#/components/schemas/AnhangAnzeige"
             },
-            "description": "Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach\n`id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/anhaenge/{aid}`."
+            "description": "Die Dateien, die dieser Eintrag trägt (LFH-117): Metadaten ohne Bytes, aufsteigend nach\n`id`, leer statt fehlend. Laden über `GET …/etb/{eintrag_id}/attachments/{aid}`."
           },
           "auftrag_id": {
             "type": [
@@ -9581,7 +9581,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counts`.",
         "required": [
           "gesamt",
           "je_typ"
@@ -15238,7 +15238,7 @@
       },
       "MeldungKennzahlen": {
         "type": "object",
-        "description": "Kennzahlen der Meldungsseite (LFH-940, `GET …/meldungen/kennzahlen`): dieselben Mengen wie\ndas Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
+        "description": "Kennzahlen der Meldungsseite (LFH-940, `GET …/reports/metrics`): dieselben Mengen wie\ndas Kennzahlenband, gezählt am Server, weil die Abgeschlossenen nur noch seitenweise kommen.",
         "required": [
           "unbearbeitet",
           "in_arbeit",
@@ -19504,7 +19504,7 @@
       },
       "RueckmeldungenAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET …/meldungen/rueckmeldungen` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
+        "description": "Antwort von `GET …/reports/check-ins` (LFH-610). Einheiten ohne Eintrag haben\nnoch nie zurückgemeldet. Die Abschnittsliste enthält nur DIREKT an den Abschnitt\ngebundene Meldungen; die Rückmeldung über den Teilbaum rechnet der Client aus beiden.",
         "required": [
           "frist_min",
           "einheiten",

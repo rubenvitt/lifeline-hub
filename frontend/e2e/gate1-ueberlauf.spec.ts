@@ -298,7 +298,7 @@ async function seedeUeberlaufstoff(page: Page, einsatzId: string, { vorlage = fa
     'Personal (Personalseite + Meldebild)',
   );
   await anlegen(
-    'befehle',
+    'orders',
     { vorlage: 'befehl_lad', titel: 'Befehl an den 2. Zug zur Menschenrettung im Abschnitt Nord' },
     'Befehl',
   );
@@ -2155,7 +2155,7 @@ async function seedeDokumente(page: Page): Promise<string> {
       false,
     ],
   ] as const) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/dokumente`, {
+    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
       multipart: {
         datei: { name: dateiname, mimeType, buffer },
         titel,

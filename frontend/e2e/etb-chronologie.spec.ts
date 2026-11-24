@@ -77,7 +77,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }).click();
     const gespeichert = page.waitForResponse(
       (antwort) =>
-        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/erinnerungen`) &&
+        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/reminders`) &&
         antwort.request().method() === 'POST',
     );
     await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();

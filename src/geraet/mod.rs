@@ -112,13 +112,13 @@ pub const ALLE_ANSICHTEN: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/module-counts"),
     ("GET", "/api/einsaetze/{id}/live"),
     // Die eigenen Anträge am Spiegel (LLH-1492): das Band liest sie über jeder Ansicht.
-    ("GET", "/api/einsaetze/{id}/antraege"),
+    ("GET", "/api/einsaetze/{id}/requests"),
 ];
 
 /// Einsatzrouten jeder schreibenden Ansicht (alle außer dem Lagemonitor): einen eigenen,
 /// abgelehnten Antrag am Spiegel verwerfen (LLH-1492).
 pub const SCHREIBENDE_ANSICHTEN: &[(&str, &str)] =
-    &[("DELETE", "/api/einsaetze/{id}/antraege/{antrag_id}")];
+    &[("DELETE", "/api/einsaetze/{id}/requests/{antrag_id}")];
 
 impl Funktionsansicht {
     /// Anzeigename der Ansicht (ETB-Text, Oberfläche).
@@ -381,8 +381,8 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void",
     ),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
 ];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
 /// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
@@ -398,25 +398,25 @@ const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/einsaetze/{id}/situation-mo
 const EINSATZABSCHNITT: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/sectors"),
     ("GET", "/api/einsaetze/{id}/einheiten"),
-    ("GET", "/api/einsaetze/{id}/auftraege"),
-    ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+    ("GET", "/api/einsaetze/{id}/tasks"),
+    ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+        "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
     ),
-    ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
-    ("GET", "/api/einsaetze/{id}/befehle"),
-    ("GET", "/api/einsaetze/{id}/befehle/{bid}"),
+    ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
+    ("GET", "/api/einsaetze/{id}/orders"),
+    ("GET", "/api/einsaetze/{id}/orders/{bid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/quittieren",
+        "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/acknowledge",
     ),
     (
         "POST",
-        "/api/einsaetze/{id}/befehle/{bid}/verteiler/{vid}/zuruecknehmen",
+        "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
     ("GET", "/api/einsaetze/{id}/zones"),
 ];
 
@@ -471,8 +471,8 @@ const BEREITSTELLUNGSRAUM: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/einheiten"),
     ("GET", "/api/einsaetze/{id}/einheiten/zeitachse"),
     ("GET", "/api/einsaetze/{id}/fahrzeuge"),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
     // Material des eigenen Raums nur lesen (LLH-1252, Entscheidung 22.10.2026): der Handler
     // schneidet auf `br_id` = eigener Raum. Zuordnen, Lösen, Status, Aufteilen und Erfassen
     // bleiben der Führungsstelle; ein Schreibweg käme als eigener Eintrag mit Stellenprüfung.
@@ -509,8 +509,8 @@ const BETREUUNGSSTELLE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/persons/transport-means"),
     ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
     ("POST", "/api/einsaetze/{id}/persons/{pid}/notes"),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
     // Registrierstelle (LLH-1612): Haushalte an der eigenen Stelle registrieren, ihre Liste
     // lesen und abmelden; der Handler prüft die eigene Stelle (fremd 403).
     (
@@ -565,8 +565,8 @@ const VERPFLEGUNG: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
     ),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
 ];
 
 /// Zusätzliche Einsatzrouten des Einheitengeräts (LLH-1579, Konzept LLH-1571 S1): die eigene
@@ -584,15 +584,15 @@ const EINHEIT: &[(&str, &str)] = &[
         "POST",
         "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
     ),
-    ("GET", "/api/einsaetze/{id}/auftraege"),
-    ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+    ("GET", "/api/einsaetze/{id}/tasks"),
+    ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
     (
         "POST",
-        "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+        "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
     ),
-    ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
-    ("GET", "/api/einsaetze/{id}/meldungen"),
-    ("POST", "/api/einsaetze/{id}/meldungen"),
+    ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
+    ("GET", "/api/einsaetze/{id}/reports"),
+    ("POST", "/api/einsaetze/{id}/reports"),
     // Kontakte am Handy (LLH-1580, Konzept LLH-1571 S2): die Personen mit versorgender Einheit =
     // eigene ohne Personalien lesen, einen Kontakt anlegen (Einheit fest, „Zur UHS“ in eine
     // aktive UHS, RTW als Sofortmeldung) und die aktiven UHS als Ziel wählen. Kein Detail, keine
@@ -704,9 +704,9 @@ mod tests {
 
     #[test]
     fn antraege_liest_jede_ansicht_verwerfen_nur_eine_schreibende() {
-        let verwerfen = "/api/einsaetze/{id}/antraege/{antrag_id}";
+        let verwerfen = "/api/einsaetze/{id}/requests/{antrag_id}";
         for a in Funktionsansicht::ALLE {
-            assert!(darf_route(a, "GET", "/api/einsaetze/{id}/antraege"));
+            assert!(darf_route(a, "GET", "/api/einsaetze/{id}/requests"));
             assert_eq!(
                 darf_route(a, "DELETE", verwerfen),
                 a != Funktionsansicht::Lagemonitor,
@@ -843,7 +843,7 @@ mod tests {
             ),
             ("GET", "/api/einsaetze/{id}/einheiten"),
             ("GET", "/api/einsaetze/{id}/einheiten/zeitachse"),
-            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/reports"),
             // Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum, ohne Freitexte
             // (LLH-1387 design.md D1).
             (
@@ -881,8 +881,8 @@ mod tests {
                 "/api/einsaetze/{id}/einheiten/aus-vorlage/{vorlage_id}",
             ),
             ("POST", "/api/einsaetze/{id}/einheiten/aus-vorlage"),
-            ("GET", "/api/einsaetze/{id}/nachforderungen"),
-            ("POST", "/api/einsaetze/{id}/nachforderungen/{nid}/status"),
+            ("GET", "/api/einsaetze/{id}/resource-requests"),
+            ("POST", "/api/einsaetze/{id}/resource-requests/{nid}/status"),
             ("POST", "/api/einsaetze/{id}/einheiten/aus-nachforderung"),
             // Ebenso der Storno einer Fehlübernahme (LLH-1388 D5).
             (
@@ -900,7 +900,7 @@ mod tests {
     fn kein_geraet_liest_die_ueblichen_arten_der_organisation() {
         for a in Funktionsansicht::ALLE {
             assert!(
-                !darf_route(a, "GET", "/api/einsaetze/{id}/nachforderungen/arten"),
+                !darf_route(a, "GET", "/api/einsaetze/{id}/resource-requests/types"),
                 "{a:?} darf die üblichen Arten nicht lesen"
             );
         }
@@ -946,8 +946,8 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
             ),
-            ("GET", "/api/einsaetze/{id}/meldungen"),
-            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("GET", "/api/einsaetze/{id}/reports"),
+            ("POST", "/api/einsaetze/{id}/reports"),
         ] {
             assert!(darf_route(v, m, p), "Verpflegungsgerät darf {m} {p}");
         }
@@ -971,8 +971,8 @@ mod tests {
                 "/api/einsaetze/{id}/catering/time-slots/from-template",
             ),
             ("GET", "/api/catering-templates"),
-            ("GET", "/api/einsaetze/{id}/nachforderungen"),
-            ("POST", "/api/einsaetze/{id}/nachforderungen"),
+            ("GET", "/api/einsaetze/{id}/resource-requests"),
+            ("POST", "/api/einsaetze/{id}/resource-requests"),
             ("GET", "/api/einsaetze/{id}/personal"),
             ("GET", "/api/einsaetze/{id}/care"),
             ("GET", "/api/einsaetze/{id}/persons"),
@@ -993,14 +993,14 @@ mod tests {
         for (m, p) in [
             ("GET", "/api/einsaetze/{id}/sectors"),
             ("GET", "/api/einsaetze/{id}/einheiten"),
-            ("GET", "/api/einsaetze/{id}/auftraege"),
-            ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+            ("GET", "/api/einsaetze/{id}/tasks"),
+            ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
             (
                 "POST",
-                "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+                "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
             ),
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
-            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
+            ("POST", "/api/einsaetze/{id}/reports"),
             ("GET", "/api/einsaetze/{id}/zones"),
         ] {
             assert!(darf_route(a, m, p), "Abschnittsgerät darf {m} {p}");
@@ -1017,12 +1017,12 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
             ),
-            ("POST", "/api/einsaetze/{id}/auftraege"),
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
+            ("POST", "/api/einsaetze/{id}/tasks"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/accept"),
             // Aufheben und Berichtigen gehören der Führung (LLH-1098).
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
-            ("PATCH", "/api/einsaetze/{id}/auftraege/{aid}"),
-            ("GET", "/api/einsaetze/{id}/auftraege/kennzahlen"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/void"),
+            ("PATCH", "/api/einsaetze/{id}/tasks/{aid}"),
+            ("GET", "/api/einsaetze/{id}/tasks/metrics"),
             ("POST", "/api/einsaetze/{id}/zones"),
             ("GET", "/api/einsaetze/{id}/free-symbols"),
             ("GET", "/api/einsaetze/{id}/personal"),
@@ -1056,15 +1056,15 @@ mod tests {
                 "POST",
                 "/api/einsaetze/{id}/einheiten/{eid}/status/zuruecknehmen",
             ),
-            ("GET", "/api/einsaetze/{id}/auftraege"),
-            ("GET", "/api/einsaetze/{id}/auftraege/{aid}"),
+            ("GET", "/api/einsaetze/{id}/tasks"),
+            ("GET", "/api/einsaetze/{id}/tasks/{aid}"),
             (
                 "POST",
-                "/api/einsaetze/{id}/auftraege/{aid}/empfaenger/{empf}/quittieren",
+                "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
             ),
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/vollzug"),
-            ("GET", "/api/einsaetze/{id}/meldungen"),
-            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/execution"),
+            ("GET", "/api/einsaetze/{id}/reports"),
+            ("POST", "/api/einsaetze/{id}/reports"),
             ("GET", "/api/einsaetze/{id}/persons"),
             ("POST", "/api/einsaetze/{id}/persons"),
             ("GET", "/api/einsaetze/{id}/persons/uhs"),
@@ -1073,7 +1073,7 @@ mod tests {
         }
         for (m, p) in [
             ("GET", "/api/einsaetze/{id}/sectors"),
-            ("GET", "/api/einsaetze/{id}/befehle"),
+            ("GET", "/api/einsaetze/{id}/orders"),
             ("GET", "/api/einsaetze/{id}/zones"),
             ("GET", "/api/einsaetze/{id}/fahrzeuge"),
             ("GET", "/api/einsaetze/{id}/personal"),
@@ -1087,10 +1087,10 @@ mod tests {
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}"),
             ("PATCH", "/api/einsaetze/{id}/einheiten/{eid}/position"),
             ("DELETE", "/api/einsaetze/{id}/einheiten/{eid}"),
-            ("POST", "/api/einsaetze/{id}/auftraege"),
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/abnehmen"),
-            ("POST", "/api/einsaetze/{id}/auftraege/{aid}/aufheben"),
-            ("PATCH", "/api/einsaetze/{id}/meldungen/{mid}"),
+            ("POST", "/api/einsaetze/{id}/tasks"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/accept"),
+            ("POST", "/api/einsaetze/{id}/tasks/{aid}/void"),
+            ("PATCH", "/api/einsaetze/{id}/reports/{mid}"),
             ("POST", "/api/vehicle-statuses"),
         ] {
             assert!(!darf_route(e, m, p), "Einheitengerät darf {m} {p} nicht");
@@ -1121,7 +1121,7 @@ mod tests {
             ),
             ("POST", "/api/einsaetze/{id}/persons"),
             ("POST", "/api/einsaetze/{id}/persons/{pid}/whereabouts"),
-            ("POST", "/api/einsaetze/{id}/meldungen"),
+            ("POST", "/api/einsaetze/{id}/reports"),
         ] {
             assert!(darf_route(b, m, p), "Betreuungsstelle darf {m} {p}");
         }

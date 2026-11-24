@@ -157,7 +157,7 @@ export function entferneTierAnhang(
 }
 
 /**
- * Download über die modul-gegatete Tier-Route, nie über `/anhaenge/{aid}` des Einsatzes (dort
+ * Download über die modul-gegatete Tier-Route, nie über `/attachments/{aid}` des Einsatzes (dort
  * 404). Ein API-Pfad, keine Navigation, deshalb nicht in `routing/deeplinks.ts`.
  */
 export function tierAnhangDownloadPfad(

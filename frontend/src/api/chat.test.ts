@@ -20,7 +20,7 @@ describe('heraufstufenZuEtb', () => {
     const fetchMock = sendeMock();
     await heraufstufenZuEtb(7, 3, 'meldung', 'Deich', [11, 12]);
     const [pfad, init] = fetchMock.mock.calls[0];
-    expect(pfad).toBe('/api/einsaetze/7/chat/nachrichten/3/heraufstufen-etb');
+    expect(pfad).toBe('/api/einsaetze/7/chat/messages/3/promote-to-etb');
     expect(JSON.parse(String(init?.body))).toEqual({
       typ: 'meldung',
       inhalt: 'Deich',
@@ -56,7 +56,7 @@ describe('chat-API: Anhänge hochladen (LFH-1021)', () => {
     const ergebnis = ladeAnhaengeHoch(7, [a, b]);
     const [xhr] = anfragen;
     expect(xhr.methode).toBe('POST');
-    expect(xhr.url).toBe('/api/einsaetze/7/anhaenge');
+    expect(xhr.url).toBe('/api/einsaetze/7/attachments');
     expect((xhr.body as FormData).getAll('datei')).toEqual([a, b]);
     xhr.antworten(201, [{ id: 1 }, { id: 2 }]);
     await expect(ergebnis).resolves.toEqual([{ id: 1 }, { id: 2 }]);

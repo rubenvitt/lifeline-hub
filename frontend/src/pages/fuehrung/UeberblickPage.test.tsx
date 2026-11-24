@@ -294,7 +294,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/einheiten', json(d.einheiten)),
     http.get('/api/einsaetze/1/sectors', json(d.abschnitte)),
     http.get('/api/einsaetze/1/hazard-areas', json(d.gefahren)),
-    http.get('/api/einsaetze/1/auftraege', json(d.auftraege)),
+    http.get('/api/einsaetze/1/tasks', json(d.auftraege)),
     http.get(
       '/api/einsaetze/1/module-counts',
       json(
@@ -313,13 +313,10 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
         },
       ),
     ),
-    http.get('/api/einsaetze/1/nachforderungen', json(d.nachforderungen ?? [])),
-    http.get('/api/einsaetze/1/meldungen', json(d.meldungen ?? [])),
-    http.get('/api/einsaetze/1/erinnerungen', json(d.erinnerungen)),
-    http.get(
-      '/api/einsaetze/1/meldungen/rueckmeldungen',
-      json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN),
-    ),
+    http.get('/api/einsaetze/1/resource-requests', json(d.nachforderungen ?? [])),
+    http.get('/api/einsaetze/1/reports', json(d.meldungen ?? [])),
+    http.get('/api/einsaetze/1/reminders', json(d.erinnerungen)),
+    http.get('/api/einsaetze/1/reports/check-ins', json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN)),
     http.get('/api/einsaetze/1/gauges', json(d.pegel ?? [])),
     // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
     // MSW-Default: alles frei.
@@ -679,7 +676,7 @@ describe('UeberblickPage', () => {
 
   it('Abschnittszeile: ohne geladene Rückmeldungen kein Rückmeldungs-Etikett (LLH-1739)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+      http.get('/api/einsaetze/1/reports/check-ins', () =>
         HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 }),
       ),
     ]);
@@ -701,7 +698,7 @@ describe('UeberblickPage', () => {
   it('Abschnittszeile: ohne Leserecht auf Meldungen (403) nichts erfunden, Paneel bleibt', async () => {
     let abgerufen = false;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () => {
+      http.get('/api/einsaetze/1/reports/check-ins', () => {
         abgerufen = true;
         return HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 });
       }),
@@ -1105,7 +1102,7 @@ describe('UeberblickPage', () => {
             meine_funktion_code: code,
           }),
         ),
-        http.get('/api/einsaetze/1/auftraege', () =>
+        http.get('/api/einsaetze/1/tasks', () =>
           HttpResponse.json([
             ...volleDaten.auftraege,
             auftrag({
@@ -1421,7 +1418,7 @@ describe('UeberblickPage', () => {
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/abloesungen', () => HttpResponse.json([schicht(1), schicht(2)])),
       // Die Auto-Frist derselben Ablösung in den Erinnerungen darf keine zweite Marke werden.
-      http.get('/api/einsaetze/1/erinnerungen', () =>
+      http.get('/api/einsaetze/1/reminders', () =>
         HttpResponse.json([
           ...volleDaten.erinnerungen,
           {
@@ -1565,7 +1562,7 @@ describe('UeberblickPage', () => {
   it('Fehler ist nicht leer: ausgefallene Aufträge zeigen „Stand unbekannt", der Rest bleibt', async () => {
     // Liste und Zähler fallen aus: das Paneel und die Kennzahl sagen es je für sich.
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/auftraege', () =>
+      http.get('/api/einsaetze/1/tasks', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
       http.get('/api/einsaetze/1/module-counts', () =>
@@ -1595,7 +1592,7 @@ describe('UeberblickPage', () => {
 
   it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Stärke bleibt (LFH-962)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/auftraege', () =>
+      http.get('/api/einsaetze/1/tasks', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -1615,7 +1612,7 @@ describe('UeberblickPage', () => {
     // Die Meldungsliste hält die Reihen nicht auf (anders als die Quellen der Marken, LLH-1748).
     stelleBereit(volleDaten, [
       http.get('/api/einsaetze/1/persons', haengt),
-      http.get('/api/einsaetze/1/meldungen', haengt),
+      http.get('/api/einsaetze/1/reports', haengt),
     ]);
     rendern();
     await koerperDa();
@@ -1645,7 +1642,7 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/nachforderungen', haengt)]);
+    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/resource-requests', haengt)]);
     rendern();
     await koerperDa();
     // Ein Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
@@ -1676,6 +1673,14 @@ describe('UeberblickPage', () => {
     afterEach(() => localStorage.clear());
 
     // Seit LLH-1748 auch die Quellen der Marken: „Nächste Marken“ steht in Reihe 1 zuoberst.
+    // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
+    const route = (modul: string) =>
+      (
+        ({ abschnitte: 'sectors', auftraege: 'tasks', erinnerungen: 'reminders' }) as Record<
+          string,
+          string
+        >
+      )[modul] ?? modul;
     for (const quelle of [
       'abschnitte',
       'einheiten',
@@ -1691,7 +1696,7 @@ describe('UeberblickPage', () => {
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
           // Die Quelle `abschnitte` liest `/sectors` (LLH-2059, ADR-0085).
-          http.get(`/api/einsaetze/1/${quelle === 'abschnitte' ? 'sectors' : quelle}`, async () => {
+          http.get(`/api/einsaetze/1/${route(quelle)}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
           }),
@@ -1749,7 +1754,7 @@ describe('UeberblickPage', () => {
 
         server.use(
           http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-          http.get(`/api/einsaetze/1/${modul}`, async () => {
+          http.get(`/api/einsaetze/1/${route(modul)}`, async () => {
             abrufe.n += 1;
             await tor;
             return HttpResponse.json(volleDaten[modul] as object);
@@ -1848,8 +1853,8 @@ describe('UeberblickPage', () => {
           },
         },
         [
-          http.get('/api/einsaetze/1/meldungen', haengt),
-          http.get('/api/einsaetze/1/nachforderungen', haengt),
+          http.get('/api/einsaetze/1/reports', haengt),
+          http.get('/api/einsaetze/1/resource-requests', haengt),
         ],
       );
     const platzhalter = (name: string) =>
@@ -2065,12 +2070,12 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     '/api/einsaetze/1/einheiten/zeitachse',
     '/api/einsaetze/1/sectors',
     '/api/einsaetze/1/hazard-areas',
-    '/api/einsaetze/1/auftraege',
-    '/api/einsaetze/1/nachforderungen',
-    '/api/einsaetze/1/meldungen',
-    '/api/einsaetze/1/erinnerungen',
+    '/api/einsaetze/1/tasks',
+    '/api/einsaetze/1/resource-requests',
+    '/api/einsaetze/1/reports',
+    '/api/einsaetze/1/reminders',
     '/api/einsaetze/1/etb',
-    '/api/einsaetze/1/meldungen/rueckmeldungen',
+    '/api/einsaetze/1/reports/check-ins',
   ];
 
   /**
@@ -2130,10 +2135,10 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     await nordDa();
     await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/persons']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/nachforderungen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/resource-requests']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/etb']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/meldungen/rueckmeldungen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/reports/check-ins']).toBeUndefined();
 
     // Alarmzeile: gesperrte Quellen fehlen still, kein „Stand unvollständig“ (Spec
     // `lage-alarmzeile`, „Ruhe nur bei vollständigen Quellen“).
@@ -2152,7 +2157,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       expect(within(a).queryByRole('link')).toBeNull();
       expect(abschnittZahl(name)).toHaveTextContent(/^—$/);
     }
-    expect(aufrufe['/api/einsaetze/1/meldungen']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/reports']).toBeUndefined();
     const entscheidungen = paneel(/Entscheidungen/);
     expect(within(entscheidungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
     expect(within(entscheidungen).queryByText(/Noch keine Entscheidung/)).toBeNull();
@@ -2249,7 +2254,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     const p = await waitFor(() => vorgaenge());
     await userEvent.click(await within(p).findByRole('button', { name: 'Erneut abrufen' }));
     expect(await within(abschnitt('Aufträge')).findByText('nicht freigegeben')).toBeInTheDocument();
-    expect(aufrufe['/api/einsaetze/1/auftraege']).toBeUndefined();
+    expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
   });
 
   it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {
@@ -2805,7 +2810,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
     server.use(
       http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/1/auftraege', async () => {
+      http.get('/api/einsaetze/1/tasks', async () => {
         abrufe.auftraege += 1;
         await auftraegeTor;
         return HttpResponse.json(leer.auftraege);

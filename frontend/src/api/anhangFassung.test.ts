@@ -13,8 +13,8 @@ import {
 
 describe('anhangFassung (LFH-747)', () => {
   it('hängt die Fassung an die Download-Adresse', () => {
-    expect(originalPfad('/api/einsaetze/5/etb/40/anhaenge/9')).toBe(
-      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=original',
+    expect(originalPfad('/api/einsaetze/5/etb/40/attachments/9')).toBe(
+      '/api/einsaetze/5/etb/40/attachments/9?fassung=original',
     );
   });
 
@@ -46,11 +46,11 @@ describe('anhangFassung (LFH-747)', () => {
 
 describe('anhangFassung — Vorschau (LFH-759)', () => {
   it('hängt die Vorschau-Fassungen an die Download-Adresse', () => {
-    expect(vorschauPfad('/api/einsaetze/5/etb/40/anhaenge/9')).toBe(
-      '/api/einsaetze/5/etb/40/anhaenge/9?fassung=vorschau',
+    expect(vorschauPfad('/api/einsaetze/5/etb/40/attachments/9')).toBe(
+      '/api/einsaetze/5/etb/40/attachments/9?fassung=vorschau',
     );
-    expect(grossansichtPfad('/api/einsaetze/5/dokumente/3/datei')).toBe(
-      '/api/einsaetze/5/dokumente/3/datei?fassung=grossansicht',
+    expect(grossansichtPfad('/api/einsaetze/5/documents/3/file')).toBe(
+      '/api/einsaetze/5/documents/3/file?fassung=grossansicht',
     );
   });
 
@@ -79,7 +79,7 @@ describe('anhangFassung — Vorschau (LFH-759)', () => {
 
 describe('einsatzIdAusPfad (LFH-759)', () => {
   it('liest die Einsatz-ID aus jedem Anhang-Weg', () => {
-    expect(einsatzIdAusPfad('/api/einsaetze/5/etb/40/anhaenge/9')).toBe(5);
+    expect(einsatzIdAusPfad('/api/einsaetze/5/etb/40/attachments/9')).toBe(5);
     expect(einsatzIdAusPfad('/api/einsaetze/12/damages/3/attachments/9/file')).toBe(12);
     expect(einsatzIdAusPfad('/a/1')).toBeNull();
   });

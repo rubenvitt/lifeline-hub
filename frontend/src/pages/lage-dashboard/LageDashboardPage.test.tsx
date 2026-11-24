@@ -206,7 +206,7 @@ function mockEndpunkte(d: Daten) {
       zaehle('matrix');
       return new HttpResponse(null, { status: d.matrixStatus });
     }),
-    http.get('/api/einsaetze/1/lageberichte', () => json(d.lageberichte, 'lageberichte')),
+    http.get('/api/einsaetze/1/situation-reports', () => json(d.lageberichte, 'lageberichte')),
     http.get('/api/einsaetze/1/einheiten', () => json(d.einheiten, 'einheiten')),
     http.get('/api/einsaetze/1/personal', () => json(d.personal, 'personal')),
     http.get('/api/einsaetze/1/fahrzeuge', () => json(d.fahrzeuge, 'fahrzeuge')),
@@ -1486,7 +1486,7 @@ describe('LageDashboardPage — Meldungsstrom', () => {
     mockEndpunkte(daten);
     // Ohne Antwort hielte die Seite den Server für unerreichbar und sagte „offline“ statt „live“.
     server.use(
-      http.get('/api/einsaetze/1/meldungen/rueckmeldungen', () =>
+      http.get('/api/einsaetze/1/reports/check-ins', () =>
         HttpResponse.json({ abschnitte: [], einheiten: [], frist_min: 60 }),
       ),
       http.get('/api/einsaetze/1/damages/marker', () => HttpResponse.json([])),
@@ -1771,11 +1771,11 @@ describe('LageDashboardPage — Stand und Alarmzeile (LLH-1743)', () => {
     const listen: string[] = [];
     mockEndpunkte({});
     server.use(
-      http.get('/api/einsaetze/1/auftraege', () => {
+      http.get('/api/einsaetze/1/tasks', () => {
         listen.push('auftraege');
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/1/meldungen', () => {
+      http.get('/api/einsaetze/1/reports', () => {
         listen.push('meldungen');
         return HttpResponse.json([]);
       }),

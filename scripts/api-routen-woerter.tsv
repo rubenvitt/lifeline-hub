@@ -1,5 +1,6 @@
 # Glossar der API-Routen (ADR-0097): segment<TAB>deutsch, „-“ ohne festen deutschen Begriff.
 # Ein deutscher Begriff hat genau ein Segment. Prüfung: scripts/check-api-routen.sh
+accept	abnehmen
 access	Zugang
 access-changes	Zugangsänderungen
 access-log	Zugangsprotokoll
@@ -22,6 +23,7 @@ archive	Archiv
 area	Fläche
 areas	Bereiche
 assessment	Beurteilung
+assign	zuweisen
 attachments	Anhänge
 attachments.zip	Anlagen
 attempts	Versuche
@@ -49,9 +51,11 @@ catalog	Katalog
 catering	Verpflegung
 catering-templates	Verpflegungsvorlagen
 certificate	Zertifikat
+channels	Kanäle
 chat	-
 check	prüfen
 check-in	melden
+check-ins	Rückmeldungen
 client-errors	Client-Fehler
 close	abschließen
 closure	Abschluss
@@ -61,14 +65,17 @@ command	Führung
 command-post	Führungsstelle
 command-roles	Führungsfunktionen
 commanders	Führungskräfte
+commitment	Zusage
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
+complete	erledigen
 components	Komponenten
 config	-
 confirm	bestätigen
 confirmers	Bestätiger
 connections	Verbindungen
 contact-person	Bezugsperson
+count	Anzahl
 countersign	gegenzeichnen
 counts	Zähler
 damages	Schäden
@@ -82,10 +89,13 @@ devices	Geräte
 diets	Kostformen
 discard	verwerfen
 discoverable	-
+distribution	Verteiler
 distributions	Ausgaben
 districts	Bezirke
+documents	Dokumente
 download	-
 emergency-takeover	Notübernahme
+enclosures	Anlagen eines Dokuments
 end	beenden
 end-others	andere beenden
 enroll	-
@@ -93,6 +103,7 @@ etb	ETB
 etb-snippets	ETB-Bausteine
 evacuation	Evakuierung
 events	-
+execution	Vollzug
 existing	vorhandene
 export	-
 external	extern
@@ -155,6 +166,7 @@ material-categories	Materialkategorien
 matrix	-
 me	-
 member-selection	Mitglied-Auswahl
+messages	Nachrichten
 metrics	Kennzahlen
 mirror	Spiegel
 module-access	Modulfreigaben
@@ -205,16 +217,21 @@ presence	Präsenz
 preview	Vorschau
 print	Druck
 progress	Stände
+promote-to-etb	zum ETB heraufstufen
+promote-to-task	zum Auftrag heraufstufen
 providers	-
 proxy	-
 qualifications	Qualifikationen
 raster	-
 rating	Bewertung
 read	gelesen
+read-marker	Lesemarke
 reason	Anlass
+recipients	Empfänger
 reclaim	zurückholen
 redaction-requests	Schwärzungsanträge
 redeem	einlösen
+reference	Bezug
 reference-values	Richtwerte
 register	-
 registration	-
@@ -222,8 +239,10 @@ registrations	Registrierungen
 reimport	neu importieren
 reject	zurückweisen
 rejected	abgelehnt
+release	freigeben
 release-notes	Versionsstand
 reliefs	Ablösungen
+reminders	Erinnerungen
 reopen	wiedereröffnen
 reports	Meldungen
 request	Antrag, anfragen
@@ -236,6 +255,7 @@ resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
+revise	fortschreiben
 revoke	widerrufen
 row	Zeile
 schedule	Termin
@@ -256,7 +276,9 @@ situation-metric-selection	Lagekennzahl-Wahl
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
 situation-picture-shares	Lagebild-Freigaben
+situation-relevant	lagerelevant
 situation-reports	Lageberichte
+situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
 sprite	-
 sprites	-
@@ -270,6 +292,7 @@ style.json	-
 subscription	Abo
 system	-
 talk-groups	Sprechgruppen
+task	Auftrag
 tasks	Aufträge
 template	Vorlage
 test	-
@@ -283,6 +306,7 @@ transfer	Übernahme
 transport	-
 transport-means	Transportmittel
 triage	Sichtung
+types	Arten
 uhs	UHS
 uhs-occupancy	UHS-Belegung
 undo	zurücknehmen
@@ -305,5 +329,6 @@ webauthn	-
 webhook	-
 whereabouts	Verbleib
 whereabouts-details	Verbleib-Angaben
+withdraw	zurückziehen
 world	Welt
 zones	Zonen

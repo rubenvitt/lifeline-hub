@@ -41,7 +41,7 @@ async function einsatzMitMeldungen(page: Page): Promise<string> {
     [WORTLAUT, 'sofort', true],
     ['Lage ruhig, keine Veränderung', 'normal', false],
   ] as const) {
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/meldungen`, {
+    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
       data: {
         absender: 'Florian Nord 1',
         empfaenger: 'ELW 1',

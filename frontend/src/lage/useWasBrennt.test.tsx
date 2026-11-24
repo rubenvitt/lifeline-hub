@@ -76,7 +76,7 @@ function handler(over: { rueckmeldungen?: () => Response; personen?: unknown[] }
     http.get(`${BASIS}/fahrzeuge`, () => HttpResponse.json([])),
     http.get(`${BASIS}/material`, () => HttpResponse.json([])),
     http.get(
-      `${BASIS}/meldungen/rueckmeldungen`,
+      `${BASIS}/reports/check-ins`,
       over.rueckmeldungen ?? (() => HttpResponse.json(rueckmeldung('2026-11-16 13:13:00'))),
     ),
   );

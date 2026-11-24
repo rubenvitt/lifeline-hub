@@ -444,7 +444,7 @@ async fn auftrag_an(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/auftraege"),
+        &format!("/api/einsaetze/{einsatz}/tasks"),
         cookie,
         Some(&json!({"auftrag_text": text, "empfaenger": empfaenger})),
     )
@@ -560,7 +560,7 @@ async fn abschnittsgeraet_sieht_nur_seinen_teilbaum() {
         ("GET", format!("{basis}/personal")),
         ("PATCH", format!("{basis}/sectors/{}", l.nord)),
         ("PUT", format!("{basis}/einheiten/{}/status", l.zug_nord)),
-        ("POST", format!("{basis}/auftraege")),
+        ("POST", format!("{basis}/tasks")),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
@@ -573,7 +573,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let basis = format!("/api/einsaetze/{}/auftraege", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/tasks", l.einsatz);
 
     let an_ost = auftrag_an(
         &app,
@@ -645,7 +645,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
 
     // Quittung: die Zeile der eigenen Einheit ja, die von Süd nicht.
-    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/recipients/{zid}/acknowledge");
     let (s, v) = anfrage(
         &app,
         "POST",
@@ -675,7 +675,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     assert_eq!(s, StatusCode::NOT_FOUND, "fremder Auftrag");
 
     // Vollzug: eigener Auftrag ja, fremder 404, abnehmen gar nicht.
-    let vollzug = |aid: i64| format!("{basis}/{aid}/vollzug");
+    let vollzug = |aid: i64| format!("{basis}/{aid}/execution");
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -697,7 +697,7 @@ async fn abschnittsgeraet_quittiert_und_meldet_nur_eigene_auftraege() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/abnehmen", id(&an_ost)),
+        &format!("{basis}/{}/accept", id(&an_ost)),
         &geraet,
         Some("{}"),
     )
@@ -726,7 +726,7 @@ async fn abschnittsgeraet_erhaelt_keine_aufloesung() {
         ]),
     )
     .await;
-    let detail = format!("{basis}/auftraege/{}", auftrag["id"].as_i64().unwrap());
+    let detail = format!("{basis}/tasks/{}", auftrag["id"].as_i64().unwrap());
     let s3 = |a: &Value| {
         a["empfaenger"]
             .as_array()
@@ -751,7 +751,7 @@ async fn abschnittsgeraet_erhaelt_keine_aufloesung() {
         e.get("aktuelle_besetzung").is_none(),
         "Gerät ohne Auflösung: {e}"
     );
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/auftraege"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/tasks"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let e = s3(&v.as_array().unwrap()[0]);
     assert!(
@@ -771,7 +771,7 @@ async fn befehl_an(
     verteiler: Value,
     freigeben: bool,
 ) -> Value {
-    let basis = format!("/api/einsaetze/{einsatz}/befehle");
+    let basis = format!("/api/einsaetze/{einsatz}/orders");
     let (s, v) = anfrage(
         app,
         "POST",
@@ -794,7 +794,7 @@ async fn befehl_an(
     if !freigeben {
         return v;
     }
-    let (s, v) = anfrage(app, "POST", &format!("{basis}/{id}/freigeben"), admin, None).await;
+    let (s, v) = anfrage(app, "POST", &format!("{basis}/{id}/release"), admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     v
 }
@@ -808,7 +808,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let basis = format!("/api/einsaetze/{}/befehle", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/orders", l.einsatz);
     let id = |v: &Value| v["id"].as_i64().unwrap();
     let zeile = |v: &Value, schluessel: &str, wert: i64| {
         v["verteiler"]
@@ -864,7 +864,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, neu) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/fortschreiben", id(&alt)),
+        &format!("{basis}/{}/revise", id(&alt)),
         &admin,
         Some("{}"),
     )
@@ -873,7 +873,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, neu) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/freigeben", id(&neu)),
+        &format!("{basis}/{}/release", id(&neu)),
         &admin,
         None,
     )
@@ -910,13 +910,13 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     }
 
     // Quittieren: die eigene Zeile ja, auch ein zweites Mal; die von Süd nicht.
-    let pfad = |bid: i64, vid: i64, wort: &str| format!("{basis}/{bid}/verteiler/{vid}/{wort}");
+    let pfad = |bid: i64, vid: i64, wort: &str| format!("{basis}/{bid}/distribution/{vid}/{wort}");
     let eigene = zeile(&gemischt, "einheit_id", l.zug_ost);
     for _ in 0..2 {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &pfad(id(&gemischt), eigene, "quittieren"),
+            &pfad(id(&gemischt), eigene, "acknowledge"),
             &geraet,
             None,
         )
@@ -948,7 +948,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
             zeile(&alt, "abschnitt_id", l.nord),
         ),
     ] {
-        for wort in ["quittieren", "zuruecknehmen"] {
+        for wort in ["acknowledge", "undo"] {
             let (s, _) = anfrage(&app, "POST", &pfad(bid, vid, wort), &geraet, None).await;
             assert_eq!(s, StatusCode::NOT_FOUND, "{wer} {wort}");
         }
@@ -971,7 +971,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &pfad(id(&gemischt), eigene, "undo"),
         &geraet,
         None,
     )
@@ -996,7 +996,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "quittieren"),
+        &pfad(id(&gemischt), eigene, "acknowledge"),
         &admin,
         None,
     )
@@ -1005,7 +1005,7 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &pfad(id(&gemischt), eigene, "zuruecknehmen"),
+        &pfad(id(&gemischt), eigene, "undo"),
         &geraet,
         None,
     )
@@ -1024,9 +1024,9 @@ async fn abschnittsgeraet_sieht_und_quittiert_nur_befehle_an_seinen_bereich() {
     for (m, p) in [
         ("POST", basis.clone()),
         ("PATCH", format!("{basis}/{}", id(&entwurf))),
-        ("POST", format!("{basis}/{}/freigeben", id(&entwurf))),
-        ("POST", format!("{basis}/{}/fortschreiben", id(&gemischt))),
-        ("GET", format!("{basis}/{}/anlagen", id(&gemischt))),
+        ("POST", format!("{basis}/{}/release", id(&entwurf))),
+        ("POST", format!("{basis}/{}/revise", id(&gemischt))),
+        ("GET", format!("{basis}/{}/enclosures", id(&gemischt))),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
@@ -1039,7 +1039,7 @@ async fn abschnittsgeraet_meldet_mit_eigenem_absender() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldungen = format!("/api/einsaetze/{}/reports", l.einsatz);
     let meldung = |bezug: Value| {
         let mut m = json!({
             "absender": "EA Nord",
@@ -1089,7 +1089,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, abschnitt) = abschnittsgeraet(&app, &admin, l.einsatz, l.nord).await;
-    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldungen = format!("/api/einsaetze/{}/reports", l.einsatz);
     let lagemeldung = |absender: &str, inhalt: &str, prioritaet: &str| {
         json!({
             "absender": absender,
@@ -1117,7 +1117,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz_uhs}/meldungen"),
+        &format!("/api/einsaetze/{einsatz_uhs}/reports"),
         &uhs,
         Some(&lagemeldung(
             "UHS Nord · Laptop 1",
@@ -1169,7 +1169,7 @@ async fn geraetelagemeldung_ist_lagerelevant_und_als_geraet_erkennbar() {
         ),
         (
             "POST",
-            format!("/api/einsaetze/{}/meldungen/{mid}/lage-gesehen", l.einsatz),
+            format!("/api/einsaetze/{}/reports/{mid}/situation-seen", l.einsatz),
             Some("{}".to_string()),
         ),
         (
@@ -1701,7 +1701,7 @@ async fn geraet_liest_die_antraege_seines_einsatzes() {
         let (s, v) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/antraege"),
+            &format!("/api/einsaetze/{einsatz}/requests"),
             cookie,
             None,
         )
@@ -1710,7 +1710,7 @@ async fn geraet_liest_die_antraege_seines_einsatzes() {
         let (s, _) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{anderer}/antraege"),
+            &format!("/api/einsaetze/{anderer}/requests"),
             cookie,
             None,
         )
@@ -1718,7 +1718,7 @@ async fn geraet_liest_die_antraege_seines_einsatzes() {
         assert_eq!(s, StatusCode::NOT_FOUND, "{wer}: anderer Einsatz");
     }
 
-    let verwerfen = format!("/api/einsaetze/{einsatz}/antraege/999999");
+    let verwerfen = format!("/api/einsaetze/{einsatz}/requests/999999");
     let (s, _) = anfrage(&app, "DELETE", &verwerfen, &monitor, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "Lagemonitor verwirft nicht");
     let (s, v) = anfrage(&app, "DELETE", &verwerfen, &tablet, None).await;
@@ -2820,7 +2820,7 @@ async fn laptop_meldet_und_liest_nur_eigene_meldungen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (einsatz, nord, _sued, tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let geraet = laptop(&app, &admin, einsatz, nord).await;
-    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldungen = format!("/api/einsaetze/{einsatz}/reports");
     let meldung = |inhalt: &str| {
         json!({
             "absender": "UHS Nord",
@@ -2873,7 +2873,7 @@ async fn laptop_korrigiert_auch_die_eigene_meldung_nicht() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         &geraet,
         Some(&meldung),
     )
@@ -2884,7 +2884,7 @@ async fn laptop_korrigiert_auch_die_eigene_meldung_nicht() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/meldungen/{mid}"),
+        &format!("/api/einsaetze/{einsatz}/reports/{mid}"),
         &geraet,
         Some(&json!({ "meldungsart": "lagemeldung" })),
     )
@@ -2900,7 +2900,7 @@ async fn laptop_blaettert_nur_durch_eigene_abgeschlossene_meldungen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (einsatz, nord, _sued, _tablet) = zwei_uhs_mit_tablet(&app, &admin).await;
     let geraet = laptop(&app, &admin, einsatz, nord).await;
-    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldungen = format!("/api/einsaetze/{einsatz}/reports");
     let meldung = |inhalt: String| {
         json!({
             "absender": "UHS Nord",
@@ -4312,7 +4312,7 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
     let (s, n) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         &admin,
         Some(
             &json!({"art": "RTW", "anzahl": 1, "adressat_kategorie": "leitstelle",
@@ -4326,7 +4326,7 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/status"),
+            &format!("/api/einsaetze/{einsatz}/resource-requests/{nid}/status"),
             &admin,
             Some(&json!({"status": stufe})),
         )
@@ -4337,12 +4337,12 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
     for (m, pfad, body) in [
         (
             "GET",
-            format!("/api/einsaetze/{einsatz}/nachforderungen"),
+            format!("/api/einsaetze/{einsatz}/resource-requests"),
             None,
         ),
         (
             "POST",
-            format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/status"),
+            format!("/api/einsaetze/{einsatz}/resource-requests/{nid}/status"),
             Some(json!({"status": "eingetroffen"})),
         ),
         (
@@ -4360,7 +4360,7 @@ async fn br_geraet_sieht_keine_nachforderung_auch_mit_ziel_eigener_raum() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         &admin,
         None,
     )
@@ -4389,7 +4389,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
         let (s, n) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+            &format!("/api/einsaetze/{einsatz}/resource-requests"),
             &admin,
             Some(
                 &json!({"art": "RTW", "anzahl": 2, "adressat_kategorie": "leitstelle",
@@ -4403,7 +4403,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/nachforderungen/{nid}/zusage"),
+            &format!("/api/einsaetze/{einsatz}/resource-requests/{nid}/commitment"),
             &admin,
             Some(&json!({"rufnamen": ["83-1", "83-2"]})),
         )
@@ -4437,7 +4437,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         &geraet,
         None,
     )
@@ -4474,7 +4474,7 @@ async fn br_geraet_sieht_erwartete_kraefte_des_eigenen_raums_und_bucht_mit_verwe
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         &admin,
         None,
     )
@@ -4642,7 +4642,7 @@ async fn br_geraet_meldet_und_liest_nur_eigene_meldungen() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sportplatz = br_anlegen(&app, &admin, einsatz, "BR Sportplatz", true).await;
     let (_, geraet) = br_geraet(&app, &admin, einsatz, sportplatz).await;
-    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldungen = format!("/api/einsaetze/{einsatz}/reports");
     let meldung = |inhalt: &str| {
         json!({
             "absender": "BR Sportplatz",
@@ -5085,7 +5085,7 @@ async fn lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let monitor = lagemonitor(&app, &admin, einsatz).await;
     let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
-    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldungen = format!("/api/einsaetze/{einsatz}/reports");
     let offen = |v: &Value| v["sofortmeldungen_offen"].clone();
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;
@@ -5164,7 +5164,7 @@ async fn lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{meldungen}/{}/bestaetigen", ids[0]),
+        &format!("{meldungen}/{}/confirm", ids[0]),
         &admin,
         None,
     )
@@ -5179,7 +5179,7 @@ async fn lagemonitor_zaehlt_offene_sofortmeldungen_ohne_meldungsfelder() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{anderer}/meldungen"),
+        &format!("/api/einsaetze/{anderer}/reports"),
         &admin,
         Some(&json!({
             "absender": "Fremd",
@@ -6844,7 +6844,7 @@ async fn verpflegungsgeraet_bucht_und_nimmt_zurueck_aber_plant_nicht() {
     let (s, nf) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/nachforderungen"),
+        &format!("/api/einsaetze/{einsatz}/resource-requests"),
         &admin,
         Some(&json!({
             "art": "Verpflegung",
@@ -7031,10 +7031,10 @@ async fn verpflegungsgeraet_liest_kein_personal_und_keine_nachforderungen() {
     for (m, pfad, body) in [
         ("GET", format!("{e}/personal"), None),
         ("GET", format!("{e}/care"), None),
-        ("GET", format!("{e}/nachforderungen"), None),
+        ("GET", format!("{e}/resource-requests"), None),
         (
             "POST",
-            format!("{e}/nachforderungen"),
+            format!("{e}/resource-requests"),
             Some(json!({
                 "art": "Verpflegung",
                 "bezeichnung": "Essensportionen",
@@ -7076,7 +7076,7 @@ async fn verpflegungsgeraet_meldet_und_liest_nur_eigene_meldungen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (_, geraet) = verpflegungsgeraet(&app, &admin, einsatz).await;
-    let meldungen = format!("/api/einsaetze/{einsatz}/meldungen");
+    let meldungen = format!("/api/einsaetze/{einsatz}/reports");
     let meldung = |inhalt: &str| {
         json!({
             "absender": "Verpflegung · Ausgabe Deich",
@@ -7110,7 +7110,7 @@ async fn verpflegungsgeraet_meldet_und_liest_nur_eigene_meldungen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{meldungen}/{mid}/zuweisen"),
+        &format!("{meldungen}/{mid}/assign"),
         &admin,
         Some(&json!({"bearbeiter_id": admin_id})),
     )
@@ -7119,7 +7119,7 @@ async fn verpflegungsgeraet_meldet_und_liest_nur_eigene_meldungen() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("{meldungen}/{mid}/bestaetigen"),
+        &format!("{meldungen}/{mid}/confirm"),
         &admin,
         None,
     )
@@ -7501,7 +7501,7 @@ async fn br_geraet_bucht_eintreffen_am_eigenen_raum() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         &geraet,
         None,
     )
@@ -7822,13 +7822,13 @@ async fn einheitengeraet_sieht_nur_die_eigene_einheit() {
     // Nicht gelistet: 403. Keine Abschnitte, keine Befehle, keine Karte in dieser Stufe.
     for (m, p) in [
         ("GET", format!("{basis}/sectors")),
-        ("GET", format!("{basis}/befehle")),
+        ("GET", format!("{basis}/orders")),
         ("GET", format!("{basis}/zones")),
         ("GET", format!("{basis}/etb")),
         ("GET", format!("{basis}/personal")),
         ("PATCH", format!("{basis}/einheiten/{}", l.zug_ost)),
         ("DELETE", format!("{basis}/einheiten/{}", l.zug_ost)),
-        ("POST", format!("{basis}/auftraege")),
+        ("POST", format!("{basis}/tasks")),
     ] {
         let (s, _) = anfrage(&app, m, &p, &geraet, Some("{}")).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{m} {p}");
@@ -7843,7 +7843,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let basis = format!("/api/einsaetze/{}/auftraege", l.einsatz);
+    let basis = format!("/api/einsaetze/{}/tasks", l.einsatz);
 
     let an_abschnitt = auftrag_an(
         &app,
@@ -7908,7 +7908,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
         "Auftrag an den Abschnitt der Einheit"
     );
 
-    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/empfaenger/{zid}/quittieren");
+    let quittieren = |aid: i64, zid: i64| format!("{basis}/{aid}/recipients/{zid}/acknowledge");
     let (s, v) = anfrage(
         &app,
         "POST",
@@ -7931,7 +7931,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_zug)),
+        &format!("{basis}/{}/execution", id(&an_zug)),
         &geraet,
         Some(&json!({"status": "vollzogen", "vollzugsmeldung": "Pumpe läuft"})),
     )
@@ -7941,7 +7941,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_zug)),
+        &format!("{basis}/{}/execution", id(&an_zug)),
         &geraet,
         Some(&json!({"status": "in_arbeit"})),
     )
@@ -7960,7 +7960,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/{}/vollzug", id(&an_abschnitt)),
+        &format!("{basis}/{}/execution", id(&an_abschnitt)),
         &geraet,
         Some(&json!({"status": "in_arbeit"})),
     )
@@ -7969,7 +7969,7 @@ async fn einheitengeraet_quittiert_nur_auftraege_an_die_eigene_einheit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{basis}/{}/abnehmen", id(&an_zug)),
+        &format!("{basis}/{}/accept", id(&an_zug)),
         &geraet,
         Some("{}"),
     )
@@ -8089,7 +8089,7 @@ async fn einheitengeraet_meldet_als_einheit_mit_standort() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldungen = format!("/api/einsaetze/{}/reports", l.einsatz);
     let meldung = |extra: Value| {
         let mut m = json!({
             "absender": "2. Zug · Handy",
@@ -8155,7 +8155,7 @@ async fn standort_vom_einheitengeraet_ueberdauert_korrektur_und_uebernahme() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let l = abschnittslage(&app, &admin).await;
     let (_, geraet) = einheitengeraet(&app, &admin, l.einsatz, l.zug_ost).await;
-    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldungen = format!("/api/einsaetze/{}/reports", l.einsatz);
     let erfassen = || async {
         let (s, v) = anfrage_json(
             &app,
@@ -8202,7 +8202,7 @@ async fn standort_vom_einheitengeraet_ueberdauert_korrektur_und_uebernahme() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{meldungen}/{id}/lagerelevant"),
+        &format!("{meldungen}/{id}/situation-relevant"),
         &admin,
         Some(&json!({})),
     )
@@ -8227,7 +8227,7 @@ async fn ort_ohne_lagemeldung_nur_vom_einheitengeraet() {
         "lat": 50.11,
         "lon": 8.68,
     });
-    let meldungen = format!("/api/einsaetze/{}/meldungen", l.einsatz);
+    let meldungen = format!("/api/einsaetze/{}/reports", l.einsatz);
     for cookie in [&admin, &abschnitt] {
         let (s, v) = anfrage_json(&app, "POST", &meldungen, cookie, Some(&body)).await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
@@ -8722,7 +8722,7 @@ async fn einheitengeraet_fordert_rtw_als_sofortmeldung_an() {
     assert_eq!(person["rtw_angefordert"], true, "{person}");
     let reg = format!("R-{:03}", person["registrier_nr"].as_i64().unwrap());
 
-    let (s, v) = anfrage(&app, "GET", &format!("{basis}/meldungen"), &geraet, None).await;
+    let (s, v) = anfrage(&app, "GET", &format!("{basis}/reports"), &geraet, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     let m = v
         .as_array()
@@ -8960,7 +8960,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("{basis}/meldungen"),
+            &format!("{basis}/reports"),
             &admin,
             Some(&json!({
                 "absender": "Melder Unbekannt", "empfaenger": "Empfaengerin Vertraulich",
@@ -8975,7 +8975,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &admin,
         Some(&json!({
             "absender": "Melder Unbekannt", "meldeweg": "funk",
@@ -8990,7 +8990,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/auftraege"),
+        &format!("{basis}/tasks"),
         &admin,
         Some(&json!({
             "auftrag_text": "Herrn Muster abholen",
@@ -9003,7 +9003,7 @@ async fn lagemonitor_alarm_traegt_zahlen_und_nur_einheits_und_abschnittsnamen() 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/erinnerungen"),
+        &format!("{basis}/reminders"),
         &admin,
         Some(&json!({ "titel": "Frau Notiz anrufen", "faellig_at": "2026-06-11 10:00" })),
     )
@@ -9223,7 +9223,7 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &admin,
         Some(&json!({
             "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
@@ -9235,7 +9235,7 @@ async fn lagemonitor_alarm_nennt_ausgeblendete_quellen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/auftraege"),
+        &format!("{basis}/tasks"),
         &admin,
         Some(&json!({
             "auftrag_text": "abholen",
@@ -9326,7 +9326,7 @@ async fn lagemonitor_kacheln_lassen_ausgeblendete_module_weg() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("{basis}/meldungen"),
+        &format!("{basis}/reports"),
         &admin,
         Some(&json!({
             "absender": "Melder", "meldeweg": "funk", "inhalt": "eingeschlossen",
@@ -9395,7 +9395,7 @@ async fn lagemonitor_bekommt_sofortmeldung_im_live_kanal_ohne_inhalt() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         &admin,
         Some(&json!({
             "absender": "Melder Unbekannt", "meldeweg": "funk",

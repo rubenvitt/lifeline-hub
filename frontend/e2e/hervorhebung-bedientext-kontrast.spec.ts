@@ -114,10 +114,10 @@ for (const modus of ['light', 'dark'] as const) {
     const einsatzId = await einsatz(page, `E2E 879 Chat ${modus} ${Date.now()}`);
 
     // Das Markieren scheitert, die Kanalliste behält ihren ungelesenen Stand (`ChatPage`).
-    await page.route(`**/api/einsaetze/${einsatzId}/chat/kanaele/*/gelesen`, (route) =>
+    await page.route(`**/api/einsaetze/${einsatzId}/chat/channels/*/read`, (route) =>
       route.fulfill({ status: 500, body: '' }),
     );
-    await page.route(`**/api/einsaetze/${einsatzId}/chat/kanaele`, async (route) => {
+    await page.route(`**/api/einsaetze/${einsatzId}/chat/channels`, async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       const antwort = await route.fetch();
       const kanaele = (await antwort.json()) as { ungelesen_anzahl: number }[];

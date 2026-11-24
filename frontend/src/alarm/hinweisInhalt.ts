@@ -23,9 +23,9 @@ import { INHALT_FRIST_MS, ladeMeldungInhalt, wortlautAnfang } from './meldungInh
  *
  * | Art | Abruf | zeigt |
  * |---|---|---|
- * | Meldung (`meldungInhalt.ts`) | `GET …/meldungen/{id}` | Absender im Titel, Wortlautanfang |
+ * | Meldung (`meldungInhalt.ts`) | `GET …/reports/{id}` | Absender im Titel, Wortlautanfang |
  * | Erinnerung (`erinnerungInhalt.ts`) | offene Erinnerungen | Titel als Gegenstand |
- * | Auftrag | `GET …/auftraege/{id}` | „#12 · Textanfang“; bei Quittung, wer quittiert hat |
+ * | Auftrag | `GET …/tasks/{id}` | „#12 · Textanfang“; bei Quittung, wer quittiert hat |
  * | Befehl, Lagebericht | Einzelabruf | Dokumenttitel als Gegenstand |
  * | Gefahr | Zonen der Lagekarte | Bezeichnung als Gegenstand |
  * | Nachforderung | Liste der Nachforderungen | Art und Bezeichnung als Gegenstand |

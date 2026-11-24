@@ -46,7 +46,7 @@ for (const modus of ['light', 'dark'] as const) {
     const einsatzId = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 874 Fehlertext ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/auftraege`, {
+    await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
       auftrag_text: 'Deich sichern',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
       frist_at: '2026-06-01 10:00:00',

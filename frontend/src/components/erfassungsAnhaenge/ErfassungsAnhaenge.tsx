@@ -44,7 +44,7 @@ export interface ErfassungsAnhangEintrag {
 
 /**
  * Die Modulroute einer Erfassungs-Ablage (LFH-758). Jede Funktion hängt schon an Einsatz und
- * Besitzer; `anhangId` ist die Linker-id. Der Download-Pfad zeigt nie auf `/anhaenge/{aid}` des
+ * Besitzer; `anhangId` ist die Linker-id. Der Download-Pfad zeigt nie auf `/attachments/{aid}` des
  * Einsatzes — dort ist die Datei 404.
  */
 export interface ErfassungsAnhangQuelle {

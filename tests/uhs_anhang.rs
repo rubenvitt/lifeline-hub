@@ -880,7 +880,7 @@ async fn abgewiesene_downloads_protokollieren_nichts() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )

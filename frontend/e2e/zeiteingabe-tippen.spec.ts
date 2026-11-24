@@ -114,7 +114,7 @@ test('Auftragsfrist: HHMM + Enter übernimmt die Frist und erteilt den Auftrag',
   await feld.press('Enter');
   await expect(dialog).toBeHidden();
 
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/auftraege`);
+  const r = await page.request.get(`/api/einsaetze/${einsatzId}/tasks`);
   const auftrag = ((await r.json()) as { auftrag_text: string; frist_at: string | null }[]).find(
     (a) => a.auftrag_text === text,
   );

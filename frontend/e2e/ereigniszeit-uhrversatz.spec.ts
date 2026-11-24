@@ -88,7 +88,7 @@ test('Meldung eines vorgehenden Geräts trägt die Serverzeit', async ({ page })
   await formular.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const meldung = async () => {
-    const r = await page.request.get(`/api/einsaetze/${einsatzId}/meldungen`);
+    const r = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
     const liste = (await r.json()) as { inhalt: string; ereigniszeit: string }[];
     return liste.find((m) => m.inhalt === inhalt);
   };

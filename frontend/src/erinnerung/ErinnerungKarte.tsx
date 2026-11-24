@@ -116,7 +116,7 @@ export default function ErinnerungKarte({
   const faellig = e.ist_faellig && !istAbg;
 
   // Beide Schritte schalten mit EINEM Klick; der Rückweg steht im Rückgängig-Toast der Seite
-  // (`POST …/erinnerungen/{eid}/oeffnen`).
+  // (`POST …/reminders/{eid}/reopen`).
   const aktionen: ReactNode[] =
     darfSchreiben && !istAbg
       ? [

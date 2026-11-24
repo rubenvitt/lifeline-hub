@@ -19,7 +19,7 @@ export interface DokumentAblage {
   bezug?: { typ: DokumentBezugTyp; id: number };
 }
 
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/dokumente`;
+const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/documents`;
 
 export function listeDokumente(einsatzId: number): Promise<Dokument[]> {
   return apiGet<Dokument[]>(basis(einsatzId));
@@ -46,7 +46,7 @@ export function legeDokumentAb(
 }
 
 /**
- * Body von `PATCH …/dokumente/{did}` (LFH-656, handgepflegt wie jedes Request-DTO). Ein fehlendes
+ * Body von `PATCH …/documents/{did}` (LFH-656, handgepflegt wie jedes Request-DTO). Ein fehlendes
  * Feld bleibt; der Bezug kommt als Paar — beide `null` entfernt ihn, eine Mischung ist 422.
  */
 export interface DokumentPatch {
@@ -68,7 +68,7 @@ export function entferneDokument(einsatzId: number, dokumentId: number): Promise
   return apiSend<void>(`${basis(einsatzId)}/${dokumentId}`, 'DELETE');
 }
 
-/** Download über die modul-gegatete Route — nie über `/anhaenge` (dort 404, LFH-632 E8). */
+/** Download über die modul-gegatete Route — nie über `/attachments` (dort 404, LFH-632 E8). */
 export function dokumentDownloadPfad(einsatzId: number, dokumentId: number): string {
-  return `${basis(einsatzId)}/${dokumentId}/datei`;
+  return `${basis(einsatzId)}/${dokumentId}/file`;
 }

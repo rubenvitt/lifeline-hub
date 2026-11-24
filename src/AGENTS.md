@@ -273,8 +273,8 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Guard `jeder_fremdschluessel_auf_anhang_ist_registriert`. **Abschottungstests laufen als die
   ablegende Person** (`admin`, `common::schaden_anhang`), sonst sind sie ohne Eintrag grün.
 - Kreuzsperren: ETB nimmt keine Chat-/modulgebundene Datei (422, `gebunden_meldung()`), Chat keine
-  modulgebundene (400). Upload `POST …/etb/anhaenge` (Dokument-Allowlist, eine Datei je Anfrage),
-  Download `GET …/etb/{eintrag_id}/anhaenge/{aid}`; Binden über `anhang_ids` in derselben
+  modulgebundene (400). Upload `POST …/etb/attachments` (Dokument-Allowlist, eine Datei je Anfrage),
+  Download `GET …/etb/{eintrag_id}/attachments/{aid}`; Binden über `anhang_ids` in derselben
   Transaktion (`anlegen_idempotent`, `write_retry!`). **Append-only**, nur die Schwärzung löscht.
 - **Heraufstufen aus dem Chat kopiert** (LFH-700): `anhang_ids` der Nachricht (explizit, leer =
   keine, ≤ 10, fremd → 400) gehen als neue `anhang`-Zeile an den Eintrag
@@ -433,7 +433,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   wie die Kennzahlen. Ohne `limit` bleibt die Vollliste (Druck, Bericht, Snapshot).
 - **Suche einer geblätterten Liste: `q` getrimmt, leer = keine Suche, über 200 Zeichen 400**,
   Muster nur aus `db::suche::like_muster`. Die Auftragsliste trägt sie wie die Schadenliste
-  (`…/auftraege?q=` und `…/auftraege/kennzahlen?q=`: Kennung `#n`, Text, Empfänger).
+  (`…/tasks?q=` und `…/tasks/metrics?q=`: Kennung `#n`, Text, Empfänger).
 
 ## Backend — Benutzername und KDF (LFH-921, LFH-981)
 
@@ -951,7 +951,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
-  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/meldungen/{mid}` lesen
+  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/reports/{mid}` lesen
   dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
 - **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
   4096 Byte für den ganzen Push, das Relais weist einen größeren Push mit 400 ab). Zu langes kürzt
@@ -1040,7 +1040,7 @@ Begriffe, Datenfluss, Migrations-SQL und Folgestellen:
   `PFAD_KEY` auf `lagemeldungen`, nicht auf `meldungen`.
 - **Schwärzung:** die Lage-Spalten sind Teil der Regel `meldung` (`lage_text` NullSetzen,
   `lat`/`lon` behalten, Zeiten und Benutzer-FKs behalten).
-- **Korrektur (LLH-1066):** `PATCH …/meldungen/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
+- **Korrektur (LLH-1066):** `PATCH …/reports/{mid}` (`routes/meldung_korrektur.rs`, Schreiben
   in `meldung/korrektur.rs`, eine Transaktion) ändert Art, Priorität, Richtung, Von-Bezug (als
   Paar; eine id außerhalb des Einsatzes 422, anders als beim Erfassen), Empfänger und die
   Lage-Angaben. Wortlaut, Absender, Meldeweg, Ereigniszeit und Eingang → 422, ein unbekanntes Feld

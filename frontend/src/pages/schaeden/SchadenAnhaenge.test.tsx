@@ -87,7 +87,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     });
     expect(dach).toHaveAttribute('href', '/api/einsaetze/1/damages/10/attachments/5/file');
     expect(dach).toHaveAttribute('download', 'dach.jpg');
-    expect(dach.getAttribute('href')).not.toMatch(/^\/api\/einsaetze\/1\/anhaenge/);
+    expect(dach.getAttribute('href')).not.toMatch(/^\/api\/einsaetze\/1\/attachments/);
     const links = within(paneel()).getAllByRole('link');
     const namen = links.map((l) => l.getAttribute('aria-label'));
     expect(new Set(namen).size).toBe(namen.length);

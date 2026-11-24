@@ -63,11 +63,11 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/personal/zeitachse', 'personalPerioden'),
     json('/fahrzeuge', 'fahrzeuge'),
     // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.
-    http.get(`/api/einsaetze/${E}/lageberichte`, () => {
+    http.get(`/api/einsaetze/${E}/situation-reports`, () => {
       zaehle('/lageberichte');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').liste);
     }),
-    http.get(`/api/einsaetze/${E}/lageberichte/:lid`, () => {
+    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, () => {
       zaehle('/lageberichte/:lid');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
     }),
@@ -78,7 +78,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/evacuation', 'evakuierung'),
     json('/care', 'betreuung'),
     json('/catering', 'verpflegung'),
-    json('/etb/zaehler', 'etbZaehler'),
+    json('/etb/counts', 'etbZaehler'),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
@@ -217,7 +217,7 @@ describe('EinsatzberichtDruckPage', () => {
     quellen();
     let versuche = 0;
     server.use(
-      http.get(`/api/einsaetze/${E}/lageberichte`, () => {
+      http.get(`/api/einsaetze/${E}/situation-reports`, () => {
         versuche += 1;
         return versuche === 1
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
@@ -281,7 +281,7 @@ describe('EinsatzberichtDruckPage', () => {
       http.get(`/api/einsaetze/${E}`, () =>
         HttpResponse.json({ ...wert<object>(roh, 'einsatz'), bezeichnung: 'Umbenannt' }),
       ),
-      http.get(`/api/einsaetze/${E}/etb/zaehler`, () =>
+      http.get(`/api/einsaetze/${E}/etb/counts`, () =>
         HttpResponse.json({
           gesamt: 4,
           je_typ: {

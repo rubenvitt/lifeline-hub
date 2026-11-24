@@ -147,7 +147,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/auftraege", self.einsatz),
+            &format!("/api/einsaetze/{}/tasks", self.einsatz),
             &self.admin,
             Some(&body.to_string()),
         )

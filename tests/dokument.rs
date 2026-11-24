@@ -9,7 +9,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/dokumente")
+    format!("/api/einsaetze/{einsatz}/documents")
 }
 
 /// Multipart mit Datei + beliebigen Textfeldern. `datei = None` lässt das Dateifeld weg.
@@ -33,7 +33,7 @@ async fn datei_laden(
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -129,7 +129,7 @@ async fn download_revalidiert_mit_304() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("{}/{did}/datei", pfad(einsatz)))
+                .uri(format!("{}/{did}/file", pfad(einsatz)))
                 .header(header::COOKIE, &admin)
                 .header(header::IF_NONE_MATCH, &etag)
                 .body(Body::empty())
@@ -356,7 +356,7 @@ async fn chat_allowlist_bleibt_ohne_heic() {
     let (app, admin, einsatz) = start().await;
     let (status, json) = multipart_post(
         &app,
-        &format!("/api/einsaetze/{einsatz}/anhaenge"),
+        &format!("/api/einsaetze/{einsatz}/attachments"),
         &admin,
         Some(("foto.heic", b"x")),
         &[],
@@ -444,7 +444,7 @@ async fn entfernen_ist_soft_delete() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )
@@ -1001,7 +1001,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_schaden_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )
@@ -1121,7 +1121,7 @@ async fn recht_auf_dokumente_genuegt_nicht_fuer_personen_anhaenge() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/anhaenge/{aid}"),
+        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
         &frieda,
         None,
     )

@@ -40,7 +40,7 @@ async fn melden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -51,7 +51,7 @@ async fn rueckmeldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Value
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/meldungen/rueckmeldungen"),
+        &format!("/api/einsaetze/{einsatz}/reports/check-ins"),
         cookie,
         None,
     )
@@ -330,7 +330,7 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/meldungen"),
+        &format!("/api/einsaetze/{e}/reports"),
         &admin,
         None,
     )

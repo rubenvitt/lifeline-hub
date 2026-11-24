@@ -43,7 +43,7 @@ async fn etb_upload(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/etb/anhaenge"))
+                .uri(format!("/api/einsaetze/{einsatz}/etb/attachments"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -620,7 +620,7 @@ async fn eintrag_mit_foto(app: &axum::Router, admin: &str) -> (i64, i64, i64) {
 }
 
 fn pfad(einsatz: i64, eintrag: i64, anhang: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/etb/{eintrag}/anhaenge/{anhang}")
+    format!("/api/einsaetze/{einsatz}/etb/{eintrag}/attachments/{anhang}")
 }
 
 #[tokio::test]
@@ -741,7 +741,7 @@ async fn ungebundener_etb_upload_ist_generisch_nur_fuer_die_hochladende_person()
     let frieda = fuehrungsperson(&app, &admin, einsatz).await;
     let erika = beobachterin(&app, &admin, einsatz).await;
     let a = hochgeladen(&app, einsatz, &admin, "a.jpg").await;
-    let generisch = format!("/api/einsaetze/{einsatz}/anhaenge/{a}");
+    let generisch = format!("/api/einsaetze/{einsatz}/attachments/{a}");
 
     let (s, _, _) = download(&app, &generisch, &frieda, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "fremde Führungsperson");
@@ -884,7 +884,7 @@ async fn chat_senden(
     let (s, kanaele) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels"),
         cookie,
         None,
     )
@@ -894,7 +894,7 @@ async fn chat_senden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/kanaele/{kid}/nachrichten"),
+        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":{anhang_ids:?}}}"#)),
     )

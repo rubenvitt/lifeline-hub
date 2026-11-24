@@ -26,7 +26,7 @@ export interface ZielGruppe {
   options: ZielOption[];
 }
 
-/** Die Felder des Ziels im Body von `POST …/nachforderungen`. */
+/** Die Felder des Ziels im Body von `POST …/resource-requests`. */
 export type ZielFelder = Pick<NeueNachforderung, 'ziel_br_id' | 'ziel_abschnitt_id' | 'ziel_text'>;
 
 const offen = (r: ZielRaum) => r.status !== 'aufgeloest';
