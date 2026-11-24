@@ -65,6 +65,7 @@ pub mod material;
 pub mod meldung;
 pub mod nachforderung;
 pub mod org;
+pub mod ortung;
 pub mod pegel;
 pub mod person;
 pub mod personal;

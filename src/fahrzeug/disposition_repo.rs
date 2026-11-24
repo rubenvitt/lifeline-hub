@@ -15,7 +15,10 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
-           ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
+           ef.lat, ef.lon, ef.position_quelle, ef.position_gemessen_at, \
+           EXISTS(SELECT 1 FROM ortung_kopplung k WHERE k.einsatz_fahrzeug_id = ef.id) \
+               AS ortung_gekoppelt, \
+           ef.tz_fachaufgabe, ef.tz_organisation, \
            ef.aktueller_br_id, ef.status_seit, \
            ef.disponiert_at, ef.disponiert_von, \
            ef.beendet_at, ef.beendet_von, ef.beendet_als, \
@@ -46,6 +49,9 @@ struct Row {
     bemerkung: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
+    position_quelle: Option<crate::ortung::PositionQuelle>,
+    position_gemessen_at: Option<String>,
+    ortung_gekoppelt: bool,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
     aktueller_br_id: Option<i64>,
@@ -117,6 +123,9 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         bemerkung: row.bemerkung,
         lat: row.lat,
         lon: row.lon,
+        position_quelle: row.position_quelle,
+        position_gemessen_at: row.position_gemessen_at,
+        ortung_gekoppelt: row.ortung_gekoppelt,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
         aktueller_br_id: row.aktueller_br_id,
@@ -608,12 +617,24 @@ pub async fn update_position(
     // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
     let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
+            position_quelle = CASE WHEN ?11 OR ?12 \
+                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
+                          THEN NULL ELSE 'manuell' END \
+                ELSE position_quelle END, \
+            position_gemessen_at = CASE WHEN ?11 OR ?12 \
+                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
+                          THEN NULL ELSE ?13 END \
+                ELSE position_gemessen_at END, \
+            position_gesetzt_at = CASE WHEN ?11 OR ?12 \
+                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
+                          THEN NULL ELSE ?13 END \
+                ELSE position_gesetzt_at END, \
             lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
             lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
             tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
             tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
          WHERE id = ?9 AND einsatz_id = ?10{}",
-        erwartet.sql_suffix(11)
+        erwartet.sql_suffix(14)
     );
     let q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.lat.is_some())
@@ -625,7 +646,11 @@ pub async fn update_position(
         .bind(daten.tz_organisation.is_some())
         .bind(daten.tz_organisation.flatten())
         .bind(ef_id)
-        .bind(einsatz_id);
+        .bind(einsatz_id)
+        // Quelle und Zeiten ändern sich nur, wenn der Patch lat oder lon trägt (LLH-2091).
+        .bind(daten.lat.is_some())
+        .bind(daten.lon.is_some())
+        .bind(crate::zeit::jetzt());
     let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
         return Err(crate::feld_cas::ohne_treffer(

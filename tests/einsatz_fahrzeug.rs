@@ -2605,3 +2605,143 @@ async fn status_ruecknahme_etb_geht_live_hinaus() {
     etb.pruefe(&app, &admin, einsatz, "Statuswechsel zurücknehmen")
         .await;
 }
+
+// ---------- Positionsquelle (LLH-2091, Task 1) ----------
+
+async fn position_zeilen(
+    pool: &sqlx::SqlitePool,
+    ef: i64,
+) -> (Option<String>, Option<String>, Option<String>) {
+    sqlx::query_as(
+        "SELECT position_quelle, position_gemessen_at, position_gesetzt_at \
+         FROM einsatz_fahrzeug WHERE id = ?",
+    )
+    .bind(ef)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn manuelle_position_setzt_quelle_und_zeiten() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position"),
+        &admin,
+        Some(r#"{"lat":52.0,"lon":10.0}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["position_quelle"], "manuell");
+    assert!(json["position_gemessen_at"].is_string(), "{json}");
+    let (quelle, gemessen, gesetzt) = position_zeilen(&pool, ef).await;
+    assert_eq!(quelle.as_deref(), Some("manuell"));
+    assert!(gemessen.is_some());
+    assert_eq!(gesetzt, gemessen);
+}
+
+#[tokio::test]
+async fn geloeschte_position_leert_quelle_und_zeiten() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"lat":52.0,"lon":10.0}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"lat":null,"lon":null}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert!(json["position_quelle"].is_null(), "{json}");
+    assert!(json["position_gemessen_at"].is_null(), "{json}");
+    assert_eq!(position_zeilen(&pool, ef).await, (None, None, None));
+}
+
+#[tokio::test]
+async fn nur_tz_felder_aendern_die_quelle_nicht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let pfad = format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position");
+    let (s, _) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"lat":52.0,"lon":10.0}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // Eine vorherige Ortungs-Position simulieren: Quelle und Zeiten sollen unberührt bleiben.
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET position_quelle = 'ortung', \
+         position_gemessen_at = '2026-11-24 10:00:00', position_gesetzt_at = '2026-11-24 10:00:05' \
+         WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"tz_fachaufgabe":"fuehrung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["position_quelle"], "ortung");
+    assert_eq!(
+        position_zeilen(&pool, ef).await,
+        (
+            Some("ortung".into()),
+            Some("2026-11-24 10:00:00".into()),
+            Some("2026-11-24 10:00:05".into())
+        )
+    );
+}
+
+#[tokio::test]
+async fn anzeige_traegt_keine_kennung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let (s, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let zeile = &json[0];
+    assert_eq!(zeile["ortung_gekoppelt"], false, "{zeile}");
+    for verboten in ["kennung", "zugang", "zugang_id", "zugang_name"] {
+        assert!(zeile.get(verboten).is_none(), "{verboten} in {zeile}");
+    }
+}

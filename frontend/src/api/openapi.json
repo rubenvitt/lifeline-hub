@@ -7286,6 +7286,7 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
+          "ortung_gekoppelt",
           "disponiert_at",
           "ist_demo"
         ],
@@ -7402,6 +7403,28 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "ortung_gekoppelt": {
+            "type": "boolean",
+            "description": "Hängt das Fahrzeug an einer Ortungs-Kennung? Nur der Wahrheitswert; Kennung und Zugang\nverlassen den Server hier nicht (LLH-2091)."
+          },
+          "position_gemessen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der Position (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die\nServerzeit des Setzens. Trägt die Altersanzeige."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PositionQuelle",
+                "description": "Woher die Position stammt (LLH-2091); fehlt ohne Position."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "soll_besatzung": {
@@ -19052,6 +19075,14 @@
             "$ref": "#/components/schemas/Sonderkost"
           }
         }
+      },
+      "PositionQuelle": {
+        "type": "string",
+        "description": "Woher die Position eines Einsatzfahrzeugs stammt. Wire == `as_str()`.",
+        "enum": [
+          "manuell",
+          "ortung"
+        ]
       },
       "PostenArt": {
         "type": "string",

@@ -1517,6 +1517,15 @@ fn beendet_als_wire() {
     } in lifeline_hub::entlassung::BeendetAls::ALLE);
 }
 
+/// LLH-2091: Quelle einer Fahrzeugposition; DB-CHECK in `migrations/0373_fahrzeugortung.sql`.
+#[test]
+fn position_quelle_wire() {
+    enum_wire!(lifeline_hub::ortung::PositionQuelle {
+        Manuell => "manuell",
+        Ortung => "ortung",
+    } in lifeline_hub::ortung::PositionQuelle::ALLE);
+}
+
 #[test]
 fn zeitachse_marke_wire() {
     enum_wire!(lifeline_hub::zeitachse::ZeitachseMarke {

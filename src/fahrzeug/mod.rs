@@ -197,6 +197,16 @@ pub struct EinsatzFahrzeugAnzeige {
     pub bemerkung: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    /// Woher die Position stammt (LLH-2091); fehlt ohne Position.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position_quelle: Option<crate::ortung::PositionQuelle>,
+    /// Zeitpunkt der Position (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die
+    /// Serverzeit des Setzens. Trägt die Altersanzeige.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position_gemessen_at: Option<String>,
+    /// Hängt das Fahrzeug an einer Ortungs-Kennung? Nur der Wahrheitswert; Kennung und Zugang
+    /// verlassen den Server hier nicht (LLH-2091).
+    pub ortung_gekoppelt: bool,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
     /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).

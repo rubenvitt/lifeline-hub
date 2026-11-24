@@ -2937,6 +2937,17 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             opta?: string | null;
+            /**
+             * @description Hängt das Fahrzeug an einer Ortungs-Kennung? Nur der Wahrheitswert; Kennung und Zugang
+             *     verlassen den Server hier nicht (LLH-2091).
+             */
+            ortung_gekoppelt: boolean;
+            /**
+             * @description Zeitpunkt der Position (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die
+             *     Serverzeit des Setzens. Trägt die Altersanzeige.
+             */
+            position_gemessen_at?: string | null;
+            position_quelle?: components["schemas"]["PositionQuelle"] | null;
             soll_besatzung?: components["schemas"]["Staerke"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
@@ -7669,6 +7680,11 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /**
+         * @description Woher die Position eines Einsatzfahrzeugs stammt. Wire == `as_str()`.
+         * @enum {string}
+         */
+        PositionQuelle: "manuell" | "ortung";
         /**
          * @description Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.
          * @enum {string}
