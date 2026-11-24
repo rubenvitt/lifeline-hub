@@ -525,14 +525,14 @@ const MODUL_GET_PFADE: &[(&str, &str)] = &[
     ("lagekarte", "karte/fuehrungskraefte"),
     ("lagemeldungen", "lage/meldungen"),
     ("dokumente", "documents"),
-    ("lagebesprechung", "lagebesprechung"),
-    ("lagebesprechung", "lagebesprechungen"),
-    // LLH-1180: die S6-Pfade bleiben unter `…/stab`, gehören aber dem Fernmeldewesen.
-    ("fernmeldewesen", "stab/kommunikationsplan"),
-    ("fernmeldewesen", "stab/fernmeldeskizze"),
-    // i6k6mzed (design.md D3): das Informationstelefon behält seinen Pfad unter `…/stab`, ist
+    ("lagebesprechung", "briefing"),
+    ("lagebesprechung", "briefings"),
+    // LLH-1180: die S6-Pfade liegen unter `…/staff`, gehören aber dem Fernmeldewesen.
+    ("fernmeldewesen", "staff/comms-plan"),
+    ("fernmeldewesen", "staff/comms-sketch"),
+    // i6k6mzed (design.md D3): das Informationstelefon liegt unter `…/staff`, ist
     // aber ein eigenes Modul.
-    ("infotelefon", "stab/infotelefon"),
+    ("infotelefon", "staff/info-line"),
 ];
 
 /// Module ohne eigene daten-besitzende Backend-Routen (reine Aggregation/Sicht):
@@ -718,16 +718,11 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
         StatusCode::OK
     );
     assert_eq!(
-        get_status(
-            &app,
-            &frieda,
-            &format!("/api/einsaetze/{eid}/lagebesprechung")
-        )
-        .await,
+        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/briefing")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: Frieda sieht die Lagebesprechung nicht"
     );
-    let besprechungen = format!("/api/einsaetze/{eid}/lagebesprechungen");
+    let besprechungen = format!("/api/einsaetze/{eid}/briefings");
     admin_post(
         &app,
         &admin,

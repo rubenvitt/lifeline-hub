@@ -344,7 +344,7 @@ mod tests {
         assert!(ist_stammdaten_pfad("/api/organization/logo"));
         assert!(!ist_stammdaten_pfad("/api/fahrzeuge-x"));
         assert!(!ist_stammdaten_pfad("/api/vehicle-suggestions"));
-        assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/sprechgruppen"));
+        assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/talk-groups"));
         assert!(!ist_stammdaten_pfad("/api/org-settings"));
     }
 }

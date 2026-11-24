@@ -18,6 +18,7 @@ animals	Tiere
 api	-
 app-code	-
 archive	Archiv
+areas	Bereiche
 assign	zuweisen
 attachments	Anhänge
 attachments.zip	Anlagen
@@ -28,6 +29,7 @@ auto-update	automatische Aktualisierung
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
+briefing	Lagebesprechung
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
@@ -59,11 +61,13 @@ commitment	Zusage
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
 complete	erledigen
+components	Komponenten
 config	-
 confirm	bestätigen
+connections	Verbindungen
 count	Anzahl
-counters	Zähler
 countersign	gegenzeichnen
+counts	Zähler
 damages	Schäden
 deactivate	deaktivieren
 decline	ablehnen
@@ -119,6 +123,7 @@ key	Schlüssel
 keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
+layout	Anordnung
 live	-
 login	-
 logins	Anmeldungen
@@ -216,6 +221,7 @@ retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
 revise	fortschreiben
 revoke	widerrufen
+schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
@@ -250,6 +256,7 @@ test	-
 tile	-
 tilejson	-
 tiles	-
+title-block	Schriftfeld
 totp	-
 transfer	Übernahme
 transport	-

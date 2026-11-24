@@ -72,7 +72,7 @@ export function ladeEtbZaehler(
   filter: EtbFilterWerte = {},
 ): Promise<EtbZaehler> {
   const qs = filterParameter(filter).toString();
-  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/counters${qs ? `?${qs}` : ''}`);
+  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/counts${qs ? `?${qs}` : ''}`);
 }
 
 /**

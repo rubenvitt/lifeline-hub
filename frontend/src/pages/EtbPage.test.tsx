@@ -137,7 +137,7 @@ function zaehlung(jeTyp: Partial<Record<EtbEintragAnzeige['typ'], number>>) {
     ...jeTyp,
   };
   const gesamt = Object.values(je_typ).reduce((a, b) => a + b, 0);
-  return http.get('/api/einsaetze/7/etb/counters', () => HttpResponse.json({ gesamt, je_typ }));
+  return http.get('/api/einsaetze/7/etb/counts', () => HttpResponse.json({ gesamt, je_typ }));
 }
 
 /**
@@ -1339,7 +1339,7 @@ describe('EtbPage – Zeitachse (Neuentwurf S4)', () => {
 describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', () => {
   /** Zählung wie der Server: 412 Einträge, davon 300 Systemeinträge; der Ausschluss nimmt sie heraus. */
   function zaehler412(zaehlQueries: string[] = []) {
-    return http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
+    return http.get('/api/einsaetze/7/etb/counts', ({ request }) => {
       const p = new URL(request.url).searchParams;
       zaehlQueries.push(p.toString());
       const ohne = p.get('ohne_system') === 'true';
@@ -1394,7 +1394,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
     let systemFreigeben: () => void = () => undefined;
     const systemDa = new Promise<void>((r) => (systemFreigeben = r));
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/counters', async ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counts', async ({ request }) => {
         const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
         if (!ohne) await systemDa;
         return HttpResponse.json({
@@ -1422,7 +1422,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
 
   it('nennt im Kopf die Einzahl', async () => {
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counts', ({ request }) => {
         const ohne = new URL(request.url).searchParams.get('ohne_system') === 'true';
         return HttpResponse.json({
           gesamt: ohne ? 1 : 2,
@@ -1490,7 +1490,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
   it('unter einem Typfilter zählen die Segmente ohne den Typ, der Kopf die Treffer', async () => {
     setzeViewportBreite(1440);
     setup('/einsaetze/7/etb?typ=meldung', [
-      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counts', ({ request }) => {
         const p = new URL(request.url).searchParams;
         const nurMeldung = p.get('typ') === 'meldung';
         return HttpResponse.json({
@@ -1516,7 +1516,7 @@ describe('EtbPage – Kopf und Typ-Segmente zeigen die exakte Zahl (kwc2yszv)', 
   it('Zählung schlägt fehl: Kopf und Typ-Segmente zeigen keine Zahl, die Liste bleibt bedienbar', async () => {
     setzeViewportBreite(1440);
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/counters', () =>
+      http.get('/api/einsaetze/7/etb/counts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2165,7 +2165,7 @@ describe('EtbPage — Handschirm (LFH-955)', () => {
       freigeben = r;
     });
     setup('/einsaetze/7/etb', [
-      http.get('/api/einsaetze/7/etb/counters', async () => {
+      http.get('/api/einsaetze/7/etb/counts', async () => {
         await zaehlung;
         return HttpResponse.json({
           gesamt: 1,
@@ -2396,7 +2396,7 @@ describe('EtbPage: Systemeinträge in der Vorgabe aus (kwc2yszv)', () => {
           p.get('ohne_system') === 'true' ? [eintrag] : [...system, eintrag],
         );
       }),
-      http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
+      http.get('/api/einsaetze/7/etb/counts', ({ request }) => {
         const p = new URL(request.url).searchParams;
         zaehlAbrufe.push(p.toString());
         const ohne = p.get('ohne_system') === 'true';
@@ -2628,7 +2628,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
    * Vorgabe, kein Filter (kwc2yszv D6).
    */
   function zaehlerJeFilter() {
-    return http.get('/api/einsaetze/7/etb/counters', ({ request }) => {
+    return http.get('/api/einsaetze/7/etb/counts', ({ request }) => {
       const p = new URL(request.url).searchParams;
       p.delete('ohne_system');
       const gefiltert = p.size > 0;
@@ -2675,7 +2675,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
 
   it('nennt ohne Zählung keine Zahl', async () => {
     setup('/einsaetze/7/etb?typ=meldung', [
-      http.get('/api/einsaetze/7/etb/counters', () => HttpResponse.json({}, { status: 500 })),
+      http.get('/api/einsaetze/7/etb/counts', () => HttpResponse.json({}, { status: 500 })),
     ]);
     const band = (await screen.findByText('Gefiltert')).closest('[data-lfh="filterhinweis"]')!;
     expect(band).not.toHaveTextContent(/\d+ von \d+/);
@@ -2709,7 +2709,7 @@ describe('EtbPage: Filterband (LLH-1071)', () => {
     setup('/einsaetze/7/etb?von=2026-05-23%2011%3A30%3A00', [
       zaehlerJeFilter(),
       http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/7/lagebesprechung', () =>
+      http.get('/api/einsaetze/7/briefing', () =>
         HttpResponse.json({
           anzahl_lagebesprechungen: 1,
           letzte_lagebesprechung: {

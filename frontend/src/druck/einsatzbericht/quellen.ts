@@ -66,13 +66,13 @@ export const QUELLEN: readonly Quelle[] = [
   // GET /api/einsaetze/{id} — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:113).
   // Kopf, Stand und Abschluss des Einsatzes braucht jeder Block.
   { schluessel: 'einsatz', bloecke: BLOECKE.map((b) => b.schluessel), modul: null },
-  // GET …/fuehrungsstelle — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
+  // GET …/command-post — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).
   // Sie trägt den Einsatzleiter (LFH-1199); die Mitglieder mit App-Rolle sind keine Leitung.
   { schluessel: 'fuehrungsstelle', bloecke: nur('fuehrung'), modul: null },
   // GET …/mitglieder — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs, `mitglieder`). Sie
   // tragen die Führungsfunktionen EL und S1–S7 (i6k6mzed, D7).
   { schluessel: 'mitglieder', bloecke: nur('fuehrung'), modul: null },
-  // GET …/lagebesprechungen — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
+  // GET …/briefings — `EinsatzLesezugriff<Lagebesprechung>` (src/routes/lagebesprechung.rs,
   // `list`), seit LLH-1111 nicht mehr am Stab.
   { schluessel: 'lagebesprechungen', bloecke: nur('fuehrung'), modul: 'lagebesprechung' },
   // GET …/einheiten — `EinsatzLesezugriff<Einheiten>` (src/routes/einsatz_einheit.rs:44).
@@ -113,7 +113,7 @@ export const QUELLEN: readonly Quelle[] = [
   { schluessel: 'betreuung', bloecke: nur('bilanz'), modul: 'betreuung' },
   // GET …/verpflegung — `EinsatzLesezugriff<Verpflegung>` (src/routes/verpflegung.rs:66).
   { schluessel: 'verpflegung', bloecke: nur('bilanz'), modul: 'verpflegung' },
-  // GET …/etb/counters — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
+  // GET …/etb/counts — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:360).
   { schluessel: 'etbZaehler', bloecke: nur('etb'), modul: 'etb' },
   // GET …/etb?typ=entscheidung — `EinsatzLesezugriff<Etb>` (src/routes/etb.rs:304).
   { schluessel: 'etbEntscheidungen', bloecke: nur('etb'), modul: 'etb' },

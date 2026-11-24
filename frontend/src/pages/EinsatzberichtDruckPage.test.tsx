@@ -54,9 +54,9 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
   server.use(
     meHandler(kraft),
     json('', 'einsatz'),
-    json('/fuehrungsstelle', 'fuehrungsstelle'),
+    json('/command-post', 'fuehrungsstelle'),
     json('/mitglieder', 'mitglieder'),
-    json('/lagebesprechungen', 'lagebesprechungen'),
+    json('/briefings', 'lagebesprechungen'),
     mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/einheiten/zeitachse', 'einheitenPerioden'),
     mitBeendeten('/personal', 'personal', 'entlassene', 'personalEntlassen'),
@@ -78,7 +78,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/evakuierung', 'evakuierung'),
     json('/betreuung', 'betreuung'),
     json('/verpflegung', 'verpflegung'),
-    json('/etb/counters', 'etbZaehler'),
+    json('/etb/counts', 'etbZaehler'),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
@@ -281,7 +281,7 @@ describe('EinsatzberichtDruckPage', () => {
       http.get(`/api/einsaetze/${E}`, () =>
         HttpResponse.json({ ...wert<object>(roh, 'einsatz'), bezeichnung: 'Umbenannt' }),
       ),
-      http.get(`/api/einsaetze/${E}/etb/counters`, () =>
+      http.get(`/api/einsaetze/${E}/etb/counts`, () =>
         HttpResponse.json({
           gesamt: 4,
           je_typ: {

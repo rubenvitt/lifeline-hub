@@ -128,7 +128,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
         v["personen"]["gesamt"].as_i64(),
         Some(liste.as_array().unwrap().len() as i64)
     );
-    let etb = get(&app, &admin, &format!("{basis}/etb/counters")).await;
+    let etb = get(&app, &admin, &format!("{basis}/etb/counts")).await;
     assert_eq!(v["etb"]["gesamt"], etb["gesamt"], "{v:?}");
 }
 

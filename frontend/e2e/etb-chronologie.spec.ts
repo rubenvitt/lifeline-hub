@@ -52,7 +52,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await seedeEintrag(page, einsatzId);
     // Der Termin kommt aus dem Modul Lagebesprechung (LLH-1111): der eine Schreibweg ohne
     // Abschluss. Gesät mit Sekunden, damit die Wiedervorlage ihn nachweislich ungerundet übernimmt.
-    const gesetzt = await page.request.put(`/api/einsaetze/${einsatzId}/lagebesprechung/termin`, {
+    const gesetzt = await page.request.put(`/api/einsaetze/${einsatzId}/briefing/schedule`, {
       data: { naechste_at: '2099-09-09T13:17:43Z' },
     });
     expect(gesetzt.ok(), `Termin setzen: ${gesetzt.status()}`).toBeTruthy();
@@ -93,7 +93,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await expect(keinTermin).toBeEnabled();
     const geloescht = page.waitForResponse(
       (antwort) =>
-        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/lagebesprechung/termin`) &&
+        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/briefing/schedule`) &&
         antwort.request().method() === 'PUT',
     );
     await keinTermin.click();

@@ -148,7 +148,7 @@ modul_marker! {
 
 /// Pfad-Präfix (app.rs-Route) → erwarteter Modul-Key (LFH-230). `None` = modul-lose
 /// Gate-Route. Der **längste** passende Präfix gewinnt (`…/lage/meldungen` ist ein
-/// eigener Eintrag, kein Kind von `…/reports`). Wächst pro migriertem Modul; nur
+/// eigener Eintrag, kein Kind von `…/meldungen`). Wächst pro migriertem Modul; nur
 /// nicht-DEFERRED-Routen (die der Guard prüft) müssen eingetragen sein. Der Guard
 /// gleicht diese Tabelle gegen die Marker in den Handler-Signaturen ab.
 pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
@@ -161,31 +161,25 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ),
     ("/api/einsaetze/{id}/reports", Some("meldungen")),
     ("/api/einsaetze/{id}/tasks", Some("auftraege")),
-    // LLH-1111: Stand und Termin unter `…/lagebesprechung`, Verlauf und Abschluss unter
-    // `…/lagebesprechungen` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
-    (
-        "/api/einsaetze/{id}/lagebesprechung",
-        Some("lagebesprechung"),
-    ),
-    (
-        "/api/einsaetze/{id}/lagebesprechungen",
-        Some("lagebesprechung"),
-    ),
-    // LLH-1180: Kommunikationsplan und Fernmeldeskizze behalten ihre Pfade unter `…/stab`, gehören
+    // LLH-1111: Stand und Termin unter `…/briefing`, Verlauf und Abschluss unter
+    // `…/briefings` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.
+    ("/api/einsaetze/{id}/briefing", Some("lagebesprechung")),
+    ("/api/einsaetze/{id}/briefings", Some("lagebesprechung")),
+    // LLH-1180: Kommunikationsplan und Fernmeldeskizze liegen unter `…/staff`, gehören
     // aber dem Modul Fernmeldewesen (Herleitung `wgnb0am2-stab-abwaehlbar`, D4). Das Modul `stab`
-    // gibt es nicht mehr (i6k6mzed, design.md D1); `…/stab` selbst ist kein Präfix.
+    // gibt es nicht mehr (i6k6mzed, design.md D1); `…/staff` selbst ist kein Präfix.
     (
-        "/api/einsaetze/{id}/stab/kommunikationsplan",
+        "/api/einsaetze/{id}/staff/comms-plan",
         Some("fernmeldewesen"),
     ),
     (
-        "/api/einsaetze/{id}/stab/fernmeldeskizze",
+        "/api/einsaetze/{id}/staff/comms-sketch",
         Some("fernmeldewesen"),
     ),
-    // i6k6mzed: das Informationstelefon behält seinen Pfad unter `…/stab`, ist aber das eigene
+    // i6k6mzed: das Informationstelefon liegt unter `…/staff`, ist aber das eigene
     // Modul `infotelefon` (Herleitung `openspec/changes/archive/2026-11-09-i6k6mzed-stab-herausnehmen/design.md`,
     // D3).
-    ("/api/einsaetze/{id}/stab/infotelefon", Some("infotelefon")),
+    ("/api/einsaetze/{id}/staff/info-line", Some("infotelefon")),
     ("/api/einsaetze/{id}/documents", Some("dokumente")),
     ("/api/einsaetze/{id}/abloesungen", Some("abloesung")),
     ("/api/einsaetze/{id}/betreuung", Some("betreuung")),
@@ -218,7 +212,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ),
     // Sprechgruppen, Ort-Vorschau und die Ortssuche des Ortsfelds (LFH-1175) gehören keinem
     // Modul (wie die Einsatz-Kopfdaten).
-    ("/api/einsaetze/{id}/sprechgruppen", None),
+    ("/api/einsaetze/{id}/talk-groups", None),
     // Die Einsatzakte (LLH-1835) prüft jedes ihrer Module im Handler, nicht im Extractor.
     ("/api/einsaetze/{id}/case-file", None),
     // Programmpunkte (LLH-1570) gehören wie die Kopfdaten keinem Modul.
@@ -292,7 +286,7 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/module-defaults", None),
     ("/api/einsaetze/{id}/mitglieder", None),
     // Eigene Führungsstelle (LFH-849): Teil der Kopfdaten, modul-los wie die Wurzel.
-    ("/api/einsaetze/{id}/fuehrungsstelle", None),
+    ("/api/einsaetze/{id}/command-post", None),
     // Präsenz an Einsatzdaten und Führungsstelle (LLH-1946): Gate wie die Kopfdaten, modul-los;
     // die Präsenz an einer Einheit liegt unter `/einheiten` und erbt deren Key.
     ("/api/einsaetze/{id}/presence", None),
@@ -314,7 +308,7 @@ const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 /// Längster-Präfix-Match über [`PFAD_KEY`]. Äußeres `None` = Pfad nicht registriert;
 /// `Some(inner)` = registriert (inner `None` = modul-lose Route). Segment-grenzen-sicher:
 /// ein Präfix trifft nur bei Gleichheit oder wenn direkt danach `/` folgt — sonst würde
-/// z. B. `…/reportsarchiv` fälschlich als `…/reports`-Kind matchen.
+/// z. B. `…/meldungenarchiv` fälschlich als `…/meldungen`-Kind matchen.
 pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
     PFAD_KEY
         .iter()
@@ -451,45 +445,43 @@ mod tests {
         );
         // Lagebesprechung (LLH-1111): eigener Key; beide Präfixe.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/lagebesprechung/termin"),
+            key_fuer_pfad("/api/einsaetze/{id}/briefing/schedule"),
             Some(Some("lagebesprechung"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/lagebesprechungen"),
+            key_fuer_pfad("/api/einsaetze/{id}/briefings"),
             Some(Some("lagebesprechung"))
         );
-        // Fernmeldewesen (LLH-1180): die S6-Pfade bleiben unter `…/stab`, gehören aber dem
+        // Fernmeldewesen (LLH-1180): die S6-Pfade liegen unter `…/staff`, gehören aber dem
         // eigenen Modul.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/kommunikationsplan"),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/comms-plan"),
             Some(Some("fernmeldewesen"))
         );
         assert_eq!(
-            key_fuer_pfad(
-                "/api/einsaetze/{id}/stab/kommunikationsplan/stellen/{sid}/sprechgruppen/{sg}"
-            ),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}"),
             Some(Some("fernmeldewesen"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/fernmeldeskizze/bereiche/{bid}"),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/comms-sketch/areas/{bid}"),
             Some(Some("fernmeldewesen"))
         );
-        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter dem alten Pfad.
+        // Informationstelefon (i6k6mzed, design.md D3): eigenes Modul unter `…/staff/info-line`.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon"),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/info-line"),
             Some(Some("infotelefon"))
         );
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/infotelefon/{aid}/status"),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/info-line/{aid}/status"),
             Some(Some("infotelefon"))
         );
         // Das Modul Stab ist entfernt (i6k6mzed, design.md D1): seine Pfade sind nicht
         // registriert, auch nicht über einen kürzeren Präfix.
         assert_eq!(
-            key_fuer_pfad("/api/einsaetze/{id}/stab/besetzung/{sachgebiet}"),
+            key_fuer_pfad("/api/einsaetze/{id}/staff/besetzung/{sachgebiet}"),
             None
         );
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/stab"), None);
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/staff"), None);
         // Modul-lose Route: registriert, aber kein Key.
         assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/attachments"), Some(None));
         assert_eq!(
@@ -523,8 +515,8 @@ mod tests {
 
     #[test]
     fn pfad_key_ignoriert_teil_segment_treffer() {
-        // "reportsarchiv" verlängert das Präfix "reports" als Text, ist aber
-        // ein anderes Segment — darf NICHT als "reports"-Kind durchgehen.
-        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/reportsarchiv"), None);
+        // "meldungenarchiv" verlängert das Präfix "meldungen" als Text, ist aber
+        // ein anderes Segment — darf NICHT als "meldungen"-Kind durchgehen.
+        assert_eq!(key_fuer_pfad("/api/einsaetze/{id}/meldungenarchiv"), None);
     }
 }

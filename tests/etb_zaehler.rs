@@ -45,7 +45,7 @@ async fn zaehler(
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb/counters{query}"),
+        &format!("/api/einsaetze/{einsatz}/etb/counts{query}"),
         cookie,
         None,
     )
@@ -483,7 +483,7 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
         "{v:?}"
     );
 
-    for pfad in ["etb", "etb/counters", "etb/count"] {
+    for pfad in ["etb", "etb/counts", "etb/count"] {
         let (status, v) = anfrage(
             &app,
             "GET",

@@ -1,5 +1,5 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): `GET`/`PATCH
-//! /api/einsaetze/{id}/fuehrungsstelle`. Spec `einsatz-fuehrungsstelle`, Herleitung
+//! /api/einsaetze/{id}/command-post`. Spec `einsatz-fuehrungsstelle`, Herleitung
 //! `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3, D6).
 //!
 //! Nicht verwechseln mit `tests/fuehrungsstelle.rs`: dort die Führungsstelle je Person
@@ -14,7 +14,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/fuehrungsstelle")
+    format!("/api/einsaetze/{einsatz}/command-post")
 }
 
 /// Die Antwort ohne den Änderungsvermerk (LLH-1834, eigene Tests in
@@ -49,7 +49,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sprechgruppen"),
+        &format!("/api/einsaetze/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )

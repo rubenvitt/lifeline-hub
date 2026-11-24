@@ -119,7 +119,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   const saat = await saeen(page, einsatzId);
 
   // Serverwahrheit zum Vergleich: dieselbe Zählung, die auch der ETB-Kopf nimmt.
-  const zaehler = await (await page.request.get(`/api/einsaetze/${einsatzId}/etb/counters`)).json();
+  const zaehler = await (await page.request.get(`/api/einsaetze/${einsatzId}/etb/counts`)).json();
   const gesamt = zaehler.gesamt as number;
   expect(gesamt, 'Vorbedingung: mehr als eine Serverseite (500)').toBeGreaterThan(500);
 

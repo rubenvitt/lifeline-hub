@@ -46,25 +46,25 @@ interface Druckseed extends Grundnetz {
 async function seedeDruck(page: Page, einsatzId: string): Promise<Druckseed> {
   const n = await seedeGrund(page, einsatzId);
   const a = api(page, einsatzId);
-  const slAs = (await a.post('sprechgruppen', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
+  const slAs = (await a.post('talk-groups', { bezeichnung: 'SL AS', betriebsart: 'TMO' })).id;
   const stelle = async (stellenart: string, bezeichnung: string) => {
-    const plan = await a.post<{ id: number; bezeichnung: string }[]>(
-      'stab/kommunikationsplan/stellen',
-      { stellenart, bezeichnung },
-    );
+    const plan = await a.post<{ id: number; bezeichnung: string }[]>('staff/comms-plan/positions', {
+      stellenart,
+      bezeichnung,
+    });
     return plan.find((s) => s.bezeichnung === bezeichnung)!.id;
   };
   const ils = await stelle('leitstelle', 'ILS Musterhausen');
   const polizei = await stelle('behoerde', 'Polizei');
-  await a.put(`stab/kommunikationsplan/stellen/${ils}/sprechgruppen/${slAs}`, {
+  await a.put(`staff/comms-plan/positions/${ils}/talk-groups/${slAs}`, {
     status: 'bestehend',
   });
-  await a.put(`stab/kommunikationsplan/stellen/${polizei}/sprechgruppen/${slAs}`, {
+  await a.put(`staff/comms-plan/positions/${polizei}/talk-groups/${slAs}`, {
     status: 'geplant',
   });
   const verbindung = async (von: unknown, nach: unknown, art: string, status: string) =>
     (
-      await a.post('stab/fernmeldeskizze/verbindungen', {
+      await a.post('staff/comms-sketch/connections', {
         von,
         nach,
         art,

@@ -3852,7 +3852,7 @@ export interface components {
             /** Format: int64 */
             system: number;
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counters`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counts`. */
         EtbZaehlerAnzeige: {
             /**
              * Format: int64
@@ -4677,7 +4677,7 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
-        /** @description Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`. */
+        /** @description Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`. */
         InfotelefonZaehler: {
             /**
              * Format: int64

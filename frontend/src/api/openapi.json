@@ -7070,7 +7070,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/EinsatzleiterAnzeige",
-                "description": "Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe\nAussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie\n`GET …/fuehrungsstelle`); der Lage-Snapshot friert ihn nicht ein, Gerätesitzungen bekommen\nihn nicht. Herleitung (D1–D3b):\n`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`."
+                "description": "Der Einsatzleiter der eigenen Führungsstelle (LLH-1168), in Liste und Detail dieselbe\nAussage: fehlt, solange keiner erfasst ist. Lesen darf ihn, wer den Einsatz liest (wie\n`GET …/command-post`); der Lage-Snapshot friert ihn nicht ein, Gerätesitzungen bekommen\nihn nicht. Herleitung (D1–D3b):\n`openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md`."
               },
               {
                 "type": "null"
@@ -9581,7 +9581,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counters`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counts`.",
         "required": [
           "gesamt",
           "je_typ"
@@ -11703,7 +11703,7 @@
       },
       "InfotelefonZaehler": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/stab/infotelefon/zaehler`.",
+        "description": "Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.",
         "required": [
           "gesamt",
           "offen",

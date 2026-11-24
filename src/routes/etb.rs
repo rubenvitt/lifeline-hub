@@ -513,7 +513,7 @@ pub async fn anzahl(
     Ok(Json(EtbAnzahlAnzeige { anzahl }))
 }
 
-/// GET /api/einsaetze/{id}/etb/counters — Zahl der Einträge gesamt und je Typ (LFH-612).
+/// GET /api/einsaetze/{id}/etb/counts — Zahl der Einträge gesamt und je Typ (LFH-612).
 ///
 /// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
 /// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die

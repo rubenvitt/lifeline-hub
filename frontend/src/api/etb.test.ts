@@ -72,7 +72,7 @@ describe('Ausschluss der Systemeinträge (LFH-958)', () => {
     await zaehleEtb(7, { ohne_system: true });
     const pfade = fetchMock.mock.calls.map(([p]) => String(p));
     expect(pfade[0]).toBe('/api/einsaetze/7/etb?ohne_system=true&before_lfd_nr=40&limit=100');
-    expect(pfade[1]).toBe('/api/einsaetze/7/etb/counters?ohne_system=true');
+    expect(pfade[1]).toBe('/api/einsaetze/7/etb/counts?ohne_system=true');
     expect(pfade[2]).toBe('/api/einsaetze/7/etb/count?ohne_system=true');
   });
 

@@ -262,7 +262,7 @@ async fn stufen_stehen_mit_verweis_in_der_etb_liste() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/fuehrungsstelle"),
+        &format!("/api/einsaetze/{e}/command-post"),
         &admin,
         Some(r#"{"rufname":"Florian Musterstadt 10/1"}"#),
     )

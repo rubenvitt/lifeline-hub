@@ -23,15 +23,12 @@ const NUMMER = '0170 1112223';
 /** Legt S2 mit einer Mobilnummer an; der Nebentext nennt die Besetzung aus den Mitgliedern. */
 async function seedeS2(page: Page, einsatzId: string) {
   const a = api(page, einsatzId);
-  const plan = await a.post<{ id: number; funktion?: string }[]>(
-    'stab/kommunikationsplan/stellen',
-    {
-      stellenart: 'funktion',
-      funktion: 's2',
-    },
-  );
+  const plan = await a.post<{ id: number; funktion?: string }[]>('staff/comms-plan/positions', {
+    stellenart: 'funktion',
+    funktion: 's2',
+  });
   const s2 = plan.find((s) => s.funktion === 's2')!;
-  await a.post(`stab/kommunikationsplan/stellen/${s2.id}/verbindungen`, {
+  await a.post(`staff/comms-plan/positions/${s2.id}/connections`, {
     mittel: 'mobil',
     wert: NUMMER,
   });

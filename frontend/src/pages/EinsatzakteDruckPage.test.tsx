@@ -71,9 +71,9 @@ function quellen(freigaben = freigabenFixture()) {
     meHandler(kraft),
     json('', () => wert(roh, 'einsatz')),
     json('/module-access', () => freigaben),
-    json('/fuehrungsstelle', () => wert(roh, 'fuehrungsstelle')),
+    json('/command-post', () => wert(roh, 'fuehrungsstelle')),
     json('/mitglieder', () => wert(roh, 'mitglieder')),
-    json('/lagebesprechungen', () => wert(roh, 'lagebesprechungen')),
+    json('/briefings', () => wert(roh, 'lagebesprechungen')),
     mitBeendeten('/einheiten', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/einheiten/zeitachse', () => wert(roh, 'einheitenPerioden')),
     // Die Anlage „Personal je Kopf“ steht in der Akte immer; sie braucht Namen.
@@ -101,7 +101,7 @@ function quellen(freigaben = freigabenFixture()) {
     json('/evakuierung', () => wert(roh, 'evakuierung')),
     json('/betreuung', () => wert(roh, 'betreuung')),
     json('/verpflegung', () => wert(roh, 'verpflegung')),
-    json('/etb/counters', () => wert(roh, 'etbZaehler')),
+    json('/etb/counts', () => wert(roh, 'etbZaehler')),
     http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');

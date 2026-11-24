@@ -20,7 +20,7 @@ pub struct EtbTypZaehler {
     pub berichtigung: i64,
 }
 
-/// Antwort von `GET /api/einsaetze/{id}/etb/counters`.
+/// Antwort von `GET /api/einsaetze/{id}/etb/counts`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct EtbZaehlerAnzeige {
     /// Zahl aller Einträge, die zum Filter passen (ohne Filter: das ganze Tagebuch).
