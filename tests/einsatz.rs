@@ -742,7 +742,7 @@ async fn lagebesprechungstermin_steht_im_kopf_und_in_der_liste() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{id}/lagebesprechung/termin"))
+                .uri(format!("/api/einsaetze/{id}/briefing/schedule"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(

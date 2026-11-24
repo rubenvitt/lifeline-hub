@@ -51,7 +51,7 @@ test('LFH-1181: Führungsstelle mit Koordinate als Marker, ohne Koordinate fort'
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
   });
-  await senden(page, 'patch', `${basis}/fuehrungsstelle`, {
+  await senden(page, 'patch', `${basis}/command-post`, {
     bezeichnung: 'ELW 2 Musterstadt',
     standort_lat: ELW[1],
     standort_lon: ELW[0],
@@ -78,7 +78,7 @@ test('LFH-1181: Führungsstelle mit Koordinate als Marker, ohne Koordinate fort'
   await expect(page.getByRole('switch', { name: /^Führungsstelle/ })).toBeVisible();
 
   // Ohne Koordinate fehlt der Marker; die Karte bekommt das live über das Ereignis `einsatz`.
-  await senden(page, 'patch', `${basis}/fuehrungsstelle`, {
+  await senden(page, 'patch', `${basis}/command-post`, {
     standort_lat: null,
     standort_lon: null,
   });

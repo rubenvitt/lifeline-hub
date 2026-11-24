@@ -17,7 +17,7 @@ async fn sprechgruppen(app: &axum::Router, cookie: &str, e: i64, n: usize) -> Ve
         let (s, j) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/sprechgruppen"),
+            &format!("/api/einsaetze/{e}/talk-groups"),
             cookie,
             Some(&json!({ "bezeichnung": format!("SG {i}"), "betriebsart": "DMO" })),
         )
@@ -95,7 +95,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/fuehrungsstelle"),
+        &format!("/api/einsaetze/{e}/command-post"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -181,7 +181,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/fuehrungsstelle"),
+        &format!("/api/einsaetze/{e}/command-post"),
         json!({ "sprechgruppe_ids": sg }),
     )
     .await;

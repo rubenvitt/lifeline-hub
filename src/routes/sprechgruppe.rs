@@ -292,7 +292,7 @@ pub async fn deaktivieren(
 // Handler: Einsatz-scoped
 // ---------------------------------------------------------------------------
 
-/// GET /api/einsaetze/{einsatz_id}/sprechgruppen — aktiver Katalog + einsatz-lokal.
+/// GET /api/einsaetze/{einsatz_id}/talk-groups — aktiver Katalog + einsatz-lokal.
 /// Lesezugriff erforderlich; kein Modul-Key (Sprechgruppen sind modulübergreifend).
 pub async fn liste_fuer_einsatz(
     State(state): State<AppState>,
@@ -304,7 +304,7 @@ pub async fn liste_fuer_einsatz(
     Ok(Json(sgs.iter().map(Sprechgruppe::anzeige).collect()))
 }
 
-/// POST /api/einsaetze/{einsatz_id}/sprechgruppen — einsatz-lokale Sprechgruppe anlegen.
+/// POST /api/einsaetze/{einsatz_id}/talk-groups — einsatz-lokale Sprechgruppe anlegen.
 /// Schreibrecht + aktiver Einsatz; kein Modul-Key. Name einer Katalog-Sprechgruppe → Conflict
 /// (LLH-1645).
 pub async fn anlegen_einsatz_lokal(

@@ -124,15 +124,15 @@ function rendere({
   server.use(
     meHandler(nutzer),
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/lagebesprechung', () => {
+    http.get('/api/einsaetze/1/briefing', () => {
       if (standStatus === 'haengt') return new Promise<Response>(() => {});
       return standStatus === 200
         ? HttpResponse.json(stand)
         : HttpResponse.json({ error: 'kaputt' }, { status: standStatus });
     }),
-    http.get('/api/einsaetze/1/lagebesprechungen', () => HttpResponse.json(verlauf)),
-    http.post('/api/einsaetze/1/lagebesprechungen', () => post()),
-    http.put('/api/einsaetze/1/lagebesprechung/termin', async ({ request }) => {
+    http.get('/api/einsaetze/1/briefings', () => HttpResponse.json(verlauf)),
+    http.post('/api/einsaetze/1/briefings', () => post()),
+    http.put('/api/einsaetze/1/briefing/schedule', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       termine.push(body);
       return HttpResponse.json({ ...stand, naechste_lagebesprechung_at: body.naechste_at });
@@ -273,7 +273,7 @@ describe('LagebesprechungPage · Aufbau', () => {
     const knopf = screen.getByRole('button', { name: 'Erneut abrufen' });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
-    server.use(http.get('/api/einsaetze/1/lagebesprechung', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/einsaetze/1/briefing', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
@@ -389,7 +389,7 @@ describe('LagebesprechungPage · Kopfaktion „Lagebesprechung abschließen"', (
     await waitFor(() => expect(screen.queryByText('Nur Ansicht')).toBeNull());
     expect(await kopfaktion()).toBeDisabled();
 
-    server.use(http.get('/api/einsaetze/1/lagebesprechung', () => HttpResponse.json(leererStand)));
+    server.use(http.get('/api/einsaetze/1/briefing', () => HttpResponse.json(leererStand)));
     await userEvent.click(screen.getByRole('button', { name: /Wiederholen|Erneut/ }));
     await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
   });

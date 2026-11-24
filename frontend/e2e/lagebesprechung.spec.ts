@@ -47,7 +47,7 @@ const vorbereitungsZeile = (page: Page, schluessel: string) =>
 function terminAntwort(page: Page, einsatzId: number) {
   return page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/lagebesprechung/termin`) &&
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefing/schedule`) &&
       r.request().method() === 'PUT',
   );
 }
@@ -68,8 +68,7 @@ async function abschliessen(page: Page, einsatzId: number, entschluss: string) {
   await dialog.getByLabel('Entschluss').fill(entschluss);
   const gespeichert = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/lagebesprechungen`) &&
-      r.request().method() === 'POST',
+      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefings`) && r.request().method() === 'POST',
   );
   await dialog.getByRole('button', { name: 'Abschließen', exact: true }).click();
   expect((await gespeichert).status()).toBe(201);
@@ -203,7 +202,7 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
   /** Ein Einsatz mit einer abgeschlossenen Besprechung und einem langen Entschluss. */
   async function seede(page: Page): Promise<number> {
     const id = await einsatzAnlegen(page);
-    const r = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+    const r = await page.request.post(`/api/einsaetze/${id}/briefings`, {
       data: {
         entschluss:
           'Evakuierung Ortsteil Nord fortführen, Sandsackverbau am Nordufer verstärken, ' +
@@ -291,7 +290,7 @@ test.describe('LFH-695: Kontrast des Zeilenziels im Verlauf', () => {
     test(`ETB-Eintrag im Verlauf hält den Textboden im Modus ${modus}`, async ({ page }) => {
       await anmeldenAlsAdmin(page);
       const id = await einsatzAnlegen(page);
-      const r = await page.request.post(`/api/einsaetze/${id}/lagebesprechungen`, {
+      const r = await page.request.post(`/api/einsaetze/${id}/briefings`, {
         data: { entschluss: 'Lage unverändert' },
       });
       expect(r.status(), `Abschluss säen: ${await r.text()}`).toBe(201);

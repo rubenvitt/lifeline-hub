@@ -840,7 +840,7 @@ pub enum Vorgang {
     Erinnerung(ErinnerungVorlage),
     /// Früher angelegte Erinnerung erledigen (Status und Vollzug wie im Handler). Kein ETB.
     ErinnerungErledigt { erinnerung: &'static str },
-    /// Termin der nächsten Lagebesprechung setzen, wie `PUT …/lagebesprechung/termin` (LLH-1752):
+    /// Termin der nächsten Lagebesprechung setzen, wie `PUT …/briefing/schedule` (LLH-1752):
     /// `termin_vor_min` Minuten vor dem Import, negativ = in der Zukunft. Kein ETB.
     LagebesprechungTermin { termin_vor_min: i64 },
     /// Fachlicher ETB-Eintrag, `ereigniszeit` = Schrittzeit. Ein Vermerk der Einsatzleitung:

@@ -12,12 +12,12 @@ import type {
  * die des Stabs.
  */
 export function fetchLagebesprechungStand(einsatzId: number): Promise<LagebesprechungStand> {
-  return apiGet<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/lagebesprechung`);
+  return apiGet<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/briefing`);
 }
 
 /** Verlauf absteigend nach `lfd_nr`, ohne Cursor. */
 export function fetchLagebesprechungen(einsatzId: number): Promise<Lagebesprechung[]> {
-  return apiGet<Lagebesprechung[]>(`/api/einsaetze/${einsatzId}/lagebesprechungen`);
+  return apiGet<Lagebesprechung[]>(`/api/einsaetze/${einsatzId}/briefings`);
 }
 
 /**
@@ -29,11 +29,7 @@ export function lagebesprechungAbschliessen(
   einsatzId: number,
   daten: LagebesprechungAbschlussBody,
 ): Promise<LagebesprechungStand> {
-  return apiSend<LagebesprechungStand>(
-    `/api/einsaetze/${einsatzId}/lagebesprechungen`,
-    'POST',
-    daten,
-  );
+  return apiSend<LagebesprechungStand>(`/api/einsaetze/${einsatzId}/briefings`, 'POST', daten);
 }
 
 /** Termin ohne Abschluss setzen (`null` = kein Termin); kein ETB-Eintrag (design.md D3). */
@@ -42,7 +38,7 @@ export function setLagebesprechungTermin(
   daten: LagebesprechungTerminBody,
 ): Promise<LagebesprechungStand> {
   return apiSend<LagebesprechungStand>(
-    `/api/einsaetze/${einsatzId}/lagebesprechung/termin`,
+    `/api/einsaetze/${einsatzId}/briefing/schedule`,
     'PUT',
     daten,
   );

@@ -257,7 +257,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
 
   it('Ablehnung einer Sprechgruppen-Änderung: Auswahl bleibt offen, Grund darunter', async () => {
     server.use(
-      http.get('/api/einsaetze/1/sprechgruppen', () =>
+      http.get('/api/einsaetze/1/talk-groups', () =>
         HttpResponse.json([sprechgruppe(7, '412_F_DRK', 'TMO'), sprechgruppe(8, 'DMO 31', 'DMO')]),
       ),
     );
@@ -280,7 +280,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
   it('Sprechgruppe hinzugefügt: nur dieser eine Eintrag, kein PATCH', async () => {
     const tmo = sprechgruppe(7, '412_F_DRK', 'TMO');
     const dmo = sprechgruppe(8, 'DMO 31', 'DMO');
-    server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
+    server.use(http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json([tmo, dmo])));
     const user = userEvent.setup();
     const { onPatch, onSprechgruppen } = renderDetail(nord({ sprechgruppen: [tmo] }));
     await user.click(screen.getByRole('button', { name: 'Sprechgruppen bearbeiten' }));
@@ -297,7 +297,7 @@ describe('AbschnittDetail (LFH-1208)', () => {
   it('eine während der Bearbeitung fremd zugeordnete Sprechgruppe bleibt stehen', async () => {
     const tmo = sprechgruppe(7, '412_F_DRK', 'TMO');
     const dmo = sprechgruppe(8, 'DMO 31', 'DMO');
-    server.use(http.get('/api/einsaetze/1/sprechgruppen', () => HttpResponse.json([tmo, dmo])));
+    server.use(http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json([tmo, dmo])));
     const user = userEvent.setup();
     const onSprechgruppen = vi.fn<SprechgruppenHandler>().mockResolvedValue(undefined);
     const props = {

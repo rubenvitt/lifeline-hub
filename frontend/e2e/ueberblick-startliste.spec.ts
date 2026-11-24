@@ -141,7 +141,7 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
     data: { einsatzort: 'Deich West', einsatzort_lat: 52.103, einsatzort_lon: 9.356 },
   });
   expect(ort.ok(), await ort.text()).toBeTruthy();
-  const leiter = await page.request.patch(`${basis}/fuehrungsstelle`, {
+  const leiter = await page.request.patch(`${basis}/command-post`, {
     data: { einsatzleiter: { art: 'extern', name: 'KBM Weber' } },
   });
   expect(leiter.ok(), await leiter.text()).toBeTruthy();

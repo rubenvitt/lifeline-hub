@@ -19,6 +19,7 @@ annul	stornieren
 api	-
 app-code	-
 archive	Archiv
+areas	Bereiche
 attachments	Anhänge
 attachments.zip	Anlagen
 attempts	Versuche
@@ -30,6 +31,7 @@ available	verfügbar
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
+briefing	Lagebesprechung
 briefings	Lagebesprechungen
 build	bauen
 build-status	Baustatus
@@ -57,11 +59,14 @@ command-post	Führungsstelle
 command-roles	Führungsfunktionen
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
+components	Komponenten
 config	-
 confirm	bestätigen
 confirmers	Bestätiger
+connections	Verbindungen
 contact-person	Bezugsperson
 countersign	gegenzeichnen
+counts	Zähler
 damages	Schäden
 deactivate	deaktivieren
 decision	Entscheidung
@@ -125,6 +130,7 @@ key	Schlüssel
 keyword-suggestions	Stichwortvorschläge
 lan	-
 last-keys	letzte Schlüssel
+layout	Anordnung
 list-accesses	Listenzugriffe
 live	-
 login	-
@@ -221,6 +227,7 @@ retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
 revoke	widerrufen
 row	Zeile
+schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
@@ -255,6 +262,7 @@ tile	-
 tilejson	-
 tiles	-
 time-slots	Zeitfenster
+title-block	Schriftfeld
 totp	-
 transfer	Übernahme
 transport	-
