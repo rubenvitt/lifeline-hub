@@ -243,7 +243,7 @@ async fn schaden_datei(
     .fetch_one(pool)
     .await
     .unwrap();
-    format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge/{linker}/datei")
+    format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments/{linker}/file")
 }
 
 fn ist_vorschau(h: &HeaderMap, bytes: &[u8], soll: (u32, u32)) {

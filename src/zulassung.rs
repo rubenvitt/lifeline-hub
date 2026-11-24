@@ -105,10 +105,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     ("GET", "/api/einsaetze/{id}/documents/{did}/file"),
     // Zweiter Multipart-Upload, ebenfalls mit clamd-Scan. NUR POST — das GET auf demselben
     // Pfad ist die kurze Liste.
-    ("POST", "/api/einsaetze/{id}/karte/hintergrundbilder"),
+    ("POST", "/api/einsaetze/{id}/map/background-images"),
     (
         "GET",
-        "/api/einsaetze/{id}/karte/hintergrundbilder/{bildId}/download",
+        "/api/einsaetze/{id}/map/background-images/{bildId}/download",
     ),
     // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
@@ -123,10 +123,10 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "GET",
         "/api/einsaetze/{id}/etb/{eintrag_id}/attachments/{aid}",
     ),
-    ("POST", "/api/einsaetze/{id}/schaeden/{sid}/anhaenge"),
+    ("POST", "/api/einsaetze/{id}/damages/{sid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/schaeden/{sid}/anhaenge/{aid}/datei",
+        "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file",
     ),
     ("POST", "/api/einsaetze/{id}/persons/{pid}/attachments"),
     (
@@ -162,7 +162,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Betroffenen-, Tier- und Schadenszahl der Lage.
     ("GET", "/api/einsaetze/{id}/persons/export"),
     ("GET", "/api/einsaetze/{id}/animals/export"),
-    ("GET", "/api/einsaetze/{id}/schaeden/export"),
+    ("GET", "/api/einsaetze/{id}/damages/export"),
     // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
     ("GET", "/api/retention/incidents/{id}/archive"),
 ];
@@ -367,7 +367,7 @@ mod tests {
             "DELETE auf demselben MethodRouter bleibt geregelt"
         );
 
-        let bild = "/api/einsaetze/{id}/karte/hintergrundbilder";
+        let bild = "/api/einsaetze/{id}/map/background-images";
         assert!(ist_ausgenommen(&Method::POST, bild), "Upload frei");
         assert!(
             !ist_ausgenommen(&Method::GET, bild),

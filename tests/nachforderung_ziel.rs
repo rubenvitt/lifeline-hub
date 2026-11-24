@@ -71,7 +71,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )

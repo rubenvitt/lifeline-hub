@@ -146,15 +146,15 @@ for (const modus of ['light', 'dark'] as const) {
     }
     const schaeden = [];
     for (const label of ['offen', 'übergeben', 'abgeschlossen']) {
-      const s = await post(page, `${basis}/schaeden`, {
+      const s = await post(page, `${basis}/damages`, {
         typ: 'sachschaden',
         ausmass: 'gering',
         ort: `Kontrast ${label}`,
       });
       if (label === 'übergeben')
-        await post(page, `${basis}/schaeden/${s.id}/uebergeben`, { uebergeben_an: 'Teststelle' });
+        await post(page, `${basis}/damages/${s.id}/hand-over`, { uebergeben_an: 'Teststelle' });
       if (label === 'abgeschlossen')
-        await post(page, `${basis}/schaeden/${s.id}/abschliessen`, { abschluss_grund: 'behoben' });
+        await post(page, `${basis}/damages/${s.id}/close`, { abschluss_grund: 'behoben' });
       schaeden.push({ id: s.id, label });
     }
     for (const [modul, saetze] of [

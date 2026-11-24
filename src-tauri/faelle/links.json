@@ -144,7 +144,7 @@
     {
       "beschreibung": "eine tiefe Dateiroute der eigenen Origin wird heruntergeladen",
       "server": "https://elw.local:8443/",
-      "ziel": "https://elw.local:8443/api/einsaetze/1/schaeden/3/anhaenge/2/datei",
+      "ziel": "https://elw.local:8443/api/einsaetze/1/damages/3/attachments/2/file",
       "erwartet": "download"
     },
     {

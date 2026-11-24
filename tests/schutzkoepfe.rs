@@ -112,7 +112,7 @@ async fn anhang_download_traegt_nosniff_genau_einmal() {
 
     let (s, h) = kopf(
         &app,
-        &format!("/api/einsaetze/{einsatz}/schaeden/{sid}/anhaenge/{aid}/datei"),
+        &format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments/{aid}/file"),
         Some(&admin),
     )
     .await;

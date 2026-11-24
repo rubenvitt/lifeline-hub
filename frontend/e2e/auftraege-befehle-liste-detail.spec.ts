@@ -157,7 +157,7 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatz(page);
-  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/abschnitte`, {
+  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
     data: { name: 'EA Süd' },
   });
   expect(abschnitt.ok(), `Abschnitt: ${abschnitt.status()}`).toBe(true);

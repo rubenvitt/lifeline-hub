@@ -97,7 +97,7 @@ function quellen(freigaben = freigabenFixture()) {
     json('/persons/print', () => [person()]),
     json('/uhs', () => []),
     mitBeendeten('/material', 'material', 'entlassene', 'materialEntlassen'),
-    json('/schaeden', () => wert(roh, 'schaeden')),
+    json('/damages', () => wert(roh, 'schaeden')),
     json('/evacuation', () => wert(roh, 'evakuierung')),
     json('/care', () => wert(roh, 'betreuung')),
     json('/catering', () => wert(roh, 'verpflegung')),

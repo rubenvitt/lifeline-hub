@@ -273,7 +273,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(&format!(r#"{{"name":"Nord","leiter_id":{leiter}}}"#)),
     )
@@ -723,7 +723,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/damages"),
         &admin,
         Some(&format!(
             r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#
@@ -766,7 +766,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/schaeden/{schaden}"),
+        &format!("/api/einsaetze/{einsatz}/damages/{schaden}"),
         &admin,
         None,
     )
@@ -1009,7 +1009,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(&format!(r#"{{"name":"Süd","leiter_id":{anna}}}"#)),
     )
@@ -1385,8 +1385,8 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         ),
         ("PUT", format!("uhs/{uhs}/forces/{anna}"), None),
         ("PATCH", "command-post".to_string(), Some(einsatzleiter)),
-        ("POST", "abschnitte".to_string(), Some(leiter)),
-        ("POST", "schaeden".to_string(), Some(schaden)),
+        ("POST", "sectors".to_string(), Some(leiter)),
+        ("POST", "damages".to_string(), Some(schaden)),
     ] {
         let (s, json) = anfrage(
             &app,
@@ -1483,7 +1483,7 @@ async fn kartensicht_traegt_einsatzfunktion_neben_der_qualifikation() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ep = adhoc_kraft(&app, &admin, einsatz, "Erika Funk").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/karte/fuehrungskraefte");
+    let pfad = format!("/api/einsaetze/{einsatz}/map/commanders");
 
     let (s, karte) = anfrage(&app, "GET", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{karte}");
@@ -1802,7 +1802,7 @@ async fn angaben_aendern_meldet_nur_betroffene_ansichten() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/schaeden"),
+        &format!("/api/einsaetze/{einsatz}/damages"),
         &admin,
         Some(&format!(
             r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#

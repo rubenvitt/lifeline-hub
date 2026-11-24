@@ -40,7 +40,7 @@ async function lagekarteMitKreis(page: Page) {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const eid = Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
-  const r = await page.request.post(`/api/einsaetze/${eid}/zonen`, {
+  const r = await page.request.post(`/api/einsaetze/${eid}/zones`, {
     data: {
       typ: 'absperrbereich',
       label: 'Nord',
@@ -101,7 +101,7 @@ async function kartenMitte(page: Page) {
 }
 
 async function zonen(page: Page, eid: number): Promise<ZoneAntwort[]> {
-  return (await (await page.request.get(`/api/einsaetze/${eid}/zonen`)).json()) as ZoneAntwort[];
+  return (await (await page.request.get(`/api/einsaetze/${eid}/zones`)).json()) as ZoneAntwort[];
 }
 
 async function etb(page: Page, eid: number): Promise<string[]> {
@@ -126,7 +126,7 @@ test('Kreiszone punktweise: Eckgriff ziehen, genau ein PATCH, Kreisangaben weg, 
   const { eid, zone } = await lagekarteMitKreis(page);
   const patches: string[] = [];
   page.on('request', (req) => {
-    if (req.method() === 'PATCH' && req.url().endsWith(`/zonen/${zone.id}`))
+    if (req.method() === 'PATCH' && req.url().endsWith(`/zones/${zone.id}`))
       patches.push(req.postData() ?? '');
   });
 

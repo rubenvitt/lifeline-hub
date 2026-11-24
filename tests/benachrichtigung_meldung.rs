@@ -737,7 +737,7 @@ async fn gesehen_raeumt_die_uebernahme() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/lage/gesehen", w.einsatz),
+        &format!("/api/einsaetze/{}/situation/seen", w.einsatz),
         &w.admin,
         Some(&json!({ "meldung_ids": [zwei] }).to_string()),
     )

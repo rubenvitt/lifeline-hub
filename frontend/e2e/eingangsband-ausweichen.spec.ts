@@ -489,7 +489,7 @@ test('Eingangsband rückt auf der Lagekarte über die Bänder des Kartenfußes, 
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
   // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur ein Knopf (LLH-1936), und das
   // Band reichte nicht unter die Meldung.
-  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
   expect(stand.ok(), `POST lage-snapshots: ${stand.status()}`).toBe(true);

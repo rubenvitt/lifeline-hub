@@ -21,7 +21,7 @@ const entferne = vi.mocked(entferneSchadenAnhang);
 const legeAb = vi.mocked(legeSchadenAnhangAb);
 afterEach(() => vi.clearAllMocks());
 
-const PFAD = '/api/einsaetze/1/schaeden/10/anhaenge';
+const PFAD = '/api/einsaetze/1/damages/10/attachments';
 const schaden = { id: 10, registrier_nr: 3, storniert_at: null as string | null };
 const anhang = (id: number, dateiname: string, mime = 'image/jpeg') => ({
   id,
@@ -85,7 +85,7 @@ describe('SchadenAnhaenge (LFH-21)', () => {
     const dach = await screen.findByRole('link', {
       name: 'dach.jpg, 2,0 MB, Datei von Schaden S-003 herunterladen',
     });
-    expect(dach).toHaveAttribute('href', '/api/einsaetze/1/schaeden/10/anhaenge/5/datei');
+    expect(dach).toHaveAttribute('href', '/api/einsaetze/1/damages/10/attachments/5/file');
     expect(dach).toHaveAttribute('download', 'dach.jpg');
     expect(dach.getAttribute('href')).not.toMatch(/^\/api\/einsaetze\/1\/attachments/);
     const links = within(paneel()).getAllByRole('link');
@@ -292,7 +292,7 @@ describe('SchadenAnhaenge — Original (LFH-747)', () => {
     const original = await screen.findByRole('link', {
       name: 'Original (mit Standort) herunterladen: dach.jpg, Schaden S-003',
     });
-    expect(original).toHaveAttribute('href', `${PFAD}/5/datei?fassung=original`);
+    expect(original).toHaveAttribute('href', `${PFAD}/5/file?fassung=original`);
     expect(screen.getAllByText(ORIGINAL_TEXT)).toHaveLength(1);
   });
 
@@ -313,12 +313,12 @@ describe('SchadenAnhaenge — Vorschau (LFH-759)', () => {
     const knopf = await within(paneel()).findByRole('button', {
       name: 'Vorschau: dach.jpg, Schaden S-003',
     });
-    expect(knopf.querySelector('img')).toHaveAttribute('src', `${PFAD}/5/datei?fassung=vorschau`);
+    expect(knopf.querySelector('img')).toHaveAttribute('src', `${PFAD}/5/file?fassung=vorschau`);
     expect(within(paneel()).getAllByRole('button', { name: /^Vorschau:/ })).toHaveLength(1);
     expect(
       within(paneel()).getByRole('link', {
         name: 'gutachten.pdf, 2,0 MB, Datei von Schaden S-003 herunterladen',
       }),
-    ).toHaveAttribute('href', `${PFAD}/6/datei`);
+    ).toHaveAttribute('href', `${PFAD}/6/file`);
   });
 });

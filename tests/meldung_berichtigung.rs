@@ -68,7 +68,7 @@ async fn lagemeldung(app: &axum::Router, cookie: &str, einsatz: i64, mid: i64) -
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/situation/reports"),
     )
     .await
     .into_iter()

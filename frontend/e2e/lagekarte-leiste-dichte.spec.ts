@@ -51,7 +51,7 @@ async function einsatzMitBild(page: Page, name: string): Promise<string> {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)/)![1];
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/karte/hintergrundbilder`, {
+  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/map/background-images`, {
     multipart: {
       datei: { name: 'plan.png', mimeType: 'image/png', buffer: PNG },
       ecken: JSON.stringify([

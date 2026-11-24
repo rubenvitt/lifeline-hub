@@ -47,7 +47,7 @@ describe('Anhänge auf Abruf am Spiegel (LLH-1492, design.md D8)', () => {
 
   it('ein Kartenhintergrund, der geholt wird, ist kein Ladefehler', async () => {
     server.use(
-      http.get('/api/einsaetze/7/karte/hintergrundbilder/3/download', () =>
+      http.get('/api/einsaetze/7/map/background-images/3/download', () =>
         HttpResponse.json({ error: ANHANG_WIRD_GEHOLT_TEXT }, { status: 409 }),
       ),
     );

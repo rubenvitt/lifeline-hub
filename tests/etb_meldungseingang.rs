@@ -55,7 +55,7 @@ async fn lagemeldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/lage/meldungen"),
+        &format!("/api/einsaetze/{einsatz}/situation/reports"),
     )
     .await
     .as_array()

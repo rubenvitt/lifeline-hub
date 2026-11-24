@@ -678,7 +678,7 @@ pub async fn rueckmeldungen(
     }))
 }
 
-/// GET /api/einsaetze/{id}/lage/meldungen — die Lagemeldungen: alle lagerelevanten Meldungen
+/// GET /api/einsaetze/{id}/situation/reports — die Lagemeldungen: alle lagerelevanten Meldungen
 /// (LFH-95, LLH-1031, Spec `meldungseingang`).
 pub async fn lage_liste(
     State(state): State<AppState>,
@@ -729,13 +729,13 @@ pub struct LageGesehenReq {
     pub meldung_ids: Vec<i64>,
 }
 
-/// Antwort von `POST …/lage/gesehen`: wie viele dabei gesehen wurden.
+/// Antwort von `POST …/situation/seen`: wie viele dabei gesehen wurden.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct LageGesehenAnzeige {
     pub gesehen: u64,
 }
 
-/// POST /api/einsaetze/{id}/lage/gesehen — die angezeigten neuen Lagemeldungen als gesehen
+/// POST /api/einsaetze/{id}/situation/seen — die angezeigten neuen Lagemeldungen als gesehen
 /// kennzeichnen (LLH-1206, LLH-1031). Kennungen, die keine lagerelevante Meldung des Einsatzes
 /// sind, bleiben unberührt.
 pub async fn lage_angezeigte_gesehen(

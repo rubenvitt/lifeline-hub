@@ -148,7 +148,7 @@ export const server = setupServer(
    * ist ein echter Serverzustand (kein Gebiet, keine Warnung). Tests mit Gebieten
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/gefahrengebiete', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/hazard-areas', () => HttpResponse.json([])),
   /**
    * Schichtmodelle der Organisation (LLH-1122) — keine als Default, der echte Zustand einer
    * Organisation ohne Stammdaten dazu. Die Einsatzanlage fragt sie für die Zeile „Schichtmodell“
@@ -181,7 +181,7 @@ export const server = setupServer(
    * Ort" ist ein echter Serverzustand ohne Zahl und ohne Hinweis. Tests mit Warnungen
    * überschreiben per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/wetter', () =>
+  http.get('/api/einsaetze/:einsatzId/weather', () =>
     HttpResponse.json({
       warnungen: { zustand: 'kein_ort' },
       vorhersage: { zustand: 'kein_ort' },
@@ -276,7 +276,7 @@ export const server = setupServer(
    * Befehl und Lagebericht (LLH-1172) fragt sie als Optionen ab; Tests mit Optionen überschreiben
    * per `server.use()`.
    */
-  http.get('/api/einsaetze/:einsatzId/abschnitte', () => HttpResponse.json([])),
+  http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([])),
   http.get('/api/einsaetze/:einsatzId/einheiten', () => HttpResponse.json([])),
   /**
    * Bereitstellungsräume — leer als Default, ein echter Serverzustand. Die Lagekarte fragt sie mit

@@ -15,7 +15,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/lagekennzahl-wahl")
+    format!("/api/einsaetze/{einsatz}/situation-metric-selection")
 }
 
 async fn waehle(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> (StatusCode, Value) {

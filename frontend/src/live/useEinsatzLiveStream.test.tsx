@@ -446,7 +446,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/3/schaeden/:sid', ({ params }) => {
+      http.get('/api/einsaetze/3/damages/:sid', ({ params }) => {
         abrufe.push(String(params.sid));
         return HttpResponse.json({
           id: 9,

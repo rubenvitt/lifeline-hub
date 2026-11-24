@@ -1142,7 +1142,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_abschnittswechsel() {
     let (s, abschnitt) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"Nord"}"#),
     )

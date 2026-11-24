@@ -17,9 +17,9 @@ import type { ModulFreigaben, Warnstufe, WetterWarnstufe } from '../api/types';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useModulZaehler } from './useModulZaehler';
 
-const GEBIETE = '/api/einsaetze/7/gefahrengebiete';
+const GEBIETE = '/api/einsaetze/7/hazard-areas';
 const ZAEHLER = '/api/einsaetze/7/module-counts';
-const WETTER = '/api/einsaetze/7/wetter';
+const WETTER = '/api/einsaetze/7/weather';
 
 const STUNDE = 60 * 60_000;
 const um = (ms: number) => new Date(Date.now() + ms).toISOString();
@@ -31,7 +31,7 @@ interface DwdWarnung {
   ende: number;
 }
 
-/** Antwort von `/wetter`; `zustand` wie vom Server (Ausfall ist kein HTTP-Fehler). */
+/** Antwort von `/weather`; `zustand` wie vom Server (Ausfall ist kein HTTP-Fehler). */
 function wetterAntwort(warnungen: DwdWarnung[], zustand: 'ok' | 'ausfall' = 'ok') {
   return {
     warnungen: {

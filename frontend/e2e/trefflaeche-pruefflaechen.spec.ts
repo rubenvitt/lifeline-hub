@@ -982,8 +982,8 @@ test('C11 · Einsatz-Vorgaben (Führungskraft): Speichern ist gesperrt, Modulzei
 
 async function gliederungSaeen(page: Page, einsatzId: string) {
   const E = `/api/einsaetze/${einsatzId}`;
-  const nord = await seed(page, `${E}/abschnitte`, { name: 'Abschnitt Nord' });
-  await seed(page, `${E}/abschnitte`, { name: 'UA Nord 1', ueber_abschnitt_id: nord.id });
+  const nord = await seed(page, `${E}/sectors`, { name: 'Abschnitt Nord' });
+  await seed(page, `${E}/sectors`, { name: 'UA Nord 1', ueber_abschnitt_id: nord.id });
   await seed(page, `${E}/einheiten`, { name: 'Zug 1', abschnitt_id: nord.id });
   await seed(page, `${E}/einheiten`, { name: 'Zug frei' });
   await seed(page, `${E}/fahrzeuge`, { adhoc: { funkrufname: 'Florian Süd 2' } });
@@ -1495,7 +1495,7 @@ async function schaedenSaeen(page: Page, einsatzId: string) {
     ['gross', 'Deichweg 2'],
     ['gering', 'Bachstraße 1'],
   ]) {
-    await seed(page, `/api/einsaetze/${einsatzId}/schaeden`, { typ: 'sachschaden', ausmass, ort });
+    await seed(page, `/api/einsaetze/${einsatzId}/damages`, { typ: 'sachschaden', ausmass, ort });
   }
 }
 

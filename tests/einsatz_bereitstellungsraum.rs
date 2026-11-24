@@ -887,7 +887,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -4590,7 +4590,7 @@ async fn raum_im_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, br: i
 }
 
 fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abschnitte/{ab}")
+    format!("/api/einsaetze/{einsatz}/sectors/{ab}")
 }
 
 /// `abschnitt_name` des Raums `br` in der Liste (das Detail trägt ihn nicht).
@@ -4733,7 +4733,7 @@ async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/abschnitte"),
+        &format!("/api/einsaetze/{eid}/sectors"),
         &frieda,
         None,
     )

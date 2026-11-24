@@ -62,7 +62,7 @@ beforeEach(() => {
       return HttpResponse.json(freigaben);
     }),
     http.get('/api/einsaetze/:id/persons/selection', json('personen', [PERSON])),
-    http.get('/api/einsaetze/:id/schaeden/auswahl', json('schaeden', [])),
+    http.get('/api/einsaetze/:id/damages/selection', json('schaeden', [])),
     http.get('/api/einsaetze/:id/uhs', json('uhs', [])),
     http.get('/api/einsaetze/:id/reports', json('meldungen', [])),
     http.get('/api/einsaetze/:id/tasks', json('auftraege', [])),
@@ -70,8 +70,8 @@ beforeEach(() => {
     http.get('/api/einsaetze/:id/personal', json('personal', [])),
     http.get('/api/einsaetze/:id/einheiten', json('einheiten', [])),
     http.get('/api/einsaetze/:id/situation-reports', json('lageberichte', [])),
-    http.get('/api/einsaetze/:id/gefahrengebiete', json('gefahrengebiete', [])),
-    http.get('/api/einsaetze/:id/abschnitte', json('abschnitte', [])),
+    http.get('/api/einsaetze/:id/hazard-areas', json('gefahrengebiete', [])),
+    http.get('/api/einsaetze/:id/sectors', json('abschnitte', [])),
     http.get('/api/einsaetze/:id/etb/count', ({ request }) => {
       zaehler['etb-anzahl'] = (zaehler['etb-anzahl'] ?? 0) + 1;
       anzahlAdressen.push(new URL(request.url));

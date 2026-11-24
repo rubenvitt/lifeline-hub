@@ -91,7 +91,7 @@ test.describe(KAPITEL, () => {
       ],
     });
     // Verteiler (LLH-1172) und eine Quittung (LLH-1173): ein Abschnitt des Demo-Einsatzes und S4.
-    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/abschnitte`);
+    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/sectors`);
     expect(antwort.ok()).toBe(true);
     const abschnitte = (await antwort.json()) as { id: number }[];
     expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);
@@ -169,7 +169,7 @@ test.describe(KAPITEL, () => {
       ],
     });
     // Verteiler (LLH-1172): ein Abschnitt des Demo-Einsatzes, S3 und die Leitstelle.
-    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/abschnitte`);
+    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/sectors`);
     expect(antwort.ok()).toBe(true);
     const abschnitte = (await antwort.json()) as { id: number }[];
     expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);

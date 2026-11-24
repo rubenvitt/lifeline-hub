@@ -29,12 +29,12 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
     bezeichnung: `E2E Abschnitt ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
-  const ost = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+  const nord = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
+  const ost = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
     name: 'UA Nord-Ost',
     ueber_abschnitt_id: nord.id,
   });
-  const sued = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Süd' });
+  const sued = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Süd' });
   await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Zug Ost', abschnitt_id: ost.id });
   await anlegen(page, `/api/einsaetze/${e}/einheiten`, { name: 'Zug Süd', abschnitt_id: sued.id });
   await anlegen(page, `/api/einsaetze/${e}/tasks`, {
@@ -123,12 +123,12 @@ test('LLH-1190: Abschnittsgerät quittiert einen Einsatzbefehl an seinen Bereich
     bezeichnung: `E2E Befehl Abschnitt ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Nord' });
-  const ost = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, {
+  const nord = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
+  const ost = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
     name: 'UA Nord-Ost',
     ueber_abschnitt_id: nord.id,
   });
-  const sued = await anlegen(page, `/api/einsaetze/${e}/abschnitte`, { name: 'EA Süd' });
+  const sued = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Süd' });
   const abschnitte = [
     { schluessel: 'lage', text: 'Pegel steigt' },
     { schluessel: 'auftrag', text: 'Deich halten' },

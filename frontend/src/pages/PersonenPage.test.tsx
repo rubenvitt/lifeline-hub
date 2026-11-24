@@ -158,7 +158,7 @@ function render(
     http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
     http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
     http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -1721,7 +1721,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <Routes>
@@ -1760,7 +1760,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
   it('?ansicht=karte öffnet die Kartenansicht und lässt den Parameter stehen', async () => {
     server.use(
       http.get('/api/map/config', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
     );
     renderMitSuche('/einsaetze/1/personen?ansicht=karte');
     // Keine Person trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand, und die Lücke ist
@@ -1808,7 +1808,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -1849,7 +1849,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.einsatz(1), einsatzAktiv);
@@ -1888,7 +1888,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -1917,7 +1917,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -1956,9 +1956,9 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
       http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/schaeden', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
       http.get('/api/map/config', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/1/karten-ansichten', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <>
@@ -2328,9 +2328,7 @@ describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
       http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
       http.get('/api/einsaetze/1/persons', () => HttpResponse.json([rot, gruen])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs])),
-      http.get('/api/einsaetze/1/abschnitte', () =>
-        HttpResponse.json([{ id: 30, name: 'EA Nord' }]),
-      ),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([{ id: 30, name: 'EA Nord' }])),
     );
     return renderMitProviders(
       <Routes>

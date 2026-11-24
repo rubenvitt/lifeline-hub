@@ -292,8 +292,8 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/fahrzeuge', json(d.fahrzeuge)),
     http.get('/api/einsaetze/1/material', json(d.material)),
     http.get('/api/einsaetze/1/einheiten', json(d.einheiten)),
-    http.get('/api/einsaetze/1/abschnitte', json(d.abschnitte)),
-    http.get('/api/einsaetze/1/gefahrengebiete', json(d.gefahren)),
+    http.get('/api/einsaetze/1/sectors', json(d.abschnitte)),
+    http.get('/api/einsaetze/1/hazard-areas', json(d.gefahren)),
     http.get('/api/einsaetze/1/tasks', json(d.auftraege)),
     http.get(
       '/api/einsaetze/1/module-counts',
@@ -317,7 +317,7 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
     http.get('/api/einsaetze/1/reports', json(d.meldungen ?? [])),
     http.get('/api/einsaetze/1/reminders', json(d.erinnerungen)),
     http.get('/api/einsaetze/1/reports/check-ins', json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN)),
-    http.get('/api/einsaetze/1/pegel', json(d.pegel ?? [])),
+    http.get('/api/einsaetze/1/gauges', json(d.pegel ?? [])),
     // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
     // MSW-Default: alles frei.
     http.get('/api/einsaetze/1/abloesungen', json([])),
@@ -538,7 +538,7 @@ describe('UeberblickPage', () => {
     erster.unmount();
 
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/pegel', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/einsaetze/1/gauges', () => new HttpResponse(null, { status: 500 })),
     ]);
     rendern();
     await waitFor(() =>
@@ -1362,7 +1362,7 @@ describe('UeberblickPage', () => {
 
     it('Modul frei → Marke „Unwetterwarnung: Orkanböen" mit Weg zur Modulseite', async () => {
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/wetter', () => HttpResponse.json(wetter())),
+        http.get('/api/einsaetze/1/weather', () => HttpResponse.json(wetter())),
       ]);
       rendern();
       const p = await waitFor(() => paneel('Nächste Marken'));
@@ -1371,11 +1371,11 @@ describe('UeberblickPage', () => {
       expect(m).toHaveAttribute('data-ton', 'neutral');
     });
 
-    it('Modul ausgeblendet → keine Anfrage an …/wetter, keine Unwettermarke', async () => {
+    it('Modul ausgeblendet → keine Anfrage an …/weather, keine Unwettermarke', async () => {
       let wetterAbrufe = 0;
       let freigabenGeliefert = 0;
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/wetter', () => {
+        http.get('/api/einsaetze/1/weather', () => {
           wetterAbrufe += 1;
           return HttpResponse.json(wetter());
         }),
@@ -1675,8 +1675,12 @@ describe('UeberblickPage', () => {
     // Seit LLH-1748 auch die Quellen der Marken: „Nächste Marken“ steht in Reihe 1 zuoberst.
     // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
     const route = (modul: string) =>
-      (({ auftraege: 'tasks', erinnerungen: 'reminders' }) as Record<string, string>)[modul] ??
-      modul;
+      (
+        ({ abschnitte: 'sectors', auftraege: 'tasks', erinnerungen: 'reminders' }) as Record<
+          string,
+          string
+        >
+      )[modul] ?? modul;
     for (const quelle of [
       'abschnitte',
       'einheiten',
@@ -1691,6 +1695,7 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
+          // Die Quelle `abschnitte` liest `/sectors` (LLH-2059, ADR-0085).
           http.get(`/api/einsaetze/1/${route(quelle)}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
@@ -1785,7 +1790,7 @@ describe('UeberblickPage', () => {
           await freigabenTor;
           return HttpResponse.json(freigabenFixture());
         }),
-        http.get('/api/einsaetze/1/abschnitte', async () => {
+        http.get('/api/einsaetze/1/sectors', async () => {
           abrufe.n += 1;
           await abschnitteTor;
           return HttpResponse.json(volleDaten.abschnitte);
@@ -2063,8 +2068,8 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     '/api/einsaetze/1/material',
     '/api/einsaetze/1/einheiten',
     '/api/einsaetze/1/einheiten/zeitachse',
-    '/api/einsaetze/1/abschnitte',
-    '/api/einsaetze/1/gefahrengebiete',
+    '/api/einsaetze/1/sectors',
+    '/api/einsaetze/1/hazard-areas',
     '/api/einsaetze/1/tasks',
     '/api/einsaetze/1/resource-requests',
     '/api/einsaetze/1/reports',
@@ -2111,7 +2116,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   it('Modul Einheiten gesperrt: keine Anfrage an die Zeitachse, kein Sprung „ohne Schicht“ (LLH-1312)', async () => {
     const aufrufe = mitFreigaben({ einheiten: { zugriff: false } });
     rendern();
-    await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
+    await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
     await waitFor(() => vorgaenge());
     expect(aufrufe['/api/einsaetze/1/einheiten/zeitachse']).toBeUndefined();
     expect(document.querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull();
@@ -2128,7 +2133,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
     await nordDa();
-    await waitFor(() => expect(aufrufe['/api/einsaetze/1/gefahrengebiete']).toBe(1));
+    await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
     expect(aufrufe['/api/einsaetze/1/persons']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
     expect(aufrufe['/api/einsaetze/1/resource-requests']).toBeUndefined();
@@ -2323,7 +2328,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
 
   it('Abschnittspaneel (LFH-887): leer bei gesperrten Fahrzeugen behauptet nicht „keine Kräfte"', async () => {
     mitFreigaben({ fahrzeuge: { zugriff: false } }, [
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/personal', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
@@ -2667,7 +2672,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   it('Quelle ausgefallen: Einsatzabschnitte „nicht geladen“, das Paneel bleibt', async () => {
     stelleBereit({ ...volleDaten, lage: eineLage }, [
       http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/abschnitte', () =>
+      http.get('/api/einsaetze/1/sectors', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2693,7 +2698,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(startliste()).toBeNull();
     const kaputt = () => HttpResponse.json({ error: 'kaputt' }, { status: 502 });
     server.use(
-      http.get('/api/einsaetze/1/abschnitte', kaputt),
+      http.get('/api/einsaetze/1/sectors', kaputt),
       http.get('/api/einsaetze/1/einheiten', kaputt),
       http.get('/api/einsaetze/1/etb', ({ request }) =>
         new URL(request.url).searchParams.get('typ') === 'lage' ? kaputt() : undefined,
@@ -2712,7 +2717,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   it('Quelle ausgefallen: „Erneut abrufen“ am Punkt lädt die Quelle neu', async () => {
     stelleBereit({ ...volleDaten, lage: eineLage }, [
       http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/abschnitte', () =>
+      http.get('/api/einsaetze/1/sectors', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2725,7 +2730,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
       expect(within(punkt(s)).queryByRole('button'), s).toBeNull();
     }
     server.use(
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json(volleDaten.abschnitte)),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(volleDaten.abschnitte)),
     );
     await userEvent.click(knopf);
     // Der letzte unbekannte Punkt ist erledigt: die Reihe fällt nach der Handlung weg.

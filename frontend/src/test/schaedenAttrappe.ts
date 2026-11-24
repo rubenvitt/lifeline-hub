@@ -17,7 +17,7 @@ import type { Ausmass, Gefahrentyp, Schaden, SchadenStatus, SchadenTyp } from '.
  */
 export function schaedenAttrappe(einsatzId: number, quelle: () => readonly object[]) {
   const abrufe: URLSearchParams[] = [];
-  const basis = `/api/einsaetze/${einsatzId}/schaeden`;
+  const basis = `/api/einsaetze/${einsatzId}/damages`;
   const alle = () => quelle() as readonly Schaden[];
 
   const liste = (q: URLSearchParams): Schaden[] => {
@@ -44,7 +44,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
   };
 
   const handler: HttpHandler[] = [
-    http.get(`${basis}/kennzahlen`, ({ request }) => {
+    http.get(`${basis}/metrics`, ({ request }) => {
       const q = new URL(request.url).searchParams;
       q.delete('status');
       const treffer = liste(q);
@@ -56,7 +56,7 @@ export function schaedenAttrappe(einsatzId: number, quelle: () => readonly objec
         abgeschlossen: zahl('abgeschlossen'),
       });
     }),
-    http.get(`${basis}/auswahl`, () =>
+    http.get(`${basis}/selection`, () =>
       HttpResponse.json(
         alle()
           .filter((s) => s.storniert_at == null)

@@ -1670,7 +1670,7 @@ async fn lage_snapshot_friert_keinen_einsatzleiter_ein() {
     let (status, snapshot) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/lage-snapshots"),
+        &format!("/api/einsaetze/{einsatz}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

@@ -45,7 +45,7 @@ describe('vorschauKachelStil (LFH-759)', () => {
   });
 });
 
-const HREF = '/api/einsaetze/5/schaeden/3/anhaenge/9/datei';
+const HREF = '/api/einsaetze/5/damages/3/attachments/9/file';
 
 describe('AnhangVorschau', () => {
   it('zeigt bei einem Foto das Vorschaubild vom Server', () => {

@@ -102,7 +102,7 @@ async fn org_vorgabe_sperrt_mitglied_wie_die_liste() {
     let v = freigaben(&app, &erika, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": false }));
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "schaeden").await,
+        liste_status(&app, &erika, einsatz, "damages").await,
         StatusCode::FORBIDDEN
     );
     // Ein nicht betroffenes Modul bleibt frei — und seine Liste antwortet.
@@ -122,7 +122,7 @@ async fn org_vorgabe_laesst_fuehrungskraft_durch() {
     let v = freigaben(&app, &fk, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": true }));
     assert_eq!(
-        liste_status(&app, &fk, einsatz, "schaeden").await,
+        liste_status(&app, &fk, einsatz, "damages").await,
         StatusCode::OK
     );
 }
@@ -200,7 +200,7 @@ async fn einsatzleitung_ohne_org_rolle_sperrt_sich_mit_einsatzfuehrung_nicht_aus
     let v = freigaben(&app, &leitung, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": true }));
     assert_eq!(
-        liste_status(&app, &leitung, einsatz, "schaeden").await,
+        liste_status(&app, &leitung, einsatz, "damages").await,
         StatusCode::OK
     );
 }
@@ -215,14 +215,14 @@ async fn einsatzfuehrung_laesst_fuehrungspersonal_durch_und_sperrt_beobachter() 
     let v = freigaben(&app, &personal, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": true }));
     assert_eq!(
-        liste_status(&app, &personal, einsatz, "schaeden").await,
+        liste_status(&app, &personal, einsatz, "damages").await,
         StatusCode::OK
     );
 
     let v = freigaben(&app, &erika, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": false }));
     assert_eq!(
-        liste_status(&app, &erika, einsatz, "schaeden").await,
+        liste_status(&app, &erika, einsatz, "damages").await,
         StatusCode::FORBIDDEN
     );
 }
@@ -237,7 +237,7 @@ async fn einsatzfuehrung_laesst_org_fuehrungskraft_ohne_mitgliedschaft_durch() {
     let v = freigaben(&app, &fk, einsatz).await;
     assert_eq!(v["schaeden"], json!({ "sichtbar": true, "zugriff": true }));
     assert_eq!(
-        liste_status(&app, &fk, einsatz, "schaeden").await,
+        liste_status(&app, &fk, einsatz, "damages").await,
         StatusCode::OK
     );
 }
@@ -278,7 +278,7 @@ async fn fuehrungskraft_sperrt_einsatzleitung_ohne_org_rolle_weiter() {
         json!({ "sichtbar": true, "zugriff": false })
     );
     assert_eq!(
-        liste_status(&app, &leitung, einsatz, "schaeden").await,
+        liste_status(&app, &leitung, einsatz, "damages").await,
         StatusCode::FORBIDDEN
     );
 }
@@ -305,9 +305,8 @@ async fn fuehrungskraft_fremder_org_als_beobachter_bleibt_draussen() {
     .unwrap();
     let fremd = login_cookie(&app, "fremd", "fremdpw12").await;
 
-    // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
     for (modul, pfad, rolle) in [
-        ("schaeden", "schaeden", "fuehrungskraft"),
+        ("schaeden", "damages", "fuehrungskraft"),
         ("auftraege", "tasks", "einsatzfuehrung"),
     ] {
         modul_override(

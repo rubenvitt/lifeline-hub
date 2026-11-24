@@ -18,14 +18,14 @@ async fn fetch_json(app: &axum::Router, cookie: &str, pfad: &str) -> Value {
 }
 
 fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/abschnitte/{ab}")
+    format!("/api/einsaetze/{einsatz}/sectors/{ab}")
 }
 
 async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/abschnitte"),
+        &format!("/api/einsaetze/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -277,7 +277,7 @@ async fn umbenennen_erreicht_leser_ohne_abschnittsrecht() {
     let vorgaben = format!("/api/einsaetze/{eid}/abloesungen/vorgaben");
     for (pfad, erwartet) in [
         (
-            format!("/api/einsaetze/{eid}/abschnitte"),
+            format!("/api/einsaetze/{eid}/sectors"),
             StatusCode::FORBIDDEN,
         ),
         (einheiten.clone(), StatusCode::OK),

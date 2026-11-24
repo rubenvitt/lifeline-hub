@@ -79,7 +79,7 @@ for (const kontext of KONTEXTE) {
       ).toBeTruthy();
       return (await antwort.json()) as { id: number };
     };
-    const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+    const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
     const einheit = async (name: string) =>
       (await post('einheiten', { name, abschnitt_id: abschnitt.id }, name)).id;
     for (const name of ['Florian Nord 1', 'Florian Nord 2']) {
@@ -239,7 +239,7 @@ test.describe('fremde Rhythmusänderung', () => {
           ).toBeTruthy();
           return (await antwort.json()) as { id: number };
         };
-        const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+        const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
         const schichten: number[] = [];
         for (const name of ['Florian Nord 1', 'Florian Nord 2', 'Florian Nord 3']) {
           const einheit = await post('einheiten', { name, abschnitt_id: abschnitt.id }, name);
@@ -373,7 +373,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
       ).toBeTruthy();
       return (await antwort.json()) as { id: number };
     };
-    const abschnitt = await post('abschnitte', { name: 'Deichwache Nord' }, 'Abschnitt');
+    const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
     // Der Abschnitt hat keine Vorgabe: die Schicht folgt der Vorgabe des Einsatzes.
     const vorgabe = await page.request.put(
       `/api/einsaetze/${einsatzId}/abloesungen/schichtmodell`,

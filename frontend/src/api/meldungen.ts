@@ -161,7 +161,7 @@ export function erteileAuftragAusMeldung(
 
 /** Lagemeldungen listen: lagerelevante Meldungen in der Sicht der Lage (LFH-95, LLH-1031). */
 export function listeLageMeldungen(einsatzId: number): Promise<LageMeldung[]> {
-  return apiGet<LageMeldung[]>(`/api/einsaetze/${einsatzId}/lage/meldungen`);
+  return apiGet<LageMeldung[]>(`/api/einsaetze/${einsatzId}/situation/reports`);
 }
 
 /** Eine Lagemeldung als gesehen kennzeichnen (LLH-1206); für alle gleich, die erste gewinnt.
@@ -183,7 +183,7 @@ export function markLageMeldungenGesehen(
   einsatzId: number,
   meldungIds: number[],
 ): Promise<LageGesehen> {
-  return apiSend<LageGesehen>(`/api/einsaetze/${einsatzId}/lage/gesehen`, 'POST', {
+  return apiSend<LageGesehen>(`/api/einsaetze/${einsatzId}/situation/seen`, 'POST', {
     meldung_ids: meldungIds,
   } satisfies LageGesehenBody);
 }

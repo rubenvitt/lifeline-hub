@@ -342,15 +342,15 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 
     // Je Modul die Zahl aus dem Drehbuch.
     for (pfad, n) in [
-        ("/abschnitte", 4),
+        ("/sectors", 4),
         ("/einheiten", 5),
         ("/fahrzeuge", 8),
         ("/personal", 12),
         ("/persons", 12),
         ("/uhs", 1),
         ("/bereitstellungsraeume", 1),
-        ("/zonen", 2),
-        ("/gefahrengebiete", 2),
+        ("/zones", 2),
+        ("/hazard-areas", 2),
         ("/reports", 8),
         ("/tasks", 5),
         ("/orders", 1),

@@ -151,7 +151,7 @@ for (const breite of BREITEN) {
   }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Pegel');
-    await senden(page, 'put', `/api/einsaetze/${einsatzId}/pegel`, {
+    await senden(page, 'put', `/api/einsaetze/${einsatzId}/gauges`, {
       stationen: [{ station_uuid: STATION, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }],
     });
     await page.setViewportSize({ width: breite, height: 900 });
@@ -160,7 +160,7 @@ for (const breite of BREITEN) {
 
     const messe = async (lang: boolean) => {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
-      await page.route(`**/api/einsaetze/${einsatzId}/pegel`, (r) =>
+      await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (r) =>
         r.request().method() === 'GET'
           ? r.fulfill({ json: pegelAntwort(lang, FEST) })
           : r.continue(),

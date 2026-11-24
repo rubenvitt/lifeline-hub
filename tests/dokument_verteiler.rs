@@ -98,7 +98,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/abschnitte", self.einsatz),
+            &format!("/api/einsaetze/{}/sectors", self.einsatz),
             &self.admin,
             Some(&format!(r#"{{"name":"{name}"}}"#)),
         )
@@ -359,7 +359,7 @@ async fn anzeigename_ueberlebt_das_loeschen_und_nennt_keine_besetzung() {
     let (s, j) = anfrage(
         &u.app,
         "DELETE",
-        &format!("/api/einsaetze/{}/abschnitte/{sued}", u.einsatz),
+        &format!("/api/einsaetze/{}/sectors/{sued}", u.einsatz),
         &u.admin,
         None,
     )

@@ -113,7 +113,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
     post(
         &app,
         &admin,
-        &format!("{basis}/abschnitte"),
+        &format!("{basis}/sectors"),
         r#"{"name":"Nord"}"#,
     )
     .await;

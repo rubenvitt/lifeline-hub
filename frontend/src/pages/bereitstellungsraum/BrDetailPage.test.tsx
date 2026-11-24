@@ -1729,7 +1729,7 @@ describe('BrDetailPage — Material am Ort (LLH-1225 D13)', () => {
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/material', () => {
         abrufe.push('material');
         return HttpResponse.json(material);
@@ -2644,7 +2644,7 @@ describe('BrDetailPage — Abrufen (LLH-1085 Teil II, Spec „Abruf in der Oberf
       http.get('/api/einsaetze/1/einheiten', () => HttpResponse.json(einheiten)),
       http.get('/api/einsaetze/1/fahrzeuge', () => HttpResponse.json([])),
       http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-      http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([DEICH])),
+      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([DEICH])),
       http.post('/api/einsaetze/1/bereitstellungsraeume/1/abruf', async ({ request }) => {
         aufrufe.abruf.push(await request.json());
         return abruf();

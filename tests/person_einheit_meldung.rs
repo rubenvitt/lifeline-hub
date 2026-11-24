@@ -39,7 +39,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, e: i64, name: &str)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/abschnitte"),
+        &format!("/api/einsaetze/{e}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )

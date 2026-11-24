@@ -32,7 +32,7 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 1090 ${modus} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/zonen`, {
+    await post(page, `/api/einsaetze/${einsatzId}/zones`, {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
       geometrie: JSON.stringify({

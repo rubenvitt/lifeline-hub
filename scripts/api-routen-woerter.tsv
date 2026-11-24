@@ -20,7 +20,9 @@ annul	stornieren
 api	-
 app-code	-
 archive	Archiv
+area	Fläche
 areas	Bereiche
+assessment	Beurteilung
 assign	zuweisen
 attachments	Anhänge
 attachments.zip	Anlagen
@@ -30,6 +32,7 @@ auth	-
 auto-update	automatische Aktualisierung
 availability	Verfügbarkeit
 available	verfügbar
+background-images	Hintergrundbilder
 backup	-
 blocks	Blöcke
 breaks	Bruchstellen
@@ -61,6 +64,7 @@ codes	-
 command	Führung
 command-post	Führungsstelle
 command-roles	Führungsfunktionen
+commanders	Führungskräfte
 commitment	Zusage
 comms-plan	Kommunikationsplan
 comms-sketch	Fernmeldeskizze
@@ -110,6 +114,8 @@ finish	-
 follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
+forecast	Prognose
+free-symbols	freie Zeichen
 from-attachment	aus Anhang
 from-template	aus Vorlage
 gauges	Pegel
@@ -120,6 +126,7 @@ hand-over	übergeben
 hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
+history	Verlauf
 household	Haushalt
 households	Haushalte
 image	Bild
@@ -150,6 +157,7 @@ logo	-
 logout	-
 lost	verloren
 map	Karte
+map-views	Kartenansichten
 marker	-
 master-data	Stammdaten
 matches	Abgleich
@@ -204,6 +212,7 @@ plans	Planungen
 position	-
 positions	Stellen
 posts	Posten
+prediction	Vorhersage
 presence	Präsenz
 preview	Vorschau
 print	Druck
@@ -214,6 +223,7 @@ providers	-
 proxy	-
 qualifications	Qualifikationen
 raster	-
+rating	Bewertung
 read	gelesen
 read-marker	Lesemarke
 reason	Anlass
@@ -252,6 +262,7 @@ schedule	Termin
 seats	Plätze
 secrets	Geheimnisse
 sectors	Einsatzabschnitte
+seen	gesehen
 selection	Auswahl
 sessions	Sitzungen
 set	festlegen
@@ -261,11 +272,14 @@ shift-models	Schichtmodelle
 shift-plan	Schichtplan
 signing-keys	Unterschriftsschlüssel
 situation	Lage
+situation-metric-selection	Lagekennzahl-Wahl
 situation-monitor	Lagemonitor
 situation-picture	Lagebild
+situation-picture-shares	Lagebild-Freigaben
 situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
+situation-snapshots	Lage-Snapshots
 sprite	-
 sprites	-
 staff	Stab
@@ -309,6 +323,7 @@ vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
 void	aufheben
+weather	Wetter
 web-push	-
 webauthn	-
 webhook	-
@@ -316,3 +331,4 @@ whereabouts	Verbleib
 whereabouts-details	Verbleib-Angaben
 withdraw	zurückziehen
 world	Welt
+zones	Zonen

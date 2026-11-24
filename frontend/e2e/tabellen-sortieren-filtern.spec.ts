@@ -33,7 +33,7 @@ async function einsatzMitSchaeden(page: Page): Promise<string> {
   ];
   // Nacheinander: die Registriernummern folgen so der Liste.
   for (const s of schaeden) {
-    const a = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+    const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
       data: { typ: 'sachschaden', ...s },
     });
     expect(a.ok(), `POST schaeden: ${a.status()} ${await a.text()}`).toBe(true);

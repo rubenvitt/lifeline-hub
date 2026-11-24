@@ -273,7 +273,7 @@ async fn schaden_datei(
     .await
     .unwrap();
     (
-        format!("/api/einsaetze/{einsatz}/schaeden/{schaden}/anhaenge/{linker}/datei"),
+        format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments/{linker}/file"),
         aid,
     )
 }

@@ -25,7 +25,7 @@ const FENSTER_MS = 24 * 60 * 60_000;
 /** Luft über und unter der Spanne, als Anteil der Spanne. */
 const LUFT = 0.08;
 
-/** Ein Punkt der Reihe, wie ihn `GET …/pegel/verlauf` liefert. */
+/** Ein Punkt der Reihe, wie ihn `GET …/gauges/history` liefert. */
 interface VerlaufsPunkt {
   zeitpunkt: string;
   wasserstand_cm: number;

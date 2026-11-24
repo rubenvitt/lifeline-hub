@@ -290,7 +290,7 @@ async fn beobachter_liest_lage_meldungen() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage/meldungen"),
+        &format!("/api/einsaetze/{e}/situation/reports"),
         &erika_c,
         None,
     )
@@ -800,7 +800,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/lage/meldungen"),
+        &format!("/api/einsaetze/{e}/situation/reports"),
         &admin,
         None,
     )

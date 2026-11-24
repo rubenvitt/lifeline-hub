@@ -662,7 +662,7 @@ const LEISTEN_ROUTEN: LeistenRoute[] = [
     feld: 'Typ',
     seite: async (page: Page) => {
       const einsatzId = await einsatzPerApi(page);
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
         data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
       });
       expect(
@@ -1713,7 +1713,7 @@ test('Informationstelefon (LFH-554): kein Statusauslöser verschwindet beim Tabb
   test.info().annotations.push({ type: 'messwert', description: gemessen.join(' | ') });
 });
 
-/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zonen` nicht). */
+/** Einsatz mit zwei Gefahrengebieten per API (Karte braucht WebGL, `POST …/zones` nicht). */
 async function matrixEinsatz(page: Page): Promise<number> {
   const antwort = await page.request.post('/api/einsaetze', {
     data: { bezeichnung: `Fokus 373 Sued ${Date.now()}` },
@@ -1722,7 +1722,7 @@ async function matrixEinsatz(page: Page): Promise<number> {
   const { id } = (await antwort.json()) as { id: number };
   for (const [i, label] of ['Sektor Sued 1', 'Sektor Sued 2'].entries()) {
     const x = 10 + i / 20;
-    const zone = await page.request.post(`/api/einsaetze/${id}/zonen`, {
+    const zone = await page.request.post(`/api/einsaetze/${id}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',
@@ -1882,7 +1882,7 @@ test('Lagekarte (LFH-373): Kartenknöpfe liegen nie unter den Fußbändern', asy
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id: einsatzId } = (await antwort.json()) as { id: number };
   for (const bezeichnung of ['Stand A', 'Stand B']) {
-    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+    const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
       data: { bezeichnung },
     });
     expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -2400,31 +2400,28 @@ for (const viewport of [
         const { id: einsatzId } = (await einsatz.json()) as { id: number };
         // Zwei Stände: erst dann trägt die Zeitachse ihre volle Bedienung (Leiste, Stand-Knöpfe).
         for (const bezeichnung of ['Stand A', 'Stand B']) {
-          const stand = await page.request.post(`/api/einsaetze/${einsatzId}/lage-snapshots`, {
+          const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
             data: { bezeichnung },
           });
           expect(stand.ok(), await stand.text()).toBeTruthy();
         }
-        const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/schaeden`, {
+        const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
           data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Fokusprobe Keller' },
         });
         expect(schaden.ok(), await schaden.text()).toBeTruthy();
         const { id: schadenId } = (await schaden.json()) as { id: number };
-        const bild = await page.request.post(
-          `/api/einsaetze/${einsatzId}/karte/hintergrundbilder`,
-          {
-            multipart: {
-              datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
-              ecken: JSON.stringify([
-                [8.796, 53.08],
-                [8.804, 53.08],
-                [8.804, 53.075],
-                [8.796, 53.075],
-              ]),
-              name: MODUS_BILD,
-            },
+        const bild = await page.request.post(`/api/einsaetze/${einsatzId}/map/background-images`, {
+          multipart: {
+            datei: { name: 'plan.png', mimeType: 'image/png', buffer: MODUS_PNG },
+            ecken: JSON.stringify([
+              [8.796, 53.08],
+              [8.804, 53.08],
+              [8.804, 53.075],
+              [8.796, 53.075],
+            ]),
+            name: MODUS_BILD,
           },
-        );
+        });
         expect(bild.ok(), await bild.text()).toBeTruthy();
 
         // Dichte ZUERST: `stelleDichte` lädt neu, und `?platzieren=` ist ein Auftrag, den die Karte

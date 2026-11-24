@@ -185,7 +185,7 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
 
     for (methode, pfad, body) in [
         ("POST", "einheiten", r#"{"name":"Trupp"}"#),
-        ("POST", "abschnitte", r#"{"name":"Nord"}"#),
+        ("POST", "sectors", r#"{"name":"Nord"}"#),
         ("PUT", "settings", r#"{"auftrag_quittierung_frist_min":45}"#),
     ] {
         let (s, v) = anfrage(

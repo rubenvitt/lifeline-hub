@@ -36,7 +36,7 @@ async function ueberhang(page: Page): Promise<number> {
 
 async function seede(page: Page): Promise<string> {
   const einsatzId = await einsatzAnlegen(page, `E2E Farbvertrag ${Date.now()}`);
-  await post(page, einsatzId, 'abschnitte', { name: ABSCHNITT, lagezustand: 'angespannt' });
+  await post(page, einsatzId, 'sectors', { name: ABSCHNITT, lagezustand: 'angespannt' });
   await post(page, einsatzId, 'fahrzeuge', { adhoc: { funkrufname: FAHRZEUG } });
   return einsatzId;
 }

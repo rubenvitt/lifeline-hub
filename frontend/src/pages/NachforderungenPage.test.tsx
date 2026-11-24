@@ -35,7 +35,7 @@ beforeEach(() => {
   server.use(
     http.get('/api/unit-types', () => HttpResponse.json([])),
     http.get('/api/einsaetze/1/bereitstellungsraeume', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/abschnitte', () => HttpResponse.json([])),
+    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
   );
 });
 afterEach(() => {

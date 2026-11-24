@@ -143,7 +143,7 @@ for (const modus of ['light', 'dark'] as const) {
     const { id: einsatzId } = await post(page, '/api/einsaetze', {
       bezeichnung: `E2E 652 ${modus} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/schaeden`, {
+    await post(page, `/api/einsaetze/${einsatzId}/damages`, {
       typ: 'sachschaden',
       ausmass: 'gering',
       ort: 'Messung Titel-Link',
