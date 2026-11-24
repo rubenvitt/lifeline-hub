@@ -55,8 +55,8 @@ async function switchZuordnung(
 
 /**
  * Die Schreibwege der Einteilung einer Person (LLH-1060, Spec `personal-ansicht`), für Liste und
- * Ansicht gleich: Einheit über `…/einheiten/{eid}/personal/{ep}`, Fahrzeug über
- * `…/fahrzeuge/{ef}/besatzung/{ep}`, UHS über `…/uhs/{uid}/forces/{ep}`, die übrigen Angaben über
+ * Ansicht gleich: Einheit über `…/units/{eid}/personnel/{ep}`, Fahrzeug über
+ * `…/vehicles/{ef}/crew/{ep}`, UHS über `…/uhs/{uid}/forces/{ep}`, die übrigen Angaben über
  * den PATCH der Disposition.
  *
  * Jede Übernahme erfüllt erst, wenn die Personalliste neu im Cache steht (`InlineAngabe` schließt

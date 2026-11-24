@@ -151,7 +151,7 @@ test.describe(KAPITEL, () => {
       await fuelle(api, 'post', `${basis}/staging-areas/${raum.id}/arrival`, {
         kraft: { objekt_typ: 'einheit', objekt_id: abloeser.id },
       });
-      await fuelle(api, 'post', `${basis}/units/${einheit('Betreuungsgruppe')}/zeitachse`, {
+      await fuelle(api, 'post', `${basis}/units/${einheit('Betreuungsgruppe')}/timeline`, {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 40)),
       });

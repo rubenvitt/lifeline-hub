@@ -601,8 +601,8 @@ pub async fn status_zuruecknehmen(
 /// POST /api/einsaetze/{id}/personnel/{ep_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Bindungen gehen, Historie bleibt, die
 /// Zeitachse bekommt die Entlassung. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
-/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1922), der Block „Entlassen“
-/// nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; eine beendete Kraft → 409. Liefert die
+/// `…/stand-down/undo` mit dem gelieferten Vorzustand (LLH-1922), der Block „Entlassen“
+/// nimmt `…/reactivate`. Schreibt ETB-Eintrag; eine beendete Kraft → 409. Liefert die
 /// entlassene Kraft und ihren Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
@@ -649,7 +649,7 @@ pub async fn entlassen(
 
 /// POST /api/einsaetze/{id}/personnel/{ep_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer Person zurücknehmen“): Body ist
-/// der Vorzustand aus der Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses
+/// der Vorzustand aus der Antwort von `…/stand-down`. Nur die entlassende Person, nur dieses
 /// Entlassen, höchstens [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, und nur, solange
 /// die Zeitachse seitdem unberichtigt ist; sonst 409. Was inzwischen anders gebunden ist oder
 /// wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein ETB-Eintrag,

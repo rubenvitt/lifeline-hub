@@ -8,7 +8,7 @@ Gilt für `frontend/src/fernmeldewesen/`, `pages/FunkplanPage.tsx`, `pages/Kommu
 Modul `fernmeldewesen` (Kategorie Kommunikation) mit Funkplan, Fernmeldeskizze, Sprechgruppen und
 Kommunikationsplan; die Dateien liegen unter `fernmeldewesen/` (umgezogen mit LLH-1602).
 Die Besetzung (Nebentext im Kommunikationsplan, Sachgebiete im Kasten „Einsatzleitung“) kommt aus
-den Mitgliedern (`GET …/mitglieder`, ohne eigenes Modulrecht, über
+den Mitgliedern (`GET …/members`, ohne eigenes Modulrecht, über
 `fuehrung/besetzungAusMitgliedern.ts`; i6k6mzed D7) und ist eine eigene Quelle mit Weiche
 (`fernmeldewesen/useNetzQuellen.ts`, Quelle „Mitglieder“): fehlt sie, steht „—“ mit Grund bzw.
 „Mitglieder: nicht geladen“, nie die ganze Seite.

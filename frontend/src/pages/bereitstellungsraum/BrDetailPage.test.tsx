@@ -1955,8 +1955,9 @@ describe('BrDetailPage — gesperrte Nachbarmodule (LLH-1462)', () => {
           freigabenFixture(Object.fromEntries(module.map((m) => [m, { zugriff: false }]))),
         ),
       ),
+      // Modulschlüssel deutsch, Pfad englisch (ADR-0097).
       ...module.map((m) =>
-        http.get(`/api/einsaetze/1/${m}`, ({ request }) => {
+        http.get(`/api/einsaetze/1/${m === 'einheiten' ? 'units' : 'vehicles'}`, ({ request }) => {
           abrufe.push(new URL(request.url).pathname);
           return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
         }),

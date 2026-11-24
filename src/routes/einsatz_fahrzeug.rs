@@ -621,8 +621,8 @@ pub async fn status_zuruecknehmen(
 /// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Besatzung, Einheit, Bereitstellungsraum und
 /// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
-/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1722), der Block „Entlassen“
-/// nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; ein beendetes Fahrzeug → 409. Liefert das
+/// `…/stand-down/undo` mit dem gelieferten Vorzustand (LLH-1722), der Block „Entlassen“
+/// nimmt `…/reactivate`. Schreibt ETB-Eintrag; ein beendetes Fahrzeug → 409. Liefert das
 /// entlassene Fahrzeug und seinen Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
@@ -693,7 +693,7 @@ pub async fn entlassen(
 
 /// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
-/// Antwort von `…/entlassen`. Nur die entlassende Person, nur dieses Entlassen, höchstens
+/// Antwort von `…/stand-down`. Nur die entlassende Person, nur dieses Entlassen, höchstens
 /// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
 /// gebunden ist oder wofür das Modulrecht fehlt, bleibt aus und steht in `ausgelassen`. Ein
 /// ETB-Eintrag, Live-Meldungen wie beim Entlassen, keine Benachrichtigung.

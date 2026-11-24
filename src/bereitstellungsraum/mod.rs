@@ -22,7 +22,7 @@ pub const STANDORT_MAX: usize = 500;
 /// `BR_NOTIZ_MAX`.
 pub const NOTIZ_MAX: usize = 2_000;
 
-/// Höchstlänge der Notiz eines Belegungs-Events (`POST …/belegung`, LLH-1302). Keine Maske
+/// Höchstlänge der Notiz eines Belegungs-Events (`POST …/occupancy`, LLH-1302). Keine Maske
 /// schreibt sie, deshalb ohne Spiegel.
 pub const BELEGUNG_NOTIZ_MAX: usize = 2_000;
 

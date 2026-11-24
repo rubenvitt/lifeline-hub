@@ -258,7 +258,7 @@ async fn statuscodes() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("{}/999999/vollzug", pfad(e)),
+        &format!("{}/999999/execution", pfad(e)),
         &admin,
         Some("{}"),
     )

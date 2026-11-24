@@ -268,7 +268,7 @@ sequenceDiagram
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
   G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
   BE->>BE: CurrentUser: fordere_geraeteroute gegen die Routenliste
-  EL->>BE: POST …/geraete/{gid}/widerrufen
+  EL->>BE: POST …/devices/{gid}/revoke
   BE->>Hub: melde_kopplung_ende
   Hub-->>G: Strom endet, KopplungBeendetPage
 ```

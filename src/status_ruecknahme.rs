@@ -24,7 +24,7 @@ pub fn conflict() -> AppError {
 
 /// Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
 /// „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
-/// und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+/// und geht als Body an `…/status/undo` zurück. Er trägt nur Prüfwerte: Was
 /// wiederhergestellt wird, liest der Server aus der eigenen Zeile.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct HandStatusRuecknahmeBeleg {

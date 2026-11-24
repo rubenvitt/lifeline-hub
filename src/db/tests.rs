@@ -15091,3 +15091,40 @@ async fn migration_0371_zieht_die_pfadvorlage_offener_antraege_auf_reports_um() 
         ]
     );
 }
+
+/// LLH-2056 (Paket 10 von LLH-1979): Ein offener Eintreffen-Antrag eines Spiegels trägt die
+/// Vorlage seines Pfads. Nach dem Umbenennen fände der Führer `/bereitstellungsraeume/{bid}/
+/// eintreffen` nicht mehr unter den beantragbaren Erfassungen und lehnte den Antrag als
+/// unbekannte Art ab; die Migration zieht die Vorlage auf `/staging-areas/{bid}/arrival` um und
+/// lässt alle anderen stehen.
+#[tokio::test]
+async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_um() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 371).await;
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO spiegel_antrag (id, einsatz_id, art, methode, pfad_vorlage, daten, \
+         benutzer_id, erfasst_at, geaendert_at) VALUES \
+         (1, 1, 'eintreffen', 'POST', '/api/einsaetze/{id}/bereitstellungsraeume/{bid}/eintreffen', '{}', 1, 'x', 'x'), \
+         (2, 1, 'etb', 'POST', '/api/einsaetze/{id}/etb', '{}', 1, 'x', 'x'), \
+         (3, 1, 'meldung', 'POST', '/api/einsaetze/{id}/reports', '{}', 1, 'x', 'x')",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
+    }
+    migriere_bis(&pool, 372).await;
+    let vorlagen: Vec<String> =
+        sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        vorlagen,
+        [
+            "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
+            "/api/einsaetze/{id}/etb",
+            "/api/einsaetze/{id}/reports",
+        ]
+    );
+}

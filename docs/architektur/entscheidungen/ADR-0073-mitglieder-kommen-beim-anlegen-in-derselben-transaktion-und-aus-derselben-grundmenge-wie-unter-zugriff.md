@@ -17,7 +17,7 @@ herleitung:
 - MUST: Mitglieder aus `NeuerEinsatz.mitglieder` werden in derselben `write_retry!`-Transaktion
   wie `anlegen_tx` geschrieben (`einsatz::repo::anlegen_mit_mitgliedern`); scheitert eine
   Person, entsteht kein Einsatz.
-- MUST NOT: kein Weg, der nach dem Anlegen je Person `PUT …/mitglieder/{id}` ruft, um die Wahl
+- MUST NOT: kein Weg, der nach dem Anlegen je Person `PUT …/members/{id}` ruft, um die Wahl
   aus dem Dialog nachzutragen.
 - MUST: Jede Personenauswahl und jeder Schreibweg, der eine Person aufnimmt, nimmt die Grundmenge
   aus `einsatz::repo::auswahl_sql` (bzw. dieselbe Bedingung im INSERT); eine zweite Kopie der

@@ -8937,7 +8937,7 @@
       },
       "EntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
+        "description": "Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung\neines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).\nKommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`\nzurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.\nDie Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom\nClient zu übernehmen.",
         "required": [
           "entlassen_at"
         ],
@@ -11216,7 +11216,7 @@
       },
       "HandStatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für\n„Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,\nund geht als Body an `…/status/undo` zurück. Er trägt nur Prüfwerte: Was\nwiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "gesetzt_at"
         ],
@@ -14835,7 +14835,7 @@
       },
       "MaterialEntlassungVorzustand": {
         "type": "object",
-        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an\n`…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
+        "description": "Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme\nvon Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an\n`…/stand-down/undo` zurück. Der Ort steht in den vier Spalten wie an der Zeile;\nhöchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das\nHerausnehmen lässt sie an der Zeile stehen.",
         "required": [
           "entlassen_at"
         ],
@@ -14929,7 +14929,7 @@
       },
       "MaterialStatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des\nPATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück.\nEr trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "status",
           "gesetzt_at"
@@ -17785,7 +17785,7 @@
       },
       "PersonalEntlassungVorzustand": {
         "type": "object",
-        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
+        "description": "Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer\nPerson zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`\nD1). Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`\nzurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das\nEntlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.",
         "required": [
           "entlassen_at"
         ],
@@ -21092,7 +21092,7 @@
       },
       "StatusRuecknahmeBeleg": {
         "type": "object",
-        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
+        "description": "Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,\nChange `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,\nwenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück. Er\nträgt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.",
         "required": [
           "status_id",
           "status_seit"

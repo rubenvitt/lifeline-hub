@@ -147,7 +147,7 @@ fn check_fahrzeug_ids(ids: Option<&[i64]>) -> Result<Vec<i64>, AppError> {
 /// `write_retry!` (design.md D9): Einheit, Sprechgruppen, Vorprüfung der Fahrzeuge (unbekannt,
 /// beendet, schon in einer Einheit → 422 mit Grund je Fahrzeug), Zuordnung, die mitkommende
 /// Besatzung ohne Einheit (D10) und die ETB-Einträge. Recht nur am Modul Einheiten, wie
-/// `PUT …/fahrzeug/{ef_id}`. Kein Zeitachsen-Ereignis aus dem Status der Fahrzeuge (D11).
+/// `PUT …/vehicles/{ef_id}`. Kein Zeitachsen-Ereignis aus dem Status der Fahrzeuge (D11).
 pub async fn bilden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,

@@ -196,7 +196,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
 - **Bereitstellungsraum** (LFH-1042): Startseite ist der eigene Raum, die geteilte
   `BrDetailPage` unter `/geraet/:id/br/:brId` (`GeraetBr` hält die Kennung beim eigenen); ohne
   `br-verwalten` kein Umschalter, kein Auflösen und Stornieren, kein gemerkter Raum. Den Verlauf
-  des eigenen Raums liest das Gerät mit (`…/bereitstellungsraeume/{bid}/verlauf`, Spec
+  des eigenen Raums liest das Gerät mit (`…/staging-areas/{bid}/history`, Spec
   `funktionsansichten`, LLH-1095), erst beim Aufklappen (`pages/bereitstellungsraum/BrVerlauf.tsx`);
   ein Wechsel nennt den anderen Raum mit Bezeichnung, dessen Detail und Verlauf bleiben 404.
   Material des eigenen Raums liest es nur (LLH-1252, Entscheidung 22.10.2026, `br-material`):
@@ -209,11 +209,11 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   ist die einzige Stelle, an der ein Gerät Einheiten und Fahrzeuge anlegt („Unangemeldet buchen“, „Aus den Stammdaten“);
   Übernehmen und Abweisen bleiben der Führung und erscheinen am Gerät nie. Den Stammdaten-Katalog
   liest das Gerät nie; Einheiten-Vorlagen findet es nur über die Projektion
-  `…/bereitstellungsraeume/{bid}/stamm-treffer` (LLH-1300, ab drei Zeichen, höchstens zehn, nur Namen
+  `…/staging-areas/{bid}/master-data-matches` (LLH-1300, ab drei Zeichen, höchstens zehn, nur Namen
   und Funkrufnamen), und „Eintreffen“ an einem solchen Treffer bildet die Einheit mit ihren freien
   Stamm-Fahrzeugen, ohne Besatzung und Material (`src/bereitstellungsraum/stamm_treffer.rs`).
   Erwartete Kräfte aus Nachforderungen mit Ziel = eigener Raum (LLH-1387, Gruppe „Aus
-  Nachforderungen“) liest das Gerät nur über `…/bereitstellungsraeume/{bid}/erwartet` (Projektion `nachforderung::erwartet`, von den Freitexten
+  Nachforderungen“) liest das Gerät nur über `…/staging-areas/{bid}/expected` (Projektion `nachforderung::erwartet`, von den Freitexten
   nur Art und Rufnamen); `GET …/resource-requests` und `nachforderungen` in den Lese-Modulen bleiben
   gesperrt. Beim Buchen trägt `nachforderung_id` den Verweis an die Einheit (ein einheitenloses
   Fahrzeug wird dabei serverseitig zur Einheit, LLH-1444); eine Stufe schaltet das Gerät nie. Ohne Netz merkt der Dialog vor (Teil III; Regeln in
@@ -267,7 +267,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   `Funktionsansicht::ohne_personenbezug` (Lagemonitor, Verpflegung) nimmt Bearbeiter- und
   Bestätigernamen aus den Meldungen und die Freitexte aus dem Einsatzkopf. Empfänger einer Ausgabe
   (LLH-1055) liest das Gerät nur aus der Projektion `empfaenger` in `GET …/catering`, **nie**
-  `GET …/einheiten` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
+  `GET …/units` (bleibt 403); Einheitennamen sind keine Namen von Einsatzkräften, Führer- und
   Mitgliedernamen bleiben draußen; Lese-Module und Routenliste `VERPFLEGUNG` unverändert. Ebenso
   Betreuungsstellen als Empfänger (LLH-1295): nur Kennung, Bezeichnung und „geschlossen“ aus
   `empfaenger.betreuungsstellen`, **nie** `GET …/care` (bleibt 403); das Ereignis `betreuung`

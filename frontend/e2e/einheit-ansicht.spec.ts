@@ -34,7 +34,7 @@ function recordWrites(page: Page, einsatzId: string, einheitId: number) {
 /** Körper aller Sammel-Dispositionen (LLH-1100) dieses Einsatzes, in Reihenfolge. */
 function recordSammel(page: Page, einsatzId: string) {
   const bodies: { pfad: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/(personal|fahrzeuge)/sammel$`);
+  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/(personnel|vehicles)/bulk$`);
   page.on('request', (r: Request) => {
     if (r.method() === 'POST' && pattern.test(r.url())) {
       bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
@@ -213,7 +213,7 @@ for (const dichte of DICHTEN) {
       const epId = await epIdVon(page, einsatzId, person);
       expect(besatzung).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/vehicles/${await efIdVon(page, einsatzId, fahrzeug)}/besatzung`,
+          pfad: `/api/einsaetze/${einsatzId}/vehicles/${await efIdVon(page, einsatzId, fahrzeug)}/crew`,
           body: { ep_ids: [epId] },
         },
       ]);

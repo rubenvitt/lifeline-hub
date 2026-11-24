@@ -3545,7 +3545,7 @@ export interface components {
         /**
          * @description Was ein Fahrzeug vor dem Entlassen trug (LLH-1722, Spec `kraefte-entlassung`, „Entlassung
          *     eines Fahrzeugs zurücknehmen“; `openspec/changes/archive/2026-11-16-tfq6f4kb-loesende-aktionen/design.md` D5).
-         *     Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`
          *     zurück. Status und „Status seit“ fehlen bewusst: das Entlassen lässt sie an der Zeile stehen.
          *     Die Storno-Sperre fehlt ebenso: sie bleibt nach der Rücknahme stehen, statt einen Wert vom
          *     Client zu übernehmen.
@@ -4487,7 +4487,7 @@ export interface components {
         /**
          * @description Beleg eines Statuswechsels aus einem Katalog (Personalstatus, Handstatus der Einheit) für
          *     „Rückgängig“ (LLH-1986). Kommt in der Antwort des Wechsels, wenn der Status sich geändert hat,
-         *     und geht als Body an `…/status/zuruecknehmen` zurück. Er trägt nur Prüfwerte: Was
+         *     und geht als Body an `…/status/undo` zurück. Er trägt nur Prüfwerte: Was
          *     wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         HandStatusRuecknahmeBeleg: {
@@ -5951,7 +5951,7 @@ export interface components {
          * @description Was ein Posten vor dem Herausnehmen trug (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme
          *     von Material zurücknehmen“; `openspec/changes/archive/2026-11-17-nw7tvxsj-material-herausnahme-zuruecknehmen/design.md`
          *     D1). Kommt in der Antwort von `…/material/{em}/stand-down` und geht als Body an
-         *     `…/entlassen/zuruecknehmen` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
+         *     `…/stand-down/undo` zurück. Der Ort steht in den vier Spalten wie an der Zeile;
          *     höchstens eine trägt einen Wert. Menge, Status und Dispositionszeit fehlen bewusst: das
          *     Herausnehmen lässt sie an der Zeile stehen.
          */
@@ -5990,7 +5990,7 @@ export interface components {
         MaterialStatus: "einsatzbereit" | "im_einsatz" | "defekt" | "verbraucht" | "desinfektion_noetig";
         /**
          * @description Beleg eines Materialstatuswechsels für „Rückgängig“ (LLH-1986). Kommt in der Antwort des
-         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück.
+         *     PATCH, wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück.
          *     Er trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         MaterialStatusRuecknahmeBeleg: {
@@ -7182,7 +7182,7 @@ export interface components {
         /**
          * @description Was eine Person vor dem Entlassen trug (LLH-1922, Spec `kraefte-entlassung`, „Entlassung einer
          *     Person zurücknehmen“; `openspec/changes/archive/2026-11-17-u131h4rq-personal-entlassung-zuruecknehmen/design.md`
-         *     D1). Kommt in der Antwort von `…/entlassen` und geht als Body an `…/entlassen/zuruecknehmen`
+         *     D1). Kommt in der Antwort von `…/stand-down` und geht als Body an `…/stand-down/undo`
          *     zurück. Status, Dispositionszeit, Stärke-Position und Storno-Sperre fehlen bewusst: das
          *     Entlassen lässt sie stehen. Das Zeitachsen-Ereignis fehlt ebenso: der Server findet es selbst.
          */
@@ -8447,7 +8447,7 @@ export interface components {
         /**
          * @description Beleg eines Statuswechsels für „Rückgängig“ (LLH-1781, Spec `fahrzeugstatus-quittung`,
          *     Change `eon26eat-status-und-bedienung`, design.md D8). Kommt in der Antwort des Status-PATCH,
-         *     wenn der Status sich geändert hat, und geht als Body an `…/status/zuruecknehmen` zurück. Er
+         *     wenn der Status sich geändert hat, und geht als Body an `…/status/undo` zurück. Er
          *     trägt nur Prüfwerte: Was wiederhergestellt wird, liest der Server aus der eigenen Zeile.
          */
         StatusRuecknahmeBeleg: {

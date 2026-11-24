@@ -427,7 +427,7 @@ const EINSATZABSCHNITT: &[(&str, &str)] = &[
 /// nehmen; die Einheiten- und Fahrzeugliste des Einsatzes samt Perioden der Einheiten lesen;
 /// Meldungen an die Einsatzleitung anlegen und die eigenen lesen. Jeder BR-Handler hier prüft die
 /// Stelle über [`stelle`], der Statuswechsel erlaubt dem Gerät nur `aktiv`. Ausrücken bestätigen
-/// ist der Austritt über `…/belegung` (LLH-1085); Abrufen, Zurücknehmen eines Abrufs und Verlegen
+/// ist der Austritt über `…/occupancy` (LLH-1085); Abrufen, Zurücknehmen eines Abrufs und Verlegen
 /// hinaus fehlen bewusst (Führungshandlungen, ein Wechsel hinaus trägt den fremden Raum). Anlegen,
 /// Stammdaten, Auflösen, Stornieren und jede Änderung an Einheiten und Fahrzeugen (auch
 /// Übernehmen und Abweisen) fehlen ebenso, außer dem Anlegen einer unangemeldeten Kraft beim

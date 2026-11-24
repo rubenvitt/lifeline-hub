@@ -60,13 +60,13 @@ function render(
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[
       'personen',
-      'personal',
+      'personnel',
       'uhs',
       'schaeden',
       'gefahrengebiete',
       'lageberichte',
-      'einheiten',
-      'fahrzeuge',
+      'units',
+      'vehicles',
       'material',
       'abschnitte',
     ].map((l) => http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([]))),

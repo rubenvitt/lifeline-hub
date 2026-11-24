@@ -1962,7 +1962,7 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `einsatz`, `mitglieder`, `lagged` und der empfängergebundenen `benachrichtigung` zu, Guard
   `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`), invalidiert Kopf und
   Stand der Lagebesprechung. **`mitglieder`** (i6k6mzed, D2) feuert bei `PUT`/`DELETE
-…/mitglieder/…` neben `einsatz` und invalidiert Mitglieder, Aufträge, Erinnerungen und
+…/members/…` neben `einsatz` und invalidiert Mitglieder, Aufträge, Erinnerungen und
   Modulzähler: die Mitgliedschaft ist die eine Quelle der Auflösung S1–S6 → Person. Es feuern PATCH, Abschluss, Frist und Termin oder Abschluss der
   Lagebesprechung **nur bei geändertem Termin**; `meine_*` und `lagekennzahlen` lösen es nicht aus.
 - **Einsatzliste und Stammdaten sind live** (LFH-734, Spec `org-live`): `globalKeys` sind wie die

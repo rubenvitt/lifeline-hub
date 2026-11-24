@@ -879,8 +879,8 @@ pub async fn loesen(
 /// POST /api/einsaetze/{id}/material/{em_id}/stand-down — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
 /// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage; der Rückweg „Rückgängig“ ist
-/// `…/entlassen/zuruecknehmen` mit dem gelieferten Vorzustand (LLH-1923), der Block „Aus dem
-/// Einsatz genommen“ nimmt `…/reaktivieren`. Schreibt ETB-Eintrag; beendetes Material → 409.
+/// `…/stand-down/undo` mit dem gelieferten Vorzustand (LLH-1923), der Block „Aus dem
+/// Einsatz genommen“ nimmt `…/reactivate`. Schreibt ETB-Eintrag; beendetes Material → 409.
 /// Liefert das herausgenommene Material und seinen Vorzustand.
 pub async fn entlassen(
     State(state): State<AppState>,
@@ -928,7 +928,7 @@ pub async fn entlassen(
 
 /// POST /api/einsaetze/{id}/material/{em_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Herausnehmen (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme von Material zurücknehmen“):
-/// Body ist der Vorzustand aus der Antwort von `…/entlassen`. Nur die herausnehmende Person, nur
+/// Body ist der Vorzustand aus der Antwort von `…/stand-down`. Nur die herausnehmende Person, nur
 /// dieses Herausnehmen, höchstens zehn Minuten danach, sonst 409; ebenso 409, wenn dasselbe Gerät
 /// inzwischen in einer anderen Zeile im Einsatz steht. Mehr als ein Ort im Body → 422. Nimmt der
 /// Ort den Posten nicht mehr auf, kommt er ohne Ort zurück, und der Ort steht in `ausgelassen`.
@@ -1020,7 +1020,7 @@ pub async fn stornieren(
 
 /// POST /api/einsaetze/{id}/material/{em_id}/reactivate — herausgenommenes oder storniertes
 /// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“; das
-/// Rückgängig nach dem Herausnehmen nimmt `…/entlassen/zuruecknehmen` (LLH-1923). Aktiv → 409.
+/// Rückgängig nach dem Herausnehmen nimmt `…/stand-down/undo` (LLH-1923). Aktiv → 409.
 /// ETB-Eintrag. Ein stornierter Posten aus einer Nachforderung zählt danach wieder als Übernahme
 /// und verlangt wie diese eine eingetroffene Nachforderung (422, LLH-1226); ein schon vorhandener
 /// Posten sperrt nicht, das Reaktivieren ist bewusstes Rückgängigmachen des Stornos.

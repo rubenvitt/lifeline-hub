@@ -213,7 +213,7 @@ test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254
 
   // Erst wenn die Einheit neu geladen ist, stünde ohne Halten der fremde Knopf unter dem Zeiger.
   const abgleich = page.waitForResponse(async (r) => {
-    if (r.request().method() !== 'GET' || !/\/einheiten$/.test(new URL(r.url()).pathname)) {
+    if (r.request().method() !== 'GET' || !/\/units$/.test(new URL(r.url()).pathname)) {
       return false;
     }
     const einheiten = (await r.json()) as {
