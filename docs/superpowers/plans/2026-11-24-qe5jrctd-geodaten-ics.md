@@ -74,19 +74,19 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 - Produces: `pub fn key_fuer_pfad(pfad: &str) -> Option<…>` (bestehende Signatur) ordnet `/api/incidents/{id}/map/…` → `lagekarte` und `/api/incidents/{id}/briefing…` → `lagebesprechung` zu. Die Präfixe stehen in `pub const EINSATZ_WURZELN: [&str; 2] = ["/api/einsaetze/{id}", "/api/incidents/{id}"]`.
 - Die Guards prüfen jede Route, die mit einem Eintrag aus `EINSATZ_WURZELN` beginnt.
 
-- [ ] **Step 1: Failing Unit-Test** in `modul.rs`: `incidents_praefix_hat_denselben_modulschluessel` mit
+- [x] **Step 1: Failing Unit-Test** in `modul.rs`: `incidents_praefix_hat_denselben_modulschluessel` mit
   - `assert_eq!(key_fuer_pfad("/api/incidents/{id}/map/foreign-layers"), key_fuer_pfad("/api/einsaetze/{id}/map/background-images"))`;
   - dasselbe für `/briefing/schedule/export` gegen `/briefing`.
-- [ ] **Step 2:** `cargo test --lib einsatz::modul` → FAIL.
-- [ ] **Step 3:** Präfix-Normalisierung umsetzen:
+- [x] **Step 2:** `cargo test --lib einsatz::modul` → FAIL.
+- [x] **Step 3:** Präfix-Normalisierung umsetzen:
   - `key_fuer_pfad` ersetzt ein führendes `/api/incidents/{id}` durch `/api/einsaetze/{id}`, bevor in `PFAD_KEY` gesucht wird;
   - `EINSATZ_WURZELN` einführen und in den drei Guard-Tests statt des Literals nutzen;
   - `EINSATZ_WURZEL` bleibt für bestehende Aufrufer.
-- [ ] **Step 4:** Prüfen:
+- [x] **Step 4:** Prüfen:
   - `cargo test --lib einsatz::modul` → PASS;
   - `cargo test --test einsatz_kontext_guard --test geraet_routen_guard --test stammdaten_live_guard` → PASS;
   - `scripts/check-api-routen.sh` → grün.
-- [ ] **Step 5:** Commit `feat: Einsatzrouten unter /api/incidents/{id} zulassen` (übergreifende Zunder-Zeile).
+- [x] **Step 5:** Commit `feat: Einsatzrouten unter /api/incidents/{id} zulassen` (übergreifende Zunder-Zeile).
 
 ### Task 2: ADR Geodaten
 
