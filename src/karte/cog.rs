@@ -412,6 +412,144 @@ fn baue_kopf(l: &Leser, ifds: &[Ifd]) -> Result<Kopf, CogFehler> {
     })
 }
 
+// ===== Kachelmathematik (Quelle und Ziel in EPSG:3857, je Achse affin) =====
+
+/// Kleinster Zoom, ab dem die Ebene Kacheln liefert. Gleich `BBOX_MIN_ZOOM` in
+/// `frontend/src/pages/lagekarte/fachebenen.ts` (Wächter im Frontend-Test).
+pub(crate) const MIN_ZOOM_BACKEND: u8 = 10;
+/// Größter Zoom einer Zielkachel (wie `proxy::MAX_KACHEL_ZOOM`).
+const MAX_ZOOM: u8 = 24;
+/// Ab dieser Breite auf der Karte (px) lohnt das Bild eine Kachel.
+const MIN_BILD_PX: f64 = 64.0;
+/// Kantenlänge einer Zielkachel.
+pub(crate) const ZIEL_PX: u32 = 256;
+/// Höchstzahl Quellkacheln je Zielkachel.
+pub(crate) const MAX_QUELLKACHELN: usize = 4;
+
+/// Umfang der Web-Mercator-Welt in Metern.
+const WELT: f64 = 2.0 * std::f64::consts::PI * 6_378_137.0;
+
+/// Meter je Pixel einer Zielkachel bei Zoom `z`.
+fn ziel_pixel(z: u8) -> f64 {
+    WELT / (ZIEL_PX as f64 * 2f64.powi(z as i32))
+}
+
+/// Meter je Pixel einer Stufe (x, y).
+fn stufen_pixel(k: &Kopf, stufe: usize) -> (f64, f64) {
+    let voll = &k.stufen[0];
+    let s = &k.stufen[stufe];
+    (
+        k.pixel.0 * voll.breite as f64 / s.breite as f64,
+        k.pixel.1 * voll.hoehe as f64 / s.hoehe as f64,
+    )
+}
+
+/// Ausdehnung des Bildes in EPSG:3857: (west, sued, ost, nord).
+fn ausdehnung(k: &Kopf) -> (f64, f64, f64, f64) {
+    let voll = &k.stufen[0];
+    let (w, n) = k.ursprung;
+    (
+        w,
+        n - voll.hoehe as f64 * k.pixel.1,
+        w + voll.breite as f64 * k.pixel.0,
+        n,
+    )
+}
+
+/// Ausdehnung der Zielkachel in EPSG:3857: (west, sued, ost, nord).
+fn kachel_ausdehnung(z: u8, x: u32, y: u32) -> (f64, f64, f64, f64) {
+    let seite = WELT / 2f64.powi(z as i32);
+    let w = -WELT / 2.0 + x as f64 * seite;
+    let n = WELT / 2.0 - y as f64 * seite;
+    (w, n - seite, w + seite, n)
+}
+
+fn merc_nach_wgs84(x: f64, y: f64) -> (f64, f64) {
+    let r = 6_378_137.0;
+    (
+        (x / r).to_degrees(),
+        (y / r).sinh().atan().to_degrees(),
+    )
+}
+
+/// Umriss des Bildes in WGS84: `[west, sued, ost, nord]`.
+pub(crate) fn bounds_wgs84(k: &Kopf) -> [f64; 4] {
+    let (w, s, o, n) = ausdehnung(k);
+    let (w, s) = merc_nach_wgs84(w, s);
+    let (o, n) = merc_nach_wgs84(o, n);
+    [w, s, o, n]
+}
+
+/// `(min_zoom, max_zoom)`: ab `min_zoom` ist das Bild mindestens [`MIN_BILD_PX`] breit (und nie
+/// unter [`MIN_ZOOM_BACKEND`]); `max_zoom` ist der erste Zoom, dessen Zielkachel feiner als die
+/// Vollauflösung wäre. Darüber vergrößert MapLibre selbst.
+pub(crate) fn zoom_grenzen(k: &Kopf) -> (u8, u8) {
+    let breite_m = k.stufen[0].breite as f64 * k.pixel.0;
+    let max = (0..=MAX_ZOOM)
+        .find(|z| ziel_pixel(*z) < k.pixel.0)
+        .unwrap_or(MAX_ZOOM);
+    let min = (0..=MAX_ZOOM)
+        .find(|z| breite_m / ziel_pixel(*z) >= MIN_BILD_PX)
+        .unwrap_or(MAX_ZOOM)
+        .max(MIN_ZOOM_BACKEND);
+    (min.min(max), max)
+}
+
+/// Die gröbste Stufe, deren Pixel nicht gröber als die Zielkachel sind; sonst das Vollbild.
+pub(crate) fn waehle_stufe(k: &Kopf, z: u8) -> usize {
+    let ziel = ziel_pixel(z) * 1.0001; // Rundung der Übersichtsgrößen
+    (0..k.stufen.len())
+        .rev()
+        .find(|i| stufen_pixel(k, *i).0 <= ziel)
+        .unwrap_or(0)
+}
+
+/// Eine Quellkachel einer Stufe: Index in `offsets`, Spalte und Zeile im Kachelraster.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Quellkachel {
+    pub index: usize,
+    pub spalte: u32,
+    pub zeile: u32,
+}
+
+/// Schneidet die Zielkachel das Bild (Berührung zählt nicht)?
+pub(crate) fn kachel_im_bild(k: &Kopf, z: u8, x: u32, y: u32) -> bool {
+    if k.stufen.is_empty() {
+        return false;
+    }
+    let (bw, bs, bo, bn) = ausdehnung(k);
+    let (kw, ks, ko, kn) = kachel_ausdehnung(z, x, y);
+    kw < bo && ko > bw && ks < bn && kn > bs
+}
+
+/// Die Quellkacheln der Stufe, die die Zielkachel braucht; leer außerhalb des Bildes.
+pub(crate) fn quellkacheln(k: &Kopf, stufe: usize, z: u8, x: u32, y: u32) -> Vec<Quellkachel> {
+    if !kachel_im_bild(k, z, x, y) || stufe >= k.stufen.len() {
+        return Vec::new();
+    }
+    let s = &k.stufen[stufe];
+    let (px, py) = stufen_pixel(k, stufe);
+    let (kw, ks, ko, kn) = kachel_ausdehnung(z, x, y);
+    let spalte = |m: f64| ((m - k.ursprung.0) / px).floor();
+    let zeile = |m: f64| ((k.ursprung.1 - m) / py).floor();
+    // Pixelbereich der Kachel, auf das Bild geklemmt; das östliche/südliche Ende ist exklusiv.
+    let klemme = |v: f64, n: u32| v.clamp(0.0, n as f64 - 1.0) as u32;
+    let (x0, x1) = (klemme(spalte(kw), s.breite), klemme(spalte(ko - 1e-6), s.breite));
+    let (y0, y1) = (klemme(zeile(kn), s.hoehe), klemme(zeile(ks + 1e-6), s.hoehe));
+    let spalten = s.breite.div_ceil(s.kachel_breite);
+    let mut aus = Vec::new();
+    for zr in y0 / s.kachel_hoehe..=y1 / s.kachel_hoehe {
+        for sp in x0 / s.kachel_breite..=x1 / s.kachel_breite {
+            aus.push(Quellkachel {
+                index: (zr * spalten + sp) as usize,
+                spalte: sp,
+                zeile: zr,
+            });
+        }
+    }
+    aus
+}
+
 #[cfg(test)]
 pub(crate) mod test_cog {
     //! Schreibt kleine COGs für Tests: 32 × 32 px in 2 × 2 Kacheln zu 16 px, dazu eine Übersicht
@@ -720,6 +858,77 @@ mod tests {
             let k = fertig(&baue_test_cog(&o));
             assert!(k.nicht_darstellbar.is_some(), "{o:?}");
         }
+    }
+
+    /// Kachel (x, y) bei Zoom z, die einen Punkt in WGS84 enthält (Standardformel).
+    fn kachel_von(lon: f64, lat: f64, z: u8) -> (u32, u32) {
+        let n = 2f64.powi(z as i32);
+        let x = ((lon + 180.0) / 360.0 * n).floor() as u32;
+        let lat = lat.to_radians();
+        let y = ((1.0 - lat.tan().asinh() / std::f64::consts::PI) / 2.0 * n).floor() as u32;
+        (x, y)
+    }
+
+    #[test]
+    fn bounds_von_emsr728() {
+        let b = bounds_wgs84(&fertig(&ANFANG[..16384]));
+        for (ist, soll) in b.iter().zip([9.16098, 48.77665, 9.57230, 48.97974]) {
+            assert!((ist - soll).abs() < 1e-4, "{b:?}");
+        }
+    }
+
+    #[test]
+    fn abnahme_lagerichtig() {
+        let k = fertig(&ANFANG[..16384]);
+        let b = bounds_wgs84(&k);
+        // Die linke obere Ecke des Bildes liegt in Kachel 14/8608/5628, nach der Standardformel
+        // aus Länge und Breite gerechnet, nicht aus dem Code unter Test.
+        assert_eq!(kachel_von(b[0] + 1e-9, b[3] - 1e-9, 14), (8608, 5628));
+        assert!(kachel_im_bild(&k, 14, 8608, 5628));
+        assert!(!kachel_im_bild(&k, 14, 8607, 5628));
+        assert!(!kachel_im_bild(&k, 14, 8608, 5627));
+        // Die Quellkachel dazu ist die linke obere des Vollbilds.
+        let q = quellkacheln(&k, waehle_stufe(&k, 14), 14, 8608, 5628);
+        assert_eq!((q[0].spalte, q[0].zeile), (0, 0));
+    }
+
+    #[test]
+    fn stufe_je_zoom() {
+        let k = fertig(&ANFANG[..16384]);
+        assert_eq!(waehle_stufe(&k, 15), 0);
+        assert_eq!(waehle_stufe(&k, 13), 2);
+        assert_eq!(waehle_stufe(&k, 10), 5);
+        assert_eq!(waehle_stufe(&k, 3), 5);
+        assert_eq!(waehle_stufe(&k, 20), 0);
+    }
+
+    #[test]
+    fn zoom_grenzen_emsr728() {
+        assert_eq!(zoom_grenzen(&fertig(&ANFANG[..16384])), (10, 16));
+    }
+
+    #[test]
+    fn hoechstens_vier_quellkacheln() {
+        let k = fertig(&ANFANG[..16384]);
+        let b = bounds_wgs84(&k);
+        for z in 10..=16u8 {
+            let (x0, y0) = kachel_von(b[0], b[3], z);
+            let (x1, y1) = kachel_von(b[2], b[1], z);
+            for x in x0..=x1 {
+                for y in y0..=y1 {
+                    let q = quellkacheln(&k, waehle_stufe(&k, z), z, x, y);
+                    assert!(q.len() <= 4, "z {z} x {x} y {y}: {}", q.len());
+                    assert!(!q.is_empty(), "z {z} x {x} y {y} ohne Quellkachel");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ausserhalb_nicht_im_bild() {
+        let k = fertig(&ANFANG[..16384]);
+        assert!(!kachel_im_bild(&k, 14, 0, 0));
+        assert!(quellkacheln(&k, 0, 14, 0, 0).is_empty());
     }
 
     #[test]
