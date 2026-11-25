@@ -246,7 +246,13 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
 
     // Vorbedingung des Rollenzweigs: Hinweis steht, Schnellwahl gesperrt, keine Übernahme.
     await rechteHinweisSteht(page);
-    const schnellwahl = paneel(page, 'Termin').getByRole('button');
+    // Die Schnellwahl ohne „In Kalender übernehmen“: der Knopf ist bewusst nur an Lesen
+    // gebunden (LLH-1196, p133o8h2-Design), ein Beobachter darf den Termin exportieren.
+    const kalender = paneel(page, 'Termin').getByRole('button', { name: 'In Kalender übernehmen' });
+    await expect(kalender, 'Kalender-Export bleibt für Leser offen').toBeEnabled();
+    const schnellwahl = paneel(page, 'Termin')
+      .getByRole('button')
+      .filter({ hasNotText: 'In Kalender übernehmen' });
     for (const k of await schnellwahl.all()) {
       await expect(
         k,
