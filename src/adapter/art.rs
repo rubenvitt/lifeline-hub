@@ -246,7 +246,8 @@ pub fn has_neues_ziel(
 }
 
 /// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105),
-/// `veranstaltungen_abruf` (LLH-2097) und `smtp` (LLH-2093); Tests bringen ihre eigene mit.
+/// `veranstaltungen_abruf` (LLH-2097), `smtp` (LLH-2093) und `stammdaten_abruf`; Tests bringen
+/// ihre eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -269,6 +270,7 @@ impl Verzeichnis {
             Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
             Arc::new(super::smtp_art::SmtpArt::produktiv()),
+            Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
 
@@ -518,8 +520,9 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        let verzeichnis = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
-        assert!(verzeichnis.find("suchlage").is_some());
-        assert!(verzeichnis.find("smtp").is_some());
+        let produktiv = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
+        assert!(produktiv.find("suchlage").is_some());
+        assert!(produktiv.find("stammdaten_abruf").is_some());
+        assert!(produktiv.find("smtp").is_some());
     }
 }

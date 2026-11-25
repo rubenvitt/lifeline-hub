@@ -1,5 +1,11 @@
-import { apiUpload } from './client';
-import type { StammdatenEntscheidungen, StammdatenErgebnis, StammdatenVorschau } from './types';
+import { apiGet, apiSend, apiUpload } from './client';
+import type {
+  StammdatenEntscheidungen,
+  StammdatenErgebnis,
+  StammdatenSchnappschuss,
+  StammdatenSchnappschussListe,
+  StammdatenVorschau,
+} from './types';
 
 /**
  * Stammdaten einlesen (LLH-1633): Fahrzeuge, Personal und Qualifikationen aus einer CSV- oder
@@ -51,4 +57,36 @@ export function stammdatenEinlesen(
   return apiUpload<StammdatenErgebnis>(BASIS, einleseDaten(datei, herkunft, entscheidungen), {
     timeoutMs: EINLESEN_TIMEOUT_MS,
   });
+}
+
+/*
+ * Schnappschüsse des Stammdaten-Abrufs (LLH-1194): ein Adapter legt den abgeholten Stand ab, ein
+ * Admin prüft und übernimmt ihn mit derselben Vorschau wie die Datei. Ist der Schnappschuss
+ * inzwischen ersetzt oder übernommen, antwortet das Übernehmen mit 409.
+ */
+const SCHNAPPSCHUESSE = `${BASIS}/snapshots`;
+const schnappschussPfad = (id: string) => `${SCHNAPPSCHUESSE}/${encodeURIComponent(id)}`;
+
+/** Die offenen Schnappschüsse der Organisation (nur für Admins). */
+export async function listeSchnappschuesse(): Promise<StammdatenSchnappschuss[]> {
+  const r = await apiGet<StammdatenSchnappschussListe>(SCHNAPPSCHUESSE);
+  return r.schnappschuesse;
+}
+
+/** Vorschau auf dem Stand des Schnappschusses; nichts geschrieben. */
+export function schnappschussVorschau(
+  id: string,
+  entscheidungen: StammdatenEntscheidungen,
+): Promise<StammdatenVorschau> {
+  return apiSend<StammdatenVorschau>(`${schnappschussPfad(id)}/preview`, 'POST', {
+    entscheidungen,
+  });
+}
+
+/** Übernehmen des Schnappschusses mit derselben Wahl wie die letzte Vorschau. */
+export function schnappschussUebernehmen(
+  id: string,
+  entscheidungen: StammdatenEntscheidungen,
+): Promise<StammdatenErgebnis> {
+  return apiSend<StammdatenErgebnis>(schnappschussPfad(id), 'POST', { entscheidungen });
 }

@@ -193,6 +193,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "maschine_ereignis",
         "Ausgang an Fremdsysteme gilt an der Instanz, die ihn ausgibt (LLH-1655)",
     ),
+    (
+        "adapter_einsatz",
+        "Adapter samt Zugangsdaten hängen an einer Instanz; ihre Zuschaltung ebenso (LLH-2105)",
+    ),
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),

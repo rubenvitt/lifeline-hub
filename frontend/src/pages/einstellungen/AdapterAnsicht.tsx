@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Button, Input, Modal, Switch } from 'antd';
+import { App, Button, Input, Modal, Switch } from 'antd';
 import { ZahlFeld } from '../../components/ZahlFeld';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router';
@@ -38,6 +38,7 @@ import {
   haltAdapter,
   loadAdapterListe,
   loadAdapterVersuche,
+  resubmitAdapter,
   resumeAdapter,
   setGeheimnis,
   updateAdapter,
@@ -59,6 +60,10 @@ import {
   type HostWechsel,
 } from './adapterAnzeige';
 import { ADAPTER_LAN_WARNUNG, INTERVALL_MAX_S } from './AdapterPaneel';
+import SchnappschussHinweis from '../../stammdaten/SchnappschussHinweis';
+
+/** Art „Stammdaten-Abruf“ (LLH-1194): legt Schnappschüsse zum Prüfen an. */
+const STAMMDATEN_ABRUF = 'stammdaten_abruf';
 
 /** Formularwerte: Name, Intervall und je Einstellungsfeld `e_<name>` (flach für das Paneel). */
 type Werte = Record<string, unknown> & { name: string; intervall_s: number };
@@ -165,6 +170,13 @@ export default function AdapterAnsicht() {
       uebernimmAdapter(qc, a);
       setLanFrage(false);
     },
+  });
+  const { message } = App.useApp();
+  // „Erneut vorlegen“ (LLH-1194): sichtbar wird es erst beim nächsten Abruf, deshalb die Meldung.
+  const erneutVorlegen = useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (id: string) => resubmitAdapter(id),
+    onSuccess: () => message.success('Wird beim nächsten Abruf erneut zum Prüfen vorgelegt'),
   });
   const loeschen = useMutation({
     ...SOFORT_ODER_NIE,
@@ -303,7 +315,8 @@ export default function AdapterAnsicht() {
       : []),
   ];
 
-  const nebenFehler = pruefen.error ?? zustandWechsel.error ?? lan.error;
+  const nebenFehler = pruefen.error ?? zustandWechsel.error ?? lan.error ?? erneutVorlegen.error;
+  const istAbruf = adapter.art === STAMMDATEN_ABRUF;
 
   return (
     <AdminPage
@@ -337,6 +350,15 @@ export default function AdapterAnsicht() {
             >
               {angehalten ? 'Fortsetzen' : 'Anhalten'}
             </Button>
+            {istAbruf && (
+              <Button
+                disabled={gesperrt != null}
+                loading={erneutVorlegen.isPending}
+                onClick={() => erneutVorlegen.mutate(adapter.id)}
+              >
+                Erneut vorlegen
+              </Button>
+            )}
             <Button
               danger
               disabled={gesperrt != null}
@@ -375,6 +397,7 @@ export default function AdapterAnsicht() {
         </div>
       )}
       <Stapel abstand="md">
+        {istAbruf && <SchnappschussHinweis adapterId={adapter.id} />}
         <Paneel
           titel="Zustand"
           fuss={

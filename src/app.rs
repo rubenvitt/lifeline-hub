@@ -2189,6 +2189,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::adapter::check),
         )
         .route("/api/admin/adapter/{id}/pause", post(routes::adapter::halt))
+        // LLH-1194: Schnappschüsse des Stammdaten-Abrufs prüfen und übernehmen.
+        .route(
+            "/api/admin/adapter/{id}/resubmit",
+            post(routes::stammdaten_schnappschuss::resubmit),
+        )
+        .route(
+            "/api/master-data/import/snapshots",
+            get(routes::stammdaten_schnappschuss::list),
+        )
+        .route(
+            "/api/master-data/import/snapshots/{id}",
+            post(routes::stammdaten_schnappschuss::apply),
+        )
+        .route(
+            "/api/master-data/import/snapshots/{id}/preview",
+            post(routes::stammdaten_schnappschuss::preview),
+        )
         .route(
             "/api/admin/adapter/{id}/resume",
             post(routes::adapter::resume),

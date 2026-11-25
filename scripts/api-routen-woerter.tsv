@@ -277,6 +277,7 @@ reset	-
 resource-request	Nachforderung
 resource-requests	Nachforderungen
 restore	wiederherstellen
+resubmit	erneut vorlegen
 resume	fortsetzen
 resync	erneut abgleichen
 retention	Aufbewahrung
@@ -309,6 +310,7 @@ situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
+snapshots	Schnappschüsse
 sources	Quellen
 split	aufteilen
 sprite	-

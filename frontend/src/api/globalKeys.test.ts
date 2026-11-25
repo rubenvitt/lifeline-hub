@@ -43,6 +43,8 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     // Adapter, die der Hub selbst abruft (LLH-2018), und der Verlauf ihrer Abrufe je Adapter.
     expect(globalKeys.adapter()).toEqual(['adapter']);
     expect(globalKeys.adapterVersuche('a1')).toEqual(['adapter-versuche', 'a1']);
+    // Offene Schnappschüsse des Stammdaten-Abrufs (LLH-1194).
+    expect(globalKeys.stammdatenSchnappschuesse()).toEqual(['stammdaten-schnappschuesse']);
     // Seite des Lagebilds für Externe (LLH-1496), ohne den Schlüssel im Key.
     expect(globalKeys.lagebildExtern()).toEqual(['lagebild-extern']);
     expect(globalKeys.instanzkopplung()).toEqual(['instanzkopplung']);
@@ -183,10 +185,10 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     expect(globalKeys.fachebene('copernicus_bilder')).toEqual(['fachebene', 'copernicus_bilder']);
   });
 
-  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 53 Prefixe und keine Dubletten', () => {
+  it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 54 Prefixe und keine Dubletten', () => {
     const werte = Object.values(GLOBAL_KEYS);
-    expect(werte).toHaveLength(53);
-    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(53);
+    expect(werte).toHaveLength(54);
+    expect(new Set(werte).size, 'zwei Properties tragen denselben Wire-String').toBe(54);
   });
 
   it('kollidiert nicht mit den einsatz-scoped Prefixen', async () => {

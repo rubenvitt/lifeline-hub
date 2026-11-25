@@ -24,8 +24,10 @@ dependencyResolutionManagement {
 
 pluginManagement {
     repositories {
-        gradlePluginPortal()
+        // Spiegel zuerst, das Portal zuletzt: das Portal leitet Plugins, die auf Maven Central
+        // liegen (Kotlin), an `repo.maven.apache.org` weiter, und dort kam am 25.11.2026 „429“.
         maven("https://maven-central.storage-download.googleapis.com/maven2/") { name = "MavenCentralSpiegel" }
         mavenCentral()
+        gradlePluginPortal()
     }
 }
