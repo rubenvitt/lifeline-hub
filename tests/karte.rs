@@ -2972,8 +2972,22 @@ async fn copernicus_bilder_trennt_archiv_im_cache() {
 #[tokio::test]
 async fn copernicus_bildkachel_pruefungen_und_cache() {
     let karten_dir = lifeline_hub::db::test_karten_dir();
-    let app = app_mit(pool().await, karten_dir.clone());
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = app_mit(pool, karten_dir.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
     let pfad = |rest: &str| format!("/api/map/overlays/copernicus/images/{rest}");
+    // Wie die Proxy-Kacheln (LFH-1072): ohne Sitzung 401, bevor irgendetwas geprüft wird.
+    for rest in [
+        "0123456789abcdef/10/1/2",
+        "0123456789abcdef/25/0/0",
+        "zu-kurz/10/1/2",
+    ] {
+        let res = anfrage(&app, "GET", &pfad(rest), None, None).await;
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{rest}");
+    }
     for (rest, soll) in [
         ("0123456789abcdef/25/0/0", StatusCode::BAD_REQUEST),
         ("0123456789abcdef/10/1024/0", StatusCode::BAD_REQUEST),
@@ -2981,7 +2995,7 @@ async fn copernicus_bildkachel_pruefungen_und_cache() {
         ("zu-kurz/10/1/2", StatusCode::NOT_FOUND),
         ("..%2F..%2Fetc/10/1/2", StatusCode::NOT_FOUND),
     ] {
-        let res = anfrage(&app, "GET", &pfad(rest), None, None).await;
+        let res = anfrage(&app, "GET", &pfad(rest), Some(&cookie), None).await;
         assert_eq!(res.status(), soll, "{rest}");
     }
     let cache = lifeline_hub::karte::tile_cache::cache_oeffnen(&karten_dir)
@@ -2994,11 +3008,18 @@ async fn copernicus_bildkachel_pruefungen_und_cache() {
         "image/png",
     )
     .await;
-    let res = anfrage(&app, "GET", &pfad("0123456789abcdef/10/1/2"), None, None).await;
+    let res = anfrage(
+        &app,
+        "GET",
+        &pfad("0123456789abcdef/10/1/2"),
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(res.status(), StatusCode::OK);
     assert_eq!(res.headers()["content-type"], "image/png");
     assert_eq!(
         res.headers()["cache-control"],
-        "public, max-age=86400, immutable"
+        "private, max-age=86400, immutable"
     );
 }

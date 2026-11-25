@@ -218,6 +218,9 @@ fn bild_feature(
     };
     let mut props = serde_json::Map::new();
     props.insert("bild".into(), bild_kennung(&b.pfad).into());
+    // Der Pfad reist mit, damit eine Liste aus dem Cache verdrängte Köpfe neu anlegen kann
+    // ([`sorge_fuer_koepfe`]); er ist ein öffentlicher Pfad der Quelle.
+    props.insert("pfad".into(), b.pfad.clone().into());
     props.insert("emsr".into(), d.code.clone().into());
     props.insert("aktivierung".into(), d.name.clone().into());
     props.insert("gebiet".into(), g.name.clone().into());
@@ -245,6 +248,39 @@ fn bild_feature(
         },
         "properties": props,
     })
+}
+
+/// Legt für jedes Bild der Antwort den Kopf-Eintrag an, falls er fehlt: Der Kachel-Cache verdrängt
+/// nach LRU, die Liste kann aber noch bis zu `COPERNICUS_TTL` aus dem Fachebenen-Cache kommen. Ohne
+/// Kopf antwortete jede neue Kachel 404. Ein vorhandener Kopf zählt dabei für den LRU. Nur Pfade,
+/// die [`copernicus::check_bildpfad`] bestehen und zur Kennung passen.
+pub(crate) async fn sorge_fuer_koepfe<R, RFut>(
+    cache: &TileCache,
+    hole_bereich: &R,
+    antwort: &FachebeneAntwort,
+) where
+    R: Fn(String, u64, u64) -> RFut,
+    RFut: Future<Output = Result<Vec<u8>, String>>,
+{
+    let pfade: Vec<String> = antwort.features["features"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|f| {
+            let p = &f["properties"];
+            let pfad = p["pfad"].as_str()?;
+            (copernicus::check_bildpfad(pfad) && p["bild"].as_str() == Some(&bild_kennung(pfad)))
+                .then(|| pfad.to_string())
+        })
+        .take(MAX_BILDER)
+        .collect();
+    stream::iter(pfade)
+        .for_each_concurrent(PARALLEL, |pfad| async move {
+            if let Err(e) = load_kopf(cache, hole_bereich, &pfad).await {
+                tracing::warn!("Copernicus: {e}");
+            }
+        })
+        .await;
 }
 
 // ===== Liste als Route =====
@@ -288,6 +324,7 @@ pub async fn fetch_copernicus_bilder(
         }
     };
     let key = listen_schluessel(&bbox, archiv);
+    let kachel_cache_lesen = kachel_cache.clone();
     let (client, p, k) = (s.client.clone(), pool.clone(), key.clone());
     let antwort = quellen::liefere_geloest(
         pool,
@@ -319,7 +356,13 @@ pub async fn fetch_copernicus_bilder(
         },
     )
     .await;
-    Ok(antwort.unwrap_or_else(offline))
+    match antwort {
+        Some(a) => {
+            sorge_fuer_koepfe(&kachel_cache_lesen, &hole_bereich_s3, &a).await;
+            Ok(a)
+        }
+        None => Ok(offline()),
+    }
 }
 
 // ===== Kacheln =====
@@ -439,6 +482,12 @@ where
         }
         roh.push((q.index, bytes));
     }
+    // Entpacken und Rendern belegen Speicher und Rechenzeit; die Proxy-Grenze gilt nur für die
+    // Abrufe. Eine eigene Grenze hält gleichzeitige Läufe klein.
+    let _platz = render_grenze()
+        .acquire()
+        .await
+        .map_err(|_| KachelFehler::Quelle("Render-Grenze geschlossen".into()))?;
     let png = tokio::task::spawn_blocking(move || {
         let mut entpackt = HashMap::new();
         for (i, b) in roh {
@@ -451,6 +500,14 @@ where
     .map_err(|e| KachelFehler::Quelle(e.to_string()))?;
     tile_cache::schreibe_eintrag(cache, &schluessel, &png, "image/png").await;
     Ok(KachelAntwort::Png(png))
+}
+
+/// Höchstzahl gleichzeitiger Render-Läufe: je Lauf höchstens 4 entpackte Kacheln zu 1 MiB.
+const RENDER_PLAETZE: usize = 4;
+
+fn render_grenze() -> &'static tokio::sync::Semaphore {
+    static GRENZE: OnceLock<tokio::sync::Semaphore> = OnceLock::new();
+    GRENZE.get_or_init(|| tokio::sync::Semaphore::new(RENDER_PLAETZE))
 }
 
 /// Client für die Range-Abrufe: keine Weiterleitungen (der Host ist fest), eigene Frist.
@@ -469,17 +526,17 @@ fn s3_client() -> &'static reqwest::Client {
 /// einen Platz der Proxy-Grenze. Verlangt 206; ein 200 nur, wenn die ganze Datei in `laenge`
 /// passt.
 pub async fn hole_bereich_s3(url: String, start: u64, laenge: u64) -> Result<Vec<u8>, String> {
-    if !url.starts_with(EBENEN_BASIS) || laenge == 0 {
+    let Some(ende) = laenge.checked_sub(1).and_then(|l| start.checked_add(l)) else {
+        return Err(format!("unzulässiger Bereich für {url}"));
+    };
+    if !url.starts_with(EBENEN_BASIS) {
         return Err(format!("unzulässiger Abruf {url}"));
     }
     let _platz = proxy::abruf_platz(proxy::proxy_abruf_grenze())
         .map_err(|_| "Grenze gleichzeitiger Abrufe erreicht".to_string())?;
     let resp = s3_client()
         .get(&url)
-        .header(
-            reqwest::header::RANGE,
-            format!("bytes={start}-{}", start + laenge - 1),
-        )
+        .header(reqwest::header::RANGE, format!("bytes={start}-{ende}"))
         .send()
         .await
         .map_err(|e| format!("Abruf {url}: {}", e.without_url()))?;
@@ -838,6 +895,28 @@ mod tests {
             stufe,
             "je Quellkachel ein Abruf, nicht doppelt"
         );
+    }
+
+    #[tokio::test]
+    async fn verdraengte_koepfe_legt_die_liste_wieder_an() {
+        let (q, s3, cache) = (quelle(), S3::default(), tile_cache::test_cache().await);
+        let antwort = baue(&q, &s3, &cache, bogen(), MAX_BILDER).await.antwort;
+        let k = bild_kennung(BOGEN_BILD);
+        assert_eq!(props(&antwort)[0]["pfad"], BOGEN_BILD);
+        sqlx::query("DELETE FROM tile_cache WHERE schluessel = ?")
+            .bind(kopf_schluessel(&k))
+            .execute(&*cache)
+            .await
+            .unwrap();
+        sorge_fuer_koepfe(&cache, &s3.hole(), &antwort).await;
+        assert!(lies_kopf_eintrag(&cache, &k).await.is_some());
+        // Ein Pfad, der die Prüfung nicht besteht, wird nie geladen.
+        let mut boese = antwort.clone();
+        boese.features["features"][0]["properties"]["pfad"] = "../../x.tif".into();
+        boese.features["features"][0]["properties"]["bild"] = bild_kennung("../../x.tif").into();
+        let n = s3.anzahl();
+        sorge_fuer_koepfe(&cache, &s3.hole(), &boese).await;
+        assert_eq!(s3.anzahl(), n);
     }
 
     #[test]

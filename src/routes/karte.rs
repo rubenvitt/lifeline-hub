@@ -637,14 +637,17 @@ pub async fn copernicus_bilder(
     fachebene_antwort(&antwort, &headers)
 }
 
-/// Cache-Kopf einer Copernicus-Bildkachel: Pfad nennt Produkt und Version, das Bild ändert sich
-/// nicht.
-pub const COPERNICUS_KACHEL_CACHE_CONTROL: &str = "public, max-age=86400, immutable";
+/// Cache-Kopf einer Copernicus-Bildkachel: privat wie die Proxy-Kacheln (LFH-1072), nur Angemeldete
+/// bekommen sie; ein Tag, weil der Server Kopf und Kachel bis zur Verdrängung hält.
+pub const COPERNICUS_KACHEL_CACHE_CONTROL: &str = "private, max-age=86400, immutable";
 
 /// GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y} — PNG-Kachel eines Bildes
 /// (LLH-2021). Nur Kennungen aus der Bilderliste, nie Pfade: 404 sonst, 400 bei falscher Kachel,
 /// 204 ohne Inhalt, 502, wenn die Quelle fehlt und die Kachel nicht im Cache liegt.
 pub async fn copernicus_bild_kachel(
+    // Erstes Argument wie bei den Proxy-Routen: ohne Sitzung 401, bevor Kennung oder Kachel
+    // geprüft werden und bevor ein Abruf die Quelle erreicht.
+    _zugriff: KartenZugriff,
     State(state): State<AppState>,
     PfadParam((bild, z, x, y)): PfadParam<(String, i64, i64, i64)>,
 ) -> Result<Response, AppError> {

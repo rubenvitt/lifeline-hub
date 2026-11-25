@@ -275,6 +275,18 @@ pub(crate) fn parse_kopf(bytes: &[u8]) -> Result<KopfErgebnis, CogFehler> {
     baue_kopf(&l, &ifds).map(KopfErgebnis::Fertig)
 }
 
+/// Größte Kachelkante, die der Leser annimmt: bei 4 Kanälen 1 MiB je entpackter Kachel. GDAL
+/// schreibt COGs mit 512er-Blöcken; größere Kacheln ließen eine Quelle viel Speicher belegen.
+pub(crate) const MAX_KACHELKANTE: u32 = 512;
+
+/// Zahl der Kacheln einer Stufe, ohne Überlauf; `None`, wenn sie nicht in `u64` passt.
+pub(crate) fn soll_kacheln(breite: u64, hoehe: u64, kb: u64, kh: u64) -> Option<u64> {
+    if kb == 0 || kh == 0 {
+        return None;
+    }
+    breite.div_ceil(kb).checked_mul(hoehe.div_ceil(kh))
+}
+
 fn einzahl(l: &Leser, ifd: &Ifd, tag: u16) -> Option<u64> {
     ifd.get(&tag).and_then(|f| f.zahlen(l).first().copied())
 }
@@ -373,19 +385,24 @@ fn baue_kopf(l: &Leser, ifds: &[Ifd]) -> Result<Kopf, CogFehler> {
             ) else {
                 continue;
             };
-            if breite == 0 || hoehe == 0 || !(16..=4096).contains(&kb) || !(16..=4096).contains(&kh)
-            {
+            let kante = 16..=MAX_KACHELKANTE as u64;
+            let (Ok(breite32), Ok(hoehe32)) = (u32::try_from(breite), u32::try_from(hoehe)) else {
+                continue;
+            };
+            if breite == 0 || hoehe == 0 || !kante.contains(&kb) || !kante.contains(&kh) {
                 continue;
             }
             let offsets = ifd.get(&324).map(|f| f.zahlen(l)).unwrap_or_default();
             let laengen = ifd.get(&325).map(|f| f.zahlen(l)).unwrap_or_default();
-            let soll = breite.div_ceil(kb) * hoehe.div_ceil(kh);
+            let Some(soll) = soll_kacheln(breite, hoehe, kb, kh) else {
+                continue;
+            };
             if offsets.len() as u64 != soll || laengen.len() as u64 != soll {
                 continue;
             }
             stufen.push(Stufe {
-                breite: breite as u32,
-                hoehe: hoehe as u32,
+                breite: breite32,
+                hoehe: hoehe32,
                 kachel_breite: kb as u32,
                 kachel_hoehe: kh as u32,
                 offsets,
@@ -583,16 +600,7 @@ pub(crate) fn entpacke(k: &Kopf, stufe: usize, roh: &[u8]) -> Result<Vec<u8>, Co
                 .map_err(|e| CogFehler::Format(format!("Deflate: {e}")))?;
             aus
         }
-        Kompression::Lzw => {
-            let mut aus = weezl::decode::Decoder::with_tiff_size_switch(weezl::BitOrder::Msb, 8)
-                .decode(roh)
-                .map_err(|e| CogFehler::Format(format!("LZW: {e}")))?;
-            // Manche Schreiber hängen nach dem Ende-Code Füllbytes an.
-            if aus.len() > erwartet {
-                aus.truncate(erwartet);
-            }
-            aus
-        }
+        Kompression::Lzw => entpacke_lzw(roh, erwartet)?,
         Kompression::Jpeg => entpacke_jpeg(k, s, roh)?,
     };
     if px.len() != erwartet {
@@ -608,6 +616,36 @@ pub(crate) fn entpacke(k: &Kopf, stufe: usize, roh: &[u8]) -> Result<Vec<u8>, Co
     Ok(px)
 }
 
+/// LZW in Stücken, höchstens `erwartet` Bytes: Eine Kachel aus langen Wiederholungen bläht sich
+/// sonst auf Gigabytes auf. Manche Schreiber hängen nach dem Ende-Code Füllbytes an; was über
+/// `erwartet` hinausginge, wird nicht mehr entpackt.
+fn entpacke_lzw(roh: &[u8], erwartet: usize) -> Result<Vec<u8>, CogFehler> {
+    let mut dec = weezl::decode::Decoder::with_tiff_size_switch(weezl::BitOrder::Msb, 8);
+    let mut aus = vec![0u8; erwartet];
+    let (mut rein, mut raus) = (0usize, 0usize);
+    while raus < erwartet {
+        let r = dec.decode_bytes(&roh[rein..], &mut aus[raus..]);
+        rein += r.consumed_in;
+        raus += r.consumed_out;
+        match r.status {
+            Ok(weezl::LzwStatus::Ok) if r.consumed_in == 0 && r.consumed_out == 0 => break,
+            Ok(weezl::LzwStatus::Ok) => {}
+            Ok(weezl::LzwStatus::Done) | Ok(weezl::LzwStatus::NoProgress) => break,
+            Err(e) => return Err(CogFehler::Format(format!("LZW: {e}"))),
+        }
+    }
+    // Mehr Daten als eine Kachel: kein stilles Abschneiden einer Bombe.
+    if raus == erwartet && rein < roh.len() {
+        let mut probe = [0u8; 1];
+        let r = dec.decode_bytes(&roh[rein..], &mut probe);
+        if r.consumed_out > 0 {
+            return Err(CogFehler::Format("LZW-Kachel größer als erwartet".into()));
+        }
+    }
+    aus.truncate(raus);
+    Ok(aus)
+}
+
 /// JPEG-Kachel: Die gemeinsamen Tabellen (Tag 347) stehen ohne Bildende vor den Daten der
 /// Kachel ohne deren Bildanfang.
 fn entpacke_jpeg(k: &Kopf, s: &Stufe, roh: &[u8]) -> Result<Vec<u8>, CogFehler> {
@@ -619,7 +657,16 @@ fn entpacke_jpeg(k: &Kopf, s: &Stufe, roh: &[u8]) -> Result<Vec<u8>, CogFehler> 
         }
         _ => roh.to_vec(),
     };
-    let bild = image::load_from_memory_with_format(&daten, image::ImageFormat::Jpeg)
+    // Größe vor dem Dekodieren begrenzen: der Kopf des JPEG kommt von außen.
+    let mut leser =
+        image::ImageReader::with_format(std::io::Cursor::new(&daten), image::ImageFormat::Jpeg);
+    let mut grenzen = image::Limits::default();
+    grenzen.max_image_width = Some(s.kachel_breite);
+    grenzen.max_image_height = Some(s.kachel_hoehe);
+    grenzen.max_alloc = Some(4 * u64::from(MAX_KACHELKANTE) * u64::from(MAX_KACHELKANTE) * 4);
+    leser.limits(grenzen);
+    let bild = leser
+        .decode()
         .map_err(|e| CogFehler::Format(format!("JPEG: {e}")))?;
     if (bild.width(), bild.height()) != (s.kachel_breite, s.kachel_hoehe) {
         return Err(CogFehler::Format("JPEG-Kachel in falscher Größe".into()));
@@ -715,6 +762,8 @@ pub(crate) mod test_cog {
         /// Ursprung (EPSG:3857) und Meter je Pixel.
         pub ursprung: (f64, f64),
         pub pixel: f64,
+        /// Kantenlänge einer Kachel; das Vollbild hat 2 × 2 Kacheln.
+        pub kachel: u32,
     }
 
     impl Default for TestCog {
@@ -729,6 +778,7 @@ pub(crate) mod test_cog {
                 praediktor: 2,
                 ursprung: (1_000_000.0, 6_000_000.0),
                 pixel: 10.0,
+                kachel: 16,
             }
         }
     }
@@ -743,8 +793,6 @@ pub(crate) mod test_cog {
             (1 + (x * 7 + y * 3 + c as u32 * 50 + stufe as u32 * 100) % 250) as u8
         }
     }
-
-    const KACHEL: u32 = 16;
 
     fn kodiere(o: &TestCog, roh: &[u8]) -> Vec<u8> {
         match o.kompression {
@@ -766,16 +814,17 @@ pub(crate) mod test_cog {
 
     fn kachel(o: &TestCog, stufe: usize, kx: u32, ky: u32) -> Vec<u8> {
         let k = o.kanaele as usize;
-        let mut roh = Vec::with_capacity((KACHEL * KACHEL) as usize * k);
-        for y in 0..KACHEL {
-            for x in 0..KACHEL {
+        let kachel = o.kachel;
+        let mut roh = Vec::with_capacity((kachel * kachel) as usize * k);
+        for y in 0..kachel {
+            for x in 0..kachel {
                 for c in 0..o.kanaele {
-                    roh.push(TestCog::pixel(stufe, kx * KACHEL + x, ky * KACHEL + y, c));
+                    roh.push(TestCog::pixel(stufe, kx * kachel + x, ky * kachel + y, c));
                 }
             }
         }
         if o.praediktor == 2 {
-            for zeile in roh.chunks_mut(KACHEL as usize * k) {
+            for zeile in roh.chunks_mut(kachel as usize * k) {
                 for i in (k..zeile.len()).rev() {
                     zeile[i] = zeile[i].wrapping_sub(zeile[i - k]);
                 }
@@ -841,7 +890,7 @@ pub(crate) mod test_cog {
         };
         let mut ifds: Vec<Vec<Eintrag>> = Vec::new();
         for (stufe, (offs, lens)) in stufen_offsets.iter().enumerate() {
-            let groesse = 32 >> stufe;
+            let groesse = (2 * o.kachel) >> stufe;
             let mut e = vec![
                 lang(256, &[groesse]),
                 lang(257, &[groesse]),
@@ -858,8 +907,8 @@ pub(crate) mod test_cog {
             }
             if o.gekachelt {
                 e.extend([
-                    kurz(322, &[KACHEL as u16]),
-                    kurz(323, &[KACHEL as u16]),
+                    kurz(322, &[o.kachel as u16]),
+                    kurz(323, &[o.kachel as u16]),
                     lang(324, offs),
                     lang(325, lens),
                 ]);
@@ -1256,6 +1305,69 @@ mod tests {
         let png = rendere_kachel(&k, 14, x, y, &Default::default()).unwrap();
         let leer = image::load_from_memory(&png).unwrap().to_rgba8();
         assert!(leer.pixels().all(|p| p[3] == 0));
+    }
+
+    // ===== Grenzen gegen bösartige Quellen (Review LLH-2021) =====
+
+    #[test]
+    fn lzw_bombe_wird_abgelehnt() {
+        let daten = baue_test_cog(&TestCog {
+            kompression: Kompression::Lzw,
+            ..TestCog::default()
+        });
+        let k = fertig(&daten);
+        // 64 MiB Nullen packen sich auf wenige hundert KiB; entpackt werden dürfen 768 Bytes.
+        let bombe = weezl::encode::Encoder::with_tiff_size_switch(weezl::BitOrder::Msb, 8)
+            .encode(&vec![0u8; 64 * 1024 * 1024])
+            .unwrap();
+        assert!(bombe.len() as u64 <= QUELLKACHEL_MAX);
+        assert!(entpacke(&k, 0, &bombe).is_err());
+    }
+
+    #[test]
+    fn kachel_ueber_512_ist_nicht_darstellbar() {
+        // Grau mit Prädiktor packt sich klein genug, dass der Kopf unter `KOPF_MAX` liegt.
+        let k = fertig(&baue_test_cog(&TestCog {
+            kachel: 1024,
+            kanaele: 1,
+            ..TestCog::default()
+        }));
+        assert!(k.nicht_darstellbar.is_some(), "{:?}", k.nicht_darstellbar);
+        let k = fertig(&baue_test_cog(&TestCog {
+            kachel: 512,
+            kanaele: 1,
+            ..TestCog::default()
+        }));
+        assert_eq!(k.nicht_darstellbar, None);
+    }
+
+    fn jpeg(breite: u32, hoehe: u32) -> Vec<u8> {
+        let bild = image::RgbImage::from_fn(breite, hoehe, |x, y| {
+            image::Rgb([(x % 28) as u8 * 9, (y % 28) as u8 * 9, 200])
+        });
+        let mut aus = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new(&mut aus)
+            .encode_image(&bild)
+            .unwrap();
+        aus
+    }
+
+    #[test]
+    fn jpeg_kachel_wird_entpackt_und_falsche_groesse_abgelehnt() {
+        let mut k = fertig(&baue_test_cog(&TestCog::default()));
+        k.kompression = Kompression::Jpeg;
+        k.praediktor = 1;
+        let px = entpacke(&k, 0, &jpeg(16, 16)).unwrap();
+        assert_eq!(px.len(), 16 * 16 * 3);
+        assert!(entpacke(&k, 0, &jpeg(32, 32)).is_err());
+        assert!(entpacke(&k, 0, &jpeg(4000, 4000)).is_err());
+    }
+
+    #[test]
+    fn kachelzahl_laeuft_nicht_ueber() {
+        assert_eq!(soll_kacheln(1000, 1000, 512, 512), Some(4));
+        assert_eq!(soll_kacheln(u64::MAX, u64::MAX, 16, 16), None);
+        assert_eq!(soll_kacheln(10, 10, 0, 16), None);
     }
 
     #[test]

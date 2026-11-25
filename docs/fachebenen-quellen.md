@@ -572,10 +572,12 @@ Dateinamen). Die Ebene `copernicus_bilder` zeigt sie als Kacheln des eigenen Ser
   Fachebene; je Bild Umriss, Kennung (16 Hex-Zeichen von SHA-256 über den Pfad), Zoomgrenzen und
   `darstellbar`. Höchstens 20 Bilder (`MAX_BILDER`), darüber `gekuerzt`.
 - **Kacheln:** `GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}`, PNG 256 px,
-  `Cache-Control: public, max-age=86400, immutable`. Der Server liest per HTTP-Range erst 16 KiB
+  nur mit Sitzung (`KartenZugriff`), `Cache-Control: private, max-age=86400, immutable`. Der Server liest per HTTP-Range erst 16 KiB
   Kopf (höchstens 1 MiB in bis zu 8 Runden), dann je Zielkachel höchstens 4 Quellkacheln der
-  passenden Übersicht (je höchstens 2 MiB). Kopf und Kacheln liegen im Kachel-Cache (256 MiB, LRU).
-- **Nur EPSG:3857:** Gelesen werden gekachelte 8-Bit-Bilder mit 1, 3 oder 4 Kanälen, Deflate, LZW,
+  passenden Übersicht (je höchstens 2 MiB komprimiert, entpackt nie mehr als eine Kachel; höchstens
+  4 Render-Läufe gleichzeitig). Kopf und Kacheln liegen im Kachel-Cache (256 MiB, LRU); jede
+  Listenantwort legt verdrängte Köpfe neu an.
+- **Nur EPSG:3857:** Gelesen werden gekachelte 8-Bit-Bilder mit höchstens 512 px Kachelkante mit 1, 3 oder 4 Kanälen, Deflate, LZW,
   JPEG oder unkomprimiert, Prädiktor 1 oder 2. Anderes heißt „nicht darstellbar“, nie umprojiziert.
 - **Fehler:** unbekannte Kennung 404, falsche Kachel 400, außerhalb des Bildes oder unter dem
   Mindest-Zoom 204, Quelle weg und Kachel nicht im Cache 502.

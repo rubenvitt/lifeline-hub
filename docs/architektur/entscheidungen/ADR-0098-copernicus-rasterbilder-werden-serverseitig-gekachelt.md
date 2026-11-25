@@ -26,6 +26,8 @@ herleitung:
 - MUST: Gezeigt werden nur die Bilder der Produkte, die `select_produkte` für die Vektorebene wählt.
 - MUST NOT: Ein Bild außerhalb von EPSG:3857 oder mit gedrehter Georeferenz wird nicht umprojiziert,
   sondern als „nicht darstellbar“ gelistet.
+- MUST: Die Kachelroute verlangt `KartenZugriff` wie die Proxy-Kacheln (LFH-1072) und sendet nur
+  privates `Cache-Control`.
 - SHOULD: Kopf und gerenderte Kacheln liegen im Kachel-Cache (`tile_cache`), nicht im
   Fachebenen-Cache, damit sie dessen 48-h-Aufräumen überstehen.
 
@@ -39,6 +41,7 @@ verlange 'starts_with\(EBENEN_BASIS\)' 'src/karte/copernicus_bilder.rs'
 verlange 'copernicus::select_im_ausschnitt' 'src/karte/copernicus_bilder.rs'
 verlange 'nicht in Web-Mercator' 'src/karte/cog.rs'
 verlange 'tile_cache::schreibe_eintrag' 'src/karte/copernicus_bilder.rs'
+verlange 'COPERNICUS_KACHEL_CACHE_CONTROL: &str = "private' 'src/routes/karte.rs'
 verbiete '^proj' 'Cargo.toml'
 ```
 
