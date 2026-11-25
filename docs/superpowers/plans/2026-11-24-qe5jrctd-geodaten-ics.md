@@ -487,7 +487,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - Layer-IDs `fremdebene-<id>-flaeche|linie|punkt|text`, eingefügt vor dem ersten eigenen Lage-Layer;
   - `useFremdebenen(einsatzId)` mit Liste, sichtbaren IDs, `toggle(id)` und Daten-Queries; für URL-Ebenen `refetchInterval: 60_000`, nur wenn sichtbar und `document.visibilityState === 'visible'`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Layer: vier Layer mit der Ebenenfarbe, das Entfernen räumt alle auf, das Neuanlegen nach Stilwechsel klappt (`reAnlegenAlles`-Weg).
   - Zeilen:
     - `role="switch"` mit dem Namen;
@@ -495,8 +495,8 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
     - mit `error` zeigt sie den Warnhinweis mit dem Text aus `FREMDEBENE_FEHLERTEXT`;
     - das ⋮-Menü hat „Umbenennen“, „Farbe“, „Entfernen“ (nicht rot), nur mit Schreibrecht.
   - Legende: Eine sichtbare Fremdebene erscheint mit Name und Farbe.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen; ein Klick auf ein Objekt öffnet `KartenDetailCard` nur zum Lesen mit `name`, `description`, Ebenenname und „Fremde Daten“. **Step 4:** vitest → PASS; `tsc --noEmit` ok.
-- [ ] **Step 5:** Commit `feat: Fremdebenen auf der Lagekarte zeigen` (Zunder B).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen; ein Klick auf ein Objekt öffnet `KartenDetailCard` nur zum Lesen mit `name`, `description`, Ebenenname und „Fremde Daten“. **Step 4:** vitest → PASS; `tsc --noEmit` ok.
+- [x] **Step 5:** Commit `feat: Fremdebenen auf der Lagekarte zeigen` (Zunder B).
 
 ### Task 18: Dialog „Fremdebene hinzufügen“
 

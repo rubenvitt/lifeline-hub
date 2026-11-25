@@ -17,6 +17,7 @@ import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
 import FachebeneStand from './FachebeneStand';
+import FremdebenenZeilen from './FremdebenenZeilen';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import Klassenlegende from './Klassenlegende';
 import { KlappPaneel, LeistenAbschnitt } from './KlappPaneel';
@@ -32,14 +33,11 @@ import {
   type EbenenZeile,
   type GruppenZustand,
 } from './leistenDaten';
-import { FehlerSlot, ebenenZeileStil } from './leistenTeile';
+import { FARBFELD, Farbfeld, FehlerSlot, ebenenZeileStil } from './leistenTeile';
 import { useBaumKlapp } from './leistenWahl';
 import Sichtungslegende from './Sichtungslegende';
 import type { KartenThemeWahl } from './basemapStil';
 import type { SidebarProps } from './Sidebar';
-
-/** Kantenlänge des Farbfelds einer Ebenen-Zeile (Neuentwurf S5). */
-const FARBFELD = 14;
 
 /**
  * Eine Zeile einer eigenen Ebene: Farbfeld · Name · Anzahl; Klick schaltet die Ebene.
@@ -90,26 +88,6 @@ function EbenenZeilenKnopf({
       {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
       <span style={{ ...monoStil('monoFein'), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
-  );
-}
-
-/** Das Farbfeld einer Zeile: gefüllt an, leer aus — der zweite Kanal neben `aria-checked`. */
-function Farbfeld({ an, farbe }: { an: boolean; farbe: string }) {
-  const { rollen } = useRollen();
-  return (
-    <span
-      aria-hidden="true"
-      data-lfh="ebenen-farbfeld"
-      style={{
-        width: FARBFELD,
-        height: FARBFELD,
-        flex: `0 0 ${FARBFELD}px`,
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: an ? farbe : rollen.steuerRahmen,
-        background: an ? `color-mix(in srgb, ${farbe} 55%, transparent)` : 'transparent',
-      }}
-    />
   );
 }
 
@@ -411,10 +389,18 @@ export default function Ebenenbaum(props: SidebarProps) {
   const bilderFehler = sektionFehler.bilder != null;
   const hintergrundTreffer = grundlageTreffer || bilderTreffer;
 
+  // Fremdebenen (LLH-2099): eine eigene Gruppe neben dem Hintergrund, nur wenn es welche gibt
+  // (hinzugefügt wird über „Weitere Aktionen zur Lagekarte“). Ein Fehler-Slot steht offen.
+  const fremd = props.fremdebenen;
+  const fremdFehler = sektionFehler.fremdebenen != null;
+  const fremdListe = fremd ? filtereGruppe(suche, ['Fremdebenen'], fremd.ebenen) : [];
+  const fremdTreffer = fremd != null && (fremdListe.length > 0 || (fremdFehler && !suche));
+
   const keinTreffer =
     suche !== '' &&
     !eigene.some((g) => g.treffer.length > 0) &&
     !fachTreffer &&
+    !fremdTreffer &&
     !hintergrundTreffer;
 
   const schalteGruppe = (
@@ -582,6 +568,22 @@ export default function Ebenenbaum(props: SidebarProps) {
               </KlappPaneel>
             ),
           )}
+        </KlappPaneel>
+      )}
+
+      {fremd && fremdTreffer && (
+        <KlappPaneel
+          titel="Fremdebenen"
+          kennung="fremdebenen"
+          meta={fremd.sichtbar.size > 0 ? `${fremd.sichtbar.size} an` : undefined}
+          offen={istOffen('fremdebenen') || fremdFehler}
+          onUmschalten={umschalten('fremdebenen')}
+          polster={false}
+        >
+          <FehlerSlot fehler={sektionFehler.fremdebenen} />
+          <div role="group" aria-label="Fremdebenen">
+            <FremdebenenZeilen {...fremd} ebenen={fremdListe} darfSchreiben={darfSchreiben} />
+          </div>
         </KlappPaneel>
       )}
 

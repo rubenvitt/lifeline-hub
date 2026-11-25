@@ -23,6 +23,7 @@ import EscKappe from './EscKappe';
 import { zielSchluessel, type ObjektEintrag } from './objektsuche';
 import type { LatLon } from '../../anzeige/koordinaten';
 import type { Hintergrundbild } from '../../api/kartenbilder';
+import type { FremdebenenZeilenProps } from './FremdebenenZeilen';
 import type { UploadFortschritt } from '../../api/client';
 import type { KartenAnsicht } from '../../api/types';
 import type { KartenGrund } from './useKartenFehler';
@@ -160,6 +161,8 @@ export interface SidebarSektionFehler {
   nichtVerortet?: SektionFehler;
   /** Eigene Query: `useKartenbilder`. */
   bilder?: SektionFehler;
+  /** Eigene Query: `useFremdebenen` (LLH-2099). */
+  fremdebenen?: SektionFehler;
   /** Eigene Query: `useKartenAnsicht`. Ohne diesen Slot rendert der Switcher bei Fehler nichts. */
   ansichten?: SektionFehler;
 }
@@ -299,6 +302,11 @@ export interface SidebarProps {
    * die Karte gehaltene Daten zeichnet (`useFachebenen`).
    */
   fachebenenAbgerufen?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, string>>;
+  /**
+   * Fremdebenen (LLH-2099) aus `useFremdebenen`: Liste, Sichtbarkeit je Arbeitsplatz und die
+   * Schreibwege des ⋮. Ohne Angabe (gesicherter Stand) keine Gruppe.
+   */
+  fremdebenen?: Omit<FremdebenenZeilenProps, 'darfSchreiben'>;
   /** Bild-Hintergründe */
   bilder: Hintergrundbild[];
   onBildUpload: (datei: File) => void;

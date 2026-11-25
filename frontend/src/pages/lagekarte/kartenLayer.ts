@@ -7,6 +7,7 @@ import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection } from '../../api/fachebenen';
 import type { Warnstufe, ZoneTyp } from '../../api/types';
 import { synchronisiereBildLayer, type BildOverlay } from './bildLayer';
+import { sorgeFuerFremdebeneLayer, type AktiveFremdebene } from './fremdebenenLayer';
 import { deckkraftImFokus, reAnlegenMarker, type MarkerFeatureCollection } from './markerLayer';
 import { farbenDunkel } from '../../theme/tokens';
 import { plakettenBildId, plakettenSchrift, zonenPlakette, type Plakette } from './plakette';
@@ -243,6 +244,7 @@ export function reAnlegenAlles(
   bilder: BildOverlay[] = [],
   marker?: MarkerFeatureCollection,
   einsatzort?: MarkerFeatureCollection,
+  fremdebenen: AktiveFremdebene[] = [],
 ) {
   // Bilder zuerst, ohne beforeId (abschnitte-fill gibt es noch nicht); Abschnitte und Zonen legen
   // sich danach darüber.
@@ -251,6 +253,8 @@ export function reAnlegenAlles(
   (map.getSource('abschnitte') as GeoJSONSource | undefined)?.setData(flaechen as never);
   sorgeFuerZonenLayer(map, zonen);
   (map.getSource('zonen') as GeoJSONSource | undefined)?.setData(zonen as never);
+  // Fremdebenen (LLH-2099) legen sich vor `abschnitte-fill`: über die Bilder, unter die eigenen.
+  for (const fr of fremdebenen) sorgeFuerFremdebeneLayer(map, fr.id, fr.daten, fr.farbe);
   for (const fe of fachebenen) {
     sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
     setzeFachebeneDaten(map, fe.def.key, fe.daten);
@@ -273,6 +277,7 @@ export function planeReAnlegenNachStyle(
   getBilder: () => BildOverlay[] = () => [],
   getMarker?: () => MarkerFeatureCollection,
   getEinsatzort?: () => MarkerFeatureCollection,
+  getFremdebenen: () => AktiveFremdebene[] = () => [],
 ) {
   wendeKartenDatenAn(map, 'stil-neuaufbau', () =>
     reAnlegenAlles(
@@ -283,6 +288,7 @@ export function planeReAnlegenNachStyle(
       getBilder(),
       getMarker?.(),
       getEinsatzort?.(),
+      getFremdebenen(),
     ),
   );
 }

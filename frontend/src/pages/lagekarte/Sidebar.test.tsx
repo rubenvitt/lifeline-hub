@@ -1795,3 +1795,48 @@ describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
     erwarteBrowsermenue(namensteil());
   });
 });
+
+describe('Sidebar · Fremdebenen (LLH-2099)', () => {
+  const fremd = {
+    ebenen: [
+      {
+        id: 4,
+        name: 'Lage Nachbarkreis',
+        color: 'fremd-1',
+        source: 'datei' as const,
+        feature_count: 2,
+        dropped_count: 0,
+        created_at: '2026-11-24T10:00:00Z',
+      },
+    ],
+    sichtbar: new Set([4]),
+    onToggle: vi.fn(),
+    onUmbenennen: vi.fn(),
+    onFarbe: vi.fn(),
+    onEntfernen: vi.fn(),
+  };
+
+  it('steht als eigene Gruppe im Baum, die Zeile ist der Schalter', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} fremdebenen={fremd} />);
+    expect(screen.getByRole('button', { name: /^Fremdebenen/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    const gruppe = screen.getByRole('group', { name: 'Fremdebenen' });
+    expect(within(gruppe).getByRole('switch', { name: 'Lage Nachbarkreis' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('ohne Fremdebenen keine Gruppe; „Ebene suchen“ findet sie', async () => {
+    const { unmount } = renderMitProviders(
+      <Sidebar {...ebenenProps} fremdebenen={{ ...fremd, ebenen: [] }} />,
+    );
+    expect(screen.queryByRole('group', { name: 'Fremdebenen' })).toBeNull();
+    unmount();
+    renderMitProviders(<Sidebar {...ebenenProps} fremdebenen={fremd} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Ebene suchen' }), 'Nachbar');
+    expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toBeInTheDocument();
+  });
+});

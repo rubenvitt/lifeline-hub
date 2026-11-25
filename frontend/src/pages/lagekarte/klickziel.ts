@@ -56,6 +56,10 @@ export function ordneKlickebene(layerId: string): Klickebene | null {
   // (`-kante`, `-buendel-kante`) sind Kontur und bleiben ohne Rolle.
   if (/^fachebene-.+-treffer$/.test(layerId)) return 'fachebeneTreffer';
   if (/^fachebene-.+-fill$/.test(layerId)) return 'fachebeneFlaeche';
+  // Fremdebenen (LLH-2099, `fremdebenenLayer.ts`) ordnen sich wie Fachebenen ein: Punkt und Linie
+  // sind schmale Ziele, die Fläche wählt bei Überlagerung das Menü; die Beschriftung zählt nicht.
+  if (/^fremdebene-\d+-(punkt|linie)$/.test(layerId)) return 'fachebene';
+  if (/^fremdebene-\d+-flaeche$/.test(layerId)) return 'fachebeneFlaeche';
   return null;
 }
 
