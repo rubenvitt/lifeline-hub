@@ -68,14 +68,20 @@ export default function TerminPaneel({
   // Nur Lesen: der Export schreibt nichts, deshalb weder `darfSchreiben` noch `isGesperrt`.
   // `networkMode: 'always'` wie `useCsvExport`: ohne Netz scheitert er sofort sichtbar, statt zu
   // pausieren und später ungefragt nachzulaufen.
+  // Der Einsatz reist in den `variables` mit: ein Fehler gilt nur am Einsatz, für den er entstand
+  // (`frontend/AGENTS.md`, „Ein Wechsel von Einsatz … räumt die Gründe“). Der Dateiname trägt die
+  // Terminzeit (lokal), nicht die Uhrzeit des Klicks: zwei Termine ergeben zwei Dateien.
   const kalender = useMutation({
     networkMode: 'always',
-    mutationFn: async () => {
-      const datei = await fetchLagebesprechungIcs(einsatzId);
-      speichereDatei(datei, exportDateiname('lagebesprechung', einsatzId, 'ics'));
+    mutationFn: async ({ einsatz, terminZeit }: { einsatz: number; terminZeit: Date }) => {
+      const datei = await fetchLagebesprechungIcs(einsatz);
+      speichereDatei(datei, exportDateiname('lagebesprechung', einsatz, 'ics', terminZeit));
     },
   });
+  const kalenderHier = kalender.variables?.einsatz === einsatzId;
+  const terminZeit = terminZeitpunkt(termin)?.toDate() ?? null;
   const isGesperrt = !darfSchreiben || stand == null || mutation.isPending;
+  const keinTermin = stand != null && !termin;
   const setTermin = (zeitpunkt: Dayjs | null) =>
     mutation.mutate(zeitpunkt ? alsBackendZeit(zeitpunkt) : null);
 
@@ -130,14 +136,17 @@ export default function TerminPaneel({
         </Flex>
         <Flex align="center" gap={token.marginXS} wrap>
           <Button
-            disabled={!termin || kalender.isPending}
-            loading={kalender.isPending}
-            aria-describedby={termin ? undefined : kalenderGrundId}
-            onClick={() => kalender.mutate()}
+            disabled={terminZeit == null || (kalenderHier && kalender.isPending)}
+            loading={kalenderHier && kalender.isPending}
+            aria-describedby={keinTermin ? kalenderGrundId : undefined}
+            onClick={() => {
+              if (terminZeit) kalender.mutate({ einsatz: einsatzId, terminZeit });
+            }}
           >
             In Kalender übernehmen
           </Button>
-          {!termin && (
+          {/* Der Grund erst mit geladenem Stand: solange er lädt, stimmt „Kein Termin“ nicht. */}
+          {keinTermin && (
             <Typography.Text id={kalenderGrundId} type="secondary">
               Kein Termin
             </Typography.Text>
@@ -145,7 +154,7 @@ export default function TerminPaneel({
         </Flex>
         <SpeicherFehler fehler={mutation.error} titel="Termin nicht gesetzt" />
         <SpeicherFehler
-          fehler={kalender.error}
+          fehler={kalenderHier ? kalender.error : null}
           titel="Nicht übernommen"
           fallback="Keine Verbindung zum Server"
         />

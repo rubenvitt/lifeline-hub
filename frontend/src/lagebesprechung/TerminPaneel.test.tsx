@@ -220,8 +220,35 @@ describe('TerminPaneel · In Kalender übernehmen', () => {
     await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
     await waitFor(() => expect(gespeichert).toHaveBeenCalledTimes(1));
     const [datei, name] = gespeichert.mock.calls[0] as [Blob, string];
-    expect(name).toMatch(/^lagebesprechung-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.ics$/);
+    // Der Name trägt die Terminzeit (lokal), nicht die Uhrzeit des Klicks.
+    const termin = dayjs(JETZT).add(45, 'minute');
+    expect(name).toBe(`lagebesprechung-einsatz-1-${termin.format('YYYY-MM-DD-HHmm')}.ics`);
     expect(await datei.text()).toContain('BEGIN:VCALENDAR');
+  });
+
+  it('solange der Stand lädt, steht kein „Kein Termin“ am Knopf', () => {
+    // `zeige(undefined)` griffe den Vorgabewert; der ladende Stand ist wirklich `undefined`.
+    renderMitProviders(
+      <TerminPaneel einsatzId={1} stand={undefined} zustand="laden" darfSchreiben />,
+    );
+    const p = screen.getByRole('region', { name: 'Termin' });
+    expect(within(p).getByRole('button', { name: /In Kalender übernehmen/ })).toBeDisabled();
+    expect(within(p).queryByText('Kein Termin')).not.toBeInTheDocument();
+  });
+
+  it('ein Einsatzwechsel räumt „Nicht übernommen“ des alten Einsatzes', async () => {
+    server.use(http.get('/api/incidents/1/briefing/schedule/export', () => HttpResponse.error()));
+    const mitTermin = stand({ naechste_lagebesprechung_at: wireAb(45) });
+    const { rerender } = renderMitProviders(
+      <TerminPaneel einsatzId={1} stand={mitTermin} zustand="daten" darfSchreiben />,
+    );
+    const p = screen.getByRole('region', { name: 'Termin' });
+    await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
+    expect(await within(p).findByText('Nicht übernommen')).toBeInTheDocument();
+    rerender(<TerminPaneel einsatzId={2} stand={mitTermin} zustand="daten" darfSchreiben />);
+    expect(
+      within(screen.getByRole('region', { name: 'Termin' })).queryByText('Nicht übernommen'),
+    ).not.toBeInTheDocument();
   });
 
   it('ohne Verbindung steht die Netzmeldung („Keine Verbindung …“) unter „Nicht übernommen“', async () => {
