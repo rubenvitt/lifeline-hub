@@ -249,68 +249,80 @@ pub async fn load_faellige(
     .map_err(Into::into)
 }
 
-/// Merkt den Beginn eines Zustellversuchs vor dem Netz: setzt `versuch_begonnen_at`, zählt
-/// `versuche` hoch und hält beim ersten Versuch `erster_versuch_at` fest.
+/// Beansprucht einen Zustellversuch vor dem Netz: setzt `versuch_begonnen_at`, zählt `versuche`
+/// hoch und hält beim ersten Versuch `erster_versuch_at` fest, aber nur, wenn der Versand noch
+/// `wartet` und kein anderer Versuch ihn hält. Liefert, ob dieser Aufruf ihn bekam; `false`
+/// heißt: ein anderer Durchgang stellt zu oder hat schon abgeschlossen (veraltete Zeile), der
+/// Aufrufer bricht ab. Die Marke ist `zeit::formatiere_utc(jetzt)` und geht an
+/// [`save_ergebnis_tx`].
 pub async fn mark_begonnen(
     pool: &SqlitePool,
     id: &str,
     jetzt: DateTime<Utc>,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let t = zeit(jetzt);
     write_retry!(pool, |conn| {
-        sqlx::query(
+        let n = sqlx::query(
             "UPDATE ausgang SET versuch_begonnen_at = ?, versuche = versuche + 1, \
                  erster_versuch_at = COALESCE(erster_versuch_at, ?) \
-             WHERE id = ? AND zustand = 'wartet'",
+             WHERE id = ? AND zustand = 'wartet' AND versuch_begonnen_at IS NULL",
         )
         .bind(&t)
         .bind(&t)
         .bind(id)
         .execute(&mut *conn)
-        .await?;
-        Ok(())
+        .await?
+        .rows_affected();
+        Ok(n == 1)
     })
 }
 
-/// Schreibt das Ergebnis eines Versuchs und leert den Merker `versuch_begonnen_at`.
+/// Schreibt das Ergebnis eines Versuchs und leert den Merker `versuch_begonnen_at`, aber nur an
+/// einem Versand, der noch `wartet` und dessen Merker `begonnen` ist: `Some(marke)` für den
+/// Versuch, den [`mark_begonnen`] (oder ein früherer Lauf) mit dieser Marke beansprucht hat,
+/// `None` für einen Abschluss vor dem Netz (kein Versuch begonnen). Liefert, ob eine Zeile sich
+/// änderte; `false` heißt: ein anderer Lauf hat den Versand schon abgeschlossen, der Aufrufer
+/// schreibt dann keinen ETB-Eintrag.
 pub async fn save_ergebnis_tx(
     conn: &mut SqliteConnection,
     id: &str,
+    begonnen: Option<&str>,
     ergebnis: Ergebnis,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
+    // `IS ?` vergleicht auch mit NULL (SQLite).
+    const BEDINGUNG: &str = "WHERE id = ? AND zustand = 'wartet' AND versuch_begonnen_at IS ?";
     let q = match ergebnis {
-        Ergebnis::Uebergeben { at } => sqlx::query(
+        Ergebnis::Uebergeben { at } => sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
                  naechster_versuch_at = NULL, versuch_begonnen_at = NULL, fehler_art = NULL, \
-                 fehler_status = NULL WHERE id = ?",
-        )
-        .bind(zeit(at))
-        .bind(id),
+                 fehler_status = NULL {BEDINGUNG}"
+        )))
+        .bind(zeit(at)),
         Ergebnis::Wiederholen {
             naechster,
             fehler,
             status,
-        } => sqlx::query(
+        } => sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE ausgang SET zustand = 'wartet', naechster_versuch_at = ?, \
-                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ? WHERE id = ?",
-        )
+                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ? {BEDINGUNG}"
+        )))
         .bind(zeit(naechster))
         .bind(fehler.as_str())
-        .bind(status.map(i64::from))
-        .bind(id),
-        Ergebnis::Fehlgeschlagen { fehler, status } => sqlx::query(
+        .bind(status.map(i64::from)),
+        Ergebnis::Fehlgeschlagen { fehler, status } => sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE ausgang SET zustand = 'fehlgeschlagen', naechster_versuch_at = NULL, \
-                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ? WHERE id = ?",
-        )
+                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ? {BEDINGUNG}"
+        )))
         .bind(fehler.as_str())
-        .bind(status.map(i64::from))
-        .bind(id),
+        .bind(status.map(i64::from)),
     };
-    let n = q.execute(&mut *conn).await?.rows_affected();
-    if n == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+    let n = q
+        .bind(id)
+        .bind(begonnen)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    Ok(n == 1)
 }
 
 /// Merkt den ETB-Eintrag eines Versands (der letzte gewinnt).

@@ -117,6 +117,7 @@ pub async fn beim_start(pool: &SqlitePool, live: &LiveHub) -> Result<u64, AppErr
     let zeilen = repo::load_unterbrochene(pool).await?;
     let mut n = 0;
     for zeile in zeilen {
+        let begonnen = zeile.versuch_begonnen_at.as_deref();
         let lauf = async {
             let ergebnis = Ergebnis::Fehlgeschlagen {
                 fehler: AusgangFehler::Ungewiss,
@@ -127,10 +128,10 @@ pub async fn beim_start(pool: &SqlitePool, live: &LiveHub) -> Result<u64, AppErr
                     fehler: AusgangFehler::Spiegel,
                     status: None,
                 };
-                return abschliessen(pool, live, &zeile, spiegel, None).await;
+                return abschliessen(pool, live, &zeile, begonnen, spiegel, None).await;
             }
             let text = etb_text(&zeile, AusgangFehler::Ungewiss, None);
-            abschliessen(pool, live, &zeile, ergebnis, Some(text)).await
+            abschliessen(pool, live, &zeile, begonnen, ergebnis, Some(text)).await
         };
         let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
         melde_luecken(&luecken);
@@ -165,6 +166,25 @@ pub async fn durchgang(
         panic!("{}", nachlauf::melde(&luecken));
     }
     Ok(())
+}
+
+/// Stellt genau diese Zeile zu, wie ein Durchgang es täte, aber ohne den Merker der laufenden
+/// Versände (für Tests: eine veraltete Kopie, die ein zweiter Durchgang noch in der Hand hat).
+/// Eine Lücke des ETB-Wächters ist ein Panic.
+pub async fn zustellen_zeile(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    live: &LiveHub,
+    zusteller: &Arc<dyn Zusteller>,
+    zeile: VersandZeile,
+    jetzt: DateTime<Utc>,
+) -> Result<(), AppError> {
+    let lauf = run_one(pool, rahmen, live, &**zusteller, zeile, jetzt);
+    let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
+    if !luecken.is_empty() {
+        panic!("{}", nachlauf::melde(&luecken));
+    }
+    ergebnis
 }
 
 async fn takt(
@@ -323,20 +343,20 @@ async fn run_one(
     // Ein Spiegel nimmt kein ETB an: sichtbar fehlgeschlagen, ohne Eintrag.
     if is_spiegel(pool, zeile.einsatz_id).await? {
         let e = fehlgeschlagen(AusgangFehler::Spiegel);
-        return abschliessen(pool, live, &zeile, e, None).await;
+        return abschliessen(pool, live, &zeile, None, e, None).await;
     }
     // Im Wiederholungsfenster geht keine überholte Fassung hinaus.
     if !is_quelle_aktuell(pool, &zeile).await? {
         let text = etb_text(&zeile, AusgangFehler::Ueberholt, None);
         let e = fehlgeschlagen(AusgangFehler::Ueberholt);
-        return abschliessen(pool, live, &zeile, e, Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, e, Some(text)).await;
     }
     let zugang = match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id).await?
     {
         Ok(z) => z,
         Err(f) => {
             let text = etb_text(&zeile, f, None);
-            return abschliessen(pool, live, &zeile, fehlgeschlagen(f), Some(text)).await;
+            return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
         }
     };
     // Gespeichert ist die Adresse nur getrimmt (Task 5); hinaus geht sie normalisiert.
@@ -346,11 +366,17 @@ async fn run_one(
     else {
         let f = AusgangFehler::AnbindungFehler;
         let text = etb_text(&zeile, f, None);
-        return abschliessen(pool, live, &zeile, fehlgeschlagen(f), Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
     };
 
     let begonnen = jetzt();
-    repo::mark_begonnen(pool, &zeile.id, begonnen).await?;
+    // Beanspruchen: eine veraltete Kopie (zweiter Durchgang, schon abgeschlossen) endet hier,
+    // ohne zuzustellen und ohne zweiten ETB-Eintrag.
+    if !repo::mark_begonnen(pool, &zeile.id, begonnen).await? {
+        tracing::warn!(versand = %zeile.id, "Ausgang: Versand schon in Arbeit oder abgeschlossen");
+        return Ok(());
+    }
+    let marke = zeit::formatiere_utc(begonnen);
     let versuche = zeile.versuche + 1;
     let erster = zeile
         .erster_versuch_at
@@ -378,12 +404,20 @@ async fn run_one(
         Err(AnhangFehler::ZuGross) => {
             let f = AusgangFehler::ZuGross;
             let text = etb_text(&zeile, f, None);
-            return abschliessen(pool, live, &zeile, fehlgeschlagen(f), Some(text)).await;
+            return abschliessen(
+                pool,
+                live,
+                &zeile,
+                Some(&marke),
+                fehlgeschlagen(f),
+                Some(text),
+            )
+            .await;
         }
         Err(AnhangFehler::App(e)) => {
             tracing::error!(versand = %zeile.id, "Ausgang: Anhänge nicht lesbar: {e}");
             let (e, text) = vorher_gescheitert(jetzt());
-            return abschliessen(pool, live, &zeile, e, text).await;
+            return abschliessen(pool, live, &zeile, Some(&marke), e, text).await;
         }
     };
     let schnappschuss = Schnappschuss {
@@ -401,7 +435,15 @@ async fn run_one(
         Ok(m) => m,
         Err(f) => {
             let text = etb_text(&zeile, f, None);
-            return abschliessen(pool, live, &zeile, fehlgeschlagen(f), Some(text)).await;
+            return abschliessen(
+                pool,
+                live,
+                &zeile,
+                Some(&marke),
+                fehlgeschlagen(f),
+                Some(text),
+            )
+            .await;
         }
     };
     drop(anhaenge);
@@ -418,7 +460,7 @@ async fn run_one(
         ),
         Err(e) => nach_fehler(&zeile, e, erster, versuche, t),
     };
-    abschliessen(pool, live, &zeile, ergebnis, text).await?;
+    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text).await?;
     // Anmeldung oder TLS brauchen einen Eingriff: der Lauf der Anbindung soll es gleich selbst
     // feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
     if let Err(SmtpFehler::Anmeldung | SmtpFehler::Tls) = antwort {
@@ -574,20 +616,26 @@ async fn von_fuer(
 }
 
 /// Schreibt das Ergebnis und, falls `etb` gesetzt, den ETB-Eintrag in einer Transaktion; nach
-/// dem Commit `publiziere` und das Ereignis der Versandliste. Scheitert die Transaktion mit
-/// ETB (etwa weil der Einsatz eben zum Spiegel wurde), steht wenigstens der Zustand: ein Versand
-/// bleibt nicht `wartet` mit gesetztem Merker.
+/// dem Commit `publiziere` und das Ereignis der Versandliste. `begonnen` ist der Merker, den der
+/// Aufrufer hält (`repo::save_ergebnis_tx`): hat ein anderer Lauf den Versand schon
+/// abgeschlossen, ändert sich nichts und es entsteht kein ETB-Eintrag. Scheitert die
+/// Transaktion mit ETB (etwa weil der Einsatz eben zum Spiegel wurde), steht wenigstens der
+/// Zustand: ein Versand bleibt nicht `wartet` mit gesetztem Merker.
 async fn abschliessen(
     pool: &SqlitePool,
     live: &LiveHub,
     zeile: &VersandZeile,
+    begonnen: Option<&str>,
     ergebnis: Ergebnis,
     etb: Option<String>,
 ) -> Result<(), AppError> {
+    // `None`: nichts geändert; `Some(etb_id)`: Ergebnis geschrieben, mit oder ohne ETB.
     let mit_etb = crate::write_retry!(pool, |conn| {
-        repo::save_ergebnis_tx(&mut *conn, &zeile.id, ergebnis).await?;
-        let Some(text) = etb.as_deref() else {
+        if !repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis).await? {
             return Ok(None);
+        }
+        let Some(text) = etb.as_deref() else {
+            return Ok(Some(None));
         };
         let startwert =
             crate::einsatz::einstellungen::laden_oder_default(&mut *conn, zeile.einsatz_id)
@@ -613,15 +661,22 @@ async fn abschliessen(
         )
         .await?;
         repo::save_etb_eintrag_tx(&mut *conn, &zeile.id, etb_id).await?;
-        Ok(Some(etb_id))
+        Ok(Some(Some(etb_id)))
     });
     let etb_id = match mit_etb {
-        Ok(id) => id,
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            tracing::warn!(versand = %zeile.id, "Ausgang: Versand schon abgeschlossen, Ergebnis verworfen");
+            return Ok(());
+        }
         Err(e) if etb.is_some() => {
             tracing::error!(versand = %zeile.id, "Ausgang: ETB-Eintrag nicht geschrieben: {e}");
-            crate::write_retry!(pool, |conn| {
-                repo::save_ergebnis_tx(&mut *conn, &zeile.id, ergebnis).await
+            let geaendert = crate::write_retry!(pool, |conn| {
+                repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis).await
             })?;
+            if !geaendert {
+                return Ok(());
+            }
             None
         }
         Err(e) => return Err(e),

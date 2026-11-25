@@ -685,3 +685,109 @@ async fn kein_geheimnis_im_etb_oder_fehler() {
         assert!(!String::from_utf8_lossy(&g.mail).contains(PASSWORT));
     }
 }
+
+/// Hält jede Zustellung an, bis der Test sie freigibt; danach wie [`Skript`].
+struct Sperre {
+    skript: Arc<Skript>,
+    begonnen: tokio::sync::Notify,
+    frei: tokio::sync::Semaphore,
+}
+
+impl Zusteller for Sperre {
+    fn zustellen<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        von: &'a str,
+        an: &'a str,
+        mail: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), SmtpFehler>> {
+        Box::pin(async move {
+            self.begonnen.notify_one();
+            self.frei.acquire().await.unwrap().forget();
+            self.skript.zustellen(zugang, von, an, mail).await
+        })
+    }
+}
+
+#[tokio::test]
+async fn veraltete_kopie_nach_dem_abschluss_stellt_nicht_ein_zweites_mal_zu() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    // Ein zweiter Durchgang hat die Zeile gelesen, bevor der erste sie abschloss.
+    let veraltet = w.zeile(&id).await;
+
+    w.durchgang(t0).await;
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    lauf::zustellen_zeile(
+        &w.pool,
+        &w.rahmen,
+        &w.live,
+        &w.zusteller,
+        veraltet.clone(),
+        t0 + chrono::Duration::seconds(1),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(w.skript.gesehen().len(), 1, "die Mail ging zweimal hinaus");
+    assert_eq!(w.etb_versand().await.len(), 1);
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    assert_eq!(z.versuche, 1);
+
+    // Auch ein Abschluss vor dem Netz (Quelle inzwischen überholt) schreibt nichts mehr.
+    w.fortschreiben_und_freigeben(lid).await;
+    let vorher = w.etb_anzahl().await;
+    lauf::zustellen_zeile(
+        &w.pool,
+        &w.rahmen,
+        &w.live,
+        &w.zusteller,
+        veraltet,
+        t0 + chrono::Duration::seconds(2),
+    )
+    .await
+    .unwrap();
+    assert_eq!(w.etb_anzahl().await, vorher);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+}
+
+#[tokio::test]
+async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let veraltet = w.zeile(&id).await;
+    let sperre = Arc::new(Sperre {
+        skript: w.skript.clone(),
+        begonnen: tokio::sync::Notify::new(),
+        frei: tokio::sync::Semaphore::new(0),
+    });
+    let gesperrt: Arc<dyn Zusteller> = sperre.clone();
+
+    // Lauf A beansprucht die Zeile und hängt im Netz.
+    let a = {
+        let (pool, rahmen, live, z) = (
+            w.pool.clone(),
+            w.rahmen.clone(),
+            w.live.clone(),
+            gesperrt.clone(),
+        );
+        tokio::spawn(async move { lauf::durchgang(&pool, &rahmen, &live, &z, t0).await })
+    };
+    sperre.begonnen.notified().await;
+    // Lauf B mit der Kopie von vorher (ungesperrt, damit der Test nie hängt): bekommt die
+    // Zeile nicht.
+    lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &w.zusteller, veraltet, t0)
+        .await
+        .unwrap();
+    sperre.frei.add_permits(2);
+    a.await.unwrap().unwrap();
+
+    assert_eq!(w.skript.gesehen().len(), 1, "die Mail ging zweimal hinaus");
+    assert_eq!(w.etb_versand().await.len(), 1);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+}

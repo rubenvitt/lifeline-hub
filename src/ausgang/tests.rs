@@ -163,16 +163,17 @@ async fn retry_nur_aus_fehlgeschlagen() {
         "{fehler:?}"
     );
 
-    repo::save_ergebnis_tx(
+    assert!(repo::save_ergebnis_tx(
         &mut conn,
         &v.id,
+        None,
         Ergebnis::Fehlgeschlagen {
             fehler: AusgangFehler::Abgelehnt,
             status: Some(550),
         },
     )
     .await
-    .unwrap();
+    .unwrap());
     let zeile = repo::load(&mut conn, w.einsatz_id, &v.id).await.unwrap();
     assert_eq!(zeile.zustand, VersandZustand::Fehlgeschlagen);
     assert_eq!(zeile.fehler_status, Some(550));
@@ -205,7 +206,7 @@ async fn unterbrochener_versuch_wird_ungewiss() {
     let w = welt().await;
     let a = w.anlegen("c1").await;
     let b = w.anlegen("c2").await;
-    repo::mark_begonnen(&w.pool, &a.id, t0()).await.unwrap();
+    assert!(repo::mark_begonnen(&w.pool, &a.id, t0()).await.unwrap());
     assert_eq!(repo::recover_unterbrochene(&w.pool).await.unwrap(), 1);
     let mut conn = w.pool.acquire().await.unwrap();
     let za = repo::load(&mut conn, w.einsatz_id, &a.id).await.unwrap();
@@ -245,7 +246,7 @@ async fn faellige_ohne_begonnene_in_reihenfolge() {
         fl.iter().map(|z| z.id.as_str()).collect::<Vec<_>>(),
         [b.id.as_str(), a.id.as_str()]
     );
-    repo::mark_begonnen(&w.pool, &b.id, t0()).await.unwrap();
+    assert!(repo::mark_begonnen(&w.pool, &b.id, t0()).await.unwrap());
     let fl = repo::load_faellige(&w.pool, t0(), 10).await.unwrap();
     assert_eq!(fl.len(), 1);
     assert_eq!(
@@ -258,16 +259,18 @@ async fn faellige_ohne_begonnene_in_reihenfolge() {
 async fn ergebnisse_schreiben_zustand_und_leeren_den_merker() {
     let w = welt().await;
     let v = w.anlegen("c1").await;
-    repo::mark_begonnen(&w.pool, &v.id, t0()).await.unwrap();
+    assert!(repo::mark_begonnen(&w.pool, &v.id, t0()).await.unwrap());
     let mut conn = w.pool.acquire().await.unwrap();
     let z = repo::load(&mut conn, w.einsatz_id, &v.id).await.unwrap();
     assert_eq!(z.versuche, 1);
     assert_eq!(z.erster_versuch_at.as_deref(), Some("2026-11-24 10:00:00"));
 
     let spaeter = t0() + Duration::seconds(30);
-    repo::save_ergebnis_tx(
+    let marke = crate::zeit::formatiere_utc(t0());
+    assert!(repo::save_ergebnis_tx(
         &mut conn,
         &v.id,
+        Some(&marke),
         Ergebnis::Wiederholen {
             naechster: spaeter,
             fehler: AusgangFehler::Voruebergehend,
@@ -275,7 +278,7 @@ async fn ergebnisse_schreiben_zustand_und_leeren_den_merker() {
         },
     )
     .await
-    .unwrap();
+    .unwrap());
     let z = repo::load(&mut conn, w.einsatz_id, &v.id).await.unwrap();
     assert_eq!(z.zustand, VersandZustand::Wartet);
     assert!(z.versuch_begonnen_at.is_none());
@@ -285,13 +288,60 @@ async fn ergebnisse_schreiben_zustand_und_leeren_den_merker() {
     );
     assert_eq!(z.fehler_art, Some(AusgangFehler::Voruebergehend));
 
-    repo::save_ergebnis_tx(&mut conn, &v.id, Ergebnis::Uebergeben { at: spaeter })
-        .await
-        .unwrap();
+    assert!(
+        repo::save_ergebnis_tx(&mut conn, &v.id, None, Ergebnis::Uebergeben { at: spaeter })
+            .await
+            .unwrap()
+    );
     let z = repo::load(&mut conn, w.einsatz_id, &v.id).await.unwrap();
     assert_eq!(z.zustand, VersandZustand::Uebergeben);
     assert_eq!(z.uebergeben_at.as_deref(), Some("2026-11-24 10:00:30"));
     assert!(z.fehler_art.is_none() && z.naechster_versuch_at.is_none());
+}
+
+#[tokio::test]
+async fn beanspruchen_gelingt_nur_einmal_und_ergebnis_nur_mit_der_marke() {
+    let w = welt().await;
+    let v = w.anlegen("c1").await;
+    let marke = crate::zeit::formatiere_utc(t0());
+    let uebergeben = Ergebnis::Uebergeben { at: t0() };
+    assert!(repo::mark_begonnen(&w.pool, &v.id, t0()).await.unwrap());
+    // Ein zweiter Durchgang mit derselben Zeile bekommt sie nicht.
+    let spaeter = t0() + Duration::seconds(1);
+    assert!(!repo::mark_begonnen(&w.pool, &v.id, spaeter).await.unwrap());
+    let mut conn = w.pool.acquire().await.unwrap();
+    assert_eq!(
+        repo::load(&mut conn, w.einsatz_id, &v.id)
+            .await
+            .unwrap()
+            .versuche,
+        1
+    );
+    // Ohne Marke oder mit fremder Marke ändert sich nichts.
+    assert!(!repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben)
+        .await
+        .unwrap());
+    assert!(
+        !repo::save_ergebnis_tx(&mut conn, &v.id, Some("2026-11-24 09:00:00"), uebergeben)
+            .await
+            .unwrap()
+    );
+    assert!(
+        repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben)
+            .await
+            .unwrap()
+    );
+    // Abgeschlossen: weder ein zweites Ergebnis noch ein neuer Anspruch.
+    assert!(
+        !repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben)
+            .await
+            .unwrap()
+    );
+    assert!(!repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben)
+        .await
+        .unwrap());
+    drop(conn);
+    assert!(!repo::mark_begonnen(&w.pool, &v.id, spaeter).await.unwrap());
 }
 
 #[tokio::test]
