@@ -15,6 +15,14 @@ export function livebildUrl(einsatzId: number, videoKey: string): string {
 
 type Zustand = 'laedt' | 'laeuft' | 'kein';
 
+/**
+ * Wartezeit vor dem nächsten Versuch nach `fehlschlaege` gescheiterten Versuchen in Folge: 5 s,
+ * 10 s, 20 s, dann höchstens 30 s. Ein kurzer Funkausfall (LTE) beendet das Livebild so nicht.
+ */
+export function wiederholNachMs(fehlschlaege: number): number {
+  return Math.min(5_000 * 2 ** Math.max(0, fehlschlaege - 1), 30_000);
+}
+
 export interface DrohnenVideoFensterProps {
   einsatzId: number;
   /** Schlüssel des Videostroms; `null`, wenn die Quelle gerade keinen meldet („Kein Livebild“). */
@@ -29,6 +37,11 @@ export interface DrohnenVideoFensterProps {
  * unterstützt oder ein fataler Player-Fehler). Ein neuer Schlüssel startet neu, so auch einer, der
  * nach einem Ausfall wieder erscheint.
  *
+ * Ein fataler Fehler ist nicht das Ende: bei einem Netzfehler lädt der Player zuerst einmal neu
+ * (`startLoad`), bei einem Medienfehler stellt er sich einmal wieder her (`recoverMediaError`);
+ * scheitert das, startet das Fenster mit Pause neu ([`wiederholNachMs`]), solange die Quelle den
+ * Schlüssel meldet (verschwindet er, ist `videoKey` `null` und der Versuch entfällt).
+ *
  * Eigener Block der Karte (Muster `KartenUeberlagerung`): einzeln positioniert, kein Rahmen über der
  * Karte, sonst schluckte er jedes Ziehen. Die Breite folgt der Kartenspalte (bis zur Knopfspalte,
  * höchstens `28rem`), keine feste Breite.
@@ -41,6 +54,10 @@ export default function DrohnenVideoFenster({
   const { token, rollen } = useRollen();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [zustand, setZustand] = useState<Zustand>(videoKey == null ? 'kein' : 'laedt');
+  // Jeder neue Versuch nach einem Ausfall zählt hoch und startet den Player neu.
+  const [versuch, setVersuch] = useState(0);
+  // Gescheiterte Versuche in Folge, je Schlüssel; ein laufendes Bild setzt zurück.
+  const fehlschlaege = useRef<{ key: string | null; n: number }>({ key: null, n: 0 });
 
   useEffect(() => {
     const video = videoRef.current;
@@ -48,17 +65,33 @@ export default function DrohnenVideoFenster({
       setZustand('kein');
       return;
     }
+    if (fehlschlaege.current.key !== videoKey) fehlschlaege.current = { key: videoKey, n: 0 };
     setZustand('laedt');
     const url = livebildUrl(einsatzId, videoKey);
     let beendet = false;
     let abbau: (() => void) | undefined;
+    let wiederholung: ReturnType<typeof setTimeout> | undefined;
     const spiele = () => {
       void video.play?.()?.catch(() => undefined);
     };
+    const laeuft = () => {
+      fehlschlaege.current.n = 0;
+      setZustand('laeuft');
+    };
+    /** Aufgegeben: „Kein Livebild“ und mit Pause ein neuer Versuch. */
+    const ausgefallen = () => {
+      if (beendet) return;
+      setZustand('kein');
+      fehlschlaege.current.n += 1;
+      clearTimeout(wiederholung);
+      wiederholung = setTimeout(
+        () => setVersuch((v) => v + 1),
+        wiederholNachMs(fehlschlaege.current.n),
+      );
+    };
 
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      const laeuft = () => setZustand('laeuft');
-      const kaputt = () => setZustand('kein');
+      const kaputt = () => ausgefallen();
       video.addEventListener('playing', laeuft);
       video.addEventListener('error', kaputt);
       video.src = url;
@@ -77,13 +110,25 @@ export default function DrohnenVideoFenster({
             return;
           }
           const player = new Hls({ lowLatencyMode: false });
-          const laeuft = () => setZustand('laeuft');
+          let neuGeladen = false;
+          let wiederhergestellt = false;
           video.addEventListener('playing', laeuft);
           player.on(Hls.Events.MANIFEST_PARSED, spiele);
           player.on(Hls.Events.ERROR, (_ereignis, daten) => {
             if (!daten.fatal) return;
+            // Erst der eigene Weg des Players, je einmal; dann Neustart mit Pause.
+            if (daten.type === Hls.ErrorTypes.NETWORK_ERROR && !neuGeladen) {
+              neuGeladen = true;
+              player.startLoad();
+              return;
+            }
+            if (daten.type === Hls.ErrorTypes.MEDIA_ERROR && !wiederhergestellt) {
+              wiederhergestellt = true;
+              player.recoverMediaError();
+              return;
+            }
             player.destroy();
-            setZustand('kein');
+            ausgefallen();
           });
           player.loadSource(url);
           player.attachMedia(video);
@@ -99,9 +144,10 @@ export default function DrohnenVideoFenster({
     }
     return () => {
       beendet = true;
+      clearTimeout(wiederholung);
       abbau?.();
     };
-  }, [einsatzId, videoKey]);
+  }, [einsatzId, videoKey, versuch]);
 
   const kein = zustand === 'kein';
   return (
