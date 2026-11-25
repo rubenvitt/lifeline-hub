@@ -21,15 +21,15 @@ function brotkrume(page: Page) {
 }
 
 async function einsatz(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Liste und Detail ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   return String(((await r.json()) as { id: number }).id);
 }
 
 async function auftragPerApi(page: Page, einsatzId: string, text: string) {
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const r = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: {
       auftrag_text: text,
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
@@ -157,12 +157,12 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatz(page);
-  const abschnitt = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
+  const abschnitt = await page.request.post(`/api/incidents/${einsatzId}/sectors`, {
     data: { name: 'EA Süd' },
   });
   expect(abschnitt.ok(), `Abschnitt: ${abschnitt.status()}`).toBe(true);
   const abschnittId = ((await abschnitt.json()) as { id: number }).id;
-  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
+  const angelegt = await page.request.post(`/api/incidents/${einsatzId}/orders`, {
     data: {
       vorlage: 'befehl_lad',
       titel: 'Befehl an EA Süd',
@@ -175,11 +175,11 @@ test('Befehl mit Verteiler im Detail quittieren und rückgängig machen (LLH-117
   });
   expect(angelegt.ok(), `Befehl: ${angelegt.status()}`).toBe(true);
   const befehlId = ((await angelegt.json()) as { id: number }).id;
-  const verteiler = await page.request.patch(`/api/einsaetze/${einsatzId}/orders/${befehlId}`, {
+  const verteiler = await page.request.patch(`/api/incidents/${einsatzId}/orders/${befehlId}`, {
     data: { verteiler: [{ empfaenger_typ: 'abschnitt', abschnitt_id: abschnittId }] },
   });
   expect(verteiler.ok(), `Verteiler: ${verteiler.status()}`).toBe(true);
-  const frei = await page.request.post(`/api/einsaetze/${einsatzId}/orders/${befehlId}/release`);
+  const frei = await page.request.post(`/api/incidents/${einsatzId}/orders/${befehlId}/release`);
   expect(frei.ok(), `Freigabe: ${frei.status()}`).toBe(true);
 
   await page.goto(`/einsaetze/${einsatzId}/auftraege?reiter=befehle&befehl=${befehlId}`);

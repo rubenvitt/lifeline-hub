@@ -56,7 +56,7 @@ test('Auftrag antippen holt „Quittieren“ ins Bild', async ({ page }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Hauptaktion Auftrag ${Date.now()}`);
   for (let i = 1; i <= 6; i++) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
       data: {
         auftrag_text: `Erkundung Abschnitt ${i}`,
         empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],

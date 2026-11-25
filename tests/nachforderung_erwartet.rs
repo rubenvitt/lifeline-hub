@@ -14,7 +14,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({ "bezeichnung": name }).to_string()),
     )
@@ -24,7 +24,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({ "status": "aktiv" }).to_string()),
     )
@@ -52,7 +52,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         Some(&body.to_string()),
     )
@@ -65,7 +65,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/commitment"),
+        &format!("/api/incidents/{einsatz}/resource-requests/{id}/commitment"),
         cookie,
         Some(&zusage.unwrap_or_else(|| json!({})).to_string()),
     )
@@ -91,7 +91,7 @@ async fn status(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
+        &format!("/api/incidents/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&json!({ "status": stufe }).to_string()),
     )
@@ -104,7 +104,7 @@ async fn erwartet(app: &axum::Router, cookie: &str, einsatz: i64, br: i64) -> (S
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/expected"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/expected"),
         cookie,
         None,
     )
@@ -121,7 +121,7 @@ async fn eintreffen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/arrival"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/arrival"),
         cookie,
         Some(&body.to_string()),
     )
@@ -132,7 +132,7 @@ async fn lade(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value 
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         None,
     )
@@ -150,7 +150,7 @@ async fn einheit(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Val
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         cookie,
         None,
     )
@@ -168,7 +168,7 @@ async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -232,7 +232,7 @@ async fn projektion_nennt_nur_zugesagte_und_unterwegs_des_raums_ohne_freitexte()
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests/{abgelehnt}/decline"),
+        &format!("/api/incidents/{e}/resource-requests/{abgelehnt}/decline"),
         &admin,
         Some(r#"{"grund":"keine"}"#),
     )
@@ -242,7 +242,7 @@ async fn projektion_nennt_nur_zugesagte_und_unterwegs_des_raums_ohne_freitexte()
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests/{zurueck}/withdraw"),
+        &format!("/api/incidents/{e}/resource-requests/{zurueck}/withdraw"),
         &admin,
         Some(r#"{"grund":"erledigt"}"#),
     )
@@ -322,7 +322,7 @@ async fn projektion_verlangt_die_freigabe_nachforderungen() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/nachforderungen"),
+        &format!("/api/incidents/{e}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -463,7 +463,7 @@ async fn eintreffen_mit_nachforderung_setzt_den_verweis_beidseitig() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/from-resource-request"),
+        &format!("/api/incidents/{e}/units/from-resource-request"),
         &admin,
         Some(&json!({ "nachforderung_id": n, "einheiten": [{ "name": "83-9" }] }).to_string()),
     )
@@ -572,7 +572,7 @@ async fn pruefkette_des_verweises() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/staging-areas/{nord}/occupancy"),
+        &format!("/api/incidents/{e}/staging-areas/{nord}/occupancy"),
         &admin,
         Some(&json!({ "objekt_typ": "einheit", "objekt_id": lf, "art": "austritt" }).to_string()),
     )
@@ -592,7 +592,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
     )
@@ -646,7 +646,7 @@ async fn fahrzeug_ohne_einheit_wird_mit_verweis_zur_einheit() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/vehicles/{ef}/crew/{anna}"),
+        &format!("/api/incidents/{e}/vehicles/{ef}/crew/{anna}"),
         &admin,
         None,
     )
@@ -829,7 +829,7 @@ async fn eintreffen_mit_verweis_haelt_die_verknuepfung_am_raum_fest() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/from-resource-request"),
+        &format!("/api/incidents/{e}/units/from-resource-request"),
         &admin,
         Some(&json!({ "nachforderung_id": n, "einheiten": [{ "name": "83-4" }] }).to_string()),
     )
@@ -920,7 +920,7 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/units/{id}/annul-takeover"),
+            &format!("/api/incidents/{e}/units/{id}/annul-takeover"),
             &admin,
             None,
         )
@@ -951,7 +951,7 @@ async fn storno_nach_verknuepfung_am_raum_bucht_nicht_aus() {
     let (s, verlauf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/staging-areas/{nord}/history"),
+        &format!("/api/incidents/{e}/staging-areas/{nord}/history"),
         &admin,
         None,
     )
@@ -1016,7 +1016,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/resource-requests/{n}/{pfad}"),
+            &format!("/api/incidents/{e}/resource-requests/{n}/{pfad}"),
             &admin,
             Some(body),
         )
@@ -1026,7 +1026,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
+        &format!("/api/incidents/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":1}"#),
     )
@@ -1035,7 +1035,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
+        &format!("/api/incidents/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":3}"#),
     )
@@ -1055,7 +1055,7 @@ async fn mit_verknuepfter_einheit_nur_noch_vorwaerts() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/resource-requests/{n}"),
+        &format!("/api/incidents/{e}/resource-requests/{n}"),
         &admin,
         Some(r#"{"anzahl":1}"#),
     )

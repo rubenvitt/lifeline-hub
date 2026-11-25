@@ -451,7 +451,7 @@ async fn abschliessen_und_nachbereitung_vorbei(i: &Instanz, einsatz: i64) {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &i.admin,
         None,
     )
@@ -621,7 +621,7 @@ async fn fuehrung(i: &Instanz, einsatz: i64) -> Value {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/command"),
+        &format!("/api/incidents/{einsatz}/command"),
         &i.admin,
         None,
     )
@@ -686,7 +686,7 @@ async fn runde(v: &VorOrtEinsatz) {
 async fn elw2_uebernimmt_mit_unterschrift(v: &VorOrtEinsatz, grund: &str) {
     let (s, start) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/start", v.e2),
+        &format!("/api/incidents/{}/command/emergency-takeover/start", v.e2),
         json!({"grund": grund}),
     )
     .await;
@@ -694,7 +694,7 @@ async fn elw2_uebernimmt_mit_unterschrift(v: &VorOrtEinsatz, grund: &str) {
     let assertion = passkey_b().sign(start["erklaerung"].as_str().unwrap(), ORIGIN, RP, 0x05);
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/finish", v.e2),
+        &format!("/api/incidents/{}/command/emergency-takeover/finish", v.e2),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -711,7 +711,7 @@ async fn mit_einer_gegenstelle_vor_protokoll_4_bleibt_der_wechsel_gesperrt() {
     .await;
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/request", v.e2),
+        &format!("/api/incidents/{}/command/request", v.e2),
         json!({}),
     )
     .await;
@@ -739,7 +739,7 @@ async fn vor_ort_geht_die_uebergabe_in_beide_richtungen() {
     // Die erreichte Seite übergibt an die meldende.
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e1),
+        &format!("/api/incidents/{}/command/hand-over", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -752,7 +752,7 @@ async fn vor_ort_geht_die_uebergabe_in_beide_richtungen() {
     runde(&v).await;
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e2),
+        &format!("/api/incidents/{}/command/hand-over", v.e2),
         json!({"an": v.ich1}),
     )
     .await;
@@ -767,7 +767,7 @@ async fn vor_ort_braucht_die_notuebernahme_einen_beweis() {
     let v = vor_ort_mit_einsatz().await;
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/emergency-takeover", v.e2),
+        &format!("/api/incidents/{}/command/emergency-takeover", v.e2),
         json!({"grund": "ELW 1 antwortet nicht"}),
     )
     .await;
@@ -843,7 +843,7 @@ async fn vor_ort_wartet_die_notuebernahme_auf_die_abgebende_seite() {
         .contains(&"fuehrung_uebernommen".to_string()));
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/confirm", v.e1),
+        &format!("/api/incidents/{}/command/confirm", v.e1),
         json!({}),
     )
     .await;
@@ -883,7 +883,7 @@ async fn ein_widerspruch_vor_ort_gibt_die_fuehrung_ohne_hin_und_her_zurueck() {
     runde(&v).await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/object", v.e1),
+        &format!("/api/incidents/{}/command/object", v.e1),
         json!({}),
     )
     .await;
@@ -924,7 +924,7 @@ async fn vor_ort_gibt_auch_die_erreichte_seite_per_code_ab() {
     let v = vor_ort_mit_einsatz().await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/code", v.e1),
+        &format!("/api/incidents/{}/command/code", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -932,7 +932,7 @@ async fn vor_ort_gibt_auch_die_erreichte_seite_per_code_ab() {
     let code = r["code"].as_str().unwrap().to_string();
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/code", v.e2),
+        &format!("/api/incidents/{}/command/emergency-takeover/code", v.e2),
         json!({"grund": "Code per Funk", "code": code}),
     )
     .await;
@@ -953,7 +953,7 @@ async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
     let v = vor_ort_mit_einsatz().await;
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/request", v.e2),
+        &format!("/api/incidents/{}/command/request", v.e2),
         json!({}),
     )
     .await;
@@ -973,7 +973,7 @@ async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
     // Ablehnen: ELW 2 sieht „abgelehnt“, der Eingang verschwindet.
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/request/decline", v.e1),
+        &format!("/api/incidents/{}/command/request/decline", v.e1),
         json!({}),
     )
     .await;
@@ -988,7 +988,7 @@ async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
     // Ohne wartende Anfrage gibt es nichts abzulehnen.
     let (s, _) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/request/decline", v.e1),
+        &format!("/api/incidents/{}/command/request/decline", v.e1),
         json!({}),
     )
     .await;
@@ -996,7 +996,7 @@ async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
     // Eine neue Anfrage zeigt sich wieder; „Übergeben“ ist die reguläre Übergabe.
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/request", v.e2),
+        &format!("/api/incidents/{}/command/request", v.e2),
         json!({}),
     )
     .await;
@@ -1010,7 +1010,7 @@ async fn eine_anfrage_vor_ort_entscheidet_die_einsatzleitung() {
     assert_eq!(angefragt(benachrichtigungen(&v.elw1).await), 2);
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e1),
+        &format!("/api/incidents/{}/command/hand-over", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -1081,7 +1081,7 @@ async fn der_hub_zieht_eine_uebergabe_zwischen_zwei_elw_nach_dem_zeugnis_nach() 
     let (hub, v) = hub_mit_einsatz_von_elw1().await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e1),
+        &format!("/api/incidents/{}/command/hand-over", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -1134,7 +1134,7 @@ async fn ohne_bestaetigten_schluessel_und_ohne_zeugen_lehnt_der_hub_ab() {
     // ELW 1 gibt per Code ab, meldet sich aber nicht mehr beim Hub.
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/code", v.e1),
+        &format!("/api/incidents/{}/command/code", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -1143,7 +1143,7 @@ async fn ohne_bestaetigten_schluessel_und_ohne_zeugen_lehnt_der_hub_ab() {
     elw1_faellt_aus(&v).await;
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/code", v.e2),
+        &format!("/api/incidents/{}/command/emergency-takeover/code", v.e2),
         json!({"grund": "Code per Funk", "code": code}),
     )
     .await;
@@ -1194,7 +1194,7 @@ async fn gibt_der_fuehrer_an_den_hub_ab_folgt_die_akte_vor_ort() {
     let (s, v) = common::anfrage_json(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/command/hand-over"),
+        &format!("/api/incidents/{e}/command/hand-over"),
         &elw1.admin,
         Some(&json!({"an": ich_hub})),
     )
@@ -1242,7 +1242,7 @@ async fn gibt_der_fuehrer_an_den_hub_ab_spiegelt_ein_dort_gekoppeltes_elw_danach
     let (s, v) = common::anfrage_json(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/command/hand-over"),
+        &format!("/api/incidents/{e}/command/hand-over"),
         &elw1.admin,
         Some(&json!({"an": ich_hub})),
     )
@@ -1361,7 +1361,7 @@ async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselbe
     let (s, v) = common::anfrage(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/vehicles"),
+        &format!("/api/incidents/{e}/vehicles"),
         &elw1.admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz1}}}"#)),
     )
@@ -1381,7 +1381,7 @@ async fn im_spiegel_vor_ort_gelten_konto_rolle_und_fahrzeug_vom_hub_als_dieselbe
     let (s, v) = common::anfrage(
         &elw1.app,
         "POST",
-        &format!("/api/einsaetze/{e}/vehicles"),
+        &format!("/api/incidents/{e}/vehicles"),
         &elw1.admin,
         Some(&format!(r#"{{"fahrzeug_id":{geliehen}}}"#)),
     )
@@ -1463,7 +1463,7 @@ async fn ein_antrag_vom_elw_vor_ort_laeuft_im_namen_desselben_kontos() {
     let (st, v) = common::anfrage_json(
         &elw2.app,
         "POST",
-        &format!("/api/einsaetze/{s2}/etb"),
+        &format!("/api/incidents/{s2}/etb"),
         &anna,
         Some(
             &json!({ "typ": "meldung", "inhalt": "Vom ELW 2", "von": "ELW 2", "an": "EL",
@@ -1499,7 +1499,7 @@ async fn ein_antrag_vom_elw_vor_ort_laeuft_im_namen_desselben_kontos() {
     let (st, v) = common::anfrage_json(
         &elw2.app,
         "POST",
-        &format!("/api/einsaetze/{s2}/etb"),
+        &format!("/api/incidents/{s2}/etb"),
         &hilfe_cookie,
         Some(
             &json!({ "typ": "meldung", "inhalt": "Von Hilfe", "von": "ELW 2", "an": "EL",
@@ -1959,7 +1959,7 @@ async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
     // ELW 2 führt nach einer Übergabe.
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e1),
+        &format!("/api/incidents/{}/command/hand-over", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -1970,7 +1970,7 @@ async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
     // Admin A an ELW 1 (Schlüssel aus dem Grundstock, ELW 2 kennt ihn) übernimmt mit Unterschrift.
     let (s, start) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/start", v.e1),
+        &format!("/api/incidents/{}/command/emergency-takeover/start", v.e1),
         json!({"grund": "ELW 2 ausgefallen"}),
     )
     .await;
@@ -1983,7 +1983,7 @@ async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
     );
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/emergency-takeover/finish", v.e1),
+        &format!("/api/incidents/{}/command/emergency-takeover/finish", v.e1),
         json!({"zeremonie": start["zeremonie"], "assertion": assertion}),
     )
     .await;
@@ -1999,7 +1999,7 @@ async fn auch_die_ausstellende_seite_uebernimmt_vor_ort_nur_mit_beweis() {
     assert_eq!(f["offen"]["grund"], "ELW 2 ausgefallen", "{f}");
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/confirm", v.e2),
+        &format!("/api/incidents/{}/command/confirm", v.e2),
         json!({}),
     )
     .await;
@@ -2066,7 +2066,7 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
     let v = vor_ort_mit_einsatz().await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/hand-over", v.e1),
+        &format!("/api/incidents/{}/command/hand-over", v.e1),
         json!({"an": v.ich2}),
     )
     .await;
@@ -2075,7 +2075,7 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
     runde(&v).await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/request", v.e1),
+        &format!("/api/incidents/{}/command/request", v.e1),
         json!({}),
     )
     .await;
@@ -2100,7 +2100,7 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
     let (s, _) = common::anfrage(
         &v.elw2.app,
         "GET",
-        &format!("/api/einsaetze/{}/command", v.e2),
+        &format!("/api/incidents/{}/command", v.e2),
         &helfer,
         None,
     )
@@ -2109,7 +2109,7 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
     let (s, _) = common::anfrage_json(
         &v.elw2.app,
         "POST",
-        &format!("/api/einsaetze/{}/command/request/decline", v.e2),
+        &format!("/api/incidents/{}/command/request/decline", v.e2),
         &helfer,
         Some(&json!({})),
     )
@@ -2117,7 +2117,7 @@ async fn ablehnen_darf_nur_wer_die_fuehrung_bedient() {
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, r) = post(
         &v.elw2,
-        &format!("/api/einsaetze/{}/command/request/decline", v.e2),
+        &format!("/api/incidents/{}/command/request/decline", v.e2),
         json!({}),
     )
     .await;
@@ -2130,7 +2130,7 @@ async fn eine_neue_anfrage_nach_der_ablehnung_zeigt_sich_auch_ohne_zwischenmeldu
     let anfragen = || async {
         let (s, r) = post(
             &v.elw2,
-            &format!("/api/einsaetze/{}/command/request", v.e2),
+            &format!("/api/incidents/{}/command/request", v.e2),
             json!({}),
         )
         .await;
@@ -2140,7 +2140,7 @@ async fn eine_neue_anfrage_nach_der_ablehnung_zeigt_sich_auch_ohne_zwischenmeldu
     runde(&v).await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/request/decline", v.e1),
+        &format!("/api/incidents/{}/command/request/decline", v.e1),
         json!({}),
     )
     .await;
@@ -2188,7 +2188,7 @@ async fn ablehnen_gilt_nur_fuer_eine_anfrage_vor_ort() {
     .await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/request/decline", v.e1),
+        &format!("/api/incidents/{}/command/request/decline", v.e1),
         json!({}),
     )
     .await;
@@ -2251,7 +2251,7 @@ async fn nach_dem_nachziehen_am_hub_landen_alle_beim_widerspruch_von_elw1() {
     melden(&v.elw2).await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/object", v.e1),
+        &format!("/api/incidents/{}/command/object", v.e1),
         json!({}),
     )
     .await;
@@ -2321,7 +2321,7 @@ async fn elw1_faellt_aus_elw2_uebernimmt_der_hub_folgt_und_elw1_bestaetigt() {
     melden(&v.elw2).await;
     let (s, r) = post(
         &v.elw1,
-        &format!("/api/einsaetze/{}/command/confirm", v.e1),
+        &format!("/api/incidents/{}/command/confirm", v.e1),
         json!({}),
     )
     .await;
@@ -2394,7 +2394,7 @@ async fn fragen_zwei_gegenstellen_an_wartet_die_erste_und_die_zweite_steht_als_h
             &format!("SELECT id FROM einsatz WHERE kennung = '{k}'"),
         )
         .await;
-        let (s, r) = post(i, &format!("/api/einsaetze/{e}/command/request"), json!({})).await;
+        let (s, r) = post(i, &format!("/api/incidents/{e}/command/request"), json!({})).await;
         assert_eq!(s, StatusCode::OK, "{r}");
         melden(i).await;
     }

@@ -32,8 +32,8 @@ async function einsatzMitUhs(page: Page): Promise<{ einsatz: number; uhs: number
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return (await antwort.json()) as { id: number };
   }
-  const einsatz = await anlegen('/api/einsaetze', { bezeichnung: `E2E Gerät ${Date.now()}` });
-  const uhs = await anlegen(`/api/einsaetze/${einsatz.id}/uhs`, {
+  const einsatz = await anlegen('/api/incidents', { bezeichnung: `E2E Gerät ${Date.now()}` });
+  const uhs = await anlegen(`/api/incidents/${einsatz.id}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
@@ -92,7 +92,7 @@ test('LFH-892: widerrufen → „Kopplung beendet“, der Code gilt nicht noch e
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   const { einsatz, uhs } = await einsatzMitUhs(page);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatz}/devices`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatz}/devices`, {
     data: { ansicht: 'uhs-tablet', uhs_id: uhs, bezeichnung: 'Tablet 1' },
   });
   expect(antwort.ok(), `Kopplung: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

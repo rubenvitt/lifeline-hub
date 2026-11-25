@@ -9,13 +9,13 @@ import { expect, type Locator, type Page } from '@playwright/test';
 export const FS_RUF = 'Florian Musterstadt 10/1';
 
 export async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return String(((await antwort.json()) as { id: number }).id);
 }
 
 export function api(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const pruefe = async (was: string, antwort: Awaited<ReturnType<Page['request']['get']>>) => {
     expect(antwort.ok(), `${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return antwort;
@@ -58,7 +58,7 @@ export async function oeffneSkizze(
   { zeiger = true }: { zeiger?: boolean } = {},
 ) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await page.goto(skizzenPfad(einsatzId));
   if (zeiger) await page.mouse.move(0, 0);

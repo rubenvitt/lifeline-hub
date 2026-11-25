@@ -44,7 +44,7 @@ async fn einsatz_mit_vorlage(
         Some(id) => format!(r#"{{"bezeichnung":"Lage","vorlage_id":{id}}}"#),
         None => r#"{"bezeichnung":"Lage"}"#.to_string(),
     };
-    anfrage(app, "POST", "/api/einsaetze", cookie, Some(&body)).await
+    anfrage(app, "POST", "/api/incidents", cookie, Some(&body)).await
 }
 
 async fn einsatz_anzahl(pool: &sqlx::SqlitePool) -> i64 {
@@ -384,7 +384,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     let (status, overrides) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-overrides"),
+        &format!("/api/incidents/{eid}/module-overrides"),
         &fk,
         None,
     )
@@ -417,7 +417,7 @@ async fn manv_blendet_beim_anlegen_aus_und_schreibt_eigene_werte() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-access"),
+        &format!("/api/incidents/{eid}/module-access"),
         &fk,
         None,
     )
@@ -441,7 +441,7 @@ async fn sanitaetsdienst_zeigt_funk_und_wetter() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-access"),
+        &format!("/api/incidents/{eid}/module-access"),
         &admin,
         None,
     )
@@ -478,7 +478,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (_, freigaben) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-access"),
+        &format!("/api/incidents/{eid}/module-access"),
         &admin,
         None,
     )
@@ -487,7 +487,7 @@ async fn org_ausblendung_bleibt_neben_der_vorlage() {
     let (_, overrides) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-overrides"),
+        &format!("/api/incidents/{eid}/module-overrides"),
         &admin,
         None,
     )
@@ -509,13 +509,13 @@ async fn ohne_vorlage_keine_modulwerte() {
         r#"{"bezeichnung":"Lage"}"#,
         r#"{"bezeichnung":"Lage","vorlage_id":null}"#,
     ] {
-        let (status, json) = anfrage(&app, "POST", "/api/einsaetze", &admin, Some(body)).await;
+        let (status, json) = anfrage(&app, "POST", "/api/incidents", &admin, Some(body)).await;
         assert_eq!(status, StatusCode::CREATED, "{json:?}");
         let eid = json["id"].as_i64().unwrap();
         let (_, overrides) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{eid}/module-overrides"),
+            &format!("/api/incidents/{eid}/module-overrides"),
             &admin,
             None,
         )
@@ -576,7 +576,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
     let (_, a) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{alt}/module-overrides"),
+        &format!("/api/incidents/{alt}/module-overrides"),
         &admin,
         None,
     )
@@ -584,7 +584,7 @@ async fn spaetere_aenderung_der_vorlage_wirkt_nur_auf_neue_einsaetze() {
     let (_, n) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{neu}/module-overrides"),
+        &format!("/api/incidents/{neu}/module-overrides"),
         &admin,
         None,
     )
@@ -607,7 +607,7 @@ async fn einsatz_vorgabe(app: &axum::Router, cookie: &str, einsatz: i64) -> Opti
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/reliefs/shift-model"),
+        &format!("/api/incidents/{einsatz}/reliefs/shift-model"),
         cookie,
         None,
     )

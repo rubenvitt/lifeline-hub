@@ -141,7 +141,7 @@ describe('HilfePage', () => {
           org_id: 1,
         }),
       ),
-      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+      http.get('/api/incidents', () => HttpResponse.json(einsaetze)),
     );
   }
   const aktiv = { id: 5, bezeichnung: 'Starkregen Nord', status: 'aktiv' };

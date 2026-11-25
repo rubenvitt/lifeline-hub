@@ -24,11 +24,11 @@ interface Tier {
 
 /** Legt die Tiere einmal je Lauf an (die Datenbank gilt für alle Tests eines Laufs). */
 async function tiereAnlegen(page: Page, einsatzId: number): Promise<Tier[]> {
-  const basis = `/api/einsaetze/${einsatzId}/animals`;
+  const basis = `/api/incidents/${einsatzId}/animals`;
   const vorhanden = (await (await page.request.get(basis)).json()) as Tier[];
   if (vorhanden.length > 0) return vorhanden;
   const personen = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
+    await page.request.get(`/api/incidents/${einsatzId}/persons`)
   ).json()) as { id: number; name: string | null }[];
   const halter = personen.find((p) => p.name === 'Mustermann')!;
   await fuelle(page, 'post', basis, {

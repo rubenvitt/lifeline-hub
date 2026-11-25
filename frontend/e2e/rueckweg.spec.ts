@@ -17,7 +17,7 @@ const MELDUNGEN = 40;
 async function einsatzMitMeldungen(page: Page): Promise<string> {
   const einsatzId = await einsatzPerApi(page, `E2E Rückweg ${Date.now()}`);
   for (let i = 0; i < MELDUNGEN; i += 1) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
       data: {
         absender: `Abschnitt ${i}`,
         meldeweg: 'funk',

@@ -18,12 +18,12 @@ async function aufbauenMitEinsatz(page: Page) {
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return (await antwort.json()) as { id: number };
   }
-  const einsatz = await anlegen('/api/einsaetze', { bezeichnung: `E2E UHS Höhe ${Date.now()}` });
-  const uhs = await anlegen(`/api/einsaetze/${einsatz.id}/uhs`, {
+  const einsatz = await anlegen('/api/incidents', { bezeichnung: `E2E UHS Höhe ${Date.now()}` });
+  const uhs = await anlegen(`/api/incidents/${einsatz.id}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'BHP Höhenprüfung',
   });
-  await anlegen(`/api/einsaetze/${einsatz.id}/uhs/${uhs.id}/seats/bulk`, {
+  await anlegen(`/api/incidents/${einsatz.id}/uhs/${uhs.id}/seats/bulk`, {
     typ: 'bett',
     menge: 2,
   });
@@ -41,7 +41,7 @@ test('UHS mit langem Kopf erhält eine nutzbare Arbeitsfläche unter der Bereich
   await page.evaluate(() => localStorage.setItem('lifeline-hub.dichte', 'handschuh'));
   // Fachlich zulässige lange Notiz: sie steht vollständig im Seitenkopf. Nur die
   // API-Antwort wird erweitert; Layout, Datenpfad und Grundriss bleiben echt.
-  await page.route(/\/api\/einsaetze\/\d+\/uhs\/\d+$/, async (route) => {
+  await page.route(/\/api\/incidents\/\d+\/uhs\/\d+$/, async (route) => {
     const antwort = await route.fetch();
     await route.fulfill({
       response: antwort,

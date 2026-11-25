@@ -26,7 +26,7 @@ async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Sta
 }
 
 fn pfad(e: i64, p: i64) -> String {
-    format!("/api/einsaetze/{e}/persons/{p}/injuries")
+    format!("/api/incidents/{e}/persons/{p}/injuries")
 }
 
 fn aufheben_pfad(e: i64, p: i64, v: &Value) -> String {
@@ -41,7 +41,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -205,7 +205,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{storniert}"),
+        &format!("/api/incidents/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -218,7 +218,7 @@ async fn storniert_409_vermisst_und_abgemeldet_422() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/persons/{p}/status"),
+            &format!("/api/incidents/{e}/persons/{p}/status"),
             &admin,
             Some(&json!({"status": status}).to_string()),
         )
@@ -370,7 +370,7 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -393,7 +393,7 @@ async fn replay_derselben_client_id_legt_eine_verletzung_an() {
 
 /// Koppelt ein Gerät mit `body` und liefert sein Sitzungscookie.
 async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
-    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/devices"), body).await;
+    let (s, v) = post(app, admin, &format!("/api/incidents/{e}/devices"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let code = v["code"]["code"].as_str().unwrap().to_string();
     let resp = app
@@ -421,7 +421,7 @@ async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String 
 }
 
 async fn aktive_stelle(app: &axum::Router, admin: &str, e: i64, art: &str, body: Value) -> i64 {
-    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/{art}"), body).await;
+    let (s, v) = post(app, admin, &format!("/api/incidents/{e}/{art}"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     v["id"].as_i64().unwrap()
 }
@@ -447,7 +447,7 @@ async fn verletzung_am_uhs_geraet() {
         let (s, _) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/uhs/{id}/status"),
+            &format!("/api/incidents/{e}/uhs/{id}/status"),
             json!({"status": "aktiv"}),
         )
         .await;
@@ -464,7 +464,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, kraft) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         json!({"adhoc": {"name": "Dr. A. Muster", "funktion": "Notärztin"}}),
     )
     .await;
@@ -472,7 +472,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, eigene) = post(
         &app,
         &tablet,
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         json!({}),
     )
     .await;
@@ -481,7 +481,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, fremde) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         json!({"uhs_id": uhs[1]}),
     )
     .await;
@@ -519,7 +519,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/care/positions/{stelle}"),
+        &format!("/api/incidents/{e}/care/positions/{stelle}"),
         &admin,
         Some(&json!({"status": "in_betrieb"}).to_string()),
     )
@@ -535,7 +535,7 @@ async fn verletzung_am_uhs_geraet() {
     let (s, in_stelle) = post(
         &app,
         &betreuung,
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         json!({}),
     )
     .await;
@@ -576,7 +576,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
     let (s, _) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{e}/uhs/{uhs}/status"),
         json!({"status": "aktiv"}),
     )
     .await;
@@ -591,7 +591,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
     let (s, person) = post(
         &app,
         &tablet,
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         json!({}),
     )
     .await;
@@ -606,7 +606,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, kraft) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/personnel"),
+            &format!("/api/incidents/{e}/personnel"),
             json!({"adhoc": {"name": format!("Bestätigt {name}")}}),
         )
         .await;
@@ -616,7 +616,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, v) = post(
             &app,
             &tablet,
-            &format!("/api/einsaetze/{e}/persons/{p}/{unterpfad}"),
+            &format!("/api/incidents/{e}/persons/{p}/{unterpfad}"),
             body,
         )
         .await;
@@ -624,7 +624,7 @@ async fn bestaetigende_kraft_von_verletzung_massnahme_oder_transport_ist_nicht_s
         let (s, v) = post(
             &app,
             &admin,
-            &format!("/api/einsaetze/{e}/personnel/{}/annul", kraft["id"]),
+            &format!("/api/incidents/{e}/personnel/{}/annul", kraft["id"]),
             json!({}),
         )
         .await;

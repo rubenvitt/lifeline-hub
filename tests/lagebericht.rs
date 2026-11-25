@@ -16,7 +16,7 @@ async fn anlegen_und_liste() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
     )
@@ -32,7 +32,7 @@ async fn anlegen_und_liste() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         None,
     )
@@ -48,7 +48,7 @@ async fn freigabe_schreibt_genau_einen_lage_etb_eintrag() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"Lage 10:00"}"#),
     )
@@ -57,7 +57,7 @@ async fn freigabe_schreibt_genau_einen_lage_etb_eintrag() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         Some(r#"{"abschnitte":[{"schluessel":"text","text":"Hochwasser steigt."}]}"#),
     )
@@ -66,7 +66,7 @@ async fn freigabe_schreibt_genau_einen_lage_etb_eintrag() {
     let (s, frei) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/release"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -77,7 +77,7 @@ async fn freigabe_schreibt_genau_einen_lage_etb_eintrag() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -104,7 +104,7 @@ async fn freigegebener_bericht_nicht_mehr_patchbar() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"X"}"#),
     )
@@ -113,7 +113,7 @@ async fn freigegebener_bericht_nicht_mehr_patchbar() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         Some(r#"{"abschnitte":[{"schluessel":"text","text":"A"}]}"#),
     )
@@ -121,7 +121,7 @@ async fn freigegebener_bericht_nicht_mehr_patchbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/release"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -129,7 +129,7 @@ async fn freigegebener_bericht_nicht_mehr_patchbar() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         Some(r#"{"titel":"Neu"}"#),
     )
@@ -150,13 +150,13 @@ async fn patch_unbekannter_abschnitts_schluessel_ist_400() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"X"}"#),
     )
     .await;
     let lid = lb["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/situation-reports/{lid}");
+    let u = format!("/api/incidents/{einsatz}/situation-reports/{lid}");
 
     let (status, antwort) = anfrage(
         &app,
@@ -187,7 +187,7 @@ async fn freigabe_leerer_bericht_422() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"X"}"#),
     )
@@ -196,7 +196,7 @@ async fn freigabe_leerer_bericht_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/release"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -212,7 +212,7 @@ async fn fortschreiben_erzeugt_version_2() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"Lage"}"#),
     )
@@ -221,7 +221,7 @@ async fn fortschreiben_erzeugt_version_2() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         Some(r#"{"abschnitte":[{"schluessel":"text","text":"A"}]}"#),
     )
@@ -229,7 +229,7 @@ async fn fortschreiben_erzeugt_version_2() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/release"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -237,7 +237,7 @@ async fn fortschreiben_erzeugt_version_2() {
     let (s, fort) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/revise"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/revise"),
         &admin,
         Some(r#"{}"#),
     )
@@ -262,7 +262,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/situation-reports"),
+            &format!("/api/incidents/{einsatz}/situation-reports"),
             &erika,
             None
         )
@@ -274,7 +274,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/situation-reports"),
+            &format!("/api/incidents/{einsatz}/situation-reports"),
             &erika,
             Some(r#"{"vorlage":"freitext","titel":"X"}"#)
         )
@@ -295,14 +295,14 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (status, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"freitext","titel":"Lage 10:00","zeitstand":"2026-06-02 10:00:00"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{lb:?}");
     let lid = lb["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/situation-reports/{lid}");
+    let u = format!("/api/incidents/{einsatz}/situation-reports/{lid}");
 
     let (s, antwort) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{antwort:?}");
@@ -333,7 +333,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -360,7 +360,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -383,7 +383,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (_, angelegt) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
     )
@@ -392,7 +392,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         None,
     )
@@ -412,7 +412,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{id}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{id}"),
         &admin,
         None,
     )
@@ -430,7 +430,7 @@ async fn entwurfs_patch_nur_an_abschnitten_kennzeichnet_das_ereignis() {
     let (_, angelegt) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
     )
@@ -440,7 +440,7 @@ async fn entwurfs_patch_nur_an_abschnitten_kennzeichnet_das_ereignis() {
         .as_str()
         .unwrap()
         .to_string();
-    let pfad = format!("/api/einsaetze/{einsatz}/situation-reports/{id}");
+    let pfad = format!("/api/incidents/{einsatz}/situation-reports/{id}");
     let mut rx = live.abonniere(einsatz);
 
     let inhalt = format!(
@@ -510,14 +510,14 @@ async fn einsatzfuehrung_laesst_einsatzleitung_ohne_org_rolle_lesen_und_schreibe
     let (status, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/lageberichte"),
+        &format!("/api/incidents/{einsatz}/module-overrides/lageberichte"),
         &leonie,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::OK);
 
-    let pfad = format!("/api/einsaetze/{einsatz}/situation-reports");
+    let pfad = format!("/api/incidents/{einsatz}/situation-reports");
     let (status, json) = anfrage(
         &app,
         "POST",
@@ -553,7 +553,7 @@ async fn patch_speichert_den_stand_der_uebernahme_je_abschnitt() {
     let (_, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"lagebericht","titel":"Lage"}"#),
     )
@@ -567,7 +567,7 @@ async fn patch_speichert_den_stand_der_uebernahme_je_abschnitt() {
     let (s, lb) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         Some(
             r#"{"abschnitte":[
@@ -591,7 +591,7 @@ async fn patch_speichert_den_stand_der_uebernahme_je_abschnitt() {
     let (_, gelesen) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}"),
         &admin,
         None,
     )
@@ -607,7 +607,7 @@ async fn unlesbarer_stand_der_uebernahme_ist_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/situation-reports");
+    let pfad = format!("/api/incidents/{einsatz}/situation-reports");
     let (s, _) = anfrage(
         &app,
         "POST",
@@ -651,7 +651,7 @@ async fn fortschreiben_uebernimmt_den_stand_der_vorfassung() {
     let (s, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(
             r#"{"vorlage":"lagebericht","titel":"Lage","abschnitte":[
@@ -670,7 +670,7 @@ async fn fortschreiben_uebernimmt_den_stand_der_vorfassung() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/release"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/release"),
         &admin,
         None,
     )
@@ -679,7 +679,7 @@ async fn fortschreiben_uebernimmt_den_stand_der_vorfassung() {
     let (s, fort) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports/{lid}/revise"),
+        &format!("/api/incidents/{einsatz}/situation-reports/{lid}/revise"),
         &admin,
         Some(r#"{}"#),
     )

@@ -66,13 +66,13 @@ function tor() {
 function render(liste = [ep, zweite]) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzFixture({ id: 7 }))),
-    http.get('/api/einsaetze/7/personnel', ({ request }) =>
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatzFixture({ id: 7 }))),
+    http.get('/api/incidents/7/personnel', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
     ),
-    http.get('/api/einsaetze/7/personnel/timeline', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/personnel/timeline', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/vehicles', () => HttpResponse.json([])),
     http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -107,7 +107,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     const zweiterVersuch = tor();
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/7/personnel/bulk', async () => {
+      http.post('/api/incidents/7/personnel/bulk', async () => {
         versuche += 1;
         if (versuche > 1) await zweiterVersuch.offen;
         return HttpResponse.json({ error: 'Person ist in einem anderen Einsatz' }, { status: 409 });
@@ -144,7 +144,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     const naechster = tor();
     let versuche = 0;
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async () => {
+      http.patch('/api/incidents/7/personnel/10', async () => {
         versuche += 1;
         if (versuche === 1) {
           return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
@@ -172,7 +172,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Position: die Ablehnung steht an der Angabe, die Auswahl bleibt mit dem gewählten Wert offen', async () => {
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', () =>
+      http.patch('/api/incidents/7/personnel/10', () =>
         HttpResponse.json({ error: 'Position abgelehnt' }, { status: 422 }),
       ),
     );
@@ -204,7 +204,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Fahrzeug: der Grund steht an der Fahrzeugzelle, die Auswahl zeigt weiter das gewählte Fahrzeug', async () => {
     const { container } = render();
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([
           {
             id: 8,
@@ -217,7 +217,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
           },
         ]),
       ),
-      http.put('/api/einsaetze/7/vehicles/8/crew/10', () =>
+      http.put('/api/incidents/7/vehicles/8/crew/10', () =>
         HttpResponse.json({ error: 'Fahrzeug ist voll besetzt' }, { status: 422 }),
       ),
     );
@@ -247,7 +247,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Bemerkung: das Feld wartet und bleibt bei Ablehnung mit dem Wortlaut offen', async () => {
     setzeViewportBreite(1600);
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', () =>
+      http.patch('/api/incidents/7/personnel/10', () =>
         HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
@@ -279,7 +279,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
     setzeViewportBreite(1600);
     let patches = 0;
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', () => {
+      http.patch('/api/incidents/7/personnel/10', () => {
         patches += 1;
         return HttpResponse.json({ ...ep, bemerkung: 'x' });
       }),
@@ -309,7 +309,7 @@ describe('PersonalPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('unter md steht der Grund an der Karte', async () => {
     setzeViewportBreite(390);
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', () =>
+      http.patch('/api/incidents/7/personnel/10', () =>
         HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 }),
       ),
     );

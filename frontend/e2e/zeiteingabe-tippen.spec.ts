@@ -49,10 +49,10 @@ function draht(d: Date): string {
 }
 
 async function neuerEinsatz(page: Page, name: string): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E ${name} ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBeTruthy();
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBeTruthy();
   return ((await r.json()) as { id: number }).id;
 }
 
@@ -84,7 +84,7 @@ test('ETB-Feld „Zeit“: HHMM + Enter übernimmt ohne Maus, der Eintrag trägt
 
   await page.getByRole('button', { name: /^Erfassen als / }).click();
   await expect(feld).toHaveValue('');
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const r = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   const eintrag = ((await r.json()) as { inhalt: string; ereigniszeit: string }[]).find(
     (e) => e.inhalt === inhalt,
   );
@@ -114,7 +114,7 @@ test('Auftragsfrist: HHMM + Enter übernimmt die Frist und erteilt den Auftrag',
   await feld.press('Enter');
   await expect(dialog).toBeHidden();
 
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/tasks`);
+  const r = await page.request.get(`/api/incidents/${einsatzId}/tasks`);
   const auftrag = ((await r.json()) as { auftrag_text: string; frist_at: string | null }[]).find(
     (a) => a.auftrag_text === text,
   );
@@ -128,7 +128,7 @@ test('Ablösung: „Im Einsatz seit“ HHMM + Enter beginnt die Schicht zu diese
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page, { startseite: false });
   const einsatzId = await neuerEinsatz(page, 'Ablösung Zeit');
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (methode: 'post' | 'put', pfad: string, data: unknown, was: string) => {
     const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
     expect(
@@ -227,7 +227,7 @@ test('doppelte Stunde: „0247“ um 02:50 Winterzeit ist im Ereignisfeld drei M
 
   await page.getByRole('button', { name: /^Erfassen/ }).click();
   await expect(feld).toHaveValue('');
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const r = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   const eintrag = ((await r.json()) as { inhalt: string; ereigniszeit: string }[]).find(
     (e) => e.inhalt === inhalt,
   );

@@ -39,8 +39,8 @@ beforeEach(async () => {
   setzeOnline(true);
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   server.use(
-    http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:einsatzId/persons/transport-means', () =>
+    http.get('/api/incidents/:einsatzId/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/:einsatzId/persons/transport-means', () =>
       HttpResponse.json({ im_einsatz: [], bisher: [], stamm: [] }),
     ),
   );
@@ -94,8 +94,8 @@ function Ort() {
 function render(personen: () => Person[], einsatz: Partial<EinsatzAnzeige> = {}) {
   server.use(
     meHandler(benutzerFixture()),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture(einsatz))),
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen())),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture(einsatz))),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json(personen())),
   );
   return renderMitProviders(
     <>
@@ -117,7 +117,7 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
     const gesendet: unknown[] = [];
     let stand: Person[] = [r007];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/triage', async ({ request }) => {
         gesendet.push(await request.json());
         stand = [{ ...r007, aktuelle_sichtung: 'sk1' }];
         return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
@@ -146,7 +146,7 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
 
   it('eine abgelehnte Nachsichtung steht an ihrer Zeile', async () => {
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', () => abgelehnt('Person ist storniert')),
+      http.post('/api/incidents/1/persons/70/triage', () => abgelehnt('Person ist storniert')),
     );
     const user = userEvent.setup();
     render(() => [r007]);
@@ -166,7 +166,7 @@ describe('Sichtung aus der Zeile (LLH-1130, 2.1)', () => {
   it('ohne gewählte Fläche schickt „Übernehmen“ nichts', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/triage', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
       }),
@@ -215,7 +215,7 @@ describe('Sichtung aus der Zeile — Haptik in der Hülle', () => {
     const antwort = new Promise<void>((r) => (freigeben = r));
     let stand: Person[] = [r007];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', async () => {
+      http.post('/api/incidents/1/persons/70/triage', async () => {
         await antwort;
         stand = [{ ...r007, aktuelle_sichtung: 'sk1' }];
         return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
@@ -255,7 +255,7 @@ describe('Sichtung aus der Zeile — Haptik in der Hülle', () => {
   it('meldet `error` bei Ablehnung; der Grund steht weiter an der Zeile, kein Toast', async () => {
     const haptik = mitIosHuelle();
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', () => abgelehnt('Person ist storniert')),
+      http.post('/api/incidents/1/persons/70/triage', () => abgelehnt('Person ist storniert')),
     );
     const user = userEvent.setup();
     render(() => [r007]);
@@ -306,7 +306,7 @@ describe('Verbleib aus der Zeile (LLH-1130, 2.2)', () => {
     const gesendet: unknown[] = [];
     let stand: Person[] = [r007];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/whereabouts', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/whereabouts', async ({ request }) => {
         gesendet.push(await request.json());
         stand = [mitVerbleib(r007)];
         return HttpResponse.json(verbleibAntwort, { status: 201 });
@@ -328,7 +328,7 @@ describe('Verbleib aus der Zeile (LLH-1130, 2.2)', () => {
   it('„Nur Lücken zeigen“: die Lücke schließt in der Zelle, die Zeile bleibt, die Zahl sinkt', async () => {
     let stand: Person[] = [r007, r008];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/whereabouts', () => {
+      http.post('/api/incidents/1/persons/70/whereabouts', () => {
         stand = [mitVerbleib(r007), r008];
         return HttpResponse.json(verbleibAntwort, { status: 201 });
       }),
@@ -380,7 +380,7 @@ describe('Ohne Netz aus der Zeile (LLH-1138, design.md D8)', () => {
   it('Nachsichtung: die Zeile zeigt „Offline vorgemerkt“, gesendet wird nichts', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/triage', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(sichtungAntwort('sk1'), { status: 201 });
       }),
@@ -413,7 +413,7 @@ describe('Ohne Netz aus der Zeile (LLH-1138, design.md D8)', () => {
   it('Verbleib aus der Lücke: der Dialog schließt, die Zeile zeigt „Offline vorgemerkt“', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/whereabouts', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/whereabouts', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(verbleibAntwort, { status: 201 });
       }),
@@ -464,7 +464,7 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
   it('im Eigentransport: „Übergabe quittieren“ im Menü, quittiert mit Fahrzeug (LLH-1332)', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/whereabouts', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/whereabouts', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(verbleibAntwort, { status: 201 });
       }),
@@ -504,7 +504,7 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
   it('„Sichten“ öffnet die Nachsichtung, „Verbleib erfassen“ den Verbleib-Dialog', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/persons/70/triage', async ({ request }) => {
+      http.post('/api/incidents/1/persons/70/triage', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json(sichtungAntwort('sk3'), { status: 201 });
       }),
@@ -536,7 +536,7 @@ describe('Zeilenmenü (LLH-1130, 2.3)', () => {
 
   it('gesperrte Lagekarte: Verorten steht gesperrt mit Grund', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
       ),
     );

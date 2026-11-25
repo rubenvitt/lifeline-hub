@@ -34,7 +34,7 @@ interface Kopplung {
 
 /** Die UHS des Demo-Einsatzes. */
 async function demoUhs(page: Page, einsatz: number): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/uhs`);
+  const antwort = await page.request.get(`/api/incidents/${einsatz}/uhs`);
   expect(antwort.ok(), `UHS: ${antwort.status()}`).toBe(true);
   const [erste] = (await antwort.json()) as { id: number }[];
   expect(erste, 'der Demo-Einsatz hat eine UHS').toBeDefined();
@@ -48,7 +48,7 @@ function endeIn(minuten: number): string {
 
 /** Legt eine Kopplung als Einsatzleitung an. */
 async function kopplungAnlegen(page: Page, einsatz: number, daten: object): Promise<Kopplung> {
-  return fuelle<Kopplung>(page, 'post', `/api/einsaetze/${einsatz}/devices`, daten);
+  return fuelle<Kopplung>(page, 'post', `/api/incidents/${einsatz}/devices`, daten);
 }
 
 /** Eigener Browserkontext für das Gerät (eigener Cookie-Jar), Uhr angehalten. */
@@ -196,7 +196,7 @@ test.describe(KAPITEL, () => {
     const { kontext, geraet } = await geraetOeffnen(browser);
     try {
       await koppeln(geraet, k.code.code);
-      await fuelle(page, 'post', `/api/einsaetze/${demo.id}/devices/${k.kopplung.id}/revoke`);
+      await fuelle(page, 'post', `/api/incidents/${demo.id}/devices/${k.kopplung.id}/revoke`);
       // Ohne Neuladen: der Server schließt den Einsatzstrom, das Gerät prüft seine Sitzung.
       await expect(geraet).toHaveURL(/\/kopplung-beendet$/);
       const karte = geraet.locator('.login-karte');

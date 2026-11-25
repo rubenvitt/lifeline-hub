@@ -1343,7 +1343,7 @@ fn kein_herstellername_im_code() {
         .unwrap()
         .flatten()
     {
-        if e.file_name().to_string_lossy().starts_with("0373_") {
+        if e.file_name().to_string_lossy().starts_with("0374_") {
             dateien.push(e.path());
         }
     }

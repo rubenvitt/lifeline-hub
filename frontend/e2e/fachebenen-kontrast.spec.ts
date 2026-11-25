@@ -210,7 +210,7 @@ for (const g of GRUNDLAGEN) {
     await fachebenenBeantworten(page);
 
     await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
-    const antwort = await page.request.post('/api/einsaetze', {
+    const antwort = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E 600 Kontrast ${Date.now()}` },
     });
     expect(antwort.ok(), await antwort.text()).toBeTruthy();

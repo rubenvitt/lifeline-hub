@@ -43,7 +43,7 @@ async function schriftenGeladen(page: Page) {
 
 async function mitStrom(page: Page, einsatzId: number, schritt: () => Promise<unknown>) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await schritt();
   await strom;
@@ -66,13 +66,13 @@ for (const kontext of KONTEXTE) {
     await page.setViewportSize(kontext.viewport);
     await anmelden(page);
 
-    const neu = await page.request.post('/api/einsaetze', {
+    const neu = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Zufluss ${kontext.name} ${Date.now()}` },
     });
     expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
     const einsatzId = ((await neu.json()) as { id: number }).id;
     const post = async (pfad: string, data: unknown, was: string) => {
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+      const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
       expect(
         antwort.ok(),
         `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
@@ -222,13 +222,13 @@ test.describe('fremde Rhythmusänderung', () => {
         await page.setViewportSize(kontext.viewport);
         await anmelden(page, { startseite: false });
 
-        const neu = await page.request.post('/api/einsaetze', {
+        const neu = await page.request.post('/api/incidents', {
           data: { bezeichnung: `E2E Umordnung ${kontext.name} ${Date.now()}` },
         });
         expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
         const einsatzId = ((await neu.json()) as { id: number }).id;
         const post = async (pfad: string, data: unknown, was: string) => {
-          const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+          const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
           expect(
             antwort.ok(),
             `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
@@ -298,7 +298,7 @@ test.describe('fremde Rhythmusänderung', () => {
         // Fremd geändert, am Frontend vorbei: 30 min Rhythmus → fällig vor den beiden anderen.
         const mitte = karten.nth(1);
         const aenderung = await page.request.patch(
-          `/api/einsaetze/${einsatzId}/reliefs/${schichten[1]}`,
+          `/api/incidents/${einsatzId}/reliefs/${schichten[1]}`,
           { data: { rhythmus_minuten: 30 } },
         );
         expect(aenderung.ok(), `fremde Änderung: ${aenderung.status()}`).toBeTruthy();
@@ -356,13 +356,13 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmelden(page, { startseite: false });
 
-    const neu = await page.request.post('/api/einsaetze', {
+    const neu = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Rhythmuszeile ${dichte} ${Date.now()}` },
     });
     expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
     const einsatzId = ((await neu.json()) as { id: number }).id;
     const post = async (pfad: string, data: unknown, was: string) => {
-      const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+      const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
       expect(
         antwort.ok(),
         `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
@@ -371,7 +371,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     };
     const abschnitt = await post('sectors', { name: 'Deichwache Nord' }, 'Abschnitt');
     // Der Abschnitt hat keine Vorgabe: die Schicht folgt der Vorgabe des Einsatzes.
-    const vorgabe = await page.request.put(`/api/einsaetze/${einsatzId}/reliefs/shift-model`, {
+    const vorgabe = await page.request.put(`/api/incidents/${einsatzId}/reliefs/shift-model`, {
       data: {
         schichtmodell: {
           bezeichnung: 'Längster Rhythmus',

@@ -182,16 +182,16 @@ const VORHERSAGE = {
  */
 async function stelle(page: Page, einsatzId: number, pegelListe = true) {
   if (pegelListe)
-    await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
+    await page.route(`**/api/incidents/${einsatzId}/gauges`, (route) =>
       route.request().method() === 'GET' ? route.fulfill({ json: PEGEL }) : route.continue(),
     );
-  await page.route(`**/api/einsaetze/${einsatzId}/gauges/history`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/gauges/history`, (route) =>
     route.fulfill({ json: VERLAUF }),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/gauges/*/prediction`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/gauges/*/prediction`, (route) =>
     route.fulfill({ json: VORHERSAGE }),
   );
-  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/weather`, (route) =>
     route.fulfill({ json: WETTER }),
   );
   await page.route('**/api/map/overlays/pegelonline*', (route) =>
@@ -228,7 +228,7 @@ test.describe(KAPITEL, () => {
     const id = await vorbereiten(page);
     // Die Reihenfolge der Seite folgt der Festlegung am Einsatz (LLH-1117), nicht der gestellten
     // Liste: für die Hochwasserlage werden die Pegel echt festgelegt.
-    await fuelle(page, 'put', `/api/einsaetze/${id}/gauges`, {
+    await fuelle(page, 'put', `/api/incidents/${id}/gauges`, {
       stationen: PEGEL.map((p) => ({
         station_uuid: p.station_uuid,
         name: p.name,
@@ -287,7 +287,7 @@ test.describe(KAPITEL, () => {
 
   test('Dialog Prognose', async ({ page }) => {
     const id = await vorbereiten(page, false);
-    await fuelle(page, 'put', `/api/einsaetze/${id}/gauges`, {
+    await fuelle(page, 'put', `/api/incidents/${id}/gauges`, {
       stationen: PEGEL.map((p) => ({
         station_uuid: p.station_uuid,
         name: p.name,

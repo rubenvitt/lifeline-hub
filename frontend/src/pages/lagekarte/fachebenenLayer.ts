@@ -615,6 +615,8 @@ const KATEGORIE_LABEL: Record<string, string> = {
   webcam: 'Webcam',
   baustelle: 'Baustelle',
   sperrung: 'Sperrung',
+  verkehrsmeldung: 'Verkehrsmeldung',
+  rastanlage: 'Rastanlage',
   luftmessstation: 'Luftmessstation',
 };
 

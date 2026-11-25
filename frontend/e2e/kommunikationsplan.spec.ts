@@ -40,7 +40,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung: name } });
   expect(antwort.ok(), `Einsatz: ${await antwort.text()}`).toBeTruthy();
   return String(((await antwort.json()) as { id: number }).id);
 }
@@ -54,7 +54,7 @@ interface Stelle {
 /** FHP mit langer Bezeichnung, eine Behörde mit zwei Verbindungen, ein Abschnitt mit Nummer —
  *  aber KEINE Leitstelle: die Lücke hat einen Treffer. */
 async function seede(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const stelle = async (data: unknown): Promise<Stelle[]> => {
     const a = await page.request.post(`${basis}/staff/comms-plan/positions`, { data });
     expect(a.status(), `Stelle: ${await a.text()}`).toBe(201);
@@ -277,7 +277,7 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     expect(vorher, 'Zeile sichtbar').not.toBeNull();
 
     const antwort = await page.request.post(
-      `/api/einsaetze/${einsatzId}/staff/comms-plan/positions`,
+      `/api/incidents/${einsatzId}/staff/comms-plan/positions`,
       { data: { stellenart: 'funktion', funktion: 's3' } },
     );
     expect(antwort.status(), `Stelle: ${await antwort.text()}`).toBe(201);

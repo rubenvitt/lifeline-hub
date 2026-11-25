@@ -12,12 +12,12 @@ import { anmeldenAlsAdmin, benutzerAnlegen, mitgliedEintragen, wechsleZu } from 
  */
 
 async function seedeEinheit(page: Page): Promise<{ einsatzId: string; einheitId: number }> {
-  const einsatz = await page.request.post('/api/einsaetze', {
+  const einsatz = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Zeitachse ${Date.now()}` },
   });
   expect(einsatz.ok(), await einsatz.text()).toBe(true);
   const einsatzId = String(((await einsatz.json()) as { id: number }).id);
-  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+  const einheit = await page.request.post(`/api/incidents/${einsatzId}/units`, {
     data: { name: 'Zeitachsenzug' },
   });
   expect(einheit.ok(), await einheit.text()).toBe(true);

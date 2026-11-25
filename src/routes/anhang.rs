@@ -47,7 +47,7 @@ async fn fordere_hochladende_bei_mitarbeit(
     Ok(())
 }
 
-/// POST /api/einsaetze/{id}/attachments — generischer Datei-Upload (multipart). Schreibrecht und
+/// POST /api/incidents/{id}/attachments — generischer Datei-Upload (multipart). Schreibrecht und
 /// aktiver Einsatz. Jedes Datei-Feld wird geprüft (MIME aus Endung, Größe, AV-Scan) und als
 /// BLOB gespeichert. Die Verknüpfung mit einer Chat-Nachricht entsteht beim Senden.
 pub async fn hochladen(
@@ -70,7 +70,7 @@ pub async fn hochladen(
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
-/// GET /api/einsaetze/{id}/attachments/{aid} — Anhang herunterladen. Lesezugriff; ein Anhang aus
+/// GET /api/incidents/{id}/attachments/{aid} — Anhang herunterladen. Lesezugriff; ein Anhang aus
 /// einem fremden Einsatz ist 404.
 ///
 /// Gegatet über [`anhang::repo::linker_stand`] (alle Linker): hängt der Anhang nur noch an
@@ -111,7 +111,7 @@ pub async fn herunterladen(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// DELETE /api/einsaetze/{id}/attachments/{aid} — Anhang hart löschen. Schreibrecht und aktiver
+/// DELETE /api/incidents/{id}/attachments/{aid} — Anhang hart löschen. Schreibrecht und aktiver
 /// Einsatz; ein fremder Anhang ist 404. CASCADE räumt die `chat_nachricht_anhang`-Verknüpfungen.
 /// Modulgebundene Anhänge werden mit 422 abgewiesen (Wortlaut aus dem Linker-Register) — sie
 /// entfernt ihr Modul, ETB-Anhänge nur die Schwärzung. Einen ungebundenen Anhang verwirft nur,

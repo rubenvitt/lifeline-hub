@@ -16,16 +16,16 @@ async function post<T = { id: number }>(page: Page, pfad: string, data: unknown)
 }
 
 async function etbInhalte(page: Page, einsatzId: string): Promise<string[]> {
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
 async function seed(page: Page, bezeichnung: string, menge: number) {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Materialliste ${Date.now()}`,
   });
   const einsatzId = String(id);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   await post(page, `${basis}/units`, { name: 'Staffel A' });
   await post(page, `${basis}/units`, { name: 'Staffel B' });
   await post(page, `${basis}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
@@ -121,7 +121,7 @@ test('Aufteilen mit Ort: 20 von 50 an die UHS, der Rest bleibt an der Einheit (t
   page,
 }) => {
   const einsatzId = await seed(page, 'Wolldecke', 50);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const einheiten = (await (await page.request.get(`${basis}/units`)).json()) as {
     id: number;
     name: string;

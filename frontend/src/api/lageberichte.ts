@@ -9,11 +9,11 @@ import type {
 
 /** Kopfdaten ohne Abschnitte (LFH-931); den Text liefert nur das Detail. */
 export function listeLageberichte(einsatzId: number): Promise<LageberichtKopf[]> {
-  return apiGet<LageberichtKopf[]>(`/api/einsaetze/${einsatzId}/situation-reports`);
+  return apiGet<LageberichtKopf[]>(`/api/incidents/${einsatzId}/situation-reports`);
 }
 
 export function ladeLagebericht(einsatzId: number, id: number): Promise<LageberichtAnzeige> {
-  return apiGet<LageberichtAnzeige>(`/api/einsaetze/${einsatzId}/situation-reports/${id}`);
+  return apiGet<LageberichtAnzeige>(`/api/incidents/${einsatzId}/situation-reports/${id}`);
 }
 
 interface NeuerLagebericht {
@@ -32,7 +32,7 @@ export function legeLageberichtAn(
   daten: NeuerLagebericht,
 ): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/situation-reports`,
+    `/api/incidents/${einsatzId}/situation-reports`,
     'POST',
     daten,
   );
@@ -52,7 +52,7 @@ export function aktualisiereLagebericht(
   patch: LageberichtPatch,
 ): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/situation-reports/${id}`,
+    `/api/incidents/${einsatzId}/situation-reports/${id}`,
     'PATCH',
     patch,
   );
@@ -60,7 +60,7 @@ export function aktualisiereLagebericht(
 
 export function gibLageberichtFrei(einsatzId: number, id: number): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/situation-reports/${id}/release`,
+    `/api/incidents/${einsatzId}/situation-reports/${id}/release`,
     'POST',
   );
 }
@@ -71,7 +71,7 @@ export function schreibeLageberichtFort(
   zeitstand?: string,
 ): Promise<LageberichtAnzeige> {
   return apiSend<LageberichtAnzeige>(
-    `/api/einsaetze/${einsatzId}/situation-reports/${id}/revise`,
+    `/api/incidents/${einsatzId}/situation-reports/${id}/revise`,
     'POST',
     { zeitstand },
   );

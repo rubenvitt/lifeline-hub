@@ -22,7 +22,7 @@ vi.mock('../alarm/alarmTon', async (original) => ({
  */
 
 const benutzer = benutzerFixture({ anzeigename: 'E' });
-const PFAD = '/api/einsaetze/7/weather';
+const PFAD = '/api/incidents/7/weather';
 const STUNDE = 3_600_000;
 
 function antwort(alterMs: number) {

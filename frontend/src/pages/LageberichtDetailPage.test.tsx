@@ -699,7 +699,7 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
       bezeichnung: 'Übung',
     } as never);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/sectors', () =>
+      http.get('/api/incidents/:einsatzId/sectors', () =>
         HttpResponse.json([{ id: 3, name: 'EA Süd' }]),
       ),
     );

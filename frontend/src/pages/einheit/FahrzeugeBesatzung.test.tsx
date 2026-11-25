@@ -366,15 +366,15 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
   it('„Auf 83-2“ geht über die Sammelroute mit genau dieser Kraft, „Vom Fahrzeug lösen“ löst sie', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.post('/api/einsaetze/1/vehicles/:efId/crew', async ({ params, request }) => {
+      http.post('/api/incidents/1/vehicles/:efId/crew', async ({ params, request }) => {
         aufrufe.push(`POST ${params.efId} ${JSON.stringify(await request.json())}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/1/vehicles/:efId/crew/:epId', ({ params }) => {
+      http.put('/api/incidents/1/vehicles/:efId/crew/:epId', ({ params }) => {
         aufrufe.push(`PUT ${params.efId}/${params.epId}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.delete('/api/einsaetze/1/vehicles/:efId/crew/:epId', ({ params }) => {
+      http.delete('/api/incidents/1/vehicles/:efId/crew/:epId', ({ params }) => {
         aufrufe.push(`DELETE ${params.efId}/${params.epId}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -388,7 +388,7 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
   it('„Als Einheitsführer“ geht über den Kopfweg, „Aus Einheit lösen“ über die Einheit', async () => {
     const geloest: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/1/units/10/personnel/:epId', ({ params }) => {
+      http.delete('/api/incidents/1/units/10/personnel/:epId', ({ params }) => {
         geloest.push(String(params.epId));
         return new HttpResponse(null, { status: 204 });
       }),
@@ -404,7 +404,7 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     server.use(
-      http.post('/api/einsaetze/1/vehicles/:efId/crew', async ({ params }) => {
+      http.post('/api/incidents/1/vehicles/:efId/crew', async ({ params }) => {
         if (params.efId === '30') {
           await ersteAblehnung;
           return HttpResponse.json({ error: 'Fahrzeug ist voll' }, { status: 409 });
@@ -425,7 +425,7 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
   });
   it('abgelehnte Kraft: der Grund je Person aus der Antwort steht an ihrer Zeile', async () => {
     server.use(
-      http.post('/api/einsaetze/1/vehicles/31/crew', () =>
+      http.post('/api/incidents/1/vehicles/31/crew', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Personen lassen sich zuordnen',
@@ -446,7 +446,7 @@ describe('FahrzeugeBesatzung · Menü je Person (D9)', () => {
 
   it('Rückmeldung vor der Antwort: der Auslöser der Person lädt, der einer anderen nicht', async () => {
     server.use(
-      http.post('/api/einsaetze/1/vehicles/:efId/crew', async () => {
+      http.post('/api/incidents/1/vehicles/:efId/crew', async () => {
         await delay('infinite');
         return new HttpResponse(null, { status: 204 });
       }),
@@ -468,7 +468,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
   it('FMS-Status an der Zeile setzen schickt `status_id`', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/vehicles/30', async ({ request }) => {
+      http.patch('/api/incidents/1/vehicles/30', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json(FAHRZEUGE[1]);
       }),
@@ -483,7 +483,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
 
   it('„Aus Einheit lösen“ steht neutral im ⋮ des Fahrzeugs, kein roter Knopf; der Grund steht an der Zeile (LLH-1722)', async () => {
     server.use(
-      http.delete('/api/einsaetze/1/units/10/vehicles/30', () =>
+      http.delete('/api/incidents/1/units/10/vehicles/30', () =>
         HttpResponse.json({ error: 'Fahrzeug ist gebunden' }, { status: 409 }),
       ),
     );
@@ -501,7 +501,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
 
   it('abgelehnte FMS-Wahl: der Grund steht an der Fahrzeugzeile, kein Toast', async () => {
     server.use(
-      http.patch('/api/einsaetze/1/vehicles/30', () =>
+      http.patch('/api/incidents/1/vehicles/30', () =>
         HttpResponse.json({ error: 'Status ist gesperrt' }, { status: 409 }),
       ),
     );
@@ -517,7 +517,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
   it('FMS-Wahl an einem zweiten Fahrzeug, während die erste noch läuft, geht hinaus', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/vehicles/:efId', async ({ params, request }) => {
+      http.patch('/api/incidents/1/vehicles/:efId', async ({ params, request }) => {
         aufrufe.push(`${params.efId}:${JSON.stringify(await request.json())}`);
         if (params.efId === '30') await delay('infinite');
         return HttpResponse.json(FAHRZEUGE[0]);
@@ -536,7 +536,7 @@ describe('FahrzeugeBesatzung · Fahrzeugzeile (D10)', () => {
 
   it('„Aus Einheit lösen“ lädt bis zur Antwort am ⋮, nur an seiner Zeile', async () => {
     server.use(
-      http.delete('/api/einsaetze/1/units/10/vehicles/30', async () => {
+      http.delete('/api/incidents/1/units/10/vehicles/30', async () => {
         await delay('infinite');
         return new HttpResponse(null, { status: 204 });
       }),
@@ -564,11 +564,11 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
   function mitschnitt() {
     const aufrufe: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/1/units/10/vehicles/:efId', ({ params }) => {
+      http.delete('/api/incidents/1/units/10/vehicles/:efId', ({ params }) => {
         aufrufe.push(`DELETE ${params.efId}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/1/units/10/vehicles/:efId', ({ params, request }) => {
+      http.put('/api/incidents/1/units/10/vehicles/:efId', ({ params, request }) => {
         aufrufe.push(`PUT ${params.efId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -640,7 +640,7 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
   it('steht das Fahrzeug inzwischen in einer anderen Einheit, steht der Grund an der gehaltenen Zeile', async () => {
     mitschnitt();
     server.use(
-      http.put('/api/einsaetze/1/units/10/vehicles/30', () =>
+      http.put('/api/incidents/1/units/10/vehicles/30', () =>
         HttpResponse.json({ error: '83-1 steht inzwischen in Einheit «Gr 2»' }, { status: 409 }),
       ),
     );
@@ -713,7 +713,7 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
     expect(ohne == null ? [] : namenIn(ohne)).not.toContain('Anna Führer');
 
     server.use(
-      http.put('/api/einsaetze/1/units/10/vehicles/30', () =>
+      http.put('/api/incidents/1/units/10/vehicles/30', () =>
         HttpResponse.json({ error: '83-1 steht inzwischen in Einheit «Gr 2»' }, { status: 409 }),
       ),
     );
@@ -731,10 +731,10 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
     const aufrufe: string[] = [];
     server.use(
       http.delete(
-        '/api/einsaetze/1/units/10/personnel/:epId',
+        '/api/incidents/1/units/10/personnel/:epId',
         () => new HttpResponse(null, { status: 204 }),
       ),
-      http.put('/api/einsaetze/1/units/10/personnel/:epId', ({ params, request }) => {
+      http.put('/api/incidents/1/units/10/personnel/:epId', ({ params, request }) => {
         aufrufe.push(`PUT ${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -752,10 +752,10 @@ describe('FahrzeugeBesatzung · Rückweg nach dem Lösen (LLH-1722)', () => {
     const aufrufe: string[] = [];
     server.use(
       http.delete(
-        '/api/einsaetze/1/vehicles/30/crew/3',
+        '/api/incidents/1/vehicles/30/crew/3',
         () => new HttpResponse(null, { status: 204 }),
       ),
-      http.put('/api/einsaetze/1/vehicles/:efId/crew/:epId', ({ params, request }) => {
+      http.put('/api/incidents/1/vehicles/:efId/crew/:epId', ({ params, request }) => {
         aufrufe.push(`PUT ${params.efId}/${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -780,7 +780,7 @@ describe('FahrzeugeBesatzung · Personal der Einheit übernehmen (LLH-1267)', ()
   it('je Fahrzeug: der Dialog schlägt die freien Kräfte der Einheit vor, Übernehmen schickt sie in einem Schritt', async () => {
     const bodies: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/vehicles/31/crew', async ({ request }) => {
+      http.post('/api/incidents/1/vehicles/31/crew', async ({ request }) => {
         bodies.push(await request.json());
         return new HttpResponse(null, { status: 204 });
       }),
@@ -828,10 +828,10 @@ describe('FahrzeugeBesatzung · Personal der Einheit übernehmen (LLH-1267)', ()
 
   it('nach dem Übernehmen ist ein alter Grund an der Person geräumt', async () => {
     server.use(
-      http.post('/api/einsaetze/1/vehicles/31/crew', () =>
+      http.post('/api/incidents/1/vehicles/31/crew', () =>
         HttpResponse.json({ error: 'Fahrzeug ist storniert' }, { status: 409 }),
       ),
-      http.post('/api/einsaetze/1/vehicles/30/crew', () => new HttpResponse(null, { status: 204 })),
+      http.post('/api/incidents/1/vehicles/30/crew', () => new HttpResponse(null, { status: 204 })),
     );
     zeige();
     await userEvent.click(within(await oeffneMenue('Dora Ohne')).getByText('Auf 83-2'));
@@ -919,7 +919,7 @@ describe('FahrzeugeBesatzung · Kontextmenü (LLH-1599)', () => {
   it('Rechtsklick auf eine Person zeigt die Einträge ihres ⋮; die Wahl wirkt wie dort', async () => {
     const bodies: string[] = [];
     server.use(
-      http.post('/api/einsaetze/1/vehicles/:efId/crew', ({ params }) => {
+      http.post('/api/incidents/1/vehicles/:efId/crew', ({ params }) => {
         bodies.push(String(params.efId));
         return new HttpResponse(null, { status: 204 });
       }),

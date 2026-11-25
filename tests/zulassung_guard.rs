@@ -30,7 +30,7 @@ const GROSSER_BODY: usize = 4 * 1024 * 1024;
 const OHNE_EIGENE_GRENZE: &[(&str, &str, &str)] = &[
     (
         "GET",
-        "/api/einsaetze/{id}/live",
+        "/api/incidents/{id}/live",
         "SSE-Dauerverbindung, Grenze je Benutzer und insgesamt mit Lebensdauer in `live::strom` (LFH-920)",
     ),
     (
@@ -45,16 +45,16 @@ const OHNE_EIGENE_GRENZE: &[(&str, &str, &str)] = &[
     ),
     (
         "GET",
-        "/api/einsaetze/{id}/persons/export",
+        "/api/incidents/{id}/persons/export",
         "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
     ),
     (
         "GET",
-        "/api/einsaetze/{id}/animals/export",
+        "/api/incidents/{id}/animals/export",
         "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
     ),    (
         "GET",
-        "/api/einsaetze/{id}/damages/export",
+        "/api/incidents/{id}/damages/export",
         "CSV-Vollexport ohne BLOB: unbeschränkt ist die Dauer, nicht der Speicher",
     ),
 ];

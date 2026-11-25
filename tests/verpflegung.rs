@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/catering")
+    format!("/api/incidents/{einsatz}/catering")
 }
 
 /// „Mittag“ am 24.09., 10:00–11:30 UTC (12:00–13:30 in Berlin), 180 Kräfte, 70 Betreute.
@@ -52,7 +52,7 @@ async fn etb_eintraege(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -559,7 +559,7 @@ async fn statuscodes_404_fremder_einsatz() {
     let (s, nf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/resource-requests"),
+        &format!("/api/incidents/{e2}/resource-requests"),
         &admin,
         Some(r#"{"art":"Verpflegung","bezeichnung":"Verpflegung 60 EP","anzahl":60,"adressat_kategorie":"leitstelle"}"#),
     )
@@ -626,7 +626,7 @@ async fn ausgabe_mit_nachforderung_traegt_nur_die_kennung() {
     let (s, nf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests"),
+        &format!("/api/incidents/{e}/resource-requests"),
         &admin,
         Some(r#"{"art":"Verpflegung","bezeichnung":"Kanarien-Lieferung 60 EP","anzahl":60,"adressat_kategorie":"leitstelle","begruendung":"Kanarien-Begründung"}"#),
     )
@@ -669,7 +669,7 @@ async fn ausgabe_mit_nachforderung_traegt_nur_die_kennung() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/resource-requests"),
+        &format!("/api/incidents/{e}/resource-requests"),
         &admin,
         None,
     )
@@ -732,7 +732,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/verpflegung"),
+        &format!("/api/incidents/{einsatz}/module-overrides/verpflegung"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -786,7 +786,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -859,7 +859,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -950,7 +950,7 @@ async fn leerlauf_patch_publiziert_kein_ereignis() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1039,7 +1039,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_zeitfensters() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -1753,7 +1753,7 @@ async fn live_ereignis_bei_stellen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -2264,7 +2264,7 @@ async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, body: &Valu
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         cookie,
         Some(body),
     )
@@ -2277,7 +2277,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -2291,7 +2291,7 @@ async fn kraft_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, einheit:
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}/personnel/{ep}"),
         cookie,
         None,
     )
@@ -2304,7 +2304,7 @@ async fn einheit_aufloesen(app: &axum::Router, cookie: &str, einsatz: i64, einhe
     let (s, j) = anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}"),
         cookie,
         None,
     )
@@ -2325,7 +2325,7 @@ async fn modul_override(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -2581,7 +2581,7 @@ async fn empfaengerliste_ohne_personenangaben() {
     let (s, j) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/units/{gruppe}"),
+        &format!("/api/incidents/{e}/units/{gruppe}"),
         &admin,
         Some(&serde_json::json!({ "fuehrer_id": fuehrer })),
     )
@@ -2591,7 +2591,7 @@ async fn empfaengerliste_ohne_personenangaben() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{gruppe}/timeline"),
+        &format!("/api/incidents/{e}/units/{gruppe}/timeline"),
         &admin,
         Some(r#"{"art":"eintreffen","zeitpunkt_at":"2026-09-24T04:40:00Z"}"#),
     )
@@ -2654,7 +2654,7 @@ async fn empfaengerliste_ohne_modul_einheiten() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         &frieda,
         None,
     )
@@ -2687,7 +2687,7 @@ async fn live_einheit_erreicht_verpflegungsleser() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/sectors"),
+        &format!("/api/incidents/{e}/sectors"),
         &frieda,
         None,
     )
@@ -2702,7 +2702,7 @@ async fn live_einheit_erreicht_verpflegungsleser() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/sectors/{deich}"),
+        &format!("/api/incidents/{e}/sectors/{deich}"),
         &admin,
         Some(r#"{"name":"Deich Nord"}"#),
     )
@@ -2743,7 +2743,7 @@ async fn betreuungsstelle(
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions"),
+        &format!("/api/incidents/{einsatz}/care/positions"),
         cookie,
         Some(&serde_json::json!({
             "bezeichnung": bezeichnung,
@@ -2770,7 +2770,7 @@ async fn betreuungsstelle_status(
     let (s, j) = anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}"),
+        &format!("/api/incidents/{einsatz}/care/positions/{sid}"),
         cookie,
         Some(&serde_json::json!({ "status": status })),
     )
@@ -2782,7 +2782,7 @@ async fn betreuungsstelle_stornieren(app: &axum::Router, cookie: &str, einsatz: 
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/care/positions/{sid}/annul"),
+        &format!("/api/incidents/{einsatz}/care/positions/{sid}/annul"),
         cookie,
         None,
     )
@@ -2987,7 +2987,7 @@ async fn betreuungsstellen_fuer_verpflegungsleser_ohne_modul_betreuung() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/care"),
+        &format!("/api/incidents/{e}/care"),
         &frieda,
         None,
     )
@@ -3683,7 +3683,7 @@ async fn tag_aus_vorlage_rechte_wie_einzelanlegen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )

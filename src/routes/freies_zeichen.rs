@@ -23,7 +23,7 @@ fn sse_zeichen(state: &AppState, einsatz_id: i64, id: i64) {
         .publiziere_objekt(einsatz_id, LiveEvent::FreiesZeichen, "zeichen_id", id);
 }
 
-/// GET /api/einsaetze/{id}/free-symbols — Liste aller freien Zeichen. Nur Lesezugriff.
+/// GET /api/incidents/{id}/free-symbols — Liste aller freien Zeichen. Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
@@ -94,7 +94,7 @@ pub struct AnlegenBody {
     pub alt: AltesFormat,
 }
 
-/// POST /api/einsaetze/{id}/free-symbols — anlegen. Schreibrecht + aktiv.
+/// POST /api/incidents/{id}/free-symbols — anlegen. Schreibrecht + aktiv.
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -147,7 +147,7 @@ pub struct PatchBody {
     pub alt: AltesFormat,
 }
 
-/// PATCH /api/einsaetze/{id}/free-symbols/{zid} — echter Teil-Patch (LFH-306): Feld absent
+/// PATCH /api/incidents/{id}/free-symbols/{zid} — echter Teil-Patch (LFH-306): Feld absent
 /// = unverändert, `null`/`""` bei der Bezeichnung = leeren. lat/lon sind NICHT verschiebbar
 /// (v1). Schreibrecht + aktiv.
 pub async fn aktualisieren(
@@ -190,7 +190,7 @@ pub async fn aktualisieren(
     Ok(Json(z))
 }
 
-/// DELETE /api/einsaetze/{id}/free-symbols/{zid} — aufheben (Hard-Delete). Schreibrecht + aktiv.
+/// DELETE /api/incidents/{id}/free-symbols/{zid} — aufheben (Hard-Delete). Schreibrecht + aktiv.
 pub async fn aufloesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,

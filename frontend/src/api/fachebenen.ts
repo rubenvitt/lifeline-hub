@@ -22,6 +22,7 @@ export type UeberlagerungQuelle =
   | 'kritis'
   | 'hochwasser'
   | 'autobahn'
+  | 'autobahn_parken'
   | 'odl'
   | 'luftqualitaet'
   | 'energie'

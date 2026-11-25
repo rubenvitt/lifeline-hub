@@ -33,7 +33,7 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function personen(page: Page, einsatzId: number): Promise<PersonZeile[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/persons`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/persons`);
   expect(antwort.ok(), `Personenliste: ${antwort.status()}`).toBeTruthy();
   return (await antwort.json()) as PersonZeile[];
 }
@@ -57,15 +57,15 @@ test('Betroffene mit Koordinate stehen als Marker auf der Karte, die Lücke wird
   await anmelden(page, { startseite: false });
 
   // Kein Modulname im Einsatznamen (die Palette sucht Module und Einsätze gemeinsam).
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Fundorte ${Date.now()}`,
   });
-  const mitKoordinate = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+  const mitKoordinate = await post(page, `/api/incidents/${einsatzId}/persons`, {
     name: 'Albers',
     antreff_lat: 53.5511,
     antreff_lon: 9.9937,
   });
-  const ohneKoordinate = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+  const ohneKoordinate = await post(page, `/api/incidents/${einsatzId}/persons`, {
     name: 'Brandt',
   });
 
@@ -141,13 +141,13 @@ test('Handschuh: ein Tipp auf den inneren Teil eines aufgefächerten Blatts öff
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmelden(page);
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Spider ${Date.now()}`,
   });
   const ids: number[] = [];
   for (const i of [0, 1]) {
     ids.push(
-      await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+      await post(page, `/api/incidents/${einsatzId}/persons`, {
         name: `Paar ${i}`,
         antreff_lat: 53.0 + i * 0.0001,
         antreff_lon: 8.8,

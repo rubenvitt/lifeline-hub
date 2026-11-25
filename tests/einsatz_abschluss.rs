@@ -20,7 +20,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode,
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         cookie,
         None,
     )
@@ -123,7 +123,7 @@ async fn pruefung(app: &axum::Router, cookie: &str, id: i64) -> (StatusCode, Val
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{id}/closure/check"),
+        &format!("/api/incidents/{id}/closure/check"),
         cookie,
         None,
     )
@@ -157,7 +157,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/units/{zug}/status"),
+        &format!("/api/incidents/{e}/units/{zug}/status"),
         &admin,
         Some(&json!({ "status_id": anfahrt })),
     )
@@ -167,7 +167,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/units/{weg}"),
+        &format!("/api/incidents/{e}/units/{weg}"),
         &admin,
         None,
     )
@@ -177,7 +177,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -185,7 +185,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Deich instabil", "ereigniszeit": "2026-06-12 09:00:00" }),
     )
@@ -193,7 +193,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/resource-requests"),
+        &format!("/api/incidents/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )
@@ -206,7 +206,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personen"),
+        &format!("/api/incidents/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -215,7 +215,7 @@ async fn pruefung_nennt_gebundene_einheit_und_offene_betroffene_auch_bei_ausgebl
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &lena,
         None,
     )
@@ -286,7 +286,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         json!({ "auftrag_text": "Deich sichern",
                 "empfaenger": [{ "empfaenger_typ": "funktion", "funktion_text": "Nord" }] }),
     )
@@ -294,7 +294,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         json!({ "absender": "Florian 1", "empfaenger": "ELW 1", "meldeweg": "funk",
                 "inhalt": "Frau Muster, Hauptstr. 4, vermisst ihren Sohn",
                 "ereigniszeit": "2026-06-12 09:00:00" }),
@@ -303,7 +303,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
     anlegen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/resource-requests"),
+        &format!("/api/incidents/{e}/resource-requests"),
         json!({ "art": "RTW", "bezeichnung": "2 RTW", "anzahl": 2,
                 "adressat_kategorie": "leitstelle" }),
     )
@@ -323,7 +323,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
         let (s, v) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
+            &format!("/api/incidents/{e}/module-overrides/{modul}"),
             &admin,
             Some(regel),
         )
@@ -334,7 +334,7 @@ async fn pruefung_nennt_texte_nur_aus_modulen_die_die_person_lesen_darf() {
             "GET",
             // Modulschlüssel bleiben deutsch, die Route ist englisch (ADR-0085).
             &format!(
-                "/api/einsaetze/{e}/{}",
+                "/api/incidents/{e}/{}",
                 match modul {
                     "meldungen" => "reports",
                     "auftraege" => "tasks",
@@ -411,7 +411,7 @@ async fn wiedereroeffnen(
     anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/reopen"),
+        &format!("/api/incidents/{id}/reopen"),
         cookie,
         body.as_ref(),
     )
@@ -512,7 +512,7 @@ async fn einsatzleitung_oeffnet_nach_zwei_stunden_wieder_mit_eintrag_und_etb_ist
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &erika,
         Some(&json!({ "typ": "meldung", "inhalt": "Weiter geht's", "von": "A", "an": "B" })),
     )
@@ -641,7 +641,7 @@ async fn ein_geraet_bekommt_403() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/devices"),
+        &format!("/api/incidents/{e}/devices"),
         &admin,
         Some(&json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
     )
@@ -837,15 +837,15 @@ async fn der_kopf_nennt_die_abschliessende_person_mit_namen() {
     let erika = login_cookie(&app, "erika", "erikapw1").await;
     let e = einsatz_anlegen(&app, &erika).await;
 
-    let (s, kopf) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &erika, None).await;
+    let (s, kopf) = anfrage(&app, "GET", &format!("/api/incidents/{e}"), &erika, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(kopf["abgeschlossen_von_name"], Value::Null, "aktiv: {kopf}");
 
     abgeschlossen(&app, &erika, e).await;
-    let (s, kopf) = anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &erika, None).await;
+    let (s, kopf) = anfrage(&app, "GET", &format!("/api/incidents/{e}"), &erika, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(kopf["abgeschlossen_von_name"], "erika", "{kopf}");
-    let (s, liste) = anfrage(&app, "GET", "/api/einsaetze", &erika, None).await;
+    let (s, liste) = anfrage(&app, "GET", "/api/incidents", &erika, None).await;
     assert_eq!(s, StatusCode::OK);
     let eintrag = liste
         .as_array()

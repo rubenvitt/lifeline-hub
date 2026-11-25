@@ -18,12 +18,12 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 async function lageberichtMitText(page: Page) {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gliederung-Menü ${Date.now()}`);
-  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
+  const angelegt = await page.request.post(`/api/incidents/${einsatzId}/situation-reports`, {
     data: { vorlage: 'lagebeurteilung', titel: 'Gliederung Menü' },
   });
   expect(angelegt.ok(), await angelegt.text()).toBe(true);
   const id = (await angelegt.json()).id as number;
-  const api = `/api/einsaetze/${einsatzId}/situation-reports/${id}`;
+  const api = `/api/incidents/${einsatzId}/situation-reports/${id}`;
   const gefuellt = await page.request.patch(api, {
     data: { abschnitte: [{ schluessel: 'auftrag', text: 'Auftrag steht' }] },
   });
@@ -120,7 +120,7 @@ test('Befehl: ⋮ und Rechtsklick auf den Abschnittskopf zeigen dieselben Eintr�
 }) => {
   await anmelden(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Befehl-Menü ${Date.now()}`);
-  const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
+  const angelegt = await page.request.post(`/api/incidents/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Befehl Menü' },
   });
   expect(angelegt.ok(), await angelegt.text()).toBe(true);

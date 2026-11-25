@@ -132,7 +132,7 @@ async function pruefeRaster(page: Page, raster: Locator, restErwartet: boolean) 
 }
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Fugenraster ${Date.now()}` },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();

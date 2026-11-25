@@ -47,7 +47,7 @@ test('beschrifteter Optionsknopf hält die Dichte-Staffel (Kartenansicht lösche
   const einsatzId = await einsatzAnlegen(page, `E2E Optionsknopf ${Date.now()}`);
   // Löschen ist für die Standardansicht gesperrt: eine zweite Ansicht anlegen und per
   // `?ansicht=` aktiv schalten. Der GET legt die Standardansicht an.
-  const basis = `/api/einsaetze/${einsatzId}/map-views`;
+  const basis = `/api/incidents/${einsatzId}/map-views`;
   expect((await page.request.get(basis)).ok()).toBeTruthy();
   const neu = await page.request.post(basis, { data: { name: 'Optionsknopf' } });
   expect(neu.ok(), `Seeding Ansicht: ${neu.status()} ${await neu.text()}`).toBeTruthy();

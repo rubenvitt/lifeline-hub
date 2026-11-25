@@ -17,7 +17,7 @@ const DICHTEN = ['kompakt', 'handschuh'] as const;
 /** Körper aller PATCH/POST an die Abschnitte dieses Einsatzes, in Reihenfolge. */
 function recordWrites(page: Page, einsatzId: string) {
   const bodies: { methode: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/sectors(/\\d+)?$`);
+  const pattern = new RegExp(`/api/incidents/${einsatzId}/sectors(/\\d+)?$`);
   page.on('request', (r: Request) => {
     if ((r.method() === 'PATCH' || r.method() === 'POST') && pattern.test(r.url())) {
       bodies.push({ methode: r.method(), body: r.postDataJSON() });
@@ -64,7 +64,7 @@ for (const dichte of DICHTEN) {
       // Nur der Wechsel schreibt System-ETB (LFH-608).
       await expect
         .poll(async () =>
-          JSON.stringify(await (await page.request.get(`/api/einsaetze/${einsatzId}/etb`)).json()),
+          JSON.stringify(await (await page.request.get(`/api/incidents/${einsatzId}/etb`)).json()),
         )
         .toContain('angespannt → kritisch');
     });
@@ -134,7 +134,7 @@ test.describe('Einsatzabschnitt auf der Karte zeigen', () => {
     await anmelden(page);
     const einsatzId = await einsatzAnlegen(page, `E2E 1349 Karte ${Date.now()}`);
     await anlegen(page, einsatzId, 'sectors', { name: 'Abschnitt Nord' }, 'Abschnitt');
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/sectors`, {
       data: { name: 'Abschnitt Süd' },
     });
     expect(antwort.ok(), await antwort.text()).toBeTruthy();

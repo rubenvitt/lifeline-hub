@@ -87,11 +87,11 @@ async function kartenRuhe(page: Page) {
 }
 
 async function zonen(page: Page, eid: number): Promise<ZoneAntwort[]> {
-  return (await (await page.request.get(`/api/einsaetze/${eid}/zones`)).json()) as ZoneAntwort[];
+  return (await (await page.request.get(`/api/incidents/${eid}/zones`)).json()) as ZoneAntwort[];
 }
 
 async function etb(page: Page, eid: number): Promise<string[]> {
-  const r = await page.request.get(`/api/einsaetze/${eid}/etb`);
+  const r = await page.request.get(`/api/incidents/${eid}/etb`);
   return ((await r.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 

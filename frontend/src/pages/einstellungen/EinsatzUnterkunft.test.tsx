@@ -25,7 +25,7 @@ function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
   let einsatz: Record<string, number> = {};
   server.use(
     meHandler(benutzerFixture({ id: 1 })),
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({
         id: 1,
         bezeichnung: 'Hochwasser',
@@ -35,14 +35,14 @@ function stelleBereit(rolle = 'einsatzleitung', spiegel: unknown = null) {
         spiegel,
       }),
     ),
-    http.get('/api/einsaetze/1/settings', () =>
+    http.get('/api/incidents/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/accommodation-guidelines', () =>
+    http.get('/api/incidents/1/accommodation-guidelines', () =>
       HttpResponse.json(richtwerteAntwort({ flaeche_je_person_m2: 5 }, einsatz)),
     ),
     http.put(
-      '/api/einsaetze/1/accommodation-guidelines/:schluessel',
+      '/api/incidents/1/accommodation-guidelines/:schluessel',
       async ({ request, params }) => {
         const body = (await request.json()) as { wert: number | null };
         const schluessel = String(params.schluessel);

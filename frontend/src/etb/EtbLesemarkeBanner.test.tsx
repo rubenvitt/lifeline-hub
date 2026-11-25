@@ -9,7 +9,7 @@ import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import EtbLesemarkeBanner from './EtbLesemarkeBanner';
 
-const URL = '/api/einsaetze/7/etb/read-marker';
+const URL = '/api/incidents/7/etb/read-marker';
 
 function stand(marke: EtbLesemarke) {
   server.use(http.get(URL, () => HttpResponse.json(marke)));
@@ -122,7 +122,7 @@ describe('EtbLesemarkeBanner', () => {
 
     it('ein Einsatzwechsel räumt den Grund, ein späteres Scheitern meldet dort nicht', async () => {
       server.use(
-        http.get('/api/einsaetze/8/etb/read-marker', () =>
+        http.get('/api/incidents/8/etb/read-marker', () =>
           HttpResponse.json({ neue_anzahl: 4, hoechste_lfd_nr: 9 }),
         ),
       );
@@ -245,7 +245,7 @@ describe('EtbLesemarkeBanner – Funkprotokoll (LLH-1149)', () => {
     stand(marke);
     let abgefragt = '';
     server.use(
-      http.get('/api/einsaetze/7/etb', ({ request }) => {
+      http.get('/api/incidents/7/etb', ({ request }) => {
         abgefragt = new globalThis.URL(request.url).search;
         return HttpResponse.json([{ id: 90, lfd_nr: 9 }]);
       }),

@@ -43,7 +43,7 @@ export async function einsatzAnlegen(page: Page, name: string): Promise<string> 
  * neuen Einsatzes.
  */
 export async function einsatzPerApi(page: Page, name: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung: name } });
   expect(antwort.ok(), `Einsatz „${name}“: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   return String(((await antwort.json()) as { id: number }).id);
 }

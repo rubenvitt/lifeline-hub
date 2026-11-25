@@ -51,7 +51,8 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | DWD | 300 s | 60 s | 30 min | Warnungen wie NINA, gröberer Takt |
 | PEGELONLINE | 300 s | 100 s | 60 min | Messwerte ~15 min, vier verpasst |
 | Hochwasser | 300 s | 60 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
-| Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst |
+| Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst; gilt auch für Verkehrsmeldungen (LLH-1637), ein Stau verschwindet aus der Antwort, sobald die Quelle ihn beendet |
+| Lkw-Parkplätze (BAB) | 24 h | 30 min | 36 h | 1,5 × TTL wie Energie, unter dem Cache-Deckel von 48 h; Rastanlagen ändern sich selten |
 | ODL | 600 s | 300 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
 | Luftqualität | 900 s | 300 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
@@ -91,6 +92,11 @@ Messung am 03.10.2026 gegen die echten Quellen (Dev-Server, `curl` mit Cookie, `
 | Luftqualität | 381 Stationen | 173 302 B | 194 B | 1,6 ms |
 | Autobahn | 2 217 Meldungen | 1 704 054 B | 194 B | 8,9 ms |
 
+Nachtrag 24.11.2026 (LLH-1637), gemessen als `curl`-Fächer mit 8 gleichzeitigen Abrufen gegen die
+Quelle, nicht über den Dev-Server: Lage-Lauf mit vier Diensten 26 s (2 178 Baustellen, 316
+Sperrungen, 9 Meldungen nachts, 0 Webcams; 7,3 MB roh). Parken-Lauf 7 s (1 800 Rastanlagen,
+1,5 MB roh, normalisiert ≈ 0,78 MB).
+
 Der Server komprimiert nicht, der Rumpf geht also roh über die Leitung. Ein 200 trägt 240 B
 Kopf. „Server je Poll" heißt: Cache-JSON parsen, wieder serialisieren, SHA-256 bilden, im
 Release-Build und ohne das Lesen aus SQLite. Das Hashen allein kostet davon unter 1,3 ms. Der
@@ -112,7 +118,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
-| **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (rund 110 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
+| **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure,warning}` | JSON → GeoJSON-**Punkte** (rund 113 Strecken × 4 Dienste, im Backend aggregiert); Verkehrsmeldungen seit LLH-1637 | **Nicht belegt** (Befund 24.11.2026, s. Lizenz-Vorbehalt unten). Kein Schlüssel, keine Registrierung. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
+| **Lkw-Parkplätze / BAB** (`autobahn_parken`, LLH-1637) | wie oben, je Strecke `…/services/parking_lorry` | JSON → GeoJSON-**Punkte** (~1 800 Rastanlagen mit Pkw-/Lkw-Stellplätzen und Ausstattung, keine Belegung) | **Nicht belegt**, wie `autobahn` | `Autobahn GmbH des Bundes` | 24 h (Erstbefüllung im Hintergrund, teilt die Einzelspur mit `autobahn`; ein Lauf zählt erst ab 90 % beantworteter Strecken) | leer + ausgegraut |
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
 | **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage über einen erweiterten Rand zusammengeführt und auf die `bbox` beschränkt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); kalter Abruf von der Anfrage gelöst, Wartefrist 10 s für beide Teile zusammen; `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
@@ -398,11 +405,31 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   * **Folgeaufgaben:** Link zur Vollmeldung auf warnung.bund.de im Inspector (LLH-2103:
     Authentizität, Handlungsanweisung) und die NINA-Ebene je Instanz abschaltbar machen, etwa
     für einen gewerblichen Betreiber (LLH-2104).
-- **Lizenz-Vorbehalt Autobahn:** weder die API noch die OpenAPI-Spec (bundesAPI) nennen eine
-  Lizenz; die GovData-Eintragung „Die Autobahn App" zeigt im Suchergebnis keinen Lizenzwert.
-  Die Pflicht-Attribution `Autobahn GmbH des Bundes` wird unabhängig davon immer mitgeführt
-  und genügt damit auch der strengsten der in Frage kommenden Bedingungen. Vor einer
-  kommerziellen Weiterverwertung ist die Lizenzlage direkt bei der Autobahn GmbH zu klären.
+- **Lizenz-Vorbehalt Autobahn: nicht belegt** (Befund 24.11.2026, LLH-1637). Die frühere
+  Einordnung als dl-de/by-2-0 hatte keine Quelle und ist gestrichen.
+  * Die API-Antwort trägt keinen Lizenz- oder Copyright-Kopf.
+  * bundesAPI (`github.com/bundesAPI/autobahn-api`): kein Lizenzvermerk im README, keine
+    LICENSE-Datei, `openapi.yaml` 1.0.1 ohne `license`; Kontakt ist die Autobahn GmbH.
+  * autobahn.de: das Impressum nennt den Herausgeber, aber weder Nutzungsbedingungen noch Lizenz;
+    `/nutzungsbedingungen` und `/open-data` antworten mit 404.
+  * Mobilithek: das einzige Angebot der Autobahn GmbH (Arbeitsstellen längerer Dauer) steht unter
+    einer eingeschränkten Lizenz für Stellen mit berechtigtem Interesse. Das gilt nicht für die
+    App-API, zeigt aber, dass die GmbH ihre Daten nicht pauschal offen lizenziert.
+  * Ein Teil der Verkehrsmeldungen stammt von **INRIX**, einem kommerziellen Datenanbieter
+    (`source: inrix`, am 24.11. 3 von 8). Das Feld wird nicht übernommen. Webcam-Bilder liegen bei
+    Drittbetreibern und werden nur verlinkt, nie zwischengespeichert.
+  * Eine schriftliche Anfrage an die Autobahn GmbH (kontakt@autobahn.de) ist vorbereitet
+    (Entwurf im Anhang des Design-Docs zu LLH-1637): Lizenz, Vermerk für INRIX, Einsatz in einer
+    entgeltlichen Anwendung, Abrufgrenze. Bis zur Antwort wird die Attribution
+    `Autobahn GmbH des Bundes` an beiden Ebenen immer mitgeführt.
+- **Autobahn — Verkehrsmeldungen** (`warning`, LLH-1637): `abnormalTrafficType` fehlte am
+  24.11.2026 bei 5 von 8 Meldungen; bekannt sind `QUEUING_TRAFFIC` (Stau), `SLOW_TRAFFIC`
+  (zähfließend), `STATIONARY_TRAFFIC` (Stillstand), andere Werte fallen weg, der Titel trägt
+  die Meldung dann allein. `delayTimeValue` kommt als String in Minuten; `0` wird nicht gezeigt.
+- **Lkw-Parkplätze** (`parking_lorry`, LLH-1637): die Stellplätze stehen nur als Text in
+  `description` (`PKW Stellplätze: 18`), die Ausstattung in `lorryParkingFeatureIcons`. Eine
+  Belegung liefert die Quelle nicht; die Geltungszeile sagt das sichtbar. Ladesäulen
+  (`electric_charging_station`) sind bewusst nicht angebunden.
 - **Luftqualität (UBA)** zeigt **Messpunkte, keine Fläche.** Die Ebene sagt, was an den
   Stationen des Luftmessnetzes gemessen wurde — nicht, wie die Luft zwischen ihnen oder am
   Einsatzort ist. Das steht als sichtbare Geltungszeile unter dem Ebenen-Label; eine

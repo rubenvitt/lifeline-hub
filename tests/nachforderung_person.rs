@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/resource-requests")
+    format!("/api/incidents/{einsatz}/resource-requests")
 }
 
 /// „RTW“ für eine Person, mit zusätzlichen Feldern aus `extra`.
@@ -45,7 +45,7 @@ async fn person(app: &axum::Router, cookie: &str, einsatz: i64, pid: i64) -> Val
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/persons/{pid}"),
+        &format!("/api/incidents/{einsatz}/persons/{pid}"),
         cookie,
         None,
     )
@@ -68,7 +68,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -118,7 +118,7 @@ async fn mehr_als_ein_rettungsmittel_oder_zweiter_bezug_ist_422() {
     let (s, j) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/care/positions"),
+        &format!("/api/incidents/{e}/care/positions"),
         serde_json::json!({"bezeichnung": "NU", "art": "notunterkunft"}),
     )
     .await;
@@ -155,7 +155,7 @@ async fn fremde_unbekannte_und_stornierte_person_sind_404_und_409() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{pid}"),
+        &format!("/api/incidents/{e}/persons/{pid}"),
         &admin,
         None,
     )
@@ -354,7 +354,7 @@ async fn einsatznummer_nur_mit_personenbezug_und_nicht_im_etb() {
     let (s, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )

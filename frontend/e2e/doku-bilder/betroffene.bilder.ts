@@ -25,7 +25,7 @@ const KAPITEL = 'betroffene';
 
 /** Kennung einer Demo-Person über ihren Nachnamen. */
 async function personId(page: Page, einsatzId: number, name: string): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/persons`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/persons`);
   expect(antwort.ok(), `Personen des Demo-Einsatzes: ${antwort.status()}`).toBe(true);
   const personen = (await antwort.json()) as { id: number; name: string | null }[];
   const person = personen.find((p) => p.name === name);
@@ -107,7 +107,7 @@ test.describe(KAPITEL, () => {
   test('Patientenkopf mit vollem PAT-Kern und Paneel „Verletzung markieren“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}/persons`;
+    const basis = `/api/incidents/${demo.id}/persons`;
     const person = await fuelle<{ id: number }>(page, 'post', basis, {
       name: 'Brandt',
       vorname: 'Jonas',

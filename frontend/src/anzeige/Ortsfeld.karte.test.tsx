@@ -151,7 +151,7 @@ function wert(): OrtsfeldWert {
 function ortVorschau(ortsname = 'Marktplatz 3, 12345 Musterstadt') {
   const abfragen: URL[] = [];
   server.use(
-    http.get('/api/einsaetze/7/place-preview', ({ request }) => {
+    http.get('/api/incidents/7/place-preview', ({ request }) => {
       abfragen.push(new URL(request.url));
       return HttpResponse.json({
         ortsname,

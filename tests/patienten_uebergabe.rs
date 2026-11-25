@@ -43,7 +43,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/vehicles"),
+            &format!("/api/incidents/{einsatz}/vehicles"),
             &self.admin,
             Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
         )
@@ -57,7 +57,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/persons/{person}/whereabouts",
+                "/api/incidents/{}/persons/{person}/whereabouts",
                 self.einsatz
             ),
             &self.admin,
@@ -70,7 +70,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/persons/{person}", self.einsatz),
+            &format!("/api/incidents/{}/persons/{person}", self.einsatz),
             &self.admin,
             None,
         )
@@ -306,7 +306,7 @@ async fn vorschlaege_nennen_einsatz_bisher_und_stamm() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/persons/transport-means", w.einsatz),
+        &format!("/api/incidents/{}/persons/transport-means", w.einsatz),
         &w.admin,
         None,
     )
@@ -487,7 +487,7 @@ async fn verbleib_angaben_fuer_den_bericht() {
     let (s, v) = w.verbleib(ohne, json!({ "art": "vor_ort" })).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
 
-    let pfad = format!("/api/einsaetze/{}/persons/whereabouts-details", w.einsatz);
+    let pfad = format!("/api/incidents/{}/persons/whereabouts-details", w.einsatz);
     let (s, v) = anfrage(&w.app, "GET", &pfad, &w.admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(
@@ -507,7 +507,7 @@ async fn verbleib_angaben_fuer_den_bericht() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
+        &format!("/api/incidents/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

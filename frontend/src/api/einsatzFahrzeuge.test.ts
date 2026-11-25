@@ -8,18 +8,18 @@ describe('api/einsatzFahrzeuge — Besatzung in einem Schritt (LLH-1073, design.
   it('trifft Methode, Pfad und Body', async () => {
     const seen: string[] = [];
     server.use(
-      http.post('/api/einsaetze/:id/vehicles/:efId/crew', async ({ request }) => {
+      http.post('/api/incidents/:id/vehicles/:efId/crew', async ({ request }) => {
         seen.push(`POST ${new URL(request.url).pathname} ${await request.text()}`);
         return new HttpResponse(null, { status: 204 });
       }),
     );
     await zuordnenBesatzungMenge(5, 3, [7, 8]);
-    expect(seen).toEqual(['POST /api/einsaetze/5/vehicles/3/crew {"ep_ids":[7,8]}']);
+    expect(seen).toEqual(['POST /api/incidents/5/vehicles/3/crew {"ep_ids":[7,8]}']);
   });
 
   it('liefert die Gründe je Person aus `zeilen`', async () => {
     server.use(
-      http.post('/api/einsaetze/:id/vehicles/:efId/crew', () =>
+      http.post('/api/incidents/:id/vehicles/:efId/crew', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Personen lassen sich zuordnen',

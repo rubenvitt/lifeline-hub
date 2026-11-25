@@ -37,7 +37,7 @@ async function oeffneGliederung(page: Page, einsatzId: string) {
 
 /** Über-Abschnitt laut Server — die Wahrheit, nicht die Anzeige. */
 async function ueberAbschnitt(page: Page, einsatzId: string, id: number) {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/sectors`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/sectors`);
   const liste = (await antwort.json()) as { id: number; ueber_abschnitt_id: number | null }[];
   return liste.find((a) => a.id === id)?.ueber_abschnitt_id ?? null;
 }
@@ -205,7 +205,7 @@ test('Gliederung: ein Umhang am anderen Arbeitsplatz wartet unter dem Zeiger im 
   await expect(zweiter.getByText('Live pausiert')).toBeVisible();
   const vorher = await zweiter.getByRole('tree').getByText(OST, { exact: true }).boundingBox();
 
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${ost}`, {
+  const antwort = await page.request.patch(`/api/incidents/${einsatzId}/sectors/${ost}`, {
     data: { ueber_abschnitt_id: sued },
   });
   expect(antwort.ok()).toBeTruthy();

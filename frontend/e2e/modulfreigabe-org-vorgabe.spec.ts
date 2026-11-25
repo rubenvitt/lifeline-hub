@@ -36,7 +36,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
 }) => {
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page, { startseite: false });
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Freigabe ${Date.now()}` },
   });
   expect(angelegt.ok(), `Einsatz: ${angelegt.status()}`).toBe(true);
@@ -49,7 +49,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     const abrufe: string[] = [];
     page.on('request', (r) => {
       const pfad = new URL(r.url()).pathname;
-      if (pfad.startsWith(`/api/einsaetze/${einsatzId}/`)) abrufe.push(pfad);
+      if (pfad.startsWith(`/api/incidents/${einsatzId}/`)) abrufe.push(pfad);
     });
 
     await page.goto(`/einsaetze/${einsatzId}/lagekarte`);
@@ -57,9 +57,9 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
 
     // Vorbedingung: freie Kartenquellen liefen — sonst wäre „kein Abruf" trivial.
     await expect
-      .poll(() => abrufe.includes(`/api/einsaetze/${einsatzId}/damages/marker`))
+      .poll(() => abrufe.includes(`/api/incidents/${einsatzId}/damages/marker`))
       .toBe(true);
-    expect(abrufe).toContain(`/api/einsaetze/${einsatzId}/module-access`);
+    expect(abrufe).toContain(`/api/incidents/${einsatzId}/module-access`);
 
     // Navigation: das Modul steht da, gesperrt, mit Grund.
     const eintrag = page.locator('button[title="Keine Berechtigung"]', {
@@ -69,7 +69,7 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect(eintrag).toBeDisabled();
 
     // Kein Abruf der gesperrten Liste und kein Ausfallhinweis.
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
+    expect(abrufe).not.toContain(`/api/incidents/${einsatzId}/situation/reports`);
     await expect(page.getByTestId('lagebild-unvollstaendig')).toHaveCount(0);
 
     // Deeplink in das gesperrte Modul (LFH-888): der Rahmen zeigt den Hinweis statt der Seite,
@@ -81,13 +81,13 @@ test('Org-Vorgabe sperrt „Lagemeldungen": gesperrt in der Navigation, kein Abr
     await expect(page.getByText('Für die eigene Rolle nicht freigegeben')).toBeVisible();
     // Der Beobachter verwaltet keine Freigaben: kein Weg in die Einstellungen (LFH-1078).
     await expect(page.getByRole('button', { name: 'Modulfreigaben öffnen' })).toHaveCount(0);
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
+    expect(abrufe).not.toContain(`/api/incidents/${einsatzId}/situation/reports`);
 
     const rueckweg = page.getByRole('button', { name: / öffnen$/ });
     await rueckweg.click();
     await expect(page).not.toHaveURL(/\/lagemeldungen/);
     await expect(hinweis).toHaveCount(0);
-    expect(abrufe).not.toContain(`/api/einsaetze/${einsatzId}/situation/reports`);
+    expect(abrufe).not.toContain(`/api/incidents/${einsatzId}/situation/reports`);
   } finally {
     // Zurück auf den Admin — nur er darf die Org-Vorgabe setzen.
     await page.request.post('/api/auth/logout');
@@ -133,7 +133,7 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
     await route.fulfill({ json: vorgaben() });
   });
   // Dieselben Vorgaben am Einsatz: daraus liest der Editor „Module“ die Herkunft (LLH-1183).
-  await page.route(`**/api/einsaetze/${einsatzId}/module-defaults`, async (route) => {
+  await page.route(`**/api/incidents/${einsatzId}/module-defaults`, async (route) => {
     await route.fulfill({ json: vorgaben() });
   });
   await page.route(`**/api/org-module-settings/${MODUL}`, async (route) => {
@@ -144,12 +144,12 @@ async function orgVorgabeImBrowser(page: Page, einsatzId: string) {
   });
   // Der Override geht echt an den Server (er gehört nur diesem Einsatz); gemerkt wird der eigene
   // Wert, damit die Freigaben unten wie auf dem Server rechnen.
-  await page.route(`**/api/einsaetze/${einsatzId}/module-overrides/${MODUL}`, async (route) => {
+  await page.route(`**/api/incidents/${einsatzId}/module-overrides/${MODUL}`, async (route) => {
     const body = route.request().postDataJSON() as { sichtbar: boolean | null };
     zustand.eigen = body.sichtbar ?? null;
     await route.continue();
   });
-  await page.route(`**/api/einsaetze/${einsatzId}/module-access`, async (route) => {
+  await page.route(`**/api/incidents/${einsatzId}/module-access`, async (route) => {
     const antwort = await route.fetch();
     const json = (await antwort.json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
     if (zustand.orgAus && zustand.eigen === null) json[MODUL] = { ...json[MODUL], sichtbar: false };
@@ -163,7 +163,7 @@ test('Org blendet „Nachforderungen" für alle Einsätze aus, der Einsatz über
 }) => {
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Sichtbarkeit ${Date.now()}` },
   });
   expect(angelegt.ok(), `Einsatz: ${angelegt.status()}`).toBe(true);

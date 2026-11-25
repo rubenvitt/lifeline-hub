@@ -154,7 +154,7 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe. Wirft eine Kachel, fällt nur sie
   aus (`KachelGrenze` in Form `gross`, ohne Knopf, neuer Versuch mit dem nächsten Datenstand;
   Regel in `frontend/AGENTS.md`, „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“).
-  Seine Zahlen kommen nur aus `GET /api/einsaetze/{id}/situation-monitor` (`src/routes/lagemonitor.rs`,
+  Seine Zahlen kommen nur aus `GET /api/incidents/{id}/situation-monitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
   `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und
   Abschnittsflächen (Bezeichnung und Fläche) für die Karte (LLH-1153) und die offenen

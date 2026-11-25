@@ -24,18 +24,18 @@ test.beforeEach(async ({ page }) => {
 test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-1031)', async ({
   page,
 }) => {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Lagemeldung ${Date.now()}`,
   });
   // Eine übernommene Rückmeldung daneben: dieselbe Achse, ihr eigenes Wort.
-  const rueck = await post(page, `/api/einsaetze/${id}/reports`, {
+  const rueck = await post(page, `/api/incidents/${id}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     meldungsart: 'rueckmeldung',
     inhalt: 'Wir sind vor Ort',
     ereigniszeit: new Date(Date.now() - 10 * 60_000).toISOString(),
   });
-  await post(page, `/api/einsaetze/${id}/reports/${rueck.id}/situation-relevant`, {
+  await post(page, `/api/incidents/${id}/reports/${rueck.id}/situation-relevant`, {
     text: 'Einheit Nord am Deich eingetroffen',
   });
 
@@ -68,7 +68,7 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
   await expect(zeilen).toHaveCount(1);
   await waehleIn(page.getByRole('combobox', { name: 'Herkunft' }), 'Alle Herkünfte');
 
-  const meldungen = await page.request.get(`/api/einsaetze/${id}/reports`);
+  const meldungen = await page.request.get(`/api/incidents/${id}/reports`);
   const lage = ((await meldungen.json()) as { id: number; lfd_nr: number; inhalt: string }[]).find(
     (m) => m.inhalt === 'Pegel Mühlbach steigt, Deich hält',
   )!;
@@ -83,10 +83,10 @@ test('erfasste Lagemeldung steht in der Zeitachse und führt zur Meldung (LLH-10
 test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenommen (LLH-1066)', async ({
   page,
 }) => {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Korrektur ${Date.now()}`,
   });
-  const m = await post<{ id: number; lfd_nr: number }>(page, `/api/einsaetze/${id}/reports`, {
+  const m = await post<{ id: number; lfd_nr: number }>(page, `/api/incidents/${id}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
     inhalt: 'Brücke Nord gesperrt',
@@ -104,7 +104,7 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
   await expect(page.getByText(`Meldung #${m.lfd_nr} korrigiert`)).toBeVisible();
   await expect(formular).toBeHidden();
   await expect(karte).toContainText('Rückmeldung');
-  await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
+  await post(page, `/api/incidents/${id}/reports/${m.id}/situation-relevant`, {});
 
   // In der Lage: Lage-Text und Ort nachtragen.
   await page.goto(`/einsaetze/${id}/lagemeldungen`);
@@ -132,7 +132,7 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
   await expect(page.getByText('Noch keine Lagemeldungen')).toBeVisible();
 
   // Das ETB nennt jede Korrektur mit Verweis auf die Meldung.
-  const etb = (await (await page.request.get(`/api/einsaetze/${id}/etb`)).json()) as {
+  const etb = (await (await page.request.get(`/api/incidents/${id}/etb`)).json()) as {
     inhalt: string;
     meldung_id?: number;
   }[];
@@ -153,18 +153,18 @@ test('eine Meldung an der Karte korrigiert, in der Lage versetzt und herausgenom
 test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-1322)', async ({
   page,
 }) => {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Lage-Zeitraum ${Date.now()}`,
   });
   const inDieLage = async (inhalt: string, vorMinuten: number) => {
-    const m = await post(page, `/api/einsaetze/${id}/reports`, {
+    const m = await post(page, `/api/incidents/${id}/reports`, {
       absender: 'Florian Nord 1',
       meldeweg: 'funk',
       meldungsart: 'rueckmeldung',
       inhalt,
       ereigniszeit: new Date(Date.now() - vorMinuten * 60_000).toISOString(),
     });
-    await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
+    await post(page, `/api/incidents/${id}/reports/${m.id}/situation-relevant`, {});
   };
   await inDieLage('Pegel Mühlbach steigt', 10);
   // Eben übergeben, aber vor drei Stunden geschehen: zählt nach der Ereigniszeit.
@@ -210,28 +210,28 @@ test('der Zeitraum ist die Schnellwahl des ETB und steht in der Adresse (LLH-132
 test('unter „seit LB“ stehen die danach übernommenen, früher geschehenen als Nachtrag (LLH-1514)', async ({
   page,
 }) => {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Lage-Nachtrag ${Date.now()}`,
   });
   const freigaben = (await (
-    await page.request.get(`/api/einsaetze/${id}/module-access`)
+    await page.request.get(`/api/incidents/${id}/module-access`)
   ).json()) as Record<string, { zugriff: boolean }>;
   expect(freigaben.lagebesprechung?.zugriff, 'Vorbedingung: Lagebesprechung frei').toBe(true);
   // Die Besprechung vor fünf Minuten; beide Meldungen gehen erst danach in die Lage.
   const vorMinuten = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
-  const lb = await page.request.post(`/api/einsaetze/${id}/briefings`, {
+  const lb = await page.request.post(`/api/incidents/${id}/briefings`, {
     data: { entschluss: 'Lage unverändert', abgehalten_at: vorMinuten(5) },
   });
   expect(lb.status(), `Abschluss: ${await lb.text()}`).toBe(201);
   const inDieLage = async (inhalt: string, geschehenVorMinuten: number) => {
-    const m = await post(page, `/api/einsaetze/${id}/reports`, {
+    const m = await post(page, `/api/incidents/${id}/reports`, {
       absender: 'Florian Nord 1',
       meldeweg: 'funk',
       meldungsart: 'rueckmeldung',
       inhalt,
       ereigniszeit: vorMinuten(geschehenVorMinuten),
     });
-    await post(page, `/api/einsaetze/${id}/reports/${m.id}/situation-relevant`, {});
+    await post(page, `/api/incidents/${id}/reports/${m.id}/situation-relevant`, {});
   };
   await inDieLage('Pegel Mühlbach steigt', 2);
   // Vor der Besprechung geschehen, nach ihr übernommen: der Nachtrag.

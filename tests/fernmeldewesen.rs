@@ -9,11 +9,11 @@ mod common;
 use common::*;
 
 fn plan_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan")
+    format!("/api/incidents/{einsatz}/staff/comms-plan")
 }
 
 fn skizze_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-sketch")
+    format!("/api/incidents/{einsatz}/staff/comms-sketch")
 }
 
 /// Setzt den Override eines Moduls im Einsatz.
@@ -21,7 +21,7 @@ async fn override_setzen(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(body),
     )
@@ -114,7 +114,7 @@ async fn ohne_stab_bleibt_das_fernmeldewesen_voll_nutzbar() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/staff"),
+        &format!("/api/incidents/{einsatz}/staff"),
         &kraft,
         None,
     )

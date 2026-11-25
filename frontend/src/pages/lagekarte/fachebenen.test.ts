@@ -50,10 +50,22 @@ describe('Fachebenen-Registry', () => {
       'kritis',
       'energie',
       'autobahn',
+      'autobahn_parken',
       'copernicus',
       'copernicus_bilder',
       'drohne',
     ]);
+  });
+  it('führt die Lkw-Parkplätze als eigene, selten getaktete Ebene neben der BAB-Lage (LLH-1637)', () => {
+    const def = FACHEBENEN.autobahn_parken;
+    expect(def.label).toBe('Lkw-Parkplätze (BAB)');
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.geltung).toBe('nur Rastanlagen an Bundesautobahnen, ohne Belegung');
+    expect(istBboxAbhaengig('autobahn_parken')).toBe(false);
+    // Erster Lauf im Hintergrund wie bei `autobahn`: kurz takten, solange `offline`.
+    expect(fachebeneTakt('autobahn_parken', 'offline')).toBe(20_000);
+    expect(fachebeneTakt('autobahn_parken', 'ok')).toBe(30 * 60_000);
+    expect(defaultFachebenenSichtbar().autobahn_parken).toBe(false);
   });
   it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
     expect(FACHEBENEN.energie.label).toBe('Energieanlagen');
@@ -191,7 +203,7 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
-  it('nur ODL, Luftqualität, KRITIS, Autobahn und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+  it('nur ODL, Luftqualität, KRITIS, Autobahn, Lkw-Parken und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
     expect(FACHEBENEN.copernicus_bilder.geltung).toMatch(/optisch/);
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
@@ -201,6 +213,7 @@ describe('Fachebenen-Registry', () => {
       'luftqualitaet',
       'kritis',
       'autobahn',
+      'autobahn_parken',
       'copernicus',
       'copernicus_bilder',
     ]);
@@ -223,6 +236,7 @@ describe('Fachebenen-Registry', () => {
       odl: 'ODL_TTL',
       luftqualitaet: 'LUFTQUALITAET_TTL',
       autobahn: 'AUTOBAHN_TTL',
+      autobahn_parken: 'AUTOBAHN_PARKEN_TTL',
       copernicus: 'COPERNICUS_TTL',
       // Die Bilderliste nutzt dieselbe TTL (`copernicus_bilder.rs` importiert sie).
       copernicus_bilder: 'COPERNICUS_TTL',
@@ -551,6 +565,7 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
+      autobahn_parken: 36 * 60,
       copernicus: 120,
       copernicus_bilder: 120,
       drohne: 1,

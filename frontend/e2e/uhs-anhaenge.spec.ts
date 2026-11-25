@@ -49,7 +49,7 @@ const paneel = (page: Page) => page.getByRole('region', { name: 'Fotos und Datei
 
 /** UHS per API (Cookie-Jar geteilt); liefert die id. */
 async function uhsAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/uhs`, {
     data: { typ: 'behandlungsplatz', bezeichnung: 'BHP 50' },
   });
   expect(antwort.ok(), `UHS: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -57,7 +57,7 @@ async function uhsAnlegen(page: Page, einsatzId: string): Promise<number> {
 }
 
 async function seedeAnhang(page: Page, einsatzId: string, uhsId: number, name: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/attachments`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/uhs/${uhsId}/attachments`, {
     multipart: { datei: { name, mimeType: 'image/jpeg', buffer: JPG } },
   });
   expect(antwort.status(), await antwort.text()).toBe(201);
@@ -93,7 +93,7 @@ test('Reiter „Dateien“: ablegen, herunterladen, Zugriff im Protokoll, entfer
   const anker = paneel(page).getByRole('link', { name: /^grundriss_halle\.jpg, / });
   await expect(anker).toHaveAttribute(
     'href',
-    new RegExp(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/attachments/\\d+/file$`),
+    new RegExp(`/api/incidents/${einsatzId}/uhs/${uhsId}/attachments/\\d+/file$`),
   );
   const [download] = await Promise.all([page.waitForEvent('download'), anker.click()]);
   expect(download.suggestedFilename()).toBe('grundriss_halle.jpg');

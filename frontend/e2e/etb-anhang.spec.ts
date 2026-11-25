@@ -25,7 +25,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatzPerApi(page: Page, bezeichnung: string): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }
@@ -85,19 +85,19 @@ test('erfasst einen Eintrag mit Anhang und lädt ihn über die ETB-Route', async
   expect(download.suggestedFilename()).toBe('Lagefoto Süd.jpg');
 
   const href = await verweis.getAttribute('href');
-  const treffer = href?.match(/^\/api\/einsaetze\/(\d+)\/etb\/(\d+)\/attachments\/(\d+)$/);
+  const treffer = href?.match(/^\/api\/incidents\/(\d+)\/etb\/(\d+)\/attachments\/(\d+)$/);
   expect(treffer, `Download-Pfad unter dem ETB-Präfix: ${href}`).not.toBeNull();
   const [, , eintragId, anhangId] = treffer!;
 
   // Derselbe Anhang über einen zweiten Einsatz: 404.
   const einsatzB = await einsatzPerApi(page, `E2E ETB-Anhang B ${Date.now()}`);
   const fremd = await page.request.get(
-    `/api/einsaetze/${einsatzB}/etb/${eintragId}/attachments/${anhangId}`,
+    `/api/incidents/${einsatzB}/etb/${eintragId}/attachments/${anhangId}`,
   );
   expect(fremd.status()).toBe(404);
 
   // Die generische Route liefert einen ETB-Anhang nicht aus.
-  const generisch = await page.request.get(`/api/einsaetze/${einsatzA}/attachments/${anhangId}`);
+  const generisch = await page.request.get(`/api/incidents/${einsatzA}/attachments/${anhangId}`);
   expect(generisch.status()).toBe(404);
 
   // Gegenprobe: über die ETB-Route kommt die Datei.

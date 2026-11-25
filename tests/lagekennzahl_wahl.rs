@@ -15,7 +15,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/situation-metric-selection")
+    format!("/api/incidents/{einsatz}/situation-metric-selection")
 }
 
 async fn waehle(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> (StatusCode, Value) {
@@ -27,14 +27,14 @@ async fn lagekennzahlen(app: &axum::Router, cookie: &str, einsatz: i64) -> (Valu
     let (status, detail) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{detail:?}");
     assert!(detail.as_object().unwrap().contains_key("lagekennzahlen"));
-    let (status, liste) = anfrage(app, "GET", "/api/einsaetze", cookie, None).await;
+    let (status, liste) = anfrage(app, "GET", "/api/incidents", cookie, None).await;
     assert_eq!(status, StatusCode::OK, "{liste:?}");
     let zeile = liste
         .as_array()
@@ -134,7 +134,7 @@ async fn wahl_steht_neben_der_evakuierung_in_fester_reihenfolge() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
+        &format!("/api/incidents/{einsatz}/evacuation/districts"),
         &admin,
         Some(r#"{"bezeichnung":"Nord","plan_personen":100,"plan_erhebung":"geschaetzt"}"#),
     )
@@ -202,7 +202,7 @@ async fn beobachter_liest_die_wahl_aber_waehlt_nicht() {
     let (status, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &beob_cookie,
         None,
     )
@@ -237,7 +237,7 @@ async fn abgeschlossener_einsatz_nimmt_keine_wahl_an() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
