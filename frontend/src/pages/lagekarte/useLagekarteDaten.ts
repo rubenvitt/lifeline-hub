@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -116,7 +118,7 @@ export function useLagekarteDaten({
   // `document.documentElement` zu raten.
   const { token } = theme.useToken();
   // Minutentakt: die GPS-Marke („veraltet“) altert ohne neuen Abruf mit.
-  const jetzt = useMinutenTakt();
+  const takt = useMinutenTakt();
   const istSnapshot = quelle.typ === 'snapshot';
   const liveAn = !istSnapshot;
   const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
@@ -126,6 +128,11 @@ export function useLagekarteDaten({
     queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
     enabled: snapshotId != null,
   });
+
+  // Ein eingefrorener Lagestand altert gegen seinen Stand, nicht gegen die Uhr: eine GPS-Marke
+  // war beim Sichern frisch oder veraltet, und bleibt es (LLH-2091).
+  const standAt = istSnapshot ? snapQuery.data?.stand_at : undefined;
+  const jetzt = standAt ? dayjs.utc(standAt).valueOf() : takt;
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),

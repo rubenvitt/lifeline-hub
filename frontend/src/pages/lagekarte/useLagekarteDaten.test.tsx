@@ -1507,3 +1507,49 @@ describe('useLagekarteDaten freie Zeichen im Altformat (LFH-836)', () => {
     expect(baueZeichenRegistry([marker]).get(erwartet.schluessel)).toBe(erwartet.drawing);
   });
 });
+
+describe('useLagekarteDaten GPS-Alter im Lagestand (LLH-2091)', () => {
+  function stand(gemessen: string) {
+    const d = dokument('akut');
+    (d.daten as unknown as { fahrzeuge: unknown[] }).fahrzeuge = [
+      {
+        id: 3,
+        funkrufname: 'Florian 1',
+        lat: 50.2,
+        lon: 8.7,
+        tz_fachaufgabe: null,
+        tz_organisation: null,
+        status_farbe: '#123456',
+        position_quelle: 'ortung',
+        position_gemessen_at: gemessen,
+      },
+    ];
+    return d;
+  }
+  const zusatz = (r: {
+    current: { alleVerortet: Array<{ schluessel: string; beschriftungZusatz?: string }> };
+  }) => r.current.alleVerortet.find((m) => m.schluessel === 'fahrzeug-3')?.beschriftungZusatz;
+
+  it('altert die GPS-Marke gegen den Zeitpunkt des Lagestands, nicht gegen die Uhr', async () => {
+    // Stand 08:00, Messung 07:58: damals frisch, obwohl heute lange her.
+    ladeLageSnapshot.mockResolvedValue(stand('2026-07-24 07:58:00'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(zusatz(result)).toBeDefined());
+    expect(zusatz(result)).toBe('GPS');
+  });
+
+  it('zeigt im Lagestand „veraltet“, wenn die Messung schon beim Sichern über 10 Minuten alt war', async () => {
+    ladeLageSnapshot.mockResolvedValue(stand('2026-07-24 07:40:00'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(zusatz(result)).toBeDefined());
+    expect(zusatz(result)).toBe('GPS · veraltet');
+  });
+});
