@@ -487,6 +487,20 @@ pub async fn create(
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
+        // Eine Org hat höchstens eine E-Mail-Anbindung, auch eine angehaltene zählt (LLH-2093).
+        if code == crate::adapter::smtp_art::CODE {
+            let (vorhanden,): (i64,) =
+                sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
+                    .bind(org_id)
+                    .bind(code)
+                    .fetch_one(&mut *conn)
+                    .await?;
+            if vorhanden > 0 {
+                return Err(AppError::UnprocessableEntity(
+                    "Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.".into(),
+                ));
+            }
+        }
         repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
     })?;
     spur(

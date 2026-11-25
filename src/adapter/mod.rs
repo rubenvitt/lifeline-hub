@@ -12,6 +12,7 @@ pub mod geheimnis;
 pub mod lauf;
 pub mod repo;
 pub mod smtp;
+pub mod smtp_art;
 pub mod ziel;
 pub mod zustand;
 

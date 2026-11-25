@@ -238,8 +238,7 @@ pub fn has_neues_ziel(
     })
 }
 
-/// Die Arten, die dieser Server kennt. In Produktion leer, bis die erste Art kommt (LLH-1193);
-/// Tests bringen ihre eigene mit.
+/// Die Arten, die dieser Server kennt. In Produktion `smtp` (LLH-2093); Tests bringen ihre eigene Art mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -258,7 +257,7 @@ impl Verzeichnis {
 
     /// Die Arten dieses Builds.
     pub fn produktiv() -> Self {
-        Verzeichnis::default()
+        Verzeichnis::new(vec![Arc::new(super::smtp_art::SmtpArt::produktiv())])
     }
 
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {
@@ -507,6 +506,6 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        assert!(Verzeichnis::produktiv().is_empty());
+        assert!(Verzeichnis::produktiv().find("smtp").is_some());
     }
 }
