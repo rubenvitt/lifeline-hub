@@ -53,3 +53,54 @@ public enum Grund: String, Sendable, CaseIterable {
         }
     }
 }
+
+/// Warum eine bestätigte Kopplung gerade nicht ortet (403 einer Sendung mit `reason`,
+/// `src/routes/helfer.rs`, `position_senden`): Kopplung und Sitzung bleiben, die App zeigt
+/// „Angemeldet – Ortung ruht“ mit `text` und prüft alle `pruefabstandS` Sekunden, ob sie weiter
+/// orten darf (`Phase.ruht`; Gegenstück `Ruhegrund` in `android/helferkern`).
+public enum Ruhegrund: String, Sendable, CaseIterable {
+    /// Weder Ortungsgerät des Ziels noch eine Person mit Personenortung.
+    case keineRolle
+    /// „Ortung im Einsatz“ der Organisation ist aus.
+    case ortungAus
+
+    /// Überschrift der Seite „Angemeldet“ während der Ruhe.
+    public static let titel = "Angemeldet – Ortung ruht"
+
+    /// Abstand der Prüfung während der Ruhe.
+    public static let pruefabstandS: Double = 60
+
+    /// Grund aus `reason` eines 403; `nil` für jeden anderen Wert.
+    public init?(wire: String?) {
+        switch wire {
+        case "no_role": self = .keineRolle
+        case "tracking_off": self = .ortungAus
+        default: return nil
+        }
+    }
+
+    public var wire: String {
+        switch self {
+        case .keineRolle: "no_role"
+        case .ortungAus: "tracking_off"
+        }
+    }
+
+    /// Erklärung unter der Überschrift.
+    public var text: String {
+        switch self {
+        case .keineRolle:
+            "Die Einsatzleitung hat dich ohne Ortung angemeldet: dieses Gerät ortet weder deine "
+                + "Einheit oder dein Fahrzeug noch dich als Person. Ändert sie das, ortet die App "
+                + "von selbst weiter."
+        case .ortungAus:
+            "Die Ortung ist für diese Organisation gerade ausgeschaltet. Wird sie wieder "
+                + "eingeschaltet, ortet die App von selbst weiter."
+        }
+    }
+
+    /// Ob die App in der Ruhe mit `{paused: false}` prüft, ob sie wieder orten darf: `GET
+    /// /api/devices/me` nennt die Einstellung der Organisation nicht, das Fortsetzen antwortet 403
+    /// `tracking_off`, solange sie aus ist, und braucht keine Position.
+    public var pruefeMitFortsetzen: Bool { self == .ortungAus }
+}

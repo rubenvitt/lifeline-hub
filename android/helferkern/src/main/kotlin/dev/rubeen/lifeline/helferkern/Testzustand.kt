@@ -11,6 +11,9 @@ enum class Testzustand(val wert: String) {
     WARTET("wartet"),
     ANGEMELDET("angemeldet"),
     PAUSIERT("pausiert"),
+
+    /** „Angemeldet – Ortung ruht“ ohne Ortungsrolle ([Phase.Ruht]). */
+    RUHT("ruht"),
     BEENDET("beendet");
 
     companion object {

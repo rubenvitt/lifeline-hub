@@ -10,10 +10,14 @@ import kotlin.math.sqrt
 
 /**
  * Was der Ortungsdienst wann sendet (Spec „Senden, Takt, ohne Netz“): [Takt], [Puffer] und
- * [Wiederholung] zusammen, wie der Dienst der iOS-App sie verschaltet. Der Dienst meldet Messungen,
- * Antworten und die Uhr; jede Methode gibt die Position zurück, die jetzt rausgeht, oder `null`.
- * Es läuft höchstens eine Sendung zur Zeit; eine neuere Messung wartet im Puffer (nur die letzte,
- * nur im Speicher).
+ * [Wiederholung] zusammen; Gegenstück `Sendeplan` in `ios/HelferKern`, beide gegen den Abschnitt
+ * `sendeplan` von `src-tauri/faelle/helfer.json`. Der Dienst meldet Messungen, Antworten und die
+ * Uhr; jede Methode gibt die Position zurück, die jetzt rausgeht, oder `null`. Es läuft höchstens
+ * eine Sendung zur Zeit; eine neuere Messung wartet im Puffer (nur die letzte, nur im Speicher).
+ *
+ * Eine Position geht immer mit der Zeit **ihrer** Messung raus, nie eine alte mit neuer Zeit: das
+ * Lebenszeichen fordert eine frische Messung an ([lebenszeichen]); kommt keine, geht nichts raus
+ * und die Karte zeigt die Position ehrlich als veraltet.
  */
 class Sendeplan(private val takt: Takt = Takt()) {
     private val puffer = Puffer()
@@ -23,8 +27,8 @@ class Sendeplan(private val takt: Takt = Takt()) {
     private var gesendet: Position? = null
     private var gesendetUm: Instant? = null
 
-    /** Letzte Messung, für das Lebenszeichen ohne Bewegung. */
-    private var letzteMessung: Position? = null
+    /** Wann das Lebenszeichen eine frische Messung angefordert hat; `null` ohne Anforderung. */
+    private var angefordertUm: Instant? = null
 
     /** Die Position, deren Antwort aussteht. */
     private var unterwegs: Position? = null
@@ -33,9 +37,14 @@ class Sendeplan(private val takt: Takt = Takt()) {
     var naechsterVersuch: Instant? = null
         private set
 
-    /** Eine neue Messung des Systems. */
+    /**
+     * Eine neue Messung des Systems. Eine, die nicht neuer ist als die zuletzt angenommene, geht
+     * nicht noch einmal raus (das System liefert auf eine Anforderung auch eine zwischengespeicherte).
+     */
     fun messung(p: Position, jetzt: Instant): Position? {
-        letzteMessung = p
+        val bisher = gesendet
+        if (bisher != null && !p.recordedAt.isAfter(bisher.recordedAt)) return null
+        angefordertUm = null
         val seit = gesendetUm?.let { sekunden(it, jetzt) } ?: Double.POSITIVE_INFINITY
         val bewegt = gesendet?.let { abstandM(it, p) } ?: Double.POSITIVE_INFINITY
         if (!takt.soll(seit, bewegt)) return null
@@ -44,16 +53,17 @@ class Sendeplan(private val takt: Takt = Takt()) {
     }
 
     /**
-     * Die halbminütliche Prüfung des Dienstes: ohne Bewegung gilt die letzte Messung nach
-     * [Takt.lebenszeichenS] weiter. Sie geht mit der Uhrzeit von [jetzt] raus, sonst verwürfe der
-     * Server sie als nicht neuer als die gespeicherte.
+     * Die halbminütliche Prüfung des Dienstes: `true` heißt „fordere jetzt **eine** frische Messung
+     * an“ (ohne Bewegung liefert das System sonst keine). [Takt.lebenszeichenS] nach der letzten
+     * angenommenen Sendung; eine Anforderung gilt [LEBENSZEICHEN_FRIST_S] Sekunden, erst danach
+     * kommt die nächste. Die Messung geht über [messung] mit ihrer eigenen Zeit raus.
      */
-    fun lebenszeichen(jetzt: Instant): Position? {
-        val messung = letzteMessung ?: return null
-        val um = gesendetUm ?: return null
-        if (sekunden(um, jetzt) < takt.lebenszeichenS) return null
-        puffer.merke(messung.copy(recordedAt = jetzt))
-        return faellige(jetzt)
+    fun lebenszeichen(jetzt: Instant): Boolean {
+        val um = gesendetUm ?: return false
+        if (unterwegs != null || sekunden(um, jetzt) < takt.lebenszeichenS) return false
+        angefordertUm?.let { if (sekunden(it, jetzt) < LEBENSZEICHEN_FRIST_S) return false }
+        angefordertUm = jetzt
+        return true
     }
 
     /** Der geplante Versuch nach einem Fehler ist dran (oder noch nicht: dann `null`). */
@@ -83,7 +93,7 @@ class Sendeplan(private val takt: Takt = Takt()) {
                 naechsterVersuch = jetzt.plusSeconds(wiederholung.naechsterAbstandS().toLong())
                 return null
             }
-            Antwort.STOPPEN -> {
+            Antwort.STOPPEN, Antwort.RUHEN -> {
                 stoppe()
                 return null
             }
@@ -97,7 +107,7 @@ class Sendeplan(private val takt: Takt = Takt()) {
         wiederholung.zuruecksetzen()
         gesendet = null
         gesendetUm = null
-        letzteMessung = null
+        angefordertUm = null
         unterwegs = null
         naechsterVersuch = null
     }
@@ -115,6 +125,11 @@ class Sendeplan(private val takt: Takt = Takt()) {
     }
 
     private fun sekunden(von: Instant, bis: Instant): Double = Duration.between(von, bis).toMillis() / 1000.0
+
+    companion object {
+        /** So lange wartet das Lebenszeichen auf die angeforderte Messung. */
+        const val LEBENSZEICHEN_FRIST_S = 30.0
+    }
 }
 
 /** Mittlerer Erdradius in Metern (IUGG). */

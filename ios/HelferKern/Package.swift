@@ -2,8 +2,9 @@
 //
 // Testbare Logik der Helfer-App ohne UIKit, CoreLocation und SwiftUI (ADR-0098, Spec
 // `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, „Logik im Kern“): Deutung
-// von QR-Code und Deeplink, Zustandsautomat der Anmeldung, Antwortentscheidung je Status, Takt,
-// Puffer der letzten Position, Texte der Gründe und die erzeugten Design-Tokens. Läuft auch unter
+// von QR-Code und Deeplink, Zustandsautomat der Anmeldung, Antwortentscheidung je Status und
+// Grund, Takt, Puffer der letzten Position, Sendeplan des Ortungsdienstes, Texte der Gründe und
+// Meldungen und die erzeugten Design-Tokens. Läuft auch unter
 // Linux (`swift test`, Schritt 18 von scripts/check-all.sh); die App (`ios/Helfer`) bindet das
 // Paket ein. Adressprüfung kommt aus `LifelineKern`. Die gemeinsamen Fälle liest die Suite aus
 // `src-tauri/faelle/helfer.json` (Tests/HelferKernTests/GemeinsameFaelle.swift).

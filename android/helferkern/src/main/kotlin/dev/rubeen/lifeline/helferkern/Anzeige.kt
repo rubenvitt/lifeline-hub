@@ -19,10 +19,15 @@ object Anzeige {
     fun meldung(status: Int, reason: String? = null, error: String? = null): String = when {
         status == 0 -> "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut."
         status == 401 -> "Der Code ist ungültig oder abgelaufen. Bitte den QR-Code neu scannen."
-        status == 403 && (reason == null || reason == "tracking_off") -> "Die Ortung ist für diese Organisation ausgeschaltet."
+        status == 403 && reason == "tracking_off" -> "Die Ortung ist für diese Organisation ausgeschaltet."
+        status == 403 && reason == "no_role" -> "Dieses Gerät ortet weder ein Ziel noch eine Person."
+        status == 403 && reason == "target_removed" -> "Das Ziel gibt es nicht mehr."
+        status == 403 -> "Das ist mit dieser Anmeldung nicht erlaubt."
         status == 409 && reason == "person_session" -> "Auf diesem Gerät ist eine persönliche Anmeldung aktiv."
         status == 409 -> "Das geht im aktuellen Zustand der Anmeldung nicht."
-        status == 422 -> error ?: "Die Angaben passen nicht. Bitte prüfen."
+        status == 422 && reason == "invitation_exhausted" ->
+            "Diese Einladung ist ausgeschöpft. Bitte die Einsatzleitung um einen neuen QR-Code."
+        status == 400 || status == 422 -> error ?: "Die Angaben passen nicht. Bitte prüfen."
         status == 429 -> "Zu viele Versuche. Bitte kurz warten."
         else -> error ?: "Unerwartete Antwort des Servers ($status)."
     }

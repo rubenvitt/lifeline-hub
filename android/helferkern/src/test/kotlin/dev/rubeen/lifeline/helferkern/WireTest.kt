@@ -27,6 +27,7 @@ class WireTest {
         assertEquals("Max", zustand.person?.name)
         assertTrue(zustand.isTracker)
         assertFalse(zustand.paused)
+        assertEquals(Rolle(isTracker = true, personId = 5), zustand.rolle)
     }
 
     @Test
@@ -38,6 +39,7 @@ class WireTest {
         assertEquals("incident_closed", zustand.reason)
         assertNull(zustand.target)
         assertNull(zustand.person)
+        assertFalse(zustand.rolle.darfOrten)
         assertNull(zustand.ablauf(Instant.EPOCH), "unlesbare Zeiten ergeben keinen Ablauf")
     }
 
@@ -80,6 +82,7 @@ class WireTest {
         )
         assertEquals("""{"target":{"kind":"vehicle","id":7}}""", Wire.zielaenderung(ZielEingabe("vehicle", 7)))
         assertEquals("""{"paused":true}""", Wire.pause(true))
+        assertEquals("""{"code":"AB12CD34"}""", Wire.zielanfrage("AB12CD34"))
         assertEquals(
             """{"lat":50.1,"lon":8.6,"accuracy_m":5.0,"recorded_at":"2026-11-25T14:00:00Z"}""",
             Wire.position(Position(50.1, 8.6, 5.0, Instant.parse("2026-11-25T14:00:00Z"))),

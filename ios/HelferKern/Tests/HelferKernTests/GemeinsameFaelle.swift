@@ -24,13 +24,15 @@ enum GemeinsameFaelle {
     }
 }
 
-/// QR, Deeplink, Antwortcodes, Takt und Wiederholung gegen `src-tauri/faelle/helfer.json`.
+/// QR, Deeplink, Antwortcodes, Takt, Wiederholung und Sendeplan gegen
+/// `src-tauri/faelle/helfer.json`.
 final class HelferFaelleTests: XCTestCase {
     struct Datei: Decodable {
         let deute: [DeuteFall]
         let antwort: [AntwortFall]
         let takt: [TaktFall]
         let wiederholung: [WiederholungFall]
+        let sendeplan: [SendeplanFall]
     }
 
     struct Ergebnis: Decodable {
@@ -47,6 +49,7 @@ final class HelferFaelleTests: XCTestCase {
     struct AntwortFall: Decodable {
         let beschreibung: String
         let status: Int
+        let grund: String?
         let entscheidung: String
     }
 
@@ -61,6 +64,21 @@ final class HelferFaelleTests: XCTestCase {
         let beschreibung: String
         let fehler_in_folge: Int
         let abstand_s: Int
+    }
+
+    struct Schritt: Decodable {
+        let art: String
+        let um_s: Double
+        let gemessen_s: Double?
+        let nord_m: Double?
+        let antwort: String?
+        let sendet: Double?
+        let fordert_an: Bool?
+    }
+
+    struct SendeplanFall: Decodable {
+        let beschreibung: String
+        let schritte: [Schritt]
     }
 
     func datei() throws -> Datei { try GemeinsameFaelle.load("helfer.json", as: Datei.self) }
@@ -79,7 +97,9 @@ final class HelferFaelleTests: XCTestCase {
         let faelle = try datei().antwort
         XCTAssertGreaterThanOrEqual(faelle.count, 10)
         for fall in faelle {
-            XCTAssertEqual(entscheide(status: fall.status).rawValue, fall.entscheidung, fall.beschreibung)
+            XCTAssertEqual(
+                entscheide(status: fall.status, grund: fall.grund).rawValue, fall.entscheidung,
+                fall.beschreibung)
         }
     }
 
@@ -102,6 +122,42 @@ final class HelferFaelleTests: XCTestCase {
             var abstand = 0
             for _ in 0..<fall.fehler_in_folge { abstand = w.naechsterAbstandS() }
             XCTAssertEqual(abstand, fall.abstand_s, fall.beschreibung)
+        }
+    }
+
+    func testJederGemeinsameFallVonSendeplanGilt() throws {
+        let faelle = try datei().sendeplan
+        XCTAssertGreaterThanOrEqual(faelle.count, 10)
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        for fall in faelle {
+            var plan = Sendeplan()
+            for (i, schritt) in fall.schritte.enumerated() {
+                let jetzt = start.addingTimeInterval(schritt.um_s)
+                let wo = "\(fall.beschreibung), Schritt \(i + 1) (\(schritt.art))"
+                let gesendet: Position?
+                switch schritt.art {
+                case "messung":
+                    let gemessen = start.addingTimeInterval(schritt.gemessen_s ?? schritt.um_s)
+                    let p = Position(
+                        latitude: 50 + (schritt.nord_m ?? 0) / 111_195, longitude: 8.6, accuracy: 5,
+                        recordedAt: gemessen)
+                    gesendet = plan.messung(p, jetzt: jetzt)
+                case "antwort":
+                    let antwort = try XCTUnwrap(Antwort(rawValue: schritt.antwort ?? ""), wo)
+                    gesendet = plan.antwort(antwort, jetzt: jetzt)
+                case "versuch":
+                    gesendet = plan.versuch(jetzt: jetzt)
+                case "lebenszeichen":
+                    let fordert = plan.lebenszeichen(jetzt: jetzt)
+                    XCTAssertEqual(fordert, schritt.fordert_an, wo)
+                    continue
+                default:
+                    XCTFail("unbekannte Art \(schritt.art)")
+                    continue
+                }
+                XCTAssertEqual(
+                    gesendet?.recordedAt, schritt.sendet.map { start.addingTimeInterval($0) }, wo)
+            }
         }
     }
 

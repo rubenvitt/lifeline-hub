@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird, „wiederholung“ den Abstand bis zur nächsten Wiederholung nach so vielen Fehlern in Folge (5, 10, 20, 40 s, dann höchstens jede Minute; ein Erfolg setzt zurück). Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; wie dort wird jede http-Adresse verworfen, auch für localhost und *.local. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
+  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers und das optionale `reason` des Fehler-Bodys (grund) tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird, „wiederholung“ den Abstand bis zur nächsten Wiederholung nach so vielen Fehlern in Folge (5, 10, 20, 40 s, dann höchstens jede Minute; ein Erfolg setzt zurück), „sendeplan“ Abläufe aus Messungen, Antworten, Lebenszeichen und Versuchen (Sekunden ab Start; um_s Uhr des Geräts, gemessen_s Zeit der Messung, Vorgabe um_s; nord_m Meter nördlich des Startpunkts, Vorgabe 0; sendet die gemessen_s der Position, die jetzt rausgeht, null für keine; fordert_an, ob das Lebenszeichen eine frische Messung anfordert). Werte wie im Backend (src/routes/helfer.rs, position_senden): 200 weiter, 409 warten (Kopplung unbestätigt), 403 mit no_role oder tracking_off ruhen (Dienst aus, Kopplung und Sitzung bleiben, die App prüft jede Minute), 401/404 und jeder andere 403 stoppen, 400 und 422 verwerfen, 429/500/502/503 und eine nicht verfolgte Weiterleitung wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s: es fordert eine frische Messung an und sendet sie mit ihrer eigenen Zeit, nie eine alte Position mit neuer Zeit. Adressen stehen in normalisierter Form wie in adresse.json; wie dort wird jede http-Adresse verworfen, auch für localhost und *.local. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
   "deute": [
     {
       "beschreibung": "QR mit https und Fragment wird gelesen",
@@ -120,10 +120,17 @@
   "antwort": [
     { "beschreibung": "200 Gesendet: weiter", "status": 200, "entscheidung": "weiter" },
     { "beschreibung": "409 Kopplung noch unbestätigt: warten", "status": 409, "entscheidung": "warten" },
+    { "beschreibung": "409 mit Grund unconfirmed: warten", "status": 409, "grund": "unconfirmed", "entscheidung": "warten" },
     { "beschreibung": "401 Sitzung ungültig: der Dienst stoppt", "status": 401, "entscheidung": "stoppen" },
-    { "beschreibung": "403 nicht berechtigt oder Ortung aus: der Dienst stoppt", "status": 403, "entscheidung": "stoppen" },
+    { "beschreibung": "403 ohne Grund: nicht berechtigt, der Dienst stoppt", "status": 403, "entscheidung": "stoppen" },
+    { "beschreibung": "403 target_removed: das Ziel ist weg, der Dienst stoppt", "status": 403, "grund": "target_removed", "entscheidung": "stoppen" },
+    { "beschreibung": "403 mit unbekanntem Grund: der Dienst stoppt", "status": 403, "grund": "etwas_anderes", "entscheidung": "stoppen" },
+    { "beschreibung": "403 no_role: weder Ortungsgerät noch Person, die Kopplung ruht", "status": 403, "grund": "no_role", "entscheidung": "ruhen" },
+    { "beschreibung": "403 tracking_off: Ortung der Organisation aus, die Kopplung ruht", "status": 403, "grund": "tracking_off", "entscheidung": "ruhen" },
     { "beschreibung": "404 Kopplung fremd oder weg: der Dienst stoppt", "status": 404, "entscheidung": "stoppen" },
+    { "beschreibung": "400 Feld fehlt oder Zeitpunkt unlesbar: die Position wird verworfen, nicht wiederholt", "status": 400, "entscheidung": "verwerfen" },
     { "beschreibung": "422 Inhalt unbrauchbar: die Position wird verworfen, nicht wiederholt", "status": 422, "entscheidung": "verwerfen" },
+    { "beschreibung": "302 Weiterleitung: nicht verfolgt (nur der Server der Kopplung), wiederholen", "status": 302, "entscheidung": "wiederholen" },
     { "beschreibung": "429 zu viele Anfragen: wiederholen", "status": 429, "entscheidung": "wiederholen" },
     { "beschreibung": "500 Serverfehler: wiederholen", "status": 500, "entscheidung": "wiederholen" },
     { "beschreibung": "502 Gateway: wiederholen", "status": 502, "entscheidung": "wiederholen" },
@@ -149,5 +156,106 @@
     { "beschreibung": "fünfter Fehler in Folge: Obergrenze 60 s", "fehler_in_folge": 5, "abstand_s": 60 },
     { "beschreibung": "sechster Fehler in Folge: bleibt bei 60 s", "fehler_in_folge": 6, "abstand_s": 60 },
     { "beschreibung": "siebter Fehler in Folge: bleibt bei 60 s", "fehler_in_folge": 7, "abstand_s": 60 }
+  ],
+  "sendeplan": [
+    {
+      "beschreibung": "die erste Messung geht sofort raus",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 }
+      ]
+    },
+    {
+      "beschreibung": "Bewegung über 25 m geht erst nach 30 s raus",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 0, "antwort": "weiter", "sendet": null },
+        { "art": "messung", "um_s": 20, "nord_m": 40, "sendet": null },
+        { "art": "messung", "um_s": 31, "nord_m": 40, "sendet": 31 }
+      ]
+    },
+    {
+      "beschreibung": "ohne Bewegung fordert das Lebenszeichen nach 300 s eine frische Messung an, die mit ihrer eigenen Zeit rausgeht",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 0, "antwort": "weiter", "sendet": null },
+        { "art": "messung", "um_s": 100, "nord_m": 3, "sendet": null },
+        { "art": "lebenszeichen", "um_s": 200, "fordert_an": false },
+        { "art": "lebenszeichen", "um_s": 299, "fordert_an": false },
+        { "art": "lebenszeichen", "um_s": 300, "fordert_an": true },
+        { "art": "messung", "um_s": 304, "gemessen_s": 303, "nord_m": 2, "sendet": 303 }
+      ]
+    },
+    {
+      "beschreibung": "kommt auf das Lebenszeichen keine frische Messung, geht nichts raus; nach 30 s wird neu angefordert",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 0, "antwort": "weiter", "sendet": null },
+        { "art": "lebenszeichen", "um_s": 300, "fordert_an": true },
+        { "art": "lebenszeichen", "um_s": 320, "fordert_an": false },
+        { "art": "versuch", "um_s": 325, "sendet": null },
+        { "art": "lebenszeichen", "um_s": 330, "fordert_an": true }
+      ]
+    },
+    {
+      "beschreibung": "eine Messung, die nicht neuer ist als die gesendete, geht nicht noch einmal raus",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 1, "antwort": "weiter", "sendet": null },
+        { "art": "lebenszeichen", "um_s": 301, "fordert_an": true },
+        { "art": "messung", "um_s": 302, "gemessen_s": 0, "sendet": null }
+      ]
+    },
+    {
+      "beschreibung": "während einer Sendung geht keine zweite raus, die neuere folgt nach der Antwort",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "messung", "um_s": 40, "nord_m": 100, "sendet": null },
+        { "art": "antwort", "um_s": 41, "antwort": "weiter", "sendet": 40 }
+      ]
+    },
+    {
+      "beschreibung": "ein Fehler plant den nächsten Versuch mit wachsendem Abstand",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 0, "antwort": "wiederholen", "sendet": null },
+        { "art": "versuch", "um_s": 4, "sendet": null },
+        { "art": "versuch", "um_s": 5, "sendet": 0 },
+        { "art": "antwort", "um_s": 5, "antwort": "wiederholen", "sendet": null },
+        { "art": "versuch", "um_s": 14, "sendet": null },
+        { "art": "versuch", "um_s": 15, "sendet": 0 }
+      ]
+    },
+    {
+      "beschreibung": "nach zehn Minuten ohne Netz verfällt die gepufferte Position",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 0, "antwort": "wiederholen", "sendet": null },
+        { "art": "versuch", "um_s": 601, "sendet": null }
+      ]
+    },
+    {
+      "beschreibung": "verwerfen vergisst nur diese Position",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 1, "antwort": "verwerfen", "sendet": null },
+        { "art": "messung", "um_s": 2, "sendet": 2 }
+      ]
+    },
+    {
+      "beschreibung": "stoppen vergisst alles",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 1, "antwort": "stoppen", "sendet": null },
+        { "art": "lebenszeichen", "um_s": 1000, "fordert_an": false }
+      ]
+    },
+    {
+      "beschreibung": "ruhen hält den Dienst an wie stoppen",
+      "schritte": [
+        { "art": "messung", "um_s": 0, "sendet": 0 },
+        { "art": "antwort", "um_s": 1, "antwort": "ruhen", "sendet": null },
+        { "art": "lebenszeichen", "um_s": 1000, "fordert_an": false }
+      ]
+    }
   ]
 }

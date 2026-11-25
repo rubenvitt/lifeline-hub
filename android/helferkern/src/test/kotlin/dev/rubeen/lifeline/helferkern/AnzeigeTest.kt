@@ -23,7 +23,14 @@ class AnzeigeTest {
         )
         assertEquals("Der Code ist ungültig oder abgelaufen. Bitte den QR-Code neu scannen.", Anzeige.meldung(401))
         assertEquals("Die Ortung ist für diese Organisation ausgeschaltet.", Anzeige.meldung(403, reason = "tracking_off"))
-        assertEquals("Die Ortung ist für diese Organisation ausgeschaltet.", Anzeige.meldung(403))
+        assertEquals("Das ist mit dieser Anmeldung nicht erlaubt.", Anzeige.meldung(403))
+        assertEquals("Das Ziel gibt es nicht mehr.", Anzeige.meldung(403, reason = "target_removed"))
+        assertEquals("Dieses Gerät ortet weder ein Ziel noch eine Person.", Anzeige.meldung(403, reason = "no_role"))
+        assertEquals(
+            "Diese Einladung ist ausgeschöpft. Bitte die Einsatzleitung um einen neuen QR-Code.",
+            Anzeige.meldung(422, reason = "invitation_exhausted", error = "ausgeschöpft"),
+        )
+        assertEquals("Name leer", Anzeige.meldung(400, error = "Name leer"))
         assertEquals("Auf diesem Gerät ist eine persönliche Anmeldung aktiv.", Anzeige.meldung(409, reason = "person_session"))
         assertEquals("Das geht im aktuellen Zustand der Anmeldung nicht.", Anzeige.meldung(409))
         assertEquals("Name zu lang", Anzeige.meldung(422, error = "Name zu lang"))

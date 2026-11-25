@@ -2,8 +2,8 @@ package dev.rubeen.lifeline.helferkern
 
 /**
  * Was der Ortungsdienst auf die Antwort des Servers auf eine Sendung tut (Spec „Ablauf“, Schritt 6;
- * gemeinsame Fälle `src-tauri/faelle/helfer.json`, Abschnitt `antwort`). Die [kennwort]e sind die
- * der Fälle.
+ * gemeinsame Fälle `src-tauri/faelle/helfer.json`, Abschnitt `antwort`, je Status und `reason`).
+ * Die [kennwort]e sind die der Fälle.
  */
 enum class Antwort(val kennwort: String) {
     /** Gesendet: weiter im Takt. */
@@ -18,21 +18,31 @@ enum class Antwort(val kennwort: String) {
     /** Kopplung noch unbestätigt (409): der Dienst läuft weiter, der Server speichert nichts. */
     WARTEN("warten"),
 
-    /** Sitzung weg, nicht berechtigt oder Kopplung weg (401, 403, 404): der Dienst stoppt. */
+    /**
+     * Angemeldet, aber gerade ohne Ortung (403 mit [Ruhegrund]: `no_role`, `tracking_off`): der
+     * Dienst stoppt, die Kopplung und die Sitzung bleiben ([Phase.Ruht]).
+     */
+    RUHEN("ruhen"),
+
+    /** Sitzung weg, nicht berechtigt oder Kopplung weg (401, 403 sonst, 404): der Dienst stoppt. */
     STOPPEN("stoppen"),
 }
 
 /**
- * Entscheidung je HTTP-Status; `0` steht für einen Netzfehler ohne Antwort.
+ * Entscheidung je HTTP-Status und `reason` des Fehler-Bodys ([grund]); `0` steht für einen
+ * Netzfehler ohne Antwort.
  *
  * Nur 401, 403 und 404 stoppen den Dienst, damit ein Neustart des Servers nicht die Ortung aller
- * Helfer stilllegt. Ein anderer 4xx außer 408 und 429 ist ein Fehler dieser Sendung und wird wie
- * 422 verworfen.
+ * Helfer stilllegt; ein 403 mit [Ruhegrund] lässt die Kopplung bestehen ([Antwort.RUHEN]). Ein
+ * anderer 4xx außer 408 und 429 (400, 422) ist ein Fehler dieser Sendung und wird verworfen. Eine
+ * Weiterleitung (3xx) folgt die App nie (ADR-0098: nur der Server der Kopplung); sie gilt wie ein
+ * Serverfehler.
  */
-fun entscheide(status: Int): Antwort = when (status) {
+fun entscheide(status: Int, grund: String? = null): Antwort = when (status) {
     in 200..299 -> Antwort.WEITER
     409 -> Antwort.WARTEN
-    401, 403, 404 -> Antwort.STOPPEN
+    403 -> if (Ruhegrund.ausWire(grund) != null) Antwort.RUHEN else Antwort.STOPPEN
+    401, 404 -> Antwort.STOPPEN
     408, 429 -> Antwort.WIEDERHOLEN
     in 400..499 -> Antwort.VERWERFEN
     else -> Antwort.WIEDERHOLEN

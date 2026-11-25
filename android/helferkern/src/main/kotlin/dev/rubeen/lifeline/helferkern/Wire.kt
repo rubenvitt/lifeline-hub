@@ -34,7 +34,7 @@ data class ZielOption(
     val zeichen: String? get() = Anzeige.zeichen(signOrganization, signFunction)
 }
 
-/** `GET /api/devices/helpers/targets` (`HelferZielliste`). */
+/** Antwort von `POST /api/devices/helpers/targets` (`HelferZielliste`). */
 @Serializable
 data class Zielliste(
     val targets: List<ZielOption>,
@@ -53,6 +53,13 @@ data class Einloesung(
     val target: ZielEingabe,
     @SerialName("track_person") val trackPerson: Boolean,
 )
+
+/**
+ * Body von `POST /api/devices/helpers/targets`: der Code steht im Body, nie in der Adresse, damit
+ * er in keinem Zugriffsprotokoll landet (wie `/koppeln` und das Einlösen).
+ */
+@Serializable
+private data class Zielanfrage(val code: String)
 
 @Serializable
 private data class Zielaenderung(val target: ZielEingabe)
@@ -92,6 +99,10 @@ data class Zustand(
     @Serializable
     data class Person(val id: Long, val name: String)
 
+    /** Was die Leitung beim Bestätigen gegeben hat ([Ereignis.Zustand]). */
+    val rolle: Rolle
+        get() = Rolle(isTracker, person?.id)
+
     /** Ablauf der Kopplung auf der Uhr des Geräts (der Server nennt seine Uhrzeit mit); `null`, wenn unlesbar. */
     fun ablauf(jetzt: Instant): Instant? {
         val ablauf = Wire.serverzeit(expiresAt) ?: return null
@@ -118,6 +129,8 @@ object Wire {
     fun zielliste(text: String): Zielliste? = lies { json.decodeFromString<Zielliste>(text) }
 
     fun fehler(text: String): Fehler = lies { json.decodeFromString<Fehler>(text) } ?: Fehler()
+
+    fun zielanfrage(code: String): String = json.encodeToString(Zielanfrage(code))
 
     fun einloesung(e: Einloesung): String = json.encodeToString(e)
 

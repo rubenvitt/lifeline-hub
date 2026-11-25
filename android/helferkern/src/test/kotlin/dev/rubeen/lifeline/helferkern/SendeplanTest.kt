@@ -3,6 +3,7 @@ package dev.rubeen.lifeline.helferkern
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -30,18 +31,51 @@ class SendeplanTest {
         plan.messung(position(0), um(0))
         plan.antwort(Antwort.WEITER, um(1))
         assertNull(plan.messung(position(40, nordM = 5.0), um(40)))
-        assertNull(plan.lebenszeichen(um(200)))
+        assertFalse(plan.lebenszeichen(um(200)))
     }
 
     @Test
-    fun `nach fuenf Minuten ohne Bewegung kommt ein Lebenszeichen mit der Uhrzeit von jetzt`() {
+    fun `das Lebenszeichen fordert eine frische Messung an und sendet nie die alte mit neuer Zeit`() {
         val plan = Sendeplan()
         plan.messung(position(0), um(0))
         plan.antwort(Antwort.WEITER, um(0))
-        plan.messung(position(100, nordM = 3.0), um(100))
-        val zeichen = assertNotNull(plan.lebenszeichen(um(300)))
-        assertEquals(um(300), zeichen.recordedAt)
-        assertEquals(position(100, nordM = 3.0).latitude, zeichen.latitude)
+        assertNull(plan.messung(position(100, nordM = 3.0), um(100)))
+        assertTrue(plan.lebenszeichen(um(300)))
+        assertFalse(plan.lebenszeichen(um(310)), "die Anforderung läuft noch")
+        assertNull(plan.versuch(um(320)), "ohne frische Messung geht nichts raus")
+        val frisch = position(325, nordM = 2.0)
+        val zeichen = assertNotNull(plan.messung(frisch, um(326)))
+        assertEquals(um(325), zeichen.recordedAt, "die Zeit der Messung, nicht die der Uhr")
+    }
+
+    @Test
+    fun `eine zwischengespeicherte Messung geht nicht noch einmal raus`() {
+        val plan = Sendeplan()
+        val p = position(0)
+        plan.messung(p, um(0))
+        plan.antwort(Antwort.WEITER, um(1))
+        assertTrue(plan.lebenszeichen(um(301)))
+        assertNull(plan.messung(p, um(302)))
+        assertNull(plan.messung(position(0, nordM = 50.0), um(303)), "gleich alt ist nicht neuer")
+    }
+
+    @Test
+    fun `waehrend einer Sendung fordert das Lebenszeichen nichts an`() {
+        val plan = Sendeplan()
+        plan.messung(position(0), um(0))
+        plan.antwort(Antwort.WEITER, um(0))
+        plan.messung(position(400, nordM = 1.0), um(400))
+        assertFalse(plan.lebenszeichen(um(401)))
+    }
+
+    @Test
+    fun `ruhen haelt den Plan an wie stoppen`() {
+        val plan = Sendeplan()
+        plan.messung(position(0), um(0))
+        assertNull(plan.antwort(Antwort.RUHEN, um(1)))
+        assertFalse(plan.lebenszeichen(um(1000)))
+        assertNull(plan.naechsterVersuch)
+        assertNotNull(plan.messung(position(1001), um(1001)), "nach dem Neustart geht die erste Messung raus")
     }
 
     @Test
@@ -112,7 +146,7 @@ class SendeplanTest {
         val plan = Sendeplan()
         plan.messung(position(0), um(0))
         plan.antwort(Antwort.STOPPEN, um(1))
-        assertNull(plan.lebenszeichen(um(1000)))
+        assertFalse(plan.lebenszeichen(um(1000)))
         assertNull(plan.naechsterVersuch)
     }
 
