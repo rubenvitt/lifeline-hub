@@ -6,6 +6,7 @@
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
+use lifeline_hub::org::einstellungen as org_einstellungen;
 use serde_json::Value;
 use tower::ServiceExt;
 
@@ -909,4 +910,117 @@ async fn nachbereitung_tage_setzen_grenzen_und_leeren() {
         !body.as_object().unwrap().contains_key("nachbereitung_tage"),
         "Vollersatz leert: body={body}"
     );
+}
+
+// ----------------------------- Fremdebenen im eigenen Netz -----------------------------
+
+/// Einträge der Admin-Spur zum Schalter: (Aktion, Ziel).
+async fn lan_spur(pool: &sqlx::SqlitePool) -> Vec<(String, String)> {
+    sqlx::query_as(
+        "SELECT aktion, ziel FROM admin_audit \
+         WHERE aktion LIKE 'fremdebenen_lan_%' ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// Ohne Zeile und ohne gesetzten Wert ist der Abruf im eigenen Netz aus.
+#[tokio::test]
+async fn fremdebenen_lan_ist_standardmaessig_aus() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = get_einstellungen(&app, Some(&admin)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["fremdebenen_lan_erlaubt"], false);
+    assert!(!org_einstellungen::is_fremdebenen_lan_erlaubt(&pool, 1)
+        .await
+        .unwrap());
+
+    // Eine Zeile aus einem anderen PUT ändert den Standard nicht.
+    let (status, body) =
+        put_einstellungen(&app, &admin, serde_json::json!({"zeitzone": "UTC"})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["fremdebenen_lan_erlaubt"], false);
+}
+
+/// Der Admin erlaubt und entzieht; jede Änderung steht in der Admin-Spur, ein gleicher Wert nicht.
+#[tokio::test]
+async fn fremdebenen_lan_setzen_schreibt_die_admin_spur_nur_bei_aenderung() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"fremdebenen_lan_erlaubt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["fremdebenen_lan_erlaubt"], true);
+    let (_, gelesen) = get_einstellungen(&app, Some(&admin)).await;
+    assert_eq!(gelesen["fremdebenen_lan_erlaubt"], true);
+    assert!(org_einstellungen::is_fremdebenen_lan_erlaubt(&pool, 1)
+        .await
+        .unwrap());
+    assert_eq!(
+        lan_spur(&pool).await,
+        vec![("fremdebenen_lan_erlaubt".into(), "fremdebenen_lan".into())]
+    );
+
+    // Derselbe Wert noch einmal: keine neue Zeile in der Spur.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"fremdebenen_lan_erlaubt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(lan_spur(&pool).await.len(), 1);
+
+    // Ein PUT ohne das Feld lässt den Wert stehen (ein älterer Client entzieht nichts still).
+    let (status, body) =
+        put_einstellungen(&app, &admin, serde_json::json!({"zeitzone": "UTC"})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["fremdebenen_lan_erlaubt"], true);
+    assert_eq!(lan_spur(&pool).await.len(), 1);
+
+    // Entziehen.
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"fremdebenen_lan_erlaubt": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["fremdebenen_lan_erlaubt"], false);
+    assert_eq!(
+        lan_spur(&pool).await,
+        vec![
+            ("fremdebenen_lan_erlaubt".into(), "fremdebenen_lan".into()),
+            ("fremdebenen_lan_entzogen".into(), "fremdebenen_lan".into()),
+        ]
+    );
+}
+
+/// Eine Führungskraft darf den Schalter nicht setzen; nichts ändert sich.
+#[tokio::test]
+async fn fremdebenen_lan_als_fuehrungskraft_ist_403() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &fk,
+        serde_json::json!({"fremdebenen_lan_erlaubt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(!org_einstellungen::is_fremdebenen_lan_erlaubt(&pool, 1)
+        .await
+        .unwrap());
+    assert!(lan_spur(&pool).await.is_empty());
 }

@@ -407,13 +407,13 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `pub async fn is_fremdebenen_lan_erlaubt(pool, org_id) -> Result<bool, AppError>`.
   - Nur ein Admin darf setzen; eine Änderung schreibt einen Admin-Spur-Eintrag.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Standard `false`;
   - der Admin setzt `true` → Lesen ergibt `true`, die Admin-Spur trägt `fremdebenen_lan_erlaubt`;
   - ein Nicht-Admin bekommt 403;
   - Frontend: Schalter sichtbar und an die Mutation gebunden.
-- [ ] **Step 2:** → FAIL. **Step 3:** umsetzen. **Step 4:** Tests, Enum-Kontrakt, Typ-Codegen → PASS.
-- [ ] **Step 5:** Commit `feat: Org-Schalter für Fremdebenen im eigenen Netz` (Zunder C).
+- [x] **Step 2:** → FAIL. **Step 3:** umsetzen. **Step 4:** Tests, Enum-Kontrakt, Typ-Codegen → PASS.
+- [x] **Step 5:** Commit `feat: Org-Schalter für Fremdebenen im eigenen Netz` (Zunder C).
 
 ### Task 15: URL-Abruf beim Lesen
 

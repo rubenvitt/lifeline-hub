@@ -35,7 +35,7 @@ wire_enum! {
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
     /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
     /// `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
-    /// `0301_admin_audit_instanz.sql` — beide Seiten
+    /// `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0374_org_fremdebenen_lan.sql`) — beide Seiten
     /// müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
     /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -174,6 +174,11 @@ wire_enum! {
         AdapterAngehalten => "adapter_angehalten",
         /// Angehaltener Adapter fortgesetzt.
         AdapterFortgesetzt => "adapter_fortgesetzt",
+        /// Fremdebenen der Lagekarte dürfen Ziele im eigenen Netz abrufen (LLH-2099, Migration
+        /// 0374); org-weiter Schalter, Ziel `fremdebenen_lan`.
+        FremdebenenLanErlaubt => "fremdebenen_lan_erlaubt",
+        /// Diese Erlaubnis zurückgenommen.
+        FremdebenenLanEntzogen => "fremdebenen_lan_entzogen",
     }
 }
 
@@ -196,6 +201,8 @@ pub enum Ziel<'a> {
     EinwurfZugang(&'a str),
     /// Ein Adapter, mit seinem Namen (LLH-2017).
     Adapter(&'a str),
+    /// Eine org-weite Einstellung, mit ihrem Schlüssel (LLH-2099).
+    Org(&'a str),
 }
 
 /// Was eine Zugangsänderung über Aktion und Ziel hinaus festhält (LFH-1152). Liegt als JSON in
@@ -330,7 +337,8 @@ pub async fn schreibe(pool: &SqlitePool, eintrag: AdminEintrag<'_>) {
         | Ziel::Archiv(id)
         | Ziel::Maschinenzugang(id)
         | Ziel::EinwurfZugang(id)
-        | Ziel::Adapter(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
+        | Ziel::Adapter(id)
+        | Ziel::Org(id) => (None, crate::auth::benutzername::fuer_protokoll(id)),
     };
     let akteur_name = crate::auth::benutzername::fuer_protokoll(&eintrag.akteur.benutzername);
     let peer_ip = eintrag.peer_ip.map(|ip| ip.to_string());
@@ -454,7 +462,8 @@ fn ziel_teile(ziel: Ziel<'_>) -> (Option<i64>, &str) {
         | Ziel::Archiv(t)
         | Ziel::Maschinenzugang(t)
         | Ziel::EinwurfZugang(t)
-        | Ziel::Adapter(t) => (None, t),
+        | Ziel::Adapter(t)
+        | Ziel::Org(t) => (None, t),
     }
 }
 

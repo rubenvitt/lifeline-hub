@@ -70,12 +70,19 @@ describe('zuUpdate', () => {
 
 describe('normalisiereAnzeige', () => {
   it('trimmt Strings, leer → null, füllt fehlende Enums mit null', () => {
-    expect(normalisiereAnzeige({ zeitzone: '  Europe/Berlin  ', geocoder_url: '   ' })).toEqual({
+    expect(
+      normalisiereAnzeige({
+        zeitzone: '  Europe/Berlin  ',
+        geocoder_url: '   ',
+        fremdebenen_lan_erlaubt: true,
+      }),
+    ).toEqual({
       zeitzone: 'Europe/Berlin',
       zeitdarstellung: null,
       einheiten: null,
       koordinatenformat: null,
       geocoder_url: null,
+      fremdebenen_lan_erlaubt: true,
     });
   });
 });

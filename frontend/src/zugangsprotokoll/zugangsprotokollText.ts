@@ -85,6 +85,8 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   adapter_lan_entzogen: 'Adapter: Ziel im lokalen Netz nicht mehr erlaubt',
   adapter_angehalten: 'Adapter angehalten',
   adapter_fortgesetzt: 'Adapter fortgesetzt',
+  fremdebenen_lan_erlaubt: 'Fremdebenen: Ziele im lokalen Netz erlaubt',
+  fremdebenen_lan_entzogen: 'Fremdebenen: Ziele im lokalen Netz nicht mehr erlaubt',
 };
 
 /**

@@ -17,6 +17,10 @@ import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
  * **Ausnahme `aufbewahrung_kategorien`** (LFH-749, design.md D8): die Liste ist KEIN Vollersatz —
  * fehlt das Feld, bleibt sie am Server unverändert. `zuUpdate` lässt sie deshalb weg; nur die
  * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit.
+ *
+ * **Ausnahme `fremdebenen_lan_erlaubt`** (LLH-2099): ebenfalls kein Vollersatz, fehlt das Feld,
+ * bleibt der Wert am Server. `zuUpdate` lässt es weg; nur die Sektion „Anzeige“ (Paneel
+ * „Fremdebenen“) schickt es über {@link normalisiereAnzeige} mit.
  */
 
 /** Anzeige-Sektion: Darstellungs-Defaults + Geocoder. */
@@ -26,6 +30,8 @@ export interface FormWerteAnzeige {
   einheiten?: EinheitenSystem;
   koordinatenformat?: Koordinatenformat;
   geocoder_url?: string;
+  /** Fremdebenen der Lagekarte dürfen Ziele im eigenen Netz abrufen (LLH-2099). */
+  fremdebenen_lan_erlaubt: boolean;
 }
 
 /** Einsatz-Defaults-Sektion: Aufbewahrung, Nummernkreise, Fristen, Auto-ETB. */
@@ -80,7 +86,12 @@ export function normalisiereAnzeige(
   w: FormWerteAnzeige,
 ): Pick<
   OrgEinstellungenUpdate,
-  'zeitzone' | 'zeitdarstellung' | 'einheiten' | 'koordinatenformat' | 'geocoder_url'
+  | 'zeitzone'
+  | 'zeitdarstellung'
+  | 'einheiten'
+  | 'koordinatenformat'
+  | 'geocoder_url'
+  | 'fremdebenen_lan_erlaubt'
 > {
   return {
     zeitzone: w.zeitzone?.trim() || null,
@@ -88,6 +99,7 @@ export function normalisiereAnzeige(
     einheiten: w.einheiten ?? null,
     koordinatenformat: w.koordinatenformat ?? null,
     geocoder_url: w.geocoder_url?.trim() || null,
+    fremdebenen_lan_erlaubt: w.fremdebenen_lan_erlaubt,
   };
 }
 
@@ -149,6 +161,7 @@ export function initialAnzeige(e: OrgEinstellungen): FormWerteAnzeige {
     einheiten: e.einheiten ?? undefined,
     koordinatenformat: e.koordinatenformat ?? undefined,
     geocoder_url: e.geocoder_url ?? undefined,
+    fremdebenen_lan_erlaubt: e.fremdebenen_lan_erlaubt === true,
   };
 }
 

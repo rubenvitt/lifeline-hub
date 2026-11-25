@@ -1,4 +1,4 @@
-import { App, AutoComplete, Form, Input } from 'antd';
+import { App, AutoComplete, Form, Input, Switch } from 'antd';
 import { Select } from '../../components/Select';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -169,6 +169,18 @@ export default function AnzeigeEinstellungen() {
               extra="Die Einsatz-Koordinate wird an diesen Dienst gesendet."
             >
               <Input placeholder={mitVorgabe('https://nominatim.openstreetmap.org')} allowClear />
+            </Feld>
+          </Formularpaneel>
+          <Formularpaneel titel="Fremdebenen">
+            <Feld
+              label="Fremdebenen dürfen das eigene Netz abrufen"
+              name="fremdebenen_lan_erlaubt"
+              valuePropName="checked"
+              // Die Folge steht am Feld (Touch, LFH-1078): ohne Schalter ruft eine Ebene nur
+              // öffentliche Ziele ab.
+              extra="Eine Ebene aus einer URL darf dann einen Server im lokalen Netz abrufen, etwa der Wache. Loopback und Link-Local bleiben gesperrt. Steht im Zugangsprotokoll."
+            >
+              <Switch />
             </Feld>
           </Formularpaneel>
           <div {...speicherLeiste}>

@@ -96,6 +96,7 @@ function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellun
     auftrag_quittierung_frist_min: null,
     auto_etb_eintraege: null,
     geocoder_url: null,
+    fremdebenen_lan_erlaubt: false,
     geaendert_at: null,
     geaendert_von: null,
     ...partial,

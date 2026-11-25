@@ -42,6 +42,8 @@ pub struct OrgEinstellungen {
     pub auto_etb_eintraege: Option<i64>,
     // Geocoder-Basis-URL (serverseitig; kein Leak an Mitglieder).
     pub geocoder_url: Option<String>,
+    // Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099): 0 = nein (Standard), 1 = ja.
+    pub fremdebenen_lan_erlaubt: i64,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -66,6 +68,7 @@ impl OrgEinstellungen {
             rueckmeldung_frist_min: None,
             auto_etb_eintraege: None,
             geocoder_url: None,
+            fremdebenen_lan_erlaubt: 0,
             geaendert_at: None,
             geaendert_von: None,
         }
@@ -96,6 +99,7 @@ impl OrgEinstellungen {
             rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
             geocoder_url: self.geocoder_url.clone(),
+            fremdebenen_lan_erlaubt: self.fremdebenen_lan_erlaubt != 0,
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
         }
@@ -154,6 +158,8 @@ pub struct OrgEinstellungenAnzeige {
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<String>,
+    /// Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099); Standard `false`.
+    pub fremdebenen_lan_erlaubt: bool,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -201,6 +207,9 @@ pub struct OrgEinstellungenDaten<'a> {
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<&'a str>,
+    /// Fremdebenen im eigenen Netz (LLH-2099); der Handler löst ein fehlendes Feld des Clients
+    /// vorher gegen den gespeicherten Wert auf.
+    pub fremdebenen_lan_erlaubt: bool,
     /// Kategorie-Vorgaben (LFH-749), bereits geprüft: `Some` ersetzt die Liste, `None` lässt sie
     /// unverändert (anders als die übrigen Felder kein Vollersatz, damit ein älterer Client sie
     /// nicht still löscht).
@@ -218,13 +227,26 @@ pub async fn laden_oder_default(
                 retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
                 meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
                 auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
-                geaendert_at, geaendert_von \
+                fremdebenen_lan_erlaubt, geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
     )
     .bind(org_id)
     .fetch_optional(executor)
     .await?;
     Ok(row.unwrap_or_else(|| OrgEinstellungen::leer(org_id)))
+}
+
+/// Dürfen Fremdebenen dieser Org Ziele im eigenen Netz abrufen (LLH-2099)? Ohne Zeile `false`.
+/// Der Abruf einer URL-Ebene (`karte::fremdebene`) fragt vor jedem Abruf, nicht beim Anlegen:
+/// ein Entzug wirkt sofort.
+pub async fn is_fremdebenen_lan_erlaubt(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
+    let wert: Option<i64> = sqlx::query_scalar(
+        "SELECT fremdebenen_lan_erlaubt FROM org_einstellungen WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(wert.is_some_and(|w| w != 0))
 }
 
 /// Speichert die Org-Einstellungen (UPSERT auf `org_id`); setzt die Audit-Felder.
@@ -243,8 +265,8 @@ pub async fn speichern(
              retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
              meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, \
              meldung_bestaetigung_frist_min, auftrag_quittierung_frist_min, rueckmeldung_frist_min, \
-             auto_etb_eintraege, geocoder_url, geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+             auto_etb_eintraege, geocoder_url, fremdebenen_lan_erlaubt, geaendert_at, geaendert_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitdarstellung = excluded.zeitdarstellung, \
@@ -262,6 +284,7 @@ pub async fn speichern(
              rueckmeldung_frist_min = excluded.rueckmeldung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
              geocoder_url = excluded.geocoder_url, \
+             fremdebenen_lan_erlaubt = excluded.fremdebenen_lan_erlaubt, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
     )
@@ -282,6 +305,7 @@ pub async fn speichern(
     .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
     .bind(daten.geocoder_url)
+    .bind(i64::from(daten.fremdebenen_lan_erlaubt))
     .bind(erfasser_id)
     .execute(&mut *tx)
     .await?;
@@ -370,6 +394,7 @@ mod tests {
                 rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
                 geocoder_url: Some("https://nominatim.example.org"),
+                fremdebenen_lan_erlaubt: true,
                 aufbewahrung_kategorien: Some(&vorgaben),
             },
         )
@@ -397,6 +422,8 @@ mod tests {
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
         assert_eq!(g.rueckmeldung_frist_min, Some(90));
         assert_eq!(g.auto_etb_eintraege, Some(0));
+        assert_eq!(g.fremdebenen_lan_erlaubt, 1);
+        assert!(is_fremdebenen_lan_erlaubt(&pool, 1).await.unwrap());
         assert_eq!(
             g.geocoder_url.as_deref(),
             Some("https://nominatim.example.org")
@@ -434,6 +461,10 @@ mod tests {
             "Vollersatz leert die Nachbereitung"
         );
         assert_eq!(zweite.auto_etb_eintraege, None);
+        assert_eq!(
+            zweite.fremdebenen_lan_erlaubt, 0,
+            "Vollersatz setzt die Erlaubnis zurück"
+        );
 
         // COUNT == 1 nach zwei Speichervorgängen (UPSERT, kein zweiter Insert).
         let anzahl: i64 =

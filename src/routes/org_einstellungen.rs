@@ -9,6 +9,7 @@
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
 use crate::app::AppState;
+use crate::auth::admin_audit::{schreibe, AdminAktion, AdminEintrag, Ziel};
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
     ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
@@ -19,8 +20,8 @@ use crate::einsatz::modul::{
     ist_ausblendbar, ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
 };
 use crate::error::AppError;
-use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::extract::{JsonBody, PeerIp};
 use crate::org::aufbewahrung_kategorie::{self, KategorieVorgabeEingabe};
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
 use crate::org::modul_einstellung::{self, OrgModulEinstellung};
@@ -65,6 +66,10 @@ pub struct OrgEinstellungenUpdate {
     pub auto_etb_eintraege: Option<bool>,
     /// Geocoder-Basis-URL (nur http/https) für die Ort-Vorschau.
     pub geocoder_url: Option<String>,
+    /// Fremdebenen der Lagekarte dürfen Ziele im eigenen Netz abrufen (LLH-2099). Anders als die
+    /// übrigen Felder kein Vollersatz: fehlt das Feld, bleibt der Wert, damit ein älterer Client
+    /// die Erlaubnis nicht still entzieht. Eine Änderung steht in der Admin-Spur.
+    pub fremdebenen_lan_erlaubt: Option<bool>,
 }
 
 /// GET /api/org-settings — Org-weite Einstellungen lesen.
@@ -86,6 +91,7 @@ pub async fn lesen(
 pub async fn setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     JsonBody(req): JsonBody<OrgEinstellungenUpdate>,
 ) -> Result<Json<OrgEinstellungenAnzeige>, AppError> {
     // Anzeige-Konventionen: bereinigen + Whitelist (400 bei Fehler).
@@ -207,6 +213,10 @@ pub async fn setzen(
         }
     }
 
+    // Fremdebenen im eigenen Netz: fehlendes Feld = unverändert.
+    let lan_alt = einstellungen::is_fremdebenen_lan_erlaubt(&state.pool, benutzer.org_id).await?;
+    let lan_neu = req.fremdebenen_lan_erlaubt.unwrap_or(lan_alt);
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         benutzer.org_id,
@@ -229,10 +239,28 @@ pub async fn setzen(
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
+            fremdebenen_lan_erlaubt: lan_neu,
             aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
+    if lan_neu != lan_alt {
+        schreibe(
+            &state.pool,
+            AdminEintrag {
+                aktion: if lan_neu {
+                    AdminAktion::FremdebenenLanErlaubt
+                } else {
+                    AdminAktion::FremdebenenLanEntzogen
+                },
+                akteur: &benutzer,
+                ziel: Ziel::Org("fremdebenen_lan"),
+                angaben: None,
+                peer_ip,
+            },
+        )
+        .await;
+    }
     let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
     Ok(Json(gespeichert.anzeige(kategorien)))
 }
