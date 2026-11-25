@@ -66,16 +66,16 @@
   ```
   (Fehlt `thiserror` im Crate, ein schlichtes Enum mit `Display`.)
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `liest_den_echten_kopf`: `parse_kopf(&ANFANG[..16384])` → `Fertig(k)` mit `k.stufen.len() == 6`, `k.stufen[0].breite == 11447`, `hoehe == 8594`, `kachel_breite == 512`, `k.stufen[0].offsets.len() == 391`, `k.stufen[5].offsets.len() == 1`, `k.stufen[5].laengen == vec![146627]`, `k.kanaele == 3`, `!k.alpha`, `k.kompression == Deflate`, `k.praediktor == 2`, `k.nodata == Some(0)`, `k.ursprung == (1019796.0, 6271424.0)`, `k.pixel == (4.0, 4.0)`, `k.nicht_darstellbar == None`.
   - `liest_nachgeladenen_kopf`: `parse_kopf(&ANFANG[..3000])` → `BrauchtBytes(n)` mit `3000 < n <= 16384`; danach `parse_kopf(&ANFANG[..n as usize])` → `Fertig`.
   - `kopf_ueber_grenze_ist_fehler`: synthetischer Kopf, dessen IFD-Offset > `KOPF_MAX` liegt → `Err(CogFehler::ZuGross)`.
   - `nicht_darstellbar_mit_grund`: je ein synthetischer Kopf (Builder aus Task 3, `baue_test_cog` mit Optionen) für EPSG 32632, Streifen statt Kacheln (keine Tags 322/324), BitsPerSample 16, ModelTransformation-Tag (34264) → `nicht_darstellbar.is_some()`.
   - `kaputter_kopf_ist_fehler`: `b"II*\0\xff\xff\xff\x7f"` und `b"XX"` → `Err(Format)`, keine Panik.
-- [ ] **Step 2:** `cargo test --lib karte::cog` → FAIL (Modul fehlt).
-- [ ] **Step 3: Implement `parse_kopf`.** Klassisch (42) und BigTIFF (43), II/MM. IFD-Kette folgen; Wert inline oder per Offset; ein Offset hinter `bytes.len()` → `BrauchtBytes(ende)` (> `KOPF_MAX` → `ZuGross`). Masken-IFDs (Tag 254 Bit 4) überspringen. Geo aus IFD 0: 33550, 33922, 34735 (Schlüssel 3072 = ProjectedCSType), 42113 (ASCII → u8). Höchstens 32 IFDs.
-- [ ] **Step 4:** `cargo test --lib karte::cog` → PASS.
-- [ ] **Step 5:** Commit `feat(karte): COG-Kopf lesen (LLH-2021)`.
+- [x] **Step 2:** `cargo test --lib karte::cog` → FAIL (Modul fehlt).
+- [x] **Step 3: Implement `parse_kopf`.** Klassisch (42) und BigTIFF (43), II/MM. IFD-Kette folgen; Wert inline oder per Offset; ein Offset hinter `bytes.len()` → `BrauchtBytes(ende)` (> `KOPF_MAX` → `ZuGross`). Masken-IFDs (Tag 254 Bit 4) überspringen. Geo aus IFD 0: 33550, 33922, 34735 (Schlüssel 3072 = ProjectedCSType), 42113 (ASCII → u8). Höchstens 32 IFDs.
+- [x] **Step 4:** `cargo test --lib karte::cog` → PASS.
+- [x] **Step 5:** Commit `feat(karte): COG-Kopf lesen (LLH-2021)`.
 
 ### Task 2: Kachelmathematik
 
@@ -95,17 +95,17 @@
   ```
   Den tatsächlichen Wert von `BBOX_MIN_ZOOM` vor dem Schreiben im Frontend nachsehen; ein Vitest-Wächter in Task 7 vergleicht beide.
 
-- [ ] **Step 1: Failing tests** (am echten Kopf)
+- [x] **Step 1: Failing tests** (am echten Kopf)
   - `bounds_von_emsr728`: `[9.16098, 48.77665, 9.57230, 48.97974]` (Ursprung 1019796/6271424, 11447 × 4 m bzw. 8594 × 4 m); Toleranz 1e-4.
   - `abnahme_lagerichtig`: für z = 14 ist die Kachel, die den Ursprung enthält, x = 8608, y = 5628 (Standardformel lon/lat → Kachel); `kachel_im_bild(k, 14, 8608, 5628)` ist wahr, `(14, 8607, 5628)` und `(14, 8608, 5627)` sind falsch.
   - `stufe_je_zoom`: `waehle_stufe(k, 15) == 0` (Pixel 4,8 m ≥ 4 m), `waehle_stufe(k, 13) == 2`, `waehle_stufe(k, 10) == 5`.
   - `zoom_grenzen_emsr728`: `max_zoom == 16` (bei z 16 wäre die Zielkachel mit 2,39 m feiner als 4 m), `min_zoom == 10` (das Bild ist schon bei z 8 75 px breit, also greift `MIN_ZOOM_BACKEND`).
   - `hoechstens_vier_quellkacheln`: für alle x/y im Bild bei z 10…16 gilt `quellkacheln(...).len() <= 4`.
   - `ausserhalb_nicht_im_bild`: Kachel (z 14, x 0, y 0) → `false`.
-- [ ] **Step 2:** Tests rot.
-- [ ] **Step 3:** Implementieren. Merc-Meter je Pixel der Zielkachel `2π·6378137 / (256·2^z)`; Stufe = die gröbste, deren Pixelgröße `pixel.0 · 2^i` (aus Breitenverhältnis) ≤ Zielpixel, sonst 0.
-- [ ] **Step 4:** Tests grün.
-- [ ] **Step 5:** Commit `feat(karte): Kachelmathematik für COG (LLH-2021)`.
+- [x] **Step 2:** Tests rot.
+- [x] **Step 3:** Implementieren. Merc-Meter je Pixel der Zielkachel `2π·6378137 / (256·2^z)`; Stufe = die gröbste, deren Pixelgröße `pixel.0 · 2^i` (aus Breitenverhältnis) ≤ Zielpixel, sonst 0.
+- [x] **Step 4:** Tests grün.
+- [x] **Step 5:** Commit `feat(karte): Kachelmathematik für COG (LLH-2021)`.
 
 ### Task 3: Entpacken und Kachel rendern
 
@@ -121,7 +121,7 @@
   #[cfg(test)] pub(crate) struct TestCog { pub epsg: u16, pub kanaele: u8, pub bits: u16, pub gekachelt: bool, pub rotation: bool, pub kompression: Kompression }
   #[cfg(test)] pub(crate) fn baue_test_cog(o: &TestCog) -> Vec<u8>; // 2×2 Kacheln à 16 px + 1 Übersicht, Prädiktor 2, Nodata 0
   ```
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `entpackt_die_echte_kleinste_stufe`: `entpacke(k, 5, &ANFANG[o..o+146627])` (o = `k.stufen[5].offsets[0]`) → Länge 512·512·3; im Bildbereich (357×268) sind > 90 % der Pixel nicht (0,0,0); außerhalb (Spalte ≥ 357) alle 0.
   - `praediktor_wird_rueckgerechnet`: `baue_test_cog` mit bekanntem Farbverlauf; entpackte Kachel = Original.
   - `rendert_png_256`: `rendere_kachel` → `image::load_from_memory` ergibt 256×256 RGBA.
@@ -129,10 +129,10 @@
   - `randkachel_ist_aussen_durchsichtig`: Zielkachel halb außerhalb → äußere Hälfte Alpha 0, keine Panik.
   - `kaputte_quellkachel_ist_fehler`: zufällige Bytes als Deflate → `Err`, keine Panik; entpackt länger als erwartet → `Err`.
   - `lzw_und_ohne_kompression`: `baue_test_cog` mit `Lzw` und `Keine` entpackt korrekt.
-- [ ] **Step 2:** Tests rot.
-- [ ] **Step 3:** Implementieren: Deflate `flate2::read::ZlibDecoder` mit `take(erwartet+1)`; LZW `weezl` (MSB, TIFF-Größe 8); JPEG über `image::codecs::jpeg` mit vorangestellten JPEGTables (SOI/EOI zusammenfügen); Prädiktor 2 je Zeile horizontal kumulieren; Abtastung nächster Nachbar von Zielpixel → Merc → Stufenpixel → Quellkachel; fehlende Quellkachel in `quellen` = durchsichtig. PNG über `image::codecs::png::PngEncoder`.
-- [ ] **Step 4:** Tests grün.
-- [ ] **Step 5:** Commit `feat(karte): COG-Kacheln entpacken und rendern (LLH-2021)`.
+- [x] **Step 2:** Tests rot.
+- [x] **Step 3:** Implementieren: Deflate `flate2::read::ZlibDecoder` mit `take(erwartet+1)`; LZW `weezl` (MSB, TIFF-Größe 8); JPEG über `image::codecs::jpeg` mit vorangestellten JPEGTables (SOI/EOI zusammenfügen); Prädiktor 2 je Zeile horizontal kumulieren; Abtastung nächster Nachbar von Zielpixel → Merc → Stufenpixel → Quellkachel; fehlende Quellkachel in `quellen` = durchsichtig. PNG über `image::codecs::png::PngEncoder`.
+- [x] **Step 4:** Tests grün.
+- [x] **Step 5:** Commit `feat(karte): COG-Kacheln entpacken und rendern (LLH-2021)`.
 
 ### Task 4: Kachel-Cache ohne Upstream
 
@@ -145,11 +145,11 @@
   pub async fn schreibe_eintrag(cache: &TileCache, schluessel: &str, bytes: &[u8], content_type: &str);
   #[cfg(test)] pub(crate) async fn test_cache() -> TileCache;
   ```
-- [ ] **Step 1: Failing tests:** `eintrag_hin_und_zurueck`; `eintrag_zaehlt_in_groesse_und_lru` (mit kleinem Cap: zweiter großer Eintrag verdrängt den ersten); `fehlender_eintrag_ist_none`.
-- [ ] **Step 2:** rot.
-- [ ] **Step 3:** über `speichere` (mit `AssetAntwort`, `expires_at = now + 30 Tage`) und `verdraenge_falls_noetig`; Lesen über `lade` + `beruehre`.
-- [ ] **Step 4:** grün (`cargo test --lib karte::tile_cache`).
-- [ ] **Step 5:** Commit `feat(karte): Kachel-Cache nimmt gerenderte Einträge (LLH-2021)`.
+- [x] **Step 1: Failing tests:** `eintrag_hin_und_zurueck`; `eintrag_zaehlt_in_groesse_und_lru` (mit kleinem Cap: zweiter großer Eintrag verdrängt den ersten); `fehlender_eintrag_ist_none`.
+- [x] **Step 2:** rot.
+- [x] **Step 3:** über `speichere` (mit `AssetAntwort`, `expires_at = now + 30 Tage`) und `verdraenge_falls_noetig`; Lesen über `lade` + `beruehre`.
+- [x] **Step 4:** grün (`cargo test --lib karte::tile_cache`).
+- [x] **Step 5:** Commit `feat(karte): Kachel-Cache nimmt gerenderte Einträge (LLH-2021)`.
 
 ### Task 5: Bilder aus den Details und Bilderliste
 
@@ -172,7 +172,7 @@
   pub(crate) async fn build_bilder_antwort<H, Fut, R, RFut>(pool: &SqlitePool, cache: &TileCache, fetch: H, hole_bereich: R, bbox: Bbox, archiv: bool, jetzt: NaiveDateTime, max_bilder: usize) -> Option<Gebaut>;
   ```
   Die Auswahlkette (Liste → Kandidaten → Details → Gebiete im Ausschnitt → `select_produkte`) wird aus `build_antwort` in eine Funktion gezogen, die beide nutzen (Name nach Wahl, z. B. `select_im_ausschnitt`); `build_antwort` bleibt im Verhalten gleich.
-- [ ] **Step 1: Failing tests** (Testdaten `copernicus-emsr728.json`, Stub `hole_bereich` liefert Ausschnitte aus `copernicus-cog-anfang.bin` für jeden Pfad)
+- [x] **Step 1: Failing tests** (Testdaten `copernicus-emsr728.json`, Stub `hole_bereich` liefert Ausschnitte aus `copernicus-cog-anfang.bin` für jeden Pfad)
   - `bilder_mit_sensor_und_aufnahme`: Gebiet Stuttgart, gewähltes DEL (MONIT04) hat zwei Bilder: GeoEye-1 `2024-06-08 10:53:00` und Pleiades `2024-06-08 10:29:00`.
   - `bild_ohne_images_eintrag_bleibt`: `fileName` passt nicht → Bild da, `sensor == None`.
   - `bildpfad_pruefung`: `check_bildpfad` lehnt `../x.tif`, `https://evil/x.tif`, `a//b.tif`, `a/b.json`, `/a.tif` ab; nimmt `EMSR728/AOI01/DEL_MONIT04/x_ORTHO.tif`.
@@ -183,10 +183,10 @@
   - `bildgrenze_kuerzt`: `max_bilder = 1` → ein Feature, Gebiet trägt `gekuerzt: true`.
   - `kopf_aus_cache_ohne_abruf`: zweiter `load_kopf` ruft `hole_bereich` nicht.
   - Bestehende Copernicus-Tests bleiben grün.
-- [ ] **Step 2:** rot.
-- [ ] **Step 3:** Implementieren. `parse_produkt` liest `format == "cog"` mit `check_bildpfad`, verbindet über das letzte Pfadsegment mit `images[].fileName`. `load_kopf`: Cache `cog-kopf:<kennung>` → sonst `hole_bereich(url, 0, KOPF_ERSTER_ABRUF)` → bei `BrauchtBytes(n)` einmal `hole_bereich(url, 0, n)` → speichern. Köpfe mit `buffer_unordered(PARALLEL)`.
-- [ ] **Step 4:** grün (`cargo test --lib karte::copernicus`).
-- [ ] **Step 5:** Commit `feat(karte): Bilderliste der Copernicus-Aktivierungen (LLH-2021)`.
+- [x] **Step 2:** rot.
+- [x] **Step 3:** Implementieren. `parse_produkt` liest `format == "cog"` mit `check_bildpfad`, verbindet über das letzte Pfadsegment mit `images[].fileName`. `load_kopf`: Cache `cog-kopf:<kennung>` → sonst `hole_bereich(url, 0, KOPF_ERSTER_ABRUF)` → bei `BrauchtBytes(n)` einmal `hole_bereich(url, 0, n)` → speichern. Köpfe mit `buffer_unordered(PARALLEL)`.
+- [x] **Step 4:** grün (`cargo test --lib karte::copernicus`).
+- [x] **Step 5:** Commit `feat(karte): Bilderliste der Copernicus-Aktivierungen (LLH-2021)`.
 
 ### Task 6: Routen für Liste und Kachel
 
@@ -204,17 +204,17 @@
   // routes::karte::copernicus_bilder (GET …/images), routes::karte::copernicus_bild_kachel (GET …/images/{bild}/{z}/{x}/{y})
   fn hole_bereich_s3(url: String, start: u64, laenge: u64) -> impl Future<Output = Result<Vec<u8>, String>>; // eigener Client: client_builder(Zweck::Lagekarte), redirect none, Timeout 20 s, verlangt 206, Body ≤ laenge
   ```
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - `unbekannte_kennung_ist_404`, `falsch_geformte_kennung_ist_404` (`xyz`, 17 Zeichen, Großbuchstaben), `falsche_kachel_ist_400` (z 25; x ≥ 2^z), `ausserhalb_ist_204`, `unter_min_zoom_ist_204`.
   - `kachel_wird_gerendert_und_gecacht`: Stub liefert Bytes aus `copernicus-cog-anfang.bin`; erste Anfrage für eine Kachel der kleinsten Stufe → Png; zweite → kein Stub-Aufruf.
   - `kachel_aus_cache_ohne_kopf`: Kachel im Cache, Kopf-Eintrag gelöscht → Png.
   - `quelle_weg_ist_502`: Stub scheitert, Kachel nicht im Cache → `Quelle`.
   - Routentest (axum, wie bestehende `/api/map/overlays`-Tests): `GET /api/map/overlays/copernicus/images` ohne `bbox` → 400; `bbox` > 3° → 400; Kachel-Antwort trägt `Content-Type: image/png` und `Cache-Control: public, max-age=86400, immutable`.
   - Gleichzeitige Misses derselben Zielkachel → ein Lauf (Zähler im Stub = Anzahl Quellkacheln, nicht doppelt).
-- [ ] **Step 2:** rot.
-- [ ] **Step 3:** Implementieren. Liste über `quellen::liefere_geloest` mit `COPERNICUS_WARTE`, Schlüssel `copernicus-bilder`/`copernicus-bilder-archiv`. Kachel: Form prüfen → `lies_eintrag("cog:…")` → `lies_eintrag("cog-kopf:…")` → `kachel_im_bild`/`zoom_grenzen` → Quellkacheln laden (jede über `proxy::abruf_platz`, Länge ≤ `QUELLKACHEL_MAX`) → `spawn_blocking(rendere_kachel)` → `schreibe_eintrag`. Bündelung je Kachelschlüssel nach Muster `tile_cache::hole_gebuendelt`. Routen in `app.rs` direkt neben `/api/map/overlays/{quelle}`.
-- [ ] **Step 4:** grün; `scripts/check-api-routen.sh` grün.
-- [ ] **Step 5:** Commit `feat(karte): Routen für Copernicus-Bilder und -Kacheln (LLH-2021)`.
+- [x] **Step 2:** rot.
+- [x] **Step 3:** Implementieren. Liste über `quellen::liefere_geloest` mit `COPERNICUS_WARTE`, Schlüssel `copernicus-bilder`/`copernicus-bilder-archiv`. Kachel: Form prüfen → `lies_eintrag("cog:…")` → `lies_eintrag("cog-kopf:…")` → `kachel_im_bild`/`zoom_grenzen` → Quellkacheln laden (jede über `proxy::abruf_platz`, Länge ≤ `QUELLKACHEL_MAX`) → `spawn_blocking(rendere_kachel)` → `schreibe_eintrag`. Bündelung je Kachelschlüssel nach Muster `tile_cache::hole_gebuendelt`. Routen in `app.rs` direkt neben `/api/map/overlays/{quelle}`.
+- [x] **Step 4:** grün; `scripts/check-api-routen.sh` grün.
+- [x] **Step 5:** Commit `feat(karte): Routen für Copernicus-Bilder und -Kacheln (LLH-2021)`.
 
 ### Task 7: Fachebene `copernicus_bilder` im Frontend
 
@@ -228,11 +228,11 @@
   - `globalKeys.fachebeneCopernicusBilder(bbox, archiv)`.
   - `export interface CopernicusBild { bild: string; emsr: string; gebiet: string; sensor?: string; aufnahme?: string; minZoom: number; maxZoom: number; bounds: [number, number, number, number]; darstellbar: boolean; gekuerzt: boolean }` und `export function copernicusBilder(fc: FeatureCollection): CopernicusBild[]` (jüngste Aufnahme zuerst) in `fachebenen.ts`.
   - `useFachebenen` liefert `copernicusBilder: { liste: CopernicusBild[]; deckkraft: number; setDeckkraft(n: number): void }` und nutzt `copernicusArchiv` für beide Abfragen.
-- [ ] **Step 1: Failing tests:** Gruppen-Wächter (`satellit` = `['copernicus', 'copernicus_bilder']`); TTL gegen Takt; Query-Key enthält Archiv; `copernicusBilder` sortiert und liest Felder, fehlender Sensor → `undefined`; `fachebeneKeys()` enthält `copernicus_bilder`; Auswahl voreingestellt aus und gespeichert wie `copernicus`; Wächter `BBOX_MIN_ZOOM` gegen den Backend-Wert 10 (Konstante als Literal im Test mit Verweis auf `cog::MIN_ZOOM_BACKEND`).
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte` → rot.
-- [ ] **Step 3:** Implementieren. Deckkraft in derselben Kartenansicht-Speicherung wie die Ebenenwahl (Feld `copernicusBilderDeckkraft`, Vorgabe 80, auf 0…100 geklemmt).
-- [ ] **Step 4:** grün; `mise exec -- pnpm -C frontend exec tsc --noEmit` grün.
-- [ ] **Step 5:** Commit `feat(lagekarte): Fachebene Copernicus-Satellitenbilder (LLH-2021)`.
+- [x] **Step 1: Failing tests:** Gruppen-Wächter (`satellit` = `['copernicus', 'copernicus_bilder']`); TTL gegen Takt; Query-Key enthält Archiv; `copernicusBilder` sortiert und liest Felder, fehlender Sensor → `undefined`; `fachebeneKeys()` enthält `copernicus_bilder`; Auswahl voreingestellt aus und gespeichert wie `copernicus`; Wächter `BBOX_MIN_ZOOM` gegen den Backend-Wert 10 (Konstante als Literal im Test mit Verweis auf `cog::MIN_ZOOM_BACKEND`).
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte` → rot.
+- [x] **Step 3:** Implementieren. Deckkraft in derselben Kartenansicht-Speicherung wie die Ebenenwahl (Feld `copernicusBilderDeckkraft`, Vorgabe 80, auf 0…100 geklemmt).
+- [x] **Step 4:** grün; `mise exec -- pnpm -C frontend exec tsc --noEmit` grün.
+- [x] **Step 5:** Commit `feat(lagekarte): Fachebene Copernicus-Satellitenbilder (LLH-2021)`.
 
 ### Task 8: Rasterlayer auf der Karte
 
@@ -247,11 +247,11 @@
   export function copernicusBildAnker(map: MapLibreMap): string | undefined; // unterster `bild-*-raster`, sonst 'abschnitte-fill', sonst undefined
   export function synchronisiereCopernicusBilder(map: MapLibreMap, bilder: CopernicusBild[], deckkraft: number): void;
   ```
-- [ ] **Step 1: Failing tests** (Map-Attrappe wie in `bildLayer.test.ts`): legt je darstellbarem Bild Quelle `{ type: 'raster', tiles: ['/api/map/overlays/copernicus/images/<k>/{z}/{x}/{y}'], tileSize: 256, bounds, minzoom, maxzoom }` und Layer mit `raster-opacity` 0.8 an; nicht darstellbare nicht; entfernt verschwundene; Deckkraftwechsel setzt nur Paint; jüngstes Bild oben (Reihenfolge der `addLayer`-Aufrufe/`moveLayer`); `beforeId` = unterster `bild-*`-Layer, sonst `abschnitte-fill`; leere Liste räumt alles ab; Ebene aus → alles weg.
-- [ ] **Step 2:** rot.
-- [ ] **Step 3:** Implementieren; in `Kartenflaeche.tsx` Fachebenen mit `def.darstellung === 'raster'` nicht an `sorgeFuerFachebeneLayer` geben, sondern `synchronisiereCopernicusBilder` (auch im `load`-Handler und nach Stilwechsel). Keine Rolle in `ordneKlickebene`.
-- [ ] **Step 4:** grün.
-- [ ] **Step 5:** Commit `feat(lagekarte): Copernicus-Bilder als Rasterlayer (LLH-2021)`.
+- [x] **Step 1: Failing tests** (Map-Attrappe wie in `bildLayer.test.ts`): legt je darstellbarem Bild Quelle `{ type: 'raster', tiles: ['/api/map/overlays/copernicus/images/<k>/{z}/{x}/{y}'], tileSize: 256, bounds, minzoom, maxzoom }` und Layer mit `raster-opacity` 0.8 an; nicht darstellbare nicht; entfernt verschwundene; Deckkraftwechsel setzt nur Paint; jüngstes Bild oben (Reihenfolge der `addLayer`-Aufrufe/`moveLayer`); `beforeId` = unterster `bild-*`-Layer, sonst `abschnitte-fill`; leere Liste räumt alles ab; Ebene aus → alles weg.
+- [x] **Step 2:** rot.
+- [x] **Step 3:** Implementieren; in `Kartenflaeche.tsx` Fachebenen mit `def.darstellung === 'raster'` nicht an `sorgeFuerFachebeneLayer` geben, sondern `synchronisiereCopernicusBilder` (auch im `load`-Handler und nach Stilwechsel). Keine Rolle in `ordneKlickebene`.
+- [x] **Step 4:** grün.
+- [x] **Step 5:** Commit `feat(lagekarte): Copernicus-Bilder als Rasterlayer (LLH-2021)`.
 
 ### Task 9: Ebenenzeile mit Deckkraft und Bildliste
 
@@ -259,23 +259,23 @@
 
 **Interfaces:**
 - Consumes: Task 7 (`copernicusBilder`, `archiv`, `setArchiv`), `isCopernicusAufnahmeAlt`, `formatiereDtg` (vorhandener DTG-Formatierer, wie `CopernicusZusatz` ihn nutzt)
-- [ ] **Step 1: Failing tests:** `leer` → „Keine Satellitenbilder im Ausschnitt“; `ok` → Zeile `EMSR728 · Stuttgart · GeoEye-1 · <DTG>`; ohne Sensor „Sensor unbekannt“; alt → Marke „Satellitenaufnahme vom <DTG>“ mit `rollen.achtungText`; `darstellbar: false` → „nicht darstellbar“; `gekuerzt` → „weiter hineinzoomen“; Regler 0–100 ruft `setDeckkraft`; Archiv-Schalter nur an einer der beiden Zeilen sichtbar.
-- [ ] **Step 2:** rot.
-- [ ] **Step 3:** Implementieren (antd `Slider` im Stil der Ebenenzusätze, `data-lfh`-Kennungen `copernicus-bilder-*`).
-- [ ] **Step 4:** grün; `mise exec -- pnpm -C frontend lint` grün.
-- [ ] **Step 5:** Commit `feat(lagekarte): Ebenenzeile der Copernicus-Bilder (LLH-2021)`.
+- [x] **Step 1: Failing tests:** `leer` → „Keine Satellitenbilder im Ausschnitt“; `ok` → Zeile `EMSR728 · Stuttgart · GeoEye-1 · <DTG>`; ohne Sensor „Sensor unbekannt“; alt → Marke „Satellitenaufnahme vom <DTG>“ mit `rollen.achtungText`; `darstellbar: false` → „nicht darstellbar“; `gekuerzt` → „weiter hineinzoomen“; Regler 0–100 ruft `setDeckkraft`; Archiv-Schalter nur an einer der beiden Zeilen sichtbar.
+- [x] **Step 2:** rot.
+- [x] **Step 3:** Implementieren (antd `Slider` im Stil der Ebenenzusätze, `data-lfh`-Kennungen `copernicus-bilder-*`).
+- [x] **Step 4:** grün; `mise exec -- pnpm -C frontend lint` grün.
+- [x] **Step 5:** Commit `feat(lagekarte): Ebenenzeile der Copernicus-Bilder (LLH-2021)`.
 
 ### Task 10: Doku und ADR
 
 **Files:** `docs/fachebenen-quellen.md`, `docs/anwender/kapitel/lagekarte.md`, neue ADR unter `docs/architektur/entscheidungen/` (Nummer und Form nach `docs/architektur/AGENTS.md`), betroffene arc42-Kapitel laut `scripts/adr-fuer.sh src/karte/cog.rs src/karte/copernicus.rs`
 
-- [ ] **Step 1:** `docs/architektur/AGENTS.md` und `docs/anwender/AGENTS.md` lesen; ADR „Copernicus-Rasterbilder werden serverseitig gekachelt“ mit Ansätzen 1–3, Bezug ADR-0079.
-- [ ] **Step 2:** `fachebenen-quellen.md`: Zeile `copernicus_bilder` (TTL, Takt, Veraltet), Abschnitt COG/Übersichtswahl/Grenzen/„nur EPSG:3857“. Anwenderkapitel: zweite Ebene, Deckkraft, Alter, „nicht darstellbar“.
-- [ ] **Step 3:** Doku-Wächter laufen lassen (`./scripts/check-all.sh --geaendert --ohne-e2e` deckt sie ab).
-- [ ] **Step 4:** Commit `docs: Copernicus-Rasterbilder (LLH-2021)`.
+- [x] **Step 1:** `docs/architektur/AGENTS.md` und `docs/anwender/AGENTS.md` lesen; ADR „Copernicus-Rasterbilder werden serverseitig gekachelt“ mit Ansätzen 1–3, Bezug ADR-0079.
+- [x] **Step 2:** `fachebenen-quellen.md`: Zeile `copernicus_bilder` (TTL, Takt, Veraltet), Abschnitt COG/Übersichtswahl/Grenzen/„nur EPSG:3857“. Anwenderkapitel: zweite Ebene, Deckkraft, Alter, „nicht darstellbar“.
+- [x] **Step 3:** Doku-Wächter laufen lassen (`./scripts/check-all.sh --geaendert --ohne-e2e` deckt sie ab).
+- [x] **Step 4:** Commit `docs: Copernicus-Rasterbilder (LLH-2021)`.
 
 ### Task 11: Gates, Bilder, PR
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
-- [ ] **Step 2:** Bilder per Wegwerf-Spec (`frontend/e2e/doku-bilder/zz-h11vkn1p.bilder.ts`): Lagekarte über Stuttgart, Archiv an, EMSR728, Bild bei 80 %, Ebenenzeile offen. Ohne Netz zu Copernicus in der Sitzung: Route im Spec abfangen und Testdaten liefern; das wird im PR offen gesagt.
-- [ ] **Step 3:** Plan abhaken, PR gegen `alpha`.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün.
+- [x] **Step 2:** Bilder per Wegwerf-Spec (`frontend/e2e/doku-bilder/zz-h11vkn1p.bilder.ts`): Lagekarte über Stuttgart, Archiv an, EMSR728, Bild bei 80 %, Ebenenzeile offen. Ohne Netz zu Copernicus in der Sitzung: Route im Spec abfangen und Testdaten liefern; das wird im PR offen gesagt.
+- [x] **Step 3:** Plan abhaken, PR gegen `alpha`.
