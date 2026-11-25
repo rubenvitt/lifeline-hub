@@ -335,6 +335,22 @@ pub async fn anlegen(
     ))
 }
 
+/// Eine Kopplung der Geräteübersicht; fremd, unbekannt oder eine Helfer-Kopplung → 404. Helfer
+/// verwaltet die Leitung nur über `/api/incidents/{id}/helpers…` (Spec Helfer-App): Verlängern,
+/// Widerruf und Code an der Helfer-Kopplung vorbei umgingen Wartezeit, Personenposition,
+/// ETB-Wortlaut und Einladung.
+async fn lade_geraet(
+    state: &AppState,
+    einsatz_id: i64,
+    kopplung_id: i64,
+) -> Result<KopplungAnzeige, AppError> {
+    let k = repo::laden(&state.pool, einsatz_id, kopplung_id).await?;
+    if k.ansicht.nur_per_einladung() {
+        return Err(AppError::NotFound);
+    }
+    Ok(k)
+}
+
 /// POST /api/einsaetze/{id}/devices/{gid}/code — neuen Code ausstellen (Gerät getauscht, Browser
 /// geleert). Der alte Code verfällt; beim Einlösen des neuen enden die alten Sitzungen.
 pub async fn code_ausstellen(
@@ -343,7 +359,7 @@ pub async fn code_ausstellen(
     PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<KopplungMitCode>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let von = ctx.benutzer.id;
     let (code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
         repo::code_ausstellen(conn, kopplung_id, von).await
@@ -368,7 +384,7 @@ pub async fn verlaengern(
     JsonBody(body): JsonBody<VerlaengernBody>,
 ) -> Result<Json<KopplungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let ende = ende_aus(Some(&body.laeuft_ab_at))?;
     let von = ctx.benutzer.id;
     crate::write_retry!(&state.pool, |conn| {
@@ -388,7 +404,7 @@ pub async fn widerrufen(
     PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<KopplungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let vorher = repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    let vorher = lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let von = ctx.benutzer.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_text = format!(
