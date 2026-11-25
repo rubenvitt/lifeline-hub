@@ -30,6 +30,7 @@ use super::Rahmen;
 use crate::ausgang::AusgangFehler;
 use crate::benachrichtigung::{self, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug};
 use crate::error::AppError;
+use crate::externe_stelle::KanalArt;
 use crate::live::LiveHub;
 use crate::zeit;
 
@@ -269,9 +270,10 @@ pub(super) async fn prepare(
     }))
 }
 
-/// Was der Ausgangskorb zum Zustellen einer Mail braucht (LLH-2093, Spec Abschnitt 3): die
-/// geprüften Einstellungen und die entschlüsselten Geheimnisse der SMTP-Anbindung der Org. Lebt
-/// nur für eine Zustellung im Speicher; `Debug` nennt keine Geheimnisse.
+/// Was der Ausgangskorb zum Zustellen braucht (LLH-2093, Spec Abschnitt 3): die geprüften
+/// Einstellungen und die entschlüsselten Geheimnisse der Anbindung, die den Kanal des Versands
+/// bedient (SMTP oder Matrix, LLH-2094). Lebt nur für eine Zustellung im Speicher; `Debug` nennt
+/// keine Geheimnisse.
 pub struct Versandzugang {
     pub einstellungen: Map<String, Value>,
     pub geheimnisse: HashMap<String, SecretString>,
@@ -312,44 +314,48 @@ impl std::fmt::Debug for Versandzugang {
     }
 }
 
-/// Prüft beim Anlegen eines Versands nur, ob die Org einen Mailserver hat, den ein Versand
-/// nutzen darf: Anbindung vorhanden, nicht angehalten, Org nicht an einem Hub (LLH-2093). Liest
-/// nur die Zeile der Anbindung und ihren Zustand; Geheimnisse werden **nicht** entschlüsselt,
-/// das tut allein der Lauf über [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
+/// Die Adapterart, die einen Kanal des Ausgangs bedient (LLH-2094, Spec Abschnitt 6, „Zugang je
+/// Kanal“): `smtp` für E-Mail, `matrix` für Matrix; Fax und Threema haben noch keine.
+pub fn art_fuer_kanal(kanal: KanalArt) -> Option<&'static str> {
+    match kanal {
+        KanalArt::Email => Some(super::smtp_art::CODE),
+        KanalArt::Matrix => Some(super::matrix_art::CODE),
+        KanalArt::Fax | KanalArt::Threema => None,
+    }
+}
+
+/// Prüft beim Anlegen eines Versands nur, ob die Org für den Kanal eine Anbindung hat, die ein
+/// Versand nutzen darf: Anbindung der passenden Art ([`art_fuer_kanal`]) vorhanden, nicht
+/// angehalten, Org nicht an einem Hub (LLH-2093, LLH-2094). Liest nur die Zeile der Anbindung und
+/// ihren Zustand; Geheimnisse werden **nicht** entschlüsselt, das tut allein der Lauf über
+/// [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
 pub async fn pruefe_versand_moeglich(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     org_id: i64,
+    kanal: KanalArt,
 ) -> Result<Result<(), AusgangFehler>, AppError> {
-    if is_org_am_hub(pool, org_id).await? {
-        return Ok(Err(AusgangFehler::AnbindungFehlt));
-    }
-    let Some(a) = repo::load_fuer_org(pool, org_id, super::smtp_art::CODE).await? else {
-        return Ok(Err(AusgangFehler::AnbindungFehlt));
-    };
-    if a.is_angehalten() {
-        return Ok(Err(AusgangFehler::AnbindungAngehalten));
-    }
-    if rahmen.arten.find(&a.art).is_none() {
-        return Ok(Err(AusgangFehler::AnbindungFehlt));
-    }
-    Ok(Ok(()))
+    Ok(anbindung_fuer_versand(pool, rahmen, org_id, kanal)
+        .await?
+        .map(|_| ()))
 }
 
-/// Der Zugang zur SMTP-Anbindung einer Org für einen Versand (LLH-2093, Spec Abschnitt 2):
-/// `AnbindungFehlt` ohne Anbindung (oder wenn die Org sich bei einem Hub meldet),
-/// `AnbindungAngehalten`, wenn sie angehalten ist (gestört ist erlaubt), `AnbindungFehler`, wenn
-/// Einstellungen oder Geheimnisse nicht taugen. Liest Geheimnisse über denselben Weg wie der
-/// Lauf ([`prepare`]); ändert an der Anbindung nichts. Kein Netz; keine Verbindung danach.
-pub async fn zugang_fuer_versand(
+/// Die Anbindung eines Kanals für einen Versand, ohne Geheimnisse: `AnbindungFehlt` ohne
+/// Anbindung der passenden Art, ohne Art im Verzeichnis oder an einem Hub,
+/// `AnbindungAngehalten`, wenn sie angehalten ist (gestört ist erlaubt).
+async fn anbindung_fuer_versand(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     org_id: i64,
-) -> Result<Result<Versandzugang, AusgangFehler>, AppError> {
+    kanal: KanalArt,
+) -> Result<Result<(Adapter, Arc<dyn AdapterArt>), AusgangFehler>, AppError> {
+    let Some(code) = art_fuer_kanal(kanal) else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
     if is_org_am_hub(pool, org_id).await? {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     }
-    let Some(a) = repo::load_fuer_org(pool, org_id, super::smtp_art::CODE).await? else {
+    let Some(a) = repo::load_fuer_org(pool, org_id, code).await? else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if a.is_angehalten() {
@@ -357,6 +363,24 @@ pub async fn zugang_fuer_versand(
     }
     let Some(art) = rahmen.arten.find(&a.art).cloned() else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    Ok(Ok((a, art)))
+}
+
+/// Der Zugang zur Anbindung, die den Kanal eines Versands bedient (LLH-2093, Spec E-Mail
+/// Abschnitt 2; je Kanal seit LLH-2094): Fehler wie [`pruefe_versand_moeglich`], dazu
+/// `AnbindungFehler`, wenn Einstellungen oder Geheimnisse nicht taugen. Liest Geheimnisse über
+/// denselben Weg wie der Lauf ([`prepare`]); ändert an der Anbindung nichts. Kein Netz; keine
+/// Verbindung danach.
+pub async fn zugang_fuer_versand(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    org_id: i64,
+    kanal: KanalArt,
+) -> Result<Result<Versandzugang, AusgangFehler>, AppError> {
+    let (a, art) = match anbindung_fuer_versand(pool, rahmen, org_id, kanal).await? {
+        Ok(x) => x,
+        Err(f) => return Ok(Err(f)),
     };
     Ok(match prepare(pool, rahmen, &*art, &a).await? {
         Ok(v) => Ok(Versandzugang {

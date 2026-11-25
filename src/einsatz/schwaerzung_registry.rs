@@ -190,6 +190,9 @@ const G_ANTRAG: &str =
 const G_ARCHIV: &str =
     "Archiv (LLH-1494): age-verschlüsselt an die Org-Schlüssel, für den Server nicht \
      lesbar; Fingerabdrücke und Prüfsumme ohne Personenbezug";
+const G_AUSGANG_TEIL: &str =
+    "Gesendeter Teil eines Versands (LLH-2094): Kennung des Versands, Teilnummer und Event-ID \
+     des Homeservers, kein Inhalt";
 const G_SPIEGEL: &str =
     "Verwaltung des Spiegels einer gekoppelten Instanz (LLH-1492): Kennungen, Stände, \
      Tabellennamen, kein Inhalt";
@@ -3752,6 +3755,23 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
             retain("uebergeben_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
+        ],
+    },
+    // Gesendete Teile eines Versands (LLH-2094): Teilnummer und Event-ID des Homeservers sind
+    // Kennungen, kein Inhalt; mit dem Versand weg (ON DELETE CASCADE).
+    TabellenRegel {
+        tabelle: "ausgang_teil",
+        scoping: Scoping::UeberParent {
+            fk: "versand_id",
+            parent: "ausgang",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("versand_id", G_AUSGANG_TEIL),
+            retain("teil", G_AUSGANG_TEIL),
+            retain("event_id", G_AUSGANG_TEIL),
+            retain("gesendet_at", G_ZEIT),
         ],
     },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------

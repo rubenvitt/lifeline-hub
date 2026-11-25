@@ -12,6 +12,7 @@ use crate::ausgang::{self, nachricht, repo, AusgangFehler, QuelleArt, Versand};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::Einsatz;
 use crate::error::AppError;
+use crate::externe_stelle::KanalArt;
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::CLIENT_ID_MAX;
@@ -69,6 +70,18 @@ fn mit_grund(fehler: AusgangFehler, meldung: &str) -> AppError {
     AppError::UnprocessableGrund {
         meldung: meldung.to_string(),
         grund: fehler.as_str(),
+    }
+}
+
+/// Die Meldung bei 422, wenn die Anbindung eines Kanals fehlt, angehalten oder nicht nutzbar ist.
+fn meldung_anbindung(kanal: KanalArt, fehler: AusgangFehler) -> &'static str {
+    match (kanal, fehler) {
+        (KanalArt::Matrix, AusgangFehler::AnbindungFehlt) => "Kein Matrix-Konto eingerichtet",
+        (KanalArt::Matrix, AusgangFehler::AnbindungAngehalten) => "Das Matrix-Konto ist angehalten",
+        (KanalArt::Matrix, _) => "Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen",
+        (_, AusgangFehler::AnbindungFehlt) => "Kein Mailserver eingerichtet",
+        (_, AusgangFehler::AnbindungAngehalten) => "Der Mailserver ist angehalten",
+        _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
     }
 }
 
@@ -233,9 +246,8 @@ async fn anlegen(
                     stelle.bezeichnung
                 )));
             }
-            // Task 6 (LLH-2094) hebt das auf, sobald es einen Matrix-Zustellweg gibt; bis dahin
-            // nimmt der Versand nur E-Mail an, auch wenn Matrix-Adressen schon angelegt werden.
-            if kanal.channel != crate::externe_stelle::KanalArt::Email {
+            // Fax und Threema nimmt noch kein Versand an, auch wenn die Tabelle sie kennt.
+            if !kanal.channel.is_freigeschaltet() {
                 return Err(AppError::UnprocessableEntity(
                     "Dieser Kanal wird noch nicht unterstützt".into(),
                 ));
@@ -244,18 +256,23 @@ async fn anlegen(
         }
     }
 
-    // Eine nicht angehaltene SMTP-Anbindung der Org (sonst 422 mit Code). Nur Zustand, kein
-    // Entschlüsseln: das Geheimnis liest allein der Lauf.
-    if let Err(fehler) =
-        crate::adapter::lauf::pruefe_versand_moeglich(&state.pool, &state.adapter, einsatz.org_id)
-            .await?
-    {
-        let meldung = match fehler {
-            AusgangFehler::AnbindungFehlt => "Kein Mailserver eingerichtet",
-            AusgangFehler::AnbindungAngehalten => "Der Mailserver ist angehalten",
-            _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
-        };
-        return Err(mit_grund(fehler, meldung));
+    // Je Kanal der Empfänger eine nicht angehaltene Anbindung der Org (sonst 422 mit Code);
+    // gemischte Empfänger brauchen beide. Nur Zustand, kein Entschlüsseln: das Geheimnis liest
+    // allein der Lauf.
+    for kanal in KanalArt::ALLE {
+        if !adressen.iter().any(|(_, k, _)| k.channel == kanal) {
+            continue;
+        }
+        if let Err(fehler) = crate::adapter::lauf::pruefe_versand_moeglich(
+            &state.pool,
+            &state.adapter,
+            einsatz.org_id,
+            kanal,
+        )
+        .await?
+        {
+            return Err(mit_grund(fehler, meldung_anbindung(kanal, fehler)));
+        }
     }
 
     let geladen = match quelle {

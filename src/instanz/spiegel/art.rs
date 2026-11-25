@@ -157,6 +157,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Zustellung ist an die Instanz mit Anbindung und Geheimnis gebunden; der Versand steht über das ETB im Spiegel",
     ),
     (
+        "ausgang_teil",
+        "Gesendete Teile eines Versands gehören zur Zustellung der Instanz mit Anbindung, wie `ausgang`",
+    ),
+    (
         "person_zugriff_audit",
         "Zugriffsprotokoll: jede Instanz protokolliert ihre eigenen Zugriffe",
     ),
@@ -515,6 +519,14 @@ mod tests {
                 "{t} ist weder gespiegelt noch ausgenommen (spiegel::art)"
             );
         }
+    }
+
+    #[test]
+    fn spiegel_registry_kennt_ausgang_teil() {
+        assert!(
+            AUSGENOMMEN.iter().any(|(t, _)| *t == "ausgang_teil"),
+            "ausgang_teil gehört wie ausgang zu den Ausgenommenen"
+        );
     }
 
     #[test]

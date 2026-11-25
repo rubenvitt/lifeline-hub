@@ -347,6 +347,41 @@ pub async fn save_ergebnis_tx(
     Ok(n == 1)
 }
 
+/// Die schon gesendeten und gemerkten Teile eines Versands (LLH-2094, Spec Abschnitt 6,
+/// „Doppelte Nachrichten vermeiden“), aufsteigend; ein späterer Versuch lässt sie aus.
+pub async fn list_teile(pool: &SqlitePool, versand_id: &str) -> Result<Vec<i64>, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT teil FROM ausgang_teil WHERE versand_id = ? ORDER BY teil")
+            .bind(versand_id)
+            .fetch_all(pool)
+            .await?,
+    )
+}
+
+/// Merkt gesendete Teile `(teil, event_id)` eines Versands. Ein schon gemerkter Teil behält
+/// seine erste Event-ID.
+pub async fn save_teile_tx(
+    conn: &mut SqliteConnection,
+    versand_id: &str,
+    teile: &[(i64, String)],
+    at: DateTime<Utc>,
+) -> Result<(), AppError> {
+    let at = zeit(at);
+    for (teil, event_id) in teile {
+        sqlx::query(
+            "INSERT INTO ausgang_teil (versand_id, teil, event_id, gesendet_at) VALUES (?, ?, ?, ?) \
+             ON CONFLICT (versand_id, teil) DO NOTHING",
+        )
+        .bind(versand_id)
+        .bind(teil)
+        .bind(event_id)
+        .bind(&at)
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
+}
+
 /// Merkt den ETB-Eintrag eines Versands (der letzte gewinnt).
 pub async fn save_etb_eintrag_tx(
     conn: &mut SqliteConnection,

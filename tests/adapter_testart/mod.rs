@@ -222,3 +222,22 @@ pub fn rahmen_smtp() -> (Rahmen, Arc<SmtpSkript>) {
     );
     (rahmen, pruefer)
 }
+
+/// Wie [`rahmen_smtp`], dazu die Art `matrix` (LLH-2094) mit eigenen Clients ohne Netz.
+pub fn rahmen_smtp_matrix() -> (Rahmen, Arc<SmtpSkript>) {
+    let pruefer = Arc::new(SmtpSkript::default());
+    let clients = Arc::new(lifeline_hub::adapter::matrix::Clients::default());
+    let rahmen = Rahmen::mit_matrix(
+        Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
+        Verzeichnis::new(vec![
+            Arc::new(lifeline_hub::adapter::smtp_art::SmtpArt::new(
+                pruefer.clone(),
+            )),
+            Arc::new(lifeline_hub::adapter::matrix_art::MatrixArt::new(
+                clients.clone(),
+            )),
+        ]),
+        clients,
+    );
+    (rahmen, pruefer)
+}

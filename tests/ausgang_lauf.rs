@@ -16,7 +16,8 @@ use futures::future::BoxFuture;
 use lifeline_hub::adapter::smtp::SmtpFehler;
 use lifeline_hub::adapter::Rahmen;
 use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
-use lifeline_hub::ausgang::zusteller::SmtpTransport;
+use lifeline_hub::ausgang::lauf::{Fehlschlag, Versandauftrag, Zustellfehler, Zustellt};
+use lifeline_hub::ausgang::zusteller::{MatrixNichtVerfuegbar, SmtpTransport, Zustellerwahl};
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use serde_json::json;
@@ -97,7 +98,7 @@ async fn welt() -> Welt {
         .await
         .unwrap();
     let live = LiveHub::new();
-    let (rahmen, _pruefer) = adapter_testart::rahmen_smtp();
+    let (rahmen, _pruefer) = adapter_testart::rahmen_smtp_matrix();
     let mut state = common::test_state(&pool, &live);
     state.adapter = rahmen.clone();
     let app = lifeline_hub::app::build_router(state);
@@ -145,7 +146,11 @@ async fn welt() -> Welt {
         org_id,
         benutzer_id,
         adapter_id,
-        zusteller: Arc::new(SmtpZusteller::mit_transport(skript.clone())),
+        // Wie produktiv: E-Mail über SMTP, Matrix noch ohne Zusteller.
+        zusteller: Arc::new(Zustellerwahl::new(
+            Arc::new(SmtpZusteller::mit_transport(skript.clone())),
+            Arc::new(MatrixNichtVerfuegbar),
+        )),
         skript,
     }
 }
@@ -217,12 +222,25 @@ impl Welt {
 
     /// Legt einen wartenden Versand an, fällig zu `ab`.
     async fn versand(&self, quelle: &str, quelle_id: i64, ab: DateTime<Utc>) -> String {
+        self.versand_in("email", ADRESSE, quelle, quelle_id, ab)
+            .await
+    }
+
+    /// Wie [`Welt::versand`], in einem Kanal an eine Adresse.
+    async fn versand_in(
+        &self,
+        kanal: &str,
+        adresse: &str,
+        quelle: &str,
+        quelle_id: i64,
+        ab: DateTime<Utc>,
+    ) -> String {
         let id = uuid::Uuid::new_v4().to_string();
         sqlx::query(
             "INSERT INTO ausgang (id, org_id, einsatz_id, client_id, quelle_art, quelle_id, kanal, \
                  stelle_bezeichnung, adresse, betreff, inhalt, zustand, naechster_versuch_at, \
                  erstellt_von_id, erstellt_at) \
-             VALUES (?, ?, ?, ?, ?, ?, 'email', ?, ?, ?, ?, 'wartet', ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'wartet', ?, ?, ?)",
         )
         .bind(&id)
         .bind(self.org_id)
@@ -230,8 +248,9 @@ impl Welt {
         .bind(format!("c-{id}"))
         .bind(quelle)
         .bind(quelle_id)
+        .bind(kanal)
         .bind(STELLE)
-        .bind(ADRESSE)
+        .bind(adresse)
         .bind("Lagebericht Nr. 1 – Hochwasser Süd – Stand 021000jun26")
         .bind("Pegel steigt\n\n-- \nHochwasser Süd\n")
         .bind(lifeline_hub::zeit::formatiere_utc(ab))
@@ -266,6 +285,41 @@ impl Welt {
         .fetch_all(&self.pool)
         .await
         .unwrap()
+    }
+
+    /// Legt die Matrix-Anbindung der Org an, mit Access-Token (ohne Netz).
+    async fn matrix_anbindung(&self) {
+        let body = json!({
+            "art": "matrix", "name": "Matrix",
+            "einstellungen": { "homeserver": "https://matrix.example.org" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        let (s, v) = anfrage_json(
+            &self.app,
+            "PUT",
+            &format!("/api/admin/adapter/{id}/secrets/access_token"),
+            &self.admin,
+            Some(&json!({ "wert": "syt_geheimes_token" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+
+    async fn teile(&self, id: &str) -> Vec<(i64, String)> {
+        sqlx::query_as("SELECT teil, event_id FROM ausgang_teil WHERE versand_id = ? ORDER BY teil")
+            .bind(id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap()
     }
 
     async fn etb_anzahl(&self) -> i64 {
@@ -977,4 +1031,153 @@ async fn lauf_prueft_die_echten_bytes_der_anlagen() {
     assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
     assert_eq!(z.fehler_art, Some(AusgangFehler::ZuGross));
     assert!(w.skript.gesehen().is_empty());
+}
+
+/// Ein Zusteller, der vorgegebene Antworten abspielt (leer heißt zugestellt ohne Teile) und
+/// sich merkt, welche Teile ihm als schon gesendet genannt wurden.
+#[derive(Default)]
+struct TeilDoppel {
+    antworten: Mutex<VecDeque<Result<Zustellt, Fehlschlag>>>,
+    gesendet: Mutex<Vec<Vec<i64>>>,
+}
+
+impl Zusteller for TeilDoppel {
+    fn zustellen<'a>(
+        &'a self,
+        auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            self.gesendet
+                .lock()
+                .unwrap()
+                .push(auftrag.gesendet.to_vec());
+            self.antworten
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| Ok(Zustellt::default()))
+        })
+    }
+}
+
+fn teile(paare: &[(i64, &str)]) -> Vec<(i64, String)> {
+    paare.iter().map(|(n, e)| (*n, e.to_string())).collect()
+}
+
+#[tokio::test]
+async fn teile_werden_mit_dem_ergebnis_gespeichert() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(0, "$text"), (1, "$anlage")]),
+    }));
+    let zusteller: Arc<dyn Zusteller> = doppel.clone();
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text"), (1, "$anlage")]));
+    let liste = lifeline_hub::ausgang::repo::list_teile(&w.pool, &id)
+        .await
+        .unwrap();
+    assert_eq!(liste, [0, 1]);
+    assert_eq!(doppel.gesendet.lock().unwrap().clone(), [Vec::<i64>::new()]);
+}
+
+#[tokio::test]
+async fn gemerkte_teile_gehen_dem_naechsten_versuch_mit() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let doppel = Arc::new(TeilDoppel::default());
+    // Der Text ging hinaus, die Anlage scheiterte vorübergehend.
+    doppel.antworten.lock().unwrap().push_back(Err(Fehlschlag {
+        fehler: Zustellfehler::Voruebergehend { nicht_vor: None },
+        grund: "Homeserver nicht erreichbar".into(),
+        smtp_status: None,
+        teile: teile(&[(0, "$text")]),
+    }));
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(1, "$anlage")]),
+    }));
+    let zusteller: Arc<dyn Zusteller> = doppel.clone();
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet);
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text")]));
+
+    let spaeter = t0 + chrono::Duration::minutes(5);
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, spaeter)
+        .await
+        .unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(
+        doppel.gesendet.lock().unwrap().clone(),
+        [Vec::<i64>::new(), vec![0]]
+    );
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text"), (1, "$anlage")]));
+}
+
+#[tokio::test]
+async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+
+    w.durchgang(t0).await;
+
+    assert!(w.skript.gesehen().is_empty(), "Matrix ging an SMTP");
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::AnbindungFehler));
+    let text: String = sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert!(text.contains("per Matrix an"), "{text}");
+    assert!(
+        text.contains("Matrix-Zustellung noch nicht verfügbar"),
+        "{text}"
+    );
+}
+
+#[tokio::test]
+async fn matrix_zeile_ohne_matrix_anbindung_ist_anbindung_fehlt() {
+    // Der Mailserver ist da; er zählt für Matrix nicht.
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+
+    w.durchgang(t0).await;
+
+    assert!(w.skript.gesehen().is_empty());
+    let z = w.zeile(&id).await;
+    assert_eq!(z.fehler_art, Some(AusgangFehler::AnbindungFehlt));
+    let text: String = sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert!(text.contains("kein Matrix-Konto eingerichtet"), "{text}");
 }

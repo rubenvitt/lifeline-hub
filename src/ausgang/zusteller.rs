@@ -28,7 +28,8 @@ pub struct Versandauftrag<'a> {
     pub betreff: &'a str,
     pub inhalt: &'a str,
     pub anhaenge: &'a [Anhang],
-    /// Schon gesendete und gemerkte Teile eines früheren Versuchs; bei SMTP immer leer.
+    /// Schon gesendete und gemerkte Teile eines früheren Versuchs (`ausgang_teil`); der Zusteller
+    /// lässt sie aus. Bei SMTP immer leer.
     pub gesendet: &'a [i64],
 }
 
@@ -181,12 +182,84 @@ impl<T: SmtpTransport> Zusteller for SmtpZusteller<T> {
         auftrag: &'a Versandauftrag<'a>,
     ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
         Box::pin(async move {
+            // Nur E-Mail; ein Versand eines anderen Kanals darf nie als Mail hinausgehen.
+            if auftrag.kanal != KanalArt::Email {
+                return Err(kanal_nicht_bedient());
+            }
             let (von, mail) = baue_smtp_mail(auftrag)?;
             self.transport
                 .senden(auftrag.zugang, &von, auftrag.adresse, &mail)
                 .await
                 .map(|()| Zustellt::default())
                 .map_err(smtp_fehlschlag)
+        })
+    }
+}
+
+/// Der Fehlschlag eines Kanals, den der Zusteller nicht bedient (fester Grund, nie gesendet).
+fn kanal_nicht_bedient() -> Fehlschlag {
+    Fehlschlag {
+        fehler: Zustellfehler::Anbindung {
+            pruefung_vorziehen: false,
+        },
+        grund: "Kanal wird hier nicht zugestellt".into(),
+        smtp_status: None,
+        teile: Vec::new(),
+    }
+}
+
+/// Die Weiche des Laufs: gibt jeden Versand dem Zusteller seines Kanals (LLH-2094, Spec
+/// Abschnitt 6). Fax und Threema haben keinen und scheitern ohne Netz.
+pub struct Zustellerwahl {
+    email: Arc<dyn Zusteller>,
+    matrix: Arc<dyn Zusteller>,
+}
+
+impl Zustellerwahl {
+    pub fn new(email: Arc<dyn Zusteller>, matrix: Arc<dyn Zusteller>) -> Self {
+        Zustellerwahl { email, matrix }
+    }
+
+    /// E-Mail über [`SmtpZusteller::produktiv`]; Matrix vorerst [`MatrixNichtVerfuegbar`].
+    pub fn produktiv() -> Self {
+        Zustellerwahl::new(
+            Arc::new(SmtpZusteller::produktiv()),
+            Arc::new(MatrixNichtVerfuegbar),
+        )
+    }
+}
+
+impl Zusteller for Zustellerwahl {
+    fn zustellen<'a>(
+        &'a self,
+        auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        match auftrag.kanal {
+            KanalArt::Email => self.email.zustellen(auftrag),
+            KanalArt::Matrix => self.matrix.zustellen(auftrag),
+            KanalArt::Fax | KanalArt::Threema => Box::pin(async { Err(kanal_nicht_bedient()) }),
+        }
+    }
+}
+
+/// Platzhalter für Matrix, bis es den Matrix-Zusteller gibt: jeder Versand scheitert endgültig
+/// als Fehler der Anbindung, ohne Netz.
+pub struct MatrixNichtVerfuegbar;
+
+impl Zusteller for MatrixNichtVerfuegbar {
+    fn zustellen<'a>(
+        &'a self,
+        _auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async {
+            Err(Fehlschlag {
+                fehler: Zustellfehler::Anbindung {
+                    pruefung_vorziehen: false,
+                },
+                grund: "Matrix-Zustellung noch nicht verfügbar".into(),
+                smtp_status: None,
+                teile: Vec::new(),
+            })
         })
     }
 }
@@ -360,6 +433,103 @@ mod tests {
         assert_eq!(angenommen[0].kanal, KanalArt::Email);
         assert_eq!(angenommen[0].adresse, "an@example.org");
         assert!(angenommen[0].umfang > 3, "{angenommen:?}");
+    }
+
+    fn zugang() -> Versandzugang {
+        let mut einstellungen = serde_json::Map::new();
+        einstellungen.insert("absender".into(), "von@example.org".into());
+        Versandzugang {
+            einstellungen,
+            geheimnisse: Default::default(),
+            lan_erlaubt: false,
+            adapter_id: "a".into(),
+        }
+    }
+
+    fn auftrag<'a>(kanal: KanalArt, zugang: &'a Versandzugang) -> Versandauftrag<'a> {
+        Versandauftrag {
+            versand_id: "v1",
+            kanal,
+            zugang,
+            adresse: "#lage:example.org",
+            betreff: "Betreff",
+            inhalt: "abc",
+            anhaenge: &[],
+            gesendet: &[],
+        }
+    }
+
+    /// Ein Transport, der zählt, wie oft er gerufen wurde.
+    #[derive(Default)]
+    struct Zaehler(std::sync::atomic::AtomicUsize);
+
+    impl SmtpTransport for Zaehler {
+        fn senden<'a>(
+            &'a self,
+            _: &'a Versandzugang,
+            _: &'a str,
+            _: &'a str,
+            _: &'a [u8],
+        ) -> BoxFuture<'a, Result<(), SmtpFehler>> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    #[tokio::test]
+    async fn smtp_zusteller_lehnt_andere_kanaele_ab() {
+        let transport = Arc::new(Zaehler::default());
+        let z = SmtpZusteller::mit_transport(transport.clone());
+        let zugang = zugang();
+        for kanal in [KanalArt::Matrix, KanalArt::Fax, KanalArt::Threema] {
+            let f = z.zustellen(&auftrag(kanal, &zugang)).await.unwrap_err();
+            assert_eq!(
+                f.fehler,
+                Zustellfehler::Anbindung {
+                    pruefung_vorziehen: false
+                },
+                "{kanal:?}"
+            );
+        }
+        assert_eq!(transport.0.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn zustellerwahl_gibt_jedem_kanal_seinen_zusteller() {
+        let email = Arc::new(AufzeichnenderZusteller::default());
+        let matrix = Arc::new(AufzeichnenderZusteller::default());
+        let wahl = Zustellerwahl::new(email.clone(), matrix.clone());
+        let zugang = zugang();
+        wahl.zustellen(&auftrag(KanalArt::Matrix, &zugang))
+            .await
+            .unwrap();
+        assert!(email.angenommen().is_empty());
+        assert_eq!(matrix.angenommen().len(), 1);
+        let mut a = auftrag(KanalArt::Email, &zugang);
+        a.adresse = "an@example.org";
+        wahl.zustellen(&a).await.unwrap();
+        assert_eq!(email.angenommen().len(), 1);
+        for kanal in [KanalArt::Fax, KanalArt::Threema] {
+            let f = wahl.zustellen(&auftrag(kanal, &zugang)).await.unwrap_err();
+            assert!(matches!(f.fehler, Zustellfehler::Anbindung { .. }));
+        }
+        assert_eq!(email.angenommen().len() + matrix.angenommen().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn matrix_ist_vorerst_nicht_verfuegbar() {
+        let zugang = zugang();
+        let f = MatrixNichtVerfuegbar
+            .zustellen(&auftrag(KanalArt::Matrix, &zugang))
+            .await
+            .unwrap_err();
+        assert_eq!(f.grund, "Matrix-Zustellung noch nicht verfügbar");
+        assert_eq!(
+            f.fehler,
+            Zustellfehler::Anbindung {
+                pruefung_vorziehen: false
+            }
+        );
     }
 
     #[cfg(debug_assertions)]

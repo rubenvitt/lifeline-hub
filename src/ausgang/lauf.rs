@@ -2,10 +2,11 @@
 //!
 //! Je [`TAKT`] oder beim Wecken ein Durchgang: die fälligen Versände laden, bis zu [`PARALLEL`]
 //! gleichzeitig zustellen, keinen doppelt. Je Versand, in dieser Reihenfolge: Spiegel? Quelle
-//! überholt? SMTP-Zugang der Org; Beginn merken (`mark_begonnen`); Anhänge laden; dem
-//! [`Zusteller`] den [`Versandauftrag`] geben, **ohne** eine Datenbankverbindung zu halten;
+//! überholt? Zugang der Anbindung, die den Kanal bedient (SMTP oder Matrix, LLH-2094); Beginn
+//! merken (`mark_begonnen`); gesendete Teile und Anhänge laden; dem [`Zusteller`] den
+//! [`Versandauftrag`] geben, **ohne** eine Datenbankverbindung zu halten; gesendete Teile,
 //! Ergebnis und ETB-Eintrag in einer Transaktion (`write_retry!`); nach dem Commit `publiziere`
-//! und das Ereignis der Versandliste.
+//! und das Ereignis der Versandliste. Produktiv ist der Zusteller die [`Zustellerwahl`] je Kanal.
 //!
 //! Ein Versand ist nie halb: entweder übergeben **und** im ETB, oder sichtbar fehlgeschlagen
 //! (am Spiegel ohne ETB, das dort gesperrt ist). Kein Geheimnis und kein Text des Mailservers
@@ -26,12 +27,14 @@ use super::nachricht::{self, Anhang, AnhangFehler};
 use super::repo::{self, Ergebnis};
 use super::zustand::naechster_versuch;
 pub use super::zusteller::{
-    Fehlschlag, SmtpZusteller, Versandauftrag, Versandzugang, Zusteller, Zustellfehler, Zustellt,
+    Fehlschlag, SmtpZusteller, Versandauftrag, Versandzugang, Zusteller, Zustellerwahl,
+    Zustellfehler, Zustellt,
 };
 use super::{AusgangFehler, QuelleArt, VersandZeile};
 use crate::adapter::Rahmen;
 use crate::error::AppError;
 use crate::etb::nachlauf::{self, Luecke};
+use crate::externe_stelle::KanalArt;
 use crate::live::{LiveEvent, LiveHub};
 use crate::zeit;
 
@@ -176,10 +179,10 @@ async fn schliesse_unterbrochen(pool: &SqlitePool, live: &LiveHub, zeile: &Versa
                 fehler: AusgangFehler::Spiegel,
                 status: None,
             };
-            return abschliessen(pool, live, zeile, begonnen, spiegel, None).await;
+            return abschliessen(pool, live, zeile, begonnen, spiegel, None, &[]).await;
         }
         let text = etb_text(zeile, AusgangFehler::Ungewiss, None);
-        abschliessen(pool, live, zeile, begonnen, ergebnis, Some(text)).await
+        abschliessen(pool, live, zeile, begonnen, ergebnis, Some(text), &[]).await
     };
     let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
     melde_luecken(&luecken);
@@ -382,29 +385,30 @@ async fn run_one(
     // Ein Spiegel nimmt kein ETB an: sichtbar fehlgeschlagen, ohne Eintrag.
     if is_spiegel(pool, zeile.einsatz_id).await? {
         let e = fehlgeschlagen(AusgangFehler::Spiegel);
-        return abschliessen(pool, live, &zeile, None, e, None).await;
+        return abschliessen(pool, live, &zeile, None, e, None, &[]).await;
     }
     // Im Wiederholungsfenster geht keine überholte Fassung hinaus.
     if !is_quelle_aktuell(pool, &zeile).await? {
         let text = etb_text(&zeile, AusgangFehler::Ueberholt, None);
         let e = fehlgeschlagen(AusgangFehler::Ueberholt);
-        return abschliessen(pool, live, &zeile, None, e, Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, e, Some(text), &[]).await;
     }
-    let zugang = match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id).await?
-    {
-        Ok(z) => z,
-        Err(f) => {
-            let text = etb_text(&zeile, f, None);
-            return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
-        }
-    };
+    let zugang =
+        match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id, zeile.kanal)
+            .await?
+        {
+            Ok(z) => z,
+            Err(f) => {
+                let text = etb_text(&zeile, f, None);
+                return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text), &[])
+                    .await;
+            }
+        };
     // Ohne gültige Absenderadresse geht keine Mail hinaus; das steht vor dem Versuch fest.
-    if zeile.kanal == crate::externe_stelle::KanalArt::Email
-        && super::zusteller::smtp_absender(&zugang).is_none()
-    {
+    if zeile.kanal == KanalArt::Email && super::zusteller::smtp_absender(&zugang).is_none() {
         let f = AusgangFehler::AnbindungFehler;
         let text = etb_text(&zeile, f, None);
-        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text), &[]).await;
     }
 
     let begonnen = jetzt();
@@ -437,6 +441,15 @@ async fn run_one(
         ),
     };
 
+    // Was ein früherer Versuch schon gesendet hat, geht nicht noch einmal hinaus.
+    let gesendet = match repo::list_teile(pool, &zeile.id).await {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!(versand = %zeile.id, "Ausgang: gesendete Teile nicht lesbar: {e}");
+            let (e, text) = vorher_gescheitert(jetzt());
+            return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
+        }
+    };
     let anhaenge = match load_anhaenge(pool, &zeile).await {
         Ok(a) => a,
         Err(AnhangFehler::ZuGross) => {
@@ -449,13 +462,14 @@ async fn run_one(
                 Some(&marke),
                 fehlgeschlagen(f),
                 Some(text),
+                &[],
             )
             .await;
         }
         Err(AnhangFehler::App(e)) => {
             tracing::error!(versand = %zeile.id, "Ausgang: Anhänge nicht lesbar: {e}");
             let (e, text) = vorher_gescheitert(jetzt());
-            return abschliessen(pool, live, &zeile, Some(&marke), e, text).await;
+            return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
         }
     };
     let auftrag = Versandauftrag {
@@ -466,23 +480,27 @@ async fn run_one(
         betreff: &zeile.betreff,
         inhalt: &zeile.inhalt,
         anhaenge: &anhaenge,
-        gesendet: &[],
+        gesendet: &gesendet,
     };
 
     // Das Netz, ohne Datenbankverbindung.
     let antwort = zusteller.zustellen(&auftrag).await;
     drop(anhaenge);
     let t = jetzt();
-    // Die gesendeten Teile (`Zustellt::teile`, `Fehlschlag::teile`) merkt sich der Lauf noch
-    // nicht; bei SMTP sind sie leer.
-    let (ergebnis, text) = match &antwort {
-        Ok(_) => (
+    // Die gesendeten Teile merkt sich der Lauf mit dem Ergebnis, auch bei einem Fehlschlag; bei
+    // SMTP sind sie leer.
+    let (ergebnis, text, teile) = match &antwort {
+        Ok(z) => (
             Ergebnis::Uebergeben { at: t },
             Some(etb_text_uebergeben(&zeile)),
+            &z.teile,
         ),
-        Err(f) => nach_fehler(&zeile, f, erster, versuche, t),
+        Err(f) => {
+            let (e, text) = nach_fehler(&zeile, f, erster, versuche, t);
+            (e, text, &f.teile)
+        }
     };
-    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text).await?;
+    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text, teile).await?;
     // Braucht die Anbindung einen Eingriff (SMTP: Anmeldung, TLS), soll ihr Lauf es gleich
     // selbst feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
     if let Err(Fehlschlag {
@@ -557,8 +575,14 @@ fn quelle_text(zeile: &VersandZeile) -> String {
 }
 
 fn ziel_text(zeile: &VersandZeile) -> String {
+    let weg = match zeile.kanal {
+        KanalArt::Email => "E-Mail",
+        KanalArt::Matrix => "Matrix",
+        KanalArt::Fax => "Fax",
+        KanalArt::Threema => "Threema",
+    };
     format!(
-        "{} per E-Mail an {} ({})",
+        "{} per {weg} an {} ({})",
         quelle_text(zeile),
         zeile.stelle_bezeichnung,
         zeile.adresse
@@ -588,14 +612,23 @@ fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, grund: Option<&str>) ->
         }
         _ => format!(
             "{ziel} nicht zugestellt: {}",
-            grund.unwrap_or_else(|| fester_grund(fehler))
+            grund.unwrap_or_else(|| fester_grund(fehler, zeile.kanal))
         ),
     }
 }
 
 /// Der feste Grund je Fehler, wenn kein Zusteller einen genaueren nennt (Fehlschlag vor dem
-/// Netz).
-fn fester_grund(fehler: AusgangFehler) -> &'static str {
+/// Netz); die Gründe der Anbindung je Kanal.
+fn fester_grund(fehler: AusgangFehler, kanal: KanalArt) -> &'static str {
+    if kanal == KanalArt::Matrix {
+        match fehler {
+            AusgangFehler::Voruebergehend => return "Homeserver nicht erreichbar",
+            AusgangFehler::AnbindungFehler => return "Matrix-Konto nicht nutzbar",
+            AusgangFehler::AnbindungFehlt => return "kein Matrix-Konto eingerichtet",
+            AusgangFehler::AnbindungAngehalten => return "Matrix-Konto angehalten",
+            _ => {}
+        }
+    }
     match fehler {
         AusgangFehler::Voruebergehend => "Mailserver nicht erreichbar",
         AusgangFehler::Abgelehnt => "vom Mailserver abgelehnt",
@@ -628,7 +661,8 @@ async fn von_fuer(
     )
 }
 
-/// Schreibt das Ergebnis und, falls `etb` gesetzt, den ETB-Eintrag in einer Transaktion; nach
+/// Schreibt die gesendeten `teile` (`ausgang_teil`), das Ergebnis und, falls `etb` gesetzt, den
+/// ETB-Eintrag in einer Transaktion; nach
 /// dem Commit `publiziere` und das Ereignis der Versandliste. `begonnen` ist der Merker, den der
 /// Aufrufer hält (`repo::save_ergebnis_tx`): hat ein anderer Lauf den Versand schon
 /// abgeschlossen, ändert sich nichts und es entsteht kein ETB-Eintrag. Scheitert die
@@ -641,9 +675,14 @@ async fn abschliessen(
     begonnen: Option<&str>,
     ergebnis: Ergebnis,
     etb: Option<String>,
+    teile: &[(i64, String)],
 ) -> Result<(), AppError> {
+    let gesendet_at = Utc::now();
     // `None`: nichts geändert; `Some(etb_id)`: Ergebnis geschrieben, mit oder ohne ETB.
     let mit_etb = crate::write_retry!(pool, |conn| {
+        // Gesendete Teile sind hinaus, auch wenn ein anderer Lauf das Ergebnis schon schrieb:
+        // gemerkt werden sie immer, damit kein späterer Versuch sie doppelt sendet.
+        repo::save_teile_tx(&mut *conn, &zeile.id, teile, gesendet_at).await?;
         if !repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis).await? {
             return Ok(None);
         }
@@ -685,6 +724,7 @@ async fn abschliessen(
         Err(e) if etb.is_some() => {
             tracing::error!(versand = %zeile.id, "Ausgang: ETB-Eintrag nicht geschrieben: {e}");
             let geaendert = crate::write_retry!(pool, |conn| {
+                repo::save_teile_tx(&mut *conn, &zeile.id, teile, gesendet_at).await?;
                 repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis).await
             })?;
             if !geaendert {
