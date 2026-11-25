@@ -425,6 +425,37 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         stopp_empfang,
     );
 
+    // Ausgang per E-Mail (LLH-2093): der Lauf des Ausgangskorbs neben dem der Adapter; die
+    // Routen wecken ihn über `AppState::ausgang_wecker`.
+    let ausgang_wecker = std::sync::Arc::new(tokio::sync::Notify::new());
+    // Nur die e2e-Suite schaltet das aufzeichnende Doppel zu (`--ausgang-testzusteller`); ein
+    // Release-Binary startet damit nicht.
+    let ausgang_zusteller: std::sync::Arc<dyn lifeline_hub::ausgang::lauf::Zusteller> =
+        if config.ausgang_testzusteller {
+            match lifeline_hub::ausgang::zusteller::testzusteller() {
+                Some(z) => {
+                    tracing::warn!(
+                        "Ausgang per E-Mail: Test-Zusteller aktiv (--ausgang-testzusteller), \
+                         es wird nichts versendet."
+                    );
+                    z
+                }
+                None => {
+                    eprintln!("--ausgang-testzusteller gibt es nur in Debug-Builds.");
+                    std::process::exit(2);
+                }
+            }
+        } else {
+            std::sync::Arc::new(lifeline_hub::ausgang::lauf::SmtpZusteller::produktiv())
+        };
+    let _ausgang_task = lifeline_hub::ausgang::lauf::start(
+        pool.clone(),
+        adapter_rahmen.clone(),
+        live.clone(),
+        ausgang_zusteller,
+        ausgang_wecker.clone(),
+    );
+
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.
     if config.datentraeger_verschluesselung_extern {
@@ -644,7 +675,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         einsatzakte_bau: Default::default(),
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
-        adapter: adapter_rahmen,
+        adapter: adapter_rahmen.clone(),
+        ausgang_wecker: ausgang_wecker.clone(),
         fremdebene_abrufer: Default::default(),
         drohne,
     };

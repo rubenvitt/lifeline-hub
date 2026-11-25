@@ -153,6 +153,10 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
 /// Einsatztabellen, die nicht gespiegelt werden, mit Grund (D3).
 pub const AUSGENOMMEN: &[(&str, &str)] = &[
     (
+        "ausgang",
+        "Zustellung ist an die Instanz mit Anbindung und Geheimnis gebunden; der Versand steht über das ETB im Spiegel",
+    ),
+    (
         "person_zugriff_audit",
         "Zugriffsprotokoll: jede Instanz protokolliert ihre eigenen Zugriffe",
     ),

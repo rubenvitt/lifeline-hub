@@ -70,7 +70,7 @@ pub async fn load(pool: &SqlitePool, org_id: i64, id: i64) -> Result<ExterneStel
     load_conn(&mut conn, org_id, id).await
 }
 
-async fn load_conn(
+pub(super) async fn load_conn(
     conn: &mut SqliteConnection,
     org_id: i64,
     id: i64,
