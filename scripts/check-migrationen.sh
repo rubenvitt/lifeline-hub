@@ -16,6 +16,10 @@
 #   2. Anhängen, nicht einschieben: jede neue Migration trägt eine Nummer GRÖSSER als jede
 #      auf der BASIS — sqlx 0.9 spielt eine kleinere, fehlende Version still nach.
 #   3. Die neuen Nummern eines Branches sind untereinander verschieden und vierstellig.
+#   Ausnahme zu 1 (Reparatur, LLH-2030-Fenster): trägt die Abzweigung eine Nummer doppelt,
+#   darf der Branch Dateien dieser Nummer hinter die Basis legen, solange genau eine unter
+#   der alten Nummer bleibt. Mit doppelter Nummer startet kein Server (UNIQUE auf
+#   _sqlx_migrations.version); welche bleibt, entscheidet der Mensch (die zuerst gemergte).
 #
 # Geprüft wird, was COMMITTET ist (Diff Abzweigung..Kopf), nicht der Arbeitsbaum.
 #
@@ -78,14 +82,35 @@ while IFS= read -r pfad; do
   [ -n "$n" ] && [ "$n" -gt "$max_basis" ] && max_basis="$n"
 done < <(git ls-tree --name-only "$B" migrations/ | grep '\.sql$' || true)
 
+# Wie oft jede Nummer in einem Stand vorkommt, als Zeilen „<nummer> <anzahl>“.
+anzahl_je_nummer() { # <commit>
+  local pfad
+  { git ls-tree --name-only "$1" migrations/ | grep '\.sql$' || true; } | while IFS= read -r pfad; do
+    nummer "$pfad"
+  done | sort -n | uniq -c | awk '{ print $2, $1 }'
+}
+anzahl_in() { # <tabelle> <nummer>
+  awk -v n="$2" '$1 == n { print $2; f = 1 } END { if (!f) print 0 }' <<< "$1"
+}
+anzahl_abzweigung="$(anzahl_je_nummer "$M")"
+anzahl_kopf="$(anzahl_je_nummer "$K")"
+
 verstoesse=()
 neue=()
+aufgeloest=()
 # --no-renames: eine Umbenennung erscheint als D (alt) + A (neu) — das D ist der Verstoß.
 while IFS=$'\t' read -r status pfad; do
   case "$pfad" in *.sql) ;; *) continue ;; esac
   case "$status" in
     A) neue+=("$pfad") ;;
-    D) verstoesse+=("bestehende Migration gelöscht oder umbenannt: $pfad") ;;
+    D)
+      n="$(nummer "$pfad")"
+      if [ -n "$n" ] && [ "$(anzahl_in "$anzahl_abzweigung" "$n")" -gt 1 ] &&
+        [ "$(anzahl_in "$anzahl_kopf" "$n")" -eq 1 ]; then
+        aufgeloest+=("$pfad")
+      else
+        verstoesse+=("bestehende Migration gelöscht oder umbenannt: $pfad")
+      fi ;;
     *) verstoesse+=("bestehende Migration geändert: $pfad") ;;
   esac
 done < <(git diff --no-renames --name-status "$M" "$K" -- migrations/)
@@ -117,6 +142,10 @@ for pfad in ${sortierte_neue[@]+"${sortierte_neue[@]}"}; do
           [ "$(nummer "$p")" = "$n" ] && printf '%s ' "$p"; done)")") ;;
   esac
   gesehen="$gesehen$n "
+done
+
+for pfad in ${aufgeloest[@]+"${aufgeloest[@]}"}; do
+  echo "==> Doppelte Nummer aufgelöst: $pfad verlässt seine Nummer, eine bleibt (Reparatur)."
 done
 
 if [ "${#verstoesse[@]}" -eq 0 ]; then

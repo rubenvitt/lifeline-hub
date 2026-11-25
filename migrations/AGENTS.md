@@ -18,6 +18,10 @@ bleibt.
   umgelegt (`scripts/migrationen-autofix.sh`), nie auf `alpha`. Danach vor dem nächsten Push
   den Branch holen. Herleitung:
   `openspec/changes/archive/2026-10-03-lfh-1014-migrationsnummern-autofix/design.md`.
+- **Doppelte Nummer auf `alpha` reparieren** (Fenster LLH-2030, am 25.11.2026 zweimal 0381):
+  die zuletzt gemergte Datei kommt auf die nächste freie Nummer, Verweise mit. Das ist die
+  einzige erlaubte Umbenennung: mit doppelter Nummer startet kein Server, und
+  `check-migrationen.sh` lässt sie zu, solange genau eine Datei unter der Nummer bleibt.
 - **Stau-Wächter** (LLH-1660): meldet Konflikte am PR und mergt bei fehlendem CI-Lauf den
   Ziel-Branch in den PR-Branch; auch danach erst holen, dann pushen. Regeln: `scripts/AGENTS.md`.
 - **Falle: sqlx spielt eine kleinere, noch nicht eingespielte Migration still nach**
