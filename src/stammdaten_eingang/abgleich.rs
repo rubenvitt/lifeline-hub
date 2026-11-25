@@ -1,7 +1,7 @@
 //! Abgleich einer Stammdatenzeile mit dem Bestand (LLH-1633): rein, ohne Datenbank.
 //! Stufen in fester Reihenfolge; mehr als ein Treffer auf einer Stufe ist mehrdeutig und stoppt.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -54,6 +54,174 @@ pub struct Bestand {
     /// Jede `(Art, herkunft, kennung)` der Org in `stammdaten_kennung`, auch eine, deren Ziel
     /// nicht zur Org gehört: sie trifft nie, belegt aber den Unique-Schlüssel.
     pub belegte_kennungen: Vec<(StammdatenArt, String, String)>,
+}
+
+/// Schlüssel `(herkunft_norm, norm(kennung))` → Positionen im Bestand.
+type KennungsIndex = HashMap<(String, String), Vec<usize>>;
+/// Normalisierter Wert → Positionen im Bestand.
+type WertIndex = HashMap<String, Vec<usize>>;
+
+/// Der [`Bestand`] zum Nachschlagen, einmal gebaut: jede Stufe des Abgleichs ist ein Zugriff
+/// auf eine Tabelle statt eines Durchlaufs mit `norm()` je Vergleich (bei 5.000 Zeilen gegen
+/// 5.000 Datensätze sonst Sekunden unter `BEGIN IMMEDIATE`). Die Positionen stehen in der
+/// Reihenfolge des Bestands, also wie vorher beim Durchlauf.
+pub struct BestandIndex<'a> {
+    pub bestand: &'a Bestand,
+    fz_id: HashMap<i64, usize>,
+    p_id: HashMap<i64, usize>,
+    q_id: HashMap<i64, usize>,
+    fz_kennung: KennungsIndex,
+    p_kennung: KennungsIndex,
+    q_kennung: KennungsIndex,
+    /// Nur Fahrzeuge bzw. Personal im Dienst.
+    fz_opta: WertIndex,
+    fz_issi: WertIndex,
+    fz_funkrufname: WertIndex,
+    p_personalnummer: WertIndex,
+    p_name: WertIndex,
+    q_label: WertIndex,
+    /// `(Art, herkunft, norm(kennung))` aus [`Bestand::belegte_kennungen`].
+    belegt: HashSet<(StammdatenArt, String, String)>,
+}
+
+fn rein(index: &mut WertIndex, wert: String, pos: usize) {
+    if !wert.is_empty() {
+        index.entry(wert).or_default().push(pos);
+    }
+}
+
+fn kennungen_rein(index: &mut KennungsIndex, kennungen: &Kennungen, pos: usize) {
+    for (h, k) in kennungen {
+        let liste = index.entry((h.clone(), norm(k))).or_default();
+        // Zwei Schreibweisen derselben Kennung an einem Datensatz zählen einmal.
+        if liste.last() != Some(&pos) {
+            liste.push(pos);
+        }
+    }
+}
+
+/// Positionen mehrerer Schlüssel, vereinigt, in der Reihenfolge des Bestands.
+fn vereinigt<'k>(index: &WertIndex, schluessel: impl Iterator<Item = &'k String>) -> Vec<usize> {
+    let mut v: Vec<usize> = schluessel
+        .filter_map(|k| index.get(k))
+        .flatten()
+        .copied()
+        .collect();
+    v.sort_unstable();
+    v.dedup();
+    v
+}
+
+impl<'a> BestandIndex<'a> {
+    pub fn new(b: &'a Bestand) -> Self {
+        let mut ix = BestandIndex {
+            bestand: b,
+            fz_id: HashMap::new(),
+            p_id: HashMap::new(),
+            q_id: HashMap::new(),
+            fz_kennung: HashMap::new(),
+            p_kennung: HashMap::new(),
+            q_kennung: HashMap::new(),
+            fz_opta: HashMap::new(),
+            fz_issi: HashMap::new(),
+            fz_funkrufname: HashMap::new(),
+            p_personalnummer: HashMap::new(),
+            p_name: HashMap::new(),
+            q_label: HashMap::new(),
+            belegt: b
+                .belegte_kennungen
+                .iter()
+                .map(|(a, h, k)| (*a, h.clone(), norm(k)))
+                .collect(),
+        };
+        for (i, f) in b.fahrzeuge.iter().enumerate() {
+            ix.fz_id.insert(f.id, i);
+            kennungen_rein(&mut ix.fz_kennung, &f.kennungen, i);
+            if f.in_dienst {
+                if let Some(o) = f.opta.as_deref() {
+                    rein(&mut ix.fz_opta, erkennungswert_norm(o), i);
+                }
+                if let Some(s) = f.fms_issi.as_deref() {
+                    rein(&mut ix.fz_issi, erkennungswert_norm(s), i);
+                }
+                rein(&mut ix.fz_funkrufname, norm(&f.funkrufname), i);
+            }
+        }
+        for (i, p) in b.personal.iter().enumerate() {
+            ix.p_id.insert(p.id, i);
+            kennungen_rein(&mut ix.p_kennung, &p.kennungen, i);
+            if p.in_dienst {
+                if let Some(pn) = p.personalnummer.as_deref() {
+                    rein(&mut ix.p_personalnummer, erkennungswert_norm(pn), i);
+                }
+                rein(&mut ix.p_name, norm(&p.name), i);
+            }
+        }
+        for (i, q) in b.qualifikationen.iter().enumerate() {
+            ix.q_id.insert(q.id, i);
+            kennungen_rein(&mut ix.q_kennung, &q.kennungen, i);
+            rein(&mut ix.q_label, norm(&q.label), i);
+        }
+        ix
+    }
+
+    pub fn fahrzeug(&self, id: i64) -> Option<&'a BestandFahrzeug> {
+        self.fz_id.get(&id).map(|i| &self.bestand.fahrzeuge[*i])
+    }
+
+    pub fn personal(&self, id: i64) -> Option<&'a BestandPersonal> {
+        self.p_id.get(&id).map(|i| &self.bestand.personal[*i])
+    }
+
+    pub fn qualifikation(&self, id: i64) -> Option<&'a BestandQualifikation> {
+        self.q_id
+            .get(&id)
+            .map(|i| &self.bestand.qualifikationen[*i])
+    }
+
+    fn kennungs_index(&self, art: StammdatenArt) -> &KennungsIndex {
+        match art {
+            StammdatenArt::Fahrzeug => &self.fz_kennung,
+            StammdatenArt::Personal => &self.p_kennung,
+            StammdatenArt::Qualifikation => &self.q_kennung,
+        }
+    }
+
+    /// Positionen der Datensätze einer Art, die `(herkunft, kennung_norm)` tragen.
+    fn mit_kennung(&self, art: StammdatenArt, herkunft: &str, kennung_norm: &str) -> &[usize] {
+        self.kennungs_index(art)
+            .get(&(herkunft.to_string(), kennung_norm.to_string()))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    /// Ids der Qualifikationen, die eine der Kennungen (normalisiert) für `herkunft` tragen.
+    pub fn qualifikationen_mit_kennung<'k>(
+        &self,
+        herkunft: &str,
+        kennungen_norm: impl Iterator<Item = &'k String>,
+    ) -> Vec<i64> {
+        let mut v: Vec<usize> = kennungen_norm
+            .flat_map(|k| self.mit_kennung(StammdatenArt::Qualifikation, herkunft, k))
+            .copied()
+            .collect();
+        v.sort_unstable();
+        v.dedup();
+        v.into_iter()
+            .map(|i| self.bestand.qualifikationen[i].id)
+            .collect()
+    }
+
+    /// Trägt ein Datensatz der Art `(herkunft, kennung_norm)`?
+    pub fn kennung_getragen(&self, art: StammdatenArt, herkunft: &str, kennung_norm: &str) -> bool {
+        !self.mit_kennung(art, herkunft, kennung_norm).is_empty()
+    }
+
+    /// Belegt eine Zeile der Org in `stammdaten_kennung` den Schlüssel, auch ohne gültiges Ziel?
+    pub fn kennung_belegt(&self, art: StammdatenArt, herkunft: &str, kennung_norm: &str) -> bool {
+        self.belegt
+            .contains(&(art, herkunft.to_string(), kennung_norm.to_string()))
+    }
 }
 
 wire_enum! {
@@ -141,12 +309,6 @@ fn kennung_der(q: &Herkunftsangabe) -> Option<String> {
     nicht_leer(&q.kennung).map(norm)
 }
 
-fn traegt(kennungen: &Kennungen, herkunft: &str, kennung: &str) -> bool {
-    kennungen
-        .iter()
-        .any(|(h, k)| h == herkunft && norm(k) == kennung)
-}
-
 /// Ziel trägt für dieselbe Herkunft schon eine andere Kennung?
 fn andere_kennung(kennungen: &Kennungen, herkunft: &str, kennung: &str) -> bool {
     kennungen
@@ -200,95 +362,71 @@ fn kennungsstufe(treffer: Vec<(i64, bool)>) -> Option<Zuordnung> {
 }
 
 /// `herkunft`: wirksame, schon normalisierte Herkunft der Zeile.
-pub fn fahrzeug_zuordnen(b: &Bestand, herkunft: &str, a: &FahrzeugAngabe) -> Zuordnung {
+pub fn fahrzeug_zuordnen(ix: &BestandIndex, herkunft: &str, a: &FahrzeugAngabe) -> Zuordnung {
+    let fz = &ix.bestand.fahrzeuge;
     let kennung = kennung_der(&a.quelle);
     if let Some(kn) = &kennung {
-        let t = b
-            .fahrzeuge
+        let t = ix
+            .mit_kennung(StammdatenArt::Fahrzeug, herkunft, kn)
             .iter()
-            .filter(|f| traegt(&f.kennungen, herkunft, kn))
-            .map(|f| (f.id, f.in_dienst))
+            .map(|i| (fz[*i].id, fz[*i].in_dienst))
             .collect();
         if let Some(z) = kennungsstufe(t) {
             return z;
         }
     }
     let kn = kennung.as_deref();
-    let aktiv = || b.fahrzeuge.iter().filter(|f| f.in_dienst);
-    let nach = |wert: Option<&str>, f: fn(&BestandFahrzeug) -> Option<&str>, g| {
-        let w = erkennungswert_norm(wert?);
-        if w.is_empty() {
-            return None;
-        }
-        let t = aktiv()
-            .filter(|x| f(x).is_some_and(|v| erkennungswert_norm(v) == w))
-            .map(|x| (x.id, &x.kennungen))
-            .collect();
-        stufe(t, g, herkunft, kn)
+    let treffer = |pos: &[usize]| -> Vec<(i64, &Kennungen)> {
+        pos.iter().map(|i| (fz[*i].id, &fz[*i].kennungen)).collect()
     };
-    if let Some(z) = nach(
-        nicht_leer(&a.opta),
-        |f| f.opta.as_deref(),
-        TrefferGrund::Opta,
-    ) {
+    let nach = |wert: Option<&str>, index: &WertIndex, g| {
+        let w = erkennungswert_norm(wert?);
+        let pos = index.get(&w)?;
+        stufe(treffer(pos), g, herkunft, kn)
+    };
+    if let Some(z) = nach(nicht_leer(&a.opta), &ix.fz_opta, TrefferGrund::Opta) {
         return z;
     }
-    if let Some(z) = nach(
-        nicht_leer(&a.issi),
-        |f| f.fms_issi.as_deref(),
-        TrefferGrund::Issi,
-    ) {
+    if let Some(z) = nach(nicht_leer(&a.issi), &ix.fz_issi, TrefferGrund::Issi) {
         return z;
     }
-    let fk = norm(&a.funkrufname);
-    if !fk.is_empty() {
-        let t = aktiv()
-            .filter(|f| norm(&f.funkrufname) == fk)
-            .map(|f| (f.id, &f.kennungen))
-            .collect();
-        if let Some(z) = stufe(t, TrefferGrund::Funkrufname, herkunft, kn) {
+    if let Some(pos) = ix.fz_funkrufname.get(&norm(&a.funkrufname)) {
+        if let Some(z) = stufe(treffer(pos), TrefferGrund::Funkrufname, herkunft, kn) {
             return z;
         }
     }
     Zuordnung::Neu
 }
 
-pub fn personal_zuordnen(b: &Bestand, herkunft: &str, a: &PersonalAngabe) -> Zuordnung {
+pub fn personal_zuordnen(ix: &BestandIndex, herkunft: &str, a: &PersonalAngabe) -> Zuordnung {
+    let ps = &ix.bestand.personal;
     let kennung = kennung_der(&a.quelle);
     if let Some(kn) = &kennung {
-        let t = b
-            .personal
+        let t = ix
+            .mit_kennung(StammdatenArt::Personal, herkunft, kn)
             .iter()
-            .filter(|p| traegt(&p.kennungen, herkunft, kn))
-            .map(|p| (p.id, p.in_dienst))
+            .map(|i| (ps[*i].id, ps[*i].in_dienst))
             .collect();
         if let Some(z) = kennungsstufe(t) {
             return z;
         }
     }
     let kn = kennung.as_deref();
-    let aktiv = || b.personal.iter().filter(|p| p.in_dienst);
+    let treffer = |pos: &[usize]| -> Vec<(i64, &Kennungen)> {
+        pos.iter().map(|i| (ps[*i].id, &ps[*i].kennungen)).collect()
+    };
     if let Some(pn) = nicht_leer(&a.personalnummer).map(erkennungswert_norm) {
-        let t = aktiv()
-            .filter(|p| {
-                p.personalnummer
-                    .as_deref()
-                    .is_some_and(|v| erkennungswert_norm(v) == pn)
-            })
-            .map(|p| (p.id, &p.kennungen))
-            .collect();
-        if let Some(z) = stufe(t, TrefferGrund::Personalnummer, herkunft, kn) {
-            return z;
+        if let Some(pos) = ix.p_personalnummer.get(&pn) {
+            if let Some(z) = stufe(treffer(pos), TrefferGrund::Personalnummer, herkunft, kn) {
+                return z;
+            }
         }
     }
     if !a.name.trim().is_empty() {
         let (nach, vor) = name_teilen(&a.name);
         let formen = namensformen(&nach, vor.as_deref());
-        let t = aktiv()
-            .filter(|p| name_passt(&p.name, &formen))
-            .map(|p| (p.id, &p.kennungen))
-            .collect();
-        if let Some(z) = stufe(t, TrefferGrund::Name, herkunft, kn) {
+        let pos = vereinigt(&ix.p_name, formen.iter());
+        if let Some(z) = stufe(treffer(&pos), TrefferGrund::Name, herkunft, kn) {
             return z;
         }
     }
@@ -296,35 +434,31 @@ pub fn personal_zuordnen(b: &Bestand, herkunft: &str, a: &PersonalAngabe) -> Zuo
 }
 
 /// Kennung = normalisierter Text, dann normalisierte Bezeichnung; aktive und inaktive.
-pub fn qualifikation_zuordnen(b: &Bestand, herkunft: &str, text: &str) -> Zuordnung {
+pub fn qualifikation_zuordnen(ix: &BestandIndex, herkunft: &str, text: &str) -> Zuordnung {
     let n = norm(text);
     if n.is_empty() {
         return Zuordnung::Fehler("Bezeichnung fehlt".to_string());
     }
-    let mehr = |ids: Vec<i64>, grund| match ids.as_slice() {
+    let qs = &ix.bestand.qualifikationen;
+    let mehr = |pos: &[usize], grund| match pos {
         [] => None,
-        [id] => Some(Zuordnung::Gefunden { id: *id, grund }),
+        [i] => Some(Zuordnung::Gefunden {
+            id: qs[*i].id,
+            grund,
+        }),
         _ => Some(Zuordnung::Mehrdeutig {
-            kandidaten: ids,
+            kandidaten: pos.iter().map(|i| qs[*i].id).collect(),
             hinweis: None,
         }),
     };
-    let t = b
-        .qualifikationen
-        .iter()
-        .filter(|q| traegt(&q.kennungen, herkunft, &n))
-        .map(|q| q.id)
-        .collect();
-    if let Some(z) = mehr(t, TrefferGrund::Kennung) {
+    if let Some(z) = mehr(
+        ix.mit_kennung(StammdatenArt::Qualifikation, herkunft, &n),
+        TrefferGrund::Kennung,
+    ) {
         return z;
     }
-    let t = b
-        .qualifikationen
-        .iter()
-        .filter(|q| norm(&q.label) == n)
-        .map(|q| q.id)
-        .collect();
-    mehr(t, TrefferGrund::Bezeichnung).unwrap_or(Zuordnung::Neu)
+    let pos = ix.q_label.get(&n).map(Vec::as_slice).unwrap_or(&[]);
+    mehr(pos, TrefferGrund::Bezeichnung).unwrap_or(Zuordnung::Neu)
 }
 
 fn aenderung(
@@ -508,6 +642,19 @@ pub fn dubletten_in_datei(
 mod tests {
     use super::*;
     use crate::stammdaten_eingang::QualifikationAngabe;
+
+    // Die Tests geben einen Bestand; der Abgleich arbeitet auf dessen Index.
+    fn fahrzeug_zuordnen(b: &Bestand, h: &str, a: &FahrzeugAngabe) -> Zuordnung {
+        super::fahrzeug_zuordnen(&BestandIndex::new(b), h, a)
+    }
+
+    fn personal_zuordnen(b: &Bestand, h: &str, a: &PersonalAngabe) -> Zuordnung {
+        super::personal_zuordnen(&BestandIndex::new(b), h, a)
+    }
+
+    fn qualifikation_zuordnen(b: &Bestand, h: &str, text: &str) -> Zuordnung {
+        super::qualifikation_zuordnen(&BestandIndex::new(b), h, text)
+    }
 
     fn kz(h: &str, k: &str) -> Kennungen {
         vec![(h.to_string(), k.to_string())]

@@ -13,7 +13,7 @@ use crate::error::{AppError, ZeilenArt, ZeilenGrund};
 use crate::stammdaten_eingang::abgleich::{
     dubletten_in_datei, erkennungswert_norm, fahrzeug_aenderungen, fahrzeug_zuordnen,
     personal_aenderungen, personal_zuordnen, qualifikation_zuordnen, AenderungsArt, Bestand,
-    FeldAenderung, Kennungen, TrefferGrund, Zuordnung,
+    BestandIndex, FeldAenderung, Kennungen, TrefferGrund, Zuordnung,
 };
 use crate::stammdaten_eingang::{
     DateiMeldung, FahrzeugAngabe, Herkunftsangabe, PersonalAngabe, StammdatenArt, StammdatenPaket,
@@ -120,18 +120,6 @@ fn wirksame_herkunft(q: &Herkunftsangabe, default: &str) -> String {
 fn traegt(k: &Kennungen, herkunft: &str, kennung_norm: &str) -> bool {
     k.iter()
         .any(|(h, x)| h == herkunft && norm(x) == kennung_norm)
-}
-
-/// Belegt eine Zeile der Org in `stammdaten_kennung` den Schlüssel, auch ohne gültiges Ziel?
-fn ist_belegt(
-    belegt: &[(StammdatenArt, String, String)],
-    art: StammdatenArt,
-    herkunft: &str,
-    kennung_norm: &str,
-) -> bool {
-    belegt
-        .iter()
-        .any(|(a, h, k)| *a == art && h == herkunft && norm(k) == kennung_norm)
 }
 
 fn hat_herkunft(k: &Kennungen, herkunft: &str) -> bool {
@@ -297,15 +285,9 @@ fn aenderungen_anwenden(
     }
 }
 
-/// Ob die Kennung der Zeile gemerkt wird. `alle` = Kennungen aller Datensätze dieser Art,
-/// `ziel` = die des Ziels (bei einer gefundenen Zeile).
-fn kennung_merken<'a>(
-    zeile: &mut Zeile,
-    mut alle: impl Iterator<Item = &'a Kennungen>,
-    ziel: Option<&Kennungen>,
-    belegt: &[(StammdatenArt, String, String)],
-    was: &str,
-) {
+/// Ob die Kennung der Zeile gemerkt wird. `ziel` = die Kennungen des Ziels (bei einer
+/// gefundenen Zeile).
+fn kennung_merken(zeile: &mut Zeile, ix: &BestandIndex, ziel: Option<&Kennungen>, was: &str) {
     if !matches!(zeile.absicht, Absicht::Neu | Absicht::Ziel { .. }) {
         return;
     }
@@ -317,8 +299,8 @@ fn kennung_merken<'a>(
         return;
     }
     let art = zeile.vorschau.art;
-    if alle.any(|x| traegt(x, &zeile.herkunft, &kn))
-        || ist_belegt(belegt, art, &zeile.herkunft, &kn)
+    if ix.kennung_getragen(art, &zeile.herkunft, &kn)
+        || ix.kennung_belegt(art, &zeile.herkunft, &kn)
     {
         zeile.vorschau.hinweise.push(format!(
             "Die Kennung gehört schon einem anderen {was}; sie wird nicht gemerkt"
@@ -364,11 +346,11 @@ fn gleiche_ziele(zeilen: &mut [Zeile], was: &str) {
 
 /// Eindeutigkeit eines Werts unter den Datensätzen im Dienst (Funkrufname, Personalnummer),
 /// gegen den Bestand und die Datei selbst. `geplant[i]` = neuer Wert der Zeile `i` (normalisiert,
-/// mit Anzeige), `bestand` = `(id, normalisierter Wert)` der Datensätze im Dienst.
+/// mit Anzeige), `bestand` = normalisierter Wert → Ids der Datensätze im Dienst.
 fn kollisionen(
     zeilen: &mut [Zeile],
     geplant: Vec<Option<(String, String)>>,
-    bestand: &[(i64, String)],
+    bestand: &HashMap<String, Vec<i64>>,
     feld: &str,
 ) {
     let mut zaehler: HashMap<&str, usize> = HashMap::new();
@@ -381,7 +363,9 @@ fn kollisionen(
             Absicht::Ziel { id, .. } => Some(id),
             _ => None,
         };
-        let im_bestand = bestand.iter().any(|(id, w)| Some(*id) != selbst && w == n);
+        let im_bestand = bestand
+            .get(n)
+            .is_some_and(|ids| ids.iter().any(|id| Some(*id) != selbst));
         if im_bestand || zaehler[n.as_str()] > 1 {
             zeile_fehler(z, format!("{feld} „{anzeige}“ ist schon vergeben"));
         }
@@ -542,8 +526,8 @@ impl QualiSammlung {
     }
 }
 
-fn kandidat_quali(b: &Bestand, id: i64) -> Kandidat {
-    let q = b.qualifikationen.iter().find(|q| q.id == id);
+fn kandidat_quali(ix: &BestandIndex, id: i64) -> Kandidat {
+    let q = ix.qualifikation(id);
     Kandidat {
         id,
         anzeige: match q {
@@ -570,12 +554,13 @@ pub fn planen(
             "Höchstens {ENTSCHEIDUNGEN_MAX} Entscheidungen je Liste"
         )));
     }
+    let ix = BestandIndex::new(b);
     // Org-Prüfung jedes Ziels einer Entscheidung, bevor irgendetwas abgeglichen wird.
     for z in &e.zeilen {
         if let ZeilenWahl::Kandidat { id } = z.wahl {
             let eigen = match z.art {
-                StammdatenArt::Fahrzeug => b.fahrzeuge.iter().any(|f| f.id == id),
-                StammdatenArt::Personal => b.personal.iter().any(|p| p.id == id),
+                StammdatenArt::Fahrzeug => ix.fahrzeug(id).is_some(),
+                StammdatenArt::Personal => ix.personal(id).is_some(),
                 StammdatenArt::Qualifikation => false,
             };
             if !eigen {
@@ -589,7 +574,7 @@ pub fn planen(
     }
     for q in &e.qualifikationen {
         if let QualiWahl::Zuordnen { qualifikation_id } = q.wahl {
-            if !b.qualifikationen.iter().any(|x| x.id == qualifikation_id) {
+            if ix.qualifikation(qualifikation_id).is_none() {
                 return Err(AppError::Validation(format!(
                     "Qualifikation „{}“: Die gewählte Qualifikation gehört nicht zur eigenen Organisation",
                     q.text.trim()
@@ -630,7 +615,7 @@ pub fn planen(
         let zuordnung = if dubletten.contains(&(art, a.zeile)) {
             Zuordnung::Fehler(DUBLETTE.into())
         } else {
-            fahrzeug_zuordnen(b, &h, a)
+            fahrzeug_zuordnen(&ix, &h, a)
         };
         let explizit = zeilen_wahl.get(&(art, a.zeile)).copied();
         let (ergebnis, absicht, kandidaten, grund, hinweise) =
@@ -642,10 +627,8 @@ pub fn planen(
             .iter()
             .map(|id| Kandidat {
                 id: *id,
-                anzeige: b
-                    .fahrzeuge
-                    .iter()
-                    .find(|f| f.id == *id)
+                anzeige: ix
+                    .fahrzeug(*id)
                     .map(|f| f.funkrufname.clone())
                     .unwrap_or_default(),
             })
@@ -659,23 +642,15 @@ pub fn planen(
                 grund,
                 datei_uebernehmen,
             } => {
-                let r = b
-                    .fahrzeuge
-                    .iter()
-                    .find(|f| f.id == id)
+                let r = ix
+                    .fahrzeug(id)
                     .ok_or_else(|| AppError::Internal("Fahrzeug fehlt im Bestand".into()))?;
                 aenderungen_anwenden(fahrzeug_aenderungen(r, a), grund, datei_uebernehmen, &mut z);
                 Some(&r.kennungen)
             }
             _ => None,
         };
-        kennung_merken(
-            &mut z,
-            b.fahrzeuge.iter().map(|f| &f.kennungen),
-            ziel,
-            &b.belegte_kennungen,
-            "Fahrzeug",
-        );
+        kennung_merken(&mut z, &ix, ziel, "Fahrzeug");
         fz.push(z);
     }
     gleiche_ziele(&mut fz, "Fahrzeug");
@@ -684,12 +659,13 @@ pub fn planen(
         .zip(&paket.fahrzeuge)
         .map(|(z, a)| geplanter_wert(z, "funkrufname", Some(&a.funkrufname), norm))
         .collect();
-    let im_dienst: Vec<(i64, String)> = b
-        .fahrzeuge
-        .iter()
-        .filter(|f| f.in_dienst)
-        .map(|f| (f.id, norm(&f.funkrufname)))
-        .collect();
+    let mut im_dienst: HashMap<String, Vec<i64>> = HashMap::new();
+    for f in b.fahrzeuge.iter().filter(|f| f.in_dienst) {
+        im_dienst
+            .entry(norm(&f.funkrufname))
+            .or_default()
+            .push(f.id);
+    }
     kollisionen(&mut fz, geplant, &im_dienst, "Der Funkrufname");
 
     // --- Personal ----------------------------------------------------------------------------
@@ -701,7 +677,7 @@ pub fn planen(
         let zuordnung = if dubletten.contains(&(art, a.zeile)) {
             Zuordnung::Fehler(DUBLETTE.into())
         } else {
-            personal_zuordnen(b, &h, a)
+            personal_zuordnen(&ix, &h, a)
         };
         let explizit = zeilen_wahl.get(&(art, a.zeile)).copied();
         let (ergebnis, absicht, kandidaten, grund, hinweise) =
@@ -713,10 +689,8 @@ pub fn planen(
             .iter()
             .map(|id| Kandidat {
                 id: *id,
-                anzeige: b
-                    .personal
-                    .iter()
-                    .find(|p| p.id == *id)
+                anzeige: ix
+                    .personal(*id)
                     .map(|p| match &p.personalnummer {
                         Some(pn) => format!("{} ({pn})", p.name),
                         None => p.name.clone(),
@@ -733,23 +707,15 @@ pub fn planen(
                 grund,
                 datei_uebernehmen,
             } => {
-                let r = b
-                    .personal
-                    .iter()
-                    .find(|p| p.id == id)
+                let r = ix
+                    .personal(id)
                     .ok_or_else(|| AppError::Internal("Person fehlt im Bestand".into()))?;
                 aenderungen_anwenden(personal_aenderungen(r, a), grund, datei_uebernehmen, &mut z);
                 Some(&r.kennungen)
             }
             _ => None,
         };
-        kennung_merken(
-            &mut z,
-            b.personal.iter().map(|p| &p.kennungen),
-            ziel,
-            &b.belegte_kennungen,
-            "Personal",
-        );
+        kennung_merken(&mut z, &ix, ziel, "Personal");
         ps.push(z);
     }
     gleiche_ziele(&mut ps, "Personal");
@@ -765,18 +731,17 @@ pub fn planen(
             )
         })
         .collect();
-    let im_dienst: Vec<(i64, String)> = b
-        .personal
-        .iter()
-        .filter(|p| p.in_dienst)
-        .filter_map(|p| {
-            p.personalnummer
-                .as_deref()
-                .map(erkennungswert_norm)
-                .filter(|n| !n.is_empty())
-                .map(|n| (p.id, n))
-        })
-        .collect();
+    let mut im_dienst: HashMap<String, Vec<i64>> = HashMap::new();
+    for p in b.personal.iter().filter(|p| p.in_dienst) {
+        if let Some(n) = p
+            .personalnummer
+            .as_deref()
+            .map(erkennungswert_norm)
+            .filter(|n| !n.is_empty())
+        {
+            im_dienst.entry(n).or_default().push(p.id);
+        }
+    }
     kollisionen(&mut ps, geplant, &im_dienst, "Die Personalnummer");
 
     // --- Qualifikationen ---------------------------------------------------------------------
@@ -817,7 +782,7 @@ pub fn planen(
         .collect();
 
     let (q_vorschau, q_schreiben, q_zaehlung, mut sperren) =
-        qualifikationen_aufloesen(b, &qs.eintraege, &quali_wahl)?;
+        qualifikationen_aufloesen(&ix, &qs.eintraege, &quali_wahl)?;
 
     // --- Qualifikationen am Personal, Zählung ------------------------------------------------
     let mut zaehlung = Zaehlung {
@@ -842,10 +807,8 @@ pub fn planen(
     let mut personal = Vec::new();
     for ((mut z, a), eintraege) in ps.into_iter().zip(&paket.personal).zip(p_qualis) {
         let bisher: &[i64] = match z.absicht {
-            Absicht::Ziel { id, .. } => b
-                .personal
-                .iter()
-                .find(|p| p.id == id)
+            Absicht::Ziel { id, .. } => ix
+                .personal(id)
                 .map(|p| p.qualifikation_ids.as_slice())
                 .unwrap_or(&[]),
             _ => &[],
@@ -859,9 +822,7 @@ pub fn planen(
                 QualiZiel::Id(q) if !bisher.contains(&q) && !ids.contains(&q) => {
                     ids.push(q);
                     Some(
-                        b.qualifikationen
-                            .iter()
-                            .find(|x| x.id == q)
+                        ix.qualifikation(q)
                             .map(|x| x.label.clone())
                             .unwrap_or_default(),
                     )
@@ -943,7 +904,7 @@ type QualiPlan = (
 /// Löst die Qualifikationen der Datei auf: zuerst über eine gemerkte Kennung (jede ihrer
 /// Kennungen), dann über die Bezeichnung; wendet die Wahl an und zählt.
 fn qualifikationen_aufloesen(
-    b: &Bestand,
+    ix: &BestandIndex,
     eintraege: &[QualiEintrag],
     quali_wahl: &HashMap<String, QualiWahl>,
 ) -> Result<QualiPlan, AppError> {
@@ -953,17 +914,13 @@ fn qualifikationen_aufloesen(
     let mut sperren: Vec<ZeilenGrund> = Vec::new();
     for e in eintraege {
         let h = &e.herkunft;
-        let ueber_kennung: Vec<i64> = b
-            .qualifikationen
-            .iter()
-            .filter(|q| e.aliase.iter().any(|a| traegt(&q.kennungen, h, &norm(a))))
-            .map(|q| q.id)
-            .collect();
+        let aliase_norm: Vec<String> = e.aliase.iter().map(|a| norm(a)).collect();
+        let ueber_kennung = ix.qualifikationen_mit_kennung(h, aliase_norm.iter());
         let zuordnung = if let Some(f) = &e.fehler {
             Zuordnung::Fehler(f.clone())
         } else {
             match ueber_kennung.as_slice() {
-                [] => qualifikation_zuordnen(b, h, &e.text),
+                [] => qualifikation_zuordnen(ix, h, &e.text),
                 [id] => Zuordnung::Gefunden {
                     id: *id,
                     grund: TrefferGrund::Kennung,
@@ -1033,7 +990,7 @@ fn qualifikationen_aufloesen(
             }
         };
         if let QualiZiel::Id(q) = ziel {
-            if b.qualifikationen.iter().any(|x| x.id == q && !x.aktiv) {
+            if ix.qualifikation(q).is_some_and(|x| !x.aktiv) {
                 hinweise.push(
                     "Die Qualifikation ist inaktiv; sie wird verknüpft und bleibt inaktiv".into(),
                 );
@@ -1046,23 +1003,18 @@ fn qualifikationen_aufloesen(
                     hinweise.push("Ohne Herkunft wird die Zuordnung nicht gemerkt".into());
                 }
             } else {
-                for a in &e.aliase {
-                    let an = norm(a);
+                for (a, an) in e.aliase.iter().zip(&aliase_norm) {
                     let ziel_traegt = match ziel {
-                        QualiZiel::Id(q) => b
-                            .qualifikationen
-                            .iter()
-                            .any(|x| x.id == q && traegt(&x.kennungen, h, &an)),
+                        QualiZiel::Id(q) => ix
+                            .qualifikation(q)
+                            .is_some_and(|x| traegt(&x.kennungen, h, an)),
                         _ => false,
                     };
                     if ziel_traegt {
                         continue;
                     }
-                    if b.qualifikationen
-                        .iter()
-                        .any(|x| traegt(&x.kennungen, h, &an))
-                        || ist_belegt(&b.belegte_kennungen, StammdatenArt::Qualifikation, h, &an)
-                    {
+                    let art = StammdatenArt::Qualifikation;
+                    if ix.kennung_getragen(art, h, an) || ix.kennung_belegt(art, h, an) {
                         hinweise.push(format!(
                             "„{a}“ ist schon einer anderen Qualifikation zugeordnet; das bleibt"
                         ));
@@ -1109,7 +1061,10 @@ fn qualifikationen_aufloesen(
             zeilen: e.zeilen.clone(),
             ergebnis,
             grund,
-            kandidaten: kandidaten.iter().map(|id| kandidat_quali(b, *id)).collect(),
+            kandidaten: kandidaten
+                .iter()
+                .map(|id| kandidat_quali(ix, *id))
+                .collect(),
             hinweise,
             wahl,
         });
@@ -1121,4 +1076,105 @@ fn qualifikationen_aufloesen(
         });
     }
     Ok((q_vorschau, q_schreiben, q_zaehlung, sperren))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stammdaten_eingang::abgleich::{BestandFahrzeug, BestandPersonal};
+    use crate::stammdaten_eingang::{FahrzeugAngabe, PersonalAngabe};
+
+    /// F4: Der Abgleich ist nicht quadratisch. 2.000 Zeilen gegen 2.000 Datensätze je Art,
+    /// jede Stufe belegt (Kennung, OPTA, Funkrufname, Personalnummer, Name, Kollisionen): mit
+    /// Indizes Millisekunden, quadratisch mit `norm()` je Vergleich Sekunden.
+    #[test]
+    fn grosser_bestand_schnell() {
+        const N: usize = 2_000;
+        let h = "fv".to_string();
+        let mut b = Bestand::default();
+        for i in 0..N {
+            let id = i as i64 + 1;
+            b.fahrzeuge.push(BestandFahrzeug {
+                id,
+                funkrufname: format!("Florian {i}"),
+                kennzeichen: None,
+                opta: Some(format!("OPTA {i}")),
+                fms_issi: None,
+                fahrzeugtyp: None,
+                standort: None,
+                in_dienst: true,
+                kennungen: if i % 2 == 0 {
+                    vec![(h.clone(), format!("fz-{i}"))]
+                } else {
+                    vec![]
+                },
+            });
+            b.personal.push(BestandPersonal {
+                id,
+                name: format!("Person{i}, Anna"),
+                personalnummer: (i % 3 == 0).then(|| format!("PN {i}")),
+                telefon: None,
+                traegerorganisation: None,
+                in_dienst: true,
+                qualifikation_ids: vec![],
+                kennungen: if i % 2 == 0 {
+                    vec![(h.clone(), format!("p-{i}"))]
+                } else {
+                    vec![]
+                },
+            });
+        }
+        let mut paket = StammdatenPaket::default();
+        for i in 0..N {
+            paket.fahrzeuge.push(FahrzeugAngabe {
+                zeile: i as u32 + 2,
+                quelle: Herkunftsangabe {
+                    kennung: Some(format!("fz-{i}")),
+                    herkunft: None,
+                },
+                funkrufname: format!("Florian {i}"),
+                kennzeichen: None,
+                opta: (i % 4 == 1).then(|| format!("opta{i}")),
+                issi: None,
+                typ: None,
+                standort: Some("Wache".into()),
+            });
+            paket.personal.push(PersonalAngabe {
+                zeile: i as u32 + 2,
+                quelle: Herkunftsangabe {
+                    kennung: Some(format!("p-{i}")),
+                    herkunft: None,
+                },
+                name: format!("Anna Person{i}"),
+                personalnummer: (i % 3 == 0).then(|| format!("pn{i}")),
+                telefon: None,
+                traegerorganisation: None,
+                qualifikationen: vec![format!("Quali {}", i % 50)],
+            });
+        }
+        let start = std::time::Instant::now();
+        let p = planen(
+            &b,
+            &paket,
+            &[],
+            &[],
+            Some("FV"),
+            None,
+            &Entscheidungen::default(),
+        )
+        .unwrap();
+        let dauer = start.elapsed();
+        assert!(p.vorschau.uebernehmbar, "{:?}", p.sperren.first());
+        assert_eq!(
+            p.vorschau.zaehlung.fahrzeuge.ergaenzt as usize, N,
+            "{:?}",
+            p.vorschau.zaehlung
+        );
+        assert_eq!(p.vorschau.zaehlung.personal.ergaenzt as usize, N);
+        assert_eq!(p.vorschau.zaehlung.qualifikationen.neu, 50);
+        assert!(
+            dauer < std::time::Duration::from_secs(2),
+            "Abgleich dauerte {dauer:?}"
+        );
+    }
 }
