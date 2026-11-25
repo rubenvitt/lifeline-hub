@@ -1,6 +1,7 @@
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
 
@@ -176,4 +177,55 @@ export function fallbackChromiumPath(): string | undefined {
     if (match) return join(CLOUD_BROWSER_DIR, match.name, file);
   }
   return undefined;
+}
+
+const BECH32_ZEICHEN = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+
+function bech32Pruefsumme(hrp: string, daten: number[]): number[] {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const werte = [
+    ...Array.from(hrp, (c) => c.charCodeAt(0) >> 5),
+    0,
+    ...Array.from(hrp, (c) => c.charCodeAt(0) & 31),
+    ...daten,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+  ];
+  let pm = 1;
+  for (const v of werte) {
+    const oben = pm >>> 25;
+    pm = ((pm & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) if ((oben >>> i) & 1) pm ^= GEN[i]!;
+  }
+  pm ^= 1;
+  return Array.from({ length: 6 }, (_, i) => (pm >>> (5 * (5 - i))) & 31);
+}
+
+/**
+ * Ein frischer privater age-Schlüssel für den Geheimnisspeicher des e2e-Backends
+ * (`LIFELINE_GEHEIMNIS_SCHLUESSEL`, LLH-2093): ohne ihn lässt sich kein Passwort der
+ * Mail-Anbindung speichern. Je Lauf neu, nie im Repo (bech32 von 32 Zufallsbytes,
+ * `AGE-SECRET-KEY-1…`, wie `age-keygen` ihn schreibt).
+ */
+export function e2eGeheimnisSchluessel(): string {
+  const hrp = 'age-secret-key-';
+  const daten: number[] = [];
+  let puffer = 0;
+  let bits = 0;
+  for (const b of randomBytes(32)) {
+    puffer = (puffer << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      daten.push((puffer >> bits) & 31);
+    }
+    puffer &= (1 << bits) - 1;
+  }
+  if (bits > 0) daten.push((puffer << (5 - bits)) & 31);
+  const alle = [...daten, ...bech32Pruefsumme(hrp, daten)];
+  return (hrp + '1' + alle.map((i) => BECH32_ZEICHEN[i]).join('')).toUpperCase();
 }
