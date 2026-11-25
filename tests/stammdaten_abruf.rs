@@ -200,7 +200,11 @@ async fn nur_die_uebernahme_meldet_stammdaten() {
 
     let post = |pfad: String| {
         let u = &u;
-        async move { anfrage_json(&u.app, "POST", &pfad, &u.admin, Some(&json!({}))).await.0 }
+        async move {
+            anfrage_json(&u.app, "POST", &pfad, &u.admin, Some(&json!({})))
+                .await
+                .0
+        }
     };
     assert_eq!(post(format!("{LISTE}/{id}/preview")).await, StatusCode::OK);
     assert_eq!(stammdaten(&mut rx), 0, "Vorschau");
