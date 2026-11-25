@@ -64,48 +64,103 @@ pub fn content_type_for(file: &str) -> Option<&'static str> {
     }
 }
 
-/// Eine URI darf nur relativ auf eine Datei im selben Verzeichnis zeigen: kein Schema, kein
-/// Netzpfad, kein absoluter Pfad, kein `..`, kein Rückwärtsstrich.
-fn check_uri(uri: &str) -> Result<(), VideoFehler> {
-    let pfad = uri.split(['?', '#']).next().unwrap_or("");
-    let schema = pfad.find(':').is_some_and(|i| !pfad[..i].contains('/'));
-    if uri.is_empty()
-        || schema
-        || uri.starts_with('/')
-        || uri.contains('\\')
-        || pfad.split('/').any(|teil| teil == "..")
-        || uri.chars().any(char::is_control)
+/// Verzeichnis eines URL-Pfads (alles bis zum letzten `/`).
+fn verzeichnis(pfad: &str) -> &str {
+    pfad.rsplit_once('/').map_or("", |(d, _)| d)
+}
+
+/// Löst eine URI der Playlist gegen deren Adresse auf und gibt den bloßen Dateinamen zurück. Sie
+/// muss nach dem Zielschutz der Adapter (`adapter::ziel::check_adapter_url`) gelten und auf eine
+/// Datei im selben Verzeichnis desselben Ziels (Schema, Host, Port) zeigen, deren Name ein
+/// sicheres Segment mit einer Endung ist, die der Proxy ausliefert ([`ttl_for`]).
+fn rewrite_uri(
+    uri: &str,
+    playlist_url: &reqwest::Url,
+    lan_erlaubt: bool,
+    http_im_lan: bool,
+) -> Result<String, VideoFehler> {
+    if uri.is_empty() || uri.contains('\\') || uri.chars().any(char::is_control) {
+        return Err(VideoFehler::Upstream);
+    }
+    let ziel = playlist_url.join(uri).map_err(|_| VideoFehler::Upstream)?;
+    crate::adapter::ziel::check_adapter_url(ziel.as_str(), lan_erlaubt, http_im_lan)
+        .map_err(|_| VideoFehler::Upstream)?;
+    let name = ziel.path().rsplit('/').next().unwrap_or("");
+    let gleiches_ziel = ziel.scheme() == playlist_url.scheme()
+        && ziel.host_str() == playlist_url.host_str()
+        && ziel.port_or_known_default() == playlist_url.port_or_known_default()
+        && verzeichnis(ziel.path()) == verzeichnis(playlist_url.path());
+    if !gleiches_ziel
+        || !crate::drohne::is_safe_segment(name)
+        || name.contains("..")
+        || ttl_for(name).is_none()
     {
         return Err(VideoFehler::Upstream);
     }
-    Ok(())
+    Ok(name.to_string())
 }
 
-/// Prüft eine Playlist: jede URI-Zeile und jedes `URI="…"` in einem Tag (`#EXT-X-MAP`,
-/// `#EXT-X-MEDIA`, `#EXT-X-PART`, `#EXT-X-PRELOAD-HINT`) ist relativ, ohne `..`, ohne Schema.
-/// Der Spieler löst sie gegen die Proxy-Adresse auf; alles andere ginge am Proxy vorbei.
-pub fn check_playlist(bytes: &[u8]) -> Result<(), VideoFehler> {
+/// Schreibt die `URI=`-Werte einer Tag-Zeile um (`#EXT-X-MAP`, `#EXT-X-MEDIA`, `#EXT-X-PART`,
+/// `#EXT-X-PRELOAD-HINT`, `#EXT-X-KEY` …), in Anführungszeichen oder ohne.
+fn rewrite_tag(
+    zeile: &str,
+    playlist_url: &reqwest::Url,
+    lan_erlaubt: bool,
+    http_im_lan: bool,
+) -> Result<String, VideoFehler> {
+    let mut aus = String::with_capacity(zeile.len());
+    let mut rest = zeile;
+    while let Some(i) = rest.find("URI=") {
+        aus.push_str(&rest[..i + 4]);
+        rest = &rest[i + 4..];
+        let (wert, nach, quote) = match rest.strip_prefix('"') {
+            Some(r) => {
+                let ende = r.find('"').ok_or(VideoFehler::Upstream)?;
+                (&r[..ende], &r[ende + 1..], true)
+            }
+            None => {
+                let ende = rest.find(',').unwrap_or(rest.len());
+                (&rest[..ende], &rest[ende..], false)
+            }
+        };
+        let name = rewrite_uri(wert, playlist_url, lan_erlaubt, http_im_lan)?;
+        if quote {
+            aus.push('"');
+            aus.push_str(&name);
+            aus.push('"');
+        } else {
+            aus.push_str(&name);
+        }
+        rest = nach;
+    }
+    aus.push_str(rest);
+    Ok(aus)
+}
+
+/// Prüft eine Playlist und schreibt jede URI-Zeile und jedes `URI=` auf den bloßen Dateinamen um
+/// ([`rewrite_uri`]): der Spieler löst sie gegen die Proxy-Adresse auf, nichts geht am Proxy
+/// vorbei. Eine einzige URI, die nicht passt, macht die ganze Playlist ungültig. Gilt für jede
+/// Drohnenart; `playlist_url` ist die Adresse, unter der die Playlist abgerufen wurde.
+pub fn rewrite_playlist(
+    bytes: &[u8],
+    playlist_url: &reqwest::Url,
+    lan_erlaubt: bool,
+    http_im_lan: bool,
+) -> Result<Bytes, VideoFehler> {
     let text = std::str::from_utf8(bytes).map_err(|_| VideoFehler::Upstream)?;
+    let mut aus = String::with_capacity(text.len());
     for zeile in text.lines() {
         let zeile = zeile.trim();
         if zeile.is_empty() {
-            continue;
+            // Leerzeilen bleiben.
+        } else if !zeile.starts_with('#') {
+            aus.push_str(&rewrite_uri(zeile, playlist_url, lan_erlaubt, http_im_lan)?);
+        } else {
+            aus.push_str(&rewrite_tag(zeile, playlist_url, lan_erlaubt, http_im_lan)?);
         }
-        if !zeile.starts_with('#') {
-            check_uri(zeile)?;
-            continue;
-        }
-        let mut rest = zeile;
-        while let Some(i) = rest.find("URI=") {
-            rest = &rest[i + 4..];
-            let wert = match rest.strip_prefix('"') {
-                Some(r) => r.split('"').next().unwrap_or(""),
-                None => rest.split(',').next().unwrap_or(""),
-            };
-            check_uri(wert)?;
-        }
+        aus.push('\n');
     }
-    Ok(())
+    Ok(Bytes::from(aus))
 }
 
 type Geteilt =
@@ -373,6 +428,21 @@ mod tests {
         assert_eq!(zaehler.load(Ordering::SeqCst), 4, "a wurde verdrängt");
     }
 
+    const SUCHLAGE: &str = "https://s.example/api/lagemonitor/v1/video/SN/hls/index.m3u8";
+    const MEDIAMTX: &str = "http://10.0.0.5:8888/drohne/index.m3u8";
+
+    fn suchlage(p: &str) -> Result<String, VideoFehler> {
+        let basis = reqwest::Url::parse(SUCHLAGE).unwrap();
+        rewrite_playlist(p.as_bytes(), &basis, false, false)
+            .map(|b| String::from_utf8(b.to_vec()).unwrap())
+    }
+
+    fn mediamtx(basis: &str, p: &str) -> Result<String, VideoFehler> {
+        let basis = reqwest::Url::parse(basis).unwrap();
+        rewrite_playlist(p.as_bytes(), &basis, true, true)
+            .map(|b| String::from_utf8(b.to_vec()).unwrap())
+    }
+
     #[test]
     fn playlist_mit_absoluter_uri_wird_abgelehnt() {
         for p in [
@@ -382,7 +452,7 @@ mod tests {
             "#EXTM3U\n#EXT-X-MAP:URI=\"https://fremd.example/init.mp4\"\n",
             "#EXTM3U\n#EXT-X-MEDIA:TYPE=AUDIO,URI=\"data:text/plain,x\"\n",
         ] {
-            assert!(check_playlist(p.as_bytes()).is_err(), "{p}");
+            assert!(suchlage(p).is_err(), "{p}");
         }
     }
 
@@ -393,14 +463,58 @@ mod tests {
             "#EXTM3U\nstream/../../seg.mp4\n",
             "#EXTM3U\n#EXT-X-MAP:URI=\"../init.mp4\"\n",
         ] {
-            assert!(check_playlist(p.as_bytes()).is_err(), "{p}");
+            assert!(suchlage(p).is_err(), "{p}");
         }
     }
 
     #[test]
-    fn playlist_mit_relativen_uris_wird_angenommen() {
+    fn playlist_mit_relativen_uris_bleibt_gleich() {
         let p = "#EXTM3U\n#EXT-X-VERSION:9\n#EXT-X-MAP:URI=\"init.mp4\"\n#EXTINF:1.0,\nseg1.mp4\n#EXT-X-STREAM-INF:BANDWIDTH=1\nvideo.m3u8\n";
-        assert!(check_playlist(p.as_bytes()).is_ok());
+        assert_eq!(suchlage(p).unwrap(), p);
+    }
+
+    #[test]
+    fn mediamtx_multivariant() {
+        let p =
+            "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1,CODECS=\"avc1.64001f\"\nvideo1_stream.m3u8\n";
+        let aus = mediamtx(MEDIAMTX, p).unwrap();
+        assert!(aus.lines().any(|z| z == "video1_stream.m3u8"), "{aus}");
+    }
+
+    #[test]
+    fn absolute_uri_im_selben_verzeichnis_wird_dateiname() {
+        let p = "#EXTM3U\n#EXT-X-MAP:URI=\"http://10.0.0.5:8888/drohne/init.mp4\"\n#EXTINF:1.0,\nhttp://10.0.0.5:8888/drohne/seg1.mp4\n";
+        let aus = mediamtx(MEDIAMTX, p).unwrap();
+        assert!(aus.contains("#EXT-X-MAP:URI=\"init.mp4\""), "{aus}");
+        assert!(aus.lines().any(|z| z == "seg1.mp4"), "{aus}");
+        assert!(!aus.contains("10.0.0.5"), "{aus}");
+    }
+
+    #[test]
+    fn query_faellt_weg() {
+        let aus = mediamtx(
+            "http://10.0.0.5:8888/drohne/index.m3u8?token=x",
+            "#EXTM3U\n#EXTINF:1.0,\nseg1.mp4?x=1\n",
+        )
+        .unwrap();
+        assert!(aus.lines().any(|z| z == "seg1.mp4"), "{aus}");
+        assert!(!aus.contains('?'), "{aus}");
+    }
+
+    #[test]
+    fn mediamtx_abgelehnt() {
+        for p in [
+            "#EXTM3U\nhttp://10.0.0.6:8888/drohne/seg.mp4\n",
+            "#EXTM3U\nhttp://10.0.0.5:9999/drohne/seg.mp4\n",
+            "#EXTM3U\nhttps://10.0.0.5:8888/drohne/seg.mp4\n",
+            "#EXTM3U\nsub/seg.mp4\n",
+            "#EXTM3U\n../seg.mp4\n",
+            "#EXTM3U\nseg.exe\n",
+            "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n",
+            "#EXTM3U\n#EXT-X-MAP:URI=\"data:text/plain,x\"\n",
+        ] {
+            assert_eq!(mediamtx(MEDIAMTX, p), Err(VideoFehler::Upstream), "{p}");
+        }
     }
 
     #[test]

@@ -16,7 +16,7 @@ use crate::adapter::repo as adapter_repo;
 use crate::app::AppState;
 use crate::drohne::is_drohnen_art;
 use crate::drohne::repo::{self, Zuschaltung};
-use crate::drohne::video::{buendel, check_playlist, content_type_for, ttl_for, VideoFehler};
+use crate::drohne::video::{buendel, content_type_for, rewrite_playlist, ttl_for, VideoFehler};
 use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::einsatz::modul::Lagekarte;
@@ -364,7 +364,8 @@ async fn hls_abrufen(
     };
     let bytes = kontext.read_bytes(antwort, deckel).await.map_err(fehl)?;
     if is_playlist {
-        check_playlist(&bytes)?;
+        let playlist_url = reqwest::Url::parse(&url).map_err(|_| VideoFehler::Upstream)?;
+        return rewrite_playlist(&bytes, &playlist_url, kontext.lan_erlaubt(), false);
     }
     Ok(bytes)
 }
