@@ -1801,3 +1801,38 @@ describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
     erwarteBrowsermenue(namensteil());
   });
 });
+
+describe('Sidebar · Copernicus-Satellitenbilder (LLH-2021)', () => {
+  beforeEach(paneeleOffen);
+  const copernicus = { archiv: false, onArchiv: vi.fn(), aktivierungen: [] };
+  const copernicusBilder = { liste: [], deckkraft: 80, onDeckkraft: vi.fn() };
+  const mit = (sichtbar: Partial<SidebarProps['fachebenenSichtbar']>) =>
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, ...sichtbar }}
+        fachebenenStatus={{ copernicus: 'ok', copernicus_bilder: 'ok' }}
+        copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
+      />,
+    );
+
+  it('zeigt Deckkraft-Regler und genau einen Archiv-Schalter, wenn beide Ebenen an sind', () => {
+    mit({ copernicus: true, copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(within(bilderZeile).getByRole('slider', { name: /Deckkraft/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /Ältere Aktivierungen/ })).toHaveLength(1);
+  });
+
+  it('trägt den Archiv-Schalter an der Bilderzeile, wenn nur sie an ist', () => {
+    mit({ copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(
+      within(bilderZeile).getByRole('checkbox', { name: /Ältere Aktivierungen/ }),
+    ).toBeInTheDocument();
+  });
+});

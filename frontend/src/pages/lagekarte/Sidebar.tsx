@@ -290,6 +290,11 @@ export interface SidebarProps {
   >;
   /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
   copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
+  /** Copernicus-Satellitenbilder (LLH-2021): Bildliste und Deckkraft (`useFachebenen`). */
+  copernicusBilder?: Pick<
+    import('./CopernicusBilderZusatz').CopernicusBilderZusatzProps,
+    'liste' | 'deckkraft' | 'onDeckkraft'
+  >;
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
