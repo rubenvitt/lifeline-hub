@@ -124,7 +124,7 @@ impl Uebernahme for SuchlageUebernahme {
 
 impl AdapterArt for SuchlageArt {
     fn code(&self) -> &'static str {
-        "suchlage"
+        super::ART
     }
     fn bezeichnung(&self) -> &'static str {
         "Suchlage (Drohne)"

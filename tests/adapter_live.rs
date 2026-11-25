@@ -72,7 +72,15 @@ impl Umgebung {
         &self,
         rahmen: &Rahmen,
     ) -> Result<lifeline_hub::adapter::live::LiveKontext, LiveVerweigert> {
-        live_kontext(&self.pool, rahmen, &rahmen.arten, self.org_id, &self.id).await
+        live_kontext(
+            &self.pool,
+            rahmen,
+            &rahmen.arten,
+            self.org_id,
+            &self.id,
+            "test",
+        )
+        .await
     }
 
     async fn sql(&self, sql: &str) {
@@ -118,6 +126,7 @@ async fn unbekannt_ist_unbekannt() {
         &u.rahmen.arten,
         u.org_id,
         "gibt-es-nicht",
+        "test",
     )
     .await;
     assert_eq!(r.err(), Some(LiveVerweigert::Unbekannt));
@@ -126,10 +135,35 @@ async fn unbekannt_ist_unbekannt() {
 }
 
 #[tokio::test]
+async fn adapter_einer_anderen_art_als_erwartet_ist_unbekannt() {
+    let u = umgebung(true).await;
+    // Die Drohnenrouten erwarten `suchlage`; ein Adapter der Test-Art bekommt dort keinen Kontext.
+    let r = live_kontext(
+        &u.pool,
+        &u.rahmen,
+        &u.rahmen.arten,
+        u.org_id,
+        &u.id,
+        "suchlage",
+    )
+    .await;
+    assert_eq!(r.err(), Some(LiveVerweigert::Unbekannt));
+    assert!(u.kontext().await.is_ok());
+}
+
+#[tokio::test]
 async fn fremde_org_ist_unbekannt() {
     let u = umgebung(true).await;
     // Ein Adapter einer anderen Org ist von einem nicht vorhandenen nicht zu unterscheiden.
-    let r = live_kontext(&u.pool, &u.rahmen, &u.rahmen.arten, u.org_id + 1000, &u.id).await;
+    let r = live_kontext(
+        &u.pool,
+        &u.rahmen,
+        &u.rahmen.arten,
+        u.org_id + 1000,
+        &u.id,
+        "test",
+    )
+    .await;
     assert_eq!(r.err(), Some(LiveVerweigert::Unbekannt));
     // Die eigene Org bekommt ihn weiterhin.
     assert!(u.kontext().await.is_ok());

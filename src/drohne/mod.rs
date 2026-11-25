@@ -13,10 +13,14 @@ pub mod video;
 
 pub use store::Store;
 
+/// Code der einzigen Adapterart mit Drohnenvertrag; die Live-Abrufe der Drohnenrouten verlangen
+/// sie (`adapter::live::live_kontext`).
+pub const ART: &str = "suchlage";
+
 /// Ob eine Adapterart einen Drohnenvertrag hat, also Drohnenbild liefert und je Einsatz
 /// zuschaltbar ist.
 pub fn is_drohnen_art(code: &str) -> bool {
-    code == "suchlage"
+    code == ART
 }
 
 /// Ob `s` ein sicheres einzelnes Pfadsegment ist: `[A-Za-z0-9._-]+`, aber nicht `.` oder `..`.

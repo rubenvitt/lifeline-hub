@@ -297,6 +297,7 @@ async fn hls_abrufen(
         &state.adapter.arten,
         org_id,
         &adapter_id,
+        crate::drohne::ART,
     )
     .await
     .map_err(|v| match v {
@@ -422,6 +423,7 @@ async fn foto_abrufen(
         &state.adapter.arten,
         org_id,
         &adapter_id,
+        crate::drohne::ART,
     )
     .await
     .map_err(|v| match v {

@@ -5,9 +5,10 @@
 //! [`live_kontext`] liest die Zeile und entschlüsselt die Geheimnisse für genau einen Abruf; der
 //! [`LiveKontext`] lebt nur so lange, nichts davon wird zwischengespeichert. Er geht über denselben
 //! Weg wie der Lauf: [`AbrufKontext`] mit Zielschutz, Client ohne Weiterleitung und gedeckelten
-//! Antworten. Verweigert wird bei unbekanntem Adapter oder unbekannter Art, bei einem
-//! angehaltenen Adapter, bei einem, der einen Menschen braucht, bei gesperrtem Geheimnisspeicher
-//! und bei einer Org, die sich bei einem Hub meldet (G5).
+//! Antworten. Verweigert wird bei unbekanntem Adapter, bei unbekannter oder nicht erwarteter Art
+//! (die Route nennt die Art, deren Abruf sie baut), bei einem angehaltenen Adapter, bei einem,
+//! der einen Menschen braucht, bei gesperrtem Geheimnisspeicher und bei einer Org, die sich bei
+//! einem Hub meldet (G5).
 
 use std::collections::HashMap;
 
@@ -107,15 +108,16 @@ impl LiveKontext {
     }
 }
 
-/// Bereitet einen Live-Abruf für den Adapter `adapter_id` der Org `org_id` (der Anfrage) vor. Ein
-/// Adapter einer anderen Org ist [`LiveVerweigert::Unbekannt`], nicht von einem fehlenden zu
-/// unterscheiden.
+/// Bereitet einen Live-Abruf für den Adapter `adapter_id` der Org `org_id` (der Anfrage) vor; die
+/// Route nennt die Art, deren Abruf sie baut (`art`). Ein Adapter einer anderen Org oder einer
+/// anderen Art ist [`LiveVerweigert::Unbekannt`], nicht von einem fehlenden zu unterscheiden.
 pub async fn live_kontext(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     verzeichnis: &Verzeichnis,
     org_id: i64,
     adapter_id: &str,
+    art: &str,
 ) -> Result<LiveKontext, LiveVerweigert> {
     let intern = |e: &dyn std::fmt::Display| {
         tracing::error!("Live-Abruf nicht vorbereitet: {e}");
@@ -127,6 +129,7 @@ pub async fn live_kontext(
             .await
             .map_err(|e| intern(&e))?
     }
+    .filter(|a| a.art == art)
     .ok_or(LiveVerweigert::Unbekannt)?;
     let art = verzeichnis.find(&a.art).ok_or(LiveVerweigert::Unbekannt)?;
     if lauf::is_org_am_hub(pool, a.org_id)

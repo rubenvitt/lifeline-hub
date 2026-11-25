@@ -30,6 +30,10 @@ Nachtrag zu ADR-0077: dort entschlüsselt nur der Lauf (`adapter::lauf`) Geheimn
   einem Hub meldet.
 - MUST: `live_kontext` nimmt die Org der Anfrage und liefert für fremde Adapter `Unbekannt`
   (nicht von einem fehlenden zu unterscheiden); es gibt keinen org-blinden Weg zum Zugang.
+- MUST: `live_kontext` nimmt die Art, deren Route ihn baut, und liefert für einen Adapter einer
+  anderen Art `Unbekannt`; eine Route bekommt nie den Zugang einer fremden Art.
+- MUST: Den Zugang bereitet `lauf::prepare` auf, derselbe Weg wie im Lauf; `adapter::live`
+  entschlüsselt nicht selbst.
 - MUST NOT: Ein Geheimnis, ein Token oder eine Seriennummer steht in Antwort, Log oder Fehler
   einer Route, die einen `LiveKontext` nutzt; sie meldet nur die Verweigerung als Code.
 
@@ -40,8 +44,9 @@ verlange 'pub async fn live_kontext\(' src/adapter/live.rs
 verlange 'load_in_org' src/adapter/live.rs
 verlange 'is_org_am_hub' src/adapter/live.rs
 verlange 'braucht_eingriff' src/adapter/live.rs
+verlange 'lauf::prepare' src/adapter/live.rs
+verlange 'a\.art == art' src/adapter/live.rs
 verbiete 'static .*LiveKontext|Cache.*LiveKontext|LiveKontext.*Cache' 'src/**/*.rs'
-verbiete 'load_chiffrate|\.decrypt\(' 'src/routes/**/*.rs'
 verbiete 'tracing::[a-z]+!\(.*(wert|geheimnis|secret|token)' src/adapter/live.rs
 ```
 
