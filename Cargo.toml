@@ -179,6 +179,7 @@ lifeline-machine-client = { path = "crates/lifeline-machine-client", features = 
 p256 = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 hmac = "0.13"
 hkdf = "0.13"
+printpdf = { version = "0.12", default-features = false, features = ["png"] }
 
 [dev-dependencies]
 # "danger-credential-internals" schaltet `From<Credential> for Passkey` frei, damit Tests aus

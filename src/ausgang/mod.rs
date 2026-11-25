@@ -5,6 +5,7 @@
 
 pub mod lauf;
 pub mod nachricht;
+pub mod pdf;
 pub mod repo;
 pub mod zustand;
 pub mod zusteller;
