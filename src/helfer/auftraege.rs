@@ -5,8 +5,8 @@
 //! Eigene Zeile: `einheit` an die Ziel-Einheit, `fahrzeug` an das Ziel-Fahrzeug, `person` an die
 //! von der Leitung zugeordnete Person. Abschnitt, Funktion und extern gehören nie einem Helfer.
 
-use crate::kommunikation::Prioritaet;
 use crate::error::AppError;
+use crate::kommunikation::Prioritaet;
 use serde::Serialize;
 use sqlx::SqlitePool;
 use utoipa::ToSchema;
@@ -19,7 +19,8 @@ pub const PAGER_EMPFAENGER: &str = "gk.ansicht = 'helfer' AND gk.helfer_zustand 
      AND e.status = 'aktiv' AND e.geloescht_at IS NULL";
 
 /// Die Empfängerzeile `ae` gehört der Helfer-Kopplung `gk` (Aliase `ae`, `gk`).
-pub const EIGENE_ZEILE: &str = "((ae.empfaenger_typ = 'einheit' AND ae.einheit_id = gk.einheit_id) \
+pub const EIGENE_ZEILE: &str =
+    "((ae.empfaenger_typ = 'einheit' AND ae.einheit_id = gk.einheit_id) \
      OR (ae.empfaenger_typ = 'fahrzeug' AND ae.fahrzeug_id = gk.fahrzeug_id) \
      OR (ae.empfaenger_typ = 'person' AND gk.person_id IS NOT NULL \
          AND ae.person_id = gk.person_id))";
@@ -171,9 +172,11 @@ pub async fn load_own(
     kopplung_id: i64,
     auftrag_id: i64,
 ) -> Result<Option<HelperTask>, AppError> {
-    Ok(gruppieren(eigene_zeilen(pool, kopplung_id, Some(auftrag_id)).await?)
-        .into_iter()
-        .next())
+    Ok(
+        gruppieren(eigene_zeilen(pool, kopplung_id, Some(auftrag_id)).await?)
+            .into_iter()
+            .next(),
+    )
 }
 
 /// Ob `empfaenger_id` eine eigene Zeile des Auftrags `auftrag_id` ist (auch aufgehoben).

@@ -336,7 +336,11 @@ async fn quittung_aus_der_app_schreibt_die_empfaengerzeile() {
     let a = quittieren(&l, &cookie, auftrag, empf).await;
     assert_eq!(a.status, StatusCode::OK, "{}", a.body);
     assert_eq!(a.body["text"], "Zelt 3");
-    assert!(a.body["recipients"][0]["acknowledged_at"].is_string(), "{}", a.body);
+    assert!(
+        a.body["recipients"][0]["acknowledged_at"].is_string(),
+        "{}",
+        a.body
+    );
     assert_eq!(a.body["recipients"][0]["acknowledged_by"], "Max M.");
     let (von, konto): (Option<i64>, i64) = sqlx::query_as(
         "SELECT ae.quittiert_von_id, gk.benutzer_id FROM auftrag_empfaenger ae, geraet_kopplung gk \
@@ -348,12 +352,11 @@ async fn quittung_aus_der_app_schreibt_die_empfaengerzeile() {
     .await
     .unwrap();
     assert_eq!(von, Some(konto));
-    let quittiert: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM benachrichtigung WHERE art = 'auftrag_quittiert'",
-    )
-    .fetch_one(&l.pool)
-    .await
-    .unwrap();
+    let quittiert: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM benachrichtigung WHERE art = 'auftrag_quittiert'")
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
     assert_eq!(quittiert, 1, "der Ersteller erfährt die Quittung");
 }
 
@@ -456,7 +459,14 @@ async fn push_anmeldung_ersetzt_die_vorige() {
     assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
     push_anmelden(&l, &cookie, "cd34").await;
     assert_eq!(push_token(&l.pool, gid).await.as_deref(), Some("cd34"));
-    let (a, _) = geraet(&l.app, "DELETE", "/api/devices/me/push", Some(&cookie), None).await;
+    let (a, _) = geraet(
+        &l.app,
+        "DELETE",
+        "/api/devices/me/push",
+        Some(&cookie),
+        None,
+    )
+    .await;
     assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
     assert_eq!(push_token(&l.pool, gid).await, None);
 }
@@ -467,11 +477,25 @@ async fn push_anmeldung_mit_kurzem_schluessel_ist_400() {
     let (_, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
     let mut body = push_body("ab12");
     body["key"] = json!("AQEB");
-    let (a, _) = geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    let (a, _) = geraet(
+        &l.app,
+        "PUT",
+        "/api/devices/me/push",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
     assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
     let mut body = push_body("ab12");
     body["environment"] = json!("test");
-    let (a, _) = geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    let (a, _) = geraet(
+        &l.app,
+        "PUT",
+        "/api/devices/me/push",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
     assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
 }
 
@@ -492,7 +516,11 @@ async fn leitung_post(l: &Lage, pfad: &str) {
 async fn push_anmeldung_endet_mit_dem_widerruf() {
     let l = lage().await;
     let (gid, _) = helfer_mit_push(&l, "Max M.").await;
-    leitung_post(&l, &format!("/api/incidents/{}/helpers/{gid}/revoke", l.einsatz)).await;
+    leitung_post(
+        &l,
+        &format!("/api/incidents/{}/helpers/{gid}/revoke", l.einsatz),
+    )
+    .await;
     assert_eq!(push_token(&l.pool, gid).await, None);
 }
 
@@ -501,7 +529,11 @@ async fn push_anmeldung_endet_mit_der_ablehnung() {
     let l = lage().await;
     let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
     push_anmelden(&l, &cookie, "ab12").await;
-    leitung_post(&l, &format!("/api/incidents/{}/helpers/{gid}/reject", l.einsatz)).await;
+    leitung_post(
+        &l,
+        &format!("/api/incidents/{}/helpers/{gid}/reject", l.einsatz),
+    )
+    .await;
     assert_eq!(push_token(&l.pool, gid).await, None);
 }
 
@@ -542,11 +574,13 @@ async fn push_anmeldung_endet_mit_dem_einsatz() {
 async fn push_anmeldung_endet_mit_dem_ablauf() {
     let l = lage().await;
     let (gid, _) = helfer_mit_push(&l, "Max M.").await;
-    sqlx::query("UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?")
-        .bind(gid)
-        .execute(&l.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?",
+    )
+    .bind(gid)
+    .execute(&l.pool)
+    .await
+    .unwrap();
     lifeline_hub::geraet::ablauf::raeume_helfer(&l.pool, &l.live)
         .await
         .unwrap();
@@ -572,7 +606,14 @@ async fn pager(l: &Lage, kind: &str, id: i64, name: &str, n: u8) -> (i64, String
     let (gid, cookie) = helfer(l, kind, id, name).await;
     let mut body = push_body(&format!("{n:02x}").repeat(32));
     body["key"] = json!(lifeline_hub::web_push::krypto::b64(&[n; 32]));
-    let (a, _) = geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    let (a, _) = geraet(
+        &l.app,
+        "PUT",
+        "/api/devices/me/push",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
     assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
     (gid, cookie)
 }
@@ -593,11 +634,13 @@ fn token(n: u8) -> String {
 }
 
 async fn gesendet(pool: &sqlx::SqlitePool, auftrag: i64) -> Vec<Option<i64>> {
-    sqlx::query_scalar("SELECT helfer_gesendet FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id")
-        .bind(auftrag)
-        .fetch_all(pool)
-        .await
-        .unwrap()
+    sqlx::query_scalar(
+        "SELECT helfer_gesendet FROM auftrag_empfaenger WHERE auftrag_id = ? ORDER BY id",
+    )
+    .bind(auftrag)
+    .fetch_all(pool)
+    .await
+    .unwrap()
 }
 
 #[tokio::test]
@@ -609,7 +652,14 @@ async fn auftrag_an_einheit_geht_an_alle_bestaetigten_helfer() {
     let (_, cookie) = anmelden(&l, "unit", l.einheit, "Neu").await;
     let mut body = push_body(&token(3));
     body["key"] = json!(lifeline_hub::web_push::krypto::b64(&[3; 32]));
-    geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    geraet(
+        &l.app,
+        "PUT",
+        "/api/devices/me/push",
+        Some(&cookie),
+        Some(body),
+    )
+    .await;
 
     let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
     let n = relais.naechste().await;
@@ -698,7 +748,11 @@ async fn widerrufener_helfer_bekommt_nichts() {
     let (l, mut relais) = lage_mit_relais().await;
     let (gid, _) = pager(&l, "unit", l.einheit, "Max M.", 1).await;
     pager(&l, "unit", l.einheit, "Lisa K.", 2).await;
-    leitung_post(&l, &format!("/api/incidents/{}/helpers/{gid}/revoke", l.einsatz)).await;
+    leitung_post(
+        &l,
+        &format!("/api/incidents/{}/helpers/{gid}/revoke", l.einsatz),
+    )
+    .await;
     let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
     assert_eq!(tokens(&relais.naechste().await), vec![token(2)]);
     assert_eq!(gesendet(&l.pool, auftrag).await, vec![Some(1)]);
@@ -737,13 +791,20 @@ async fn berichtigung_stellt_nur_neu_betroffenen_zu() {
 async fn nutzlast_ist_entschluesselbar() {
     let (l, mut relais) = lage_mit_relais().await;
     pager(&l, "unit", l.einheit, "Max M.", 1).await;
-    let (auftrag, _) = erteilen(&l, "Verletzte Person, Zelt 3", json!([an_einheit(l.einheit)])).await;
+    let (auftrag, _) = erteilen(
+        &l,
+        "Verletzte Person, Zelt 3",
+        json!([an_einheit(l.einheit)]),
+    )
+    .await;
     let n = relais.naechste().await;
     let umschlag = n["nachrichten"][0]["nutzlast"].as_str().unwrap();
-    let (kennung, nonce, chiffrat) = lifeline_hub::ios_push::krypto::umschlag_lesen(umschlag).unwrap();
+    let (kennung, nonce, chiffrat) =
+        lifeline_hub::ios_push::krypto::umschlag_lesen(umschlag).unwrap();
     assert_eq!(kennung, "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90");
-    let klar = lifeline_hub::ios_push::krypto::entschluesseln(&[1; 32], &kennung, &nonce, &chiffrat)
-        .unwrap();
+    let klar =
+        lifeline_hub::ios_push::krypto::entschluesseln(&[1; 32], &kennung, &nonce, &chiffrat)
+            .unwrap();
     let k: Value = serde_json::from_slice(&klar).unwrap();
     assert_eq!(k["art"], "auftrag", "{k}");
     assert_eq!(k["t"], auftrag, "{k}");
@@ -774,8 +835,12 @@ async fn live_ereignis_nur_im_strom_der_betroffenen_kopplung() {
     let l = lage().await;
     let (_, h1) = helfer(&l, "unit", l.einheit, "Max M.").await;
     let (_, h3) = helfer(&l, "unit", l.einheit_f, "Lisa K.").await;
-    let mut strom_h1 = common::live_oeffnen(&l.app, &h1, l.einsatz).await.into_body();
-    let mut strom_h3 = common::live_oeffnen(&l.app, &h3, l.einsatz).await.into_body();
+    let mut strom_h1 = common::live_oeffnen(&l.app, &h1, l.einsatz)
+        .await
+        .into_body();
+    let mut strom_h3 = common::live_oeffnen(&l.app, &h3, l.einsatz)
+        .await
+        .into_body();
     let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
     let d = std::time::Duration::from_millis(800);
     let text_h1 = common::sse_lesen_fuer(&mut strom_h1, d).await;
@@ -796,7 +861,9 @@ async fn quittung_meldet_den_anderen_helfern_live() {
     let (_, h1) = helfer(&l, "unit", l.einheit, "Max M.").await;
     let (_, h2) = helfer(&l, "unit", l.einheit, "Lisa K.").await;
     let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
-    let mut strom_h2 = common::live_oeffnen(&l.app, &h2, l.einsatz).await.into_body();
+    let mut strom_h2 = common::live_oeffnen(&l.app, &h2, l.einsatz)
+        .await
+        .into_body();
     let d = std::time::Duration::from_millis(300);
     common::sse_lesen_fuer(&mut strom_h2, d).await;
     let empf = zeile(&l.pool, auftrag).await;
@@ -814,7 +881,10 @@ async fn auftragsdetail_zeigt_helfer_gesendet_und_quittierenden_helfer() {
     helfer(&l, "unit", l.einheit, "Lisa K.").await;
     let (auftrag, v) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
     // Die Antwort des Erteilens entsteht vor der Zustellung; das Detail zählt.
-    assert!(v["empfaenger"][0].get("quittiert_von_helfer").is_none(), "{v}");
+    assert!(
+        v["empfaenger"][0].get("quittiert_von_helfer").is_none(),
+        "{v}"
+    );
     let empf = zeile(&l.pool, auftrag).await;
     quittieren(&l, &h1, auftrag, empf).await;
     let (s, d) = anfrage_json(

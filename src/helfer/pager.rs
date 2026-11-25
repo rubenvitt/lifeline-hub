@@ -124,7 +124,8 @@ async fn zaehle_neue_zeilen(
             *je_zeile.entry(*e).or_default() += 1;
         }
     }
-    let zaehlung = serde_json::to_string(&je_zeile).map_err(|e| AppError::Internal(e.to_string()))?;
+    let zaehlung =
+        serde_json::to_string(&je_zeile).map_err(|e| AppError::Internal(e.to_string()))?;
     // Nur Zeilen der Typen, die ein Helfer empfangen kann; ohne Treffer 0.
     sqlx::query(
         "UPDATE auftrag_empfaenger \
@@ -143,10 +144,9 @@ async fn zaehle_neue_zeilen(
 async fn deliver_inner(state: &AppState, einsatz_id: i64, auftrag_id: i64) -> Result<(), AppError> {
     let ziele = resolve(&state.pool, einsatz_id, auftrag_id).await?;
     zaehle_neue_zeilen(&state.pool, auftrag_id, &ziele).await?;
-    state.live.melde_helfer_auftrag(
-        ziele.iter().map(|z| z.kopplung_id).collect(),
-        auftrag_id,
-    );
+    state
+        .live
+        .melde_helfer_auftrag(ziele.iter().map(|z| z.kopplung_id).collect(), auftrag_id);
     let neu: Vec<&PagerZiel> = ziele.iter().filter(|z| z.is_new).collect();
     let Some(ios) = state.live.ios_push() else {
         return Ok(());

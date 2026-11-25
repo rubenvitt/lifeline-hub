@@ -211,10 +211,7 @@ impl ApnsClient {
                 "authorization",
                 format!("bearer {}", self.anbieter_token(jetzt)),
             )
-            .header(
-                "apns-topic",
-                n.thema.as_deref().unwrap_or(&self.bundle_id),
-            )
+            .header("apns-topic", n.thema.as_deref().unwrap_or(&self.bundle_id))
             .header("apns-push-type", "alert")
             .header("apns-priority", "10")
             .header("apns-expiration", (jetzt + ABLAUF_SEKUNDEN).to_string())

@@ -425,7 +425,10 @@ pub async fn ziel_aendern(
 pub const GRUND_NICHT_BESTAETIGT: &str = "not_confirmed";
 
 /// 403 `not_confirmed`, wenn die Kopplung nicht bestätigt ist.
-async fn fordere_bestaetigt(state: &AppState, g: &GeraetKontext) -> Result<Option<Response>, AppError> {
+async fn fordere_bestaetigt(
+    state: &AppState,
+    g: &GeraetKontext,
+) -> Result<Option<Response>, AppError> {
     if helfer::auftraege::is_confirmed(&state.pool, g.kopplung_id).await? {
         return Ok(None);
     }
@@ -460,8 +463,7 @@ pub async fn auftrag_quittieren(
     if let Some(abweisung) = fordere_bestaetigt(&state, &g).await? {
         return Ok(abweisung);
     }
-    if !helfer::auftraege::is_own_row(&state.pool, g.kopplung_id, auftrag_id, empfaenger_id)
-        .await?
+    if !helfer::auftraege::is_own_row(&state.pool, g.kopplung_id, auftrag_id, empfaenger_id).await?
     {
         return Err(AppError::NotFound);
     }

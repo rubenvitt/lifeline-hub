@@ -97,3 +97,84 @@ impl IosPush {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+
+    fn faelle() -> Value {
+        let pfad = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src-tauri/faelle/helfer-auftrag.json"
+        );
+        serde_json::from_str(&std::fs::read_to_string(pfad).unwrap()).unwrap()
+    }
+
+    fn bytes(v: &Value) -> Vec<u8> {
+        krypto::b64_lesen(v.as_str().unwrap()).unwrap()
+    }
+
+    #[test]
+    fn pager_nutzlast_passt_zum_testvektor() {
+        for f in faelle()["nutzlast"].as_array().unwrap() {
+            let schluessel: [u8; 32] = bytes(&f["schluessel"]).try_into().unwrap();
+            let nonce: [u8; 12] = bytes(&f["nonce"]).try_into().unwrap();
+            let kennung = f["kennung"].as_str().unwrap();
+            let klartext = f["klartext"].as_str().unwrap();
+            let chiffrat =
+                krypto::verschluesseln(&schluessel, kennung, klartext.as_bytes(), nonce).unwrap();
+            assert_eq!(
+                krypto::b64(&chiffrat),
+                f["chiffrat"],
+                "{}",
+                f["beschreibung"]
+            );
+            assert_eq!(
+                krypto::umschlag(kennung, &nonce, &chiffrat),
+                f["umschlag"],
+                "{}",
+                f["beschreibung"]
+            );
+        }
+    }
+
+    #[test]
+    fn pager_klartext_hat_die_form_des_testvektors() {
+        let f = &faelle()["nutzlast"][0];
+        let k = PagerKlartext {
+            v: 1,
+            s: "Lifeline".into(),
+            art: "auftrag",
+            e: 42,
+            t: 7,
+            titel: "San-Trupp 2".into(),
+            text: "Verletzte Person, Zelt 3".into(),
+        };
+        assert_eq!(serde_json::to_string(&k).unwrap(), f["klartext"]);
+    }
+
+    #[test]
+    fn umschlag_ist_mit_dem_schluessel_lesbar() {
+        let a = HelferPushAnmeldung {
+            kopplung_id: 1,
+            kennung: "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90".into(),
+            token: "ab".into(),
+            umgebung: super::super::relais::Umgebung::Sandbox,
+            schluessel: [9; 32],
+        };
+        let k = PagerKlartext {
+            v: 1,
+            s: "L".into(),
+            art: "auftrag",
+            e: 1,
+            t: 2,
+            titel: "T".into(),
+            text: "x".repeat(crate::helfer::pager::TEXT_MAX_ZEICHEN),
+        };
+        let u = umschlag_bauen(&a, &k).unwrap();
+        let (kennung, nonce, c) = krypto::umschlag_lesen(&u).unwrap();
+        let klar = krypto::entschluesseln(&[9; 32], &kennung, &nonce, &c).unwrap();
+        assert_eq!(klar, serde_json::to_vec(&k).unwrap());
+    }
+}

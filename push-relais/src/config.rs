@@ -172,7 +172,10 @@ mod tests {
     #[test]
     fn config_liest_weitere_bundle_ids() {
         let cfg = parse(&["--weitere-bundle-ids", "a.b, c.d"]).unwrap();
-        assert_eq!(cfg.weitere_bundle_ids, vec!["a.b".to_string(), "c.d".to_string()]);
+        assert_eq!(
+            cfg.weitere_bundle_ids,
+            vec!["a.b".to_string(), "c.d".to_string()]
+        );
         assert!(parse(&[]).unwrap().weitere_bundle_ids.is_empty());
         assert!(parse(&["--weitere-bundle-ids", "a b"]).is_err());
     }

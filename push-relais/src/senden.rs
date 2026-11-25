@@ -85,10 +85,11 @@ pub async fn senden(
         return StatusCode::BAD_REQUEST.into_response();
     }
     // Ein Thema außerhalb der erlaubten Bundle-IDs (ADR-0104): nichts geht hinaus.
-    if nachrichten
-        .iter()
-        .any(|n| n.thema.as_deref().is_some_and(|t| !state.apns.thema_erlaubt(t)))
-    {
+    if nachrichten.iter().any(|n| {
+        n.thema
+            .as_deref()
+            .is_some_and(|t| !state.apns.thema_erlaubt(t))
+    }) {
         return fehler(StatusCode::UNPROCESSABLE_ENTITY, "thema");
     }
     if !state.minute_zaehlen(server_id, nachrichten.len() as u32) {
