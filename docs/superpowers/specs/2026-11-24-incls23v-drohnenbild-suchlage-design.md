@@ -166,7 +166,7 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/incidents/{id}/drone` und
 `/api/incidents/{id}/map/drone`):
 - `GET  /api/incidents/{id}/drone/sources` – Drohnenquellen der Org mit Zustand (Lesezugriff):
   je Quelle Bezeichnung, zugeschaltet an diesem Einsatz ja/nein, belegt durch einen anderen
-  Einsatz (nur dessen Name, wenn der Nutzer ihn lesen darf, sonst „anderer Einsatz“),
+  Einsatz (dessen Name, wenn der Nutzer ihn lesen darf; sonst nur der Hinweis `held_by_other_hidden`, angezeigt als „einem anderen Einsatz“),
   `lagemonitor`, Adapter-Zustand, Name des laufenden Suchlage-Einsatzes (`mission.name`) und die
   Video-Kennungen.
 - `PUT  /api/incidents/{id}/drone/sources/{aid}` `{ lagemonitor: bool }` – zuschalten oder Flag
