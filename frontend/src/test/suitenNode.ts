@@ -20,7 +20,9 @@ export function checkNodeVersion(actual: string, required: string | undefined): 
 }
 
 export default function setup(): void {
-  const paket = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8')) as {
+  const paket = JSON.parse(
+    readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+  ) as {
     engines?: { node?: string };
   };
   const meldung = checkNodeVersion(process.version, paket.engines?.node);
