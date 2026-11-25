@@ -1,4 +1,5 @@
 import type { GlobalToken } from 'antd';
+import { ortungStand } from './ortungAlter';
 import { rollenFarbe } from '../../theme/statusFarben';
 import type {
   Betreuungsstelle,
@@ -441,6 +442,16 @@ export function buildFreieZeichenMarker(
   });
 }
 
+/**
+ * Marke einer geortenen Fahrzeugposition an der Plakette (LLH-2091): „GPS“, jenseits der Schwelle
+ * „GPS · veraltet“ — das Wort ist der Kanal, nicht die Farbe. Manuell und ohne Quelle: keine Marke.
+ */
+function ortungMarke(f: EinsatzFahrzeug, jetzt: number): string | undefined {
+  const s = ortungStand(f, jetzt);
+  if (s.quelle !== 'gps') return undefined;
+  return s.veraltet ? 'GPS · veraltet' : 'GPS';
+}
+
 export interface TaktischeQuelle {
   einheiten: Einheit[];
   fahrzeuge: EinsatzFahrzeug[];
@@ -452,6 +463,8 @@ export interface TaktischeQuelle {
 export function buildTaktischeMarker(
   q: TaktischeQuelle,
   token: Pick<GlobalToken, 'controlHeight'>,
+  /** Takt in ms (`useMinutenTakt`) für das Alter der GPS-Marke; ohne ihn die Uhr. */
+  jetzt: number = Date.now(),
 ): {
   verortet: KarteMarker[];
   nichtVerortet: NichtVerortet[];
@@ -466,6 +479,7 @@ export function buildTaktischeMarker(
     lon: number | null | undefined,
     tz: TzProps,
     statusFarbe?: string | null,
+    beschriftungZusatz?: string,
   ) => {
     if (lat != null && lon != null) {
       verortet.push({
@@ -479,6 +493,7 @@ export function buildTaktischeMarker(
         tz,
         statusFarbe,
         trefferDurchmesser: token.controlHeight,
+        ...(beschriftungZusatz ? { beschriftungZusatz } : {}),
       });
     } else {
       nichtVerortet.push({ typ, id, label });
@@ -517,6 +532,7 @@ export function buildTaktischeMarker(
         traegerorganisation: f.traegerorganisation,
       }),
       f.status_farbe,
+      ortungMarke(f, jetzt),
     );
   }
   for (const p of q.fuehrungskraefte) {

@@ -30,6 +30,7 @@ import {
 import { MELDEWEG_WORT, rueckmeldungJeEinheit } from '../../meldungen/rueckmeldung';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import type { KarteMarker, MarkerTyp } from './marker';
+import { ortungStand } from './ortungAlter';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
@@ -543,6 +544,8 @@ export function auswahlRaster(
   marker: KarteMarker,
   roh: AuswahlRoh,
   zeit: (utc: string | null | undefined) => string,
+  /** Takt in ms (`useMinutenTakt`) für das Alter der GPS-Position; ohne ihn die Uhr. */
+  jetzt: number = Date.now(),
 ): RasterFeld[] {
   const abschnittName = (id: number | null | undefined) =>
     id == null ? '—' : text(roh.abschnitte.find((a) => a.id === id)?.name);
@@ -597,6 +600,18 @@ export function auswahlRaster(
         { label: 'Disponiert', wert: f.disponiert_at ? zeit(f.disponiert_at) : '—' },
         { label: 'Einheit', wert: text(einheit?.name), mono: false },
       ];
+      const ort = ortungStand(f, jetzt);
+      if (ort.quelle === 'manuell')
+        felder.push({ label: 'Position', wert: 'manuell', mono: false });
+      else if (ort.quelle === 'gps')
+        felder.push({
+          label: 'Position',
+          wert: ['GPS', ort.veraltet ? 'veraltet' : null, ort.alterText]
+            .filter(Boolean)
+            .join(' · '),
+          rolle: ort.veraltet ? 'achtung' : undefined,
+          mono: false,
+        });
       if (f.kennzeichen) felder.push({ label: 'Kennzeichen', wert: f.kennzeichen });
       return felder;
     }

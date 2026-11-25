@@ -1031,3 +1031,35 @@ describe('auswahlRaster — Sammelstelle (LLH-1393)', () => {
     );
   });
 });
+
+describe('auswahlRaster — Fahrzeug, Quelle der Position (LLH-2091)', () => {
+  const JETZT = Date.UTC(2026, 10, 25, 12, 0, 0);
+  const vor = (min: number) => new Date(JETZT - min * 60_000).toISOString();
+  const raster = (f: Partial<EinsatzFahrzeug>) =>
+    auswahlRaster(
+      marker('fahrzeug', 7),
+      { ...ROH, fahrzeuge: [{ ...FAHRZEUG, ...f } as EinsatzFahrzeug] },
+      zeit,
+      JETZT,
+    ).find((x) => x.label === 'Position');
+
+  it('nennt GPS mit Alter', () => {
+    const z = raster({ position_quelle: 'ortung', position_gemessen_at: vor(3) });
+    expect(z?.wert).toBe('GPS · vor 3 min');
+    expect(z?.rolle).toBeUndefined();
+  });
+
+  it('nennt veraltet in Worten und mit Rolle achtung', () => {
+    const z = raster({ position_quelle: 'ortung', position_gemessen_at: vor(14) });
+    expect(z?.wert).toBe('GPS · veraltet · vor 14 min');
+    expect(z?.rolle).toBe('achtung');
+  });
+
+  it('nennt manuell ohne Alter', () => {
+    expect(raster({ position_quelle: 'manuell' })?.wert).toBe('manuell');
+  });
+
+  it('lässt die Zeile ohne Quelle weg', () => {
+    expect(raster({ position_quelle: null })).toBeUndefined();
+  });
+});

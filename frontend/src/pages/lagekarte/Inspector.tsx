@@ -3,6 +3,7 @@ import { Button, Popconfirm, Space } from 'antd';
 import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo, useState } from 'react';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { renderSvg } from '@einsatzzeichen/core';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
@@ -193,7 +194,8 @@ export default function Inspector({
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => markerBildUrl(marker, dunkel), [marker, dunkel]);
-  const raster = auswahlRaster(marker, roh, zeitKurz);
+  const jetzt = useMinutenTakt();
+  const raster = auswahlRaster(marker, roh, zeitKurz, jetzt);
   const letzte = letzteMeldungBlock(marker, roh, zeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);

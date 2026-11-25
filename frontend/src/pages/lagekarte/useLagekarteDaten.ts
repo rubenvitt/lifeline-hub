@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
@@ -114,6 +115,8 @@ export function useLagekarteDaten({
   // keinen `useToken()`-Zugang; diese Ebene reicht den Token des aktiven Modus durch, statt ihn aus
   // `document.documentElement` zu raten.
   const { token } = theme.useToken();
+  // Minutentakt: die GPS-Marke („veraltet“) altert ohne neuen Abruf mit.
+  const jetzt = useMinutenTakt();
   const istSnapshot = quelle.typ === 'snapshot';
   const liveAn = !istSnapshot;
   const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
@@ -480,8 +483,9 @@ export function useLagekarteDaten({
           orgDefault,
         },
         token,
+        jetzt,
       ),
-    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token],
+    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token, jetzt],
   );
 
   const flaechen = useMemo(
