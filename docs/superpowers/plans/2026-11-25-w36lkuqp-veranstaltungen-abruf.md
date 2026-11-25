@@ -28,10 +28,10 @@ sie je Adapter in `veranstaltung_extern`; die IUK-Suite bietet den Vertrag mit A
 
 ## Teil 2 — Lifeline (Repo `lifeline-hub`, PR gegen `alpha`)
 
-- [ ] Migration `veranstaltung_extern` (PK `(adapter_id, extern_id)`, FK auf `adapter` mit Cascade, Index `ende_at`).
-- [ ] `vertrag.rs`: Parser v1 mit Grenzen; Tests (gültig, fehlendes Feld, zu lang, Fassung 2, Ende ≤ Beginn, unbekannte Art → `sonstiges`).
-- [ ] `repo.rs`: Übernahme (neu / unverändert = 0 / geändert / verschwunden → `entfernt`) und Aufräumen (14 Tage nach Ende); Tests.
-- [ ] `art.rs`: Art `veranstaltungen_abruf` (Feld `basis_url`, Platz `schluessel`, 60 s / 300 s, Deckel 512 KiB), registriert in `Verzeichnis::produktiv`; Test gegen lokalen Testserver inkl. 401 → `Abgelehnt`.
-- [ ] Aufräumen in den bestehenden Aufbewahrungslauf hängen; `src/AGENTS.md` Aufbewahrung.
-- [ ] Doku: `docs/schnittstellen/veranstaltungen-abruf.md`, Anwenderkapitel Anbindungen, Architektur Kap. 5/8.
-- [ ] Gates nach `scripts/AGENTS.md`.
+- [x] Migration `veranstaltung_extern` (`0376`, PK `(adapter_id, extern_id)`, FK auf `adapter` mit Cascade, Index `ende_at`).
+- [x] `vertrag.rs`: Parser v1 mit Grenzen; Tests (gültig, fehlendes Feld, zu lang, Fassung 2, Ende ≤ Beginn, unbekannte Art → `sonstiges`).
+- [x] `repo.rs`: Übernahme (neu / unverändert = 0 / geändert / verschwunden → `entfernt`) und Aufräumen (14 Tage nach Ende); Tests.
+- [x] `art.rs`: Art `veranstaltungen_abruf` (Feld `basis_url`, Platz `schluessel`, 60 s / 300 s, Deckel 512 KiB), registriert in `Verzeichnis::produktiv`; Test gegen lokalen Testserver inkl. 401 → `Abgelehnt`.
+- [x] Aufräumen in den bestehenden Aufbewahrungslauf hängen; `src/AGENTS.md` Aufbewahrung.
+- [x] Doku: `docs/schnittstellen/veranstaltungen-abruf.md`, Anwenderkapitel Anbindungen, Architektur Kap. 5/8.
+- [x] Gates nach `scripts/AGENTS.md`.
