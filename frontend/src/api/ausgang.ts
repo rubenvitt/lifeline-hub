@@ -58,6 +58,11 @@ export function fetchVersaende(einsatzId: number, quelle: QuelleFilter): Promise
   );
 }
 
+/** Alle Versände einer Quellart im Einsatz: ein Abruf für ein ganzes Board. */
+export function fetchVersaendeArt(einsatzId: number, kind: QuelleArt): Promise<Versand[]> {
+  return apiGet<Versand[]>(`/api/einsaetze/${einsatzId}/deliveries?source_kind=${kind}`);
+}
+
 export function createVersaende(
   einsatzId: number,
   quelle: QuelleFilter,
@@ -80,11 +85,20 @@ export function retryVersand(einsatzId: number, versandId: string): Promise<Vers
  */
 const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
 
-/** Versände einer Quelle; live über das Ereignis `ausgang`. Nicht in `LAGEBILD_OFFLINE`. */
+/**
+ * Versände einer Quelle; live über das Ereignis `ausgang`. Nicht in `LAGEBILD_OFFLINE`.
+ * Nachforderungen stehen als Karten im Board: dort holt ein Abruf je Einsatz alle Versände der Art
+ * und jede Karte filtert ihre heraus (statt eines Abrufs je Karte).
+ */
 export function useVersaende(einsatzId: number, quelle: QuelleFilter) {
+  const proArt = quelle.kind === 'nachforderung';
   return useQuery({
-    queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
-    queryFn: () => fetchVersaende(einsatzId, quelle),
+    queryKey: proArt
+      ? einsatzKeys.deliveriesArt(einsatzId, quelle.kind)
+      : einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+    queryFn: () =>
+      proArt ? fetchVersaendeArt(einsatzId, quelle.kind) : fetchVersaende(einsatzId, quelle),
+    select: proArt ? (alle: Versand[]) => alle.filter((v) => v.source_id === quelle.id) : undefined,
     // Ohne Leserecht am Quellmodul antwortet der Server 403; die Liste bleibt dann weg.
     retry: false,
   });
@@ -97,7 +111,7 @@ export function useSendeVersaende(einsatzId: number, quelle: QuelleFilter) {
     mutationFn: (body: SendenAnfrage) => createVersaende(einsatzId, quelle, body),
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+        queryKey: einsatzKeys.deliveriesArt(einsatzId, quelle.kind),
       }),
   });
 }
@@ -109,7 +123,7 @@ export function useWiederholeVersand(einsatzId: number, quelle: QuelleFilter) {
     mutationFn: (versandId: string) => retryVersand(einsatzId, versandId),
     onSuccess: () =>
       qc.invalidateQueries({
-        queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+        queryKey: einsatzKeys.deliveriesArt(einsatzId, quelle.kind),
       }),
   });
 }

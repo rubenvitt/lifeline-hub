@@ -1114,4 +1114,38 @@ describe('NachforderungKarte — Senden (LLH-2093)', () => {
     expect(await screen.findByText('wartet')).toBeInTheDocument();
     expect(screen.getByText('Versand')).toBeInTheDocument();
   });
+
+  it('holt für drei Karten eines Einsatzes die Versände mit einem Abruf und filtert je Karte', async () => {
+    const abrufe: string[] = [];
+    const versand = (id: string, quelle: number) => ({
+      id,
+      address: `a${quelle}@example.org`,
+      agency_name: `Stelle ${quelle}`,
+      attempts: 0,
+      channel: 'email',
+      created_at: '2026-11-24 14:00:00',
+      created_by_id: 1,
+      source_id: quelle,
+      source_kind: 'nachforderung',
+      state: 'wartet',
+      subject: 'x',
+    });
+    server.use(
+      http.get('/api/einsaetze/1/deliveries', ({ request }) => {
+        abrufe.push(new URL(request.url).search);
+        return HttpResponse.json([versand('v1', 11), versand('v2', 12)]);
+      }),
+    );
+    renderMitProviders(
+      <>
+        <NachforderungKarte nachforderung={nf({ id: 11 })} />
+        <NachforderungKarte nachforderung={nf({ id: 12 })} />
+        <NachforderungKarte nachforderung={nf({ id: 13 })} />
+      </>,
+    );
+    expect(await screen.findByText(/Stelle 11/)).toBeInTheDocument();
+    expect(screen.getByText(/Stelle 12/)).toBeInTheDocument();
+    expect(screen.queryByText(/Stelle 13/)).toBeNull();
+    expect(abrufe).toEqual(['?source_kind=nachforderung']);
+  });
 });

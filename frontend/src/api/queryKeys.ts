@@ -977,6 +977,12 @@ export const einsatzKeys = {
   deliveries: (einsatzId: number, kind: QuelleArt, id: number) =>
     [EINSATZ_KEYS.deliveries, einsatzId, kind, id] as const,
   /**
+   * Alle Versände einer Quellart im Einsatz (ein Abruf je Board statt je Karte). Zugleich Prefix
+   * der Keys je Quelle: wer ihn invalidiert, trifft beide.
+   */
+  deliveriesArt: (einsatzId: number, kind: QuelleArt) =>
+    [EINSATZ_KEYS.deliveries, einsatzId, kind] as const,
+  /**
    * Kommunikationsplan (LFH-848), unter dem Prefix des Fernmeldewesens (LLH-1180): das
    * `fernmeldewesen`-Ereignis trifft ihn mit. Als einziger Key des Moduls ohne Netz lesbar
    * (`LAGEBILD_OFFLINE.einsatzUnterKeys`, LFH-848 design.md D9).
