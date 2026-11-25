@@ -193,6 +193,15 @@ function zeilenOptionen(z: StammdatenZeile) {
         { value: 'neu', label: 'Neu anlegen' },
         auslassen,
       ];
+    // Nur abweichend, ohne Lücke: der Server zählt sie als unverändert, die Abweichung bleibt
+    // aber wählbar (Design LLH-1633, „Hinweis + Wahl je Zeile“).
+    case 'unveraendert':
+      return abweichend
+        ? [
+            { value: VORSCHLAG, label: 'Bestand behalten' },
+            { value: 'datei_uebernehmen', label: 'Datei übernehmen' },
+          ]
+        : null;
     case 'mehrdeutig':
       return [
         ...z.kandidaten.map((k) => ({ value: `kandidat:${k.id}`, label: k.anzeige })),
