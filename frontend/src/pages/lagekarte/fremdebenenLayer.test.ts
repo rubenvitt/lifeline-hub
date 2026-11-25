@@ -4,6 +4,7 @@ import { synchronisiereBildLayer } from './bildLayer';
 import {
   bildAnker,
   entferneFremdebeneLayer,
+  fremdObjektGeometrie,
   fremdObjektSichtbar,
   fremdebeneClickLayerIds,
   fremdebeneIdVon,
@@ -253,5 +254,47 @@ describe('Auswahl eines Fremdebenen-Objekts (LLH-2099)', () => {
     expect(
       fremdObjektSichtbar([{ ...aktiv[0], daten: ohneBeschreibung }], 7, { name: 'H 1' }),
     ).toBe(true);
+  });
+});
+
+describe('Geometrie eines gewählten Fremdebenen-Objekts (LLH-2129)', () => {
+  const ZWEI: FeatureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [1, 1] },
+        properties: { name: 'A' },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [2, 2] },
+        properties: { name: 'B' },
+      },
+    ],
+  };
+  const aktiv = [{ id: 7, name: 'E', daten: ZWEI, farbe: FARBE }];
+
+  it('nimmt das Objekt am Index, wenn es dasselbe ist', () => {
+    expect(fremdObjektGeometrie(aktiv, 7, { name: 'B' }, 1)).toEqual({
+      type: 'Point',
+      coordinates: [2, 2],
+    });
+  });
+
+  it('sucht nach den Angaben, wenn der Index nicht mehr passt (Abgleich)', () => {
+    expect(fremdObjektGeometrie(aktiv, 7, { name: 'B' }, 0)).toEqual({
+      type: 'Point',
+      coordinates: [2, 2],
+    });
+    expect(fremdObjektGeometrie(aktiv, 7, { name: 'A' }, undefined)).toEqual({
+      type: 'Point',
+      coordinates: [1, 1],
+    });
+  });
+
+  it('ohne Ebene oder Objekt keine Geometrie', () => {
+    expect(fremdObjektGeometrie([], 7, { name: 'A' }, 0)).toBeNull();
+    expect(fremdObjektGeometrie(aktiv, 7, { name: 'Z' }, 0)).toBeNull();
   });
 });

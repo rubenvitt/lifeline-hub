@@ -208,3 +208,33 @@ export function fremdObjektSichtbar(
     );
   });
 }
+
+/** Gleiche Properties, wie `fremdObjektSichtbar` sie vergleicht. */
+function gleicheAngaben(
+  a: Record<string, unknown> | null | undefined,
+  b: Record<string, unknown>,
+): boolean {
+  const p = gefuellt(a);
+  const g = gefuellt(b);
+  return p.length === g.length && g.every(([k, v]) => p.some(([k2, v2]) => k2 === k && v2 === v));
+}
+
+/**
+ * Die volle Geometrie des gewählten Objekts (LLH-2129) aus den Daten der Ebene, nicht die
+ * gekachelte der Karte. Der Index (MapLibre-`id` dank `generateId`) gilt, solange das Objekt dort
+ * dieselben Angaben trägt; nach einem Abgleich wird nach den Angaben gesucht.
+ */
+export function fremdObjektGeometrie(
+  aktive: readonly AktiveFremdebene[],
+  ebeneId: number,
+  properties: Record<string, unknown>,
+  index: number | undefined,
+): unknown {
+  const features = aktive.find((e) => e.id === ebeneId)?.daten.features ?? [];
+  const amIndex = index != null ? features[index] : undefined;
+  const treffer =
+    amIndex && gleicheAngaben(amIndex.properties as Record<string, unknown>, properties)
+      ? amIndex
+      : features.find((f) => gleicheAngaben(f.properties as Record<string, unknown>, properties));
+  return treffer?.geometry ?? null;
+}

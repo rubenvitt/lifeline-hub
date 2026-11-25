@@ -57,7 +57,9 @@ import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDa
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useFremdebenen } from './lagekarte/useFremdebenen';
-import { fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { fremdObjektGeometrie, fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { useFremdebeneUebernahme } from './lagekarte/useFremdebeneUebernahme';
+import { alsText, pick } from './lagekarte/fachebeneTitel';
 import { standAusWire } from './lagekarte/geoExport';
 import FremdebeneDetail from './lagekarte/FremdebeneDetail';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
@@ -794,6 +796,8 @@ export default function LagekartePage() {
   const [fremdAuswahl, setFremdAuswahl] = useState<{
     ebeneId: number;
     properties: Record<string, unknown>;
+    /** Index in den Daten der Ebene (LLH-2129); geprüft gegen die Angaben. */
+    index: number | undefined;
   } | null>(null);
   // Die Detailkarte gilt nur, solange das Objekt auf der Karte steht: ausgeblendet, entfernt oder
   // beim Abgleich gestrichen räumt sie die Auswahl (sonst hielte sie `useAuswahlVorn` vorn).
@@ -805,6 +809,25 @@ export default function LagekartePage() {
   useEffect(() => {
     if (fremdAuswahl != null && !fremdAuswahlGilt) setFremdAuswahl(null);
   }, [fremdAuswahl, fremdAuswahlGilt]);
+  const fremdAuswahlGeometrie = useMemo(
+    () =>
+      fremdAuswahl && fremdAuswahlGilt
+        ? fremdObjektGeometrie(
+            fremd.aktive,
+            fremdAuswahl.ebeneId,
+            fremdAuswahl.properties,
+            fremdAuswahl.index,
+          )
+        : null,
+    [fremd.aktive, fremdAuswahl, fremdAuswahlGilt],
+  );
+  // Objekt als eigene Zeichnung übernehmen (LLH-2129); Herkunft schreibt der Server ins ETB.
+  const fremdUebernahme = useFremdebeneUebernahme({
+    einsatzId,
+    ansichtId: aktiveAnsichtId ?? null,
+    beginneHandlung: kartenFehler.beginne,
+    erfolg,
+  });
 
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
@@ -882,12 +905,12 @@ export default function LagekartePage() {
     if (auswahl != null || zoneAuswahl != null || fachebeneAuswahl != null) setFremdAuswahl(null);
   }, [auswahl, zoneAuswahl, fachebeneAuswahl]);
   const onFremdebeneKlick = useCallback(
-    (properties: Record<string, unknown>, ebeneId: number) => {
+    (properties: Record<string, unknown>, ebeneId: number, index: number | undefined) => {
       if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
       setAuswahl(null);
       setZoneAuswahl(null);
       setFachebeneAuswahl(null);
-      setFremdAuswahl({ ebeneId, properties });
+      setFremdAuswahl({ ebeneId, properties, index });
     },
     [exklusiverModusAktiv, setAuswahl, setZoneAuswahl, setFachebeneAuswahl],
   );
@@ -1486,6 +1509,19 @@ export default function LagekartePage() {
           <FremdebeneDetail
             ebene={fremdAuswahlEbene}
             properties={fremdAuswahl.properties}
+            geometrie={fremdAuswahlGeometrie}
+            darfSchreiben={!!darfSchreiben}
+            uebernahmeLaeuft={fremdUebernahme.laeuft}
+            onUebernehmen={async (wahl) => {
+              const ok = await fremdUebernahme.uebernehme({
+                ebene: fremdAuswahlEbene,
+                ...wahl,
+                name: pick(fremdAuswahl.properties, 'name') ?? null,
+                beschreibung: alsText(fremdAuswahl.properties.description) ?? null,
+              });
+              if (ok) setFremdAuswahl(null);
+              return ok;
+            }}
             onSchliessen={() => setFremdAuswahl(null)}
           />
         )}
