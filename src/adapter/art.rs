@@ -15,10 +15,14 @@ use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
 use super::repo::Adapter;
+
+/// Meldung, wenn eine Art mit `http_im_lan` eine `http`-Adresse bekommt, die nicht erlaubt ist.
+pub const HTTP_IM_LAN_FEHLER: &str =
+    "Die Adresse muss mit https:// beginnen; http:// nur zu einer privaten IP-Adresse mit LAN-Ausnahme.";
 use super::ziel::AbrufKontext;
 use super::zustand::AdapterFehler;
 use crate::error::AppError;
-use crate::public_api::webhook::ziel::{check_host, check_url};
+use crate::public_api::webhook::ziel::check_host;
 use crate::wire_enum::wire_enum;
 
 /// Höchstlänge eines Textfelds einer Einstellung, wenn die Art keine kleinere nennt.
@@ -127,6 +131,12 @@ pub trait AdapterArt: Send + Sync + 'static {
         false
     }
 
+    /// Ob die Art `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen darf
+    /// (`ziel::check_adapter_url`, ADR-0105), etwa einen Medienserver im LAN.
+    fn http_im_lan(&self) -> bool {
+        false
+    }
+
     /// Prüfung über die Felder hinaus (Kombinationen); Meldung für die Verwaltung (400).
     fn check_extra(&self, _einstellungen: &Map<String, Value>) -> Result<(), String> {
         Ok(())
@@ -185,8 +195,17 @@ pub fn check_einstellungen(
                     }
                     match feld.typ {
                         FeldTyp::Url => {
-                            check_url(text, lan_erlaubt)
-                                .map_err(|f| format!("{}: {}", feld.bezeichnung, f.text()))?;
+                            super::ziel::check_adapter_url(text, lan_erlaubt, art.http_im_lan())
+                                .map_err(|f| {
+                                    let text = if art.http_im_lan()
+                                        && f == crate::public_api::webhook::ziel::ZielFehler::NichtHttps
+                                    {
+                                        HTTP_IM_LAN_FEHLER
+                                    } else {
+                                        f.text()
+                                    };
+                                    format!("{}: {text}", feld.bezeichnung)
+                                })?;
                             Some(Value::from(text))
                         }
                         FeldTyp::Host => {
@@ -267,7 +286,8 @@ impl Verzeichnis {
     /// Die Arten dieses Builds.
     pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
         Verzeichnis::new(vec![
-            Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
+            Arc::new(crate::drohne::art::SuchlageArt::new(drohne.clone())),
+            Arc::new(crate::drohne::hls::HlsAdresseArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
             Arc::new(super::smtp_art::SmtpArt::produktiv()),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
@@ -296,6 +316,8 @@ pub struct AdapterArtAnzeige {
     pub felder: Vec<Feld>,
     pub intervall_min_s: i64,
     pub intervall_vorschlag_s: i64,
+    /// Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105).
+    pub http_im_lan: bool,
 }
 
 impl AdapterArtAnzeige {
@@ -307,6 +329,7 @@ impl AdapterArtAnzeige {
             felder: art.felder().to_vec(),
             intervall_min_s: art.intervall_min_s(),
             intervall_vorschlag_s: art.intervall_vorschlag_s(),
+            http_im_lan: art.http_im_lan(),
         }
     }
 }
@@ -418,6 +441,57 @@ mod tests {
         assert!(pruefe(json!({ "adresse": "http://a.example" }), false)
             .unwrap_err()
             .contains("https://"));
+    }
+
+    struct HttpProbe;
+
+    impl AdapterArt for HttpProbe {
+        fn code(&self) -> &'static str {
+            "http_probe"
+        }
+        fn bezeichnung(&self) -> &'static str {
+            "HTTP-Probe"
+        }
+        fn plaetze(&self) -> &'static [Platz] {
+            &[]
+        }
+        fn felder(&self) -> &'static [Feld] {
+            Probe.felder()
+        }
+        fn intervall_min_s(&self) -> i64 {
+            30
+        }
+        fn intervall_vorschlag_s(&self) -> i64 {
+            60
+        }
+        fn http_im_lan(&self) -> bool {
+            true
+        }
+        fn abrufen<'a>(
+            &'a self,
+            _kontext: &'a AbrufKontext<'a>,
+        ) -> BoxFuture<'a, Result<Box<dyn Uebernahme>, Fehlschlag>> {
+            Box::pin(async { Ok(Box::new(OhneUebernahme(0)) as Box<dyn Uebernahme>) })
+        }
+    }
+
+    #[test]
+    fn http_nur_fuer_arten_mit_http_im_lan_und_privatem_ip_literal() {
+        let http = |v: Value, lan| check_einstellungen(&HttpProbe, v.as_object().unwrap(), lan);
+        assert!(http(
+            json!({ "adresse": "http://10.0.0.5:8888/d/index.m3u8" }),
+            true
+        )
+        .is_ok());
+        let f = http(json!({ "adresse": "http://mediamtx.lan/x" }), true).unwrap_err();
+        assert!(
+            f.contains(
+                "Die Adresse muss mit https:// beginnen; http:// nur zu einer privaten IP-Adresse mit LAN-Ausnahme."
+            ),
+            "{f}"
+        );
+        assert!(http(json!({ "adresse": "http://10.0.0.5/x" }), false).is_err());
+        assert!(pruefe(json!({ "adresse": "http://10.0.0.5/x" }), true).is_err());
     }
 
     #[test]

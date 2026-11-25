@@ -53,7 +53,7 @@ verbiete 'Zweck::Adapter' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclu
 verlange 'redirect::Policy::none\(\)' src/adapter/ziel.rs
 verlange '\.no_proxy\(\)' src/adapter/ziel.rs
 verlange 'dns_resolver\(Arc::new\(WebhookResolver' src/adapter/ziel.rs
-verlange 'check_url\(url, self\.lan_erlaubt\)' src/adapter/ziel.rs
+verlange 'check_adapter_url\(url, self\.lan_erlaubt' src/adapter/ziel.rs
 verbiete 'tracing::[a-z]+!\(.*(wert|geheimnis|secret)' 'src/adapter/**/*.rs' src/routes/adapter.rs
 ```
 

@@ -26,7 +26,7 @@ export function HistorienBanner({ standAt, bezeichnung, onZurueckAktuell }: Hist
     <Alert
       type="warning"
       showIcon
-      message="Historischer Stand — schreibgeschützt"
+      title="Historischer Stand — schreibgeschützt"
       description={beschreibung || undefined}
       action={
         /* Ohne Größen-Prop: die Trefffläche kommt aus `controlHeight`. */

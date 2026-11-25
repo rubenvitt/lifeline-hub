@@ -208,6 +208,9 @@ export const EINSATZ_KEYS = {
   // Snapshot-Dokument: eigener Prefix, damit die Listen-Invalidierung (`lage_snapshot`) die
   // unveränderlichen Dokumente nicht per Prefix mit-refetcht.
   lageSnapshotDokument: 'einsatz-lage-snapshot-dokument',
+  // Eingefrorener Inhalt einer Fremdebene eines Stands (LLH-2130): unter seinem Hash unveränderlich,
+  // nicht im Lagebild offline wie das Dokument.
+  lageSnapshotFremdebeneDaten: 'einsatz-lage-snapshot-fremdebene-daten',
   // Maßgebliche Pegel mit Messung: kein Live-Event, 5-min-Nachfrage.
   pegel: 'einsatz-pegel',
   // Wetter am Einsatzort: DWD-Warnungen + Vorhersage, kein Live-Event.
@@ -626,6 +629,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Live-Refetch schriebe weitere.
  * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
  *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
+ * - `lageSnapshotFremdebeneDaten` (LLH-2130): der Key trägt den Hash des eingefrorenen Inhalts,
+ *   er ändert sich nie; gelöscht wird er nur mit dem Stand.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -654,6 +659,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
   EINSATZ_KEYS.lageSnapshotDokument,
+  EINSATZ_KEYS.lageSnapshotFremdebeneDaten,
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
   EINSATZ_KEYS.etbDruck,
@@ -872,6 +878,8 @@ export const einsatzKeys = {
   lageSnapshot: (einsatzId: number) => [EINSATZ_KEYS.lageSnapshot, einsatzId] as const,
   lageSnapshotDokument: (einsatzId: number, snapshotId: number) =>
     [EINSATZ_KEYS.lageSnapshotDokument, einsatzId, snapshotId] as const,
+  lageSnapshotFremdebeneDaten: (einsatzId: number, snapshotId: number, sha256: string) =>
+    [EINSATZ_KEYS.lageSnapshotFremdebeneDaten, einsatzId, snapshotId, sha256] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,
@@ -1511,6 +1519,9 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.organisation,
     // Eine übernommene Nachlieferung vom Hub (LLH-1493) ändert, was „vom Hub“ ist.
     GLOBAL_KEYS.stammdatenHerkunft,
+    // Eine Übernahme aus Datei oder Schnappschuss (LLH-2121) erledigt den Hinweis „zum Prüfen“ auf
+    // jedem Schirm. Ein neuer Schnappschuss aus dem Lauf im Hintergrund meldet weiter nichts.
+    GLOBAL_KEYS.stammdatenSchnappschuesse,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
     GLOBAL_KEYS.einsaetze,
   ],
@@ -1540,9 +1551,6 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `adapter`, `adapterVersuche` (LLH-2018): Verwaltung der Adapter und Verlauf ihrer Abrufe; die
  *   eigene Änderung setzt die Antwort, den Zustand aus dem Lauf im Hintergrund zeigt der nächste
  *   Abruf (30 s), kein Ereignis je Abruf. Geheimnisse stehen in keinem der beiden.
- * - `stammdatenSchnappschuesse` (LLH-1194): ein neuer Schnappschuss erscheint beim nächsten Laden
- *   der Seite, nicht live (Entwurf `personal-abruf`, „Oberfläche“); die eigene Übernahme und ein
- *   409 frischen die Liste auf. Der Lauf im Hintergrund meldet kein Ereignis.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
@@ -1577,7 +1585,6 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.adapter,
   GLOBAL_KEYS.adapterVersuche,
-  GLOBAL_KEYS.stammdatenSchnappschuesse,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,
@@ -1683,7 +1690,7 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
     // Fremdebenen (LLH-2099): Liste und je Ebene das normierte GeoJSON, damit die Karte ohne Netz
-    // dieselben Ebenen zeigt.
+    // dieselben Ebenen zeigt; die Daten nur im Budget (LLH-2130, `offline/fremdebenenBudget.ts`).
     EINSATZ_KEYS.fremdebenen,
     EINSATZ_KEYS.fremdebeneDaten,
     EINSATZ_KEYS.lageSnapshot,

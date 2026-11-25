@@ -379,3 +379,73 @@ async fn ohne_leserecht_am_halter_kommt_kein_name_nur_das_merkmal() {
     assert_eq!(liste[0]["held_by_other"], "Lage B");
     assert_eq!(liste[0]["held_by_other_hidden"], false);
 }
+
+/// PUT mit der Lagemonitor-Wahl `an` (LLH-2109).
+async fn schalten(u: &Umgebung, an: bool) {
+    let (s, v) = anfrage(
+        &u.app,
+        "PUT",
+        &u.pfad(u.einsatz, "a1"),
+        &u.admin,
+        Some(&json!({ "lagemonitor": an }).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+}
+
+/// Die Systemeinträge der Drohnenquelle (ohne Annahme über die Folge).
+async fn drohnen_eintraege(u: &Umgebung) -> Vec<String> {
+    system_etb_inhalte(&u.app, &u.admin, u.einsatz)
+        .await
+        .into_iter()
+        .filter(|i| i.contains("Drohnenbild") || i.contains("Lagemonitor"))
+        .collect()
+}
+
+fn anzahl(e: &[String], text: &str) -> usize {
+    e.iter().filter(|i| i.contains(text)).count()
+}
+
+const ZU: &str = "Drohnenbild aus Suchlage zugeschaltet";
+
+const EIN: &str = "Livebild auf dem Lagemonitor eingeschaltet";
+const AUS: &str = "Livebild auf dem Lagemonitor ausgeschaltet";
+
+#[tokio::test]
+async fn schalter_an_und_aus_steht_im_etb() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    schalten(&u, false).await;
+    schalten(&u, true).await;
+    schalten(&u, false).await;
+    let e = drohnen_eintraege(&u).await;
+    assert_eq!(e.len(), 3, "{e:?}");
+    assert_eq!(
+        (anzahl(&e, ZU), anzahl(&e, EIN), anzahl(&e, AUS)),
+        (1, 1, 1),
+        "{e:?}"
+    );
+}
+
+#[tokio::test]
+async fn gleicher_wert_kein_neuer_eintrag() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    schalten(&u, false).await;
+    schalten(&u, true).await;
+    schalten(&u, true).await;
+    schalten(&u, false).await;
+    schalten(&u, false).await;
+    let e = drohnen_eintraege(&u).await;
+    assert_eq!((anzahl(&e, EIN), anzahl(&e, AUS)), (1, 1), "{e:?}");
+}
+
+#[tokio::test]
+async fn neu_zuschalten_mit_schalter_an_zwei_eintraege() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    schalten(&u, true).await;
+    let e = drohnen_eintraege(&u).await;
+    assert_eq!(e.len(), 2, "{e:?}");
+    assert_eq!((anzahl(&e, ZU), anzahl(&e, EIN)), (1, 1), "{e:?}");
+}

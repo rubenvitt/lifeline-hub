@@ -87,6 +87,8 @@ pub async fn apply(
     for fz in fahrzeug_ids {
         super::fahrzeug::stamm_geaendert_melden(&state, admin.org_id, fz).await;
     }
+    // LLH-2121: wie dort auch die Kataloge und der Hinweis „zum Prüfen“ auf anderen Schirmen.
+    state.live.publiziere_stammdaten(admin.org_id);
     Ok(Json(ergebnis))
 }
 

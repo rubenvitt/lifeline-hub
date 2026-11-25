@@ -34,6 +34,7 @@ struct Zeile {
     versucht_at: Option<String>,
     fehler: Option<FremdebeneFehler>,
     erstellt_at: String,
+    groesse: Option<i64>,
 }
 
 impl From<Zeile> for FremdebeneAnzeige {
@@ -51,6 +52,7 @@ impl From<Zeile> for FremdebeneAnzeige {
             attempted_at: z.versucht_at,
             error: z.fehler,
             created_at: z.erstellt_at,
+            data_size: z.groesse,
         }
     }
 }
@@ -58,7 +60,8 @@ impl From<Zeile> for FremdebeneAnzeige {
 const ANZEIGE_SELECT: &str = "\
     SELECT e.id, e.name, e.quelle, e.url, e.farbe, \
            COALESCE(d.objekte, 0) AS objekte, COALESCE(d.verworfen, 0) AS verworfen, \
-           e.abgerufen_at, e.versucht_at, e.fehler, e.erstellt_at \
+           e.abgerufen_at, e.versucht_at, e.fehler, e.erstellt_at, \
+           length(d.geojson) AS groesse \
     FROM karte_fremdebene e LEFT JOIN karte_fremdebene_daten d ON d.ebene_id = e.id";
 
 /// Alle Fremdebenen eines Einsatzes in der Reihenfolge des Anlegens.
@@ -479,6 +482,27 @@ mod tests {
             .as_bytes(),
         )
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn liste_traegt_data_size() {
+        let pool = crate::db::test_pool().await;
+        let (e, b) = einsatz(&pool).await;
+        let n = punkte(3);
+        anlegen(
+            &pool,
+            e,
+            b,
+            "Hydranten",
+            FremdebeneQuelle::Datei,
+            None,
+            "fremd-1",
+            &n,
+        )
+        .await
+        .unwrap();
+        let liste = liste(&pool, e).await.unwrap();
+        assert_eq!(liste[0].data_size, Some(n.geojson.len() as i64));
     }
 
     #[tokio::test]

@@ -151,7 +151,7 @@ Upload eines Fotos mit EXIF-GPS kommt ganz zuletzt und braucht einen GPS-Leser i
 | 5 | Fotos als Bildpunkte | lifeline-hub | 1, 3 |
 | 6 | Lagemonitor-Kachel „Livebild“ samt Regeländerung und Schalter | lifeline-hub | 4 |
 | 7 | Löschfristen für Fotos und Aufzeichnungen | suchlage | – |
-| 8 | Profil „reine HLS/WHEP-Adresse“, später WHEP und manueller Foto-Upload mit EXIF-GPS | lifeline-hub | 4 |
+| 8 | Profil „reine HLS/WHEP-Adresse“ (HLS: Adapterart `hls_adresse`, LLH-2110), später WHEP und manueller Foto-Upload mit EXIF-GPS | lifeline-hub | 4 |
 
 Schritt 1 und 2 können parallel laufen. Der schnelle Gewinn ist 2 und 3: Die Drohne erscheint auf
 der Lagekarte, ohne dass Suchlage etwas ändern muss.

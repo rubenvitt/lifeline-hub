@@ -48,13 +48,21 @@ interface AnlegenWerte {
 
 /** Warnung an der LAN-Ausnahme; steht beim Anlegen und in der Ansicht gleich. */
 export const ADAPTER_LAN_WARNUNG =
-  'Nur für einen Server im lokalen Netz, etwa der Wache. Der Rechner selbst und Link-Local-Adressen bleiben gesperrt. Steht im Zugangsprotokoll.';
+  'Nur für einen Server im lokalen Netz, etwa der Wache. Der Rechner selbst und Link-Local-Adressen bleiben gesperrt. Steht im Zugangsprotokoll. Mit http:// (nur zu einer privaten IP-Adresse) gehen Zugangsdaten unverschlüsselt durchs Netz.';
 
 /** Ein Einstellungsfeld der Art als Formularfeld; Name und Regeln aus dem Verzeichnis. */
-export function EinstellungsFeld({ feld, pfad }: { feld: AdapterFeld; pfad: (string | number)[] }) {
+export function EinstellungsFeld({
+  feld,
+  pfad,
+  httpImLan = false,
+}: {
+  feld: AdapterFeld;
+  pfad: (string | number)[];
+  httpImLan?: boolean;
+}) {
   const max = feld.max > 0 ? feld.max : undefined;
   return (
-    <Feld label={feld.bezeichnung} name={pfad} rules={einstellungsRegeln(feld)}>
+    <Feld label={feld.bezeichnung} name={pfad} rules={einstellungsRegeln(feld, httpImLan)}>
       {feld.typ === 'zahl' ? (
         <ZahlFeld />
       ) : (
@@ -276,6 +284,7 @@ export default function AdapterPaneel() {
             key={`${art.code}-${f.name}`}
             feld={f}
             pfad={['einstellungen', f.name]}
+            httpImLan={art.http_im_lan}
           />
         ))}
         {art && (

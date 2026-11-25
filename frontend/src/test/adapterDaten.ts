@@ -17,6 +17,7 @@ export const BEISPIEL_ART: AdapterArtAnzeige = {
   ],
   intervall_min_s: 30,
   intervall_vorschlag_s: 60,
+  http_im_lan: false,
 };
 
 export function adapterFixture(id: string, extra: Partial<AdapterAnzeige> = {}): AdapterAnzeige {
