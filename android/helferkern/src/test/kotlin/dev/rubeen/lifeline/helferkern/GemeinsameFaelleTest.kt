@@ -151,6 +151,7 @@ class GemeinsameFaelleTest {
         val ordnung: List<OrdnungFall>,
         val mitteilung: List<MitteilungFall>,
         val quittungsstand: List<StandFall>,
+        val quittungstext: List<TextFall>,
     )
 
     @Serializable
@@ -176,6 +177,17 @@ class GemeinsameFaelleTest {
 
     @Serializable
     private class StandFall(val beschreibung: String, val auftrag: HelperTask, val erwartet: Stand)
+
+    @Serializable
+    private class TextErwartung(val eigen: Boolean, val text: String? = null)
+
+    @Serializable
+    private class TextFall(
+        val beschreibung: String,
+        val empfaenger: HelperTaskRecipient,
+        val eigener_name: String,
+        val erwartet: TextErwartung,
+    )
 
     private fun auftraege() = GemeinsameFaelle.load("helfer-auftrag.json", AuftragsDatei.serializer())
 
@@ -227,6 +239,19 @@ class GemeinsameFaelleTest {
                 else -> error("unbekannter Stand ${fall.erwartet.stand}")
             }
             assertEquals(erwartet, Auftraege.stand(fall.auftrag), fall.beschreibung)
+        }
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von quittungstext gilt`() {
+        val faelle = auftraege().quittungstext
+        assertTrue(faelle.size >= 5)
+        val utc = java.time.ZoneOffset.UTC
+        for (fall in faelle) {
+            val r = fall.empfaenger
+            val stand = r.acknowledgedAt?.let { Quittungsstand.Quittiert(it, r.acknowledgedBy) } ?: Quittungsstand.Offen
+            assertEquals(fall.erwartet.eigen, Auftraege.isEigeneQuittung(r, fall.eigener_name), fall.beschreibung)
+            assertEquals(fall.erwartet.text, Auftraege.quittungstext(stand, fall.eigener_name, utc), fall.beschreibung)
         }
     }
 }

@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Aufträge an die Helfer-App (ADR-0105) für Server (Rust), HelferKern (Swift) und helferkern (Kotlin). nutzlast: Testvektor wie push-nutzlast.json (AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat + 16-Byte-Tag, umschlag = base64url des kompakten JSON {c,k,n}; alle Binärwerte base64url ohne Auffüllung). sse: Rohtext des Live-Stroms und die Ereignisse, die ein Leser daraus macht (ein Rahmen endet mit einer Leerzeile; nur event helfer_auftrag mit data {task_id} ist ein Auftrag, heartbeat ein Lebenszeichen, alles andere unbekannt; Kommentar- und retry-Rahmen ohne event erzeugen nichts). ordnung: Liste aus GET /api/devices/me/tasks → Reihenfolge der IDs. mitteilung: ob ein Auftrag eine Mitteilung bekommt (offen, nicht aufgehoben, noch nicht gemeldet, issued_at höchstens 10 Minuten vor jetzt; Zeiten UTC). quittungsstand: Stand einer Empfängerzeile (erste Zeile des Auftrags).",
+  "zweck": "Gemeinsame Fälle der Aufträge an die Helfer-App (ADR-0105) für Server (Rust), HelferKern (Swift) und helferkern (Kotlin). nutzlast: Testvektor wie push-nutzlast.json (AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat + 16-Byte-Tag, umschlag = base64url des kompakten JSON {c,k,n}; alle Binärwerte base64url ohne Auffüllung). sse: Rohtext des Live-Stroms und die Ereignisse, die ein Leser daraus macht (ein Rahmen endet mit einer Leerzeile; nur event helfer_auftrag mit data {task_id} ist ein Auftrag, heartbeat ein Lebenszeichen, alles andere unbekannt; Kommentar- und retry-Rahmen ohne event erzeugen nichts). ordnung: Liste aus GET /api/devices/me/tasks → Reihenfolge der IDs. mitteilung: ob ein Auftrag eine Mitteilung bekommt (offen, nicht aufgehoben, noch nicht gemeldet, issued_at höchstens 10 Minuten vor jetzt; Zeiten UTC). quittungsstand: Stand einer Empfängerzeile (erste Zeile des Auftrags). quittungstext: ob eine quittierte Empfängerzeile die eigene ist (acknowledged_by leer oder gleich dem eigenen Anzeigenamen, beide ohne Rand verglichen) und der Text dazu in UTC; offen: nicht eigen, kein Text.",
   "nutzlast": [
     {
       "beschreibung": "Auftrag an eine Einheit",
@@ -439,6 +439,98 @@
       },
       "erwartet": {
         "stand": "aufgehoben"
+      }
+    }
+  ],
+  "quittungstext": [
+    {
+      "beschreibung": "selbst übernommen",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Max M."
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ein anderer war schneller",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Lisa K."
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": false,
+        "text": "Übernommen von Lisa K. um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ohne Namen vom Server gilt als eigen",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": null
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "Rand zählt nicht",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": " Max M. "
+      },
+      "eigener_name": "Max M.  ",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ohne eigenen Namen ist ein Name fremd",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Max M."
+      },
+      "eigener_name": "",
+      "erwartet": {
+        "eigen": false,
+        "text": "Übernommen von Max M. um 10:01"
+      }
+    },
+    {
+      "beschreibung": "offen: nicht eigen, kein Text",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": null,
+        "acknowledged_by": null
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": false,
+        "text": null
       }
     }
   ]

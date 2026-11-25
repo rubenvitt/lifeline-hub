@@ -54,14 +54,30 @@ object Auftraege {
     fun offen(l: List<HelperTask>): Int = l.count { it.isOffen }
 
     /**
+     * Ob [r] von diesem Gerät quittiert ist ([eigenerName] ist sein Anzeigename): quittiert und
+     * ohne Namen vom Server oder mit dem eigenen (gemeinsame Fälle, Abschnitt `quittungstext`).
+     * Nur dann gilt eine Quittung als eigene (Text ohne Namen, Rückmeldung der App).
+     */
+    fun isEigeneQuittung(r: HelperTaskRecipient, eigenerName: String?): Boolean =
+        r.isQuittiert && isEigenerName(r.acknowledgedBy, eigenerName)
+
+    /**
      * Text nach der Quittung: „Übernommen um 14:32“, oder mit Namen, wenn ein anderer schneller war
      * ([eigenerName] ist der Anzeigename dieses Geräts); `null`, solange offen oder aufgehoben.
      */
     fun quittungstext(stand: Quittungsstand, eigenerName: String?, zone: ZoneId): String? {
         val q = stand as? Quittungsstand.Quittiert ?: return null
         val uhr = uhrzeit(q.um, zone) ?: q.um
-        val von = q.von
-        return if (von.isNullOrBlank() || von == eigenerName) "Übernommen um $uhr" else "Übernommen von $von um $uhr"
+        val von = q.von?.trim()
+        return if (von.isNullOrEmpty() || isEigenerName(von, eigenerName)) "Übernommen um $uhr" else "Übernommen von $von um $uhr"
+    }
+
+    /** Ohne Namen vom Server gilt die Quittung als eigene; sonst zählt der Name ohne Rand. */
+    private fun isEigenerName(von: String?, eigenerName: String?): Boolean {
+        val v = von?.trim()
+        if (v.isNullOrEmpty()) return true
+        val e = eigenerName?.trim()
+        return !e.isNullOrEmpty() && v == e
     }
 
     /** Serverzeit als Uhrzeit `HH:mm` in [zone]; `null`, wenn unlesbar. */
