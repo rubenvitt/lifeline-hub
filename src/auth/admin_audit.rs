@@ -179,6 +179,16 @@ wire_enum! {
         FremdebenenLanErlaubt => "fremdebenen_lan_erlaubt",
         /// Diese Erlaubnis zurückgenommen.
         FremdebenenLanEntzogen => "fremdebenen_lan_entzogen",
+        /// Org-Schalter „Ortung im Einsatz“ (Helfer-App) eingeschaltet (LLH-2120, Migration
+        /// 0382); Ziel `ortung`. Das Einschalten bestätigt Einwilligung bzw.
+        /// Betriebsvereinbarung.
+        OrtungEingeschaltet => "ortung_eingeschaltet",
+        /// „Ortung im Einsatz“ ausgeschaltet.
+        OrtungAusgeschaltet => "ortung_ausgeschaltet",
+        /// „Auch Personen orten“ eingeschaltet; Ziel `ortung_personen`.
+        OrtungPersonenEingeschaltet => "ortung_personen_eingeschaltet",
+        /// „Auch Personen orten“ ausgeschaltet, von Hand oder mit „Ortung im Einsatz“.
+        OrtungPersonenAusgeschaltet => "ortung_personen_ausgeschaltet",
     }
 }
 

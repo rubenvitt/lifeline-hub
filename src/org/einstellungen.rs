@@ -67,15 +67,20 @@ pub struct OrtungFreigabe {
 
 /// Liest die Ortungs-Freigabe der Organisation; ohne Zeile ist beides aus.
 pub async fn ortung_der_org(pool: &SqlitePool, org_id: i64) -> Result<OrtungFreigabe, AppError> {
-    let e = laden_oder_default(pool, org_id).await?;
-    let im_einsatz = e.ortung_im_einsatz != 0;
-    Ok(OrtungFreigabe {
-        im_einsatz,
-        personen: im_einsatz && e.ortung_personen != 0,
-    })
+    Ok(laden_oder_default(pool, org_id).await?.ortung_freigabe())
 }
 
 impl OrgEinstellungen {
+    /// Die Ortungs-Freigabe dieser Einstellungen: „Personen orten“ gilt nur mit „Ortung im
+    /// Einsatz“.
+    pub fn ortung_freigabe(&self) -> OrtungFreigabe {
+        let im_einsatz = self.ortung_im_einsatz != 0;
+        OrtungFreigabe {
+            im_einsatz,
+            personen: im_einsatz && self.ortung_personen != 0,
+        }
+    }
+
     pub(crate) fn leer(org_id: i64) -> Self {
         Self {
             org_id,
@@ -312,14 +317,11 @@ pub async fn speichern(
     // Schreibsperre gelesen. Zwei Admins, die gleichzeitig schalten, sehen je den Stand des
     // anderen, und der Eintrag der Admin-Spur folgt dem echten Wechsel (LLH-2099,
     // Abschluss-Review, M5).
+    // Ebenso die Ortungs-Schalter (LLH-2120).
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
-    let lan_vorher: Option<i64> = sqlx::query_scalar(
-        "SELECT fremdebenen_lan_erlaubt FROM org_einstellungen WHERE org_id = ?",
-    )
-    .bind(org_id)
-    .fetch_optional(&mut *tx)
-    .await?;
-    let lan_vorher = lan_vorher.is_some_and(|w| w != 0);
+    let vorher = laden_oder_default(&mut *tx, org_id).await?;
+    let lan_vorher = vorher.fremdebenen_lan_erlaubt != 0;
+    let ortung_vorher = vorher.ortung_freigabe();
     let lan_neu = daten.fremdebenen_lan_erlaubt.unwrap_or(lan_vorher);
     sqlx::query(
         "INSERT INTO org_einstellungen \
@@ -409,6 +411,7 @@ pub async fn speichern(
         einstellungen: laden_oder_default(pool, org_id).await?,
         personen_geloescht,
         lan_vorher,
+        ortung_vorher,
     })
 }
 
@@ -421,6 +424,8 @@ pub struct Gespeichert {
     /// LAN-Erlaubnis der Fremdebenen vor dem Speichern (LLH-2099), in derselben Transaktion
     /// gelesen; der Handler schreibt bei echtem Wechsel die Admin-Spur.
     pub lan_vorher: bool,
+    /// Ortungs-Schalter vor dem Speichern (LLH-2120), ebenso in derselben Transaktion gelesen.
+    pub ortung_vorher: OrtungFreigabe,
 }
 
 #[cfg(test)]
