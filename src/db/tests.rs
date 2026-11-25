@@ -4373,7 +4373,7 @@ async fn migration_0311_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_
     pruefe_audit_rebuild(&pool, MIGRATION_0311, &["registrierliste"]).await;
 }
 
-const MIGRATION_0380: &str = include_str!("../../migrations/0380_person_zugriff_audit_pass.sql");
+const MIGRATION_0380: &str = include_str!("../../migrations/0381_person_zugriff_audit_pass.sql");
 
 // --- Migration 0380: Blatt-Umbau von person_zugriff_audit mit den Arten 'pass_export' und
 // 'pass_druck' (LLH-1198). Ausgangspunkt ist der 0311-Stand mit allen fünf Bestandsarten.

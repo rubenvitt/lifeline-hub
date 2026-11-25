@@ -44,7 +44,7 @@
 ### Task 1: Protokollarten `pass_export` und `pass_druck`
 
 **Files:**
-- Create: `migrations/0380_person_zugriff_audit_pass.sql`. Die Nummer ist die nächste über allem auf `origin/alpha`; vorher `scripts/check-migrationen.sh` prüfen.
+- Create: `migrations/0381_person_zugriff_audit_pass.sql`. Die Nummer ist die nächste über allem auf `origin/alpha`; vorher `scripts/check-migrationen.sh` prüfen.
 - Modify: `src/person/audit_repo.rs` (Enum `ZugriffArt`, Doku-Kommentare)
 - Modify: `tests/enum_wire_kontrakt.rs:925` (`ZugriffArt`)
 - Test: `src/db/tests.rs` (neben `migration_0311_…`)
