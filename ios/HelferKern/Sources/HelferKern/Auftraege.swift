@@ -155,6 +155,23 @@ public enum Auftraege {
         else { return false }
         return jetzt.timeIntervalSince(erteilt) <= mitteilungFristS
     }
+
+    /// Ob `empfaenger` von diesem Gerät quittiert ist (`eigenerName` ist sein Anzeigename):
+    /// quittiert und ohne Namen vom Server oder mit dem eigenen (gemeinsame Fälle, Abschnitt
+    /// `quittungstext`). Nur dann gilt eine Quittung als eigene: Text ohne Namen, Haptik.
+    public static func istEigeneQuittung(
+        _ empfaenger: HelferAuftrag.Empfaenger, eigenerName: String?
+    ) -> Bool {
+        empfaenger.isQuittiert && istEigenerName(empfaenger.acknowledgedBy, eigenerName: eigenerName)
+    }
+
+    /// Ohne Namen vom Server gilt die Quittung als eigene; sonst zählt der Name ohne Rand.
+    static func istEigenerName(_ von: String?, eigenerName: String?) -> Bool {
+        let v = von?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if v.isEmpty { return true }
+        let e = eigenerName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !e.isEmpty && v == e
+    }
 }
 
 /// Stand der Quittung einer Empfängerzeile: offen → sendet → quittiert; ein Fehler lässt sie
@@ -220,16 +237,29 @@ public enum AuftragAnzeige {
     public static let rueckfall = "Öffnen, um den Auftrag zu sehen"
 
     /// „Übernommen um 14:32“ bzw. „Übernommen von Max M. um 14:32“, wenn ein anderer schneller
-    /// war. `eigen`: diese App hat quittiert (oder der Name ist der eigene).
+    /// war; ob der Name der eigene ist, entscheidet `Auftraege.istEigeneQuittung` (`eigenerName`
+    /// ist der Anzeigename dieses Geräts).
     public static func quittiert(
-        um: Date?, von: String?, eigen: Bool, zeitzone: TimeZone = .current
+        um: Date?, von: String?, eigenerName: String?, zeitzone: TimeZone = .current
     ) -> String {
         var text = knopf
-        if !eigen, let von, !von.trimmingCharacters(in: .whitespaces).isEmpty {
-            text += " von \(von)"
+        if !Auftraege.istEigenerName(von, eigenerName: eigenerName),
+            let name = von?.trimmingCharacters(in: .whitespacesAndNewlines)
+        {
+            text += " von \(name)"
         }
         if let um { text += " um \(uhrzeit(um, zeitzone: zeitzone))" }
         return text
+    }
+
+    /// Text einer Zeile nach der Quittung; `nil`, solange sie offen ist.
+    public static func quittungstext(
+        _ empfaenger: HelferAuftrag.Empfaenger, eigenerName: String?, zeitzone: TimeZone = .current
+    ) -> String? {
+        guard let um = empfaenger.acknowledgedAt else { return nil }
+        return quittiert(
+            um: Serverzeit.datum(um), von: empfaenger.acknowledgedBy, eigenerName: eigenerName,
+            zeitzone: zeitzone)
     }
 
     /// `HH:mm` in der Zeitzone des Geräts.
@@ -263,4 +293,22 @@ extension Phase {
         case .start, .anmelden, .unbestaetigt, .beendet: false
         }
     }
+
+    /// Was ein Tippen auf die Mitteilung eines Auftrags tut. Beim Kaltstart kommt es, solange die
+    /// Phase noch `.start` ist (der Zustand vom Server steht aus): dann wartet es, bis sie bekannt
+    /// ist, statt verloren zu gehen.
+    public var meldungstipp: Meldungstipp {
+        if zeigtAuftraege { return .oeffnen }
+        return self == .start ? .warten : .verwerfen
+    }
+}
+
+/// Wirkung eines Tippens auf die Mitteilung eines Auftrags (`Phase.meldungstipp`).
+public enum Meldungstipp: Equatable, Sendable {
+    /// Den Auftrag öffnen und die Liste neu laden.
+    case oeffnen
+    /// Phase noch unbekannt: merken und beim nächsten Phasenwechsel neu entscheiden.
+    case warten
+    /// Ohne bestätigte Kopplung gibt es keine Aufträge: nichts tun.
+    case verwerfen
 }

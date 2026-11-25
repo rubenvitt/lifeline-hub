@@ -181,6 +181,7 @@ final class HelferAuftragFaelleTests: XCTestCase {
         let ordnung: [OrdnungFall]
         let mitteilung: [MitteilungFall]
         let quittungsstand: [QuittungsstandFall]
+        let quittungstext: [QuittungstextFall]
     }
 
     struct NutzlastFall: Decodable {
@@ -218,6 +219,19 @@ final class HelferAuftragFaelleTests: XCTestCase {
         let beschreibung: String
         let auftrag: HelferAuftrag
         let erwartet: Stand
+    }
+
+    struct Quittungstext: Decodable {
+        let eigen: Bool
+        let text: String?
+    }
+
+    struct QuittungstextFall: Decodable {
+        let beschreibung: String
+        let empfaenger: HelferAuftrag.Empfaenger
+        /// `eigener_name` in der JSON.
+        let eigenerName: String
+        let erwartet: Quittungstext
     }
 
     /// Der Klartext, wie der Server ihn schreibt (`PagerKlartext` in src/helfer/pager.rs).
@@ -306,6 +320,21 @@ final class HelferAuftragFaelleTests: XCTestCase {
                 continue
             }
             XCTAssertEqual(Quittungsstand.aus(fall.auftrag), erwartet, fall.beschreibung)
+        }
+    }
+
+    func testJederGemeinsameFallVonQuittungstextGilt() throws {
+        let faelle = try datei().quittungstext
+        XCTAssertGreaterThanOrEqual(faelle.count, 5)
+        let utc = try XCTUnwrap(TimeZone(identifier: "UTC"))
+        for fall in faelle {
+            XCTAssertEqual(
+                Auftraege.istEigeneQuittung(fall.empfaenger, eigenerName: fall.eigenerName),
+                fall.erwartet.eigen, fall.beschreibung)
+            XCTAssertEqual(
+                AuftragAnzeige.quittungstext(
+                    fall.empfaenger, eigenerName: fall.eigenerName, zeitzone: utc),
+                fall.erwartet.text, fall.beschreibung)
         }
     }
 }

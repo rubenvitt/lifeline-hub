@@ -84,6 +84,7 @@ final class HelferModellTests: XCTestCase {
         XCTAssertTrue(
             modell.quittungstext(zeile, um: um, von: von).hasPrefix("Übernommen um "),
             "die eigene Quittung nennt keinen Namen")
+        XCTAssertTrue(modell.eigeneQuittungen.contains(zeile.id), "nur die eigene gibt Haptik")
     }
 
     func testEinAndererHatUebernommenUndAufgehobenGehtVor() throws {

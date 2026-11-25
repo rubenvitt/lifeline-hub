@@ -79,13 +79,16 @@ final class AuftraegeTests: XCTestCase {
         let utc = try XCTUnwrap(TimeZone(identifier: "UTC"))
         let um = try XCTUnwrap(Serverzeit.datum("2026-11-25 14:32:00"))
         XCTAssertEqual(
-            AuftragAnzeige.quittiert(um: um, von: "Max M.", eigen: true, zeitzone: utc),
+            AuftragAnzeige.quittiert(um: um, von: "Max M.", eigenerName: "Max M.", zeitzone: utc),
             "Übernommen um 14:32")
         XCTAssertEqual(
-            AuftragAnzeige.quittiert(um: um, von: "Lisa K.", eigen: false, zeitzone: utc),
+            AuftragAnzeige.quittiert(um: um, von: "Lisa K.", eigenerName: "Max M.", zeitzone: utc),
             "Übernommen von Lisa K. um 14:32")
         XCTAssertEqual(
-            AuftragAnzeige.quittiert(um: nil, von: nil, eigen: false, zeitzone: utc), "Übernommen")
+            AuftragAnzeige.quittiert(um: nil, von: nil, eigenerName: nil, zeitzone: utc),
+            "Übernommen")
+        let offen = HelferAuftrag.Empfaenger(id: 1, kind: "unit", label: "San-Trupp 2")
+        XCTAssertNil(AuftragAnzeige.quittungstext(offen, eigenerName: "Max M.", zeitzone: utc))
         let berlin = try XCTUnwrap(TimeZone(identifier: "Europe/Berlin"))
         XCTAssertEqual(AuftragAnzeige.uhrzeit(um, zeitzone: berlin), "15:32")
     }
@@ -111,6 +114,28 @@ final class AuftraegeTests: XCTestCase {
         XCTAssertFalse(Phase.unbestaetigt.zeigtAuftraege)
         XCTAssertFalse(Phase.start.zeigtAuftraege)
         XCTAssertFalse(Phase.beendet(.abgemeldet).zeigtAuftraege)
+    }
+
+    /// Kaltstart: das Tippen kommt vor dem Zustand vom Server und wartet, bis die Phase steht.
+    func testEinTippenWartetBisDiePhaseBekanntIst() {
+        XCTAssertEqual(Phase.start.meldungstipp, .warten)
+        XCTAssertEqual(Phase.aktiv.meldungstipp, .oeffnen)
+        XCTAssertEqual(Phase.pausiert.meldungstipp, .oeffnen)
+        XCTAssertEqual(Phase.ruht(.keineRolle).meldungstipp, .oeffnen)
+        XCTAssertEqual(Phase.unbestaetigt.meldungstipp, .verwerfen)
+        XCTAssertEqual(Phase.anmelden.meldungstipp, .verwerfen)
+        XCTAssertEqual(Phase.beendet(.abgemeldet).meldungstipp, .verwerfen)
+    }
+
+    /// Nur eine quittierte Zeile mit dem eigenen Namen (oder ohne Namen) ist eine eigene.
+    func testEineFremdeQuittungIstNichtDieEigene() {
+        let lisa = HelferAuftrag.Empfaenger(
+            id: 1, kind: "unit", label: "San-Trupp 2", acknowledgedAt: "2026-11-25 10:01:00",
+            acknowledgedBy: "Lisa K.")
+        XCTAssertFalse(Auftraege.istEigeneQuittung(lisa, eigenerName: "Max M."))
+        XCTAssertTrue(Auftraege.istEigeneQuittung(lisa, eigenerName: " Lisa K. "))
+        let offen = HelferAuftrag.Empfaenger(id: 2, kind: "person", label: "Max")
+        XCTAssertFalse(Auftraege.istEigeneQuittung(offen, eigenerName: "Max M."))
     }
 
     func testEinUnbekannterKlartextIstKeinAuftrag() {

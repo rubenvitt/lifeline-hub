@@ -78,7 +78,8 @@ final class HelferModell {
     private(set) var quittungLaeuft: Set<Int64> = []
     /// Empfängerzeilen, deren Quittung scheiterte, mit dem Text für die Seite.
     private(set) var quittungsfehler: [Int64: String] = [:]
-    /// Empfängerzeilen, die diese App quittiert hat: „Übernommen um …“ statt „von …“.
+    /// Empfängerzeilen, die diese App erfolgreich quittiert hat und deren Quittung der Server als
+    /// eigene zurückgab (`Auftraege.istEigeneQuittung`); nur für die Haptik der Seite.
     private(set) var eigeneQuittungen: Set<Int64> = []
     /// Der geöffnete Auftrag (Detail), auch aus dem Tippen auf eine Mitteilung.
     var geoeffneterAuftrag: Int64?
@@ -106,6 +107,9 @@ final class HelferModell {
     @ObservationIgnored private var startNachRuhe = false
     /// Ob die Push-Anmeldung in diesem Lauf der App schon an den Server ging.
     @ObservationIgnored private var pushGemeldet = false
+    /// Ein Tippen auf eine Mitteilung, bevor die Phase bekannt war (Kaltstart,
+    /// `Meldungstipp.warten`): `nil` innen heißt ohne Auftrag.
+    @ObservationIgnored private var wartenderTipp: Int64??
 
     private static let anzeigenameSchluessel = "anzeigename"
 
@@ -464,8 +468,8 @@ final class HelferModell {
         quittungLaeuft.insert(empfaenger.id)
         defer { quittungLaeuft.remove(empfaenger.id) }
         if umgebung == .test {
-            eigeneQuittungen.insert(empfaenger.id)
-            ersetze(Beispiel.quittiert(auftrag, empfaenger: empfaenger, von: anzeigename))
+            let neu = Beispiel.quittiert(auftrag, empfaenger: empfaenger, von: anzeigename)
+            nachQuittung(neu, empfaenger: empfaenger.id)
             return
         }
         guard let verbindung else {
@@ -474,8 +478,7 @@ final class HelferModell {
         }
         let rueckmeldung = await verbindung.quittiere(auftrag: auftrag.id, empfaenger: empfaenger.id)
         if rueckmeldung.istErfolg, let neu = Auftraege.auftrag(aus: rueckmeldung.daten) {
-            eigeneQuittungen.insert(empfaenger.id)
-            ersetze(neu)
+            nachQuittung(neu, empfaenger: empfaenger.id)
         } else if rueckmeldung.status == 422 {
             await ladeAuftraege()
         } else {
@@ -491,11 +494,21 @@ final class HelferModell {
             fehler: quittungsfehler[empfaenger.id])
     }
 
-    /// „Übernommen um …“ oder „Übernommen von … um …“.
+    /// Antwort einer angenommenen Quittung: übernehmen; eine eigene (der Kern vergleicht den Namen
+    /// des Servers mit dem eigenen) bekommt die Haptik. War ein anderer schneller, gibt der Server
+    /// dessen Quittung zurück.
+    private func nachQuittung(_ neu: HelferAuftrag, empfaenger id: Int64) {
+        if let zeile = neu.recipients.first(where: { $0.id == id }),
+            Auftraege.istEigeneQuittung(zeile, eigenerName: anzeigename)
+        {
+            eigeneQuittungen.insert(id)
+        }
+        ersetze(neu)
+    }
+
+    /// „Übernommen um …“ oder „Übernommen von … um …“; eigen oder fremd entscheidet der Kern.
     func quittungstext(_ empfaenger: HelferAuftrag.Empfaenger, um: Date?, von: String?) -> String {
-        let name = anzeigename.trimmingCharacters(in: .whitespacesAndNewlines)
-        let eigen = eigeneQuittungen.contains(empfaenger.id) || (!name.isEmpty && von == name)
-        return AuftragAnzeige.quittiert(um: um, von: von, eigen: eigen)
+        AuftragAnzeige.quittiert(um: um, von: von, eigenerName: anzeigename)
     }
 
     func auftrag(_ id: Int64) -> HelferAuftrag? {
@@ -507,11 +520,20 @@ final class HelferModell {
         Task { await ladeAuftraege() }
     }
 
-    /// Tippen auf eine Mitteilung: den Auftrag öffnen und die Liste neu laden.
+    /// Tippen auf eine Mitteilung: den Auftrag öffnen und die Liste neu laden. Beim Kaltstart ist
+    /// die Phase noch `.start`; dann wartet das Tippen bis zum ersten Phasenwechsel
+    /// (`nachWechsel`), was der Kern entscheidet (`Phase.meldungstipp`).
     func meldungAngetippt(auftrag: Int64?) {
-        guard phase.zeigtAuftraege else { return }
-        if let auftrag { geoeffneterAuftrag = auftrag }
-        Task { await ladeAuftraege() }
+        switch phase.meldungstipp {
+        case .oeffnen:
+            wartenderTipp = nil
+            if let auftrag { geoeffneterAuftrag = auftrag }
+            Task { await ladeAuftraege() }
+        case .warten:
+            wartenderTipp = .some(auftrag)
+        case .verwerfen:
+            wartenderTipp = nil
+        }
     }
 
     /// Fragt nach Mitteilungen (nur, solange nicht entschieden), holt das Token und meldet Kennung,
@@ -558,6 +580,7 @@ final class HelferModell {
         quittungsfehler = [:]
         eigeneQuittungen = []
         geoeffneterAuftrag = nil
+        wartenderTipp = nil
     }
 
     // MARK: Antworten
@@ -630,9 +653,10 @@ final class HelferModell {
                 if phase.gekoppelt {
                     reagiere(auf: rueckmeldung)
                 } else {
-                    // Gespeicherte Sitzung beim Start ungültig: vergessen.
+                    // Gespeicherte Sitzung beim Start ungültig: vergessen, auch ein wartendes Tippen.
                     Sitzungsablage.loeschen()
                     self.verbindung = nil
+                    wartenderTipp = nil
                 }
             }
             return
@@ -655,6 +679,9 @@ final class HelferModell {
     /// abräumen.
     private func nachWechsel(von vorher: Phase) {
         guard phase != vorher else { return }
+        if let tipp = wartenderTipp, phase.meldungstipp != .warten {
+            meldungAngetippt(auftrag: tipp)
+        }
         if vorher == .unbestaetigt, phase == .aktiv {
             bestaetigungen += 1
             aktivitaet?.aktualisiere(aktivitaetsstand)
