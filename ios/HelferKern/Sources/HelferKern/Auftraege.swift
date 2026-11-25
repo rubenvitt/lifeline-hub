@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ein Auftrag an die Helfer-App (Stufe 2, ADR-0104), wie `GET /api/devices/me/tasks` ihn liefert
+/// Ein Auftrag an die Helfer-App (Stufe 2, ADR-0105), wie `GET /api/devices/me/tasks` ihn liefert
 /// (`HelperTask` in src/helfer/auftraege.rs). Die Felder sind die englischen Wire-Namen in
 /// camelCase; `HelferAuftrag.decoder` übersetzt aus snake_case. Zeiten sind UTC
 /// `YYYY-MM-DD HH:MM:SS` (`Serverzeit`). Aufträge liegen nur im Speicher, nie auf der Platte.
@@ -251,5 +251,16 @@ public enum AuftragAnzeige {
     public static func kurz(_ auftrag: HelferAuftrag) -> String {
         if auftrag.isAufgehoben { return aufgehoben }
         return auftrag.isOffen ? "offen" : "übernommen"
+    }
+}
+
+extension Phase {
+    /// Ob die App Aufträge lädt und den Bereich „Aufträge“ zeigt: nur bestätigt, also auch
+    /// pausiert und in der Ruhe. Vorher antwortet der Server 403 `not_confirmed`.
+    public var zeigtAuftraege: Bool {
+        switch self {
+        case .aktiv, .pausiert, .ruht: true
+        case .start, .anmelden, .unbestaetigt, .beendet: false
+        }
     }
 }

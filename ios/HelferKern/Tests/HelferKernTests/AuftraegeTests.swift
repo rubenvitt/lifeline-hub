@@ -3,7 +3,7 @@ import XCTest
 
 @testable import HelferKern
 
-/// Aufträge über die gemeinsamen Fälle hinaus (ADR-0104): Wire-Format, mehrere Zeilen, Stand
+/// Aufträge über die gemeinsamen Fälle hinaus (ADR-0105): Wire-Format, mehrere Zeilen, Stand
 /// während der Quittung, Texte.
 final class AuftraegeTests: XCTestCase {
     private func auftrag(
@@ -102,6 +102,15 @@ final class AuftraegeTests: XCTestCase {
         XCTAssertEqual(
             AuftragAnzeige.empfaenger(.init(id: 1, kind: "vehicle", label: "RTW 1")), "RTW 1")
         XCTAssertEqual(AuftragAnzeige.kurz(auftrag(aufgehoben: "2026-11-25 10:05:00")), "aufgehoben")
+    }
+
+    func testAuftraegeGibtEsNurBestaetigt() {
+        XCTAssertTrue(Phase.aktiv.zeigtAuftraege)
+        XCTAssertTrue(Phase.pausiert.zeigtAuftraege)
+        XCTAssertTrue(Phase.ruht(.keineRolle).zeigtAuftraege)
+        XCTAssertFalse(Phase.unbestaetigt.zeigtAuftraege)
+        XCTAssertFalse(Phase.start.zeigtAuftraege)
+        XCTAssertFalse(Phase.beendet(.abgemeldet).zeigtAuftraege)
     }
 
     func testEinUnbekannterKlartextIstKeinAuftrag() {
