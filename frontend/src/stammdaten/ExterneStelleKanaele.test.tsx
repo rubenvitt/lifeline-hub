@@ -132,10 +132,7 @@ describe('ExterneStelle Kanaladressen', () => {
     const nutzer = userEvent.setup();
     renderMitProviders(<ExterneStelleFormModal offen stelle={ils} onClose={() => {}} />);
 
-    // antd legt die Eingabe unter das Etikett (pointer-events: none): geklickt wird das Etikett.
-    await nutzer.click(
-      (await screen.findByRole('radio', { name: 'Fax' })).closest('label') as HTMLElement,
-    );
+    await nutzer.click(await screen.findByRole('radio', { name: 'Fax' }));
     const feld = screen.getByLabelText('Faxnummer');
     expect(feld).toHaveAttribute('inputmode', 'tel');
     await nutzer.type(feld, 'Leitstelle anrufen');

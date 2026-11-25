@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Fax mit Abfrage bis „zugestellt“, LLH-2095; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -794,6 +794,29 @@ sequenceDiagram
   (`src/ausgang/zustand.rs`).
 - Beim Start behandelt `beim_start` eine mitten in der Zustellung unterbrochene Zeile wie
   `ungewiss`.
+
+Ein Fax (LLH-2095, [ADR-0105](entscheidungen/ADR-0105-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md))
+läuft durch denselben Korb; sipgate nimmt nur an, ob es durchging, zeigt erst die Abfrage.
+
+```mermaid
+sequenceDiagram
+  participant Hub as lifeline-hub (src/ausgang/lauf.rs)
+  participant DB as SQLite (ausgang, etb_eintrag)
+  participant SG as sipgate (api.sipgate.com)
+  Hub->>DB: fällige Fax-Zeile, Verbindung zurückgeben
+  Hub->>Hub: PDF aus Schnappschuss und Anlagen (src/ausgang/pdf.rs)
+  Hub->>SG: POST /v2/sessions/fax (Basic-Auth, Token)
+  SG-->>Hub: 200 sessionId
+  Hub->>DB: uebergeben, anbieter_ref, nächste Abfrage in 30 s (kein ETB)
+  loop jede Minute bis Endstand, höchstens 2 h
+    Hub->>SG: GET /v2/history/{sessionId}
+    SG-->>Hub: faxStatusType
+  end
+  Hub->>DB: BEGIN, zugestellt bzw. fehlgeschlagen und ETB-Eintrag, COMMIT
+```
+
+- Ohne Endstand nach 2 h ist das Fax `ungewiss`; ein Abbruch nach dem Senden ebenso, ohne
+  zweites Fax. Ein Neustart fragt weiter und sendet nicht neu.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

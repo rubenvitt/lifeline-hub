@@ -92,21 +92,24 @@ sie.
    „Stand der Übernahme“ mit ⧖ und „aus der Vorfassung“; eine neue Übernahme im Abschnitt bringt
    die aktuellen Zahlen.
 
-### Einen Lagebericht per E-Mail senden
+### Einen Lagebericht per E-Mail oder Fax senden
 
 Für Einsatzleitung und Führungspersonal, mit freigegebenem Bericht:
 
 1. Einen freigegebenen Bericht öffnen und „Senden“ wählen.
-2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen. Vorbelegt sind die Stellen aus dem
-   Verteiler des Berichts, die eine Mailadresse haben; hat eine Stelle mehrere, steht jede Adresse
-   einzeln da.
+2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen, unter „E-Mail“ die Mailadressen, unter
+   „Fax“ die Faxnummern. Vorbelegt sind die Mailadressen der Stellen aus dem Verteiler des
+   Berichts; eine Faxnummer wird immer selbst angekreuzt. Hat eine Stelle mehrere Adressen, steht
+   jede einzeln da.
 3. „Senden“ wählen. Unter dem Berichtstext erscheint der Abschnitt „Versand“ mit einer Zeile je
-   Adresse und ihrem Stand: „wartet“, „übergeben 14:32“ oder „fehlgeschlagen: …“.
+   Adresse und ihrem Stand: „wartet“, „übergeben 14:32“, beim Fax „übergeben 14:32, Zustellung
+   wird geprüft“ und danach „zugestellt 14:34“, oder „fehlgeschlagen: …“.
 4. Ist ein Versand fehlgeschlagen oder die Zustellung unklar, in seiner Zeile „Erneut senden“
    wählen.
 
-Fehlt jede Mailadresse, steht im Dialog „Keine Mailadresse hinterlegt“ mit dem Weg zu den Externen
-Stellen; ist kein Mailserver eingerichtet, meldet der Dialog „Kein Mailserver eingerichtet“.
+Fehlt jede Adresse, steht im Dialog „Keine Adresse hinterlegt“ mit dem Weg zu den Externen
+Stellen; ist kein Mailserver eingerichtet, meldet der Dialog „Kein Mailserver eingerichtet“, fehlt
+der Faxzugang, „Kein Faxzugang eingerichtet“.
 
 ## Hintergrund
 
@@ -219,6 +222,27 @@ Der Versand gilt nur für Stellen mit hinterlegter Mailadresse (Kapitel [Stammda
   sehen alle, die den Bericht lesen dürfen. Ohne Netz ist „Senden“ gesperrt („Ohne Netz nicht
   möglich“). Führt eine andere Instanz den Einsatz, sendet dieser Rechner nicht
   („Einsatz wird von einer anderen Instanz geführt“).
+- **PDF im Anhang.** Jede Mail trägt den Bericht zusätzlich als PDF (Kopf mit Absender, Zeit,
+  ÜBUNG bei einer Übung, Betreff, Empfänger und Einsatz; jede Anlage auf eigener Seite). Ist das
+  PDF zu groß oder lässt es sich nicht bauen, geht die Mail ohne PDF hinaus und die Zeile sagt
+  „ohne PDF“. Gedruckt wird weiter über „Drucken / als PDF“ im Browser.
+
+### Versand per Fax
+
+Der Versand per Fax braucht eine Faxnummer an der Stelle (Kapitel [Stammdaten](stammdaten.md),
+„Externe Stellen“) und den Faxzugang der Organisation (Kapitel [Anbindungen](anbindungen.md)).
+Sonst gilt alles wie beim Versand per E-Mail.
+
+- **Das Fax ist das PDF.** Es geht schwarz auf weiß hinaus, höchstens 30 Seiten und 10 MB. Wäre
+  es länger, lehnt „Senden“ ab („Fax zu lang (höchstens 30 Seiten)“), auch für die Mails derselben
+  Auswahl; dann den Bericht kürzen oder nur per E-Mail senden.
+- **„Zustellung wird geprüft“, dann „zugestellt“.** sipgate nimmt das Fax erst nur an; die App
+  fragt danach nach, bis es „zugestellt“ ist oder „fehlgeschlagen: Fax nicht zugestellt“ (etwa
+  weil die Gegenstelle besetzt war; dann „Erneut senden“). Bestätigt sipgate innerhalb von zwei
+  Stunden nichts, steht „Zustellung nicht bestätigt“ da. Das ETB bekommt den Eintrag erst mit dem
+  Ergebnis, etwa „Lagebericht Nr. 3 per Fax an Leitstelle Nord (+49…) zugestellt“.
+- **Kein doppeltes Fax.** Bricht die Verbindung nach dem Absenden ab, sendet die App nicht von
+  selbst noch einmal; ob „Erneut senden“, entscheidet die Person.
 
 ### Anlagen
 

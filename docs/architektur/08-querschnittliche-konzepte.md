@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Fax und PDF des Ausgangs, LLH-2095; Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -543,7 +543,7 @@ Helfer-App (ADR-0101, Spec
 
 ## 8.34 Nachrichten an Menschen: Ausgangskorb
 
-Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur über die Tabelle
+Was ein Mensch an eine Externe Stelle sendet (E-Mail, LLH-2093; Fax, LLH-2095), geht nur über die Tabelle
 `ausgang` und den Lauf `src/ausgang/` ([ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
 [`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
 
@@ -555,6 +555,11 @@ Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur 
   Zeile; jedes Ergebnis steht im ETB, Ergebnis und Eintrag in einer Transaktion. Der Mailserver
   bestätigt mit 250 oder gar nicht: ein Abbruch nach DATA ist `ungewiss` und wird nie selbst
   wiederholt.
+- **Ein Kanal, eine Art:** Fax ist die Adapter-Art `sipgate_fax` mit Token als Geheimnis; das Fax
+  ist ein PDF, das nur hier am Server entsteht
+  ([ADR-0105](entscheidungen/ADR-0105-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md)) und
+  auch der Mail anhängt. Ein Fax gilt erst als `zugestellt`, wenn sipgate es auf Nachfrage
+  bestätigt; das ETB folgt dem Endstand.
 - **Spiegel und Schwärzung:** `ausgang` ist vom Spiegel ausgenommen (`src/instanz/spiegel/art.rs`),
   am Spiegel wird nicht angelegt und nicht zugestellt; die Tabelle steht in der Schwärzung.
 

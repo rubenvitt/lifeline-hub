@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 25.11.2026 (Ausgangskorb, LLH-2093; Ortung und Kopplung (Ortung), LLH-2091; Fremdebene, LLH-2099; Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
+Stand: 25.11.2026 (Zugestellt, LLH-2095; Ausgangskorb, LLH-2093; Ortung und Kopplung (Ortung), LLH-2091; Fremdebene, LLH-2099; Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -18,7 +18,7 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Ablösung | Ablösen einer Einheit nach ihrer Schicht; eine Zeile ist eine Schicht mit Fälligkeit, geplanter ablösender Einheit und Vollzug. | `src/abloesung/mod.rs`, Spec [`kraefte-abloesung`](../../openspec/specs/kraefte-abloesung/spec.md) |
 | Archiv (Einsatz) | Age-verschlüsselte SQLite-Datei eines Einsatzes, angelegt am Ende der Nachbereitung an die geprüften Archiv-Schlüssel der Org, auf jeder Instanz ohne Kopplung „meldet sich“ (Hub oder ungekoppelter ELW). Gestaffelte Blöcke: einer je Kategorie-Fristende vor dem Ende der Aufbewahrung, dazu einer bis zu diesem Ende (zwei verschiedene Kategorie-Fristen ergeben drei Blöcke). Danach ist der Einsatz geschwärzt. | `src/einsatz/archiv.rs`, `einsatz_archiv` und `org_archiv_empfaenger` in `migrations/0329_einsatz_archiv.sql` |
 | Auftrag | Top-down-Strang des Führungsvorgangs (Befehlsgebung, Vollzug, Kontrolle) mit Quittung je Empfänger. | `src/auftrag/mod.rs`, Spec [`auftraege-befehle`](../../openspec/specs/auftraege-befehle/spec.md) |
-| Ausgangskorb | Tabelle `ausgang` und Lauf, über die Nachrichten an Menschen (E-Mail an Externe Stellen) zugestellt werden; ein Versand je Adresse mit Zustand `wartet`, `uebergeben`, `fehlgeschlagen`. | `src/ausgang/`, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md) |
+| Ausgangskorb | Tabelle `ausgang` und Lauf, über die Nachrichten an Menschen (E-Mail und Fax an Externe Stellen) zugestellt werden; ein Versand je Adresse mit Zustand `wartet`, `uebergeben`, `zugestellt` (nur Fax), `fehlgeschlagen`. | `src/ausgang/`, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md) |
 | Belegungsart (gezählt, namentlich geführt) | Wie eine Betreuungsstelle ihre Belegung führt: gemeldet oder vom Server aus den dort Registrierten. | [ADR-0017](entscheidungen/ADR-0017-belegung-einer-betreuungsstelle-hat-eine-meldereihe.md), `src/betreuung/repo.rs` |
 | Bereitstellungsraum (BR) | Ort, an dem Einheiten und Fahrzeuge auf ihren Einsatz warten; Status `geplant`, `aktiv`, `aufgeloest`. | `BrStatus` in `src/bereitstellungsraum/mod.rs`, Spec [`bereitstellungsraum-belegung`](../../openspec/specs/bereitstellungsraum-belegung/spec.md) |
 | Betreuungsstelle | Stelle zur Betreuung und Unterbringung Betroffener. | Modul „Betreuung“ in `frontend/src/einsatz/modulRegistry.ts`, [`frontend/src/betreuung/AGENTS.md`](../../frontend/src/betreuung/AGENTS.md) |
@@ -126,4 +126,5 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Verwahrung | Übergabe eines eigenen, abgeschlossenen Einsatzes nach der Nachbereitung von der meldenden an die erreichte Instanz; dort wird aus dem Spiegel ein eigener Einsatz. | `verwahrung_annehmen` in `src/instanz/spiegel/lebensende.rs`, `einsatz_verwahrung` in `migrations/0322_nachbereitung_lebensende.sql` |
 | Wächter | Test oder Skript, das eine Regel im Code durchsetzt (`*.guard.test.ts`, `tests/*_guard.rs`, `scripts/check-*.sh`). | [Querschnitt 8.27](08-querschnittliche-konzepte.md) |
 | Wire-Enum | Enum, dessen Wire-Werte aus einer Liste `Variante => "wire"` entstehen. | `wire_enum!` in `src/wire_enum.rs`, `tests/enum_wire_kontrakt.rs` |
+| Zugestellt (Fax) | Endstand eines Faxes im Ausgangskorb, wenn sipgate auf Nachfrage `SENT` meldet; `uebergeben` heißt beim Fax nur „angenommen“. | `src/ausgang/lauf.rs` (`abfragen_one`), `src/adapter/sipgate.rs` |
 | Zunder | Aufgabenverwaltung des Projekts; alte Kennungen `LFH-<n>` bleiben gültig. | [Wurzel-`AGENTS.md`](../../AGENTS.md), Abschnitt „Zunder“ |

@@ -1,6 +1,6 @@
-import { Button, Input, Radio } from 'antd';
+import { Button, Input } from 'antd';
 import { useId, useState } from 'react';
-import { Augenbraue, FeldFehler, Stapel, Textstufe } from '../components/instrument';
+import { Augenbraue, FeldFehler, SegmentFeld, Stapel, Textstufe } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { useCreateKanal, useDeleteKanal, useExterneStelleKanaele } from '../api/externeStellen';
@@ -136,17 +136,16 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
           </Textstufe>
         ) : (
           <Stapel abstand="xs">
-            <Radio.Group
-              aria-label="Kanal der neuen Adresse"
-              optionType="button"
+            <SegmentFeld<'email' | 'fax'>
+              beschriftung="Kanal der neuen Adresse"
               value={kanal}
-              onChange={(e) => {
-                setKanal(e.target.value as 'email' | 'fax');
+              onChange={(w) => {
+                setKanal(w);
                 setFormFehler(null);
               }}
-              options={[
-                { value: 'email', label: KANAL_TEXT.email.name },
-                { value: 'fax', label: KANAL_TEXT.fax.name },
+              optionen={[
+                { wert: 'email', label: KANAL_TEXT.email.name },
+                { wert: 'fax', label: KANAL_TEXT.fax.name },
               ]}
             />
             <Stapel richtung="zeile" abstand="sm" umbruch>
