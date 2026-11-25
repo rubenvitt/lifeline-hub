@@ -55,8 +55,9 @@ ein Muster vorliegt.
 - **Protokoll vor Daten:** erst der Audit-Eintrag, dann die Daten (wie `druck`). Scheitert der
   Eintrag, verlässt keine Person den Server.
 - **Migration:** Die neuen Protokollarten verlangen einen Umbau von `person_zugriff_audit`, weil
-  SQLite einen Spalten-CHECK nur so ändert. Das Muster ist 1:1 `0311`, `-- no-transaction`,
-  Nummer nach `migrations/AGENTS.md`.
+  SQLite einen Spalten-CHECK nur so ändert. Das Schema folgt 1:1 `0311`; als Blatt-Umbau ohne
+  den Marker no-transaction (`migrations/AGENTS.md`, „Tabellenumbau“), Nummer nach derselben
+  Datei.
 - **Wire-Enum (ADR-0006):** neue Varianten in `ZugriffArt` und im Enum-Wire-Kontrakt;
   `scripts/check-typ-codegen.sh` läuft, beide generierten Dateien werden mitcommittet.
 - **Druck:** über den Browser (`frontend/src/druck/AGENTS.md`). Der Weg im Dialog heißt nach
@@ -98,8 +99,8 @@ Nachgeschärft am 24.11.2026: Die Sichtung `tot` zählt wie der Status `verstorb
 `unverletzt` macht niemanden verletzt. `abgemeldet` bekommt kein eigenes Wort, denn das Gehen
 zeigt die Spalte Verbleib.
 
-Ein `wire_enum!` `PassBetroffenheit` (`verstorben`, `vermisst`, `verletzt_erkrankt`,
-`untergebracht`, `unverletzt`); das Wort für CSV und Druck kommt aus einer Funktion daneben.
+Ein Server-Enum `PassBetroffenheit` ohne Wire-Wert (also kein `wire_enum!`); das Wort für CSV
+und Druck kommt aus seiner Funktion `wort`.
 
 ### Protokoll
 
@@ -129,7 +130,8 @@ Listenzugriffen (`liste_listenweit`) und im Erfassungsfenster je Person, wie dor
 - CSV: `GET /api/einsaetze/{id}/persons/export?profile=pass`
 - Druck: `GET /api/einsaetze/{id}/persons/print?profile=pass` liefert `Vec<PassZeile>` als JSON
 - Ohne `profile` bleibt alles wie heute. Ein unbekanntes `profile` gibt 400.
-- In OpenAPI stehen beide Antwortformen am Pfad. `PassZeile` geht in den Typ-Codegen.
+- `PassZeile` steht als Schema in `api_doc.rs` und geht so in den Typ-Codegen. Die internen
+  Pfade selbst stehen nicht im OpenAPI-Dokument.
 - **`PassZeile` trägt fertige Texte**, eine Zeichenkette je Spalte, genau wie im CSV: Wörter,
   formatierte Daten, Verbleibtext. Die Druckseite zeigt sie nur an und ordnet nichts zu. So steht
   die Zuordnung allein in Rust (Anti-Ziel). `PassBetroffenheit` bleibt ein Enum im Server und
