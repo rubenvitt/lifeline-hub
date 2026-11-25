@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalView
 import dev.rubeen.lifeline.helfer.seiten.AngemeldetSeite
+import dev.rubeen.lifeline.helfer.seiten.AuftragSeite
 import dev.rubeen.lifeline.helfer.seiten.AnmeldenSeite
 import dev.rubeen.lifeline.helfer.seiten.BeendetSeite
 import dev.rubeen.lifeline.helfer.seiten.ScannerSeite
@@ -107,12 +108,20 @@ fun Wurzel(modell: HelferModell, onEinstellungen: () -> Unit) {
                 Phase.Start -> StartSeite(modell, onScannen = { scannt = true })
                 is Phase.Anmelden -> AnmeldenSeite(modell, onAnmelden = { mitRechten(NACH_ANMELDEN) })
                 Phase.Unbestaetigt -> WartetSeite(modell, onOrtungStarten = { mitRechten(NACH_STARTEN) }, onEinstellungen = onEinstellungen)
-                Phase.Aktiv, Phase.Pausiert, is Phase.Ruht -> AngemeldetSeite(
-                    modell,
-                    onFortsetzen = { mitRechten(NACH_FORTSETZEN) },
-                    onOrtungStarten = { mitRechten(NACH_STARTEN) },
-                    onEinstellungen = onEinstellungen,
-                )
+                Phase.Aktiv, Phase.Pausiert, is Phase.Ruht -> {
+                    // Detail eines Auftrags (aus der Liste oder einer Mitteilung, ADR-0105).
+                    val auftrag = modell.offenerAuftrag?.let { id -> modell.auftraege.firstOrNull { it.id == id } }
+                    if (auftrag != null) {
+                        AuftragSeite(modell, auftrag)
+                    } else {
+                        AngemeldetSeite(
+                            modell,
+                            onFortsetzen = { mitRechten(NACH_FORTSETZEN) },
+                            onOrtungStarten = { mitRechten(NACH_STARTEN) },
+                            onEinstellungen = onEinstellungen,
+                        )
+                    }
+                }
                 is Phase.Beendet -> BeendetSeite(modell, phase.grund)
             }
         }

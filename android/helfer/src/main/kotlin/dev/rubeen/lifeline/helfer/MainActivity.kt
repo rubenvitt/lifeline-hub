@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
+import dev.rubeen.lifeline.helfer.dienste.Mitteilungen
 import dev.rubeen.lifeline.helfer.dienste.Systemdienste
 import dev.rubeen.lifeline.helfer.ui.HelferThema
 import dev.rubeen.lifeline.helferkern.Testzustand
@@ -56,8 +57,13 @@ class MainActivity : ComponentActivity() {
         oeffne(intent)
     }
 
-    /** Ein Deeplink von außen (`lifeline-helfer://anmelden?server=…#CODE`). */
+    /**
+     * Ein Deeplink von außen (`lifeline-helfer://anmelden?server=…#CODE`) oder das Tippen auf die
+     * Mitteilung eines Auftrags (öffnet sein Detail).
+     */
     private fun oeffne(intent: Intent?) {
+        val auftrag = intent?.getLongExtra(Mitteilungen.EXTRA_AUFTRAG, -1L) ?: -1L
+        if (auftrag >= 0) modell.zeigeAuftrag(auftrag)
         val link = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.dataString ?: return
         modell.oeffne(link)
     }

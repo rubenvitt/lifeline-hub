@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Lifeline Helfer (ADR-0101, Regeln android/helfer/AGENTS.md): eine App mit einer Aufgabe, am Einsatz
-  anmelden und die Position senden. Ortung nur im Vordergrund-Dienst vom Typ `location`, gestartet aus
-  der geöffneten App; kein Recht für den Standort im Hintergrund.
+  anmelden, die Position senden und Aufträge empfangen (ADR-0105). Ortung und Empfang nur im einen
+  Vordergrund-Dienst vom Typ `location|remoteMessaging`, gestartet aus der geöffneten App; kein Recht
+  für den Standort im Hintergrund, kein Google-Push.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
@@ -13,9 +14,13 @@
     <!-- Standort fein oder grob (die Person darf „ungefähr“ wählen), nur im Vordergrund-Dienst. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Der Ortungsdienst läuft als Vordergrund-Dienst vom Typ `location` mit Benachrichtigung. -->
+    <!--
+      Der Helfer-Dienst läuft als Vordergrund-Dienst mit Benachrichtigung: `location` zum Orten,
+      `remoteMessaging` für die eigene Verbindung zum Server, über die Aufträge kommen.
+    -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Ab Android 16 zeigt das System die Benachrichtigung des Dienstes als Live-Update. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
@@ -53,10 +58,13 @@
             </intent-filter>
         </activity>
 
-        <!-- Die einzige Stelle, die im Hintergrund sendet; nur aus der App gestartet (ADR-0101). -->
+        <!--
+          Die einzige Stelle, die im Hintergrund sendet und empfängt; nur aus der App gestartet
+          (ADR-0101, ADR-0105). Ohne Ortung läuft er allein mit `remoteMessaging`.
+        -->
         <service
             android:name=".dienste.OrtungsDienst"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="location|remoteMessaging" />
     </application>
 </manifest>

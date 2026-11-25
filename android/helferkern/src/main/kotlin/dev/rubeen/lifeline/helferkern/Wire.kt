@@ -111,6 +111,53 @@ data class Zustand(
     }
 }
 
+/**
+ * Eine eigene Empfängerzeile eines Auftrags (`HelperTaskRecipient`, src/helfer/auftraege.rs):
+ * die Einheit, das Fahrzeug oder die Person dieser Kopplung, mit Quittungsstand.
+ */
+@Serializable
+data class HelperTaskRecipient(
+    val id: Long,
+    /** `unit`, `vehicle` oder `person`. */
+    val kind: String,
+    /** Empfänger, wie beim Erteilen angezeigt. */
+    val label: String,
+    @SerialName("acknowledged_at") val acknowledgedAt: String? = null,
+    /** Anzeigename der Helfer-Kopplung oder Name des Kontos, das quittiert hat. */
+    @SerialName("acknowledged_by") val acknowledgedBy: String? = null,
+) {
+    val isQuittiert: Boolean get() = acknowledgedAt != null
+}
+
+/**
+ * Ein Auftrag an diese Kopplung (`HelperTask`, `GET /api/devices/me/tasks`). Zeiten in UTC,
+ * `yyyy-MM-dd HH:mm:ss` ([Wire.serverzeit]). Liegt nur im Speicher (ADR-0105: nie auf die Platte).
+ */
+@Serializable
+data class HelperTask(
+    val id: Long,
+    val number: Long? = null,
+    val text: String,
+    val location: String? = null,
+    @SerialName("location_lat") val locationLat: Double? = null,
+    @SerialName("location_lon") val locationLon: Double? = null,
+    /** `sofort`, `dringend` oder `normal` (`Prioritaet`). */
+    val priority: String,
+    @SerialName("deadline_at") val deadlineAt: String? = null,
+    @SerialName("issued_at") val issuedAt: String,
+    @SerialName("cancelled_at") val cancelledAt: String? = null,
+    val recipients: List<HelperTaskRecipient> = emptyList(),
+) {
+    val isAufgehoben: Boolean get() = cancelledAt != null
+
+    /** Offen: nicht aufgehoben, und mindestens eine eigene Zeile ist noch nicht quittiert. */
+    val isOffen: Boolean get() = !isAufgehoben && recipients.any { !it.isQuittiert }
+}
+
+/** Antwort von `GET /api/devices/me/tasks` (`HelperTaskList`). */
+@Serializable
+data class HelperTaskList(val tasks: List<HelperTask>)
+
 /** Fehler-Body `{error, reason?}`; beide `null`, wenn der Body keiner ist. */
 @Serializable
 data class Fehler(val error: String? = null, val reason: String? = null)
@@ -127,6 +174,12 @@ object Wire {
     fun zustand(text: String): Zustand? = lies { json.decodeFromString<Zustand>(text) }
 
     fun zielliste(text: String): Zielliste? = lies { json.decodeFromString<Zielliste>(text) }
+
+    /** Liste aus `GET /api/devices/me/tasks`. */
+    fun auftraege(text: String): List<HelperTask>? = lies { json.decodeFromString<HelperTaskList>(text).tasks }
+
+    /** Antwort auf die Quittung (`POST …/recipients/{id}/acknowledge`). */
+    fun auftrag(text: String): HelperTask? = lies { json.decodeFromString<HelperTask>(text) }
 
     fun fehler(text: String): Fehler = lies { json.decodeFromString<Fehler>(text) } ?: Fehler()
 
