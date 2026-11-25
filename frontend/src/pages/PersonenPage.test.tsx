@@ -10,6 +10,7 @@ import { neuerQueryClient, renderMitProviders, setzeOnline, sortTarget } from '.
 import { AdresseSteht } from '../test/adresseSteht';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzAnzeige, Person } from '../api/types';
+import { ZWECK_BILDSCHIRM } from '../personen/passListe';
 import PersonenPage from './PersonenPage';
 import PersonenDetailPage from './PersonenDetailPage';
 import {
@@ -2406,5 +2407,102 @@ describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
     expect(
       screen.getByRole('button', { name: 'Filter Sichtung: SK I entfernen' }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * PASS-Liste (LLH-1198, Entwurf `2026-11-24-sco62ku3-pass-liste`): nur die Einsatzleitung sieht den
+ * einen Einstieg „PASS-Liste“; sein Dialog nennt die Zweckbindung und bietet Druckansicht und CSV.
+ * Das CSV lädt erst auf „Als CSV exportieren“, genau einmal.
+ */
+describe('PersonenPage — PASS-Liste (LLH-1198)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  function kopfAktionen() {
+    return waitFor(() => {
+      const el = document.querySelector<HTMLElement>('[data-lfh="seitenkopf-aktionen"]');
+      expect(el).not.toBeNull();
+      return el!;
+    });
+  }
+
+  function zaehlePassAbrufe() {
+    const abrufe = { pass: 0 };
+    server.use(
+      http.get('/api/incidents/1/persons/export', ({ request }) => {
+        if (new URL(request.url).searchParams.get('profile') === 'pass') abrufe.pass += 1;
+        return new HttpResponse('\uFEFFKennung;Name\r\n"R-001";"Muster"\r\n');
+      }),
+    );
+    return abrufe;
+  }
+
+  async function oeffnePassDialog() {
+    const kopf = await kopfAktionen();
+    await userEvent.click(within(kopf).getByRole('button', { name: 'PASS-Liste' }));
+    return screen.findByRole('dialog', { name: 'PASS-Liste' });
+  }
+
+  it('die Einsatzleitung sieht genau einen PASS-Eintrag im Kopf', async () => {
+    const abrufe = zaehlePassAbrufe();
+    render(einsatzAktiv, [person]);
+    const kopf = await kopfAktionen();
+    expect(within(kopf).getAllByRole('button', { name: /PASS/ })).toHaveLength(1);
+    expect(within(kopf).queryByRole('link', { name: /PASS/ })).toBeNull();
+    // Die gewohnte Druckansicht bleibt daneben stehen.
+    expect(within(kopf).getByRole('link', { name: 'Druckansicht' })).toBeInTheDocument();
+    expect(abrufe.pass).toBe(0);
+  });
+
+  it.each([
+    ['Führungspersonal', 'fuehrungspersonal'],
+    ['Beobachter', 'beobachter'],
+  ] as const)('%s sieht keinen PASS-Eintrag', async (_name, rolle) => {
+    render(einsatzFixture({ meine_rolle: rolle }), [person]);
+    const kopf = await kopfAktionen();
+    expect(within(kopf).getByRole('button', { name: 'CSV exportieren' })).toBeInTheDocument();
+    expect(within(kopf).queryByRole('button', { name: 'PASS-Liste' })).toBeNull();
+  });
+
+  it('der Dialog nennt die Zweckbindung und führt zur Druckansicht', async () => {
+    const abrufe = zaehlePassAbrufe();
+    render(einsatzAktiv, [person]);
+    const dialog = await oeffnePassDialog();
+    expect(dialog).toHaveTextContent(ZWECK_BILDSCHIRM);
+    expect(within(dialog).getByRole('link', { name: 'Druckansicht' })).toHaveAttribute(
+      'href',
+      '/einsaetze/1/personen/pass-druck',
+    );
+    expect(abrufe.pass).toBe(0);
+    await schliesseMaske(dialog);
+    expect(abrufe.pass).toBe(0);
+  });
+
+  it('„Als CSV exportieren“ lädt genau einmal und schließt den Dialog', async () => {
+    const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    const abrufe = zaehlePassAbrufe();
+    render(einsatzAktiv, [person]);
+    const dialog = await oeffnePassDialog();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als CSV exportieren' }));
+    await waitFor(() => expect(speichern).toHaveBeenCalledTimes(1));
+    expect(abrufe.pass).toBe(1);
+    expect(speichern.mock.calls[0][1]).toMatch(
+      /^pass-liste-einsatz-1-\d{4}-\d{2}-\d{2}-\d{4}\.csv$/,
+    );
+  });
+
+  it('ein Fehler des PASS-Exports steht an der Seite', async () => {
+    vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+    server.use(
+      http.get('/api/incidents/1/persons/export', () =>
+        HttpResponse.json({ error: 'Nur für die Einsatzleitung' }, { status: 403 }),
+      ),
+    );
+    render(einsatzAktiv, [person]);
+    const dialog = await oeffnePassDialog();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Als CSV exportieren' }));
+    const meldung = await screen.findByText('Nur für die Einsatzleitung');
+    expect(meldung.closest('.ant-alert')).not.toBeNull();
+    expect(screen.getByText('Export fehlgeschlagen')).toBeInTheDocument();
   });
 });

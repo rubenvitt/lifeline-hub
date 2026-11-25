@@ -468,6 +468,7 @@ use utoipa::OpenApi;
         crate::person::abgleich_repo::AbgleichAnzeige,
         crate::person::audit_repo::ZugriffAnzeige,
         crate::person::audit_repo::ZugriffArt,
+        crate::person::pass::PassZeile,
         crate::person::anhang::PersonAnhangAnzeige,
         crate::person::massnahme_repo::MassnahmeAnzeige,
         crate::person::massnahme_repo::MassnahmeArt,

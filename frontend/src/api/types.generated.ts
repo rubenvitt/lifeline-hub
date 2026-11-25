@@ -7111,6 +7111,22 @@ export interface components {
          * @enum {string}
          */
         PaketPostenArt: "einheit" | "fahrzeug" | "uhs" | "pause";
+        /**
+         * @description Eine Zeile der PASS-Liste: je Spalte der fertige Text, leer = keine Angabe. Reihenfolge der
+         *     Felder = Reihenfolge der CSV-Spalten ([`KOPF`]).
+         */
+        PassZeile: {
+            address: string;
+            affectedness: string;
+            age: string;
+            birth_date: string;
+            first_name: string;
+            id_label: string;
+            last_name: string;
+            recorded_at: string;
+            sex: string;
+            whereabouts: string;
+        };
         /** @description Ein festgelegter Pegel eines Einsatzes. */
         PegelAnzeige: {
             gewaesser?: string | null;
@@ -10716,11 +10732,11 @@ export interface components {
         };
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-         *     `art IN ('detail','export','druck','anhang','registrierliste')`
-         *     (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
+         *     `art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`
+         *     (migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
          * @enum {string}
          */
-        ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste";
+        ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste" | "pass_export" | "pass_druck";
         /**
          * @description Welche Fassung abgerufen wurde. Wire = DB-CHECK `fassung IN ('bereinigt','original')`.
          * @enum {string}

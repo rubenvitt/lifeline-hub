@@ -4,6 +4,7 @@ import {
   registrierlisteDruckPfad,
   geraetRegistrierlisteDruckPfad,
   personenDruckPfad,
+  passListeDruckPfad,
   parsePersonenDruckAuswahl,
   tiereDruckPfad,
   parseTiereDruckAuswahl,
@@ -1125,6 +1126,10 @@ describe('etbDruckPfad (LFH-22)', () => {
  */
 describe('Druckpfade der Modul-Listen (LFH-727)', () => {
   const rundlauf = (pfad: string) => new URLSearchParams(pfad.split('?')[1] ?? '');
+
+  it('passListeDruckPfad führt auf die Druckansicht der PASS-Liste (LLH-1198)', () => {
+    expect(passListeDruckPfad(7)).toBe('/einsaetze/7/personen/pass-druck');
+  });
 
   it('Personen: ohne Filter der blanke Pfad, mit Filter hin und zurück', () => {
     expect(personenDruckPfad(7, { filter: 'alle', nurLuecken: false })).toBe(
