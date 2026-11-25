@@ -425,6 +425,14 @@ pub const PERSONENBEZUEGE: &[PersonenBezug] = &[
             ("herkunft", Mit),
         ],
     },
+    // Helfer-Kopplung, als Person geortet (Helfer-App, Mig 0377): dieselbe Kraft, also geht der
+    // Name, den sie in der App eingegeben hat, mit ihr.
+    PersonenBezug {
+        art: PersonenArt::ExterneKraft,
+        tabelle: "geraet_kopplung",
+        bezug: Bezug::Spalte("person_id"),
+        spalten: &[("anzeigename", Mit)],
+    },
     // Letzte Besetzung einer aufgelösten Einheit (LLH-1266): nur Verweise, nichts zu entfernen;
     // der Name geht mit `einsatz_personal`.
     PersonenBezug {
