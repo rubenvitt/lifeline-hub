@@ -201,6 +201,11 @@ Quelle nicht laden, steht „—“ statt einer Zahl.
 Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wann ihr Stand ist;
 „offline“, „keine Daten“ oder „näher heranzoomen“ sagen, warum sie gerade nichts zeigt.
 
+Eine Warnung der Ebene „Amtliche Warnungen (NINA)“ zeigt in ihren Details nur einen Auszug. Die vollständige
+Meldung mit Beschreibung und Handlungsanweisung öffnet „Vollmeldung bei warnung.bund.de“ in einem
+neuen Tab. Dort lässt sich auch die Echtheit der Warnung prüfen. Ohne Netz ist der Knopf gesperrt
+und nennt den Grund.
+
 „Satellitenauswertung (Copernicus EMS)“ zeigt die Karten des europäischen Notfalldienstes, wo er
 für eine Großschadenslage aktiviert wurde: betroffene Flächen, Wassertiefe und Schäden an Gebäuden
 und Straßen, gestrichelt umrandet das ausgewertete Gebiet. Außerhalb dieses Umrisses hat niemand
