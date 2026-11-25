@@ -21,7 +21,8 @@ kotlin {
 dependencies {
     // `ServerAdresse` (Adressprüfung, Normalform) aus dem Lifeline-Kern.
     implementation("dev.rubeen.lifeline:kern")
-    testImplementation(libs.kotlinx.serialization.json)
+    // Wire-Bodies der Helfer-Routen (`Wire.kt`), damit die App sie ohne eigenes Plugin liest.
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.kotlin.test.junit5)
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
