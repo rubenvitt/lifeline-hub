@@ -32,12 +32,21 @@ object Auftragsstand {
         for (a in geordnet) {
             if (!a.isOffen) {
                 Mitteilungen.entferne(context, a.id)
-            } else if (Auftraege.sollMitteilen(a, synchronized(gemeldet) { gemeldet.toSet() }, jetzt)) {
-                // Auch ohne Mitteilungsrecht gemeldet: sonst kämen alte Aufträge nach dem Erlauben.
-                gemeldet += a.id
+            } else if (merke(a, jetzt)) {
                 Mitteilungen.zeige(context, a)
             }
         }
+    }
+
+    /**
+     * Prüft und merkt in einem Schritt, ob [a] eine Mitteilung bekommt: Dienst und Modell laden
+     * gleichzeitig, sonst zeigten beide denselben Auftrag. Auch ohne Mitteilungsrecht gemerkt: sonst
+     * kämen alte Aufträge nach dem Erlauben.
+     */
+    private fun merke(a: HelperTask, jetzt: Long): Boolean = synchronized(gemeldet) {
+        if (!Auftraege.sollMitteilen(a, gemeldet, jetzt)) return@synchronized false
+        gemeldet += a.id
+        true
     }
 
     /** Ersetzt einen Auftrag nach der Quittung (Antwort des Servers). */
