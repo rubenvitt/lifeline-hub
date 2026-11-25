@@ -274,13 +274,9 @@ pub async fn karte(
     crate::routes::karte::fachebene_antwort(&antwort, &headers)
 }
 
-/// Ob `file` ein einfacher Dateiname ist: `[A-Za-z0-9._-]+`, ohne `..`.
+/// Ob `file` ein einfacher Dateiname ist: ein sicheres Segment ohne `..` darin.
 fn is_dateiname(file: &str) -> bool {
-    !file.is_empty()
-        && !file.contains("..")
-        && file
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    crate::drohne::is_safe_segment(file) && !file.contains("..")
 }
 
 /// Holt eine HLS-Datei der Quelle. Der `LiveKontext` entsteht hier, im Abruf, und fällt mit ihm
@@ -311,6 +307,10 @@ async fn hls_abrufen(
         .einstellung_text("basis_url")
         .ok_or(VideoFehler::Verweigert)?;
     let token = kontext.geheimnis("token").ok_or(VideoFehler::Verweigert)?;
+    // Tiefenverteidigung: auch was aus dem Speicher kommt, geht nur als sicheres Segment in den Pfad.
+    if !crate::drohne::is_safe_segment(&gateway_sn) || !crate::drohne::is_safe_segment(&file) {
+        return Err(VideoFehler::Upstream);
+    }
     let url = format!(
         "{}/api/lagemonitor/v1/video/{gateway_sn}/hls/{file}",
         basis.trim_end_matches('/')
@@ -325,7 +325,7 @@ async fn hls_abrufen(
         .map_err(fehl)?
         .bearer_auth(token.expose_secret());
     let antwort = kontext.send(anfrage).await.map_err(fehl)?;
-    let is_playlist = file.ends_with(".m3u8");
+    let is_playlist = crate::drohne::video::is_playlist(&file);
     let deckel = if is_playlist {
         DECKEL_PLAYLIST
     } else {
@@ -364,7 +364,7 @@ pub async fn video(
         return Err(AppError::NotFound);
     }
     let org_id = ctx.einsatz.org_id;
-    let is_playlist = file.ends_with(".m3u8");
+    let is_playlist = crate::drohne::video::is_playlist(&file);
     let schluessel = (adapter_id.clone(), key, file.clone());
     let bytes = buendel()
         .get_or_fetch(schluessel, ttl, move || {

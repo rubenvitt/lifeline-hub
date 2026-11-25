@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
+use super::is_safe_segment;
 use super::vertrag::{key_for, DrohnenFoto, DrohnenLage, DrohnenVideo, Fluggeraet};
 
 /// Was nur wir kennen: Kennung → Seriennummer bzw. Vorschau-Pfad. Verlässt den Speicher nie.
@@ -104,34 +105,46 @@ pub fn parse_lage(
     let lm: LmLage = serde_json::from_slice(json).map_err(|_| ParseError::Ungueltig)?;
 
     let mut upstream = Upstream::default();
+    // Eine Seriennummer wandert in den Abruf-Pfad: nur ein sicheres Segment ist zulässig, sonst
+    // fällt das Fluggerät samt Video weg.
+    let mut verworfen = 0;
     let fluggeraete = lm
         .aircraft
         .into_iter()
         .enumerate()
-        .map(|(i, a)| Fluggeraet {
-            key: key_for(adapter_id, &a.gateway_sn),
-            label: a
-                .label
-                .filter(|l| !l.trim().is_empty())
-                .unwrap_or_else(|| format!("Fluggerät {}", i + 1)),
-            position: a.position.map(|p| [p.lon, p.lat]),
-            heading_deg: a.heading_deg,
-            height_m: a.elevation_takeoff_m,
-            battery_percent: a.battery_percent,
-            airborne: a.airborne,
+        .filter_map(|(i, a)| {
+            if !is_safe_segment(&a.gateway_sn) {
+                verworfen += 1;
+                return None;
+            }
+            Some(Fluggeraet {
+                key: key_for(adapter_id, &a.gateway_sn),
+                label: a
+                    .label
+                    .filter(|l| !l.trim().is_empty())
+                    .unwrap_or_else(|| format!("Fluggerät {}", i + 1)),
+                position: a.position.map(|p| [p.lon, p.lat]),
+                heading_deg: a.heading_deg,
+                height_m: a.elevation_takeoff_m,
+                battery_percent: a.battery_percent,
+                airborne: a.airborne,
+            })
         })
         .collect();
     let videos = lm
         .videos
         .into_iter()
-        .map(|v| {
+        .filter_map(|v| {
+            if !is_safe_segment(&v.gateway_sn) {
+                verworfen += 1;
+                return None;
+            }
             let key = key_for(adapter_id, &v.gateway_sn);
             upstream.videos.insert(key.clone(), v.gateway_sn);
-            DrohnenVideo { key }
+            Some(DrohnenVideo { key })
         })
         .collect();
 
-    let mut verworfen = 0;
     let (karte, map_etag) = match lm.map {
         Some(map) => (Some(karte_umschreiben(&map, &mut verworfen)), lm.map_etag),
         None => match vorige_karte {
@@ -312,6 +325,23 @@ mod tests {
         assert_eq!(lage.verworfen, 1);
         let karte = lage.karte.unwrap();
         assert!(!karte.to_string().contains("etwas_neues"));
+    }
+
+    #[test]
+    fn feindliche_seriennummer_wird_samt_video_verworfen() {
+        let json = br#"{"api_version": 1, "server_time_ms": 1,
+            "aircraft": [
+              {"gateway_sn": "../../../admin", "label": "boese"},
+              {"gateway_sn": "RC?x#y", "label": "boese 2"},
+              {"gateway_sn": "RC-OK-1", "label": "gut"}],
+            "videos": [{"gateway_sn": "../../../admin"}, {"gateway_sn": "RC-OK-1"}]}"#;
+        let (lage, _, _, up) = parse_lage("a1", json, None, 0).unwrap();
+        assert_eq!(lage.fluggeraete.len(), 1);
+        assert_eq!(lage.fluggeraete[0].label, "gut");
+        assert_eq!(lage.videos.len(), 1);
+        assert_eq!(up.videos.len(), 1);
+        assert_eq!(up.videos[&lage.videos[0].key], "RC-OK-1");
+        assert_eq!(lage.verworfen, 3, "zwei Fluggeräte, ein Video");
     }
 
     #[test]

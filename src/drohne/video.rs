@@ -35,6 +35,12 @@ fn endung(file: &str) -> Option<String> {
     file.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase())
 }
 
+/// Ob `file` eine Playlist ist (Endung ohne Groß-/Kleinschreibung). Einzige Quelle dieser
+/// Entscheidung: Prüfung, Deckel und Cache-Kopf hängen daran.
+pub fn is_playlist(file: &str) -> bool {
+    endung(file).as_deref() == Some("m3u8")
+}
+
 /// Lebensdauer einer Datei im Bündel; `None` für eine Endung, die der Proxy nicht ausliefert.
 /// Eine Playlist wechselt jede Sekunde, ein Segment ändert sich nie.
 pub fn ttl_for(file: &str) -> Option<Duration> {
@@ -411,6 +417,12 @@ mod tests {
     #[test]
     fn ttl_nach_endung() {
         assert_eq!(ttl_for("index.m3u8"), Some(Duration::from_secs(1)));
+        assert_eq!(ttl_for("index.M3U8"), Some(Duration::from_secs(1)));
+        assert!(is_playlist("index.m3u8"));
+        assert!(is_playlist("index.M3U8"));
+        assert!(is_playlist("Sub.M3u8"));
+        assert!(!is_playlist("seg1.mp4"));
+        assert!(!is_playlist("m3u8"));
         assert_eq!(ttl_for("a.mp4"), Some(Duration::from_secs(30)));
         assert_eq!(ttl_for("a.m4s"), Some(Duration::from_secs(30)));
         assert_eq!(ttl_for("a.ts"), Some(Duration::from_secs(30)));
