@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 23.11.2026 (Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Fremdebene aus URL beim Lesen nachholen, LLH-2099; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -16,6 +16,7 @@ stehen in den genannten Dateien und Bereichs-`AGENTS.md` und werden hier nicht w
 | 6.6 | Gerät koppeln und Funktionsansicht | `src/geraet`, `frontend/src/geraet` |
 | 6.6a | Instanzen koppeln und melden | `src/instanz`, `src/routes` |
 | 6.6b | Einsatz spiegeln und am Spiegel beantragen | `src/instanz` (`spiegel`), `src/auth`, `src/live` |
+| 6.6h | Fremdebene aus URL beim Lesen nachholen | `src/karte_fremdebene`, `src/adapter` (`ziel.rs`), `frontend/src/pages/lagekarte` |
 | 6.7 | Kartenkacheln über Proxy, Cache und Offline-Karte | `src/karte`, `karten-service` |
 | 6.8 | Benachrichtigung, Web Push und iOS-Push | `src/benachrichtigung`, `src/web_push`, `src/ios_push`, `push-relais`, `ios`, `frontend/src/alarm` |
 
@@ -657,6 +658,49 @@ sequenceDiagram
   wieder fällig.
 - „Verbindung prüfen“ (`POST …/check`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
   der Versuch steht im Verlauf (`lauf::probe`).
+
+## 6.6h Fremdebene aus URL beim Lesen nachholen
+
+Eine Fremdebene aus einer https-Adresse hat keinen Hintergrundlauf: der Server holt sie nach,
+wenn jemand ihre Daten liest (LLH-2099,
+[ADR-0098](entscheidungen/ADR-0098-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Lagekarte (useFremdebenen)
+  participant Hub as lifeline-hub (src/routes/karte_fremdebene.rs, src/karte_fremdebene/abruf.rs)
+  participant DB as SQLite (karte_fremdebene, karte_fremdebene_daten)
+  participant Q as Quelle (fremde https-Adresse)
+  loop alle 60 s, nur sichtbare URL-Ebene und sichtbarer Tab
+    FE->>Hub: GET …/map/foreign-layers/{ebeneId}/data (If-None-Match)
+    Hub->>DB: Abrufstand lesen (versucht_at, ETag, Last-Modified)
+    alt über 60 s seit dem letzten Versuch, führende Seite, Einsatz aktiv
+      Hub->>Hub: Sperre je Ebene (Single-Flight), versucht_at neu prüfen
+      Hub->>Q: bedingter Abruf über adapter::ziel (check_url, keine Weiterleitung, Deckel)
+      Q-->>Hub: 200 mit Inhalt oder 304
+      Hub->>DB: 200: normiertes GeoJSON ersetzen; immer: Abrufstand und Fehler setzen
+    end
+    Hub-->>FE: 200 mit ETag des gespeicherten Inhalts oder 304
+  end
+```
+
+- Abgerufen wird nur auf der führenden Seite eines aktiven Einsatzes: nicht am Spiegel, nicht auf der Instanz,
+  die die Führung einer anderen überlassen hat, nicht nach dem Abschluss
+  (`is_hier_abzurufen` in `src/karte_fremdebene/abruf.rs`). Dort liest ein Spiegel nur, was
+  gespeichert ist.
+- Zwischen zwei Versuchen liegen mindestens 60 s (`FRISCH_SEKUNDEN`); gleichzeitige Leser teilen
+  sich einen Abruf, weil je Ebene eine Sperre gilt und der Zeitpunkt des letzten Versuchs nach
+  dem Warten neu geprüft wird.
+- Die Antwort auf den Abruf ist bedingt (`If-None-Match`, `If-Modified-Since`): bei 304 ändert
+  sich nur der Zeitpunkt des Abrufs, bei 200 ersetzt das neu normierte GeoJSON den Inhalt und ein
+  Live-Ereignis `karte_fremdebene` geht an die Arbeitsplätze.
+- Ein gestörter Abruf setzt nur den Fehlercode an der Ebene; der letzte gute Inhalt bleibt
+  (ADR-0098). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
+  Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`), nicht aus der Ebene.
+- Den Abruf stellt der Trait `FremdebeneAbrufer` bereit, Tests setzen einen zählenden ein; die
+  URL steht nie in Log oder Fehlertext, nur `ebene_id` und der Fehlercode.
+- Beim Anlegen aus einer URL holt der Server einmal synchron (Antwort 400 mit `grund` bei Fehler,
+  ohne die URL zu nennen); eine Datei läuft durch den Virenscan (`src/anhang`) und denselben Parser.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

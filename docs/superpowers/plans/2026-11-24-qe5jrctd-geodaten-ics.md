@@ -527,9 +527,9 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - arc42 unter `docs/architektur/`: Kapitel 5 (Modul `karte_fremdebene`), Kapitel 6 (Abruf beim Lesen), Kapitel 11 (Risiko fremde URL bzw. fremde Datei), Kapitel 12 (Begriff „Fremdebene“).
 - Create: Folgeaufgaben vermerken (im PR-Text, nicht im Code): iOS-Kalender, GPX, „Objekt übernehmen“, Fremdebenen im Snapshot.
 
-- [ ] **Step 1:** Doku schreiben.
-- [ ] **Step 2:** Doku-Wächter (Teil von `check-all.sh`) → grün.
-- [ ] **Step 3:** Commit `docs: Fremdebenen, Export und Kalender in Anwender- und Architekturdoku`.
+- [x] **Step 1:** Doku schreiben.
+- [x] **Step 2:** Doku-Wächter (Teil von `check-all.sh`) → grün.
+- [x] **Step 3:** Commit `docs: Fremdebenen, Export und Kalender in Anwender- und Architekturdoku`.
 
 ### Task 20: Gate
 

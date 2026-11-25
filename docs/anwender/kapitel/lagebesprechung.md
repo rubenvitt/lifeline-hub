@@ -2,7 +2,7 @@
 titel: Lagebesprechung
 gruppen: [fuehrung]
 reihenfolge: 150
-quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/useVorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungGrossbild.tsx, frontend/src/components/grossbild/, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs]
+quellen: [frontend/src/pages/LagebesprechungPage.tsx, frontend/src/lagebesprechung/TerminPaneel.tsx, frontend/src/lagebesprechung/VorbereitungPaneel.tsx, frontend/src/lagebesprechung/vorbereitung.ts, frontend/src/lagebesprechung/useVorbereitung.ts, frontend/src/lagebesprechung/LagebesprechungGrossbild.tsx, frontend/src/components/grossbild/, frontend/src/lagebesprechung/LagebesprechungModal.tsx, frontend/src/lagebesprechung/LagebesprechungHistorie.tsx, frontend/src/lagebesprechung/lagebesprechungZustand.ts, frontend/src/einsatz/schreibrecht.ts, src/routes/lagebesprechung.rs, src/lagebesprechung/mod.rs, src/lagebesprechung/repo.rs, src/lagebesprechung/ankuendigung.rs, src/erinnerung/scheduler.rs, src/benachrichtigung/text.rs, src/lagebesprechung/ics.rs, android/app/src/main/kotlin/dev/rubeen/lifeline/android/dienste/Downloads.kt, android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Linkweiche.kt, frontend/src/components/dateiSpeichern.ts, frontend/src/api/lagebesprechung.ts]
 ---
 
 ## Überblick
@@ -62,7 +62,32 @@ Das Paneel „Verlauf“ zeigt danach alle Besprechungen, die neueste zuerst, je
 Entschluss, dem beim Abschluss gesetzten Termin und dem Verweis „ETB-Eintrag“. Ein langer
 Entschluss steht gekürzt da; „ganz zeigen“ öffnet ihn.
 
+### Den Termin in den Kalender übernehmen
+
+Für alle, die die Lagebesprechung sehen. Die Übernahme legt nichts im Einsatz fest und braucht
+kein Schreibrecht.
+
+1. „Lagebesprechung“ öffnen. Im Paneel „Termin“ ist ein Termin gesetzt.
+2. „In Kalender übernehmen“ wählen. Ohne Termin ist der Knopf gesperrt, daneben steht „Kein Termin“.
+3. Die Kalenderdatei (`lagebesprechung-einsatz-42-2026-11-24-1430.ics`) wird gespeichert und mit
+   der Kalender-App des Geräts geöffnet. Am Rechner den Download öffnen oder in die Kalender-App
+   ziehen; in der Android-App öffnet sich direkt eine Kalender-App, sonst das Teilen-Menü.
+4. Der Eintrag beginnt mit „Lagebesprechung – “, es folgt die Einsatzbezeichnung. Er dauert
+   30 Minuten und erinnert 10 Minuten vorher.
+5. Scheitert die Übernahme, steht im Paneel „Nicht übernommen“ mit dem Grund; ohne Verbindung
+   geht sie nicht.
+
 ## Hintergrund
+
+### Der Kalendereintrag
+
+Die Datei ist eine Veröffentlichung des Termins zum Stand des Klicks, keine Einladung: sie nennt
+keine Teilnehmer und verbindet den Eintrag nicht mit der App. Wird der Termin verschoben, bleibt
+der alte Eintrag im Kalender stehen; ein neuer Klick auf „In Kalender übernehmen“ legt den
+neuen Termin als weiteren Eintrag an, der alte ist von Hand zu löschen. Auch ein überfälliger
+Termin lässt sich übernehmen. Zeiten gehen in UTC, die Kalender-App zeigt sie in der Ortszeit des
+Geräts. Die Hinweise der App vor dem Termin (siehe „Hinweise vor dem Termin“) bleiben davon
+unberührt. Auf iPhone und iPad öffnet sich die Kalender-App noch nicht von selbst.
 
 ### Wer was darf
 

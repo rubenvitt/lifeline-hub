@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/useGeoExport.ts, frontend/src/pages/lagekarte/geoExport.ts, frontend/src/pages/lagekarte/geojsonWriter.ts, frontend/src/pages/lagekarte/kmlWriter.ts, frontend/src/pages/lagekarte/kmzPacker.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/useGeoExport.ts, frontend/src/pages/lagekarte/geoExport.ts, frontend/src/pages/lagekarte/geojsonWriter.ts, frontend/src/pages/lagekarte/kmlWriter.ts, frontend/src/pages/lagekarte/kmzPacker.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs, frontend/src/pages/lagekarte/FremdebeneDialog.tsx, frontend/src/pages/lagekarte/FremdebenenZeilen.tsx, frontend/src/pages/lagekarte/FremdebeneDetail.tsx, frontend/src/pages/lagekarte/useFremdebenen.ts, frontend/src/pages/lagekarte/fremdebenenLayer.ts, frontend/src/api/fremdebenen.ts, src/routes/karte_fremdebene.rs, src/karte_fremdebene/mod.rs, src/karte_fremdebene/abruf.rs, src/karte_fremdebene/einlesen/]
 ---
 
 ## Überblick
@@ -184,6 +184,35 @@ Lesen genügt: jede Person im Einsatz kann exportieren.
 3. Der Browser speichert die Datei, etwa `lagekarte-einsatz-42-2026-11-24-1405.kmz`. Steht am
    Eintrag „(Nichts eingeblendet)“, ist er gesperrt, bis mindestens ein Objekt zu sehen ist.
 4. Scheitert das Erzeugen, steht über der Karte „Export nicht erstellt“ mit dem Grund.
+
+### Eine Fremdebene hinzufügen
+
+Für Einsatzleitung und Führungspersonal in einem laufenden Einsatz. Eine Fremdebene zeigt Daten
+Dritter auf der Karte, etwa Suchgebiete eines Nachbarkreises als GeoJSON, KML oder KMZ.
+
+1. Im Kopf der Seite unter „Weitere Aktionen zur Lagekarte“ (auf schmalen Bildschirmen „Weitere“)
+   „Fremdebene hinzufügen …“ wählen.
+2. Unter „Quelle“ „Datei“ oder „Adresse“ wählen. Bei „Datei“ die Datei auswählen (höchstens
+   10 MB), bei „Adresse“ die Adresse eintragen; sie muss mit `https://` beginnen.
+3. Bei Bedarf einen „Name“ eintragen. Bleibt das Feld leer, schlägt der Server einen vor: der
+   Name aus der Datei, bei einer Adresse der Name des Servers.
+4. „Hinzufügen“ wählen. Die App meldet „Fremdebene hinzugefügt“; die Ebene steht danach in der
+   Leiste unter „Fremdebenen“ und ist auf der Karte zu sehen.
+5. Scheitert das Hinzufügen, steht im Dialog „Nicht hinzugefügt“ mit dem Grund, etwa „Die Datei
+   ist zu groß (höchstens 10 MB).“ oder „Die Adresse ist nicht erreichbar.“
+
+### Eine Fremdebene ein- oder ausblenden, umbenennen, färben oder entfernen
+
+1. In der Leiste die Ansicht „Ebenen“ öffnen. Die Gruppe „Fremdebenen“ erscheint, sobald es eine
+   Ebene gibt.
+2. Die Zeile einer Fremdebene wählen, um sie ein- oder auszublenden. Das gilt nur an diesem
+   Arbeitsplatz.
+3. Für Einsatzleitung und Führungspersonal: am Menü der Zeile „Umbenennen …“, „Farbe …“ oder
+   „Entfernen …“ wählen. Die Farbe ist einer von sechs Tönen (Indigo, Petrol, Pflaume, Oliv,
+   Violett, Ocker).
+4. „Entfernen …“ fragt nach; die Ebene verschwindet danach mit ihren Daten für alle.
+5. Ein Objekt einer Fremdebene auf der Karte antippen zeigt seinen Namen und seine Beschreibung
+   unter „Fremde Daten“, nur zum Lesen.
 
 ## Hintergrund
 
@@ -431,12 +460,48 @@ App. Die KMZ-Datei bringt die taktischen Zeichen als Bilder mit; die GeoJSON-Dat
 und Zeichen als Eigenschaften. Mit der Datei verlassen Geodaten das System; wer sie weitergibt,
 verantwortet den Empfängerkreis.
 
+### Fremdebenen
+
+Eine Fremdebene ist eine Kartenebene aus Daten Dritter. Sie gehört zum Einsatz und ist für alle
+sichtbar, die ihn sehen; ein- oder ausgeblendet wird je Arbeitsplatz, und das Gerät merkt sich
+die Wahl je Einsatz. Fremde Daten erscheinen auf der Karte, im Lageplan samt Legende
+(„Fremde Daten: Name“) und bei der Auswahl; in den Export (KMZ, GeoJSON), in gesicherte Stände
+der Lage, im Lagemonitor und im Lagebild extern erscheinen sie nicht.
+
+- **Dateien:** GeoJSON, KML und KMZ, jeweils bis 10 MB; ein KMZ darf entpackt höchstens 20 MB
+  haben. Eine Ebene trägt höchstens 5000 Objekte und 200000 Stützpunkte, eine einzelne Linie oder
+  ein Ring höchstens 5000. Koordinaten müssen in Längen- und Breitengrad (WGS84) stehen; Meterangaben
+  einer anderen Projektion lehnt die App ab („Die Koordinaten liegen außerhalb der Erde. Ist die
+  Datei in WGS84?“). Ist ein Teil eines Objekts unbrauchbar, fehlt nur dieser Teil.
+- **Was übernommen wird:** Punkte, Linien und Flächen mit Name und Beschreibung. Stile, Symbole,
+  Bilder, Ansichten und Verknüpfungen auf weitere Inhalte (etwa ein KML-„NetworkLink“) werden
+  nicht gelesen und nie nachgeladen; in einer Beschreibung bleibt nur Text. Eine Datei mit einer
+  DTD wird aus Sicherheitsgründen abgelehnt, ebenso eine, die der Virenscan beanstandet.
+- **Adresse:** Der Server holt die Daten selbst ab, nicht der Browser. Erlaubt sind nur
+  `https`-Adressen; Weiterleitungen werden nicht verfolgt. Adressen im eigenen Netz, etwa auf
+  einem Server der Wache, ruft der Server nur ab, wenn ein System-Admin das erlaubt hat (siehe
+  Kapitel [Verwaltung der Organisation](verwaltung.md)); der Server selbst (localhost) bleibt
+  gesperrt.
+- **Aktualität:** Eine Ebene aus einer Adresse wird nachgeholt, wenn die Karte sie anzeigt, höchstens
+  einmal je Minute. Die Zeile nennt den Stand („abgerufen vor 3 min“). Ist der Abruf gestört,
+  steht dort ein Warnhinweis mit dem Grund („Die Adresse ist nicht erreichbar.“); die zuletzt
+  geholten Daten bleiben sichtbar und werden mit dem nächsten gelungenen Abruf ersetzt. Eine
+  Ebene aus einer Datei ändert sich nicht. Nachgeholt wird nur auf der Instanz, die den Einsatz
+  führt; eine Spiegel-Instanz zeigt den letzten gespeicherten Stand.
+- **Die Adresse sehen nur Schreibende:** Wer nur lesen darf, sieht den Namen des Servers, nicht
+  die vollständige Adresse.
+- **Ohne Netz:** Die App hält die Ebenen für die Arbeit ohne Netz vor. Hinzufügen, Umbenennen,
+  Färben und Entfernen brauchen eine Verbindung; die Einträge sind ohne Netz gesperrt.
+- **Verantwortung:** Fremde Daten sind nicht geprüft und nicht Teil des Lagebilds. Wer sie in
+  der Lagedarstellung verwendet, verantwortet ihre Herkunft.
+
 ### Rechte
 
-Lesen, Ebenen schalten, Messen und Exportieren gehen mit jeder Rolle. Verorten, Zeichnen und Zeichen setzen
-brauchen das Schreibrecht im Einsatz: Einsatzleitung oder Führungspersonal in einem laufenden
-Einsatz (Kapitel [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf
-„Zeichnen“.
+Lesen, Ebenen schalten, Messen und Exportieren gehen mit jeder Rolle. Verorten, Zeichnen, Zeichen
+setzen und Fremdebenen hinzufügen, ändern und entfernen brauchen das Schreibrecht im Einsatz:
+Einsatzleitung oder Führungspersonal in einem laufenden Einsatz (Kapitel
+[Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf „Zeichnen“, und
+„Fremdebene hinzufügen …“ steht nicht im Menü.
 
 ### Bereitstellungsräume
 

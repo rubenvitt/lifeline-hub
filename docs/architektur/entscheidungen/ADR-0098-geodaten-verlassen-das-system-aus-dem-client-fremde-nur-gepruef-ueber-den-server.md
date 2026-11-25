@@ -1,10 +1,13 @@
 ---
 id: ADR-0098
 titel: Geodaten verlassen das System aus dem Client, fremde kommen nur geprüft über den Server herein
-status: vorgeschlagen
+status: akzeptiert
 datum: 2026-11-24
 gilt_fuer:
   - frontend/src/pages/lagekarte/geo*
+  - frontend/src/pages/lagekarte/kml*
+  - frontend/src/pages/lagekarte/kmz*
+  - src/karte_fremdebene/**
   - src/adapter/ziel.rs
 herleitung:
   - docs/superpowers/specs/2026-11-24-k9tkgrou-lagekarte-geo-export-design.md
@@ -35,10 +38,13 @@ herleitung:
 ## Prüfung
 
 ```sh
-# Die Pfade von Parser und Export entstehen mit LLH-2099/LLH-2100 und LLH-1196 Teil A; bis dahin
-# prüft dieser Block nur den Weg nach draußen, den die Regeln voraussetzen.
 verlange 'check_url' src/adapter/ziel.rs
 verbiete 'danger_accept_invalid_certs|redirect::Policy::(limited|permissive)' src/adapter/ziel.rs
+verlange 'Event::DocType' src/karte_fremdebene/einlesen/kml.rs
+verbiete 'reqwest|hyper::Client|TcpStream' src/karte_fremdebene/einlesen/**
+verlange 'fetch_bedingt' src/karte_fremdebene/abruf.rs
+verbiete 'reqwest::' src/karte_fremdebene/abruf.rs
+verbiete 'DOMParser|parseFromString' frontend/src/pages/lagekarte/kmlWriter.ts frontend/src/pages/lagekarte/kmzPacker.ts
 ```
 
 ## Kontext
@@ -52,7 +58,5 @@ Abrufe ins interne Netz). Beides soll an je einer Stelle geregelt sein.
 
 Der Export ist eine reine Funktion im Client und kennt keine Daten, die nicht schon auf der
 Karte stehen. Jede neue Quelle für Fremdebenen läuft durch den Parser und den Abrufweg des
-Servers und kann dort nichts nachladen. `gilt_fuer` nennt vorerst nur die vorhandenen Dateien
-(`geo*`, `adapter/ziel.rs`); die Muster für `kmz*`, `kml*` und `src/karte_fremdebene/**` zieht
-die Umsetzung nach, sobald die Dateien existieren (Pfadnachzug erlaubt). Akzeptieren kann nur der
-Mensch.
+Servers und kann dort nichts nachladen. Akzeptiert am 24.11.2026 durch Ruben (Freigabe der
+Design-Docs); die Muster für `kml*`, `kmz*` und `src/karte_fremdebene/**` sind nachgezogen.

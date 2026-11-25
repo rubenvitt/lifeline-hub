@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 22.11.2026 (Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
+Stand: 25.11.2026 (Fremdebene, LLH-2099; Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -33,6 +33,7 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Evakuierung | Räumungsbezirke und ihr Stand evakuiert. | Modul „Evakuierung“ in `frontend/src/einsatz/modulRegistry.ts`, Spec [`betreuung-evakuierung`](../../openspec/specs/betreuung-evakuierung/spec.md) |
 | Fernmeldewesen | Modul des S6 mit Funkplan, Fernmeldeskizze und Kommunikationsplan. | [`frontend/src/fernmeldewesen/AGENTS.md`](../../frontend/src/fernmeldewesen/AGENTS.md), Spec [`fernmeldewesen`](../../openspec/specs/fernmeldewesen/spec.md) |
 | FMS-Status | Fahrzeugstatus nach Funkmeldesystem (1 Frei auf Funk bis 0 Prio. Sprechwunsch); ein Eintrag im Statuskatalog der Organisation kann über `fms_anker` (0 bis 9, optional) an einen FMS-Status gebunden sein. | `STATUS_STARTLISTE` in `src/fahrzeug/mod.rs`, `migrations/0008_fahrzeug_status.sql` |
+| Fremdebene | Von Dritten stammende Kartenebene (GeoJSON, KML oder KMZ aus Datei oder https-Adresse), die ein Einsatz auf der Lagekarte nur zur Ansicht einblendet; sie ist keine Fachebene und kein Objekt des Einsatzes. Der Server liest sie ein und speichert normiertes GeoJSON; jede Fremdebene trägt `source` (`datei` oder `url`) und eine Farbe `fremd-1` bis `fremd-6`. | `src/karte_fremdebene/mod.rs`, [ADR-0098](entscheidungen/ADR-0098-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md), Spec [`2026-11-24-qe5jrctd-fremdebenen-design.md`](../superpowers/specs/2026-11-24-qe5jrctd-fremdebenen-design.md) |
 | Fükw, Führungs-Tablet, ortsfeste Stelle (BHP/BTP), mobil | Die vier Einsatzkontexte, für die die Oberfläche gebaut wird. Die Kürzel Fükw, BHP und BTP stehen im Repo nur abgekürzt; eine Langform ist nirgends belegt. | [`frontend/AGENTS.md`](../../frontend/AGENTS.md), Abschnitt „Bedien-Leitlinie“ |
 | Führungsorganisation | Organigramm nach FwDV 100, abgeleitet aus der Einsatzgliederung. | Spec [`fuehrungsorganisation`](../../openspec/specs/fuehrungsorganisation/spec.md) |
 | Führungsstelle | Die eigene Führungsstelle eines Einsatzes (ELW, Einsatzleitung) als Gegenstelle für Funkplan und Skizze. | `src/einsatz/fuehrungsstelle.rs`, Spec [`einsatz-fuehrungsstelle`](../../openspec/specs/einsatz-fuehrungsstelle/spec.md) |
