@@ -22,6 +22,7 @@ pub mod demo_daten;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod dokument;
+pub mod drohne;
 pub mod einheit_typ;
 pub mod einheit_vorlage;
 pub mod einsatz;

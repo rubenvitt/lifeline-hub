@@ -638,7 +638,8 @@ async fn status_wechsel(
     })
 }
 
-/// Beendet am Spiegel Gerätekopplungen und Freigaben für Maschinenzugänge (LLH-1814, Spec
+/// Beendet am Spiegel Gerätekopplungen, Freigaben für Maschinenzugänge und Zuschaltungen von
+/// Drohnenquellen (LLH-1814, LLH-2105, Spec
 /// `einsatz-abschluss`: beide MUST nach dem Abschluss beendet bleiben). Beide Tabellen werden
 /// nicht gespiegelt ([`super::art`]); was eine Führungsübergabe am abgebenden Ende stehen ließ,
 /// galt bisher nur über den Status als beendet und lebte mit dem Wiederöffnen beim Führer wieder
@@ -649,6 +650,9 @@ async fn status_wechsel(
 async fn beende_zugaenge(conn: &mut SqliteConnection, id: i64) -> Result<(), AppError> {
     crate::geraet::repo::widerrufe_am_spiegel(conn, id).await?;
     crate::public_api::freigabe::delete_fuer_einsatz_tx(conn, id).await?;
+    // LLH-2105: auch die Zuschaltung einer Drohnenquelle endet; den Merker im Store gleicht der
+    // nächste Lauf der Art ab (`drohne::art`, `uebernehmen`).
+    crate::drohne::repo::delete_for_einsatz(conn, id).await?;
     Ok(())
 }
 

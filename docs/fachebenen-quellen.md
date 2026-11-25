@@ -57,10 +57,12 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 | Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
+| Drohne (LLH-2106) | — (Arbeitsspeicher) | 5 s | 1 min | Der Adapter erneuert den Stand alle 5 s (`intervall_vorschlag_s`); eine Minute ohne neuen Stand ist ein altes Fluggerät. Einsatzroute `/api/incidents/{id}/map/drone`, ein Poll ohne Änderung kostet ein 304 |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
-`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
-mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser; ein
+`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen bis auf die Drohnenlage bei
+mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser (die
+Drohnenlage mit 1 min setzt Uhren voraus, die auf wenige Sekunden gehen); ein
 Zeitpunkt in der Zukunft zählt als Alter 0. **KRITIS:** Das Import-Intervall ist konfigurierbar
 (`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
 hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet.

@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
+    /// `adapter_einsatz`, nur im Arbeitsspeicher.
+    pub drohne: std::sync::Arc<crate::drohne::Store>,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -1939,6 +1942,31 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
+        // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
+        .route(
+            "/api/incidents/{id}/drone/sources",
+            get(routes::drohne::liste),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            put(routes::drohne::zuschalten),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            delete(routes::drohne::abschalten),
+        )
+        // Drohnenlage als Fachebene der Lagekarte (LLH-2106).
+        .route("/api/incidents/{id}/map/drone", get(routes::drohne::karte))
+        // Livebild der Drohne als gebündelter HLS-Proxy (LLH-2107).
+        .route(
+            "/api/incidents/{id}/drone/video/{key}/hls/{*file}",
+            get(routes::drohne::video),
+        )
+        // Vorschau der Drohnenfotos über den Proxy (LLH-2108).
+        .route(
+            "/api/incidents/{id}/drone/photos/{key}/thumb",
+            get(routes::drohne::foto_vorschau),
+        )
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
@@ -3220,6 +3248,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            drohne: Default::default(),
         }
     }
 

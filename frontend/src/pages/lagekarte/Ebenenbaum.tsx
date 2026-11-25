@@ -16,6 +16,7 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
+import DrohnenQuelle from './DrohnenQuelle';
 import FachebeneStand from './FachebeneStand';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import Klassenlegende from './Klassenlegende';
@@ -261,6 +262,14 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
       )}
       {sichtbar && quelle === 'copernicus' && props.copernicus && (
         <CopernicusZusatz status={status} {...props.copernicus} />
+      )}
+      {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
+      {quelle === 'drohne' && props.drohne && (
+        <DrohnenQuelle
+          einsatzId={props.einsatzId}
+          darfSchalten={props.drohne.darfSchalten}
+          onLivebild={props.drohne.onLivebild}
+        />
       )}
     </div>
   );

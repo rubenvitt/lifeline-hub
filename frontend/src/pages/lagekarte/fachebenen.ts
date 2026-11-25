@@ -164,6 +164,12 @@ export interface FachebeneDef {
    * einen Kreis-Layer an; Features mit `klasse: 'gebiet'` erscheinen nur als gestrichelter Umriss.
    */
   gemischteGeometrie?: boolean;
+  /**
+   * Nur die Drohnenlage (LLH-2106): Punkte, Linien und Flächen gemischt, je Feature nach
+   * `properties.kind` (`aircraft` | `track` | `element` | `photo`) gezeichnet. Lädt über die
+   * Einsatzroute, nicht über `/api/map/overlays` (`loadDrohneFachebene`).
+   */
+  drohnenlage?: boolean;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -317,6 +323,19 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
       faerbe: faerbeCopernicus,
     },
   },
+  drohne: {
+    key: 'drohne',
+    label: 'Drohnenlage (Suchlage)',
+    geometrieTyp: 'punkt',
+    drohnenlage: true,
+    // Kein Server-Cache: die Lage liegt im Arbeitsspeicher und erneuert sich im Takt des Adapters
+    // (`intervall_vorschlag_s` = 5 s, `src/drohne/art.rs`). Ein Poll ohne neuen Stand kostet ein
+    // 304. Wächter in `fachebenen.test.ts`.
+    pollMs: 5_000,
+    bboxAbhaengig: false,
+    // Eine Minute ohne neuen Stand ist für ein Fluggerät eine alte Position, nicht „noch frisch“.
+    veraltetNachMin: 1,
+  },
 };
 
 /** Alter eines Fachebenen-Stands, wie Panel und Inspector es zeigen (LFH-591). */
@@ -399,6 +418,7 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'energie',
     'autobahn',
     'copernicus',
+    'drohne',
   ];
 }
 
