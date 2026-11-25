@@ -2606,98 +2606,20 @@ async fn status_ruecknahme_etb_geht_live_hinaus() {
         .await;
 }
 
-// ---------- Positionsquelle (LLH-2091, Task 1) ----------
+// ---------- Positionsquelle und Ortung (LLH-2091) ----------
 
-async fn position_zeilen(
-    pool: &sqlx::SqlitePool,
-    ef: i64,
-) -> (Option<String>, Option<String>, Option<String>) {
-    sqlx::query_as(
-        "SELECT position_quelle, position_gemessen_at, position_gesetzt_at \
-         FROM einsatz_fahrzeug WHERE id = ?",
-    )
-    .bind(ef)
-    .fetch_one(pool)
-    .await
-    .unwrap()
-}
-
-#[tokio::test]
-async fn manuelle_position_setzt_quelle_und_zeiten() {
-    let (app, pool) = setup_mit_pool().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position"),
-        &admin,
-        Some(r#"{"lat":52.0,"lon":10.0}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{json}");
-    assert_eq!(json["position_quelle"], "manuell");
-    assert!(json["position_gemessen_at"].is_string(), "{json}");
-    let (quelle, gemessen, gesetzt) = position_zeilen(&pool, ef).await;
-    assert_eq!(quelle.as_deref(), Some("manuell"));
-    assert!(gemessen.is_some());
-    assert_eq!(gesetzt, gemessen);
-}
-
-#[tokio::test]
-async fn geloeschte_position_leert_quelle_und_zeiten() {
-    let (app, pool) = setup_mit_pool().await;
-    let admin = login_cookie(&app, "admin", "startpw12").await;
-    let einsatz = einsatz_anlegen(&app, &admin).await;
-    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position");
-    let (s, _) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"lat":52.0,"lon":10.0}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-
-    let (s, json) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"lat":null,"lon":null}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{json}");
-    assert!(json["position_quelle"].is_null(), "{json}");
-    assert!(json["position_gemessen_at"].is_null(), "{json}");
-    assert_eq!(position_zeilen(&pool, ef).await, (None, None, None));
-}
-
+/// Ein PATCH nur der taktischen Zeichen lässt Quelle und Zeitpunkt einer Einwurf-Position stehen
+/// (die Handwege setzen `manuell` nur mit `lat`/`lon`, Positionsbaustein ADR-0101).
 #[tokio::test]
 async fn nur_tz_felder_aendern_die_quelle_nicht() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/vehicles/{ef}/position");
-    let (s, _) = anfrage(
-        &app,
-        "PATCH",
-        &pfad,
-        &admin,
-        Some(r#"{"lat":52.0,"lon":10.0}"#),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK);
-    // Eine vorherige Ortungs-Position simulieren: Quelle und Zeiten sollen unberührt bleiben.
+    let pfad = format!("/api/incidents/{einsatz}/vehicles/{ef}/position");
     sqlx::query(
-        "UPDATE einsatz_fahrzeug SET position_quelle = 'ortung', \
-         position_gemessen_at = '2026-11-24 10:00:00', position_gesetzt_at = '2026-11-24 10:00:05' \
-         WHERE id = ?",
+        "UPDATE einsatz_fahrzeug SET lat = 52.0, lon = 10.0, position_quelle = 'einwurf', \
+         position_aktualisiert_at = '2026-11-24 10:00:00' WHERE id = ?",
     )
     .bind(ef)
     .execute(&pool)
@@ -2713,15 +2635,8 @@ async fn nur_tz_felder_aendern_die_quelle_nicht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{json}");
-    assert_eq!(json["position_quelle"], "ortung");
-    assert_eq!(
-        position_zeilen(&pool, ef).await,
-        (
-            Some("ortung".into()),
-            Some("2026-11-24 10:00:00".into()),
-            Some("2026-11-24 10:00:05".into())
-        )
-    );
+    assert_eq!(json["position_quelle"], "einwurf");
+    assert_eq!(json["position_aktualisiert_at"], "2026-11-24 10:00:00");
 }
 
 #[tokio::test]
@@ -2733,7 +2648,7 @@ async fn anzeige_traegt_keine_kennung() {
     let (s, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         &admin,
         None,
     )

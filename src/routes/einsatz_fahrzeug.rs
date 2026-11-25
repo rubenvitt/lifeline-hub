@@ -783,7 +783,6 @@ pub async fn zuruecknehmen(
                         &anzeige.funkrufname,
                         &k.zugang_name,
                         &k.kennung,
-                        k.ehrenamt_bestaetigt,
                     ),
                 )
                 .await?,

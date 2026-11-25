@@ -3,6 +3,7 @@
 //! macht der Aufrufer.
 
 use crate::error::AppError;
+use crate::ortung::{Ortungsziel, Positionsquelle};
 use crate::public_api::scope::Scope;
 use sqlx::{SqliteConnection, SqlitePool};
 
@@ -14,14 +15,7 @@ pub struct Kopplung {
     pub zugang_id: String,
     pub zugang_name: String,
     pub kennung: String,
-    pub ehrenamt_bestaetigt: bool,
     pub gekoppelt_at: String,
-}
-
-/// Darf gekoppelt werden? Bei ausgeschaltetem Org-Schalter „Ortung auch bei hauptamtlicher
-/// Besatzung“ nur mit bestätigter ehrenamtlicher Besatzung (PUT und Rückgängig nach Entlassen).
-pub fn is_ehrenamt_ok(ortung_hauptamt: bool, ehrenamt_bestaetigt: bool) -> bool {
-    ortung_hauptamt || ehrenamt_bestaetigt
 }
 
 /// Eine Kennung der letzten 24 Stunden. Bewusst ohne Koordinaten.
@@ -35,7 +29,7 @@ pub struct Kandidat {
 }
 
 const SELECT_KOPPLUNG: &str = "SELECT k.einsatz_fahrzeug_id, k.einsatz_id, k.zugang_id, \
-        z.name AS zugang_name, k.kennung, k.ehrenamt_bestaetigt, k.gekoppelt_at \
+        z.name AS zugang_name, k.kennung, k.gekoppelt_at \
      FROM ortung_kopplung k JOIN einwurf_zugang z ON z.id = k.zugang_id";
 
 /// Die Kopplung des Einsatzfahrzeugs, wenn es eine hat.
@@ -53,18 +47,21 @@ pub async fn load_kopplung_tx(
     .await?)
 }
 
+/// Meldung des 422, wenn der Org-Schalter „Ortung im Einsatz“ (ADR-0101) aus ist.
+pub const MELDUNG_SCHALTER_AUS: &str = "Ortung ist für diese Organisation ausgeschaltet \
+     (Verwaltung → Einsatz-Vorgaben)";
+
 /// Koppelt das Fahrzeug an die Kennung; eine vorhandene Kopplung desselben Fahrzeugs wird
 /// ersetzt. 409 bei beendetem Fahrzeug, nicht aktivem oder gespiegeltem Einsatz und bei einer
-/// Kennung, die schon an einem anderen Fahrzeug hängt; 422 bei fremdem, widerrufenem oder
-/// falschem Zugang.
-#[allow(clippy::too_many_arguments)]
+/// Kennung, die schon an einem anderen Fahrzeug hängt; 422 bei ausgeschaltetem Org-Schalter
+/// „Ortung im Einsatz“ (ein Zustand, `src/AGENTS.md`, Statuscode-Konvention) und bei fremdem,
+/// widerrufenem oder falschem Zugang.
 pub async fn create_kopplung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     zugang_id: &str,
     kennung: &str,
-    ehrenamt_bestaetigt: bool,
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<Kopplung, AppError> {
@@ -83,6 +80,9 @@ pub async fn create_kopplung_tx(
         return Err(AppError::Conflict("Der Einsatz ist nicht aktiv".into()));
     }
     crate::fahrzeug::disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    if !is_schalter_an_tx(conn, org_id).await? {
+        return Err(AppError::UnprocessableEntity(MELDUNG_SCHALTER_AUS.into()));
+    }
 
     let zugang: Option<(String, Option<String>)> = sqlx::query_as(
         "SELECT scope, widerrufen_at FROM einwurf_zugang WHERE id = ? AND org_id = ? \
@@ -124,15 +124,14 @@ pub async fn create_kopplung_tx(
         .await?;
     sqlx::query(
         "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, \
-         kennung, ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+         kennung, gekoppelt_at, gekoppelt_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(ef_id)
     .bind(einsatz_id)
     .bind(org_id)
     .bind(zugang_id)
     .bind(kennung)
-    .bind(ehrenamt_bestaetigt)
     .bind(jetzt)
     .bind(benutzer_id)
     .execute(&mut *conn)
@@ -140,6 +139,17 @@ pub async fn create_kopplung_tx(
     load_kopplung_tx(conn, einsatz_id, ef_id)
         .await?
         .ok_or(AppError::NotFound)
+}
+
+/// Ist der Org-Schalter „Ortung im Einsatz“ (ADR-0101) an? Ohne Zeile aus. In der Transaktion
+/// des Aufrufers gelesen, damit Koppeln und Übernahme den Stand sehen, unter dem sie schreiben.
+pub async fn is_schalter_an_tx(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
+    Ok(
+        crate::org::einstellungen::laden_oder_default(&mut *conn, org_id)
+            .await?
+            .ortung_im_einsatz
+            != 0,
+    )
 }
 
 /// Löscht die Kopplung des Fahrzeugs und liefert die gelöschte; `None`, wenn es keine gab.
@@ -159,12 +169,39 @@ pub async fn delete_kopplung_tx(
     Ok(alt)
 }
 
-/// Löscht alle Kopplungen des Einsatzes (Abschluss) und liefert sie mit der Fahrzeug-ID.
-pub async fn delete_kopplungen_einsatz_tx(
+/// Was der Abschluss an der Fahrzeugortung beendet hat (LLH-2091).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct EndeImEinsatz {
+    /// Die gelöschten Kopplungen; je eine bekommt einen ETB-Eintrag.
+    pub getrennt: Vec<Kopplung>,
+    /// Einsatzfahrzeuge, deren Position aus dem Einwurf gelöscht wurde.
+    pub geleert: Vec<i64>,
+}
+
+impl EndeImEinsatz {
+    /// Alle betroffenen Einsatzfahrzeuge ohne Doppel, für das Live-Ereignis nach dem Commit.
+    pub fn fahrzeuge(&self) -> Vec<i64> {
+        let mut ids: Vec<i64> = self
+            .getrennt
+            .iter()
+            .map(|k| k.einsatz_fahrzeug_id)
+            .chain(self.geleert.iter().copied())
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+}
+
+/// Abschluss: löscht alle Kopplungen des Einsatzes und die Positionen der Quelle `einwurf`
+/// (über [`crate::ortung::loesche_position`]; Quelle und Zeitpunkt bleiben als Hinweis). Manuelle
+/// und Helfer-Positionen bleiben stehen. Läuft in der Abschluss-Transaktion neben
+/// `helfer::ende::beende_ortung_im_einsatz`.
+pub async fn beende_im_einsatz_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
-) -> Result<Vec<(i64, Kopplung)>, AppError> {
-    let alle = sqlx::query_as::<_, Kopplung>(sqlx::AssertSqlSafe(format!(
+) -> Result<EndeImEinsatz, AppError> {
+    let getrennt = sqlx::query_as::<_, Kopplung>(sqlx::AssertSqlSafe(format!(
         "{SELECT_KOPPLUNG} WHERE k.einsatz_id = ? ORDER BY k.einsatz_fahrzeug_id"
     )))
     .bind(einsatz_id)
@@ -174,10 +211,18 @@ pub async fn delete_kopplungen_einsatz_tx(
         .bind(einsatz_id)
         .execute(&mut *conn)
         .await?;
-    Ok(alle
-        .into_iter()
-        .map(|k| (k.einsatz_fahrzeug_id, k))
-        .collect())
+    let geleert: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM einsatz_fahrzeug \
+         WHERE einsatz_id = ? AND position_quelle = ? AND lat IS NOT NULL ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .bind(Positionsquelle::Einwurf.as_str())
+    .fetch_all(&mut *conn)
+    .await?;
+    for id in &geleert {
+        crate::ortung::loesche_position(conn, Ortungsziel::Fahrzeug(*id)).await?;
+    }
+    Ok(EndeImEinsatz { getrennt, geleert })
 }
 
 /// Kennungen der letzten 24 Stunden aus den nicht widerrufenen, nicht abgelaufenen Zugängen der Org mit

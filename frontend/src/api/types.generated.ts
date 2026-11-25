@@ -3002,6 +3002,11 @@ export interface components {
             lon?: number | null;
             opta?: string | null;
             /**
+             * @description Hängt das Fahrzeug an einer Ortungs-Kennung des Einwurfs? Nur der Wahrheitswert; Kennung
+             *     und Zugang verlassen den Server hier nicht (LLH-2091).
+             */
+            ortung_gekoppelt: boolean;
+            /**
              * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
              *     Bestand vor der Quelle.
              */
@@ -3633,6 +3638,7 @@ export interface components {
             entlassen_at: string;
             /** @description Trug das Fahrzeug die Führungsstelle? */
             fuehrungsstelle?: boolean;
+            ortung?: components["schemas"]["OrtungVorzustand"] | null;
         };
         /**
          * @description Die Wahl in der Vorschau. Je Zeile (Art + Zeilennummer) bzw. je Qualifikationstext; fehlt
@@ -7085,6 +7091,11 @@ export interface components {
             ortsname?: string | null;
             peilung?: components["schemas"]["PeilungAntwort"] | null;
         };
+        /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091). */
+        OrtungVorzustand: {
+            kennung: string;
+            zugang_id: string;
+        };
         /**
          * @description Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren
          *     Funkrufnamen. Wire == `as_str()`.
@@ -9045,6 +9056,32 @@ export interface components {
         TotpEnrollStart: {
             otpauth_url: string;
             secret_base32: string;
+        };
+        /** @description Eine Kennung der letzten 24 Stunden, ohne Koordinaten. */
+        TrackingCandidate: {
+            access_id: string;
+            access_name: string;
+            /** @description Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)? */
+            coupled: boolean;
+            device_id: string;
+            received_at: string;
+        };
+        /**
+         * @description Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“
+         *     (ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu
+         *     dürfen, und erklärt, warum Koppeln gesperrt ist.
+         */
+        TrackingCandidates: {
+            candidates: components["schemas"]["TrackingCandidate"][];
+            /** @description Org-Schalter „Ortung im Einsatz“; aus = Koppeln antwortet 422, nichts wird übernommen. */
+            tracking_enabled: boolean;
+        };
+        /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung. */
+        TrackingResponse: {
+            access_id: string;
+            access_name: string;
+            coupled_at: string;
+            device_id: string;
         };
         /** @description Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“. */
         TransportAnzeige: {

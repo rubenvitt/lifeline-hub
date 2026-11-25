@@ -39,9 +39,6 @@ Handler (`JsonBody`, LFH-1074).
   `kein_mitglied` wird zuerst geprüft, damit ein Fremder nichts über gelöschte oder abgelaufene
   Einsätze erfährt. Jeder andere 403 bleibt `Forbidden`; das Frontend liest den Grund in
   `frontend/src/einsatz/sackgasse.ts`.
-- **422 mit Grund** (LLH-2091): ein Zusammenhangsfehler, den der Client gezielt behandelt, antwortet
-  `AppError::UnprocessableGrund` mit `grund` (Referenz `volunteer_crew_required`, Client liest es in
-  `frontend/src/api/ortung.ts`); eine neue Route nimmt ihn statt eines eigenen Feldes.
 - **CAS-Baseline beim Öffnen einfrieren**: das Sammelbearbeiten von Tier und Schaden über
   `components/useEditSitzung.ts` (gebrandete `CasBasis`; `starte` nimmt den Datensatz); Test
   braucht ein gemountetes `<Form form={form}>`.

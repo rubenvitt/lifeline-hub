@@ -20,9 +20,6 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// Wert von `grund` im 422, wenn die Besatzung ehrenamtlich bestätigt werden muss.
-pub const GRUND_EHRENAMT_ERFORDERLICH: &str = "volunteer_crew_required";
-
 /// Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TrackingResponse {
@@ -30,7 +27,6 @@ pub struct TrackingResponse {
     pub access_name: String,
     pub device_id: String,
     pub coupled_at: String,
-    pub volunteer_crew_confirmed: bool,
 }
 
 impl From<Kopplung> for TrackingResponse {
@@ -40,7 +36,6 @@ impl From<Kopplung> for TrackingResponse {
             access_name: k.zugang_name,
             device_id: k.kennung,
             coupled_at: k.gekoppelt_at,
-            volunteer_crew_confirmed: k.ehrenamt_bestaetigt,
         }
     }
 }
@@ -68,12 +63,13 @@ impl From<Kandidat> for TrackingCandidate {
     }
 }
 
-/// Antwort der Kandidatenliste: die Kennungen und ob die Bestätigung „Besatzung ehrenamtlich“
-/// beim Koppeln Pflicht ist (Org-Schalter `ortung_hauptamt` aus). Der Dialog liest so den Schalter,
-/// ohne die Org-Einstellungen lesen zu dürfen.
+/// Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“
+/// (ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu
+/// dürfen, und erklärt, warum Koppeln gesperrt ist.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TrackingCandidates {
-    pub volunteer_crew_required: bool,
+    /// Org-Schalter „Ortung im Einsatz“; aus = Koppeln antwortet 422, nichts wird übernommen.
+    pub tracking_enabled: bool,
     pub candidates: Vec<TrackingCandidate>,
 }
 
@@ -82,8 +78,6 @@ pub struct TrackingCandidates {
 pub struct TrackingRequest {
     pub access_id: String,
     pub device_id: String,
-    #[serde(default)]
-    pub volunteer_crew_confirmed: bool,
 }
 
 /// GET /api/incidents/{id}/vehicles/{ef_id}/tracking — die Kopplung des Fahrzeugs oder 404.
@@ -107,16 +101,17 @@ pub async fn candidates(
 ) -> Result<Json<TrackingCandidates>, AppError> {
     let liste =
         kopplung::list_kandidaten(&state.pool, ctx.einsatz.org_id, &crate::zeit::jetzt()).await?;
-    let einstellungen =
-        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+    let freigabe =
+        crate::org::einstellungen::ortung_der_org(&state.pool, ctx.einsatz.org_id).await?;
     Ok(Json(TrackingCandidates {
-        volunteer_crew_required: !einstellungen.is_ortung_hauptamt(),
+        tracking_enabled: freigabe.im_einsatz,
         candidates: liste.into_iter().map(Into::into).collect(),
     }))
 }
 
 /// PUT /api/incidents/{id}/vehicles/{ef_id}/tracking — Fahrzeug an eine Kennung koppeln, die
-/// vorhandene Position übernehmen, ETB-Eintrag. Ein erneutes PUT ersetzt die Kopplung.
+/// vorhandene Position übernehmen, ETB-Eintrag. Ein erneutes PUT ersetzt die Kopplung. Mit
+/// ausgeschaltetem Org-Schalter „Ortung im Einsatz“ 422.
 pub async fn couple(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
@@ -129,17 +124,6 @@ pub async fn couple(
             "device_id: 1 bis {POSITION_KENNUNG_MAX} Zeichen"
         )));
     }
-    let einstellungen =
-        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
-    if !kopplung::is_ehrenamt_ok(
-        einstellungen.is_ortung_hauptamt(),
-        body.volunteer_crew_confirmed,
-    ) {
-        return Err(AppError::UnprocessableGrund {
-            meldung: "Die ehrenamtliche Besatzung muss bestätigt werden".into(),
-            grund: GRUND_EHRENAMT_ERFORDERLICH,
-        });
-    }
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
     let (anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
@@ -149,7 +133,6 @@ pub async fn couple(
             ef_id,
             &body.access_id,
             &body.device_id,
-            body.volunteer_crew_confirmed,
             ctx.benutzer.id,
             &jetzt,
         )
@@ -158,12 +141,8 @@ pub async fn couple(
         // holt der nächste Fix nach.
         apply_position_tx(conn, &k.zugang_id, &k.kennung, &jetzt).await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        let text = crate::fahrzeug::etb_text_gekoppelt(
-            &anzeige.funkrufname,
-            &k.zugang_name,
-            &k.kennung,
-            k.ehrenamt_bestaetigt,
-        );
+        let text =
+            crate::fahrzeug::etb_text_gekoppelt(&anzeige.funkrufname, &k.zugang_name, &k.kennung);
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;

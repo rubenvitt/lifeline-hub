@@ -1,19 +1,26 @@
 //! Übernahme der Ablage `position_letzte` in das gekoppelte Einsatzfahrzeug (LLH-2091, Entwurf
-//! „Übernahme“). Ein eigener Schritt nach dem Einwurf: die Antwort des Einwurfs hängt weder von
-//! der Kopplung noch vom Ergebnis ab (ADR-0023).
+//! „Übernahme“, ADR-0103). Ein eigener Schritt nach dem Einwurf: die Antwort des Einwurfs hängt
+//! weder von der Kopplung noch vom Ergebnis ab (ADR-0023).
 //!
-//! - **Vorrang** über `position_gesetzt_at` (Serverzeit): nur ein Fix, der später *empfangen*
-//!   wurde als die letzte Setzung, wird übernommen. Eine falsch gehende Geräteuhr ändert daran
-//!   nichts; Quelle und Zeiten NULL (gelöschte Position) zählen als älter.
-//! - **Drossel** je Fahrzeug: weniger als [`ORTUNG_DROSSEL_S`] nach dem letzten Schreiben aus der
-//!   Ortung wird nicht geschrieben, sondern genau ein Nachlauf vorgemerkt, der die jüngste
-//!   Position nach Ablauf übernimmt. Der Nachlauf lebt nur im Speicher; ein Neustart verliert
-//!   höchstens einen, der nächste Fix holt ihn nach.
+//! - **Geschrieben** wird über den Positionsbaustein [`crate::ortung::schreibe_position`] mit
+//!   Quelle `einwurf` und der Messzeit des Geräts, geklemmt mit
+//!   [`crate::ortung::klemme_zeitpunkt`]. Vorrang hat damit die Regel des Bausteins: der jüngere
+//!   Zeitpunkt gewinnt, eine manuelle Position gilt im Moment des Setzens immer.
+//! - **Nur mit Org-Schalter** „Ortung im Einsatz“ (ADR-0101): ist er aus, schreibt die Übernahme
+//!   nichts; die Kopplung bleibt stehen.
+//! - **Drossel** je Fahrzeug über `position_aktualisiert_at`: liegt die Messzeit eines Fixes
+//!   weniger als [`ORTUNG_DROSSEL_S`] nach der gespeicherten Einwurf-Position, wird nicht
+//!   geschrieben, sondern genau ein Nachlauf vorgemerkt, der die jüngste Position nach Ablauf
+//!   übernimmt. Beide Zeiten stammen vom selben Gerät; ein Versatz der Geräteuhr hebt sich auf.
+//!   Der Nachlauf lebt nur im Speicher; ein Neustart verliert höchstens einen, der nächste Fix
+//!   holt ihn nach.
 
 use crate::app::AppState;
 use crate::error::AppError;
-use crate::live::LiveEvent;
 use crate::log_drossel::SammelzeileJe;
+use crate::ortung::{
+    klemme_zeitpunkt, publiziere, schreibe_position, Ortungsziel, Positionsquelle,
+};
 use crate::write_retry;
 use crate::zeit;
 use sqlx::{SqliteConnection, SqlitePool};
@@ -21,7 +28,7 @@ use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::Duration;
 
-/// Mindestabstand zwischen zwei Schreibvorgängen der Ortung je Fahrzeug, in Sekunden.
+/// Mindestabstand der Messzeiten zweier Schreibvorgänge der Ortung je Fahrzeug, in Sekunden.
 pub const ORTUNG_DROSSEL_S: i64 = 15;
 
 /// Ergebnis eines Übernahmeversuchs.
@@ -31,7 +38,8 @@ pub enum Uebernahme {
     Geschrieben { einsatz_id: i64, ef_id: i64 },
     /// Zu kurz nach dem letzten Schreiben; es wurde nichts geändert, ein Nachlauf ist fällig.
     Gedrosselt { ef_id: i64 },
-    /// Keine Kopplung, kein aktives Fahrzeug im aktiven eigenen Einsatz, oder nichts Neueres.
+    /// Keine Kopplung, Org-Schalter aus, kein aktives Fahrzeug im aktiven eigenen Einsatz, oder
+    /// nichts Neueres.
     Nichts,
 }
 
@@ -79,7 +87,8 @@ impl Drop for NachlaufWache {
 }
 
 /// Übernimmt die Ablage der Kennung in das gekoppelte Fahrzeug. `jetzt` ist die Serverzeit
-/// (`zeit::FORMAT`); Tests geben sie vor. Gehört in eine Schreibtransaktion des Aufrufers.
+/// (`zeit::FORMAT`) für die Klemme der Messzeit; Tests geben sie vor. Gehört in eine
+/// Schreibtransaktion des Aufrufers.
 pub async fn apply_position_tx(
     conn: &mut SqliteConnection,
     zugang_id: &str,
@@ -98,57 +107,58 @@ async fn apply_position_gedrosselt_tx(
     jetzt: &str,
     drosseln: bool,
 ) -> Result<Uebernahme, AppError> {
-    type Zeile = (
-        i64,
-        i64,
-        f64,
-        f64,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-    );
+    type Zeile = (i64, i64, f64, f64, String, Option<String>, Option<String>);
     let zeile: Option<Zeile> = sqlx::query_as(
-        "SELECT k.einsatz_fahrzeug_id, k.einsatz_id, p.lat, p.lon, p.gemessen_at, p.empfangen_at, \
-                ef.position_quelle, ef.position_gesetzt_at \
+        "SELECT k.einsatz_fahrzeug_id, k.einsatz_id, p.lat, p.lon, p.gemessen_at, \
+                ef.position_quelle, ef.position_aktualisiert_at \
          FROM ortung_kopplung k \
          JOIN einsatz_fahrzeug ef ON ef.id = k.einsatz_fahrzeug_id AND ef.beendet_at IS NULL \
          JOIN einsatz e ON e.id = ef.einsatz_id AND e.status = 'aktiv' AND e.spiegel = 0 \
+         JOIN org_einstellungen o ON o.org_id = k.org_id AND o.ortung_im_einsatz = 1 \
          JOIN position_letzte p ON p.zugang_id = k.zugang_id AND p.kennung = k.kennung \
-         WHERE k.zugang_id = ? AND k.kennung = ? \
-           AND p.empfangen_at > COALESCE(ef.position_gesetzt_at, '')",
+         WHERE k.zugang_id = ? AND k.kennung = ?",
     )
     .bind(zugang_id)
     .bind(kennung)
     .fetch_optional(&mut *conn)
     .await?;
-    let Some((ef_id, einsatz_id, lat, lon, gemessen_at, empfangen_at, quelle, gesetzt_at)) = zeile
+    let Some((ef_id, einsatz_id, breite, laenge, gemessen_at, quelle, aktualisiert_at)) = zeile
     else {
         return Ok(Uebernahme::Nichts);
     };
+    let zeitpunkt = klemme_zeitpunkt(&gemessen_at, jetzt);
 
-    if drosseln && quelle.as_deref() == Some("ortung") {
-        let zuletzt = gesetzt_at.as_deref().and_then(zeit::parse);
-        let jetzt_t = zeit::parse(jetzt);
-        if let (Some(zuletzt), Some(jetzt_t)) = (zuletzt, jetzt_t) {
-            if (jetzt_t - zuletzt).num_seconds() < ORTUNG_DROSSEL_S {
+    // Nur gegen die eigene Quelle: was schon steht (oder Jüngeres), ist nichts Neues, und ein
+    // Fix knapp danach wird gedrosselt. Gegen `manuell` und `helfer` entscheidet allein der
+    // Baustein.
+    if quelle.as_deref() == Some(Positionsquelle::Einwurf.as_str()) {
+        let alt = aktualisiert_at.as_deref().and_then(zeit::parse);
+        let neu = zeit::parse(&zeitpunkt);
+        if let (Some(alt), Some(neu)) = (alt, neu) {
+            if neu <= alt {
+                return Ok(Uebernahme::Nichts);
+            }
+            if drosseln && (neu - alt).num_seconds() < ORTUNG_DROSSEL_S {
                 return Ok(Uebernahme::Gedrosselt { ef_id });
             }
         }
     }
 
-    sqlx::query(
-        "UPDATE einsatz_fahrzeug SET lat = ?, lon = ?, position_quelle = 'ortung', \
-         position_gemessen_at = ?, position_gesetzt_at = ? WHERE id = ?",
+    let geschrieben = schreibe_position(
+        conn,
+        einsatz_id,
+        Ortungsziel::Fahrzeug(ef_id),
+        breite,
+        laenge,
+        &zeitpunkt,
+        Positionsquelle::Einwurf,
     )
-    .bind(lat)
-    .bind(lon)
-    .bind(gemessen_at)
-    .bind(empfangen_at)
-    .bind(ef_id)
-    .execute(&mut *conn)
     .await?;
-    Ok(Uebernahme::Geschrieben { einsatz_id, ef_id })
+    Ok(if geschrieben {
+        Uebernahme::Geschrieben { einsatz_id, ef_id }
+    } else {
+        Uebernahme::Nichts
+    })
 }
 
 /// Übernahme nach dem Einwurf: eigene Transaktion, danach live melden bzw. den Nachlauf
@@ -165,9 +175,7 @@ async fn uebernehmen_und_melden(state: &AppState, zugang_id: &str, kennung: &str
     });
     match ergebnis {
         Ok(Uebernahme::Geschrieben { einsatz_id, ef_id }) => {
-            state
-                .live
-                .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
+            publiziere(state, einsatz_id, Ortungsziel::Fahrzeug(ef_id));
         }
         Ok(Uebernahme::Gedrosselt { ef_id }) => schedule_nachlauf(state, ef_id),
         Ok(Uebernahme::Nichts) => {}

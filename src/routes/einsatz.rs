@@ -333,11 +333,10 @@ pub async fn abschliessen(
     }
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
-    // Kopplung und GPS-Position sind weg (LLH-2091): offene Fahrzeug- und Lagekartenschirme ziehen nach.
+    // Kopplung und Einwurf-Position sind weg (LLH-2091): offene Fahrzeug- und Lagekartenschirme
+    // ziehen nach.
     for ef_id in &ergebnis.ortung_ef_ids {
-        state
-            .live
-            .publiziere_objekt(id, crate::live::LiveEvent::Fahrzeug, "fahrzeug_id", *ef_id);
+        crate::ortung::publiziere(&state, id, crate::ortung::Ortungsziel::Fahrzeug(*ef_id));
     }
     Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),

@@ -184,7 +184,6 @@ pub async fn setzen(
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
-        ortung_ef_ids: Vec::new(),
     })
 }
 
