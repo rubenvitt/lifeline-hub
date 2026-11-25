@@ -156,4 +156,36 @@ describe('SendenDialog (LLH-2093)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Kein Faxzugang eingerichtet')).toBeInTheDocument();
   });
+
+  it('zeigt bei zu_gross den Text des Servers, der den Kanal nennt', async () => {
+    kanaele([kanal(21, 'Kreis', '+49511123456', 'fax')]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          {
+            error: 'Das Fax hätte 45 Seiten; erlaubt sind höchstens 30 Seiten und 10 MiB',
+            grund: 'zu_gross',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige({ vorschlagNamen: [] });
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Kreis/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(await screen.findByText(/Das Fax hätte 45 Seiten/)).toBeInTheDocument();
+    expect(screen.queryByText('Anhänge zu groß für eine Mail')).toBeNull();
+  });
+
+  it('bietet die Mailadressen an, auch wenn die Faxnummern nicht laden', async () => {
+    server.use(
+      http.get('/api/external-agencies/channels', ({ request }) =>
+        new URL(request.url).searchParams.get('channel') === 'fax'
+          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
+          : HttpResponse.json(KANAELE),
+      ),
+    );
+    zeige();
+    expect(await screen.findByRole('checkbox', { name: /ILS Nord/ })).toBeInTheDocument();
+  });
 });

@@ -57,19 +57,27 @@ export function ausgangFehlerText(
   return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
 }
 
-/** Gründe einer fehlenden oder gestörten Anbindung: der Server nennt den Kanal selbst. */
-const ANBINDUNG_GRUENDE = new Set(['anbindung_fehlt', 'anbindung_angehalten', 'anbindung_fehler']);
+/**
+ * Gründe, deren Text der Server je Kanal setzt (Anbindung fehlt oder gestört; Fax zu lang oder
+ * Anhänge zu groß): nur er weiß, ob die Mail oder das Fax es auslöste (LLH-2095).
+ */
+const SERVER_TEXT_GRUENDE = new Set([
+  'anbindung_fehlt',
+  'anbindung_angehalten',
+  'anbindung_fehler',
+  'zu_gross',
+]);
 
 /**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
- * Servertextes; alles andere bleibt, wie es ist. Bei einer Anbindung bleibt der Text des
- * Servers, denn nur er weiß, ob der Mailserver oder der Faxzugang fehlt (LLH-2095).
+ * Servertextes; alles andere bleibt, wie es ist. Bei einer Anbindung und bei „zu groß“ bleibt
+ * der Text des Servers, denn nur er weiß, ob Mail oder Fax es auslöste (LLH-2095).
  */
 export function versandFehler(fehler: unknown): unknown {
   if (
     fehler instanceof ApiError &&
     fehler.grund &&
-    ANBINDUNG_GRUENDE.has(fehler.grund) &&
+    SERVER_TEXT_GRUENDE.has(fehler.grund) &&
     fehler.vomAnwendungsserver &&
     fehler.message
   ) {

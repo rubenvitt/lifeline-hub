@@ -65,8 +65,10 @@ export default function SendenDialog({
   const mailQuery = useKanaeleSammlung('email');
   const faxQuery = useKanaeleSammlung('fax');
   const sende = useSendeVersaende(einsatzId, quelle);
-  const mails = mailQuery.data;
-  const faxe = faxQuery.data;
+  // Lädt eine Liste nicht, bleibt die andere nutzbar: ein Fehler bei den Faxnummern sperrt die
+  // Mail nicht (und umgekehrt).
+  const mails = mailQuery.data ?? (mailQuery.isError ? [] : undefined);
+  const faxe = faxQuery.data ?? (faxQuery.isError ? [] : undefined);
   const kanaele = mails && faxe ? [...mails, ...faxe] : undefined;
 
   // Ein Schlüssel je Öffnen: ein zweiter Versuch derselben Eingabe legt keine zweite Mail an.
