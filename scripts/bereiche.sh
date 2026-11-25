@@ -30,6 +30,12 @@ bereiche_von() {
     frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts \
       | frontend/public/beispiele/*)
       echo "rust frontend e2e" ;;
+    # Rust prüft Stammdaten-Eingang samt Dialog und Vertrag auf Herstellernamen
+    # (tests/stammdaten_eingang.rs, LLH-1633). Der Vertrag steht vor der Doku-Regel.
+    frontend/src/stammdaten/*)
+      echo "rust frontend e2e" ;;
+    docs/schnittstellen/stammdaten-datei.md)
+      echo "rust" ;;
     # Rust liest die gemeinsamen Fälle der Dauerform (`include_str!` in src/zeitdarstellung.rs,
     # LLH-1750); der Kern im Frontend liest sie ebenso.
     frontend/src/anzeige/dauer.faelle.json)

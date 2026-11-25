@@ -98,6 +98,7 @@ pub mod schichtmodell;
 pub mod shell;
 pub mod sitzung;
 pub mod sprechgruppe;
+pub mod stammdaten_eingang;
 pub mod stichwort;
 pub mod support;
 pub mod system;
