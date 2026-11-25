@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import dev.rubeen.lifeline.helfer.seiten.StartSeite
 import dev.rubeen.lifeline.helfer.ui.HelferThema
 import org.junit.Assert.assertEquals
@@ -14,7 +15,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Bildschirm 1 „Start“: QR-Code scannen, darunter Code eingeben (Spec „Bildschirme“). */
+/**
+ * Bildschirm 1 „Start“: QR-Code scannen, darunter Code eingeben (Spec „Bildschirme“). Robolectric
+ * zeigt ein kleines Fenster; die Knöpfe liegen unter dem Sucherbild, daher erst hinscrollen.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class StartSeiteTest {
@@ -35,15 +39,15 @@ class StartSeiteTest {
     @Test
     fun `der Start zeigt QR-Code scannen und Code eingeben`() {
         zeige()
-        compose.onNodeWithText("QR-Code scannen").assertIsDisplayed()
-        compose.onNodeWithText("Code eingeben").assertIsDisplayed()
+        compose.onNodeWithText("QR-Code scannen").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Code eingeben").performScrollTo().assertIsDisplayed()
     }
 
     @Test
     fun `QR-Code scannen oeffnet den Scanner und loescht die alte Meldung`() {
         modell.meldung = "alt"
         zeige()
-        compose.onNodeWithTag("scannen").performClick()
+        compose.onNodeWithTag("scannen").performScrollTo().performClick()
         assertEquals(1, scans)
         assertEquals(null, modell.meldung)
     }
@@ -51,7 +55,7 @@ class StartSeiteTest {
     @Test
     fun `Code eingeben oeffnet die Eingabe von Server und Code`() {
         zeige()
-        compose.onNodeWithTag("code-eingeben").performClick()
+        compose.onNodeWithTag("code-eingeben").performScrollTo().performClick()
         compose.waitForIdle()
         compose.onNodeWithText("Server und Code stehen unter dem QR-Code der Einsatzleitung.").assertExists()
     }

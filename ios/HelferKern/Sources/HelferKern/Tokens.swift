@@ -138,6 +138,7 @@ public enum LifelineFarbe {
     public static let fachebeneLuftqualitaet = Paar(nacht: 0xFF8C9BB3, tag: 0xFF5B6B82)
     public static let fachebeneOdl = Paar(nacht: 0xFFA0D911, tag: 0xFF7CB305)
     public static let fachebeneAutobahn = Paar(nacht: 0xFFF759AB, tag: 0xFFC41D7F)
+    public static let fachebeneAutobahnParken = Paar(nacht: 0xFF7FB0CF, tag: 0xFF3F6E8C)
     public static let fachebeneKritis = Paar(nacht: 0xFF9254DE, tag: 0xFF531DAB)
     public static let fachebeneEnergie = Paar(nacht: 0xFFFADB14, tag: 0xFFD4B106)
     public static let fachebeneCopernicus = Paar(nacht: 0xFFC48A5A, tag: 0xFF873800)

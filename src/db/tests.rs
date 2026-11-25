@@ -15470,6 +15470,8 @@ async fn migration_0376_baut_kopplung_um_und_setzt_positionsquelle() {
     .await
     .unwrap();
     assert_eq!(rest, 0, "Kaskade Kopplung → Code, Ereignis, Sitzung");
+}
+
 /// LLH-2061 (Paket 15 von LLH-1979): Das Präfix `/api/einsaetze` heißt jetzt `/api/incidents`.
 /// Ein offener Antrag eines Spiegels trägt die Vorlage seines Pfads; ohne Umschreiben fände der
 /// Führer sie nicht mehr unter den beantragbaren Erfassungen. Die Migration tauscht nur das Präfix

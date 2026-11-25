@@ -24,8 +24,9 @@ const SWIFT = "ios/HelferKern/Sources/HelferKern/Tokens.swift";
 const KOTLIN = "android/helferkern/src/main/kotlin/dev/rubeen/lifeline/helferkern/Tokens.kt";
 const KOPF = `Erzeugt aus ${QUELLE} von scripts/design/tokens-nativ.mjs — nicht von Hand ändern.`;
 
+// `-` und `_` trennen Wörter (`autobahn_parken` → `autobahnParken`).
 export function lowerCamel(name) {
-  const teile = name.split("-").filter(Boolean);
+  const teile = name.split(/[-_]/).filter(Boolean);
   return teile.map((t, i) => (i === 0 ? t : t[0].toUpperCase() + t.slice(1))).join("");
 }
 
