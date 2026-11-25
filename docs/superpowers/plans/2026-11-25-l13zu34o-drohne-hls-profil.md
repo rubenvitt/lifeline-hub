@@ -108,7 +108,7 @@
 ### Task 5: Regeln, ADR, Doku, Hinweis im Formular
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0104-adapter-rufen-http-nur-zu-privaten-ip-literalen.md`
+- Create: `docs/architektur/entscheidungen/ADR-0105-adapter-rufen-http-nur-zu-privaten-ip-literalen.md`
 - Modify: `src/AGENTS.md` (Adapter: `http`-Regel, `drohne::ARTEN`), `docs/architektur/05-bausteinsicht.md:237-238`, `docs/konzepte/2026-11-24-drohnenbild-ueber-suchlage.md` (Schritt 8 Stand), `frontend/src/pages/einstellungen/AdapterPaneel.tsx` (`ADAPTER_LAN_WARNUNG` + Satz „Mit http:// (nur zu einer privaten IP-Adresse) gehen Zugangsdaten unverschlüsselt durchs Netz.“)
 
 - [ ] **Step 1:** ADR nach `VORLAGE.md`, `gilt_fuer: src/adapter/ziel.rs`, Regeln (MUST NOT `http` ohne `http_im_lan`; MUST nur IP-Literal `Privat`), Prüfung `verlange 'fn check_adapter_url' src/adapter/ziel.rs`.

@@ -109,7 +109,8 @@ export default function DrohnenVideoFenster({
             setZustand('kein');
             return;
           }
-          const player = new Hls({ lowLatencyMode: false });
+          // Interstitials lädt der Spieler sonst an jedem Proxy vorbei (Server lehnt sie ab, LLH-2110).
+          const player = new Hls({ lowLatencyMode: false, enableInterstitialPlayback: false });
           let neuGeladen = false;
           let wiederhergestellt = false;
           video.addEventListener('playing', laeuft);

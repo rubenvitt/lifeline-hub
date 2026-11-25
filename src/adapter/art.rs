@@ -128,7 +128,7 @@ pub trait AdapterArt: Send + Sync + 'static {
     }
 
     /// Ob die Art `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen darf
-    /// (`ziel::check_adapter_url`, ADR-0104), etwa einen Medienserver im LAN.
+    /// (`ziel::check_adapter_url`, ADR-0105), etwa einen Medienserver im LAN.
     fn http_im_lan(&self) -> bool {
         false
     }

@@ -100,6 +100,23 @@ fn rewrite_uri(
     Ok(name.to_string())
 }
 
+/// Ob ein Attributwert in Anführungszeichen, der kein `URI=` ist, eine Adresse trägt (`://`
+/// oder beginnend mit `//`).
+fn has_fremde_adresse(zeile: &str) -> bool {
+    let mut rest = zeile;
+    while let Some(i) = rest.find("=\"") {
+        let ist_uri = rest[..i].ends_with("URI");
+        let wert_ab = &rest[i + 2..];
+        let ende = wert_ab.find('"').unwrap_or(wert_ab.len());
+        let wert = &wert_ab[..ende];
+        if !ist_uri && (wert.contains("://") || wert.starts_with("//")) {
+            return true;
+        }
+        rest = &wert_ab[(ende + 1).min(wert_ab.len())..];
+    }
+    false
+}
+
 /// Schreibt die `URI=`-Werte einer Tag-Zeile um (`#EXT-X-MAP`, `#EXT-X-MEDIA`, `#EXT-X-PART`,
 /// `#EXT-X-PRELOAD-HINT`, `#EXT-X-KEY` …), in Anführungszeichen oder ohne.
 fn rewrite_tag(
@@ -108,6 +125,11 @@ fn rewrite_tag(
     lan_erlaubt: bool,
     http_im_lan: bool,
 ) -> Result<String, VideoFehler> {
+    // Was der Spieler sonst noch als Adresse liest, ginge am Proxy vorbei: Interstitials
+    // (`X-ASSET-LIST`) und jeder andere Attributwert, der absolut oder netzrelativ aussieht.
+    if zeile.contains("X-ASSET-LIST=") || has_fremde_adresse(zeile) {
+        return Err(VideoFehler::Upstream);
+    }
     let mut aus = String::with_capacity(zeile.len());
     let mut rest = zeile;
     while let Some(i) = rest.find("URI=") {
@@ -512,6 +534,9 @@ mod tests {
             "#EXTM3U\nseg.exe\n",
             "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key.bin\"\n",
             "#EXTM3U\n#EXT-X-MAP:URI=\"data:text/plain,x\"\n",
+            "#EXTM3U\n#EXT-X-DATERANGE:ID=\"a\",CLASS=\"com.apple.hls.interstitial\",START-DATE=\"2026-11-25T10:00:00Z\",X-ASSET-LIST=\"https://fremd.example/a.json\"\n",
+            "#EXTM3U\n#EXT-X-DATERANGE:ID=\"a\",X-ASSET-LIST=\"liste.json\"\n",
+            "#EXTM3U\n#EXT-X-SESSION-DATA:DATA-ID=\"x\",VALUE=\"//fremd.example/x\"\n",
         ] {
             assert_eq!(mediamtx(MEDIAMTX, p), Err(VideoFehler::Upstream), "{p}");
         }

@@ -1,5 +1,5 @@
 ---
-id: ADR-0104
+id: ADR-0105
 titel: Adapter rufen http nur zu einem privaten IP-Literal, nur mit LAN-Ausnahme und nur für Arten, die es erklären
 status: akzeptiert
 datum: 2026-11-25
@@ -11,7 +11,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/l13zu34ormzjup8syaxj7ttj
 ---
 
-# ADR-0104: Adapter rufen http nur zu einem privaten IP-Literal, nur mit LAN-Ausnahme und nur für Arten, die es erklären
+# ADR-0105: Adapter rufen http nur zu einem privaten IP-Literal, nur mit LAN-Ausnahme und nur für Arten, die es erklären
 
 Präzisiert ADR-0077 („nur `https`“) für Medienserver im LAN.
 
@@ -33,7 +33,8 @@ Präzisiert ADR-0077 („nur `https`“) für Medienserver im LAN.
 verlange 'pub fn check_adapter_url' 'src/adapter/ziel.rs'
 verlange 'check_adapter_url\(url, self\.lan_erlaubt, self\.http_im_lan\)' 'src/adapter/ziel.rs'
 verlange 'check_adapter_url\(text, lan_erlaubt, art\.http_im_lan\(\)\)' 'src/adapter/art.rs'
-verbiete '\.https_only\(false\)' 'src/**/*.rs'
+verlange 'if url\.scheme\(\) == "http" \{' 'src/adapter/ziel.rs'
+verbiete 'client_http_lan\(\)' 'src/routes/**/*.rs' 'src/drohne/**/*.rs'
 ```
 
 ## Kontext

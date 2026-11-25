@@ -268,7 +268,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Adapter-URL prüft `ziel::check_adapter_url`; `http` nur für eine Art mit
   `AdapterArt::http_im_lan`, nur mit LAN-Ausnahme und nur zu einem privaten IP-Literal, nie zu
   einem Hostnamen (LLH-2110,
-  [ADR-0104](../docs/architektur/entscheidungen/ADR-0104-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
+  [ADR-0105](../docs/architektur/entscheidungen/ADR-0105-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
   Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf

@@ -350,8 +350,9 @@ async fn hls_abrufen(
             .einstellung_text("playlist_url")
             .ok_or(VideoFehler::Verweigert)?;
         let url = reqwest::Url::parse(playlist)
-            .and_then(|p| p.join(&file))
-            .map_err(|_| VideoFehler::Upstream)?;
+            .ok()
+            .and_then(|p| crate::drohne::hls::upstream_url(&p, &file).ok())
+            .ok_or(VideoFehler::Upstream)?;
         let anfrage = crate::drohne::hls::apply_auth(
             kontext.get(url.as_str()).map_err(fehl)?,
             kontext.einstellung_text("benutzer"),

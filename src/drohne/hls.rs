@@ -69,6 +69,21 @@ pub fn einordnen(
     }
 }
 
+/// Dateiname, unter dem das Videofenster die Playlist abruft (`…/hls/index.m3u8`, LLH-2107).
+pub const EINSTIEG: &str = "index.m3u8";
+
+/// Die Adresse beim Medienserver für eine Datei des Proxys: der Einstieg ist die eingetragene
+/// Playlist selbst, jede andere Datei liegt in ihrem Verzeichnis. Die Query der Playlist (etwa
+/// ein Token) geht an jede Datei mit, weil sie meist für alle gilt.
+pub fn upstream_url(playlist_url: &reqwest::Url, file: &str) -> Result<reqwest::Url, ()> {
+    if file == EINSTIEG {
+        return Ok(playlist_url.clone());
+    }
+    let mut url = playlist_url.join(file).map_err(|_| ())?;
+    url.set_query(playlist_url.query());
+    Ok(url)
+}
+
 /// Basic-Auth an das Ziel, nur wenn Benutzer und Passwort beide gesetzt sind.
 pub fn apply_auth(
     anfrage: reqwest::RequestBuilder,
@@ -238,6 +253,47 @@ mod tests {
             einordnen("a1", Ok(p), &url(), true).unwrap_err().art,
             AdapterFehler::AntwortUngueltig
         );
+    }
+
+    #[test]
+    fn upstream_url_einstieg_ist_die_playlist_samt_query() {
+        let p = reqwest::Url::parse("http://10.0.0.5:8888/d/stream.m3u8?jwt=abc").unwrap();
+        assert_eq!(
+            upstream_url(&p, EINSTIEG).unwrap().as_str(),
+            "http://10.0.0.5:8888/d/stream.m3u8?jwt=abc"
+        );
+        assert_eq!(
+            upstream_url(&p, "video1_stream.m3u8").unwrap().as_str(),
+            "http://10.0.0.5:8888/d/video1_stream.m3u8?jwt=abc"
+        );
+        assert_eq!(
+            upstream_url(&p, "seg1.mp4").unwrap().as_str(),
+            "http://10.0.0.5:8888/d/seg1.mp4?jwt=abc"
+        );
+        let ohne = reqwest::Url::parse(URL).unwrap();
+        assert_eq!(
+            upstream_url(&ohne, "seg1.mp4").unwrap().as_str(),
+            "http://10.0.0.5:8888/drohne/seg1.mp4"
+        );
+    }
+
+    #[test]
+    fn basic_auth_nur_mit_beiden_werten() {
+        let c = reqwest::Client::new();
+        let pw = age::secrecy::SecretString::from("geheim".to_string());
+        let kopf = |r: reqwest::RequestBuilder| {
+            r.build()
+                .unwrap()
+                .headers()
+                .get(reqwest::header::AUTHORIZATION)
+                .map(|v| v.to_str().unwrap().to_string())
+        };
+        assert_eq!(
+            kopf(apply_auth(c.get(URL), Some("drohne"), Some(&pw))).as_deref(),
+            Some("Basic ZHJvaG5lOmdlaGVpbQ==")
+        );
+        assert_eq!(kopf(apply_auth(c.get(URL), Some("drohne"), None)), None);
+        assert_eq!(kopf(apply_auth(c.get(URL), None, Some(&pw))), None);
     }
 
     #[test]

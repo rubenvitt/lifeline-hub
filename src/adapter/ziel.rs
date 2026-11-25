@@ -64,7 +64,7 @@ fn client_http_lan() -> &'static reqwest::Client {
 /// Zielschutz einer Adapter-URL: [`check_url`], dazu `http` nur, wenn die Art es erlaubt
 /// (`AdapterArt::http_im_lan`), die LAN-Ausnahme gesetzt ist und der Host ein IP-Literal in einem
 /// privaten Netz ist (`ausgehend::zieladresse::klasse`). Ein Hostname geht nie per `http`: er
-/// könnte auf eine öffentliche Adresse zeigen (`src/AGENTS.md`, „Adapter“, ADR-0104).
+/// könnte auf eine öffentliche Adresse zeigen (`src/AGENTS.md`, „Adapter“, ADR-0105).
 pub fn check_adapter_url(
     roh: &str,
     lan_erlaubt: bool,
