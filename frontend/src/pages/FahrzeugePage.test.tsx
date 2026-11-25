@@ -586,6 +586,47 @@ describe('FahrzeugePage', () => {
     ).toBeInTheDocument();
   });
 
+  describe('Spiegel zeigt Marke Ortung bei frischer Einwurf-Position', () => {
+    const spiegel = {
+      gegenstelle: 'ELW 1',
+      beendet: false,
+      antraege_ausstehend: 0,
+      antraege_abgelehnt: 0,
+      bruchstelle: 0,
+    };
+    const vor = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+    it('zeigt die Marke bei einer Position unter 5 min', async () => {
+      render(einsatz({ spiegel }), [], {
+        ...ef,
+        position_quelle: 'einwurf',
+        position_aktualisiert_at: vor(2),
+      });
+      await screen.findByText('Florian 1');
+      expect(screen.getByText('Ortung')).toBeInTheDocument();
+    });
+
+    it('lässt die Marke bei einer älteren Position weg', async () => {
+      render(einsatz({ spiegel }), [], {
+        ...ef,
+        position_quelle: 'einwurf',
+        position_aktualisiert_at: vor(6),
+      });
+      await screen.findByText('Florian 1');
+      expect(screen.queryByText('Ortung')).toBeNull();
+    });
+
+    it('zeigt am eigenen Einsatz ohne Kopplung keine Marke aus der Position', async () => {
+      render(einsatz(), [], {
+        ...ef,
+        position_quelle: 'einwurf',
+        position_aktualisiert_at: vor(2),
+      });
+      await screen.findByText('Florian 1');
+      expect(screen.queryByText('Ortung')).toBeNull();
+    });
+  });
+
   it('bietet im abgeschlossenen Einsatz keine Ortung an', async () => {
     render(einsatz({ status: 'abgeschlossen', abgeschlossen_at: '2026-05-26 12:00:00' }));
     await screen.findByText('Florian 1');

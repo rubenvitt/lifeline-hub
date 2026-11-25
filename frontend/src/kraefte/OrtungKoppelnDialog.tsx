@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Form, Radio } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { koppleOrtung, listOrtungKandidaten, type TrackingCandidate } from '../api/ortung';
@@ -24,6 +24,11 @@ export interface OrtungKoppelnDialogProps {
   onSchliessen: () => void;
 }
 
+/** Der Hub holt die Kennungen vom ELW nach; so oft fragt der Dialog erneut nach (LLH-2119). */
+const HUB_ABFRAGE_MS = 2000;
+/** So lange wartet der Dialog auf den Hub, bevor er „antwortet nicht“ sagt (LLH-2119). */
+const HUB_GEDULD_MS = 15_000;
+
 /** Warum Koppeln gesperrt ist, wenn der Org-Schalter „Ortung im Einsatz“ aus ist. */
 const SCHALTER_AUS_TEXT =
   'Ortung ist für diese Organisation ausgeschaltet. Ein Admin schaltet sie unter Verwaltung → ' +
@@ -37,7 +42,9 @@ const SCHALTER_AUS_TEXT =
  * Kandidatenliste (die Org-Einstellungen darf nicht jeder Schreibberechtigte lesen). Ist er aus,
  * erklärt der Dialog das und sperrt „Koppeln“; maßgeblich ist der Server (422). Die Kandidaten
  * werden beim Öffnen geholt, nicht live und nicht im Lagebild ohne Netz (`NICHT_LIVE_KEYS`). Die
- * Liste trägt keine Koordinaten.
+ * Liste trägt keine Koordinaten. Im gespiegelten Einsatz holt der Hub die Kennungen vom ELW nach
+ * (`pending`, LLH-2119): der Dialog fragt dann alle 2 s erneut und meldet nach 15 s, dass der Hub
+ * nicht antwortet; Kennungen von dort tragen „über den Hub“.
  */
 export default function OrtungKoppelnDialog({
   einsatzId,
@@ -57,7 +64,20 @@ export default function OrtungKoppelnDialog({
     // Ein Schnappschuss beim Öffnen: ein erneutes Öffnen holt frisch.
     staleTime: 0,
     gcTime: 0,
+    // Solange der Hub die Kennungen noch holt (`pending`), nur bei offenem Dialog erneut fragen.
+    refetchInterval: (q) => (offen && q.state.data?.pending === true ? HUB_ABFRAGE_MS : false),
   });
+  const hubHolt = kandidatenQuery.data?.pending === true;
+  /** Der Hub liefert seit {@link HUB_GEDULD_MS} noch nichts: Zeit läuft ab dem ersten `pending`. */
+  const [hubStumm, setHubStumm] = useState(false);
+  useEffect(() => {
+    if (!hubHolt) return;
+    const timer = setTimeout(() => setHubStumm(true), HUB_GEDULD_MS);
+    return () => {
+      clearTimeout(timer);
+      setHubStumm(false);
+    };
+  }, [hubHolt]);
   /** Der Server nennt den Org-Schalter mit der Liste; solange sie fehlt, gilt er als aus. */
   const schalterAn = kandidatenQuery.data?.tracking_enabled === true;
 
@@ -115,6 +135,14 @@ export default function OrtungKoppelnDialog({
         {SCHALTER_AUS_TEXT}
       </Textstufe>
     );
+  } else if (kandidaten.length === 0 && hubHolt) {
+    auswahl = (
+      <Textstufe ton="gedaempft" als="p">
+        {hubStumm
+          ? 'Der Hub antwortet gerade nicht. Später erneut versuchen.'
+          : 'Kennungen werden vom Hub geholt …'}
+      </Textstufe>
+    );
   } else if (kandidaten.length === 0) {
     auswahl = (
       <Textstufe ton="gedaempft" als="p">
@@ -129,6 +157,7 @@ export default function OrtungKoppelnDialog({
             {kandidaten.map((k) => (
               <Radio key={kennungWert(k)} value={kennungWert(k)} disabled={k.coupled}>
                 {k.access_name} · <Kennung>{k.device_id}</Kennung> · {vorText(k.received_at, jetzt)}
+                {k.via_hub && ' · über den Hub'}
               </Radio>
             ))}
           </Stapel>

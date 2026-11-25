@@ -6,7 +6,12 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { ladeEinsatz, ladeModulFreigaben } from '../api/einsaetze';
-import { darfImEinsatzSchreiben, darfVerwaltung, isEinsatzGesperrt } from '../einsatz/schreibrecht';
+import {
+  darfImEinsatzSchreiben,
+  darfVerwaltung,
+  isEinsatzGesperrt,
+  istSpiegel,
+} from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import { fahrzeugDetailPfad } from '../stammdaten/stammdatenDetail';
 import { useAdressWertNachRueckfrage } from '../routing/useAdressWert';
@@ -62,6 +67,8 @@ import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
 import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
+import { useMinutenTakt } from '../components/useMinutenTakt';
+import { positionsAlter } from './lagekarte/positionsAlter';
 import OrtungKoppelnDialog from '../kraefte/OrtungKoppelnDialog';
 import { trenneOrtung } from '../api/ortung';
 import { hasFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
@@ -478,6 +485,7 @@ function FahrzeugeInhalt() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { benutzer } = useAuth();
+  const jetzt = useMinutenTakt();
   const { dichte } = useDichte();
   /** Nur der Menüauslöser (Entscheidung 14.10.2026, `components/menueSpalte.ts`). */
   const aktionenBreite = menueSpaltenBreite(dichte);
@@ -854,6 +862,14 @@ function FahrzeugeInhalt() {
   const darfSchreiben = darfImEinsatzSchreiben(einsatz);
   // Abgeschlossen oder Spiegel: der Grund steht auf der Seite (LLH-1675).
   const nurAnsicht = isEinsatzGesperrt(einsatz);
+  /**
+   * Am Spiegel gibt es keine eigene Kopplung (sie liegt beim ELW): die Marke „Ortung“ zeigt dort,
+   * dass die Position gerade aus dem Einwurf kommt, also jünger ist als „veraltet“ (LLH-2119).
+   */
+  const spiegelOrtung = (ef: EinsatzFahrzeug) =>
+    istSpiegel(einsatz) &&
+    ef.position_quelle === 'einwurf' &&
+    positionsAlter(ef.position_aktualisiert_at, new Date(jetzt))?.veraltet === false;
 
   const efs = efQuery.data ?? [];
   const entlassene = entlasseneQuery.data ?? [];
@@ -1099,7 +1115,7 @@ function FahrzeugeInhalt() {
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
               {/* Gekoppelt an eine Einwurf-Kennung (LLH-2091); dasselbe Wort wie die Quelle am
                   Marker der Lagekarte („Ortung · vor 3 min“). */}
-              {ef.ortung_gekoppelt && <Marke>Ortung</Marke>}
+              {(ef.ortung_gekoppelt || spiegelOrtung(ef)) && <Marke>Ortung</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>
           }

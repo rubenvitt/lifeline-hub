@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders } from '../test/utils';
 import type { EinsatzFahrzeug } from '../api/types';
@@ -31,11 +31,12 @@ const KANDIDATEN = [
 let bodies: unknown[];
 let onSchliessen: () => void;
 
-function handler(opts: { kandidaten?: unknown[]; schalter?: boolean } = {}) {
+function handler(opts: { kandidaten?: unknown[]; schalter?: boolean; pending?: boolean } = {}) {
   server.use(
     http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
       HttpResponse.json({
         tracking_enabled: opts.schalter ?? true,
+        pending: opts.pending ?? false,
         candidates: opts.kandidaten ?? KANDIDATEN,
       }),
     ),
@@ -58,6 +59,57 @@ function render() {
 }
 
 describe('OrtungKoppelnDialog', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('zeigt Ladezustand, solange der Hub liefert, und fragt erneut ab', async () => {
+    let abrufe = 0;
+    server.use(
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () => {
+        abrufe += 1;
+        return HttpResponse.json({
+          tracking_enabled: true,
+          pending: abrufe < 2,
+          candidates: abrufe < 2 ? [] : KANDIDATEN,
+        });
+      }),
+    );
+    render();
+    expect(await screen.findByText('Kennungen werden vom Hub geholt …')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('radio', { name: /kennung-a/ }, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(abrufe).toBeGreaterThanOrEqual(2);
+  });
+
+  it('zeigt Hinweis nach 15 s ohne Antwort', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    handler({ kandidaten: [], pending: true });
+    render();
+    expect(await screen.findByText('Kennungen werden vom Hub geholt …')).toBeInTheDocument();
+    expect(screen.queryByText(/Der Hub antwortet gerade nicht/)).toBeNull();
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(
+      await screen.findByText('Der Hub antwortet gerade nicht. Später erneut versuchen.'),
+    ).toBeInTheDocument();
+  });
+
+  it('kennzeichnet Kennungen über den Hub', async () => {
+    handler({
+      kandidaten: [
+        { ...KANDIDATEN[0], via_hub: true },
+        { ...KANDIDATEN[1], via_hub: false },
+      ],
+    });
+    render();
+    const hub = await screen.findByRole('radio', { name: /kennung-a/ });
+    expect(hub.closest('label')).toHaveTextContent('über den Hub');
+    expect(screen.getByRole('radio', { name: /kennung-b/ }).closest('label')).not.toHaveTextContent(
+      'über den Hub',
+    );
+  });
+
   it('zeigt die Kennungen als „Zugang · Kennung · vor 2 min“ und sperrt gekoppelte', async () => {
     handler();
     render();
