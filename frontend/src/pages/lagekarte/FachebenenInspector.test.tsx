@@ -811,6 +811,17 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByText(/Reisezeitverlust|Stau/)).not.toBeInTheDocument();
   });
 
+  it('Autobahn/Verkehrsmeldung: Reisezeitverlust ab einer Stunde in der Form der Dauer', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A1 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: 65 }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('+1 h 05 min Reisezeitverlust')).toBeInTheDocument();
+  });
+
   it('Lkw-Parken: Name, Autobahn, Abschnitt, Stellplätze und Ausstattung', () => {
     const { unmount } = render(
       <FachebenenInspector

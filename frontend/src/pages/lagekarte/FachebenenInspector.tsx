@@ -40,6 +40,7 @@ import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
+import { dauer } from '../../anzeige/dauer';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
@@ -677,8 +678,8 @@ const MELDUNGSART: Record<string, string> = {
 /** Kopfzeile einer Verkehrsmeldung: Art und Reisezeitverlust, was davon da ist. */
 function meldungsKopf(p: Record<string, unknown>): string | undefined {
   const art = MELDUNGSART[s(p.art) ?? ''];
-  const minuten = typeof p.verzoegerung_min === 'number' && p.verzoegerung_min > 0;
-  const teile = [art, minuten ? `+${p.verzoegerung_min} min Reisezeitverlust` : undefined];
+  const minuten = typeof p.verzoegerung_min === 'number' ? p.verzoegerung_min : 0;
+  const teile = [art, minuten > 0 ? `+${dauer(minuten)} Reisezeitverlust` : undefined];
   const kopf = teile.filter(Boolean).join(' · ');
   return kopf || undefined;
 }
