@@ -239,7 +239,9 @@ impl Verzeichnis {
 
     /// Die Arten dieses Builds.
     pub fn produktiv() -> Self {
-        Verzeichnis::default()
+        Verzeichnis::new(vec![Arc::new(
+            super::arten::stammdaten_abruf::StammdatenAbruf,
+        )])
     }
 
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {
@@ -417,6 +419,6 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        assert!(Verzeichnis::produktiv().is_empty());
+        assert!(Verzeichnis::produktiv().find("stammdaten_abruf").is_some());
     }
 }

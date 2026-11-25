@@ -815,6 +815,15 @@ export interface components {
          * @enum {string}
          */
         AntragZielArt: "einsatz" | "betroffene" | "externe_kraft" | "infotelefon_anruf" | "medienkontakt";
+        /** @description Zählung je Art, wie sie die Liste der offenen Schnappschüsse zeigt. */
+        Anzahl: {
+            /** Format: int64 */
+            fahrzeuge: number;
+            /** Format: int64 */
+            personal: number;
+            /** Format: int64 */
+            qualifikationen: number;
+        };
         /** @description Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS). */
         AppCode: {
             code: string;
@@ -8072,6 +8081,19 @@ export interface components {
              * @description Wirksame Mindestruhe in Minuten.
              */
             min_ruhe_minuten: number;
+        };
+        /** @description Ein offener Schnappschuss ohne Inhalt, für Hinweis und Liste. */
+        SchnappschussInfo: {
+            abgerufen_at: string;
+            adapter_id: string;
+            adapter_name: string;
+            anzahl: components["schemas"]["Anzahl"];
+            herkunft: string;
+            id: string;
+        };
+        /** @description Antwort der Liste: die offenen Schnappschüsse der Org. */
+        SchnappschussListe: {
+            schnappschuesse: components["schemas"]["SchnappschussInfo"][];
         };
         /**
          * @description Schriftfeld der Skizze (J.5). Jedes Feld trägt den gespeicherten Wert, `null` = leer. Die

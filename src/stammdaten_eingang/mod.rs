@@ -10,7 +10,9 @@ use crate::wire_enum::wire_enum;
 
 pub mod abgleich;
 pub mod datei;
+pub mod json;
 pub mod repo;
+pub mod schnappschuss;
 
 wire_enum! {
     /// Art eines Stammdatensatzes. Wire == `as_str()`.

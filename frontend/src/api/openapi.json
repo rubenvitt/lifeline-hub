@@ -2109,6 +2109,29 @@
           "medienkontakt"
         ]
       },
+      "Anzahl": {
+        "type": "object",
+        "description": "Zählung je Art, wie sie die Liste der offenen Schnappschüsse zeigt.",
+        "required": [
+          "fahrzeuge",
+          "personal",
+          "qualifikationen"
+        ],
+        "properties": {
+          "fahrzeuge": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "personal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "qualifikationen": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AppCode": {
         "type": "object",
         "description": "Antwort von `POST /api/auth/app-code`: der Einmalcode für den Rücksprung in die App (Mac oder iOS).",
@@ -20127,6 +20150,53 @@
             "type": "integer",
             "format": "int64",
             "description": "Wirksame Mindestruhe in Minuten."
+          }
+        }
+      },
+      "SchnappschussInfo": {
+        "type": "object",
+        "description": "Ein offener Schnappschuss ohne Inhalt, für Hinweis und Liste.",
+        "required": [
+          "id",
+          "adapter_id",
+          "adapter_name",
+          "herkunft",
+          "anzahl",
+          "abgerufen_at"
+        ],
+        "properties": {
+          "abgerufen_at": {
+            "type": "string"
+          },
+          "adapter_id": {
+            "type": "string"
+          },
+          "adapter_name": {
+            "type": "string"
+          },
+          "anzahl": {
+            "$ref": "#/components/schemas/Anzahl"
+          },
+          "herkunft": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "SchnappschussListe": {
+        "type": "object",
+        "description": "Antwort der Liste: die offenen Schnappschüsse der Org.",
+        "required": [
+          "schnappschuesse"
+        ],
+        "properties": {
+          "schnappschuesse": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SchnappschussInfo"
+            }
           }
         }
       },

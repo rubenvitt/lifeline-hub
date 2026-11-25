@@ -8,6 +8,7 @@
 //! Adapter für die Verwaltung (`routes::adapter`). Regeln: `src/AGENTS.md`, „Adapter“.
 
 pub mod art;
+pub mod arten;
 pub mod geheimnis;
 pub mod lauf;
 pub mod repo;
