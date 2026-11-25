@@ -10,7 +10,7 @@
 -- ohne Verweise, AUTOINCREMENT-Sequenz umgehängt), aber ohne den Marker no-transaction: ein
 -- Blatt-Umbau läuft in der Transaktion von sqlx (migrations/AGENTS.md, „Tabellenumbau“).
 -- Schema = 0311 1:1, einzige Änderung ist der art-CHECK.
--- Abgesichert von db::tests::migration_0373_* (include_str!).
+-- Abgesichert von db::tests::migration_0380_* (include_str!).
 
 CREATE TABLE person_zugriff_audit_neu (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
