@@ -5,6 +5,7 @@
 pub mod benachrichtigung;
 pub mod eingabe;
 pub mod etb_text;
+pub mod quittung;
 pub mod repo;
 
 pub use eingabe::{

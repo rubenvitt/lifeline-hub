@@ -11,9 +11,11 @@
 //!   (Migration 0377); [`liste`] zeigt sie der Leitung.
 
 pub mod anmeldung;
+pub mod auftraege;
 pub mod bestaetigung;
 pub mod einladung;
 pub mod ende;
+pub mod pager;
 pub mod position;
 pub mod push;
 

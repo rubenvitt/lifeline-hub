@@ -419,6 +419,71 @@ pub async fn ziel_aendern(
     Ok(Json(anmeldung::zustand(&state.pool, g.kopplung_id).await?))
 }
 
+// ---------- Aufträge (Helfer-Sitzung, Stufe 2, ADR-0104) ----------
+
+/// Wert von `reason` im 403, solange die Leitung den Helfer nicht bestätigt hat.
+pub const GRUND_NICHT_BESTAETIGT: &str = "not_confirmed";
+
+/// 403 `not_confirmed`, wenn die Kopplung nicht bestätigt ist.
+async fn fordere_bestaetigt(state: &AppState, g: &GeraetKontext) -> Result<Option<Response>, AppError> {
+    if helfer::auftraege::is_confirmed(&state.pool, g.kopplung_id).await? {
+        return Ok(None);
+    }
+    Ok(Some(abgewiesen(
+        StatusCode::FORBIDDEN,
+        "Die Einsatzleitung hat dich noch nicht bestätigt",
+        GRUND_NICHT_BESTAETIGT,
+    )))
+}
+
+/// GET /api/devices/me/tasks — die Aufträge an Einheit, Fahrzeug oder Person der Kopplung, neueste
+/// zuerst. 403 `not_confirmed` vor der Bestätigung.
+pub async fn auftraege(
+    State(state): State<AppState>,
+    HelferSitzung(g): HelferSitzung,
+) -> Result<Response, AppError> {
+    if let Some(abweisung) = fordere_bestaetigt(&state, &g).await? {
+        return Ok(abweisung);
+    }
+    let tasks = helfer::auftraege::list_own(&state.pool, g.kopplung_id).await?;
+    Ok(Json(helfer::auftraege::HelperTaskList { tasks }).into_response())
+}
+
+/// POST /api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge — „Übernommen“. Derselbe
+/// Quittungsablauf wie am Auftrag (`auftrag::quittung`); 404 für eine fremde Zeile, 422 für einen
+/// aufgehobenen Auftrag, 403 `not_confirmed` vor der Bestätigung.
+pub async fn auftrag_quittieren(
+    State(state): State<AppState>,
+    HelferSitzung(g): HelferSitzung,
+    PfadParam((auftrag_id, empfaenger_id)): PfadParam<(i64, i64)>,
+) -> Result<Response, AppError> {
+    if let Some(abweisung) = fordere_bestaetigt(&state, &g).await? {
+        return Ok(abweisung);
+    }
+    if !helfer::auftraege::is_own_row(&state.pool, g.kopplung_id, auftrag_id, empfaenger_id)
+        .await?
+    {
+        return Err(AppError::NotFound);
+    }
+    let benutzer_id: i64 =
+        sqlx::query_scalar("SELECT benutzer_id FROM geraet_kopplung WHERE id = ?")
+            .bind(g.kopplung_id)
+            .fetch_one(&state.pool)
+            .await?;
+    crate::auftrag::quittung::acknowledge(
+        &state,
+        g.einsatz_id,
+        auftrag_id,
+        empfaenger_id,
+        benutzer_id,
+    )
+    .await?;
+    let auftrag = helfer::auftraege::load_own(&state.pool, g.kopplung_id, auftrag_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    Ok(Json(auftrag).into_response())
+}
+
 // ---------- Position senden (Helfer-Sitzung) ----------
 
 /// Wert von `reason` im 403 einer Sendung, wenn „Ortung im Einsatz“ der Organisation aus ist.

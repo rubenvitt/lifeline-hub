@@ -12120,6 +12120,128 @@
           }
         }
       },
+      "HelperTask": {
+        "type": "object",
+        "description": "Ein Auftrag in der Helfer-App.",
+        "required": [
+          "id",
+          "text",
+          "priority",
+          "issued_at",
+          "recipients"
+        ],
+        "properties": {
+          "cancelled_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadline_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issued_at": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "location_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Prioritaet"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelperTaskRecipient"
+            }
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "HelperTaskList": {
+        "type": "object",
+        "description": "Antwort von `GET /api/devices/me/tasks`.",
+        "required": [
+          "tasks"
+        ],
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelperTask"
+            }
+          }
+        }
+      },
+      "HelperTaskRecipient": {
+        "type": "object",
+        "description": "Eine eigene Empfängerzeile eines Auftrags.",
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "acknowledged_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acknowledged_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wer quittiert hat: Anzeigename der Helfer-Kopplung, sonst Name des Kontos."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`unit`, `vehicle` oder `person`."
+          },
+          "label": {
+            "type": "string",
+            "description": "Empfänger, wie beim Erteilen angezeigt."
+          }
+        }
+      },
       "HintergrundbildAnzeige": {
         "type": "object",
         "description": "Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.",

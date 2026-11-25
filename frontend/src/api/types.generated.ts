@@ -4832,6 +4832,40 @@ export interface components {
             state: components["schemas"]["HelferStatus"];
             target?: components["schemas"]["HelferZiel"] | null;
         };
+        /** @description Ein Auftrag in der Helfer-App. */
+        HelperTask: {
+            cancelled_at?: string | null;
+            deadline_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            issued_at: string;
+            location?: string | null;
+            /** Format: double */
+            location_lat?: number | null;
+            /** Format: double */
+            location_lon?: number | null;
+            /** Format: int64 */
+            number?: number | null;
+            priority: components["schemas"]["Prioritaet"];
+            recipients: components["schemas"]["HelperTaskRecipient"][];
+            text: string;
+        };
+        /** @description Antwort von `GET /api/devices/me/tasks`. */
+        HelperTaskList: {
+            tasks: components["schemas"]["HelperTask"][];
+        };
+        /** @description Eine eigene Empfängerzeile eines Auftrags. */
+        HelperTaskRecipient: {
+            acknowledged_at?: string | null;
+            /** @description Wer quittiert hat: Anzeigename der Helfer-Kopplung, sonst Name des Kontos. */
+            acknowledged_by?: string | null;
+            /** Format: int64 */
+            id: number;
+            /** @description `unit`, `vehicle` oder `person`. */
+            kind: string;
+            /** @description Empfänger, wie beim Erteilen angezeigt. */
+            label: string;
+        };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
             /**

@@ -285,35 +285,15 @@ pub async fn quittieren(
         .filter(|e| e.id == empfaenger_id)
         .collect();
     fordere_im_bereich(&state, &ctx, &zeile).await?;
-    let erste_quittung =
-        repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
+    crate::auftrag::quittung::acknowledge(
+        &state,
+        einsatz_id,
+        auftrag_id,
+        empfaenger_id,
+        ctx.benutzer.id,
+    )
+    .await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
-    // Nur die erste Quittung der Zeile meldet dem Auftraggeber; eine wiederholte bleibt still.
-    if erste_quittung {
-        crate::auftrag::benachrichtigung::quittiert(
-            &state.pool,
-            &state.live,
-            einsatz_id,
-            empfaenger_id,
-            d.auftrag.erstellt_von_id,
-            ctx.benutzer.id,
-        )
-        .await;
-    }
-
-    // LFH-118: sobald ALLE Empfänger quittiert haben, ist der Auftrag nicht mehr überfällig →
-    // die Auto-Frist-Erinnerung schließen (verstummt den Nachfass). Solange ein Empfänger offen
-    // ist, bleibt sie offen.
-    if d.auftrag.empfaenger_anzahl > 0 && d.auftrag.empfaenger_anzahl == d.auftrag.quittiert_anzahl
-    {
-        crate::erinnerung::repo::schliesse_offene_auto(
-            &state.pool,
-            crate::kommunikation::OBJEKT_AUFTRAG,
-            auftrag_id,
-            &jetzt(),
-        )
-        .await?;
-    }
 
     let mut d = d;
     anreichern_alle(
@@ -323,7 +303,6 @@ pub async fn quittieren(
         std::slice::from_mut(&mut d),
     )
     .await?;
-    sse(&state, einsatz_id);
     Ok(Json(d))
 }
 
