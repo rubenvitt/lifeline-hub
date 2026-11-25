@@ -430,24 +430,30 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let ausgang_wecker = std::sync::Arc::new(tokio::sync::Notify::new());
     // Nur die e2e-Suite schaltet das aufzeichnende Doppel zu (`--ausgang-testzusteller`); ein
     // Release-Binary startet damit nicht.
-    let ausgang_zusteller: std::sync::Arc<dyn lifeline_hub::ausgang::lauf::Zusteller> =
-        if config.ausgang_testzusteller {
-            match lifeline_hub::ausgang::zusteller::testzusteller() {
-                Some(z) => {
-                    tracing::warn!(
-                        "Ausgang per E-Mail: Test-Zusteller aktiv (--ausgang-testzusteller), \
-                         es wird nichts versendet."
-                    );
-                    z
-                }
-                None => {
-                    eprintln!("--ausgang-testzusteller gibt es nur in Debug-Builds.");
-                    std::process::exit(2);
-                }
+    // Beide Doppel (Mail und Fax, LLH-2095) hängen am selben Schalter.
+    let ausgang_zusteller = if config.ausgang_testzusteller {
+        match (
+            lifeline_hub::ausgang::zusteller::testzusteller(),
+            lifeline_hub::ausgang::zusteller::testfaxzusteller(),
+        ) {
+            (Some(mail), Some(fax)) => {
+                tracing::warn!(
+                    "Ausgang: Test-Zusteller aktiv (--ausgang-testzusteller), es wird nichts \
+                     versendet, weder Mail noch Fax."
+                );
+                lifeline_hub::ausgang::zusteller::Zustellwege { mail, fax }
             }
-        } else {
-            std::sync::Arc::new(lifeline_hub::ausgang::lauf::SmtpZusteller::produktiv())
-        };
+            _ => {
+                eprintln!("--ausgang-testzusteller gibt es nur in Debug-Builds.");
+                std::process::exit(2);
+            }
+        }
+    } else {
+        lifeline_hub::ausgang::zusteller::Zustellwege {
+            mail: std::sync::Arc::new(lifeline_hub::ausgang::lauf::SmtpZusteller::produktiv()),
+            fax: std::sync::Arc::new(lifeline_hub::ausgang::zusteller::SipgateZusteller),
+        }
+    };
     let _ausgang_task = lifeline_hub::ausgang::lauf::start(
         pool.clone(),
         adapter_rahmen.clone(),

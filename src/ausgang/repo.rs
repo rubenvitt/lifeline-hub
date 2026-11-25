@@ -72,10 +72,16 @@ impl From<AnzeigeZeile> for Versand {
 }
 
 /// Ergebnis eines Zustellversuchs, wie [`save_ergebnis_tx`] es schreibt.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Ergebnis {
-    /// Vom Mailserver angenommen.
-    Uebergeben { at: DateTime<Utc> },
+    /// Vom Mailserver bzw. Fax-Anbieter angenommen. Ein Fax trägt die Session des Anbieters
+    /// (`anbieter_ref`), danach fragt der Lauf ab ([`super::zustand::erste_abfrage`]); eine Mail
+    /// ohne PDF trägt `ohne_pdf`.
+    Uebergeben {
+        at: DateTime<Utc>,
+        anbieter_ref: Option<String>,
+        ohne_pdf: bool,
+    },
     /// Vorübergehender Fehler: bleibt `wartet`, nächster Versuch zum Zeitpunkt `naechster`.
     Wiederholen {
         naechster: DateTime<Utc>,
@@ -320,12 +326,25 @@ pub async fn save_ergebnis_tx(
     // `IS ?` vergleicht auch mit NULL (SQLite).
     const BEDINGUNG: &str = "WHERE id = ? AND zustand = 'wartet' AND versuch_begonnen_at IS ?";
     let q = match ergebnis {
-        Ergebnis::Uebergeben { at } => sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
+        Ergebnis::Uebergeben {
+            at,
+            anbieter_ref,
+            ohne_pdf,
+        } => {
+            let abfrage = anbieter_ref
+                .as_ref()
+                .map(|_| zeit(super::zustand::erste_abfrage(at)));
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
                  naechster_versuch_at = NULL, versuch_begonnen_at = NULL, fehler_art = NULL, \
-                 fehler_status = NULL {BEDINGUNG}"
-        )))
-        .bind(zeit(at)),
+                 fehler_status = NULL, anbieter_ref = ?, naechste_abfrage_at = ?, ohne_pdf = ? \
+                 {BEDINGUNG}"
+            )))
+            .bind(zeit(at))
+            .bind(anbieter_ref)
+            .bind(abfrage)
+            .bind(ohne_pdf)
+        }
         Ergebnis::Wiederholen {
             naechster,
             fehler,

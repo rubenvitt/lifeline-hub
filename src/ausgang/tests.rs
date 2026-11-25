@@ -304,11 +304,18 @@ async fn ergebnisse_schreiben_zustand_und_leeren_den_merker() {
     );
     assert_eq!(z.fehler_art, Some(AusgangFehler::Voruebergehend));
 
-    assert!(
-        repo::save_ergebnis_tx(&mut conn, &v.id, None, Ergebnis::Uebergeben { at: spaeter })
-            .await
-            .unwrap()
-    );
+    assert!(repo::save_ergebnis_tx(
+        &mut conn,
+        &v.id,
+        None,
+        Ergebnis::Uebergeben {
+            at: spaeter,
+            anbieter_ref: None,
+            ohne_pdf: false
+        }
+    )
+    .await
+    .unwrap());
     let z = repo::load(&mut conn, w.einsatz_id, &v.id).await.unwrap();
     assert_eq!(z.zustand, VersandZustand::Uebergeben);
     assert_eq!(z.uebergeben_at.as_deref(), Some("2026-11-24 10:00:30"));
@@ -320,7 +327,11 @@ async fn beanspruchen_gelingt_nur_einmal_und_ergebnis_nur_mit_der_marke() {
     let w = welt().await;
     let v = w.anlegen("c1").await;
     let marke = crate::zeit::formatiere_utc(t0());
-    let uebergeben = Ergebnis::Uebergeben { at: t0() };
+    let uebergeben = Ergebnis::Uebergeben {
+        at: t0(),
+        anbieter_ref: None,
+        ohne_pdf: false,
+    };
     assert!(repo::mark_begonnen(&w.pool, &v.id, t0()).await.unwrap());
     // Ein zweiter Durchgang mit derselben Zeile bekommt sie nicht.
     let spaeter = t0() + Duration::seconds(1);
@@ -334,28 +345,35 @@ async fn beanspruchen_gelingt_nur_einmal_und_ergebnis_nur_mit_der_marke() {
         1
     );
     // Ohne Marke oder mit fremder Marke ändert sich nichts.
-    assert!(!repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben)
-        .await
-        .unwrap());
     assert!(
-        !repo::save_ergebnis_tx(&mut conn, &v.id, Some("2026-11-24 09:00:00"), uebergeben)
+        !repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben.clone())
             .await
             .unwrap()
     );
+    assert!(!repo::save_ergebnis_tx(
+        &mut conn,
+        &v.id,
+        Some("2026-11-24 09:00:00"),
+        uebergeben.clone()
+    )
+    .await
+    .unwrap());
     assert!(
-        repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben)
+        repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben.clone())
             .await
             .unwrap()
     );
     // Abgeschlossen: weder ein zweites Ergebnis noch ein neuer Anspruch.
     assert!(
-        !repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben)
+        !repo::save_ergebnis_tx(&mut conn, &v.id, Some(&marke), uebergeben.clone())
             .await
             .unwrap()
     );
-    assert!(!repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben)
-        .await
-        .unwrap());
+    assert!(
+        !repo::save_ergebnis_tx(&mut conn, &v.id, None, uebergeben.clone())
+            .await
+            .unwrap()
+    );
     drop(conn);
     assert!(!repo::mark_begonnen(&w.pool, &v.id, spaeter).await.unwrap());
 }

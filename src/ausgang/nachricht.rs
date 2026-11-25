@@ -337,7 +337,7 @@ pub fn baue_pdf_fuer(
 }
 
 /// Baut die Nachricht als RFC-5322-Bytes: `text/plain; charset=utf-8`, mit Anhängen als
-/// `multipart/mixed` mit `image/png`. Betreff und Anzeigename kodiert lettre nach RFC 2047.
+/// `multipart/mixed`: zuerst das PDF (`application/pdf`, LLH-2095), dann die `image/png`. Betreff und Anzeigename kodiert lettre nach RFC 2047.
 /// `message_id` steht mit den spitzen Klammern, wie sie in den Kopf kommen.
 pub fn baue_mail(
     von_adresse: &str,
@@ -345,6 +345,7 @@ pub fn baue_mail(
     an: &str,
     message_id: &str,
     s: &Schnappschuss,
+    pdf: Option<(&str, &[u8])>,
     anhaenge: &[(String, Vec<u8>)],
 ) -> Result<Vec<u8>, AusgangFehler> {
     fn fehler<E>(_: E) -> AusgangFehler {
@@ -365,10 +366,14 @@ pub fn baue_mail(
         .header(ContentType::parse("text/plain; charset=utf-8").map_err(fehler)?)
         .body(s.inhalt.clone());
     let png = ContentType::parse("image/png").map_err(fehler)?;
-    let mail = if anhaenge.is_empty() {
+    let mail = if anhaenge.is_empty() && pdf.is_none() {
         builder.singlepart(text)
     } else {
         let mut teile = MultiPart::mixed().singlepart(text);
+        if let Some((name, daten)) = pdf {
+            let typ = ContentType::parse("application/pdf").map_err(fehler)?;
+            teile = teile.singlepart(Attachment::new(name.to_string()).body(daten.to_vec(), typ));
+        }
         for (name, daten) in anhaenge {
             teile =
                 teile.singlepart(Attachment::new(name.clone()).body(daten.clone(), png.clone()));
@@ -610,6 +615,7 @@ mod tests {
             "ils@example.org",
             "<ausgang-1@host.example>",
             &schnappschuss(),
+            None,
             &[],
         )
         .unwrap();
@@ -643,6 +649,7 @@ mod tests {
             "ils@example.org",
             "<ausgang-2@host.example>",
             &schnappschuss(),
+            None,
             &[("anlage-1.png".to_string(), png.clone())],
         )
         .unwrap();
