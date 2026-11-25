@@ -36,7 +36,7 @@ impl PassBetroffenheit {
 
 /// Was die PASS-Liste von einer Person liest; aus [`PersonAnzeige`] gebildet.
 #[derive(Debug, Clone, Default)]
-pub struct PassEingabe<'a> {
+pub struct PassInput<'a> {
     pub id: i64,
     pub registrier_nr: i64,
     pub status: Option<PersonStatus>,
@@ -53,9 +53,9 @@ pub struct PassEingabe<'a> {
     pub uhs_id: Option<i64>,
 }
 
-impl<'a> From<&'a PersonAnzeige> for PassEingabe<'a> {
+impl<'a> From<&'a PersonAnzeige> for PassInput<'a> {
     fn from(p: &'a PersonAnzeige) -> Self {
-        PassEingabe {
+        PassInput {
             id: p.id,
             registrier_nr: p.registrier_nr,
             status: Some(p.status),
@@ -92,7 +92,7 @@ pub struct PassZeile {
 
 /// Was die Zeilen außer der Person brauchen: Zone für „Erfasst am“, Bezeichnungen der UHS des
 /// Einsatzes, Personen mit nicht aufgehobener Maßnahme oder Verletzung.
-pub struct PassKontext<'a> {
+pub struct PassContext<'a> {
     pub zone: chrono_tz::Tz,
     pub uhs_namen: &'a HashMap<i64, String>,
     pub mit_versorgung: &'a HashSet<i64>,
@@ -102,7 +102,7 @@ pub struct PassKontext<'a> {
 pub const KOPF: &str = "Kennung;Name;Vorname;Geburtsdatum;Alter (geschätzt);Geschlecht;Anschrift;Art der Betroffenheit;Verbleib;Erfasst am";
 
 /// Die erste passende Regel gewinnt (Entscheidung 24.11.2026).
-pub fn betroffenheit(p: &PassEingabe, hat_offene_versorgung: bool) -> PassBetroffenheit {
+pub fn betroffenheit(p: &PassInput, hat_offene_versorgung: bool) -> PassBetroffenheit {
     use Sichtungskategorie as Sk;
     if p.status == Some(PersonStatus::Verstorben)
         || p.verbleib_art == Some(VerbleibArt::Verstorben)
@@ -138,7 +138,7 @@ fn geburtsdatum_text(roh: &str) -> String {
         .unwrap_or_else(|_| roh.to_string())
 }
 
-fn verbleib_text(p: &PassEingabe, uhs_namen: &HashMap<i64, String>) -> String {
+fn verbleib_text(p: &PassInput, uhs_namen: &HashMap<i64, String>) -> String {
     if let Some(v) = p.verbleib.filter(|v| !v.trim().is_empty()) {
         return v.to_string();
     }
@@ -152,7 +152,7 @@ fn verbleib_text(p: &PassEingabe, uhs_namen: &HashMap<i64, String>) -> String {
     }
 }
 
-fn zeile(p: &PassEingabe, k: &PassKontext) -> PassZeile {
+fn zeile(p: &PassInput, k: &PassContext) -> PassZeile {
     let geburtsdatum = p.geburtsdatum.filter(|g| !g.trim().is_empty());
     PassZeile {
         id_label: super::registrier_anzeige(p.registrier_nr),
@@ -188,7 +188,7 @@ fn zeile(p: &PassEingabe, k: &PassKontext) -> PassZeile {
 
 /// Sortierschlüssel nach DIN 5007-1 (Wörterbuch): klein, ä = a, ö = o, ü = u, ß = ss. Sonst
 /// stünden Namen mit Umlaut am Anfang auf der Papierliste hinter Z.
-fn sortierschluessel(s: &str) -> String {
+fn sort_key(s: &str) -> String {
     s.trim()
         .to_lowercase()
         .chars()
@@ -203,17 +203,17 @@ fn sortierschluessel(s: &str) -> String {
 }
 
 /// Bildet und sortiert die Zeilen: Name, Vorname, Registriernummer; ohne Namen ans Ende.
-pub fn pass_zeilen(personen: &[PassEingabe], k: &PassKontext) -> Vec<PassZeile> {
-    let schluessel = |p: &PassEingabe| {
+pub fn pass_zeilen(personen: &[PassInput], k: &PassContext) -> Vec<PassZeile> {
+    let schluessel = |p: &PassInput| {
         let name = p.name.map(str::trim).filter(|n| !n.is_empty());
         (
             name.is_none(),
-            sortierschluessel(name.unwrap_or_default()),
-            sortierschluessel(p.vorname.unwrap_or_default()),
+            sort_key(name.unwrap_or_default()),
+            sort_key(p.vorname.unwrap_or_default()),
             p.registrier_nr,
         )
     };
-    let mut sortiert: Vec<&PassEingabe> = personen.iter().collect();
+    let mut sortiert: Vec<&PassInput> = personen.iter().collect();
     sortiert.sort_by_cached_key(|p| schluessel(p));
     sortiert.into_iter().map(|p| zeile(p, k)).collect()
 }
@@ -273,8 +273,8 @@ pub async fn pass_liste(
     .await?
     .into_iter()
     .collect();
-    let eingaben: Vec<PassEingabe> = personen.iter().map(PassEingabe::from).collect();
-    let k = PassKontext {
+    let eingaben: Vec<PassInput> = personen.iter().map(PassInput::from).collect();
+    let k = PassContext {
         zone,
         uhs_namen: &uhs_namen,
         mit_versorgung: &mit_versorgung,
@@ -298,8 +298,8 @@ pub fn csv_feld(s: &str) -> String {
 mod tests {
     use super::*;
 
-    fn person() -> PassEingabe<'static> {
-        PassEingabe {
+    fn person() -> PassInput<'static> {
+        PassInput {
             id: 1,
             registrier_nr: 1,
             status: Some(PersonStatus::Betroffen),
@@ -308,9 +308,9 @@ mod tests {
         }
     }
 
-    fn zeile(p: PassEingabe, uhs: &HashMap<i64, String>) -> PassZeile {
+    fn zeile(p: PassInput, uhs: &HashMap<i64, String>) -> PassZeile {
         let leer = HashSet::new();
-        let k = PassKontext {
+        let k = PassContext {
             zone: chrono_tz::Europe::Berlin,
             uhs_namen: uhs,
             mit_versorgung: &leer,
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn sichtung_tot_gilt_als_verstorben() {
-        let p = PassEingabe {
+        let p = PassInput {
             sichtung: Some(Sichtungskategorie::Tot),
             ..person()
         };
@@ -329,7 +329,7 @@ mod tests {
 
     #[test]
     fn status_verstorben_vor_vermisst() {
-        let p = PassEingabe {
+        let p = PassInput {
             status: Some(PersonStatus::Verstorben),
             ..person()
         };
@@ -338,7 +338,7 @@ mod tests {
 
     #[test]
     fn verbleib_verstorben_gilt_als_verstorben() {
-        let p = PassEingabe {
+        let p = PassInput {
             verbleib_art: Some(VerbleibArt::Verstorben),
             ..person()
         };
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn vermisst_vor_verletzt() {
-        let p = PassEingabe {
+        let p = PassInput {
             status: Some(PersonStatus::Vermisst),
             sichtung: Some(Sichtungskategorie::Sk1),
             ..person()
@@ -363,7 +363,7 @@ mod tests {
             Sichtungskategorie::Sk3,
             Sichtungskategorie::Sk4,
         ] {
-            let p = PassEingabe {
+            let p = PassInput {
                 sichtung: Some(sk),
                 ..person()
             };
@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn sichtung_unverletzt_bleibt_unverletzt() {
-        let p = PassEingabe {
+        let p = PassInput {
             sichtung: Some(Sichtungskategorie::Unverletzt),
             ..person()
         };
@@ -394,7 +394,7 @@ mod tests {
 
     #[test]
     fn notunterkunft_gilt_als_untergebracht() {
-        let p = PassEingabe {
+        let p = PassInput {
             verbleib_art: Some(VerbleibArt::Notunterkunft),
             ..person()
         };
@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn abgemeldet_ohne_weiteres_ist_unverletzt() {
-        let p = PassEingabe {
+        let p = PassInput {
             status: Some(PersonStatus::Abgemeldet),
             ..person()
         };
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn geburtsdatum_wird_deutsch_und_alter_entfaellt() {
-        let p = PassEingabe {
+        let p = PassInput {
             geburtsdatum: Some("1950-03-07"),
             alter_geschaetzt: Some(70),
             ..person()
@@ -424,7 +424,7 @@ mod tests {
 
     #[test]
     fn geburtsdatum_altbestand_bleibt_roh() {
-        let p = PassEingabe {
+        let p = PassInput {
             geburtsdatum: Some("ca. 1950"),
             ..person()
         };
@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn ohne_geburtsdatum_steht_alter() {
-        let p = PassEingabe {
+        let p = PassInput {
             alter_geschaetzt: Some(40),
             ..person()
         };
@@ -442,7 +442,7 @@ mod tests {
 
     #[test]
     fn felder_kommen_als_fertige_texte() {
-        let p = PassEingabe {
+        let p = PassInput {
             registrier_nr: 7,
             name: Some("Muster"),
             vorname: Some("Erika"),
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn verbleib_uhs_ohne_verbleib() {
         let uhs = |n: &str| HashMap::from([(3, n.to_string())]);
-        let p = || PassEingabe {
+        let p = || PassInput {
             uhs_id: Some(3),
             ..person()
         };
@@ -474,7 +474,7 @@ mod tests {
 
     #[test]
     fn verbleib_geht_vor_uhs() {
-        let p = PassEingabe {
+        let p = PassInput {
             verbleib: Some("Transport → KH Mitte"),
             uhs_id: Some(3),
             ..person()
@@ -495,12 +495,12 @@ mod tests {
     fn sortiert_nach_name_vorname_kennung_namenlose_zuletzt() {
         let leer = HashSet::new();
         let uhs = HashMap::new();
-        let k = PassKontext {
+        let k = PassContext {
             zone: chrono_tz::Europe::Berlin,
             uhs_namen: &uhs,
             mit_versorgung: &leer,
         };
-        let p = |nr: i64, name: Option<&'static str>, vorname: Option<&'static str>| PassEingabe {
+        let p = |nr: i64, name: Option<&'static str>, vorname: Option<&'static str>| PassInput {
             id: nr,
             registrier_nr: nr,
             name,
@@ -525,12 +525,12 @@ mod tests {
     fn umlaute_sortieren_wie_im_telefonbuch() {
         let leer = HashSet::new();
         let uhs = HashMap::new();
-        let k = PassKontext {
+        let k = PassContext {
             zone: chrono_tz::Europe::Berlin,
             uhs_namen: &uhs,
             mit_versorgung: &leer,
         };
-        let p = |nr: i64, name: &'static str| PassEingabe {
+        let p = |nr: i64, name: &'static str| PassInput {
             id: nr,
             registrier_nr: nr,
             name: Some(name),
@@ -559,7 +559,7 @@ mod tests {
     fn offene_versorgung_kommt_aus_dem_kontext() {
         let mit = HashSet::from([1]);
         let uhs = HashMap::new();
-        let k = PassKontext {
+        let k = PassContext {
             zone: chrono_tz::Europe::Berlin,
             uhs_namen: &uhs,
             mit_versorgung: &mit,
@@ -567,7 +567,7 @@ mod tests {
         let zeilen = pass_zeilen(
             &[
                 person(),
-                PassEingabe {
+                PassInput {
                     id: 2,
                     registrier_nr: 2,
                     ..person()
@@ -592,7 +592,7 @@ mod tests {
 
     #[test]
     fn csv_entschaerft_formel() {
-        let p = PassEingabe {
+        let p = PassInput {
             name: Some("=SUM(A1)"),
             ..person()
         };

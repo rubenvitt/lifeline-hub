@@ -2170,7 +2170,7 @@ pub struct ExportParams {
 }
 
 /// Ob die PASS-Liste gemeint ist; ein unbekanntes Profil ist 400.
-fn ist_pass_profil(params: &ExportParams) -> Result<bool, AppError> {
+fn is_pass_profile(params: &ExportParams) -> Result<bool, AppError> {
     match params.profile.as_deref() {
         None => Ok(false),
         Some("pass") => Ok(true),
@@ -2190,7 +2190,7 @@ pub async fn export(
     Query(params): Query<ExportParams>,
 ) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    if ist_pass_profil(&params)? {
+    if is_pass_profile(&params)? {
         ctx.fordere_einsatzleitung()?;
         audit_repo::create(
             &state.pool,
@@ -2235,7 +2235,7 @@ pub async fn druck(
     Query(params): Query<ExportParams>,
 ) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    if ist_pass_profil(&params)? {
+    if is_pass_profile(&params)? {
         ctx.fordere_einsatzleitung()?;
         audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "pass_druck").await?;
         return Ok(

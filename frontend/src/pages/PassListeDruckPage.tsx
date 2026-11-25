@@ -1,7 +1,7 @@
 import { useParams } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Typography } from 'antd';
-import { ladePassListeDruck } from '../api/einsatzPerson';
+import { loadPassListeDruck } from '../api/einsatzPerson';
 import { einsatzKeys } from '../api/queryKeys';
 import { DRUCK_ABFRAGE } from '../druck/abfrageOptionen';
 import DruckTabelle from '../druck/DruckTabelle';
@@ -26,7 +26,7 @@ export default function PassListeDruckPage() {
   const druckQuery = useQuery({
     queryKey: einsatzKeys.passListeDruck(einsatzId),
     queryFn: async () => ({
-      zeilen: await ladePassListeDruck(einsatzId),
+      zeilen: await loadPassListeDruck(einsatzId),
       geladenAt: new Date().toISOString(),
     }),
     ...DRUCK_ABFRAGE,

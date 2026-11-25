@@ -14,7 +14,7 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfBeantragen, darfImEinsatzSchreiben, istEinsatzLeitung } from '../einsatz/schreibrecht';
 import { useAuth } from '../auth/AuthContext';
 import {
-  ladePassListeExport,
+  loadPassListeExport,
   ladePersonenExport,
   listePersonen,
   registrierAnzeige,
@@ -651,7 +651,7 @@ export default function PersonenPage() {
   }, [searchParams, neuAuftrag, einsatzQuery.isLoading, einsatzQuery.data, benutzer, einsatzId]);
 
   const csvExport = useCsvExport(einsatzId, 'personen', ladePersonenExport);
-  const passExport = useCsvExport(einsatzId, 'pass-liste', ladePassListeExport);
+  const passExport = useCsvExport(einsatzId, 'pass-liste', loadPassListeExport);
 
   const abgleichVorschlagMutation = useMutation({
     mutationFn: (v: {
