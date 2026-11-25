@@ -238,6 +238,8 @@ async fn anzeige(
         .map(|art| {
             art.plaetze()
                 .iter()
+                // Interne Plätze (`Platz::intern`) füllt der Server; die Verwaltung sieht sie nie.
+                .filter(|p| !p.intern)
                 .map(|p| {
                     let stand = gesetzt.iter().find(|g| g.name == p.name);
                     AdapterGeheimnisAnzeige {
@@ -377,6 +379,62 @@ fn art_von<'r>(rahmen: &'r Rahmen, a: &Adapter) -> Result<&'r dyn AdapterArt, Ap
     })
 }
 
+/// Ein Platz, den die Verwaltung setzen und entfernen darf; einen internen (`Platz::intern`) oder
+/// unbekannten gibt es für sie nicht (400).
+fn check_platz_setzbar(art: &dyn AdapterArt, platz: &str) -> Result<(), AppError> {
+    if art.plaetze().iter().any(|p| p.name == platz && !p.intern) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "Platz „{platz}“ gibt es bei dieser Art nicht"
+        )))
+    }
+}
+
+/// Die Meldung, wenn eine Art höchstens einmal je Org angelegt werden darf und es schon eine gibt
+/// (auch eine angehaltene zählt): `smtp` (LLH-2093), `matrix` (LLH-2094). `None` für andere Arten.
+fn meldung_schon_vorhanden(code: &str) -> Option<&'static str> {
+    match code {
+        crate::adapter::smtp_art::CODE => {
+            Some("Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.")
+        }
+        crate::adapter::matrix_art::CODE => {
+            Some("Es gibt schon eine Matrix-Anbindung; ändere oder lösche sie.")
+        }
+        _ => None,
+    }
+}
+
+/// Erzeugt die internen Geheimnisse einer Art (`Platz::intern`) für eine neue Anbindung: je Platz
+/// 32 Zufallsbytes, base64, verschlüsselt. Ohne Schlüssel des Speichers 422, denn ohne sie taugt
+/// die Anbindung nicht.
+async fn create_interne_geheimnisse(
+    rahmen: &Rahmen,
+    art: &dyn AdapterArt,
+) -> Result<Vec<(&'static str, Vec<u8>, String)>, AppError> {
+    use base64::Engine;
+    let mut erzeugt = Vec::new();
+    for platz in art.plaetze().iter().filter(|p| p.intern) {
+        if !rahmen.speicher.has_schluessel() {
+            return Err(AppError::UnprocessableEntity(
+                "Der Server hat keinen Schlüssel für Geheimnisse (LIFELINE_GEHEIMNIS_SCHLUESSEL); \
+                 ohne ihn lässt sich diese Anbindung nicht anlegen."
+                    .into(),
+            ));
+        }
+        let mut zufall = [0u8; 32];
+        getrandom::fill(&mut zufall).expect("Zufallsquelle des Systems");
+        let wert = SecretString::from(base64::engine::general_purpose::STANDARD.encode(zufall));
+        let speicher = rahmen.speicher.clone();
+        let (chiffrat, fp) = tokio::task::spawn_blocking(move || speicher.encrypt(&wert))
+            .await
+            .map_err(|e| AppError::Internal(format!("Verschlüsseln abgebrochen: {e}")))?
+            .map_err(|_| AppError::Internal("Verschlüsseln fehlgeschlagen".into()))?;
+        erzeugt.push((platz.name, chiffrat, fp));
+    }
+    Ok(erzeugt)
+}
+
 /// Sperrt das Schreiben, wenn die Org sich bei einem Hub meldet (409).
 async fn check_nicht_gesperrt(conn: &mut SqliteConnection, org_id: i64) -> Result<(), AppError> {
     match gesperrt_grund(conn, org_id).await? {
@@ -483,12 +541,14 @@ pub async fn create(
         )?,
         lan_erlaubt: body.lan_erlaubt,
     };
+    let interne = create_interne_geheimnisse(rahmen, &**art).await?;
     let jetzt = crate::zeit::jetzt();
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
-        // Eine Org hat höchstens eine E-Mail-Anbindung, auch eine angehaltene zählt (LLH-2093).
-        if code == crate::adapter::smtp_art::CODE {
+        // Eine Org hat höchstens eine E-Mail- und eine Matrix-Anbindung, auch eine angehaltene
+        // zählt (LLH-2093, LLH-2094).
+        if let Some(meldung) = meldung_schon_vorhanden(code) {
             let (vorhanden,): (i64,) =
                 sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
                     .bind(org_id)
@@ -496,12 +556,15 @@ pub async fn create(
                     .fetch_one(&mut *conn)
                     .await?;
             if vorhanden > 0 {
-                return Err(AppError::UnprocessableEntity(
-                    "Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.".into(),
-                ));
+                return Err(AppError::UnprocessableEntity(meldung.into()));
             }
         }
-        repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
+        let a = repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await?;
+        // Interne Geheimnisse ohne Admin-Spur: kein Admin hat sie gesetzt oder gesehen.
+        for (platz, chiffrat, fp) in &interne {
+            repo::save_geheimnis(&mut *conn, &a.id, platz, chiffrat, fp, admin_id, &jetzt).await?;
+        }
+        Ok(a)
     })?;
     spur(
         &state,
@@ -697,12 +760,7 @@ pub async fn set_geheimnis(
     {
         let mut conn = state.pool.acquire().await?;
         let a = load_fuer_schreiben(&mut conn, org_id, &id).await?;
-        let art = art_von(rahmen, &a)?;
-        if !art.plaetze().iter().any(|p| p.name == platz) {
-            return Err(AppError::Validation(format!(
-                "Platz „{platz}“ gibt es bei dieser Art nicht"
-            )));
-        }
+        check_platz_setzbar(art_von(rahmen, &a)?, &platz)?;
     }
     if !rahmen.speicher.has_schluessel() {
         return Err(AppError::UnprocessableEntity(
@@ -751,8 +809,13 @@ pub async fn delete_geheimnis(
     PfadParam((id, platz)): PfadParam<(String, String)>,
 ) -> Result<StatusCode, AppError> {
     let org_id = admin.org_id;
+    let rahmen = &state.adapter;
     let a = crate::write_retry!(&state.pool, |conn| {
         let a = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
+        // Eine Art, die der Server nicht mehr kennt, behält das Entfernen ihrer Geheimnisse.
+        if let Some(art) = rahmen.arten.find(&a.art) {
+            check_platz_setzbar(&**art, &platz)?;
+        }
         if !repo::delete_geheimnis(&mut *conn, &a.id, &platz).await? {
             return Err(AppError::NotFound);
         }

@@ -359,9 +359,15 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     // Zuschaltungen der Drohnenquellen (LLH-2105) stehen, bevor der Lauf Abrufe beginnt.
     let drohne = std::sync::Arc::new(lifeline_hub::drohne::Store::new());
     drohne.load(&pool).await;
-    let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
+    // Matrix-Clients (LLH-2094): einer je Anbindung, geteilt von Lauf und Ausgangskorb; die
+    // Schlüsselspeicher liegen neben der Datenbank.
+    let matrix = std::sync::Arc::new(lifeline_hub::adapter::matrix::Clients::new(
+        lifeline_hub::config::default_matrix_dir(&config.db_path),
+    ));
+    let adapter_rahmen = lifeline_hub::adapter::Rahmen::mit_matrix(
         speicher,
-        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone()),
+        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone(), matrix.clone()),
+        matrix,
     );
     // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
     // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.

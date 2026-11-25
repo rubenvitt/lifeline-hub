@@ -12,22 +12,45 @@ pub mod arten;
 pub mod geheimnis;
 pub mod lauf;
 pub mod live;
+pub mod matrix;
+pub mod matrix_art;
 pub mod repo;
 pub mod smtp;
 pub mod smtp_art;
 pub mod ziel;
 pub mod zustand;
 
-/// Was Routen und Lauf vom Rahmen brauchen: den Geheimnisspeicher und die bekannten Arten.
-/// Vorgabe: kein Schlüssel, die Arten dieses Builds.
+/// Was Routen und Lauf vom Rahmen brauchen: den Geheimnisspeicher, die bekannten Arten und die
+/// Matrix-Clients des Prozesses (LLH-2094; dieselben, die die Art `matrix` hält, damit Lauf und
+/// Ausgangskorb einen Client je Anbindung teilen). Vorgabe: kein Schlüssel, keine Arten,
+/// Matrix-Speicher unter dem Temp-Verzeichnis.
 #[derive(Clone, Debug, Default)]
 pub struct Rahmen {
     pub speicher: geheimnis::Geheimnisspeicher,
     pub arten: art::Verzeichnis,
+    pub matrix: std::sync::Arc<matrix::Clients>,
 }
 
 impl Rahmen {
+    /// Ohne eigene Matrix-Clients (Tests ohne Matrix-Art).
     pub fn new(speicher: geheimnis::Geheimnisspeicher, arten: art::Verzeichnis) -> Self {
-        Rahmen { speicher, arten }
+        Rahmen {
+            speicher,
+            arten,
+            matrix: Default::default(),
+        }
+    }
+
+    /// Mit den Matrix-Clients, die auch die Art `matrix` in `arten` hält.
+    pub fn mit_matrix(
+        speicher: geheimnis::Geheimnisspeicher,
+        arten: art::Verzeichnis,
+        matrix: std::sync::Arc<matrix::Clients>,
+    ) -> Self {
+        Rahmen {
+            speicher,
+            arten,
+            matrix,
+        }
     }
 }

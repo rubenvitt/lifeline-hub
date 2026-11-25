@@ -28,6 +28,7 @@ const PLAETZE: &[Platz] = &[Platz {
     name: "schluessel",
     bezeichnung: "Abruf-Schlüssel",
     pflicht: true,
+    intern: false,
 }];
 
 const FELDER: &[Feld] = &[Feld {
@@ -302,7 +303,10 @@ mod tests {
 
     #[test]
     fn verzeichnis_enthaelt_die_art() {
-        let v = Verzeichnis::produktiv(std::sync::Arc::new(crate::drohne::Store::new()));
+        let v = Verzeichnis::produktiv(
+            std::sync::Arc::new(crate::drohne::Store::new()),
+            Default::default(),
+        );
         assert!(v.find(ART).is_some());
     }
 }

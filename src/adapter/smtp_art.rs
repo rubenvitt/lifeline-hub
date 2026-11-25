@@ -76,6 +76,7 @@ const PLAETZE: &[Platz] = &[Platz {
     name: "passwort",
     bezeichnung: "Passwort",
     pflicht: false,
+    intern: false,
 }];
 
 const FELDER: &[Feld] = &[

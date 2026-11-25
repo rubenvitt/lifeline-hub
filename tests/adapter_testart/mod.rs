@@ -95,6 +95,7 @@ impl AdapterArt for TestArt {
             name: "token",
             bezeichnung: "Token",
             pflicht: true,
+            intern: false,
         }]
     }
     fn felder(&self) -> &'static [Feld] {

@@ -30,6 +30,25 @@ pub struct Platz {
     pub name: &'static str,
     pub bezeichnung: &'static str,
     pub pflicht: bool,
+    /// Ein Platz, den der Server selbst füllt (LLH-2094, etwa `speicher_passphrase` der
+    /// Matrix-Art): beim Anlegen der Anbindung mit 32 Zufallsbytes (base64) erzeugt, nie im
+    /// Formular, nie in einer Antwort, nicht über die Route der Geheimnisse setzbar. Der Lauf
+    /// entschlüsselt ihn wie jeden anderen Platz.
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub intern: bool,
+}
+
+impl Platz {
+    /// Ein Platz, den die Verwaltung setzt.
+    pub const fn new(name: &'static str, bezeichnung: &'static str, pflicht: bool) -> Self {
+        Platz {
+            name,
+            bezeichnung,
+            pflicht,
+            intern: false,
+        }
+    }
 }
 
 wire_enum! {
@@ -246,8 +265,8 @@ pub fn has_neues_ziel(
 }
 
 /// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105),
-/// `veranstaltungen_abruf` (LLH-2097), `smtp` (LLH-2093) und `stammdaten_abruf`; Tests bringen
-/// ihre eigene mit.
+/// `veranstaltungen_abruf` (LLH-2097), `smtp` (LLH-2093), `matrix` (LLH-2094) und
+/// `stammdaten_abruf`; Tests bringen ihre eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -264,12 +283,16 @@ impl Verzeichnis {
         Verzeichnis(arten.into())
     }
 
-    /// Die Arten dieses Builds.
-    pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
+    /// Die Arten dieses Builds. `matrix`: dieselben Clients wie in `Rahmen::matrix`.
+    pub fn produktiv(
+        drohne: Arc<crate::drohne::Store>,
+        matrix: Arc<super::matrix::Clients>,
+    ) -> Self {
         Verzeichnis::new(vec![
             Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
             Arc::new(super::smtp_art::SmtpArt::produktiv()),
+            Arc::new(super::matrix_art::MatrixArt::new(matrix)),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
@@ -303,7 +326,12 @@ impl AdapterArtAnzeige {
         AdapterArtAnzeige {
             code: art.code().to_string(),
             bezeichnung: art.bezeichnung().to_string(),
-            plaetze: art.plaetze().to_vec(),
+            plaetze: art
+                .plaetze()
+                .iter()
+                .filter(|p| !p.intern)
+                .copied()
+                .collect(),
             felder: art.felder().to_vec(),
             intervall_min_s: art.intervall_min_s(),
             intervall_vorschlag_s: art.intervall_vorschlag_s(),
@@ -520,9 +548,11 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        let produktiv = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
+        let produktiv =
+            Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()), Default::default());
         assert!(produktiv.find("suchlage").is_some());
         assert!(produktiv.find("stammdaten_abruf").is_some());
         assert!(produktiv.find("smtp").is_some());
+        assert!(produktiv.find("matrix").is_some());
     }
 }

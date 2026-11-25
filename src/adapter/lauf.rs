@@ -324,7 +324,7 @@ pub async fn pruefe_versand_moeglich(
     if is_org_am_hub(pool, org_id).await? {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     }
-    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+    let Some(a) = repo::load_fuer_org(pool, org_id, super::smtp_art::CODE).await? else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if a.is_angehalten() {
@@ -349,7 +349,7 @@ pub async fn zugang_fuer_versand(
     if is_org_am_hub(pool, org_id).await? {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     }
-    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+    let Some(a) = repo::load_fuer_org(pool, org_id, super::smtp_art::CODE).await? else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if a.is_angehalten() {

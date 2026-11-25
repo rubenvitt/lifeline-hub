@@ -75,6 +75,7 @@ impl AdapterArt for StammdatenAbruf {
             name: PLATZ_SCHLUESSEL,
             bezeichnung: "Zugangsschlüssel",
             pflicht: true,
+            intern: false,
         }]
     }
     fn felder(&self) -> &'static [Feld] {

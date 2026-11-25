@@ -1205,7 +1205,8 @@
           "geheimnisspeicher_gesperrt",
           "einstellung_ungueltig",
           "version_unbekannt",
-          "intern"
+          "intern",
+          "schluessel_passen_nicht"
         ]
       },
       "AdapterGeheimnisAnzeige": {

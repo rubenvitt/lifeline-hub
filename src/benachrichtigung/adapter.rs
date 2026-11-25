@@ -116,6 +116,9 @@ pub fn fehler_text(fehler: AdapterFehler, status: Option<i64>) -> String {
         EinstellungUngueltig => "Einstellung ungültig",
         VersionUnbekannt => "Unbekannte Schnittstellenversion",
         Intern => "Fehler im Server",
+        SchluesselPassenNicht => {
+            "Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen."
+        }
     };
     match status {
         Some(s) => format!("{text} ({s})"),

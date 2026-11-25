@@ -843,6 +843,7 @@ fn serde_wire_gleich_as_str() {
         EinstellungUngueltig => "einstellung_ungueltig",
         VersionUnbekannt => "version_unbekannt",
         Intern => "intern",
+        SchluesselPassenNicht => "schluessel_passen_nicht",
     });
     enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {
         Wartet => "wartet",

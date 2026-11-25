@@ -145,18 +145,19 @@ pub async fn load_in_org(
     .await
 }
 
-/// Die SMTP-Anbindung einer Org (höchstens eine, auch angehaltene zählen; LLH-2093). Bei Altdaten
-/// mit mehreren gilt die zuerst angelegte.
-pub async fn load_smtp_fuer_org(
+/// Die Anbindung einer Art, von der eine Org höchstens eine hat (`smtp`, LLH-2093; `matrix`,
+/// LLH-2094; auch angehaltene zählen). Bei Altdaten mit mehreren gilt die zuerst angelegte.
+pub async fn load_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
+    art_code: &str,
 ) -> Result<Option<Adapter>, sqlx::Error> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM adapter WHERE org_id = ? AND art = ? \
          ORDER BY angelegt_at, id LIMIT 1"
     )))
     .bind(org_id)
-    .bind(super::smtp_art::CODE)
+    .bind(art_code)
     .fetch_optional(pool)
     .await
 }

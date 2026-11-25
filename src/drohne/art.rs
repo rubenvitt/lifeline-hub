@@ -31,6 +31,7 @@ const PLAETZE: &[Platz] = &[Platz {
     name: "token",
     bezeichnung: "Großbild-Zugang",
     pflicht: true,
+    intern: false,
 }];
 
 const FELDER: &[Feld] = &[Feld {
@@ -335,7 +336,7 @@ mod tests {
 
     #[test]
     fn verzeichnis_enthaelt_suchlage() {
-        let v = Verzeichnis::produktiv(Arc::new(Store::new()));
+        let v = Verzeichnis::produktiv(Arc::new(Store::new()), Default::default());
         assert!(v.find("suchlage").is_some());
     }
 
