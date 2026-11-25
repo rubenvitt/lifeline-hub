@@ -417,7 +417,10 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
 - **Wiederholung:** vorübergehende Fehler mit Backoff `30 s · 2^(n−1)`, gedeckelt auf 5 min,
   höchstens **30 min** ab `erster_versuch_at`; dauerhafte Fehler sofort `fehlgeschlagen`.
   `ungewiss` (Abbruch nach DATA, auch ein Absturz mitten in der Zustellung, `versuch_begonnen_at`)
-  wird **nie** selbst wiederholt.
+  wird **nie** selbst wiederholt. Einen Merker, der länger als `lauf::HAENGT_NACH` (Sitzung plus
+  Datenphase plus 2 min) steht und den kein laufender Versuch hält, schließt jeder Durchgang wie
+  der Neustart als `ungewiss` ab. Den Versuch beansprucht `repo::mark_begonnen`; ein Ergebnis
+  schreibt nur, wer den Merker hält, sonst kein ETB-Eintrag (keine Doppelzustellung).
 - **Fehlercodes:** Versandfehler sind `AusgangFehler` (`voruebergehend`, `abgelehnt`, `ungewiss`,
   `ueberholt`, `anbindung_fehlt`, `anbindung_angehalten`, `anbindung_fehler`, `zu_gross`,
   `spiegel`) mit Enum-Kontrakt und Text in `frontend/src/api/ausgang.ts`; die SMTP-Sitzung

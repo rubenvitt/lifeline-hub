@@ -117,32 +117,77 @@ pub async fn beim_start(pool: &SqlitePool, live: &LiveHub) -> Result<u64, AppErr
     let zeilen = repo::load_unterbrochene(pool).await?;
     let mut n = 0;
     for zeile in zeilen {
-        let begonnen = zeile.versuch_begonnen_at.as_deref();
-        let lauf = async {
-            let ergebnis = Ergebnis::Fehlgeschlagen {
-                fehler: AusgangFehler::Ungewiss,
-                status: None,
-            };
-            if is_spiegel(pool, zeile.einsatz_id).await? {
-                let spiegel = Ergebnis::Fehlgeschlagen {
-                    fehler: AusgangFehler::Spiegel,
-                    status: None,
-                };
-                return abschliessen(pool, live, &zeile, begonnen, spiegel, None).await;
-            }
-            let text = etb_text(&zeile, AusgangFehler::Ungewiss, None);
-            abschliessen(pool, live, &zeile, begonnen, ergebnis, Some(text)).await
-        };
-        let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
-        melde_luecken(&luecken);
-        match ergebnis {
-            Ok(()) => n += 1,
-            Err(e) => tracing::error!(versand = %zeile.id, "Ausgang: Abschluss nach Neustart: {e}"),
+        if schliesse_unterbrochen(pool, live, &zeile).await {
+            n += 1;
         }
     }
     // Was danach noch offen ist (etwa ein gescheiterter Abschluss), bleibt nicht `wartet`.
     n += repo::recover_unterbrochene(pool).await?;
     Ok(n)
+}
+
+/// Ab wann ein begonnener Versuch als hängengeblieben gilt: länger als jede Sitzung dauern
+/// kann (Dialog und Datenphase des SMTP-Clients) und zwei Minuten Rand.
+pub const HAENGT_NACH: Duration = Duration::from_secs(
+    crate::adapter::smtp::SITZUNG_ZEITLIMIT.as_secs()
+        + crate::adapter::smtp::DATEN_ZEITLIMIT.as_secs()
+        + 120,
+);
+
+/// Im laufenden Betrieb: ein Versand, dessen Merker seit [`HAENGT_NACH`] steht und den kein
+/// Versuch dieses Laufs mehr hält (der Abschluss scheiterte zweimal, die Zustellung stürzte
+/// ab), wird wie nach einem Neustart `ungewiss` abgeschlossen, samt ETB-Eintrag. Sonst stünde
+/// er bis zum nächsten Neustart auf „wartet“.
+async fn raeume_haengende(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    jetzt: DateTime<Utc>,
+    laufend: &Laufend,
+) -> Result<(), AppError> {
+    let grenze = jetzt - chrono::Duration::from_std(HAENGT_NACH).unwrap_or_default();
+    for zeile in repo::load_haengende(pool, grenze).await? {
+        if laufend
+            .lock()
+            .expect("Merker nicht vergiftet")
+            .contains(&zeile.id)
+        {
+            continue;
+        }
+        if schliesse_unterbrochen(pool, live, &zeile).await {
+            tracing::warn!(versand = %zeile.id, "Ausgang: hängengebliebene Zustellung als ungewiss abgeschlossen");
+        }
+    }
+    Ok(())
+}
+
+/// Schließt einen unterbrochenen Versuch als `ungewiss` ab (am Spiegel als `spiegel` ohne ETB),
+/// mit dem Merker der Zeile als Marke. Liefert, ob das gelang; ein Fehler steht im Log.
+async fn schliesse_unterbrochen(pool: &SqlitePool, live: &LiveHub, zeile: &VersandZeile) -> bool {
+    let begonnen = zeile.versuch_begonnen_at.as_deref();
+    let lauf = async {
+        let ergebnis = Ergebnis::Fehlgeschlagen {
+            fehler: AusgangFehler::Ungewiss,
+            status: None,
+        };
+        if is_spiegel(pool, zeile.einsatz_id).await? {
+            let spiegel = Ergebnis::Fehlgeschlagen {
+                fehler: AusgangFehler::Spiegel,
+                status: None,
+            };
+            return abschliessen(pool, live, zeile, begonnen, spiegel, None).await;
+        }
+        let text = etb_text(zeile, AusgangFehler::Ungewiss, None);
+        abschliessen(pool, live, zeile, begonnen, ergebnis, Some(text)).await
+    };
+    let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
+    melde_luecken(&luecken);
+    match ergebnis {
+        Ok(()) => true,
+        Err(e) => {
+            tracing::error!(versand = %zeile.id, "Ausgang: unterbrochene Zustellung nicht abgeschlossen: {e}");
+            false
+        }
+    }
 }
 
 /// Ein Durchgang zum Zeitpunkt `jetzt`, der auf jede gestartete Zustellung wartet (für Tests).
@@ -196,6 +241,9 @@ async fn takt(
     laufend: &Laufend,
     plaetze: &Arc<Semaphore>,
 ) -> Result<Vec<JoinHandle<Vec<Luecke>>>, AppError> {
+    if let Err(e) = raeume_haengende(pool, live, jetzt, laufend).await {
+        tracing::error!("Ausgang: hängengebliebene Zustellungen nicht geprüft: {e}");
+    }
     let faellige = repo::load_faellige(pool, jetzt, JE_DURCHGANG).await?;
     let mut handles = Vec::new();
     for zeile in faellige {

@@ -791,3 +791,44 @@ async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
     assert_eq!(w.etb_versand().await.len(), 1);
     assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
 }
+
+#[tokio::test]
+async fn haengengebliebener_versuch_wird_im_betrieb_ungewiss() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let alt = w.versand("lagebericht", lid, t0).await;
+    let frisch = w.versand("lagebericht", lid, t0).await;
+    let setze_begonnen = |id: String, vor_min: i64| {
+        let pool = w.pool.clone();
+        async move {
+            sqlx::query("UPDATE ausgang SET versuch_begonnen_at = ?, versuche = 1 WHERE id = ?")
+                .bind(lifeline_hub::zeit::formatiere_utc(
+                    t0 - chrono::Duration::minutes(vor_min),
+                ))
+                .bind(&id)
+                .execute(&pool)
+                .await
+                .unwrap();
+        }
+    };
+    // Der eine hängt länger als jede Sitzung dauern kann, der andere läuft womöglich noch.
+    setze_begonnen(alt.clone(), 15).await;
+    setze_begonnen(frisch.clone(), 1).await;
+
+    w.durchgang(t0).await;
+
+    let z = w.zeile(&alt).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Ungewiss));
+    assert!(z.versuch_begonnen_at.is_none());
+    assert!(z.etb_eintrag_id.is_some());
+    let etb = w.etb_versand().await;
+    assert_eq!(etb.len(), 1, "{etb:?}");
+    assert!(etb[0].0.contains("Zustellung unklar"), "{etb:?}");
+    let f = w.zeile(&frisch).await;
+    assert_eq!(f.zustand, VersandZustand::Wartet);
+    assert!(f.versuch_begonnen_at.is_some());
+    assert!(w.skript.gesehen().is_empty());
+    assert!(lauf::HAENGT_NACH > std::time::Duration::from_secs(12 * 60));
+}

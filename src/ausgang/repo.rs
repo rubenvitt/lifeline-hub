@@ -351,6 +351,23 @@ pub async fn load_unterbrochene(pool: &SqlitePool) -> Result<Vec<VersandZeile>, 
     .map_err(Into::into)
 }
 
+/// Zeilen, deren Versuch vor `vor` begann und noch immer nicht abgeschlossen ist (`wartet` mit
+/// gesetztem Merker); der Lauf schließt sie im Betrieb als `ungewiss` ab.
+pub async fn load_haengende(
+    pool: &SqlitePool,
+    vor: DateTime<Utc>,
+) -> Result<Vec<VersandZeile>, AppError> {
+    sqlx::query_as::<_, VersandZeile>(sqlx::AssertSqlSafe(format!(
+        "SELECT {ZEILE} FROM ausgang \
+         WHERE zustand = 'wartet' AND versuch_begonnen_at IS NOT NULL \
+             AND versuch_begonnen_at < ? ORDER BY id"
+    )))
+    .bind(zeit(vor))
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 /// Nach einem Neustart: Zeilen mit gesetztem Merker waren mitten in der Zustellung, ob die Mail
 /// raus ist, ist unklar. Sie werden `fehlgeschlagen` mit `ungewiss`, ohne Wiederholung. Liefert
 /// die Anzahl.
