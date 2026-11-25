@@ -173,6 +173,30 @@ describe('StammdatenEinlesen', () => {
     );
   });
 
+  it('bietet bei einer Zeile, die nur abweicht, „Datei übernehmen“ an', async () => {
+    // Ohne Lücke zählt der Server die Zeile als unverändert; die Abweichung bleibt wählbar.
+    vorschauApi.mockResolvedValue(
+      vorschau({
+        zaehlung: {
+          fahrzeuge: { ...NULL, unveraendert: 1 },
+          personal: NULL,
+          qualifikationen: NULL,
+        },
+        zeilen: [{ ...ZEILE, ergebnis: 'unveraendert' }],
+      }),
+    );
+    zeichne();
+    const { dialog, datei } = await oeffneUndWaehle();
+    await within(dialog).findByText('Florian 1/10');
+    await waehle('Wahl für Florian 1/10', 'Datei übernehmen');
+    await waitFor(() =>
+      expect(vorschauApi).toHaveBeenLastCalledWith(datei, undefined, {
+        zeilen: [{ art: 'fahrzeug', zeile: 2, wahl: { art: 'datei_uebernehmen' } }],
+        qualifikationen: [],
+      }),
+    );
+  });
+
   it('uebernehmen_gesperrt_bei_fehlern', async () => {
     vorschauApi.mockResolvedValue(
       vorschau({

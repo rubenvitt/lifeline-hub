@@ -58,9 +58,9 @@ Materialliste lässt sich nach „Art“ filtern.
 3. Trägt die Datei Kennungen ohne Herkunft, unter „Herkunft“ den Namen der liefernden Anwendung
    eintragen; vorgeschlagen ist die zuletzt genutzte.
 4. Die Vorschau prüfen. Zeilen mit „Mehrdeutig“ brauchen eine Wahl (einen der Treffer, „Neu
-   anlegen“ oder „Auslassen“). Weicht ein schon gefüllter Wert ab, bleibt er mit „Lücken füllen,
-   Bestand behalten“ stehen; „Datei übernehmen“ ersetzt ihn. Unbekannte Qualifikationen werden
-   neu angelegt oder einer vorhandenen zugeordnet.
+   anlegen“ oder „Auslassen“). Weicht ein schon gefüllter Wert ab, bleibt er stehen („Bestand
+   behalten“, mit Lücken „Lücken füllen, Bestand behalten“); „Datei übernehmen“ ersetzt ihn.
+   Unbekannte Qualifikationen werden neu angelegt oder einer vorhandenen zugeordnet.
 5. „Übernehmen“ wählen.
 
 ### Eine Liste sortieren und filtern
