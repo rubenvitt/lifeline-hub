@@ -334,3 +334,290 @@ async fn anlegen_erzeugt_speicher_passphrase_und_zeigt_sie_nie() {
     let (s, _) = anfrage_json(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+// --- Lebenszyklus des Speichers (Spec Abschnitt 4) --------------------------------------------
+
+/// Die gespeicherte Passphrase einer Anbindung (Chiffrat), `None` ohne Zeile.
+async fn passphrase_chiffrat(pool: &sqlx::SqlitePool, id: &str) -> Option<Vec<u8>> {
+    sqlx::query_scalar("SELECT chiffrat FROM adapter_geheimnis WHERE adapter_id = ? AND name = ?")
+        .bind(id)
+        .bind("speicher_passphrase")
+        .fetch_optional(pool)
+        .await
+        .unwrap()
+}
+
+async fn hat_geheimnis(pool: &sqlx::SqlitePool, id: &str, platz: &str) -> bool {
+    let (n,): (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM adapter_geheimnis WHERE adapter_id = ? AND name = ?")
+            .bind(id)
+            .bind(platz)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    n > 0
+}
+
+/// Legt ein Speicherverzeichnis an, wie es eine Prüfung hinterlässt.
+fn speicher_anlegen(basis: &tempfile::TempDir, id: &str) -> std::path::PathBuf {
+    let dir = basis.path().join("matrix").join(id);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("matrix-sdk-crypto.sqlite3"), b"alt").unwrap();
+    std::fs::write(
+        dir.join(matrix::GERAET_DATEI),
+        br#"{"user_id":"@lifeline:example.org","device_id":"ALT"}"#,
+    )
+    .unwrap();
+    dir
+}
+
+async fn token_setzen(app: &axum::Router, admin: &str, id: &str, wert: &str) {
+    let (s, e) = anfrage_json(
+        app,
+        "PUT",
+        &format!("{LISTE}/{id}/secrets/access_token"),
+        admin,
+        Some(&json!({ "wert": wert })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{e}");
+}
+
+#[tokio::test]
+async fn neues_token_loescht_speicherverzeichnis() {
+    let (app, pool, admin, basis) = setup().await;
+    let (s, a) = anlegen(&app, &admin, "https://matrix.example.org").await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    let id = a["id"].as_str().unwrap().to_string();
+    token_setzen(&app, &admin, &id, "erstes-token").await;
+    let dir = speicher_anlegen(&basis, &id);
+    let passphrase_vorher = passphrase_chiffrat(&pool, &id).await.expect("Passphrase");
+
+    token_setzen(&app, &admin, &id, "neues-token").await;
+
+    assert!(!dir.exists(), "altes Verzeichnis gelöscht");
+    let passphrase_nachher = passphrase_chiffrat(&pool, &id).await.expect("Passphrase");
+    assert_ne!(passphrase_vorher, passphrase_nachher, "neue Passphrase");
+}
+
+#[tokio::test]
+async fn geaenderter_homeserver_loescht_speicherverzeichnis_und_token() {
+    let (app, pool, admin, basis) = setup().await;
+    let (s, a) = anlegen(&app, &admin, "https://matrix.example.org").await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    let id = a["id"].as_str().unwrap().to_string();
+    token_setzen(&app, &admin, &id, "erstes-token").await;
+    let dir = speicher_anlegen(&basis, &id);
+    let passphrase_vorher = passphrase_chiffrat(&pool, &id).await.expect("Passphrase");
+
+    let (s, a) = anfrage_json(
+        &app,
+        "PATCH",
+        &format!("{LISTE}/{id}"),
+        &admin,
+        Some(&json!({ "einstellungen": { "homeserver": "https://matrix.invalid" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{a}");
+
+    assert!(!dir.exists(), "altes Verzeichnis gelöscht");
+    assert!(
+        !hat_geheimnis(&pool, &id, "access_token").await,
+        "Token entfernt"
+    );
+    let passphrase_nachher = passphrase_chiffrat(&pool, &id)
+        .await
+        .expect("neue Passphrase im selben Schreiben");
+    assert_ne!(passphrase_vorher, passphrase_nachher);
+    // Die Spur nennt nur, was der Admin gesetzt hatte.
+    let (n,): (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM admin_audit WHERE aktion = 'adapter_geheimnis_entfernt' \
+         AND detail LIKE '%speicher_passphrase%'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 0, "kein Spur-Eintrag für den internen Platz");
+
+    // Mit neuem Token fehlt der nächsten Prüfung kein Geheimnis.
+    token_setzen(&app, &admin, &id, "token-fuer-neuen-server").await;
+    let (s, p) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/check"), &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{p}");
+    assert_ne!(p["fehler_art"], "geheimnis_fehlt", "{p}");
+}
+
+#[tokio::test]
+async fn geloeschte_anbindung_loescht_speicherverzeichnis() {
+    let (app, _pool, admin, basis) = setup().await;
+    let (s, a) = anlegen(&app, &admin, "https://matrix.example.org").await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    let id = a["id"].as_str().unwrap().to_string();
+    let dir = speicher_anlegen(&basis, &id);
+
+    let (s, _) = anfrage_json(&app, "DELETE", &format!("{LISTE}/{id}"), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert!(!dir.exists(), "Verzeichnis gelöscht");
+}
+
+#[tokio::test]
+async fn restore_ohne_verzeichnis_meldet_schluessel_passen_nicht() {
+    let (server, token) = homeserver("BOT1").await;
+    let vorher = tempfile::tempdir().unwrap();
+    matrix::pruefe(&clients(&vorher), &ziel(&server, &token, "a1"))
+        .await
+        .expect("Speicher für BOT1 angelegt, Schlüssel hochgeladen");
+
+    // Nach einem Restore fehlt das Verzeichnis; der Server kennt die Schlüssel von BOT1.
+    let nachher = tempfile::tempdir().unwrap();
+    let f = matrix::pruefe(&clients(&nachher), &ziel(&server, &token, "a1"))
+        .await
+        .unwrap_err();
+    assert_eq!(f, MatrixFehler::SchluesselPassenNicht);
+    // Kein neuer Speicher für ein Gerät, dessen Schlüssel anderswo liegen.
+    assert!(!nachher.path().join("matrix/a1").exists());
+}
+
+#[tokio::test]
+async fn verwerfen_wartet_auf_den_alten_client_und_die_naechste_pruefung_gelingt() {
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let (server1, token1) = homeserver("BOT1").await;
+    let ziel1 = ziel(&server1, &token1, "a1");
+    matrix::pruefe(&clients, &ziel1).await.expect("BOT1");
+
+    // Ein Hintergrund-Task (wie die des SDK) hält den alten Client noch kurz.
+    let spur = Arc::new(Mutex::new(Vec::<&'static str>::new()));
+    let schwach = {
+        let spur = spur.clone();
+        clients
+            .mit_client(&ziel1, move |client| {
+                let halter = client.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(300)).await;
+                    spur.lock().unwrap().push("alter Client frei");
+                    drop(halter);
+                });
+                Box::pin(async move { client.downgrade() })
+            })
+            .await
+            .expect("Zugriff")
+    };
+
+    let begonnen = std::time::Instant::now();
+    clients.verwerfen("a1").await;
+    spur.lock().unwrap().push("verworfen");
+    assert_eq!(schwach.strong_count(), 0, "kein alter Client lebt mehr");
+    assert_eq!(*spur.lock().unwrap(), ["alter Client frei", "verworfen"]);
+    assert!(begonnen.elapsed() < Duration::from_secs(5));
+    assert!(!basis.path().join("matrix/a1").exists());
+    assert_eq!(clients.befund("a1").await, None);
+
+    // Gleich danach: neues Token (neues Gerät) auf derselben Anbindung.
+    let (server2, token2) = homeserver("BOT2").await;
+    let befund = matrix::pruefe(&clients, &ziel(&server2, &token2, "a1"))
+        .await
+        .expect("Prüfung nach dem Verwerfen");
+    assert_eq!(befund.device_id, "BOT2");
+}
+
+#[tokio::test]
+async fn verwerfen_ohne_client_schliesst_den_naechsten_zugriff_ein() {
+    // Wer nach dem Vormerken zuerst an den Client kommt, verwirft vorher: auch wenn das
+    // Verwerfen selbst nicht abgewartet wurde.
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let dir = speicher_anlegen(&basis, "a1");
+    drop(clients.verwerfen("a1"));
+    let (server, token) = homeserver("BOT1").await;
+    let befund = matrix::pruefe(&clients, &ziel(&server, &token, "a1"))
+        .await
+        .expect("frischer Speicher");
+    assert_eq!(befund.device_id, "BOT1");
+    let merk = std::fs::read_to_string(dir.join(matrix::GERAET_DATEI)).unwrap();
+    assert!(merk.contains("BOT1"), "{merk}");
+}
+
+#[tokio::test]
+async fn befund_wartet_nicht_auf_einen_laufenden_zugriff() {
+    let (server, token) = homeserver("BOT1").await;
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let ziel = ziel(&server, &token, "a1");
+    matrix::pruefe(&clients, &ziel).await.expect("Prüfung");
+
+    let (los_tx, los_rx) = tokio::sync::oneshot::channel::<()>();
+    let (frei_tx, frei_rx) = tokio::sync::oneshot::channel::<()>();
+    let langer = {
+        let clients = clients.clone();
+        let ziel = MatrixZiel {
+            homeserver: ziel.homeserver.clone(),
+            access_token: ziel.access_token.clone(),
+            passphrase: ziel.passphrase.clone(),
+            lan_erlaubt: ziel.lan_erlaubt,
+            adapter_id: ziel.adapter_id.clone(),
+        };
+        tokio::spawn(async move {
+            clients
+                .mit_client(&ziel, move |_client| {
+                    Box::pin(async move {
+                        los_tx.send(()).unwrap();
+                        let _ = frei_rx.await;
+                    })
+                })
+                .await
+                .expect("Zugriff")
+        })
+    };
+    los_rx.await.unwrap();
+    let befund = tokio::time::timeout(Duration::from_millis(500), clients.befund("a1"))
+        .await
+        .expect("Befund ohne Warten auf den Zugriff");
+    assert_eq!(befund.map(|b| b.device_id), Some("BOT1".into()));
+    frei_tx.send(()).unwrap();
+    langer.await.unwrap();
+}
+
+#[tokio::test]
+async fn pruefung_endet_nach_der_frist() {
+    let (server, token) = homeserver("BOT1").await;
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let ziel = ziel(&server, &token, "a1");
+    matrix::pruefe(&clients, &ziel).await.expect("Prüfung");
+
+    // Ein langer Versand hält den Client; die Uhr läuft ab hier nur virtuell.
+    tokio::time::pause();
+    let (los_tx, los_rx) = tokio::sync::oneshot::channel::<()>();
+    let langer = {
+        let clients = clients.clone();
+        let ziel = MatrixZiel {
+            homeserver: ziel.homeserver.clone(),
+            access_token: ziel.access_token.clone(),
+            passphrase: ziel.passphrase.clone(),
+            lan_erlaubt: ziel.lan_erlaubt,
+            adapter_id: ziel.adapter_id.clone(),
+        };
+        tokio::spawn(async move {
+            clients
+                .mit_client(&ziel, move |_client| {
+                    Box::pin(async move {
+                        los_tx.send(()).unwrap();
+                        tokio::time::sleep(Duration::from_secs(600)).await;
+                    })
+                })
+                .await
+        })
+    };
+    los_rx.await.unwrap();
+    let begonnen = tokio::time::Instant::now();
+    let f = matrix::pruefe(&clients, &ziel).await.unwrap_err();
+    assert_eq!(f, MatrixFehler::Zeit);
+    let dauer = begonnen.elapsed();
+    assert!(
+        dauer >= matrix::PRUEF_ZEITLIMIT
+            && dauer < matrix::PRUEF_ZEITLIMIT + Duration::from_secs(1),
+        "{dauer:?}"
+    );
+    assert!(matrix::PRUEF_ZEITLIMIT < lifeline_hub::zulassung::REQUEST_BUDGET);
+    langer.abort();
+}

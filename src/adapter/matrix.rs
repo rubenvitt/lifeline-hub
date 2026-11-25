@@ -6,7 +6,10 @@
 //! Schlüsselspeicher. Der Speicher liegt in `<basis>/<adapter_id>/` (verschlüsseltes SQLite von
 //! `matrix-sdk-sqlite`, Passphrase aus dem Platz `speicher_passphrase`). Eine Merkdatei
 //! [`GERAET_DATEI`] darin nennt Nutzer und Gerät, für die er angelegt wurde: gehört das Token zu
-//! einem anderen Gerät, wird der Speicher nicht geöffnet (`SchluesselPassenNicht`).
+//! einem anderen Gerät, wird der Speicher nicht geöffnet (`SchluesselPassenNicht`). Ebenso, wenn
+//! er fehlt, der Server für das Gerät aber schon Schlüssel kennt (Restore, Umzug). Neues Token,
+//! neuer Homeserver und gelöschte Anbindung verwerfen Client und Verzeichnis
+//! ([`Clients::verwerfen`]); eine Prüfung endet spätestens nach [`PRUEF_ZEITLIMIT`].
 //!
 //! Netz: matrix-sdk bekommt unseren `reqwest::Client` aus [`ziel::client_builder_mit_zielschutz`]
 //! (filternder Resolver, keine Weiterleitung, nur `https`); die Homeserver-URL besteht vorher
@@ -14,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, SystemTime};
 
@@ -46,8 +50,19 @@ pub const ANFRAGE_ZEITLIMIT: Duration = Duration::from_secs(30);
 /// Gesamtzeitlimit des HTTP-Clients; das gilt für Uploads, die eigene Anfrage-Limits setzen.
 pub const UPLOAD_ZEITLIMIT: Duration = Duration::from_secs(120);
 
+/// Frist einer ganzen Prüfung, samt Warten auf den Client: „Verbindung prüfen“ bleibt so unter
+/// dem Zeitbudget eines Requests (`zulassung::REQUEST_BUDGET`).
+pub const PRUEF_ZEITLIMIT: Duration = Duration::from_secs(45);
+
+/// Wie lange das Verwerfen höchstens darauf wartet, dass ein Hintergrund-Task des SDK den alten
+/// Client loslässt, bevor es das Verzeichnis trotzdem löscht.
+const FREIGABE_WARTEZEIT: Duration = Duration::from_secs(10);
+
 /// Deckel für die Antwort von `whoami` (ein kleines JSON-Objekt).
 const WHOAMI_DECKEL: usize = 16 * 1024;
+
+/// Deckel für die Antwort von `keys/query` für ein einzelnes Gerät (samt Cross-Signing-Schlüsseln).
+const SCHLUESSEL_DECKEL: usize = 256 * 1024;
 
 /// Das Ziel einer Matrix-Anbindung, aus Einstellungen und Geheimnissen. `Debug` nennt keine
 /// Geheimnisse.
@@ -158,10 +173,22 @@ struct Offen {
     geraet: Geraet,
 }
 
+/// Was der Prozess je Anbindung hält. Der Client liegt hinter der `tokio`-Mutex (Zugriffe
+/// nacheinander); der Befund hinter einer eigenen kleinen Sperre, damit Lesen nie hinter einem
+/// langen Versand wartet.
 #[derive(Default)]
 struct Eintrag {
-    offen: Option<Offen>,
-    befund: Option<Pruefbefund>,
+    offen: tokio::sync::Mutex<Option<Offen>>,
+    befund: std::sync::Mutex<Option<Pruefbefund>>,
+    /// Vorgemerkt von [`Clients::verwerfen`]: wer als Nächstes an den Client kommt, verwirft ihn
+    /// und löscht das Verzeichnis, bevor er etwas anderes tut.
+    verwerfen: AtomicBool,
+}
+
+impl Eintrag {
+    fn set_befund(&self, befund: Option<Pruefbefund>) {
+        *self.befund.lock().expect("Befund nicht vergiftet") = befund;
+    }
 }
 
 /// Die Matrix-Clients des Prozesses, je Anbindung höchstens einer (`AppState.adapter.matrix`).
@@ -169,7 +196,7 @@ pub struct Clients {
     basis: PathBuf,
     zielschutz: bool,
     http: [OnceLock<reqwest::Client>; 2],
-    eintraege: std::sync::Mutex<HashMap<String, Arc<tokio::sync::Mutex<Eintrag>>>>,
+    eintraege: std::sync::Mutex<HashMap<String, Arc<Eintrag>>>,
 }
 
 impl std::fmt::Debug for Clients {
@@ -222,7 +249,7 @@ impl Clients {
         gueltig.then(|| self.basis.join(adapter_id))
     }
 
-    fn eintrag(&self, adapter_id: &str) -> Arc<tokio::sync::Mutex<Eintrag>> {
+    fn eintrag(&self, adapter_id: &str) -> Arc<Eintrag> {
         self.eintraege
             .lock()
             .expect("Clients nicht vergiftet")
@@ -247,6 +274,22 @@ impl Clients {
             .clone()
     }
 
+    /// Sperrt den Client der Anbindung; ist ein Verwerfen vorgemerkt, erledigt es der Halter der
+    /// Sperre zuerst.
+    async fn sperre<'e>(
+        &self,
+        adapter_id: &str,
+        eintrag: &'e Eintrag,
+    ) -> tokio::sync::MutexGuard<'e, Option<Offen>> {
+        let mut offen = eintrag.offen.lock().await;
+        if eintrag.verwerfen.swap(false, Ordering::SeqCst) {
+            eintrag.set_befund(None);
+            schliesse(&mut offen, adapter_id).await;
+            self.loesche_verzeichnis(adapter_id).await;
+        }
+        offen
+    }
+
     /// Führt `f` mit dem Client der Anbindung aus; baut ihn bei Bedarf (Token prüfen, Speicher
     /// öffnen, Sitzung herstellen). Zugriffe auf dieselbe Anbindung laufen nacheinander.
     pub async fn mit_client<T>(
@@ -255,58 +298,76 @@ impl Clients {
         f: impl for<'c> FnOnce(&'c matrix_sdk::Client) -> BoxFuture<'c, T>,
     ) -> Result<T, MatrixFehler> {
         let eintrag = self.eintrag(&ziel.adapter_id);
-        let mut e = eintrag.lock().await;
-        let client = self.oeffne(&mut e, ziel, None).await?;
+        let mut offen = self.sperre(&ziel.adapter_id, &eintrag).await;
+        let client = self.oeffne(&eintrag, &mut offen, ziel, None).await?;
         Ok(f(&client).await)
     }
 
     /// Verwirft den Client der Anbindung und löscht ihr Speicherverzeichnis (neues Token, neuer
-    /// Homeserver, Anbindung gelöscht). Wartet, bis ein laufender Zugriff fertig ist.
-    pub async fn verwerfen(&self, adapter_id: &str) {
+    /// Homeserver, Anbindung gelöscht). Der Aufruf merkt das Verwerfen sofort vor, noch bevor die
+    /// Zukunft läuft; sie wartet dann, bis ein laufender Zugriff fertig ist, und erledigt es. Wird
+    /// sie nicht abgewartet (Frist des Requests), erledigt es der nächste Zugriff, bevor er den
+    /// Speicher öffnet. Der alte Client ist ganz los (auch aus Hintergrund-Tasks des SDK), bevor
+    /// das Verzeichnis fällt: nie öffnen zwei Clients denselben Speicher.
+    pub fn verwerfen<'s>(&'s self, adapter_id: &str) -> impl std::future::Future<Output = ()> + 's {
         let eintrag = self.eintrag(adapter_id);
-        let mut e = eintrag.lock().await;
-        e.offen = None;
-        e.befund = None;
-        if let Some(dir) = self.verzeichnis(adapter_id) {
-            match tokio::fs::remove_dir_all(&dir).await {
-                Ok(()) => {}
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                Err(err) => {
-                    tracing::warn!(
-                        adapter = adapter_id,
-                        "Matrix-Speicher nicht gelöscht: {err}"
-                    )
-                }
+        eintrag.verwerfen.store(true, Ordering::SeqCst);
+        eintrag.set_befund(None);
+        let adapter_id = adapter_id.to_string();
+        async move {
+            drop(self.sperre(&adapter_id, &eintrag).await);
+        }
+    }
+
+    /// Löscht das Speicherverzeichnis einer Anbindung; nur unter ihrer Sperre, ohne offenen Client.
+    async fn loesche_verzeichnis(&self, adapter_id: &str) {
+        let Some(dir) = self.verzeichnis(adapter_id) else {
+            return;
+        };
+        match tokio::fs::remove_dir_all(&dir).await {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => {
+                tracing::warn!(
+                    adapter = adapter_id,
+                    "Matrix-Speicher nicht gelöscht: {err}"
+                )
             }
         }
     }
 
-    /// Der Befund der letzten erfolgreichen Prüfung seit dem Start des Prozesses.
+    /// Der Befund der letzten erfolgreichen Prüfung seit dem Start des Prozesses. Wartet nie auf
+    /// einen laufenden Zugriff.
     pub async fn befund(&self, adapter_id: &str) -> Option<Pruefbefund> {
-        self.eintrag(adapter_id).lock().await.befund.clone()
+        self.eintrag(adapter_id)
+            .befund
+            .lock()
+            .expect("Befund nicht vergiftet")
+            .clone()
     }
 
     /// Der Client des Eintrags; ein neuer, wenn keiner offen ist oder sich das Ziel änderte.
     async fn oeffne(
         &self,
-        e: &mut Eintrag,
+        eintrag: &Eintrag,
+        offen: &mut Option<Offen>,
         ziel: &MatrixZiel,
         geraet: Option<Geraet>,
     ) -> Result<matrix_sdk::Client, MatrixFehler> {
         let stand = stand(ziel);
-        if let Some(o) = &e.offen {
+        if let Some(o) = offen.as_ref() {
             if o.stand == stand {
                 return Ok(o.client.clone());
             }
         }
-        e.offen = None;
-        e.befund = None;
+        eintrag.set_befund(None);
+        schliesse(offen, &ziel.adapter_id).await;
         let geraet = match geraet {
             Some(g) => g,
             None => self.whoami(ziel).await?,
         };
         let client = self.baue(ziel, &geraet).await?;
-        e.offen = Some(Offen {
+        *offen = Some(Offen {
             client: client.clone(),
             stand,
             geraet,
@@ -368,6 +429,51 @@ impl Clients {
         })
     }
 
+    /// `POST /keys/query` für das eigene Gerät: ob der Server schon Geräteschlüssel dafür kennt.
+    async fn hat_server_schluessel(
+        &self,
+        ziel: &MatrixZiel,
+        geraet: &Geraet,
+    ) -> Result<bool, MatrixFehler> {
+        #[derive(Deserialize)]
+        struct Antwort {
+            #[serde(default)]
+            device_keys: HashMap<String, HashMap<String, serde_json::Value>>,
+        }
+        let homeserver = self.homeserver(ziel)?;
+        let url = format!(
+            "{}/_matrix/client/v3/keys/query",
+            homeserver.as_str().trim_end_matches('/')
+        );
+        let anfrage = serde_json::json!({
+            "device_keys": { &geraet.user_id: [&geraet.device_id] }
+        });
+        let antwort = self
+            .http(ziel.lan_erlaubt)
+            .post(url)
+            .bearer_auth(ziel.access_token.expose_secret())
+            .json(&anfrage)
+            .timeout(ANFRAGE_ZEITLIMIT)
+            .send()
+            .await
+            .map_err(|e| netzfehler(&e))?;
+        let status = antwort.status().as_u16();
+        if !(200..300).contains(&status) {
+            let retry = if status == 429 {
+                retry_after(antwort).await
+            } else {
+                None
+            };
+            return Err(status_fehler(status, retry));
+        }
+        let a: Antwort = crate::http_begrenzt::lies_json_begrenzt(antwort, SCHLUESSEL_DECKEL)
+            .await
+            .map_err(|_| MatrixFehler::Antwort)?;
+        Ok(a.device_keys
+            .get(&geraet.user_id)
+            .is_some_and(|geraete| geraete.contains_key(&geraet.device_id)))
+    }
+
     /// Öffnet den Speicher für `geraet` und stellt die Sitzung her.
     async fn baue(
         &self,
@@ -378,7 +484,15 @@ impl Clients {
         let dir = self
             .verzeichnis(&ziel.adapter_id)
             .ok_or(MatrixFehler::Antwort)?;
-        sichere_geraet(&dir, geraet).await?;
+        if !hat_passende_merkdatei(&dir, geraet).await? {
+            // Ein neuer Speicher. Kennt der Server für dieses Gerät schon Schlüssel, liegen die
+            // geheimen Gegenstücke anderswo (Restore, Umzug, ein anderer Client mit demselben
+            // Token): mit einem leeren Speicher ginge nichts mehr zu entschlüsseln.
+            if self.hat_server_schluessel(ziel, geraet).await? {
+                return Err(MatrixFehler::SchluesselPassenNicht);
+            }
+            lege_merkdatei_an(&dir, geraet).await?;
+        }
         let client = matrix_sdk::Client::builder()
             .homeserver_url(homeserver.as_str())
             .http_client(self.http(ziel.lan_erlaubt))
@@ -421,20 +535,32 @@ impl Clients {
 /// Cross-Signing anlegen, falls es fehlt (scheitert das, nur `cross_signing: false`), und die
 /// Upload-Grenze lesen. Der Befund bleibt am Eintrag ([`Clients::befund`]).
 pub async fn pruefe(clients: &Clients, ziel: &MatrixZiel) -> Result<Pruefbefund, MatrixFehler> {
+    // Die Frist gilt für alles, auch das Warten auf einen laufenden Versand.
+    tokio::time::timeout(PRUEF_ZEITLIMIT, pruefe_ohne_frist(clients, ziel))
+        .await
+        .unwrap_or(Err(MatrixFehler::Zeit))
+}
+
+async fn pruefe_ohne_frist(
+    clients: &Clients,
+    ziel: &MatrixZiel,
+) -> Result<Pruefbefund, MatrixFehler> {
     let eintrag = clients.eintrag(&ziel.adapter_id);
-    let mut e = eintrag.lock().await;
+    let mut offen = clients.sperre(&ziel.adapter_id, &eintrag).await;
     let geraet = clients.whoami(ziel).await?;
     // Ein offener Client für ein anderes Gerät desselben Ziels (Token beim Server neu vergeben):
     // nicht weiter benutzen; der Speicher gehört dem alten Gerät.
-    if e.offen
+    if offen
         .as_ref()
         .is_some_and(|o| o.stand == stand(ziel) && o.geraet != geraet)
     {
-        e.offen = None;
-        e.befund = None;
+        eintrag.set_befund(None);
+        schliesse(&mut offen, &ziel.adapter_id).await;
         return Err(MatrixFehler::SchluesselPassenNicht);
     }
-    let client = clients.oeffne(&mut e, ziel, Some(geraet.clone())).await?;
+    let client = clients
+        .oeffne(&eintrag, &mut offen, ziel, Some(geraet.clone()))
+        .await?;
 
     let filter = SyncFilter::FilterDefinition(ohne_raeume());
     client
@@ -471,8 +597,30 @@ pub async fn pruefe(clients: &Clients, ziel: &MatrixZiel) -> Result<Pruefbefund,
         cross_signing,
         upload_max,
     };
-    e.befund = Some(befund.clone());
+    eintrag.set_befund(Some(befund.clone()));
     Ok(befund)
+}
+
+/// Schließt den offenen Client: lässt ihn los und wartet, bis auch Hintergrund-Tasks des SDK
+/// ihn losgelassen haben (keine starke Referenz mehr, damit Speicher und Verbindungen zu sind).
+/// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen.
+async fn schliesse(offen: &mut Option<Offen>, adapter_id: &str) {
+    let Some(alt) = offen.take() else {
+        return;
+    };
+    let schwach = alt.client.downgrade();
+    drop(alt);
+    let frist = tokio::time::Instant::now() + FREIGABE_WARTEZEIT;
+    while schwach.strong_count() > 0 {
+        if tokio::time::Instant::now() >= frist {
+            tracing::warn!(
+                adapter = adapter_id,
+                "Matrix: alter Client nach {FREIGABE_WARTEZEIT:?} noch gehalten"
+            );
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
 }
 
 /// Ein Filter, der keine Räume, Präsenz und Kontodaten lädt: der Sync bringt nur to-device und
@@ -500,41 +648,48 @@ fn stand(ziel: &MatrixZiel) -> [u8; 32] {
     h.finalize().into()
 }
 
-/// Prüft die Merkdatei des Verzeichnisses gegen `geraet`; legt Verzeichnis und Merkdatei an,
-/// wenn es noch keins gibt. Ein Verzeichnis mit Inhalt, aber ohne Merkdatei gehört niemandem
-/// Bekanntem und wird nicht geöffnet.
-async fn sichere_geraet(dir: &Path, geraet: &Geraet) -> Result<(), MatrixFehler> {
-    let io = |err: std::io::Error| {
-        tracing::warn!("Matrix-Speicherverzeichnis: {err}");
-        MatrixFehler::Verschluesselung
-    };
+/// Ob das Verzeichnis eine Merkdatei für `geraet` hat (`true`) oder noch keinen Speicher
+/// (`false`: fehlt oder leer). Eine Merkdatei für ein anderes Gerät oder Inhalt ohne Merkdatei
+/// gehört niemandem Bekanntem und wird nicht geöffnet (`SchluesselPassenNicht`).
+async fn hat_passende_merkdatei(dir: &Path, geraet: &Geraet) -> Result<bool, MatrixFehler> {
     let merk = dir.join(GERAET_DATEI);
     match tokio::fs::read(&merk).await {
         Ok(roh) => {
             return match serde_json::from_slice::<Geraet>(&roh) {
-                Ok(g) if g == *geraet => Ok(()),
+                Ok(g) if g == *geraet => Ok(true),
                 _ => Err(MatrixFehler::SchluesselPassenNicht),
             }
         }
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-        Err(err) => return Err(io(err)),
+        Err(err) => return Err(io_fehler(err)),
     }
     match tokio::fs::read_dir(dir).await {
         Ok(mut eintraege) => {
-            if eintraege.next_entry().await.map_err(io)?.is_some() {
+            if eintraege.next_entry().await.map_err(io_fehler)?.is_some() {
                 return Err(MatrixFehler::SchluesselPassenNicht);
             }
+            Ok(false)
         }
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
-            tokio::fs::create_dir_all(dir).await.map_err(io)?;
-        }
-        Err(err) => return Err(io(err)),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(err) => Err(io_fehler(err)),
     }
+}
+
+/// Legt Verzeichnis und Merkdatei für `geraet` an (atomar über eine Zwischendatei).
+async fn lege_merkdatei_an(dir: &Path, geraet: &Geraet) -> Result<(), MatrixFehler> {
+    tokio::fs::create_dir_all(dir).await.map_err(io_fehler)?;
     let neu = dir.join(format!("{GERAET_DATEI}.neu"));
     let json = serde_json::to_vec(geraet).map_err(|_| MatrixFehler::Antwort)?;
-    tokio::fs::write(&neu, json).await.map_err(io)?;
-    tokio::fs::rename(&neu, &merk).await.map_err(io)?;
+    tokio::fs::write(&neu, json).await.map_err(io_fehler)?;
+    tokio::fs::rename(&neu, dir.join(GERAET_DATEI))
+        .await
+        .map_err(io_fehler)?;
     Ok(())
+}
+
+fn io_fehler(err: std::io::Error) -> MatrixFehler {
+    tracing::warn!("Matrix-Speicherverzeichnis: {err}");
+    MatrixFehler::Verschluesselung
 }
 
 fn netzfehler(e: &reqwest::Error) -> MatrixFehler {
