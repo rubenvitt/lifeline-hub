@@ -21,9 +21,10 @@ herleitung:
   nur mit `archiv=1` („Ältere Aktivierungen“). Führt die öffentliche Liste denselben Code, gilt
   die Liste.
 - MUST: Vector Packages werden nur unter `PAKET_BASIS`
-  (`https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`) geladen, auch
-  nach Weiterleitungen; gelesen werden nur die GeoJSON-Dateien im Wurzelverzeichnis, mit
-  Grenzen für Einträge, Größe je Eintrag und Summe, gemessen an den gelesenen Bytes.
+  (`https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`) geladen, über
+  einen eigenen Client, dessen Redirect-Regel nur Weiterleitungen innerhalb des Präfixes
+  verfolgt. Gelesen werden nur die GeoJSON-Dateien im Wurzelverzeichnis, mit Grenzen für
+  Einträge, Größe je Eintrag und Summe, gemessen an den gelesenen Bytes.
 - MUST NOT: Gebäude und Straßen aus einem Produkt, das nicht `GRA` ist, werden nicht gezeigt
   (in `DEL` sind es Referenzdaten ohne Schadensklasse).
 - MUST: Jede Copernicus-Ebene liefert nur Features, die den gerundeten Ausschnitt
@@ -37,6 +38,7 @@ herleitung:
 # Exit 0, solange die Regeln gelten (Hilfen und Grenzen: docs/architektur/AGENTS.md).
 verlange 'const PAKET_BASIS' 'src/karte/copernicus_alt.rs'
 verlange 'take\(PAKET_EINTRAG_MAX' 'src/karte/copernicus_alt.rs'
+verlange 'redirect\(redirect_policy\(PAKET_BASIS' 'src/karte/copernicus_alt.rs'
 verlange 'if archiv \{' 'src/karte/copernicus.rs'
 verlange 'fn filter_ausschnitt' 'src/karte/copernicus.rs'
 verlange 'p\.typ != "GRA"' 'src/karte/copernicus.rs'

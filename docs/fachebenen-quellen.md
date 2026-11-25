@@ -559,9 +559,9 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   Anmeldung. Ausgewählte Aktivierungen stehen deshalb im Katalog
   `src/karte/copernicus_altbestand.json`, heute EMSR517 (Hochwasser Westdeutschland 2021, 17
   Gebiete, 23 Produkte). Mit „Ältere Aktivierungen“ lädt der Server das Vector Package je
-  gezeigtem Produkt (höchstens 6 je Antwort, Download höchstens 48 MiB, nur vom Präfix
-  `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`, auch nach
-  Weiterleitung) und liest daraus nur die GeoJSON-Dateien des Umrisses und der bekannten Ebenen
+  gezeigtem Produkt (höchstens 6 je Antwort und 2 gleichzeitig, Download höchstens 48 MiB, nur
+  vom Präfix `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`;
+  ein eigener Client verfolgt Weiterleitungen nur innerhalb dieses Präfixes) und liest daraus nur die GeoJSON-Dateien des Umrisses und der bekannten Ebenen
   (höchstens 200 Einträge, 16 MiB je Eintrag, 32 MiB zusammen). Gebäude und Straßen nur aus
   `GRA`; in `DEL` sind sie Referenzdaten. Die Pakete nennen keine Aufnahmezeit: Es zählt die
   Lieferzeit, und Liste wie Inspector sagen „Lieferung“. Fehlt ein Paket, zeigt das Gebiet sein

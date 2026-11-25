@@ -51,6 +51,10 @@ const WKT_MAX_TIEFE: usize = 3;
 /// Gleichzeitige Abrufe von Ebenen-Dateien.
 const PARALLEL: usize = 6;
 
+/// Gleichzeitige Abrufe von Vector Packages: ein Paket hält beim Lesen bis 48 MiB Rumpf und
+/// 16 MiB Eintrag samt JSON-Baum im Speicher.
+pub(crate) const PARALLEL_PAKETE: usize = 2;
+
 pub(crate) const COPERNICUS_ATTRIB: &str =
     "© European Union, Copernicus Emergency Management Service";
 
@@ -819,7 +823,7 @@ where
             .await;
             (ti, p, roh)
         })
-        .buffered(PARALLEL)
+        .buffered(PARALLEL_PAKETE)
         .collect()
         .await;
 
@@ -996,7 +1000,6 @@ pub async fn fetch_copernicus(
         "copernicus"
     });
     let (client, p, k) = (s.client.clone(), pool.clone(), key.clone());
-    let paket_client = s.client.clone();
     let antwort = quellen::liefere_geloest(
         pool,
         &s.inflight,
@@ -1008,10 +1011,8 @@ pub async fn fetch_copernicus(
                 let c = client.clone();
                 async move { quellen::hole_json(&c, &url).await }
             };
-            let fetch_paket = move |url: String| {
-                let c = paket_client.clone();
-                async move { copernicus_alt::fetch_paket(&c, &url).await }
-            };
+            // Eigener Client mit Redirect-Regel (ADR-0098), nicht der der Fachebenen.
+            let fetch_paket = |url: String| async move { copernicus_alt::fetch_paket(&url).await };
             let jetzt = chrono::Utc::now().naive_utc();
             let gebaut = build_antwort(
                 &p,
@@ -1720,6 +1721,46 @@ mod tests {
         assert_eq!(g["properties"]["gekuerzt"], true);
     }
 
+    #[tokio::test]
+    async fn laedt_hoechstens_zwei_pakete_gleichzeitig() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let laufend = Arc::new(AtomicUsize::new(0));
+        let hoechst = Arc::new(AtomicUsize::new(0));
+        let geholt = Arc::new(AtomicUsize::new(0));
+        let (l, h, g) = (laufend.clone(), hoechst.clone(), geholt.clone());
+        let fetch_paket = move |_url: String| {
+            let (l, h, g) = (l.clone(), h.clone(), g.clone());
+            async move {
+                let jetzt = l.fetch_add(1, Ordering::SeqCst) + 1;
+                h.fetch_max(jetzt, Ordering::SeqCst);
+                for _ in 0..5 {
+                    tokio::task::yield_now().await;
+                }
+                l.fetch_sub(1, Ordering::SeqCst);
+                g.fetch_add(1, Ordering::SeqCst);
+                Err::<Value, String>("HTTP 404".into())
+            }
+        };
+        // Schneidet unter anderem AOI03 (Hönningen), AOI08 (Euskirchen) und AOI15 (Ahrweiler).
+        let bbox = Bbox::parse("6.95,50.50,7.10,50.56").unwrap();
+        let pool = crate::db::test_pool().await;
+        let q = Quelle::default();
+        build_antwort(
+            &pool,
+            q.fetch(),
+            fetch_paket,
+            bbox,
+            true,
+            heute(),
+            Grenzen::STANDARD,
+        )
+        .await
+        .unwrap();
+        assert!(geholt.load(Ordering::SeqCst) >= 3);
+        assert_eq!(hoechst.load(Ordering::SeqCst), PARALLEL_PAKETE);
+        assert_eq!(PARALLEL_PAKETE, 2);
+    }
+
     #[test]
     fn nur_adressen_unter_dem_paketpraefix_gelten() {
         use crate::karte::copernicus_alt::is_paket_url;
@@ -1737,8 +1778,7 @@ mod tests {
 
     #[tokio::test]
     async fn fetch_paket_lehnt_fremde_adressen_ab() {
-        let client = reqwest::Client::new();
-        let e = crate::karte::copernicus_alt::fetch_paket(&client, "https://example.org/x.zip")
+        let e = crate::karte::copernicus_alt::fetch_paket("https://example.org/x.zip")
             .await
             .unwrap_err();
         assert!(e.contains("Adresse"), "{e}");

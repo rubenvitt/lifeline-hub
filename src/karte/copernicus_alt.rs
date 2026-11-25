@@ -253,9 +253,47 @@ pub(crate) fn is_paket_url(url: &str) -> bool {
     url.starts_with(PAKET_BASIS)
 }
 
-/// Holt ein Vector Package und liest es mit [`read_vector_package`] (in `spawn_blocking`).
-pub(crate) async fn fetch_paket(client: &reqwest::Client, url: &str) -> Result<Value, String> {
-    if !is_paket_url(url) {
+/// Weiterleitungen nur innerhalb von `basis` (ADR-0098); eine auf einen anderen Host wird nicht
+/// verfolgt, die Antwort bleibt die Weiterleitung selbst.
+pub(crate) fn redirect_policy(basis: String) -> reqwest::redirect::Policy {
+    reqwest::redirect::Policy::custom(move |a| {
+        if a.previous().len() >= 5 {
+            a.error("zu viele Weiterleitungen")
+        } else if a.url().as_str().starts_with(&basis) {
+            a.follow()
+        } else {
+            a.stop()
+        }
+    })
+}
+
+/// Eigener Client für die Pakete: wie der Fachebenen-Client, aber mit [`redirect_policy`] auf
+/// [`PAKET_BASIS`].
+pub(crate) fn paket_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        crate::ausgehend::client_builder(crate::ausgehend::Zweck::Lagekarte)
+            .timeout(PAKET_TIMEOUT)
+            .gzip(true)
+            .redirect(redirect_policy(PAKET_BASIS.to_string()))
+            .build()
+            .expect("reqwest-Client baubar")
+    })
+}
+
+/// Holt ein Vector Package über [`paket_client`] und liest es mit [`read_vector_package`] (in
+/// `spawn_blocking`).
+pub(crate) async fn fetch_paket(url: &str) -> Result<Value, String> {
+    fetch_paket_unter(paket_client(), url, PAKET_BASIS).await
+}
+
+/// [`fetch_paket`] mit frei wählbarem Client und Präfix (Tests gegen einen lokalen Server).
+pub(crate) async fn fetch_paket_unter(
+    client: &reqwest::Client,
+    url: &str,
+    basis: &str,
+) -> Result<Value, String> {
+    if !url.starts_with(basis) {
         return Err(format!("Adresse außerhalb des Altbestands: {url}"));
     }
     let resp = client
@@ -264,7 +302,8 @@ pub(crate) async fn fetch_paket(client: &reqwest::Client, url: &str) -> Result<V
         .send()
         .await
         .map_err(|e| e.to_string())?;
-    if !is_paket_url(resp.url().as_str()) {
+    // Zweite Sicherung neben der Redirect-Regel.
+    if !resp.url().as_str().starts_with(basis) {
         return Err(format!(
             "Weiterleitung auf eine fremde Adresse: {}",
             resp.url()
@@ -430,5 +469,44 @@ mod tests {
     #[test]
     fn kaputtes_zip_ist_ein_fehler() {
         assert!(read_vector_package(b"kein zip").is_err());
+    }
+
+    #[tokio::test]
+    async fn folgt_keiner_weiterleitung_auf_einen_fremden_host() {
+        use crate::http_begrenzt::fixture::bediene;
+        use axum::{response::Redirect, routing::get, Router};
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        let treffer = Arc::new(AtomicUsize::new(0));
+        let t = treffer.clone();
+        let fremd = bediene(Router::new().route(
+            "/x.zip",
+            get(move || {
+                t.fetch_add(1, Ordering::SeqCst);
+                async { "kein zip" }
+            }),
+        ))
+        .await;
+        let ziel = format!("{fremd}/x.zip");
+        let eigen = bediene(Router::new().route(
+            "/a.zip",
+            get(move || async move { Redirect::temporary(&ziel) }),
+        ))
+        .await;
+        let basis = format!("{eigen}/");
+        let client = reqwest::Client::builder()
+            .redirect(redirect_policy(basis.clone()))
+            .no_proxy()
+            .build()
+            .unwrap();
+        let e = fetch_paket_unter(&client, &format!("{eigen}/a.zip"), &basis)
+            .await
+            .unwrap_err();
+        assert!(e.contains("HTTP 307"), "{e}");
+        assert_eq!(
+            treffer.load(Ordering::SeqCst),
+            0,
+            "fremder Host wurde angefragt"
+        );
     }
 }
