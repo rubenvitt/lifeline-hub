@@ -1185,7 +1185,7 @@ fn fuehrungsfunktion_wire() {
     } in lifeline_hub::fuehrung::Fuehrungsfunktion::ALLE);
 }
 
-/// Helfer-App: Quelle einer Position; Werte = CHECK von `position_quelle` (Migration 0376).
+/// Helfer-App: Quelle einer Position; Werte = CHECK von `position_quelle` (Migration 0377).
 #[test]
 fn positionsquelle_wire() {
     enum_wire!(lifeline_hub::ortung::Positionsquelle {
@@ -1196,7 +1196,7 @@ fn positionsquelle_wire() {
 }
 
 /// Helfer-App: Zustand einer Helfer-Kopplung; die ersten drei = CHECK von `helfer_zustand`
-/// (Migration 0376), `beendet` leitet der Server ab.
+/// (Migration 0377), `beendet` leitet der Server ab.
 #[test]
 fn helfer_status_wire() {
     enum_wire!(lifeline_hub::helfer::HelferStatus {

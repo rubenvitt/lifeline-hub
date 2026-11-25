@@ -4680,7 +4680,7 @@ export interface components {
         };
         /**
          * @description Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in
-         *     `geraet_kopplung.helfer_zustand` (CHECK in Migration 0376); `beendet` leitet der Server
+         *     `geraet_kopplung.helfer_zustand` (CHECK in Migration 0377); `beendet` leitet der Server
          *     ab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.
          * @enum {string}
          */
@@ -7926,7 +7926,7 @@ export interface components {
         };
         /**
          * @description Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration
-         *     0376) `manuell`, `einwurf`, `helfer`.
+         *     0377) `manuell`, `einwurf`, `helfer`.
          * @enum {string}
          */
         Positionsquelle: "manuell" | "einwurf" | "helfer";

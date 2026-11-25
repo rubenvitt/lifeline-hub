@@ -23,7 +23,7 @@ use utoipa::ToSchema;
 
 wire_enum! {
     /// Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration
-    /// 0376) `manuell`, `einwurf`, `helfer`.
+    /// 0377) `manuell`, `einwurf`, `helfer`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
     pub enum Positionsquelle {
         /// Von Hand auf der Lagekarte gesetzt.
