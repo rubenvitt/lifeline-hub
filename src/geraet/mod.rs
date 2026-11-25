@@ -47,6 +47,9 @@ wire_enum! {
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegung => "verpflegung",
         Einheit => "einheit",
+        /// Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`,
+        /// Migration 0377): entsteht nur über die Einladung (`POST /api/devices/helpers/redeem`).
+        Helfer => "helfer",
     }
     try_from = |s| format!("Ungültige Funktionsansicht: {s}");
 }
@@ -133,6 +136,7 @@ impl Funktionsansicht {
             Funktionsansicht::Einsatzabschnitt => "Einsatzabschnitt",
             Funktionsansicht::Verpflegung => "Verpflegung",
             Funktionsansicht::Einheit => "Einheit",
+            Funktionsansicht::Helfer => "Helfer",
         }
     }
 
@@ -147,7 +151,9 @@ impl Funktionsansicht {
             Funktionsansicht::Einsatzabschnitt => Some(Bindungsart::Einsatzabschnitt),
             Funktionsansicht::Verpflegung => Some(Bindungsart::Verpflegungsstelle),
             Funktionsansicht::Einheit => Some(Bindungsart::Einheit),
-            Funktionsansicht::Lagemonitor => None,
+            // Das Ziel des Helfers (Einheit oder Fahrzeug) ist keine Stelle: es verengt keine
+            // Lage, die Routenliste [`HELFER`] lässt keine zu.
+            Funktionsansicht::Lagemonitor | Funktionsansicht::Helfer => None,
         }
     }
 
@@ -162,9 +168,18 @@ impl Funktionsansicht {
         self.stellenart().is_some() && !self.stelle_wahlweise()
     }
 
+    /// Ob die Ansicht nur über die Helfer-Einladung entsteht, nie über die Kopplungsmaske der
+    /// Einsatzleitung (`POST /api/incidents/{id}/devices` antwortet 422). Ihre Kopplungen zeigt
+    /// die Helfer-Übersicht, nicht die Geräteliste.
+    pub fn nur_per_einladung(self) -> bool {
+        matches!(self, Funktionsansicht::Helfer)
+    }
+
     /// Ob die Einsatzleitung ein Gerät mit dieser Ansicht koppeln kann. Eine Ansicht wird erst
     /// verfügbar, wenn ihre Routenliste, Stellenfilter, Tests und Hülle stehen (LFH-1040:
-    /// Katalog und Bindung kommen vorab, jede Ansicht schaltet sich in ihrem Task frei).
+    /// Katalog und Bindung kommen vorab, jede Ansicht schaltet sich in ihrem Task frei). Der
+    /// Helfer ist verfügbar, die Maske bietet ihn trotzdem nie an: er entsteht nur über die
+    /// Einladung ([`Self::nur_per_einladung`]).
     pub fn ist_verfuegbar(self) -> bool {
         matches!(
             self,
@@ -176,6 +191,7 @@ impl Funktionsansicht {
                 | Funktionsansicht::Einsatzabschnitt
                 | Funktionsansicht::Verpflegung
                 | Funktionsansicht::Einheit
+                | Funktionsansicht::Helfer
         )
     }
 
@@ -185,7 +201,9 @@ impl Funktionsansicht {
     pub fn ohne_personenbezug(self) -> bool {
         matches!(
             self,
-            Funktionsansicht::Lagemonitor | Funktionsansicht::Verpflegung
+            Funktionsansicht::Lagemonitor
+                | Funktionsansicht::Verpflegung
+                | Funktionsansicht::Helfer
         )
     }
 
@@ -196,7 +214,8 @@ impl Funktionsansicht {
             Funktionsansicht::UhsTablet | Funktionsansicht::UhsLaptop => {
                 EinsatzRolle::Fuehrungspersonal
             }
-            Funktionsansicht::Lagemonitor => EinsatzRolle::Beobachter,
+            // Der Helfer schreibt nur über seine eigenen Routen (`/api/devices/me…`).
+            Funktionsansicht::Lagemonitor | Funktionsansicht::Helfer => EinsatzRolle::Beobachter,
             // Alle fünf schreiben an ihrer Stelle; die Routenliste verengt die Rolle.
             Funktionsansicht::Betreuungsstelle
             | Funktionsansicht::Bereitstellungsraum
@@ -245,6 +264,8 @@ impl Funktionsansicht {
             // Lagekarte: S1 hat keine Karte (Konzept LLH-1571, Abschnitt 3).
             // LLH-1580: die Kontakte der Einheit (versorgende Einheit = eigene, ohne Personalien).
             Funktionsansicht::Einheit => &["einheiten", "auftraege", "meldungen", "personen"],
+            // Keine Lage (Spec Helfer-App, „Anmelden“): der Live-Kanal trägt ihm nur das Ende.
+            Funktionsansicht::Helfer => &[],
         }
     }
 
@@ -261,9 +282,26 @@ impl Funktionsansicht {
             Funktionsansicht::Betreuungsstelle => BETREUUNGSSTELLE,
             Funktionsansicht::Verpflegung => VERPFLEGUNG,
             Funktionsansicht::Einheit => EINHEIT,
+            Funktionsansicht::Helfer => HELFER,
         }
     }
 }
+
+/// Die ganze Routenliste der Helfer-Kopplung (Spec Helfer-App, „Routenliste `helfer`“): der eigene
+/// Zustand, Ziel ändern, Abmelden, Anmeldestatus und der Live-Kanal des Einsatzes (mit leeren
+/// [`Funktionsansicht::lese_module`] nur Lebenszeichen und das Ende der Kopplung). Anders als jede
+/// andere Ansicht erbt sie weder [`ALLE_GERAETE`] noch [`ALLE_ANSICHTEN`]: kein Einsatzkopf, keine
+/// Karte, kein Branding ([`darf_route`]). Die Zielliste vor dem Einlösen ist öffentlich und steht
+/// deshalb nicht hier. `PUT /api/devices/me/position` steht auch im Zustand `unbestaetigt` hier;
+/// der Handler antwortet dort 409 ohne zu speichern.
+const HELFER: &[(&str, &str)] = &[
+    ("GET", "/api/devices/me"),
+    ("PUT", "/api/devices/me"),
+    ("PUT", "/api/devices/me/position"),
+    ("POST", "/api/auth/logout"),
+    ("GET", "/api/auth/me"),
+    ("GET", "/api/incidents/{id}/live"),
+];
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
 /// Platzverfügbarkeit, Personen der eigenen UHS mit Aufnahme, Stammdaten, Sichtung, Verbleib und
@@ -591,6 +629,9 @@ const EINHEIT: &[(&str, &str)] = &[
 /// ist die `MatchedPath` (Muster mit Platzhaltern). Ohne Treffer: verboten.
 pub fn darf_route(ansicht: Funktionsansicht, methode: &str, pfad: &str) -> bool {
     let passt = |liste: &[(&str, &str)]| liste.iter().any(|(m, p)| *m == methode && *p == pfad);
+    if ansicht == Funktionsansicht::Helfer {
+        return passt(HELFER);
+    }
     passt(ALLE_GERAETE)
         || passt(ALLE_ANSICHTEN)
         || (ansicht != Funktionsansicht::Lagemonitor && passt(SCHREIBENDE_ANSICHTEN))
@@ -680,15 +721,60 @@ mod tests {
             assert!(!darf_route(a, "GET", "/api/incidents/{id}/etb"));
             assert!(!darf_route(a, "GET", "/api/users"));
             assert!(!darf_route(a, "PATCH", "/api/incidents/{id}"));
-            assert!(darf_route(a, "GET", "/api/incidents/{id}"));
+            // Den Einsatzkopf liest jede Ansicht außer dem Helfer (eigene Liste, keine Lage).
+            assert_eq!(
+                darf_route(a, "GET", "/api/incidents/{id}"),
+                a != Funktionsansicht::Helfer,
+                "{a:?}"
+            );
             assert!(darf_route(a, "GET", "/api/auth/me"));
+        }
+    }
+
+    #[test]
+    fn helfer_erreicht_nur_den_eigenen_zustand() {
+        let h = Funktionsansicht::Helfer;
+        assert!(h.nur_per_einladung());
+        assert!(h.ist_verfuegbar(), "Server, Seite und Hülle stehen");
+        assert_eq!(h.stellenart(), None);
+        assert_eq!(h.rolle(), EinsatzRolle::Beobachter);
+        assert!(h.lese_module().is_empty());
+        for (m, p) in [
+            ("GET", "/api/devices/me"),
+            ("PUT", "/api/devices/me"),
+            ("PUT", "/api/devices/me/position"),
+            ("POST", "/api/auth/logout"),
+            ("GET", "/api/auth/me"),
+            ("GET", "/api/incidents/{id}/live"),
+        ] {
+            assert!(darf_route(h, m, p), "Helfer darf {m} {p}");
+        }
+        for (m, p) in [
+            ("GET", "/api/incidents/{id}"),
+            ("GET", "/api/incidents/{id}/module-access"),
+            ("GET", "/api/incidents/{id}/requests"),
+            ("GET", "/api/incidents/{id}/units"),
+            ("GET", "/api/organization"),
+            ("GET", "/api/map/config"),
+            ("POST", "/api/client-errors"),
+        ] {
+            assert!(!darf_route(h, m, p), "Helfer darf {m} {p} nicht");
+        }
+        for a in Funktionsansicht::ALLE {
+            assert_eq!(a.nur_per_einladung(), a == h, "{a:?}");
+            if a != h {
+                assert!(!darf_route(a, "GET", "/api/devices/me"), "{a:?}");
+            }
         }
     }
 
     #[test]
     fn antraege_liest_jede_ansicht_verwerfen_nur_eine_schreibende() {
         let verwerfen = "/api/incidents/{id}/requests/{antrag_id}";
-        for a in Funktionsansicht::ALLE {
+        for a in Funktionsansicht::ALLE
+            .into_iter()
+            .filter(|a| !a.nur_per_einladung())
+        {
             assert!(darf_route(a, "GET", "/api/incidents/{id}/requests"));
             assert_eq!(
                 darf_route(a, "DELETE", verwerfen),
@@ -1059,7 +1145,8 @@ mod tests {
     #[test]
     fn nicht_verfuegbare_ansicht_erreicht_nur_den_einsatzkopf() {
         for a in Funktionsansicht::ALLE {
-            if a.ist_verfuegbar() {
+            // Der Helfer ist für die Kopplungsmaske nie verfügbar, erreicht aber seine Liste.
+            if a.ist_verfuegbar() || a.nur_per_einladung() {
                 continue;
             }
             assert!(a.routen().is_empty(), "{a:?} hat Routen, ist aber gesperrt");

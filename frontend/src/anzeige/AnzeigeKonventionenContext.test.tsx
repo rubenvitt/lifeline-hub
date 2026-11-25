@@ -84,6 +84,8 @@ function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellun
   return {
     org_id: 1,
     aufbewahrung_kategorien: [],
+    ortung_im_einsatz: false,
+    ortung_personen: false,
     zeitzone: null,
     zeitdarstellung: null,
     einheiten: null,

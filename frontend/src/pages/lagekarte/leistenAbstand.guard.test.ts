@@ -51,6 +51,7 @@ const DATEIEN = [
   'KartenDetailCard.tsx',
   'KartenUeberlagerung.tsx',
   'SnapshotLeiste.tsx',
+  'GeortetListe.tsx',
 ] as const;
 
 /** Stil-Schlüssel, die einen Abstand tragen. `0` bleibt erlaubt: es ist kein Maß, sondern

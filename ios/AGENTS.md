@@ -2,7 +2,8 @@
 
 Gilt für `ios/`, zusätzlich zur `AGENTS.md` der Wurzel. Entscheidung: ADR-0068; Anforderungen in
 den Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`; Herleitung im `design.md` der
-Change `t39ltxxi-ios-huelle`.
+Change `t39ltxxi-ios-huelle`. Die Helfer-App liegt unter `ios/Helfer/` (Kern `ios/HelferKern`) und
+hat eigene Regeln in `ios/Helfer/AGENTS.md`.
 
 - **Keine Anwendungslogik in der Hülle:** der Webview lädt die Oberfläche des Servers. Native
   Seiten nur für Onboarding, Serverliste, Einstellungen der Hülle und Status (kein Server, nicht
@@ -39,8 +40,9 @@ Change `t39ltxxi-ios-huelle`.
   gegen `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in
   die JSON, nie nur in einen Swift-Test.
 - **Bauen nur auf macOS:** keine `.xcodeproj` und keine Versionsangabe im Repo. Ablauf:
-  `scripts/ios/version.sh` (Version aus `[workspace.package]`) → `xcodegen generate --spec
-  ios/project.yml` → Xcode. Die XcodeGen-Version steht nur in
+  `scripts/ios/version.sh` (Version aus `[workspace.package]`) und `scripts/ios/helfer-version.sh`
+  (beide xcconfig braucht XcodeGen für jedes Schema, auch für die Hülle allein) → `xcodegen
+  generate --spec ios/project.yml` → Xcode. Die XcodeGen-Version steht nur in
   `scripts/ios/xcodegen-installieren.sh`. Im Linux-Container läuft nur der Kern; App-Code,
   `ios/AppTests` und `ios/AppUITests` prüft `scripts/ios/simulator-pruefung.sh` in
   `ios-pruefung.yml`. Ohne grünen Lauf dort ist App-Code nicht fertig.

@@ -10,6 +10,12 @@
 # Group und den gemeinsamen Schlüsselbund (App/LifelineHub.entitlements); die Notification Service
 # Extension `Benachrichtigungsdienst` entschlüsselt die Nutzlast und teilt App Group und
 # Schlüsselbund. Code für beide liegt in Gemeinsam/. Signiert wird beides automatisch.
+#
+# Helfer-App (ADR-0101, Regeln: ios/Helfer/AGENTS.md): eigene native App `LifelineHelfer` mit der
+# Widget-Erweiterung `HelferAktivitaet` (Live-Aktivität) und dem Kern `HelferKern`. Ihre Version
+# schreibt scripts/ios/helfer-version.sh nach Helfer/App/Version.xcconfig (nicht versioniert).
+# XcodeGen braucht beide xcconfig für jedes Schema: vor `xcodegen generate` laufen immer
+# scripts/ios/version.sh und scripts/ios/helfer-version.sh (testflight.sh, simulator-pruefung.sh).
 name: LifelineHub
 
 options:
@@ -32,6 +38,9 @@ packages:
   # Testbare Logik ohne UIKit und WebKit, auch unter Linux geprüft (Schritt 18 von check-all.sh).
   LifelineKern:
     path: LifelineKern
+  # Kern der Helfer-App, ebenfalls unter Linux geprüft (ios/Helfer/AGENTS.md).
+  HelferKern:
+    path: HelferKern
 
 targets:
   LifelineHub:
@@ -189,6 +198,138 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios.uitests
         GENERATE_INFOPLIST_FILE: "YES"
 
+  # Helfer-App (ADR-0101): SwiftUI, eigene Bundle-ID, nur iPhone. Ortung nur „When in Use“ plus
+  # `UIBackgroundModes location`, nie die Always-Freigabe; sichtbar durch Standortanzeige und
+  # Live-Aktivität.
+  LifelineHelfer:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: Helfer/App
+        excludes:
+          - "Info.plist"
+          - "LifelineHelfer.entitlements"
+          - "PrivacyInfo.xcprivacy"
+          - "Version.xcconfig"
+      # Live-Aktivität (Attribute, Pausieren) und Thema, gemeinsam mit der Erweiterung.
+      - path: Helfer/Gemeinsam
+      - path: Helfer/App/PrivacyInfo.xcprivacy
+        buildPhase: resources
+      # App-Symbol und Startfarbe aus der Bildmarke (Spec `app-marke`), dieselben wie die Hülle.
+      - path: App/Assets.xcassets
+    dependencies:
+      - package: HelferKern
+      - target: HelferAktivitaet
+    configFiles:
+      Debug: Helfer/App/Version.xcconfig
+      Release: Helfer/App/Version.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.helfer
+        PRODUCT_NAME: LifelineHelfer
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: Helfer/App/LifelineHelfer.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+    info:
+      path: Helfer/App/Info.plist
+      properties:
+        CFBundleDisplayName: Lifeline Helfer
+        # Aus Helfer/App/Version.xcconfig (scripts/ios/helfer-version.sh).
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        LSRequiresIPhoneOS: true
+        NSCameraUsageDescription: Zum Scannen des QR-Codes der Einsatzleitung.
+        NSLocalNetworkUsageDescription: Lifeline Helfer verbindet sich mit dem Einsatzserver im lokalen Netz, etwa mit elw.local.
+        NSLocationWhenInUseUsageDescription: Lifeline Helfer sendet deine Position an die Einsatzleitung, solange du am Einsatz angemeldet bist.
+        # Ortung im Hintergrund nur für eine bestehende Helfer-Kopplung (ADR-0101).
+        UIBackgroundModes:
+          - location
+        NSSupportsLiveActivities: true
+        CFBundleURLTypes:
+          - CFBundleURLName: dev.rubeen.lifeline.helfer
+            CFBundleURLSchemes:
+              - lifeline-helfer
+        UILaunchScreen:
+          UIColorName: Kopfschwarz
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+
+  # Widget-Erweiterung der Helfer-App: nur die Live-Aktivität auf Sperrbildschirm und Dynamic
+  # Island, mit „Pausieren“ (LiveActivityIntent, ausgeführt im Prozess der App).
+  HelferAktivitaet:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: Helfer/Aktivitaet
+        excludes:
+          - "Info.plist"
+          - "HelferAktivitaet.entitlements"
+          - "PrivacyInfo.xcprivacy"
+      - path: Helfer/Gemeinsam
+      - path: Helfer/Aktivitaet/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: HelferKern
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    # Dieselbe Version wie die App; App Store Connect lehnt eine abweichende ab.
+    configFiles:
+      Debug: Helfer/App/Version.xcconfig
+      Release: Helfer/App/Version.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.helfer.aktivitaet
+        PRODUCT_NAME: HelferAktivitaet
+        GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: Helfer/Aktivitaet/HelferAktivitaet.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+    info:
+      path: Helfer/Aktivitaet/Info.plist
+      properties:
+        CFBundleDisplayName: Lifeline Helfer
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  # Unit-Tests der Helfer-App im Simulator (Modell im Testzustand, ohne Netz).
+  LifelineHelferTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: HelferTests
+    dependencies:
+      - target: LifelineHelfer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.helfer.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "1"
+
+  # UI-Tests der Helfer-App: Smoke-Test und Bildschirmbilder der Seiten (Startargument
+  # `-HelferTestzustand <seite>`).
+  LifelineHelferUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: HelferUITests
+    dependencies:
+      - target: LifelineHelfer
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.helfer.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TARGETED_DEVICE_FAMILY: "1"
+
 schemes:
   LifelineHub:
     build:
@@ -201,3 +342,13 @@ schemes:
         - LifelineHubUITests
         # Der Swift-Kern läuft hier zusätzlich auf iOS (Foundation weicht von Linux ab).
         - package: LifelineKern/LifelineKernTests
+  LifelineHelfer:
+    build:
+      targets:
+        LifelineHelfer: all
+    test:
+      config: Debug
+      targets:
+        - LifelineHelferTests
+        - LifelineHelferUITests
+        - package: HelferKern/HelferKernTests

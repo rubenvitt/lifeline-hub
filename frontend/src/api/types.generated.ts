@@ -2582,6 +2582,12 @@ export interface components {
             nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
             /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
+            /**
              * @description Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;
              *     `None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M.
              */
@@ -2995,6 +3001,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             opta?: string | null;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             soll_besatzung?: components["schemas"]["Staerke"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
@@ -4363,6 +4375,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             name: string;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
@@ -4435,7 +4453,7 @@ export interface components {
          *     `migrations/0286_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit" | "helfer";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
@@ -4603,6 +4621,130 @@ export interface components {
              */
             nummer: number;
             personen: components["schemas"]["RegistriertePerson"][];
+        };
+        /** @description Eine Helfer-Kopplung, wie die Leitung sie sieht. */
+        HelferAnzeige: {
+            created_at: string;
+            /** @description Name, den die Kraft beim Anmelden eingegeben hat. */
+            display_name: string;
+            expires_at: string;
+            /**
+             * Format: int64
+             * @description Kennung der Kopplung (`geraet_kopplung.id`).
+             */
+            id: number;
+            /** @description Das Gerät schreibt die Position seines Ziels („Ortungsgerät“). */
+            is_tracker: boolean;
+            /** @description Zeitpunkt der letzten Position, die dieses Gerät geschrieben hat (Quelle `helfer`). */
+            last_position_at?: string | null;
+            /** @description Die Kraft hat die Ortung pausiert. */
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            /** @description Die Kraft hat „Mich als Person orten“ gewählt. */
+            person_requested: boolean;
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
+        };
+        /** @description Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal. */
+        HelferEinladungAnzeige: {
+            /** @description Der Code (8 Zeichen); fehlt außer in der Antwort auf das Anlegen. */
+            code?: string | null;
+            expires_at: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description `https://<server>/helfer#<CODE>`, wenn der Server seine öffentliche Adresse kennt; sonst
+             *     baut der Client die Adresse aus seinem Origin (`helferAdresse`).
+             */
+            url?: string | null;
+        };
+        /** @description Der Einsatz einer Helfer-Kopplung, nur Kennung und Bezeichnung. */
+        HelferEinsatz: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Warum eine Helfer-Kopplung endet. Jedes Ende ist für das Gerät 401, auch die Ablehnung:
+         *     sie löscht die Sitzungen (`routes::helfer::ablehnen`). Die App nennt den Grund aus der
+         *     letzten bekannten Antwort selbst; `rejected` liefert `GET /api/devices/me` nur für eine
+         *     abgelehnte Kopplung, die noch eine Sitzung hätte.
+         * @enum {string}
+         */
+        HelferEndeGrund: "incident_closed" | "revoked" | "expired" | "rejected" | "signed_out";
+        /** @description Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung. */
+        HelferPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in
+         *     `geraet_kopplung.helfer_zustand` (CHECK in Migration 0377); `beendet` leitet der Server
+         *     ab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.
+         * @enum {string}
+         */
+        HelferStatus: "unbestaetigt" | "aktiv" | "abgelehnt" | "beendet";
+        /** @description Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen. */
+        HelferUebersicht: {
+            helpers: components["schemas"]["HelferAnzeige"][];
+            invitation?: components["schemas"]["HelferEinladungAnzeige"] | null;
+            /** @description „Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu. */
+            person_tracking_allowed: boolean;
+            /** @description „Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich. */
+            tracking_enabled: boolean;
+        };
+        /** @description Ziel einer Helfer-Kopplung. */
+        HelferZiel: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+        };
+        /**
+         * @description Art des Ziels einer Helfer-Kopplung.
+         * @enum {string}
+         */
+        HelferZielArt: "unit" | "vehicle";
+        /** @description Ein wählbares Ziel vor dem Einlösen. */
+        HelferZielOption: {
+            /** @description Eigener Funkrufname der Einheit; fehlt beim Fahrzeug (der Name ist sein Rufname). */
+            call_sign?: string | null;
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+            /** @description Taktisches Zeichen: Fachaufgabe (`tz_fachaufgabe`). */
+            sign_function?: string | null;
+            /** @description Taktisches Zeichen: Organisation (`tz_organisation`). */
+            sign_organization?: string | null;
+        };
+        /**
+         * @description Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
+         *     Personen.
+         */
+        HelferZielliste: {
+            /** @description Ob die Organisation „Auch Personen orten“ erlaubt; sonst blendet die App das Häkchen aus. */
+            person_tracking_allowed: boolean;
+            targets: components["schemas"]["HelferZielOption"][];
+        };
+        /** @description Der eigene Zustand einer Helfer-Kopplung (`GET /api/devices/me`, Antwort auf das Einlösen). */
+        HelferZustand: {
+            /** @description Ablauf der Kopplung (UTC, `%Y-%m-%d %H:%M:%S`). */
+            expires_at: string;
+            incident: components["schemas"]["HelferEinsatz"];
+            /** @description Das Gerät schreibt die Position seines Ziels. */
+            is_tracker: boolean;
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            reason?: components["schemas"]["HelferEndeGrund"] | null;
+            /** @description Uhrzeit des Servers in derselben Form, für Restzeiten auf dem Gerät. */
+            server_time: string;
+            /** @description `beendet` kommt hier nicht vor: nach dem Ende ist die Sitzung ungültig (401). */
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
         };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
@@ -5985,7 +6127,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -6774,6 +6916,12 @@ export interface components {
             nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
+            /** @description Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde. */
+            ortung_bestaetigt_at?: string | null;
+            /** @description „Ortung im Einsatz“ (Helfer-App); Vorgabe aus. */
+            ortung_im_einsatz: boolean;
+            /** @description „Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist. */
+            ortung_personen: boolean;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
             /**
@@ -7766,6 +7914,22 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /** @description Antwort von `PUT /api/devices/me/position`. */
+        PositionAntwort: {
+            /** @description Uhrzeit des Servers (UTC, `%Y-%m-%d %H:%M:%S`). */
+            server_time: string;
+            /**
+             * @description Mindestens ein Ziel hat die Position übernommen; `false` bei einer älteren als der
+             *     gespeicherten, während einer Pause und beim Pausieren selbst.
+             */
+            stored: boolean;
+        };
+        /**
+         * @description Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration
+         *     0377) `manuell`, `einwurf`, `helfer`.
+         * @enum {string}
+         */
+        Positionsquelle: "manuell" | "einwurf" | "helfer";
         /**
          * @description Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.
          * @enum {string}

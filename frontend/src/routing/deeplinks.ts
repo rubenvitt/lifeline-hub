@@ -1672,6 +1672,33 @@ export function koppelnAdresse(origin: string, code: string): string {
   return `${origin}${KOPPELN_PFAD}#${encodeURIComponent(code)}`;
 }
 
+/** Weiche der Helfer-App im Browser (Helfer-App): ohne Sitzung, der Code steht im Fragment. */
+export const HELFER_PFAD = '/helfer';
+
+/**
+ * Adresse im QR-Code einer Helfer-Einladung: `https://<server>/helfer#<CODE>`. Der Code steht im
+ * Fragment, das der Browser nie an den Server schickt (wie {@link koppelnAdresse}); die Kamera
+ * öffnet damit die Weiche, die App liest dieselbe Adresse direkt.
+ */
+export function helferAdresse(origin: string, code: string): string {
+  return `${origin}${HELFER_PFAD}#${encodeURIComponent(code)}`;
+}
+
+/**
+ * Deeplink in die App „Lifeline Helfer“: `lifeline-helfer://anmelden?server=<origin>#<CODE>`. Der
+ * Server steht als Abfrage, der Code wieder nur im Fragment. Ein Origin trägt weder `?` noch `#`
+ * noch `&`, `:` und `/` sind in der Abfrage erlaubt (RFC 3986): er steht unkodiert, so wie die
+ * App ihn als Serveradresse prüft.
+ */
+export function helferAppLink(origin: string, code: string): string {
+  return `lifeline-helfer://anmelden?server=${origin}#${encodeURIComponent(code)}`;
+}
+
+/** Bereich „Helfer“ der Geräte-Sektion (Ziel des Hinweises im Einsatzkopf). */
+export function einsatzHelferPfad(einsatzId: number): string {
+  return `${einsatzEinstellungenPfad(einsatzId, 'geraete')}#helfer`;
+}
+
 /** Seite des Lagebilds für Externe (LLH-1496), ohne Sitzung. */
 export const EXTERN_PFAD = '/extern';
 

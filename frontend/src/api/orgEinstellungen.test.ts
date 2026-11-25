@@ -24,6 +24,8 @@ const beispielAnzeige: OrgEinstellungen = {
   auftrag_quittierung_frist_min: 15,
   auto_etb_eintraege: 1,
   geocoder_url: null,
+  ortung_im_einsatz: false,
+  ortung_personen: false,
   geaendert_at: '2026-06-19 12:00:00',
   geaendert_von: 1,
 };
@@ -53,6 +55,8 @@ describe('ladeOrgEinstellungen', () => {
       auftrag_quittierung_frist_min: null,
       auto_etb_eintraege: null,
       geocoder_url: null,
+      ortung_im_einsatz: false,
+      ortung_personen: false,
       geaendert_at: null,
       geaendert_von: null,
     };

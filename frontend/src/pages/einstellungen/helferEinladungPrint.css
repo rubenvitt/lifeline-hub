@@ -1,0 +1,8 @@
+/* Eigenheiten des Blatts „Helfer anmelden“ (Helfer-App). Die Mechanik liegt in `druck/druck.css`;
+   `.helfer-einladung-print-root` trägt `data-lfh="druckwurzel"` und steht nur im Dialog der neuen
+   Einladung, solange ihr Code bekannt ist. Der Kopierknopf hat auf Papier nichts zu tun. */
+@media print {
+  .helfer-einladung-print-root button {
+    display: none !important;
+  }
+}

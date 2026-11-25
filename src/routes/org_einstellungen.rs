@@ -65,6 +65,13 @@ pub struct OrgEinstellungenUpdate {
     pub auto_etb_eintraege: Option<bool>,
     /// Geocoder-Basis-URL (nur http/https) für die Ort-Vorschau.
     pub geocoder_url: Option<String>,
+    /// „Ortung im Einsatz“ (Helfer-App). Fehlt das Feld, bleibt der Schalter, wie er ist: ein
+    /// älterer Client schaltet die Ortung nicht still ab. Der Wechsel von aus auf an gilt als
+    /// Bestätigung von Einwilligung bzw. Betriebsvereinbarung (der Dialog im Client).
+    pub ortung_im_einsatz: Option<bool>,
+    /// „Auch Personen orten“; nur zusammen mit `ortung_im_einsatz` (sonst 422). Fehlt das Feld,
+    /// bleibt der Wert, außer die Ortung geht aus: dann geht er mit aus.
+    pub ortung_personen: Option<bool>,
 }
 
 /// GET /api/org-settings — Org-weite Einstellungen lesen.
@@ -207,6 +214,26 @@ pub async fn setzen(
         }
     }
 
+    // Ortung (Helfer-App): „Personen orten“ ohne „Ortung im Einsatz“ ist ein Zusammenhang,
+    // kein kaputtes Feld (422, `src/AGENTS.md`, Statuscode-Konvention).
+    let (ortung_im_einsatz, ortung_personen) =
+        if req.ortung_im_einsatz.is_some() || req.ortung_personen.is_some() {
+            let alt = einstellungen::ortung_der_org(&state.pool, benutzer.org_id).await?;
+            let im = req.ortung_im_einsatz.unwrap_or(alt.im_einsatz);
+            let personen = match req.ortung_personen {
+                Some(true) if !im => {
+                    return Err(AppError::UnprocessableEntity(
+                        "„Auch Personen orten“ geht nur mit „Ortung im Einsatz“".into(),
+                    ));
+                }
+                Some(p) => p,
+                None => im && alt.personen,
+            };
+            (Some(im), Some(personen))
+        } else {
+            (None, None)
+        };
+
     let gespeichert = einstellungen::speichern(
         &state.pool,
         benutzer.org_id,
@@ -229,12 +256,21 @@ pub async fn setzen(
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
+            ortung_im_einsatz,
+            ortung_personen,
             aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
+    for (einsatz_id, person_id) in gespeichert.personen_geloescht {
+        crate::ortung::publiziere(
+            &state,
+            einsatz_id,
+            crate::ortung::Ortungsziel::Person(person_id),
+        );
+    }
     let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
-    Ok(Json(gespeichert.anzeige(kategorien)))
+    Ok(Json(gespeichert.einstellungen.anzeige(kategorien)))
 }
 
 /// Trimmt und filtert leere Strings (None bei leerem Wert).
