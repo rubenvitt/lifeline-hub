@@ -2784,6 +2784,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
             get(routes::karte::proxy_glyphs),
         )
+        .route(
+            "/api/map/proxy/{id}/asset/{slot}",
+            get(routes::karte::proxy_asset_slot),
+        )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
             "/api/map/online-sources",
