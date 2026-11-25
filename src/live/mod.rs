@@ -42,6 +42,8 @@ wire_enum! {
         KarteFremdebene => "karte_fremdebene",
         Etb => "etb",
         Befehl => "befehl",
+        /// Versandliste des Ausgangskorbs an Lagebericht, Befehl und Nachforderung (LLH-2093).
+        Ausgang => "ausgang",
         /// Termin, Abschluss und Verlauf der Lagebesprechung (LLH-1111).
         Lagebesprechung => "lagebesprechung",
         /// Kommunikationsplan und Fernmeldeskizze des Moduls Fernmeldewesen (LLH-1180).
@@ -147,6 +149,10 @@ impl LiveEvent {
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
+            // Ein Versand gehört zu seiner Quelle: Lagebericht, Befehl (Modul `auftraege`) oder
+            // Nachforderung; die Versandliste liegt hinter dem Lesen des jeweiligen Moduls
+            // (LLH-2093, Spec Abschnitt 5). Das Ereignis trägt nur die Einsatz-Kennung.
+            LiveEvent::Ausgang => &["lageberichte", "auftraege", "nachforderungen"],
             // Nur `fernmeldewesen`: Kommunikationsplan und Skizze sind Datenobjekte dieses Moduls,
             // auch wenn ihre Pfade unter `…/staff` liegen (LLH-1180, design.md D3).
             LiveEvent::Fernmeldewesen => &["fernmeldewesen"],
@@ -1280,6 +1286,11 @@ mod tests {
             (LiveEvent::KarteFremdebene, &["lagekarte"]),
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
+            // Versandliste je Quelle (LLH-2093, Begründung an der Variante).
+            (
+                LiveEvent::Ausgang,
+                &["lageberichte", "auftraege", "nachforderungen"],
+            ),
             (LiveEvent::Lagebesprechung, &["lagebesprechung"]),
             (LiveEvent::Fernmeldewesen, &["fernmeldewesen"]),
             (LiveEvent::Dokument, &["dokumente"]),

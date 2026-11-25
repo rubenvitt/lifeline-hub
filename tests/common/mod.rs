@@ -21,7 +21,7 @@ thread_local! {
     static TEST_POOL: RefCell<Option<sqlx::SqlitePool>> = const { RefCell::new(None) };
 }
 
-fn pool_merken(pool: &sqlx::SqlitePool) {
+pub fn pool_merken(pool: &sqlx::SqlitePool) {
     TEST_POOL.with(|p| *p.borrow_mut() = Some(pool.clone()));
 }
 
@@ -161,6 +161,7 @@ pub fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
         backup_empfaenger: Default::default(),
         datentraeger: Default::default(),
         adapter: Default::default(),
+        ausgang_wecker: Default::default(),
         fremdebene_abrufer: Default::default(),
         drohne: Default::default(),
     }

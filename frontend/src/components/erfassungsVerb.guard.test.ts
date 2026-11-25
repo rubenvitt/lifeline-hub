@@ -68,6 +68,9 @@ const ERLAUBT: readonly string[] = [
   'Weiter',
   // Baustein einsetzen (LLH-2010): füllt den ETB-Text, speichert noch nichts.
   'Einsetzen',
+  // Mail an gewählte Stellen (LLH-2093): der Knopf nennt die Handlung, nicht „Erfassen“; er
+  // erfasst keinen Datensatz, sondern legt Versände im Ausgangskorb an.
+  'Senden',
   // Aktionen an bestehenden Datensätzen, keine Erfassungen.
   'Abschließen',
   'Abziehen',
