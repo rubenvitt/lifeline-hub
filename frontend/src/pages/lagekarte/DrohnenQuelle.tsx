@@ -189,7 +189,6 @@ function LagemonitorSchalter({
         }}
       >
         <Switch
-          size="small"
           checked={quelle.lagemonitor}
           loading={laeuft}
           aria-describedby={hinweisId}
