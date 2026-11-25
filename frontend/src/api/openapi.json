@@ -2686,6 +2686,51 @@
           }
         }
       },
+      "ArtZaehlung": {
+        "type": "object",
+        "description": "Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen).",
+        "required": [
+          "neu",
+          "ergaenzt",
+          "geaendert",
+          "unveraendert",
+          "ausgelassen",
+          "fehler",
+          "offen"
+        ],
+        "properties": {
+          "ausgelassen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ergaenzt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gefunden; die Datei füllt Lücken, fügt Qualifikationen hinzu oder merkt die Kennung."
+          },
+          "fehler": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gefunden; abweichende Werte werden übernommen."
+          },
+          "neu": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unveraendert": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AufbewahrungEintragAnzeige": {
         "type": "object",
         "description": "Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine\npersonenbezogene Spalte: Einsatzort, Sachverhalt und meldende Stelle fehlen. Eine Zeile im\nZustand `endgueltig_geloescht` stammt aus dem Löschprotokoll (LFH-750) und trägt keine\nBezeichnung.",
@@ -5716,6 +5761,40 @@
           "ungelesen": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "DateiMeldung": {
+        "type": "object",
+        "description": "Fehler oder Hinweis beim Lesen; `art` und `zeile` nur, wenn es sie gibt.",
+        "required": [
+          "stufe",
+          "text"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenDateiArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/MeldungStufe"
+          },
+          "text": {
+            "type": "string"
+          },
+          "zeile": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -8982,6 +9061,25 @@
           }
         }
       },
+      "Entscheidungen": {
+        "type": "object",
+        "description": "Die Wahl in der Vorschau. Je Zeile (Art + Zeilennummer) bzw. je Qualifikationstext; fehlt\nein Eintrag, gilt der Vorschlag. Doppelte Einträge: der letzte gilt.",
+        "properties": {
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualiEntscheidung"
+            }
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeilenEntscheidung"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
       "Ereignis": {
         "type": "string",
         "description": "Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in\n`migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und\n`0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test\n`jede_variante_passiert_den_db_check`). Zugleich Schema-Anker der Union in\n[`AnmeldeEintragAnzeige`] (LFH-120).",
@@ -10116,6 +10214,50 @@
           },
           "typ": {
             "$ref": "#/components/schemas/FeldTyp"
+          }
+        }
+      },
+      "FeldAenderungArt": {
+        "type": "string",
+        "description": "Art einer Feldänderung. Wire == `as_str()`.",
+        "enum": [
+          "fuellt",
+          "weicht_ab"
+        ]
+      },
+      "FeldAenderungDto": {
+        "type": "object",
+        "description": "Eine Feldänderung. `feld` ist die Spalte des Vertrags (`funkrufname`, `issi`, `typ`, …,\n`qualifikationen` für eine hinzukommende Qualifikation); Werte nur aus Spalten des Vertrags.",
+        "required": [
+          "feld",
+          "neu",
+          "art",
+          "erkennungsfeld",
+          "uebernommen"
+        ],
+        "properties": {
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "art": {
+            "$ref": "#/components/schemas/FeldAenderungArt"
+          },
+          "erkennungsfeld": {
+            "type": "boolean",
+            "description": "Ein Erkennungsmerkmal; eine Abweichung wird nur bei Treffer über die Kennung übernommen."
+          },
+          "feld": {
+            "type": "string"
+          },
+          "neu": {
+            "type": "string"
+          },
+          "uebernommen": {
+            "type": "boolean",
+            "description": "Ob das Übernehmen mit der aktuellen Wahl dieses Feld schreibt."
           }
         }
       },
@@ -12252,6 +12394,23 @@
           "baut",
           "aktuell"
         ]
+      },
+      "Kandidat": {
+        "type": "object",
+        "description": "Ein Kandidat einer Zeile: ein Datensatz der eigenen Org.",
+        "required": [
+          "id",
+          "anzeige"
+        ],
+        "properties": {
+          "anzeige": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "KarteAktualisierung": {
         "type": "object",
@@ -19181,6 +19340,23 @@
           }
         }
       },
+      "QualiEntscheidung": {
+        "type": "object",
+        "required": [
+          "text",
+          "wahl"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Der Text der Qualifikation, wie die Vorschau ihn zeigt (`qualifikationen[].text`)."
+          },
+          "wahl": {
+            "$ref": "#/components/schemas/QualiWahl"
+          }
+        },
+        "additionalProperties": false
+      },
       "QualiSollEintrag": {
         "type": "object",
         "description": "Ein Eintrag in der Antwort, mit dem Label der Qualifikation.",
@@ -19200,6 +19376,119 @@
           "qualifikation_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "QualiWahl": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "neu"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Zu einer Qualifikation der eigenen Org; wird gemerkt und gilt in späteren Läufen.",
+            "required": [
+              "qualifikation_id",
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "zuordnen"
+                ]
+              },
+              "qualifikation_id": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "auslassen"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Was mit einer Qualifikation der Datei geschehen soll. Fehlt die Wahl, wird eine unbekannte\nneu angelegt und eine gefundene verknüpft."
+      },
+      "QualiZeile": {
+        "type": "object",
+        "description": "Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des\nPersonals, je Herkunft und normalisiertem Text einmal.",
+        "required": [
+          "text",
+          "zeilen",
+          "ergebnis",
+          "kandidaten",
+          "hinweise"
+        ],
+        "properties": {
+          "ergebnis": {
+            "$ref": "#/components/schemas/ZeilenErgebnis"
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenTrefferGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Kandidat"
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "wahl": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualiWahl"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "Zeilen im Blatt „Qualifikationen“ (leer, wenn sie nur das Personal nennt)."
           }
         }
       },
@@ -20963,6 +21252,26 @@
           "unterkunft_richtwert"
         ]
       },
+      "StammdatenDateiArt": {
+        "type": "string",
+        "description": "Art eines Stammdatensatzes. Wire == `as_str()`.",
+        "enum": [
+          "fahrzeug",
+          "personal",
+          "qualifikation"
+        ]
+      },
+      "StammdatenErgebnis": {
+        "type": "object",
+        "required": [
+          "zaehlung"
+        ],
+        "properties": {
+          "zaehlung": {
+            "$ref": "#/components/schemas/Zaehlung"
+          }
+        }
+      },
       "StammdatenHerkunftAnzeige": {
         "type": "object",
         "description": "Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9).",
@@ -20998,6 +21307,146 @@
             "propertyNames": {
               "type": "string"
             }
+          }
+        }
+      },
+      "StammdatenTrefferGrund": {
+        "type": "string",
+        "description": "Über welche Stufe eine Zeile einen Datensatz getroffen hat.",
+        "enum": [
+          "kennung",
+          "opta",
+          "issi",
+          "funkrufname",
+          "personalnummer",
+          "name",
+          "bezeichnung"
+        ]
+      },
+      "StammdatenVorschau": {
+        "type": "object",
+        "required": [
+          "zaehlung",
+          "zeilen",
+          "qualifikationen",
+          "meldungen",
+          "nicht_uebernommen",
+          "herkunft_noetig",
+          "uebernehmbar"
+        ],
+        "properties": {
+          "herkunft_noetig": {
+            "type": "boolean",
+            "description": "Eine Zeile hat eine Kennung, aber weder Zeile noch Hochladen nennen eine Herkunft."
+          },
+          "herkunft_vorschlag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die zuletzt in der Org gemerkte Herkunft (normalisiert)."
+          },
+          "meldungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DateiMeldung"
+            }
+          },
+          "nicht_uebernommen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Spaltenköpfe, die der Vertrag nicht kennt (nie ihre Werte)."
+          },
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualiZeile"
+            }
+          },
+          "uebernehmbar": {
+            "type": "boolean",
+            "description": "Keine Fehler, nichts offen, Herkunft da: das Übernehmen schreibt."
+          },
+          "zaehlung": {
+            "$ref": "#/components/schemas/Zaehlung"
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StammdatenZeile"
+            }
+          }
+        }
+      },
+      "StammdatenZeile": {
+        "type": "object",
+        "description": "Eine Fahrzeug- oder Personalzeile der Datei in der Vorschau.",
+        "required": [
+          "art",
+          "zeile",
+          "anzeige",
+          "ergebnis",
+          "kandidaten",
+          "aenderungen",
+          "hinweise"
+        ],
+        "properties": {
+          "aenderungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeldAenderungDto"
+            }
+          },
+          "anzeige": {
+            "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/StammdatenDateiArt"
+          },
+          "ergebnis": {
+            "$ref": "#/components/schemas/ZeilenErgebnis"
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenTrefferGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hinweise; bei `fehler` steht der Grund zuerst."
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Kandidat"
+            },
+            "description": "Getroffene Datensätze: einer bei `gefunden`/`ausser_dienst`, mehrere bei `mehrdeutig`."
+          },
+          "wahl": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZeilenWahl",
+                "description": "Die wirksame Wahl: die gesendete, sonst `neu` bei einer neuen Zeile; fehlt bei einer\ngefundenen Zeile ohne Wahl (Vorschlag) und bei einer offenen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeile": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -25140,6 +25589,25 @@
           }
         }
       },
+      "Zaehlung": {
+        "type": "object",
+        "required": [
+          "fahrzeuge",
+          "personal",
+          "qualifikationen"
+        ],
+        "properties": {
+          "fahrzeuge": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          },
+          "personal": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          },
+          "qualifikationen": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          }
+        }
+      },
       "ZeilenArt": {
         "type": "string",
         "description": "Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können\nkollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im\nEinsatz die der Disposition (LLH-1073). Wire == `as_str()`.",
@@ -25149,6 +25617,40 @@
           "material",
           "planschicht",
           "dateizeile"
+        ]
+      },
+      "ZeilenEntscheidung": {
+        "type": "object",
+        "required": [
+          "art",
+          "zeile",
+          "wahl"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/StammdatenDateiArt"
+          },
+          "wahl": {
+            "$ref": "#/components/schemas/ZeilenWahl"
+          },
+          "zeile": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZeilenErgebnis": {
+        "type": "string",
+        "description": "Ergebnis des Abgleichs einer Zeile. Wire == `as_str()`.",
+        "enum": [
+          "neu",
+          "gefunden",
+          "mehrdeutig",
+          "ausser_dienst",
+          "fehler",
+          "unveraendert"
         ]
       },
       "ZeilenFehler": {
@@ -25192,6 +25694,76 @@
             "description": "Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition)."
           }
         }
+      },
+      "ZeilenWahl": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Die Zeile wird nicht übernommen.",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "auslassen"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Ein neuer Datensatz wird angelegt.",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "neu"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Einer der Kandidaten der Zeile (`kandidaten[].id`).",
+            "required": [
+              "id",
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "kandidat"
+                ]
+              },
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Abweichende Werte der Datei übernehmen (Erkennungsfelder nur bei Treffer über die\nKennung).",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "datei_uebernehmen"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Was mit einer Zeile geschehen soll. Fehlt die Wahl, gilt der Vorschlag: `neu` legt an,\n`gefunden` füllt nur Lücken und behält abweichende Werte; `mehrdeutig` bleibt offen."
       },
       "ZeitachseAnzeige": {
         "type": "object",

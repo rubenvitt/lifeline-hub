@@ -59,6 +59,7 @@ pub struct Bestand {
 wire_enum! {
     /// Über welche Stufe eine Zeile einen Datensatz getroffen hat.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    #[schema(as = StammdatenTrefferGrund)]
     pub enum TrefferGrund {
         Kennung => "kennung",
         Opta => "opta",

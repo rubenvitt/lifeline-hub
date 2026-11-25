@@ -716,3 +716,194 @@ async fn vorschau_schreibt_nichts() {
     }
     assert_eq!(anzahl(&pool, "qualifikation").await, katalog);
 }
+
+// ---------------------------------------------------------------------------------------------
+// HTTP (LLH-1633, Task 6): Routen unter /api/master-data/import
+// ---------------------------------------------------------------------------------------------
+
+mod http {
+    use super::{anzahl, FZ};
+    use axum::http::StatusCode;
+    use serde_json::{json, Value};
+
+    use crate::common::{benutzer_anlegen, login_cookie, multipart_post, setup_mit_pool};
+
+    const VORSCHAU: &str = "/api/master-data/import/preview";
+    const IMPORT: &str = "/api/master-data/import";
+
+    async fn start() -> (axum::Router, sqlx::SqlitePool, String) {
+        let (app, pool) = setup_mit_pool().await;
+        let admin = login_cookie(&app, "admin", "startpw12").await;
+        (app, pool, admin)
+    }
+
+    async fn hochladen(
+        app: &axum::Router,
+        pfad: &str,
+        cookie: &str,
+        csv: &str,
+        felder: &[(&str, &str)],
+    ) -> (StatusCode, Value) {
+        multipart_post(
+            app,
+            pfad,
+            cookie,
+            Some(("stamm.csv", csv.as_bytes())),
+            felder,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn preview_200_und_schreibt_nichts() {
+        let (app, pool, admin) = start().await;
+        let (s, v) = hochladen(
+            &app,
+            VORSCHAU,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 2);
+        assert_eq!(v["uebernehmbar"], true);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+        assert_eq!(anzahl(&pool, "stammdaten_kennung").await, 0);
+    }
+
+    #[tokio::test]
+    async fn import_200_zaehlung() {
+        let (app, pool, admin) = start().await;
+        let (s, v) = hochladen(
+            &app,
+            IMPORT,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 2);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 2);
+        // Zweiter Lauf: nichts mehr neu.
+        let (s, v) = hochladen(
+            &app,
+            IMPORT,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 0);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 2);
+    }
+
+    #[tokio::test]
+    async fn ohne_admin_403() {
+        let (app, pool, admin) = start().await;
+        benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+        let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &frieda, FZ, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
+        }
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn org_am_hub_409() {
+        let (app, pool, admin) = start().await;
+        let org: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let kopplung: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand, art) VALUES ('hub-a', 'X', \
+             'Hub Kreis', 'meldet_sich', 'https://hub.example', 'aktiv', 'standard') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (?, ?, 'hub-a/1', 'Kreis')",
+        )
+        .bind(kopplung)
+        .bind(org)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &admin, FZ, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::CONFLICT, "{pfad}");
+        }
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn unbekanntes_feld_400() {
+        let (app, _pool, admin) = start().await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &admin, FZ, &[("irgendwas", "x")]).await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{pfad}");
+        }
+        let (s, _) = hochladen(&app, VORSCHAU, &admin, FZ, &[("entscheidungen", "{kaputt")]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        let lang = "x".repeat(101);
+        let (s, _) = hochladen(&app, VORSCHAU, &admin, FZ, &[("herkunft", &lang)]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        let (s, _) = multipart_post(&app, VORSCHAU, &admin, None, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn unlesbar_400() {
+        let (app, _pool, admin) = start().await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = multipart_post(
+                &app,
+                pfad,
+                &admin,
+                Some(("x.xlsx", &[0u8, 1, 2, 3][..])),
+                &[("herkunft", "FV")],
+            )
+            .await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{pfad}");
+        }
+        // Keine Herkunft nötig, aber keine genannt: Übernehmen ist 400, die Vorschau 200.
+        let (s, v) = hochladen(&app, VORSCHAU, &admin, FZ, &[]).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["herkunft_noetig"], true);
+        let (s, _) = hochladen(&app, IMPORT, &admin, FZ, &[]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn nicht_uebernehmbar_422() {
+        let (app, pool, admin) = start().await;
+        // Zweimal derselbe Funkrufname in der Datei: Zeilenfehler.
+        let csv = "Kennung;Funkrufname\nfz-1;Florian 1\nfz-2;Florian 1\n";
+        let (s, v) = hochladen(&app, IMPORT, &admin, csv, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+        assert!(v["zeilen"].as_array().is_some_and(|z| !z.is_empty()), "{v}");
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn iban_wert_nicht_in_antwort() {
+        let (app, _pool, admin) = start().await;
+        let csv = "Name;IBAN\nMuster, Max;DE89370400440532013000\n";
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, v) = hochladen(&app, pfad, &admin, csv, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::OK, "{pfad} {v}");
+            let text = v.to_string();
+            assert!(!text.contains("DE89370400440532013000"), "{text}");
+            if pfad == VORSCHAU {
+                assert_eq!(v["nicht_uebernommen"], json!(["IBAN"]));
+            }
+        }
+    }
+}
