@@ -1,6 +1,6 @@
 # Ausgang per E-Mail — Umsetzungsplan (LLH-2093)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Lagebericht, Befehl und Nachforderung per E-Mail an Externe Stellen senden, über einen
 Ausgangskorb am Server, mit Versandliste, Wiederholung und ETB-Eintrag.
@@ -77,19 +77,19 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
     `struct KanalMitStelle { channel: ExterneStelleKanal, agency_id: i64, agency_name: String }`
     (nur aktive Stellen; für den Senden-Dialog in Task 10). Route vor `/{id}` registrieren.
 
-- [ ] **Step 1: Migration schreiben** — Tabelle wie Spec Abschnitt 1, `CHECK (kanal IN ('email','fax','matrix','threema'))`, `UNIQUE(externe_stelle_id, kanal, adresse)`, Index auf `(org_id, externe_stelle_id)`. Hat `org_externe_stelle` Änderungs-Trigger aus 0312, bekommt die Kanaltabelle dieselben; den Hub-Schreibschutz-Trigger aus 0312 für Kanäle einer synchronisierten Stelle mitziehen.
-- [ ] **Step 2: Failing Tests (Unit)** in `src/externe_stelle/tests.rs`:
+- [x] **Step 1: Migration schreiben** — Tabelle wie Spec Abschnitt 1, `CHECK (kanal IN ('email','fax','matrix','threema'))`, `UNIQUE(externe_stelle_id, kanal, adresse)`, Index auf `(org_id, externe_stelle_id)`. Hat `org_externe_stelle` Änderungs-Trigger aus 0312, bekommt die Kanaltabelle dieselben; den Hub-Schreibschutz-Trigger aus 0312 für Kanäle einer synchronisierten Stelle mitziehen.
+- [x] **Step 2: Failing Tests (Unit)** in `src/externe_stelle/tests.rs`:
   - `normalize_email_nimmt_eine_adresse` (`" Lage@Leitstelle-Nord.de "` → `"Lage@leitstelle-nord.de"`)
   - `normalize_email_lehnt_mehrere_und_anzeigenamen_ab` (`"a@b.de, c@d.de"`, `"Nord <a@b.de>"`, `""`, 255 Zeichen → `Err`)
-- [ ] **Step 3: Failing Tests (Routen)** in `tests/externe_stelle_kanal.rs`:
+- [x] **Step 3: Failing Tests (Routen)** in `tests/externe_stelle_kanal.rs`:
   - `admin_legt_mailadresse_an_und_liest_sie` (POST 201, GET liefert sie)
   - `fax_ist_noch_nicht_freigeschaltet` (POST `channel: "fax"` → 400)
   - `kein_admin_darf_nicht_schreiben` (403), `fremde_org_sieht_404`
   - `doppelte_adresse_ist_409_oder_422` (Konvention des Repos für UNIQUE übernehmen)
-- [ ] **Step 4: Run** `cargo test --test externe_stelle_kanal` und `cargo test externe_stelle` → FAIL
-- [ ] **Step 5: Implementieren** (Repo, Routen `GET|POST /api/external-agencies/{id}/channels`, `PATCH|DELETE …/channels/{kanal_id}`; Lesen `CurrentUser`, Schreiben `AdminUser`; Präfix liegt schon in `STAMMDATEN_PFADE`)
-- [ ] **Step 6: Run** dieselben Tests → PASS; `scripts/check-typ-codegen.sh`
-- [ ] **Step 7: Commit** `feat(externe-stelle): Kanaladressen je Stelle (LLH-2093)`
+- [x] **Step 4: Run** `cargo test --test externe_stelle_kanal` und `cargo test externe_stelle` → FAIL
+- [x] **Step 5: Implementieren** (Repo, Routen `GET|POST /api/external-agencies/{id}/channels`, `PATCH|DELETE …/channels/{kanal_id}`; Lesen `CurrentUser`, Schreiben `AdminUser`; Präfix liegt schon in `STAMMDATEN_PFADE`)
+- [x] **Step 6: Run** dieselben Tests → PASS; `scripts/check-typ-codegen.sh`
+- [x] **Step 7: Commit** `feat(externe-stelle): Kanaladressen je Stelle (LLH-2093)`
 
 ### Task 2: Kanaladressen pflegen (Frontend)
 
@@ -102,11 +102,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 - Consumes: Routen aus Task 1.
 - Produces: `useExterneStelleKanaele(stelleId)`, `useCreateKanal`, `useDeleteKanal` (alle `SOFORT_ODER_NIE`).
 
-- [ ] **Step 1: Failing Test** `ExterneStelleKanaele.test.tsx`: „zeigt hinterlegte Mailadressen und fügt eine hinzu“ (MSW: GET liefert eine Adresse; Eingabe + „Adresse hinzufügen“ → POST mit `{channel:'email', address, label}`; Liste zeigt beide), „meldet ‚Mailadresse ungültig‘ ohne Request“.
-- [ ] **Step 2: Run** `mise exec -- pnpm -C frontend vitest run src/stammdaten/ExterneStelleKanaele.test.tsx` → FAIL
-- [ ] **Step 3: Implementieren** (Abschnitt nur bei bestehender Stelle; Hub-synchronisierte Stelle schreibgeschützt mit sichtbarem Grund wie `zustaendig`)
-- [ ] **Step 4: Run** Test → PASS; `mise exec -- pnpm -C frontend lint`
-- [ ] **Step 5: Commit** `feat(stammdaten): Mailadressen an Externen Stellen pflegen (LLH-2093)`
+- [x] **Step 1: Failing Test** `ExterneStelleKanaele.test.tsx`: „zeigt hinterlegte Mailadressen und fügt eine hinzu“ (MSW: GET liefert eine Adresse; Eingabe + „Adresse hinzufügen“ → POST mit `{channel:'email', address, label}`; Liste zeigt beide), „meldet ‚Mailadresse ungültig‘ ohne Request“.
+- [x] **Step 2: Run** `mise exec -- pnpm -C frontend vitest run src/stammdaten/ExterneStelleKanaele.test.tsx` → FAIL
+- [x] **Step 3: Implementieren** (Abschnitt nur bei bestehender Stelle; Hub-synchronisierte Stelle schreibgeschützt mit sichtbarem Grund wie `zustaendig`)
+- [x] **Step 4: Run** Test → PASS; `mise exec -- pnpm -C frontend lint`
+- [x] **Step 5: Commit** `feat(stammdaten): Mailadressen an Externen Stellen pflegen (LLH-2093)`
 
 ### Task 3: Feldtyp `Host` im Adapter-Rahmen
 
@@ -119,15 +119,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 **Interfaces:**
 - Produces: `check_host` — getrimmt, kleingeschrieben; lehnt Schema, `/`, `:`-Port, Leerzeichen, `localhost`, IP-Literal in gesperrtem Netz (ohne LAN-Ausnahme auch privat) ab.
 
-- [ ] **Step 1: Failing Tests**
+- [x] **Step 1: Failing Tests**
   - `check_host_nimmt_namen_und_oeffentliche_ip` (`"smtp.example.org"`, `"203.0.113.5"`)
   - `check_host_lehnt_url_port_loopback_ab` (`"smtps://x"`, `"x:25"`, `"localhost"`, `"127.0.0.1"`, `"10.0.0.1"` ohne LAN)
   - `has_neues_ziel_zaehlt_geaenderten_host` (Testart mit `Host`-Feld: `a.example` → `b.example` ⇒ `true`; gleich ⇒ `false`)
   - Review-Fokus 5, in `tests/adapter_admin.rs`: `geaenderter_host_entfernt_passwort` (PATCH mit neuem Host → Platz `passwort` nicht mehr gesetzt)
-- [ ] **Step 2: Run** `cargo test check_host has_neues_ziel` und `cargo test --test adapter_admin geaenderter_host` → FAIL
-- [ ] **Step 3: Implementieren**; Enum-Kontrakt/Codegen nachziehen
-- [ ] **Step 4: Run** → PASS; `scripts/check-typ-codegen.sh`
-- [ ] **Step 5: Commit** `feat(adapter): Feldtyp Host mit Zielschutz (LLH-2093)`
+- [x] **Step 2: Run** `cargo test check_host has_neues_ziel` und `cargo test --test adapter_admin geaenderter_host` → FAIL
+- [x] **Step 3: Implementieren**; Enum-Kontrakt/Codegen nachziehen
+- [x] **Step 4: Run** → PASS; `scripts/check-typ-codegen.sh`
+- [x] **Step 5: Commit** `feat(adapter): Feldtyp Host mit Zielschutz (LLH-2093)`
 
 ### Task 4: SMTP-Client
 
@@ -146,7 +146,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - intern generisch: `async fn sitzung<S: AsyncRead + AsyncWrite + Unpin + Send>(…)`; die Verbindung entsteht in `fn verbinde(ziel) -> TcpStream` nach `tokio::net::lookup_host` + `filter_adressen` (leer ⇒ `ZielIntern`), Verbindung zur ersten erlaubten Adresse, SNI = `host`
 - Zeitlimits wie Global Constraints; Antwortzeilen gedeckelt (4 KiB je Zeile, 64 Zeilen).
 
-- [ ] **Step 1: Failing Tests** gegen einen skriptbaren Testserver (`tokio::io::duplex` für Klartext; tokio-rustls-Server mit `rcgen`-Zertifikat und einem Test-`ClientConfig`, das genau dieses Zertifikat annimmt, für STARTTLS/TLS):
+- [x] **Step 1: Failing Tests** gegen einen skriptbaren Testserver (`tokio::io::duplex` für Klartext; tokio-rustls-Server mit `rcgen`-Zertifikat und einem Test-`ClientConfig`, das genau dieses Zertifikat annimmt, für STARTTLS/TLS):
   - `starttls_auth_plain_und_zustellung` (Server sieht `EHLO`, `STARTTLS`, nach TLS `AUTH PLAIN <b64>`, `MAIL FROM:<a@x>`, `RCPT TO:<b@y>`, Daten, `QUIT`)
   - `punktzeile_wird_verdoppelt_und_lf_zu_crlf` (Review-Fokus 1: Text `"a\n.\nb"` kommt als `"a\r\n..\r\nb\r\n.\r\n"`)
   - `535_ist_anmeldung`, `450_bei_rcpt_ist_voruebergehend`, `550_bei_rcpt_ist_abgelehnt`
@@ -154,10 +154,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `ohne_starttls_angebot_kein_klartext` (EHLO ohne `STARTTLS` → `Tls`, kein `AUTH` gesendet)
   - `fremdes_zertifikat_ist_tls`
   - `verbinde_lehnt_loopback_ab` (`host = "127.0.0.1"` → `ZielIntern`, ohne Verbindung)
-- [ ] **Step 2: Run** `cargo test adapter::smtp` → FAIL
-- [ ] **Step 3: Implementieren** (Dot-Stuffing und CRLF-Normalisierung beim Schreiben der Daten; `Ungewiss` genau dann, wenn der Abschluss `\r\n.\r\n` geschrieben, aber keine 250 gelesen wurde)
-- [ ] **Step 4: Run** → PASS; `cargo tree -i ring` zeigt keinen neuen Pfad über diese Crates (kein zweiter Provider)
-- [ ] **Step 5: Commit** `feat(adapter): kleiner SMTP-Client mit Zielschutz (LLH-2093)`
+- [x] **Step 2: Run** `cargo test adapter::smtp` → FAIL
+- [x] **Step 3: Implementieren** (Dot-Stuffing und CRLF-Normalisierung beim Schreiben der Daten; `Ungewiss` genau dann, wenn der Abschluss `\r\n.\r\n` geschrieben, aber keine 250 gelesen wurde)
+- [x] **Step 4: Run** → PASS; `cargo tree -i ring` zeigt keinen neuen Pfad über diese Crates (kein zweiter Provider)
+- [x] **Step 5: Commit** `feat(adapter): kleiner SMTP-Client mit Zielschutz (LLH-2093)`
 
 ### Task 5: Adapter-Art `smtp`
 
@@ -174,15 +174,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `pub fn smtp_ziel<'a>(einstellungen: &'a Map<String, Value>, geheimnisse: &'a HashMap<String, SecretString>, lan_erlaubt: bool, ehlo_name: &'a str) -> Result<SmtpZiel<'a>, AdapterFehler>` (geteilt mit Task 8)
   - `abrufen`: `pruefe(...)`, Erfolg → `OhneUebernahme(0)`, Fehler → `Fehlschlag::new(e.adapter_fehler())`. Für Tests nimmt `SmtpArt` ein injizierbares `Arc<dyn SmtpPruefer>` (Produktion: echter Client).
 
-- [ ] **Step 1: Failing Tests**
+- [x] **Step 1: Failing Tests**
   - `smtp_art_ist_im_verzeichnis` (`Verzeichnis::produktiv().find("smtp")`)
   - `einstellungen_ohne_absender_sind_400`, `verschluesselung_klartext_ist_400`
   - `zweite_smtp_anbindung_ist_422` (auch wenn die erste angehalten ist)
   - `probe_meldet_anmeldefehler_als_abgelehnt` (Pruefer-Doppel liefert `Anmeldung`)
-- [ ] **Step 2: Run** `cargo test --test adapter_smtp` → FAIL
-- [ ] **Step 3: Implementieren**
-- [ ] **Step 4: Run** → PASS; `cargo test --test adapter_admin --test adapter_lauf` bleibt grün
-- [ ] **Step 5: Commit** `feat(adapter): Anbindung E-Mail (SMTP) (LLH-2093)`
+- [x] **Step 2: Run** `cargo test --test adapter_smtp` → FAIL
+- [x] **Step 3: Implementieren**
+- [x] **Step 4: Run** → PASS; `cargo test --test adapter_admin --test adapter_lauf` bleibt grün
+- [x] **Step 5: Commit** `feat(adapter): Anbindung E-Mail (SMTP) (LLH-2093)`
 
 ### Task 6: Ausgangskorb — Tabelle, Zustand, Repo
 
@@ -207,18 +207,18 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `repo::mark_begonnen(pool, id, jetzt)`, `repo::save_ergebnis_tx(conn, id, Ergebnis)` mit `enum Ergebnis { Uebergeben { at }, Wiederholen { naechster, fehler, status }, Fehlgeschlagen { fehler, status } }`
   - `repo::recover_unterbrochene(pool) -> Result<u64, AppError>` (Zeilen mit `versuch_begonnen_at` ⇒ `fehlgeschlagen`/`ungewiss`)
 
-- [ ] **Step 1: Migration** nach Spec 3 (inkl. `versuch_begonnen_at`, `UNIQUE(org_id, client_id)`, Index `(zustand, naechster_versuch_at)`, Index `(einsatz_id, quelle_art, quelle_id)`); PK TEXT (nanoid wie andere Tabellen mit TEXT-id).
-- [ ] **Step 2: Failing Tests** `src/ausgang/tests.rs`:
+- [x] **Step 1: Migration** nach Spec 3 (inkl. `versuch_begonnen_at`, `UNIQUE(org_id, client_id)`, Index `(zustand, naechster_versuch_at)`, Index `(einsatz_id, quelle_art, quelle_id)`); PK TEXT (nanoid wie andere Tabellen mit TEXT-id).
+- [x] **Step 2: Failing Tests** `src/ausgang/tests.rs`:
   - `backoff_30s_60s_120s_dann_5min_deckel` (`versuche` 1..=5 → +30, +60, +120, +240, +300 s)
   - `nach_30_minuten_keine_wiederholung` (`erster` vor 30 min 1 s → `None`)
   - `doppelte_client_id_liefert_denselben_versand`
   - `retry_nur_aus_fehlgeschlagen` (aus `wartet` → 422)
   - `unterbrochener_versuch_wird_ungewiss`
   - Wächter grün: `cargo test instanz::spiegel::art` und `cargo test schwaerzung`
-- [ ] **Step 3: Run** `cargo test ausgang::` → FAIL
-- [ ] **Step 4: Implementieren**
-- [ ] **Step 5: Run** → PASS, Wächter grün
-- [ ] **Step 6: Commit** `feat(ausgang): Ausgangskorb mit Zustand und Wiederholung (LLH-2093)`
+- [x] **Step 3: Run** `cargo test ausgang::` → FAIL
+- [x] **Step 4: Implementieren**
+- [x] **Step 5: Run** → PASS, Wächter grün
+- [x] **Step 6: Commit** `feat(ausgang): Ausgangskorb mit Zustand und Wiederholung (LLH-2093)`
 
 ### Task 7: Nachricht bauen
 
@@ -238,16 +238,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `async fn load_anhaenge<T: Dokumentart>(pool, einsatz_id, id) -> Result<Vec<(String, Vec<u8>)>, AppError>` (`anlage-{n}.png`; Summe > 20 MiB → `AusgangFehler::ZuGross`)
 - Betreff exakt nach Spec 4; `nr` = `version` des Dokuments, wenn es keine eigene Nummer gibt (im Modell prüfen und eine Zeile im Code kommentieren).
 
-- [ ] **Step 1: Failing Tests**
+- [x] **Step 1: Failing Tests**
   - `render_freigabe_gleicht_etb_text` (freigeben, ETB-`inhalt` == `render_freigabe` danach)
   - `ueberholte_fassung_ist_422` (fortschreiben + freigeben, alte id → 422)
   - `umlaute_in_betreff_und_name_sind_kodiert` (Review-Fokus 2: `Subject: =?utf-8?…?=` o. ä., Rückparse über lettre ergibt „Hochwasser Süd“)
   - `png_anlage_haengt_an` (Content-Type `image/png`, Dateiname `anlage-1.png`)
   - `nachforderung_text_enthaelt_anzahl_bezeichnung_begruendung`
-- [ ] **Step 2: Run** `cargo test ausgang::nachricht vorlagendokument` → FAIL
-- [ ] **Step 3: Implementieren**
-- [ ] **Step 4: Run** → PASS (bestehende Freigabe-Tests unverändert grün)
-- [ ] **Step 5: Commit** `feat(ausgang): Nachricht aus freigegebener Fassung bauen (LLH-2093)`
+- [x] **Step 2: Run** `cargo test ausgang::nachricht vorlagendokument` → FAIL
+- [x] **Step 3: Implementieren**
+- [x] **Step 4: Run** → PASS (bestehende Freigabe-Tests unverändert grün)
+- [x] **Step 5: Commit** `feat(ausgang): Nachricht aus freigegebener Fassung bauen (LLH-2093)`
 
 ### Task 8: Lauf des Ausgangskorbs
 
@@ -267,7 +267,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 - ETB-Text nach Spec 6; `erfasser_id = erstellt_von_id`, `an = stelle_bezeichnung`, `typ` wie bei `nachforderung::repo::protokollieren_tx`; Lauf in `etb::nachlauf::klammer`.
 - Fehlerzuordnung: `Voruebergehend|Verbindung|Zeitueberschreitung|Dns` → wiederholen (solange `naechster_versuch` `Some`), sonst `Fehlgeschlagen{Voruebergehend}`; `Abgelehnt(_)` → `Abgelehnt`; `Ungewiss` → `Ungewiss`; `Anmeldung|Tls|ZielIntern|Antwort` → `AnbindungFehler`.
 
-- [ ] **Step 1: Failing Tests** `tests/ausgang_lauf.rs` mit skriptbarem `Zusteller`-Doppel und Test-`Rahmen` (SMTP-Adapter + Passwort angelegt):
+- [x] **Step 1: Failing Tests** `tests/ausgang_lauf.rs` mit skriptbarem `Zusteller`-Doppel und Test-`Rahmen` (SMTP-Adapter + Passwort angelegt):
   - `freigegebener_lagebericht_wird_uebergeben_und_steht_im_etb` (ETB `an` = Stelle, Text enthält „übergeben“ und Adresse)
   - `450_wird_wiederholt_dann_uebergeben` (zweiter Durchgang nach 30 s)
   - `nach_30_minuten_vorübergehend_fehlgeschlagen`
@@ -278,10 +278,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `anmeldefehler_zieht_adapterpruefung_vor` (`naechster_lauf_at` der Anbindung ≤ jetzt)
   - Review-Fokus 4: `neustart_mit_begonnenem_versuch_ist_ungewiss_und_wird_nicht_zugestellt`
   - `kein_geheimnis_im_etb_oder_fehler` (Passwort-Text kommt in keiner ETB-Zeile und keiner Spalte von `ausgang` vor)
-- [ ] **Step 2: Run** `cargo test --test ausgang_lauf` → FAIL
-- [ ] **Step 3: Implementieren**
-- [ ] **Step 4: Run** → PASS; `cargo test --test adapter_lauf` grün
-- [ ] **Step 5: Commit** `feat(ausgang): Lauf stellt zu und schreibt ins ETB (LLH-2093)`
+- [x] **Step 2: Run** `cargo test --test ausgang_lauf` → FAIL
+- [x] **Step 3: Implementieren**
+- [x] **Step 4: Run** → PASS; `cargo test --test adapter_lauf` grün
+- [x] **Step 5: Commit** `feat(ausgang): Lauf stellt zu und schreibt ins ETB (LLH-2093)`
 
 ### Task 9: Routen
 
@@ -299,17 +299,17 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - Prüfreihenfolge im Anlegen: Recht → Einsatz aktiv → Spiegel (422 `spiegel`) → Empfänger nicht leer, höchstens 20 (400) → jede Kanaladresse in Org, Stelle aktiv, Kanal freigeschaltet (404/422) → SMTP-Anbindung da und nicht angehalten (422 mit Code) → Schnappschuss (422) → Anhänge ≤ 20 MiB (422 `zu_gross`) → `create_tx` je Empfänger in **einer** Transaktion → Wecker `notify_one()` → `publiziere_einsatz(Ausgang)`.
   - 422-Antworten tragen den `AusgangFehler`-Code maschinenlesbar (Muster für 422 mit Code im Repo suchen und übernehmen).
 
-- [ ] **Step 1: Failing Tests**
+- [x] **Step 1: Failing Tests**
   - `senden_legt_je_empfaenger_einen_versand_an`
   - Review-Fokus 3: `doppelklick_mit_gleicher_client_id_ein_versand`
   - `entwurf_senden_ist_422`, `ohne_mailserver_ist_422_anbindung_fehlt`, `spiegel_ist_422`
   - `leser_ohne_schreibrecht_403`, `fremde_kanaladresse_404`
   - `erneut_senden_aus_fehlgeschlagen_setzt_wartet`, `erneut_senden_ueberholter_fassung_422`
   - `nachforderung_zurueckgezogen_ist_422`
-- [ ] **Step 2: Run** `cargo test --test ausgang_routen` → FAIL
-- [ ] **Step 3: Implementieren**
-- [ ] **Step 4: Run** → PASS; `scripts/check-api-routen.sh`; `scripts/check-typ-codegen.sh`
-- [ ] **Step 5: Commit** `feat(ausgang): Routen zum Senden und Wiederholen (LLH-2093)`
+- [x] **Step 2: Run** `cargo test --test ausgang_routen` → FAIL
+- [x] **Step 3: Implementieren**
+- [x] **Step 4: Run** → PASS; `scripts/check-api-routen.sh`; `scripts/check-typ-codegen.sh`
+- [x] **Step 5: Commit** `feat(ausgang): Routen zum Senden und Wiederholen (LLH-2093)`
 
 ### Task 10: Senden-Dialog und Versandliste (Frontend)
 
@@ -328,15 +328,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
   - `<Versandliste einsatzId quelle />` mit Zustandstexten: „wartet“, „übergeben HH:MM“, „fehlgeschlagen: {Text}“, „Zustellung unklar“; Knopf „Erneut senden“ bei `fehlgeschlagen`.
 - Texte der `AusgangFehler`-Codes in `frontend/src/api/ausgang.ts` (`AUSGANG_FEHLER_TEXT`), etwa `anbindung_fehlt` → „Kein Mailserver eingerichtet“, `ueberholt` → „Neuere Fassung freigegeben“, `ungewiss` → „Zustellung unklar“, `spiegel` → „Einsatz wird von einer anderen Instanz geführt“.
 
-- [ ] **Step 1: Failing Tests**
+- [x] **Step 1: Failing Tests**
   - `empfaengerVorschlag.test.ts`: „Leitstelle  Nord“ trifft „leitstelle nord“; „Nord“ trifft nicht „Leitstelle Nord“
   - `SendenDialog.test.tsx`: vorbelegt angehakt; „Senden“ schickt `{client_id, recipients:[{channel_id}]}` einmal; 422 `anbindung_fehlt` zeigt „Kein Mailserver eingerichtet“; ohne Adressen gesperrt mit Grund „Keine Mailadresse hinterlegt“
   - `Versandliste.test.tsx`: zeigt Zustände; „Erneut senden“ nur bei `fehlgeschlagen`, POST an `/retry`
   - Verb-Wächter grün
-- [ ] **Step 2: Run** `mise exec -- pnpm -C frontend vitest run src/ausgang` → FAIL
-- [ ] **Step 3: Implementieren** (`ErfassungsModal`, Fokus im ersten Feld, `SOFORT_ODER_NIE`, ohne Netz gesperrt mit „Ohne Netz nicht möglich“)
-- [ ] **Step 4: Run** → PASS; `mise exec -- pnpm -C frontend lint`, `… typecheck`
-- [ ] **Step 5: Commit** `feat(ausgang): Senden-Dialog und Versandliste (LLH-2093)`
+- [x] **Step 2: Run** `mise exec -- pnpm -C frontend vitest run src/ausgang` → FAIL
+- [x] **Step 3: Implementieren** (`ErfassungsModal`, Fokus im ersten Feld, `SOFORT_ODER_NIE`, ohne Netz gesperrt mit „Ohne Netz nicht möglich“)
+- [x] **Step 4: Run** → PASS; `mise exec -- pnpm -C frontend lint`, `… typecheck`
+- [x] **Step 5: Commit** `feat(ausgang): Senden-Dialog und Versandliste (LLH-2093)`
 
 ### Task 11: Regel, Entscheidung, Doku
 
@@ -346,10 +346,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 - Modify: `docs/architektur/` nach Mitänderungsregel (Bausteinsicht, Laufzeitsicht)
 - Modify: `docs/anwender/` Kapitel „Senden an Externe Stellen“ nach `docs/anwender/AGENTS.md` (Bilder über den Bildlauf, falls dort Pflicht)
 
-- [ ] **Step 1:** ADR schreiben (Inhalt Spec 8), `scripts/check-adr-nummern.sh`
-- [ ] **Step 2:** `src/AGENTS.md` ergänzen; Verweise im Code (`// src/AGENTS.md, Ausgang an Menschen`) an `src/ausgang/mod.rs`
-- [ ] **Step 3:** Architektur- und Anwenderdoku; deren Wächter (`./scripts/check-all.sh --nur` für die Doku-Schritte, Namen im Skriptkopf)
-- [ ] **Step 4: Commit** `docs(ausgang): ADR, Regel und Anwenderdoku (LLH-2093)`
+- [x] **Step 1:** ADR schreiben (Inhalt Spec 8), `scripts/check-adr-nummern.sh`
+- [x] **Step 2:** `src/AGENTS.md` ergänzen; Verweise im Code (`// src/AGENTS.md, Ausgang an Menschen`) an `src/ausgang/mod.rs`
+- [x] **Step 3:** Architektur- und Anwenderdoku; deren Wächter (`./scripts/check-all.sh --nur` für die Doku-Schritte, Namen im Skriptkopf)
+- [x] **Step 4: Commit** `docs(ausgang): ADR, Regel und Anwenderdoku (LLH-2093)`
 
 ### Task 12: e2e und Gesamtprüfung
 
@@ -357,7 +357,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 - Create: `frontend/e2e/ausgang.spec.ts` (Muster und Regeln aus `frontend/e2e/AGENTS.md`)
 - Modify: Testbetrieb: ein `Zusteller`-Doppel, das im e2e-Server (Feature/Schalter der e2e-Suite) statt SMTP greift
 
-- [ ] **Step 1: Failing e2e** „Lagebericht freigeben → Senden an Leitstelle → Versandliste zeigt ‚übergeben‘“
-- [ ] **Step 2: Run** e2e-Einzeltest nach `frontend/e2e/AGENTS.md` → FAIL, dann implementieren → PASS
-- [ ] **Step 3: Gesamtprüfung** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün
-- [ ] **Step 4: Commit** `test(ausgang): e2e Senden eines Lageberichts (LLH-2093)`
+- [x] **Step 1: Failing e2e** „Lagebericht freigeben → Senden an Leitstelle → Versandliste zeigt ‚übergeben‘“
+- [x] **Step 2: Run** e2e-Einzeltest nach `frontend/e2e/AGENTS.md` → FAIL, dann implementieren → PASS
+- [x] **Step 3: Gesamtprüfung** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün
+- [x] **Step 4: Commit** `test(ausgang): e2e Senden eines Lageberichts (LLH-2093)`
