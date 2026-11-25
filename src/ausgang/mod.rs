@@ -2,6 +2,7 @@
 //! Abschnitt 3): die Tabelle `ausgang`, ihr Zustandsmodell, die Wiederholungsfrist und das Repo.
 //! Der Lauf (Zustellung) und die Routen kommen in späteren Schritten dazu.
 
+pub mod nachricht;
 pub mod repo;
 pub mod zustand;
 
