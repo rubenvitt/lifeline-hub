@@ -78,7 +78,7 @@ final class HelferModell {
     @ObservationIgnored private var abfrage: Task<Void, Never>?
     /// Prüfung während `Phase.ruht`, alle `Ruhegrund.pruefabstandS` Sekunden.
     @ObservationIgnored private var ruhePruefung: Task<Void, Never>?
-    /// Ob die Szene sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0098).
+    /// Ob die Szene sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0101).
     @ObservationIgnored private var imVordergrund = false
     /// Die Ruhe endete im Hintergrund; die Ortung startet beim nächsten Öffnen.
     @ObservationIgnored private var startNachRuhe = false

@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0098; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -130,7 +130,7 @@ sequenceDiagram
   anderer Wortlaut darunter 409 (`CLIENT_ID_KONFLIKT`).
 - Über den Kanal geht nur die Kennung; der Client lädt mit seinen eigenen Rechten nach. Welches
   Ereignis welchem Modul gehört, legt `LiveEvent::modul_keys` fest (`src/live/mod.rs`).
-  Ergänzung zu ADR-0003 (Helfer-App, ADR-0098): `LiveEvent::Helfer` trägt kein Modul, sondern
+  Ergänzung zu ADR-0003 (Helfer-App, ADR-0101): `LiveEvent::Helfer` trägt kein Modul, sondern
   ist über `LiveEvent::nur_leitung` an die Einsatzleitung gebunden. Ohne dieses Kennzeichen der
   Verbindung erreicht es niemanden (fail-closed, `LiveNachricht::fuer_verbindung`,
   `src/live/mod.rs`); die Variante steht im Enum-Wire-Kontrakt wie jede andere.

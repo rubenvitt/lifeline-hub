@@ -121,7 +121,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     /** Prüfung während [Phase.Ruht], alle [Ruhegrund.PRUEFABSTAND_S] Sekunden. */
     private var ruhePruefung: Job? = null
 
-    /** Ob die Activity sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0098). */
+    /** Ob die Activity sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0101). */
     private var imVordergrund = false
 
     /** Die Ruhe endete im Hintergrund; die Ortung startet beim nächsten Öffnen. */

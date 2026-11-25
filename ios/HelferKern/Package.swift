@@ -1,6 +1,6 @@
 // swift-tools-version: 6.1
 //
-// Testbare Logik der Helfer-App ohne UIKit, CoreLocation und SwiftUI (ADR-0098, Spec
+// Testbare Logik der Helfer-App ohne UIKit, CoreLocation und SwiftUI (ADR-0101, Spec
 // `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, „Logik im Kern“): Deutung
 // von QR-Code und Deeplink, Zustandsautomat der Anmeldung, Antwortentscheidung je Status und
 // Grund, Takt, Puffer der letzten Position, Sendeplan des Ortungsdienstes, Texte der Gründe und

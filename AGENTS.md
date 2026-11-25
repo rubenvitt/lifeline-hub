@@ -37,8 +37,8 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Push über APNs, Bauen nur auf macOS |
 | `android/AGENTS.md` | Android-Hülle: keine Anwendungslogik, Kern ohne SDK, ein Profil je Server, Brücke nur für den aktiven Server, Updater nie im Vordergrund, Signierschlüssel, lokal bauen |
-| `ios/Helfer/AGENTS.md` | Helfer-App (iOS): eigene native App, Logik im Kern, nur der Server der Kopplung, Ortung nur „When in Use“ (ADR-0098) |
-| `android/helfer/AGENTS.md` | Helfer-App (Android): eigene native App, Logik im Kern, nur der Server der Kopplung, Ortung nur als Vordergrund-Dienst (ADR-0098) |
+| `ios/Helfer/AGENTS.md` | Helfer-App (iOS): eigene native App, Logik im Kern, nur der Server der Kopplung, Ortung nur „When in Use“ (ADR-0101) |
+| `android/helfer/AGENTS.md` | Helfer-App (Android): eigene native App, Logik im Kern, nur der Server der Kopplung, Ortung nur als Vordergrund-Dienst (ADR-0101) |
 | `website/AGENTS.md` | Marketing-Seite (Astro), Kopien aus dem Frontend |
 | `push-relais/AGENTS.md` | APNs-Relais: keine Inhalte, nie Token/Nutzlast loggen, Wire deutsch und additiv, Sperren nur per Unterbefehl, APNs-Doppel in Tests |
 | `scripts/AGENTS.md` | Sammel-Gate im Detail, Stau-Wächter, Werkzeugversionen, Bauziel, Advisories, Release |

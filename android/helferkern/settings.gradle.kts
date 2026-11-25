@@ -1,4 +1,4 @@
-// Kern der Android-Helfer-App (ADR-0098): eigener Build ohne Android-SDK und ohne Android-Plugin,
+// Kern der Android-Helfer-App (ADR-0101): eigener Build ohne Android-SDK und ohne Android-Plugin,
 // Versionen aus dem Katalog der Hülle.
 rootProject.name = "helferkern"
 

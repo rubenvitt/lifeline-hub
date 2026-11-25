@@ -17,7 +17,7 @@
 # Stempel werden eingecheckt; frontend/src/marke/marke.guard.test.ts prüft Größe, Transparenz,
 # den sicheren Kreis, die Hintergrundfarbe und den Stempel `scripts/android/symbol.sha256`.
 # `scripts/marke/erzeuge-symbole.sh` ruft dieses Skript am Ende auf. Die Helfer-App
-# (`android/helfer`, ADR-0098) trägt dasselbe Symbol; das Skript schreibt in beide Module.
+# (`android/helfer`, ADR-0101) trägt dasselbe Symbol; das Skript schreibt in beide Module.
 set -euo pipefail
 
 wurzel="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"

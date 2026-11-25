@@ -1,7 +1,7 @@
 # Betrieb: Helfer-App „Lifeline Helfer“ (iPhone, Android)
 
 Die Helfer-App ist eine **eigene native App** (SwiftUI, Compose), kein Webview und keine Hülle
-([ADR-0098](../architektur/entscheidungen/ADR-0098-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md)).
+([ADR-0101](../architektur/entscheidungen/ADR-0101-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md)).
 Helfende melden damit ihre Position an die Einsatzleitung; die Bedienung steht im Anwenderkapitel
 [Helfer anmelden](../anwender/kapitel/helfer-anmelden.md), die Datenschutzvorlage unter
 [`docs/datenschutz/dsfa-vorlage-ortung.md`](../datenschutz/dsfa-vorlage-ortung.md). Neben ihr

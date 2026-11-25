@@ -1,7 +1,7 @@
 # Helfer-App iOS — Regeln
 
 Gilt für `ios/Helfer/` und den Kern `ios/HelferKern/`, zusätzlich zu `ios/AGENTS.md` und der
-Wurzel. Entscheidung: ADR-0098; Herleitung: `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`.
+Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`.
 
 - **Eigene native App** (`dev.rubeen.lifeline.helfer`, SwiftUI), kein Webview. „Keine
   Anwendungslogik in der Hülle“ aus `ios/AGENTS.md` gilt hier nicht; die Lifeline-Hülle bleibt
@@ -16,7 +16,7 @@ Wurzel. Entscheidung: ADR-0098; Herleitung: `docs/superpowers/specs/2026-11-24-v
   Live-Aktivität aus, Kopplung und Sitzung bleiben; die App prüft jede Minute (Zustand, bei Ortung
   aus dazu `{paused: false}`) und ortet wieder, wenn der Kern es entscheidet, gestartet nur im
   Vordergrund. Ohne Ortungsgerät und Person startet sie gar nicht erst.
-- **Ortung** (ADR-0098): nur „When in Use“ plus `UIBackgroundModes location`, nie
+- **Ortung** (ADR-0101): nur „When in Use“ plus `UIBackgroundModes location`, nie
   `NSLocationAlways…`; nur solange eine Kopplung besteht, Start nur aus dem Vordergrund; sichtbar
   durch Standortanzeige und Live-Aktivität. Kein Verlauf, nur die letzte Position, nur im
   Speicher.

@@ -12,7 +12,7 @@
 # neuesten iOS-Laufzeit wählen und ihnen die Test-CA als Wurzel geben → `xcodebuild test` mit
 # dem Schema `LifelineHub`: App-Tests (ios/AppTests), UI-Tests (ios/AppUITests) und die Suite des
 # Swift-Kerns auf iOS → danach dasselbe mit dem Schema `LifelineHelfer` auf dem iPhone (Helfer-App,
-# ADR-0098: ios/HelferTests, ios/HelferUITests und die Suite von HelferKern; Version aus
+# ADR-0101: ios/HelferTests, ios/HelferUITests und die Suite von HelferKern; Version aus
 # scripts/ios/helfer-version.sh) → die Bildschirmbilder der UI-Tests (XCTAttachment) aus beiden
 # Ergebnisbündeln nach <ausgabe>/bilder
 # (scripts/ios/bilder-ablegen.sh: nur Bilder, Namen ohne Zeichen, die das Artefakt abweist). Nach
@@ -35,7 +35,7 @@ done
 rm -rf "$AUSGABE"
 mkdir -p "$AUSGABE/bilder"
 
-# Kern der Helfer-App (ADR-0098) mit dem Swift dieses Xcode auf macOS, vor dem Simulator: ein
+# Kern der Helfer-App (ADR-0101) mit dem Swift dieses Xcode auf macOS, vor dem Simulator: ein
 # roter Kern bricht hier ab. Unter Linux fährt ihn Schritt 18 von check-all.sh (`suiten.yml`).
 swift test --package-path "$WURZEL/ios/HelferKern"
 

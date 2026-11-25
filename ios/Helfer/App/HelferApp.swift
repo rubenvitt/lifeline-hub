@@ -1,7 +1,7 @@
 import HelferKern
 import SwiftUI
 
-/// Lifeline Helfer (ADR-0098, Regeln `ios/Helfer/AGENTS.md`): eine App mit genau einer Aufgabe,
+/// Lifeline Helfer (ADR-0101, Regeln `ios/Helfer/AGENTS.md`): eine App mit genau einer Aufgabe,
 /// am Einsatz anmelden und die Position senden. Welche Seite gilt, entscheidet die Phase der
 /// `Anmeldung` im Kern.
 @main

@@ -94,7 +94,7 @@ bereiche_von() {
     website/src/daten/module.json)
       echo "frontend" ;;
     # Gemeinsame Fälle der Helfer-App: nur ihre beiden Kerne lesen sie (ios/HelferKern,
-    # android/helferkern); die Desktop-Hülle hat keine Helfer-App (ADR-0098). Vor der Regel unten.
+    # android/helferkern); die Desktop-Hülle hat keine Helfer-App (ADR-0101). Vor der Regel unten.
     src-tauri/faelle/helfer.json)
       echo "ios android" ;;
     # Gemeinsame Fälle der Hüllen (LLH-1978, `src-tauri/AGENTS.md`, „Gemeinsame Fälle“): die
@@ -106,7 +106,7 @@ bereiche_von() {
     android/app/src/main/assets/huelle.js)
       echo "frontend android" ;;
     # Der Marken-Wächter (marke.guard.test.ts) prüft App-Symbol, Farbe Kopf-Schwarz und Thema der
-    # Android-App in ihren Ressourcen (LLH-1989), dazu das gleiche Symbol der Helfer-App (ADR-0098).
+    # Android-App in ihren Ressourcen (LLH-1989), dazu das gleiche Symbol der Helfer-App (ADR-0101).
     android/app/src/main/res/* | android/helfer/src/main/res/*)
       echo "frontend android" ;;
     # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)

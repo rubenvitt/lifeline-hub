@@ -1,6 +1,6 @@
 -- no-transaction
 -- Helfer-App (Zunder vakwvkpg, Spec docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md,
--- ADR-0098). Schema für alle Stufen in einer Migration:
+-- ADR-0101). Schema für alle Stufen in einer Migration:
 --
 -- 1. Org-Schalter „Ortung im Einsatz“ mit Unterpunkt „Auch Personen orten“; Vorgabe aus. Wer den
 --    ersten Schalter einschaltet, bestätigt Einwilligung bzw. Betriebsvereinbarung; wer und wann,

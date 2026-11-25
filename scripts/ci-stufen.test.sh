@@ -289,7 +289,7 @@ pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
 
 echo "==> ci-stufen: ios-helfer.yml (TestFlight der Helfer-App)"
-# Der Upload der Helfer-App (ADR-0098): nur mit dem Label `testflight-helfer` am PR oder per
+# Der Upload der Helfer-App (ADR-0101): nur mit dem Label `testflight-helfer` am PR oder per
 # Handstart. Ein Upload bei jedem PR kostete macOS-Minuten und füllte TestFlight.
 pruefe "ios-helfer.yml: PR und Handstart" nur_ausloeser "$IOSHELFER" "pull_request workflow_dispatch "
 pruefe "ios-helfer.yml: PR nur bei labeled und synchronize" \
@@ -316,7 +316,7 @@ pruefe "simulator-pruefung.sh testet auch die Helfer-App" \
   enthaelt "$(code_ohne_kommentar "$SKRIPTE/ios/simulator-pruefung.sh")" "-scheme LifelineHelfer"
 
 echo "==> ci-stufen: android-helfer.yml (APK der Helfer-App)"
-# Die signierte APK der Helfer-App (ADR-0098): nur mit dem Label `apk-helfer` am PR oder per
+# Die signierte APK der Helfer-App (ADR-0101): nur mit dem Label `apk-helfer` am PR oder per
 # Handstart, mit demselben Schlüssel wie die Lifeline-App, als Artefakt (noch kein Kanal).
 pruefe "android-helfer.yml: PR und Handstart" nur_ausloeser "$ANDROIDHELFER" "pull_request workflow_dispatch "
 pruefe "android-helfer.yml: PR nur bei labeled und synchronize" \

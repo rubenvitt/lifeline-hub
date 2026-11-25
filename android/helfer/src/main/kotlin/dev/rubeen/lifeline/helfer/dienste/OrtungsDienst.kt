@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Die Helfer-Ortung (ADR-0098, Spec „Ortung im Hintergrund“ und „Senden, Takt, ohne Netz“): die
+ * Die Helfer-Ortung (ADR-0101, Spec „Ortung im Hintergrund“ und „Senden, Takt, ohne Netz“): die
  * einzige Stelle, die im Hintergrund sendet.
  *
  * - Ein Vordergrund-Dienst vom Typ `location`, gestartet nur aus der geöffneten App ([starte]);
@@ -406,7 +406,7 @@ class OrtungsDienst : Service() {
         private const val PRUEFUNG_MS = 30_000L
 
         /**
-         * Startet die Ortung; nur aus der geöffneten App (ADR-0098). `false`, wenn das System den
+         * Startet die Ortung; nur aus der geöffneten App (ADR-0101). `false`, wenn das System den
          * Dienst nicht zulässt.
          */
         fun starte(context: Context, einsatz: String, ziel: String): Boolean = try {

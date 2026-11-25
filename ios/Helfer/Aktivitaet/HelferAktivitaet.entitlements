@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Berechtigungen der Widget-Erweiterung HelferAktivitaet (ADR-0098): dieselbe App Group wie die
+  Berechtigungen der Widget-Erweiterung HelferAktivitaet (ADR-0101): dieselbe App Group wie die
   App (Helfer/App/LifelineHelfer.entitlements), für die Pausieranfrage der Live-Aktivität.
 -->
 <plist version="1.0">

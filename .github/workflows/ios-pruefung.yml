@@ -3,7 +3,7 @@
 # einem macOS-Runner das Projekt erzeugen, die App für den Simulator bauen, App-, UI- und
 # Kern-Tests auf iOS fahren und die Bildschirmbilder der nativen Seiten als Artefakt ablegen
 # (Bilder der Änderung für den PR). Danach dasselbe für die Helfer-App (Schema `LifelineHelfer`,
-# ADR-0098) auf dem iPhone.
+# ADR-0101) auf dem iPhone.
 #
 # KEIN PFLICHT-CHECK: Pflicht sind nur die Checks in `scripts/ruleset-pruefen.sh` (ADR-0048). Ein
 # PR ohne solche Änderungen startet keinen macOS-Lauf (Pfadfilter); macOS-Minuten sind teuer.

@@ -1,4 +1,4 @@
-# Helfer-App als signierte APK (ADR-0098, Regeln android/helfer/AGENTS.md): `:helfer:assembleRelease`
+# Helfer-App als signierte APK (ADR-0101, Regeln android/helfer/AGENTS.md): `:helfer:assembleRelease`
 # mit demselben Schlüssel wie die Lifeline-App (android/AGENTS.md, „Signierschlüssel wechselt nie“;
 # Geheimnisse wie android.yml), Signatur und Paket prüfen und die APK als Workflow-Artefakt ablegen.
 # Einen Release- oder Update-Kanal hat die Helfer-App noch nicht; er folgt später.

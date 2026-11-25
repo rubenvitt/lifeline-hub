@@ -4,7 +4,7 @@ import HelferKern
 import SwiftUI
 import WidgetKit
 
-/// Widget-Erweiterung der Helfer-App: nur die Live-Aktivität der Ortung (ADR-0098: die Ortung ist
+/// Widget-Erweiterung der Helfer-App: nur die Live-Aktivität der Ortung (ADR-0101: die Ortung ist
 /// sichtbar). Kein Netz, keine Ablage; „Pausieren“ führt die App aus (`PausierenIntent`).
 @main
 struct HelferAktivitaetBundle: WidgetBundle {

@@ -2,7 +2,7 @@ import CoreLocation
 import Foundation
 import HelferKern
 
-/// Die Helfer-Ortung (ADR-0098, Spec „Ortung im Hintergrund“ und „Senden, Takt, ohne Netz“): die
+/// Die Helfer-Ortung (ADR-0101, Spec „Ortung im Hintergrund“ und „Senden, Takt, ohne Netz“): die
 /// einzige Stelle, die im Hintergrund sendet.
 ///
 /// - Startet nur aus dem Vordergrund (beim Einlösen oder auf Knopfdruck), nie von selbst nach einem

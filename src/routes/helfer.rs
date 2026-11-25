@@ -1,4 +1,4 @@
-//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0098).
+//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0101).
 //!
 //! - Routen der Leitung am Einsatz unter `/api/incidents/{id}/helpers…`. Recht wie beim Koppeln:
 //!   [`EinsatzLeitungszugriff`] (Einsatzleitung, nur aktiver Einsatz). Der Pfadparameter heißt

@@ -30,7 +30,7 @@ sealed interface Phase {
     /** Die Anmeldung ist vorbei: Bildschirm „Beendet“ mit Grund. */
     data class Beendet(val grund: Grund) : Phase
 
-    /** Ob der Ortungsdienst läuft: ab dem Einlösen, solange die Kopplung besteht und nicht pausiert ist (ADR-0098). */
+    /** Ob der Ortungsdienst läuft: ab dem Einlösen, solange die Kopplung besteht und nicht pausiert ist (ADR-0101). */
     val ortet: Boolean
         get() = this is Unbestaetigt || this is Aktiv
 

@@ -11,7 +11,7 @@
 # Extension `Benachrichtigungsdienst` entschlüsselt die Nutzlast und teilt App Group und
 # Schlüsselbund. Code für beide liegt in Gemeinsam/. Signiert wird beides automatisch.
 #
-# Helfer-App (ADR-0098, Regeln: ios/Helfer/AGENTS.md): eigene native App `LifelineHelfer` mit der
+# Helfer-App (ADR-0101, Regeln: ios/Helfer/AGENTS.md): eigene native App `LifelineHelfer` mit der
 # Widget-Erweiterung `HelferAktivitaet` (Live-Aktivität) und dem Kern `HelferKern`. Ihre Version
 # schreibt scripts/ios/helfer-version.sh nach Helfer/App/Version.xcconfig (nicht versioniert).
 # XcodeGen braucht beide xcconfig für jedes Schema: vor `xcodegen generate` laufen immer
@@ -198,7 +198,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.ios.uitests
         GENERATE_INFOPLIST_FILE: "YES"
 
-  # Helfer-App (ADR-0098): SwiftUI, eigene Bundle-ID, nur iPhone. Ortung nur „When in Use“ plus
+  # Helfer-App (ADR-0101): SwiftUI, eigene Bundle-ID, nur iPhone. Ortung nur „When in Use“ plus
   # `UIBackgroundModes location`, nie die Always-Freigabe; sichtbar durch Standortanzeige und
   # Live-Aktivität.
   LifelineHelfer:
@@ -244,7 +244,7 @@ targets:
         NSCameraUsageDescription: Zum Scannen des QR-Codes der Einsatzleitung.
         NSLocalNetworkUsageDescription: Lifeline Helfer verbindet sich mit dem Einsatzserver im lokalen Netz, etwa mit elw.local.
         NSLocationWhenInUseUsageDescription: Lifeline Helfer sendet deine Position an die Einsatzleitung, solange du am Einsatz angemeldet bist.
-        # Ortung im Hintergrund nur für eine bestehende Helfer-Kopplung (ADR-0098).
+        # Ortung im Hintergrund nur für eine bestehende Helfer-Kopplung (ADR-0101).
         UIBackgroundModes:
           - location
         NSSupportsLiveActivities: true

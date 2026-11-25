@@ -28,7 +28,7 @@ struct Rueckmeldung: Sendable {
     }
 }
 
-/// Folgt keiner Weiterleitung (ADR-0098: nur der Server der Kopplung). Das `Cookie` setzt die
+/// Folgt keiner Weiterleitung (ADR-0101: nur der Server der Kopplung). Das `Cookie` setzt die
 /// Verbindung von Hand; `URLSession` kopierte es beim Folgen in die Anfrage an die neue Adresse.
 /// Ohne neue Anfrage endet die Aufgabe mit der 3xx-Antwort selbst, die wie ein Serverfehler gilt
 /// (`entscheide`: wiederholen).
@@ -41,7 +41,7 @@ final class OhneWeiterleitung: NSObject, URLSessionTaskDelegate, Sendable {
     }
 }
 
-/// Verbindung zum Server der einen Kopplung (ADR-0098: nur an diesen Server und nur mit der
+/// Verbindung zum Server der einen Kopplung (ADR-0101: nur an diesen Server und nur mit der
 /// Sitzung dieser Kopplung, ohne Weiterleitungen). Eine eigene `URLSession` ohne gemeinsamen
 /// Cookie-Speicher: das Cookie `lifeline_sid` nimmt die Verbindung aus `Set-Cookie` selbst an und
 /// schickt es selbst mit, die Ablage ist der Schlüsselbund (`Sitzungsablage`). So landet es nie in

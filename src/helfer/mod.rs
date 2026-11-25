@@ -1,4 +1,4 @@
-//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0098):
+//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0101):
 //! Helfende melden sich per Einsatz-QR selbst an und senden ihre Position an ein Ziel (Einheit
 //! oder Fahrzeug, optional die Person).
 //!

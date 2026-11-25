@@ -7,7 +7,7 @@
 #   scripts/ios/testflight.sh --app helfer --build <nummer> [--ausgabe <verzeichnis>]
 #
 # `--app` wählt die App: `hub` (Vorgabe) ist die Lifeline-Hülle mit Tag und Workspace-Version,
-# `helfer` die Helfer-App (ADR-0098, `.github/workflows/ios-helfer.yml`): Schema
+# `helfer` die Helfer-App (ADR-0101, `.github/workflows/ios-helfer.yml`): Schema
 # `LifelineHelfer`, kein Tag, Version aus scripts/ios/helfer-version.sh und die Build-Nummer aus
 # `--build`. Signierung und Upload sind dieselben.
 #

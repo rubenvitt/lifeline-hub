@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 25.11.2026 (iOS-Helfer-App `ios/Helfer` mit Live-Aktivität, ADR-0098; iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 25.11.2026 (iOS-Helfer-App `ios/Helfer` mit Live-Aktivität, ADR-0101; iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -476,7 +476,7 @@ Wrapper und Versionskatalog `libs.versions.toml`, `android/settings.gradle.kts` 
 
 ### Helfer-App (`ios/Helfer`, `android/helfer`)
 
-Die Helfer-App (ADR-0098, Regeln in [ios/Helfer/AGENTS.md](../../ios/Helfer/AGENTS.md) und
+Die Helfer-App (ADR-0101, Regeln in [ios/Helfer/AGENTS.md](../../ios/Helfer/AGENTS.md) und
 [android/helfer/AGENTS.md](../../android/helfer/AGENTS.md)) ist je Plattform eine eigene native App
 (SwiftUI, Compose) neben den Hüllen: Helfer lösen eine Einladung ein und senden danach die letzte
 Position an den Server ihrer Kopplung. Die Logik steht im Kern (`ios/HelferKern`,

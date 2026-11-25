@@ -36,7 +36,7 @@ data class Rueckmeldung(val status: Int, val text: String) {
 }
 
 /**
- * Verbindung zum Server der einen Kopplung (ADR-0098: nur an diesen Server und nur mit der Sitzung
+ * Verbindung zum Server der einen Kopplung (ADR-0101: nur an diesen Server und nur mit der Sitzung
  * dieser Kopplung). `HttpURLConnection` ohne gemeinsamen Cookie-Speicher und ohne Weiterleitungen:
  * das Cookie `lifeline_sid` nimmt die Verbindung aus `Set-Cookie` selbst an und schickt es selbst
  * mit; abgelegt wird es verschlüsselt in der [Sitzungsablage]. Jede Anfrage blockiert; Aufrufer
@@ -89,7 +89,7 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
             }
             val status = verbindung.responseCode
             if (status in 300..399) {
-                // Nicht gefolgt (ADR-0098); gilt wie ein Serverfehler ([entscheide]: wiederholen).
+                // Nicht gefolgt (ADR-0101); gilt wie ein Serverfehler ([entscheide]: wiederholen).
                 // Ohne Ziel und ohne Cookie im Protokoll.
                 Log.w(TAG, "Weiterleitung $status auf $methode /$pfad nicht gefolgt")
             }

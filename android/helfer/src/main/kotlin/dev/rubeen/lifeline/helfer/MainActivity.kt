@@ -16,7 +16,7 @@ import dev.rubeen.lifeline.helfer.ui.HelferThema
 import dev.rubeen.lifeline.helferkern.Testzustand
 
 /**
- * Einzige Activity von Lifeline Helfer (ADR-0098): von Rand zu Rand, die Systemleisten folgen dem
+ * Einzige Activity von Lifeline Helfer (ADR-0101): von Rand zu Rand, die Systemleisten folgen dem
  * Systemmodus, Zurück mit vorausschauender Geste (`enableOnBackInvokedCallback` im Manifest,
  * `BackHandler` in den Seiten). `singleTask`: ein Deeplink `lifeline-helfer://anmelden` kommt als
  * neues Intent in dieselbe Activity. Ein Testzustand im Intent ([Testzustand.EXTRA]) zeigt nur in

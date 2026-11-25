@@ -94,12 +94,12 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Archiv, Signierung und Upload stehen in `scripts/ios/testflight.sh`, das Alpha-Tags und eine
     vom Tag abweichende Workspace-Version selbst abweist (Selbsttest in Schritt 8). Betrieb und
     Secrets: `docs/betrieb/ios-app.md`.
-  - **TestFlight der Helfer-App** (ADR-0098): `ios-helfer.yml` lädt das Schema `LifelineHelfer`
+  - **TestFlight der Helfer-App** (ADR-0101): `ios-helfer.yml` lädt das Schema `LifelineHelfer`
     hoch, nur an PRs mit dem Label `testflight-helfer` (beim Setzen und bei jedem Push danach)
     oder per Handstart; dasselbe Skript mit `--app helfer --build <Laufnummer + 1000>`, die
     Version steht nur in `scripts/ios/helfer-version.sh`. Kein Verteilschritt: die Gruppe
     „Intern“ bekommt jeden Build automatisch. `ios-pruefung.yml` testet die Helfer-App mit.
-  - **APK der Helfer-App** (ADR-0098): `android-helfer.yml` baut `:helfer:assembleRelease` mit
+  - **APK der Helfer-App** (ADR-0101): `android-helfer.yml` baut `:helfer:assembleRelease` mit
     demselben Schlüssel wie die Lifeline-App (`ANDROID_KEY*`, fehlt eins: rot), prüft Signatur
     und Paket und legt die APK als Artefakt `android-helfer-apk` ab; nur an PRs mit dem Label
     `apk-helfer` oder per Handstart, `versionCode` = Laufnummer + 1000. Noch kein Kanal.

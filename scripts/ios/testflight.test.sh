@@ -187,7 +187,7 @@ pruefe "Ausgabe: build= mit der Nummer aus version.sh" "build=202611181200" "$(c
 w="$(wurzel_mit 1.0.0-beta.3)"
 pruefe "ohne GITHUB_OUTPUT: Exit 0" 0 "$(laufe "$w" --tag v1.0.0-beta.3 --ausgabe "$w/aus")"
 
-echo "==> ios/testflight.sh: Helfer-App (ADR-0098, ios-helfer.yml)"
+echo "==> ios/testflight.sh: Helfer-App (ADR-0101, ios-helfer.yml)"
 w="$(wurzel_mit 1.0.0-alpha.200)"
 ausgabe="$ARBEIT/github-output-helfer"
 : > "$ausgabe"

@@ -1,7 +1,7 @@
 import ActivityKit
 import Foundation
 
-/// Live-Aktivität der laufenden Ortung (ADR-0098: die Ortung ist sichtbar) auf Sperrbildschirm
+/// Live-Aktivität der laufenden Ortung (ADR-0101: die Ortung ist sichtbar) auf Sperrbildschirm
 /// und Dynamic Island: Einsatz und Ziel fest, letzte Sendung und Pause im Zustand. Gemeinsam mit
 /// der Widget-Erweiterung; die App startet, ändert und beendet sie (`LiveAktivitaet`).
 struct OrtungAttribute: ActivityAttributes, Hashable {

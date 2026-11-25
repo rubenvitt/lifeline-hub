@@ -1,5 +1,5 @@
 ---
-id: ADR-0098
+id: ADR-0101
 titel: Die Helfer-App ist eine eigene native App und ortet im Hintergrund nur für eine aktive Helfer-Kopplung
 status: akzeptiert
 datum: 2026-11-24
@@ -13,7 +13,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
 ---
 
-# ADR-0098: Die Helfer-App ist eine eigene native App und ortet im Hintergrund nur für eine aktive Helfer-Kopplung
+# ADR-0101: Die Helfer-App ist eine eigene native App und ortet im Hintergrund nur für eine aktive Helfer-Kopplung
 
 ## Regeln
 

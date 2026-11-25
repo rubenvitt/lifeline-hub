@@ -35,7 +35,7 @@ enum class Antwort(val kennwort: String) {
  * Nur 401, 403 und 404 stoppen den Dienst, damit ein Neustart des Servers nicht die Ortung aller
  * Helfer stilllegt; ein 403 mit [Ruhegrund] lässt die Kopplung bestehen ([Antwort.RUHEN]). Ein
  * anderer 4xx außer 408 und 429 (400, 422) ist ein Fehler dieser Sendung und wird verworfen. Eine
- * Weiterleitung (3xx) folgt die App nie (ADR-0098: nur der Server der Kopplung); sie gilt wie ein
+ * Weiterleitung (3xx) folgt die App nie (ADR-0101: nur der Server der Kopplung); sie gilt wie ein
  * Serverfehler.
  */
 fun entscheide(status: Int, grund: String? = null): Antwort = when (status) {
@@ -49,7 +49,7 @@ fun entscheide(status: Int, grund: String? = null): Antwort = when (status) {
 }
 
 /**
- * Abstand bis zur nächsten Wiederholung nach Fehlern in Folge (ADR-0098: wachsender Abstand,
+ * Abstand bis zur nächsten Wiederholung nach Fehlern in Folge (ADR-0101: wachsender Abstand,
  * höchstens jede Minute): 5, 10, 20, 40, 60, 60, … Sekunden. Ein `weiter` setzt zurück.
  */
 class Wiederholung {

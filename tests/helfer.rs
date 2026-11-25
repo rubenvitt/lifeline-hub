@@ -1,4 +1,4 @@
-//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0098):
+//! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0101):
 //! Helfer-Einladung, Anmeldung und Bestätigung durch die Leitung.
 
 use axum::http::StatusCode;

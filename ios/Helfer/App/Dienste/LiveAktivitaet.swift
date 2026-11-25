@@ -1,7 +1,7 @@
 import ActivityKit
 import Foundation
 
-/// Die Live-Aktivität der Ortung (ADR-0098: die Ortung ist sichtbar). Gestartet nur aus dem
+/// Die Live-Aktivität der Ortung (ADR-0101: die Ortung ist sichtbar). Gestartet nur aus dem
 /// Vordergrund zusammen mit der Ortung, geändert bei jeder angenommenen Sendung und jeder Pause,
 /// beendet mit der Ortung (`Antwort.stoppen`, Abmelden, Ende der Kopplung).
 ///

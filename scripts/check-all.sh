@@ -550,7 +550,7 @@ schritt_17() {
 }
 
 schritt_18() {
-  echo "==> [18/$SCHRITTE] Swift-Kerne der iOS-Hülle und der Helfer-App gegen die gemeinsamen Fälle (LLH-1978, ADR-0098)"
+  echo "==> [18/$SCHRITTE] Swift-Kerne der iOS-Hülle und der Helfer-App gegen die gemeinsamen Fälle (LLH-1978, ADR-0101)"
   # `swift test` im Paket ios/LifelineKern: Adressprüfung, Deeplink und Linkregeln gegen
   # src-tauri/faelle/ (dieselben Fälle prüft die Desktop-Hülle in Schritt 4), dazu Serverliste,
   # Vertragsprüfung, Onboarding und Haptik. Danach im Paket ios/HelferKern: QR und Deeplink,
@@ -617,7 +617,7 @@ schritt_20() {
   # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an (Testnamen als Satz); unter der
   # Locale C scheitert das mit `InvalidPathException`. Deshalb immer mit UTF-8.
   LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
-  # Kern der Helfer-App (ADR-0098): eigener Build, gleiche Voraussetzungen, gemeinsame Fälle
+  # Kern der Helfer-App (ADR-0101): eigener Build, gleiche Voraussetzungen, gemeinsame Fälle
   # `src-tauri/faelle/helfer.json`.
   LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/helferkern" test --console=plain
 }

@@ -5,7 +5,7 @@ und Fahrzeugen über die Helfer-App und, wenn die Organisation es freigibt, von 
 Vorlage aus LLH-2091 gab es beim Anlegen noch nicht; diese Datei ist deshalb die gemeinsame, und
 eine spätere Vorlage dort bezieht sich auf sie. Herleitung:
 `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, Abschnitt „Datenschutz“;
-Regeln der App: [ADR-0098](../architektur/entscheidungen/ADR-0098-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md).
+Regeln der App: [ADR-0101](../architektur/entscheidungen/ADR-0101-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md).
 
 Die Vorlage beschreibt, was Lifeline Hub tut. **Ob eine DSFA nötig ist und wie sie ausfällt,
 entscheidet die verantwortliche Organisation** mit ihrer oder ihrem Datenschutzbeauftragten.
@@ -89,7 +89,7 @@ Mildere Mittel, die die Software bietet:
   zweiter, eigener Schalter.
 - Ortung nur **je Kopplung** und nur mit Einwilligung der Person; sichtbar durch die
   Standortanzeige und Live-Aktivität (iOS) bzw. die Benachrichtigung des Dienstes (Android).
-- **Nur „When in Use“** (iOS) bzw. Vordergrund-Dienst (Android), nie „Immer“ (ADR-0098).
+- **Nur „When in Use“** (iOS) bzw. Vordergrund-Dienst (Android), nie „Immer“ (ADR-0101).
 - **Pausieren** jederzeit; die Personenposition wird dabei gelöscht.
 - Takt: höchstens alle 30 Sekunden und nur bei Bewegung über 25 m, sonst ein Lebenszeichen alle
   5 Minuten; gepuffert wird höchstens die letzte Position bis zu 10 Minuten.

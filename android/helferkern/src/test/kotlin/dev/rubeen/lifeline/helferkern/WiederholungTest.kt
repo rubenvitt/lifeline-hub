@@ -3,7 +3,7 @@ package dev.rubeen.lifeline.helferkern
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Wachsender Abstand der Wiederholung: 5, 10, 20, 40, dann höchstens jede Minute (ADR-0098). */
+/** Wachsender Abstand der Wiederholung: 5, 10, 20, 40, dann höchstens jede Minute (ADR-0101). */
 class WiederholungTest {
     @Test
     fun `der Abstand waechst bis zur Obergrenze von 60 Sekunden`() {

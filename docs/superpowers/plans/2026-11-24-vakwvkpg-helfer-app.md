@@ -82,7 +82,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
 ### Task 1: ADR, Regeln, Glossar
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0098-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md`
+- Create: `docs/architektur/entscheidungen/ADR-0101-die-helfer-app-ist-eine-eigene-native-app-und-ortet-im-hintergrund-nur-fuer-eine-aktive-helfer-kopplung.md`
   (Nummer vorher prüfen: die nächste freie auf alpha)
 - Create: `ios/Helfer/AGENTS.md`, `android/helfer/AGENTS.md`
 - Modify: `AGENTS.md` (Tabelle „Wo die Regeln stehen“: zwei Zeilen)

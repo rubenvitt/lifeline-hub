@@ -284,7 +284,7 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
 
 ## Helfer-App (Lifeline Helfer)
 
-Eigene native App neben der Hülle (ADR-0098, Regeln `ios/Helfer/AGENTS.md`): Helfer scannen den
+Eigene native App neben der Hülle (ADR-0101, Regeln `ios/Helfer/AGENTS.md`): Helfer scannen den
 Einsatz-QR, melden sich mit Namen und Ziel an und senden danach ihre Position, auch bei gesperrtem
 Bildschirm. Bundle-ID `dev.rubeen.lifeline.helfer`, Widget-Erweiterung
 `dev.rubeen.lifeline.helfer.aktivitaet` (Live-Aktivität), App Group

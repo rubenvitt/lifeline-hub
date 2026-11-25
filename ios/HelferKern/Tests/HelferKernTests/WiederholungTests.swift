@@ -2,7 +2,7 @@ import XCTest
 
 @testable import HelferKern
 
-/// Wachsender Abstand der Wiederholung: 5, 10, 20, 40, dann höchstens jede Minute (ADR-0098).
+/// Wachsender Abstand der Wiederholung: 5, 10, 20, 40, dann höchstens jede Minute (ADR-0101).
 final class WiederholungTests: XCTestCase {
     func testDerAbstandWaechstBisZurObergrenzeVon60Sekunden() {
         var w = Wiederholung()

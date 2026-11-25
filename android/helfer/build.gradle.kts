@@ -1,4 +1,4 @@
-// Helfer-App „Lifeline Helfer“ (ADR-0098, Regeln android/helfer/AGENTS.md): eigene native App mit
+// Helfer-App „Lifeline Helfer“ (ADR-0101, Regeln android/helfer/AGENTS.md): eigene native App mit
 // Compose, eigene Application-ID, derselbe Signierschlüssel wie `:app`. Was ohne Android geht,
 // entscheidet der Kern `dev.rubeen.lifeline:helferkern`; hier stehen Oberfläche, Dienst und
 // Systemdienste. Plugins und Versionen wie `:app` (android/app/build.gradle.kts).

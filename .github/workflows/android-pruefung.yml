@@ -2,7 +2,7 @@
 # die gemeinsamen Fälle der Hüllen ändert, und nach jedem solchen Push auf `alpha`: auf
 # `ubuntu-latest` die App-Tests unter Robolectric fahren, die Release-APK ohne Signatur bauen, den
 # Kotlin-Kern testen und die Bildschirmbilder jeder nativen Seite als Artefakt `android-bilder`
-# ablegen (Bilder der Änderung für den PR). Ebenso für die Helfer-App (`:helfer`, ADR-0098): Tests,
+# ablegen (Bilder der Änderung für den PR). Ebenso für die Helfer-App (`:helfer`, ADR-0101): Tests,
 # Release-APK ohne Signatur und ihre Bilder als `android-helfer-bilder`. Ohne grünen Lauf ist
 # App-Code nicht fertig.
 #

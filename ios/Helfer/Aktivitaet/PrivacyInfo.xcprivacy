@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Privacy-Manifest der Widget-Erweiterung HelferAktivitaet (ADR-0098): sie erhebt nichts. Die
+  Privacy-Manifest der Widget-Erweiterung HelferAktivitaet (ADR-0101): sie erhebt nichts. Die
   Pausieranfrage kann sie in die UserDefaults der App Group legen (Grund 1C8F.1).
 -->
 <plist version="1.0">

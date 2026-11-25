@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Lifeline Helfer (ADR-0098, Regeln android/helfer/AGENTS.md): eine App mit einer Aufgabe, am Einsatz
+  Lifeline Helfer (ADR-0101, Regeln android/helfer/AGENTS.md): eine App mit einer Aufgabe, am Einsatz
   anmelden und die Position senden. Ortung nur im Vordergrund-Dienst vom Typ `location`, gestartet aus
   der geöffneten App; kein Recht für den Standort im Hintergrund.
 -->
@@ -53,7 +53,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Die einzige Stelle, die im Hintergrund sendet; nur aus der App gestartet (ADR-0098). -->
+        <!-- Die einzige Stelle, die im Hintergrund sendet; nur aus der App gestartet (ADR-0101). -->
         <service
             android:name=".dienste.OrtungsDienst"
             android:exported="false"

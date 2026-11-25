@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Version der Helfer-App (ADR-0098, Regeln ios/Helfer/AGENTS.md): eigene Zählung, unabhängig von
+# Version der Helfer-App (ADR-0101, Regeln ios/Helfer/AGENTS.md): eigene Zählung, unabhängig von
 # `[workspace.package]`, weil die Helfer-App eine eigene App in App Store Connect ist.
 #
 #   scripts/ios/helfer-version.sh [--build <nummer>] [--ausgabe <datei.xcconfig>]

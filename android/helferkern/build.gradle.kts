@@ -1,4 +1,4 @@
-// Testbare Logik der Android-Helfer-App ohne Android-Klassen (ADR-0098). Reines Kotlin/JVM, damit
+// Testbare Logik der Android-Helfer-App ohne Android-Klassen (ADR-0101). Reines Kotlin/JVM, damit
 // `android/gradlew -p android/helferkern test` nur ein JDK braucht; Gegenstück zu `ios/HelferKern`.
 plugins {
     alias(libs.plugins.kotlin.jvm)

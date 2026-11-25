@@ -1594,7 +1594,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
         )
-        // Helfer-App (Spec 2026-11-24-vakwvkpg, ADR-0098): Einladung und Helfer der Leitung.
+        // Helfer-App (Spec 2026-11-24-vakwvkpg, ADR-0101): Einladung und Helfer der Leitung.
         .route(
             "/api/incidents/{id}/helpers",
             get(routes::helfer::uebersicht),

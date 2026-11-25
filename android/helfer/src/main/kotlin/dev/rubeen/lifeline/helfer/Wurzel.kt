@@ -44,7 +44,7 @@ private fun seitenart(phase: Phase): Int = when (phase) {
 /**
  * Wählt die Seite nach der Phase der `Anmeldung` im Kern; Wechsel sind sanft animiert. Fragt vor dem
  * Anmelden und vor dem Start der Ortung nach dem Standort (fein oder grob, nur im Vordergrund) und
- * nach Benachrichtigungen; nie nach dem Standort im Hintergrund (ADR-0098).
+ * nach Benachrichtigungen; nie nach dem Standort im Hintergrund (ADR-0101).
  */
 @Composable
 fun Wurzel(modell: HelferModell, onEinstellungen: () -> Unit) {

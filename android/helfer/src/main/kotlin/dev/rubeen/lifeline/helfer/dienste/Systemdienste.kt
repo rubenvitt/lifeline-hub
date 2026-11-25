@@ -21,7 +21,7 @@ interface Dienste {
     /** Zuletzt genutzter Anzeigename (kein Geheimnis, unverschlüsselt). */
     var anzeigename: String
 
-    /** Ob die Ortung fein oder grob erlaubt ist (nur im Vordergrund, ADR-0098). */
+    /** Ob die Ortung fein oder grob erlaubt ist (nur im Vordergrund, ADR-0101). */
     val isOrtungErlaubt: Boolean
 
     /** Startet den [OrtungsDienst]; `false`, wenn das System ihn nicht zulässt. */

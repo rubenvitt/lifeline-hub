@@ -1,4 +1,4 @@
-# Helfer-App zu TestFlight (ADR-0098, Regeln ios/Helfer/AGENTS.md): das Projekt erzeugen, das Schema
+# Helfer-App zu TestFlight (ADR-0101, Regeln ios/Helfer/AGENTS.md): das Projekt erzeugen, das Schema
 # `LifelineHelfer` archivieren, automatisch signieren und hochladen. Ablauf in
 # `scripts/ios/testflight.sh --app helfer` (dasselbe Skript wie die Hülle, auf einem Mac genauso),
 # XcodeGen gepinnt in `scripts/ios/xcodegen-installieren.sh`. Die App in App Store Connect

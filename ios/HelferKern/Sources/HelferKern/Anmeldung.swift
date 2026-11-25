@@ -20,7 +20,7 @@ public enum Phase: Equatable, Sendable {
     case beendet(Grund)
 
     /// Ob der Ortungsdienst läuft: ab dem Einlösen, solange die Kopplung besteht und nicht
-    /// pausiert ist (ADR-0098).
+    /// pausiert ist (ADR-0101).
     public var ortet: Bool {
         switch self {
         case .unbestaetigt, .aktiv: true
