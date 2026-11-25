@@ -3120,6 +3120,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("freigegeben_at", G_ZEIT),
         ],
     },
+    // ---------- Zuschaltung einer Drohnenquelle (LLH-2105, migrations/0373_adapter_einsatz.sql) ----------
+    // Ohne Personenbezug: welcher Adapter einem Einsatz zugeschaltet ist, seit wann und ob der
+    // Lagemonitor ihn zeigt. Aus der Drohnenlage selbst wird nichts gespeichert.
+    TabellenRegel {
+        tabelle: "adapter_einsatz",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("adapter_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("zugeschaltet_at", G_ZEIT),
+            retain("lagemonitor", G_KONFIG),
+        ],
+    },
     // ---------- Lagebild für Externe (LLH-1496, migrations/0319) ----------
     TabellenRegel {
         tabelle: "lagebild_freigabe",
