@@ -173,15 +173,28 @@ struct Offen {
     geraet: Geraet,
 }
 
+/// Was unter der Sperre einer Anbindung liegt. Alles, was ein abgebrochener Zugriff noch schuldig
+/// ist, steht hier (nicht in lokalen Variablen), damit der nächste Halter es zu Ende führt.
+#[derive(Default)]
+struct Zugriff {
+    offen: Option<Offen>,
+    /// Ein geschlossener Client, den womöglich noch ein Hintergrund-Task des SDK hält. Bevor ein
+    /// neuer Client den Speicher öffnet oder das Verzeichnis fällt, muss er ganz los sein.
+    alt: Option<matrix_sdk::WeakClient>,
+}
+
+type Sperre = tokio::sync::OwnedMutexGuard<Zugriff>;
+
 /// Was der Prozess je Anbindung hält. Der Client liegt hinter der `tokio`-Mutex (Zugriffe
 /// nacheinander); der Befund hinter einer eigenen kleinen Sperre, damit Lesen nie hinter einem
 /// langen Versand wartet.
 #[derive(Default)]
 struct Eintrag {
-    offen: tokio::sync::Mutex<Option<Offen>>,
+    zugriff: Arc<tokio::sync::Mutex<Zugriff>>,
     befund: std::sync::Mutex<Option<Pruefbefund>>,
     /// Vorgemerkt von [`Clients::verwerfen`]: wer als Nächstes an den Client kommt, verwirft ihn
-    /// und löscht das Verzeichnis, bevor er etwas anderes tut.
+    /// und löscht das Verzeichnis, bevor er etwas anderes tut. Zurückgesetzt erst, wenn das
+    /// Verzeichnis wirklich weg ist.
     verwerfen: AtomicBool,
 }
 
@@ -275,19 +288,26 @@ impl Clients {
     }
 
     /// Sperrt den Client der Anbindung; ist ein Verwerfen vorgemerkt, erledigt es der Halter der
-    /// Sperre zuerst.
-    async fn sperre<'e>(
+    /// Sperre zuerst. Das Verwerfen läuft in einem eigenen Task, der die Sperre hält: bricht der
+    /// Aufrufer ab (Frist), endet nur sein Warten, nie das Verwerfen halb. Scheitert es (alter
+    /// Client nicht frei, Verzeichnis nicht löschbar), bleibt es vorgemerkt, und der Zugriff
+    /// scheitert, statt einen Speicher zu öffnen, der fallen soll.
+    async fn sperre(
         &self,
         adapter_id: &str,
-        eintrag: &'e Eintrag,
-    ) -> tokio::sync::MutexGuard<'e, Option<Offen>> {
-        let mut offen = eintrag.offen.lock().await;
-        if eintrag.verwerfen.swap(false, Ordering::SeqCst) {
-            eintrag.set_befund(None);
-            schliesse(&mut offen, adapter_id).await;
-            self.loesche_verzeichnis(adapter_id).await;
+        eintrag: &Arc<Eintrag>,
+    ) -> Result<Sperre, MatrixFehler> {
+        let sperre = eintrag.zugriff.clone().lock_owned().await;
+        if !eintrag.verwerfen.load(Ordering::SeqCst) {
+            return Ok(sperre);
         }
-        offen
+        let task = tokio::spawn(raeume(
+            eintrag.clone(),
+            sperre,
+            self.verzeichnis(adapter_id),
+            adapter_id.to_string(),
+        ));
+        task.await.unwrap_or(Err(MatrixFehler::Verschluesselung))
     }
 
     /// Führt `f` mit dem Client der Anbindung aus; baut ihn bei Bedarf (Token prüfen, Speicher
@@ -298,8 +318,8 @@ impl Clients {
         f: impl for<'c> FnOnce(&'c matrix_sdk::Client) -> BoxFuture<'c, T>,
     ) -> Result<T, MatrixFehler> {
         let eintrag = self.eintrag(&ziel.adapter_id);
-        let mut offen = self.sperre(&ziel.adapter_id, &eintrag).await;
-        let client = self.oeffne(&eintrag, &mut offen, ziel, None).await?;
+        let mut zugriff = self.sperre(&ziel.adapter_id, &eintrag).await?;
+        let client = self.oeffne(&eintrag, &mut zugriff, ziel, None).await?;
         Ok(f(&client).await)
     }
 
@@ -315,24 +335,8 @@ impl Clients {
         eintrag.set_befund(None);
         let adapter_id = adapter_id.to_string();
         async move {
+            // Scheitert es, bleibt es vorgemerkt; der nächste Zugriff versucht es wieder.
             drop(self.sperre(&adapter_id, &eintrag).await);
-        }
-    }
-
-    /// Löscht das Speicherverzeichnis einer Anbindung; nur unter ihrer Sperre, ohne offenen Client.
-    async fn loesche_verzeichnis(&self, adapter_id: &str) {
-        let Some(dir) = self.verzeichnis(adapter_id) else {
-            return;
-        };
-        match tokio::fs::remove_dir_all(&dir).await {
-            Ok(()) => {}
-            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-            Err(err) => {
-                tracing::warn!(
-                    adapter = adapter_id,
-                    "Matrix-Speicher nicht gelöscht: {err}"
-                )
-            }
         }
     }
 
@@ -350,24 +354,24 @@ impl Clients {
     async fn oeffne(
         &self,
         eintrag: &Eintrag,
-        offen: &mut Option<Offen>,
+        zugriff: &mut Zugriff,
         ziel: &MatrixZiel,
         geraet: Option<Geraet>,
     ) -> Result<matrix_sdk::Client, MatrixFehler> {
         let stand = stand(ziel);
-        if let Some(o) = offen.as_ref() {
+        if let Some(o) = zugriff.offen.as_ref() {
             if o.stand == stand {
                 return Ok(o.client.clone());
             }
         }
         eintrag.set_befund(None);
-        schliesse(offen, &ziel.adapter_id).await;
+        schliesse(zugriff, &ziel.adapter_id).await?;
         let geraet = match geraet {
             Some(g) => g,
             None => self.whoami(ziel).await?,
         };
         let client = self.baue(ziel, &geraet).await?;
-        *offen = Some(Offen {
+        zugriff.offen = Some(Offen {
             client: client.clone(),
             stand,
             geraet,
@@ -546,20 +550,21 @@ async fn pruefe_ohne_frist(
     ziel: &MatrixZiel,
 ) -> Result<Pruefbefund, MatrixFehler> {
     let eintrag = clients.eintrag(&ziel.adapter_id);
-    let mut offen = clients.sperre(&ziel.adapter_id, &eintrag).await;
+    let mut zugriff = clients.sperre(&ziel.adapter_id, &eintrag).await?;
     let geraet = clients.whoami(ziel).await?;
     // Ein offener Client für ein anderes Gerät desselben Ziels (Token beim Server neu vergeben):
     // nicht weiter benutzen; der Speicher gehört dem alten Gerät.
-    if offen
+    if zugriff
+        .offen
         .as_ref()
         .is_some_and(|o| o.stand == stand(ziel) && o.geraet != geraet)
     {
         eintrag.set_befund(None);
-        schliesse(&mut offen, &ziel.adapter_id).await;
+        schliesse(&mut zugriff, &ziel.adapter_id).await?;
         return Err(MatrixFehler::SchluesselPassenNicht);
     }
     let client = clients
-        .oeffne(&eintrag, &mut offen, ziel, Some(geraet.clone()))
+        .oeffne(&eintrag, &mut zugriff, ziel, Some(geraet.clone()))
         .await?;
 
     let filter = SyncFilter::FilterDefinition(ohne_raeume());
@@ -603,13 +608,16 @@ async fn pruefe_ohne_frist(
 
 /// Schließt den offenen Client: lässt ihn los und wartet, bis auch Hintergrund-Tasks des SDK
 /// ihn losgelassen haben (keine starke Referenz mehr, damit Speicher und Verbindungen zu sind).
-/// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen.
-async fn schliesse(offen: &mut Option<Offen>, adapter_id: &str) {
-    let Some(alt) = offen.take() else {
-        return;
+/// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen. Der
+/// schwache Verweis bleibt unter der Sperre, bis er frei ist: bricht das Warten ab, wartet der
+/// nächste Halter weiter. Ist er nach [`FREIGABE_WARTEZEIT`] nicht frei, scheitert es.
+async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), MatrixFehler> {
+    if let Some(alt) = zugriff.offen.take() {
+        zugriff.alt = Some(alt.client.downgrade());
+    }
+    let Some(schwach) = &zugriff.alt else {
+        return Ok(());
     };
-    let schwach = alt.client.downgrade();
-    drop(alt);
     let frist = tokio::time::Instant::now() + FREIGABE_WARTEZEIT;
     while schwach.strong_count() > 0 {
         if tokio::time::Instant::now() >= frist {
@@ -617,10 +625,36 @@ async fn schliesse(offen: &mut Option<Offen>, adapter_id: &str) {
                 adapter = adapter_id,
                 "Matrix: alter Client nach {FREIGABE_WARTEZEIT:?} noch gehalten"
             );
-            return;
+            return Err(MatrixFehler::Verschluesselung);
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
+    zugriff.alt = None;
+    Ok(())
+}
+
+/// Verwirft unter der Sperre: Client schließen, Verzeichnis löschen, erst dann die Vormerkung
+/// zurücksetzen. Läuft als eigener Task (siehe [`Clients::sperre`]); gibt die Sperre zurück.
+async fn raeume(
+    eintrag: Arc<Eintrag>,
+    mut sperre: Sperre,
+    dir: Option<PathBuf>,
+    adapter_id: String,
+) -> Result<Sperre, MatrixFehler> {
+    eintrag.set_befund(None);
+    schliesse(&mut sperre, &adapter_id).await?;
+    if let Some(dir) = dir {
+        match tokio::fs::remove_dir_all(&dir).await {
+            Ok(()) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => {
+                tracing::warn!(adapter = %adapter_id, "Matrix-Speicher nicht gelöscht: {err}");
+                return Err(MatrixFehler::Verschluesselung);
+            }
+        }
+    }
+    eintrag.verwerfen.store(false, Ordering::SeqCst);
+    Ok(sperre)
 }
 
 /// Ein Filter, der keine Räume, Präsenz und Kontodaten lädt: der Sync bringt nur to-device und

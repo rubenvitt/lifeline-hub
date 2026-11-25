@@ -621,3 +621,41 @@ async fn pruefung_endet_nach_der_frist() {
     assert!(matrix::PRUEF_ZEITLIMIT < lifeline_hub::zulassung::REQUEST_BUDGET);
     langer.abort();
 }
+
+#[tokio::test]
+async fn abgebrochenes_verwerfen_loescht_das_verzeichnis_trotzdem() {
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let (server1, token1) = homeserver("BOT1").await;
+    let ziel1 = ziel(&server1, &token1, "a1");
+    matrix::pruefe(&clients, &ziel1).await.expect("BOT1");
+
+    // Ein Hintergrund-Task hält den alten Client länger, als der Aufrufer wartet.
+    clients
+        .mit_client(&ziel1, |client| {
+            let halter = client.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+                drop(halter);
+            });
+            Box::pin(async {})
+        })
+        .await
+        .expect("Zugriff");
+    let abgebrochen =
+        tokio::time::timeout(Duration::from_millis(50), clients.verwerfen("a1")).await;
+    assert!(
+        abgebrochen.is_err(),
+        "Verwerfen wartet noch auf den alten Client"
+    );
+
+    // Der nächste Zugriff findet keinen Speicher des alten Geräts mehr.
+    let (server2, token2) = homeserver("BOT2").await;
+    let befund = matrix::pruefe(&clients, &ziel(&server2, &token2, "a1"))
+        .await
+        .expect("Prüfung nach abgebrochenem Verwerfen");
+    assert_eq!(befund.device_id, "BOT2");
+    let merk =
+        std::fs::read_to_string(basis.path().join("matrix/a1").join(matrix::GERAET_DATEI)).unwrap();
+    assert!(merk.contains("BOT2"), "{merk}");
+}
