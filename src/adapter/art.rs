@@ -249,6 +249,7 @@ impl Verzeichnis {
         Verzeichnis::new(vec![
             Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
+            Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
 
@@ -427,10 +428,8 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        assert!(
-            Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()))
-                .find("suchlage")
-                .is_some()
-        );
+        let produktiv = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
+        assert!(produktiv.find("suchlage").is_some());
+        assert!(produktiv.find("stammdaten_abruf").is_some());
     }
 }

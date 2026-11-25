@@ -85,6 +85,14 @@ export function resumeAdapter(id: string): Promise<AdapterAnzeige> {
   return apiSend<AdapterAnzeige>(`${pfad(id)}/resume`, 'POST');
 }
 
+/**
+ * „Erneut vorlegen“ (LLH-1194, nur Art `stammdaten_abruf`): der nächste Abruf legt in jedem Fall
+ * einen Schnappschuss zum Prüfen an, auch ohne Änderung an der Quelle.
+ */
+export function resubmitAdapter(id: string): Promise<void> {
+  return apiSend<void>(`${pfad(id)}/resubmit`, 'POST');
+}
+
 export function loadAdapterVersuche(id: string): Promise<AdapterVersuchAnzeige[]> {
   return apiGet<AdapterVersuchAnzeige[]>(`${pfad(id)}/attempts`);
 }

@@ -15622,3 +15622,72 @@ async fn migration_0374_stammdaten_kennung() {
         "ein Fahrzeug mit Kennung hält fest (NO ACTION, Demo-Löschweg behält es)"
     );
 }
+
+/// LLH-1194: höchstens ein offener Schnappschuss je Adapter, nur ein offener trägt Inhalt, Löschen
+/// des Adapters kaskadiert; `adapter.vorlegen_erzwingen` steht auf 0.
+#[tokio::test]
+async fn migration_0380_stammdaten_schnappschuss() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 380;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Org')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO adapter (id, org_id, art, name, intervall_s) VALUES ('a1', 1, 'stammdaten_abruf', 'Abruf', 3600)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    migriere_bis(&pool, VERSION).await;
+
+    let erzwingen: i64 =
+        sqlx::query_scalar("SELECT vorlegen_erzwingen FROM adapter WHERE id = 'a1'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(erzwingen, 0);
+
+    let einfuegen = |id: &'static str, status: &'static str, inhalt: Option<&'static str>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO stammdaten_schnappschuss (id, org_id, adapter_id, status, fingerabdruck, inhalt, anzahl, abgerufen_at) \
+                 VALUES (?, 1, 'a1', ?, 'f', ?, '{}', '2026-11-25T00:00:00Z')",
+            )
+            .bind(id)
+            .bind(status)
+            .bind(inhalt)
+            .execute(&pool)
+            .await
+        }
+    };
+    assert!(einfuegen("s1", "offen", Some("{}")).await.is_ok());
+    assert!(
+        einfuegen("s2", "offen", Some("{}")).await.is_err(),
+        "zweiter offener"
+    );
+    assert!(
+        einfuegen("s3", "offen", None).await.is_err(),
+        "offen ohne Inhalt"
+    );
+    assert!(
+        einfuegen("s4", "uebernommen", Some("{}")).await.is_err(),
+        "erledigt mit Inhalt"
+    );
+    assert!(einfuegen("s5", "ersetzt", None).await.is_ok());
+    assert!(einfuegen("s6", "unbekannt", None).await.is_err());
+
+    sqlx::query("DELETE FROM adapter WHERE id = 'a1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM stammdaten_schnappschuss")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rest, 0, "Löschen des Adapters kaskadiert");
+}
