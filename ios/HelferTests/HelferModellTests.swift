@@ -52,12 +52,21 @@ final class HelferModellTests: XCTestCase {
             .wartet: .unbestaetigt,
             .angemeldet: .aktiv,
             .pausiert: .pausiert,
+            .ruht: .ruht(.keineRolle),
             .beendet: .beendet(.einsatzBeendet),
         ]
         for zustand in Testzustand.allCases {
             let modell = HelferModell.start(argumente: ["-HelferTestzustand", zustand.rawValue])
             XCTAssertEqual(modell.phase, erwartet[zustand], zustand.rawValue)
         }
+    }
+
+    func testAbgewieseneAnfragenNutzenDieTexteDesKerns() {
+        let rueckmeldung = Rueckmeldung(status: 403, daten: Data(#"{"reason":"no_role"}"#.utf8))
+        XCTAssertEqual(HelferModell.text(fuer: rueckmeldung), Anzeige.meldung(status: 403, grund: "no_role"))
+        XCTAssertEqual(rueckmeldung.antwort, .ruhen, "der Grund aus dem Body geht in die Entscheidung")
+        XCTAssertEqual(Rueckmeldung(status: 403, daten: Data()).antwort, .stoppen)
+        XCTAssertEqual(Rueckmeldung(status: 302, daten: Data()).antwort, .wiederholen)
     }
 
     func testDerAblaufRechnetMitDerUhrDesServers() throws {

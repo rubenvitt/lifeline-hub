@@ -50,7 +50,7 @@ struct ZielOption: Codable, Hashable, Sendable {
     var eingabe: ZielEingabe { ZielEingabe(kind: kind, id: id) }
 }
 
-/// `GET /api/devices/helpers/targets` (`HelferZielliste`).
+/// Antwort von `POST /api/devices/helpers/targets` (`HelferZielliste`).
 struct Zielliste: Decodable, Equatable, Sendable {
     let targets: [ZielOption]
     let personTrackingAllowed: Bool
@@ -60,6 +60,11 @@ struct Zielliste: Decodable, Equatable, Sendable {
 struct ZielEingabe: Codable, Hashable, Sendable {
     let kind: String
     let id: Int64
+}
+
+/// Body von `POST /api/devices/helpers/targets`: der Code im Body, nie in der Adresse.
+struct Zielanfrage: Encodable, Sendable {
+    let code: String
 }
 
 /// Body von `POST /api/devices/helpers/redeem`.
@@ -125,6 +130,9 @@ struct Zustand: Decodable, Equatable, Sendable {
     let paused: Bool
     let expiresAt: String
     let serverTime: String
+
+    /// Was die Leitung beim Bestätigen gegeben hat (`Ereignis.zustand`).
+    var rolle: Rolle { Rolle(isTracker: isTracker, personId: person?.id) }
 
     /// Ablauf der Kopplung, auf die Uhr des Geräts umgerechnet (der Server nennt seine Uhrzeit mit).
     var ablauf: Date? {

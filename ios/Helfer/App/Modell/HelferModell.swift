@@ -16,7 +16,7 @@ enum Verbindungsstand: Equatable, Sendable {
 /// `-HelferTestzustand <seite>`; ohne Netz, Schlüsselbund, Ortung und Live-Aktivität). Für die
 /// Bildschirmbilder in ios/HelferUITests.
 enum Testzustand: String, CaseIterable, Sendable {
-    case start, anmelden, wartet, angemeldet, pausiert, beendet
+    case start, anmelden, wartet, angemeldet, pausiert, ruht, beendet
 
     static let argument = "-HelferTestzustand"
 
@@ -76,6 +76,12 @@ final class HelferModell {
     private let ortung: Ortungsdienst?
     private let aktivitaet: LiveAktivitaet?
     @ObservationIgnored private var abfrage: Task<Void, Never>?
+    /// Prüfung während `Phase.ruht`, alle `Ruhegrund.pruefabstandS` Sekunden.
+    @ObservationIgnored private var ruhePruefung: Task<Void, Never>?
+    /// Ob die Szene sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0098).
+    @ObservationIgnored private var imVordergrund = false
+    /// Die Ruhe endete im Hintergrund; die Ortung startet beim nächsten Öffnen.
+    @ObservationIgnored private var startNachRuhe = false
 
     private static let anzeigenameSchluessel = "anzeigename"
 
@@ -110,7 +116,7 @@ final class HelferModell {
             guard let verbindung = self?.verbindung else { return .netzfehler }
             return await verbindung.sende(position)
         }
-        ortung?.beiAntwort = { [weak self] antwort in self?.verarbeite(antwort) }
+        ortung?.beiAntwort = { [weak self] antwort, grund in self?.verarbeite(antwort, grund: grund) }
         ortung?.beiWiederholung = { [weak self] zeit in
             self?.verbindungsstand = zeit.map { .wiederholt($0) } ?? .verbunden
         }
@@ -130,9 +136,16 @@ final class HelferModell {
     func szene(aktiv: Bool) {
         abfrage?.cancel()
         abfrage = nil
+        imVordergrund = aktiv
         guard aktiv, umgebung == .echt else { return }
         if Pausieranfrage.abholen(), phase == .aktiv {
             Task { await pausieren() }
+        }
+        // Die Freigabe kann sich in den Einstellungen geändert haben.
+        if let ortung { ortungVerweigert = ortung.isVerweigert }
+        if startNachRuhe {
+            startNachRuhe = false
+            starteOrtung()
         }
         abfrage = Task { [weak self] in
             while !Task.isCancelled {
@@ -207,6 +220,7 @@ final class HelferModell {
         defer { zieleLaden = false }
         let rueckmeldung = await Serververbindung(server: einladung.server, cookie: nil)
             .ziele(code: einladung.code)
+        guard self.einladung == einladung else { return }
         if rueckmeldung.istErfolg, let liste = rueckmeldung.dekodiert(Zielliste.self) {
             zielliste = liste
             meldung = nil
@@ -256,15 +270,21 @@ final class HelferModell {
         self.verbindung = verbindung
         zustand = rueckmeldung.dekodiert(Zustand.self)
         anmeldung.verarbeite(.eingeloest)
-        if let zustand { anmeldung.verarbeite(.zustand(zustand.state, grund: zustand.reason)) }
+        if let zustand {
+            anmeldung.verarbeite(
+                .zustand(zustand.state, grund: zustand.reason, rolle: zustand.rolle))
+        }
         starteOrtung()
     }
 
     /// Startet die Ortung, solange die Phase sie verlangt; nur aus dem Vordergrund (Einlösen,
-    /// Fortsetzen oder „Ortung wieder starten“ nach einem Neustart der App).
+    /// Fortsetzen, Ende der Ruhe oder „Ortung wieder starten“ nach einem Neustart der App). Ohne
+    /// Standortrecht startet nichts, auch keine Live-Aktivität: sie zeigte „Ortung an“, ohne dass
+    /// etwas gesendet wird.
     func starteOrtung() {
         guard phase.ortet, let ortung else { return }
         ortungVerweigert = ortung.isVerweigert
+        guard !ortungVerweigert else { return }
         ortung.starte()
         ortungLaeuft = true
         aktivitaet?.starte(
@@ -376,29 +396,62 @@ final class HelferModell {
     // MARK: Antworten
 
     /// Antwort des Servers auf eine Sendung des Ortungsdienstes.
-    private func verarbeite(_ antwort: Antwort) {
+    private func verarbeite(_ antwort: Antwort, grund: String?) {
         switch antwort {
         case .weiter:
             letzteSendung = Date()
             verbindungsstand = .verbunden
         case .warten:
             verbindungsstand = .verbunden
-        case .wiederholen, .verwerfen, .stoppen:
+        case .wiederholen, .verwerfen, .stoppen, .ruhen:
             break
         }
         let vorher = phase
-        anmeldung.verarbeite(.antwort(antwort))
+        anmeldung.verarbeite(.antwort(antwort, grund: grund))
         nachWechsel(von: vorher)
         if phase.ortet { aktivitaet?.aktualisiere(aktivitaetsstand) }
     }
 
-    /// Eine Antwort außerhalb der Sendungen: 401, 403 und 404 beenden die Kopplung.
+    /// Eine Antwort außerhalb der Sendungen: 401, 403 und 404 beenden die Kopplung, ein 403 mit
+    /// `Ruhegrund` lässt sie ruhen.
     private func reagiere(auf rueckmeldung: Rueckmeldung) {
-        guard rueckmeldung.antwort == .stoppen, phase.gekoppelt else { return }
+        let antwort = rueckmeldung.antwort
+        guard antwort == .stoppen || antwort == .ruhen, phase.gekoppelt else { return }
         let vorher = phase
-        stoppeOrtung()
-        anmeldung.verarbeite(.antwort(.stoppen))
+        anmeldung.verarbeite(.antwort(antwort, grund: rueckmeldung.grund))
         nachWechsel(von: vorher)
+    }
+
+    /// Während der Ruhe: alle `Ruhegrund.pruefabstandS` Sekunden den eigenen Zustand holen (eine
+    /// neue Rolle beendet `.keineRolle`), bei `.ortungAus` dazu fortsetzen ohne Position (`{paused:
+    /// false}`); erst ein angenommenes Fortsetzen beendet die Ruhe.
+    private func starteRuhePruefung() {
+        ruhePruefung?.cancel()
+        guard umgebung == .echt else { return }
+        ruhePruefung = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(Ruhegrund.pruefabstandS))
+                guard !Task.isCancelled, let self else { return }
+                await self.pruefeRuhe()
+            }
+        }
+    }
+
+    private func pruefeRuhe() async {
+        await aktualisiereZustand()
+        guard case .ruht(let grund) = phase, grund.pruefeMitFortsetzen, let verbindung else {
+            return
+        }
+        let rueckmeldung = await verbindung.pausiere(false)
+        guard case .ruht = phase else { return }
+        switch rueckmeldung.antwort {
+        case .weiter, .warten, .ruhen, .stoppen:
+            let vorher = phase
+            anmeldung.verarbeite(.antwort(rueckmeldung.antwort, grund: rueckmeldung.grund))
+            nachWechsel(von: vorher)
+        case .wiederholen, .verwerfen:
+            break
+        }
     }
 
     /// Eigener Zustand vom Server (Abfrage im Vordergrund und nach dem Start der App).
@@ -419,7 +472,7 @@ final class HelferModell {
         }
         zustand = neu
         let vorher = phase
-        anmeldung.verarbeite(.zustand(neu.state, grund: neu.reason))
+        anmeldung.verarbeite(.zustand(neu.state, grund: neu.reason, rolle: neu.rolle))
         if neu.paused, phase == .aktiv {
             // Pausiert aus der Live-Aktivität, während die App nicht lief.
             anmeldung.verarbeite(.pausiert)
@@ -431,12 +484,27 @@ final class HelferModell {
         nachWechsel(von: vorher)
     }
 
-    /// Wirkungen eines Phasenwechsels: Bestätigung melden, am Ende alles abräumen.
+    /// Wirkungen eines Phasenwechsels: Bestätigung melden, Ruhe beginnen und beenden, am Ende alles
+    /// abräumen.
     private func nachWechsel(von vorher: Phase) {
         guard phase != vorher else { return }
         if vorher == .unbestaetigt, phase == .aktiv {
             bestaetigungen += 1
             aktivitaet?.aktualisiere(aktivitaetsstand)
+        }
+        let ruhteVorher: Bool
+        if case .ruht = vorher { ruhteVorher = true } else { ruhteVorher = false }
+        if case .ruht = phase {
+            // Ohne Ortung keine Live-Aktivität; die Kopplung und die Sitzung bleiben.
+            stoppeOrtung()
+            aktivitaet?.beende()
+            if !ruhteVorher { starteRuhePruefung() }
+        } else if ruhteVorher {
+            ruhePruefung?.cancel()
+            ruhePruefung = nil
+            if phase.ortet {
+                if imVordergrund { starteOrtung() } else { startNachRuhe = true }
+            }
         }
         if case .beendet = phase { raeumeAb() }
     }
@@ -446,6 +514,9 @@ final class HelferModell {
         aktivitaet?.beende()
         abfrage?.cancel()
         abfrage = nil
+        ruhePruefung?.cancel()
+        ruhePruefung = nil
+        startNachRuhe = false
         Sitzungsablage.loeschen()
         verbindung = nil
     }
@@ -462,21 +533,11 @@ final class HelferModell {
             wartet: phase == .unbestaetigt)
     }
 
-    /// Text für eine abgewiesene Anfrage.
+    /// Text für eine abgewiesene Anfrage (`Anzeige.meldung` im Kern).
     static func text(fuer rueckmeldung: Rueckmeldung) -> String {
-        switch rueckmeldung.status {
-        case 0: return "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut."
-        case 401: return "Der Code ist ungültig oder abgelaufen. Bitte den QR-Code neu scannen."
-        case 403 where rueckmeldung.grund == "tracking_off", 403 where rueckmeldung.grund == nil:
-            return "Die Ortung ist für diese Organisation ausgeschaltet."
-        case 409 where rueckmeldung.grund == "person_session":
-            return "Auf diesem Gerät ist eine persönliche Anmeldung aktiv."
-        case 409: return "Das geht im aktuellen Zustand der Anmeldung nicht."
-        case 422: return rueckmeldung.fehlertext ?? "Die Angaben passen nicht. Bitte prüfen."
-        case 429: return "Zu viele Versuche. Bitte kurz warten."
-        default:
-            return rueckmeldung.fehlertext ?? "Unerwartete Antwort des Servers (\(rueckmeldung.status))."
-        }
+        Anzeige.meldung(
+            status: rueckmeldung.status, grund: rueckmeldung.grund,
+            fehlertext: rueckmeldung.fehlertext)
     }
 
     // MARK: Testzustand
@@ -492,7 +553,7 @@ final class HelferModell {
             self.einladung = einladung
             zielliste = Beispiel.zielliste
             gewaehltesZiel = Beispiel.zielliste.targets.first
-        case .wartet, .angemeldet, .pausiert, .beendet:
+        case .wartet, .angemeldet, .pausiert, .ruht, .beendet:
             anmeldung.verarbeite(.gescannt(einladung))
             self.einladung = einladung
             zielliste = Beispiel.zielliste
@@ -509,8 +570,15 @@ final class HelferModell {
                 anmeldung.verarbeite(.pausiert)
                 ortungLaeuft = false
             }
+            if testzustand == .ruht {
+                // Bestätigt ohne Ortungsgerät und ohne Person (Entscheidung 7 der Spec).
+                let ohneRolle = Rolle(isTracker: false, personId: nil)
+                anmeldung.verarbeite(.zustand("aktiv", grund: nil, rolle: ohneRolle))
+                ortungLaeuft = false
+            }
             if testzustand == .beendet {
-                anmeldung.verarbeite(.zustand("beendet", grund: Grund.einsatzBeendet.wire))
+                anmeldung.verarbeite(
+                    .zustand("beendet", grund: Grund.einsatzBeendet.wire, rolle: Beispiel.zustand(state: "aktiv").rolle))
                 ortungLaeuft = false
             }
         }

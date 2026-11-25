@@ -2,17 +2,28 @@ import HelferKern
 import SwiftUI
 
 /// Bildschirm 4 „Angemeldet“ (Spec „Bildschirme“): große Anzeige „Ortung an“ mit Ziel, Alter der
-/// letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“.
+/// letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe
+/// (`Phase.ruht`) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“.
 struct AngemeldetSeite: View {
     @Bindable var modell: HelferModell
     @State private var abmeldenFragen = false
 
     private var pausiert: Bool { modell.phase == .pausiert }
 
+    private var ruhegrund: Ruhegrund? {
+        if case .ruht(let grund) = modell.phase { return grund }
+        return nil
+    }
+
     var body: some View {
         Seite {
             Seitenkopf(untertitel: modell.servername)
-            if pausiert {
+            if let ruhegrund {
+                Zustandsbuehne(
+                    augenbraue: modell.einsatzname, zustand: Ruhegrund.titel,
+                    erklaerung: ruhegrund.text,
+                    farbe: Farbe.achtung, flaeche: Farbe.achtungFlaeche, pulsiert: false)
+            } else if pausiert {
                 Zustandsbuehne(
                     augenbraue: modell.einsatzname, zustand: "Ortung pausiert",
                     erklaerung: "Die Einsatzleitung sieht „pausiert“. Deine Position geht erst nach „Fortsetzen“ wieder raus.",
@@ -53,7 +64,9 @@ struct AngemeldetSeite: View {
                 Hinweis(text: meldung)
             }
             VStack(spacing: LifelineAbstand.abstandKomfortabelSm) {
-                if pausiert {
+                if ruhegrund != nil {
+                    // In der Ruhe gibt es nichts zu pausieren; die App prüft selbst.
+                } else if pausiert {
                     Button {
                         Task { await modell.fortsetzen() }
                     } label: {

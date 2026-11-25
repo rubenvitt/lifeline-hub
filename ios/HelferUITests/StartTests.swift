@@ -63,6 +63,16 @@ final class StartTests: XCTestCase {
         bild("helfer-pausiert")
     }
 
+    /// Bestätigt ohne Ortungsgerät und ohne Person: „Angemeldet – Ortung ruht“, nur „Abmelden“.
+    @MainActor
+    func testRuht() {
+        let app = launch("ruht")
+        XCTAssertTrue(element(app, "zustand").waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["abmelden"].exists)
+        XCTAssertFalse(app.buttons["pausieren"].exists)
+        bild("helfer-ruht")
+    }
+
     @MainActor
     func testBeendet() {
         let app = launch("beendet")

@@ -61,7 +61,7 @@ struct Hauptansicht: View {
             AnmeldenSeite(modell: modell).transition(.move(edge: .trailing).combined(with: .opacity))
         case .unbestaetigt:
             WartetSeite(modell: modell).transition(.opacity)
-        case .aktiv, .pausiert:
+        case .aktiv, .pausiert, .ruht:
             AngemeldetSeite(modell: modell).transition(.opacity)
         case .beendet(let grund):
             BeendetSeite(modell: modell, grund: grund).transition(.opacity)

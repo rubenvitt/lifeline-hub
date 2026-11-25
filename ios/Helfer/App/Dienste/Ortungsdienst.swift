@@ -10,8 +10,9 @@ import HelferKern
 /// - `CLLocationUpdate.liveUpdates` mit `CLBackgroundActivitySession` (ab iOS 17, zeigt die
 ///   Standortanzeige des Systems), ab iOS 18 dazu `CLServiceSession(authorization: .whenInUse)`.
 ///   Nur „When in Use“, nie Always.
-/// - Was gesendet wird und wann, entscheiden `Takt`, `Puffer`, `Wiederholung` und
-///   `entscheide(status:)` im Kern; hier stehen nur Uhr, Netz und System.
+/// - Was gesendet wird und wann, entscheiden `Sendeplan` und `entscheide(status:grund:)` im Kern;
+///   hier stehen nur Uhr, Netz und System. Das Lebenszeichen fordert eine frische Messung an
+///   (`requestLocation`), nie geht eine alte Position mit neuer Zeit raus.
 /// - Kein Verlauf: der Puffer hält nur die letzte Position, nur im Speicher.
 @MainActor
 final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
@@ -26,21 +27,18 @@ final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
     private var lebenszeichen: Task<Void, Never>?
     private var naechsterVersuch: Task<Void, Never>?
 
-    private let takt = Takt()
-    private var puffer = Puffer()
-    private var wiederholung = Wiederholung()
-    /// Zuletzt angenommene Sendung: Position und Uhrzeit des Geräts.
-    private var gesendet: (position: Position, zeit: Date)?
-    /// Letzte gemessene Position, für das Lebenszeichen ohne Bewegung.
-    private var letzteMessung: Position?
-    private var sendetGerade = false
+    /// Takt, Puffer, Wiederholung und Lebenszeichen (Kern, gemeinsame Fälle `sendeplan`).
+    private var plan = Sendeplan()
+    /// Zählt jeden Start; eine Antwort aus einem früheren Lauf ändert nichts mehr.
+    private var lauf = 0
 
     private(set) var laeuft = false
 
     /// Schickt eine Position an den Server der Kopplung (setzt das Modell).
     var senden: (@MainActor (Position) async -> Rueckmeldung)?
-    /// Entscheidung zu einer Antwort; bei `.stoppen` ist der Dienst schon aus.
-    var beiAntwort: (@MainActor (Antwort) -> Void)?
+    /// Entscheidung zu einer Antwort mit `reason` des Fehler-Bodys; bei `.stoppen` und `.ruhen`
+    /// ist der Dienst schon aus.
+    var beiAntwort: (@MainActor (Antwort, String?) -> Void)?
     /// Nächster Versuch nach einem Fehler, `nil` wieder verbunden.
     var beiWiederholung: (@MainActor (Date?) -> Void)?
 
@@ -79,6 +77,15 @@ final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let ort = locations.last else { return }
+        let position = Ortungsdienst.position(ort)
+        MainActor.assumeIsolated { neueMessung(position) }
+    }
+
+    /// Pflicht für `requestLocation`; ohne Messung geht kein Lebenszeichen raus.
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {}
+
     // MARK: Start und Stopp
 
     /// Startet die Ortung. Nur aus dem Vordergrund aufrufen: dort entstehen die Sitzungen, die sie
@@ -86,6 +93,8 @@ final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
     func starte() {
         guard !laeuft else { return }
         laeuft = true
+        lauf += 1
+        plan.stoppe()
         hintergrund = CLBackgroundActivitySession()
         if #available(iOS 18.0, *) {
             dienstSitzung = CLServiceSession(authorization: .whenInUse)
@@ -95,19 +104,14 @@ final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
                 for try await update in CLLocationUpdate.liveUpdates() {
                     guard !Task.isCancelled else { return }
                     guard let ort = update.location else { continue }
-                    let position = Position(
-                        latitude: ort.coordinate.latitude,
-                        longitude: ort.coordinate.longitude,
-                        accuracy: ort.horizontalAccuracy >= 0 ? ort.horizontalAccuracy : nil,
-                        recordedAt: ort.timestamp)
-                    self?.neueMessung(position)
+                    self?.neueMessung(Ortungsdienst.position(ort))
                 }
             } catch {
                 // Die Folge endet nur mit dem Abbruch der Aufgabe.
             }
         }
-        // Ohne Bewegung ein Lebenszeichen nach `takt.lebenszeichenS`, damit die Karte nicht
-        // „veraltet“ zeigt; geprüft jede halbe Minute.
+        // Ohne Bewegung liefert das System keine Messung: jede halbe Minute fragt der Plan, ob ein
+        // Lebenszeichen dran ist, und dann wird genau eine frische Messung angefordert.
         lebenszeichen = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
@@ -131,91 +135,75 @@ final class Ortungsdienst: NSObject, CLLocationManagerDelegate {
             (dienstSitzung as? CLServiceSession)?.invalidate()
         }
         dienstSitzung = nil
-        puffer.leere()
-        wiederholung.zuruecksetzen()
-        gesendet = nil
-        letzteMessung = nil
+        plan.stoppe()
         laeuft = false
     }
 
-    // MARK: Takt
+    // MARK: Messungen
+
+    private nonisolated static func position(_ ort: CLLocation) -> Position {
+        Position(
+            latitude: ort.coordinate.latitude,
+            longitude: ort.coordinate.longitude,
+            accuracy: ort.horizontalAccuracy >= 0 ? ort.horizontalAccuracy : nil,
+            recordedAt: ort.timestamp)
+    }
 
     private func neueMessung(_ position: Position) {
-        guard laeuft else { return }
-        letzteMessung = position
-        let jetzt = Date()
-        let seit = gesendet.map { jetzt.timeIntervalSince($0.zeit) } ?? .infinity
-        let bewegt = gesendet.map { abstand($0.position, position) } ?? .infinity
-        if takt.soll(senden: seit, bewegtM: bewegt) {
-            puffer.merke(position)
-            sendeFaellige()
-        }
+        guard laeuft, let faellig = plan.messung(position, jetzt: Date()) else { return }
+        sende(faellig)
     }
 
     private func pruefeLebenszeichen() {
-        guard laeuft, let messung = letzteMessung, let gesendet else { return }
-        guard Date().timeIntervalSince(gesendet.zeit) >= takt.lebenszeichenS else { return }
-        // Ohne Bewegung gilt die letzte Messung weiter; sie geht mit der Uhrzeit von jetzt raus,
-        // sonst verwürfe der Server sie als nicht neuer als die gespeicherte.
-        puffer.merke(
-            Position(
-                latitude: messung.latitude, longitude: messung.longitude,
-                accuracy: messung.accuracy, recordedAt: Date()))
-        sendeFaellige()
-    }
-
-    private func abstand(_ a: Position, _ b: Position) -> Double {
-        CLLocation(latitude: a.latitude, longitude: a.longitude)
-            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
+        guard laeuft, plan.lebenszeichen(jetzt: Date()) else { return }
+        manager.requestLocation()
     }
 
     // MARK: Senden
 
-    /// Sendet die gepufferte Position, wenn keine Sendung läuft und kein Versuch geplant ist; eine
-    /// ältere als 10 min verfällt (`Puffer.faellig`).
-    private func sendeFaellige() {
-        guard laeuft, !sendetGerade, naechsterVersuch == nil, let senden else { return }
-        guard let position = puffer.faellig(jetzt: Date()) else {
-            puffer.leere()
-            return
-        }
-        sendetGerade = true
+    private func sende(_ position: Position) {
+        guard let senden else { return }
+        let dieser = lauf
         Task { [weak self] in
             let rueckmeldung = await senden(position)
-            self?.verarbeite(rueckmeldung.antwort, fuer: position)
+            self?.verarbeite(rueckmeldung, lauf: dieser)
         }
     }
 
-    private func verarbeite(_ antwort: Antwort, fuer position: Position) {
-        sendetGerade = false
-        guard laeuft else { return }
+    private func verarbeite(_ rueckmeldung: Rueckmeldung, lauf dieser: Int) {
+        guard laeuft, dieser == lauf else { return }
+        let antwort = rueckmeldung.antwort
+        let naechste = plan.antwort(antwort, jetzt: Date())
         switch antwort {
         case .weiter, .warten:
-            if antwort == .weiter { wiederholung.zuruecksetzen() }
-            gesendet = (position, Date())
-            if puffer.letzte == position { puffer.leere() }
             beiWiederholung?(nil)
-        case .verwerfen:
-            if puffer.letzte == position { puffer.leere() }
         case .wiederholen:
             planeVersuch()
-        case .stoppen:
+        case .stoppen, .ruhen:
             stoppe()
+        case .verwerfen:
+            break
         }
-        beiAntwort?(antwort)
+        beiAntwort?(antwort, rueckmeldung.grund)
         // Kam während der Sendung eine neuere Position, geht sie jetzt.
-        if laeuft, antwort != .wiederholen, puffer.letzte != nil { sendeFaellige() }
+        if laeuft, let naechste { sende(naechste) }
     }
 
-    /// Wachsender Abstand nach Fehlern, höchstens jede Minute (`Wiederholung`).
+    /// Wachsender Abstand nach Fehlern, höchstens jede Minute (`Wiederholung` im Plan).
     private func planeVersuch() {
-        let sekunden = wiederholung.naechsterAbstandS()
-        beiWiederholung?(Date().addingTimeInterval(TimeInterval(sekunden)))
+        guard let zeit = plan.naechsterVersuch else { return }
+        beiWiederholung?(zeit)
+        naechsterVersuch?.cancel()
         naechsterVersuch = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(sekunden))
+            try? await Task.sleep(for: .seconds(max(0, zeit.timeIntervalSinceNow)))
             guard !Task.isCancelled else { return }
-            self?.naechsterVersuch = nil
-            self?.sendeFaellige()
+            self?.versuche()
         }
+    }
+
+    private func versuche() {
+        naechsterVersuch = nil
+        guard laeuft, let faellig = plan.versuch(jetzt: Date()) else { return }
+        sende(faellig)
     }
 }
