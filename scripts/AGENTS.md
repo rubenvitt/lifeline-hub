@@ -9,7 +9,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `android-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` + `ios/testflight.test.sh` + `ios/testflight-verteilen.test.mjs` + `ios/bilder-ablegen.test.sh` + `ios/fehlgruende.test.sh` + `android/version.test.sh` + `android/sdk-version.test.sh` + `android/release-apk.test.sh` + `android/apk-ablegen.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-eingefroren.sh` → `check-schreibweisen.sh` + `check-api-routen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
-`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
+`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) und `check-design-tokens-nativ.sh` (Schritt 21, Bündel `schnell`) →
 `swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
 `cargo build --bin lifeline-hub` + `cargo check -p karten-service` (Schritt 19, Bündel `rust` und
@@ -18,6 +18,13 @@ allein `binaer`, LLH-2033/LLH-2038) →
 Lücke, mit `ANDROID_KERN_PFLICHT=1` rot).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
 Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+- **Native Design-Tokens** (Helfer-Apps, Schritt 21, Bündel `schnell`): `Tokens.swift`
+  (`ios/HelferKern`) und `Tokens.kt` (`android/helferkern`) entstehen aus
+  `docs/design/design-system/project/tokens.json` mit `mise exec -- node scripts/design/tokens-nativ.mjs`
+  und werden mitcommittet; `scripts/check-design-tokens-nativ.sh` erzeugt sie neu und vergleicht
+  Byte für Byte (rot bei Abweichung oder fehlender Datei). Nie von Hand ändern, nie einen Wert
+  nativ erfinden: ein neuer Token kommt in `tokens.json`. `bereiche.sh` ordnet `tokens.json`, den
+  Erzeuger und den Wächter dem Frontend (nur `tokens.json`), iOS und Android zu.
 - **Server-Binary ohne Dev-Abhängigkeiten** (LLH-2033): Jeder Rust-Schritt mit Testzielen, auch
   `--nur baut` (`--all-targets`), übersetzt mit den Features der Dev-Abhängigkeiten
   (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, …). Was ein Feature nur über sie

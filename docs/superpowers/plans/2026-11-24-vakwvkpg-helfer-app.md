@@ -403,11 +403,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
     Global Constraints.
 - Tokens: Swift `public enum LifelineFarbe { public static let rolleGrund = Paar(nacht: 0x08090B, tag: 0xE6E7E9) … }`, `enum LifelineAbstand`, `enum LifelineRadius`, `enum LifelineSchrift` (Familien und Skala als Punktwerte). Kotlin: `object LifelineFarbe { val rolleGrund = Paar(nacht = 0xFF08090B, tag = 0xFFE6E7E9) … }` analog. Namen: Token-Name in lowerCamelCase.
 
-- [ ] **Step 1:** `helfer.json` schreiben (mindestens 6 `deute`-, 10 `antwort`- und 5 `takt`-Fälle).
-- [ ] **Step 2: Failing check:** `scripts/check-design-tokens-nativ.sh` → FAIL (Dateien fehlen).
-- [ ] **Step 3:** Generator umsetzen, laufen lassen, Ausgaben committen.
-- [ ] **Step 4:** Run `scripts/check-design-tokens-nativ.sh && ./scripts/check-all.sh --nur 11` → PASS (die Selbsttests verlangen, dass die Bündel `alle` decken).
-- [ ] **Step 5:** Commit `chore: gemeinsame Helfer-Fälle und native Design-Tokens`.
+- [x] **Step 1:** `helfer.json` schreiben (mindestens 6 `deute`-, 10 `antwort`- und 5 `takt`-Fälle).
+- [x] **Step 2: Failing check:** `scripts/check-design-tokens-nativ.sh` → FAIL (Dateien fehlen).
+- [x] **Step 3:** Generator umsetzen, laufen lassen, Ausgaben committen.
+- [x] **Step 4:** Run `scripts/check-design-tokens-nativ.sh && ./scripts/check-all.sh --nur 11` → PASS (die Selbsttests verlangen, dass die Bündel `alle` decken).
+- [x] **Step 5:** Commit `chore: gemeinsame Helfer-Fälle und native Design-Tokens`.
 
 ### Task 10: iOS `HelferKern`
 

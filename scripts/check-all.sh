@@ -28,7 +28,8 @@ set -euo pipefail
 #                    Werkzeugversionen aus mise.toml,
 #                    OpenSpec bleibt eingefrorenes Archiv,
 #                    Schreibweisen der Dateinamen, API-Routen englisch,
-#                    Architekturdoku und ihre Entscheidungen (Sekunden bis ~1:30)
+#                    Architekturdoku und ihre Entscheidungen,
+#                    native Design-Tokens der Helfer-Apps (Sekunden bis ~1:30)
 #   --nur rust       cargo test (Workspace, Hülle getrennt),
 #                    Dev-Seed mit Feature dev-seeds          (~19 min)
 #   --nur frontend   Vitest                                  (~16 min, shardbar)
@@ -114,7 +115,7 @@ FE="$ROOT/frontend"
 # Node und pnpm kommen aus `[tools]` in mise.toml (LFH-773) — dort steht auch, warum die
 # Nachbarn der gepinnten Node-Version ausfallen. Hier steht bewusst KEINE Zahl.
 PNPM="mise exec -- pnpm"
-SCHRITTE=20
+SCHRITTE=21
 
 # ZEITZONE FESTNAGELN: ohne sie hängt das Ergebnis der Suite an der Zone des Rechners
 # (`EtbFilterleiste` prüft einen UTC-Wire-String als Ortszeit mit festem Wert). Europe/Berlin
@@ -129,7 +130,7 @@ if [ -n "${geraeumt// /}" ]; then
   echo "==> Dev-Variablen werden für die Testläufe geräumt: $geraeumt"
 fi
 
-# ── Die zwanzig Schritte, je als Funktion ───────────────────────────────────────────
+# ── Die einundzwanzig Schritte, je als Funktion ───────────────────────────────────────────
 # Funktionen, damit die CI sie auf mehreren Runnern einzeln ansprechen kann. Die Nummer in
 # der Ausgabe ist die Position im GESAMTgate, nicht im laufenden Teilstück.
 
@@ -609,12 +610,19 @@ schritt_20() {
   LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
 }
 
+schritt_21() {
+  echo "==> [21/$SCHRITTE] Native Design-Tokens der Helfer-Apps: Tokens.swift und Tokens.kt aus tokens.json (Helfer-App)"
+  # Erzeugt beide Dateien neu und vergleicht sie mit dem Repo (scripts/design/tokens-nativ.mjs):
+  # ein geänderter Token der Oberfläche, dessen native Ausgabe niemand nachzieht, wird rot.
+  "$ROOT/scripts/check-design-tokens-nativ.sh"
+}
+
 # ── Bündel für die parallele CI ─────────────────────────────────────────────────────
 # `schnell` trägt alles, was in Sekunden bis gut einer Minute fertig ist, und scheitert
 # deshalb früh; die drei teuren Suiten bekommen je einen eigenen Runner. Schritt 15 fährt
 # im Bündel `rust` mit: er nutzt die Abhängigkeiten, die Schritt 4 gerade gebaut hat. Schritt 19
 # auch: so fährt ihn `--geaendert` bei jeder Rust-Änderung und alpha in der Rust-Suite.
-BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14 16"
+BUENDEL_schnell="1 2 3 6 8 9 10 11 12 13 14 16 21"
 BUENDEL_rust="4 15 19"
 BUENDEL_frontend="5"
 BUENDEL_e2e="7"
@@ -625,9 +633,9 @@ BUENDEL_ios="18"
 BUENDEL_android="20"
 # `binaer` ist ein Ausschnitt aus `rust` für den Pflicht-Check im PR und zählt unten nicht mit.
 BUENDEL_binaer="19"
-BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18 19 20"
+BUENDEL_alle="1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 18 19 20 21"
 
-# SELBSTPRÜFUNG: die sechs Bündel ergeben zusammen genau die neunzehn Schritte von `alle`, jeden
+# SELBSTPRÜFUNG: die sechs Bündel ergeben zusammen genau die zwanzig Schritte von `alle`, jeden
 # einmal (`baut` und `binaer` zählen nicht mit) —
 # sonst fiele beim Umsortieren still ein Schritt aus der CI.
 _summe="$(printf '%s\n' $BUENDEL_schnell $BUENDEL_rust $BUENDEL_frontend $BUENDEL_e2e $BUENDEL_ios $BUENDEL_android | sort -n | tr '\n' ' ')"

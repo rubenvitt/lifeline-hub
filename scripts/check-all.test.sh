@@ -297,8 +297,30 @@ rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/leer'; JAVA_HOME='$ARBEIT/s2
 pruefe "19 JAVA_HOME auf JDK 21 ohne java im PATH → grün" 0 "$rc"
 enthaelt "19 JAVA_HOME auf JDK 21 → gradlew testet den Kern" "^gradlew-lief -p $ARBEIT/s20/android/kern test"
 
+# 20 — Schritt 21, die nativen Design-Tokens der Helfer-Apps: Teil von `schnell` (Sekunden, scheitert
+# früh) und damit von jedem PR und vom vollen Lauf; ein eigenes Bündel gibt es nicht. Der Schritt
+# ruft den Wächter und übernimmt dessen Ergebnis.
+rc=0; "$CHECK_ALL" --nur schnell --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "20 schnell fährt die nativen Tokens" '^Schritte: .*\b21\b'
+rc=0; "$CHECK_ALL" --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+enthaelt "20 voller Lauf fährt die nativen Tokens" '^Schritte: .*\b21\b'
+rc=0; "$CHECK_ALL" --nur ios --auswahl > "$ARBEIT/aus" 2>&1 || rc=$?
+fehlt "20 ios fährt die nativen Tokens nicht" '^Schritte: .*\b21\b'
+mkdir -p "$ARBEIT/s21/scripts"
+schritt_21_def="$(sed -n '/^schritt_21() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_21_def" ] || { echo "FAIL 20 schritt_21 fehlt in check-all.sh" >&2; fehler=1; }
+printf '#!/bin/sh\necho tokens-gruen\n' > "$ARBEIT/s21/scripts/check-design-tokens-nativ.sh"
+chmod +x "$ARBEIT/s21/scripts/check-design-tokens-nativ.sh"
+rc=0; fahren "ROOT='$ARBEIT/s21'; $schritt_21_def" 0 21 || rc=$?
+pruefe "20 Wächter grün → Schritt 21 grün" 0 "$rc"
+enthaelt "20 Schritt 21 ruft den Wächter" '^tokens-gruen$'
+printf '#!/bin/sh\necho tokens-rot; exit 1\n' > "$ARBEIT/s21/scripts/check-design-tokens-nativ.sh"
+rc=0; fahren "ROOT='$ARBEIT/s21'; $schritt_21_def" 0 21 || rc=$?
+pruefe "20 Wächter rot → Schritt 21 rot" 1 "$rc"
+
 if [ "$fehler" -ne 0 ]; then
   echo "check-all.test.sh: ROT" >&2
   exit 1
 fi
+
 echo "check-all.test.sh: alle Fälle grün"

@@ -1,0 +1,144 @@
+{
+  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird. Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; anders als dort ist http für localhost und *.local erlaubt (Entwicklung und Einsatznetz ohne TLS), jede andere http-Adresse wird verworfen. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
+  "deute": [
+    {
+      "beschreibung": "QR mit https und Fragment wird gelesen",
+      "eingabe": "https://elw.local:8443/helfer#AB12CD34",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "QR ohne Port: Standardport fällt weg",
+      "eingabe": "https://einsatz.example.org/helfer#K7M2Q9XA",
+      "ergebnis": { "server": "https://einsatz.example.org/", "code": "K7M2Q9XA" }
+    },
+    {
+      "beschreibung": "Leerraum an den Rändern wird getrimmt",
+      "eingabe": "  https://elw.local:8443/helfer#AB12CD34 \n",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "Deeplink mit Server wird gelesen",
+      "eingabe": "lifeline-helfer://anmelden?server=https://elw.local:8443#AB12CD34",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "Deeplink mit prozentkodiertem Server wird gelesen",
+      "eingabe": "lifeline-helfer://anmelden?server=https%3A%2F%2Felw.local%3A8443%2F#AB12CD34",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "Deeplink mit abschließendem Schrägstrich im Pfad",
+      "eingabe": "lifeline-helfer://anmelden/?server=https://elw.local#AB12CD34",
+      "ergebnis": { "server": "https://elw.local/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "ein klein geschriebener Code wird groß (QR)",
+      "eingabe": "https://elw.local:8443/helfer#ab12cd34",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "ein klein geschriebener Code wird groß (Deeplink)",
+      "eingabe": "lifeline-helfer://anmelden?server=https://elw.local:8443#k7m2q9xa",
+      "ergebnis": { "server": "https://elw.local:8443/", "code": "K7M2Q9XA" }
+    },
+    {
+      "beschreibung": "http ist für localhost erlaubt",
+      "eingabe": "http://localhost:8080/helfer#AB12CD34",
+      "ergebnis": { "server": "http://localhost:8080/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "http ist für *.local erlaubt",
+      "eingabe": "http://elw.local:8080/helfer#AB12CD34",
+      "ergebnis": { "server": "http://elw.local:8080/", "code": "AB12CD34" }
+    },
+    {
+      "beschreibung": "http ohne TLS wird verworfen",
+      "eingabe": "http://einsatz.example.org/helfer#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "http ohne TLS wird auch im Deeplink verworfen",
+      "eingabe": "lifeline-helfer://anmelden?server=http://einsatz.example.org#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein Host, der nur auf local endet, ist kein *.local",
+      "eingabe": "http://notlocal/helfer#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein fremdes Schema wird verworfen: lifeline",
+      "eingabe": "lifeline://verbinden?server=https://elw.local:8443",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein fremdes Schema wird verworfen: file",
+      "eingabe": "file:///etc/passwd#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein fremder Befehl im Deeplink wird verworfen",
+      "eingabe": "lifeline-helfer://verbinden?server=https://elw.local:8443#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein fremder Pfad im QR wird verworfen: /koppeln gehört der Geräte-Kopplung",
+      "eingabe": "https://elw.local:8443/koppeln#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ohne Fragment fehlt der Code",
+      "eingabe": "https://elw.local:8443/helfer",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "ein leeres Fragment ist kein Code",
+      "eingabe": "https://elw.local:8443/helfer#",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "Deeplink ohne Server wird verworfen",
+      "eingabe": "lifeline-helfer://anmelden#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "Deeplink mit Zugangsdaten im Server wird verworfen",
+      "eingabe": "lifeline-helfer://anmelden?server=https://nutzer@elw.local:8443#AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "Text ohne Link wird verworfen",
+      "eingabe": "AB12CD34",
+      "ergebnis": null
+    },
+    {
+      "beschreibung": "leere Eingabe",
+      "eingabe": "",
+      "ergebnis": null
+    }
+  ],
+  "antwort": [
+    { "beschreibung": "200 Gesendet: weiter", "status": 200, "entscheidung": "weiter" },
+    { "beschreibung": "409 Kopplung noch unbestätigt: warten", "status": 409, "entscheidung": "warten" },
+    { "beschreibung": "401 Sitzung ungültig: der Dienst stoppt", "status": 401, "entscheidung": "stoppen" },
+    { "beschreibung": "403 nicht berechtigt oder Ortung aus: der Dienst stoppt", "status": 403, "entscheidung": "stoppen" },
+    { "beschreibung": "404 Kopplung fremd oder weg: der Dienst stoppt", "status": 404, "entscheidung": "stoppen" },
+    { "beschreibung": "422 Inhalt unbrauchbar: die Position wird verworfen, nicht wiederholt", "status": 422, "entscheidung": "verwerfen" },
+    { "beschreibung": "429 zu viele Anfragen: wiederholen", "status": 429, "entscheidung": "wiederholen" },
+    { "beschreibung": "500 Serverfehler: wiederholen", "status": 500, "entscheidung": "wiederholen" },
+    { "beschreibung": "502 Gateway: wiederholen", "status": 502, "entscheidung": "wiederholen" },
+    { "beschreibung": "503 nicht erreichbar: wiederholen", "status": 503, "entscheidung": "wiederholen" },
+    { "beschreibung": "Status 0 ist ein Netzfehler ohne Antwort: wiederholen", "status": 0, "entscheidung": "wiederholen" }
+  ],
+  "takt": [
+    { "beschreibung": "kurz nach dem Senden und ohne Bewegung: nichts senden", "seit_letzter_s": 5, "bewegt_m": 0, "senden": false },
+    { "beschreibung": "große Bewegung, aber vor Ablauf der 30 s: nichts senden", "seit_letzter_s": 29, "bewegt_m": 500, "senden": false },
+    { "beschreibung": "30 s vorbei, aber keine Bewegung: nichts senden", "seit_letzter_s": 30, "bewegt_m": 0, "senden": false },
+    { "beschreibung": "genau 25 m sind keine Bewegung über 25 m: nichts senden", "seit_letzter_s": 60, "bewegt_m": 25, "senden": false },
+    { "beschreibung": "30 s vorbei und 26 m bewegt: senden", "seit_letzter_s": 30, "bewegt_m": 26, "senden": true },
+    { "beschreibung": "lange nach 30 s und deutliche Bewegung: senden", "seit_letzter_s": 120, "bewegt_m": 300, "senden": true },
+    { "beschreibung": "kurz vor dem Lebenszeichen und ohne Bewegung: nichts senden", "seit_letzter_s": 299, "bewegt_m": 0, "senden": false },
+    { "beschreibung": "Lebenszeichen nach 300 s ohne Bewegung: senden", "seit_letzter_s": 300, "bewegt_m": 0, "senden": true },
+    { "beschreibung": "weit über dem Lebenszeichen: senden", "seit_letzter_s": 900, "bewegt_m": 3, "senden": true }
+  ]
+}

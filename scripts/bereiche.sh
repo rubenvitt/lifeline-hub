@@ -69,6 +69,14 @@ bereiche_von() {
     # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
     docs/anwender/*)
       echo "frontend e2e" ;;
+    # Die Helfer-Apps erzeugen ihre Tokens aus tokens.json (`scripts/design/tokens-nativ.mjs`, Schritt
+    # 21 im Bündel `schnell`); Swift- und Kotlin-Kern übersetzen die erzeugten Dateien. Vor der
+    # Regel für das ganze Design System unten.
+    docs/design/design-system/project/tokens.json)
+      echo "frontend ios android" ;;
+    # Der Erzeuger und sein Wächter: die Ausgabe ist Quelltext beider Helfer-Kerne.
+    scripts/design/tokens-nativ.mjs | scripts/check-design-tokens-nativ.sh)
+      echo "ios android" ;;
     # Vitest erzeugt das Design System aus dem Code und vergleicht es mit der Ausgabe im Repo
     # (designSystem.guard.test.ts); die README schneidet es aus den Frontend-Regeln.
     docs/design/design-system/project/* | frontend/AGENTS.md)
@@ -77,6 +85,10 @@ bereiche_von() {
     # (websiteModule.guard.test.ts, LLH-1378). Steht vor der Website-Regel unten.
     website/src/daten/module.json)
       echo "frontend" ;;
+    # Gemeinsame Fälle der Helfer-App: nur ihre beiden Kerne lesen sie (ios/HelferKern,
+    # android/helferkern); die Desktop-Hülle hat keine Helfer-App (ADR-0098). Vor der Regel unten.
+    src-tauri/faelle/helfer.json)
+      echo "ios android" ;;
     # Gemeinsame Fälle der Hüllen (LLH-1978, `src-tauri/AGENTS.md`, „Gemeinsame Fälle“): die
     # Rust-Tests der Desktop-Hülle, der Swift-Kern der iOS-Hülle und der Kotlin-Kern der
     # Android-Hülle (LLH-1989) lesen sie. Vor `src-tauri/*`.
