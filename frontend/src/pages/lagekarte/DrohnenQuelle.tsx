@@ -1,4 +1,4 @@
-import { Button } from 'antd';
+import { Button, Switch } from 'antd';
 import { useId } from 'react';
 import {
   useAbschalten,
@@ -26,6 +26,11 @@ function zustandWort(q: DroneSourceView): string {
   return q.mission_name ? `Zugeschaltet · Mission ${q.mission_name}` : 'Zugeschaltet';
 }
 
+/** Zeile unter dem Schalter „Livebild auf dem Lagemonitor“ (LLH-2109): sagt, was gilt. */
+export const LAGEMONITOR_AUS = 'Aus (Vorgabe): das Großbild zeigt kein Livebild.';
+export const LAGEMONITOR_AN =
+  'Das Großbild zeigt das Livebild; Personen im Bild sind dort sichtbar.';
+
 /**
  * Zeile je Drohnenquelle unter der Ebene „Drohnenlage“ in der Kartenleiste (LLH-2106), außerhalb
  * des Zeilenknopfs: Name, Zustand und Missionsname als Text, dazu „Suchlage zuschalten“ bzw.
@@ -38,6 +43,10 @@ function zustandWort(q: DroneSourceView): string {
  *
  * „Suchlage zuschalten“ steht nur, solange keine Quelle dieses Einsatzes zugeschaltet ist (Spec
  * §5.4); danach nur „Abschalten“ an der zugeschalteten.
+ *
+ * Unter der zugeschalteten Quelle steht der Schalter „Livebild auf dem Lagemonitor“ (LLH-2109,
+ * Vorgabe aus): Auf dem Großbild können Personen im Bild zu sehen sein, deshalb legt nur die
+ * Einsatzleitung es dorthin. Ohne Schaltrecht steht nur die Zeile, die sagt, was gilt.
  */
 export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: DrohnenQuelleProps) {
   const { token, rollen } = useRollen();
@@ -108,6 +117,16 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
                   Livebild
                 </Button>
               )}
+              {q.connected && (
+                <LagemonitorSchalter
+                  quelle={q}
+                  darfSchalten={darfSchalten}
+                  laeuft={zuschalten.isPending && zuschalten.variables?.adapterId === q.adapter_id}
+                  onSchalten={(an) =>
+                    zuschalten.mutate({ adapterId: q.adapter_id, lagemonitor: an })
+                  }
+                />
+              )}
               {darfSchalten && schaltbar && (
                 <Button
                   style={{ alignSelf: 'flex-start' }}
@@ -139,5 +158,48 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
         </span>
       )}
     </div>
+  );
+}
+
+/** Schalter „Livebild auf dem Lagemonitor“ einer zugeschalteten Quelle (LLH-2109). */
+function LagemonitorSchalter({
+  quelle,
+  darfSchalten,
+  laeuft,
+  onSchalten,
+}: {
+  quelle: DroneSourceView;
+  darfSchalten: boolean;
+  laeuft: boolean;
+  onSchalten: (an: boolean) => void;
+}) {
+  const { token, rollen } = useRollen();
+  const hinweisId = useId();
+  const hinweis = quelle.lagemonitor ? LAGEMONITOR_AN : LAGEMONITOR_AUS;
+  if (!darfSchalten) return <span data-lfh="drohnen-lagemonitor">{hinweis}</span>;
+  return (
+    <>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: token.marginXS,
+          color: rollen.text,
+          cursor: 'pointer',
+        }}
+      >
+        <Switch
+          size="small"
+          checked={quelle.lagemonitor}
+          loading={laeuft}
+          aria-describedby={hinweisId}
+          onChange={onSchalten}
+        />
+        Livebild auf dem Lagemonitor
+      </label>
+      <span id={hinweisId} data-lfh="drohnen-lagemonitor">
+        {hinweis}
+      </span>
+    </>
   );
 }
