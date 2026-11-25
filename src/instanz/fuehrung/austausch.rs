@@ -1997,7 +1997,7 @@ pub(crate) mod tests {
     fn pad_to_bytes(mut m: AkteMeldung, ziel: usize) -> AkteMeldung {
         m.erklaerung = Some(String::new());
         let fehlt = ziel - m.bytes();
-        let erklaerung = "\u{1}".repeat(fehlt / 6) + &"e".repeat(fehlt % 6);
+        let erklaerung = "\u{1}".repeat(fehlt / 6) + "e".repeat(fehlt % 6).as_str();
         assert!(erklaerung.len() <= ERKLAERUNG_MAX, "Ziel {ziel} zu groß");
         m.erklaerung = Some(erklaerung);
         assert_eq!(m.bytes(), ziel);

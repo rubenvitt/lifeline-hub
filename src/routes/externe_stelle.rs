@@ -141,7 +141,7 @@ use crate::externe_stelle::{ExterneStelleKanal, KanalArt, KanalMitStelle};
 const UNGUELTIGER_KANAL: &str = "Ungültiger Kanal";
 const KANAL_NICHT_FREIGESCHALTET: &str = "Dieser Kanal ist noch nicht freigeschaltet";
 
-/// Nimmt nur freigeschaltete Kanäle an (heute E-Mail), alles andere ist 400.
+/// Nimmt nur freigeschaltete Kanäle an (heute E-Mail und Matrix), alles andere ist 400.
 fn parse_kanal(roh: &str) -> Result<KanalArt, AppError> {
     let kanal = parse_enum(KanalArt::parse, roh.trim(), UNGUELTIGER_KANAL)?;
     if !kanal.is_freigeschaltet() {
@@ -154,6 +154,7 @@ fn parse_kanal(roh: &str) -> Result<KanalArt, AppError> {
 fn pruefe_adresse(kanal: KanalArt, roh: &str) -> Result<String, AppError> {
     match kanal {
         KanalArt::Email => kanal::normalize_email(roh).map_err(AppError::Validation),
+        KanalArt::Matrix => kanal::normalize_matrix(roh).map_err(AppError::Validation),
         // `parse_kanal` lässt nur freigeschaltete Kanäle durch.
         _ => Err(AppError::Validation(KANAL_NICHT_FREIGESCHALTET.into())),
     }
@@ -170,19 +171,26 @@ pub async fn kanal_list(
 
 #[derive(Debug, Deserialize)]
 pub struct KanalQuery {
-    pub channel: String,
+    /// Fehlt der Parameter, kommen alle freigeschalteten Kanäle.
+    pub channel: Option<String>,
 }
 
-/// GET /api/external-agencies/channels?channel=email — alle Adressen der aktiven Stellen der
+/// GET /api/external-agencies/channels[?channel=email] — alle Adressen der aktiven Stellen der
 /// Organisation mit ihrer Stelle (Auswahl im Senden-Dialog).
 pub async fn kanal_sammlung(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
     Query(q): Query<KanalQuery>,
 ) -> Result<Json<Vec<KanalMitStelle>>, AppError> {
-    let art = parse_kanal(&q.channel)?;
-    debug_assert_eq!(art, KanalArt::Email);
-    let zeilen = kanal::list_email_fuer_org(&state.pool, benutzer.org_id).await?;
+    let arten: Vec<KanalArt> = match &q.channel {
+        Some(roh) => vec![parse_kanal(roh)?],
+        None => KanalArt::ALLE
+            .iter()
+            .copied()
+            .filter(|k| k.is_freigeschaltet())
+            .collect(),
+    };
+    let zeilen = kanal::list_fuer_org(&state.pool, benutzer.org_id, &arten).await?;
     Ok(Json(
         zeilen
             .into_iter()

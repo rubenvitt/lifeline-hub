@@ -233,7 +233,9 @@ async fn anlegen(
                     stelle.bezeichnung
                 )));
             }
-            if !kanal.channel.is_freigeschaltet() {
+            // Task 6 (LLH-2094) hebt das auf, sobald es einen Matrix-Zustellweg gibt; bis dahin
+            // nimmt der Versand nur E-Mail an, auch wenn Matrix-Adressen schon angelegt werden.
+            if kanal.channel != crate::externe_stelle::KanalArt::Email {
                 return Err(AppError::UnprocessableEntity(
                     "Dieser Kanal wird noch nicht unterstützt".into(),
                 ));

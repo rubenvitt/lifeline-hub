@@ -5227,7 +5227,7 @@ export interface components {
         /**
          * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
          *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
-         *     angenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).
+         *     angenommen werden heute E-Mail und Matrix (siehe [`KanalArt::is_freigeschaltet`]).
          * @enum {string}
          */
         KanalArt: "email" | "fax" | "matrix" | "threema";

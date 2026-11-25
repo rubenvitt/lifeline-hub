@@ -145,7 +145,7 @@ async fn fax_ist_noch_nicht_freigeschaltet() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let stelle = stelle_anlegen(&app, &admin, "Kreisverwaltung").await;
-    for kanal in ["fax", "matrix", "threema", "brieftaube"] {
+    for kanal in ["fax", "threema", "brieftaube"] {
         let (status, json) = kanal_anlegen(
             &app,
             &admin,
@@ -350,4 +350,60 @@ async fn doppelte_adresse_ist_409() {
     )
     .await;
     assert_eq!(status, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn post_matrix_kanal_legt_an_und_sammlung_liefert_beide_kanaele() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let stelle = stelle_anlegen(&app, &admin, "Leitstelle Nord").await;
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"matrix","address":" #lage:example.org "}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    assert_eq!(json["channel"], "matrix");
+    assert_eq!(json["address"], "#lage:example.org");
+    let (status, _) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"email","address":"a@b.de"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"matrix","address":"@bot:example.org"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+
+    let (status, json) = anfrage(&app, "GET", &format!("{PFAD}/channels"), &admin, None).await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let kanaele: Vec<&str> = json
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|k| k["channel"]["channel"].as_str().unwrap())
+        .collect();
+    assert_eq!(kanaele.len(), 2, "{json}");
+    assert!(kanaele.contains(&"email") && kanaele.contains(&"matrix"));
+
+    let (status, json) = anfrage(
+        &app,
+        "GET",
+        &format!("{PFAD}/channels?channel=matrix"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    assert_eq!(json.as_array().unwrap().len(), 1, "{json}");
+    assert_eq!(json[0]["channel"]["address"], "#lage:example.org");
 }

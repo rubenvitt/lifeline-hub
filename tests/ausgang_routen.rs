@@ -416,6 +416,21 @@ async fn fremde_kanaladresse_404() {
 }
 
 #[tokio::test]
+async fn matrix_adresse_ist_vorerst_422_nicht_unterstuetzt() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    sqlx::query("UPDATE org_externe_stelle_kanal SET kanal = 'matrix', adresse = '#lage:example.org' WHERE id = ?")
+        .bind(w.kanaele[0])
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v) = w.lb_senden(lid, "m-1", &[w.kanaele[0]]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v.to_string().contains("noch nicht unterstützt"), "{v}");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
 async fn inaktive_stelle_ist_422() {
     let w = welt().await;
     let lid = w.lagebericht(true).await;
