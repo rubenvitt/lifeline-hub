@@ -73,6 +73,10 @@ pub struct Nachricht {
     pub stufe: Stufe,
     pub kollaps: Option<String>,
     pub nutzlast: String,
+    /// Bundle-ID der Ziel-App (ADR-0104); fehlt es, gilt die eingestellte `bundle_id`. Nur
+    /// erlaubte Werte ([`ApnsClient::thema_erlaubt`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thema: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -89,6 +93,7 @@ pub struct ApnsClient {
     key_id: String,
     team_id: String,
     bundle_id: String,
+    weitere_bundle_ids: Vec<String>,
     basis_production: String,
     basis_sandbox: String,
     /// `https://`-Basen: Aushandlung per ALPN.
@@ -126,6 +131,7 @@ impl ApnsClient {
             key_id: cfg.apns_key_id.clone(),
             team_id: cfg.apns_team_id.clone(),
             bundle_id: cfg.bundle_id.clone(),
+            weitere_bundle_ids: cfg.weitere_bundle_ids.clone(),
             basis_production: cfg.apns_basis_production.trim_end_matches('/').to_string(),
             basis_sandbox: cfg.apns_basis_sandbox.trim_end_matches('/').to_string(),
             http: bauen(false)?,
@@ -174,6 +180,12 @@ impl ApnsClient {
         }
     }
 
+    /// Ob `thema` als `apns-topic` gesendet werden darf: die eingestellte `bundle_id` oder eine
+    /// der weiteren (`PUSH_RELAIS_WEITERE_BUNDLE_IDS`).
+    pub fn thema_erlaubt(&self, thema: &str) -> bool {
+        thema == self.bundle_id || self.weitere_bundle_ids.iter().any(|b| b == thema)
+    }
+
     /// Eine Nachricht an Apple. Kein Wiederholen; Token und Nutzlast nie ins Log.
     pub async fn senden(&self, n: &Nachricht) -> Ergebnis {
         // Gerätetoken sind hexadezimal; alles andere gehört nicht in den Pfad.
@@ -199,7 +211,10 @@ impl ApnsClient {
                 "authorization",
                 format!("bearer {}", self.anbieter_token(jetzt)),
             )
-            .header("apns-topic", &self.bundle_id)
+            .header(
+                "apns-topic",
+                n.thema.as_deref().unwrap_or(&self.bundle_id),
+            )
             .header("apns-push-type", "alert")
             .header("apns-priority", "10")
             .header("apns-expiration", (jetzt + ABLAUF_SEKUNDEN).to_string())
@@ -247,6 +262,7 @@ mod tests {
             key_id: "KEYID12345".into(),
             team_id: "TEAMID1234".into(),
             bundle_id: "b".into(),
+            weitere_bundle_ids: Vec::new(),
             basis_production: String::new(),
             basis_sandbox: String::new(),
             http: reqwest::Client::new(),

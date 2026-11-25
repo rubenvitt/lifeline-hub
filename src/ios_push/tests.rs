@@ -413,7 +413,18 @@ mod relais_client {
             stufe: Stufe::Alarm,
             kollaps: None,
             nutzlast: "xyz".into(),
+            thema: None,
         }
+    }
+
+    #[test]
+    fn thema_steht_nur_bei_gesetztem_wert_auf_dem_draht() {
+        let ohne = serde_json::to_value(nachricht()).unwrap();
+        assert!(ohne.get("thema").is_none());
+        let mut mit = nachricht();
+        mit.thema = Some("dev.rubeen.lifeline.helfer".into());
+        let mit = serde_json::to_value(mit).unwrap();
+        assert_eq!(mit["thema"], "dev.rubeen.lifeline.helfer");
     }
 
     fn pfade(g: &Gesehen) -> Vec<String> {

@@ -247,6 +247,7 @@ impl IosPush {
                 },
                 kollaps: Some(kollaps(&zugang.server_id, s.ereignis.benachrichtigung_id)),
                 nutzlast,
+                thema: None,
             });
             ziele.push((a.id, a.token));
         }
