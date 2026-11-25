@@ -15,7 +15,7 @@ use lifeline_hub::instanz::spiegel::paket::{
     RemoteTrackingCandidates, RemoteTrackingRequest, SpiegelPaket,
 };
 use lifeline_hub::instanz::{identitaet, org_kennung};
-use lifeline_hub::ortung::fern;
+use lifeline_hub::ortung::{fern, uebernahme};
 use serde_json::json;
 use tower::ServiceExt;
 
@@ -399,4 +399,114 @@ fn aelteres_paket_ohne_felder_wird_gelesen() {
     assert!(p.tracking_candidates_wanted.is_empty());
     assert!(p.tracking_positions.is_empty());
     assert!(p.tracking_candidates.is_empty());
+}
+
+// ── ELW fragt an und übernimmt (Task 3) ──────────────────────────────────────────────────────
+
+/// Das ELW führt einen Einsatz mit einem disponierten Fahrzeug; die Kopplung zeigt per SQL auf
+/// `fkw1` des Hub-Zugangs (die Route kommt später). (Einsatz, Einsatzfahrzeug, Kopplung am ELW).
+async fn elw_mit_gekoppeltem_fahrzeug(a: &Aufbau) -> (i64, i64, KopplungZeile) {
+    schalter_setzen(&a.elw.pool, 1, true).await;
+    let einsatz = common::einsatz_anlegen(&a.elw.app, &a.elw.admin).await;
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/vehicles"),
+        &a.elw.admin,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ef = v["id"].as_i64().unwrap();
+    let kopplung = {
+        let mut conn = a.elw.pool.acquire().await.unwrap();
+        lifeline_hub::instanz::repo::find_kopplung(&mut conn, &a.hub.kennung)
+            .await
+            .unwrap()
+            .expect("Kopplung am ELW")
+    };
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, instanz_kopplung_id, \
+         fremder_zugang_id, zugang_name, kennung, gekoppelt_at, gekoppelt_von) \
+         VALUES (?, ?, 1, ?, ?, 'Tracker', 'fkw1', ?, 1)",
+    )
+    .bind(ef)
+    .bind(einsatz)
+    .bind(kopplung.id)
+    .bind(&a.zugang)
+    .bind(lifeline_hub::zeit::jetzt())
+    .execute(&a.elw.pool)
+    .await
+    .unwrap();
+    (einsatz, ef, kopplung)
+}
+
+async fn position_am_elw(a: &Aufbau, ef: i64) -> (Option<f64>, Option<f64>, Option<String>) {
+    sqlx::query_as("SELECT lat, lon, position_quelle FROM einsatz_fahrzeug WHERE id = ?")
+        .bind(ef)
+        .fetch_one(&a.elw.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn elw_bekommt_position_vom_hub() {
+    let a = aufbau().await;
+    let (_, ef, _) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    abgleichen(&a.elw).await;
+    assert_eq!(
+        position_am_elw(&a, ef).await,
+        (Some(48.1), Some(11.5), Some("einwurf".into()))
+    );
+    // Der Spiegel am Hub folgt mit dem nächsten Abgleich.
+    abgleichen(&a.elw).await;
+    let am_hub: Vec<(Option<f64>, Option<f64>)> = sqlx::query_as(
+        "SELECT ef.lat, ef.lon FROM einsatz_fahrzeug ef JOIN einsatz e ON e.id = ef.einsatz_id \
+         WHERE e.spiegel = 1",
+    )
+    .fetch_all(&a.hub.pool)
+    .await
+    .unwrap();
+    assert_eq!(am_hub, vec![(Some(48.1), Some(11.5))]);
+}
+
+#[tokio::test]
+async fn zweite_lieferung_binnen_15s_wird_gedrosselt() {
+    let a = aufbau().await;
+    let (_, ef, _) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    abgleichen(&a.elw).await;
+    sqlx::query(
+        "UPDATE position_letzte SET lat = 50.0, lon = 13.0, \
+         gemessen_at = strftime('%Y-%m-%d %H:%M:%S', gemessen_at, '+5 seconds') \
+         WHERE kennung = 'fkw1'",
+    )
+    .execute(&a.hub.pool)
+    .await
+    .unwrap();
+    abgleichen(&a.elw).await;
+    assert_eq!(
+        position_am_elw(&a, ef).await,
+        (Some(48.1), Some(11.5), Some("einwurf".into()))
+    );
+    assert!(!uebernahme::is_nachlauf_vorgemerkt(&a.elw.pool, ef));
+}
+
+#[tokio::test]
+async fn aelterer_hub_ohne_felder() {
+    let a = aufbau().await;
+    let (_, ef, kopplung) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    fern::apply_answer(&a.elw.pool, &kopplung, &SpiegelPaket::default()).await;
+    assert_eq!(position_am_elw(&a, ef).await, (None, None, None));
+}
+
+#[tokio::test]
+async fn wunsch_liefert_kandidaten_in_den_puffer() {
+    let a = aufbau().await;
+    let (_, _, kopplung) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    assert!(fern::cached_candidates(&a.elw.pool, kopplung.id, 1).is_none());
+    fern::wish_candidates(&a.elw.pool, kopplung.id, 1);
+    abgleichen(&a.elw).await;
+    let (_, k) = fern::cached_candidates(&a.elw.pool, kopplung.id, 1).expect("Puffer gesetzt");
+    assert!(k.tracking_enabled);
+    assert!(k.items.iter().any(|i| i.device_id == "fkw1"), "{k:?}");
 }

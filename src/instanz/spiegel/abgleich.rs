@@ -683,6 +683,13 @@ pub async fn abgleich_einmal(
                 super::hinweis::offene(conn, kopplung.id, chrono::Utc::now()).await?;
             hinweise_mehr = mehr;
             let mitarbeit_nachtraege = super::nachtrag::list_offene(conn, kopplung.id).await?;
+            // Fahrzeugortung (LLH-2119): nur in der ersten Runde, sonst fragt ein Paket mit
+            // mehreren Runden doppelt.
+            let (tracking_requests, tracking_candidates_wanted) = if runde == 0 {
+                crate::ortung::fern::build_requests(pool, conn, kopplung).await?
+            } else {
+                (Vec::new(), Vec::new())
+            };
             Ok(SpiegelPaket {
                 staende,
                 lieferungen,
@@ -698,8 +705,8 @@ pub async fn abgleich_einmal(
                 akten,
                 mitarbeit_nachtraege,
                 mitarbeit_quittungen: mitarbeit_quittungen.clone(),
-                tracking_requests: Vec::new(),
-                tracking_candidates_wanted: Vec::new(),
+                tracking_requests,
+                tracking_candidates_wanted,
                 tracking_positions: Vec::new(),
                 tracking_candidates: Vec::new(),
             })
@@ -716,6 +723,8 @@ pub async fn abgleich_einmal(
         .await?
         .wert;
         antwort.check().map_err(SendError::AntwortUngueltig)?;
+        // Nach dem Commit der Anfrage und außerhalb ihrer Transaktion; fehlerfrei nach außen.
+        crate::ortung::fern::apply_answer(pool, kopplung, &antwort).await;
         let mut uebernommen = Uebernommen::default();
         let mut abzuraeumen = Vec::new();
         crate::write_retry!(pool, |conn| {

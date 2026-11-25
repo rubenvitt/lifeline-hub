@@ -15,13 +15,18 @@ use crate::instanz::identitaet::Identitaet;
 use crate::instanz::org_kennung;
 use crate::instanz::repo::{self, KopplungZeile};
 use crate::instanz::spiegel::paket::{
-    RemoteTrackingCandidate, RemoteTrackingCandidates, RemoteTrackingPosition, SpiegelPaket,
-    TRACKING_ANFRAGEN_MAX,
+    RemoteTrackingCandidate, RemoteTrackingCandidates, RemoteTrackingPosition,
+    RemoteTrackingRequest, SpiegelPaket, TRACKING_ANFRAGEN_MAX,
 };
 use crate::log_drossel::SammelzeileJe;
 use crate::ortung::kopplung;
+use crate::ortung::uebernahme::{apply_remote_position_tx, Uebernahme};
 use crate::public_api::scope::Scope;
-use sqlx::SqlitePool;
+use crate::write_retry;
+use sqlx::{SqliteConnection, SqlitePool};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 /// Beantwortet die Ortungsfelder der Anfrage: (Positionen, Kandidaten). Bei einem Fehler leere
 /// Listen.
@@ -141,4 +146,201 @@ async fn antworten(
         });
     }
     Ok((positionen, kandidaten))
+}
+
+// ── Seite des ELW ────────────────────────────────────────────────────────────────────────────
+//
+// Das ELW fragt im Abgleich die Positionen seiner Hub-Kopplungen an und übernimmt die Antwort
+// über den Positionsbaustein (Entwurf, „Übernahme am ELW“). Auf diesem Weg gibt es keinen
+// Nachlauf: der nächste Abgleich bringt die jüngste Position ohnehin.
+
+/// So lange gilt ein Wunsch nach der Kandidatenliste einer Org des Hubs.
+const WUNSCH_DAUER: Duration = Duration::from_secs(60);
+
+/// Schlüssel des Puffers: die Datenbank (Adresse des Pools, wie `NachlaufKey` in
+/// `uebernahme.rs`), die Kopplung zum Hub und die eigene Org.
+type PufferKey = (usize, i64, i64);
+
+fn puffer_key(pool: &SqlitePool, instanz_kopplung_id: i64, org_id: i64) -> PufferKey {
+    (
+        std::ptr::from_ref(pool.options()) as usize,
+        instanz_kopplung_id,
+        org_id,
+    )
+}
+
+/// Wünsche (bis wann) und zuletzt empfangene Kandidatenlisten, prozessweit.
+#[derive(Default)]
+struct Puffer {
+    wuensche: HashMap<PufferKey, Instant>,
+    kandidaten: HashMap<PufferKey, (Instant, RemoteTrackingCandidates)>,
+}
+
+static PUFFER: Mutex<Option<Puffer>> = Mutex::new(None);
+
+fn puffer<T>(f: impl FnOnce(&mut Puffer) -> T) -> T {
+    let mut g = PUFFER.lock().unwrap_or_else(|e| e.into_inner());
+    f(g.get_or_insert_with(Puffer::default))
+}
+
+/// Wünscht für 60 s die Kandidatenliste der Org beim Hub; der nächste Abgleich fragt sie an.
+pub fn wish_candidates(pool: &SqlitePool, instanz_kopplung_id: i64, org_id: i64) {
+    let bis = Instant::now() + WUNSCH_DAUER;
+    puffer(|p| {
+        p.wuensche
+            .insert(puffer_key(pool, instanz_kopplung_id, org_id), bis);
+    });
+}
+
+/// Die zuletzt empfangene Kandidatenliste der Org mit dem Zeitpunkt des Empfangs.
+pub fn cached_candidates(
+    pool: &SqlitePool,
+    instanz_kopplung_id: i64,
+    org_id: i64,
+) -> Option<(Instant, RemoteTrackingCandidates)> {
+    puffer(|p| {
+        p.kandidaten
+            .get(&puffer_key(pool, instanz_kopplung_id, org_id))
+            .cloned()
+    })
+}
+
+/// Die Anfragefelder des nächsten Abgleichs: je Hub-Kopplung eines aktiven Fahrzeugs eines
+/// aktiven, nicht gespiegelten Einsatzes mit eingeschaltetem Org-Schalter eine Positionsanfrage,
+/// dazu die Org-Kennungen, deren Kandidatenliste gewünscht ist. `org` ist die Kennung der Org
+/// beim Hub (`fremde_org_kennung`).
+pub async fn build_requests(
+    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+) -> Result<(Vec<RemoteTrackingRequest>, Vec<String>), AppError> {
+    let orgs = repo::list_orgs_aktiv(conn, kopplung.id).await?;
+    let wire_von = |org_id: i64| {
+        orgs.iter()
+            .find(|o| o.org_id == org_id)
+            .map(|o| o.fremde_org_kennung.clone())
+    };
+    let zeilen: Vec<(i64, String, String)> = sqlx::query_as(
+        "SELECT k.org_id, k.fremder_zugang_id, k.kennung \
+         FROM ortung_kopplung k \
+         JOIN einsatz_fahrzeug ef ON ef.id = k.einsatz_fahrzeug_id AND ef.beendet_at IS NULL \
+         JOIN einsatz e ON e.id = ef.einsatz_id AND e.status = 'aktiv' AND e.spiegel = 0 \
+         JOIN org_einstellungen o ON o.org_id = k.org_id AND o.ortung_im_einsatz = 1 \
+         WHERE k.instanz_kopplung_id = ? \
+         ORDER BY k.einsatz_fahrzeug_id LIMIT ?",
+    )
+    .bind(kopplung.id)
+    .bind(TRACKING_ANFRAGEN_MAX as i64)
+    .fetch_all(&mut *conn)
+    .await?;
+    let anfragen = zeilen
+        .into_iter()
+        .filter_map(|(org_id, access_id, device_id)| {
+            Some(RemoteTrackingRequest {
+                org: wire_von(org_id)?,
+                access_id,
+                device_id,
+            })
+        })
+        .collect();
+
+    let jetzt = Instant::now();
+    let mut gewuenscht: Vec<String> = puffer(|p| {
+        p.wuensche.retain(|_, bis| *bis > jetzt);
+        orgs.iter()
+            .filter(|o| {
+                p.wuensche
+                    .contains_key(&puffer_key(pool, kopplung.id, o.org_id))
+            })
+            .map(|o| o.fremde_org_kennung.clone())
+            .collect()
+    });
+    gewuenscht.truncate(TRACKING_ANFRAGEN_MAX);
+    Ok((anfragen, gewuenscht))
+}
+
+/// Übernimmt die Ortungsfelder der Antwort des Hubs: Kandidatenlisten in den Puffer, jede
+/// Position in einer eigenen Schreibtransaktion, danach die Live-Meldung. Fehlerfrei nach außen:
+/// ein Fehler zählt eine Sammelzeile ohne Kennung und Koordinaten; ein älterer Hub liefert leere
+/// Listen, dann geschieht nichts.
+pub async fn apply_answer(pool: &SqlitePool, kopplung: &KopplungZeile, antwort: &SpiegelPaket) {
+    if antwort.tracking_positions.is_empty() && antwort.tracking_candidates.is_empty() {
+        return;
+    }
+    let orgs = {
+        let Ok(mut conn) = pool.acquire().await else {
+            return zaehle_fehler(kopplung);
+        };
+        match repo::list_orgs_aktiv(&mut conn, kopplung.id).await {
+            Ok(o) => o,
+            Err(_) => return zaehle_fehler(kopplung),
+        }
+    };
+    let org_von = |wire: &str| {
+        orgs.iter()
+            .find(|o| o.fremde_org_kennung == wire)
+            .map(|o| o.org_id)
+    };
+
+    let jetzt_instant = Instant::now();
+    for k in &antwort.tracking_candidates {
+        if let Some(org_id) = org_von(&k.org) {
+            puffer(|p| {
+                p.kandidaten.insert(
+                    puffer_key(pool, kopplung.id, org_id),
+                    (jetzt_instant, k.clone()),
+                );
+            });
+        }
+    }
+
+    for p in antwort
+        .tracking_positions
+        .iter()
+        .take(TRACKING_ANFRAGEN_MAX)
+    {
+        if org_von(&p.org).is_none() {
+            continue;
+        }
+        let jetzt = crate::zeit::jetzt();
+        let ergebnis = write_retry!(pool, |conn| {
+            apply_remote_position_tx(
+                conn,
+                kopplung.id,
+                &p.access_id,
+                &p.device_id,
+                p.lat,
+                p.lon,
+                &p.measured_at,
+                &jetzt,
+            )
+            .await
+        });
+        match ergebnis {
+            Ok(Uebernahme::Geschrieben { einsatz_id, ef_id }) => {
+                if let Some(live) = crate::instanz::stammdaten::live() {
+                    live.publiziere_objekt(
+                        einsatz_id,
+                        crate::live::LiveEvent::Fahrzeug,
+                        "fahrzeug_id",
+                        ef_id,
+                    );
+                }
+            }
+            Ok(_) => {}
+            Err(_) => zaehle_fehler(kopplung),
+        }
+    }
+}
+
+fn zaehle_fehler(kopplung: &KopplungZeile) {
+    // Je Kopplung gezählt; weder Kennung noch Zugang noch Koordinaten stehen im Log.
+    static FEHLER: SammelzeileJe = SammelzeileJe::neu();
+    if let Some(f) = FEHLER.zaehlen(&kopplung.id.to_string()) {
+        tracing::warn!(
+            anzahl = f.anzahl,
+            seit_s = f.seit_s,
+            "Ortungsantwort des Hubs nicht übernommen, Sammelzeile"
+        );
+    }
 }
