@@ -93,7 +93,7 @@ export function sorgeFuerFachebeneLayer(
     return;
   }
   if (def.drohnenlage) {
-    sorgeFuerDrohnenLayer(map, def.key, src, farbe);
+    sorgeFuerDrohnenLayer(map, def.key, src, farbe, treffer);
     return;
   }
   if (def.geometrieTyp === 'polygon') {
@@ -337,11 +337,19 @@ const kindFarbe = (farbe: string) => ['coalesce', ['get', 'color'], farbe];
  * - `aircraft` als Kreis in der Ebenenfarbe mit Pfeil, der mit `heading_deg` dreht. Ohne
  *   Blickrichtung steht nur der Kreis da: ein Pfeil nach Norden wäre eine falsche Aussage.
  *
- * Die Ebene ist noch kein Klickziel (`fachebeneClickLayerIds`); Fotos öffnen später ein eigenes
- * Fenster. Die Layer-IDs enden bewusst nie auf `-circle`, `-linie`, `-fill` oder `-treffer`: das
- * Schema in `ordneKlickebene` (`klickziel.ts`) machte sie sonst zu Klickzielen ohne Handler. Spät gezeichnet liegt oben, die Reihenfolge unten ist die Stapelung.
+ * Klickziel sind nur die Fotos, über die Trefferzone `-treffer` (`fachebeneClickLayerIds`); sie
+ * öffnen den Inspector mit der Vorschau. Fluggerät, Spur und Element sind keine Ziele, darum
+ * enden ihre Layer-IDs nie auf `-circle`, `-linie`, `-fill` oder `-treffer`: das Schema in
+ * `ordneKlickebene` (`klickziel.ts`) machte sie sonst zu Klickzielen ohne Handler. Spät gezeichnet
+ * liegt oben, die Reihenfolge unten ist die Stapelung.
  */
-function sorgeFuerDrohnenLayer(map: MapLibreMap, key: FachebeneQuelle, src: string, farbe: string) {
+function sorgeFuerDrohnenLayer(
+  map: MapLibreMap,
+  key: FachebeneQuelle,
+  src: string,
+  farbe: string,
+  treffer: number,
+) {
   const anlegen = (spec: Parameters<MapLibreMap['addLayer']>[0]) => {
     if (!map.getLayer(spec.id)) map.addLayer(spec);
   };
@@ -403,6 +411,15 @@ function sorgeFuerDrohnenLayer(map: MapLibreMap, key: FachebeneQuelle, src: stri
     filter: spur,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': kindFarbe(farbe) as never, 'line-width': 3 },
+  });
+  // Unsichtbare Trefferzone der Fotos (LLH-2108, wie `-treffer` der Punkt-Ebenen, LFH-600):
+  // `controlHeight` statt des 5-px-Bildpunkts. Fluggerät, Spur und Element bleiben ohne Ziel.
+  anlegen({
+    id: `fachebene-${key}-treffer`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('photo') as never,
+    paint: { 'circle-radius': treffer / 2, 'circle-opacity': 0, 'circle-stroke-width': 0 },
   });
   anlegen({
     id: `fachebene-${key}-foto-kante`,
@@ -545,9 +562,9 @@ export function setzeFachebeneDaten(
  * ist Kontur.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
-  // Die Drohnenlage ist noch kein Klickziel (LLH-2106): ihre Eigenschaften passen in keinen
-  // Inspector der übrigen Ebenen; das Foto-Fenster kommt mit LLH-2108.
-  if (def.drohnenlage) return [];
+  // Nur die Fotos der Drohnenlage sind ein Ziel (LLH-2108), über ihre Trefferzone; Fluggerät, Spur
+  // und Element haben keinen Inspector.
+  if (def.drohnenlage) return [`fachebene-${def.key}-treffer`];
   if (def.gemischteGeometrie) {
     return ['fill', 'linie', 'circle', 'treffer'].map((t) => `fachebene-${def.key}-${t}`);
   }

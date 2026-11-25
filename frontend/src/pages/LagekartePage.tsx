@@ -1391,6 +1391,7 @@ export default function LagekartePage() {
             onSchliessen={() => setFachebeneAuswahl(null)}
             // Schnellweg „Als maßgeblichen Pegel festlegen"; wirkt nur an PEGELONLINE-Punkten.
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
+            einsatzId={einsatzId}
             abgerufen={fachebenenAbgerufen[fachebeneAuswahl.quelle]}
           />
         )}

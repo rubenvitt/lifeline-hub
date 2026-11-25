@@ -37,6 +37,7 @@ export function fachebeneTitel(quelle: FachebeneQuelle, p: Record<string, unknow
     return event ? titelCase(event) : 'Wetterwarnung';
   }
   if (quelle === 'nina') return 'Amtliche Warnung';
+  if (quelle === 'drohne' && p.kind === 'photo') return 'Drohnenfoto';
   if (quelle === 'copernicus') {
     // LLH-1200: die Klasse als Wort; ein Gebiet mit seinem Namen.
     const gebiet = pick(p, 'gebiet');

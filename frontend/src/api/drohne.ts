@@ -18,6 +18,10 @@ const QUELLEN_TAKT_MS = 10_000;
 const basis = (einsatzId: number, adapterId: string) =>
   `/api/incidents/${einsatzId}/drone/sources/${encodeURIComponent(adapterId)}`;
 
+/** `GET …/drone/photos/{key}/thumb` — die Vorschau eines Fotos über den Backend-Proxy (LLH-2108). */
+export const drohnenFotoVorschauPfad = (einsatzId: number, key: string) =>
+  `/api/incidents/${einsatzId}/drone/photos/${encodeURIComponent(key)}/thumb`;
+
 /** `GET /api/incidents/{id}/drone/sources` — die Drohnenquellen der Org. */
 export function loadDrohnenQuellen(einsatzId: number): Promise<DroneSourceView[]> {
   return apiGet<DroneSourceView[]>(`/api/incidents/${einsatzId}/drone/sources`);

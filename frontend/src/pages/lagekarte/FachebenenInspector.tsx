@@ -40,6 +40,7 @@ import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
+import { drohnenFotoVorschauPfad } from '../../api/drohne';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
@@ -57,6 +58,8 @@ interface FachebenenInspectorProps {
    * Einsatz-Schreibrecht der Lagekarte (im Snapshot-Modus `false`).
    */
   pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
+  /** Einsatz der Lagekarte; die Vorschau eines Drohnenfotos kommt über dessen Route (LLH-2108). */
+  einsatzId?: number;
   /**
    * Abrufzeitpunkt der Ebene durch den Server (LFH-591). Steht neben den Zeitangaben der Quelle
    * am Objekt, ersetzt sie nicht: eine Meldeklasse kann frisch gemessen und trotzdem vor zwei
@@ -578,6 +581,65 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   );
 }
 
+const LINSE: Record<string, string> = {
+  thermal: 'Wärmebild',
+  wide: 'Weitwinkel',
+  zoom: 'Zoom',
+  visible: 'Sichtbild',
+};
+
+/**
+ * Vorschau eines Drohnenfotos vom Backend-Proxy, nach `WebcamStandbild`: ohne Fehlerzustand ein
+ * nacktes `<img>`, bei einem Fehler der Grund statt eines kaputten Bildsymbols.
+ */
+function DrohnenFotoVorschau({ src }: { src: string }) {
+  const { token } = theme.useToken();
+  const [fehler, setFehler] = useState(false);
+  if (fehler) {
+    return (
+      <div style={{ marginBottom: token.marginSM }}>
+        <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+          Vorschau nicht abrufbar
+        </Textstufe>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt="Drohnenfoto"
+      onError={() => setFehler(true)}
+      style={{
+        width: '100%',
+        display: 'block',
+        marginBottom: token.marginXS,
+        borderRadius: token.borderRadius,
+      }}
+    />
+  );
+}
+
+function DrohnenFotoInhalt({ p, einsatzId }: { p: Record<string, unknown>; einsatzId?: number }) {
+  const fmtZeit = useFmtZeit();
+  const key = s(p.key);
+  const src = key && einsatzId != null ? drohnenFotoVorschauPfad(einsatzId, key) : null;
+  const linse = LINSE[s(p.lens) ?? ''] ?? 'unbekannte Linse';
+  const aufnahme =
+    typeof p.taken_at_ms === 'number' ? fmtZeit(new Date(p.taken_at_ms).toISOString()) : null;
+  const blick = typeof p.heading_deg === 'number' ? `${Math.round(p.heading_deg)}°` : null;
+  return (
+    <>
+      {/* Der `key` bindet den Fehlerzustand an die URL — jedes andere Foto beginnt frisch. */}
+      {src && <DrohnenFotoVorschau key={src} src={src} />}
+      <Descriptions column={1}>
+        <Descriptions.Item label="Linse">{linse}</Descriptions.Item>
+        {aufnahme && <Descriptions.Item label="Aufnahme">{aufnahme}</Descriptions.Item>}
+        {blick && <Descriptions.Item label="Blickrichtung">{blick}</Descriptions.Item>}
+      </Descriptions>
+    </>
+  );
+}
+
 const ANLAGENART: Record<EnergieAnlagenart, string> = {
   kohle: 'Kohle',
   gas: 'Gas',
@@ -830,6 +892,7 @@ export default function FachebenenInspector({
   geometrie,
   onSchliessen,
   pegelBezug,
+  einsatzId,
   abgerufen,
 }: FachebenenInspectorProps) {
   const { token } = theme.useToken();
@@ -883,6 +946,8 @@ export default function FachebenenInspector({
         <LuftqualitaetInhalt p={p} />
       ) : quelle === 'copernicus' ? (
         <CopernicusInhalt p={p} />
+      ) : quelle === 'drohne' ? (
+        <DrohnenFotoInhalt p={p} einsatzId={einsatzId} />
       ) : quelle === 'energie' ? (
         // Vor dem Rückfall: jede unbekannte Quelle fiele sonst still in den KRITIS-Inhalt.
         <EnergieInhalt p={p} />

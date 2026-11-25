@@ -379,6 +379,9 @@ describe('Trefferzone und Kante der Punkt-Fachebenen (LFH-600)', () => {
   const punktEbenen = Object.values(FACHEBENEN).filter(
     (d) => d.geometrieTyp === 'punkt' && !d.drohnenlage,
   );
+  // Die Trefferzone prüfen alle Punkt-Ebenen, die Drohnenlage eingeschlossen (LLH-2108): ihre Zone
+  // gilt nur den Fotos. Kante und Kreis zeichnet sie je Art in eigenen Layern (Block unten).
+  const trefferEbenen = Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt');
   const kreisRadius = ['coalesce', ['get', 'radius'], 5];
 
   it('es gibt Punkt-Ebenen mit und ohne Bündel — sonst prüften die Schleifen nur eine Sorte', () => {
@@ -387,13 +390,16 @@ describe('Trefferzone und Kante der Punkt-Fachebenen (LFH-600)', () => {
   });
 
   it('legt je Punkt-Ebene eine unsichtbare Trefferzone ohne Filter mit halbem Staffelwert an', () => {
-    for (const def of punktEbenen) {
+    for (const def of trefferEbenen) {
       const m = fakeMap();
       sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
       const zone = m._specs.get(`fachebene-${def.key}-treffer`);
       expect(zone?.type, def.key).toBe('circle');
       // Ohne Filter: Einzelpunkt, Client-Bündel und Server-Sammelpunkt tragen dieselbe Zone.
-      expect(zone?.filter, def.key).toBeUndefined();
+      // Nur die Drohnenlage filtert: ihre Zone gilt den Fotos, nicht Fluggerät, Spur und Element.
+      expect(zone?.filter, def.key).toEqual(
+        def.drohnenlage ? ['==', ['get', 'kind'], 'photo'] : undefined,
+      );
       expect(zone?.paint?.['circle-radius'], def.key).toBe(TREFFER / 2);
       expect(zone?.paint?.['circle-opacity'], def.key).toBe(0);
       expect(zone?.paint?.['circle-stroke-width'], def.key).toBe(0);
@@ -614,6 +620,7 @@ describe('Drohnenlage (LLH-2106)', () => {
       'fachebene-drohne-elem-punkt',
       'fachebene-drohne-spur-kante',
       'fachebene-drohne-spur',
+      'fachebene-drohne-treffer',
       'fachebene-drohne-foto-kante',
       'fachebene-drohne-foto',
       'fachebene-drohne-flug-kante',
@@ -636,13 +643,31 @@ describe('Drohnenlage (LLH-2106)', () => {
       'fachebene-drohne-elem-flaeche',
       'fachebene-drohne-elem-umriss',
     ]);
-    expect(trifft(foto)).toEqual(['fachebene-drohne-foto-kante', 'fachebene-drohne-foto']);
+    expect(trifft(foto)).toEqual([
+      'fachebene-drohne-treffer',
+      'fachebene-drohne-foto-kante',
+      'fachebene-drohne-foto',
+    ]);
     expect(trifft({ kind: 'element', __geometrie: 'Point' })).toEqual([
       'fachebene-drohne-elem-punkt',
     ]);
     expect(trifft({ kind: 'element', __geometrie: 'LineString' })).toEqual([
       'fachebene-drohne-elem-strich',
     ]);
+  });
+
+  it('nur die Fotos sind ein Klickziel, über eine Trefferzone unter dem Bildpunkt', () => {
+    expect(fachebeneClickLayerIds(def)).toEqual(['fachebene-drohne-treffer']);
+    expect(ordneKlickebene('fachebene-drohne-treffer')).toBe('fachebeneTreffer');
+    const m = anlegen();
+    const i = (s: string) => m._reihenfolge.indexOf(`fachebene-drohne-${s}`);
+    expect(i('treffer')).toBeGreaterThanOrEqual(0);
+    expect(i('treffer')).toBeLessThan(i('foto-kante'));
+    const zone = m._specs.get('fachebene-drohne-treffer');
+    expect(passt(zone?.filter, foto)).toBe(true);
+    expect(passt(zone?.filter, flugzeug)).toBe(false);
+    expect(zone?.paint?.['circle-radius']).toBe(TREFFER / 2);
+    expect(zone?.paint?.['circle-opacity']).toBe(0);
   });
 
   it('dreht den Pfeil mit der Blickrichtung und lässt ihn ohne sie weg', () => {
@@ -695,12 +720,14 @@ describe('Drohnenlage (LLH-2106)', () => {
     ]);
   });
 
-  it('ist noch kein Klickziel: keine Klickebene, keine Rolle im Schiedsspruch', () => {
-    expect(fachebeneClickLayerIds(def)).toEqual([]);
+  it('Fluggerät, Spur und Element sind kein Klickziel: außer der Fototrefferzone keine Rolle', () => {
     // Ein Layer mit einer Rolle (`ordneKlickebene`) risse Tipps an sich, ohne dass ein Handler sie
     // beantwortet — und öffnete über die Flächenwahl den Inspector einer fremden Ebene.
     const m = anlegen();
-    for (const id of m._layers) expect(ordneKlickebene(id), id).toBeNull();
+    for (const id of m._layers) {
+      if (id === 'fachebene-drohne-treffer') continue;
+      expect(ordneKlickebene(id), id).toBeNull();
+    }
   });
 
   it('entfernt alle eigenen Layer', () => {
