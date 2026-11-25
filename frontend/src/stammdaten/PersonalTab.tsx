@@ -24,6 +24,7 @@ import type { Personal, StaerkePosition } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
 import StammdatenEinlesen from './StammdatenEinlesen';
+import SchnappschussHinweis from './SchnappschussHinweis';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
 import {
@@ -196,12 +197,16 @@ export default function PersonalTab() {
         </>
       }
       hinweis={
-        <SeitenHinweise
-          fehler={dienststatusMutation.error}
-          {...DIENSTSTATUS_FEHLER}
-          rechteFehlt={!istAdmin}
-          rechteText={STAMMDATEN_RECHTE_TEXT}
-        />
+        <Stapel abstand="sm">
+          {/* Abgerufene Personaldaten zum Prüfen (LLH-1194); nur für Admins, sonst nichts. */}
+          <SchnappschussHinweis />
+          <SeitenHinweise
+            fehler={dienststatusMutation.error}
+            {...DIENSTSTATUS_FEHLER}
+            rechteFehlt={!istAdmin}
+            rechteText={STAMMDATEN_RECHTE_TEXT}
+          />
+        </Stapel>
       }
     >
       {/* Der Fehler tauscht die Tabelle aus (LFH-331): `Datensicht` führt den Kartenzweig an

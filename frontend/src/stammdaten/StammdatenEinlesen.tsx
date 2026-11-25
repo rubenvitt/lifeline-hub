@@ -1,20 +1,18 @@
 import { Alert, Button, Input, Modal, Spin, Typography, Upload } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useId, useState } from 'react';
-import { ApiError } from '../api/client';
+import { useEffect, useEffectEvent, useId, useState } from 'react';
+import { ApiError, fehlerText, istKonflikt } from '../api/client';
 import { STAMMDATEN_DATEI_MAX_BYTES } from '../api/eingabegrenzen';
 import { listeQualifikationen } from '../api/qualifikationen';
 import { globalKeys } from '../api/queryKeys';
 import {
   LEERE_ENTSCHEIDUNGEN,
+  schnappschussUebernehmen,
+  schnappschussVorschau,
   stammdatenEinlesen,
   stammdatenEinlesenVorschau,
 } from '../api/stammdatenEingang';
-import type {
-  StammdatenEntscheidungen,
-  StammdatenErgebnis,
-  StammdatenVorschau,
-} from '../api/types';
+import type { StammdatenEntscheidungen, StammdatenErgebnis } from '../api/types';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { FELD_KLASSE, Stapel } from '../components/instrument';
 import Feldetikett from '../components/instrument/Feldetikett';
@@ -28,6 +26,7 @@ import {
   offeneEntscheidungen,
   zaehlungMarken,
 } from './StammdatenVorschauAnsicht';
+import { useVorschauStand } from './useVorschauStand';
 
 /**
  * „Stammdaten einlesen“ (LLH-1633): Knopf und Dialog in drei Schritten — Datei und Herkunft,
@@ -39,6 +38,11 @@ import {
  * entstand: schlägt eine Abfrage fehl (etwa eine Wahl, die der Server ablehnt), bleibt die
  * Vorschau stehen, der Fehler steht darüber und die letzte Wahl ist zurückgenommen. Lehnt das
  * Übernehmen mit Zeilen ab (422), stehen die Zeilen da und die Vorschau wird neu abgefragt.
+ *
+ * Quelle „Schnappschuss“ (LLH-1194): derselbe Dialog für einen Stand, den ein Adapter
+ * „Stammdaten-Abruf“ abgeholt hat. Den ersten Schritt (Datei und Herkunft) gibt es dann nicht,
+ * die Vorschau lädt beim Öffnen. Ist der Schnappschuss inzwischen ersetzt (409), sagt der Dialog
+ * das und lädt die Liste der offenen neu.
  */
 
 const ACCEPT =
@@ -51,170 +55,32 @@ interface StammdatenEinlesenProps {
   disabled?: boolean;
 }
 
+/** Woher die Stammdaten kommen: eine Datei oder ein abgerufener Schnappschuss. */
+export type StammdatenQuelle = { art: 'datei' } | { art: 'schnappschuss'; id: string };
+
+/** Was außer den Entscheidungen zu einer Anfrage gehört; die Herkunft getrimmt. */
+type Anfrage =
+  { art: 'datei'; datei: File; herkunft: string } | { art: 'schnappschuss'; id: string };
+
+function dateiAnfrage(f: File, h: string): Anfrage {
+  return { art: 'datei', datei: f, herkunft: h.trim() };
+}
+
+function vorschauFuer(a: Anfrage, e: StammdatenEntscheidungen) {
+  return a.art === 'datei'
+    ? stammdatenEinlesenVorschau(a.datei, a.herkunft || undefined, e)
+    : schnappschussVorschau(a.id, e);
+}
+
+function uebernimm(a: Anfrage, e: StammdatenEntscheidungen) {
+  return a.art === 'datei'
+    ? stammdatenEinlesen(a.datei, a.herkunft || undefined, e)
+    : schnappschussUebernehmen(a.id, e);
+}
+
 /** Knopf „Stammdaten einlesen“ mit seinem Dialog. */
 export default function StammdatenEinlesen({ disabled = false }: StammdatenEinlesenProps) {
-  const qc = useQueryClient();
-  const grundId = useId();
-  const herkunftId = useId();
   const [offen, setOffen] = useState(false);
-  const [datei, setDatei] = useState<File | null>(null);
-  const [dateiFehler, setDateiFehler] = useState<string | null>(null);
-  const [herkunft, setHerkunft] = useState('');
-  const [herkunftGesendet, setHerkunftGesendet] = useState('');
-  const [herkunftZeigen, setHerkunftZeigen] = useState(false);
-  const [entscheidungen, setEntscheidungen] =
-    useState<StammdatenEntscheidungen>(LEERE_ENTSCHEIDUNGEN);
-  /** Die letzte gelungene Vorschau, mit Herkunft und Entscheidungen, aus denen sie entstand. */
-  const [stand, setStand] = useState<{
-    vorschau: StammdatenVorschau;
-    herkunft: string;
-    entscheidungen: StammdatenEntscheidungen;
-  } | null>(null);
-  const [ergebnis, setErgebnis] = useState<StammdatenErgebnis | null>(null);
-
-  const katalog = useQuery({
-    queryKey: globalKeys.qualifikationen(),
-    queryFn: listeQualifikationen,
-    enabled: offen,
-  });
-
-  const vorschauMut = useMutation({
-    mutationFn: (v: { datei: File; herkunft: string; e: StammdatenEntscheidungen }) =>
-      stammdatenEinlesenVorschau(v.datei, v.herkunft.trim() || undefined, v.e),
-  });
-  const uebernehmenMut = useMutation({
-    mutationFn: (v: { datei: File; herkunft: string; e: StammdatenEntscheidungen }) =>
-      stammdatenEinlesen(v.datei, v.herkunft.trim() || undefined, v.e),
-    onSuccess: (r) => {
-      setErgebnis(r);
-      void qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
-      void qc.invalidateQueries({ queryKey: globalKeys.personal() });
-      void qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() });
-    },
-    onError: (fehler, v) => {
-      // Der Stand hat sich seit der Vorschau geändert: neu abfragen, die Zeilen bleiben stehen.
-      if (fehler instanceof ApiError && fehler.status === 422) {
-        frage(v.datei, v.herkunft, v.e, { fehlerBehalten: true });
-      }
-    },
-  });
-  const vorschau = stand?.vorschau ?? null;
-  const laeuft = vorschauMut.isPending || uebernehmenMut.isPending;
-
-  const frage = (
-    f: File,
-    h: string,
-    e: StammdatenEntscheidungen,
-    { fehlerBehalten = false }: { fehlerBehalten?: boolean } = {},
-  ) => {
-    setHerkunftGesendet(h.trim());
-    if (!fehlerBehalten) uebernehmenMut.reset();
-    vorschauMut.mutate(
-      { datei: f, herkunft: h, e },
-      {
-        onError: () => {
-          // Zurück auf den Stand der letzten Vorschau, damit es weitergehen kann.
-          setEntscheidungen(stand?.entscheidungen ?? LEERE_ENTSCHEIDUNGEN);
-          setHerkunftGesendet(stand?.herkunft ?? '');
-        },
-        onSuccess: (v) => {
-          setStand({ vorschau: v, herkunft: h.trim(), entscheidungen: e });
-          if (v.herkunft_noetig) setHerkunftZeigen(true);
-          // Der zuletzt genutzte Name der Quelle wird vorbelegt und gleich mitgeprüft.
-          if (v.herkunft_noetig && h.trim() === '' && v.herkunft_vorschlag) {
-            setHerkunft(v.herkunft_vorschlag);
-            frage(f, v.herkunft_vorschlag, e);
-          }
-        },
-      },
-    );
-  };
-
-  const zuruecksetzen = () => {
-    setDatei(null);
-    setDateiFehler(null);
-    setHerkunft('');
-    setHerkunftGesendet('');
-    setHerkunftZeigen(false);
-    setEntscheidungen(LEERE_ENTSCHEIDUNGEN);
-    setStand(null);
-    setErgebnis(null);
-    vorschauMut.reset();
-    uebernehmenMut.reset();
-  };
-  const schliessen = () => {
-    if (uebernehmenMut.isPending) return;
-    setOffen(false);
-    zuruecksetzen();
-  };
-  const waehleDatei = (f: File) => {
-    zuruecksetzen();
-    if (f.size > STAMMDATEN_DATEI_MAX_BYTES) {
-      setDateiFehler(ZU_GROSS);
-      return;
-    }
-    setDatei(f);
-    frage(f, '', LEERE_ENTSCHEIDUNGEN);
-  };
-  const aendereEntscheidungen = (neu: StammdatenEntscheidungen) => {
-    if (datei == null) return;
-    setEntscheidungen(neu);
-    frage(datei, herkunft, neu);
-  };
-  const bestaetigeHerkunft = () => {
-    if (datei != null && herkunft.trim() !== herkunftGesendet) {
-      frage(datei, herkunft, entscheidungen);
-    }
-  };
-
-  const sperrGrund =
-    vorschau == null
-      ? null
-      : artZaehlungen(vorschau.zaehlung).some((a) => a.fehler > 0) ||
-          vorschau.meldungen.some((m) => m.stufe === 'fehler')
-        ? 'Fehler in der Datei'
-        : offeneEntscheidungen(vorschau, entscheidungen) > 0
-          ? 'Entscheidungen offen'
-          : vorschau.herkunft_noetig && herkunft.trim() === ''
-            ? 'Herkunft fehlt'
-            : herkunft.trim() !== stand?.herkunft
-              ? 'Herkunft wird geprüft'
-              : !vorschau.uebernehmbar
-                ? 'Nicht übernehmbar'
-                : artZaehlungen(vorschau.zaehlung).reduce((s, a) => s + artAenderungen(a), 0) === 0
-                  ? 'Keine Änderungen'
-                  : null;
-
-  const fuss = ergebnis ? (
-    <Button type="primary" onClick={schliessen}>
-      Schließen
-    </Button>
-  ) : (
-    <Stapel richtung="zeile" umbruch abstand="sm" verteilen="ende" ausrichten="mitte">
-      {sperrGrund != null && (
-        <Typography.Text type="secondary" id={grundId} data-lfh="einlesen-gesperrt">
-          {sperrGrund}
-        </Typography.Text>
-      )}
-      <Button onClick={schliessen} disabled={uebernehmenMut.isPending}>
-        Abbrechen
-      </Button>
-      <Button
-        type="primary"
-        disabled={vorschau == null || sperrGrund != null || vorschauMut.isPending}
-        loading={uebernehmenMut.isPending}
-        aria-describedby={sperrGrund != null ? grundId : undefined}
-        onClick={() =>
-          datei &&
-          stand &&
-          uebernehmenMut.mutate({ datei, herkunft: stand.herkunft, e: stand.entscheidungen })
-        }
-      >
-        Übernehmen
-      </Button>
-    </Stapel>
-  );
-
   return (
     <>
       <Button
@@ -228,9 +94,202 @@ export default function StammdatenEinlesen({ disabled = false }: StammdatenEinle
       >
         Stammdaten einlesen
       </Button>
+      <StammdatenEinlesenDialog quelle={DATEI} offen={offen} onSchliessen={() => setOffen(false)} />
+    </>
+  );
+}
+
+const DATEI: StammdatenQuelle = { art: 'datei' };
+
+interface StammdatenEinlesenDialogProps {
+  quelle: StammdatenQuelle;
+  offen: boolean;
+  onSchliessen: () => void;
+}
+
+/** Der Dialog allein; die Quelle bestimmt, ob er mit der Datei oder gleich mit der Vorschau beginnt. */
+export function StammdatenEinlesenDialog({
+  quelle,
+  offen,
+  onSchliessen,
+}: StammdatenEinlesenDialogProps) {
+  const qc = useQueryClient();
+  const grundId = useId();
+  const herkunftId = useId();
+  const ausDatei = quelle.art === 'datei';
+  const schnappschussId = quelle.art === 'schnappschuss' ? quelle.id : null;
+  const [datei, setDatei] = useState<File | null>(null);
+  const [dateiFehler, setDateiFehler] = useState<string | null>(null);
+  const [herkunft, setHerkunft] = useState('');
+  const [herkunftGesendet, setHerkunftGesendet] = useState('');
+  const [herkunftZeigen, setHerkunftZeigen] = useState(false);
+  /** Die letzte gelungene Vorschau, mit der Anfrage und den Entscheidungen, aus denen sie entstand. */
+  const vorschauStand = useVorschauStand<Anfrage>(vorschauFuer);
+  const { entscheidungen, setEntscheidungen, stand } = vorschauStand;
+  const standHerkunft = stand?.anfrage.art === 'datei' ? stand.anfrage.herkunft : '';
+  const [ergebnis, setErgebnis] = useState<StammdatenErgebnis | null>(null);
+
+  const katalog = useQuery({
+    queryKey: globalKeys.qualifikationen(),
+    queryFn: listeQualifikationen,
+    enabled: offen,
+  });
+
+  const schnappschuesseNeu = () =>
+    void qc.invalidateQueries({ queryKey: globalKeys.stammdatenSchnappschuesse() });
+
+  const uebernehmenMut = useMutation({
+    mutationFn: (v: { anfrage: Anfrage; e: StammdatenEntscheidungen }) => uebernimm(v.anfrage, v.e),
+    onSuccess: (r, v) => {
+      setErgebnis(r);
+      void qc.invalidateQueries({ queryKey: globalKeys.fahrzeuge() });
+      void qc.invalidateQueries({ queryKey: globalKeys.personal() });
+      void qc.invalidateQueries({ queryKey: globalKeys.qualifikationen() });
+      if (v.anfrage.art === 'schnappschuss') schnappschuesseNeu();
+    },
+    onError: (fehler, v) => {
+      // Der Stand hat sich seit der Vorschau geändert: neu abfragen, die Zeilen bleiben stehen.
+      if (fehler instanceof ApiError && fehler.status === 422) {
+        frage(v.anfrage, v.e, { fehlerBehalten: true });
+      }
+      // Ein neuerer Abruf hat den Schnappschuss ersetzt: die Liste zeigt den neuen.
+      if (v.anfrage.art === 'schnappschuss' && istKonflikt(fehler)) schnappschuesseNeu();
+    },
+  });
+  const vorschau = vorschauStand.vorschau;
+  const laeuft = vorschauStand.laeuft || uebernehmenMut.isPending;
+  const ersetzt = !ausDatei && istKonflikt(uebernehmenMut.error);
+
+  const frage = (
+    a: Anfrage,
+    e: StammdatenEntscheidungen,
+    { fehlerBehalten = false }: { fehlerBehalten?: boolean } = {},
+  ) => {
+    if (a.art === 'datei') setHerkunftGesendet(a.herkunft);
+    if (!fehlerBehalten) uebernehmenMut.reset();
+    vorschauStand.frage(a, e, {
+      onError: (vorher) => {
+        setHerkunftGesendet(vorher?.anfrage.art === 'datei' ? vorher.anfrage.herkunft : '');
+      },
+      onSuccess: (v) => {
+        if (a.art !== 'datei') return;
+        if (v.herkunft_noetig) setHerkunftZeigen(true);
+        // Der zuletzt genutzte Name der Quelle wird vorbelegt und gleich mitgeprüft.
+        if (v.herkunft_noetig && a.herkunft === '' && v.herkunft_vorschlag) {
+          setHerkunft(v.herkunft_vorschlag);
+          frage(dateiAnfrage(a.datei, v.herkunft_vorschlag), e);
+        }
+      },
+    });
+  };
+  /** Die Anfrage zum aktuellen Stand des Dialogs; `null`, solange keine Datei gewählt ist. */
+  const anfrageJetzt = (): Anfrage | null =>
+    schnappschussId != null
+      ? { art: 'schnappschuss', id: schnappschussId }
+      : datei != null
+        ? dateiAnfrage(datei, herkunft)
+        : null;
+
+  // Beim Schnappschuss gibt es keinen ersten Schritt: die Vorschau lädt beim Öffnen.
+  const starteSchnappschuss = useEffectEvent((id: string) => {
+    if (vorschauStand.stand == null && !vorschauStand.laeuft) {
+      frage({ art: 'schnappschuss', id }, LEERE_ENTSCHEIDUNGEN);
+    }
+  });
+  useEffect(() => {
+    if (offen && schnappschussId != null) starteSchnappschuss(schnappschussId);
+  }, [offen, schnappschussId]);
+
+  const zuruecksetzen = () => {
+    setDatei(null);
+    setDateiFehler(null);
+    setHerkunft('');
+    setHerkunftGesendet('');
+    setHerkunftZeigen(false);
+    vorschauStand.zuruecksetzen();
+    setErgebnis(null);
+    uebernehmenMut.reset();
+  };
+  const schliessen = () => {
+    if (uebernehmenMut.isPending) return;
+    onSchliessen();
+    zuruecksetzen();
+  };
+  const waehleDatei = (f: File) => {
+    zuruecksetzen();
+    if (f.size > STAMMDATEN_DATEI_MAX_BYTES) {
+      setDateiFehler(ZU_GROSS);
+      return;
+    }
+    setDatei(f);
+    frage(dateiAnfrage(f, ''), LEERE_ENTSCHEIDUNGEN);
+  };
+  const aendereEntscheidungen = (neu: StammdatenEntscheidungen) => {
+    const a = anfrageJetzt();
+    if (a == null) return;
+    setEntscheidungen(neu);
+    frage(a, neu);
+  };
+  const bestaetigeHerkunft = () => {
+    if (datei != null && herkunft.trim() !== herkunftGesendet) {
+      frage(dateiAnfrage(datei, herkunft), entscheidungen);
+    }
+  };
+
+  const sperrGrund =
+    vorschau == null
+      ? null
+      : artZaehlungen(vorschau.zaehlung).some((a) => a.fehler > 0) ||
+          vorschau.meldungen.some((m) => m.stufe === 'fehler')
+        ? ausDatei
+          ? 'Fehler in der Datei'
+          : 'Fehler in den abgerufenen Daten'
+        : offeneEntscheidungen(vorschau, entscheidungen) > 0
+          ? 'Entscheidungen offen'
+          : vorschau.herkunft_noetig && herkunft.trim() === ''
+            ? 'Herkunft fehlt'
+            : herkunft.trim() !== standHerkunft
+              ? 'Herkunft wird geprüft'
+              : !vorschau.uebernehmbar
+                ? 'Nicht übernehmbar'
+                : artZaehlungen(vorschau.zaehlung).reduce((s, a) => s + artAenderungen(a), 0) === 0
+                  ? 'Keine Änderungen'
+                  : null;
+  const gesperrt = ersetzt ? 'Neuer Stand liegt vor' : sperrGrund;
+
+  const fuss = ergebnis ? (
+    <Button type="primary" onClick={schliessen}>
+      Schließen
+    </Button>
+  ) : (
+    <Stapel richtung="zeile" umbruch abstand="sm" verteilen="ende" ausrichten="mitte">
+      {gesperrt != null && (
+        <Typography.Text type="secondary" id={grundId} data-lfh="einlesen-gesperrt">
+          {gesperrt}
+        </Typography.Text>
+      )}
+      <Button onClick={schliessen} disabled={uebernehmenMut.isPending}>
+        Abbrechen
+      </Button>
+      <Button
+        type="primary"
+        disabled={vorschau == null || gesperrt != null || vorschauStand.laeuft}
+        loading={uebernehmenMut.isPending}
+        aria-describedby={gesperrt != null ? grundId : undefined}
+        onClick={() =>
+          stand && uebernehmenMut.mutate({ anfrage: stand.anfrage, e: stand.entscheidungen })
+        }
+      >
+        Übernehmen
+      </Button>
+    </Stapel>
+  );
+
+  return (
+    <>
       <Modal
         open={offen}
-        title="Stammdaten einlesen"
+        title={ausDatei ? 'Stammdaten einlesen' : 'Abgerufene Stammdaten prüfen'}
         onCancel={schliessen}
         footer={fuss}
         width={760}
@@ -257,41 +316,43 @@ export default function StammdatenEinlesen({ disabled = false }: StammdatenEinle
             </div>
           ) : (
             <Stapel abstand="md">
-              <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
-                <Upload
-                  accept={ACCEPT}
-                  showUploadList={false}
-                  maxCount={1}
-                  disabled={laeuft}
-                  beforeUpload={(f) => {
-                    waehleDatei(f);
-                    return false;
-                  }}
-                >
-                  <Button
-                    icon={
-                      <span aria-hidden="true">
-                        <IconHochladen />
-                      </span>
-                    }
+              {ausDatei && (
+                <Stapel richtung="zeile" umbruch abstand="sm" ausrichten="mitte">
+                  <Upload
+                    accept={ACCEPT}
+                    showUploadList={false}
+                    maxCount={1}
+                    disabled={laeuft}
+                    beforeUpload={(f) => {
+                      waehleDatei(f);
+                      return false;
+                    }}
                   >
-                    {datei == null ? 'Datei wählen' : 'Andere Datei'}
-                  </Button>
-                </Upload>
-                {datei != null && (
-                  <Typography.Text data-lfh="einlesen-datei">{datei.name}</Typography.Text>
-                )}
-                <Typography.Text type="secondary" style={{ marginInlineStart: 'auto' }}>
-                  Beispieldatei:{' '}
-                  <a href={`${BEISPIEL}.csv`} download>
-                    CSV
-                  </a>{' '}
-                  ·{' '}
-                  <a href={`${BEISPIEL}.xlsx`} download>
-                    Excel
-                  </a>
-                </Typography.Text>
-              </Stapel>
+                    <Button
+                      icon={
+                        <span aria-hidden="true">
+                          <IconHochladen />
+                        </span>
+                      }
+                    >
+                      {datei == null ? 'Datei wählen' : 'Andere Datei'}
+                    </Button>
+                  </Upload>
+                  {datei != null && (
+                    <Typography.Text data-lfh="einlesen-datei">{datei.name}</Typography.Text>
+                  )}
+                  <Typography.Text type="secondary" style={{ marginInlineStart: 'auto' }}>
+                    Beispieldatei:{' '}
+                    <a href={`${BEISPIEL}.csv`} download>
+                      CSV
+                    </a>{' '}
+                    ·{' '}
+                    <a href={`${BEISPIEL}.xlsx`} download>
+                      Excel
+                    </a>
+                  </Typography.Text>
+                </Stapel>
+              )}
               {dateiFehler != null && <Alert type="error" showIcon title={dateiFehler} />}
               {herkunftZeigen && (
                 <div data-lfh="einlesen-herkunft">
@@ -318,13 +379,36 @@ export default function StammdatenEinlesen({ disabled = false }: StammdatenEinle
                 </div>
               )}
               <SpeicherFehler
-                fehler={vorschauMut.error}
-                titel={vorschau == null ? 'Datei nicht gelesen' : 'Wahl nicht übernommen'}
+                fehler={vorschauStand.fehler}
+                titel={
+                  vorschau != null
+                    ? 'Wahl nicht übernommen'
+                    : ausDatei
+                      ? 'Datei nicht gelesen'
+                      : 'Abgerufene Daten nicht gelesen'
+                }
               />
-              <UebernehmenFehler fehler={uebernehmenMut.error} />
-              {vorschauMut.isPending && vorschau == null && <Spin />}
+              {ersetzt ? (
+                <Alert
+                  type="warning"
+                  showIcon
+                  data-lfh="einlesen-ersetzt"
+                  title="Inzwischen gibt es einen neueren Stand"
+                  description={
+                    <Stapel abstand="xxs">
+                      <span>{fehlerText(uebernehmenMut.error)}</span>
+                      <span>
+                        Übernommen ist nichts. Schließe den Dialog und prüfe den neuen Stand.
+                      </span>
+                    </Stapel>
+                  }
+                />
+              ) : (
+                <UebernehmenFehler fehler={uebernehmenMut.error} />
+              )}
+              {vorschauStand.laeuft && vorschau == null && <Spin />}
               {vorschau != null && (
-                <Spin spinning={vorschauMut.isPending}>
+                <Spin spinning={vorschauStand.laeuft}>
                   <StammdatenVorschauAnsicht
                     vorschau={vorschau}
                     katalog={katalog.data ?? []}

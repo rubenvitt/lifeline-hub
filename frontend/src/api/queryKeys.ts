@@ -1139,6 +1139,8 @@ export const GLOBAL_KEYS = {
   archivEinspielen: 'archiv-einspielen',
   // Herkunft der Stammdaten (LLH-1493): welche Zeilen vom Hub kommen; frisch mit `stammdaten`.
   stammdatenHerkunft: 'stammdaten-herkunft',
+  // Offene Schnappschüsse des Stammdaten-Abrufs (LLH-1194): Hinweis „zum Prüfen“, nur für Admins.
+  stammdatenSchnappschuesse: 'stammdaten-schnappschuesse',
   // Präferenzen des ANGEMELDETEN Benutzers.
   benutzerEinstellungen: 'benutzer-einstellungen',
   // Versionsstand der Instanz und Lesestand der Neuigkeiten (Spec `versionsstand`).
@@ -1272,6 +1274,8 @@ export const globalKeys = {
   lagebildExtern: () => [GLOBAL_KEYS.lagebildExtern] as const,
   instanzkopplung: () => [GLOBAL_KEYS.instanzkopplung] as const,
   stammdatenHerkunft: () => [GLOBAL_KEYS.stammdatenHerkunft] as const,
+  /** Offene Schnappschüsse des Stammdaten-Abrufs (LLH-1194), Hinweis über dem Personal. */
+  stammdatenSchnappschuesse: () => [GLOBAL_KEYS.stammdatenSchnappschuesse] as const,
   orgArchivSchluessel: () => [GLOBAL_KEYS.orgArchivSchluessel] as const,
   archivEinspielen: () => [GLOBAL_KEYS.archivEinspielen] as const,
   /**
@@ -1478,6 +1482,9 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `adapter`, `adapterVersuche` (LLH-2018): Verwaltung der Adapter und Verlauf ihrer Abrufe; die
  *   eigene Änderung setzt die Antwort, den Zustand aus dem Lauf im Hintergrund zeigt der nächste
  *   Abruf (30 s), kein Ereignis je Abruf. Geheimnisse stehen in keinem der beiden.
+ * - `stammdatenSchnappschuesse` (LLH-1194): ein neuer Schnappschuss erscheint beim nächsten Laden
+ *   der Seite, nicht live (Entwurf `personal-abruf`, „Oberfläche“); die eigene Übernahme und ein
+ *   409 frischen die Liste auf. Der Lauf im Hintergrund meldet kein Ereignis.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
@@ -1512,6 +1519,7 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.adapter,
   GLOBAL_KEYS.adapterVersuche,
+  GLOBAL_KEYS.stammdatenSchnappschuesse,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,

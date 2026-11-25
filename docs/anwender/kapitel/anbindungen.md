@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/adapter/arten/stammdaten_abruf.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx]
 ---
 
 ## Überblick
@@ -250,7 +250,54 @@ Eingriff“.
 
 Der Adapter ist danach samt Geheimnissen und Verlauf gelöscht.
 
+### Stammdaten abrufen
+
+Der Adapter der Art „Stammdaten-Abruf“ holt Personal mit Qualifikationen aus einer
+Helferverwaltung, die ihre Helfer für Lifeline Hub bereitstellt. Adresse und Zugangsschlüssel
+stellt die Helferverwaltung aus, dort unter ihrem Zugang für Lifeline Hub. Für den System-Admin:
+
+1. In der Verwaltung unter „Einstellungen“ „Anbindungen“ im Paneel „Adapter“ „Adapter anlegen“
+   wählen und unter „Art“ „Stammdaten-Abruf“ wählen.
+2. Einen „Name“ eintragen, unter „Adresse“ die Adresse aus der Helferverwaltung und unter
+   „Herkunft“ den Namen der Quelle, etwa „Helferverwaltung“. Die Kennungen der Personen gelten
+   nur für diese Herkunft.
+3. Das „Intervall“ prüfen (Vorschlag sechs Stunden, frühestens stündlich) und „Anlegen“ wählen.
+4. In der Ansicht des Adapters im Paneel „Geheimnisse“ an „Zugangsschlüssel“ „Setzen“ wählen,
+   den Schlüssel aus der Helferverwaltung einfügen und „Speichern“ wählen.
+5. Hat ein Abruf etwas Neues gebracht, steht in der Verwaltung über „Personal“ und in der Ansicht
+   des Adapters der Hinweis „Neue Personaldaten aus ‹Herkunft› vom ‹Zeit› zum Prüfen“. „Prüfen“
+   wählen.
+6. Im Dialog „Abgerufene Stammdaten prüfen“ steht gleich die Vorschau, wie beim Einlesen einer
+   Datei: was neu ist, was sich ändert und wo eine Entscheidung fehlt. Die Entscheidungen treffen
+   und „Übernehmen“ wählen.
+7. Das Ergebnis lesen und „Schließen“ wählen. Der Hinweis ist danach weg.
+
+Steht nach „Übernehmen“ „Inzwischen gibt es einen neueren Stand“, hat ein späterer Abruf den
+Stand ersetzt, und übernommen ist nichts. Nach „Schließen“ steht der Hinweis auf den neueren Stand
+da.
+
+### Erneut vorlegen
+
+1. In der Ansicht eines Adapters der Art „Stammdaten-Abruf“ „Erneut vorlegen“ wählen.
+2. Beim nächsten Abruf steht der Hinweis „zum Prüfen“ wieder da, auch wenn sich an der Quelle
+   nichts geändert hat.
+
+So kommen Personen zurück, die beim Prüfen ausgelassen oder in Lifeline Hub gelöscht wurden.
+
 ## Hintergrund
+
+### Abgerufene Stammdaten
+
+Ein Abruf übernimmt nie selbst. Er legt den abgeholten Stand nur zum Prüfen ab; erst „Übernehmen“
+schreibt Personen und Qualifikationen in die Stammdaten. Je Adapter wartet höchstens ein Stand,
+ein neuerer ersetzt ihn. Bringt ein Abruf denselben Stand wie der wartende oder der zuletzt
+übernommene, entsteht nichts Neues und kein Hinweis; die Reihenfolge der Personen spielt dabei
+keine Rolle. Einen neuen Stand zeigt der Hinweis beim nächsten Laden der Seite.
+
+Den Hinweis sieht und bedient nur der System-Admin. Eine Person, die Lifeline Hub unter derselben
+Herkunft und Kennung schon kennt, wird ergänzt oder geändert, nicht doppelt angelegt. Vergibt die
+Helferverwaltung einer Person eine neue Kennung, etwa nach einem Wechsel ihrer eigenen Quelle,
+fragt die Vorschau einmal nach, zu wem sie gehört.
 
 ### Wer was darf
 

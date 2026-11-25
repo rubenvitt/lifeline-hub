@@ -418,4 +418,58 @@ describe('AdapterAnsicht', () => {
     expect(screen.getByRole('button', { name: 'Anhalten' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Ersetzen' })).not.toBeInTheDocument();
   });
+
+  /** LLH-1194: der Stammdaten-Abruf zeigt seinen offenen Schnappschuss und „Erneut vorlegen“. */
+  it('bietet beim Stammdaten-Abruf Hinweis und „Erneut vorlegen“', async () => {
+    const aufrufe = stelleBereit(
+      adapterFixture('a1', { art: 'stammdaten_abruf', art_bezeichnung: 'Stammdaten-Abruf' }),
+    );
+    server.use(
+      http.get('/api/master-data/import/snapshots', () =>
+        HttpResponse.json({
+          schnappschuesse: [
+            {
+              id: 's1',
+              adapter_id: 'a1',
+              adapter_name: 'Adapter a1',
+              herkunft: 'Helferverwaltung',
+              anzahl: { fahrzeuge: 0, personal: 3, qualifikationen: 0 },
+              abgerufen_at: '2026-11-24 08:15:00',
+            },
+            {
+              id: 's2',
+              adapter_id: 'a9',
+              adapter_name: 'Anderer',
+              herkunft: 'Andere Quelle',
+              anzahl: { fahrzeuge: 0, personal: 1, qualifikationen: 0 },
+              abgerufen_at: '2026-11-24 08:15:00',
+            },
+          ],
+        }),
+      ),
+      http.post('/api/admin/adapter/a1/resubmit', async ({ request }) => {
+        aufrufe.push({ methode: 'POST', pfad: 'resubmit', body: (await request.text()) || null });
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    rendere();
+    expect(
+      await screen.findByText(/^Neue Personaldaten aus Helferverwaltung vom .+ zum Prüfen$/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/aus Andere Quelle/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Erneut vorlegen' }));
+    await waitFor(() =>
+      expect(aufrufe).toContainEqual({ methode: 'POST', pfad: 'resubmit', body: null }),
+    );
+    expect(
+      await screen.findByText('Wird beim nächsten Abruf erneut zum Prüfen vorgelegt'),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt „Erneut vorlegen“ nur beim Stammdaten-Abruf', async () => {
+    stelleBereit(adapterFixture('a1'));
+    rendere();
+    await screen.findByRole('button', { name: 'Verbindung prüfen' });
+    expect(screen.queryByRole('button', { name: 'Erneut vorlegen' })).not.toBeInTheDocument();
+  });
 });

@@ -14,14 +14,18 @@ import type {
   StammdatenZeile,
 } from '../api/types';
 import { oeffne, optionenVon, waehle } from '../test/auswahlListe';
-import StammdatenEinlesen from './StammdatenEinlesen';
+import StammdatenEinlesen, { StammdatenEinlesenDialog } from './StammdatenEinlesen';
 
 const vorschauApi = vi.fn();
 const einlesenApi = vi.fn();
+const schnappschussVorschauApi = vi.fn();
+const schnappschussApi = vi.fn();
 vi.mock('../api/stammdatenEingang', async (orig) => ({
   ...(await orig<typeof import('../api/stammdatenEingang')>()),
   stammdatenEinlesenVorschau: (...a: unknown[]) => vorschauApi(...a),
   stammdatenEinlesen: (...a: unknown[]) => einlesenApi(...a),
+  schnappschussVorschau: (...a: unknown[]) => schnappschussVorschauApi(...a),
+  schnappschussUebernehmen: (...a: unknown[]) => schnappschussApi(...a),
 }));
 const katalogApi = vi.fn();
 vi.mock('../api/qualifikationen', async (orig) => ({
@@ -401,5 +405,92 @@ describe('StammdatenEinlesen', () => {
       ),
     ).toBeInTheDocument();
     await waitFor(() => expect(vorschauApi).toHaveBeenCalledTimes(2));
+  });
+});
+
+/** Quelle „Schnappschuss“ (LLH-1194): ohne Dateischritt, Vorschau und Übernehmen über den Abruf. */
+describe('StammdatenEinlesenDialog mit Quelle Schnappschuss', () => {
+  beforeEach(() => {
+    vorschauApi.mockReset();
+    einlesenApi.mockReset();
+    schnappschussVorschauApi.mockReset();
+    schnappschussApi.mockReset();
+    katalogApi.mockReset();
+    katalogApi.mockResolvedValue(KATALOG);
+  });
+
+  function zeichneSchnappschuss(onSchliessen = vi.fn()) {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const utils = render(
+      <QueryClientProvider client={qc}>
+        <AntApp>
+          <StammdatenEinlesenDialog
+            quelle={{ art: 'schnappschuss', id: 's1' }}
+            offen
+            onSchliessen={onSchliessen}
+          />
+        </AntApp>
+      </QueryClientProvider>,
+    );
+    return { qc, onSchliessen, ...utils };
+  }
+
+  it('lädt die Vorschau sofort und zeigt keinen Dateischritt', async () => {
+    schnappschussVorschauApi.mockResolvedValue(vorschau());
+    zeichneSchnappschuss();
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Florian 1/10');
+    expect(schnappschussVorschauApi).toHaveBeenCalledWith('s1', {
+      zeilen: [],
+      qualifikationen: [],
+    });
+    expect(vorschauApi).not.toHaveBeenCalled();
+    expect(dialog.querySelector('input[type="file"]')).toBeNull();
+    expect(within(dialog).queryByRole('link', { name: 'CSV' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('textbox', { name: 'Herkunft' })).not.toBeInTheDocument();
+  });
+
+  it('übernimmt über den Schnappschuss und frischt die Liste auf', async () => {
+    schnappschussVorschauApi.mockResolvedValue(vorschau());
+    schnappschussApi.mockResolvedValue({ zaehlung: vorschau().zaehlung });
+    const { qc } = zeichneSchnappschuss();
+    const invalidiere = vi.spyOn(qc, 'invalidateQueries');
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Florian 1/10');
+    await waehle('Wahl für Florian 1/10', 'Datei übernehmen');
+    await waitFor(() => expect(schnappschussVorschauApi).toHaveBeenCalledTimes(2));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    await within(dialog).findByText('Übernommen');
+    expect(schnappschussApi).toHaveBeenCalledWith('s1', {
+      zeilen: [{ art: 'fahrzeug', zeile: 2, wahl: { art: 'datei_uebernehmen' } }],
+      qualifikationen: [],
+    });
+    expect(einlesenApi).not.toHaveBeenCalled();
+    const schluessel = invalidiere.mock.calls.map((c) => c[0]?.queryKey);
+    expect(schluessel).toContainEqual(globalKeys.stammdatenSchnappschuesse());
+    expect(schluessel).toContainEqual(globalKeys.personal());
+  });
+
+  it('nennt bei einem 409 den ersetzten Stand und lädt die Liste neu', async () => {
+    schnappschussVorschauApi.mockResolvedValue(vorschau());
+    schnappschussApi.mockRejectedValue(
+      new ApiError(409, 'Der Schnappschuss ist inzwischen ersetzt', { vomAnwendungsserver: true }),
+    );
+    const { qc } = zeichneSchnappschuss();
+    const invalidiere = vi.spyOn(qc, 'invalidateQueries');
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Florian 1/10');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Übernehmen' }));
+    expect(
+      await within(dialog).findByText('Inzwischen gibt es einen neueren Stand'),
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByText(/Der Schnappschuss ist inzwischen ersetzt/),
+    ).toBeInTheDocument();
+    expect(invalidiere.mock.calls.map((c) => c[0]?.queryKey)).toContainEqual(
+      globalKeys.stammdatenSchnappschuesse(),
+    );
+    // Gesperrt, bis der Dialog geschlossen und der neue Stand geöffnet ist.
+    expect(within(dialog).getByRole('button', { name: 'Übernehmen' })).toBeDisabled();
   });
 });
