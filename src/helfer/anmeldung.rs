@@ -17,9 +17,10 @@ use utoipa::ToSchema;
 pub const ANZEIGENAME_MAX: usize = crate::geraet::BEZEICHNUNG_MAX;
 
 wire_enum! {
-    /// Warum eine Helfer-Kopplung endet. Der Server liefert nur `rejected` (die abgelehnte
-    /// Kopplung beantwortet `GET /api/devices/me` noch); jedes andere Ende ist 401, und die App
-    /// nennt den Grund aus der letzten bekannten Antwort selbst.
+    /// Warum eine Helfer-Kopplung endet. Jedes Ende ist für das Gerät 401, auch die Ablehnung:
+    /// sie löscht die Sitzungen (`routes::helfer::ablehnen`). Die App nennt den Grund aus der
+    /// letzten bekannten Antwort selbst; `rejected` liefert `GET /api/devices/me` nur für eine
+    /// abgelehnte Kopplung, die noch eine Sitzung hätte.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum HelferEndeGrund {
         /// Der Einsatz ist beendet.

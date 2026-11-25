@@ -300,7 +300,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - Live: `state.live.melde_kopplung_ende(kopplung_id)` bei Ende; Geräteliste-Ereignis bei jeder
     Änderung (bestehendes Ereignis der Seite `EinsatzGeraete`).
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `bestaetigung_macht_aktiv_und_schreibt_etb`;
   - `zweites_ortungsgeraet_fuer_dieselbe_einheit_ist_409`;
   - `zwei_parallele_bestaetigungen_ergeben_ein_ortungsgeraet` (Review Focus 5:
@@ -310,10 +310,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - `entfernen_loescht_personenposition`;
   - `alle_abmelden_beendet_alle_helfer`;
   - `person_nur_mit_personenortung_der_org`.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run `cargo test --test helfer` → PASS; Codegen.
-- [ ] **Step 5:** Commit `feat: Leitung bestätigt Helfer`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** Run `cargo test --test helfer` → PASS; Codegen.
+- [x] **Step 5:** Commit `feat: Leitung bestätigt Helfer`.
 
 ### Task 7: Position senden
 

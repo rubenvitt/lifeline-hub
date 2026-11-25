@@ -124,7 +124,7 @@ pub struct NeueKopplungBody {
 }
 
 /// Normalisiert und prüft ein gewünschtes Ende (400 bei Form, Vergangenheit, über 72 h).
-fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
+pub(crate) fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
     let jetzt = chrono::Utc::now();
     let ende = match eingabe {
         None => crate::zeit::formatiere_utc(jetzt + chrono::Duration::hours(STANDARD_STUNDEN)),

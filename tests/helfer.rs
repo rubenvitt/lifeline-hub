@@ -1,5 +1,5 @@
 //! Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, ADR-0098):
-//! Helfer-Einladung durch die Leitung.
+//! Helfer-Einladung, Anmeldung und Bestätigung durch die Leitung.
 
 use axum::http::StatusCode;
 use lifeline_hub::error::AppError;
@@ -312,6 +312,7 @@ async fn redeem(app: &axum::Router, cookie: Option<&str>, body: Value) -> Antwor
 struct Lage {
     app: axum::Router,
     pool: sqlx::SqlitePool,
+    live: lifeline_hub::live::LiveHub,
     admin: String,
     einsatz: i64,
     einheit: i64,
@@ -320,7 +321,7 @@ struct Lage {
 }
 
 async fn lage() -> Lage {
-    let (app, pool) = setup_mit_pool().await;
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     ortung_einschalten(&app, &admin).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
@@ -341,6 +342,7 @@ async fn lage() -> Lage {
     Lage {
         app,
         pool,
+        live,
         admin,
         einsatz,
         einheit,
@@ -701,4 +703,411 @@ async fn ziel_aendern_nur_unbestaetigt() {
     let (s, v) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["state"], "aktiv");
+}
+
+// ---------- Bestätigen, Ablehnen, Entfernen (Leitung) ----------
+
+/// Meldet einen Helfer an; liefert Kennung der Kopplung und Cookie des Geräts.
+async fn anmelden(l: &Lage, kind: &str, id: i64, name: &str) -> (i64, String) {
+    let mut body = anmeldung(&l.code, kind, id);
+    body["display_name"] = json!(name);
+    let a = redeem(&l.app, None, body).await;
+    assert_eq!(a.status, StatusCode::CREATED, "{}", a.body);
+    let gid: i64 = sqlx::query_scalar(
+        "SELECT id FROM geraet_kopplung WHERE ansicht = 'helfer' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    (gid, a.cookie.unwrap())
+}
+
+async fn leitung(l: &Lage, pfad: &str, body: Option<Value>) -> (StatusCode, Value) {
+    anfrage_json(
+        &l.app,
+        "POST",
+        &format!("/api/incidents/{}/helpers{pfad}", l.einsatz),
+        &l.admin,
+        body.as_ref(),
+    )
+    .await
+}
+
+async fn bestaetigen(l: &Lage, gid: i64, body: Value) -> (StatusCode, Value) {
+    leitung(l, &format!("/{gid}/confirm"), Some(body)).await
+}
+
+async fn ist_ortungsgeraet(pool: &sqlx::SqlitePool, gid: i64) -> bool {
+    sqlx::query_scalar("SELECT ortungsgeraet <> 0 FROM geraet_kopplung WHERE id = ?")
+        .bind(gid)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+async fn personenortung_einschalten(l: &Lage) {
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PUT",
+        "/api/org-settings",
+        &l.admin,
+        Some(&json!({"ortung_im_einsatz": true, "ortung_personen": true})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+#[tokio::test]
+async fn bestaetigung_macht_aktiv_und_schreibt_etb() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["id"], gid, "{v}");
+    assert_eq!(v["state"], "aktiv", "{v}");
+    assert_eq!(v["is_tracker"], true, "{v}");
+    assert_eq!(v["target"]["id"], l.einheit, "{v}");
+
+    // 72 h ab der Bestätigung, die Sitzung des Geräts endet mit.
+    let (minuten, sitzung_gleich, bestaetigt): (i64, bool, bool) = sqlx::query_as(
+        "SELECT CAST((julianday(gk.laeuft_ab_at) - julianday('now')) * 1440 AS INTEGER), \
+                (SELECT s.expires_at FROM session s WHERE s.kopplung_id = gk.id) = gk.laeuft_ab_at, \
+                gk.bestaetigt_at IS NOT NULL AND gk.bestaetigt_von IS NOT NULL \
+         FROM geraet_kopplung gk WHERE gk.id = ?",
+    )
+    .bind(gid)
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    assert!(
+        (72 * 60 - 2..=72 * 60).contains(&minuten),
+        "72 h: {minuten}"
+    );
+    assert!(sitzung_gleich, "Sitzung endet mit der Kopplung");
+    assert!(bestaetigt);
+    let spur: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM geraet_kopplung_ereignis WHERE kopplung_id = ? AND ereignis = 'bestaetigt'",
+    )
+    .bind(gid)
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    assert_eq!(spur, 1);
+
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.starts_with("Helfer „Max M.“ für San-Trupp 2 bestätigt von ")),
+        "{etb:?}"
+    );
+
+    // Das Gerät sieht den neuen Zustand.
+    let (s, v) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["state"], "aktiv", "{v}");
+    assert_eq!(v["is_tracker"], true, "{v}");
+
+    // Ein fremder Helfer ist 404.
+    let (s, _) = bestaetigen(&l, gid + 100, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn zweites_ortungsgeraet_fuer_dieselbe_einheit_ist_409() {
+    let l = lage().await;
+    let (a, _) = anmelden(&l, "unit", l.einheit, "A").await;
+    let (b, _) = anmelden(&l, "unit", l.einheit, "B").await;
+    let (s, v) = bestaetigen(&l, a, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["reason"], "tracker_taken", "{v}");
+    assert_eq!(v["holder"], a, "{v}");
+    let zustand: String =
+        sqlx::query_scalar("SELECT helfer_zustand FROM geraet_kopplung WHERE id = ?")
+            .bind(b)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(zustand, "unbestaetigt", "nichts geschrieben");
+
+    // Ohne Ortungsrolle geht es.
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["is_tracker"], false, "{v}");
+    assert!(ist_ortungsgeraet(&l.pool, a).await);
+
+    // Ein abgelaufenes Ortungsgerät hält die Rolle nicht fest.
+    sqlx::query(
+        "UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?",
+    )
+    .bind(a)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["is_tracker"], true, "{v}");
+}
+
+#[tokio::test]
+async fn zwei_parallele_bestaetigungen_ergeben_ein_ortungsgeraet() {
+    let l = lage().await;
+    let (a, _) = anmelden(&l, "vehicle", l.fahrzeug, "A").await;
+    let (b, _) = anmelden(&l, "vehicle", l.fahrzeug, "B").await;
+    let ((sa, va), (sb, vb)) = tokio::join!(
+        bestaetigen(&l, a, json!({"is_tracker": true})),
+        bestaetigen(&l, b, json!({"is_tracker": true})),
+    );
+    let mut status = [sa, sb];
+    status.sort();
+    assert_eq!(
+        status,
+        [StatusCode::OK, StatusCode::CONFLICT],
+        "{va} / {vb}"
+    );
+    let n: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM geraet_kopplung WHERE ansicht = 'helfer' AND ortungsgeraet = 1",
+    )
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    assert_eq!(n, 1);
+}
+
+#[tokio::test]
+async fn ersetzen_uebertraegt_die_ortungsrolle() {
+    let l = lage().await;
+    let (a, _) = anmelden(&l, "unit", l.einheit, "A").await;
+    let (b, _) = anmelden(&l, "unit", l.einheit, "B").await;
+    let (s, _) = bestaetigen(&l, a, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true, "replace": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["is_tracker"], true, "{v}");
+    assert!(!ist_ortungsgeraet(&l.pool, a).await, "A verliert die Rolle");
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Helfer „B“") && t.contains("„A“")),
+        "{etb:?}"
+    );
+
+    // Derselbe Weg rückt die Rolle bei einem schon aktiven Helfer nach; das Ende bleibt.
+    let ende_vorher: String =
+        sqlx::query_scalar("SELECT laeuft_ab_at FROM geraet_kopplung WHERE id = ?")
+            .bind(a)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    let (s, v) = bestaetigen(&l, a, json!({"is_tracker": true, "replace": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(ist_ortungsgeraet(&l.pool, a).await);
+    assert!(!ist_ortungsgeraet(&l.pool, b).await);
+    assert_eq!(v["expires_at"], ende_vorher, "{v}");
+}
+
+#[tokio::test]
+async fn ablehnen_beendet_die_sitzung() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let mut ende = l.live.abonniere_kopplung_ende();
+
+    let (s, v) = leitung(&l, &format!("/{gid}/reject"), None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["state"], "abgelehnt", "{v}");
+    assert_eq!(ende.try_recv().unwrap(), gid, "Live: Kopplung endet");
+    let (s, _) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.starts_with("Helfer „Max M.“ abgelehnt von ")),
+        "{etb:?}"
+    );
+
+    // Abgelehnt ist abgelehnt: kein zweites Ablehnen, kein Bestätigen.
+    let (s, _) = leitung(&l, &format!("/{gid}/reject"), None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = bestaetigen(&l, gid, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+}
+
+#[tokio::test]
+async fn entfernen_loescht_personenposition() {
+    let l = lage().await;
+    personenortung_einschalten(&l).await;
+    let person = common::stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, "Erika M.").await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Erika").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true, "person_id": person})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["person"]["id"], person, "{v}");
+    for (tabelle, id) in [("einsatz_personal", person), ("einsatz_einheit", l.einheit)] {
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {tabelle} SET lat = 50.1, lon = 8.6, position_quelle = 'helfer', \
+             position_aktualisiert_at = datetime('now') WHERE id = ?"
+        )))
+        .bind(id)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    }
+
+    let (s, v) = leitung(&l, &format!("/{gid}/revoke"), None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["state"], "beendet", "{v}");
+    let (lat, quelle): (Option<f64>, Option<String>) =
+        sqlx::query_as("SELECT lat, position_quelle FROM einsatz_personal WHERE id = ?")
+            .bind(person)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(lat, None, "Person nicht mehr auf der Karte");
+    assert_eq!(
+        quelle.as_deref(),
+        Some("helfer"),
+        "Quelle bleibt als Hinweis"
+    );
+    let einheit_lat: Option<f64> =
+        sqlx::query_scalar("SELECT lat FROM einsatz_einheit WHERE id = ?")
+            .bind(l.einheit)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        einheit_lat,
+        Some(50.1),
+        "Einheit behält den letzten Lagestand"
+    );
+    let (s, _) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.starts_with("Helfer „Erika“ abgemeldet von ")),
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn alle_abmelden_beendet_alle_helfer() {
+    let l = lage().await;
+    let (a, ca) = anmelden(&l, "unit", l.einheit, "A").await;
+    let (_b, cb) = anmelden(&l, "vehicle", l.fahrzeug, "B").await;
+    let (s, _) = bestaetigen(&l, a, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = leitung(&l, "/revoke", None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let zustaende: Vec<&str> = v["helpers"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| h["state"].as_str().unwrap())
+        .collect();
+    assert_eq!(zustaende, ["beendet", "beendet"], "{v}");
+    for c in [ca, cb] {
+        let (s, _) = anfrage(&l.app, "GET", "/api/devices/me", &c, None).await;
+        assert_eq!(s, StatusCode::UNAUTHORIZED);
+    }
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert_eq!(
+        etb.iter()
+            .filter(|t| t.starts_with("2 Helfer abgemeldet von "))
+            .count(),
+        1,
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn person_nur_mit_personenortung_der_org() {
+    let l = lage().await;
+    let person = common::stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, "Erika M.").await;
+    let (gid, _) = anmelden(&l, "unit", l.einheit, "Erika").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": person})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    personenortung_einschalten(&l).await;
+    let anderer = einsatz_anlegen(&l.app, &l.admin).await;
+    let fremd = common::stammpersonal_disponieren(&l.app, &l.admin, anderer, "Fremd").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": fremd})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": person})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["person"]["id"], person, "{v}");
+}
+
+#[tokio::test]
+async fn leitung_verlaengert_einen_helfer() {
+    let l = lage().await;
+    let (gid, _) = anmelden(&l, "unit", l.einheit, "A").await;
+    let ende = lifeline_hub::zeit::formatiere_utc(chrono::Utc::now() + chrono::Duration::hours(10));
+    // Unbestätigt: erst bestätigen.
+    let (s, _) = leitung(
+        &l,
+        &format!("/{gid}/extend"),
+        Some(json!({"laeuft_ab_at": ende})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let (s, _) = bestaetigen(&l, gid, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = leitung(
+        &l,
+        &format!("/{gid}/extend"),
+        Some(json!({"laeuft_ab_at": ende})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["expires_at"], ende, "{v}");
+}
+
+/// 30 Minuten vor dem Ablauf einer bestätigten Helfer-Kopplung schreibt der Takt einen Hinweis
+/// ins ETB, genau einmal; unbestätigte und beendete melden nichts.
+#[tokio::test]
+async fn bestaetigter_helfer_warnt_30_minuten_vor_ablauf() {
+    use lifeline_hub::geraet::ablauf::AblaufFenster;
+    let l = lage().await;
+    let (a, _) = anmelden(&l, "unit", l.einheit, "A").await;
+    let (_b, _) = anmelden(&l, "vehicle", l.fahrzeug, "B").await;
+    let (s, _) = bestaetigen(&l, a, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK);
+    let jetzt = chrono::Utc::now();
+    let ende = lifeline_hub::zeit::formatiere_utc(jetzt + chrono::Duration::minutes(30));
+    sqlx::query("UPDATE geraet_kopplung SET laeuft_ab_at = ? WHERE ansicht = 'helfer'")
+        .bind(&ende)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let vorher = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz)
+        .await
+        .len();
+
+    let takt = chrono::Duration::seconds(30);
+    let mut fenster = AblaufFenster::ab(jetzt - takt * 2);
+    fenster.takt(&l.pool, &l.live, jetzt - takt).await.unwrap();
+    assert_eq!(
+        common::system_etb_inhalte(&l.app, &l.admin, l.einsatz)
+            .await
+            .len(),
+        vorher,
+        "vor der Warnzeit"
+    );
+    fenster.takt(&l.pool, &l.live, jetzt).await.unwrap();
+    fenster.takt(&l.pool, &l.live, jetzt + takt).await.unwrap();
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert_eq!(etb.len(), vorher + 1, "{etb:?}");
+    assert!(
+        etb.iter().any(|t| t.contains("„A“") && t.contains("endet")),
+        "{etb:?}"
+    );
+    assert!(
+        !etb.iter().any(|t| t.contains("„B“") && t.contains("endet")),
+        "{etb:?}"
+    );
 }

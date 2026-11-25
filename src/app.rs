@@ -1593,6 +1593,26 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/helpers/invitations/{einladung_id}/revoke",
             post(routes::helfer::einladung_widerrufen),
         )
+        .route(
+            "/api/incidents/{id}/helpers/revoke",
+            post(routes::helfer::alle_entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/confirm",
+            post(routes::helfer::bestaetigen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/reject",
+            post(routes::helfer::ablehnen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/revoke",
+            post(routes::helfer::entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/extend",
+            post(routes::helfer::verlaengern),
+        )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(

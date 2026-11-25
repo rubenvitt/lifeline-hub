@@ -4,10 +4,12 @@
 //!
 //! - [`einladung`]: die Helfer-Einladung der Leitung (Code, Gültigkeit, Widerruf, Einlösen).
 //! - [`anmeldung`]: Zielliste, Prüfung des Ziels und der eigene Zustand des Geräts.
+//! - [`bestaetigung`]: Bestätigen durch die Leitung, Ziel, Person und Ortungsgerät.
 //! - Die Helfer-Kopplung ist eine Zeile in `geraet_kopplung` mit `ansicht = 'helfer'`
 //!   (Migration 0373); [`liste`] zeigt sie der Leitung.
 
 pub mod anmeldung;
+pub mod bestaetigung;
 pub mod einladung;
 
 use crate::error::AppError;
@@ -111,6 +113,26 @@ struct HelferZeile {
 /// Alle Helfer-Kopplungen eines Einsatzes, älteste zuerst, auch beendete und abgelehnte (der
 /// Client wählt, was er zeigt).
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<HelferAnzeige>, AppError> {
+    auswahl(pool, einsatz_id, None).await
+}
+
+/// Eine Helfer-Kopplung des Einsatzes; fremd oder andere Ansicht → 404.
+pub async fn laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    kopplung_id: i64,
+) -> Result<HelferAnzeige, AppError> {
+    auswahl(pool, einsatz_id, Some(kopplung_id))
+        .await?
+        .pop()
+        .ok_or(AppError::NotFound)
+}
+
+async fn auswahl(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    kopplung_id: Option<i64>,
+) -> Result<Vec<HelferAnzeige>, AppError> {
     let zeilen: Vec<HelferZeile> = sqlx::query_as(concat!(
         "SELECT gk.id, gk.anzeigename, gk.bezeichnung, gk.helfer_zustand, \
                 (gk.widerrufen_at IS NOT NULL OR gk.laeuft_ab_at <= datetime('now')) AS beendet, \
@@ -134,10 +156,11 @@ pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<HelferAnzei
          LEFT JOIN einsatz_fahrzeug ef ON ef.id = gk.fahrzeug_id \
          LEFT JOIN einsatz_personal ep ON ep.id = gk.person_id \
          LEFT JOIN personal p ON p.id = ep.personal_id \
-         WHERE gk.einsatz_id = ? AND gk.ansicht = 'helfer' \
+         WHERE gk.einsatz_id = ?1 AND gk.ansicht = 'helfer' AND (?2 IS NULL OR gk.id = ?2) \
          ORDER BY gk.erstellt_at, gk.id"
     ))
     .bind(einsatz_id)
+    .bind(kopplung_id)
     .fetch_all(pool)
     .await?;
     zeilen.into_iter().map(anzeige).collect()

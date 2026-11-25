@@ -11,7 +11,8 @@ use utoipa::ToSchema;
 wire_enum! {
     #[wire(ohne_serde)]
     /// Ereignis der Kopplungsspur. Wire-Werte stehen als CHECK in
-    /// `migrations/0147_geraet_kopplung.sql`.
+    /// `migrations/0147_geraet_kopplung.sql`, die drei der Helfer-App in
+    /// `migrations/0373_helfer_app.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum KopplungEreignis {
         Angelegt => "angelegt",
@@ -19,6 +20,13 @@ wire_enum! {
         Eingeloest => "eingeloest",
         Verlaengert => "verlaengert",
         Widerrufen => "widerrufen",
+        /// Die Leitung hat eine Helfer-Kopplung bestätigt oder ihr Ziel, ihre Person oder ihre
+        /// Ortungsrolle geändert.
+        Bestaetigt => "bestaetigt",
+        /// Die Leitung hat eine Helfer-Anmeldung abgelehnt.
+        Abgelehnt => "abgelehnt",
+        /// Die Kraft hat sich in der Helfer-App abgemeldet.
+        Abgemeldet => "abgemeldet",
     }
 }
 
@@ -551,6 +559,29 @@ pub async fn widerrufen(
     widerrufen_durch(conn, kopplung_id, Some(von)).await
 }
 
+/// Lehnt eine Helfer-Anmeldung ab (Spec Helfer-App, „Bestätigen“): Zustand `abgelehnt`, dann wie
+/// ein Widerruf Sitzungen weg und Gerätekonto inaktiv, Ereignis `abgelehnt`. Nur eine offene
+/// Kopplung im Zustand `unbestaetigt`; liefert, ob abgelehnt wurde.
+pub async fn helfer_ablehnen(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: i64,
+) -> Result<bool, AppError> {
+    let geaendert = sqlx::query(
+        "UPDATE geraet_kopplung SET helfer_zustand = 'abgelehnt' \
+         WHERE id = ? AND ansicht = 'helfer' AND helfer_zustand = 'unbestaetigt' \
+           AND widerrufen_at IS NULL AND laeuft_ab_at > datetime('now')",
+    )
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if geaendert == 0 {
+        return Ok(false);
+    }
+    beenden(conn, kopplung_id, Some(von), KopplungEreignis::Abgelehnt).await
+}
+
 /// Widerruft jede offene Kopplung eines Spiegels, ohne handelnde Person (LLH-1814, Spec
 /// `einsatz-abschluss`, „Kopplung bleibt beendet“): Kopplungen werden nicht gespiegelt, und eine,
 /// die eine Führungsübergabe am abgebenden Ende stehen ließ, lebte sonst mit dem Wiederöffnen
@@ -575,6 +606,17 @@ async fn widerrufen_durch(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     von: Option<i64>,
+) -> Result<bool, AppError> {
+    beenden(conn, kopplung_id, von, KopplungEreignis::Widerrufen).await
+}
+
+/// Beendet eine Kopplung (`widerrufen_at`), löscht Sitzungen und Code, setzt das Gerätekonto
+/// inaktiv und schreibt `art` in die Spur. Eine schon beendete bleibt, wie sie ist (`false`).
+async fn beenden(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: Option<i64>,
+    art: KopplungEreignis,
 ) -> Result<bool, AppError> {
     let geaendert = sqlx::query(
         "UPDATE geraet_kopplung SET widerrufen_at = datetime('now'), widerrufen_von = ? \
@@ -602,14 +644,7 @@ async fn widerrufen_durch(
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
-    ereignis(
-        &mut *conn,
-        kopplung_id,
-        KopplungEreignis::Widerrufen,
-        von,
-        None,
-    )
-    .await?;
+    ereignis(&mut *conn, kopplung_id, art, von, None).await?;
     Ok(true)
 }
 

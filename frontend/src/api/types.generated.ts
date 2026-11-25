@@ -4580,9 +4580,10 @@ export interface components {
             name: string;
         };
         /**
-         * @description Warum eine Helfer-Kopplung endet. Der Server liefert nur `rejected` (die abgelehnte
-         *     Kopplung beantwortet `GET /api/devices/me` noch); jedes andere Ende ist 401, und die App
-         *     nennt den Grund aus der letzten bekannten Antwort selbst.
+         * @description Warum eine Helfer-Kopplung endet. Jedes Ende ist für das Gerät 401, auch die Ablehnung:
+         *     sie löscht die Sitzungen (`routes::helfer::ablehnen`). Die App nennt den Grund aus der
+         *     letzten bekannten Antwort selbst; `rejected` liefert `GET /api/devices/me` nur für eine
+         *     abgelehnte Kopplung, die noch eine Sitzung hätte.
          * @enum {string}
          */
         HelferEndeGrund: "incident_closed" | "revoked" | "expired" | "rejected" | "signed_out";

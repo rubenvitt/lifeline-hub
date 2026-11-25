@@ -5,19 +5,24 @@
 //!   `{id}`, weil `EinsatzKontext` den Einsatz unter diesem Namen liest.
 //! - Öffentliche Wege der App vor der Anmeldung: Zielliste und Einlösen
 //!   (`/api/devices/helpers/…`), gedrosselt wie `/api/devices/pair`.
+//! - Bestätigen, Ablehnen, Abmelden und Verlängern durch die Leitung
+//!   (`/api/incidents/{id}/helpers/{gid}/…`, `…/helpers/revoke` für alle).
 //! - Der eigene Zustand der Helfer-Kopplung (`/api/devices/me`), nur mit [`HelferSitzung`]; die
 //!   Schranke der Routenliste steht in `CurrentUser` (`crate::geraet::darf_route`).
 
 use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::EinsatzLeitungszugriff;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::geraet::repo::{self as geraet_repo, NeueHelferKopplung};
 use crate::geraet::{Funktionsansicht, GeraetKontext, PROVIDER};
 use crate::helfer::anmeldung::{self, HelferZielliste, HelferZustand, ZielEingabe};
+use crate::helfer::bestaetigung::{self, Bestaetigt, Bestaetigung};
 use crate::helfer::einladung::{self, HelferEinladungAnzeige};
 use crate::helfer::{self, HelferAnzeige};
+use crate::ortung::{self, Ortungsziel};
 use axum::extract::{FromRequestParts, Query, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
@@ -325,4 +330,257 @@ pub async fn ziel_aendern(
         geraet_repo::helfer_ziel_setzen(conn, g.kopplung_id, ziel).await
     })?;
     Ok(Json(anmeldung::zustand(&state.pool, g.kopplung_id).await?))
+}
+
+// ---------- Bestätigen, Ablehnen, Entfernen (Leitung) ----------
+
+/// Wert von `reason` im 409 des Bestätigens, wenn das Ziel schon ein Ortungsgerät hat; `holder`
+/// nennt dessen Kopplung (Spec Helfer-App, „Ein Ortungsgerät je Ziel“).
+pub const GRUND_ORTUNGSGERAET_BELEGT: &str = "tracker_taken";
+
+#[derive(Debug, Deserialize)]
+pub struct BestaetigenBody {
+    /// Korrigiertes Ziel; fehlt es, bleibt das gewählte.
+    #[serde(default)]
+    pub target: Option<ZielEingabe>,
+    /// Kraft in `einsatz_personal`; nur mit „Auch Personen orten“ der Organisation.
+    #[serde(default)]
+    pub person_id: Option<i64>,
+    pub is_tracker: bool,
+    /// Das bisherige Ortungsgerät des Ziels verliert die Rolle an diesen Helfer.
+    #[serde(default)]
+    pub replace: bool,
+}
+
+/// POST /api/incidents/{id}/helpers/{gid}/confirm — bestätigt einen wartenden Helfer (`aktiv`,
+/// 72 h ab jetzt) oder ändert Ziel, Person und Ortungsrolle eines aktiven. ETB-Eintrag.
+///
+/// 404 fremd; 409 abgelehnt oder beendet, oder `{reason: "tracker_taken", holder}`, wenn das Ziel
+/// schon ein Ortungsgerät hat und `replace` fehlt; 422 Ziel oder Person fremd, Person ohne
+/// Personenortung der Organisation.
+pub async fn bestaetigen(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<BestaetigenBody>,
+) -> Result<Response, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let personen_erlaubt =
+        crate::org::einstellungen::ortung_der_org(&state.pool, ctx.einsatz.org_id)
+            .await?
+            .personen;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let von = ctx.benutzer.id;
+    let leitung = &ctx.benutzer.anzeigename;
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        let stand = bestaetigung::stand(conn, einsatz_id, kopplung_id).await?;
+        let ziel = match body.target {
+            Some(t) => anmeldung::pruefe_ziel(conn, einsatz_id, Some(t)).await?,
+            None => stand.ziel().ok_or_else(|| {
+                AppError::UnprocessableEntity("Bitte eine Einheit oder ein Fahrzeug wählen".into())
+            })?,
+        };
+        let eingabe = Bestaetigung {
+            ziel,
+            person_id: body.person_id,
+            personen_erlaubt,
+            ortungsgeraet: body.is_tracker,
+            ersetzen: body.replace,
+            von,
+        };
+        match bestaetigung::bestaetigen(conn, &stand, eingabe).await? {
+            Bestaetigt::Belegt { halter } => Ok(Err(halter)),
+            Bestaetigt::Ja {
+                erstmals,
+                ziel_name,
+                person_name,
+                ersetzt,
+                alte_person,
+            } => {
+                let text = bestaetigung::etb_text(
+                    &stand.anzeigename,
+                    leitung,
+                    erstmals,
+                    &ziel_name,
+                    person_name.as_deref(),
+                    body.is_tracker,
+                    ersetzt.as_deref(),
+                );
+                let etb_id =
+                    crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
+                Ok(Ok((etb_id, alte_person)))
+            }
+        }
+    })?;
+    let (etb_id, alte_person) = match ergebnis {
+        Ok(wert) => wert,
+        Err(halter) => {
+            return Ok((
+                StatusCode::CONFLICT,
+                Json(serde_json::json!({
+                    "error": "Das Ziel hat schon ein Ortungsgerät",
+                    "reason": GRUND_ORTUNGSGERAET_BELEGT,
+                    "holder": halter,
+                })),
+            )
+                .into_response())
+        }
+    };
+    state.live.publiziere(einsatz_id, etb_id);
+    if let Some(pid) = alte_person {
+        ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(pid));
+    }
+    Ok(Json(helfer::laden(&state.pool, einsatz_id, kopplung_id).await?).into_response())
+}
+
+/// POST /api/incidents/{id}/helpers/{gid}/reject — lehnt einen wartenden Helfer ab: `abgelehnt`,
+/// Sitzungen weg, ETB-Eintrag. 404 fremd; 409, wenn er nicht mehr wartet.
+pub async fn ablehnen(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<HelferAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let von = ctx.benutzer.id;
+    let leitung = &ctx.benutzer.anzeigename;
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
+        let stand = bestaetigung::stand(conn, einsatz_id, kopplung_id).await?;
+        if !geraet_repo::helfer_ablehnen(conn, kopplung_id, von).await? {
+            return Err(AppError::Conflict(
+                "Nur eine wartende Anmeldung lässt sich ablehnen".into(),
+            ));
+        }
+        let text = format!("Helfer „{}“ abgelehnt von {leitung}.", stand.anzeigename);
+        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await
+    })?;
+    state.live.melde_kopplung_ende(kopplung_id);
+    state.live.publiziere(einsatz_id, etb_id);
+    Ok(Json(
+        helfer::laden(&state.pool, einsatz_id, kopplung_id).await?,
+    ))
+}
+
+/// Beendet eine Helfer-Kopplung (ein Schritt der Transaktion): Widerruf wie beim Gerät und, mit
+/// zugeordneter Person, deren Position gelöscht (Spec „Personenposition“). Liefert, ob beendet
+/// wurde, und die Person.
+async fn helfer_beenden(
+    conn: &mut sqlx::SqliteConnection,
+    kopplung_id: i64,
+    person_id: Option<i64>,
+    von: i64,
+) -> Result<bool, AppError> {
+    if !geraet_repo::widerrufen(conn, kopplung_id, von).await? {
+        return Ok(false);
+    }
+    if let Some(pid) = person_id {
+        ortung::loesche_position(conn, Ortungsziel::Person(pid)).await?;
+    }
+    Ok(true)
+}
+
+/// POST /api/incidents/{id}/helpers/{gid}/revoke — meldet einen Helfer ab: Sitzungen weg,
+/// Position der Person gelöscht, ETB-Eintrag. Idempotent; 404 fremd.
+pub async fn entfernen(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
+) -> Result<Json<HelferAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let von = ctx.benutzer.id;
+    let leitung = &ctx.benutzer.anzeigename;
+    let beendet = crate::write_retry!(&state.pool, |conn| {
+        let stand = bestaetigung::stand(conn, einsatz_id, kopplung_id).await?;
+        if !helfer_beenden(conn, kopplung_id, stand.person_id, von).await? {
+            return Ok(None);
+        }
+        let text = format!("Helfer „{}“ abgemeldet von {leitung}.", stand.anzeigename);
+        let etb_id = crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?;
+        Ok(Some((etb_id, stand.person_id)))
+    })?;
+    state.live.melde_kopplung_ende(kopplung_id);
+    if let Some((etb_id, person_id)) = beendet {
+        state.live.publiziere(einsatz_id, etb_id);
+        if let Some(pid) = person_id {
+            ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(pid));
+        }
+    }
+    Ok(Json(
+        helfer::laden(&state.pool, einsatz_id, kopplung_id).await?,
+    ))
+}
+
+/// POST /api/incidents/{id}/helpers/revoke — meldet alle laufenden Helfer des Einsatzes ab, mit
+/// einem Sammeleintrag im ETB. Liefert die Übersicht.
+pub async fn alle_entfernen(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+) -> Result<Json<HelferUebersicht>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+    let von = ctx.benutzer.id;
+    let leitung = &ctx.benutzer.anzeigename;
+    let (beendet, etb_id) = crate::write_retry!(&state.pool, |conn| {
+        let offen: Vec<(i64, Option<i64>)> = sqlx::query_as(
+            "SELECT id, person_id FROM geraet_kopplung \
+             WHERE einsatz_id = ? AND ansicht = 'helfer' AND widerrufen_at IS NULL \
+               AND laeuft_ab_at > datetime('now') ORDER BY id",
+        )
+        .bind(einsatz_id)
+        .fetch_all(&mut *conn)
+        .await?;
+        let mut beendet = Vec::new();
+        for (id, person_id) in offen {
+            if helfer_beenden(conn, id, person_id, von).await? {
+                beendet.push((id, person_id));
+            }
+        }
+        let etb_id = if beendet.is_empty() {
+            None
+        } else {
+            let text = format!("{} Helfer abgemeldet von {leitung}.", beendet.len());
+            Some(crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?)
+        };
+        Ok((beendet, etb_id))
+    })?;
+    for (id, person_id) in &beendet {
+        state.live.melde_kopplung_ende(*id);
+        if let Some(pid) = person_id {
+            ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(*pid));
+        }
+    }
+    if let Some(etb_id) = etb_id {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
+    Ok(Json(HelferUebersicht {
+        invitation: einladung::gueltige(&state.pool, einsatz_id).await?,
+        helpers: helfer::liste(&state.pool, einsatz_id).await?,
+    }))
+}
+
+/// POST /api/incidents/{id}/helpers/{gid}/extend — neues Ende eines bestätigten Helfers, wie
+/// `POST /api/einsaetze/{id}/devices/{gid}/extend` (höchstens 72 h ab jetzt). 404 fremd; 409,
+/// wenn er nicht aktiv ist.
+pub async fn verlaengern(
+    State(state): State<AppState>,
+    ctx: EinsatzLeitungszugriff,
+    PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<crate::routes::geraet::VerlaengernBody>,
+) -> Result<Json<HelferAnzeige>, AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    let ende = crate::routes::geraet::ende_aus(Some(&body.laeuft_ab_at))?;
+    let von = ctx.benutzer.id;
+    crate::write_retry!(&state.pool, |conn| {
+        let stand = bestaetigung::stand(conn, einsatz_id, kopplung_id).await?;
+        if !stand.ist_aktiv() {
+            return Err(AppError::Conflict(
+                "Nur ein bestätigter Helfer lässt sich verlängern".into(),
+            ));
+        }
+        geraet_repo::verlaengern(conn, kopplung_id, &ende, von).await
+    })?;
+    Ok(Json(
+        helfer::laden(&state.pool, einsatz_id, kopplung_id).await?,
+    ))
 }
