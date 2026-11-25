@@ -97,6 +97,20 @@ describe('StammdatenEinlesen', () => {
     einlesenApi.mockReset();
   });
 
+  it('bietet die Beispieldatei als CSV und Excel an', async () => {
+    zeichne();
+    await userEvent.click(screen.getByRole('button', { name: /Stammdaten einlesen/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'CSV' })).toHaveAttribute(
+      'href',
+      '/beispiele/stammdaten-beispiel.csv',
+    );
+    expect(within(dialog).getByRole('link', { name: 'Excel' })).toHaveAttribute(
+      'href',
+      '/beispiele/stammdaten-beispiel.xlsx',
+    );
+  });
+
   it('zeigt_herkunft_feld_wenn_noetig', async () => {
     vorschauApi.mockResolvedValue(
       vorschau({ herkunft_noetig: true, herkunft_vorschlag: 'Leitstelle', uebernehmbar: false }),

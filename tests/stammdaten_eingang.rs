@@ -907,3 +907,254 @@ mod http {
         }
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Musterdateien (Vertrag `docs/schnittstellen/stammdaten-datei.md`)
+// ---------------------------------------------------------------------------------------------
+
+const MUSTER_CSV: &[u8] = include_bytes!("../frontend/public/beispiele/stammdaten-beispiel.csv");
+const MUSTER_XLSX: &[u8] = include_bytes!("../frontend/public/beispiele/stammdaten-beispiel.xlsx");
+
+type Blatt = (&'static str, &'static [&'static [&'static str]]);
+
+/// Inhalt der Muster-Excel-Datei: ein Blatt je Art. Quelle der Wahrheit für
+/// `muster_xlsx_schreiben`; `muster_xlsx_entspricht_der_tabelle` hält die eingecheckte Datei daran.
+const MUSTER_BLAETTER: &[Blatt] = &[
+    (
+        "Fahrzeuge",
+        &[
+            &[
+                "kennung",
+                "herkunft",
+                "funkrufname",
+                "kennzeichen",
+                "opta",
+                "issi",
+                "typ",
+                "standort",
+            ],
+            &[
+                "fz-001",
+                "Musterquelle",
+                "RK Musterstadt 1/83-1",
+                "MS-RK 101",
+                "4-83-1",
+                "1234501",
+                "RTW",
+                "Wache Nord",
+            ],
+            &[
+                "fz-002",
+                "Musterquelle",
+                "RK Musterstadt 1/19-1",
+                "MS-RK 102",
+                "4-19-1",
+                "1234502",
+                "KTW",
+                "Wache Nord",
+            ],
+            &[
+                "fz-003",
+                "Musterquelle",
+                "RK Musterstadt 2/42-1",
+                "MS-RK 201",
+                "4-42-1",
+                "1234503",
+                "MTW",
+                "Wache Süd",
+            ],
+        ],
+    ),
+    (
+        "Personal",
+        &[
+            &[
+                "kennung",
+                "herkunft",
+                "name",
+                "personalnummer",
+                "telefon",
+                "traegerorganisation",
+                "qualifikationen",
+            ],
+            &[
+                "p-001",
+                "Musterquelle",
+                "Muster, Maria",
+                "10001",
+                "0151 00000001",
+                "Musterverband",
+                "q-san; q-fue",
+            ],
+            &[
+                "p-002",
+                "Musterquelle",
+                "Beispiel, Bernd",
+                "10002",
+                "0151 00000002",
+                "Musterverband",
+                "q-san",
+            ],
+            &[
+                "p-003",
+                "Musterquelle",
+                "Probe, Paula",
+                "10003",
+                "0151 00000003",
+                "Musterverband",
+                "q-fue",
+            ],
+        ],
+    ),
+    (
+        "Qualifikationen",
+        &[
+            &["kennung", "herkunft", "bezeichnung"],
+            &["q-san", "Musterquelle", "Sanitätshelfer (Muster)"],
+            &["q-fue", "Musterquelle", "Gruppenführer (Muster)"],
+        ],
+    ),
+];
+
+fn muster_mappe() -> Vec<u8> {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    for (name, zeilen) in MUSTER_BLAETTER {
+        let ws = wb.add_worksheet();
+        ws.set_name(*name).unwrap();
+        for (r, zeile) in zeilen.iter().enumerate() {
+            for (c, text) in zeile.iter().enumerate() {
+                ws.write_string(r as u32, c as u16, *text).unwrap();
+            }
+        }
+    }
+    wb.save_to_buffer().unwrap()
+}
+
+/// Schreibt `frontend/public/beispiele/stammdaten-beispiel.xlsx` neu:
+/// `cargo test --test stammdaten_eingang muster_xlsx_schreiben -- --ignored`.
+#[test]
+#[ignore = "erzeugt die eingecheckte Muster-Excel-Datei"]
+fn muster_xlsx_schreiben() {
+    let ziel = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/frontend/public/beispiele/stammdaten-beispiel.xlsx"
+    );
+    std::fs::write(ziel, muster_mappe()).unwrap();
+}
+
+#[test]
+fn muster_xlsx_entspricht_der_tabelle() {
+    let (soll, _, _) = lies_paket(&muster_mappe()).unwrap();
+    let (ist, _, _) = lies_paket(MUSTER_XLSX).unwrap();
+    assert_eq!(
+        format!("{soll:?}"),
+        format!("{ist:?}"),
+        "Datei veraltet: `muster_xlsx_schreiben` (siehe dort) neu laufen lassen"
+    );
+}
+
+#[tokio::test]
+async fn musterdateien_lesbar() {
+    for (name, bytes, arten) in [
+        ("CSV", MUSTER_CSV, (3, 0, 0)),
+        ("XLSX", MUSTER_XLSX, (3, 3, 2)),
+    ] {
+        let (pool, org) = pool().await;
+        let (p, m, n) = lies_paket(bytes).unwrap();
+        assert_eq!(
+            (p.fahrzeuge.len(), p.personal.len(), p.qualifikationen.len()),
+            arten,
+            "{name}"
+        );
+        let v = vorschau(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        assert!(v.meldungen.is_empty(), "{name}: {:?}", v.meldungen);
+        assert!(
+            v.nicht_uebernommen.is_empty(),
+            "{name}: {:?}",
+            v.nicht_uebernommen
+        );
+        assert!(!v.herkunft_noetig, "{name}");
+        assert!(v.uebernehmbar, "{name}: {v:?}");
+        assert!(
+            v.zeilen.iter().all(|z| z.ergebnis == ZeilenErgebnis::Neu),
+            "{name}: {:?}",
+            v.zeilen
+        );
+        // Zweiter Lauf: alles unverändert.
+        uebernehmen(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        let v2 = vorschau(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        assert!(
+            v2.zeilen
+                .iter()
+                .all(|z| z.ergebnis == ZeilenErgebnis::Unveraendert),
+            "{name}: {:?}",
+            v2.zeilen
+        );
+    }
+}
+
+/// Prüfstein (LLH-1633): kein Name der liefernden Anwendung im Code. Ganze Wörter, ohne Rücksicht
+/// auf Groß-/Kleinschreibung.
+#[test]
+fn kein_herstellername_im_code() {
+    const VERBOTEN: &[&str] = &["iuk", "hiorg", "divera", "fe2", "boswatch"];
+    let wurzel = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut dateien: Vec<std::path::PathBuf> = Vec::new();
+    fn sammle(pfad: &std::path::Path, aus: &mut Vec<std::path::PathBuf>) {
+        if pfad.is_dir() {
+            let mut eintraege: Vec<_> = std::fs::read_dir(pfad).unwrap().flatten().collect();
+            eintraege.sort_by_key(|e| e.path());
+            for e in eintraege {
+                sammle(&e.path(), aus);
+            }
+        } else {
+            aus.push(pfad.to_path_buf());
+        }
+    }
+    for rel in [
+        "src/stammdaten_eingang",
+        "src/einlesen",
+        "src/routes/stammdaten_eingang.rs",
+    ] {
+        sammle(&wurzel.join(rel), &mut dateien);
+    }
+    for rel in ["frontend/src/stammdaten"] {
+        let mut alle = Vec::new();
+        sammle(&wurzel.join(rel), &mut alle);
+        dateien.extend(alle.into_iter().filter(|p| {
+            p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                n.starts_with("StammdatenEinlesen") || n.starts_with("StammdatenVorschau")
+            })
+        }));
+    }
+    for e in std::fs::read_dir(wurzel.join("migrations"))
+        .unwrap()
+        .flatten()
+    {
+        if e.file_name().to_string_lossy().starts_with("0373_") {
+            dateien.push(e.path());
+        }
+    }
+    dateien.push(wurzel.join("frontend/src/api/stammdatenEingang.ts"));
+    dateien.push(wurzel.join("docs/schnittstellen/stammdaten-datei.md"));
+    assert!(
+        dateien.len() >= 10,
+        "zu wenige Dateien gefunden: {dateien:?}"
+    );
+    for pfad in dateien {
+        let text = std::fs::read_to_string(&pfad).unwrap().to_lowercase();
+        for wort in text.split(|c: char| !c.is_alphanumeric()) {
+            assert!(
+                !VERBOTEN.contains(&wort),
+                "{}: Herstellername „{wort}“",
+                pfad.display()
+            );
+        }
+    }
+}

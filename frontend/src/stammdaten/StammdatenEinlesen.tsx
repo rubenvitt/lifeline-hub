@@ -32,6 +32,7 @@ import {
 
 const ACCEPT =
   '.csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const BEISPIEL = '/beispiele/stammdaten-beispiel';
 const ZU_GROSS = `Datei ist zu groß (${STAMMDATEN_DATEI_MAX_BYTES / 1024 / 1024} MiB erlaubt)`;
 
 interface StammdatenEinlesenProps {
@@ -235,6 +236,16 @@ export default function StammdatenEinlesen({ disabled = false }: StammdatenEinle
                 {datei != null && (
                   <Typography.Text data-lfh="einlesen-datei">{datei.name}</Typography.Text>
                 )}
+                <Typography.Text type="secondary" style={{ marginInlineStart: 'auto' }}>
+                  Beispieldatei:{' '}
+                  <a href={`${BEISPIEL}.csv`} download>
+                    CSV
+                  </a>{' '}
+                  ·{' '}
+                  <a href={`${BEISPIEL}.xlsx`} download>
+                    Excel
+                  </a>
+                </Typography.Text>
               </Stapel>
               {dateiFehler != null && <Alert type="error" showIcon title={dateiFehler} />}
               {herkunftZeigen && (
