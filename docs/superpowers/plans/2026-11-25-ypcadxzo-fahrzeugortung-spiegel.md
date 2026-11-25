@@ -27,7 +27,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 - Kandidaten-Puffer: 60 s gültig, älter als 10 s gilt als `pending`; Dialog fragt alle 2 s nach,
   höchstens 15 s lang.
 - Bezeichner nach `AGENTS.md`: Fachbegriffe deutsch, Technik englisch. Prosa deutsch.
-- Migration: nächste freie Nummer **0382** (vorher `git fetch origin alpha` und
+- Migration: nächste freie Nummer **0385** (umgelegt, s. LLH-2136) (vorher `git fetch origin alpha` und
   `scripts/check-migrationen.sh`); Blatt-Umbau ohne `-- no-transaction`.
 - Nach jeder DTO-Änderung `scripts/check-typ-codegen.sh`, generierte Dateien mitcommitten.
 - Commit-Body: `Zunder: https://zunder.rubeen.dev/#/aufgabe/ypcadxzog8lomshl4wapmybc`.
@@ -49,7 +49,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 ### Task 1: Tabelle `ortung_kopplung` mit Hub-Zugängen
 
 **Dateien:**
-- Neu: `migrations/0382_ortung_kopplung_hub.sql`
+- Neu: `migrations/0385_ortung_kopplung_hub.sql`
 - Ändern: `src/ortung/kopplung.rs` (`Kopplung`, `SELECT_KOPPLUNG`, `create_kopplung_tx`)
 - Ändern: `src/ortung/uebernahme.rs` (`run_nachlauf`), `src/routes/ortung.rs`
   (`From<Kopplung>`), `src/fahrzeug/disposition_repo.rs` (Vorzustand aus `Kopplung`)
@@ -81,7 +81,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `trennen_und_abschluss_sehen_hub_kopplungen`: `delete_kopplung_tx` liefert `Some(..)`;
     `beende_im_einsatz_tx` führt sie in `getrennt`.
 - [ ] **Schritt 2:** `cargo test --test ortung` muss mit FAIL enden (Spalte fehlt).
-- [ ] **Schritt 3: Migration 0382 schreiben**
+- [ ] **Schritt 3: Migration 0385 schreiben**
   - Umbau nach dem Muster 0324: neue Tabelle anlegen, Bestand mit `zugang_id` kopieren, die alte
     Tabelle löschen, umbenennen, Indizes anlegen.
   - Kopfkommentar mit Verweis auf die Spec.
