@@ -422,6 +422,17 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         stopp_empfang,
     );
 
+    // Ausgang per E-Mail (LLH-2093): der Lauf des Ausgangskorbs neben dem der Adapter; die
+    // Routen wecken ihn über `AppState::ausgang_wecker`.
+    let ausgang_wecker = std::sync::Arc::new(tokio::sync::Notify::new());
+    let _ausgang_task = lifeline_hub::ausgang::lauf::start(
+        pool.clone(),
+        adapter_rahmen.clone(),
+        live.clone(),
+        std::sync::Arc::new(lifeline_hub::ausgang::lauf::SmtpZusteller::produktiv()),
+        ausgang_wecker.clone(),
+    );
+
     // Datenträgerprüfung (LFH-1100): sofort im Hintergrund, danach stündlich; der Start wartet
     // nicht, und kein Ergebnis hält den Betrieb an.
     if config.datentraeger_verschluesselung_extern {
@@ -634,7 +645,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         einsatzakte_bau: Default::default(),
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
-        adapter: adapter_rahmen,
+        adapter: adapter_rahmen.clone(),
+        ausgang_wecker: ausgang_wecker.clone(),
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());

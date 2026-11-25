@@ -1,5 +1,5 @@
 import type { FachebeneQuelle } from './fachebenen';
-import type { AbloesungStatus, EtbTyp } from './types';
+import type { AbloesungStatus, EtbTyp, QuelleArt } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
 /**
@@ -113,6 +113,8 @@ export const EINSATZ_KEYS = {
   // Informationstelefon (LFH-554, seit i6k6mzed ein eigenes Modul): NICHT im Lagebild offline
   // (Personenbezug).
   infotelefon: 'einsatz-infotelefon',
+  // Versandliste des Ausgangskorbs (LLH-2093), live über das `ausgang`-Ereignis.
+  deliveries: 'einsatz-deliveries',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
   // Eigene Anträge am Spiegel (LLH-1492, design.md D13): live über das `einsatz`-Ereignis (die
@@ -453,6 +455,9 @@ export const EINSATZ_STREAM_EVENTS = {
   ],
   // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
+  // Versandliste an Lagebericht, Befehl und Nachforderung (LLH-2093); der Server gatet das
+  // Ereignis nach den drei Modulen der Quellen.
+  ausgang: [EINSATZ_KEYS.deliveries],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -968,6 +973,9 @@ export const einsatzKeys = {
   /** Ein Anruf für den Deeplink auf eine nicht geladene Zeile. */
   infotelefonAnruf: (einsatzId: number, anrufId: number) =>
     [EINSATZ_KEYS.infotelefon, einsatzId, 'anruf', anrufId] as const,
+  /** Versandliste einer Quelle (LLH-2093); das `ausgang`-Ereignis trifft alle per Prefix. */
+  deliveries: (einsatzId: number, kind: QuelleArt, id: number) =>
+    [EINSATZ_KEYS.deliveries, einsatzId, kind, id] as const,
   /**
    * Kommunikationsplan (LFH-848), unter dem Prefix des Fernmeldewesens (LLH-1180): das
    * `fernmeldewesen`-Ereignis trifft ihn mit. Als einziger Key des Moduls ohne Netz lesbar

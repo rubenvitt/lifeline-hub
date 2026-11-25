@@ -716,6 +716,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            ausgang_wecker: Default::default(),
         }
     }
 

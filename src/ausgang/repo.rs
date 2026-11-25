@@ -327,6 +327,18 @@ pub async fn save_etb_eintrag_tx(
     Ok(())
 }
 
+/// Zeilen, die bei einem Neustart mitten in der Zustellung waren (`wartet` mit gesetztem
+/// Merker). Der Lauf schließt sie beim Start als `ungewiss` ab, samt ETB-Eintrag.
+pub async fn load_unterbrochene(pool: &SqlitePool) -> Result<Vec<VersandZeile>, AppError> {
+    sqlx::query_as::<_, VersandZeile>(sqlx::AssertSqlSafe(format!(
+        "SELECT {ZEILE} FROM ausgang \
+         WHERE zustand = 'wartet' AND versuch_begonnen_at IS NOT NULL ORDER BY id"
+    )))
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
 /// Nach einem Neustart: Zeilen mit gesetztem Merker waren mitten in der Zustellung, ob die Mail
 /// raus ist, ist unklar. Sie werden `fehlgeschlagen` mit `ungewiss`, ohne Wiederholung. Liefert
 /// die Anzahl.

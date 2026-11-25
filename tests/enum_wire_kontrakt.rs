@@ -1693,6 +1693,7 @@ fn live_event_wire() {
         KarteBild => "karte_bild",
         Etb => "etb",
         Befehl => "befehl",
+        Ausgang => "ausgang",
         Lagebesprechung => "lagebesprechung",
         Fernmeldewesen => "fernmeldewesen",
         Dokument => "dokument",

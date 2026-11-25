@@ -314,6 +314,8 @@ export interface ModulOverrideUpdate {
 
 // ============================== ETB ==============================
 export type EtbTyp = S['EtbTyp'];
+/** Quelle eines Versands im Ausgangskorb (LLH-2093). */
+export type QuelleArt = S['QuelleArt'];
 export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];

@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Weckt den Lauf des Ausgangskorbs (LLH-2093, `ausgang::lauf`), sobald ein Versand angelegt
+    /// oder erneut gesendet wird; sonst sieht er erst im nächsten Takt nach.
+    pub ausgang_wecker: Arc<tokio::sync::Notify>,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -3230,6 +3233,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            ausgang_wecker: Default::default(),
         }
     }
 

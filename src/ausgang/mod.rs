@@ -1,10 +1,12 @@
 //! Ausgangskorb (LLH-2093, Spec `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
 //! Abschnitt 3): die Tabelle `ausgang`, ihr Zustandsmodell, die Wiederholungsfrist und das Repo.
-//! Der Lauf (Zustellung) und die Routen kommen in späteren Schritten dazu.
+//! Der Lauf ([`lauf`]) stellt zu und schreibt das Ergebnis ins ETB; die Routen kommen später.
 
+pub mod lauf;
 pub mod nachricht;
 pub mod repo;
 pub mod zustand;
+pub mod zusteller;
 
 pub use zustand::{AusgangFehler, QuelleArt, VersandZustand};
 
