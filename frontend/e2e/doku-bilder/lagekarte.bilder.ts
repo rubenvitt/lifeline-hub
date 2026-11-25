@@ -1,10 +1,18 @@
 import type { Locator, Page } from '@playwright/test';
 import {
+  DROHNEN_MISSION,
+  drohnenFotoOrt,
+  drohnenLageSimulieren,
+  drohnenquelleAnlegen,
+} from '../drohne-kern';
+import {
   objektListe,
   objektZeile,
+  oeffneEbenenGruppe,
   oeffneObjektGruppe,
   oeffneZeichenWahl,
   waehleWerkzeug,
+  zeigeLeistenAnsicht,
 } from '../leisten-kern';
 import { anmelden, demoEinsatz, expect, fotografiere, fuelle, test } from './kern';
 import { GRUNDKARTE, oeffneKarte } from './lagekarte-kern';
@@ -29,11 +37,22 @@ import { GRUNDKARTE, oeffneKarte } from './lagekarte-kern';
  *                          frontend/src/pages/lagekarte/kreisVorschau.ts (Vorschau, Radius-Griff)
  *   messen.png             frontend/src/pages/lagekarte/MessSteuerung.tsx
  *   lageplan-anlage.png    frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx
+ *   drohne-zuschalten.png  frontend/src/pages/lagekarte/DrohnenQuelle.tsx,
+ *                          frontend/src/pages/lagekarte/Ebenenbaum.tsx (Gruppe „Drohne“)
+ *   drohne-livebild.png    frontend/src/pages/lagekarte/DrohnenVideoFenster.tsx,
+ *                          frontend/src/pages/lagekarte/fachebenenLayer.ts (Drohnenlage),
+ *                          frontend/src/pages/lagekarte/drohnenSymbol.ts
+ *   drohne-foto.png        frontend/src/pages/lagekarte/FachebenenInspector.tsx (Drohnenfoto)
  *
- * Karte und Lage aus `lagekarte-kern.ts` (Fixture-Grundlage ohne Netz, Demo-Lage verortet).
+ * Karte und Lage aus `lagekarte-kern.ts` (Fixture-Grundlage ohne Netz, Demo-Lage verortet). Die
+ * Drohnenquelle ist eine echte, angehaltene Anbindung „Suchlage (Drohne)“, zugeschaltet über die
+ * Oberfläche; Lage, Livebild und Foto simuliert `e2e/drohne-kern.ts` (ohne Suchlage).
  */
 
 const KAPITEL = 'lagekarte';
+
+/** Einsatzort der Demo-Lage (`lagekarte-kern.ts`), um ihn fliegt die simulierte Drohne. */
+const EINSATZORT: [number, number] = [10.2525, 50.9571];
 
 /** Klickt relativ zur Kartenmitte; darunter liegt die Steuerung im Kartenfuß. */
 async function tippe(page: Page, canvas: Locator, dx: number, dy: number) {
@@ -193,5 +212,58 @@ test.describe(KAPITEL, () => {
     await dialog.getByRole('button', { name: 'Anfügen' }).click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
     await expect(page.getByText('Lageplan an „Lagebericht · Lage 1400“ angefügt')).toBeVisible();
+  });
+
+  // Zuletzt: die Drohnenquelle stünde sonst als Zeile in der Leiste der übrigen Bilder.
+  test('Drohnenbild aus Suchlage', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await drohnenquelleAnlegen(page, 'Drohnengruppe Suchlage');
+    await drohnenLageSimulieren(page, demo.id, EINSATZORT);
+    const canvas = await oeffneKarte(page);
+    await oeffneEbenenGruppe(page, 'drohne');
+    const gruppe = page.locator('section[data-paneel="drohne"]');
+    const zuschalten = gruppe.getByRole('button', { name: 'Suchlage zuschalten' });
+    await expect(gruppe.getByText('Nicht zugeschaltet')).toBeVisible();
+    await page.mouse.move(0, 0);
+    await fotografiere(gruppe, KAPITEL, 'drohne-zuschalten');
+
+    // Zuschalten über den Server; die Lage erscheint, die Zeile nennt die Mission.
+    await zuschalten.click();
+    await expect(gruppe.getByText(`Zugeschaltet · Mission ${DROHNEN_MISSION}`)).toBeVisible();
+
+    // Livebild über der Karte, mit laufendem Bild.
+    await gruppe.getByRole('button', { name: 'Livebild' }).click();
+    const fenster = page.locator('[data-lfh="drohnen-video-fenster"]');
+    await expect(fenster).toBeVisible();
+    await expect
+      .poll(() => fenster.locator('video').evaluate((v: HTMLVideoElement) => v.readyState))
+      .toBeGreaterThanOrEqual(2);
+    await page.mouse.move(0, 0);
+    await fotografiere(page.getByTestId('kartenflaeche'), KAPITEL, 'drohne-livebild');
+    await page.getByRole('button', { name: 'Livebild schließen' }).click();
+    await expect(fenster).toBeHidden();
+
+    // Ein Foto antippen: die Vorschau steht unter „Auswahl“.
+    const punkt = await page.evaluate(([lon, lat]) => {
+      const karte = (
+        window as unknown as {
+          __lfhKarte: { project(p: [number, number]): { x: number; y: number } };
+        }
+      ).__lfhKarte;
+      return karte.project([lon, lat]);
+    }, drohnenFotoOrt(EINSATZORT));
+    const box = (await canvas.boundingBox())!;
+    await page.mouse.click(box.x + punkt.x, box.y + punkt.y);
+    const vorschau = page.getByRole('img', { name: 'Drohnenfoto' });
+    await expect(vorschau).toBeVisible();
+    await expect.poll(() => vorschau.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(480);
+    await page.mouse.move(0, 0);
+    await fotografiere(page.locator('#lagekarte-leiste'), KAPITEL, 'drohne-foto');
+
+    // Ablauf weiter: abschalten, die Zeile steht wieder auf „Nicht zugeschaltet“.
+    await zeigeLeistenAnsicht(page, 'Ebenen');
+    await gruppe.getByRole('button', { name: 'Abschalten' }).click();
+    await expect(gruppe.getByText('Nicht zugeschaltet')).toBeVisible();
   });
 });
