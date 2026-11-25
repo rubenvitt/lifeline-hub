@@ -51,8 +51,11 @@ import { GRUNDKARTE, oeffneKarte } from './lagekarte-kern';
 
 const KAPITEL = 'lagekarte';
 
-/** Einsatzort der Demo-Lage (`lagekarte-kern.ts`), um ihn fliegt die simulierte Drohne. */
-const EINSATZORT: [number, number] = [10.2525, 50.9571];
+/**
+ * Mitte der simulierten Drohnenlage: rund 650 m östlich des Einsatzorts der Demo-Lage
+ * (`lagekarte-kern.ts`, 10.2525/50.9571), rechts neben dem Livebild-Fenster.
+ */
+const DROHNEN_MITTE: [number, number] = [10.2618, 50.958];
 
 /** Klickt relativ zur Kartenmitte; darunter liegt die Steuerung im Kartenfuß. */
 async function tippe(page: Page, canvas: Locator, dx: number, dy: number) {
@@ -219,7 +222,7 @@ test.describe(KAPITEL, () => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
     await drohnenquelleAnlegen(page, 'Drohnengruppe Suchlage');
-    await drohnenLageSimulieren(page, demo.id, EINSATZORT);
+    await drohnenLageSimulieren(page, demo.id, DROHNEN_MITTE);
     const canvas = await oeffneKarte(page);
     await oeffneEbenenGruppe(page, 'drohne');
     const gruppe = page.locator('section[data-paneel="drohne"]');
@@ -231,6 +234,10 @@ test.describe(KAPITEL, () => {
     // Zuschalten über den Server; die Lage erscheint, die Zeile nennt die Mission.
     await zuschalten.click();
     await expect(gruppe.getByText(`Zugeschaltet · Mission ${DROHNEN_MISSION}`)).toBeVisible();
+    // Die Ebene steht nach dem Zuschalten noch aus (Vorgabe der Fachebenen): einblenden.
+    const ebene = gruppe.getByRole('switch', { name: /^Drohnenlage \(Suchlage\)/ });
+    await ebene.click();
+    await expect(ebene).toHaveAttribute('aria-checked', 'true');
 
     // Livebild über der Karte, mit laufendem Bild.
     await gruppe.getByRole('button', { name: 'Livebild' }).click();
@@ -252,14 +259,14 @@ test.describe(KAPITEL, () => {
         }
       ).__lfhKarte;
       return karte.project([lon, lat]);
-    }, drohnenFotoOrt(EINSATZORT));
+    }, drohnenFotoOrt(DROHNEN_MITTE));
     const box = (await canvas.boundingBox())!;
     await page.mouse.click(box.x + punkt.x, box.y + punkt.y);
     const vorschau = page.getByRole('img', { name: 'Drohnenfoto' });
     await expect(vorschau).toBeVisible();
     await expect.poll(() => vorschau.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(480);
     await page.mouse.move(0, 0);
-    await fotografiere(page.locator('#lagekarte-leiste'), KAPITEL, 'drohne-foto');
+    await fotografiere(page.locator('[data-paneel="ausgewaehlt"]'), KAPITEL, 'drohne-foto');
 
     // Ablauf weiter: abschalten, die Zeile steht wieder auf „Nicht zugeschaltet“.
     await zeigeLeistenAnsicht(page, 'Ebenen');

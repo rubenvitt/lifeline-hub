@@ -222,15 +222,16 @@ Dritter auf der Karte, etwa Suchgebiete eines Nachbarkreises als GeoJSON, KML od
 Für die Einsatzleitung in einem laufenden Einsatz. Voraussetzung ist eine Anbindung „Suchlage
 (Drohne)“ der Organisation (Kapitel [Anbindungen](anbindungen.md)).
 
-1. In der Leiste unter „Ebenen“ die Gruppe „Drohne“ aufklappen. Unter der Ebene „Drohnenlage
-   (Suchlage)“ steht je Drohnenquelle ihr Name und „Nicht zugeschaltet“.
+1. In der Leiste unter „Ebenen“ die Gruppe „Fachebenen“ und darin „Drohne“ aufklappen. Unter der
+   Ebene „Drohnenlage (Suchlage)“ steht je Drohnenquelle ihr Name und „Nicht zugeschaltet“.
 
    ![Gruppe „Drohne“ mit der Quelle „Drohnengruppe Suchlage“, „Nicht zugeschaltet“ und dem Knopf „Suchlage zuschalten“](../bilder/lagekarte/drohne-zuschalten.png)
 
 2. „Suchlage zuschalten“ wählen. Die Zeile zeigt danach „Zugeschaltet · Mission …“ mit dem Namen
-   des laufenden Einsatzes in Suchlage. Auf der Karte erscheinen Fluggerät mit Blickrichtung,
-   Flugspur, Suchgebiete und Fotos der Drohne.
-3. Zum Abschalten in derselben Zeile „Abschalten“ wählen. Die Zeile steht wieder auf „Nicht
+   des laufenden Einsatzes in Suchlage.
+3. Die Ebene „Drohnenlage (Suchlage)“ antippen, um sie einzublenden; sie steht zunächst aus. Auf
+   der Karte erscheinen Fluggerät mit Blickrichtung, Flugspur, Suchgebiete und Fotos der Drohne.
+4. Zum Abschalten in derselben Zeile „Abschalten“ wählen. Die Zeile steht wieder auf „Nicht
    zugeschaltet“, und die Drohnenlage verschwindet von der Karte.
 
 ### Das Livebild der Drohne ansehen
@@ -246,7 +247,8 @@ Für die Einsatzleitung in einem laufenden Einsatz. Voraussetzung ist eine Anbin
 
 ### Ein Foto der Drohne ansehen
 
-1. Auf der Karte einen Bildpunkt der Drohnenlage antippen.
+1. Bei eingeblendeter Ebene „Drohnenlage (Suchlage)“ auf der Karte einen Bildpunkt der Drohnenlage
+   antippen.
 2. Die Leiste zeigt unter „Auswahl“ die Vorschau des Fotos mit Linse, Aufnahmezeit und
    Blickrichtung.
 

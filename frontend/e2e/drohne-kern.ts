@@ -111,7 +111,7 @@ function drohnenFeatures(mitte: [number, number], jetzt: Date) {
           kind: 'photo',
           key: FOTO_KEY,
           taken_at_ms: jetzt.getTime() - 4 * 60_000,
-          lens: 'ir',
+          lens: 'thermal',
           heading_deg: 40,
         },
       },
