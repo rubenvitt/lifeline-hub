@@ -57,6 +57,9 @@ class OrtungsDienst : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val plan = Sendeplan()
     private var verbindung: Serververbindung? = null
+
+    /** Die Sitzung (Server und Cookie), mit der der Dienst gerade sendet. */
+    private var aktiveSitzung: Sitzung? = null
     private var einsatz = ""
     private var ziel = ""
     private var ortet = false
@@ -138,7 +141,13 @@ class OrtungsDienst : Service() {
             beenden()
             return
         }
-        if (ortet && verbindung?.server == sitzung.server) return
+        if (ortet) {
+            // Dieselbe Sitzung: der Dienst läuft schon, nur die Benachrichtigung ist neu.
+            if (sitzung == aktiveSitzung) return
+            // Inzwischen neu eingelöst: nie mit dem alten Cookie weiter senden.
+            stoppeOrtung()
+        }
+        aktiveSitzung = sitzung
         verbindung = Serververbindung(sitzung.server, sitzung.cookie, kennung(this))
         if (!fordereOrteAn()) {
             beenden()

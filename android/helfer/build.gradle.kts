@@ -114,6 +114,11 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
     implementation(libs.activity.compose)
+    // `ViewModel`/`viewModelScope`, `LocalLifecycleOwner` und `Dispatchers.Main` ausdrücklich, nicht
+    // nur transitiv über activity-compose und Compose.
+    implementation(libs.lifecycle.viewmodel)
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.camera.camera2)
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
