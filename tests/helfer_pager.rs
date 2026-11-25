@@ -416,3 +416,139 @@ async fn helfer_darf_nicht_die_auftraege_des_einsatzes() {
     .await;
     assert_eq!(a.status, StatusCode::FORBIDDEN, "{}", a.body);
 }
+
+// ---------- Push-Anmeldung ----------
+
+fn push_body(token: &str) -> Value {
+    json!({
+        "registration_id": "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90",
+        "token": token,
+        "environment": "sandbox",
+        "key": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    })
+}
+
+async fn push_anmelden(l: &Lage, cookie: &str, token: &str) -> Antwort {
+    geraet(
+        &l.app,
+        "PUT",
+        "/api/devices/me/push",
+        Some(cookie),
+        Some(push_body(token)),
+    )
+    .await
+    .0
+}
+
+async fn push_token(pool: &sqlx::SqlitePool, gid: i64) -> Option<String> {
+    sqlx::query_scalar("SELECT token FROM helfer_push_anmeldung WHERE kopplung_id = ?")
+        .bind(gid)
+        .fetch_optional(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn push_anmeldung_ersetzt_die_vorige() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let a = push_anmelden(&l, &cookie, "ab12").await;
+    assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
+    push_anmelden(&l, &cookie, "cd34").await;
+    assert_eq!(push_token(&l.pool, gid).await.as_deref(), Some("cd34"));
+    let (a, _) = geraet(&l.app, "DELETE", "/api/devices/me/push", Some(&cookie), None).await;
+    assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_mit_kurzem_schluessel_ist_400() {
+    let l = lage().await;
+    let (_, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let mut body = push_body("ab12");
+    body["key"] = json!("AQEB");
+    let (a, _) = geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
+    let mut body = push_body("ab12");
+    body["environment"] = json!("test");
+    let (a, _) = geraet(&l.app, "PUT", "/api/devices/me/push", Some(&cookie), Some(body)).await;
+    assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
+}
+
+/// Ein bestätigter Helfer mit Push-Anmeldung.
+async fn helfer_mit_push(l: &Lage, name: &str) -> (i64, String) {
+    let (gid, cookie) = helfer(l, "unit", l.einheit, name).await;
+    let a = push_anmelden(l, &cookie, "ab12").await;
+    assert_eq!(a.status, StatusCode::NO_CONTENT, "{}", a.body);
+    (gid, cookie)
+}
+
+async fn leitung_post(l: &Lage, pfad: &str) {
+    let (s, v) = anfrage_json(&l.app, "POST", pfad, &l.admin, Some(&json!({}))).await;
+    assert_eq!(s, StatusCode::OK, "{pfad}: {v}");
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_dem_widerruf() {
+    let l = lage().await;
+    let (gid, _) = helfer_mit_push(&l, "Max M.").await;
+    leitung_post(&l, &format!("/api/incidents/{}/helpers/{gid}/revoke", l.einsatz)).await;
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_der_ablehnung() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    push_anmelden(&l, &cookie, "ab12").await;
+    leitung_post(&l, &format!("/api/incidents/{}/helpers/{gid}/reject", l.einsatz)).await;
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_dem_abmelden() {
+    let l = lage().await;
+    let (gid, cookie) = helfer_mit_push(&l, "Max M.").await;
+    let (a, _) = geraet(&l.app, "POST", "/api/auth/logout", Some(&cookie), None).await;
+    assert!(a.status.is_success(), "{}", a.body);
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_alle_entfernen() {
+    let l = lage().await;
+    let (gid, _) = helfer_mit_push(&l, "Max M.").await;
+    leitung_post(&l, &format!("/api/incidents/{}/helpers/revoke", l.einsatz)).await;
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_dem_einsatz() {
+    let l = lage().await;
+    let (gid, _) = helfer_mit_push(&l, "Max M.").await;
+    let (s, v) = anfrage_json(
+        &l.app,
+        "POST",
+        &format!("/api/incidents/{}/close", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}
+
+#[tokio::test]
+async fn push_anmeldung_endet_mit_dem_ablauf() {
+    let l = lage().await;
+    let (gid, _) = helfer_mit_push(&l, "Max M.").await;
+    sqlx::query("UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?")
+        .bind(gid)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    lifeline_hub::geraet::ablauf::raeume_helfer(&l.pool, &l.live)
+        .await
+        .unwrap();
+    assert_eq!(push_token(&l.pool, gid).await, None);
+}

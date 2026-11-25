@@ -308,6 +308,9 @@ const HELFER: &[(&str, &str)] = &[
         "POST",
         "/api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge",
     ),
+    // Push-Anmeldung der iOS-Helfer-App, an die Kopplung gebunden (`helfer::push`).
+    ("PUT", "/api/devices/me/push"),
+    ("DELETE", "/api/devices/me/push"),
 ];
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
@@ -758,6 +761,8 @@ mod tests {
                 "POST",
                 "/api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge",
             ),
+            ("PUT", "/api/devices/me/push"),
+            ("DELETE", "/api/devices/me/push"),
         ] {
             assert!(darf_route(h, m, p), "Helfer darf {m} {p}");
         }

@@ -484,6 +484,78 @@ pub async fn auftrag_quittieren(
     Ok(Json(auftrag).into_response())
 }
 
+/// Body von `PUT /api/devices/me/push`: die Push-Anmeldung der iOS-Helfer-App, wie die
+/// Lifeline-App sie bildet (ADR-0090).
+#[derive(Debug, Deserialize)]
+pub struct HelperPushBody {
+    /// Zufällige UUID, die das Gerät erzeugt und behält (AAD der Verschlüsselung).
+    pub registration_id: String,
+    /// Geräte-Token von APNs, Hex.
+    pub token: String,
+    /// `sandbox` oder `production`.
+    pub environment: String,
+    /// 32 Byte als Base64url: der Schlüssel des Geräts für die Nutzlast.
+    pub key: String,
+}
+
+const PUSH_TOKEN_MAX: usize = 200;
+
+/// PUT /api/devices/me/push — Push-Anmeldung der Helfer-App (ersetzt eine vorige); 204. Erlaubt
+/// schon vor der Bestätigung, zugestellt wird erst danach (`helfer::pager`). 400 bei falschem
+/// Feld.
+pub async fn push_anmelden(
+    State(state): State<AppState>,
+    HelferSitzung(g): HelferSitzung,
+    JsonBody(body): JsonBody<HelperPushBody>,
+) -> Result<StatusCode, AppError> {
+    let kennung = body.registration_id.trim();
+    uuid::Uuid::parse_str(kennung)
+        .map_err(|_| AppError::Validation("registration_id ist keine UUID".into()))?;
+    let token = body.token.trim();
+    if token.is_empty()
+        || token.len() > PUSH_TOKEN_MAX
+        || !token.chars().all(|c| c.is_ascii_hexdigit())
+    {
+        return Err(AppError::Validation(format!(
+            "token muss 1 bis {PUSH_TOKEN_MAX} Hex-Zeichen lang sein"
+        )));
+    }
+    let umgebung = match body.environment.as_str() {
+        "sandbox" => crate::ios_push::relais::Umgebung::Sandbox,
+        "production" => crate::ios_push::relais::Umgebung::Production,
+        _ => {
+            return Err(AppError::Validation(
+                "environment muss sandbox oder production sein".into(),
+            ))
+        }
+    };
+    let schluessel: [u8; 32] = crate::web_push::krypto::b64_lesen(body.key.trim())
+        .and_then(|b| b.try_into().ok())
+        .ok_or_else(|| AppError::Validation("key muss 32 Byte als Base64url sein".into()))?;
+    helfer::push::save_registration(
+        &state.pool,
+        &helfer::push::HelferPushAnmeldung {
+            kopplung_id: g.kopplung_id,
+            kennung: kennung.to_string(),
+            token: token.to_string(),
+            umgebung,
+            schluessel,
+        },
+    )
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// DELETE /api/devices/me/push — meldet die Push-Anmeldung ab; 204, auch ohne Anmeldung.
+pub async fn push_abmelden(
+    State(state): State<AppState>,
+    HelferSitzung(g): HelferSitzung,
+) -> Result<StatusCode, AppError> {
+    let mut conn = state.pool.acquire().await?;
+    helfer::push::delete_registration(&mut conn, g.kopplung_id).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 // ---------- Position senden (Helfer-Sitzung) ----------
 
 /// Wert von `reason` im 403 einer Sendung, wenn „Ortung im Einsatz“ der Organisation aus ist.
