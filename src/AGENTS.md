@@ -430,6 +430,9 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   oder Geheimnisse der Anbindung, `ausgang` hält Nachrichten. Der SMTP-Client ist
   `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
   `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
+- **Test-Zusteller nur für e2e:** `--ausgang-testzusteller` (versteckt, ohne Umgebungsvariable)
+  setzt `ausgang::zusteller::AufzeichnenderZusteller` statt SMTP ein; es gibt ihn nur im
+  Debug-Build (`testzusteller()`), ein Release-Binary beendet sich mit dem Schalter.
 - **Routen** bleiben unter `/api/einsaetze/{id}/…` (Segmente `deliveries`, `retry`): die
   Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle
   `org_externe_stelle_kanal` hat keine Änderungsspur (nicht Teil des ELW-Abgleichs).

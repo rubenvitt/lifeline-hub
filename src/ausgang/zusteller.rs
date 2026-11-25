@@ -71,3 +71,88 @@ impl Zusteller for SmtpZusteller {
         })
     }
 }
+
+/// Eine vom Test-Doppel angenommene Zustellung (ohne Mailtext: der enthält Inhalt).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Angenommen {
+    pub von: String,
+    pub an: String,
+    pub bytes: usize,
+}
+
+/// Das Doppel der e2e-Suite (LLH-2093): nimmt jede Zustellung an und merkt sie sich, ohne
+/// Netz. Nur über [`testzusteller`] zu bekommen, und das gibt es nur in Debug-Builds.
+#[derive(Default)]
+pub struct AufzeichnenderZusteller {
+    angenommen: std::sync::Mutex<Vec<Angenommen>>,
+}
+
+impl AufzeichnenderZusteller {
+    pub fn angenommen(&self) -> Vec<Angenommen> {
+        self.angenommen.lock().unwrap().clone()
+    }
+}
+
+impl Zusteller for AufzeichnenderZusteller {
+    fn zustellen<'a>(
+        &'a self,
+        _zugang: &'a Versandzugang,
+        von: &'a str,
+        an: &'a str,
+        mail: &'a [u8],
+    ) -> BoxFuture<'a, Result<(), SmtpFehler>> {
+        Box::pin(async move {
+            self.angenommen.lock().unwrap().push(Angenommen {
+                von: von.to_string(),
+                an: an.to_string(),
+                bytes: mail.len(),
+            });
+            Ok(())
+        })
+    }
+}
+
+/// Das aufzeichnende Doppel, nur in einem Debug-Build; im Release-Build immer `None`, damit
+/// kein Produktivbinary Mails verschluckt, auch nicht durch einen versehentlich gesetzten Schalter.
+pub fn testzusteller() -> Option<Arc<AufzeichnenderZusteller>> {
+    cfg!(debug_assertions).then(|| Arc::new(AufzeichnenderZusteller::default()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn doppel_nimmt_an_und_merkt_sich_nur_umschlag_und_groesse() {
+        let z = AufzeichnenderZusteller::default();
+        let zugang = Versandzugang {
+            einstellungen: Default::default(),
+            geheimnisse: Default::default(),
+            lan_erlaubt: false,
+            adapter_id: "a".into(),
+        };
+        z.zustellen(&zugang, "von@example.org", "an@example.org", b"abc")
+            .await
+            .unwrap();
+        assert_eq!(
+            z.angenommen(),
+            vec![Angenommen {
+                von: "von@example.org".into(),
+                an: "an@example.org".into(),
+                bytes: 3
+            }]
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn im_debug_build_gibt_es_das_doppel() {
+        assert!(testzusteller().is_some());
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn im_release_build_gibt_es_das_doppel_nie() {
+        assert!(testzusteller().is_none());
+    }
+}
