@@ -24,7 +24,7 @@ let gesendet: Record<string, unknown>[];
 beforeEach(() => {
   gesendet = [];
   server.use(
-    http.put('/api/einsaetze/1/follow-up', async ({ request }) => {
+    http.put('/api/incidents/1/follow-up', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json({ id: 1 });
     }),

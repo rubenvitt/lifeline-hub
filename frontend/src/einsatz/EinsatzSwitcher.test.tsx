@@ -46,7 +46,7 @@ function setup() {
 describe('EinsatzSwitcher', () => {
   it('kennzeichnet eine Übung in der Liste mit der Übungsmarke (LLH-1725)', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz({ id: 7, bezeichnung: 'Hochwasser', einsatzart: 'realeinsatz' }),
           einsatz({ id: 8, bezeichnung: 'Starkregen Nord', einsatzart: 'uebung' }),
@@ -64,7 +64,7 @@ describe('EinsatzSwitcher', () => {
 
   it('zeigt nur aktive Einsaetze plus Aktionen', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz({ id: 7, bezeichnung: 'Hochwasser' }),
           einsatz({ id: 8, bezeichnung: 'MANV B14' }),
@@ -83,7 +83,7 @@ describe('EinsatzSwitcher', () => {
 
   it('markiert den eigenen Einsatz, ein Klick darauf bleibt im Modul (LFH-954)', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz({ id: 7, bezeichnung: 'Hochwasser' }),
           einsatz({ id: 8, bezeichnung: 'MANV B14' }),
@@ -104,7 +104,7 @@ describe('EinsatzSwitcher', () => {
 
   it('führt den eigenen Einsatz auch abgeschlossen und markiert ihn', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([einsatz({ id: 7, status: 'abgeschlossen' })]),
       ),
     );
@@ -116,7 +116,7 @@ describe('EinsatzSwitcher', () => {
 
   it('wechselt über einen anderen Einsatz in dessen Rahmen', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([einsatz({ id: 7 }), einsatz({ id: 8, bezeichnung: 'MANV B14' })]),
       ),
     );
@@ -128,7 +128,7 @@ describe('EinsatzSwitcher', () => {
 
   it('bleibt beim Wechsel im Modul und lässt Detail und Auswahl zurück (LLH-1821)', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([einsatz({ id: 7 }), einsatz({ id: 8, bezeichnung: 'MANV B14' })]),
       ),
     );
@@ -175,7 +175,7 @@ describe('EinsatzSwitcher', () => {
 
   it('wechselt außerhalb eines Moduls ohne Hinweis', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([einsatz({ id: 7 }), einsatz({ id: 8, bezeichnung: 'MANV B14' })]),
       ),
     );
@@ -204,7 +204,7 @@ describe('EinsatzSwitcher', () => {
 
   it('nennt die Einsatzart vor Nummer und Ort, bei einer Übung nicht (LLH-1821)', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz({ id: 7, bezeichnung: 'Hochwasser' }),
           einsatz({
@@ -238,7 +238,7 @@ describe('EinsatzSwitcher', () => {
 
   it('nennt je Einsatz Nummer und Ort, ohne Nummer den Beginn', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz({ id: 7, einsatznummer_intern: 'E-2026-0431', einsatzort: 'Deich West' }),
           einsatz({ id: 8, bezeichnung: 'MANV B14', leitstellen_nr: '4711' }),
@@ -267,7 +267,7 @@ describe('EinsatzSwitcher', () => {
    */
   it('ein langer Name kürzt und steht vollständig im title', async () => {
     const lang = 'Hochwasser Nord — Deichverteidigung Abschnitt West, Lage 3';
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     renderMitProviders(
       <Routes>
         <Route
@@ -302,14 +302,14 @@ describe('EinsatzSwitcher', () => {
   });
 
   it('setzt den Namen in der Stufe `kartentitel`, in jeder Dichte (LLH-1726, LLH-1968)', async () => {
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     setup();
     const knopf = await screen.findByRole('button', { name: /Hochwasser/ });
     expect(knopf.style.fontSize).toBe(`${schriftskala.kartentitel.groesse}px`);
   });
 
   it('navigiert ueber „Alle Einsätze …" zur Heim-Seite', async () => {
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     setup();
     await userEvent.click(screen.getByRole('button', { name: /Hochwasser/ }));
     await userEvent.click(await screen.findByText('Alle Einsätze …'));

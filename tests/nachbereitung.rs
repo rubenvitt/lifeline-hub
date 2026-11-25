@@ -16,7 +16,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (status, body) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         cookie,
         None,
     )
@@ -34,7 +34,7 @@ async fn nachbereitung(
     anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{id}/follow-up"),
+        &format!("/api/incidents/{id}/follow-up"),
         cookie,
         Some(&body),
     )
@@ -177,7 +177,7 @@ async fn der_kopf_nennt_die_wartende_verwahrung() {
     .await
     .unwrap();
     let (status, body) =
-        anfrage_json(&app, "GET", &format!("/api/einsaetze/{id}"), &admin, None).await;
+        anfrage_json(&app, "GET", &format!("/api/incidents/{id}"), &admin, None).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(
         body["verwahrung"],

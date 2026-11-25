@@ -68,7 +68,7 @@ pub struct ListeParams {
     entlassene: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/material — aktives Material (aufgelöst), mit `?entlassene=1` das aus
+/// GET /api/incidents/{id}/material — aktives Material (aufgelöst), mit `?entlassene=1` das aus
 /// dem Einsatz genommene (Spec `kraefte-entlassung`). Storniertes liefert keine der beiden. Nur
 /// Lesezugriff.
 pub async fn liste(
@@ -122,7 +122,7 @@ pub struct DisponierenBody {
     pub ergaenzen: Option<bool>,
 }
 
-/// POST /api/einsaetze/{id}/material — Stamm-Material disponieren ODER Ad-hoc anlegen, optional
+/// POST /api/incidents/{id}/material — Stamm-Material disponieren ODER Ad-hoc anlegen, optional
 /// gleich an einen Ort (LLH-1224) und als Übernahme aus einer Nachforderung (LLH-1226).
 /// Schreibberechtigt + aktiver Einsatz. Schreibt EINEN ETB-Eintrag (Menge, Ort, Herkunft).
 /// Reihenfolge: 400 (Feld) → 422 (Kombination: `ergaenzen` ohne Bezug, zwei Orte, Art am Stamm) →
@@ -364,7 +364,7 @@ pub struct OrtErwartet {
     pub br_id: Option<i64>,
 }
 
-/// PATCH /api/einsaetze/{id}/material/{em_id} — Menge, Ausgabe, Status, Art, Bemerkung, der eine
+/// PATCH /api/incidents/{id}/material/{em_id} — Menge, Ausgabe, Status, Art, Bemerkung, der eine
 /// Ort und bei Ad-hoc-Posten Bezeichnung, Kategorie, Bestandsnummer und Träger (LLH-1093,
 /// LLH-1224). Je geändertem Aspekt ein ETB-Eintrag in der Folge Menge, Ausgabe, Status, Art,
 /// Angaben, Ort (design.md D11); eine reine Bemerkung schreibt keinen. Reihenfolge: 400 (Feld) →
@@ -596,7 +596,7 @@ pub async fn update(
     }))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/status/undo — „Rückgängig“ nach einem
+/// POST /api/incidents/{id}/material/{em_id}/status/undo — „Rückgängig“ nach einem
 /// Statuswechsel (LLH-1986, Regel `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines
 /// Statuswechsels“). Body ist der Beleg aus der Antwort des PATCH. Status inzwischen anders →
 /// 409 `veraltet`; andere Person, abgelaufene Frist, inzwischen geänderte Menge oder Art → 409 mit
@@ -698,7 +698,7 @@ pub struct AufteilenBody {
     pub br_id: Option<Option<i64>>,
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/split — einen Posten auf zwei Zeilen aufteilen
+/// POST /api/incidents/{id}/material/{em_id}/split — einen Posten auf zwei Zeilen aufteilen
 /// (LLH-1093, design.md D8): die Ausgangszeile wird um `menge` gemindert, eine neue Zeile mit
 /// `menge` übernimmt Angaben, Art, Status, Bemerkung, Ort und Dispositionszeitpunkt und beginnt
 /// ohne Ausgabe (LLH-1224 D14). Nennt der Body einen Ort, steht die neue Zeile dort (t1hvaqzu,
@@ -783,7 +783,7 @@ pub struct VerknuepfenBody {
     pub ergaenzen: Option<bool>,
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/resource-request — einen vorhandenen Posten nachträglich
+/// POST /api/incidents/{id}/material/{em_id}/resource-request — einen vorhandenen Posten nachträglich
 /// mit einer eingetroffenen Nachforderung verknüpfen (LLH-1259, design.md D1–D4); der PATCH nimmt
 /// `nachforderung_id` bewusst nicht an. Gleiche Prüfungen wie die Übernahme. Reihenfolge: 400
 /// (Feld) → 403 (Nachforderungen nicht freigegeben, vor jedem Lesen) → in der Transaktion 404/409
@@ -834,7 +834,7 @@ pub async fn verknuepfen(
     Ok(Json(anzeige))
 }
 
-/// DELETE /api/einsaetze/{id}/material/{em_id}/resource-request — eine Fehlzuordnung lösen (LLH-1403,
+/// DELETE /api/incidents/{id}/material/{em_id}/resource-request — eine Fehlzuordnung lösen (LLH-1403,
 /// design.md D1–D6, Spec `nachforderung-material`, „Fehlzuordnung lösen“): nur der Bezug geht, der
 /// Posten bleibt mit Menge, Ort, Art und Status. Reihenfolge: Gate Material → 403 (Nachforderungen
 /// nicht freigegeben, vor jedem Lesen) → in der Transaktion 404 (fremd) / 409 (beendet) / 422 (ohne
@@ -876,7 +876,7 @@ pub async fn loesen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/stand-down — aus dem Einsatz nehmen (LLH-1079, Spec
+/// POST /api/incidents/{id}/material/{em_id}/stand-down — aus dem Einsatz nehmen (LLH-1079, Spec
 /// `kraefte-entlassung`; die Oberfläche sagt „Aus dem Einsatz nehmen“, LLH-1093 Nr. 3). Die
 /// Zeile bleibt, der Ort geht (LLH-1224 D13). Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/stand-down/undo` mit dem gelieferten Vorzustand (LLH-1923), der Block „Aus dem
@@ -926,7 +926,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/stand-down/undo — „Rückgängig“ nach dem
+/// POST /api/incidents/{id}/material/{em_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Herausnehmen (LLH-1923, Spec `kraefte-entlassung`, „Herausnahme von Material zurücknehmen“):
 /// Body ist der Vorzustand aus der Antwort von `…/stand-down`. Nur die herausnehmende Person, nur
 /// dieses Herausnehmen, höchstens zehn Minuten danach, sonst 409; ebenso 409, wenn dasselbe Gerät
@@ -986,7 +986,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/annul — Fehldisposition stornieren (LLH-1079,
+/// POST /api/incidents/{id}/material/{em_id}/annul — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur ohne Ort (LLH-1224 D13) und in den ersten 15 Minuten, sonst 422 mit dem
 /// Grund; beendetes Material → 409. ETB-Eintrag.
 pub async fn stornieren(
@@ -1018,7 +1018,7 @@ pub async fn stornieren(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/einsaetze/{id}/material/{em_id}/reactivate — herausgenommenes oder storniertes
+/// POST /api/incidents/{id}/material/{em_id}/reactivate — herausgenommenes oder storniertes
 /// Material erneut disponieren (LLH-1079, design.md D7): Block „Aus dem Einsatz genommen“; das
 /// Rückgängig nach dem Herausnehmen nimmt `…/stand-down/undo` (LLH-1923). Aktiv → 409.
 /// ETB-Eintrag. Ein stornierter Posten aus einer Nachforderung zählt danach wieder als Übernahme

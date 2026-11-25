@@ -1089,8 +1089,8 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
     const posts: unknown[] = [];
     let stand = liste;
     server.use(
-      http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(stand)),
-      http.post('/api/einsaetze/1/gauges', async ({ request }) => {
+      http.get('/api/incidents/1/gauges', () => HttpResponse.json(stand)),
+      http.post('/api/incidents/1/gauges', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         posts.push(body);
         stand = [...stand, { id: 99, reihenfolge: stand.length, ...body }];
@@ -1181,7 +1181,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('ein abgelehnter POST (volle Liste, 422) steht als Fehler im Panel, ohne Erfolgsmeldung', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'höchstens 5 Pegel je Einsatz' }, { status: 422 }),
       ),
     );
@@ -1197,7 +1197,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('Fehler und Ladezustand gehören zur Station: ein anderer Punkt zeigt sie nicht', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

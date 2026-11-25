@@ -63,7 +63,7 @@ function stelleBereit(a: Aufbau = {}) {
   let stelle = { ...TURNHALLE };
   server.use(
     meHandler(benutzerFixture({ id: 1, anzeigename: 'Leitung' })),
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({
         id: 1,
         bezeichnung: 'Hochwasser Weser',
@@ -72,22 +72,22 @@ function stelleBereit(a: Aufbau = {}) {
         org_id: 1,
       }),
     ),
-    http.get('/api/einsaetze/1/module-access', () =>
+    http.get('/api/incidents/1/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
-    http.get('/api/einsaetze/1/care', () =>
+    http.get('/api/incidents/1/care', () =>
       HttpResponse.json({ stellen: [stelle], namentlich: [] } satisfies BetreuungUebersicht),
     ),
-    http.get('/api/einsaetze/1/accommodation-guidelines', () =>
+    http.get('/api/incidents/1/accommodation-guidelines', () =>
       HttpResponse.json(richtwerteAntwort({}, a.einsatzWerte)),
     ),
-    http.patch('/api/einsaetze/1/care/positions/8', async ({ request }) => {
+    http.patch('/api/incidents/1/care/positions/8', async ({ request }) => {
       const body = (await request.json()) as { kapazitaet_personen: number };
       patches.push(body);
       stelle = { ...stelle, ...body };
       return HttpResponse.json(stelle);
     }),
-    http.post('/api/einsaetze/1/resource-requests', async ({ request }) => {
+    http.post('/api/incidents/1/resource-requests', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       nachforderungen.push(body);
       return HttpResponse.json({ id: nachforderungen.length, ...body }, { status: 201 });

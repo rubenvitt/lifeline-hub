@@ -39,7 +39,7 @@ async function entwurfAufPlatte(page: Page, inhalt: string): Promise<boolean> {
 /** Admin legt einen Einsatz und eine zweite Person (Führungspersonal) darin an. */
 async function vorbereiten(page: Page) {
   await anmeldenAlsAdmin(page);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Geräteräumung ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBe(true);

@@ -16,14 +16,14 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn plan(einsatz: i64, uhs: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan")
+    format!("/api/incidents/{einsatz}/uhs/{uhs}/plan")
 }
 
 async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -> i64 {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&format!(
             r#"{{"typ":"behandlungsplatz","bezeichnung":"{bez}"}}"#
@@ -103,7 +103,7 @@ async fn anhang_ablegen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments"))
+                .uri(format!("/api/incidents/{einsatz}/uhs/{uhs}/attachments"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -181,7 +181,7 @@ async fn detail(app: &axum::Router, einsatz: i64, uhs: i64, cookie: &str) -> Val
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         cookie,
         None,
     )
@@ -236,7 +236,7 @@ async fn hochladen_liefert_den_plan_und_steht_im_detail_und_im_etb() {
     let (_, l) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/attachments"),
         &admin,
         None,
     )
@@ -382,7 +382,7 @@ async fn uebernahme_kopiert_mit_genau_einer_auditzeile() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments/{linker}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/attachments/{linker}"),
         &admin,
         None,
     )
@@ -414,7 +414,7 @@ async fn uebernahme_fremder_oder_entfernter_anhaenge_ist_404() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments/{weg}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/attachments/{weg}"),
         &admin,
         None,
     )
@@ -540,7 +540,7 @@ async fn stornierte_uhs_ist_409_beim_schreiben_und_zeigt_den_plan() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         &admin,
         None,
     )
@@ -621,16 +621,16 @@ async fn schreibende_routen_melden_uhs_live() {
 fn upload_und_bild_sind_vom_zeitbudget_ausgenommen() {
     use axum::http::Method;
     use lifeline_hub::zulassung::ist_ausgenommen;
-    let plan = "/api/einsaetze/{id}/uhs/{uid}/plan";
+    let plan = "/api/incidents/{id}/uhs/{uid}/plan";
     assert!(ist_ausgenommen(&Method::PUT, plan));
     assert!(ist_ausgenommen(
         &Method::GET,
-        "/api/einsaetze/{id}/uhs/{uid}/plan/image"
+        "/api/incidents/{id}/uhs/{uid}/plan/image"
     ));
     assert!(!ist_ausgenommen(&Method::PATCH, plan));
     assert!(!ist_ausgenommen(&Method::DELETE, plan));
     assert!(!ist_ausgenommen(
         &Method::POST,
-        "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment"
+        "/api/incidents/{id}/uhs/{uid}/plan/from-attachment"
     ));
 }

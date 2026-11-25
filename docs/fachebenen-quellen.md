@@ -592,7 +592,7 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   nach außen). Der Gebietsumriss kommt immer mit.
 - **Archiv:** Der Schalter „Ältere Aktivierungen“ in der Ebenenzeile gilt nur bis zum Neuladen;
   er reist weder in gespeicherte Kartenansichten noch in den Browserspeicher.
-- **Altbestand vor 2023 (LLH-2022, ADR-0098):** Die Detail-Schnittstelle verlangt dort eine
+- **Altbestand vor 2023 (LLH-2022, ADR-0099):** Die Detail-Schnittstelle verlangt dort eine
   Anmeldung. Ausgewählte Aktivierungen stehen deshalb im Katalog
   `src/karte/copernicus_altbestand.json`, heute EMSR517 (Hochwasser Westdeutschland 2021, 17
   Gebiete, 23 Produkte). Mit „Ältere Aktivierungen“ lädt der Server das Vector Package je

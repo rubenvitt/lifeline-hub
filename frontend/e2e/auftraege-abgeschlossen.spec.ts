@@ -21,10 +21,10 @@ const VOLLZOGEN = 105;
 async function einsatzMitVollzogenen(
   page: Page,
 ): Promise<{ einsatzId: string; aeltesterId: number }> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Aufträge blättern ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   const einsatzId = String(((await r.json()) as { id: number }).id);
   const auftrag = (text: string) => ({
     auftrag_text: text,
@@ -32,19 +32,19 @@ async function einsatzMitVollzogenen(
   });
   const ids: number[] = [];
   for (let i = 0; i < VOLLZOGEN; i += 1) {
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+    const angelegt = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
       data: auftrag(`Vollzogen ${i}`),
     });
     expect(angelegt.ok(), `Auftrag ${i}: ${angelegt.status()}`).toBe(true);
     const { id } = (await angelegt.json()) as { id: number };
-    const vollzug = await page.request.post(`/api/einsaetze/${einsatzId}/tasks/${id}/execution`, {
+    const vollzug = await page.request.post(`/api/incidents/${einsatzId}/tasks/${id}/execution`, {
       data: { status: 'vollzogen', vollzugsmeldung: 'Erledigt' },
     });
     expect(vollzug.ok(), `Vollzug ${i}: ${vollzug.status()}`).toBe(true);
     ids.push(id);
   }
   // Ein offener daneben: die Vorgabeansicht hat Inhalt.
-  const offen = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const offen = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: auftrag('Noch offen'),
   });
   expect(offen.ok()).toBe(true);

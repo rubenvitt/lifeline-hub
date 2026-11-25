@@ -99,22 +99,22 @@ function render(
   const efListe = Array.isArray(efObj) ? efObj : [efObj];
   server.use(
     // Mit Freigabe des Moduls Einheiten lädt die Liste die Einheiten stets (LLH-1073, design.md D5).
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheitenDaten)),
-    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/units', () => HttpResponse.json(einheitenDaten)),
+    http.get('/api/incidents/7/sectors', () => HttpResponse.json([])),
     meHandler(optionen.benutzer ?? nutzer),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatzObj)),
     // Aktive und entlassene Fahrzeuge teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
-    http.get('/api/einsaetze/7/vehicles', ({ request }) =>
+    http.get('/api/incidents/7/vehicles', ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : efListe,
       ),
     ),
-    http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personal)),
+    http.get('/api/incidents/7/personnel', () => HttpResponse.json(personal)),
     http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
     http.get('/api/vehicles', () => HttpResponse.json([])), // Pool (nur_im_dienst)
     // Beladung im Aufklapper (LLH-1225 D11): Materialliste und die Namen der Orte im Angebot.
-    http.get('/api/einsaetze/7/material', () => HttpResponse.json(optionen.material ?? [])),
-    http.get('/api/einsaetze/7/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/material', () => HttpResponse.json(optionen.material ?? [])),
+    http.get('/api/incidents/7/uhs', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <>
@@ -220,7 +220,7 @@ describe('FahrzeugePage', () => {
       freigeben = resolve;
     });
     server.use(
-      http.patch('/api/einsaetze/7/vehicles/10', async () => {
+      http.patch('/api/incidents/7/vehicles/10', async () => {
         await gate;
         return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
       }),
@@ -252,7 +252,7 @@ describe('FahrzeugePage', () => {
       refetchFreigeben = resolve;
     });
     server.use(
-      http.get('/api/einsaetze/7/vehicles', async () => {
+      http.get('/api/incidents/7/vehicles', async () => {
         await refetchGate;
         return HttpResponse.json([{ ...ef, funkrufname: 'Extern geändert' }, zweitesFahrzeug]);
       }),
@@ -281,9 +281,9 @@ describe('FahrzeugePage', () => {
   it('hebt per ?fahrzeug=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([ef])),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([ef])),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
       http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
       http.get('/api/vehicles', () => HttpResponse.json([])),
     );
@@ -303,9 +303,9 @@ describe('FahrzeugePage', () => {
   it('?fahrzeug=<id> eines Fahrzeugs, das nicht im Einsatz steht, zeigt den Hinweis und räumt den Parameter', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([ef])),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([ef])),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
       http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
       http.get('/api/vehicles', () => HttpResponse.json([])),
     );
@@ -397,16 +397,16 @@ describe('FahrzeugePage', () => {
     const aufrufe: string[] = [];
     let body: unknown = null;
     server.use(
-      http.post('/api/einsaetze/7/vehicles/10/stand-down', () => {
+      http.post('/api/incidents/7/vehicles/10/stand-down', () => {
         aufrufe.push('entlassen');
         return entlassenAntwort();
       }),
-      http.post('/api/einsaetze/7/vehicles/10/stand-down/undo', async ({ request }) => {
+      http.post('/api/incidents/7/vehicles/10/stand-down/undo', async ({ request }) => {
         aufrufe.push('zuruecknehmen');
         body = await request.json();
         return HttpResponse.json({ fahrzeug: ef, ausgelassen: [] });
       }),
-      http.post('/api/einsaetze/7/vehicles/10/reactivate', () => {
+      http.post('/api/incidents/7/vehicles/10/reactivate', () => {
         aufrufe.push('reaktivieren');
         return HttpResponse.json(ef);
       }),
@@ -424,8 +424,8 @@ describe('FahrzeugePage', () => {
 
   it('nennt im Seitenhinweis, was die Rücknahme ausgelassen hat (LLH-1722)', async () => {
     server.use(
-      http.post('/api/einsaetze/7/vehicles/10/stand-down', () => entlassenAntwort()),
-      http.post('/api/einsaetze/7/vehicles/10/stand-down/undo', () =>
+      http.post('/api/incidents/7/vehicles/10/stand-down', () => entlassenAntwort()),
+      http.post('/api/incidents/7/vehicles/10/stand-down/undo', () =>
         HttpResponse.json({
           fahrzeug: ef,
           ausgelassen: [
@@ -447,8 +447,8 @@ describe('FahrzeugePage', () => {
   /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
   it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
     server.use(
-      http.post('/api/einsaetze/7/vehicles/10/stand-down', () => entlassenAntwort()),
-      http.post('/api/einsaetze/7/vehicles/10/stand-down/undo', () =>
+      http.post('/api/incidents/7/vehicles/10/stand-down', () => entlassenAntwort()),
+      http.post('/api/incidents/7/vehicles/10/stand-down/undo', () =>
         HttpResponse.json(
           { error: 'Die Entlassung lässt sich nicht mehr zurücknehmen' },
           { status: 409 },
@@ -471,7 +471,7 @@ describe('FahrzeugePage', () => {
   it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
     let gesendet = 0;
     server.use(
-      http.post('/api/einsaetze/7/vehicles/10/annul', () => {
+      http.post('/api/incidents/7/vehicles/10/annul', () => {
         gesendet += 1;
         return HttpResponse.json(
           {
@@ -501,7 +501,7 @@ describe('FahrzeugePage', () => {
   it('zeigt Entlassene eingeklappt unter der Liste und disponiert sie erneut', async () => {
     let reaktiviert: number | null = null;
     server.use(
-      http.post('/api/einsaetze/7/vehicles/:ef/reactivate', ({ params }) => {
+      http.post('/api/incidents/7/vehicles/:ef/reactivate', ({ params }) => {
         reaktiviert = Number(params.ef);
         return HttpResponse.json(ef);
       }),
@@ -690,7 +690,7 @@ describe('FahrzeugePage', () => {
   it('nennt je Person Position und Funktion; „Vom Fahrzeug lösen“ fragt nicht nach (LLH-1073)', async () => {
     const geloest: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/7/vehicles/10/crew/:epId', ({ params }) => {
+      http.delete('/api/incidents/7/vehicles/10/crew/:epId', ({ params }) => {
         geloest.push(String(params.epId));
         return new HttpResponse(null, { status: 204 });
       }),
@@ -730,7 +730,7 @@ describe('FahrzeugePage', () => {
   it('zwei schnelle Tipps auf „Vom Fahrzeug lösen“: ein DELETE, an der Stelle steht „Gelöst“ (LLH-1924)', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/7/vehicles/10/crew/:epId', async ({ params }) => {
+      http.delete('/api/incidents/7/vehicles/10/crew/:epId', async ({ params }) => {
         aufrufe.push(`DELETE ${params.epId}`);
         await delay(20);
         return new HttpResponse(null, { status: 204 });
@@ -766,10 +766,10 @@ describe('FahrzeugePage', () => {
   it('„Rückgängig“ in der gehaltenen Besatzungszeile; Ablehnung steht an der Zeile (LLH-1924)', async () => {
     server.use(
       http.delete(
-        '/api/einsaetze/7/vehicles/10/crew/:epId',
+        '/api/incidents/7/vehicles/10/crew/:epId',
         () => new HttpResponse(null, { status: 204 }),
       ),
-      http.put('/api/einsaetze/7/vehicles/10/crew/:epId', () =>
+      http.put('/api/incidents/7/vehicles/10/crew/:epId', () =>
         HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
       ),
     );
@@ -797,11 +797,11 @@ describe('FahrzeugePage', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let gesetzt = true;
     server.use(
-      http.delete('/api/einsaetze/7/vehicles/10/crew/:epId', () => {
+      http.delete('/api/incidents/7/vehicles/10/crew/:epId', () => {
         gesetzt = false;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/7/vehicles/10/crew/:epId', () =>
+      http.put('/api/incidents/7/vehicles/10/crew/:epId', () =>
         HttpResponse.json({ error: 'Anna Crew sitzt inzwischen auf «83-2»' }, { status: 409 }),
       ),
     );
@@ -809,7 +809,7 @@ describe('FahrzeugePage', () => {
       person({ id: 100, name: 'Anna Crew', fahrzeug_id: 10 }),
     ]);
     server.use(
-      http.get('/api/einsaetze/7/personnel', () =>
+      http.get('/api/incidents/7/personnel', () =>
         HttpResponse.json([
           person({ id: 100, name: 'Anna Crew', fahrzeug_id: gesetzt ? 10 : null }),
         ]),
@@ -846,11 +846,11 @@ describe('FahrzeugePage', () => {
   it('nach „Vom Fahrzeug lösen“ setzt „Rückgängig“ die Person wieder auf das Fahrzeug (LLH-1722)', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/7/vehicles/10/crew/:epId', ({ params }) => {
+      http.delete('/api/incidents/7/vehicles/10/crew/:epId', ({ params }) => {
         aufrufe.push(`DELETE ${params.epId}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/7/vehicles/10/crew/:epId', ({ params, request }) => {
+      http.put('/api/incidents/7/vehicles/10/crew/:epId', ({ params, request }) => {
         aufrufe.push(`PUT ${params.epId}${new URL(request.url).search}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1193,7 +1193,7 @@ describe('FahrzeugePage', () => {
     it('ohne Freigabe Einheiten steht der Typ in der Karte einmal, nicht zusätzlich als Feld', async () => {
       setzeViewportBreite(390);
       server.use(
-        http.get('/api/einsaetze/:einsatzId/module-access', () =>
+        http.get('/api/incidents/:einsatzId/module-access', () =>
           HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
         ),
       );
@@ -1224,7 +1224,7 @@ describe('FahrzeugePage', () => {
     it('die Karte trägt keinen Knopf „Entlassen“; das Menü entlässt ohne Rückfrage (LLH-1722)', async () => {
       let entlassen = 0;
       server.use(
-        http.post('/api/einsaetze/7/vehicles/10/stand-down', () => {
+        http.post('/api/incidents/7/vehicles/10/stand-down', () => {
           entlassen += 1;
           return HttpResponse.json({
             fahrzeug: { ...ef, beendet_als: 'entlassen' },
@@ -1331,10 +1331,10 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     let stand: Record<string, unknown> = { ...mitSeit, einheit_id: null };
     const { container } = render(einsatz(), [], stand, [], EINHEITEN);
     server.use(
-      http.get('/api/einsaetze/7/vehicles', ({ request }) =>
+      http.get('/api/incidents/7/vehicles', ({ request }) =>
         HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [stand]),
       ),
-      http.put('/api/einsaetze/7/units/:eid/vehicles/:efId', ({ params }) => {
+      http.put('/api/incidents/7/units/:eid/vehicles/:efId', ({ params }) => {
         anfragen.push(`PUT ${params.eid}/${params.efId}`);
         stand = { ...stand, einheit_id: Number(params.eid) };
         return new HttpResponse(null, { status: 204 });
@@ -1367,7 +1367,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     const anfragen: string[] = [];
     const { container } = render(einsatz(), [], { ...mitSeit, einheit_id: 3 }, [], EINHEITEN);
     server.use(
-      http.delete('/api/einsaetze/7/units/:eid/vehicles/:efId', ({ params }) => {
+      http.delete('/api/incidents/7/units/:eid/vehicles/:efId', ({ params }) => {
         anfragen.push(`DELETE ${params.eid}/${params.efId}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1384,7 +1384,7 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
   it('eine Ablehnung steht an der Einheit', async () => {
     const { container } = render(einsatz(), [], mitSeit, [], EINHEITEN);
     server.use(
-      http.put('/api/einsaetze/7/units/:eid/vehicles/:efId', () =>
+      http.put('/api/incidents/7/units/:eid/vehicles/:efId', () =>
         HttpResponse.json({ error: 'Einheit ist aufgelöst' }, { status: 409 }),
       ),
     );
@@ -1418,12 +1418,12 @@ describe('FahrzeugePage · Einheit, Abschnitt und Seit (LLH-1073)', () => {
     setzeViewportBreite(1600);
     const abrufe: string[] = [];
     const zaehle = ({ request }: { request: Request }) => {
-      if (new URL(request.url).pathname === '/api/einsaetze/7/units') abrufe.push(request.url);
+      if (new URL(request.url).pathname === '/api/incidents/7/units') abrufe.push(request.url);
     };
     server.events.on('request:start', zaehle);
     // Vor `render`: dessen Handler kennen die Freigaben nicht und überdecken sie deshalb nicht.
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -1601,10 +1601,10 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
     let stand = { ...zeilenDaten };
     render(einsatz(), [], stand);
     server.use(
-      http.get('/api/einsaetze/7/vehicles', ({ request }) =>
+      http.get('/api/incidents/7/vehicles', ({ request }) =>
         HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [stand]),
       ),
-      http.patch('/api/einsaetze/7/vehicles/10', async ({ request }) => {
+      http.patch('/api/incidents/7/vehicles/10', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         patches.push(body);
         stand = { ...stand, ...body };
@@ -1687,7 +1687,7 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
   it('eine Ablehnung steht im Dialog', async () => {
     const { dialog } = await oeffneAngaben();
     server.use(
-      http.patch('/api/einsaetze/7/vehicles/10', () =>
+      http.patch('/api/incidents/7/vehicles/10', () =>
         HttpResponse.json({ error: 'Fahrzeug ist entlassen' }, { status: 409 }),
       ),
     );
@@ -1712,9 +1712,9 @@ describe('FahrzeugePage · Angaben ändern (LLH-1073)', () => {
 describe('FahrzeugePage · Datenzustände', () => {
   const gruenerBoden = () => [
     meHandler(nutzer),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+    http.get('/api/incidents/7/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
     http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
     http.get('/api/vehicles', () => HttpResponse.json([])),
   ];
@@ -1732,7 +1732,7 @@ describe('FahrzeugePage · Datenzustände', () => {
   }
 
   it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
-    zeige(http.get('/api/einsaetze/7/vehicles', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/7/vehicles', () => new HttpResponse(null, { status: 500 })));
     const alarm = (
       await screen.findByText('Disponierte Fahrzeuge konnten nicht geladen werden')
     ).closest<HTMLElement>('[role="alert"]')!;
@@ -1748,7 +1748,7 @@ describe('FahrzeugePage · Datenzustände', () => {
   });
 
   it('der Fehler der Dispositionsliste bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
-    zeige(http.get('/api/einsaetze/7/vehicles', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/7/vehicles', () => new HttpResponse(null, { status: 500 })));
     const text = 'Disponierte Fahrzeuge konnten nicht geladen werden';
     expect(await screen.findByText(text)).toBeInTheDocument();
     const alarm = screen.getByText(text).closest<HTMLElement>('[role="alert"]')!;
@@ -1757,7 +1757,7 @@ describe('FahrzeugePage · Datenzustände', () => {
     // holt die gescheiterte Liste noch einmal: erst danach steht der Fehler endgültig.
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
-    server.use(http.get('/api/einsaetze/7/vehicles', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/incidents/7/vehicles', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
@@ -1795,11 +1795,11 @@ describe('FahrzeugePage · Datenzustände', () => {
    * `SeitenStandVeraltet`, `SeitenFehler` und das Statuskatalog-Banner.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
-    const { client } = zeige(http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([ef])));
+    const { client } = zeige(http.get('/api/incidents/7/vehicles', () => HttpResponse.json([ef])));
     await screen.findByText('Florian 1');
 
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/7/vehicles', () => new HttpResponse(null, { status: 500 })),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.fahrzeuge(7) });
 
@@ -1854,8 +1854,8 @@ describe('FahrzeugePage · Datenzustände', () => {
    */
   it('gescheiterte Personalliste: der Besatzungsblock nennt den Ausfall, ohne Auswahl', async () => {
     const { container } = zeige(
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([ef])),
-      http.get('/api/einsaetze/7/personnel', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([ef])),
+      http.get('/api/incidents/7/personnel', () => new HttpResponse(null, { status: 500 })),
     );
     await screen.findByText('Florian 1');
     await klappeZeileAuf(container);
@@ -1872,7 +1872,7 @@ describe('FahrzeugePage · Datenzustände', () => {
 
   it('Partnerhälfte: leere Personalliste behält „Keine freien Kräfte"', async () => {
     const { container } = zeige(
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([ef])),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([ef])),
     );
     await screen.findByText('Florian 1');
     await klappeZeileAuf(container);
@@ -1938,7 +1938,7 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   it('„Speichern und nächste" hält den Dialog offen und behält Träger und Typ', async () => {
     const gesendet: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/7/vehicles', async ({ request }) => {
+      http.post('/api/incidents/7/vehicles', async ({ request }) => {
         const koerper = (await request.json()) as { adhoc: Record<string, unknown> };
         gesendet.push(koerper.adhoc);
         return HttpResponse.json({
@@ -1978,7 +1978,7 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
   it('ein Wert aus dem zugeklappten Bereich geht beim Absenden mit', async () => {
     const gesendet: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/7/vehicles', async ({ request }) => {
+      http.post('/api/incidents/7/vehicles', async ({ request }) => {
         const koerper = (await request.json()) as { adhoc: Record<string, unknown> };
         gesendet.push(koerper.adhoc);
         return HttpResponse.json({ ...ef, id: 22, ist_adhoc: true });
@@ -2007,7 +2007,7 @@ describe('FahrzeugePage · Ad-hoc-Schnellerfassung', () => {
    */
   it('Gegenprobe: „Disponieren" fährt den Dialog zu', async () => {
     server.use(
-      http.post('/api/einsaetze/7/vehicles', () =>
+      http.post('/api/incidents/7/vehicles', () =>
         HttpResponse.json({ ...ef, id: 21, ist_adhoc: true, funkrufname: 'Florian 44/1' }),
       ),
     );
@@ -2047,13 +2047,13 @@ describe('FahrzeugePage — FMS-Tableau', () => {
     };
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([stand])),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/units', einheiten),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([stand])),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/units', einheiten),
       http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
       http.get('/api/vehicles', () => HttpResponse.json([])),
-      http.patch('/api/einsaetze/7/vehicles/10', async ({ request }) => {
+      http.patch('/api/incidents/7/vehicles/10', async ({ request }) => {
         const body = await request.json();
         patches.push(body);
         const vorher = stand;
@@ -2073,7 +2073,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
           },
         });
       }),
-      http.post('/api/einsaetze/7/vehicles/10/status/undo', async ({ request }) => {
+      http.post('/api/incidents/7/vehicles/10/status/undo', async ({ request }) => {
         ruecknahmen.push(await request.json());
         stand = {
           ...stand,
@@ -2253,7 +2253,7 @@ describe('FahrzeugePage — FMS-Tableau', () => {
 
   it('ohne Freigabe des Moduls Einheiten ungegliedert, mit Grund (LLH-1073, design.md D5)', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -2397,9 +2397,9 @@ describe('FahrzeugePage · Demo-Marke', () => {
   function zeige(efs: Record<string, unknown>[], pool: ReturnType<typeof stamm>[]) {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(efs)),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json(efs)),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
       http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
       http.get('/api/vehicles', () => HttpResponse.json(pool)),
     );
@@ -2414,7 +2414,7 @@ describe('FahrzeugePage · Demo-Marke', () => {
   it('Auswahl: echte Fahrzeuge vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/vehicles/bulk', async ({ request }) => {
+      http.post('/api/incidents/7/vehicles/bulk', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([{ ...ef, id: 30, fahrzeug_id: 2, ist_demo: true }], {
           status: 201,
@@ -2502,7 +2502,7 @@ describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.
 
   it('fehlt ohne Freigabe des Moduls Einheiten', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -2568,8 +2568,8 @@ describe('FahrzeugePage · Personal der Einheit übernehmen (LLH-1073 Teil II, d
     const bodies: unknown[] = [];
     render(einsatz(), personal, mitEinheit, [], EINHEIT);
     server.use(
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personal)),
-      http.post('/api/einsaetze/7/vehicles/10/crew', async ({ request }) => {
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json(personal)),
+      http.post('/api/incidents/7/vehicles/10/crew', async ({ request }) => {
         const body = (await request.json()) as { ep_ids: number[] };
         bodies.push(body);
         personal = personal.map((p) =>
@@ -2641,7 +2641,7 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
     const gesendet: { url: string; body: unknown }[] = [];
     render(einsatz(), [], ef, [], [], { material: MATERIAL });
     server.use(
-      http.patch('/api/einsaetze/7/material/:emId', async ({ request }) => {
+      http.patch('/api/incidents/7/material/:emId', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
         return HttpResponse.json({});
       }),
@@ -2656,15 +2656,15 @@ describe('FahrzeugePage · Beladung im Aufklapper (LLH-1225 Teil II, design.md D
     await userEvent.click(await screen.findByText('Trage · 1'));
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/7/material/50', body: { einsatz_fahrzeug_id: null } },
-        { url: '/api/einsaetze/7/material/51', body: { einsatz_fahrzeug_id: 10 } },
+        { url: '/api/incidents/7/material/50', body: { einsatz_fahrzeug_id: null } },
+        { url: '/api/incidents/7/material/51', body: { einsatz_fahrzeug_id: 10 } },
       ]),
     );
   });
 
   it('ohne Freigabe Material: kein Block „Beladung“, und die Materialliste wird nicht abgefragt', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ material: { zugriff: false } })),
       ),
     );
@@ -2914,10 +2914,10 @@ describe('FahrzeugePage · Personal gesperrt (LLH-1462)', () => {
     const abrufe: string[] = [];
     render(einsatz(), [person({ fahrzeug_id: 10 })]);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
       ),
-      http.get('/api/einsaetze/7/personnel', ({ request }) => {
+      http.get('/api/incidents/7/personnel', ({ request }) => {
         abrufe.push(request.url);
         return HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 });
       }),

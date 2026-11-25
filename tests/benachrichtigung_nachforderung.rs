@@ -92,7 +92,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/resource-requests", self.einsatz),
+            &format!("/api/incidents/{}/resource-requests", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -106,7 +106,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/resource-requests/{nachforderung}/status",
+                "/api/incidents/{}/resource-requests/{nachforderung}/status",
                 self.einsatz
             ),
             cookie,
@@ -121,7 +121,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/resource-requests/{nachforderung}/decline",
+                "/api/incidents/{}/resource-requests/{nachforderung}/decline",
                 self.einsatz
             ),
             cookie,

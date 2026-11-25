@@ -32,7 +32,7 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenPerApi(page, 'admin', PW);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Einsatzkopf live ${Date.now()}` },
   });
   expect(antwort.ok()).toBeTruthy();
@@ -42,7 +42,7 @@ async function anmeldenUndAnlegen(page: Page): Promise<number> {
 /** Öffnet `pfad` und wartet, bis der Live-Strom des Einsatzes steht. */
 async function oeffnenMitStrom(page: Page, pfad: string, id: number) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${id}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${id}/live`) && r.status() === 200,
   );
   await page.goto(pfad);
   await strom;
@@ -74,12 +74,12 @@ test('LLH-1111: ein anderer Schirm setzt den Termin, die offene Seite Lagebespre
   await expect(kennzahl).toContainText('kein Termin');
 
   // Der Kopf-PATCH lehnt den Termin ab, laut statt still: es gibt nur einen Schreibweg.
-  const patch = await page.request.patch(`/api/einsaetze/${id}`, {
+  const patch = await page.request.patch(`/api/incidents/${id}`, {
     data: { naechste_lagebesprechung_at: terminInZweiStunden() },
   });
   expect(patch.status()).toBe(400);
 
-  const termin = await page.request.put(`/api/einsaetze/${id}/briefing/schedule`, {
+  const termin = await page.request.put(`/api/incidents/${id}/briefing/schedule`, {
     data: { naechste_at: terminInZweiStunden() },
   });
   expect(termin.ok()).toBeTruthy();
@@ -106,7 +106,7 @@ test('LLH-1111: der Abschluss setzt den Termin, Überblick und Seite Lagebesprec
   await expect(terminKennzahl(seite)).toContainText('kein Termin');
   await expect(seite.getByText('Noch keine Lagebesprechung abgeschlossen')).toBeVisible();
 
-  const abschluss = await page.request.post(`/api/einsaetze/${id}/briefings`, {
+  const abschluss = await page.request.post(`/api/incidents/${id}/briefings`, {
     data: { entschluss: 'Lage unverändert', naechste_at: terminInZweiStunden() },
   });
   expect(abschluss.status()).toBe(201);
@@ -169,7 +169,7 @@ test('LFH-855: der erste Pegel auf einem anderen Schirm bietet dem offenen Dashb
     .first();
   await expect(platzEins).toContainText('Verbleib offen');
 
-  const festlegen = await page.request.post(`/api/einsaetze/${id}/gauges`, {
+  const festlegen = await page.request.post(`/api/incidents/${id}/gauges`, {
     data: { station_uuid: 'a6ee8177-107b-47dd-bcfd-30960ccc6e9c', name: 'Hann. Münden' },
   });
   expect(festlegen.status()).toBe(201);

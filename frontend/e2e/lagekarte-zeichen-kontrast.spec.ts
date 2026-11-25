@@ -58,7 +58,7 @@ interface Probe {
 const ort = (i: number) => [LAENGE + i * 0.1, BREITE] as const;
 
 async function seede(page: Page, einsatzId: string): Promise<Probe[]> {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const pruefe = async (was: string, antwort: Awaited<ReturnType<Page['request']['patch']>>) =>
     expect(antwort.ok(), `${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
 

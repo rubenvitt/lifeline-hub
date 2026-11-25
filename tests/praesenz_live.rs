@@ -47,7 +47,7 @@ async fn override_setzen(app: &axum::Router, admin: &str, eid: i64, modul: &str)
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{eid}/module-overrides/{modul}"))
+                .uri(format!("/api/incidents/{eid}/module-overrides/{modul}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.to_string())
                 .body(Body::from(r#"{"sichtbar":false,"benoetigte_rolle":null}"#))
@@ -169,11 +169,11 @@ async fn ohne_einheiten_kein_einheit_eintrag() {
 // ---------- Schreibwege (Entwurf D4) ----------
 
 fn pfad(eid: i64) -> String {
-    format!("/api/einsaetze/{eid}/presence")
+    format!("/api/incidents/{eid}/presence")
 }
 
 fn einheit_pfad(eid: i64, einheit: i64) -> String {
-    format!("/api/einsaetze/{eid}/units/{einheit}/presence")
+    format!("/api/incidents/{eid}/units/{einheit}/presence")
 }
 
 #[tokio::test]
@@ -315,7 +315,7 @@ async fn ohne_schreibrecht_403_fremde_einheit_404_fremde_org_wie_patch() {
     let (patch, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}"),
+        &format!("/api/incidents/{eid}"),
         &fremd,
         Some(r#"{"stichwort":"x"}"#),
     )

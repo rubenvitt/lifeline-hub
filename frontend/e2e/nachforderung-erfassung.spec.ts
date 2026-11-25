@@ -15,10 +15,10 @@ async function senden<T = { id: number }>(page: Page, pfad: string, data?: unkno
 
 test('Schnellwahl, Anzahl, Enter: „2× RTW → BR Nord“ an Karte und ETB', async ({ page }) => {
   await anmeldenAlsAdmin(page, { startseite: false });
-  const { id: einsatzId } = await senden(page, '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, '/api/incidents', {
     bezeichnung: `Nachforderung schnell ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const { id: br } = await senden(page, `${basis}/staging-areas`, {
     bezeichnung: 'BR Nord',
   });

@@ -1687,7 +1687,7 @@ mod tests {
     #[test]
     fn download_skript_kodiert_die_url() {
         let ziel =
-            Url::parse("https://elw.local:8443/api/einsaetze/1/attachments/7?n=a'b\"c").unwrap();
+            Url::parse("https://elw.local:8443/api/incidents/1/attachments/7?n=a'b\"c").unwrap();
         let skript = download_skript(&ziel);
         let literal = serde_json::to_string(ziel.as_str()).unwrap();
         assert!(skript.contains(&format!("a.href = {literal};")), "{skript}");

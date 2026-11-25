@@ -50,7 +50,7 @@ test.describe(KAPITEL, () => {
   test('Paneel „Dienst und Ruhe“ mit eigenem Höchstdienst', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const pfad = `/api/einsaetze/${demo.id}/reliefs/shift-plan/limits`;
+    const pfad = `/api/incidents/${demo.id}/reliefs/shift-plan/limits`;
     // Nur für die Aufnahme: ein eigener Höchstdienst neben der Vorgabe der Mindestruhe, danach
     // zurück auf die Vorgabe. Andere Kapitel zeigen den Demo-Einsatz mit den Vorgaben.
     await fuelle(page, 'patch', pfad, { max_dienst_minuten: 600 });
@@ -80,7 +80,7 @@ test.describe(KAPITEL, () => {
   test('Reiter „Module“ mit ausgeblendetem und beschränktem Modul', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const pfad = (modul: string) => `/api/einsaetze/${demo.id}/module-overrides/${modul}`;
+    const pfad = (modul: string) => `/api/incidents/${demo.id}/module-overrides/${modul}`;
     const orgPfad = '/api/org-module-settings/lage-dashboard';
     // Nur für die Aufnahme: zwei Module im Einsatz verändert und eines von der Organisation
     // ausgeblendet (LLH-1179), danach zurückgesetzt. Andere Kapitel brauchen den Demo-Einsatz

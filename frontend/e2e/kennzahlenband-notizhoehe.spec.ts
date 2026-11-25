@@ -77,7 +77,7 @@ async function senden<T>(page: Page, methode: 'post' | 'put', pfad: string, data
 }
 
 async function einsatzAnlegen(page: Page, name: string): Promise<number> {
-  const { id } = await senden<{ id: number }>(page, 'post', '/api/einsaetze', {
+  const { id } = await senden<{ id: number }>(page, 'post', '/api/incidents', {
     bezeichnung: `${name} ${Date.now()}`,
   });
   return id;
@@ -113,7 +113,7 @@ for (const breite of BREITEN) {
   }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Evakuierung');
-    const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+    const basis = `/api/incidents/${einsatzId}/evacuation`;
     const bezirk = await senden<{ id: number }>(page, 'post', `${basis}/districts`, {
       bezeichnung: 'Uferstraße 12–40',
       plan_personen: 1850,
@@ -151,7 +151,7 @@ for (const breite of BREITEN) {
   }) => {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page, 'E2E Notizhöhe Pegel');
-    await senden(page, 'put', `/api/einsaetze/${einsatzId}/gauges`, {
+    await senden(page, 'put', `/api/incidents/${einsatzId}/gauges`, {
       stationen: [{ station_uuid: STATION, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }],
     });
     await page.setViewportSize({ width: breite, height: 900 });
@@ -160,7 +160,7 @@ for (const breite of BREITEN) {
 
     const messe = async (lang: boolean) => {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
-      await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (r) =>
+      await page.route(`**/api/incidents/${einsatzId}/gauges`, (r) =>
         r.request().method() === 'GET'
           ? r.fulfill({ json: pegelAntwort(lang, FEST) })
           : r.continue(),

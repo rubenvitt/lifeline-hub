@@ -84,7 +84,7 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // SSE-Dauerverbindung: jede Zeitschranke kappte sie, und jede offene Verbindung bände einen
     // Cap-Slot. Eigene Grenze je Benutzer und insgesamt, Lebensdauer statt Zeitbudget:
     // `live::strom` (LFH-920).
-    ("GET", "/api/einsaetze/{id}/live"),
+    ("GET", "/api/incidents/{id}/live"),
     // Org-Strom (LFH-734), dieselbe SSE-Dauerverbindung außerhalb eines Einsatzes, mit derselben
     // Grenze.
     ("GET", "/api/live"),
@@ -95,74 +95,74 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
     // Multipart-Upload bis 26 MiB, plus clamd-INSTREAM-Scan im Request (Default 30 s). Alle
     // Uploads hier tragen die gemeinsame Upload-Grenze, alle Downloads eine Download-Grenze
     // (`transfer`).
-    ("POST", "/api/einsaetze/{id}/attachments"),
+    ("POST", "/api/incidents/{id}/attachments"),
     // Voll-BLOB-Read bis 25 MiB. NUR GET — das DELETE im selben MethodRouter ist ein reiner
     // DB-Delete und bleibt geregelt.
-    ("GET", "/api/einsaetze/{id}/attachments/{aid}"),
+    ("GET", "/api/incidents/{id}/attachments/{aid}"),
     // Dokumentenablage: Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Nur POST bzw. GET —
     // die Liste und das DELETE bleiben geregelt.
-    ("POST", "/api/einsaetze/{id}/documents"),
-    ("GET", "/api/einsaetze/{id}/documents/{did}/file"),
+    ("POST", "/api/incidents/{id}/documents"),
+    ("GET", "/api/incidents/{id}/documents/{did}/file"),
     // Zweiter Multipart-Upload, ebenfalls mit clamd-Scan. NUR POST — das GET auf demselben
     // Pfad ist die kurze Liste.
-    ("POST", "/api/einsaetze/{id}/map/background-images"),
+    ("POST", "/api/incidents/{id}/map/background-images"),
     (
         "GET",
-        "/api/einsaetze/{id}/map/background-images/{bildId}/download",
+        "/api/incidents/{id}/map/background-images/{bildId}/download",
     ),
     // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
-    ("PUT", "/api/einsaetze/{id}/uhs/{uid}/plan"),
-    ("GET", "/api/einsaetze/{id}/uhs/{uid}/plan/image"),
+    ("PUT", "/api/incidents/{id}/uhs/{uid}/plan"),
+    ("GET", "/api/incidents/{id}/uhs/{uid}/plan/image"),
     // ETB-Anhänge (LFH-117) und Erfassungs-Anhänge (Schaden LFH-21, Person LFH-757, Tier und UHS
     // LFH-758): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Download. Über LTE dauert ein
     // 15-MiB-Gutachten länger als das Budget (LFH-938). Nur POST bzw. GET — Liste, DELETE und die
     // Zugriffsliste bleiben geregelt.
-    ("POST", "/api/einsaetze/{id}/etb/attachments"),
+    ("POST", "/api/incidents/{id}/etb/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/etb/{eintrag_id}/attachments/{aid}",
+        "/api/incidents/{id}/etb/{eintrag_id}/attachments/{aid}",
     ),
-    ("POST", "/api/einsaetze/{id}/damages/{sid}/attachments"),
+    ("POST", "/api/incidents/{id}/damages/{sid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file",
+        "/api/incidents/{id}/damages/{sid}/attachments/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/persons/{pid}/attachments"),
+    ("POST", "/api/incidents/{id}/persons/{pid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}/file",
+        "/api/incidents/{id}/persons/{pid}/attachments/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/animals/{tid}/attachments"),
+    ("POST", "/api/incidents/{id}/animals/{tid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file",
+        "/api/incidents/{id}/animals/{tid}/attachments/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/uhs/{uid}/attachments"),
+    ("POST", "/api/incidents/{id}/uhs/{uid}/attachments"),
     (
         "GET",
-        "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
+        "/api/incidents/{id}/uhs/{uid}/attachments/{aid}/file",
     ),
     // Bild-Anlagen an Lagebericht und Befehl (LFH-1028): dieselbe Kette wie die Anhänge. Nur POST
     // bzw. GET — Liste und DELETE bleiben geregelt.
     (
         "POST",
-        "/api/einsaetze/{id}/situation-reports/{lid}/enclosures",
+        "/api/incidents/{id}/situation-reports/{lid}/enclosures",
     ),
     (
         "GET",
-        "/api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}/file",
+        "/api/incidents/{id}/situation-reports/{lid}/enclosures/{aid}/file",
     ),
-    ("POST", "/api/einsaetze/{id}/orders/{bid}/enclosures"),
+    ("POST", "/api/incidents/{id}/orders/{bid}/enclosures"),
     (
         "GET",
-        "/api/einsaetze/{id}/orders/{bid}/enclosures/{aid}/file",
+        "/api/incidents/{id}/orders/{bid}/enclosures/{aid}/file",
     ),
     // CSV-Vollexporte: laden ohne Limit und bauen im Speicher — Dauer wächst linear mit der
     // Betroffenen-, Tier- und Schadenszahl der Lage.
-    ("GET", "/api/einsaetze/{id}/persons/export"),
-    ("GET", "/api/einsaetze/{id}/animals/export"),
-    ("GET", "/api/einsaetze/{id}/damages/export"),
+    ("GET", "/api/incidents/{id}/persons/export"),
+    ("GET", "/api/incidents/{id}/animals/export"),
+    ("GET", "/api/incidents/{id}/damages/export"),
     // Archiv eines Einsatzes (LLH-1494): ein ganzer Block, Platz bis zum Ende der Übertragung.
     ("GET", "/api/retention/incidents/{id}/archive"),
 ];
@@ -266,8 +266,8 @@ mod tests {
 
     fn router_mit(cfg: Zulassung) -> Router {
         Router::new()
-            .route("/api/einsaetze/{id}/lagemeldungen", get(langsam))
-            .route("/api/einsaetze/{id}/live", get(langsam))
+            .route("/api/incidents/{id}/lagemeldungen", get(langsam))
+            .route("/api/incidents/{id}/live", get(langsam))
             .layer(axum::middleware::from_fn_with_state(cfg, zulassung))
     }
 
@@ -292,14 +292,14 @@ mod tests {
     #[tokio::test]
     async fn geregelte_route_wird_nach_dem_budget_abgeschnitten() {
         assert_eq!(
-            anfrage("/api/einsaetze/7/lagemeldungen").await,
+            anfrage("/api/incidents/7/lagemeldungen").await,
             StatusCode::SERVICE_UNAVAILABLE
         );
     }
 
     #[tokio::test]
     async fn ausgenommene_route_laeuft_ueber_das_budget_hinaus() {
-        assert_eq!(anfrage("/api/einsaetze/7/live").await, StatusCode::OK);
+        assert_eq!(anfrage("/api/incidents/7/live").await, StatusCode::OK);
     }
 
     /// Der überzählige Request wird SOFORT abgewiesen, nicht gestaut (anders als `tower`s
@@ -310,11 +310,11 @@ mod tests {
         let cfg = Zulassung::neu(Duration::from_secs(30), 1);
         let router = router_mit(cfg);
 
-        let belegt = tokio::spawn(status_von(router.clone(), "/api/einsaetze/7/lagemeldungen"));
+        let belegt = tokio::spawn(status_von(router.clone(), "/api/incidents/7/lagemeldungen"));
         // Dem ersten Request Zeit geben, den Platz zu belegen — er schläft danach 800 ms.
         tokio::time::sleep(Duration::from_millis(100)).await;
 
-        let zweiter = status_von(router.clone(), "/api/einsaetze/7/lagemeldungen").await;
+        let zweiter = status_von(router.clone(), "/api/incidents/7/lagemeldungen").await;
         assert_eq!(
             zweiter,
             StatusCode::SERVICE_UNAVAILABLE,
@@ -331,11 +331,11 @@ mod tests {
         let cfg = Zulassung::neu(Duration::from_secs(30), 1);
         let router = router_mit(cfg);
 
-        let stream = tokio::spawn(status_von(router.clone(), "/api/einsaetze/7/live"));
+        let stream = tokio::spawn(status_von(router.clone(), "/api/incidents/7/live"));
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         assert_eq!(
-            status_von(router.clone(), "/api/einsaetze/7/lagemeldungen").await,
+            status_von(router.clone(), "/api/incidents/7/lagemeldungen").await,
             StatusCode::OK,
             "der einzige Platz darf von der SSE-Route nicht belegt sein"
         );
@@ -350,7 +350,7 @@ mod tests {
 
         for durchgang in 1..=3 {
             assert_eq!(
-                status_von(router.clone(), "/api/einsaetze/7/lagemeldungen").await,
+                status_von(router.clone(), "/api/incidents/7/lagemeldungen").await,
                 StatusCode::OK,
                 "Durchgang {durchgang} muss durchlaufen"
             );
@@ -360,14 +360,14 @@ mod tests {
     /// Die zwei Pfade mit geteiltem `MethodRouter` sind nur in der langen Richtung befreit.
     #[test]
     fn ausnahme_trifft_methoden_genau() {
-        let anhang = "/api/einsaetze/{id}/attachments/{aid}";
+        let anhang = "/api/incidents/{id}/attachments/{aid}";
         assert!(ist_ausgenommen(&Method::GET, anhang), "BLOB-Read frei");
         assert!(
             !ist_ausgenommen(&Method::DELETE, anhang),
             "DELETE auf demselben MethodRouter bleibt geregelt"
         );
 
-        let bild = "/api/einsaetze/{id}/map/background-images";
+        let bild = "/api/incidents/{id}/map/background-images";
         assert!(ist_ausgenommen(&Method::POST, bild), "Upload frei");
         assert!(
             !ist_ausgenommen(&Method::GET, bild),
@@ -388,7 +388,7 @@ mod tests {
     #[tokio::test]
     async fn fallback_ohne_matched_path_bleibt_geregelt() {
         let router = Router::new()
-            .route("/api/einsaetze/{id}/live", get(langsam))
+            .route("/api/incidents/{id}/live", get(langsam))
             .fallback(langsam)
             .layer(axum::middleware::from_fn_with_state(
                 Zulassung::neu(TEST_BUDGET, MAX_GLEICHZEITIGE_REQUESTS),

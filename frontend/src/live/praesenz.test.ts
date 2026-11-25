@@ -148,7 +148,7 @@ describe('melden und beenden', () => {
     vi.mocked(apiSend).mockResolvedValue(undefined);
     vi.mocked(apiSendKeepalive).mockResolvedValue(undefined);
     beendePraesenz(leitstelle);
-    expect(apiSend).toHaveBeenLastCalledWith('/api/einsaetze/1/presence', 'DELETE', {
+    expect(apiSend).toHaveBeenLastCalledWith('/api/incidents/1/presence', 'DELETE', {
       objekt: 'einsatz',
       felder: ['leitstellen_nr'],
       fenster: FENSTER_ID,
@@ -161,7 +161,7 @@ describe('melden und beenden', () => {
     };
     beendePraesenz(einheit, true);
     expect(apiSendKeepalive).toHaveBeenLastCalledWith(
-      '/api/einsaetze/1/units/5/presence',
+      '/api/incidents/1/units/5/presence',
       { felder: ['bemerkung'], fenster: FENSTER_ID },
       'DELETE',
     );

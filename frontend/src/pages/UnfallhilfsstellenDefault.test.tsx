@@ -63,7 +63,7 @@ describe('UnfallhilfsstellenDefault', () => {
 
   it('leitet auf die älteste aktive UHS um, wenn keine zuletzt ausgewählte gemerkt ist', async () => {
     server.use(
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([uhs(7, 'aktiv'), uhs(3, 'aktiv'), uhs(9, 'geplant')]),
       ),
     );
@@ -74,7 +74,7 @@ describe('UnfallhilfsstellenDefault', () => {
   it('bevorzugt die zuletzt ausgewählte UHS — auch vor einer aktiven', async () => {
     merkeLetzteUhs(1, 9);
     server.use(
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')]),
       ),
     );
@@ -84,7 +84,7 @@ describe('UnfallhilfsstellenDefault', () => {
 
   it('leitet auf die zuletzt angelegte UHS um, wenn keine aktive existiert', async () => {
     server.use(
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([uhs(2, 'geplant'), uhs(7, 'aufgeloest'), uhs(4, 'geplant')]),
       ),
     );
@@ -93,7 +93,7 @@ describe('UnfallhilfsstellenDefault', () => {
   });
 
   it('zeigt bei 0 UHS einen Leerzustand, dessen CTA den Anlegen-Dialog öffnet', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/uhs', () => HttpResponse.json([])));
     renderDefault();
     await userEvent.click(await screen.findByRole('button', { name: 'Erste UHS anlegen' }));
     expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
@@ -104,21 +104,21 @@ describe('UnfallhilfsstellenDefault', () => {
    * über die Weiche bleibt, nicht über die Schreibweise.
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/uhs', () => new HttpResponse(null, { status: 500 })));
     renderDefault();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Unfallhilfsstellen erfasst')).not.toBeInTheDocument();
   });
 
   it('zeigt bei 0 UHS den Leertext und KEINEN Fehler', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/uhs', () => HttpResponse.json([])));
     renderDefault();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 
   it('springt nicht automatisch ins Detail, wenn nachträglich eine aktive UHS auftaucht', async () => {
-    server.use(http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/uhs', () => HttpResponse.json([])));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     renderDefault(qc);
     await screen.findByRole('button', { name: 'Erste UHS anlegen' });

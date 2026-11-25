@@ -121,17 +121,17 @@ function render({
   const patches: Patch[] = [];
   const abrufe: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/material', () => {
+    http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigaben)),
+    http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/material', () => {
       abrufe.push('material');
       return listeKaputt
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(liste);
     }),
-    http.patch('/api/einsaetze/1/material/:emId', async (info) => {
+    http.patch('/api/incidents/1/material/:emId', async (info) => {
       patches.push({ emId: Number(info.params.emId), body: await info.request.clone().json() });
       return patch ? patch(info) : HttpResponse.json({});
     }),
@@ -271,7 +271,7 @@ describe('MaterialTab · Sperrgrund „Material zuordnen …“ (LFH-970)', () =
     await waitFor(() => expect(auswahl()).toBeEnabled());
     await screen.findByText('Trage');
     server.use(
-      http.get('/api/einsaetze/1/material', () =>
+      http.get('/api/incidents/1/material', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -401,11 +401,11 @@ describe('MaterialTab · Gerät (UHS-Laptop)', () => {
     const abgefragt: string[] = [];
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json(GERAET_ME)),
-      http.get('/api/einsaetze/1/material', () => {
+      http.get('/api/incidents/1/material', () => {
         abgefragt.push('material');
         return HttpResponse.json([frei]);
       }),
-      http.get('/api/einsaetze/1/module-access', () => {
+      http.get('/api/incidents/1/module-access', () => {
         abgefragt.push('freigaben');
         return HttpResponse.json(freigabenFixture());
       }),

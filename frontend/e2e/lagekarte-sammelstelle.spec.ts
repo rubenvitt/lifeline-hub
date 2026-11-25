@@ -100,10 +100,10 @@ test('Sammelstelle: Zeichen, Sprung vom Bezirk ohne Fläche, Setzen ohne ETB', a
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Sammelstelle ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
@@ -160,10 +160,10 @@ test('Sammelstelle: ohne Modul Evakuierung keine Ebene und kein Marker', async (
   test.setTimeout(120_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Sammelstelle gesperrt ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

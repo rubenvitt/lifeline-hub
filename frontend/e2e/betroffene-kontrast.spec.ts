@@ -327,7 +327,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Fehler an der Zeile: der PATCH scheitert, die Zelle trägt Marke und Satz.
-    await page.route('**/api/einsaetze/*/persons/*', (r) =>
+    await page.route('**/api/incidents/*/persons/*', (r) =>
       r.request().method() === 'PATCH'
         ? r.fulfill({ status: 500, json: { error: 'Speicher nicht erreichbar' } })
         : r.continue(),

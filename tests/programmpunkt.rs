@@ -1,5 +1,5 @@
 //! Programmpunkte der Veranstaltung (LLH-1570, Spec `ablaufplan`): `GET`/`POST
-//! /api/einsaetze/{id}/agenda-items`, `PATCH`/`DELETE …/{pid}` und das Feld `programm` des
+//! /api/incidents/{id}/agenda-items`, `PATCH`/`DELETE …/{pid}` und das Feld `programm` des
 //! Lagemonitors. Herleitung: `/mnt/project-files/llh-1570/design.md` (D1–D4).
 
 use axum::body::Body;
@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/agenda-items")
+    format!("/api/incidents/{einsatz}/agenda-items")
 }
 
 /// Wire-Zeit (UTC, `YYYY-MM-DD HH:MM:SS`) relativ zu jetzt.
@@ -57,7 +57,7 @@ async fn lagemonitor(app: &axum::Router, admin: &str, einsatz: i64) -> String {
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         admin,
         Some(&json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"})),
     )
@@ -238,7 +238,7 @@ async fn ohne_lesezugriff_wie_beim_einsatzkopf() {
     let (kopf, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &fremd,
         None,
     )
@@ -279,7 +279,7 @@ async fn abgeschlossener_einsatz_liest_und_ist_409_beim_schreiben() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -304,7 +304,7 @@ async fn lagemonitor_traegt_die_naechsten_drei_programmpunkte() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let lagebild = format!("/api/einsaetze/{einsatz}/situation-monitor");
+    let lagebild = format!("/api/incidents/{einsatz}/situation-monitor");
     let monitor = lagemonitor(&app, &admin, einsatz).await;
 
     let (s, v) = anfrage(&app, "GET", &lagebild, &monitor, None).await;

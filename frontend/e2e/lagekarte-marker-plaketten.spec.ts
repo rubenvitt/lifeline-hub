@@ -51,14 +51,14 @@ test.use({ viewport: { width: 1920, height: 1080 } });
  *  dem Cluster-Radius von 45 px — „keine Plakette unter Zoom 12" misst also den Mindestzoom,
  *  nicht das Clustering. Kein Modulname im Einsatznamen (Palette). */
 async function einsatzMitEinheiten(page: Page): Promise<{ einsatzId: number; ersteId: number }> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Plaketten ${Date.now()}`,
   });
   let ersteId = 0;
   for (const [i, name] of ['Deichwache Nord', 'Deichwache Süd', 'Pumpenzug Mitte'].entries()) {
-    const id = await post(page, `/api/einsaetze/${einsatzId}/units`, { name });
+    const id = await post(page, `/api/incidents/${einsatzId}/units`, { name });
     if (i === 0) ersteId = id;
-    const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${id}/position`, {
+    const antwort = await page.request.patch(`/api/incidents/${einsatzId}/units/${id}/position`, {
       data: { lat: MITTE[1] + (i - 1) * 0.002, lon: MITTE[0] + (i - 1) * 0.04 },
     });
     expect(antwort.ok(), `Position ${name}: ${await antwort.text()}`).toBeTruthy();
@@ -119,7 +119,7 @@ test('Marker tragen ihre Namensplakette erst ab Zoom 12, offline in Mono', async
     );
   });
   const verschoben = await page.request.patch(
-    `/api/einsaetze/${einsatzId}/units/${ersteId}/position`,
+    `/api/incidents/${einsatzId}/units/${ersteId}/position`,
     { data: { lat: MITTE[1] - 0.002 + 0.00001, lon: MITTE[0] - 0.04 } },
   );
   expect(verschoben.ok()).toBeTruthy();

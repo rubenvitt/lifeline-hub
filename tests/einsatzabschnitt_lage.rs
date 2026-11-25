@@ -9,7 +9,7 @@ mod common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, system_etb_anzahl};
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/sectors")
+    format!("/api/incidents/{einsatz}/sectors")
 }
 
 async fn anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> Value {
@@ -40,7 +40,7 @@ async fn system_texte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Str
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )

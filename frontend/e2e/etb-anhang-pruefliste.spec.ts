@@ -30,17 +30,17 @@ async function anmelden(page: Page, modus: 'light' | 'dark', dichte: string) {
 
 /** Einsatz mit einem Eintrag samt Foto, gesät über die API. */
 async function saeen(page: Page, modus: string): Promise<number> {
-  const einsatz = await page.request.post('/api/einsaetze', {
+  const einsatz = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E 117 ${modus} ${Date.now()}` },
   });
   expect(einsatz.ok()).toBeTruthy();
   const { id } = (await einsatz.json()) as { id: number };
-  const upload = await page.request.post(`/api/einsaetze/${id}/etb/attachments`, {
+  const upload = await page.request.post(`/api/incidents/${id}/etb/attachments`, {
     multipart: { datei: { name: 'IMG_0412.HEIC', mimeType: 'image/heic', buffer: JPG } },
   });
   expect(upload.ok(), `Upload: ${upload.status()}`).toBeTruthy();
   const [{ id: anhang }] = (await upload.json()) as { id: number }[];
-  const eintrag = await page.request.post(`/api/einsaetze/${id}/etb`, {
+  const eintrag = await page.request.post(`/api/incidents/${id}/etb`, {
     data: {
       typ: 'meldung',
       von: 'ELW 1',

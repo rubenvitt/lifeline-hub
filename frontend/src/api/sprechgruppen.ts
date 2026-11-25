@@ -27,12 +27,12 @@ export function deaktiviereSprechgruppe(id: number): Promise<void> {
 }
 
 export function listeEinsatzSprechgruppen(einsatzId: number): Promise<Sprechgruppe[]> {
-  return apiGet<Sprechgruppe[]>(`/api/einsaetze/${einsatzId}/talk-groups`);
+  return apiGet<Sprechgruppe[]>(`/api/incidents/${einsatzId}/talk-groups`);
 }
 
 export function legeEinsatzSprechgruppeAn(
   einsatzId: number,
   eingabe: { bezeichnung: string; betriebsart: import('./types').Betriebsart; hinweis?: string },
 ): Promise<Sprechgruppe> {
-  return apiSend<Sprechgruppe>(`/api/einsaetze/${einsatzId}/talk-groups`, 'POST', eingabe);
+  return apiSend<Sprechgruppe>(`/api/incidents/${einsatzId}/talk-groups`, 'POST', eingabe);
 }

@@ -103,7 +103,7 @@ async fn gekoppeltes_geraet_erreicht_den_vertrag() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &admin,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "UHS 1"})),
     )
@@ -113,7 +113,7 @@ async fn gekoppeltes_geraet_erreicht_den_vertrag() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         &admin,
         Some(&json!({"status": "aktiv"})),
     )
@@ -122,7 +122,7 @@ async fn gekoppeltes_geraet_erreicht_den_vertrag() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         &admin,
         Some(&json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"})),
     )

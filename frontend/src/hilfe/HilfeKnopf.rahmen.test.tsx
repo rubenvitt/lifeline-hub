@@ -34,8 +34,8 @@ afterEach(() => vi.restoreAllMocks());
 function renderApp(route: string) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
   );
   const router = createMemoryRouter(appRouten, { initialEntries: [route] });
   render(

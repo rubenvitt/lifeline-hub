@@ -1,5 +1,5 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): `GET`/`PATCH
-//! /api/einsaetze/{id}/command-post`. Spec `einsatz-fuehrungsstelle`, Herleitung
+//! /api/incidents/{id}/command-post`. Spec `einsatz-fuehrungsstelle`, Herleitung
 //! `openspec/changes/archive/2026-10-04-lfh-849-eigene-fuehrungsstelle/design.md` (D2, D3, D6).
 //!
 //! Nicht verwechseln mit `tests/fuehrungsstelle.rs`: dort die Führungsstelle je Person
@@ -14,7 +14,7 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/command-post")
+    format!("/api/incidents/{einsatz}/command-post")
 }
 
 /// Die Antwort ohne den Änderungsvermerk (LLH-1834, eigene Tests in
@@ -49,7 +49,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -135,7 +135,7 @@ async fn ohne_lesezugriff_wie_beim_einsatzkopf() {
     let (kopf, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &fremd,
         None,
     )
@@ -374,7 +374,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -391,7 +391,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&json!({"adhoc": {"funkrufname": funkrufname, "fahrzeugtyp": "ELW 2"}})),
     )
@@ -483,7 +483,7 @@ async fn entlassen_loest_die_zuordnung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
+        &format!("/api/incidents/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -507,7 +507,7 @@ async fn entlassenes_fahrzeug_ist_409_vor_nicht_disponiertem_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{elw}/stand-down"),
+        &format!("/api/incidents/{einsatz}/vehicles/{elw}/stand-down"),
         &admin,
         None,
     )
@@ -552,7 +552,7 @@ async fn entlassen_eines_getragenen_fahrzeugs_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
+                &format!("/api/incidents/{einsatz}/vehicles/{ef}/stand-down"),
                 &admin,
                 None,
             )
@@ -635,7 +635,7 @@ async fn erfolg_feuert_einsatz_ablehnung_nicht() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -978,7 +978,7 @@ async fn etb_mit(app: &axum::Router, cookie: &str, einsatz: i64, nadel: &str) ->
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -1147,7 +1147,7 @@ async fn einsatzleiter_am_abgeschlossenen_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1201,7 +1201,7 @@ async fn entlassene_person_bleibt_mit_vermerk() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )
@@ -1244,7 +1244,7 @@ async fn entlassen_des_einsatzleiters_feuert_einsatz() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+                &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -1423,7 +1423,7 @@ async fn repo_lehnt_den_abgeschlossenen_einsatz_in_der_transaktion_ab() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1518,9 +1518,9 @@ async fn schwaerzung_nullt_den_namen_des_einsatzleiters() {
 // Spec `einsatz-fuehrungsstelle`, „Einsatzleiter in der Einsatzanzeige“. Herleitung:
 // `openspec/changes/archive/2026-10-12-b1tfx66d-einsatzleiter-kommplan-einsatzliste/design.md` (D1–D3).
 
-/// Der Eintrag `einsatz` aus `GET /api/einsaetze`.
+/// Der Eintrag `einsatz` aus `GET /api/incidents`.
 async fn listeneintrag(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
-    let (status, json) = anfrage(app, "GET", "/api/einsaetze", cookie, None).await;
+    let (status, json) = anfrage(app, "GET", "/api/incidents", cookie, None).await;
     assert_eq!(status, StatusCode::OK, "{json:?}");
     json.as_array()
         .unwrap()
@@ -1534,7 +1534,7 @@ async fn detail(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
@@ -1610,7 +1610,7 @@ async fn liste_traegt_den_vermerk_einer_entlassenen_person() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{anna}/stand-down"),
         &admin,
         None,
     )
@@ -1646,7 +1646,7 @@ async fn liste_liefert_den_geschwaerzten_einsatzleiter_ohne_namen() {
     .unwrap();
     tx.commit().await.unwrap();
 
-    let (status, liste) = anfrage(&app, "GET", "/api/einsaetze", &admin, None).await;
+    let (status, liste) = anfrage(&app, "GET", "/api/incidents", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     assert!(!liste.to_string().contains("Anna Schulz"), "{liste}");
     let el = &listeneintrag(&app, &admin, einsatz).await["einsatzleiter"];
@@ -1670,7 +1670,7 @@ async fn lage_snapshot_friert_keinen_einsatzleiter_ein() {
     let (status, snapshot) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-snapshots"),
+        &format!("/api/incidents/{einsatz}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

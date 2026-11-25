@@ -75,8 +75,8 @@ function setupDetail(lb: LageberichtAnzeige) {
   let stand = lb;
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get(`/api/einsaetze/7/situation-reports/${lb.id}`, () => HttpResponse.json(stand)),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+    http.get(`/api/incidents/7/situation-reports/${lb.id}`, () => HttpResponse.json(stand)),
     /*
      * Erfolgreicher PATCH als Grundrauschen: mehrere Tests verlassen ein Feld und lösen den
      * Blur-Autosave aus. Ohne Handler stünde „Nicht gespeichert" in der Seite. Wer einen Fehlschlag
@@ -86,7 +86,7 @@ function setupDetail(lb: LageberichtAnzeige) {
      * Merker, und der folgende Refetch schreibt den Serverstand ins Formular. Ein Handler mit altem
      * Stand modellierte einen Server, der nichts speichert, und löschte das Getippte wieder.
      */
-    http.patch(`/api/einsaetze/7/situation-reports/${lb.id}`, async ({ request }) => {
+    http.patch(`/api/incidents/7/situation-reports/${lb.id}`, async ({ request }) => {
       const body = (await request.json()) as Partial<LageberichtAnzeige>;
       stand = { ...stand, ...body };
       return HttpResponse.json(stand);
@@ -128,16 +128,16 @@ describe('LageberichtDetailPage', () => {
     let status = 'entwurf';
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/situation-reports/12', () =>
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/situation-reports/12', () =>
         HttpResponse.json({ ...lagebericht7Abschnitte, abschnitte: persistierte, status }),
       ),
-      http.patch('/api/einsaetze/7/situation-reports/12', async ({ request }) => {
+      http.patch('/api/incidents/7/situation-reports/12', async ({ request }) => {
         const body = (await request.json()) as { abschnitte?: typeof persistierte };
         if (body.abschnitte) persistierte = body.abschnitte;
         return HttpResponse.json({ ...lagebericht7Abschnitte, abschnitte: persistierte, status });
       }),
-      http.post('/api/einsaetze/7/situation-reports/12/release', () => {
+      http.post('/api/incidents/7/situation-reports/12/release', () => {
         if (persistierte.every((a) => a.text.trim() === '')) {
           return HttpResponse.json(
             { error: 'Der Bericht ist leer und kann nicht freigegeben werden' },
@@ -307,9 +307,9 @@ function setupLebend(start: LageberichtAnzeige) {
   const patches: Record<string, unknown>[] = [];
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get(`/api/einsaetze/7/situation-reports/${start.id}`, () => HttpResponse.json(stand)),
-    http.patch(`/api/einsaetze/7/situation-reports/${start.id}`, async ({ request }) => {
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+    http.get(`/api/incidents/7/situation-reports/${start.id}`, () => HttpResponse.json(stand)),
+    http.patch(`/api/incidents/7/situation-reports/${start.id}`, async ({ request }) => {
       patches.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json(stand);
     }),
@@ -346,7 +346,7 @@ describe('LageberichtDetailPage — Leere Abschnitte aus dem Lagebild füllen (L
       ([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)] as const,
     );
     server.use(
-      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/incidents/7/module-access', () => HttpResponse.json(freigabenFixture())),
     );
     setupDetail({
       ...lagebericht7Abschnitte,
@@ -436,12 +436,12 @@ describe('LageberichtDetailPage — Verlustschutz (LFH-348 · C13, Befund H63)',
     };
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/situation-reports/12', () =>
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/situation-reports/12', () =>
         HttpResponse.json(lagebericht7Abschnitte),
       ),
-      http.get('/api/einsaetze/7/situation-reports/13', () => HttpResponse.json(zweiter)),
-      http.patch('/api/einsaetze/7/situation-reports/12', () =>
+      http.get('/api/incidents/7/situation-reports/13', () => HttpResponse.json(zweiter)),
+      http.patch('/api/incidents/7/situation-reports/12', () =>
         HttpResponse.json(lagebericht7Abschnitte),
       ),
     );
@@ -585,9 +585,9 @@ describe('LageberichtDetailPage — Einstiegsfokus (LFH-495)', () => {
     };
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/situation-reports/12', () => HttpResponse.json(teilweiseBefuellt)),
-      http.get('/api/einsaetze/7/situation-reports/13', () => HttpResponse.json(zweiter)),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/situation-reports/12', () => HttpResponse.json(teilweiseBefuellt)),
+      http.get('/api/incidents/7/situation-reports/13', () => HttpResponse.json(zweiter)),
     );
     function Weiter() {
       const navigate = useNavigate();
@@ -630,9 +630,9 @@ describe('LageberichtDetailPage — Speicherfehler in der Seite (LFH-494)', () =
     const zustand = { scheitert: true };
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get(`/api/einsaetze/7/situation-reports/${start.id}`, () => HttpResponse.json(start)),
-      http.patch(`/api/einsaetze/7/situation-reports/${start.id}`, () =>
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get(`/api/incidents/7/situation-reports/${start.id}`, () => HttpResponse.json(start)),
+      http.patch(`/api/incidents/7/situation-reports/${start.id}`, () =>
         zustand.scheitert
           ? HttpResponse.json({ error: 'Zeitstand liegt in der Zukunft' }, { status: 422 })
           : HttpResponse.json(start),
@@ -688,9 +688,9 @@ function setupListe(
 ) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(optionen.einsatz ?? einsatz)),
-    http.get('/api/einsaetze/7/situation-reports', () => HttpResponse.json(berichte)),
-    http.get('/api/einsaetze/7/situation-reports/:lbId', ({ params }) => {
+    http.get('/api/incidents/7', () => HttpResponse.json(optionen.einsatz ?? einsatz)),
+    http.get('/api/incidents/7/situation-reports', () => HttpResponse.json(berichte)),
+    http.get('/api/incidents/7/situation-reports/:lbId', ({ params }) => {
       const lb = berichte.find((b) => b.id === Number(params.lbId));
       return lb ? HttpResponse.json(lb) : HttpResponse.json({ error: 'fehlt' }, { status: 404 });
     }),
@@ -746,11 +746,11 @@ function zaehlePosts(
     QUELLEN.map(([s, q]) => [s, vi.spyOn(q, 'erzeuge').mockResolvedValue(`Text ${s}`)]),
   );
   server.use(
-    http.get('/api/einsaetze/7/module-access', () => {
+    http.get('/api/incidents/7/module-access', () => {
       freigabenAbrufe.anzahl += 1;
       return HttpResponse.json(freigaben);
     }),
-    http.post('/api/einsaetze/7/situation-reports', async ({ request }) => {
+    http.post('/api/incidents/7/situation-reports', async ({ request }) => {
       posts.push((await request.json()) as Record<string, unknown>);
       return antwort?.() ?? HttpResponse.json({ ...bericht, id: 41 }, { status: 201 });
     }),
@@ -999,7 +999,7 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
   it('bietet Fortschreiben nur am Kettenkopf an und öffnet die neue Fassung', async () => {
     const posts: string[] = [];
     server.use(
-      http.post('/api/einsaetze/7/situation-reports/20/revise', () => {
+      http.post('/api/incidents/7/situation-reports/20/revise', () => {
         posts.push('fort');
         return HttpResponse.json({ ...entwurf, id: 42 }, { status: 201 });
       }),
@@ -1033,8 +1033,8 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
   it('nennt einen Ladefehler als „Stand unbekannt“ statt als leer', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/situation-reports', () =>
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/situation-reports', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -1051,8 +1051,8 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
   it('der Fehler bleibt stehen, solange „Erneut abrufen" lädt (LLH-1581)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/situation-reports', () =>
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/situation-reports', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -1065,7 +1065,7 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
     const knopf = await screen.findByRole('button', { name: 'Erneut abrufen' });
     expect(knopf).not.toHaveClass('ant-btn-loading');
 
-    server.use(http.get('/api/einsaetze/7/situation-reports', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/incidents/7/situation-reports', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     // Vorher stand hier das Ladeskelett: der neue Versuch ist auch `isLoading`.
@@ -1109,12 +1109,12 @@ describe('LageberichtePage — Übersicht (LLH-1064)', () => {
 function setupMitZone(berichte: LageberichtAnzeige[]) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/situation-reports', () => HttpResponse.json(berichte)),
-    http.get('/api/einsaetze/7/situation-reports/:lbId', ({ params }) =>
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents/7/situation-reports', () => HttpResponse.json(berichte)),
+    http.get('/api/incidents/7/situation-reports/:lbId', ({ params }) =>
       HttpResponse.json(berichte.find((b) => b.id === Number(params.lbId))),
     ),
-    http.get('/api/einsaetze/7/settings', () =>
+    http.get('/api/incidents/7/settings', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: 'Europe/Berlin', org_defaults: { org_id: 1 } }),
     ),
   );

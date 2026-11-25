@@ -14,14 +14,14 @@ mod common;
 use common::*;
 
 fn url(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/units/from-resource-request")
+    format!("/api/incidents/{einsatz}/units/from-resource-request")
 }
 
 async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({ "bezeichnung": name }).to_string()),
     )
@@ -31,7 +31,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({ "status": "aktiv" }).to_string()),
     )
@@ -56,7 +56,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         Some(&body.to_string()),
     )
@@ -69,7 +69,7 @@ async fn nachforderung(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/commitment"),
+        &format!("/api/incidents/{einsatz}/resource-requests/{id}/commitment"),
         cookie,
         Some(&json!({ "rufnamen": ["83-1", "83-2"] }).to_string()),
     )
@@ -95,7 +95,7 @@ async fn status(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
+        &format!("/api/incidents/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&json!({ "status": stufe }).to_string()),
     )
@@ -117,7 +117,7 @@ async fn einheiten(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value>
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         cookie,
         None,
     )
@@ -130,7 +130,7 @@ async fn lade(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -> Value 
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         None,
     )
@@ -148,7 +148,7 @@ async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -168,7 +168,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -241,7 +241,7 @@ async fn eintreffen_und_uebernahme_mit_ziel_br_nord() {
         let (s, z) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/units/{id}/timeline"),
+            &format!("/api/incidents/{e}/units/{id}/timeline"),
             &admin,
             None,
         )
@@ -260,7 +260,7 @@ async fn eintreffen_und_uebernahme_mit_ziel_br_nord() {
     let (s, verlauf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/staging-areas/{nord}/history"),
+        &format!("/api/incidents/{e}/staging-areas/{nord}/history"),
         &admin,
         None,
     )
@@ -437,7 +437,7 @@ async fn bestehende_einheit_wird_verknuepft_und_bleibt_in_ihrem_raum() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/staging-areas/{sued}/occupancy"),
+        &format!("/api/incidents/{e}/staging-areas/{sued}/occupancy"),
         &admin,
         Some(
             &json!({ "objekt_typ": "einheit", "objekt_id": vorab, "art": "eintritt" }).to_string(),
@@ -532,7 +532,7 @@ async fn ruecknahme_gesperrt_solange_einheiten_verknuepft_sind() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{einheit}/annul"),
+        &format!("/api/incidents/{e}/units/{einheit}/annul"),
         &admin,
         None,
     )
@@ -543,7 +543,7 @@ async fn ruecknahme_gesperrt_solange_einheiten_verknuepft_sind() {
 }
 
 fn storno_url(einsatz: i64, einheit: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/units/{einheit}/annul-takeover")
+    format!("/api/incidents/{einsatz}/units/{einheit}/annul-takeover")
 }
 
 async fn storniere(
@@ -559,7 +559,7 @@ async fn verlauf(app: &axum::Router, cookie: &str, einsatz: i64, br: i64) -> Vec
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/history"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/history"),
         cookie,
         None,
     )
@@ -615,7 +615,7 @@ async fn fehluebernahme_mit_raum_wird_storniert_und_gibt_die_ruecknahme_frei() {
     let (s, aufgeloest) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units?aufgeloeste=1"),
+        &format!("/api/incidents/{e}/units?aufgeloeste=1"),
         &admin,
         None,
     )
@@ -695,7 +695,7 @@ async fn verknuepfte_einheit_bleibt_und_verlaesst_nur_die_gebuchte_buchung() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/staging-areas/{sued}/occupancy"),
+        &format!("/api/incidents/{e}/staging-areas/{sued}/occupancy"),
         &admin,
         Some(
             &json!({ "objekt_typ": "einheit", "objekt_id": im_sueden, "art": "eintritt" })
@@ -765,7 +765,7 @@ async fn verknuepfte_einheit_bleibt_und_verlaesst_nur_die_gebuchte_buchung() {
     let (_, aufgeloest) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units?aufgeloeste=1"),
+        &format!("/api/incidents/{e}/units?aufgeloeste=1"),
         &admin,
         None,
     )
@@ -824,7 +824,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
     )
@@ -873,7 +873,7 @@ async fn gleichnamiges_fahrzeug_ohne_einheit_wird_zur_einheit() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/vehicles/{ef}/crew/{anna}"),
+        &format!("/api/incidents/{e}/vehicles/{ef}/crew/{anna}"),
         &admin,
         None,
     )
@@ -977,7 +977,7 @@ async fn gleichnamiges_fahrzeug_im_raum_macht_der_einheit_platz() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/staging-areas/{nord}/occupancy"),
+            &format!("/api/incidents/{e}/staging-areas/{nord}/occupancy"),
             &admin,
             Some(
                 &json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" })
@@ -1105,7 +1105,7 @@ async fn abgerufenes_fahrzeug_wird_erst_nach_aufheben_ueberfuehrt() {
     )
     .await;
     let ef = adhoc_fahrzeug(&app, &admin, e, "RTW 2").await;
-    let belegung = format!("/api/einsaetze/{e}/staging-areas/{nord}/occupancy");
+    let belegung = format!("/api/incidents/{e}/staging-areas/{nord}/occupancy");
     let (s, j) = anfrage(
         &app,
         "POST",
@@ -1124,7 +1124,7 @@ async fn abgerufenes_fahrzeug_wird_erst_nach_aufheben_ueberfuehrt() {
     .execute(&pool)
     .await
     .unwrap();
-    let abruf = format!("/api/einsaetze/{e}/staging-areas/{nord}/dispatch");
+    let abruf = format!("/api/incidents/{e}/staging-areas/{nord}/dispatch");
     let (s, j) = anfrage(
         &app,
         "POST",
@@ -1194,7 +1194,7 @@ async fn austragen_und_zuruecknehmen(
     let (s, aus) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/occupancy"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/occupancy"),
         cookie,
         Some(&json!({ "objekt_typ": typ, "objekt_id": objekt, "art": "austritt" }).to_string()),
     )
@@ -1204,7 +1204,7 @@ async fn austragen_und_zuruecknehmen(
         app,
         "POST",
         &format!(
-            "/api/einsaetze/{einsatz}/staging-areas/{br}/occupancy/{}/undo",
+            "/api/incidents/{einsatz}/staging-areas/{br}/occupancy/{}/undo",
             aus["id"]
         ),
         cookie,
@@ -1234,7 +1234,7 @@ async fn uebernahme_nach_zurueckgenommenem_austragen_haelt_seit() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/staging-areas/{nord}/occupancy"),
+        &format!("/api/incidents/{e}/staging-areas/{nord}/occupancy"),
         &admin,
         Some(&json!({ "objekt_typ": "fahrzeug", "objekt_id": ef, "art": "eintritt" }).to_string()),
     )

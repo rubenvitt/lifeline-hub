@@ -19,7 +19,7 @@ export interface DokumentAblage {
   bezug?: { typ: DokumentBezugTyp; id: number };
 }
 
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/documents`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/documents`;
 
 export function listeDokumente(einsatzId: number): Promise<Dokument[]> {
   return apiGet<Dokument[]>(basis(einsatzId));

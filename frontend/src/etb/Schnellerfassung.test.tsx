@@ -29,8 +29,8 @@ import { mitProzessZone } from '../test/prozessZone';
 // Test-spezifische server.use(...) überschreiben diese Defaults.
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/units', () => HttpResponse.json([])),
   );
 });
 
@@ -390,10 +390,10 @@ describe('Schnellerfassung', () => {
 
   it('bietet disponierte Funkrufnamen als Absender-Vorschlag (Freitext bleibt Fallback)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
       ),
-      http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/units', () => HttpResponse.json([])),
     );
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -420,10 +420,10 @@ describe('Schnellerfassung', () => {
 
   it('bietet disponierte Funkrufnamen auch als Empfänger-Vorschlag (an)', async () => {
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
       ),
-      http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/units', () => HttpResponse.json([])),
     );
     const p = props();
     renderMitProviders(<Schnellerfassung {...p} />);
@@ -650,7 +650,7 @@ describe('Schnellerfassung', () => {
 
   it('LFH-888: ohne Zugriff auf Lageberichte entfällt der Sprung, der Typ „Lage" bleibt', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/module-access', () =>
+      http.get('/api/incidents/:id/module-access', () =>
         HttpResponse.json(freigabenFixture({ lageberichte: { zugriff: false } })),
       ),
     );
@@ -974,7 +974,7 @@ describe('Schnellerfassung – Befehlszeile (Neuentwurf S4)', () => {
 
   it('@ füllt bei einer Meldung den Absender aus den Funkrufnamen', async () => {
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
       ),
     );
@@ -1840,7 +1840,7 @@ describe('Auch in den Meldungseingang', () => {
 
   it('ohne Freigabe der Meldungen aus und gesperrt mit Grund; sendet false', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/module-access', () =>
+      http.get('/api/incidents/:id/module-access', () =>
         HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
       ),
     );
@@ -1954,7 +1954,7 @@ describe('Buchstabierhilfe an Von und An (LFH-110)', () => {
 describe('Von und An folgen der Tastaturregel des Vorschlagsfelds (kwc2yszv, D5)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
       ),
     );
@@ -2084,7 +2084,7 @@ describe('Review der Erfassung (kwc2yszv E4–E7)', () => {
 
   it('E7: ein per Klick übernommener Freitext bleibt nach Escape stehen', async () => {
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([{ id: 1, funkrufname: 'Florian 1', opta: null }]),
       ),
     );

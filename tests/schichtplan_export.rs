@@ -24,7 +24,7 @@ const CSV: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stad
 const XLSX_TYP: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
+    format!("/api/incidents/{einsatz}/reliefs/shift-plan")
 }
 
 /// GET mit Bytes statt JSON.
@@ -128,7 +128,7 @@ async fn einsatz_export_und_erneutes_einlesen_aendern_nichts() {
     let (s, adhoc) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         Some(
             &json!({"adhoc": {"name": "Notarzt Extern", "funktion": "Notarzt",
@@ -296,7 +296,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personal"),
+        &format!("/api/incidents/{e}/module-overrides/personal"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -307,7 +307,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personal"),
+        &format!("/api/incidents/{e}/module-overrides/personal"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":null}"#),
     )
@@ -318,7 +318,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )

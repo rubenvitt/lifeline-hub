@@ -103,7 +103,7 @@ async fn bestaetigter_code_meldet_den_einsatzkopf_am_elw() {
     let (hub, elw, live, e, akte) = setup().await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/code"),
+        &format!("/api/incidents/{e}/command/code"),
         json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;
@@ -153,7 +153,7 @@ async fn bestaetigung_des_gegenuebers_meldet_den_einsatzkopf_am_hub() {
     melden(&elw).await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/confirm"),
+        &format!("/api/incidents/{e}/command/confirm"),
         json!({}),
     )
     .await;
@@ -206,7 +206,7 @@ async fn notuebernahme_bei_gleicher_einsatznummer() {
     );
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/code"),
+        &format!("/api/incidents/{e}/command/code"),
         json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;
@@ -287,7 +287,7 @@ async fn notuebernahme_bei_gleicher_einsatznummer() {
     // Der Hub gibt die Führung zurück: Der ELW führt wieder, die Nummer bleibt (dort frei).
     let (s, v) = post(
         &hub,
-        &format!("/api/einsaetze/{h}/command/hand-over"),
+        &format!("/api/incidents/{h}/command/hand-over"),
         json!({"an": eine::<String>(&elw.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;
@@ -315,7 +315,7 @@ async fn uebergabe_meldet_am_hub_kopf_und_vollabgleich() {
     .await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/hand-over"),
+        &format!("/api/incidents/{e}/command/hand-over"),
         json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;
@@ -356,7 +356,7 @@ async fn widerruf_durch_den_hub_meldet_am_elw_den_zurueckgeholten_einsatz() {
     let (hub, elw, live, e, _akte) = setup().await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e}/command/hand-over"),
+        &format!("/api/incidents/{e}/command/hand-over"),
         json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;
@@ -423,7 +423,7 @@ async fn erste_akte_mit_uebergabe_meldet_am_hub_kopf_und_vollabgleich() {
     .await;
     let (s, v) = post(
         &elw,
-        &format!("/api/einsaetze/{e2}/command/hand-over"),
+        &format!("/api/incidents/{e2}/command/hand-over"),
         json!({"an": eine::<String>(&hub.pool, "SELECT kennung FROM instanz_identitaet").await}),
     )
     .await;

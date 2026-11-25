@@ -32,30 +32,30 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Tablet ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  const sued = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const sued = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Süd',
   });
   for (const u of [nord, sued]) {
-    await anlegen(page, `/api/einsaetze/${e}/uhs/${u.id}/status`, { status: 'aktiv' });
+    await anlegen(page, `/api/incidents/${e}/uhs/${u.id}/status`, { status: 'aktiv' });
   }
   // Eine Person der anderen UHS: das Tablet darf sie nicht sehen.
-  await anlegen(page, `/api/einsaetze/${e}/persons`, {
+  await anlegen(page, `/api/incidents/${e}/persons`, {
     name: 'Fremdling',
     sichtung: 'sk3',
     uhs_id: sued.id,
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'uhs-tablet', uhs_id: nord.id, bezeichnung: 'Tablet 1' },
   );
 
@@ -107,7 +107,7 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
     );
 
     // Widerruf durch die Einsatzleitung: das Tablet endet von selbst, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
+    await anlegen(page, `/api/incidents/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/);
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
     await expect(tablet.getByText('UHS Nord')).toHaveCount(0);
@@ -124,21 +124,21 @@ test('LFH-1024: Tablet nimmt auf, kennt nur die eigene UHS und endet beim Widerr
  */
 test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, browser }) => {
   await anmeldenAlsAdmin(page);
-  const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Bediener ${Date.now()}` }))
+  const e = (await anlegen(page, '/api/incidents', { bezeichnung: `E2E Bediener ${Date.now()}` }))
     .id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/incidents/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
-  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
+  const person = await anlegen(page, `/api/incidents/${e}/persons`, {
     name: 'Patient',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -173,7 +173,7 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
     await kontext.close();
   }
 
-  const etb = (await (await page.request.get(`/api/einsaetze/${e}/etb`)).json()) as {
+  const etb = (await (await page.request.get(`/api/incidents/${e}/etb`)).json()) as {
     typ: string;
     inhalt: string;
     erfasser_name: string;
@@ -194,23 +194,23 @@ test('LFH-1046: Tablet bestätigt eine Sichtung namentlich', async ({ page, brow
 test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, browser }) => {
   await anmeldenAlsAdmin(page);
   const e = (
-    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Verletzung Gerät ${Date.now()}` })
+    await anlegen(page, '/api/incidents', { bezeichnung: `E2E Verletzung Gerät ${Date.now()}` })
   ).id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  await anlegen(page, `/api/einsaetze/${e}/personnel`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/incidents/${e}/personnel`, {
     adhoc: { name: 'Dr. A. Muster', funktion: 'Notärztin' },
   });
-  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
+  const person = await anlegen(page, `/api/incidents/${e}/persons`, {
     name: 'Patient',
     geschlecht: 'weiblich',
     sichtung: 'sk2',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -251,7 +251,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
   }
 
   const detail = (await (
-    await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
+    await page.request.get(`/api/incidents/${e}/persons/${person.id}`)
   ).json()) as {
     verletzungen: { region: string; bestaetigt_name?: string }[];
   };
@@ -260,7 +260,7 @@ test('Tablet markiert eine Verletzung mit „Bestätigt von“', async ({ page, 
     region: 'unterarm_l',
     bestaetigt_name: 'Dr. A. Muster',
   });
-  const etb = (await (await page.request.get(`/api/einsaetze/${e}/etb`)).json()) as {
+  const etb = (await (await page.request.get(`/api/incidents/${e}/etb`)).json()) as {
     inhalt: string;
   }[];
   expect(etb.some((x) => /Unterarm|Fraktur/.test(x.inhalt))).toBe(false);
@@ -286,19 +286,19 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
 }) => {
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
-  const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Offline ${Date.now()}` }))
+  const e = (await anlegen(page, '/api/incidents', { bezeichnung: `E2E Offline ${Date.now()}` }))
     .id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  const person = await anlegen(page, `/api/incidents/${e}/persons`, {
     name: 'Patient',
     sichtung: 'sk3',
     uhs_id: nord.id,
   });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'uhs-tablet',
     uhs_id: nord.id,
     bezeichnung: 'Tablet 1',
@@ -374,7 +374,7 @@ test('LLH-1138: Tablet sichtet nach, erfasst Verbleib und Notiz ohne Netz', asyn
 
     // Genau einmal, mit der Erfassungszeit von unterwegs (Sekunden des Servers, daher ± 1 s).
     const detail = (await (
-      await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
+      await page.request.get(`/api/incidents/${e}/persons/${person.id}`)
     ).json()) as {
       sichtungen: { kategorie: string; gesichtet_at: string; eingegangen_at?: string | null }[];
       verbleib: {
@@ -420,14 +420,14 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
   const e = (
-    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Kopplungsende ${Date.now()}` })
+    await anlegen(page, '/api/incidents', { bezeichnung: `E2E Kopplungsende ${Date.now()}` })
   ).id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  const person = await anlegen(page, `/api/einsaetze/${e}/persons`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  const person = await anlegen(page, `/api/incidents/${e}/persons`, {
     name: 'Patient',
     sichtung: 'sk3',
     uhs_id: nord.id,
@@ -435,7 +435,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
   const koppeln = () =>
     anlegen<{ kopplung: { id: number }; code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/devices`,
+      `/api/incidents/${e}/devices`,
       { ansicht: 'uhs-tablet', uhs_id: nord.id, bezeichnung: 'Tablet 1' },
     );
   const erste = await koppeln();
@@ -465,7 +465,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
     const offlineBis = Date.now();
 
     // Die Kopplung endet, während das Tablet kein Netz hat.
-    await anlegen(page, `/api/einsaetze/${e}/devices/${erste.kopplung.id}/revoke`);
+    await anlegen(page, `/api/incidents/${e}/devices/${erste.kopplung.id}/revoke`);
     await kontext.setOffline(false);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/, { timeout: 30_000 });
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
@@ -482,7 +482,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
       .poll(
         async () => {
           const detail = (await (
-            await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
+            await page.request.get(`/api/incidents/${e}/persons/${person.id}`)
           ).json()) as { sichtungen: { kategorie: string }[] };
           return detail.sichtungen.filter((s) => s.kategorie === 'sk2').length;
         },
@@ -490,7 +490,7 @@ test('LLH-1331: neuer Code für dieselbe UHS sendet Vorgemerktes der beendeten K
       )
       .toBe(1);
     const detail = (await (
-      await page.request.get(`/api/einsaetze/${e}/persons/${person.id}`)
+      await page.request.get(`/api/incidents/${e}/persons/${person.id}`)
     ).json()) as { sichtungen: { kategorie: string; gesichtet_at: string }[] };
     const sk2 = detail.sichtungen.find((s) => s.kategorie === 'sk2')!;
     expect(ms(sk2.gesichtet_at)).toBeGreaterThanOrEqual(offlineAb - 1_000);

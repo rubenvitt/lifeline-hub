@@ -50,7 +50,7 @@ async function auftragErteilen(
   await expect(dialog.getByTitle(/^S3 – /)).toBeVisible();
   const erteilt = page.waitForResponse(
     (antwort) =>
-      /\/api\/einsaetze\/\d+\/etb\/\d+\/task$/.test(antwort.url()) &&
+      /\/api\/incidents\/\d+\/etb\/\d+\/task$/.test(antwort.url()) &&
       antwort.request().method() === 'POST',
   );
   await dialog.getByRole('button', { name: 'Auftrag erteilen', exact: true }).click();

@@ -187,17 +187,17 @@ describe('useFunkrufnamenEinsatz', () => {
     const abgefragt: string[] = [];
     let freigabenGeladen = false;
     server.use(
-      http.get('/api/einsaetze/4/module-access', () => {
+      http.get('/api/incidents/4/module-access', () => {
         freigabenGeladen = true;
         return HttpResponse.json(
           freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
         );
       }),
-      http.get('/api/einsaetze/4/vehicles', () => {
+      http.get('/api/incidents/4/vehicles', () => {
         abgefragt.push('fahrzeuge');
         return HttpResponse.json([]);
       }),
-      http.get('/api/einsaetze/4/units', () => {
+      http.get('/api/incidents/4/units', () => {
         abgefragt.push('einheiten');
         return HttpResponse.json([]);
       }),
@@ -212,7 +212,7 @@ describe('useFunkrufnamenEinsatz', () => {
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.einheiten(4), [{ id: 1, name: 'Florian 3' } as Einheit]);
     server.use(
-      http.get('/api/einsaetze/4/module-access', () =>
+      http.get('/api/incidents/4/module-access', () =>
         HttpResponse.json(
           freigabenFixture({ fahrzeuge: { zugriff: false }, einheiten: { zugriff: false } }),
         ),
@@ -227,9 +227,9 @@ describe('useFunkrufnamenEinsatz', () => {
 
   it('schlägt mit Modulrecht Funkrufnamen aus Fahrzeugen und Einheiten vor', async () => {
     server.use(
-      http.get('/api/einsaetze/4/module-access', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/4/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/4/units', () =>
+      http.get('/api/incidents/4/module-access', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/incidents/4/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents/4/units', () =>
         HttpResponse.json([{ id: 1, name: 'Florian 3' } as Einheit]),
       ),
     );

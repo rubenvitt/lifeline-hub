@@ -22,7 +22,7 @@ async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
         cookie,
         None,
     )
@@ -41,7 +41,7 @@ async fn nachricht(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kanal}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kanal}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
     )
@@ -59,7 +59,7 @@ async fn mitarbeit_schreibt_bearbeitet_und_loescht_eigene_chatnachricht() {
     let (s, m) = nachricht(&app, einsatz, kid, &mit, "Erster Stand").await;
     assert_eq!(s, StatusCode::CREATED, "{m:?}");
     let mid = m["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{einsatz}/chat/messages/{mid}");
+    let uri = format!("/api/incidents/{einsatz}/chat/messages/{mid}");
 
     let (s, _) = anfrage(
         &app,
@@ -87,7 +87,7 @@ async fn mitarbeit_bearbeitet_fremde_chatnachricht_nicht() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}"),
         &mit,
         Some(r#"{"inhalt":"Übernommen"}"#),
     )
@@ -108,7 +108,7 @@ async fn mitarbeit_legt_keinen_chatkanal_an_und_setzt_keinen_bezug() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
         &mit,
         Some(r#"{"name":"Neu"}"#),
     )
@@ -117,7 +117,7 @@ async fn mitarbeit_legt_keinen_chatkanal_an_und_setzt_keinen_bezug() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/reference"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}/reference"),
         &mit,
         Some(r#"{"typ":"schaden","ziel_id":1}"#),
     )
@@ -160,7 +160,7 @@ async fn mitarbeit_laedt_anhang_hoch_und_loescht_eigenen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/attachments");
+    let uri = format!("/api/incidents/{einsatz}/attachments");
 
     let (s, v) = multipart_post(&app, &uri, &mit, Some(("a.png", MINI_PNG)), &[]).await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
@@ -191,7 +191,7 @@ async fn mitarbeit_legt_keine_kraefte_abschnitte_oder_einstellungen_an() {
         let (s, v) = anfrage(
             &app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &format!("/api/incidents/{einsatz}/{pfad}"),
             &mit,
             Some(body),
         )
@@ -207,7 +207,7 @@ async fn mitarbeit_loescht_keinen_anhang_einer_fremden_chatnachricht() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let kid = default_kanal(&app, einsatz, &admin).await;
     let (_, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/attachments");
+    let uri = format!("/api/incidents/{einsatz}/attachments");
 
     let (s, v) = multipart_post(&app, &uri, &admin, Some(("c.png", MINI_PNG)), &[]).await;
     assert_eq!(s, StatusCode::CREATED, "{v:?}");
@@ -215,7 +215,7 @@ async fn mitarbeit_loescht_keinen_anhang_einer_fremden_chatnachricht() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"Mit Foto","anhang_ids":[{aid}]}}"#)),
     )
@@ -253,7 +253,7 @@ async fn meldung_senden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports"),
+        &format!("/api/incidents/{einsatz}/reports"),
         cookie,
         Some(&meldung_body(extra).to_string()),
     )
@@ -270,7 +270,7 @@ async fn meldung_korrigieren(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/reports/{mid}"),
+        &format!("/api/incidents/{einsatz}/reports/{mid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -281,7 +281,7 @@ async fn meldungen_liste(app: &axum::Router, einsatz: i64, cookie: &str) -> Vec<
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/reports"),
+        &format!("/api/incidents/{einsatz}/reports"),
         cookie,
         None,
     )
@@ -434,7 +434,7 @@ async fn mitarbeit_bestaetigt_weist_zu_und_erteilt_keinen_auftrag() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/reports/{mid}/{pfad}"),
+            &format!("/api/incidents/{einsatz}/reports/{mid}/{pfad}"),
             &mit,
             Some(&body),
         )
@@ -449,7 +449,7 @@ async fn mitarbeit_meldung_offline_replay_gibt_gespeicherte_zurueck() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (id, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/reports");
+    let uri = format!("/api/incidents/{einsatz}/reports");
     let body = meldung_body(serde_json::json!({ "client_id": "offline-mit-1" })).to_string();
 
     let (s1, erst) =
@@ -503,7 +503,7 @@ async fn mitarbeit_korrigiert_eigene_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -544,7 +544,7 @@ async fn etb_senden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(&etb_body(typ, extra)),
     )
@@ -672,7 +672,7 @@ async fn mitarbeit_berichtigt_etb_eintrag_einer_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -732,7 +732,7 @@ async fn mitarbeit_berichtigt_berichtigung_einer_meldung_in_der_lage_nicht() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -789,14 +789,14 @@ async fn etb_anzeige_nennt_meldung_in_der_lage() {
             .get("meldung_in_lage")
             .cloned()
     };
-    let uri = format!("/api/einsaetze/{einsatz}/etb");
+    let uri = format!("/api/incidents/{einsatz}/etb");
     let (_, vorher) = anfrage(&app, "GET", &uri, &mit, None).await;
     assert_eq!(in_lage(&vorher, eid), None, "{vorher:?}");
 
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{einsatz}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -832,7 +832,7 @@ async fn etb_foto_hochladen(
 ) -> (StatusCode, serde_json::Value) {
     multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/etb/attachments"),
+        &format!("/api/incidents/{einsatz}/etb/attachments"),
         cookie,
         Some(("foto.png", MINI_PNG)),
         &[],
@@ -928,7 +928,7 @@ async fn mitarbeit_etb_offline_replay_gibt_gespeicherten_zurueck() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (id, mit) = mitarbeit_anlegen(&app, &admin, einsatz).await;
-    let uri = format!("/api/einsaetze/{einsatz}/etb");
+    let uri = format!("/api/incidents/{einsatz}/etb");
     let body = etb_body(
         "meldung",
         serde_json::json!({ "client_id": "offline-etb-1" }),
@@ -966,7 +966,7 @@ async fn mitarbeit_erfasst_nicht_wenn_etb_auf_fuehrung_im_einsatz_steht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
+        &format!("/api/incidents/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -989,7 +989,7 @@ async fn mitarbeit_erteilt_keinen_etb_auftrag() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb/{eid}/task"),
+        &format!("/api/incidents/{einsatz}/etb/{eid}/task"),
         &mit,
         Some(
             r#"{"auftrag_text":"x","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#,

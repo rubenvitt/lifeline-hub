@@ -1,6 +1,6 @@
 //! Routen des Schichtplans eines Einsatzes (LLH-1552, Spec `kraefte-schichtplan`): Blöcke an
 //! Einheiten, UHS und der Zeile „Pause“, Helfer des Plans, „Schichten erzeugen“ und die
-//! Grenzwerte des Dienst-Befunds. Pfade unter `/api/einsaetze/{id}/reliefs/shift-plan`.
+//! Grenzwerte des Dienst-Befunds. Pfade unter `/api/incidents/{id}/reliefs/shift-plan`.
 //!
 //! Gates wie die Ablösung (`EinsatzLesezugriff<Abloesung>`, `EinsatzSchreibzugriff<Abloesung>`).
 //! Nach den Feldprüfungen (400) verlangt der Handler die Zusatzmodule: Einheiten für einen
@@ -213,7 +213,7 @@ pub(crate) fn grenzwert(
     Ok(wert)
 }
 
-/// GET /api/einsaetze/{id}/reliefs/shift-plan
+/// GET /api/incidents/{id}/reliefs/shift-plan
 pub async fn lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Abloesung>,
@@ -239,7 +239,7 @@ pub struct BlockAnlegen {
     notiz: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/blocks — liefert den ganzen Plan.
+/// POST /api/incidents/{id}/reliefs/shift-plan/blocks — liefert den ganzen Plan.
 pub async fn create_block(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -289,7 +289,7 @@ pub struct BlockAendern {
     notiz: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid} — Zeit, Posten (Verschieben
+/// PATCH /api/incidents/{id}/reliefs/shift-plan/blocks/{bid} — Zeit, Posten (Verschieben
 /// in eine andere Zeile), Soll, Personen, Notiz; CAS über `version` (409).
 pub async fn update_block(
     State(state): State<AppState>,
@@ -339,7 +339,7 @@ impl VersionParams {
     }
 }
 
-/// DELETE /api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}?version=… (409 bei
+/// DELETE /api/incidents/{id}/reliefs/shift-plan/blocks/{bid}?version=… (409 bei
 /// veraltetem Stand). Einen belegten Block löscht nur, wer Personal darf (403).
 pub async fn delete_block(
     State(state): State<AppState>,
@@ -374,7 +374,7 @@ pub struct Erzeugen {
     laenge_minuten: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/generate — füllt den Zeitraum am Posten mit
+/// POST /api/incidents/{id}/reliefs/shift-plan/generate — füllt den Zeitraum am Posten mit
 /// Schichten (alles oder nichts, ein ETB-Satz). Liefert den ganzen Plan.
 pub async fn erzeugen(
     State(state): State<AppState>,
@@ -410,7 +410,7 @@ pub struct Grenzwerte {
     min_ruhe_minuten: Option<Option<i64>>,
 }
 
-/// PATCH /api/einsaetze/{id}/reliefs/shift-plan/limits — Grenzwerte des
+/// PATCH /api/incidents/{id}/reliefs/shift-plan/limits — Grenzwerte des
 /// Dienst-Befunds. Liefert den ganzen Plan (die Befunde ändern sich mit).
 pub async fn update_grenzwerte(
     State(state): State<AppState>,
@@ -476,7 +476,7 @@ impl HelferAnlegen {
     }
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/helpers
+/// POST /api/incidents/{id}/reliefs/shift-plan/helpers
 pub async fn create_helfer(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -526,7 +526,7 @@ impl HelferAendern {
     }
 }
 
-/// PATCH /api/einsaetze/{id}/reliefs/shift-plan/helpers/{hid}
+/// PATCH /api/incidents/{id}/reliefs/shift-plan/helpers/{hid}
 pub async fn update_helfer(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Abloesung>,
@@ -543,7 +543,7 @@ pub async fn update_helfer(
     Ok(Json(helfer))
 }
 
-/// DELETE /api/einsaetze/{id}/reliefs/shift-plan/helpers/{hid} — nimmt den Helfer aus allen
+/// DELETE /api/incidents/{id}/reliefs/shift-plan/helpers/{hid} — nimmt den Helfer aus allen
 /// Blöcken.
 pub async fn delete_helfer(
     State(state): State<AppState>,
@@ -584,7 +584,7 @@ async fn fordere_wechsel_module(
     ctx.fordere_zielmodul::<Personal>(&state.pool).await
 }
 
-/// GET /api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}/handovers — der nächste Wechsel
+/// GET /api/incidents/{id}/reliefs/shift-plan/blocks/{bid}/handovers — der nächste Wechsel
 /// eines UHS- oder Pausenblocks zum Vorbelegen (LLH-1555). Nennt Personen: Personal, an der UHS
 /// dazu Unfallhilfsstellen (403); ein Block an einer Einheit ist 422.
 pub async fn wechsel_vorlage(
@@ -656,7 +656,7 @@ fn wechsel_eingabe(req: WechselVollziehen, jetzt: &str) -> Result<WechselEingabe
     })
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}/handovers — vollzieht den
+/// POST /api/incidents/{id}/reliefs/shift-plan/blocks/{bid}/handovers — vollzieht den
 /// Wechsel an der UHS, Beginn oder Ende der Pause (LLH-1555, design.md D6/D7). 409, wenn er
 /// schon vollzogen ist; 422, wenn der Posten nicht passt, kein Status als Pause gekennzeichnet
 /// ist oder die Pause nicht begonnen hat.
@@ -683,7 +683,7 @@ pub async fn wechsel_vollziehen(
     Ok((StatusCode::CREATED, Json(anzeige)))
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/handovers/{wid}/undo — legt zurück,
+/// POST /api/incidents/{id}/reliefs/shift-plan/handovers/{wid}/undo — legt zurück,
 /// was noch den Stand des Wechsels trägt (409, wenn schon zurückgenommen).
 pub async fn wechsel_zuruecknehmen(
     State(state): State<AppState>,
@@ -808,7 +808,7 @@ pub(crate) async fn mappe_antwort(
         .into_response())
 }
 
-/// GET /api/einsaetze/{id}/reliefs/shift-plan/export — der Plan als Excel-Mappe (LLH-1557,
+/// GET /api/incidents/{id}/reliefs/shift-plan/export — der Plan als Excel-Mappe (LLH-1557,
 /// design.md D4/D5): Lesen der Ablösung und das Modul Personal (403 ohne), auch im
 /// abgeschlossenen Einsatz. Kein ETB, kein Live-Ereignis.
 pub async fn export(
@@ -830,7 +830,7 @@ pub async fn export(
     mappe_antwort(plan).await
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/import/preview — Multipart mit `datei` und
+/// POST /api/incidents/{id}/reliefs/shift-plan/import/preview — Multipart mit `datei` und
 /// optional `entscheidungen`. Gleicht ab und schreibt nichts; Fehler stehen in der Antwort (200).
 /// Eine unlesbare Datei ist 400.
 pub async fn import_vorschau(
@@ -886,7 +886,7 @@ pub(crate) fn publish_uebernahme(
     }
 }
 
-/// POST /api/einsaetze/{id}/reliefs/shift-plan/import — wie die Vorschau, schreibt aber in
+/// POST /api/incidents/{id}/reliefs/shift-plan/import — wie die Vorschau, schreibt aber in
 /// EINER Transaktion (alles oder nichts). Fehler der Planung: 422 mit Zeilen der Datei; ein
 /// neuer Posten ohne Freigabe seines Moduls: 403. Ein zweiter Lauf derselben Datei ändert
 /// nichts (kein ETB, kein Live-Ereignis). Liefert die Zählung und den ganzen Plan.

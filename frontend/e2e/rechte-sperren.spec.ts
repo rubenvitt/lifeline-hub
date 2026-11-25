@@ -25,7 +25,7 @@ import {
  */
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Rechte-Sperren ${Date.now()}` },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
@@ -38,7 +38,7 @@ const zugriff = (page: Page) => page.getByRole('region', { name: 'Zugriff' });
 function zaehleRollenPuts(page: Page): { anzahl: number } {
   const zaehler = { anzahl: 0 };
   page.on('request', (r) => {
-    if (r.method() === 'PUT' && /\/api\/einsaetze\/\d+\/members\/\d+$/.test(r.url())) {
+    if (r.method() === 'PUT' && /\/api\/incidents\/\d+\/members\/\d+$/.test(r.url())) {
       zaehler.anzahl += 1;
     }
   });

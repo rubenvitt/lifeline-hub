@@ -72,7 +72,7 @@ test.describe(KAPITEL, () => {
   test('Einsatzbefehle: Liste und gewählter Befehl mit Quittungen', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const befehl = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${demo.id}/orders`, {
+    const befehl = await fuelle<{ id: number }>(page, 'post', `/api/incidents/${demo.id}/orders`, {
       vorlage: 'befehl_lad',
       titel: 'Befehl an Logistiktrupp: Sicherung Lindenstraße',
       abschnitte: [
@@ -91,11 +91,11 @@ test.describe(KAPITEL, () => {
       ],
     });
     // Verteiler (LLH-1172) und eine Quittung (LLH-1173): ein Abschnitt des Demo-Einsatzes und S4.
-    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/sectors`);
+    const antwort = await page.request.get(`/api/incidents/${demo.id}/sectors`);
     expect(antwort.ok()).toBe(true);
     const abschnitte = (await antwort.json()) as { id: number }[];
     expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);
-    await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/orders/${befehl.id}`, {
+    await fuelle(page, 'patch', `/api/incidents/${demo.id}/orders/${befehl.id}`, {
       verteiler: [
         { empfaenger_typ: 'abschnitt', abschnitt_id: abschnitte[0].id },
         { empfaenger_typ: 'funktion', funktion: 's4' },
@@ -104,12 +104,12 @@ test.describe(KAPITEL, () => {
     const frei = await fuelle<{ verteiler: { id: number }[] }>(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/orders/${befehl.id}/release`,
+      `/api/incidents/${demo.id}/orders/${befehl.id}/release`,
     );
     await fuelle(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/orders/${befehl.id}/distribution/${frei.verteiler[0].id}/acknowledge`,
+      `/api/incidents/${demo.id}/orders/${befehl.id}/distribution/${frei.verteiler[0].id}/acknowledge`,
     );
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${demo.id}/auftraege?reiter=befehle&befehl=${befehl.id}`);
@@ -127,7 +127,7 @@ test.describe(KAPITEL, () => {
     const auftrag = await fuelle<{ id: number; lfd_nr: number }>(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/tasks`,
+      `/api/incidents/${demo.id}/tasks`,
       {
         auftrag_text: 'Sandsäcke vom Bauhof zur Unterführung Lindenstraße bringen.',
         empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
@@ -150,7 +150,7 @@ test.describe(KAPITEL, () => {
   test('Befehlsentwurf auf der Detailseite', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const befehl = await fuelle<{ id: number }>(page, 'post', `/api/einsaetze/${demo.id}/orders`, {
+    const befehl = await fuelle<{ id: number }>(page, 'post', `/api/incidents/${demo.id}/orders`, {
       vorlage: 'befehl_lad',
       titel: 'Befehl an Logistiktrupp: Sicherung Lindenstraße',
       abschnitte: [
@@ -169,11 +169,11 @@ test.describe(KAPITEL, () => {
       ],
     });
     // Verteiler (LLH-1172): ein Abschnitt des Demo-Einsatzes, S3 und die Leitstelle.
-    const antwort = await page.request.get(`/api/einsaetze/${demo.id}/sectors`);
+    const antwort = await page.request.get(`/api/incidents/${demo.id}/sectors`);
     expect(antwort.ok()).toBe(true);
     const abschnitte = (await antwort.json()) as { id: number }[];
     expect(abschnitte.length, 'Demo ohne Einsatzabschnitt').toBeGreaterThan(0);
-    await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/orders/${befehl.id}`, {
+    await fuelle(page, 'patch', `/api/incidents/${demo.id}/orders/${befehl.id}`, {
       verteiler: [
         { empfaenger_typ: 'abschnitt', abschnitt_id: abschnitte[0].id },
         { empfaenger_typ: 'funktion', funktion: 's4' },

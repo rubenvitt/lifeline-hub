@@ -51,7 +51,7 @@ function eintrag(id: number, teil: Partial<BenachrichtigungAnzeige> = {}): Benac
 function serverMit(verlauf: { eintraege: BenachrichtigungAnzeige[]; ungelesen: number }) {
   const zaehler = { abrufe: 0, quittiert: [] as number[], gelesen: [] as number[] };
   server.use(
-    http.get('/api/einsaetze/:id/notifications', () => {
+    http.get('/api/incidents/:id/notifications', () => {
       zaehler.abrufe++;
       return HttpResponse.json(verlauf);
     }),
@@ -59,7 +59,7 @@ function serverMit(verlauf: { eintraege: BenachrichtigungAnzeige[]; ungelesen: n
       zaehler.quittiert.push(Number(params.id));
       return new HttpResponse(null, { status: 204 });
     }),
-    http.post('/api/einsaetze/:id/notifications/read', async ({ request }) => {
+    http.post('/api/incidents/:id/notifications/read', async ({ request }) => {
       zaehler.gelesen.push(((await request.json()) as { bis_id: number }).bis_id);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -204,7 +204,7 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
     });
     let erreichbar = false;
     server.use(
-      http.get('/api/einsaetze/:id/reports/:mid', ({ params }) =>
+      http.get('/api/incidents/:id/reports/:mid', ({ params }) =>
         erreichbar
           ? HttpResponse.json({ id: Number(params.mid), absender: 'RTW 3', inhalt: 'Lage stabil' })
           : HttpResponse.json({ error: 'weg' }, { status: 503 }),
@@ -246,14 +246,14 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       ungelesen: 1,
     });
     server.use(
-      http.get('/api/einsaetze/:id/reports/:mid', ({ params }) =>
+      http.get('/api/incidents/:id/reports/:mid', ({ params }) =>
         HttpResponse.json({
           id: Number(params.mid),
           absender: 'RTW 2',
           inhalt: 'Patient ansprechbar, Transport ins Klinikum',
         }),
       ),
-      http.get('/api/einsaetze/:id/reminders', () =>
+      http.get('/api/incidents/:id/reminders', () =>
         HttpResponse.json([{ id: 5, einsatz_id: 1, titel: 'Pegel prüfen' }]),
       ),
     );
@@ -292,10 +292,10 @@ describe('Knopf „Eingänge“ (LLH-1143)', () => {
       ungelesen: 2,
     });
     server.use(
-      http.get('/api/einsaetze/:id/resource-requests', () =>
+      http.get('/api/incidents/:id/resource-requests', () =>
         HttpResponse.json([{ id: 3, anzahl: 2, art: 'RTW', bezeichnung: 'Transport aus der UHS' }]),
       ),
-      http.get('/api/einsaetze/:id/zones', () =>
+      http.get('/api/incidents/:id/zones', () =>
         HttpResponse.json([{ id: 2, gefahrengebiet_id: 9, label: 'Gasaustritt Halle 3' }]),
       ),
     );
@@ -637,7 +637,7 @@ describe('Eingänge ohne Netz (LLH-1422)', () => {
       daten: { bis_id: 9 },
     });
     serverMit({ eintraege: [eintrag(10), eintrag(9), eintrag(4)], ungelesen: 3 });
-    server.use(http.post('/api/einsaetze/:id/notifications/read', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/:id/notifications/read', () => HttpResponse.error()));
     rendern();
     await screen.findByTestId('angemeldet');
     act(() => {

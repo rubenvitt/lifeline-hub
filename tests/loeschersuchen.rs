@@ -42,7 +42,7 @@ async fn lage() -> Lage {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         Some(&json!({"von":"ELW 1","an":"ELW 1","typ": "meldung", "inhalt": "Frau Mustermann an RTW übergeben"})),
     )
@@ -51,7 +51,7 @@ async fn lage() -> Lage {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -503,7 +503,7 @@ async fn personen_antrag_bis_zum_vollzug() {
     );
     // Schwärzungsstand im Kopf (LFH-996, Spec `einsatzkopf-live`): vor dem Vollzug fehlt das
     // Feld, danach tragen Kopf und Liste `teilschwaerzungen: 1`.
-    let kopf_uri = format!("/api/einsaetze/{}", l.einsatz);
+    let kopf_uri = format!("/api/incidents/{}", l.einsatz);
     let (_, kopf) = anfrage(&l.app, "GET", &kopf_uri, &l.admin, None).await;
     assert!(
         !kopf.as_object().unwrap().contains_key("teilschwaerzungen"),
@@ -515,7 +515,7 @@ async fn personen_antrag_bis_zum_vollzug() {
     );
     let (_, kopf) = anfrage(&l.app, "GET", &kopf_uri, &l.admin, None).await;
     assert_eq!(kopf["teilschwaerzungen"], 1, "{kopf}");
-    let (_, liste) = anfrage(&l.app, "GET", "/api/einsaetze", &l.admin, None).await;
+    let (_, liste) = anfrage(&l.app, "GET", "/api/incidents", &l.admin, None).await;
     let eintrag = liste
         .as_array()
         .unwrap()
@@ -584,7 +584,7 @@ async fn antrag_etb_eintraege_gehen_live_hinaus() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )

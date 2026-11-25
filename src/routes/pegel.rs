@@ -152,7 +152,7 @@ async fn anzeige(
         .collect())
 }
 
-/// GET /api/einsaetze/{id}/gauges — festgelegte Pegel in Reihenfolge, je mit Messung.
+/// GET /api/incidents/{id}/gauges — festgelegte Pegel in Reihenfolge, je mit Messung.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<OhneModul>,
@@ -162,7 +162,7 @@ pub async fn liste(
     ))
 }
 
-/// GET /api/einsaetze/{id}/gauges/history — je festgelegtem Pegel, in dessen Reihenfolge, der
+/// GET /api/incidents/{id}/gauges/history — je festgelegtem Pegel, in dessen Reihenfolge, der
 /// Verlauf der letzten 24 Stunden. Liest über denselben Weg wie die Messung der Liste
 /// (`abruf::reihen`) und damit aus demselben Cache-Eintrag. Es sind aber zwei Anfragen: dass
 /// Wert und Linie ein Stand sind, ist der Normalfall, keine Zusicherung. Station ohne Stand →
@@ -197,7 +197,7 @@ pub async fn verlauf(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/gauges — Liste vollständig ersetzen (Reihenfolge = Array).
+/// PUT /api/incidents/{id}/gauges — Liste vollständig ersetzen (Reihenfolge = Array).
 pub async fn ersetzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<OhneModul>,
@@ -233,7 +233,7 @@ pub async fn ersetzen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/gauges — einen Pegel hinten anfügen (Karten-Schnellweg).
+/// POST /api/incidents/{id}/gauges — einen Pegel hinten anfügen (Karten-Schnellweg).
 /// Neu → 201; schon festgelegt → 200 mit dem Bestand (idempotent).
 pub async fn anfuegen(
     State(state): State<AppState>,
@@ -256,7 +256,7 @@ pub async fn anfuegen(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/gauges/{pegel_id}/forecast — erwarteten Höchststand setzen
+/// PUT /api/incidents/{id}/gauges/{pegel_id}/forecast — erwarteten Höchststand setzen
 /// (überschreibt einen vorhandenen). Pegel nicht in diesem Einsatz → 404.
 pub async fn prognose_setzen(
     State(state): State<AppState>,
@@ -281,7 +281,7 @@ pub async fn prognose_setzen(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/gauges/{pegel_id}/forecast — Prognose löschen. Idempotent: ohne
+/// DELETE /api/incidents/{id}/gauges/{pegel_id}/forecast — Prognose löschen. Idempotent: ohne
 /// gesetzte Prognose ebenfalls 200. Pegel nicht in diesem Einsatz → 404.
 pub async fn prognose_loeschen(
     State(state): State<AppState>,
@@ -296,7 +296,7 @@ pub async fn prognose_loeschen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/gauges/{pegel_id}/prediction — Vorschlag aus der Reihe `WV`
+/// GET /api/incidents/{id}/gauges/{pegel_id}/prediction — Vorschlag aus der Reihe `WV`
 /// (höchster künftiger Wert). Ohne Reihe: 200 ohne `vorhersage`. Quelle nicht erreichbar und
 /// nichts im Cache → 502. Pegel nicht in diesem Einsatz → 404.
 pub async fn vorhersage_lesen(

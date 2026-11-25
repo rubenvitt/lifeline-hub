@@ -81,7 +81,7 @@ fn enum_opt<T: TryFrom<String, Error = String>>(s: Option<String>) -> Result<Opt
 
 // ── Lesen ───────────────────────────────────────────────────────────────────────────────────
 
-/// GET /api/einsaetze/{id}/evacuation — nicht stornierte Bezirke mit aktueller Meldung. Die eine
+/// GET /api/incidents/{id}/evacuation — nicht stornierte Bezirke mit aktueller Meldung. Die eine
 /// Quelle für Modulseite, Modulzähler und Kennzahl „Evakuiert“. Gekoppelte Geräte erreichen die
 /// Route nie (keine Funktionsansicht führt sie, `geraet::Funktionsansicht::routen`).
 pub async fn uebersicht(
@@ -93,7 +93,7 @@ pub async fn uebersicht(
     }))
 }
 
-/// GET /api/einsaetze/{id}/evacuation/districts/{bid}/progress — die ganze Standreihe des
+/// GET /api/incidents/{id}/evacuation/districts/{bid}/progress — die ganze Standreihe des
 /// Bezirks samt zurückgenommener Meldungen (LFH-676). Auch ein stornierter Bezirk liefert sie:
 /// 409 steht in diesem Modul für Lebenszyklus-AKTIONEN, Lesen ist keine. Fremd/unbekannt → 404.
 pub async fn stand_verlauf(
@@ -131,7 +131,7 @@ pub struct BezirkAnlegen {
     notiz: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/evacuation/districts
+/// POST /api/incidents/{id}/evacuation/districts
 pub async fn bezirk_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Evakuierung>,
@@ -189,7 +189,7 @@ pub struct BezirkAendern {
     notiz: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/evacuation/districts/{bid}
+/// PATCH /api/incidents/{id}/evacuation/districts/{bid}
 pub async fn bezirk_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Evakuierung>,
@@ -223,7 +223,7 @@ pub async fn bezirk_aendern(
     ))
 }
 
-/// POST /api/einsaetze/{id}/evacuation/districts/{bid}/annul — Fehlanlage; liefert den
+/// POST /api/incidents/{id}/evacuation/districts/{bid}/annul — Fehlanlage; liefert den
 /// Bezirk mit gesetztem `storniert_at`.
 pub async fn bezirk_stornieren(
     State(state): State<AppState>,
@@ -263,7 +263,7 @@ pub struct StandMelden {
     client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/evacuation/districts/{bid}/progress
+/// POST /api/incidents/{id}/evacuation/districts/{bid}/progress
 ///
 /// Mit `client_id` idempotent (LFH-675): ein Replay liefert die gespeicherte Meldung (201),
 /// ohne Zeile, ETB-Eintrag oder Live-Ereignis — auch am inzwischen stornierten Bezirk und nach
@@ -323,7 +323,7 @@ async fn bezirk_meldung(
     })
 }
 
-/// POST /api/einsaetze/{id}/evacuation/progress/{sid}/undo
+/// POST /api/incidents/{id}/evacuation/progress/{sid}/undo
 pub async fn stand_zuruecknehmen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Evakuierung>,

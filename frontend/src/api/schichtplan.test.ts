@@ -13,7 +13,7 @@ import {
   updateSchichtplanGrenzwerte,
 } from './schichtplan';
 
-const basis = '/api/einsaetze/7/reliefs/shift-plan';
+const basis = '/api/incidents/7/reliefs/shift-plan';
 
 /** Zeichnet jede Anfrage als „METHODE /pfad?query body“ auf. */
 function aufzeichnen() {

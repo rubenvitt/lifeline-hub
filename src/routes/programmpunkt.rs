@@ -1,5 +1,5 @@
 //! Programmpunkte der Veranstaltung (LLH-1570, Spec `ablaufplan`): `GET`/`POST
-//! /api/einsaetze/{id}/agenda-items`, `PATCH`/`DELETE …/{pid}`.
+//! /api/incidents/{id}/agenda-items`, `PATCH`/`DELETE …/{pid}`.
 //!
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten
 //! (`EinsatzVerwaltungszugriff`). Eine Änderung meldet das Ereignis `einsatz`, damit Einsatzdaten
@@ -55,7 +55,7 @@ fn melden(state: &AppState, einsatz_id: i64) {
         .publiziere_einsatz(einsatz_id, LiveEvent::Einsatz);
 }
 
-/// GET /api/einsaetze/{id}/agenda-items — alle Programmpunkte nach Zeitpunkt.
+/// GET /api/incidents/{id}/agenda-items — alle Programmpunkte nach Zeitpunkt.
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -63,7 +63,7 @@ pub async fn liste(
     Ok(Json(repo::liste(&state.pool, ctx.einsatz.id).await?))
 }
 
-/// POST /api/einsaetze/{id}/agenda-items — anlegen (201).
+/// POST /api/incidents/{id}/agenda-items — anlegen (201).
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,
@@ -87,7 +87,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(p)))
 }
 
-/// PATCH /api/einsaetze/{id}/agenda-items/{pid} — Bezeichnung und/oder Zeitpunkt ändern.
+/// PATCH /api/incidents/{id}/agenda-items/{pid} — Bezeichnung und/oder Zeitpunkt ändern.
 pub async fn aendern(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,
@@ -153,7 +153,7 @@ pub async fn aendern(
     Ok(Json(p))
 }
 
-/// DELETE /api/einsaetze/{id}/agenda-items/{pid} — löschen (204).
+/// DELETE /api/incidents/{id}/agenda-items/{pid} — löschen (204).
 pub async fn loeschen(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,

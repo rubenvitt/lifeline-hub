@@ -85,7 +85,7 @@ async function ohneDevtoolsKnopf(page: Page) {
 }
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Dialoge Handy ${Date.now()}` },
   });
   expect(r.ok(), await r.text()).toBeTruthy();
@@ -411,7 +411,7 @@ for (const dichte of STUFEN_BLATT) {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page);
     const inhalt = `Lagemeldung vor dem Filter ${Date.now()}`;
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
     });
     expect(r.ok(), await r.text()).toBeTruthy();
@@ -434,7 +434,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     await anmeldenAlsAdmin(page);
     const einsatzId = await einsatzAnlegen(page);
     const inhalt = `Lagemeldung vor dem Filter ${Date.now()}`;
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
     });
     expect(r.ok(), await r.text()).toBeTruthy();

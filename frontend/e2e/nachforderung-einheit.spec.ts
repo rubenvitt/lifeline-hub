@@ -32,11 +32,11 @@ interface EinheitDraht {
 }
 
 async function seed(page: Page) {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Nachforderung Einheit ${Date.now()}`,
   });
   const einsatzId = String(id);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   // Der Typ „RTW“ steht im Katalog (Vorbelegung des Typs aus der Art, D4).
   const typen = await get<{ label: string }[]>(page, '/api/unit-types');
   if (!typen.some((t) => t.label === 'RTW')) {
@@ -88,7 +88,7 @@ test('Eintreffen melden und als Einheit übernehmen mit Ziel BR Nord (LLH-1383)'
   await expect(karte.getByRole('button', { name: 'Als Material übernehmen' })).toHaveCount(0);
 
   // Im Einsatz und im Raum, beide mit Herkunft.
-  const einheiten = await get<EinheitDraht[]>(page, `/api/einsaetze/${einsatzId}/units`);
+  const einheiten = await get<EinheitDraht[]>(page, `/api/incidents/${einsatzId}/units`);
   const neu = einheiten.filter((e) => e.nachforderung_id === nfId);
   expect(neu.map((e) => e.name).sort()).toEqual(['83-1', '83-2']);
   for (const e of neu) {

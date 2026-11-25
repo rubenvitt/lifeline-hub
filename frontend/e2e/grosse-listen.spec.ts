@@ -29,14 +29,14 @@ test('1 000 Personen: Ausschnitt im DOM, Bildlauf bis ans Ende, Kopfzeile steht'
   test.setTimeout(180_000);
   await page.setViewportSize(FUEKW);
   await anmelden(page);
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Große Liste ${Date.now()}`,
   });
   // In Bündeln, damit das Säen nicht die Laufzeit des Tests frisst.
   for (let ab = 0; ab < MENGE; ab += 50) {
     await Promise.all(
       Array.from({ length: Math.min(50, MENGE - ab) }, (_, i) =>
-        post(page, `/api/einsaetze/${einsatzId}/persons`, { name: `Person ${ab + i + 1}` }),
+        post(page, `/api/incidents/${einsatzId}/persons`, { name: `Person ${ab + i + 1}` }),
       ),
     );
   }

@@ -19,10 +19,10 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function einsatzMitEinheit(page: Page, einheit: string) {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Sammel-Disposition ${LAUF}`,
   });
-  const einheitId = await post(page, `/api/einsaetze/${einsatzId}/units`, { name: einheit });
+  const einheitId = await post(page, `/api/incidents/${einsatzId}/units`, { name: einheit });
   return { einsatzId, einheitId };
 }
 
@@ -45,7 +45,7 @@ test('Personal disponieren: drei Personen in einem Absenden in Einheit und auf F
 }) => {
   await anmeldenAlsAdmin(page);
   const { einsatzId, einheitId } = await einsatzMitEinheit(page, 'Rettungsstaffel');
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const efId = await post(page, `${basis}/vehicles`, {
     adhoc: { funkrufname: `Sammel ${LAUF} 83-1`, fahrzeugtyp: 'RTW' },
   });
@@ -117,7 +117,7 @@ test('Fahrzeuge disponieren: zwei Fahrzeuge in einem Absenden in eine Einheit', 
   const region = page.getByRole('region', { name: 'Fahrzeuge im Einsatz', exact: true });
   for (const funkrufname of funkrufnamen) await expect(region.getByText(funkrufname)).toBeVisible();
 
-  const efs = (await (await page.request.get(`/api/einsaetze/${einsatzId}/vehicles`)).json()) as {
+  const efs = (await (await page.request.get(`/api/incidents/${einsatzId}/vehicles`)).json()) as {
     id: number;
     einheit_id: number | null;
   }[];

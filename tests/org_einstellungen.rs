@@ -568,7 +568,7 @@ async fn einsatz_nummer_praefix_persistiert_und_greift_beim_anlegen() {
     let (status, einsatz) = anfrage(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin_cookie,
         Some(r#"{"bezeichnung":"Lage"}"#),
     )

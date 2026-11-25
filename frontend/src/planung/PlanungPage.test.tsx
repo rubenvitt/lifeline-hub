@@ -481,7 +481,7 @@ describe('PlanungPage (LLH-1586)', () => {
       setup();
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
-        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.get('/api/incidents', () => HttpResponse.json([])),
         http.post('/api/plans/5/transfer/preview', async ({ request }) => {
           anfragen.push(await request.json());
           return HttpResponse.json(vorschau());
@@ -527,7 +527,7 @@ describe('PlanungPage (LLH-1586)', () => {
       setup();
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
-        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.get('/api/incidents', () => HttpResponse.json([])),
         http.post('/api/plans/5/transfer/preview', async ({ request }) => {
           anfragen.push(await request.json());
           // Die zweite Vorschau sieht den geänderten Stand: ein Block mehr.
@@ -586,7 +586,7 @@ describe('PlanungPage (LLH-1586)', () => {
       setup();
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
-        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.get('/api/incidents', () => HttpResponse.json([])),
         http.post('/api/plans/5/transfer/preview', () => {
           vorschauen += 1;
           return vorschauen === 1
@@ -615,7 +615,7 @@ describe('PlanungPage (LLH-1586)', () => {
       setup();
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
-        http.get('/api/einsaetze', () =>
+        http.get('/api/incidents', () =>
           HttpResponse.json([
             {
               id: 7,
@@ -694,7 +694,7 @@ describe('PlanungPage (LLH-1586)', () => {
       setup();
       server.use(
         http.get('/api/incident-templates', () => HttpResponse.json([])),
-        http.get('/api/einsaetze', () => HttpResponse.json([])),
+        http.get('/api/incidents', () => HttpResponse.json([])),
         http.post('/api/plans/5/transfer/preview', () =>
           HttpResponse.json(
             vorschau({

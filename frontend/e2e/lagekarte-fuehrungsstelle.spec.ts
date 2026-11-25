@@ -42,10 +42,10 @@ test('LFH-1181: Führungsstelle mit Koordinate als Marker, ohne Koordinate fort'
 }) => {
   test.setTimeout(120_000);
   await anmelden(page, { startseite: false });
-  const { id } = await senden(page, 'post', '/api/einsaetze', {
+  const { id } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Führungsstelle Karte ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${id}`;
+  const basis = `/api/incidents/${id}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

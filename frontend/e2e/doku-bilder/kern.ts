@@ -217,7 +217,7 @@ export async function demoEinsatz(quelle: Page | APIRequestContext): Promise<Dem
 /**
  * Füllt eine Lücke der Demo-Daten über die API (Design LFH-1127, D3) und gibt die Antwort zurück.
  * Rot mit Status und Text, wenn der Server ablehnt: eine still gescheiterte Füllung ergäbe ein
- * leeres Bild. Pfade wie im Frontend (`/api/einsaetze/<id>/…`).
+ * leeres Bild. Pfade wie im Frontend (`/api/incidents/<id>/…`).
  */
 export async function fuelle<T = unknown>(
   quelle: Page | APIRequestContext,
@@ -244,7 +244,7 @@ export async function fuehrungsstelleOrtFuellen(
   quelle: Page | APIRequestContext,
   einsatzId: number,
 ): Promise<void> {
-  const pfad = `/api/einsaetze/${einsatzId}/command-post`;
+  const pfad = `/api/incidents/${einsatzId}/command-post`;
   const fs = (await (await apiVon(quelle).get(pfad)).json()) as { bezeichnung?: string };
   if (fs.bezeichnung) return;
   await fuelle(quelle, 'patch', pfad, {
