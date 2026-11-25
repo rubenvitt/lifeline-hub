@@ -223,7 +223,9 @@ mod tests {
                 einsatz_id: eingabe["einsatz_id"].as_i64().expect("einsatz_id"),
                 bezeichnung: eingabe["bezeichnung"].as_str().expect("bezeichnung"),
                 termin: zeit("termin"),
-                instanz_kennung: eingabe["instanz_kennung"].as_str().expect("instanz_kennung"),
+                instanz_kennung: eingabe["instanz_kennung"]
+                    .as_str()
+                    .expect("instanz_kennung"),
             },
             zeit("jetzt"),
         );
