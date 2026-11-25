@@ -545,7 +545,7 @@ describe('FahrzeugePage', () => {
 
   /**
    * Ortung (LLH-2091): das Zeilenmenü bietet „Ortung koppeln …“ bzw. „Ortung trennen“ je nach
-   * `ortung_gekoppelt`, die Zeile trägt die Marke „GPS“, solange gekoppelt; ohne Schreibrecht
+   * `ortung_gekoppelt`, die Zeile trägt die Marke „Ortung“, solange gekoppelt; ohne Schreibrecht
    * (abgeschlossener Einsatz) steht kein Menü.
    */
   it('bietet „Ortung koppeln …“ im Zeilenmenü, solange nicht gekoppelt', async () => {
@@ -554,10 +554,10 @@ describe('FahrzeugePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }));
     expect(await screen.findByRole('menuitem', { name: 'Ortung koppeln …' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Ortung trennen' })).toBeNull();
-    expect(screen.queryByText('GPS')).toBeNull();
+    expect(screen.queryByText('Ortung')).toBeNull();
   });
 
-  it('trennt die Ortung ohne Rückfrage und zeigt „GPS“, solange gekoppelt', async () => {
+  it('trennt die Ortung ohne Rückfrage und zeigt „Ortung“, solange gekoppelt', async () => {
     let getrennt = 0;
     server.use(
       http.delete('/api/incidents/7/vehicles/10/tracking', () => {
@@ -567,7 +567,7 @@ describe('FahrzeugePage', () => {
     );
     render(einsatz(), [], { ...ef, ortung_gekoppelt: true });
     await screen.findByText('Florian 1');
-    expect(screen.getByText('GPS')).toBeInTheDocument();
+    expect(screen.getByText('Ortung')).toBeInTheDocument();
     await waehleImZeilenmenue('Florian 1', 'Ortung trennen');
     await waitFor(() => expect(getrennt).toBe(1));
   });
@@ -575,7 +575,7 @@ describe('FahrzeugePage', () => {
   it('öffnet aus „Ortung koppeln …“ den Dialog mit den Kennungen', async () => {
     server.use(
       http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
-        HttpResponse.json({ volunteer_crew_required: true, candidates: [] }),
+        HttpResponse.json({ tracking_enabled: true, candidates: [] }),
       ),
     );
     render(einsatz());

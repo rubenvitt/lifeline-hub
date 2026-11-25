@@ -34,7 +34,6 @@ import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
 import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import EinwurfZugaenge from './EinwurfZugaenge';
-import OrtungHauptamt from './OrtungHauptamt';
 import AdapterPaneel from './AdapterPaneel';
 import {
   ANBINDUNGEN_ABRUF_MS,
@@ -311,8 +310,6 @@ export default function Anbindungen() {
       </Paneel>
 
       <EinwurfZugaenge />
-
-      <OrtungHauptamt />
 
       <AdapterPaneel />
 

@@ -245,8 +245,6 @@ export interface OrgEinstellungenUpdate {
   rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
-  /** Ortung auch bei hauptamtlicher Besatzung (LLH-2091): bool auf dem Draht; fehlt = aus. */
-  ortung_hauptamt?: boolean | null;
   geocoder_url: string | null;
   /** Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099). Kein Vollersatz: fehlt das Feld,
    *  bleibt der Wert am Server; nur die Sektion „Anzeige“ schickt es mit. */

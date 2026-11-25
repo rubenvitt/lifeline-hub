@@ -31,11 +31,11 @@ const KANDIDATEN = [
 let bodies: unknown[];
 let onSchliessen: () => void;
 
-function handler(opts: { kandidaten?: unknown[]; pflicht?: boolean } = {}) {
+function handler(opts: { kandidaten?: unknown[]; schalter?: boolean } = {}) {
   server.use(
     http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
       HttpResponse.json({
-        volunteer_crew_required: opts.pflicht ?? true,
+        tracking_enabled: opts.schalter ?? true,
         candidates: opts.kandidaten ?? KANDIDATEN,
       }),
     ),
@@ -70,33 +70,25 @@ describe('OrtungKoppelnDialog', () => {
     ).toBeDisabled();
   });
 
-  it('verlangt bei Pflicht die Bestätigung „Besatzung ist ehrenamtlich“', async () => {
-    handler({ pflicht: true });
+  it('koppelt die gewählte Kennung ohne weitere Bestätigung', async () => {
+    handler();
     render();
     await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
-    const koppeln = screen.getByRole('button', { name: 'Koppeln' });
-    expect(koppeln).toBeDisabled();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' }));
-    expect(koppeln).toBeEnabled();
-    await userEvent.click(koppeln);
-    await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
-    expect(bodies).toEqual([
-      { access_id: 'z1', device_id: 'kennung-a', volunteer_crew_confirmed: true },
-    ]);
-  });
-
-  it('zeigt das Kästchen nicht, wenn die Bestätigung nicht Pflicht ist, und koppelt ohne Bestätigung', async () => {
-    handler({ pflicht: false });
-    render();
-    await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
-    await waitFor(() =>
-      expect(screen.queryByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' })).toBeNull(),
-    );
+    expect(screen.queryByRole('checkbox')).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
-    expect(bodies).toEqual([
-      { access_id: 'z1', device_id: 'kennung-a', volunteer_crew_confirmed: false },
-    ]);
+    expect(bodies).toEqual([{ access_id: 'z1', device_id: 'kennung-a' }]);
+  });
+
+  it('erklärt bei ausgeschaltetem Org-Schalter, warum Koppeln gesperrt ist', async () => {
+    handler({ schalter: false });
+    render();
+    expect(
+      await screen.findByText(/Ortung ist für diese Organisation ausgeschaltet/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Verwaltung → Einsatz-Vorgaben/)).toBeInTheDocument();
+    expect(screen.queryByRole('radio')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Koppeln' })).toBeDisabled();
   });
 
   it('nennt ohne Kennungen den Zustand und lässt nicht koppeln', async () => {
@@ -109,18 +101,18 @@ describe('OrtungKoppelnDialog', () => {
     expect(screen.getByRole('button', { name: 'Koppeln' })).toBeDisabled();
   });
 
-  it('holt bei 422 `volunteer_crew_required` die Kandidaten neu: das Kästchen erscheint, der Dialog bleibt offen', async () => {
-    let pflicht = false;
+  it('holt bei 422 (Org-Schalter inzwischen aus) die Kandidaten neu, erklärt die Sperre und bleibt offen', async () => {
+    let schalter = true;
     server.use(
       http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
-        HttpResponse.json({ volunteer_crew_required: pflicht, candidates: KANDIDATEN }),
+        HttpResponse.json({ tracking_enabled: schalter, candidates: KANDIDATEN }),
       ),
       http.put('/api/incidents/7/vehicles/10/tracking', () => {
-        pflicht = true;
+        schalter = false;
         return HttpResponse.json(
           {
-            error: 'Die ehrenamtliche Besatzung muss bestätigt werden',
-            grund: 'volunteer_crew_required',
+            error:
+              'Ortung ist für diese Organisation ausgeschaltet (Verwaltung → Einsatz-Vorgaben)',
           },
           { status: 422 },
         );
@@ -128,12 +120,9 @@ describe('OrtungKoppelnDialog', () => {
     );
     render();
     await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
-    expect(screen.queryByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' })).toBeNull();
     await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
-    expect(
-      await screen.findByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' }),
-    ).toBeInTheDocument();
-    expect(await screen.findByText(/muss bestätigt werden/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('radio')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Koppeln' })).toBeDisabled();
     expect(onSchliessen).not.toHaveBeenCalled();
   });
 
@@ -142,7 +131,7 @@ describe('OrtungKoppelnDialog', () => {
     server.use(
       http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
         HttpResponse.json({
-          volunteer_crew_required: false,
+          tracking_enabled: true,
           candidates: KANDIDATEN.map((k) =>
             k.device_id === 'kennung-a' ? { ...k, coupled: vergeben } : k,
           ),

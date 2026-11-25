@@ -320,7 +320,6 @@ export default function LagekartePage() {
     datenstand,
     einsatz: einsatzDaten,
     abschnitteOhneFlaeche,
-    bezugszeit,
   } = useLagekarteDaten({ einsatzId, zeigeZonen: layer.zone, aktiveAnsichtId, quelle });
   // Fällt das Schreibrecht weg (eingefrorener Stand, Rolle), ist das Menü zu und bleibt es auch
   // danach — im Render statt per Effekt (React: State bei Prop-Wechsel anpassen).
@@ -1451,7 +1450,6 @@ export default function LagekartePage() {
             onVerortungLoeschen={loescheVerortung}
             onSymbolAendern={aendereSymbol}
             roh={rohdaten}
-            bezugszeit={bezugszeit}
             ohneOrt={aktiverMarkerOhneOrt}
             onAbschnittFokussieren={
               aktiverMarker.typ === 'abschnitt' && fokusSicht?.abschnittId !== aktiverMarker.id

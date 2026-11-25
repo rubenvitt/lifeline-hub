@@ -3,7 +3,6 @@ import { Button, Popconfirm, Space } from 'antd';
 import { istPfadGesperrt, istSprungGesperrt } from '../../einsatz/modulRegistry';
 import { useModulFreigaben } from '../../einsatz/useSprungSperre';
 import { useId, useMemo, useState } from 'react';
-import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { renderSvg } from '@einsatzzeichen/core';
 import { Select } from '../../components/Select';
 import FeldLabel from '../../components/FeldLabel';
@@ -54,8 +53,6 @@ interface InspectorProps {
   ) => void;
   /** Rohlisten für das Datenraster (Stärke, Abschnitt, Status …); ohne Angabe nur Ort. */
   roh?: AuswahlRoh;
-  /** Stand eines eingefrorenen Lagestands (ms): das GPS-Alter rechnet gegen ihn, nicht gegen die Uhr. */
-  bezugszeit?: number;
   /**
    * „Abschnitt fokussieren“ (LLH-1057): nur an einem Abschnitt. Ohne Handler fehlt der Knopf, etwa
    * wenn genau dieser Abschnitt schon im Fokus steht — dann trägt das Fuß-Band „Fokus aufheben“.
@@ -178,7 +175,6 @@ export default function Inspector({
   onVerortungLoeschen,
   onSymbolAendern,
   roh = LEERE_ROHDATEN,
-  bezugszeit,
   onAbschnittFokussieren,
   ohneOrt = false,
 }: InspectorProps) {
@@ -197,8 +193,7 @@ export default function Inspector({
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => markerBildUrl(marker, dunkel), [marker, dunkel]);
-  const takt = useMinutenTakt();
-  const raster = auswahlRaster(marker, roh, zeitKurz, bezugszeit ?? takt);
+  const raster = auswahlRaster(marker, roh, zeitKurz);
   const letzte = letzteMeldungBlock(marker, roh, zeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);

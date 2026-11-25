@@ -82,8 +82,6 @@ export function zuUpdate(e: OrgEinstellungen): OrgEinstellungenUpdate {
     rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? null,
     // 0 = aus; null/1 = an (Default an).
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
-    // Vollersatz: ohne das Feld setzte jedes andere Speichern den Schalter zurück (LLH-2091).
-    ortung_hauptamt: e.ortung_hauptamt === 1,
     geocoder_url: e.geocoder_url ?? null,
   };
 }

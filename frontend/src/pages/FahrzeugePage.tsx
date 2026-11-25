@@ -1097,7 +1097,9 @@ function FahrzeugeInhalt() {
               {/* Funkrufname in Mono. */}
               <Kennung>{ef.funkrufname}</Kennung>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
-              {ef.ortung_gekoppelt && <Marke>GPS</Marke>}
+              {/* Gekoppelt an eine Einwurf-Kennung (LLH-2091); dasselbe Wort wie die Quelle am
+                  Marker der Lagekarte („Ortung · vor 3 min“). */}
+              {ef.ortung_gekoppelt && <Marke>Ortung</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>
           }

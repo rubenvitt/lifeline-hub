@@ -15,6 +15,11 @@ export interface GeortetEintrag {
   veraltet: boolean;
 }
 
+/** Ist die automatische Position des Markers veraltet (blass gezeichnet)? */
+function isVeraltet(m: KarteMarker): boolean {
+  return m.deckkraft != null && m.deckkraft < 1;
+}
+
 /** Automatisch geortete Ziele, nach Namen. Handpositionen tragen keinen Untertitel und fehlen. */
 export function geortetEintraege(verortet: readonly KarteMarker[]): GeortetEintrag[] {
   return verortet
@@ -23,7 +28,18 @@ export function geortetEintraege(verortet: readonly KarteMarker[]): GeortetEintr
       schluessel: m.schluessel,
       label: m.label,
       quelle: m.untertitel,
-      veraltet: m.deckkraft != null && m.deckkraft < 1,
+      veraltet: isVeraltet(m),
     }))
     .sort((a, b) => a.label.localeCompare(b.label, 'de'));
+}
+
+/**
+ * Quelle und Alter einer automatischen Position als Text wie in der Liste „Geortet“ („Ortung ·
+ * vor 6 min · veraltet“), etwa für das Datenraster des Paneels „Ausgewählt“ (LLH-2091). Ohne
+ * Untertitel (Handposition, keine Position) `null`.
+ */
+export function positionsHinweisText(m: KarteMarker): { text: string; veraltet: boolean } | null {
+  if (m.untertitel == null) return null;
+  const veraltet = isVeraltet(m);
+  return { text: veraltet ? `${m.untertitel} · veraltet` : m.untertitel, veraltet };
 }

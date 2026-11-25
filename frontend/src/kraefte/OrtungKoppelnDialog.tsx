@@ -1,12 +1,7 @@
 import { useMemo } from 'react';
-import { Checkbox, Form, Radio } from 'antd';
+import { Form, Radio } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  GRUND_EHRENAMT_ERFORDERLICH,
-  koppleOrtung,
-  listOrtungKandidaten,
-  type TrackingCandidate,
-} from '../api/ortung';
+import { koppleOrtung, listOrtungKandidaten, type TrackingCandidate } from '../api/ortung';
 import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug } from '../api/types';
@@ -16,7 +11,7 @@ import { Feld, Kennung, Stapel, Textstufe } from '../components/instrument';
 import { pflicht } from '../components/pflichtRegel';
 import { useMinutenTakt } from '../components/useMinutenTakt';
 
-type Werte = { kennung?: string; ehrenamt?: boolean };
+type Werte = { kennung?: string };
 
 /** Der Wert einer Auswahl: Zugang und Kennung zusammen bestimmen die Kennung eindeutig. */
 const kennungWert = (k: Pick<TrackingCandidate, 'access_id' | 'device_id'>) =>
@@ -29,15 +24,20 @@ export interface OrtungKoppelnDialogProps {
   onSchliessen: () => void;
 }
 
+/** Warum Koppeln gesperrt ist, wenn der Org-Schalter „Ortung im Einsatz“ aus ist. */
+const SCHALTER_AUS_TEXT =
+  'Ortung ist für diese Organisation ausgeschaltet. Ein Admin schaltet sie unter Verwaltung → ' +
+  'Einsatz-Vorgaben ein.';
+
 /**
- * Dialog „Ortung koppeln“ (LLH-2091, Spec `fahrzeugortung`, „Oberfläche“): wählt eine der
- * Kennungen, von denen in den letzten 24 Stunden eine Position eingegangen ist („Zugang · Kennung ·
- * vor 2 min“; schon gekoppelte stehen ausgegraut). „Besatzung ist ehrenamtlich“ ist Pflicht, solange
- * der Org-Schalter `ortung_hauptamt` nicht an ist; ist er an, steht das Kästchen nicht da. Ob es
- * Pflicht ist, steht als `volunteer_crew_required` in der Kandidatenliste (die Org-Einstellungen
- * darf nicht jeder Schreibberechtigte lesen). Maßgeblich ist ohnehin der Server (422
- * `volunteer_crew_required`). Die Kandidaten werden beim Öffnen geholt, nicht live und
- * nicht im Lagebild ohne Netz (`NICHT_LIVE_KEYS`). Die Liste trägt keine Koordinaten.
+ * Dialog „Ortung koppeln“ (LLH-2091, Spec `fahrzeugortung`, „Oberfläche“, Nachtrag 25.11.2026):
+ * wählt eine der Kennungen, von denen in den letzten 24 Stunden eine Position eingegangen ist
+ * („Zugang · Kennung · vor 2 min“; schon gekoppelte stehen ausgegraut). Koppeln geht nur mit dem
+ * Org-Schalter „Ortung im Einsatz“ (ADR-0101); ob er an ist, steht als `tracking_enabled` in der
+ * Kandidatenliste (die Org-Einstellungen darf nicht jeder Schreibberechtigte lesen). Ist er aus,
+ * erklärt der Dialog das und sperrt „Koppeln“; maßgeblich ist der Server (422). Die Kandidaten
+ * werden beim Öffnen geholt, nicht live und nicht im Lagebild ohne Netz (`NICHT_LIVE_KEYS`). Die
+ * Liste trägt keine Koordinaten.
  */
 export default function OrtungKoppelnDialog({
   einsatzId,
@@ -58,16 +58,15 @@ export default function OrtungKoppelnDialog({
     staleTime: 0,
     gcTime: 0,
   });
-  /** Der Server nennt den Org-Schalter mit der Liste; solange sie fehlt, ist die Bestätigung Pflicht. */
-  const bestaetigungPflicht = kandidatenQuery.data?.volunteer_crew_required ?? true;
+  /** Der Server nennt den Org-Schalter mit der Liste; solange sie fehlt, gilt er als aus. */
+  const schalterAn = kandidatenQuery.data?.tracking_enabled === true;
 
   const kennung = Form.useWatch('kennung', form);
-  const ehrenamt = Form.useWatch('ehrenamt', form);
   const kandidaten = useMemo(() => kandidatenQuery.data?.candidates ?? [], [kandidatenQuery.data]);
-  const bereit = kennung != null && (!bestaetigungPflicht || ehrenamt === true);
+  const bereit = schalterAn && kennung != null;
 
   const mutation = useMutation({
-    mutationFn: (v: { efId: number; kandidat: TrackingCandidate; ehrenamt: boolean }) => {
+    mutationFn: (v: { efId: number; kandidat: TrackingCandidate }) => {
       // Nach einem Neuabruf kann die gewählte Kennung inzwischen vergeben sein: nicht still schließen.
       if (v.kandidat.coupled) {
         form.setFieldValue('kennung', undefined);
@@ -78,19 +77,14 @@ export default function OrtungKoppelnDialog({
       return koppleOrtung(einsatzId, v.efId, {
         access_id: v.kandidat.access_id,
         device_id: v.kandidat.device_id,
-        volunteer_crew_confirmed: v.ehrenamt,
       });
     },
     // Der Server hat anders entschieden als die Liste beim Öffnen: die Kennung ist inzwischen
-    // vergeben (409) oder die Bestätigung ist jetzt Pflicht (422 `volunteer_crew_required`).
-    // Der Dialog bleibt offen, die Kandidaten werden neu geholt (Kästchen, ausgegraute Kennung),
+    // vergeben (409), oder der Org-Schalter ist aus bzw. der Zugang ungültig (422). Der Dialog
+    // bleibt offen, die Kandidaten werden neu geholt (ausgegraute Kennung, Hinweis zum Schalter),
     // die Fehlerzeile nennt den Zustand.
     onError: (fehler) => {
-      if (
-        fehler instanceof ApiError &&
-        (fehler.status === 409 ||
-          (fehler.status === 422 && fehler.grund === GRUND_EHRENAMT_ERFORDERLICH))
-      ) {
+      if (fehler instanceof ApiError && (fehler.status === 409 || fehler.status === 422)) {
         if (fehler.status === 409) form.setFieldValue('kennung', undefined);
         void kandidatenQuery.refetch();
       }
@@ -113,6 +107,12 @@ export default function OrtungKoppelnDialog({
     auswahl = (
       <Textstufe ton="gedaempft" als="p">
         Kennungen werden geladen …
+      </Textstufe>
+    );
+  } else if (!schalterAn) {
+    auswahl = (
+      <Textstufe ton="gedaempft" als="p">
+        {SCHALTER_AUS_TEXT}
       </Textstufe>
     );
   } else if (kandidaten.length === 0) {
@@ -152,31 +152,12 @@ export default function OrtungKoppelnDialog({
         if (!fahrzeug) return;
         const kandidat = kandidaten.find((k) => kennungWert(k) === werte.kennung);
         if (!kandidat) return;
-        await mutation.mutateAsync({
-          efId: fahrzeug.id,
-          kandidat,
-          ehrenamt: werte.ehrenamt === true,
-        });
+        await mutation.mutateAsync({ efId: fahrzeug.id, kandidat });
       }}
       onFertig={onSchliessen}
       onAbbrechen={onSchliessen}
     >
       {auswahl}
-      {bestaetigungPflicht && kandidaten.length > 0 && (
-        <Feld
-          name="ehrenamt"
-          valuePropName="checked"
-          abstand="ohne"
-          rules={[
-            {
-              validator: (_, wert: boolean | undefined) =>
-                wert === true ? Promise.resolve() : Promise.reject(new Error('Bestätigung fehlt')),
-            },
-          ]}
-        >
-          <Checkbox>Besatzung ist ehrenamtlich</Checkbox>
-        </Feld>
-      )}
     </ErfassungsModal>
   );
 }

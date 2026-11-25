@@ -478,41 +478,6 @@ describe('buildTaktischeMarker', () => {
     expect(tz?.organisation).toBe('feuerwehr');
   });
 
-  it('trägt bei GPS die Marke „GPS“, veraltet zusätzlich in Worten (LLH-2091)', () => {
-    const jetzt = Date.UTC(2026, 10, 25, 12, 0, 0);
-    const vor = (min: number) => new Date(jetzt - min * 60_000).toISOString();
-    const fz = (id: number, extra: object) => ({
-      id,
-      funkrufname: `Fz ${id}`,
-      lat: 50.2,
-      lon: 8.7,
-      tz_fachaufgabe: null,
-      tz_organisation: null,
-      status_farbe: '#123456',
-      ...extra,
-    });
-    const fahrzeuge = [
-      fz(1, { position_quelle: 'ortung', position_gemessen_at: vor(3) }),
-      fz(2, { position_quelle: 'ortung', position_gemessen_at: vor(14) }),
-      fz(3, { position_quelle: 'manuell', position_gemessen_at: null }),
-      fz(4, { position_quelle: null }),
-    ] as unknown as TaktischeQuelle['fahrzeuge'];
-    const { verortet } = buildTaktischeMarker(
-      { einheiten: [], fahrzeuge, fuehrungskraefte: [], orgDefault: null },
-      token,
-      jetzt,
-    );
-    const zusatz = (id: number) =>
-      verortet.find((m) => m.schluessel === `fahrzeug-${id}`)?.beschriftungZusatz;
-    expect(zusatz(1)).toBe('GPS');
-    expect(zusatz(2)).toBe('GPS · veraltet');
-    expect(zusatz(3)).toBeUndefined();
-    expect(zusatz(4)).toBeUndefined();
-    const m1 = verortet.find((m) => m.schluessel === 'fahrzeug-1');
-    expect(m1?.statusFarbe).toBe('#123456');
-    expect(m1?.trefferDurchmesser).toBe(token.controlHeight);
-  });
-
   it('reicht Funktion + Führungskraft-Flag an die Personen-TZ-Ableitung durch (LFH-172)', () => {
     const fuehrungskraefte = [
       {
