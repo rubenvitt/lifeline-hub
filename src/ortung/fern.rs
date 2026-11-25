@@ -344,3 +344,12 @@ fn zaehle_fehler(kopplung: &KopplungZeile) {
         );
     }
 }
+
+/// Testhaken: leert den Puffer der Kandidatenliste und den Wunsch der Org, wie nach Verfall.
+pub fn clear_candidates(pool: &SqlitePool, instanz_kopplung_id: i64, org_id: i64) {
+    let key = puffer_key(pool, instanz_kopplung_id, org_id);
+    puffer(|p| {
+        p.kandidaten.remove(&key);
+        p.wuensche.remove(&key);
+    });
+}

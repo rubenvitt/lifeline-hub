@@ -510,3 +510,243 @@ async fn wunsch_liefert_kandidaten_in_den_puffer() {
     assert!(k.tracking_enabled);
     assert!(k.items.iter().any(|i| i.device_id == "fkw1"), "{k:?}");
 }
+
+// ── Routen am ELW (Task 4) ───────────────────────────────────────────────────────────────────
+
+/// Das ELW führt einen Einsatz mit einem disponierten Fahrzeug, ohne Kopplung.
+/// (Einsatz, Einsatzfahrzeug, Kopplung am ELW).
+async fn elw_mit_fahrzeug(a: &Aufbau, name: &str) -> (i64, i64, KopplungZeile) {
+    schalter_setzen(&a.elw.pool, 1, true).await;
+    let einsatz = common::einsatz_anlegen(&a.elw.app, &a.elw.admin).await;
+    let ef = fahrzeug_dazu(a, einsatz, name).await;
+    let kopplung = {
+        let mut conn = a.elw.pool.acquire().await.unwrap();
+        lifeline_hub::instanz::repo::find_kopplung(&mut conn, &a.hub.kennung)
+            .await
+            .unwrap()
+            .expect("Kopplung am ELW")
+    };
+    fern::clear_candidates(&a.elw.pool, kopplung.id, 1);
+    (einsatz, ef, kopplung)
+}
+
+async fn fahrzeug_dazu(a: &Aufbau, einsatz: i64, name: &str) -> i64 {
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/vehicles"),
+        &a.elw.admin,
+        Some(&format!(
+            r#"{{"adhoc":{{"funkrufname":"{name}","traegerorganisation":"Feuerwehr"}}}}"#
+        )),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    v["id"].as_i64().unwrap()
+}
+
+fn tracking_pfad(einsatz: i64, ef: i64) -> String {
+    format!("/api/incidents/{einsatz}/vehicles/{ef}/tracking")
+}
+
+async fn koppeln_am_elw(
+    a: &Aufbau,
+    einsatz: i64,
+    ef: i64,
+    kennung: &str,
+) -> (StatusCode, serde_json::Value) {
+    common::anfrage_json(
+        &a.elw.app,
+        "PUT",
+        &tracking_pfad(einsatz, ef),
+        &a.elw.admin,
+        Some(&json!({"access_id": a.zugang, "device_id": kennung})),
+    )
+    .await
+}
+
+/// Wartet, bis der Hub-Teil im Puffer des ELW steht (zwei Abgleiche).
+async fn kandidaten_holen(a: &Aufbau, einsatz: i64, ef: i64) -> serde_json::Value {
+    let pfad = format!("{}/candidates", tracking_pfad(einsatz, ef));
+    let (s, v) = common::anfrage(&a.elw.app, "GET", &pfad, &a.elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["pending"], true, "{v}");
+    abgleichen(&a.elw).await;
+    let (s, v) = common::anfrage(&a.elw.app, "GET", &pfad, &a.elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    v
+}
+
+#[tokio::test]
+async fn kandidaten_vom_hub_mit_pending() {
+    let a = aufbau().await;
+    let (einsatz, ef, _) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    let pfad = format!("{}/candidates", tracking_pfad(einsatz, ef));
+    let (s, v) = common::anfrage(&a.elw.app, "GET", &pfad, &a.elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["pending"], true, "{v}");
+    assert_eq!(v["candidates"], json!([]), "{v}");
+    abgleichen(&a.elw).await;
+    let (s, v) = common::anfrage(&a.elw.app, "GET", &pfad, &a.elw.admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["pending"], false, "{v}");
+    assert_eq!(v["tracking_enabled"], true, "{v}");
+    let fkw1 = v["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["device_id"] == "fkw1")
+        .unwrap_or_else(|| panic!("fkw1 fehlt: {v}"));
+    assert_eq!(fkw1["via_hub"], true);
+    assert_eq!(fkw1["coupled"], false);
+    assert_eq!(fkw1["access_id"], a.zugang.as_str());
+    assert_eq!(fkw1["access_name"], "Tracker");
+}
+
+#[tokio::test]
+async fn koppeln_an_hub_kennung() {
+    let a = aufbau().await;
+    let (einsatz, ef, _) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    kandidaten_holen(&a, einsatz, ef).await;
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef, "fkw1").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let etb = common::system_etb_inhalte(&a.elw.app, &a.elw.admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "Ortung gekoppelt: FW Extern 1 (Tracker / fkw1)"),
+        "{etb:?}"
+    );
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "GET",
+        &tracking_pfad(einsatz, ef),
+        &a.elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["access_name"], "Tracker");
+    assert_eq!(v["device_id"], "fkw1");
+    // Die Position kommt mit dem nächsten Abgleich.
+    abgleichen(&a.elw).await;
+    assert_eq!(
+        position_am_elw(&a, ef).await,
+        (Some(48.1), Some(11.5), Some("einwurf".into()))
+    );
+    // Danach steht die Kennung als gekoppelt in der Liste.
+    let v = kandidaten_holen_ohne_pending(&a, einsatz, ef).await;
+    let fkw1 = v["candidates"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["device_id"] == "fkw1")
+        .unwrap();
+    assert_eq!(fkw1["coupled"], true);
+}
+
+async fn kandidaten_holen_ohne_pending(a: &Aufbau, einsatz: i64, ef: i64) -> serde_json::Value {
+    let pfad = format!("{}/candidates", tracking_pfad(einsatz, ef));
+    let (_, v) = common::anfrage(&a.elw.app, "GET", &pfad, &a.elw.admin, None).await;
+    v
+}
+
+#[tokio::test]
+async fn koppeln_nicht_im_puffer_422() {
+    let a = aufbau().await;
+    let (einsatz, ef, _) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    kandidaten_holen(&a, einsatz, ef).await;
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef, "fkw9").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}
+
+#[tokio::test]
+async fn koppeln_ohne_puffer_422() {
+    let a = aufbau().await;
+    let (einsatz, ef, _) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef, "fkw1").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+}
+
+#[tokio::test]
+async fn doppelt_gekoppelt_409() {
+    let a = aufbau().await;
+    let (einsatz, ef, _) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    let ef2 = fahrzeug_dazu(&a, einsatz, "FW Extern 2").await;
+    kandidaten_holen(&a, einsatz, ef).await;
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef, "fkw1").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef2, "fkw1").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+}
+
+#[tokio::test]
+async fn ruecknahme_stellt_hub_kopplung_her() {
+    let a = aufbau().await;
+    let (einsatz, ef, kopplung) = elw_mit_fahrzeug(&a, "FW Extern 1").await;
+    kandidaten_holen(&a, einsatz, ef).await;
+    let (s, v) = koppeln_am_elw(&a, einsatz, ef, "fkw1").await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/vehicles/{ef}/stand-down"),
+        &a.elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let vorzustand = v["vorzustand"].clone();
+    assert_eq!(vorzustand["ortung"]["instanz_kopplung_id"], kopplung.id);
+    assert_eq!(vorzustand["ortung"]["zugang_name"], "Tracker");
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM ortung_kopplung")
+        .fetch_one(&a.elw.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+    // Der Puffer ist verfallen; die Rücknahme prüft ihn nicht.
+    fern::clear_candidates(&a.elw.pool, kopplung.id, 1);
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/vehicles/{ef}/stand-down/undo"),
+        &a.elw.admin,
+        Some(&vorzustand.to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ausgelassen"], json!([]), "{v}");
+    let (s, v) = common::anfrage(
+        &a.elw.app,
+        "GET",
+        &tracking_pfad(einsatz, ef),
+        &a.elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["access_name"], "Tracker");
+    assert_eq!(v["device_id"], "fkw1");
+}
+
+#[tokio::test]
+async fn ohne_hub_bleibt_alles_lokal() {
+    let inst = instanz().await;
+    schalter_setzen(&inst.pool, 1, true).await;
+    let einsatz = common::einsatz_anlegen(&inst.app, &inst.admin).await;
+    let (zugang, schluessel) = zugang_anlegen(&inst, "Lokal").await;
+    einwerfen(&inst, &schluessel, "lok1", 48.1, 11.5).await;
+    let (s, v) = common::anfrage(
+        &inst.app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/vehicles/1/tracking/candidates"),
+        &inst.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["pending"], false, "{v}");
+    let c = &v["candidates"][0];
+    assert_eq!(c["device_id"], "lok1", "{v}");
+    assert_eq!(c["access_id"], zugang.as_str());
+    assert_eq!(c["via_hub"], false);
+}

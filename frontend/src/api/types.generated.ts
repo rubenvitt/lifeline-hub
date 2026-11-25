@@ -7141,8 +7141,16 @@ export interface components {
         };
         /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091). */
         OrtungVorzustand: {
+            /**
+             * Format: int64
+             * @description Gesetzt: die Kopplung hing an einer Kennung des Hubs (LLH-2119).
+             */
+            instanz_kopplung_id?: number | null;
             kennung: string;
+            /** @description Der lokale Einwurf-Zugang, mit `instanz_kopplung_id` der Zugang auf dem Hub. */
             zugang_id: string;
+            /** @description Name des Hub-Zugangs für das ETB. */
+            zugang_name?: string | null;
         };
         /**
          * @description Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren
@@ -9152,6 +9160,8 @@ export interface components {
             coupled: boolean;
             device_id: string;
             received_at: string;
+            /** @description Kommt die Kennung vom Hub (gespiegelte Org) statt aus der eigenen Ablage? */
+            via_hub: boolean;
         };
         /**
          * @description Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“
@@ -9160,6 +9170,8 @@ export interface components {
          */
         TrackingCandidates: {
             candidates: components["schemas"]["TrackingCandidate"][];
+            /** @description Die Liste des Hubs ist angefragt, aber noch nicht (frisch) da; der Dialog fragt erneut. */
+            pending: boolean;
             /** @description Org-Schalter „Ortung im Einsatz“; aus = Koppeln antwortet 422, nichts wird übernommen. */
             tracking_enabled: boolean;
         };

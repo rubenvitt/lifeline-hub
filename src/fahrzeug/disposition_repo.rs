@@ -796,6 +796,19 @@ impl Entlassen {
                 .map(|k| crate::fahrzeug::OrtungVorzustand {
                     zugang_id: k.access_id().to_string(),
                     kennung: k.kennung.clone(),
+                    instanz_kopplung_id: match &k.zugang {
+                        crate::ortung::kopplung::KopplungZugang::Hub {
+                            instanz_kopplung_id,
+                            ..
+                        } => Some(*instanz_kopplung_id),
+                        crate::ortung::kopplung::KopplungZugang::Lokal { .. } => None,
+                    },
+                    zugang_name: match &k.zugang {
+                        crate::ortung::kopplung::KopplungZugang::Hub { .. } => {
+                            Some(k.zugang_name.clone())
+                        }
+                        crate::ortung::kopplung::KopplungZugang::Lokal { .. } => None,
+                    },
                 }),
         }
     }
@@ -1411,21 +1424,62 @@ async fn restore_ortung_tx(
         ));
         return Ok(());
     }
-    match crate::ortung::kopplung::create_kopplung_tx(
-        conn,
-        einsatz_id,
-        ef_id,
-        &ortung.zugang_id,
-        &ortung.kennung,
-        benutzer_id,
-        jetzt,
-    )
-    .await
-    {
+    let kopplung = match ortung.instanz_kopplung_id {
+        Some(instanz_kopplung_id) => {
+            // Über den Hub gibt es keine Pufferprüfung (er ist nach der Entlassung verfallen);
+            // die Instanzkopplung muss aktiv und die Org ihr noch zugeordnet sein.
+            let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+                .bind(einsatz_id)
+                .fetch_optional(&mut *conn)
+                .await?
+                .ok_or(AppError::NotFound)?;
+            let aktiv = crate::public_api::zugang::hub_kopplung_fuer_org(conn, org_id).await?;
+            match aktiv {
+                Some((id, _)) if id == instanz_kopplung_id => {
+                    crate::ortung::kopplung::create_hub_kopplung_tx(
+                        conn,
+                        einsatz_id,
+                        ef_id,
+                        instanz_kopplung_id,
+                        &ortung.zugang_id,
+                        ortung.zugang_name.as_deref().unwrap_or_default(),
+                        &ortung.kennung,
+                        benutzer_id,
+                        jetzt,
+                    )
+                    .await
+                }
+                _ => Err(AppError::UnprocessableEntity(
+                    "Die Kopplung zum Hub besteht nicht mehr".into(),
+                )),
+            }
+        }
+        None => {
+            crate::ortung::kopplung::create_kopplung_tx(
+                conn,
+                einsatz_id,
+                ef_id,
+                &ortung.zugang_id,
+                &ortung.kennung,
+                benutzer_id,
+                jetzt,
+            )
+            .await
+        }
+    };
+    match kopplung {
         Ok(k) => {
-            // Wie beim Koppeln: die vorhandene Position der Kennung gleich übernehmen.
-            crate::ortung::uebernahme::apply_position_tx(conn, k.access_id(), &k.kennung, jetzt)
+            // Wie beim Koppeln: lokal die vorhandene Position der Kennung gleich übernehmen; vom
+            // Hub bringt sie der nächste Abgleich.
+            if ortung.instanz_kopplung_id.is_none() {
+                crate::ortung::uebernahme::apply_position_tx(
+                    conn,
+                    k.access_id(),
+                    &k.kennung,
+                    jetzt,
+                )
                 .await?;
+            }
             ergebnis.ortung = Some(k);
         }
         // Schalter aus, Zugang ungültig oder Kennung belegt: der Grund steht im Fehler.

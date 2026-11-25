@@ -133,24 +133,7 @@ pub async fn create_kopplung_tx(
     benutzer_id: i64,
     jetzt: &str,
 ) -> Result<Kopplung, AppError> {
-    let einsatz: Option<(i64, String, bool)> =
-        sqlx::query_as("SELECT org_id, status, spiegel != 0 FROM einsatz WHERE id = ?")
-            .bind(einsatz_id)
-            .fetch_optional(&mut *conn)
-            .await?;
-    let (org_id, status, spiegel) = einsatz.ok_or(AppError::NotFound)?;
-    if spiegel {
-        return Err(AppError::Conflict(
-            "Dieser Einsatz ist ein Spiegel; Ortung lässt sich dort nicht koppeln".into(),
-        ));
-    }
-    if status != "aktiv" {
-        return Err(AppError::Conflict("Der Einsatz ist nicht aktiv".into()));
-    }
-    crate::fahrzeug::disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
-    if !is_schalter_an_tx(conn, org_id).await? {
-        return Err(AppError::UnprocessableEntity(MELDUNG_SCHALTER_AUS.into()));
-    }
+    let org_id = pruefe_koppelbar_tx(conn, einsatz_id, ef_id).await?;
 
     let zugang: Option<(String, Option<String>)> = sqlx::query_as(
         "SELECT scope, widerrufen_at FROM einwurf_zugang WHERE id = ? AND org_id = ? \
@@ -207,6 +190,91 @@ pub async fn create_kopplung_tx(
     load_kopplung_tx(conn, einsatz_id, ef_id)
         .await?
         .ok_or(AppError::NotFound)
+}
+
+/// Koppelt das Fahrzeug an eine Kennung eines Zugangs des Hubs (LLH-2119). Die Prüfungen sind
+/// die von [`create_kopplung_tx`] ohne die Zugangsprüfung: der Zugang liegt am Hub, die Kennung
+/// hat der Aufrufer im Puffer des Hubs nachgeschlagen. „Belegt“ gilt unter den Hub-Zeilen
+/// derselben Instanzkopplung (409).
+#[allow(clippy::too_many_arguments)]
+pub async fn create_hub_kopplung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    instanz_kopplung_id: i64,
+    zugang_id: &str,
+    zugang_name: &str,
+    kennung: &str,
+    benutzer_id: i64,
+    jetzt: &str,
+) -> Result<Kopplung, AppError> {
+    let org_id = pruefe_koppelbar_tx(conn, einsatz_id, ef_id).await?;
+    let belegt: Option<i64> = sqlx::query_scalar(
+        "SELECT einsatz_fahrzeug_id FROM ortung_kopplung \
+         WHERE instanz_kopplung_id = ? AND fremder_zugang_id = ? AND kennung = ? \
+           AND einsatz_fahrzeug_id != ?",
+    )
+    .bind(instanz_kopplung_id)
+    .bind(zugang_id)
+    .bind(kennung)
+    .bind(ef_id)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if belegt.is_some() {
+        return Err(AppError::Conflict(
+            "Die Kennung ist schon an ein anderes Fahrzeug gekoppelt".into(),
+        ));
+    }
+    sqlx::query("DELETE FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?")
+        .bind(ef_id)
+        .execute(&mut *conn)
+        .await?;
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, \
+         instanz_kopplung_id, fremder_zugang_id, zugang_name, kennung, gekoppelt_at, \
+         gekoppelt_von) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(ef_id)
+    .bind(einsatz_id)
+    .bind(org_id)
+    .bind(instanz_kopplung_id)
+    .bind(zugang_id)
+    .bind(zugang_name)
+    .bind(kennung)
+    .bind(jetzt)
+    .bind(benutzer_id)
+    .execute(&mut *conn)
+    .await?;
+    load_kopplung_tx(conn, einsatz_id, ef_id)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// Die gemeinsamen Prüfungen beider Kopplungsarten; liefert die Org des Einsatzes.
+async fn pruefe_koppelbar_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+) -> Result<i64, AppError> {
+    let einsatz: Option<(i64, String, bool)> =
+        sqlx::query_as("SELECT org_id, status, spiegel != 0 FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    let (org_id, status, spiegel) = einsatz.ok_or(AppError::NotFound)?;
+    if spiegel {
+        return Err(AppError::Conflict(
+            "Dieser Einsatz ist ein Spiegel; Ortung lässt sich dort nicht koppeln".into(),
+        ));
+    }
+    if status != "aktiv" {
+        return Err(AppError::Conflict("Der Einsatz ist nicht aktiv".into()));
+    }
+    crate::fahrzeug::disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
+    if !is_schalter_an_tx(conn, org_id).await? {
+        return Err(AppError::UnprocessableEntity(MELDUNG_SCHALTER_AUS.into()));
+    }
+    Ok(org_id)
 }
 
 /// Ist der Org-Schalter „Ortung im Einsatz“ (ADR-0101) an? Ohne Zeile aus. In der Transaktion
