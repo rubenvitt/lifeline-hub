@@ -952,3 +952,111 @@ async fn meldung_nur_fuer_admins_der_org_lesbar() {
     assert_eq!(s, StatusCode::NOT_FOUND);
     assert!(u.meldungen(&u.admin2).await.is_empty());
 }
+
+// ───────────────────── Flüchtige Arten und `version_unbekannt` (LLH-2105) ─────────────────────
+
+async fn versuche(u: &Umgebung, id: &str) -> Vec<Option<String>> {
+    sqlx::query_scalar("SELECT fehler_art FROM adapter_versuch WHERE adapter_id = ? ORDER BY id")
+        .bind(id)
+        .fetch_all(&u.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn flüchtige_art_schreibt_bei_erfolg_keinen_versuch() {
+    let u = umgebung().await;
+    u.art
+        .fluechtig
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let id = u.adapter(true).await;
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    u.lauf(t0 + Duration::seconds(65)).await;
+    assert_eq!(u.art.gesehen().len(), 2);
+    assert!(versuche(&u, &id).await.is_empty());
+    let a = u.ansicht(&id).await;
+    assert_eq!(a["zustand"], "ok");
+    assert!(a["letzter_erfolg_at"].as_str().is_some());
+}
+
+#[tokio::test]
+async fn flüchtige_art_schreibt_den_versuch_der_die_störung_beendet() {
+    let u = umgebung().await;
+    u.art
+        .fluechtig
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let id = u.adapter(true).await;
+    let t0 = Utc::now();
+    u.art.plane(verbindung());
+    u.lauf(t0).await;
+    u.lauf(t0 + Duration::seconds(125)).await;
+    assert_eq!(
+        versuche(&u, &id).await,
+        vec![Some("verbindung".to_string()), None]
+    );
+    // Danach wieder still.
+    u.lauf(t0 + Duration::seconds(250)).await;
+    assert_eq!(versuche(&u, &id).await.len(), 2);
+}
+
+#[tokio::test]
+async fn flüchtige_art_zählt_das_intervall_ab_laufbeginn() {
+    let u = umgebung().await;
+    u.art
+        .fluechtig
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let id = u.adapter(true).await;
+    sqlx::query("UPDATE adapter SET intervall_s = 5 WHERE id = ?")
+        .bind(&id)
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    // Ein Abruf, der Zeit braucht: das Ende liegt spürbar nach dem Beginn.
+    *u.art.waehrenddessen.lock().unwrap() = None;
+    u.art
+        .verzoegerung_ms
+        .store(1500, std::sync::atomic::Ordering::SeqCst);
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    let a = u.ansicht(&id).await;
+    assert_eq!(
+        a["naechster_abruf_at"].as_str().unwrap(),
+        zeit(t0 + Duration::seconds(5))
+    );
+}
+
+#[tokio::test]
+async fn nicht_flüchtige_art_bleibt_wie_bisher() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    sqlx::query("UPDATE adapter SET intervall_s = 5 WHERE id = ?")
+        .bind(&id)
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    u.art
+        .verzoegerung_ms
+        .store(1500, std::sync::atomic::Ordering::SeqCst);
+    let t0 = Utc::now();
+    u.lauf(t0).await;
+    u.lauf(t0 + Duration::seconds(65)).await;
+    assert_eq!(versuche(&u, &id).await, vec![None, None]);
+    let a = u.ansicht(&id).await;
+    // Ende (≥ t0 + 1 s) + Intervall, nicht Beginn + Intervall.
+    assert!(
+        a["naechster_abruf_at"].as_str().unwrap() > zeit(t0 + Duration::seconds(65 + 5)).as_str()
+    );
+}
+
+#[tokio::test]
+async fn version_unbekannt_hält_den_adapter_an() {
+    let u = umgebung().await;
+    let id = u.adapter(true).await;
+    u.art
+        .plane(Err(Fehlschlag::new(AdapterFehler::VersionUnbekannt)));
+    u.lauf(Utc::now()).await;
+    let a = u.ansicht(&id).await;
+    assert_eq!(a["zustand"], "braucht_eingriff");
+    assert_eq!(a["angehalten_grund"], "version_unbekannt");
+}

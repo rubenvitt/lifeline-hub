@@ -853,6 +853,7 @@ describe('Gruppen des Ebenenbaums', () => {
       ['Umwelt', ['luftqualitaet', 'odl']],
       ['Verkehr & Infrastruktur', ['autobahn', 'kritis', 'energie']],
       ['Satellitenauswertung', ['copernicus']],
+      ['Drohne', ['drohne']],
     ]);
   });
 

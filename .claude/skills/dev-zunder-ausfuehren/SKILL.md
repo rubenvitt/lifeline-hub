@@ -347,6 +347,16 @@ in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
 - **Dein PR ist doppelt** (du hast selbst einen Fix mit `alpha-rot` geöffnet, ein älterer
   existiert): deinen PR schließen, oder das Label entfernen, wenn er etwas anderes repariert.
 
+## Drei Runden, dann der Mensch
+
+**Festlegung vom 24.11.2026 (LLH-2090).** Bleibt ein Gate, ein Test oder das Ansehen mit dem
+Skill `verify` nach **drei** Reparaturrunden rot, hörst du auf zu reparieren. Eine Runde ist:
+Ursache vermuten, ändern, erneut prüfen. Dann setzt du die Aufgabe auf `blocked` und schreibst
+einen Kommentar: was rot ist (Kommando und Ausgabe), was du versucht hast und was du vermutest.
+Danach fragst du den Menschen. Keine vierte Runde aufs Geratewohl. Um grün zu werden, gibt es
+keinen zusätzlichen Wiederholversuch, keine Wartezeit, kein `skip` und kein Lockern der Prüfung
+(`frontend/e2e/AGENTS.md`, „Warten auf einen Zustand“; `scripts/AGENTS.md`, „Gate-Dateien“).
+
 ## Review nach Ermessen
 
 **Festlegung des Users vom 17.11.2026:** kein Pflicht-Review vor jedem PR, aber auch keiner auf

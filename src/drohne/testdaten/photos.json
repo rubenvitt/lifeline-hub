@@ -1,0 +1,11 @@
+[
+  { "id": 17, "taken_at_ms": 1700000003000, "position": { "lat": 50.1, "lon": 8.1 },
+    "relative_altitude_m": 55.0, "gimbal_yaw_deg": 180.0,
+    "photos": [
+      { "lens": "thermal", "thumb_url": "/api/lagemonitor/v1/photos/17/thumb?v=1" },
+      { "lens": "wide", "thumb_url": "/api/lagemonitor/v1/photos/18/thumb?v=1" }
+    ] },
+  { "id": 20, "taken_at_ms": 1700000004000, "position": null,
+    "relative_altitude_m": null, "gimbal_yaw_deg": null,
+    "photos": [ { "lens": "wide", "thumb_url": "/api/lagemonitor/v1/photos/20/thumb?v=1" } ] }
+]

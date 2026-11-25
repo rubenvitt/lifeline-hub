@@ -57,10 +57,12 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 | Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
+| Drohne (LLH-2106) | — (Arbeitsspeicher) | 5 s | 1 min | Der Adapter erneuert den Stand alle 5 s (`intervall_vorschlag_s`); eine Minute ohne neuen Stand ist ein altes Fluggerät. Einsatzroute `/api/incidents/{id}/map/drone`, ein Poll ohne Änderung kostet ein 304 |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
-`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
-mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser; ein
+`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen bis auf die Drohnenlage bei
+mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser (die
+Drohnenlage mit 1 min setzt Uhren voraus, die auf wenige Sekunden gehen); ein
 Zeitpunkt in der Zukunft zählt als Alter 0. **KRITIS:** Das Import-Intervall ist konfigurierbar
 (`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
 hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet.
@@ -113,7 +115,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
 | **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage über einen erweiterten Rand zusammengeführt und auf die `bbox` beschränkt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); kalter Abruf von der Anfrage gelöst, Wartefrist 10 s für beide Teile zusammen; `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
-| **Copernicus EMS Rapid Mapping** (`copernicus`, LLH-1200) | Liste `https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500` · Details `…/dashboard-api/public-activations/?code=EMSRnnn` · Ebenen als GeoJSON unter `https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/…` | WKT (Gebiete) + GeoJSON in CRS84 (Flächen, Linien, Punkte) → einheitliche Features mit `art`, `klasse`, Herkunft und Aufnahmezeit, je Ausschnitt | **Frei mit Quellenangabe** (Copernicus-Datenpolitik der EU). Kein Schlüssel. Die Detail-Schnittstelle ist ein Pfad des Dashboard-Backends ohne Stabilitätszusage; öffentlich erst ab EMSR656 (März 2023). | `© European Union, Copernicus Emergency Management Service` | Antwort, Liste und laufende Aktivierungen 1 800 s, abgeschlossene Aktivierungen und Ebenen-Dateien 24 h; kalter Abruf von der Anfrage gelöst, Wartefrist 10 s (der Client bricht nach 15 s ab); eine unvollständige Antwort geht hinaus, wird aber nicht gespeichert; `stand` = jüngste Aufnahme | ohne Liste oder ohne jede Details leer + ausgegraut; einzelne fehlende Ebene → Gebiet „unvollständig“, in der Ebenenzeile genannt |
+| **Copernicus EMS Rapid Mapping** (`copernicus`, LLH-1200) | Liste `https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500` · Details `…/dashboard-api/public-activations/?code=EMSRnnn` · Ebenen als GeoJSON unter `https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/…` · Altbestand vor 2023 (LLH-2022): Katalog `src/karte/copernicus_altbestand.json`, Vector Packages (ZIP) unter `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/…` | WKT (Gebiete) + GeoJSON in CRS84 (Flächen, Linien, Punkte) → einheitliche Features mit `art`, `klasse`, Herkunft und Aufnahmezeit, je Ausschnitt | **Frei mit Quellenangabe** (Copernicus-Datenpolitik der EU). Kein Schlüssel. Die Detail-Schnittstelle ist ein Pfad des Dashboard-Backends ohne Stabilitätszusage; öffentlich erst ab EMSR656 (März 2023); davor nur, was der Katalog führt. | `© European Union, Copernicus Emergency Management Service` | Antwort, Liste und laufende Aktivierungen 1 800 s, abgeschlossene Aktivierungen und Ebenen-Dateien und Vector Packages 24 h; kalter Abruf von der Anfrage gelöst, Wartefrist 10 s (der Client bricht nach 15 s ab); eine unvollständige Antwort geht hinaus, wird aber nicht gespeichert; `stand` = jüngste Aufnahme, ersatzweise Lieferung | ohne Liste oder ohne jede Details leer + ausgegraut; einzelne fehlende Ebene oder fehlendes Vector Package → Gebiet „unvollständig“, in der Ebenenzeile genannt |
 
 ## Hinweise zur Anbindung
 
@@ -585,8 +587,27 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   Funkverbindung vor dem Abbruch des Clients an. Jede Datei liest `http_begrenzt` mit
   `DECKEL_FACHEBENE`, und nur vom S3-Host der Quelle. WKT wird höchstens drei Ebenen tief
   gelesen.
+- **Ausschnitt:** Jedes Feature, dessen Rechteck den Ausschnitt nicht schneidet, fällt weg
+  (`filter_ausschnitt`: der auf 2 Stellen gerundete Ausschnitt des Cache-Schlüssels, um 0,005°
+  nach außen). Der Gebietsumriss kommt immer mit.
 - **Archiv:** Der Schalter „Ältere Aktivierungen“ in der Ebenenzeile gilt nur bis zum Neuladen;
   er reist weder in gespeicherte Kartenansichten noch in den Browserspeicher.
-- **Nicht angebunden:** Aktivierungen vor März 2023 (die Detail-Schnittstelle verlangt dort eine
-  Anmeldung; die Produkt-ZIPs mit Shapefiles liest Lifeline Hub nicht) und die Rasterbilder
+- **Altbestand vor 2023 (LLH-2022, ADR-0098):** Die Detail-Schnittstelle verlangt dort eine
+  Anmeldung. Ausgewählte Aktivierungen stehen deshalb im Katalog
+  `src/karte/copernicus_altbestand.json`, heute EMSR517 (Hochwasser Westdeutschland 2021, 17
+  Gebiete, 23 Produkte). Mit „Ältere Aktivierungen“ lädt der Server das Vector Package je
+  gezeigtem Produkt (höchstens 6 je Antwort und 2 gleichzeitig, Download höchstens 48 MiB, nur
+  vom Präfix `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`;
+  ein eigener Client verfolgt Weiterleitungen nur innerhalb dieses Präfixes) und liest daraus nur die GeoJSON-Dateien des Umrisses und der bekannten Ebenen
+  (höchstens 200 Einträge, 16 MiB je Eintrag, 32 MiB zusammen). Gebäude und Straßen nur aus
+  `GRA`; in `DEL` sind sie Referenzdaten. Die Pakete nennen keine Aufnahmezeit: Es zählt die
+  Lieferzeit, und Liste wie Inspector sagen „Lieferung“. Fehlt ein Paket, zeigt das Gebiet sein
+  Rechteck und trägt „unvollständig“.
+- **Einen Eintrag pflegen:** Auf `https://mapping.emergency.copernicus.eu/activations/EMSRnnn/`
+  stehen je Produkt Lieferzeit und Link „Vector Package (.zip)“. Je Gebiet kommen Nummer, Name
+  (`locality` aus `…_areaOfInterestA_…json` im ZIP) und das Rechteck um diesen Umriss
+  (`[west, süd, ost, nord]`, nach außen gerundet) in den Katalog, je Produkt Typ (`DEL`, `GRA`),
+  Monitoring-Nummer (0 für `PRODUCT`), Version, Lieferzeit (UTC) und ZIP-Adresse. Die Tests in
+  `copernicus_alt.rs` prüfen Format, Präfix und doppelte Codes.
+- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs und die Rasterbilder
   (COG). EFAS-Echtzeitdaten gibt es nur für Partner.

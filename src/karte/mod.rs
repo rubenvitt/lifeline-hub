@@ -8,6 +8,7 @@ pub mod assets;
 pub mod auto_aktualisierung;
 pub mod cache;
 pub mod copernicus;
+pub mod copernicus_alt;
 pub mod download;
 pub mod katalog;
 pub mod kritis;

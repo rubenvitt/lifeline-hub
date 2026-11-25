@@ -214,6 +214,8 @@ export const SCHICHTPLAN_ERZEUGEN_MAX = 100;
 export const SCHICHTPLAN_NOTIZ_MAX = 500;
 /** Größte Schichtplan-Datei zum Einlesen in Bytes, 2 MiB (LLH-1556). */
 export const SCHICHTPLAN_DATEI_MAX_BYTES = 2_097_152;
+/** Größte Stammdaten-Datei zum Einlesen in Bytes, 2 MiB (LLH-1633). */
+export const STAMMDATEN_DATEI_MAX_BYTES = 2_097_152;
 /** Name und Organisation eines Helfers des Schichtplans (LLH-1552). */
 export const SCHICHTPLAN_HELFER_TEXT_MAX = 200;
 /** Telefon eines Helfers des Schichtplans (LLH-1552). */

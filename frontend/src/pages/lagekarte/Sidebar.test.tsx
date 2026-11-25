@@ -19,6 +19,8 @@ import Sidebar, {
 import type { MarkerTyp, NichtVerortet } from './marker';
 import type { ObjektEintrag } from './objektsuche';
 import { AusgangUnbekannt, NetzFehler } from '../../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
 import type { SidebarProps } from './Sidebar';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
@@ -85,6 +87,7 @@ const basisProps: SidebarProps = {
     energie: false,
     autobahn: false,
     copernicus: false,
+    drohne: false,
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -1671,6 +1674,7 @@ describe('Sidebar: Ebenenbaum', () => {
       'Umwelt: alle Ebenen',
       'Verkehr & Infrastruktur: alle Ebenen',
       'Satellitenauswertung: alle Ebenen',
+      'Drohne: alle Ebenen',
     ]);
   });
 
@@ -1704,6 +1708,41 @@ describe('Sidebar: Ebenenbaum', () => {
     ).toHaveLength(1);
     fireEvent.click(zeile);
     expect(onFachebeneToggle).toHaveBeenCalledWith('dwd', false);
+  });
+
+  it('hängt die Quellenzeile der Drohne an die Drohnenebene, nicht an eine andere (LLH-2106)', async () => {
+    server.use(
+      http.get('/api/incidents/1/drone/sources', () =>
+        HttpResponse.json([
+          {
+            adapter_id: 'suchlage-1',
+            label: 'Suchlage Staffel Nord',
+            connected: false,
+            lagemonitor: false,
+            state: 'aktiv',
+            video_keys: [],
+          },
+        ]),
+      ),
+    );
+    renderMitProviders(<Sidebar {...ebenenProps} drohne={{ darfSchalten: true }} />);
+    const zeile = screen.getByRole('switch', { name: FACHEBENEN.drohne.label });
+    const zusatz = await screen.findByRole('button', { name: 'Suchlage zuschalten' });
+    expect(zeile.closest('[data-fachebene="drohne"]')).toContainElement(zusatz);
+    expect(screen.getAllByRole('button', { name: 'Suchlage zuschalten' })).toHaveLength(1);
+  });
+
+  it('zeigt ohne `drohne` keine Quellenzeile und fragt nichts ab (LLH-2106)', () => {
+    const abgefragt = vi.fn();
+    server.use(
+      http.get('/api/incidents/1/drone/sources', () => {
+        abgefragt();
+        return HttpResponse.json([]);
+      }),
+    );
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    expect(screen.queryByText('Suchlage zuschalten')).toBeNull();
+    expect(abgefragt).not.toHaveBeenCalled();
   });
 
   it('„Ebene suchen" öffnet Gruppen mit Treffern, ohne den gemerkten Zustand zu ändern', () => {
