@@ -93,7 +93,9 @@ private fun herkunft(text: String): ServerAdresse? {
 private fun prozentDekodiert(text: String): String =
     if ('%' !in text) text
     else try {
-        URLDecoder.decode(text.replace("+", "%2B"), Charsets.UTF_8)
+        // Die Form mit Zeichensatz-Namen: `decode(String, Charset)` gibt es unter Android erst ab
+        // API 33, die Helfer-App läuft ab API 29.
+        URLDecoder.decode(text.replace("+", "%2B"), "UTF-8")
     } catch (_: IllegalArgumentException) {
         text
     }
