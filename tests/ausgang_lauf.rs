@@ -832,3 +832,61 @@ async fn haengengebliebener_versuch_wird_im_betrieb_ungewiss() {
     assert!(w.skript.gesehen().is_empty());
     assert!(lauf::HAENGT_NACH > std::time::Duration::from_secs(12 * 60));
 }
+
+/// Macht den Einsatz zum Spiegel (Führungswechsel), wie es die Übernahme täte.
+async fn zum_spiegel(pool: &sqlx::SqlitePool, einsatz: i64) {
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("INSERT INTO spiegel_uebernahme (id) VALUES (1)")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES (?1, 'x/' || ?1)")
+        .bind(einsatz)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM spiegel_uebernahme")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// Die eine Ausnahme von „nie halb“ (src/AGENTS.md, „Ausgang an Menschen“): wird der Einsatz
+/// während der Zustellung zum Spiegel, nimmt das ETB nichts mehr an. Die übergebene Mail lässt
+/// sich nicht zurückholen; der Versand steht als `uebergeben` ohne ETB-Eintrag.
+#[tokio::test]
+async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let sperre = Arc::new(Sperre {
+        skript: w.skript.clone(),
+        begonnen: tokio::sync::Notify::new(),
+        frei: tokio::sync::Semaphore::new(0),
+    });
+    let gesperrt: Arc<dyn Zusteller> = sperre.clone();
+    let lauf_a = {
+        let (pool, rahmen, live, z) = (
+            w.pool.clone(),
+            w.rahmen.clone(),
+            w.live.clone(),
+            gesperrt.clone(),
+        );
+        tokio::spawn(async move { lauf::durchgang(&pool, &rahmen, &live, &z, t0).await })
+    };
+    sperre.begonnen.notified().await;
+    zum_spiegel(&w.pool, w.einsatz).await;
+    let vorher = w.etb_anzahl().await;
+    sperre.frei.add_permits(1);
+    lauf_a.await.unwrap().unwrap();
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    assert!(z.uebergeben_at.is_some());
+    assert!(z.versuch_begonnen_at.is_none());
+    assert!(z.etb_eintrag_id.is_none());
+    assert_eq!(w.skript.gesehen().len(), 1);
+    assert_eq!(w.etb_anzahl().await, vorher);
+}

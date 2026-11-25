@@ -66,4 +66,7 @@ muss. Ein Mailserver bestätigt mit 250 oder gar nicht, also muss „unklar“ e
 
 Jeder Versand ist sichtbar, wiederholbar und im ETB belegt; ein Absturz erzeugt höchstens einen
 `ungewiss`, nie eine stille Doppelzustellung. Der Mensch trägt die Entscheidung bei „Zustellung
-unklar“. Ein neuer Kanal braucht eine Art mit Versandweg, aber keinen neuen Lauf.
+unklar“. Ein neuer Kanal braucht eine Art mit Versandweg, aber keinen neuen Lauf. Die eine
+Ausnahme vom ETB-Beleg: nimmt das ETB nach einer Übergabe nichts an (der Einsatz wurde während
+der Zustellung zum Spiegel), steht der Versand als `uebergeben` ohne Eintrag, weil sich eine
+übergebene Mail nicht zurückholen lässt (`src/AGENTS.md`, „Ausgang an Menschen“).

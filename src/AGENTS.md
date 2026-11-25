@@ -413,7 +413,11 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
 - **Spiegel:** `ausgang` steht in `instanz::spiegel::art::AUSGENOMMEN`; am Spiegel lehnt das
   Anlegen mit 422 `spiegel` ab, der Lauf setzt `fehlgeschlagen` mit `spiegel` **ohne** ETB-Eintrag
   (am Spiegel gesperrt). Ein Versand ist nie halb: zugestellt und im ETB oder sichtbar
-  fehlgeschlagen.
+  fehlgeschlagen. **Die eine Ausnahme:** scheitert nach einer Übergabe der ETB-Eintrag (etwa
+  weil der Einsatz während der Zustellung zum Spiegel wurde), bleibt der Versand `uebergeben`
+  ohne ETB-Eintrag und der Fehler steht im Log; eine übergebene Mail lässt sich nicht
+  zurückholen, die Versandliste zeigt sie als übergeben (Test
+  `spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb`).
 - **Wiederholung:** vorübergehende Fehler mit Backoff `30 s · 2^(n−1)`, gedeckelt auf 5 min,
   höchstens **30 min** ab `erster_versuch_at`; dauerhafte Fehler sofort `fehlgeschlagen`.
   `ungewiss` (Abbruch nach DATA, auch ein Absturz mitten in der Zustellung, `versuch_begonnen_at`)
