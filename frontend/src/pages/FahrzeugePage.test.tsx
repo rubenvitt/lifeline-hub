@@ -543,6 +543,53 @@ describe('FahrzeugePage', () => {
     expect(screen.queryByRole('button', { name: 'Florian 1 entlassen' })).not.toBeInTheDocument();
   });
 
+  /**
+   * Ortung (LLH-2091): das Zeilenmenü bietet „Ortung koppeln …“ bzw. „Ortung trennen“ je nach
+   * `ortung_gekoppelt`, die Zeile trägt die Marke „GPS“, solange gekoppelt; ohne Schreibrecht
+   * (abgeschlossener Einsatz) steht kein Menü.
+   */
+  it('bietet „Ortung koppeln …“ im Zeilenmenü, solange nicht gekoppelt', async () => {
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen zu Florian 1' }));
+    expect(await screen.findByRole('menuitem', { name: 'Ortung koppeln …' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Ortung trennen' })).toBeNull();
+    expect(screen.queryByText('GPS')).toBeNull();
+  });
+
+  it('trennt die Ortung ohne Rückfrage und zeigt „GPS“, solange gekoppelt', async () => {
+    let getrennt = 0;
+    server.use(
+      http.delete('/api/incidents/7/vehicles/10/tracking', () => {
+        getrennt += 1;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    render(einsatz(), [], { ...ef, ortung_gekoppelt: true });
+    await screen.findByText('Florian 1');
+    expect(screen.getByText('GPS')).toBeInTheDocument();
+    await waehleImZeilenmenue('Florian 1', 'Ortung trennen');
+    await waitFor(() => expect(getrennt).toBe(1));
+  });
+
+  it('öffnet aus „Ortung koppeln …“ den Dialog mit den Kennungen', async () => {
+    server.use(
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () => HttpResponse.json([])),
+    );
+    render(einsatz());
+    await screen.findByText('Florian 1');
+    await waehleImZeilenmenue('Florian 1', 'Ortung koppeln …');
+    expect(
+      await screen.findByText('Keine Position in den letzten 24 Stunden eingegangen.'),
+    ).toBeInTheDocument();
+  });
+
+  it('bietet im abgeschlossenen Einsatz keine Ortung an', async () => {
+    render(einsatz({ status: 'abgeschlossen', abgeschlossen_at: '2026-05-26 12:00:00' }));
+    await screen.findByText('Florian 1');
+    expect(screen.queryByRole('button', { name: 'Weitere Aktionen zu Florian 1' })).toBeNull();
+  });
+
   // LLH-1675: Am Spiegel fehlten die Knöpfe ohne Grund auf der Seite.
   it('am Spiegel nennt die Seite die führende Instanz', async () => {
     render(
@@ -1497,6 +1544,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       'Entlassen',
       'Angaben ändern …',
       'Als eigene Einheit führen …',
+      'Ortung koppeln …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -1510,6 +1558,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       'Entlassen',
       'Angaben ändern · aus dem Stamm (gesperrt)',
       'Als eigene Einheit führen …',
+      'Ortung koppeln …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -1532,6 +1581,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       'Angaben ändern · aus dem Stamm (gesperrt)',
       'Im Stamm ändern ↗',
       'Als eigene Einheit führen …',
+      'Ortung koppeln …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -1558,6 +1608,7 @@ describe('FahrzeugePage · Zeilenmenü (LLH-1073)', () => {
       'Entlassen',
       'Angaben ändern …',
       'Als eigene Einheit führen …',
+      'Ortung koppeln …',
       '—',
       'Stornieren (rot)',
     ]);
@@ -2511,6 +2562,7 @@ describe('FahrzeugePage · Als eigene Einheit führen (LLH-1073 Teil II, design.
     expect(await menueTexte('Florian Nachbarstadt 44/1')).toEqual([
       'Entlassen',
       'Angaben ändern …',
+      'Ortung koppeln …',
       'Stornieren',
     ]);
   });

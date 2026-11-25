@@ -62,6 +62,8 @@ import { funktionText } from '../kraefte/einsatzfunktionKern';
 import { FAHRZEUG_BEMERKUNG_MAX } from '../api/eingabegrenzen';
 import AdhocFahrzeugFelder from '../kraefte/AdhocFahrzeugFelder';
 import FahrzeugAngabenDialog from '../kraefte/FahrzeugAngabenDialog';
+import OrtungKoppelnDialog from '../kraefte/OrtungKoppelnDialog';
+import { trenneOrtung } from '../api/ortung';
 import { hasFehlerIn, type AdhocFeld } from '../kraefte/fahrzeugAngaben';
 import FmsTableau from '../kraefte/FmsTableau';
 import Verdichtungszeile from '../kraefte/Verdichtungszeile';
@@ -405,7 +407,14 @@ const ANSICHT_OPTIONEN = [
 const ADHOC_WEITERE: readonly AdhocFeld[] = ['opta'];
 
 /** Einträge des Zeilenmenüs (design.md D6; „Als eigene Einheit führen“ D9). */
-type ZeilenAktion = 'entlassen' | 'angaben' | 'stamm' | 'einheit' | 'stornieren';
+type ZeilenAktion =
+  | 'entlassen'
+  | 'angaben'
+  | 'stamm'
+  | 'einheit'
+  | 'ortung-koppeln'
+  | 'ortung-trennen'
+  | 'stornieren';
 
 type FahrzeugSpalteKey =
   | 'funkrufname'
@@ -482,6 +491,8 @@ function FahrzeugeInhalt() {
   const isNewGestureStorno = useNewGesture(stornoFuer !== null);
   /** Offener Dialog „Angaben ändern“ (design.md D7), ebenfalls außerhalb der Zeilen-`map`. */
   const [angabenFuer, setAngabenFuer] = useState<EinsatzFahrzeug | null>(null);
+  /** Das Fahrzeug, dessen Ortung der Dialog koppelt (LLH-2091). */
+  const [ortungFuer, setOrtungFuer] = useState<EinsatzFahrzeug | null>(null);
   /** Offener Dialog „Als eigene Einheit führen“ (design.md D9). */
   const [einheitFuer, setEinheitFuer] = useState<EinsatzFahrzeug | null>(null);
   /** Offener Dialog „Personal der Einheit übernehmen“ samt Vorwahl beim Öffnen (D12). */
@@ -727,6 +738,17 @@ function FahrzeugeInhalt() {
     onSuccess: invalidate,
     onError: (e, efId) => zeilen.melde(efId, e, 'Nicht storniert'),
   });
+  // Ortung trennen (LLH-2091): umkehrbar durch erneutes Koppeln, deshalb ohne Rückfrage; die
+  // Position bleibt am Fahrzeug stehen. Der Server schreibt den ETB-Eintrag.
+  const ortungTrennenMutation = useMutation({
+    mutationFn: (efId: number) => trenneOrtung(einsatzId, efId),
+    onMutate: (efId) => zeilen.beginne(efId),
+    onSuccess: () => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: einsatzKeys.etb(einsatzId) });
+    },
+    onError: (e, efId) => zeilen.melde(efId, e, 'Nicht getrennt'),
+  });
   const besatzungZuMutation = useMutation({
     mutationFn: (v: { efId: number; epId: number }) => ordneBesatzungZu(einsatzId, v.efId, v.epId),
     onMutate: (v) => zuordnenFehler.beginne(v.efId),
@@ -838,7 +860,8 @@ function FahrzeugeInhalt() {
   /** Läuft für diese Zeile Entlassen oder Stornieren? Dann keine zweite Handlung. */
   const isZeileBusy = (efId: number) =>
     (entlassenMutation.isPending && entlassenMutation.variables?.efId === efId) ||
-    (stornierenMutation.isPending && stornierenMutation.variables === efId);
+    (stornierenMutation.isPending && stornierenMutation.variables === efId) ||
+    (ortungTrennenMutation.isPending && ortungTrennenMutation.variables === efId);
   /**
    * Zeilenmenü (design.md D6, nachgeschärft 14.10.2026): „Entlassen“ steht als erster Eintrag im
    * Menü statt als Knopf — in der Tabelle braucht die Einheit-Spalte (LLH-1073) den Platz, damit
@@ -863,6 +886,11 @@ function FahrzeugeInhalt() {
       ...(einheitenFrei && ef.einheit_id == null
         ? [{ key: 'einheit' as const, label: 'Als eigene Einheit führen …' }]
         : []),
+      // Ortung (LLH-2091): die Zeile zeigt, ob sie gekoppelt ist; das Menü steht nur mit
+      // Schreibrecht und im aktiven, nicht gespiegelten Einsatz (`darfSchreiben`).
+      ef.ortung_gekoppelt
+        ? { key: 'ortung-trennen' as const, label: 'Ortung trennen' }
+        : { key: 'ortung-koppeln' as const, label: 'Ortung koppeln …' },
       { key: 'stornieren', label: 'Stornieren', gefahr: true },
     ];
   };
@@ -872,6 +900,8 @@ function FahrzeugeInhalt() {
     else if (aktion === 'stamm' && ef.fahrzeug_id != null)
       void navigate(fahrzeugDetailPfad(ef.fahrzeug_id));
     else if (aktion === 'einheit') setEinheitFuer(ef);
+    else if (aktion === 'ortung-koppeln') setOrtungFuer(ef);
+    else if (aktion === 'ortung-trennen') ortungTrennenMutation.mutate(ef.id);
     else if (aktion === 'stornieren') setStornoFuer({ id: ef.id, name: ef.funkrufname });
   };
 
@@ -1067,6 +1097,7 @@ function FahrzeugeInhalt() {
               {/* Funkrufname in Mono. */}
               <Kennung>{ef.funkrufname}</Kennung>
               {ef.ist_adhoc && <Marke>ad-hoc</Marke>}
+              {ef.ortung_gekoppelt && <Marke>GPS</Marke>}
               {ef.ist_demo && <DemoMarke />}
             </Stapel>
           }
@@ -1653,6 +1684,13 @@ function FahrzeugeInhalt() {
         einsatzId={einsatzId}
         fahrzeug={angabenFuer}
         onSchliessen={() => setAngabenFuer(null)}
+      />
+
+      {/* Ortung koppeln (LLH-2091), geöffnet aus dem Zeilenmenü. */}
+      <OrtungKoppelnDialog
+        einsatzId={einsatzId}
+        fahrzeug={ortungFuer}
+        onSchliessen={() => setOrtungFuer(null)}
       />
 
       {/* Ein Fahrzeug als eigene Einheit führen (D9), geöffnet aus dem Zeilenmenü; der Abschnitt
