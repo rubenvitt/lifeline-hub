@@ -82,7 +82,7 @@ export default function FremdebeneDetail({
         ]}
       />
       {darfSchreiben && onUebernehmen && (
-        <Space orientation="vertical" size={token.marginXXS}>
+        <Space orientation="vertical" size={4}>
           <Button disabled={!teile} onClick={() => setDialogOffen(true)}>
             Übernehmen …
           </Button>
