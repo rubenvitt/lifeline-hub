@@ -75,7 +75,7 @@ pub async fn apply(
     JsonBody(body): JsonBody<SchnappschussEntscheidungen>,
 ) -> Result<Json<StammdatenErgebnis>, AppError> {
     nicht_am_elw(&state, admin.org_id).await?;
-    let (ergebnis, _) = schnappschuss::uebernehmen(
+    let (ergebnis, fahrzeug_ids) = schnappschuss::uebernehmen(
         &state.pool,
         admin.org_id,
         &id,
@@ -83,6 +83,10 @@ pub async fn apply(
         &body.entscheidungen,
     )
     .await?;
+    // Wie der Dateiweg (`routes::stammdaten_eingang`): disponierte Fahrzeuge erfahren die Änderung.
+    for fz in fahrzeug_ids {
+        super::fahrzeug::stamm_geaendert_melden(&state, admin.org_id, fz).await;
+    }
     Ok(Json(ergebnis))
 }
 
