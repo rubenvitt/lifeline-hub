@@ -86,6 +86,7 @@ const basisProps: SidebarProps = {
     kritis: false,
     energie: false,
     autobahn: false,
+    autobahn_parken: false,
     copernicus: false,
     drohne: false,
   },

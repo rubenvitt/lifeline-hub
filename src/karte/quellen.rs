@@ -12,9 +12,9 @@ use crate::karte::cache;
 use crate::karte::luftqualitaet::{luftqualitaet_fenster, normalisiere_luftqualitaet};
 use crate::karte::normalisierung::{
     energie_attribution, energie_beitraege, fuehre_energie_zusammen, kombiniere_nina,
-    normalisiere_autobahn, normalisiere_energie_mastr, normalisiere_energie_osm,
-    normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline, ENERGIE_MASTR_ATTRIB,
-    ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
+    normalisiere_autobahn, normalisiere_autobahn_parken, normalisiere_energie_mastr,
+    normalisiere_energie_osm, normalisiere_hochwasser, normalisiere_odl, normalisiere_pegelonline,
+    ENERGIE_MASTR_ATTRIB, ENERGIE_OSM_ATTRIB, ENERGIE_OSM_RAND_RADIEN,
 };
 use crate::karte::odl_grundpegel::{self, GrundpegelKarte};
 use crate::karte::typen::{leere_collection, Bbox, FachebeneAntwort, FachebeneStatus};
@@ -664,17 +664,20 @@ fn extrahiere_ki(html: &str) -> Option<String> {
 
 const AUTOBAHN_ATTRIB: &str = "Autobahn GmbH des Bundes";
 /// Baustellen und Sperrungen dauern Stunden bis Tage; kürzer zu takten holt nichts Frischeres,
-/// kostet aber je Runde 334 Abrufe gegen eine fremde Behörden-API.
+/// kostet aber je Runde ~450 Abrufe gegen eine fremde Behörden-API.
 const AUTOBAHN_TTL: Duration = Duration::from_secs(600);
+/// Rastanlagen ändern sich selten; einmal am Tag reicht (LLH-1637).
+const AUTOBAHN_PARKEN_TTL: Duration = Duration::from_secs(86_400);
 const AUTOBAHN_BASIS: &str = "https://verkehr.autobahn.de/o/autobahn/";
-/// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80). Die übrigen tragen nichts bei
-/// und kosteten je 111 weitere Abrufe pro Runde.
-const AUTOBAHN_DIENSTE: [&str; 3] = ["webcam", "roadworks", "closure"];
+/// Die für Anfahrt und Lageaufklärung belegten Dienste (LFH-80, Verkehrsmeldungen seit LLH-1637).
+/// Ladesäulen tragen nichts bei und kosteten je ~113 weitere Abrufe pro Runde; die Lkw-Parkplätze
+/// sind statisch und laufen als eigene Ebene mit 24 h TTL (`fetch_autobahn_parken`).
+const AUTOBAHN_DIENSTE: [&str; 4] = ["webcam", "roadworks", "closure", "warning"];
 /// Die Quelle drosselt: bei 16 gleichzeitigen Abrufen scheitern deutlich mehr als bei 8. Mehr
 /// Parallelität macht den Lauf nicht schneller, sondern löchriger.
 const AUTOBAHN_PARALLEL: usize = 8;
 /// Gesamtdeckel über den Fächer. Das Client-Timeout (8 s) gilt je Abruf; ohne Deckel stünde der
-/// Lauf im schlechtesten Fall bei 334/8 × 8 s ≈ 5,5 min.
+/// Lauf im schlechtesten Fall bei ~450/8 × 8 s ≈ 7,5 min.
 const AUTOBAHN_BUDGET: Duration = Duration::from_secs(60);
 
 /// `{"roads":["A1","A2",…]}` → saubere Liste: getrimmt (die Quelle führt `"A60 "`, der Abruf
@@ -729,14 +732,38 @@ pub(crate) fn autobahn_antwort(
     ))
 }
 
+/// Ergebnis eines Parken-Laufs → speicherbare Antwort, oder `None` unter 90 % beantworteter
+/// Strecken (LLH-1637). Strenger als [`autobahn_antwort`]: der Stand hält 24 h, und eine Lücke
+/// verdeckte Hunderte Rastanlagen einen ganzen Tag lang, ohne dass die Oberfläche es zeigt.
+pub(crate) fn autobahn_parken_antwort(
+    gesamt: usize,
+    roh: &[(String, Value)],
+) -> Option<FachebeneAntwort> {
+    let brauchbar = roh
+        .iter()
+        .filter(|(_, a)| a.get("parking_lorry").is_some_and(Value::is_array))
+        .count();
+    if brauchbar == 0 || brauchbar * 10 < gesamt * 9 {
+        return None;
+    }
+    Some(FachebeneAntwort::ok(
+        "autobahn_parken",
+        AUTOBAHN_ATTRIB,
+        None,
+        normalisiere_autobahn_parken(roh),
+    ))
+}
+
 /// Nach einem gescheiterten Lauf wird nicht sofort neu versucht: bei `offline` pollt das
-/// Frontend im Aufwärmtakt (20 s), und jeder Poll stieße sonst einen neuen Fächer mit 333
+/// Frontend im Aufwärmtakt (20 s), und jeder Poll stieße sonst einen neuen Fächer mit ~450
 /// Abrufen an.
 const AUTOBAHN_ABKUEHLUNG: Duration = Duration::from_secs(300);
 
 /// Zeitpunkt des letzten gescheiterten Laufs. `std::sync::Mutex`, nie über ein `await`
 /// gehalten.
 static AUTOBAHN_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// Dasselbe für die Parken-Ebene; ein gescheiterter Parken-Lauf sperrt die Lage-Ebene nicht.
+static AUTOBAHN_PARKEN_FEHLSCHLAG: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 /// Darf ein neuer Fächer starten? Rein, die Zeitspanne kommt von außen.
 pub(crate) fn autobahn_darf_starten(
@@ -778,57 +805,93 @@ pub(crate) fn autobahn_weg(eintrag_alter: Option<i64>, ttl: Duration) -> Autobah
 /// der Aufwärmphase meldet die Ebene `offline`, und das Frontend pollt kurz getaktet
 /// (`FACHEBENEN.autobahn.aufwaermPollMs`).
 pub async fn fetch_autobahn(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
-    let eintrag = cache::eintrag(pool, "autobahn").await;
-    let weg = autobahn_weg(eintrag.as_ref().map(|(_, alter)| *alter), AUTOBAHN_TTL);
+    liefere_im_hintergrund(
+        s,
+        pool,
+        "autobahn",
+        AUTOBAHN_TTL,
+        &AUTOBAHN_FEHLSCHLAG,
+        erneuere_autobahn,
+    )
+    .await
+}
+
+/// Lkw-Parkplätze an Bundesautobahnen (LLH-1637): eigene Ebene, gleicher Hintergrund-Weg wie
+/// [`fetch_autobahn`], aber 24 h TTL. Die Rastanlagen sind statisch; ein Lauf im 10-min-Takt
+/// holte jedes Mal ~113 Abrufe für denselben Stand.
+pub async fn fetch_autobahn_parken(s: &FachebenenState, pool: &SqlitePool) -> FachebeneAntwort {
+    liefere_im_hintergrund(
+        s,
+        pool,
+        "autobahn_parken",
+        AUTOBAHN_PARKEN_TTL,
+        &AUTOBAHN_PARKEN_FEHLSCHLAG,
+        erneuere_autobahn_parken,
+    )
+    .await
+}
+
+/// Der gemeinsame Weg beider Autobahn-Ebenen: Cache frisch → ausliefern; sonst den Lauf im
+/// Hintergrund anstoßen und sofort antworten (alter Stand oder `offline`).
+async fn liefere_im_hintergrund<F, Fut>(
+    s: &FachebenenState,
+    pool: &SqlitePool,
+    schluessel: &'static str,
+    ttl: Duration,
+    fehlschlag: &'static Mutex<Option<std::time::Instant>>,
+    erneuere: F,
+) -> FachebeneAntwort
+where
+    F: FnOnce(reqwest::Client, SqlitePool) -> Fut + Send + 'static,
+    Fut: Future<Output = Option<FachebeneAntwort>> + Send + 'static,
+{
+    let eintrag = cache::eintrag(pool, schluessel).await;
+    let weg = autobahn_weg(eintrag.as_ref().map(|(_, alter)| *alter), ttl);
     if weg == AutobahnWeg::Frisch {
         return eintrag.expect("Frisch entsteht nur aus einem Eintrag").0;
     }
     // Erster Riegel: die Abkühlung nach einem Fehlschlag.
-    let seit_fehlschlag = AUTOBAHN_FEHLSCHLAG.lock().unwrap().map(|t| t.elapsed());
+    let seit_fehlschlag = fehlschlag.lock().unwrap().map(|t| t.elapsed());
     let darf = autobahn_darf_starten(seit_fehlschlag, AUTOBAHN_ABKUEHLUNG);
-    // Zweiter Riegel: nur ein Lauf gleichzeitig. Der Schlüssel fällt erst nach der Aufgabe, damit
-    // ein Poll währenddessen keinen zweiten Fächer anstößt.
-    if darf && s.inflight.lock().unwrap().insert("autobahn".to_string()) {
+    // Zweiter Riegel: nur ein Lauf je Ebene gleichzeitig. Der Schlüssel fällt erst nach der
+    // Aufgabe, damit ein Poll währenddessen keinen zweiten Fächer anstößt.
+    if darf && s.inflight.lock().unwrap().insert(schluessel.to_string()) {
         let (client, pool2, inflight) = (s.client.clone(), pool.clone(), s.inflight.clone());
         tokio::spawn(async move {
-            let ergebnis = erneuere_autobahn(client, pool2).await;
+            let ergebnis = erneuere(client, pool2).await;
             // Erst den Ausgang vermerken, dann freigeben: andersherum könnte ein Poll dazwischen
-            // den
-            // Schlüssel greifen, bevor die Sperre steht.
-            *AUTOBAHN_FEHLSCHLAG.lock().unwrap() = match ergebnis {
+            // den Schlüssel greifen, bevor die Sperre steht.
+            *fehlschlag.lock().unwrap() = match ergebnis {
                 Some(_) => None,
                 None => Some(std::time::Instant::now()),
             };
-            inflight.lock().unwrap().remove("autobahn");
+            inflight.lock().unwrap().remove(schluessel);
         });
     } else if !darf {
-        tracing::debug!("Autobahn: Abkühlung nach Fehlschlag läuft — kein neuer Fächer");
+        tracing::debug!("{schluessel}: Abkühlung nach Fehlschlag läuft — kein neuer Fächer");
     }
     match eintrag {
         Some((a, _)) => a, // veralteter Stand ist besser als keiner
-        None => FachebeneAntwort::offline("autobahn", AUTOBAHN_ATTRIB),
+        None => FachebeneAntwort::offline(schluessel, AUTOBAHN_ATTRIB),
     }
 }
 
 /// Einzelspur für den Fächer, Rückfallebene hinter der `inflight`-Marke (die gilt nur für EINE
 /// `inflight`-Menge). Ohne Riegel startete jeder Bediener, der die Ebene bei leerem Cache
-/// einschaltet, eigene 333 Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus.
+/// einschaltet, eigene ~450 Abrufe, und schon zwei gleichzeitig lösten die Drosselung aus.
+///
+/// Beide Autobahn-Ebenen teilen sie (LLH-1637): Lage-Lauf und Parken-Lauf laufen nacheinander,
+/// nie gleichzeitig. Ein geteilter Semaphor verlangsamte nach einem Neustart mit kaltem Cache
+/// beide und schöbe den Lage-Lauf (~35 s) an [`AUTOBAHN_BUDGET`].
 static AUTOBAHN_EINZELSPUR: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
-    // Wer gewartet hat, fetcht nicht blind nach, sondern bekommt den gerade gefüllten Cache — DATEN
-    // statt `offline`.
-    let _spur = AUTOBAHN_EINZELSPUR
-        .get_or_init(|| tokio::sync::Mutex::new(()))
-        .lock()
-        .await;
-    if let Some((a, alter)) = cache::eintrag(&pool, "autobahn").await {
-        if alter < AUTOBAHN_TTL.as_secs() as i64 {
-            tracing::debug!("Autobahn: Lauf übersprungen, Vorgänger hat frisch gefüllt");
-            return Some(a);
-        }
-    }
-    let liste = match hole_json(&client, AUTOBAHN_BASIS).await {
+fn autobahn_einzelspur() -> &'static tokio::sync::Mutex<()> {
+    AUTOBAHN_EINZELSPUR.get_or_init(|| tokio::sync::Mutex::new(()))
+}
+
+/// Streckenliste holen und säubern; `None`, wenn sie fehlt oder leer ist.
+async fn hole_autobahn_strassen(client: &reqwest::Client) -> Option<Vec<String>> {
+    let liste = match hole_json(client, AUTOBAHN_BASIS).await {
         Ok(v) => v,
         Err(e) => {
             tracing::warn!("Autobahn-Streckenliste nicht abrufbar: {e}");
@@ -854,16 +917,16 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
             roh_anzahl - strassen.len()
         );
     }
-    let jobs: Vec<(String, String)> = strassen
-        .iter()
-        .flat_map(|s| {
-            AUTOBAHN_DIENSTE
-                .iter()
-                .map(move |d| (s.clone(), d.to_string()))
-        })
-        .collect();
+    Some(strassen)
+}
+
+/// Fächer über `(strasse, dienst)` mit [`AUTOBAHN_PARALLEL`] Abrufen unter [`AUTOBAHN_BUDGET`].
+/// Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body); `None` nur, wenn das Budget reißt.
+async fn autobahn_faecher(
+    client: &reqwest::Client,
+    jobs: Vec<(String, String)>,
+) -> Option<Vec<(String, String, Value)>> {
     let gesamt = jobs.len();
-    // Einzelne Abrufe dürfen scheitern (Drosselung, leerer Body); die übrigen Strecken bleiben.
     let faecher = stream::iter(jobs)
         .map(|(strasse, dienst)| {
             let client = client.clone();
@@ -896,6 +959,57 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
     } else if fehlend > 0 {
         tracing::debug!("Autobahn: {fehlend} von {gesamt} Teilabrufen ohne Antwort");
     }
+    Some(roh)
+}
+
+/// Frischer Stand unter `schluessel`, falls ein Vorgänger ihn gerade gefüllt hat: wer an der
+/// Einzelspur gewartet hat, fetcht nicht blind nach, sondern bekommt DATEN statt `offline`.
+async fn autobahn_schon_frisch(
+    pool: &SqlitePool,
+    schluessel: &str,
+    ttl: Duration,
+) -> Option<FachebeneAntwort> {
+    let (a, alter) = cache::eintrag(pool, schluessel).await?;
+    (alter < ttl.as_secs() as i64).then(|| {
+        tracing::debug!("{schluessel}: Lauf übersprungen, Vorgänger hat frisch gefüllt");
+        a
+    })
+}
+
+/// Ein misslungener Cache-Schreibvorgang ist hier ein Fehlschlag: der Lauf hängt an keinem
+/// Request, sein einziges Ergebnis IST der Cache-Eintrag. Sonst fiele die Abkühlung, der Cache
+/// bliebe leer, und jeder Aufwärm-Poll stieße einen neuen Fächer an (SQLite busy, Platte voll).
+/// Die übrigen Ebenen dürfen den Wert ignorieren, für sie ist der Cache nur Beschleunigung.
+async fn autobahn_speichere(
+    pool: &SqlitePool,
+    schluessel: &str,
+    a: FachebeneAntwort,
+) -> Option<FachebeneAntwort> {
+    if !cache::setze(pool, schluessel, &a).await {
+        tracing::warn!(
+            "{schluessel}: Lauf nicht speicherbar — gilt als Fehlschlag, Abkühlung greift"
+        );
+        return None;
+    }
+    Some(a)
+}
+
+async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<FachebeneAntwort> {
+    let _spur = autobahn_einzelspur().lock().await;
+    if let Some(a) = autobahn_schon_frisch(&pool, "autobahn", AUTOBAHN_TTL).await {
+        return Some(a);
+    }
+    let strassen = hole_autobahn_strassen(&client).await?;
+    let jobs: Vec<(String, String)> = strassen
+        .iter()
+        .flat_map(|s| {
+            AUTOBAHN_DIENSTE
+                .iter()
+                .map(move |d| (s.clone(), d.to_string()))
+        })
+        .collect();
+    let gesamt = jobs.len();
+    let roh = autobahn_faecher(&client, jobs).await?;
     // Ein zu löchriger Lauf wird verworfen, statt den gesunden Cache-Stand mit null Features zu
     // überschreiben.
     let Some(a) = autobahn_antwort(gesamt, &roh) else {
@@ -906,15 +1020,37 @@ async fn erneuere_autobahn(client: reqwest::Client, pool: SqlitePool) -> Option<
         );
         return None;
     };
-    // Ein misslungener Cache-Schreibvorgang ist hier ein Fehlschlag: der Lauf hängt an keinem
-    // Request, sein einziges Ergebnis IST der Cache-Eintrag. Sonst fiele die Abkühlung, der Cache
-    // bliebe leer, und jeder Aufwärm-Poll stieße einen neuen Fächer an (SQLite busy, Platte voll).
-    // Die übrigen Ebenen dürfen den Wert ignorieren, für sie ist der Cache nur Beschleunigung.
-    if !cache::setze(&pool, "autobahn", &a).await {
-        tracing::warn!("Autobahn: Lauf nicht speicherbar — gilt als Fehlschlag, Abkühlung greift");
-        return None;
+    autobahn_speichere(&pool, "autobahn", a).await
+}
+
+async fn erneuere_autobahn_parken(
+    client: reqwest::Client,
+    pool: SqlitePool,
+) -> Option<FachebeneAntwort> {
+    let _spur = autobahn_einzelspur().lock().await;
+    if let Some(a) = autobahn_schon_frisch(&pool, "autobahn_parken", AUTOBAHN_PARKEN_TTL).await {
+        return Some(a);
     }
-    Some(a)
+    let strassen = hole_autobahn_strassen(&client).await?;
+    let jobs: Vec<(String, String)> = strassen
+        .into_iter()
+        .map(|s| (s, "parking_lorry".to_string()))
+        .collect();
+    let gesamt = jobs.len();
+    let roh: Vec<(String, Value)> = autobahn_faecher(&client, jobs)
+        .await?
+        .into_iter()
+        .map(|(strasse, _, v)| (strasse, v))
+        .collect();
+    let Some(a) = autobahn_parken_antwort(gesamt, &roh) else {
+        tracing::warn!(
+            "Autobahn-Parken: nur {} von {gesamt} Strecken beantwortet (unter 90 %) — Lauf \
+             verworfen, bisheriger Cache-Stand bleibt",
+            roh.len()
+        );
+        return None;
+    };
+    autobahn_speichere(&pool, "autobahn_parken", a).await
 }
 
 // ------------------------------------------------------------------ LUFTQUALITÄT (UBA)
@@ -2954,5 +3090,51 @@ mod deckel_tests {
             .await
             .unwrap();
         assert_eq!(v["type"], "FeatureCollection");
+    }
+}
+
+#[cfg(test)]
+mod autobahn_parken_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn treffer(strasse: &str) -> (String, Value) {
+        (strasse.to_string(), json!({ "parking_lorry": [] }))
+    }
+
+    /// Hält jemand die Einzelspur (ein Lage-Lauf), wartet der Parken-Lauf, statt parallel einen
+    /// zweiten Fächer gegen die Quelle zu starten (LLH-1637).
+    #[tokio::test]
+    async fn parken_und_autobahn_teilen_die_einzelspur() {
+        // Frischer Stand: ohne Einzelspur käme der Lauf sofort mit ihm zurück, ohne Netz.
+        let pool = crate::cache_db::cache_pool(&crate::db::test_karten_dir())
+            .await
+            .unwrap();
+        let stand = autobahn_parken_antwort(1, &[treffer("A1")]).unwrap();
+        assert!(cache::setze(&pool, "autobahn_parken", &stand).await);
+        let _halt = autobahn_einzelspur().lock().await;
+        let lauf = erneuere_autobahn_parken(reqwest::Client::new(), pool);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), lauf)
+                .await
+                .is_err(),
+            "der Parken-Lauf darf nicht an der Einzelspur vorbei"
+        );
+    }
+
+    /// Ein Stand hält 24 h; ein löchriger Lauf verdeckte Hunderte Anlagen einen Tag lang
+    /// (Entwurf LLH-1637). Deshalb 90 % statt der Hälfte wie beim Autobahn-Lauf.
+    #[test]
+    fn parken_antwort_braucht_neunzig_prozent() {
+        let neun: Vec<_> = (0..9).map(|i| treffer(&format!("A{i}"))).collect();
+        let a = autobahn_parken_antwort(10, &neun).expect("9 von 10 reicht");
+        assert_eq!(a.quelle, "autobahn_parken");
+        assert_eq!(a.attribution, AUTOBAHN_ATTRIB);
+        assert!(autobahn_parken_antwort(10, &neun[..8]).is_none());
+        assert!(autobahn_parken_antwort(10, &[]).is_none());
+        // Ein Umschlag ohne Liste zählt nicht.
+        let mut kaputt = neun[..8].to_vec();
+        kaputt.push(("A9".to_string(), json!({ "fehler": "x" })));
+        assert!(autobahn_parken_antwort(10, &kaputt).is_none());
     }
 }
