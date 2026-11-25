@@ -534,6 +534,8 @@ pub async fn heraufstufen_auftrag(
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
+    // Helfer-App Stufe 2 (ADR-0105): an die Helfer-Apps der Empfänger.
+    crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
     let nachricht = repo::laden(&state.pool, nachricht_id).await?;
     sse_chat(&state, einsatz_id, nachricht_ids(&nachricht));
     Ok((StatusCode::CREATED, Json(nachricht)))

@@ -507,6 +507,11 @@ pub async fn berichtigen(
     JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    // Helfer-App Stufe 2: wer den Auftrag vor der Berichtigung hatte, erfährt sie auch dann,
+    // wenn seine Zeile wegfällt (ADR-0105).
+    let helfer_vorher = crate::helfer::pager::kopplungen(&state.pool, einsatz_id, auftrag_id)
+        .await
+        .unwrap_or_default();
     let b =
         crate::auftrag::validate_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
@@ -538,6 +543,7 @@ pub async fn berichtigen(
     .await;
     // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0105).
     crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
+    crate::helfer::pager::notify_removed(&state, helfer_vorher, auftrag_id);
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(
         &state.pool,

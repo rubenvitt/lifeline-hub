@@ -56,7 +56,7 @@ impl IosPush {
             Err(e) => return fehler_melden("Relais nicht erreichbar", &e),
         };
         let kollaps = kollaps_auftrag(&zugang.server_id, auftrag_id);
-        let mut ziele: Vec<i64> = Vec::new();
+        let mut ziele: Vec<(i64, String)> = Vec::new();
         let mut nachrichten: Vec<RelaisNachricht> = Vec::new();
         for (a, k) in &sendungen {
             let nutzlast = match umschlag_bauen(a, k) {
@@ -66,7 +66,7 @@ impl IosPush {
                     continue;
                 }
             };
-            ziele.push(a.kopplung_id);
+            ziele.push((a.kopplung_id, a.token.clone()));
             nachrichten.push(RelaisNachricht {
                 token: a.token.clone(),
                 umgebung: a.umgebung,
@@ -76,15 +76,22 @@ impl IosPush {
                 thema: Some(HELFER_BUNDLE_ID.to_string()),
             });
         }
-        for (teil_ziele, teil) in ziele.chunks(100).zip(nachrichten.chunks(100)) {
+        for (teil_ziele, teil) in ziele
+            .chunks(super::JE_AUFRUF)
+            .zip(nachrichten.chunks(super::JE_AUFRUF))
+        {
             match self.senden(teil).await {
                 Ok(ergebnisse) => {
-                    for (kopplung_id, e) in teil_ziele.iter().zip(ergebnisse) {
+                    for ((kopplung_id, token), e) in teil_ziele.iter().zip(ergebnisse) {
                         if e == RelaisErgebnis::TokenUngueltig {
                             let geloescht = async {
                                 let mut conn = self.inner.pool.acquire().await?;
-                                crate::helfer::push::delete_registration(&mut conn, *kopplung_id)
-                                    .await
+                                crate::helfer::push::delete_registration_with_token(
+                                    &mut conn,
+                                    *kopplung_id,
+                                    token,
+                                )
+                                .await
                             };
                             if let Err(e) = geloescht.await {
                                 fehler_melden("Erloschene Helfer-Anmeldung nicht gelöscht", &e);

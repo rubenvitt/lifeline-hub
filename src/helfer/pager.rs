@@ -190,25 +190,39 @@ pub async fn deliver(state: &AppState, einsatz_id: i64, auftrag_id: i64) {
     }
 }
 
-/// Meldet den Helfer-Apps eines Auftrags eine Änderung (Quittung, Aufhebung), nur live.
-pub async fn notify_changed(state: &AppState, einsatz_id: i64, auftrag_id: i64) {
-    // Auch aufgehobene: die App soll den Auftrag als aufgehoben zeigen.
-    let ziele: Result<Vec<i64>, AppError> = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+/// Die Helfer-Kopplungen, denen der Auftrag gerade gehört (Pager-Empfänger mit eigener Zeile,
+/// auch bei aufgehobenem Auftrag).
+pub async fn kopplungen(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    auftrag_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
         "SELECT DISTINCT gk.id FROM auftrag a \
          JOIN einsatz e ON e.id = a.einsatz_id \
          JOIN geraet_kopplung gk ON gk.einsatz_id = a.einsatz_id \
          JOIN auftrag_empfaenger ae ON ae.auftrag_id = a.id \
-         WHERE a.id = ? AND a.einsatz_id = ? AND {PAGER_EMPFAENGER} AND {EIGENE_ZEILE}"
+         WHERE a.id = ? AND a.einsatz_id = ? AND {PAGER_EMPFAENGER} AND {EIGENE_ZEILE} \
+         ORDER BY gk.id"
     )))
     .bind(auftrag_id)
     .bind(einsatz_id)
-    .fetch_all(&state.pool)
-    .await
-    .map_err(AppError::from);
-    match ziele {
+    .fetch_all(pool)
+    .await?)
+}
+
+/// Meldet den Helfer-Apps eines Auftrags eine Änderung (Quittung, Aufhebung), nur live.
+pub async fn notify_changed(state: &AppState, einsatz_id: i64, auftrag_id: i64) {
+    match kopplungen(&state.pool, einsatz_id, auftrag_id).await {
         Ok(ids) => state.live.melde_helfer_auftrag(ids, auftrag_id),
         Err(e) => tracing::warn!(einsatz_id, auftrag_id, fehler = %e, "Helfer-Apps nicht gemeldet"),
     }
+}
+
+/// Meldet Kopplungen, die den Auftrag bis eben hatten (eine Berichtigung hat ihre Zeile entfernt),
+/// damit offene Apps neu laden. `vorher` stammt aus [`kopplungen`] vor der Änderung.
+pub fn notify_removed(state: &AppState, vorher: Vec<i64>, auftrag_id: i64) {
+    state.live.melde_helfer_auftrag(vorher, auftrag_id);
 }
 
 #[cfg(test)]

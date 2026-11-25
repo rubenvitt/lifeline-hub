@@ -101,6 +101,21 @@ pub async fn load_registrations(
         .collect())
 }
 
+/// Löscht die Anmeldung nur, wenn sie noch dieses Token trägt: das Relais meldete es ungültig, die
+/// App kann inzwischen ein neues angemeldet haben.
+pub async fn delete_registration_with_token(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    token: &str,
+) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM helfer_push_anmeldung WHERE kopplung_id = ? AND token = ?")
+        .bind(kopplung_id)
+        .bind(token)
+        .execute(&mut *conn)
+        .await?;
+    Ok(())
+}
+
 /// Räumt Anmeldungen beendeter Kopplungen: widerrufen, abgelaufen, abgelehnt, oder ihr Einsatz ist
 /// nicht mehr aktiv oder gelöscht. Liefert die Zahl der gelöschten Zeilen.
 pub async fn delete_ended(conn: &mut SqliteConnection) -> Result<u64, AppError> {

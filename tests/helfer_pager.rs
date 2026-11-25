@@ -899,3 +899,128 @@ async fn auftragsdetail_zeigt_helfer_gesendet_und_quittierenden_helfer() {
     assert_eq!(d["empfaenger"][0]["helfer_gesendet"], 2, "{d}");
     assert_eq!(d["empfaenger"][0]["quittiert_von_helfer"], "Max M.", "{d}");
 }
+
+// ---------- Weitere Wege zum Auftrag (Review) ----------
+
+async fn post_admin(l: &Lage, pfad: String, body: Value) -> Value {
+    let (s, v) = anfrage_json(&l.app, "POST", &pfad, &l.admin, Some(&body)).await;
+    assert!(s.is_success(), "{pfad}: {s} {v}");
+    v
+}
+
+#[tokio::test]
+async fn auftraege_aus_etb_chat_und_meldung_gehen_an_die_helfer_app() {
+    let (l, mut relais) = lage_mit_relais().await;
+    pager(&l, "unit", l.einheit, "Max M.", 1).await;
+    let e = l.einsatz;
+    let auftrag = json!({"auftrag_text": "Zelt 3", "empfaenger": [an_einheit(l.einheit)]});
+
+    let etb = post_admin(
+        &l,
+        format!("/api/incidents/{e}/etb"),
+        json!({"von": "ELW 1", "an": "ELW 1", "typ": "meldung", "inhalt": "Deich km12"}),
+    )
+    .await;
+    post_admin(
+        &l,
+        format!("/api/incidents/{e}/etb/{}/task", etb["id"]),
+        auftrag.clone(),
+    )
+    .await;
+    assert_eq!(
+        tokens(&relais.naechste().await),
+        vec![token(1)],
+        "aus dem ETB"
+    );
+
+    let meldung = post_admin(
+        &l,
+        format!("/api/incidents/{e}/reports"),
+        json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
+               "inhalt": "Deich km12", "ereigniszeit": "2026-06-12 09:00:00"}),
+    )
+    .await;
+    post_admin(
+        &l,
+        format!("/api/incidents/{e}/reports/{}/task", meldung["id"]),
+        auftrag.clone(),
+    )
+    .await;
+    assert_eq!(
+        tokens(&relais.naechste().await),
+        vec![token(1)],
+        "aus der Meldung"
+    );
+
+    let (_, kanaele) = anfrage_json(
+        &l.app,
+        "GET",
+        &format!("/api/incidents/{e}/chat/channels"),
+        &l.admin,
+        None,
+    )
+    .await;
+    let nachricht = post_admin(
+        &l,
+        format!(
+            "/api/incidents/{e}/chat/channels/{}/messages",
+            kanaele[0]["id"]
+        ),
+        json!({"inhalt": "Deich sichern"}),
+    )
+    .await;
+    post_admin(
+        &l,
+        format!(
+            "/api/incidents/{e}/chat/messages/{}/promote-to-task",
+            nachricht["id"]
+        ),
+        auftrag,
+    )
+    .await;
+    assert_eq!(
+        tokens(&relais.naechste().await),
+        vec![token(1)],
+        "aus dem Chat"
+    );
+
+    let offen: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM auftrag_empfaenger WHERE helfer_gesendet IS NULL")
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(offen, 0, "jede Zeile ist gezählt");
+}
+
+#[tokio::test]
+async fn berichtigung_meldet_entfernten_empfaengern_live() {
+    let l = lage().await;
+    helfer(&l, "unit", l.einheit, "Max M.").await;
+    let (_, h2) = helfer(&l, "unit", l.einheit_f, "Lisa K.").await;
+    let (auftrag, _) = erteilen(
+        &l,
+        "Zelt 3",
+        json!([an_einheit(l.einheit), an_einheit(l.einheit_f)]),
+    )
+    .await;
+    let mut strom = common::live_oeffnen(&l.app, &h2, l.einsatz)
+        .await
+        .into_body();
+    common::sse_lesen_fuer(&mut strom, std::time::Duration::from_millis(300)).await;
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PATCH",
+        &format!("/api/incidents/{}/tasks/{auftrag}", l.einsatz),
+        &l.admin,
+        Some(&json!({"empfaenger": [an_einheit(l.einheit)]})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let text = common::sse_lesen_fuer(&mut strom, std::time::Duration::from_millis(800)).await;
+    assert!(
+        text.contains(&format!("\"task_id\":{auftrag}")),
+        "der entfernte Helfer lädt neu: {text}"
+    );
+    let a = meine_auftraege(&l, &h2).await;
+    assert!(texte(&a).is_empty(), "{}", a.body);
+}
