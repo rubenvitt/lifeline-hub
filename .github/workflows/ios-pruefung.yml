@@ -2,7 +2,8 @@
 # Simulator“): an einem PR, der die iOS-Hülle oder die gemeinsamen Fälle der Hüllen ändert, auf
 # einem macOS-Runner das Projekt erzeugen, die App für den Simulator bauen, App-, UI- und
 # Kern-Tests auf iOS fahren und die Bildschirmbilder der nativen Seiten als Artefakt ablegen
-# (Bilder der Änderung für den PR).
+# (Bilder der Änderung für den PR). Danach dasselbe für die Helfer-App (Schema `LifelineHelfer`,
+# ADR-0098) auf dem iPhone.
 #
 # KEIN PFLICHT-CHECK: Pflicht sind nur die Checks in `scripts/ruleset-pruefen.sh` (ADR-0048). Ein
 # PR ohne solche Änderungen startet keinen macOS-Lauf (Pfadfilter); macOS-Minuten sind teuer.
@@ -40,7 +41,8 @@ jobs:
   simulator:
     name: iOS-Simulator
     runs-on: macos-26
-    timeout-minutes: 45
+    # Hülle (iPhone und iPad) und Helfer-App (iPhone) nacheinander.
+    timeout-minutes: 60
     env:
       XCODE_APP: /Applications/Xcode_26.6.app
     steps:
@@ -72,6 +74,8 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ios-xcresult
-          path: ${{ runner.temp }}/ios-pruefung/LifelineHub.xcresult
+          path: |
+            ${{ runner.temp }}/ios-pruefung/LifelineHub.xcresult
+            ${{ runner.temp }}/ios-pruefung/LifelineHelfer.xcresult
           if-no-files-found: ignore
           retention-days: 3

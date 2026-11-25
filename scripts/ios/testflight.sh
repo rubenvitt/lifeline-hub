@@ -4,6 +4,12 @@
 # auf einem Mac genauso. An die TestFlight-Gruppen verteilt danach testflight-verteilen.mjs.
 #
 #   scripts/ios/testflight.sh --tag <vX.Y.Z | vX.Y.Z-beta.N | vX.Y.Z-alpha.N> [--ausgabe <verzeichnis>]
+#   scripts/ios/testflight.sh --app helfer --build <nummer> [--ausgabe <verzeichnis>]
+#
+# `--app` wählt die App: `hub` (Vorgabe) ist die Lifeline-Hülle mit Tag und Workspace-Version,
+# `helfer` die Helfer-App (ADR-0098, `.github/workflows/ios-helfer.yml`): Schema
+# `LifelineHelfer`, kein Tag, Version aus scripts/ios/helfer-version.sh und die Build-Nummer aus
+# `--build`. Signierung und Upload sind dieselben.
 #
 # Umgebung (Secrets des Repositorys, docs/betrieb/ios-app.md):
 #   APP_STORE_CONNECT_KEY_ID      Schlüssel-ID des App-Store-Connect-API-Schlüssels
@@ -27,6 +33,8 @@ set -euo pipefail
 WURZEL="$(cd "$(dirname "$0")/../.." && pwd)"
 AUSGABE="$WURZEL/ios/build/testflight"
 TAG=""
+APP="hub"
+HELFER_BUILD=""
 # Team der App; dieselbe Angabe wie `DEVELOPMENT_TEAM` in ios/project.yml (der Selbsttest
 # vergleicht beide).
 TEAM_ID="H95J852PKP"
@@ -37,18 +45,33 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --tag) [ $# -ge 2 ] || fehler "--tag braucht einen Tag."; TAG="$2"; shift 2 ;;
     --ausgabe) [ $# -ge 2 ] || fehler "--ausgabe braucht ein Verzeichnis."; AUSGABE="$2"; shift 2 ;;
-    -h | --help) sed -n '2,24p' "$0"; exit 0 ;;
-    *) fehler "unbekanntes Argument '$1' (erlaubt: --tag, --ausgabe)." ;;
+    --app) [ $# -ge 2 ] || fehler "--app braucht hub oder helfer."; APP="$2"; shift 2 ;;
+    --build) [ $# -ge 2 ] || fehler "--build braucht eine Nummer."; HELFER_BUILD="$2"; shift 2 ;;
+    -h | --help) sed -n '2,30p' "$0"; exit 0 ;;
+    *) fehler "unbekanntes Argument '$1' (erlaubt: --tag, --ausgabe, --app, --build)." ;;
   esac
 done
 
-[ -n "$TAG" ] || fehler "--tag fehlt."
-# Nur die drei Release-Kanäle (ADR-0080); ein anderer Vorabkanal wie `-rc.1` gehört in keinen.
-# Erst gegen das Muster prüfen, dann verwenden: bei einem Handstart ist der Tag freie Eingabe.
-if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
-  fehler "'$TAG' gehört in keinen TestFlight-Kanal: hochgeladen werden nur Tags der Kanäle alpha (vX.Y.Z-alpha.N), beta (vX.Y.Z-beta.N) und main (vX.Y.Z)."
-fi
-VERSION="${TAG#v}"
+case "$APP" in
+  hub)
+    SCHEMA="LifelineHub"
+    [ -z "$HELFER_BUILD" ] || fehler "--build gilt nur mit --app helfer (die Hülle zählt über version.sh)."
+    [ -n "$TAG" ] || fehler "--tag fehlt."
+    # Nur die drei Release-Kanäle (ADR-0080); ein anderer Vorabkanal wie `-rc.1` gehört in keinen.
+    # Erst gegen das Muster prüfen, dann verwenden: bei einem Handstart ist der Tag freie Eingabe.
+    if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+      fehler "'$TAG' gehört in keinen TestFlight-Kanal: hochgeladen werden nur Tags der Kanäle alpha (vX.Y.Z-alpha.N), beta (vX.Y.Z-beta.N) und main (vX.Y.Z)."
+    fi
+    VERSION="${TAG#v}"
+    ;;
+  helfer)
+    SCHEMA="LifelineHelfer"
+    [ -z "$TAG" ] || fehler "--tag gilt nur für die Hülle; die Helfer-App zählt eigene Versionen."
+    [[ "$HELFER_BUILD" =~ ^[1-9][0-9]{0,17}$ ]] \
+      || fehler "--build braucht eine positive ganze Zahl (die Build-Nummer der Helfer-App)."
+    ;;
+  *) fehler "unbekannte App '$APP' (erlaubt: hub, helfer)." ;;
+esac
 
 fehlt=()
 for v in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8; do
@@ -65,18 +88,25 @@ for werkzeug in xcodebuild xcodegen; do
 done
 
 # Version aus [workspace.package]; sie muss die des Tags sein, sonst trüge der Build in TestFlight
-# eine andere Version als das Release.
+# eine andere Version als das Release. Auch die Helfer-App braucht die Datei: XcodeGen erzeugt das
+# ganze Projekt, die Ziele der Hülle binden sie ein.
 "$WURZEL/scripts/ios/version.sh"
-ist="$(awk '$1 == "LIFELINE_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
-[ "$ist" = "$VERSION" ] \
-  || fehler "Workspace-Version $ist passt nicht zum Tag $TAG (erwartet $VERSION)."
-BUILD_NUMMER="$(awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
+if [ "$APP" = hub ]; then
+  ist="$(awk '$1 == "LIFELINE_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
+  [ "$ist" = "$VERSION" ] \
+    || fehler "Workspace-Version $ist passt nicht zum Tag $TAG (erwartet $VERSION)."
+  BUILD_NUMMER="$(awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
+else
+  "$WURZEL/scripts/ios/helfer-version.sh" --build "$HELFER_BUILD"
+  VERSION="$(awk '$1 == "MARKETING_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/Helfer/App/Version.xcconfig")"
+  BUILD_NUMMER="$HELFER_BUILD"
+fi
 
 xcodegen generate --spec "$WURZEL/ios/project.yml"
 
 rm -rf "$AUSGABE"
 mkdir -p "$AUSGABE"
-ARCHIV="$AUSGABE/LifelineHub.xcarchive"
+ARCHIV="$AUSGABE/$SCHEMA.xcarchive"
 OPTIONEN="$AUSGABE/ExportOptions.plist"
 
 # Der Schlüssel nur in einem eigenen Wegwerf-Ordner, nie in der Ausgabe (die lädt ein Workflow
@@ -121,7 +151,7 @@ PLIST
 echo "==> Archivieren ($VERSION)"
 xcodebuild archive \
   -project "$WURZEL/ios/LifelineHub.xcodeproj" \
-  -scheme LifelineHub \
+  -scheme "$SCHEMA" \
   -configuration Release \
   -destination generic/platform=iOS \
   -archivePath "$ARCHIV" \
@@ -137,4 +167,4 @@ xcodebuild -exportArchive \
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   echo "build=$BUILD_NUMMER" >> "$GITHUB_OUTPUT"
 fi
-echo "Hochgeladen: Lifeline $VERSION (Build $BUILD_NUMMER). TestFlight zeigt den Build nach Apples Verarbeitung."
+echo "Hochgeladen: $SCHEMA $VERSION (Build $BUILD_NUMMER). TestFlight zeigt den Build nach Apples Verarbeitung."

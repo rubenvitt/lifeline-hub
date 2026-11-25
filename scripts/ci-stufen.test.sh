@@ -24,6 +24,7 @@ MIGK="$WF/migrationen-kanal.yml"
 RULESET="$WF/ruleset.yml"
 IOS="$WF/ios-pruefung.yml"
 IOSREL="$WF/ios.yml"
+IOSHELFER="$WF/ios-helfer.yml"
 ANDROID="$WF/android-pruefung.yml"
 ANDROIDALPHA="$WF/android-pruefung-alpha.yml"
 ANDROIDREL="$WF/android.yml"
@@ -37,7 +38,7 @@ pruefe() { # <name> <bedingung …>
   if "$@"; then ok "$name"; else fehl "$name"; fi
 }
 
-for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS" "$IOSREL" "$ANDROID" "$ANDROIDALPHA" "$ANDROIDREL" "$ART"; do
+for datei in "$CI" "$PR" "$SUITEN" "$E2E" "$MIG" "$MIGK" "$RULESET" "$IOS" "$IOSREL" "$IOSHELFER" "$ANDROID" "$ANDROIDALPHA" "$ANDROIDREL" "$ART"; do
   [ -f "$datei" ] || { echo "FEHLER: $datei fehlt." >&2; fehler=$((fehler + 1)); }
 done
 [ "$fehler" = 0 ] || { echo "==> FEHLER: $fehler Datei(en) fehlen im Selbsttest ci-stufen." >&2; exit 1; }
@@ -285,6 +286,33 @@ pruefe "ios.yml: verteilen löscht den Schlüssel immer" \
   enthaelt "$(job "$IOSREL" verteilen)" "if: \${{ always() }}"
 pruefe "artefakte.yml: freigeben wartet nicht auf ios" \
   fehlt "$(job "$ART" freigeben | grep -E '^    needs:')" "ios"
+
+echo "==> ci-stufen: ios-helfer.yml (TestFlight der Helfer-App)"
+# Der Upload der Helfer-App (ADR-0098): nur mit dem Label `testflight-helfer` am PR oder per
+# Handstart. Ein Upload bei jedem PR kostete macOS-Minuten und füllte TestFlight.
+pruefe "ios-helfer.yml: PR und Handstart" nur_ausloeser "$IOSHELFER" "pull_request workflow_dispatch "
+pruefe "ios-helfer.yml: PR nur bei labeled und synchronize" \
+  enthaelt "$(kopf_code "$IOSHELFER")" "types: [labeled, synchronize]"
+helfer_if="$(job_if "$IOSHELFER" testflight)"
+for teil in "github.event.label.name == 'testflight-helfer'" \
+  "contains(github.event.pull_request.labels.*.name, 'testflight-helfer')" \
+  "github.event_name == 'workflow_dispatch'"; do
+  pruefe "ios-helfer.yml: Job testflight nur mit $teil" enthaelt "$helfer_if" "$teil"
+done
+pruefe "ios-helfer.yml liest nur" test "$(code_ohne_kommentar "$IOSHELFER" | grep -cE ': write')" = 0
+pruefe "ios-helfer.yml fährt scripts/ios/testflight.sh --app helfer" \
+  enthaelt "$(job "$IOSHELFER" testflight)" "./scripts/ios/testflight.sh --app helfer --build"
+pruefe "ios-helfer.yml: Build-Nummer aus der Laufnummer plus 1000" \
+  enthaelt "$(job "$IOSHELFER" testflight)" "LAUFNUMMER + 1000"
+pruefe "ios-helfer.yml installiert XcodeGen nur über das Skript" \
+  enthaelt "$(job "$IOSHELFER" testflight)" "run: ./scripts/ios/xcodegen-installieren.sh"
+for geheim in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_P8; do
+  pruefe "ios-helfer.yml reicht $geheim an das Skript" \
+    enthaelt "$(job "$IOSHELFER" testflight)" "$geheim: \${{ secrets.$geheim }}"
+done
+pruefe "ios-helfer.yml: kein pull_request_target" fehlt "$(code_ohne_kommentar "$IOSHELFER")" "pull_request_target"
+pruefe "simulator-pruefung.sh testet auch die Helfer-App" \
+  enthaelt "$(code_ohne_kommentar "$SKRIPTE/ios/simulator-pruefung.sh")" "-scheme LifelineHelfer"
 
 echo "==> ci-stufen: android-pruefung.yml"
 # Der App-Lauf der Android-Hülle (LLH-1989, Entwurf D10): am PR und nach dem Merge auf `alpha`, nur

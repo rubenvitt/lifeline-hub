@@ -94,6 +94,11 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Archiv, Signierung und Upload stehen in `scripts/ios/testflight.sh`, das Alpha-Tags und eine
     vom Tag abweichende Workspace-Version selbst abweist (Selbsttest in Schritt 8). Betrieb und
     Secrets: `docs/betrieb/ios-app.md`.
+  - **TestFlight der Helfer-App** (ADR-0098): `ios-helfer.yml` lädt das Schema `LifelineHelfer`
+    hoch, nur an PRs mit dem Label `testflight-helfer` (beim Setzen und bei jedem Push danach)
+    oder per Handstart; dasselbe Skript mit `--app helfer --build <Laufnummer + 1000>`, die
+    Version steht nur in `scripts/ios/helfer-version.sh`. Kein Verteilschritt: die Gruppe
+    „Intern“ bekommt jeden Build automatisch. `ios-pruefung.yml` testet die Helfer-App mit.
   - **Android-Prüfung** (LLH-1989): `android-pruefung.yml` fährt an PRs und nach Pushes auf
     `alpha`, die `android/`, `scripts/android/` oder `src-tauri/faelle/` ändern, die App-Tests
     (Robolectric, Bilder als Artefakt `android-bilder`), die Release-APK ohne Signatur und den

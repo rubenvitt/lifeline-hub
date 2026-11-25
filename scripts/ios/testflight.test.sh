@@ -57,7 +57,8 @@ chmod +x "$ARBEIT/bin/xcodebuild" "$ARBEIT/bin/xcodegen"
 wurzel_mit() { # <version> → Pfad
   local w="$ARBEIT/wurzel-$RANDOM"
   mkdir -p "$w/scripts/ios" "$w/ios/App"
-  cp "$QUELLE/scripts/ios/testflight.sh" "$QUELLE/scripts/ios/version.sh" "$w/scripts/ios/"
+  cp "$QUELLE/scripts/ios/testflight.sh" "$QUELLE/scripts/ios/version.sh" \
+    "$QUELLE/scripts/ios/helfer-version.sh" "$w/scripts/ios/"
   cp "$QUELLE/ios/project.yml" "$w/ios/project.yml"
   printf '[workspace.package]\nversion = "%s"\n' "$1" > "$w/Cargo.toml"
   printf '%s\n' "$w"
@@ -142,6 +143,44 @@ pruefe "Ausgabe: Exit 0" 0 "$(AUSGABE_DATEI="$ausgabe" laufe "$w" --tag v1.0.0-b
 pruefe "Ausgabe: build= mit der Nummer aus version.sh" "build=202611181200" "$(cat "$ausgabe")"
 w="$(wurzel_mit 1.0.0-beta.3)"
 pruefe "ohne GITHUB_OUTPUT: Exit 0" 0 "$(laufe "$w" --tag v1.0.0-beta.3 --ausgabe "$w/aus")"
+
+echo "==> ios/testflight.sh: Helfer-App (ADR-0098, ios-helfer.yml)"
+w="$(wurzel_mit 1.0.0-alpha.200)"
+ausgabe="$ARBEIT/github-output-helfer"
+: > "$ausgabe"
+pruefe "Helfer: Exit 0" 0 "$(AUSGABE_DATEI="$ausgabe" laufe "$w" --app helfer --build 1042 --ausgabe "$w/aus")"
+pruefe "Helfer: Projekt erzeugt" 1 "$(aufrufe_mit "xcodegen generate --spec $w/ios/project.yml")"
+pruefe "Helfer: Version der Hülle trotzdem geschrieben (XcodeGen braucht sie)" ja \
+  "$([ -f "$w/ios/App/Version.xcconfig" ] && echo ja || echo nein)"
+pruefe "Helfer: eigene Marketing-Version" "MARKETING_VERSION = $(awk -F'"' '/^HELFER_VERSION=/ { print $2 }' "$QUELLE/scripts/ios/helfer-version.sh")" \
+  "$(grep '^MARKETING_VERSION' "$w/ios/Helfer/App/Version.xcconfig")"
+pruefe "Helfer: Build-Nummer aus --build" "CURRENT_PROJECT_VERSION = 1042" \
+  "$(grep '^CURRENT_PROJECT_VERSION' "$w/ios/Helfer/App/Version.xcconfig")"
+archiv="$(grep '^xcodebuild archive' "$ARBEIT/aufrufe" || true)"
+for teil in "-scheme LifelineHelfer" "-archivePath $w/aus/LifelineHelfer.xcarchive" \
+  "-allowProvisioningUpdates" "-authenticationKeyID ABC123XYZ9" "-authenticationKeyPath "; do
+  pruefe "Helfer-Archiv: $teil" ja "$(ja_nein grep -qF -- "$teil" <<< "$archiv")"
+done
+pruefe "Helfer-Archiv: nicht das Schema der Hülle" nein "$(ja_nein grep -qF -- "-scheme LifelineHub" <<< "$archiv")"
+pruefe "Helfer: hochgeladen" 1 "$(aufrufe_mit '^xcodebuild -exportArchive')"
+pruefe "Helfer: build= mit der Nummer aus --build" "build=1042" "$(cat "$ausgabe")"
+pruefe "Helfer: Schlüssel steht nicht im Log" nein "$(ja_nein grep -qF -- "$GEHEIM" "$ARBEIT/log")"
+
+w="$(wurzel_mit 1.0.0-beta.3)"
+rc="$(laufe "$w" --app helfer --ausgabe "$w/aus")"
+pruefe "Helfer ohne --build: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+pruefe "Helfer ohne --build: kein xcodebuild" 0 "$(aufrufe_mit '^xcodebuild')"
+rc="$(laufe "$w" --app helfer --build 0 --ausgabe "$w/aus")"
+pruefe "Helfer mit Build 0: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+rc="$(laufe "$w" --app helfer --build '12;id' --ausgabe "$w/aus")"
+pruefe "Helfer mit Build-Unsinn: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+rc="$(laufe "$w" --app helfer --build 1042 --tag v1.0.0-beta.3 --ausgabe "$w/aus")"
+pruefe "Helfer mit --tag: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+rc="$(laufe "$w" --tag v1.0.0-beta.3 --build 1042 --ausgabe "$w/aus")"
+pruefe "Hülle mit --build: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+rc="$(laufe "$w" --app andere --build 1042 --ausgabe "$w/aus")"
+pruefe "unbekannte App: Exit ≠ 0" ja "$([ "$rc" != 0 ] && echo ja || echo nein)"
+pruefe "unbekannte App: kein xcodebuild" 0 "$(aufrufe_mit '^xcodebuild')"
 
 echo "==> ios/testflight.sh: abgewiesen"
 

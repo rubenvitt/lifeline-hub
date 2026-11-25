@@ -1,0 +1,88 @@
+# Helfer-App zu TestFlight (ADR-0098, Regeln ios/Helfer/AGENTS.md): das Projekt erzeugen, das Schema
+# `LifelineHelfer` archivieren, automatisch signieren und hochladen. Ablauf in
+# `scripts/ios/testflight.sh --app helfer` (dasselbe Skript wie die Hülle, auf einem Mac genauso),
+# XcodeGen gepinnt in `scripts/ios/xcodegen-installieren.sh`. Die App in App Store Connect
+# („Lifeline Helfer“, `dev.rubeen.lifeline.helfer`) verteilt jeden Build selbst an die interne
+# Gruppe „Intern“ (automatische Verteilung); ein Verteilschritt wie in ios.yml entfällt.
+#
+# Zwei Auslöser, kein Push:
+#
+# - `pull_request`, sobald ein PR das Label `testflight-helfer` bekommt, und danach bei jedem Push
+#   auf den PR, solange das Label hängt. Ein anderes Label startet keinen Upload. PRs aus Forks
+#   haben keine Secrets; dort bricht das Skript mit einer Meldung ab.
+# - `workflow_dispatch` als Handstart für den gewählten Branch.
+#
+# Version: MARKETING_VERSION aus scripts/ios/helfer-version.sh (einzige Stelle), Build-Nummer die
+# Laufnummer dieses Workflows plus 1000 (steigt mit jedem Lauf; App Store Connect verlangt eine
+# steigende Nummer je Version). Signiert wird über den App-Store-Connect-API-Schlüssel
+# (APP_STORE_CONNECT_*), auf dem Runner liegt kein Zertifikat; App-ID, Erweiterung und App Group
+# legt `-allowProvisioningUpdates` an. Runner und Xcode wie ios.yml: Xcode 26.6 auf macos-26.
+#
+# KEIN PFLICHT-CHECK (ADR-0048). Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Helfer-App (TestFlight)
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+  workflow_dispatch:
+
+# Least privilege: der Lauf liest nur das Repository; hochgeladen wird zu Apple, nicht zu GitHub.
+permissions:
+  contents: read
+
+jobs:
+  testflight:
+    name: TestFlight (Helfer)
+    # Nur mit dem Label: beim Setzen genau dieses Labels und bei jedem Push, solange es hängt.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.action == 'labeled' && github.event.label.name == 'testflight-helfer')
+      || (github.event.action == 'synchronize'
+          && contains(github.event.pull_request.labels.*.name, 'testflight-helfer'))
+    runs-on: macos-26
+    timeout-minutes: 60
+    # Je Branch ein Upload zur Zeit; ein zweiter wartet.
+    concurrency:
+      group: ios-helfer-${{ github.head_ref || github.ref }}
+      cancel-in-progress: false
+    env:
+      XCODE_APP: /Applications/Xcode_26.6.app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Der Stand des PR-Branches, nicht der Merge-Commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Xcode wählen
+        run: |
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "FEHLER: $XCODE_APP fehlt auf dem Runner. Vorhanden:" >&2
+            ls -d /Applications/Xcode*.app >&2
+            exit 1
+          fi
+          sudo xcode-select --switch "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+      - name: XcodeGen (gepinnt)
+        run: ./scripts/ios/xcodegen-installieren.sh
+      - name: Archivieren, signieren, hochladen
+        env:
+          LAUFNUMMER: ${{ github.run_number }}
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          ./scripts/ios/testflight.sh --app helfer --build "$((LAUFNUMMER + 1000))" \
+            --ausgabe "$RUNNER_TEMP/testflight"
+      # Zur Diagnose nur bei Rot: die Protokolle des Exports (ohne Schlüssel, der liegt nie in der
+      # Ausgabe).
+      - name: Export-Protokolle
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ios-helfer-testflight-protokolle
+          path: |
+            ${{ runner.temp }}/testflight/export/*.log
+            ${{ runner.temp }}/testflight/export/*.plist
+            ${{ runner.temp }}/testflight/ExportOptions.plist
+          if-no-files-found: ignore
+          retention-days: 7
