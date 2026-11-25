@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR } from '../../offline/verbindung';
 import { FREMDEBENE_FEHLERTEXT, type Fremdebene } from '../../api/fremdebenen';
 import FremdebenenZeilen, { type FremdebenenZeilenProps } from './FremdebenenZeilen';
 
@@ -72,13 +73,36 @@ describe('Zeilen der Fremdebenen (LLH-2099)', () => {
     expect(screen.getByText(FREMDEBENE_FEHLERTEXT.zeitlimit)).toBeInTheDocument();
   });
 
-  it('das ⋮ hat Umbenennen, Farbe und Entfernen, nichts davon rot', async () => {
+  it('das ⋮ hat Umbenennen, Farbe und Entfernen; nur Entfernen ist rot', async () => {
     zeilen();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Lage Nachbarkreis' }));
     const liste = await waitFor(() => screen.getByRole('menu'));
     const eintraege = within(liste).getAllByRole('menuitem');
     expect(eintraege.map((e) => e.textContent)).toEqual(['Umbenennen …', 'Farbe …', 'Entfernen …']);
-    for (const e of eintraege) expect(e).not.toHaveClass('ant-dropdown-menu-item-danger');
+    const [umbenennen, farbe, entfernen] = eintraege;
+    expect(umbenennen).not.toHaveClass('ant-dropdown-menu-item-danger');
+    expect(farbe).not.toHaveClass('ant-dropdown-menu-item-danger');
+    // Unumkehrbar (ADR-0055): rot hinter dem Trenner.
+    expect(entfernen).toHaveClass('ant-dropdown-menu-item-danger');
+    expect(liste.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
+  });
+
+  it('ohne Verbindung ist das ⋮ gesperrt, und der Grund steht sichtbar daneben', async () => {
+    setzeOnline(false);
+    try {
+      zeilen();
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Aktionen zu Lage Nachbarkreis' })).toBeDisabled(),
+      );
+      expect(screen.getByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
+    } finally {
+      setzeOnline(true);
+    }
+  });
+
+  it('mit Verbindung steht kein Sperrgrund', () => {
+    zeilen();
+    expect(screen.queryByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeNull();
   });
 
   it('ohne Schreibrecht kein ⋮', () => {
@@ -87,7 +111,7 @@ describe('Zeilen der Fremdebenen (LLH-2099)', () => {
     expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toBeInTheDocument();
   });
 
-  it('Entfernen fragt mit Folgesatz nach, der Knopf ist nicht rot', async () => {
+  it('Entfernen fragt mit Folgesatz nach, der Knopf ist rot', async () => {
     const props = zeilen();
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Lage Nachbarkreis' }));
     const liste = await waitFor(() => screen.getByRole('menu'));
@@ -97,7 +121,7 @@ describe('Zeilen der Fremdebenen (LLH-2099)', () => {
     });
     expect(within(dialog).getByText(/für alle aus dem Einsatz/)).toBeInTheDocument();
     const knopf = within(dialog).getByRole('button', { name: 'Entfernen' });
-    expect(knopf).not.toHaveClass('ant-btn-dangerous');
+    expect(knopf).toHaveClass('ant-btn-dangerous');
     await userEvent.click(knopf);
     expect(props.onEntfernen).toHaveBeenCalledWith(4);
   });

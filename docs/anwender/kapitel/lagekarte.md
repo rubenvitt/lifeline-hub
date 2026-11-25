@@ -210,7 +210,9 @@ Dritter auf der Karte, etwa Suchgebiete eines Nachbarkreises als GeoJSON, KML od
 3. Für Einsatzleitung und Führungspersonal: am Menü der Zeile „Umbenennen …“, „Farbe …“ oder
    „Entfernen …“ wählen. Die Farbe ist einer von sechs Tönen (Indigo, Petrol, Pflaume, Oliv,
    Violett, Ocker).
-4. „Entfernen …“ fragt nach; die Ebene verschwindet danach mit ihren Daten für alle.
+4. „Entfernen …“ steht rot unter einem Trenner und fragt nach. Nach „Entfernen“ verschwindet die
+   Ebene mit ihren Daten für alle; zurück kommt sie nur, wenn jemand sie neu hinzufügt. Ohne
+   Verbindung ist das Menü gesperrt, über den Zeilen steht dann „Ohne Verbindung nicht änderbar“.
 5. Ein Objekt einer Fremdebene auf der Karte antippen zeigt seinen Namen und seine Beschreibung
    unter „Fremde Daten“, nur zum Lesen.
 

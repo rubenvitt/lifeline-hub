@@ -7,7 +7,7 @@ import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { vorText } from '../../anzeige/dauer';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
-import { useOnline } from '../../offline/useOnline';
+import { OHNE_VERBINDUNG_NICHT_AENDERBAR, useOhneVerbindung } from '../../offline/verbindung';
 import { FREMDEBENE_FEHLERTEXT, FREMDEBENE_GRENZEN, type Fremdebene } from '../../api/fremdebenen';
 import { FREMDEBENE_TOENE, type FremdebeneTon } from '../../theme/tokens';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
@@ -46,13 +46,14 @@ type Dialog = { art: 'umbenennen' | 'farbe' | 'entfernen'; id: number } | null;
  * letzten Abrufs bzw. dem Warnhinweis zum Fehlercode, daneben das ⋮ (nur mit Schreibrecht).
  *
  * Die Sichtbarkeit gilt für diesen Arbeitsplatz, nicht am Datensatz. Entfernen löscht die Ebene
- * für alle; ein Rückweg stellte sie nicht her (eine URL-Ebene wäre neu abzurufen, eine Datei neu
- * hochzuladen), deshalb eine Rückfrage mit Folgesatz und kein Rot (`frontend/AGENTS.md`,
- * „Beenden: Verb, Ort und Sicherung je Art“, Zuordnung lösen).
+ * für alle und hat keinen Rückweg (eine URL-Ebene wäre neu abzurufen, eine Datei neu
+ * hochzuladen): rot hinter dem Trenner, Rückfrage mit Folgesatz und rotem Knopf wie „Bild
+ * entfernen …“ (`frontend/AGENTS.md`, „Destruktiv ist nicht gleich destruktiv“, ADR-0055).
  */
 export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
   const { darfSchreiben } = props;
-  const online = useOnline();
+  // Ändern geht nur mit Netz (Entwurf „Offline“); der Grund steht sichtbar über den Zeilen.
+  const ohneVerbindung = useOhneVerbindung();
   const [dialog, setDialog] = useState<Dialog>(null);
   const [neuerName, setNeuerName] = useState('');
   const ziel = loeschDialogBild(props.ebenen, dialog?.id ?? null);
@@ -63,7 +64,7 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
         eintraege: () => [
           { key: 'umbenennen', label: 'Umbenennen …' },
           { key: 'farbe', label: 'Farbe …' },
-          { key: 'entfernen', label: 'Entfernen …' },
+          { key: 'entfernen', label: 'Entfernen …', gefahr: true },
         ],
         zugaenglicherName: (e) => `Aktionen zu ${e.name}`,
         onWahl: (key, e) => {
@@ -82,6 +83,11 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
   return (
     <Stapel abstand="xs">
       <SpeicherFehler fehler={props.fehler} />
+      {menue && ohneVerbindung && props.ebenen.length > 0 && (
+        <Textstufe stufe="meta" ton="text2">
+          {OHNE_VERBINDUNG_NICHT_AENDERBAR}
+        </Textstufe>
+      )}
       <div>
         {props.ebenen.map((e) => (
           <FremdebeneZeile
@@ -90,8 +96,7 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
             sichtbar={props.sichtbar.has(e.id)}
             onToggle={() => props.onToggle(e.id)}
             menue={menue}
-            // Ändern geht nur mit Netz (Entwurf „Offline“).
-            gesperrt={!online}
+            gesperrt={ohneVerbindung}
           />
         ))}
       </div>
@@ -139,6 +144,7 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
         open={dialog?.art === 'entfernen' && ziel != null}
         title={`Fremdebene „${ziel?.name ?? ''}“ entfernen?`}
         okText="Entfernen"
+        okButtonProps={{ danger: true }}
         cancelText="Abbrechen"
         onOk={() => {
           if (ziel) props.onEntfernen(ziel.id);
