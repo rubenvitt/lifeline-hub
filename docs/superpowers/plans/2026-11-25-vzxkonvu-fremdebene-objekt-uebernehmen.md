@@ -54,15 +54,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vzxkonvuigfqz37jfifcq3gj
   `pub async fn herkunft_fuer(pool, einsatz_id, Option<i64>) -> Result<Option<String>, AppError>`
   (lädt per `repo::laden`, 404 durchgereicht).
 
-- [ ] **Step 1: Failing tests** in `tests/karte_fremdebene.rs` (Ebene per `hochladen` aus `ZWEI_PUNKTE`, Name „Lage Kreis X“):
+- [x] **Step 1: Failing tests** in `tests/karte_fremdebene.rs` (Ebene per `hochladen` aus `ZWEI_PUNKTE`, Name „Lage Kreis X“):
   - `zone_mit_fremdebene_traegt_herkunft_im_etb`: POST zones gefahrengebiet, label „Brandfläche“, `fremdebene_id` → 201; `system_etb_inhalte` enthält genau
     `Gefahrengebiet «Brandfläche» eingerichtet (übernommen aus Fremdebene «Lage Kreis X», Datei)`.
   - `zone_mit_fremder_fremdebene_ist_404`: Ebene aus anderem Einsatz → 404, keine Zone angelegt.
   - Unit-Test in `mod.rs`: `herkunft_text` für Quelle `url` mit `url_host = Some("lage.example.org")` → `übernommen aus Fremdebene «X», von lage.example.org`.
-- [ ] **Step 2:** `cargo test --test karte_fremdebene zone_mit` → FAIL (unbekanntes Feld wird ignoriert, Text ohne Herkunft).
-- [ ] **Step 3:** `fremdebene_id: Option<i64>` an `ZoneBody`; in `anlegen` nach `pruefe_zugehoerig` `herkunft_fuer` aufrufen; im Tx den Text als `format!("{text} ({h})")` bauen. Länge gegen `etb::INHALT_MAX` prüfen (400 bei Überlänge, praktisch unerreichbar).
-- [ ] **Step 4:** Tests grün; `cargo test --test lage_zone` weiter grün (Text ohne Feld unverändert).
-- [ ] **Step 5:** Commit `feat: Zone mit Herkunft aus Fremdebene anlegen (LLH-2129)`.
+- [x] **Step 2:** `cargo test --test karte_fremdebene zone_mit` → FAIL (unbekanntes Feld wird ignoriert, Text ohne Herkunft).
+- [x] **Step 3:** `fremdebene_id: Option<i64>` an `ZoneBody`; in `anlegen` nach `pruefe_zugehoerig` `herkunft_fuer` aufrufen; im Tx den Text als `format!("{text} ({h})")` bauen. Länge gegen `etb::INHALT_MAX` prüfen (400 bei Überlänge, praktisch unerreichbar).
+- [x] **Step 4:** Tests grün; `cargo test --test lage_zone` weiter grün (Text ohne Feld unverändert).
+- [x] **Step 5:** Commit `feat: Zone mit Herkunft aus Fremdebene anlegen (LLH-2129)`.
 
 ### Task 2: Herkunft am freien Zeichen
 
@@ -73,14 +73,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vzxkonvuigfqz37jfifcq3gj
 **Interfaces:**
 - Consumes: `karte_fremdebene::herkunft_fuer`, `herkunft_text` (Task 1).
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `zeichen_mit_fremdebene_schreibt_system_etb`: POST free-symbols mit Spec `STELLE_SANITAET` (aus `tests/freies_zeichen.rs` kopieren), label „Sammelpunkt“, `fremdebene_id` → 201; ETB enthält `Freies Zeichen «Sammelpunkt» übernommen aus Fremdebene «Lage Kreis X», Datei`.
   - `zeichen_ohne_fremdebene_schreibt_kein_etb`: dieselbe Anlage ohne Feld → Zahl der System-ETB-Einträge unverändert.
   - `zeichen_mit_fremder_fremdebene_ist_404`.
-- [ ] **Step 2:** Tests rot.
-- [ ] **Step 3:** Mit `fremdebene_id`: `etb_startwert` + `write_retry!` mit Zeichen-INSERT und `etb::system_audit_tx` (Muster `routes/lage_zone.rs::anlegen`), danach `super::etb_verteilen` und `sse_zeichen`. Ohne: bisheriger Weg unverändert.
-- [ ] **Step 4:** Tests grün; `cargo test --test freies_zeichen` grün.
-- [ ] **Step 5:** Commit `feat: Freies Zeichen mit Herkunft aus Fremdebene anlegen (LLH-2129)`.
+- [x] **Step 2:** Tests rot.
+- [x] **Step 3:** Mit `fremdebene_id`: `etb_startwert` + `write_retry!` mit Zeichen-INSERT und `etb::system_audit_tx` (Muster `routes/lage_zone.rs::anlegen`), danach `super::etb_verteilen` und `sse_zeichen`. Ohne: bisheriger Weg unverändert.
+- [x] **Step 4:** Tests grün; `cargo test --test freies_zeichen` grün.
+- [x] **Step 5:** Commit `feat: Freies Zeichen mit Herkunft aus Fremdebene anlegen (LLH-2129)`.
 
 ### Task 3: Zerlegen und Bodies bauen (rein)
 
@@ -98,11 +98,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vzxkonvuigfqz37jfifcq3gj
   - `uebernahmeLabel(name: string | null, ebenenName: string, i: number, n: number): string`
   - `uebernahmeNotiz(ebenenName: string, beschreibung: string | null): string`
 
-- [ ] **Step 1: Failing tests:** Point → 1 punkt; MultiPolygon mit 3 Teilen → 3 flaeche, Loch-Ring des ersten erhalten; MultiLineString → linie; GeometryCollection aus 2 Polygonen → 2 flaeche; aus Polygon+Point → `{grund:'gemischt'}`; MultiPoint mit 21 Punkten → `{grund:'zu_viele'}`; `null` → `{grund:'leer'}`; `zonenArtenFuer('flaeche')` Typen `['gefahrengebiet','absperrbereich','sperrgebiet','freie_skizze']`, `('linie')` → `['absperrgrenze','freie_skizze']`; `uebernahmeLabel(null,'Ebene',0,1)` = `'Ebene'`, `('A','E',1,3)` = `'A (2/3)'`, 250-Zeichen-Name mit n=3 → Länge 200 und endet auf ` (1/3)`; `uebernahmeNotiz('E','Text')` = `'Übernommen aus Fremdebene «E».\n\nText'`, ohne Beschreibung nur der Satz, Gesamtlänge ≤ 2000.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte/fremdebeneUebernahme.test.ts` → FAIL.
-- [ ] **Step 3:** Implementieren.
-- [ ] **Step 4:** Test grün; `mise exec -- pnpm -C frontend exec tsc -b` sauber.
-- [ ] **Step 5:** Commit `feat: Fremdebenen-Objekt in übernehmbare Teile zerlegen (LLH-2129)`.
+- [x] **Step 1: Failing tests:** Point → 1 punkt; MultiPolygon mit 3 Teilen → 3 flaeche, Loch-Ring des ersten erhalten; MultiLineString → linie; GeometryCollection aus 2 Polygonen → 2 flaeche; aus Polygon+Point → `{grund:'gemischt'}`; MultiPoint mit 21 Punkten → `{grund:'zu_viele'}`; `null` → `{grund:'leer'}`; `zonenArtenFuer('flaeche')` Typen `['gefahrengebiet','absperrbereich','sperrgebiet','freie_skizze']`, `('linie')` → `['absperrgrenze','freie_skizze']`; `uebernahmeLabel(null,'Ebene',0,1)` = `'Ebene'`, `('A','E',1,3)` = `'A (2/3)'`, 250-Zeichen-Name mit n=3 → Länge 200 und endet auf ` (1/3)`; `uebernahmeNotiz('E','Text')` = `'Übernommen aus Fremdebene «E».\n\nText'`, ohne Beschreibung nur der Satz, Gesamtlänge ≤ 2000.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte/fremdebeneUebernahme.test.ts` → FAIL.
+- [x] **Step 3:** Implementieren.
+- [x] **Step 4:** Test grün; `mise exec -- pnpm -C frontend exec tsc -b` sauber.
+- [x] **Step 5:** Commit `feat: Fremdebenen-Objekt in übernehmbare Teile zerlegen (LLH-2129)`.
 
 ### Task 4: Knopf, Dialog und Anlage in der Lagekarte
 
@@ -117,17 +117,17 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vzxkonvuigfqz37jfifcq3gj
   - `FremdebeneDetail` neue Props `geometrie: Geometry | null`, `darfSchreiben: boolean`, `onUebernehmen?: () => void`.
   - `useFremdebeneUebernahme({ einsatzId, ansichtId })` → `{ uebernehme(p: { ebene: Fremdebene; teile: UebernahmeTeil[]; name: string | null; beschreibung: string | null; zonenTyp?: ZoneTyp; spec?: FreiesZeichenUpdate }): Promise<void>; laeuft: boolean }`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - Detail: mit `darfSchreiben` und Polygon zeigt Knopf „Übernehmen“; ohne Schreibrecht kein Knopf; gemischte Geometrie → Knopf deaktiviert mit Tooltip „Gemischte Objekte lassen sich nicht übernehmen“; 21 Punkte → „Mehr als 20 Teile lassen sich nicht übernehmen“.
   - Dialog (Fläche): Radio mit vier Arten, Gefahrengebiet vorgewählt; „Übernehmen“ ruft `onBestaetigen('gefahrengebiet')`.
   - Hook (mit gemocktem `legeZoneAn`): 2 Flächen → zwei Aufrufe mit `geometrie_typ:'Polygon'`, `fremdebene_id`, `ansicht_id`, Label `A (1/2)`/`A (2/2)`, Notiz laut Task 3; freie_skizze mit `farbe: FREIE_SKIZZE_VORGABEFARBE`; zweiter Aufruf wirft → Fehlermeldung enthält „1 von 2 übernommen“; Erfolg → `einsatzKeys.zonen` und `einsatzKeys.gefahrengebiete` invalidiert, Meldung „2 Objekte übernommen“ (bei 1: „Objekt übernommen“). Punkte: `legeFreiesZeichenAn` mit `lat/lon` aus den Koordinaten, `...spec`, `label`, `fremdebene_id`; invalidiert `einsatzKeys.freieZeichen`.
-- [ ] **Step 2:** Tests rot.
-- [ ] **Step 3:** Implementieren. Fläche/Linie → `FremdebeneUebernehmenDialog` (antd `Modal` im Stil von `ZeichenWahlDialog`: `mask={{ closable: false }}`, `MASKE_HAELT_FOKUS`, `Knopfreihe fuss`); Punkt → `ZeichenWahlDialog` (`quelle: 'maus'`), Knopf „Platzieren“ startet hier direkt die Anlage. Fehler über `beginneHandlung`-Muster wie in `useKartenInteraktion`. Nach Erfolg Detail schließen. In der Verlaufsansicht ist `darfSchreiben` falsch zu übergeben (gleiche Bedingung wie beim übrigen Zeichnen in `LagekartePage`).
-- [ ] **Step 4:** Tests grün; `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte` grün; `tsc -b` und `pnpm lint` sauber.
-- [ ] **Step 5:** Commit `feat: Fremdebenen-Objekt in der Lagekarte übernehmen (LLH-2129)`.
+- [x] **Step 2:** Tests rot.
+- [x] **Step 3:** Implementieren. Fläche/Linie → `FremdebeneUebernehmenDialog` (antd `Modal` im Stil von `ZeichenWahlDialog`: `mask={{ closable: false }}`, `MASKE_HAELT_FOKUS`, `Knopfreihe fuss`); Punkt → `ZeichenWahlDialog` (`quelle: 'maus'`), Knopf „Platzieren“ startet hier direkt die Anlage. Fehler über `beginneHandlung`-Muster wie in `useKartenInteraktion`. Nach Erfolg Detail schließen. In der Verlaufsansicht ist `darfSchreiben` falsch zu übergeben (gleiche Bedingung wie beim übrigen Zeichnen in `LagekartePage`).
+- [x] **Step 4:** Tests grün; `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte` grün; `tsc -b` und `pnpm lint` sauber.
+- [x] **Step 5:** Commit `feat: Fremdebenen-Objekt in der Lagekarte übernehmen (LLH-2129)`.
 
 ### Task 5: Doku, Gates
 
-- [ ] **Step 1:** `docs/anwender/AGENTS.md` lesen; im Fremdebenen-Abschnitt der Anwenderdoku „Objekt übernehmen“ ergänzen, wenn die Mitänderungsregel es verlangt. `docs/architektur` nur, wenn deren Mitänderungsregel greift.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (Ausgabe festhalten für „Geprüft“).
-- [ ] **Step 3:** Commit `docs: Objekt aus Fremdebene übernehmen (LLH-2129)`.
+- [x] **Step 1:** `docs/anwender/AGENTS.md` lesen; im Fremdebenen-Abschnitt der Anwenderdoku „Objekt übernehmen“ ergänzen, wenn die Mitänderungsregel es verlangt. `docs/architektur` nur, wenn deren Mitänderungsregel greift.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e`: Schnellprüfungen grün; Rust-/Frontend-Suite im Container nicht vollständig lauffähig (Platte/Zeitlimit, doppelte Migration 0381 auf alpha), gezielte Suiten grün — siehe PR „Geprüft“.
+- [x] **Step 3:** Commit `docs: Objekt aus Fremdebene übernehmen (LLH-2129)`.
