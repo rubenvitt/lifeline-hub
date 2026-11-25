@@ -160,7 +160,7 @@ pub async fn zuschalten(
     let startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
     let now = jetzt();
 
-    let (adapter, zuschaltung, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (adapter, zuschaltung, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let adapter = adapter_repo::load_in_org(conn, org_id, &adapter_id)
             .await?
             .ok_or(AppError::NotFound)?;
@@ -189,8 +189,9 @@ pub async fn zuschalten(
             lagemonitor: body.lagemonitor,
         };
         repo::upsert(conn, &z).await?;
-        let etb_id = if vorher.is_none() {
-            Some(
+        let mut etb_ids = Vec::new();
+        if vorher.is_none() {
+            etb_ids.push(
                 crate::etb::system_audit_tx(
                     conn,
                     einsatz_id,
@@ -199,20 +200,36 @@ pub async fn zuschalten(
                     "Drohnenbild aus Suchlage zugeschaltet",
                 )
                 .await?,
-            )
-        } else {
-            None
-        };
+            );
+        }
+        // Wer das Livebild aufs Großbild legt oder wegnimmt, steht im ETB (LLH-2109): auf dem
+        // Bild können Personen zu sehen sein.
+        if body.lagemonitor != vorher.as_ref().is_some_and(|v| v.lagemonitor) {
+            etb_ids.push(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    erfasser,
+                    startwert,
+                    if body.lagemonitor {
+                        "Livebild auf dem Lagemonitor eingeschaltet"
+                    } else {
+                        "Livebild auf dem Lagemonitor ausgeschaltet"
+                    },
+                )
+                .await?,
+            );
+        }
         let z = vorher.map_or(z, |v| Zuschaltung {
             lagemonitor: body.lagemonitor,
             ..v
         });
-        Ok((adapter, z, etb_id))
+        Ok((adapter, z, etb_ids))
     })?;
 
     // Erst nach dem Commit: der Store ist nur das Abbild der Datenbank.
     state.drohne.set_zugeschaltet(&adapter.id, true);
-    if let Some(id) = etb_id {
+    for id in etb_ids {
         state.live.publiziere(einsatz_id, id);
     }
     Ok(Json(
@@ -387,12 +404,15 @@ pub async fn video(
         return Err(AppError::NotFound);
     };
     let (adapter_id, gateway_sn) = state.drohne.find_video(&key).ok_or(AppError::NotFound)?;
+    // Ein Gerät (nur der Lagemonitor steht in einer Routenliste) braucht zusätzlich den Schalter
+    // „Livebild auf dem Lagemonitor“ (LLH-2109); ausgeschaltet bricht sein Bild sofort ab.
+    let ist_geraet = ctx.geraet.is_some();
     let zugeschaltet = {
         let mut conn = state.pool.acquire().await?;
         repo::load_for_einsatz(&mut conn, ctx.einsatz.id)
             .await?
             .iter()
-            .any(|z| z.adapter_id == adapter_id)
+            .any(|z| z.adapter_id == adapter_id && (!ist_geraet || z.lagemonitor))
     };
     if !zugeschaltet {
         return Err(AppError::NotFound);

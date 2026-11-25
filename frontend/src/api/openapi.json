@@ -14962,6 +14962,17 @@
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
           },
+          "drohne": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorDrohne",
+                "description": "Livebild der Drohne (LLH-2109): nur wenn die Einsatzleitung den Schalter „Livebild auf dem\nLagemonitor“ eingeschaltet hat; nur [`lagebild`] füllt ihn."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kraefte": {
             "$ref": "#/components/schemas/LagemonitorKraefte"
           },
@@ -15070,6 +15081,26 @@
           "vermisst": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "LagemonitorDrohne": {
+        "type": "object",
+        "description": "Was der Lagemonitor vom Livebild der Drohne erfährt (LLH-2109): die eigenen Videokennungen\n(keine Seriennummern) und den Datenstand der Drohnenlage. Leer, wenn die Quelle gerade keinen\nStrom meldet; die Kachel zeigt dann „Kein Livebild“.",
+        "required": [
+          "videos",
+          "stand_at"
+        ],
+        "properties": {
+          "stand_at": {
+            "type": "string",
+            "description": "Zeit des letzten Abrufs bei Suchlage (UTC, SQLite-Format); ohne Abruf die Zuschaltung."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

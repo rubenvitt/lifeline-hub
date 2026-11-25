@@ -22,6 +22,7 @@ export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
 export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorKachel = S['LagemonitorKachel'];
+export type LagemonitorDrohne = S['LagemonitorDrohne'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
 export type LagemonitorZone = S['LagemonitorZone'];
 export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
