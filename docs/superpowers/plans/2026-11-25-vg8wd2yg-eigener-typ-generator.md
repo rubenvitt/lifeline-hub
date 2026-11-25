@@ -1,6 +1,6 @@
 # Eigener Typ-Generator Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** `types.generated.ts` entsteht aus einem eigenen Node-Skript statt aus openapi-typescript, byte-gleich bis auf die Kopfzeile.
 
@@ -65,11 +65,11 @@ Abgedeckt durch den Byte-Vergleich in Task 1 (Fälle 1–4) und den Abbruchtest 
   (nur Kopfzeile, durch Generatorlauf)
 - Delete: `frontend/scripts/ts6-fuer-codegen.mjs`
 
-- [ ] **Step 1:** `package.json` anpassen, `mise exec -- pnpm install`, Hook löschen.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend gen:types`; `git diff src/api/types.generated.ts`
+- [x] **Step 1:** `package.json` anpassen, `mise exec -- pnpm install`, Hook löschen.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend gen:types`; `git diff src/api/types.generated.ts`
   zeigt nur die Kopfzeile; der Byte-Test aus Task 1 liest die neue Datei und bleibt grün.
-- [ ] **Step 3:** `scripts/check-typ-codegen.sh` → `OK: Backend↔Frontend-Typen sind in Sync.`
-- [ ] **Step 4:** Commit `chore(codegen): openapi-typescript und TS-6-Krücke entfernt (LLH-2141, LLH-2068)`.
+- [x] **Step 3:** `scripts/check-typ-codegen.sh` → `OK: Backend↔Frontend-Typen sind in Sync.`
+- [x] **Step 4:** Commit `chore(codegen): openapi-typescript und TS-6-Krücke entfernt (LLH-2141, LLH-2068)`.
 
 ### Task 3: ADR und Doku
 
@@ -84,12 +84,12 @@ Abgedeckt durch den Byte-Vergleich in Task 1 (Fälle 1–4) und den Abbruchtest 
   `docs/architektur/11-risiken-und-technische-schulden.md` (R53 erledigt),
   `src/AGENTS.md:129`, `frontend/AGENTS.md:2051`.
 
-- [ ] **Step 1:** Dateien schreiben.
-- [ ] **Step 2:** `scripts/check-adr.sh` (bzw. ADR-Schritt in `check-all.sh`) → grün;
+- [x] **Step 1:** Dateien schreiben.
+- [x] **Step 2:** `scripts/check-adr.sh` (bzw. ADR-Schritt in `check-all.sh`) → grün;
   `git grep -n 'openapi-typescript\|typescript6\|ts6-fuer-codegen' -- ':!docs/superpowers' ':!openspec' ':!*.lock*'`
   trifft nur ADR-0004/0089 (unveränderlich) und die neue ADR.
-- [ ] **Step 3:** Commit `docs(architektur): ADR-0105 eigener Typ-Generator, Doku nachgezogen (LLH-2141)`.
+- [x] **Step 3:** Commit `docs(architektur): ADR-0105 eigener Typ-Generator, Doku nachgezogen (LLH-2141)`.
 
 ### Task 4: Gates
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün; Ergebnis in den PR unter „Geprüft“.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün; Ergebnis in den PR unter „Geprüft“.
