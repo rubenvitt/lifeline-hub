@@ -22,8 +22,9 @@ und der Wurzel. Entscheidung: ADR-0098; Herleitung: `docs/superpowers/specs/2026
   aus; ein Dienst nach einem Neustart des Prozesses startet nicht von selbst (`START_NOT_STICKY`).
 - **Sitzung verschlüsselt:** das Cookie `lifeline_sid` liegt nur AES/GCM-verschlüsselt mit einem
   Schlüssel aus dem Android Keystore in den privaten Einstellungen (`dienste/Sitzungsablage.kt`),
-  keine Sicherung (`allowBackup="false"`), Anfragen nur über `dienste/Serververbindung.kt` (ohne
-  Weiterleitungen).
+  keine Sicherung (`allowBackup="false"`), Anfragen nur über `dienste/Serververbindung.kt`, ohne
+  Weiterleitungen (`instanceFollowRedirects = false` an jeder Anfrage; eine 3xx-Antwort gilt als
+  Serverfehler), der Code der Einladung nie in der Adresse (`POST …/helpers/targets` mit `{code}`).
 - **Bildschirmbilder:** jede Seite hat einen `Testzustand` im Kern (Intent-Extra
   `lifeline.helfer.testzustand`, nur in Debug-Bauten) und ein Bild in
   `android/helfer/src/test/…/BilderTest.kt` (Roborazzi, hell und dunkel, nach

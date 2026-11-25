@@ -1,5 +1,6 @@
 package dev.rubeen.lifeline.helfer.dienste
 
+import android.util.Log
 import dev.rubeen.lifeline.helferkern.Antwort
 import dev.rubeen.lifeline.helferkern.Anzeige
 import dev.rubeen.lifeline.helferkern.Einloesung
@@ -13,7 +14,6 @@ import java.io.IOException
 import java.net.HttpCookie
 import java.net.HttpURLConnection
 import java.net.URL
-import java.net.URLEncoder
 
 /** Antwort des Servers; [status] `0` heißt Netzfehler ohne Antwort (wie [entscheide]). */
 data class Rueckmeldung(val status: Int, val text: String) {
@@ -45,9 +45,8 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
 
     // Routen (src/app.rs).
 
-    // `URLEncoder.encode(String, Charset)` gibt es erst ab API 33; minSdk ist 29.
-    fun ziele(code: String): Rueckmeldung =
-        anfrage("GET", "api/devices/helpers/targets?code=" + URLEncoder.encode(code, "UTF-8"))
+    // Der Code steht im Body, nie in der Adresse: sonst hielten ihn Zugriffsprotokolle fest.
+    fun ziele(code: String): Rueckmeldung = anfrage("POST", "api/devices/helpers/targets", Wire.zielanfrage(code))
 
     fun einloesen(einloesung: Einloesung): Rueckmeldung = anfrage("POST", "api/devices/helpers/redeem", Wire.einloesung(einloesung))
 
@@ -85,6 +84,11 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
                 verbindung.outputStream.use { it.write(daten) }
             }
             val status = verbindung.responseCode
+            if (status in 300..399) {
+                // Nicht gefolgt (ADR-0098); gilt wie ein Serverfehler ([entscheide]: wiederholen).
+                // Ohne Ziel und ohne Cookie im Protokoll.
+                Log.w(TAG, "Weiterleitung $status auf $methode /$pfad nicht gefolgt")
+            }
             val strom = if (status >= 400) verbindung.errorStream else verbindung.inputStream
             val text = strom?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
             uebernimmCookie(verbindung.headerFields)
@@ -112,5 +116,7 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
     companion object {
         /** `SESSION_COOKIE` in src/auth/session.rs. */
         const val COOKIE_NAME = "lifeline_sid"
+
+        private const val TAG = "LifelineHelfer"
     }
 }
