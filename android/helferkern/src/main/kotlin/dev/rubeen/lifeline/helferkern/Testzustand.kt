@@ -14,7 +14,27 @@ enum class Testzustand(val wert: String) {
 
     /** „Angemeldet – Ortung ruht“ ohne Ortungsrolle ([Phase.Ruht]). */
     RUHT("ruht"),
-    BEENDET("beendet");
+    BEENDET("beendet"),
+
+    // Aufträge (ADR-0104); „angemeldet“ zeigt den leeren Bereich.
+
+    /** „Angemeldet“ mit offenen, übernommenen und aufgehobenen Aufträgen. */
+    AUFTRAEGE("auftraege"),
+
+    /** „Angemeldet“ ohne Mitteilungsrecht: Hinweis über dem Bereich. */
+    MITTEILUNGEN_AUS("mitteilungen-aus"),
+
+    /** Detail eines offenen Auftrags mit „Übernommen“. */
+    AUFTRAG_OFFEN("auftrag-offen"),
+
+    /** Detail: ein anderer Helfer derselben Einheit war schneller. */
+    AUFTRAG_UEBERNOMMEN("auftrag-uebernommen"),
+
+    /** Detail eines aufgehobenen Auftrags, ohne Knopf. */
+    AUFTRAG_AUFGEHOBEN("auftrag-aufgehoben"),
+
+    /** Detail nach einer gescheiterten Quittung („Bitte über Funk bestätigen“). */
+    QUITTUNG_FEHLGESCHLAGEN("quittung-fehlgeschlagen");
 
     companion object {
         const val EXTRA = "lifeline.helfer.testzustand"

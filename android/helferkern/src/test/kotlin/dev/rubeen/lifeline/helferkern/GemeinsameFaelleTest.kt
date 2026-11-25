@@ -6,7 +6,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.serialization.Serializable
 
-/** QR, Deeplink, Antwortcodes, Takt, Wiederholung und Sendeplan gegen `src-tauri/faelle/helfer.json`. */
+/**
+ * QR, Deeplink, Antwortcodes, Takt, Wiederholung und Sendeplan gegen `src-tauri/faelle/helfer.json`;
+ * Live-Strom, Ordnung, Mitteilung und Quittungsstand der Aufträge gegen `helfer-auftrag.json`.
+ */
 class GemeinsameFaelleTest {
     @Serializable
     private class Datei(
@@ -140,4 +143,90 @@ class GemeinsameFaelleTest {
         assertEquals(Antwort.entries.map { it.kennwort }.toSet(), genannt)
     }
 
+    // Aufträge (ADR-0104) gegen `src-tauri/faelle/helfer-auftrag.json`; `nutzlast` gilt nur für iOS.
+
+    @Serializable
+    private class AuftragsDatei(
+        val sse: List<SseFall>,
+        val ordnung: List<OrdnungFall>,
+        val mitteilung: List<MitteilungFall>,
+        val quittungsstand: List<StandFall>,
+    )
+
+    @Serializable
+    private class SseEreignis(val art: String, val task_id: Long? = null)
+
+    @Serializable
+    private class SseFall(val beschreibung: String, val eingabe: String, val ereignisse: List<SseEreignis>)
+
+    @Serializable
+    private class OrdnungFall(val beschreibung: String, val auftraege: List<HelperTask>, val erwartet: List<Long>)
+
+    @Serializable
+    private class MitteilungFall(
+        val beschreibung: String,
+        val auftrag: HelperTask,
+        val bereits_gemeldet: List<Long>,
+        val jetzt: String,
+        val erwartet: Boolean,
+    )
+
+    @Serializable
+    private class Stand(val stand: String, val um: String? = null, val von: String? = null)
+
+    @Serializable
+    private class StandFall(val beschreibung: String, val auftrag: HelperTask, val erwartet: Stand)
+
+    private fun auftraege() = GemeinsameFaelle.load("helfer-auftrag.json", AuftragsDatei.serializer())
+
+    private fun SseEreignis.alsEreignis(): LiveEreignis = when (art) {
+        "auftrag" -> LiveEreignis.Auftrag(task_id ?: error("auftrag ohne task_id"))
+        "lebenszeichen" -> LiveEreignis.Lebenszeichen
+        "unbekannt" -> LiveEreignis.Unbekannt
+        else -> error("unbekannte Art $art")
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von sse gilt`() {
+        val faelle = auftraege().sse
+        assertTrue(faelle.size >= 5)
+        for (fall in faelle) {
+            assertEquals(fall.ereignisse.map { it.alsEreignis() }, SseLeser().text(fall.eingabe), fall.beschreibung)
+        }
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von ordnung gilt`() {
+        val faelle = auftraege().ordnung
+        assertTrue(faelle.isNotEmpty())
+        for (fall in faelle) {
+            assertEquals(fall.erwartet, Auftraege.ordnen(fall.auftraege).map { it.id }, fall.beschreibung)
+        }
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von mitteilung gilt`() {
+        val faelle = auftraege().mitteilung
+        assertTrue(faelle.size >= 6)
+        for (fall in faelle) {
+            val jetzt = Wire.serverzeit(fall.jetzt) ?: error("jetzt unlesbar: ${fall.jetzt}")
+            val soll = Auftraege.sollMitteilen(fall.auftrag, fall.bereits_gemeldet.toSet(), jetzt.toEpochMilli())
+            assertEquals(fall.erwartet, soll, fall.beschreibung)
+        }
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von quittungsstand gilt`() {
+        val faelle = auftraege().quittungsstand
+        assertTrue(faelle.size >= 3)
+        for (fall in faelle) {
+            val erwartet = when (fall.erwartet.stand) {
+                "offen" -> Quittungsstand.Offen
+                "quittiert" -> Quittungsstand.Quittiert(fall.erwartet.um ?: error("ohne um"), fall.erwartet.von)
+                "aufgehoben" -> Quittungsstand.Aufgehoben
+                else -> error("unbekannter Stand ${fall.erwartet.stand}")
+            }
+            assertEquals(erwartet, Auftraege.stand(fall.auftrag), fall.beschreibung)
+        }
+    }
 }
