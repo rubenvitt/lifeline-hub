@@ -14,13 +14,15 @@
  *   die Anschrift), nie `beschriftungZusatz`, Notiz oder Beschreibung.
  * - **Warnstufe trägt der Text** (LFH-357, `pages/lagekarte/AGENTS.md`): `warnstufe` als Code,
  *   die Beschriftung mit „Warnstufe: <label>“ allein aus `warnstufeKarte`.
- * - **Farben als Hex:** Gefahrengebiete in {@link GEFAHR_EXPORT_FARBE} (Tagestöne der Rollen),
- *   nie ein Theme-Token oder eine CSS-Variable.
+ * - **Farben als Hex, immer in Tagestönen** (LLH-2133): Gefahrengebiete in
+ *   {@link GEFAHR_EXPORT_FARBE}, Marker mit Rollenfarbe über {@link tagesFarbe}; nie ein
+ *   Theme-Token oder eine CSS-Variable. Nachts und am Tag gezogene Dateien sehen gleich aus.
  */
 import { parseAnySpec } from '@einsatzzeichen/core/exact';
 import type { Drawing } from '@einsatzzeichen/schema';
-import { warnstufeKarte } from '../../theme/statusFarben';
-import { farbenHell } from '../../theme/tokens';
+import { theme, type GlobalToken } from 'antd';
+import { rollenFarbe, warnstufeKarte, type Statusrolle } from '../../theme/statusFarben';
+import { antdAlgorithmus, antdToken, farbenHell } from '../../theme/tokens';
 import { fuellfarbe } from '../../zeichen/freiesZeichen';
 import { formatRadius, type GeoJsonLineString, type GeoJsonPolygon } from './geo';
 import { ABSCHNITT_FARBE, type ZoneFeature } from './kartenLayer';
@@ -85,6 +87,11 @@ export interface ExportEingabe {
   marker: KarteMarker[];
   flaechen: readonly { id: number; label: string; polygon: GeoJsonPolygon }[];
   zonen: ZoneFeature[];
+  /**
+   * Der Token, mit dem die Karte die Marker gebaut hat (`rollenFarbe(rolle, token)`); an ihm
+   * erkennt der Export eine Rollenfarbe des aktiven Modus und tauscht sie gegen den Tageston.
+   */
+  token: GlobalToken;
   einsatzName: string;
   /**
    * Stand der Datei: in der Historienansicht der gezeigte gesicherte Stand, `null` in der
@@ -130,7 +137,7 @@ export function collectExportObjekte(eingabe: ExportEingabe): ExportObjekt[] {
     ...eingabe.flaechen.map(flaecheObjekt),
     ...eingabe.zonen.map(zoneObjekt),
     ...eingabe.marker.flatMap((mk) => {
-      const o = markerObjekt(mk);
+      const o = markerObjekt(mk, eingabe.token);
       return o ? [o] : [];
     }),
   ];
@@ -213,12 +220,12 @@ function warnstufeText(stufe: NonNullable<ZoneFeature['warnstufe']>): string {
     : `Warnstufe: ${warnstufeKarte[stufe].label}`;
 }
 
-function markerObjekt(mk: KarteMarker): ExportObjekt | null {
+function markerObjekt(mk: KarteMarker, token: GlobalToken): ExportObjekt | null {
   const art = EXPORT_MARKER_ARTEN[mk.typ];
   if (!art) return null;
   const name = art === 'einsatzort' ? 'Einsatzort' : mk.label.trim() || zeichenloserName(art);
   const zeichen = zeichenVon(mk);
-  const markerFarbe = (zeichen && zeichenFarbe(zeichen.spec)) ?? hex(mk.farbe);
+  const markerFarbe = (zeichen && zeichenFarbe(zeichen.spec)) ?? tagesFarbe(hex(mk.farbe), token);
   return {
     art,
     name,
@@ -242,6 +249,37 @@ function zeichenVon(mk: KarteMarker): ExportObjekt['zeichen'] {
     spec: z.schluessel.slice(ZEICHEN_PRAEFIX.length),
     drawing: z.drawing,
   };
+}
+
+const STATUSROLLEN: readonly Statusrolle[] = [
+  'alarm',
+  'achtung',
+  'normal',
+  'bedien',
+  'neutral',
+  'marke',
+];
+
+let tagToken: GlobalToken | undefined;
+
+/** Der helle antd-Token, wie ihn die App am Tag rechnet (vgl. `SkizzenAufnahme`). */
+function tagesToken(): GlobalToken {
+  tagToken ??= theme.getDesignToken({
+    token: antdToken(farbenHell),
+    algorithm: antdAlgorithmus(false),
+  });
+  return tagToken;
+}
+
+/**
+ * Tageston einer Markerfarbe (LLH-2133): ist sie genau `rollenFarbe(rolle, token)` des Modus, in
+ * dem die Karte die Marker gebaut hat, kommt der Wert derselben Rolle am Tag; jede andere Farbe
+ * (feste Hexwerte, Zeichenpalette) bleibt, wie sie ist.
+ */
+export function tagesFarbe(farbe: string | undefined, token: GlobalToken): string | undefined {
+  if (!farbe) return farbe;
+  const rolle = STATUSROLLEN.find((r) => hex(rollenFarbe(r, token)) === farbe);
+  return rolle ? (hex(rollenFarbe(rolle, tagesToken())) ?? farbe) : farbe;
 }
 
 /** Füllfarbe des Zeichens aus der `PALETTE` (über `fuellfarbe`), sonst `undefined`. */
