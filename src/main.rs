@@ -356,9 +356,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang.clone());
     // Adapter (LLH-2017): Geheimnisspeicher (oben geladen), Abrufe im
     // Hintergrund. Ohne Schlüssel läuft der Server; Adapter mit Geheimnissen melden das selbst.
+    // Zuschaltungen der Drohnenquellen (LLH-2105) stehen, bevor der Lauf Abrufe beginnt.
+    let drohne = std::sync::Arc::new(lifeline_hub::drohne::Store::new());
+    drohne.load(&pool).await;
     let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
         speicher,
-        lifeline_hub::adapter::art::Verzeichnis::produktiv(),
+        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone()),
     );
     // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
     // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.
@@ -415,9 +418,6 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
              Geheimnisse lassen sich nicht speichern"
         ),
     }
-    // Zuschaltungen der Drohnenquellen (LLH-2105) stehen, bevor der Lauf Abrufe beginnt.
-    let drohne = std::sync::Arc::new(lifeline_hub::drohne::Store::new());
-    drohne.load(&pool).await;
     let adapter_task = lifeline_hub::adapter::lauf::start(
         pool.clone(),
         adapter_rahmen.clone(),
