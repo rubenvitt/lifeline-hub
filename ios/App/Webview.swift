@@ -498,18 +498,33 @@ final class Systemdialoge: Dialogzeiger {
 }
 
 /// Lädt Dateien mit `WKDownload` (mit den Cookies des Datenspeichers, auch aus `blob:`) in ein
-/// eigenes Verzeichnis unter dem temporären Verzeichnis und bietet sie im Teilen-Blatt an.
+/// eigenes Verzeichnis unter dem temporären Verzeichnis und bietet sie im Teilen-Blatt an. Eine
+/// Kalenderdatei mit einem lesbaren Termin geht stattdessen an den Dialog „Neues Ereignis“
+/// (LLH-2127; `Downloadablage.oeffnenAls` und `IcsTermin` im Kern).
 @MainActor
 final class Downloads: NSObject, WKDownloadDelegate {
     static let basis = FileManager.default.temporaryDirectory.appendingPathComponent(
         "Downloads", isDirectory: true)
 
-    private var ziele: [ObjectIdentifier: URL] = [:]
+    /// Größte Kalenderdatei, die die App liest; ein Termin hat wenige hundert Byte.
+    static let maxKalenderBytes = 1024 * 1024
+
+    private struct Ziel {
+        let datei: URL
+        let oeffnen: Oeffnen
+    }
+
+    private var ziele: [ObjectIdentifier: Ziel] = [:]
     private let zeige: @MainActor (URL, WKWebView?) -> Void
+    private let zeigeKalender: @MainActor (IcsTermin, URL, WKWebView?) -> Void
     private let protokoll = Logger(subsystem: "dev.rubeen.lifeline.ios", category: "download")
 
-    init(zeige: @escaping @MainActor (URL, WKWebView?) -> Void = Teilen.zeige) {
+    init(
+        zeige: @escaping @MainActor (URL, WKWebView?) -> Void = Teilen.zeige,
+        zeigeKalender: @escaping @MainActor (IcsTermin, URL, WKWebView?) -> Void = Kalenderdialog.zeige
+    ) {
         self.zeige = zeige
+        self.zeigeKalender = zeigeKalender
     }
 
     func download(
@@ -526,19 +541,36 @@ final class Downloads: NSObject, WKDownloadDelegate {
             completionHandler(nil)
             return
         }
-        ziele[ObjectIdentifier(download)] = ziel
+        let oeffnen = Downloadablage.oeffnenAls(
+            mimetyp: response.mimeType ?? "", endung: ziel.pathExtension)
+        ziele[ObjectIdentifier(download)] = Ziel(datei: ziel, oeffnen: oeffnen)
         completionHandler(ziel)
     }
 
     func downloadDidFinish(_ download: WKDownload) {
         guard let ziel = ziele.removeValue(forKey: ObjectIdentifier(download)) else { return }
-        zeige(ziel, download.webView)
+        if ziel.oeffnen == .anzeigen, let termin = Self.termin(in: ziel.datei) {
+            zeigeKalender(termin, ziel.datei, download.webView)
+        } else {
+            zeige(ziel.datei, download.webView)
+        }
+    }
+
+    /// Der Termin einer Kalenderdatei; zu groß, kein UTF-8 oder nicht lesbar heißt `nil`, dann
+    /// kommt das Teilen-Blatt.
+    static func termin(in datei: URL) -> IcsTermin? {
+        guard let groesse = try? datei.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+            groesse <= maxKalenderBytes,
+            let daten = try? Data(contentsOf: datei),
+            let text = String(data: daten, encoding: .utf8)
+        else { return nil }
+        return IcsTermin.lies(text)
     }
 
     func download(_ download: WKDownload, didFailWithError error: any Error, resumeData: Data?) {
         protokoll.error("Download gescheitert: \(error.localizedDescription)")
         if let ziel = ziele.removeValue(forKey: ObjectIdentifier(download)) {
-            try? FileManager.default.removeItem(at: ziel.deletingLastPathComponent())
+            try? FileManager.default.removeItem(at: ziel.datei.deletingLastPathComponent())
         }
     }
 }

@@ -434,9 +434,13 @@ const UHS_LAPTOP: &[(&str, &str)] = &[
     ("POST", "/api/incidents/{id}/reports"),
 ];
 /// Zusätzliche Einsatzrouten des Lagemonitors (Subtask Lagemonitor).
-/// Nur das verdichtete Lagebild; Karte, Kopf, Freigaben und Live-Kanal kommen aus
-/// [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
-const LAGEMONITOR: &[(&str, &str)] = &[("GET", "/api/incidents/{id}/situation-monitor")];
+/// Nur das verdichtete Lagebild und das Livebild der Drohne (LLH-2109; der Handler lässt ein Gerät
+/// nur bei eingeschaltetem Schalter „Livebild auf dem Lagemonitor“ durch); Karte, Kopf,
+/// Freigaben und Live-Kanal kommen aus [`ALLE_GERAETE`] und [`ALLE_ANSICHTEN`].
+const LAGEMONITOR: &[(&str, &str)] = &[
+    ("GET", "/api/incidents/{id}/situation-monitor"),
+    ("GET", "/api/incidents/{id}/drone/video/{key}/hls/{*file}"),
+];
 /// Zusätzliche Einsatzrouten des Abschnittsgeräts (LFH-1043): den eigenen Teilbaum und seine
 /// Einheiten lesen, Aufträge an den Bereich lesen, quittieren und ihren Vollzug melden, die
 /// geltenden Einsatzbefehle an den Bereich lesen und ihre eigenen Verteiler-Einträge quittieren
@@ -1102,6 +1106,20 @@ mod tests {
             ("GET", "/api/incidents/{id}/situation-monitor"),
         ] {
             assert!(!darf_route(a, m, p), "Abschnittsgerät darf {m} {p} nicht");
+        }
+    }
+
+    /// LLH-2109: Nur der Lagemonitor erreicht das Livebild der Drohne; der Handler prüft dazu
+    /// den Schalter „Livebild auf dem Lagemonitor“.
+    #[test]
+    fn nur_der_lagemonitor_liest_das_livebild() {
+        let pfad = "/api/incidents/{id}/drone/video/{key}/hls/{*file}";
+        for a in Funktionsansicht::ALLE {
+            assert_eq!(
+                darf_route(a, "GET", pfad),
+                a == Funktionsansicht::Lagemonitor,
+                "{a:?}"
+            );
         }
     }
 

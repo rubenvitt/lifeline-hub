@@ -1,9 +1,15 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { stehendeAuswahl, waehleIn } from './auswahl-kern';
-import { einsatzDialogOeffnen } from './einsatz-kern';
-import { oeffneZeichenWahl, waehleWerkzeug, zeigeLeistenAnsicht } from './leisten-kern';
+import { einsatzDialogOeffnen, einsatzPerApi } from './einsatz-kern';
+import {
+  oeffneEbenenGruppe,
+  oeffneZeichenWahl,
+  waehleWerkzeug,
+  zeigeLeistenAnsicht,
+} from './leisten-kern';
 import { waehleAnzeige } from './menue-kern';
 import { anmeldenPerApi } from './anmelde-kern';
+import { drohnenLageSimulieren, drohnenquelleAnlegen } from './drohne-kern';
 
 // Browser-Smoke der Lagekarte: das EINZIGE automatisierte Netz unter MapLibre/WebGL.
 // `Kartenflaeche.tsx` ist die einzige Stelle mit `new maplibregl.Map`; die Unit-Tests stubben
@@ -209,6 +215,88 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   await expect(page.getByRole('button', { name: 'Abschließen' })).toBeHidden();
 
   expect(seitenFehler.map((f) => f.message)).toEqual([]);
+});
+
+/** Ob sich zwei Boxen schneiden (beide Achsen). */
+function schneiden(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+// LLH-2122: das Livebild der Drohne (LLH-2107) am Handschirm 390 × 844. Das Fenster steht über
+// der Kartenspalte; es darf weder den Kartenfuß (Maßstab, „Stand sichern“) noch die Kartenknöpfe
+// verdecken und muss ganz im Bild stehen, das Kreuz bedienbar. Den linken Block prüft der Fall
+// erst nach LLH-2137. Drohnenquelle,
+// Lage und Video simuliert `e2e/drohne-kern.ts`; die Zuschaltung geht über den Server.
+test('Lagekarte: Livebild der Drohne bei 390 px verdeckt weder Fuß noch Kartenknöpfe', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const seitenFehler: Error[] = [];
+  page.on('pageerror', (fehler) => seitenFehler.push(fehler));
+  await anmelden(page, { startseite: false });
+  const eid = Number(await einsatzPerApi(page, `E2E Drohnensmoke ${Date.now()}`));
+  const ort = { lat: 50.9571, lon: 10.2525 };
+  await einsatzortSetzen(page, eid, ort);
+  const quelle = await drohnenquelleAnlegen(page, `Drohne Smoke ${Date.now()}`);
+  const zu = await page.request.put(`/api/incidents/${eid}/drone/sources/${quelle}`, {
+    data: { lagemonitor: false },
+  });
+  expect(zu.ok(), `Zuschalten: ${zu.status()} ${await zu.text()}`).toBe(true);
+  await drohnenLageSimulieren(page, eid, [ort.lon, ort.lat]);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/einsaetze/${eid}/lagekarte`);
+  await expect(page.getByTestId('kartenflaeche').locator('canvas.maplibregl-canvas')).toHaveCount(
+    1,
+  );
+
+  // Das Livebild öffnet aus der Zeile der Quelle in der Leiste (am Handschirm per Vorgabe zu).
+  const leiste = page.locator('#lagekarte-leiste');
+  if (!(await leiste.isVisible())) await page.getByRole('button', { name: 'Leiste' }).click();
+  await oeffneEbenenGruppe(page, 'drohne');
+  await page
+    .locator('section[data-paneel="drohne"]')
+    .getByRole('button', { name: 'Livebild' })
+    .click();
+  const fenster = page.locator('[data-lfh="drohnen-video-fenster"]');
+  await expect(fenster).toBeVisible();
+  await expect
+    .poll(() => fenster.locator('video').evaluate((v: HTMLVideoElement) => v.readyState))
+    .toBeGreaterThanOrEqual(2);
+  await fenster.scrollIntoViewIfNeeded();
+
+  const f = (await fenster.boundingBox())!;
+  const breite = page.viewportSize()!.width;
+  expect(f.x, 'Livebild beginnt links außerhalb').toBeGreaterThanOrEqual(0);
+  expect(f.x + f.width, 'Livebild ragt rechts hinaus').toBeLessThanOrEqual(breite);
+  const pruefe = async (locator: Locator, wo: string) => {
+    const boxen = await locator.evaluateAll((els) =>
+      els
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.width > 0 && r.height > 0)
+        .map((r) => ({ x: r.x, y: r.y, width: r.width, height: r.height })),
+    );
+    expect(boxen.length, `${wo}: nichts gemessen`).toBeGreaterThan(0);
+    for (const b of boxen) {
+      expect(
+        schneiden(f, b),
+        `Livebild ${JSON.stringify(f)} verdeckt ${wo} ${JSON.stringify(b)}`,
+      ).toBe(false);
+    }
+  };
+  await pruefe(page.locator('[data-lfh="karten-fuss"] > *'), 'den Kartenfuß');
+  // Den linken Block überdeckt das Fenster bei 390 px noch (≈ 10 px über der Zeigerkoordinate):
+  // LLH-2137. Mit dem Fix diese Prüfung einschalten.
+  // await pruefe(page.locator('[data-lfh="karten-ueberlagerung-links"] > *'), 'den linken Block');
+  await pruefe(page.locator('[data-lfh="karten-knoepfe"]'), 'die Kartenknöpfe');
+
+  // Das Kreuz ist bedienbar (Klick, nicht nur sichtbar).
+  await page.getByRole('button', { name: 'Livebild schließen' }).click();
+  await expect(fenster).toBeHidden();
+  expect(seitenFehler.map((e) => e.message)).toEqual([]);
 });
 
 /**

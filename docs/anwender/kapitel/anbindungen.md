@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/drohne/art.rs]
 ---
 
 ## Überblick
@@ -206,6 +206,22 @@ Für den System-Admin:
 Ein neuer Adapter ruft sofort ab. Fehlt ihm ein Geheimnis, das seine Art verlangt, hält er mit
 „Geheimnis fehlt“ an, bis es gesetzt ist.
 
+### Drohnenbild aus dem eigenen Medienserver
+
+Sendet die Drohnen-App in einen eigenen Medienserver (etwa MediaMTX), zeigt die Lagekarte dessen
+Livebild ohne Suchlage:
+
+1. Einen Adapter der Art „Drohnenbild (HLS-Adresse)“ anlegen.
+2. Unter „Adresse der Playlist“ die HLS-Adresse eintragen, etwa
+   `http://10.0.0.5:8888/drohne/index.m3u8`. `http://` geht nur zu einer privaten IP-Adresse und
+   nur mit „Ziel im eigenen Netz erlauben“; sonst `https://`.
+3. Verlangt der Medienserver eine Anmeldung, „Benutzer“ eintragen und danach das Geheimnis
+   „Passwort“ setzen.
+4. Im Einsatz die Quelle zuschalten wie eine aus Suchlage.
+
+Der Adapter zeigt nur das Bild, keine Position der Drohne. Sendet gerade niemand, bleibt er „ok“
+und das Videofenster zeigt „Kein Livebild“.
+
 ### Mailserver für den Versand einrichten
 
 Für den System-Admin; jede Organisation hat höchstens eine E-Mail-Anbindung:
@@ -322,6 +338,26 @@ stellt die Helferverwaltung aus, dort unter ihrem Zugang für Lifeline Hub. Für
 Steht nach „Übernehmen“ „Inzwischen gibt es einen neueren Stand“, hat ein späterer Abruf den
 Stand ersetzt, und übernommen ist nichts. Nach „Schließen“ steht der Hinweis auf den neueren Stand
 da.
+
+### Suchlage anbinden
+
+Suchlage führt die Drohnengruppe; angebunden zeigt Lifeline Hub deren Lage, Livebild und Fotos auf
+der Lagekarte eines Einsatzes (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Für den
+System-Admin, zusammen mit einer Person, die Suchlage verwaltet:
+
+1. In Suchlage unter „Einstellungen“ „Großbild“ wählen, eine „Bezeichnung“ eintragen, etwa
+   „Lifeline Hub“, „Fotos für Lifeline Hub“ ankreuzen und „Großbild-Zugang erzeugen“ wählen.
+   Suchlage zeigt die Adresse des Zugangs nur dieses eine Mal. Der Teil nach „#“ ist der Zugang.
+2. Hier „Adapter anlegen“ wählen, unter „Art“ „Suchlage (Drohne)“ wählen und einen „Name“
+   eintragen, etwa „Drohnengruppe Suchlage“.
+3. Unter „Adresse von Suchlage“ die Adresse ohne „/kiosk#…“ eintragen, etwa
+   `https://suchlage.example`, und „Anlegen“ wählen. Das „Intervall“ steht auf 5 Sekunden.
+4. In der Ansicht des Adapters im Paneel „Geheimnisse“ an „Großbild-Zugang“ „Setzen“ wählen, den
+   Teil nach „#“ einfügen und „Speichern“ wählen.
+5. „Verbindung prüfen“ wählen. „erreichbar“ zeigt, dass Adresse und Zugang stimmen.
+
+Abgerufen wird erst, wenn die Einsatzleitung das Drohnenbild an einem laufenden Einsatz
+zuschaltet. Ohne „Fotos für Lifeline Hub“ kommen Lage und Livebild, aber keine Fotos.
 
 ### Erneut vorlegen
 

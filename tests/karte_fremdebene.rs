@@ -16,7 +16,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag,
-    rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,
+    rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live, system_etb_inhalte,
 };
 
 const ZWEI_PUNKTE: &str = r#"{"type":"FeatureCollection","features":[
@@ -473,4 +473,284 @@ async fn live_ereignis_bei_jeder_aenderung() {
     let (s, _) = anfrage(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     recv_until_tag(&mut rx, "karte_fremdebene", warten).await;
+}
+
+// ── Übernehmen eines Objekts als eigene Zeichnung (LLH-2129) ───────────────────────────
+// Entwurf `docs/superpowers/specs/2026-11-25-vzxkonvu-fremdebene-objekt-uebernehmen-design.md`.
+
+const FLAECHE: &str =
+    r#"{"type":"Polygon","coordinates":[[[9.0,50.0],[9.1,50.0],[9.1,50.1],[9.0,50.0]]]}"#;
+const STELLE_SANITAET: &str =
+    r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
+
+/// Lädt eine Datei-Ebene „Lage Kreis X“ hoch und liefert ihre ID.
+async fn ebene_anlegen(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
+    let (s, ebene) = hochladen(
+        app,
+        einsatz,
+        cookie,
+        &[("name", "Lage Kreis X")],
+        Some(("lage.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ebene}");
+    ebene["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn zone_mit_fremdebene_traegt_herkunft_im_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, einsatz, &admin).await;
+
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":FLAECHE,
+        "label":"Brandfläche","fremdebene_id":ebene})
+    .to_string();
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter().any(|t| t
+            == "Gefahrengebiet «Brandfläche» eingerichtet (übernommen aus Fremdebene «Lage Kreis X», Datei)"),
+        "ETB: {etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn zone_mit_fremder_fremdebene_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, anderer, &admin).await;
+
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":FLAECHE,
+        "label":"Brandfläche","fremdebene_id":ebene})
+    .to_string();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+}
+
+async fn zeichen_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    extra: Value,
+) -> (StatusCode, Value) {
+    let mut body =
+        json!({"lat": 50.1, "lon": 9.1, "zeichen_spec": STELLE_SANITAET, "label": "Sammelpunkt"});
+    body.as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/free-symbols"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn zeichen_mit_fremdebene_schreibt_system_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, einsatz, &admin).await;
+
+    let (s, z) = zeichen_anlegen(&app, &admin, einsatz, json!({"fremdebene_id": ebene})).await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t
+                == "Freies Zeichen «Sammelpunkt» übernommen aus Fremdebene «Lage Kreis X», Datei"),
+        "ETB: {etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn zeichen_ohne_fremdebene_schreibt_kein_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let vorher = system_etb_inhalte(&app, &admin, einsatz).await.len();
+
+    let (s, z) = zeichen_anlegen(&app, &admin, einsatz, json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, einsatz).await.len(),
+        vorher
+    );
+}
+
+#[tokio::test]
+async fn zeichen_mit_fremder_fremdebene_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, anderer, &admin).await;
+
+    let (s, _) = zeichen_anlegen(&app, &admin, einsatz, json!({"fremdebene_id": ebene})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/free-symbols"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+}
+
+// ---------- Fremdebenen im gesicherten Stand (LLH-2130) ----------
+
+async fn stand_daten(
+    app: &axum::Router,
+    einsatz: i64,
+    stand: i64,
+    sha: &str,
+    cookie: &str,
+    if_none_match: Option<&str>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/incidents/{einsatz}/situation-snapshots/{stand}/foreign-layers/{sha}/data"
+        ))
+        .header(header::COOKIE, cookie);
+    if let Some(etag) = if_none_match {
+        req = req.header(header::IF_NONE_MATCH, etag);
+    }
+    let resp = app
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, headers, bytes)
+}
+
+/// Legt einen Stand an; liefert seine ID und die Hashes seiner Fremdebenen.
+async fn stand_sichern(app: &axum::Router, einsatz: i64, cookie: &str) -> (i64, Vec<String>) {
+    let (s, dok) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/situation-snapshots"),
+        cookie,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{dok}");
+    let hashes = dok["daten"]["fremdebenen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["sha256"].as_str().unwrap().to_string())
+        .collect();
+    (dok["id"].as_i64().unwrap(), hashes)
+}
+
+#[tokio::test]
+async fn stand_route_liefert_eingefrorenen_inhalt_und_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, ebene) = hochladen(
+        &app,
+        einsatz,
+        &admin,
+        &[("name", "Gebiete")],
+        Some(("g.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    let (_, live_h, live) = daten(&app, einsatz, ebene["id"].as_i64().unwrap(), &admin, None).await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+    assert_eq!(hashes.len(), 1);
+
+    let (s, h, body) = stand_daten(&app, einsatz, stand, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h[header::CONTENT_TYPE], "application/geo+json");
+    assert_eq!(body, live);
+    let etag = h[header::ETAG].to_str().unwrap().to_string();
+    assert_eq!(etag, live_h[header::ETAG].to_str().unwrap());
+
+    let (s, _, body) = stand_daten(&app, einsatz, stand, &hashes[0], &admin, Some(&etag)).await;
+    assert_eq!(s, StatusCode::NOT_MODIFIED);
+    assert!(body.is_empty());
+}
+
+#[tokio::test]
+async fn fremder_hash_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let datei = Some(("g.geojson", ZWEI_PUNKTE.as_bytes()));
+    hochladen(&app, einsatz, &admin, &[("name", "A")], datei).await;
+    let (leer, _) = stand_sichern(&app, anderer, &admin).await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+
+    // Derselbe Inhalt über einen Stand, der ihn nicht nennt, und über einen anderen Einsatz.
+    let (s, _, _) = stand_daten(&app, anderer, leer, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = stand_daten(&app, anderer, stand, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = stand_daten(&app, einsatz, stand, "kein-hash", &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn beobachter_liest_stand_fremdebene() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    hochladen(
+        &app,
+        einsatz,
+        &admin,
+        &[("name", "A")],
+        Some(("g.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+    let beo_id = benutzer_anlegen(&app, &admin, "beobachter-stand", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beo_id, "beobachter").await;
+    let beo = login_cookie(&app, "beobachter-stand", "beobachter-standpw1").await;
+
+    let (s, _, _) = stand_daten(&app, einsatz, stand, &hashes[0], &beo, None).await;
+    assert_eq!(s, StatusCode::OK);
 }

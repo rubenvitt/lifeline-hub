@@ -500,6 +500,8 @@ export interface components {
             bezeichnung: string;
             code: string;
             felder: components["schemas"]["Feld"][];
+            /** @description Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105). */
+            http_im_lan: boolean;
             /** Format: int64 */
             intervall_min_s: number;
             /** Format: int64 */
@@ -4284,6 +4286,12 @@ export interface components {
             created_at: string;
             /**
              * Format: int64
+             * @description Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne
+             *     den Inhalt zu serialisieren. Fehlt ohne Inhalt.
+             */
+            data_size?: number | null;
+            /**
+             * Format: int64
              * @description Zahl der Objekte ohne lesbare Geometrie.
              */
             dropped_count: number;
@@ -5997,6 +6005,7 @@ export interface components {
              */
             ausgeblendet?: components["schemas"]["LagemonitorKachel"][];
             betroffene: components["schemas"]["LagemonitorBetroffene"];
+            drohne?: components["schemas"]["LagemonitorDrohne"] | null;
             kraefte: components["schemas"]["LagemonitorKraefte"];
             /**
              * @description Die nächsten anstehenden Programmpunkte der Veranstaltung (LLH-1570, höchstens
@@ -6048,6 +6057,16 @@ export interface components {
             unverletzt: number;
             /** Format: int64 */
             vermisst: number;
+        };
+        /**
+         * @description Was der Lagemonitor vom Livebild der Drohne erfährt (LLH-2109): die eigenen Videokennungen
+         *     (keine Seriennummern) und den Datenstand der Drohnenlage. Leer, wenn die Quelle gerade keinen
+         *     Strom meldet; die Kachel zeigt dann „Kein Livebild“.
+         */
+        LagemonitorDrohne: {
+            /** @description Zeit des letzten Abrufs bei Suchlage (UTC, SQLite-Format); ohne Abruf die Zuschaltung. */
+            stand_at: string;
+            videos: string[];
         };
         /**
          * @description Was der Monitor über das Gefahrengebiet einer Zone erfährt (LLH-1746, Spec `lagemonitor`,
@@ -10857,7 +10876,7 @@ export interface components {
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
          *     `art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`
-         *     (migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
+         *     (migrations/0384_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
          * @enum {string}
          */
         ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste" | "pass_export" | "pass_druck";
