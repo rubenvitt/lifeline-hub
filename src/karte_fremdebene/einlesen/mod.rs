@@ -5,6 +5,8 @@
 //! `name` und `description` als Text; die Grenzen stehen in [`super`].
 
 pub mod geojson;
+pub mod kml;
+pub mod kmz;
 pub mod pruefen;
 
 pub use pruefen::normalize_geometrie;
@@ -57,20 +59,22 @@ impl Grenzen {
     }
 }
 
-/// Liest eine hochgeladene Datei. KML und KMZ folgen (Task 12); bis dahin `Unlesbar`.
+/// Liest eine hochgeladene Datei; das Format folgt aus dem Inhalt (ZIP → KMZ, `<` → KML,
+/// `{` → GeoJSON).
 pub fn read_datei(bytes: &[u8]) -> Result<Normiert, FremdebeneFehler> {
     if bytes.len() > DATEI_MAX {
         return Err(FremdebeneFehler::ZuGross);
     }
+    let mut grenzen = Grenzen::default();
     if bytes.starts_with(b"PK\x03\x04") {
-        return Err(FremdebeneFehler::Unlesbar);
+        return kmz::read_kmz(bytes, &mut grenzen);
     }
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
     let text = std::str::from_utf8(bytes).map_err(|_| FremdebeneFehler::Unlesbar)?;
-    let mut grenzen = Grenzen::default();
     match text.trim_start().chars().next() {
         None => Err(FremdebeneFehler::Leer),
         Some('{') => geojson::read_geojson(text, &mut grenzen),
+        Some('<') => kml::read_kml(text, &mut grenzen),
         Some(_) => Err(FremdebeneFehler::Unlesbar),
     }
 }
@@ -434,15 +438,13 @@ mod tests {
     }
 
     #[test]
-    fn grosse_und_kml_folgen_spaeter() {
+    fn zu_grosse_datei_wird_vor_dem_lesen_abgelehnt() {
         assert_eq!(
             read_datei(&vec![b' '; DATEI_MAX + 1]),
             Err(FremdebeneFehler::ZuGross)
         );
-        assert_eq!(lies("<kml/>"), Err(FremdebeneFehler::Unlesbar));
-        assert_eq!(
-            read_datei(b"PK\x03\x04rest"),
-            Err(FremdebeneFehler::Unlesbar)
-        );
+        let mut kmz = b"PK\x03\x04".to_vec();
+        kmz.resize(DATEI_MAX + 1, 0);
+        assert_eq!(read_datei(&kmz), Err(FremdebeneFehler::ZuGross));
     }
 }

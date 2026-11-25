@@ -4188,6 +4188,7 @@ dependencies = [
  "osmpbf",
  "p256 0.14.0",
  "percent-encoding",
+ "quick-xml 0.42.0",
  "rayon",
  "rcgen",
  "reqwest",

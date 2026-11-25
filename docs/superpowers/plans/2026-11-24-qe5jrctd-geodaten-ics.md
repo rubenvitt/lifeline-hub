@@ -350,7 +350,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `pub fn read_kmz(bytes: &[u8], grenzen: &mut Grenzen) -> Result<Normiert, FremdebeneFehler>`.
   - `read_datei` verzweigt darauf.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `placemarks_punkt_linie_flaeche_multigeometry`;
   - `gx_track_wird_linie`;
   - `hoehe_wird_verworfen`;
@@ -360,10 +360,10 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `kmz_nimmt_doc_kml_sonst_erste_kml`;
   - `kmz_bombe_ist_zu_gross` (Eintrag mit kleinem Kopf, entpackt > 20 MiB → `ZuGross`, beim Lesen begrenzt über `take`);
   - `kmz_ohne_kml_ist_unlesbar`.
-- [ ] **Step 2:** `cargo test --lib karte_fremdebene::einlesen` → FAIL.
-- [ ] **Step 3:** `quick_xml::Reader` mit `Event::DocType` → `Dtd`, Entity-Referenzen nicht auflösen (unbekannte → `Unlesbar`), `zip::ZipArchive` mit gedeckeltem `Read::take`.
-- [ ] **Step 4:** → PASS.
-- [ ] **Step 5:** Commit `feat: Fremdebenen aus KML und KMZ einlesen` (Zunder B).
+- [x] **Step 2:** `cargo test --lib karte_fremdebene::einlesen` → FAIL.
+- [x] **Step 3:** `quick_xml::Reader` mit `Event::DocType` → `Dtd`, Entity-Referenzen nicht auflösen (unbekannte → `Unlesbar`), `zip::ZipArchive` mit gedeckeltem `Read::take`.
+- [x] **Step 4:** → PASS.
+- [x] **Step 5:** Commit `feat: Fremdebenen aus KML und KMZ einlesen` (Zunder B).
 
 ### Task 13: Routen für Datei-Fremdebenen und Live-Ereignis
 
