@@ -57,6 +57,9 @@ export default function OrtungKoppelnDialog({
   const offen = fahrzeug !== null;
   const efId = fahrzeug?.id ?? 0;
 
+  /** Der Hub liefert seit {@link HUB_GEDULD_MS} noch nichts: Zeit läuft ab dem ersten `pending`. */
+  const [hubStumm, setHubStumm] = useState(false);
+
   const kandidatenQuery = useQuery({
     queryKey: einsatzKeys.ortungKandidaten(einsatzId, efId),
     queryFn: () => listOrtungKandidaten(einsatzId, efId),
@@ -64,12 +67,12 @@ export default function OrtungKoppelnDialog({
     // Ein Schnappschuss beim Öffnen: ein erneutes Öffnen holt frisch.
     staleTime: 0,
     gcTime: 0,
-    // Solange der Hub die Kennungen noch holt (`pending`), nur bei offenem Dialog erneut fragen.
-    refetchInterval: (q) => (offen && q.state.data?.pending === true ? HUB_ABFRAGE_MS : false),
+    // Solange der Hub die Kennungen noch holt (`pending`), nur bei offenem Dialog und höchstens
+    // {@link HUB_GEDULD_MS} lang erneut fragen; danach gilt „antwortet nicht“.
+    refetchInterval: (q) =>
+      offen && !hubStumm && q.state.data?.pending === true ? HUB_ABFRAGE_MS : false,
   });
   const hubHolt = kandidatenQuery.data?.pending === true;
-  /** Der Hub liefert seit {@link HUB_GEDULD_MS} noch nichts: Zeit läuft ab dem ersten `pending`. */
-  const [hubStumm, setHubStumm] = useState(false);
   useEffect(() => {
     if (!hubHolt) return;
     const timer = setTimeout(() => setHubStumm(true), HUB_GEDULD_MS);

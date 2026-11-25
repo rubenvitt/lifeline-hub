@@ -95,6 +95,25 @@ describe('OrtungKoppelnDialog', () => {
     ).toBeInTheDocument();
   });
 
+  it('fragt nach dem Hinweis „antwortet nicht“ nicht mehr beim Hub nach', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let abrufe = 0;
+    server.use(
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () => {
+        abrufe += 1;
+        return HttpResponse.json({ tracking_enabled: true, pending: true, candidates: [] });
+      }),
+    );
+    render();
+    await vi.advanceTimersByTimeAsync(16_000);
+    expect(
+      await screen.findByText('Der Hub antwortet gerade nicht. Später erneut versuchen.'),
+    ).toBeInTheDocument();
+    const nachGeduld = abrufe;
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(abrufe).toBe(nachGeduld);
+  });
+
   it('kennzeichnet Kennungen über den Hub', async () => {
     handler({
       kandidaten: [
