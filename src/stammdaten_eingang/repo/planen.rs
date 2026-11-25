@@ -20,6 +20,28 @@ use crate::stammdaten_eingang::{
 };
 
 const DUBLETTE: &str = "Kennung und Herkunft stehen in der Datei mehrfach";
+const AUSSER_DIENST_GEWAEHLT: &str =
+    "Der gewählte Datensatz ist außer Dienst gestellt; die Zeile wird nicht übernommen";
+
+/// Ein Ziel außer Dienst wird nie beschrieben: wählt man es (unter mehreren Kandidaten der
+/// Kennung), fällt die Zeile aus, wie bei einem Kennungstreffer außer Dienst.
+fn ziel_im_dienst(z: &mut Zeile, absicht: Absicht, in_dienst: impl Fn(i64) -> bool) -> Absicht {
+    match absicht {
+        Absicht::Ziel { id, .. } if !in_dienst(id) => {
+            z.vorschau.hinweise.push(AUSSER_DIENST_GEWAEHLT.into());
+            Absicht::Aus
+        }
+        a => a,
+    }
+}
+
+fn mit_dienststatus(anzeige: String, in_dienst: bool) -> String {
+    if in_dienst {
+        anzeige
+    } else {
+        format!("{anzeige} (außer Dienst)")
+    }
+}
 
 /// Wohin eine Fahrzeug- oder Personalzeile schreibt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -629,10 +651,13 @@ pub fn planen(
                 id: *id,
                 anzeige: ix
                     .fahrzeug(*id)
-                    .map(|f| f.funkrufname.clone())
+                    .map(|f| mit_dienststatus(f.funkrufname.clone(), f.in_dienst))
                     .unwrap_or_default(),
             })
             .collect();
+        let absicht = ziel_im_dienst(&mut z, absicht, |id| {
+            ix.fahrzeug(id).is_some_and(|f| f.in_dienst)
+        });
         z.absicht = absicht;
         z.vorschau.wahl = wirksame_wahl(absicht, explizit);
         ohne_kennung_hinweis(&mut z);
@@ -691,13 +716,19 @@ pub fn planen(
                 id: *id,
                 anzeige: ix
                     .personal(*id)
-                    .map(|p| match &p.personalnummer {
-                        Some(pn) => format!("{} ({pn})", p.name),
-                        None => p.name.clone(),
+                    .map(|p| {
+                        let anzeige = match &p.personalnummer {
+                            Some(pn) => format!("{} ({pn})", p.name),
+                            None => p.name.clone(),
+                        };
+                        mit_dienststatus(anzeige, p.in_dienst)
                     })
                     .unwrap_or_default(),
             })
             .collect();
+        let absicht = ziel_im_dienst(&mut z, absicht, |id| {
+            ix.personal(id).is_some_and(|p| p.in_dienst)
+        });
         z.absicht = absicht;
         z.vorschau.wahl = wirksame_wahl(absicht, explizit);
         ohne_kennung_hinweis(&mut z);

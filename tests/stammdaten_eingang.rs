@@ -717,6 +717,69 @@ async fn vorschau_schreibt_nichts() {
     assert_eq!(anzahl(&pool, "qualifikation").await, katalog);
 }
 
+fn quali_wahl(text: &str, wahl: QualiWahl) -> Entscheidungen {
+    Entscheidungen {
+        zeilen: vec![],
+        qualifikationen: vec![QualiEntscheidung {
+            text: text.into(),
+            wahl,
+        }],
+    }
+}
+
+/// F8: Trifft die Kennung mehrere Datensätze und wählt man einen außer Dienst gestellten, wird
+/// die Zeile ausgelassen statt in ihn zu schreiben.
+#[tokio::test]
+async fn kandidat_ausser_dienst_wird_ausgelassen() {
+    let (pool, org) = pool().await;
+    let a = fz_anlegen(&pool, org, "Florian 1", None).await;
+    let b = fz_anlegen(&pool, org, "Florian 2", None).await;
+    sqlx::query("UPDATE fahrzeug SET dienststatus = 'ausser_dienst' WHERE id = ?")
+        .bind(b)
+        .execute(&pool)
+        .await
+        .unwrap();
+    for (id, k) in [(a, "K1"), (b, "k1")] {
+        sqlx::query(
+            "INSERT INTO stammdaten_kennung (org_id, herkunft, kennung, fahrzeug_id, angelegt_at) \
+             VALUES (?, 'fv', ?, ?, '2026-11-01T00:00:00Z')",
+        )
+        .bind(org)
+        .bind(k)
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let csv = "Kennung;Funkrufname;Standort\nk1;Florian 9;Wache West\n";
+    let v = vor(&pool, org, &[csv], Some("FV"), &keine()).await;
+    assert_eq!(v.zeilen[0].ergebnis, ZeilenErgebnis::Mehrdeutig);
+    let e = wahl(StammdatenArt::Fahrzeug, 2, ZeilenWahl::Kandidat { id: b });
+    let v = vor(&pool, org, &[csv], Some("FV"), &e).await;
+    assert_eq!(v.zaehlung.fahrzeuge.ausgelassen, 1, "{:?}", v.zeilen);
+    assert!(v.zeilen[0]
+        .hinweise
+        .iter()
+        .any(|h| h.contains("außer Dienst")));
+    assert!(v.uebernehmbar);
+    let (erg, ids) = ueber(&pool, org, &[csv], Some("FV"), &e).await.unwrap();
+    assert_eq!(erg.zaehlung.fahrzeuge.ausgelassen, 1);
+    assert!(ids.is_empty());
+    assert_eq!(fz_spalte(&pool, b, "standort").await, None);
+    assert_eq!(
+        fz_spalte(&pool, b, "funkrufname").await.as_deref(),
+        Some("Florian 2")
+    );
+    // Der Kandidat im Dienst bleibt wählbar.
+    let e = wahl(StammdatenArt::Fahrzeug, 2, ZeilenWahl::Kandidat { id: a });
+    let (erg, _) = ueber(&pool, org, &[csv], Some("FV"), &e).await.unwrap();
+    assert_eq!(erg.zaehlung.fahrzeuge.ergaenzt, 1);
+    assert_eq!(
+        fz_spalte(&pool, a, "standort").await.as_deref(),
+        Some("Wache West")
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // HTTP (LLH-1633, Task 6): Routen unter /api/master-data/import
 // ---------------------------------------------------------------------------------------------
