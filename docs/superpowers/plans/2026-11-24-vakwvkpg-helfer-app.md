@@ -113,7 +113,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
 ### Task 2: Migration und Org-Schalter „Ortung im Einsatz“
 
 **Files:**
-- Create: `migrations/0376_helfer_app.sql` (Nummer prüfen)
+- Create: `migrations/0377_helfer_app.sql` (Nummer prüfen)
 - Modify: `src/org/einstellungen.rs` (Struct, Anzeige, Daten), `src/routes/org_einstellungen.rs`
 - Modify: `frontend/src/pages/einstellungen/EinsatzDefaults.tsx`, `orgEinstellungenForm.ts`
 - Test: `tests/org_einstellungen.rs` (bestehende Datei, sonst anlegen), `frontend/src/pages/einstellungen/EinsatzDefaults.test.tsx`
