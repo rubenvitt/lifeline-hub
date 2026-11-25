@@ -1,0 +1,113 @@
+# Helfer-App als signierte APK (ADR-0098, Regeln android/helfer/AGENTS.md): `:helfer:assembleRelease`
+# mit demselben Schlüssel wie die Lifeline-App (android/AGENTS.md, „Signierschlüssel wechselt nie“;
+# Geheimnisse wie android.yml), Signatur und Paket prüfen und die APK als Workflow-Artefakt ablegen.
+# Einen Release- oder Update-Kanal hat die Helfer-App noch nicht; er folgt später.
+#
+# Zwei Auslöser, kein Push (dieselbe Form wie ios-helfer.yml):
+#
+# - `pull_request`, sobald ein PR das Label `apk-helfer` bekommt, und danach bei jedem Push auf den
+#   PR, solange das Label hängt. Ein anderes Label startet keinen Bau. PRs aus Forks haben keine
+#   Secrets; dort bricht der Lauf mit einer Meldung ab.
+# - `workflow_dispatch` als Handstart für den gewählten Branch.
+#
+# Version: `HELFER_VERSION` aus scripts/ios/helfer-version.sh (liest build.gradle.kts), versionCode
+# die Laufnummer dieses Workflows plus 1000 (steigt mit jedem Lauf, Android ersetzt die App nur mit
+# einer höheren Nummer). Fehlt ein Geheimnis, wird der Lauf rot; eine unsignierte APK entsteht hier
+# nie. Der Keystore liegt nur in einem Wegwerf-Ordner unter RUNNER_TEMP.
+#
+# KEIN PFLICHT-CHECK (ADR-0048). Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
+name: Helfer-App (APK)
+
+on:
+  pull_request:
+    types: [labeled, synchronize]
+  workflow_dispatch:
+
+# Least privilege: der Lauf liest nur und legt ein Artefakt ab.
+permissions:
+  contents: read
+
+env:
+  # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an; unter der Locale C scheitert das.
+  LC_ALL: C.UTF-8
+
+jobs:
+  apk:
+    name: APK (Helfer)
+    # Nur mit dem Label: beim Setzen genau dieses Labels und bei jedem Push, solange es hängt.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || (github.event.action == 'labeled' && github.event.label.name == 'apk-helfer')
+      || (github.event.action == 'synchronize'
+          && contains(github.event.pull_request.labels.*.name, 'apk-helfer'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Je Branch ein Bau zur Zeit; ein neuer Push ersetzt den laufenden.
+    concurrency:
+      group: android-helfer-${{ github.head_ref || github.ref }}
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Der Stand des PR-Branches, nicht der Merge-Commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: JDK (vorinstalliert, Version aus sdk-version.sh)
+        run: ./scripts/android/jdk-waehlen.sh
+      - name: Android-SDK ergänzen
+        run: ./scripts/android/sdk-installieren.sh
+      - name: Bauen, signieren, prüfen
+        env:
+          LAUFNUMMER: ${{ github.run_number }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          fehlt=()
+          for v in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [ -n "${!v:-}" ] || fehlt+=("$v")
+          done
+          if [ "${#fehlt[@]}" -gt 0 ]; then
+            echo "FEHLER: Secrets für die Signatur fehlen: ${fehlt[*]} (PR aus einem Fork?). Anleitung: docs/betrieb/android-app.md." >&2
+            exit 1
+          fi
+          werte="$(./scripts/android/sdk-version.sh)"
+          eval "$werte"
+          werkzeuge="$ANDROID_HOME/build-tools/$ANDROID_BUILD_TOOLS"
+
+          geheim="$(mktemp -d "$RUNNER_TEMP/android-signatur.XXXXXX")"
+          trap 'rm -rf "$geheim"' EXIT
+          chmod 700 "$geheim"
+          export ANDROID_KEYSTORE_PATH="$geheim/release.keystore"
+          ( umask 077; printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH" )
+          [ -s "$ANDROID_KEYSTORE_PATH" ] || { echo "FEHLER: ANDROID_KEYSTORE_BASE64 ergibt einen leeren Keystore." >&2; exit 1; }
+          unset ANDROID_KEYSTORE_BASE64
+          export HELFER_VERSION_CODE="$((LAUFNUMMER + 1000))"
+
+          ./android/gradlew -p android :helfer:assembleRelease --console=plain
+
+          apk="android/helfer/build/outputs/apk/release/helfer-release.apk"
+          [ -f "$apk" ] || { echo "FEHLER: $apk fehlt (ohne Signatur hieße sie helfer-release-unsigned.apk)." >&2; exit 1; }
+          "$werkzeuge/apksigner" verify --verbose --print-certs "$apk" > "$geheim/verify.txt" \
+            || { cat "$geheim/verify.txt" >&2; echo "FEHLER: apksigner verify lehnt die APK ab." >&2; exit 1; }
+          # Derselbe Fingerabdruck wie die Lifeline-App (android.yml loggt ihn ebenso).
+          grep -E '^Verified using|^Signer #1 certificate (DN|SHA-256)' "$geheim/verify.txt" || true
+          badging="$("$werkzeuge/aapt2" dump badging "$apk" | sed -n '1p')"
+          [[ "$badging" == *"name='dev.rubeen.lifeline.helfer'"* ]] \
+            || { echo "FEHLER: Die APK trägt nicht das Paket dev.rubeen.lifeline.helfer: $badging" >&2; exit 1; }
+          echo "$badging"
+
+          mkdir -p "$RUNNER_TEMP/versand"
+          version="$(sed -n "s/.*versionName='\([^']*\)'.*/\1/p" <<< "$badging")"
+          name="lifeline-helfer-android-$version-$HELFER_VERSION_CODE.apk"
+          cp "$apk" "$RUNNER_TEMP/versand/$name"
+          ( cd "$RUNNER_TEMP/versand" && sha256sum "$name" > "$name.sha256" )
+          echo "Gebaut: $name ($(cut -d' ' -f1 "$RUNNER_TEMP/versand/$name.sha256"))"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-helfer-apk
+          path: ${{ runner.temp }}/versand/
+          if-no-files-found: error
+          retention-days: 14

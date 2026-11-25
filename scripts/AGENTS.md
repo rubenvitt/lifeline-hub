@@ -99,6 +99,11 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     oder per Handstart; dasselbe Skript mit `--app helfer --build <Laufnummer + 1000>`, die
     Version steht nur in `scripts/ios/helfer-version.sh`. Kein Verteilschritt: die Gruppe
     „Intern“ bekommt jeden Build automatisch. `ios-pruefung.yml` testet die Helfer-App mit.
+  - **APK der Helfer-App** (ADR-0098): `android-helfer.yml` baut `:helfer:assembleRelease` mit
+    demselben Schlüssel wie die Lifeline-App (`ANDROID_KEY*`, fehlt eins: rot), prüft Signatur
+    und Paket und legt die APK als Artefakt `android-helfer-apk` ab; nur an PRs mit dem Label
+    `apk-helfer` oder per Handstart, `versionCode` = Laufnummer + 1000. Noch kein Kanal.
+    `android-pruefung.yml` testet die Helfer-App mit (Bilder als `android-helfer-bilder`).
   - **Android-Prüfung** (LLH-1989): `android-pruefung.yml` fährt an PRs und nach Pushes auf
     `alpha`, die `android/`, `scripts/android/` oder `src-tauri/faelle/` ändern, die App-Tests
     (Robolectric, Bilder als Artefakt `android-bilder`), die Release-APK ohne Signatur und den

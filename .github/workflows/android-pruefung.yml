@@ -2,7 +2,9 @@
 # die gemeinsamen Fälle der Hüllen ändert, und nach jedem solchen Push auf `alpha`: auf
 # `ubuntu-latest` die App-Tests unter Robolectric fahren, die Release-APK ohne Signatur bauen, den
 # Kotlin-Kern testen und die Bildschirmbilder jeder nativen Seite als Artefakt `android-bilder`
-# ablegen (Bilder der Änderung für den PR). Ohne grünen Lauf ist App-Code nicht fertig.
+# ablegen (Bilder der Änderung für den PR). Ebenso für die Helfer-App (`:helfer`, ADR-0098): Tests,
+# Release-APK ohne Signatur und ihre Bilder als `android-helfer-bilder`. Ohne grünen Lauf ist
+# App-Code nicht fertig.
 #
 # KEIN PFLICHT-CHECK: Pflicht sind nur die Checks in `scripts/ruleset-pruefen.sh` (ADR-0048). Ein
 # PR ohne solche Änderungen startet keinen Lauf (Pfadfilter). Der Kern läuft zusätzlich in
@@ -25,6 +27,8 @@ on:
       - "android/**"
       - "src-tauri/faelle/**"
       - "scripts/android/**"
+      # Version der Helfer-App (eine Zählung für iOS und Android).
+      - "scripts/ios/helfer-version.sh"
       - ".github/workflows/android-pruefung.yml"
   workflow_call:
 
@@ -93,6 +97,9 @@ jobs:
             ~/.gradle/wrapper/dists
             ~/.m2/repository/org/robolectric
           key: ${{ steps.abhaengigkeiten.outputs.cache-primary-key }}
+      # Nach dem Speichern des Caches: ein roter Helfer-Bau hält den Eintrag der App nicht auf.
+      - name: Helfer-App-Tests und Release-APK (ohne Signatur)
+        run: ./android/gradlew -p android :helfer:testDebugUnitTest :helfer:assembleRelease --console=plain
       - name: Kotlin-Kern
         run: ./android/gradlew -p android/kern test --console=plain
       - name: Kotlin-Kern der Helfer-App
@@ -105,6 +112,14 @@ jobs:
           path: android/app/build/bilder/
           if-no-files-found: warn
           retention-days: 14
+      - name: Bildschirmbilder der Helfer-App
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android-helfer-bilder
+          path: android/helfer/build/bilder/
+          if-no-files-found: warn
+          retention-days: 14
       # Zur Diagnose nur bei Rot.
       - name: Testberichte
         if: ${{ failure() }}
@@ -113,6 +128,7 @@ jobs:
           name: android-testberichte
           path: |
             android/app/build/reports/tests/
+            android/helfer/build/reports/tests/
             android/kern/build/reports/tests/
             android/helferkern/build/reports/tests/
           if-no-files-found: ignore

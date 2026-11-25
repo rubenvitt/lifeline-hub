@@ -25,6 +25,7 @@ RULESET="$WF/ruleset.yml"
 IOS="$WF/ios-pruefung.yml"
 IOSREL="$WF/ios.yml"
 IOSHELFER="$WF/ios-helfer.yml"
+ANDROIDHELFER="$WF/android-helfer.yml"
 ANDROID="$WF/android-pruefung.yml"
 ANDROIDALPHA="$WF/android-pruefung-alpha.yml"
 ANDROIDREL="$WF/android.yml"
@@ -314,6 +315,30 @@ pruefe "ios-helfer.yml: kein pull_request_target" fehlt "$(code_ohne_kommentar "
 pruefe "simulator-pruefung.sh testet auch die Helfer-App" \
   enthaelt "$(code_ohne_kommentar "$SKRIPTE/ios/simulator-pruefung.sh")" "-scheme LifelineHelfer"
 
+echo "==> ci-stufen: android-helfer.yml (APK der Helfer-App)"
+# Die signierte APK der Helfer-App (ADR-0098): nur mit dem Label `apk-helfer` am PR oder per
+# Handstart, mit demselben Schlüssel wie die Lifeline-App, als Artefakt (noch kein Kanal).
+pruefe "android-helfer.yml: PR und Handstart" nur_ausloeser "$ANDROIDHELFER" "pull_request workflow_dispatch "
+pruefe "android-helfer.yml: PR nur bei labeled und synchronize" \
+  enthaelt "$(kopf_code "$ANDROIDHELFER")" "types: [labeled, synchronize]"
+apk_helfer_if="$(job_if "$ANDROIDHELFER" apk)"
+for teil in "github.event.label.name == 'apk-helfer'" \
+  "contains(github.event.pull_request.labels.*.name, 'apk-helfer')" \
+  "github.event_name == 'workflow_dispatch'"; do
+  pruefe "android-helfer.yml: Job apk nur mit $teil" enthaelt "$apk_helfer_if" "$teil"
+done
+pruefe "android-helfer.yml liest nur" test "$(code_ohne_kommentar "$ANDROIDHELFER" | grep -cE ': write')" = 0
+pruefe "android-helfer.yml baut :helfer:assembleRelease" enthaelt "$(job "$ANDROIDHELFER" apk)" ":helfer:assembleRelease"
+for geheim in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+  pruefe "android-helfer.yml: derselbe Schlüssel ($geheim)" \
+    enthaelt "$(job "$ANDROIDHELFER" apk)" "$geheim: \${{ secrets.$geheim }}"
+done
+pruefe "android-helfer.yml prüft die Signatur" enthaelt "$(job "$ANDROIDHELFER" apk)" "apksigner\" verify"
+pruefe "android-helfer.yml: versionCode aus der Laufnummer plus 1000" \
+  enthaelt "$(job "$ANDROIDHELFER" apk)" "LAUFNUMMER + 1000"
+pruefe "android-helfer.yml lädt die APK als Artefakt" enthaelt "$(job "$ANDROIDHELFER" apk)" "name: android-helfer-apk"
+pruefe "android-helfer.yml: kein pull_request_target" fehlt "$(code_ohne_kommentar "$ANDROIDHELFER")" "pull_request_target"
+
 echo "==> ci-stufen: android-pruefung.yml"
 # Der App-Lauf der Android-Hülle (LLH-1989, Entwurf D10): am PR und nach dem Merge auf `alpha`, nur
 # bei Änderungen an der Hülle, ihren Skripten oder den gemeinsamen Fällen, nie Pflicht, nie
@@ -344,6 +369,10 @@ pruefe "android-pruefung.yml bekommt keine Geheimnisse" fehlt "$(code_ohne_komme
 pruefe "android-pruefung.yml: App-Tests und Release-APK" \
   enthaelt "$(job "$ANDROID" app)" ":app:testDebugUnitTest :app:assembleRelease"
 pruefe "android-pruefung.yml: Kotlin-Kern" enthaelt "$(job "$ANDROID" app)" "-p android/kern test"
+pruefe "android-pruefung.yml: Helfer-App-Tests und Release-APK" \
+  enthaelt "$(job "$ANDROID" app)" ":helfer:testDebugUnitTest :helfer:assembleRelease"
+pruefe "android-pruefung.yml: Kern der Helfer-App" enthaelt "$(job "$ANDROID" app)" "-p android/helferkern test"
+pruefe "android-pruefung.yml: Bilder der Helfer-App" enthaelt "$(job "$ANDROID" app)" "name: android-helfer-bilder"
 pruefe "android-pruefung.yml: Bilder als android-bilder" enthaelt "$(job "$ANDROID" app)" "name: android-bilder"
 pruefe "android-pruefung.yml: SDK über das Skript" enthaelt "$(job "$ANDROID" app)" "run: ./scripts/android/sdk-installieren.sh"
 pruefe "Android-App ist kein Pflicht-Check" fehlt "$(cat "$SKRIPTE/ruleset-pruefen.sh")" "Android-App"
