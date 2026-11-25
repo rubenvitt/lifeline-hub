@@ -186,14 +186,30 @@ fn zeile(p: &PassEingabe, k: &PassKontext) -> PassZeile {
     }
 }
 
+/// Sortierschlüssel nach DIN 5007-1 (Wörterbuch): klein, ä = a, ö = o, ü = u, ß = ss. Sonst
+/// stünden Namen mit Umlaut am Anfang auf der Papierliste hinter Z.
+fn sortierschluessel(s: &str) -> String {
+    s.trim()
+        .to_lowercase()
+        .chars()
+        .flat_map(|c| match c {
+            'ä' => vec!['a'],
+            'ö' => vec!['o'],
+            'ü' => vec!['u'],
+            'ß' => vec!['s', 's'],
+            c => vec![c],
+        })
+        .collect()
+}
+
 /// Bildet und sortiert die Zeilen: Name, Vorname, Registriernummer; ohne Namen ans Ende.
 pub fn pass_zeilen(personen: &[PassEingabe], k: &PassKontext) -> Vec<PassZeile> {
     let schluessel = |p: &PassEingabe| {
         let name = p.name.map(str::trim).filter(|n| !n.is_empty());
         (
             name.is_none(),
-            name.unwrap_or_default().to_lowercase(),
-            p.vorname.unwrap_or_default().trim().to_lowercase(),
+            sortierschluessel(name.unwrap_or_default()),
+            sortierschluessel(p.vorname.unwrap_or_default()),
             p.registrier_nr,
         )
     };
@@ -503,6 +519,40 @@ mod tests {
         );
         let kennungen: Vec<_> = zeilen.iter().map(|z| z.id_label.as_str()).collect();
         assert_eq!(kennungen, ["R-004", "R-003", "R-002", "R-005", "R-001"]);
+    }
+
+    #[test]
+    fn umlaute_sortieren_wie_im_telefonbuch() {
+        let leer = HashSet::new();
+        let uhs = HashMap::new();
+        let k = PassKontext {
+            zone: chrono_tz::Europe::Berlin,
+            uhs_namen: &uhs,
+            mit_versorgung: &leer,
+        };
+        let p = |nr: i64, name: &'static str| PassEingabe {
+            id: nr,
+            registrier_nr: nr,
+            name: Some(name),
+            ..person()
+        };
+        let zeilen = pass_zeilen(
+            &[
+                p(1, "Zander"),
+                p(2, "Özdemir"),
+                p(3, "Ährens"),
+                p(4, "Baz"),
+                p(5, "Bär"),
+                p(6, "Strauß"),
+            ],
+            &k,
+        );
+        let namen: Vec<_> = zeilen.iter().map(|z| z.last_name.as_str()).collect();
+        // DIN 5007-1: ä = a, ö = o, ü = u, ß = ss.
+        assert_eq!(
+            namen,
+            ["Ährens", "Bär", "Baz", "Özdemir", "Strauß", "Zander"]
+        );
     }
 
     #[test]
