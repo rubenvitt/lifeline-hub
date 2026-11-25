@@ -212,3 +212,68 @@ mod tests {
         assert!(check_farbe("rot").is_err());
     }
 }
+
+/// Herkunftsvermerk eines übernommenen Objekts (LLH-2129) für den System-ETB-Eintrag: Name der
+/// Ebene und Quelle, bei einer URL nur der Host, nie die ganze Adresse (sie kann ein Geheimnis im
+/// Query tragen).
+pub fn herkunft_text(ebene: &FremdebeneAnzeige) -> String {
+    match (ebene.source, ebene.url_host.as_deref()) {
+        (FremdebeneQuelle::Url, Some(host)) => {
+            format!("übernommen aus Fremdebene «{}», von {host}", ebene.name)
+        }
+        _ => format!("übernommen aus Fremdebene «{}», Datei", ebene.name),
+    }
+}
+
+/// Herkunft zur `fremdebene_id` eines Anlege-Bodies (LLH-2129): `None` ohne Feld, 404, wenn die
+/// Ebene nicht zu diesem Einsatz gehört.
+pub async fn herkunft_fuer(
+    pool: &sqlx::SqlitePool,
+    einsatz_id: i64,
+    fremdebene_id: Option<i64>,
+) -> Result<Option<String>, crate::error::AppError> {
+    match fremdebene_id {
+        Some(id) => Ok(Some(herkunft_text(
+            &repo::laden(pool, einsatz_id, id).await?,
+        ))),
+        None => Ok(None),
+    }
+}
+
+#[cfg(test)]
+mod herkunft_tests {
+    use super::*;
+
+    fn ebene(source: FremdebeneQuelle, url_host: Option<&str>) -> FremdebeneAnzeige {
+        FremdebeneAnzeige {
+            id: 1,
+            name: "Lage Kreis X".into(),
+            source,
+            url: None,
+            url_host: url_host.map(Into::into),
+            color: "fremd-1".into(),
+            feature_count: 1,
+            dropped_count: 0,
+            fetched_at: None,
+            attempted_at: None,
+            error: None,
+            created_at: "2026-11-25T00:00:00Z".into(),
+        }
+    }
+
+    #[test]
+    fn herkunft_einer_datei_ebene() {
+        assert_eq!(
+            herkunft_text(&ebene(FremdebeneQuelle::Datei, None)),
+            "übernommen aus Fremdebene «Lage Kreis X», Datei"
+        );
+    }
+
+    #[test]
+    fn herkunft_einer_url_ebene_nennt_nur_den_host() {
+        assert_eq!(
+            herkunft_text(&ebene(FremdebeneQuelle::Url, Some("lage.example.org"))),
+            "übernommen aus Fremdebene «Lage Kreis X», von lage.example.org"
+        );
+    }
+}

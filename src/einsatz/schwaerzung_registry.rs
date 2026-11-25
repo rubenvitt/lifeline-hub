@@ -803,7 +803,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Eingefrorene Inhalte der Fremdebenen für gesicherte Stände (LLH-2130, Migration 0382).
+        // Eingefrorene Inhalte der Fremdebenen für gesicherte Stände (LLH-2130, Migration 0385).
         // Einzeln im Nachlauf (`Strategie::ZeileEinzelnLoeschen`): die Tabelle hat keine
         // Mengengrenze (Versionen × Ebenen × bis 8 MiB), alle in einer Transaktion hielten die
         // Schreibsperre zu lange (LFH-905). Zuordnung `anhaenge` wie die Bilder der Lagekarte,
@@ -3740,6 +3740,41 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("angelegt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
+    // ---------- Ausgangskorb für E-Mail (LLH-2093, `ausgang`) ----------
+    // Schnappschuss des Versands: Betreff, Text, Adresse und Name der Stelle sind Freitext der
+    // Module (Linie A, LFH-701) und werden geschwärzt; der rechtsverbindliche Wortlaut steht im
+    // ETB (G_ETB). Zustand, Fehlercode und Zeiten sind Skelett.
+    TabellenRegel {
+        tabelle: "ausgang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("org_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("client_id", G_IDEMPOTENZ),
+            retain("quelle_art", G_ENUM),
+            retain("quelle_id", G_POLY),
+            retain("kanal", G_ENUM),
+            retain("externe_stelle_id", G_FK),
+            scrub("stelle_bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("adresse", Strategie::Platzhalter, Z_EINSATZ),            // NOT NULL
+            scrub("betreff", Strategie::Platzhalter, Z_EINSATZ),            // NOT NULL
+            scrub("inhalt", Strategie::Platzhalter, Z_EINSATZ),             // NOT NULL
+            retain("zustand", G_ENUM),
+            retain("versuche", G_ZAEHLER),
+            retain("naechster_versuch_at", G_ZEIT),
+            retain("erster_versuch_at", G_ZEIT),
+            retain("versuch_begonnen_at", G_ZEIT),
+            retain("fehler_art", G_ENUM),
+            retain("fehler_status", G_ZAEHLER),
+            retain("erstellt_von_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("uebergeben_at", G_ZEIT),
+            retain("etb_eintrag_id", G_FK),
+        ],
+    },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
     // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
     // der Purge-Lauf löscht nach sieben Tagen. Mit dem Einsatz gehen die Zeilen über seinen
@@ -3755,6 +3790,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("type", G_ENUM),
             retain("einsatz_id", G_SCOPE),
             retain("occurred_at", G_ZEIT),
+        ],
+    },
+    // ---------- Fahrzeugortung aus dem Einwurf (LLH-2091, migrations/0381, ADR-0103) ----------
+    // Ganze Zeile löschen: die Kopplung ist eine lokale Betriebsangabe ohne Skelettwert (die
+    // Spur steht im ETB), und der Abschluss löscht sie ohnehin. `kennung` ist die Absender-
+    // Kennung eines Ortungsgeräts; sie kann ein Gerät der Besatzung benennen und darf nicht
+    // bleiben. Ein Platzhalter verletzte zudem `UNIQUE (zugang_id, kennung)` ab der zweiten Zeile.
+    TabellenRegel {
+        tabelle: "ortung_kopplung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("einsatz_fahrzeug_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kennung", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("gekoppelt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("gekoppelt_von", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {

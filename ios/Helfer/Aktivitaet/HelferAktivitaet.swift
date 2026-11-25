@@ -125,11 +125,8 @@ struct Sperrbildschirm: View {
         let anzeige = Anzeige(zustand: zustand, veraltet: veraltet)
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "cross.fill")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(.white)
+                Markenkachel()
                     .frame(width: 26, height: 26)
-                    .background(Farbe.marke)
                 Label {
                     Text(anzeige.titel)
                         .schrift(Stil.kartentitel, relativeTo: .headline)

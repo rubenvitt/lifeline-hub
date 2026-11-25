@@ -10,6 +10,9 @@
 # im Abstand von 4 s, beide ADR-0077), trägt der zweite beim Merge noch seinen alten grünen
 # Status. Das Fenster bleibt bewusst offen (keine Merge Queue, kein „up to date"); die doppelte
 # Nummer fällt dann auf `alpha` auf und geht über „alpha rot" (Stau-Wächter, `scripts/AGENTS.md`).
+# Der Reparatur-PR legt eine der beiden Dateien um; `check-migrationen.sh` lässt das zu
+# (Ausnahme zu Regel 1). Er wird mit der Fassung des Ziel-Branches bewertet: der erste PR, der
+# die Ausnahme selbst bringt, bleibt rot und braucht den Bypass.
 #
 # Deshalb zwei Auslöser für dieselbe Prüfung, je in einem eigenen Workflow (LLH-1896: ein Job,
 # der nur bei Push läuft, stünde sonst an jedem PR als übersprungener Eintrag):

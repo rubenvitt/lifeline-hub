@@ -3,6 +3,7 @@ import type { Nebenweg } from '../../components/EinsatzSeite';
 import { exportDateiname, speichereDatei } from '../../components/dateiSpeichern';
 import { collectExportObjekte, type ExportEingabe } from './geoExport';
 import { GEOJSON_ENDUNG, GEOJSON_MEDIENTYP, writeGeojson } from './geojsonWriter';
+import { GPX_ENDUNG, GPX_MEDIENTYP, writeGpx } from './gpxWriter';
 import { packKmz } from './kmzPacker';
 
 /** Label-Zusatz eines gesperrten Eintrags: der Grund steht sichtbar am Element. */
@@ -13,10 +14,11 @@ export const EXPORT_LAEDT = 'lädt';
 export const EXPORT_LAEUFT = 'läuft';
 export const EXPORT_KMZ = 'Exportieren: Google Earth (KMZ)';
 export const EXPORT_GEOJSON = 'Exportieren: GIS (GeoJSON)';
+export const EXPORT_GPX = 'Exportieren: Fireboard (GPX)';
 
 /**
- * Die Lagekarte als Datei für Google Earth (KMZ) und GIS (GeoJSON) — zwei Nebenwege des Kopfes
- * (Spec `lagekarte-geo-export`). Lesen genügt, kein Schreibrecht. Ein Fehler beim Erzeugen geht an
+ * Die Lagekarte als Datei für Google Earth (KMZ), GIS (GeoJSON) und Fireboard (GPX, LLH-2128) —
+ * drei Nebenwege des Kopfes (Spec `lagekarte-geo-export`). Lesen genügt, kein Schreibrecht. Ein Fehler beim Erzeugen geht an
  * den Melder, den `beginneExport` je Klick liefert (Seitenfehler der Karte; ein neuer Versuch räumt
  * den alten Grund). Gesperrt, mit dem Grund am Eintrag: solange die Daten laden (`eingabe: null`),
  * ohne sichtbares Objekt und solange die Datei des Eintrags entsteht (ein zweiter Klick speicherte
@@ -84,6 +86,12 @@ export function useGeoExport(
         EXPORT_GEOJSON,
         GEOJSON_ENDUNG,
         (s) => new Blob([writeGeojson(objekte, meta(s))], { type: GEOJSON_MEDIENTYP }),
+      ),
+      eintrag(
+        'export-gpx',
+        EXPORT_GPX,
+        GPX_ENDUNG,
+        (s) => new Blob([writeGpx(objekte, meta(s))], { type: GPX_MEDIENTYP }),
       ),
     ];
   }, [eingabe, einsatzId, leer, objekte, beginneExport, laufend]);

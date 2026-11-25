@@ -17,8 +17,9 @@ import { StammdatenEinlesenDialog } from './StammdatenEinlesen';
  *
  * Nur für Admins (dieselbe Tür wie die Route): ohne Recht fragt der Hinweis nichts an. Ohne
  * offenen Schnappschuss steht nichts da. Der Dialog hängt nicht an der Zeile: nach dem Übernehmen
- * verschwindet die Zeile, das Ergebnis bleibt bis „Schließen“ stehen. Ein neuer Schnappschuss
- * erscheint beim nächsten Laden, nicht live (`api/queryKeys.ts`, `NICHT_LIVE_GLOBAL_KEYS`).
+ * verschwindet die Zeile, das Ergebnis bleibt bis „Schließen“ stehen. Eine Übernahme auf einem
+ * anderen Schirm räumt die Zeile über das Org-Ereignis `stammdaten` ab (LLH-2121); ein neuer
+ * Schnappschuss erscheint erst beim nächsten Laden (`api/queryKeys.ts`, `ORG_STREAM_EVENTS`).
  */
 
 interface SchnappschussHinweisProps {

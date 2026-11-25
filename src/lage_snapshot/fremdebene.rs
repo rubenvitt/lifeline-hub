@@ -1,6 +1,6 @@
 //! Fremdebenen in gesicherten Ständen (LLH-2130). Ein Stand nennt je Ebene ihre Angaben und den
 //! Hash ihres Inhalts (`daten.fremdebenen`); der Inhalt selbst liegt einmal je Einsatz und Hash in
-//! `karte_fremdebene_stand` (Migration 0382), solange ein Stand darauf zeigt. Herleitung:
+//! `karte_fremdebene_stand` (Migration 0385), solange ein Stand darauf zeigt. Herleitung:
 //! `docs/superpowers/specs/2026-11-25-m6rhqco4-fremdebenen-stand-offline-design.md`.
 //!
 //! Kopie, kein Verweis auf `karte_fremdebene_daten`: ein neuer Abruf oder das Löschen der Ebene

@@ -394,3 +394,79 @@ describe('Bildmarke — eine Geometrie (LFH-837)', () => {
     }
   });
 });
+
+describe('Bildmarke — Helfer-App (ADR-0101)', () => {
+  const swiftKern = join(repo, 'ios', 'HelferKern', 'Sources', 'HelferKern', 'Bildmarke.swift');
+  const kotlinKern = join(
+    repo,
+    'android',
+    'helferkern',
+    'src',
+    'main',
+    'kotlin',
+    'dev',
+    'rubeen',
+    'lifeline',
+    'helferkern',
+    'Bildmarke.kt',
+  );
+
+  /** Punkte der Pulslinie aus `LINIE_PFAD` (nur M, H, L). */
+  function linienPunkte(): [number, number][] {
+    const punkte: [number, number][] = [];
+    let y = 0;
+    for (const [, befehl, werte] of LINIE_PFAD.matchAll(/([MHL])([^MHL]+)/g)) {
+      const zahlen = werte.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+      if (befehl === 'H') punkte.push([zahlen[0], y]);
+      else {
+        punkte.push([zahlen[0], zahlen[1]]);
+        y = zahlen[1];
+      }
+    }
+    return punkte;
+  }
+
+  it('beide Kerne tragen dieselbe Geometrie wie die Oberfläche', () => {
+    const punkte = linienPunkte();
+    const swift = readFileSync(swiftKern, 'utf8');
+    const kotlin = readFileSync(kotlinKern, 'utf8');
+    expect(swift).toContain(punkte.map(([x, y]) => `(${x}, ${y})`).join(', '));
+    expect(kotlin).toContain(punkte.map(([x, y]) => `${x}f to ${y}f`).join(', '));
+    expect(swift).toContain(`linienStaerke: Double = ${LINIE_STAERKE}`);
+    expect(kotlin).toContain(`LINIEN_STAERKE = ${LINIE_STAERKE}f`);
+    expect(swift).toContain(`gehrungsgrenze: Double = ${LINIE_GEHRUNGSGRENZE}`);
+    expect(kotlin).toContain(`GEHRUNGSGRENZE = ${LINIE_GEHRUNGSGRENZE}f`);
+    expect(swift).toContain(`(x: ${QUADRAT.x}.0, y: ${QUADRAT.y}.0, kante: ${QUADRAT.kante}.0)`);
+    expect(kotlin).toContain(`QUADRAT_X = ${QUADRAT.x}f`);
+    expect(kotlin).toContain(`QUADRAT_Y = ${QUADRAT.y}f`);
+    expect(kotlin).toContain(`QUADRAT_KANTE = ${QUADRAT.kante}f`);
+  });
+
+  it('kein Kreuz als Markenzeichen: die Marke ist eigen, kein Rotkreuz-Zeichen', () => {
+    const dateien = (wurzel: string, endung: string): string[] =>
+      readdirSync(wurzel, { recursive: true, encoding: 'utf8' })
+        .filter((name) => name.endsWith(endung))
+        .map((name) => join(wurzel, name));
+    for (const datei of dateien(join(repo, 'ios', 'Helfer'), '.swift')) {
+      expect(readFileSync(datei, 'utf8'), datei).not.toMatch(/systemName:\s*"cross/);
+    }
+    const kotlin = readFileSync(
+      join(
+        repo,
+        'android',
+        'helfer',
+        'src',
+        'main',
+        'kotlin',
+        'dev',
+        'rubeen',
+        'lifeline',
+        'helfer',
+        'seiten',
+        'Bausteine.kt',
+      ),
+      'utf8',
+    );
+    expect(kotlin).toContain('Bildmarke.linie');
+  });
+});

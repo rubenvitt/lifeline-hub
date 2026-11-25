@@ -40,6 +40,9 @@ import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../anzeige/zeitEingabe';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { LAGEBERICHT_STATUS, StatusBadge } from '../kommunikation';
+import SendenAktion from '../ausgang/SendenAktion';
+import Versandliste from '../ausgang/Versandliste';
+import { abschnittVorschau, externeVerteilerNamen } from '../ausgang/empfaengerVorschlag';
 import EinsatzSeite from '../components/EinsatzSeite';
 import Druckkopf from '../components/druck/Druckkopf';
 import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
@@ -419,6 +422,15 @@ function LageberichtDetail() {
                   Fortschreiben
                 </Button>
               )}
+              {/* Nur die freigegebene Fassung geht hinaus (LLH-2093). */}
+              {!istEntwurf && darfSchreiben && (
+                <SendenAktion
+                  einsatzId={einsatzId}
+                  quelle={{ kind: 'lagebericht', id: berichtId }}
+                  vorschlagNamen={externeVerteilerNamen(bericht.verteiler)}
+                  vorschauText={abschnittVorschau(bericht.abschnitte)}
+                />
+              )}
               {istEntwurf && darfSchreiben && (
                 <>
                   {/* Der sichtbare Beleg des stillen Autosave — ohne ihn wäre „gespeichert" von
@@ -560,6 +572,16 @@ function LageberichtDetail() {
               <LageberichtText bericht={bericht} unterEbene={2} />
             </div>
           </Paneel>
+        )}
+        {/* Versand (LLH-2093): nur mit mindestens einem Versand, nie im Druck. */}
+        {!istEntwurf && (
+          <div className="lagebericht-no-print">
+            <Versandliste
+              einsatzId={einsatzId}
+              quelle={{ kind: 'lagebericht', id: berichtId }}
+              darfSchreiben={darfSchreiben}
+            />
+          </div>
         )}
         {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}
         <DokumentAnlagen

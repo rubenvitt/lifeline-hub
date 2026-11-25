@@ -154,6 +154,18 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   hervorgehoben; Gerätemenü nur nach 3 s Drücken, zu nach 30 s ohne Eingabe. Wirft eine Kachel, fällt nur sie
   aus (`KachelGrenze` in Form `gross`, ohne Knopf, neuer Versuch mit dem nächsten Datenstand;
   Regel in `frontend/AGENTS.md`, „Jede Kachel einer Lagefläche hat ihre eigene Fehlergrenze“).
+  Neben `situation-monitor` (unten) hat er genau eine zweite Quelle (LLH-2109): das Livebild der Drohne aus
+  dem Video-Proxy `GET …/drone/video/{key}/hls/{*file}`, die einzige Medienroute in seiner Liste.
+  Welche Videos es gibt, erfährt er nur aus dem Block `drohne` (`videos`, `stand_at`) derselben
+  Antwort; der Block steht nur, wenn die Einsatzleitung an der zugeschalteten Drohnenquelle den
+  Schalter „Livebild auf dem Lagemonitor“ eingeschaltet hat (Vorgabe aus, Ein- und Ausschalten
+  im ETB) und die Lagekarte im Einsatz sichtbar ist, und nur dann lässt der Proxy ein Gerät
+  durch (`routes/drohne.rs::video`). Auf dem Bild können Personen zu sehen sein; deshalb der
+  eigene Schalter, und keine andere Ansicht erreicht den Proxy. Die Kachel „Livebild“
+  (`geraet/LagemonitorLivebild.tsx`) ist stumm und ohne Bedienung, nennt den Datenstand und
+  zeigt ohne Strom „Kein Livebild“ ohne Alarm; mit ihr steht unter der Karte eine Zeile aus
+  Livebild und Meldungen über dem nächsten Programmpunkt, der Rest als „+n weitere“ (Entwurf
+  `docs/design/2026-11-25-lagemonitor-livebild/`).
   Seine Zahlen kommen nur aus `GET /api/incidents/{id}/situation-monitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
   `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und
