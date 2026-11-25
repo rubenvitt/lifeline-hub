@@ -455,8 +455,8 @@ async fn foto_abrufen(
 
 /// GET /api/incidents/{id}/drone/photos/{key}/thumb — die Vorschau eines Drohnenfotos, bereinigt
 /// und kurz gebündelt; nichts wird gespeichert. Die Quelle muss in diesem laufenden Einsatz
-/// zugeschaltet sein, die Fotokennung zu ihr gehören und das Foto nicht vor der ersten
-/// Zuschaltung des Einsatzes entstanden sein (wie `map/drone`), sonst 404.
+/// zugeschaltet sein, die Fotokennung zu ihr gehören und das Foto nicht vor der Zuschaltung
+/// dieser Quelle entstanden sein, sonst 404.
 pub async fn foto_vorschau(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
@@ -470,13 +470,11 @@ pub async fn foto_vorschau(
         let mut conn = state.pool.acquire().await?;
         repo::load_for_einsatz(&mut conn, ctx.einsatz.id).await?
     };
-    if !zuschaltungen.iter().any(|z| z.adapter_id == adapter_id) {
-        return Err(AppError::NotFound);
-    }
-    let erste_ms = zuschaltungen
+    let zuschalt_ms = zuschaltungen
         .iter()
-        .filter_map(|z| crate::zeit::parse_utc(&z.zugeschaltet_at).map(|t| t.timestamp_millis()))
-        .min()
+        .find(|z| z.adapter_id == adapter_id)
+        .and_then(|z| crate::zeit::parse_utc(&z.zugeschaltet_at))
+        .map(|t| t.timestamp_millis())
         .ok_or(AppError::NotFound)?;
     let aufgenommen = state.drohne.get(&adapter_id).and_then(|s| {
         s.lage
@@ -485,7 +483,7 @@ pub async fn foto_vorschau(
             .find(|f| f.key == key)
             .map(|f| f.taken_at_ms)
     });
-    if !aufgenommen.is_some_and(|ms| ms >= erste_ms) {
+    if !aufgenommen.is_some_and(|ms| ms >= zuschalt_ms) {
         return Err(AppError::NotFound);
     }
     let org_id = ctx.einsatz.org_id;

@@ -176,3 +176,29 @@ async fn zugelassenes_foto_ohne_zugang_503() {
     assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
     assert!(!body.contains("/photos/"));
 }
+
+/// Die Zeitgrenze gilt je Quelle: Ein Foto von B, das nach dem Zuschalten von A, aber vor dem
+/// Zuschalten von B entstand, bleibt gesperrt; ein Foto nach B passiert die Zeitprüfung.
+#[tokio::test]
+async fn zeitgrenze_je_quelle_nicht_je_einsatz() {
+    let u = umgebung().await;
+    u.adapter_anlegen("a1").await;
+    u.adapter_anlegen("a2").await;
+    u.zuschalten("a1").await;
+    u.zuschalten("a2").await;
+    // A wurde schon 2020 zugeschaltet, B jetzt (Stand der Uhr).
+    sqlx::query(
+        "UPDATE adapter_einsatz SET zugeschaltet_at = '2020-01-01 00:00:00' WHERE adapter_id = 'a1'",
+    )
+    .execute(&u.pool)
+    .await
+    .unwrap();
+    // 2023: nach A, vor B.
+    u.stand_mit_foto("a2", "f2", 1_700_000_000_000);
+    let (s, _) = u.holen("f2/thumb").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    // Weit nach B: die Zeitprüfung besteht, es endet erst am fehlenden Zugang.
+    u.stand_mit_foto("a2", "f3", SPAETER_MS);
+    let (s, _) = u.holen("f3/thumb").await;
+    assert_ne!(s, StatusCode::NOT_FOUND);
+}
