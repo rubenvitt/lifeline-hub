@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Button, Descriptions, Space, Typography } from 'antd';
+import { Button, Descriptions, Space, Typography, theme } from 'antd';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
 import { useRollen } from '../../components/instrument';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
@@ -45,6 +45,7 @@ export default function FremdebeneDetail({
   onSchliessen: () => void;
 }) {
   const { token } = useRollen();
+  const { token: designToken } = theme.useToken();
   const [dialogOffen, setDialogOffen] = useState(false);
   const zerlegt = useMemo(() => zerlege(geometrie), [geometrie]);
   const teile = 'teile' in zerlegt ? zerlegt.teile : null;
@@ -82,7 +83,7 @@ export default function FremdebeneDetail({
         ]}
       />
       {darfSchreiben && onUebernehmen && (
-        <Space orientation="vertical" size={4}>
+        <Space orientation="vertical" size={designToken.marginXXS}>
           <Button disabled={!teile} onClick={() => setDialogOffen(true)}>
             Übernehmen …
           </Button>
