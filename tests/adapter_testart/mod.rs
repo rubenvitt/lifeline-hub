@@ -258,3 +258,19 @@ pub fn rahmen_sipgate() -> (Rahmen, Arc<SipgateSkript>) {
     );
     (rahmen, pruefer)
 }
+
+/// Ein Rahmen mit beiden Versand-Arten (E-Mail und Fax), je mit Skript-Prüfer (LLH-2095).
+pub fn rahmen_ausgang() -> (Rahmen, Arc<SmtpSkript>, Arc<SipgateSkript>) {
+    let smtp = Arc::new(SmtpSkript::default());
+    let fax = Arc::new(SipgateSkript::default());
+    let rahmen = Rahmen::new(
+        Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
+        Verzeichnis::new(vec![
+            Arc::new(lifeline_hub::adapter::smtp_art::SmtpArt::new(smtp.clone())),
+            Arc::new(lifeline_hub::adapter::sipgate_fax_art::SipgateFaxArt::new(
+                fax.clone(),
+            )),
+        ]),
+    );
+    (rahmen, smtp, fax)
+}

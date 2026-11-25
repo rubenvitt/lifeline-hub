@@ -12,6 +12,7 @@ use crate::ausgang::{self, nachricht, repo, AusgangFehler, QuelleArt, Versand};
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::Einsatz;
 use crate::error::AppError;
+use crate::externe_stelle::{ExterneStelle, ExterneStelleKanal, KanalArt};
 use crate::extract::PfadParam;
 use crate::live::LiveEvent;
 use crate::routes::support::CLIENT_ID_MAX;
@@ -70,6 +71,89 @@ fn mit_grund(fehler: AusgangFehler, meldung: &str) -> AppError {
         meldung: meldung.to_string(),
         grund: fehler.as_str(),
     }
+}
+
+/// Text der Ablehnung, wenn die Anbindung eines Kanals fehlt oder nicht nutzbar ist.
+fn anbindung_meldung(kanal: KanalArt, fehler: AusgangFehler) -> &'static str {
+    match (kanal, fehler) {
+        (KanalArt::Fax, AusgangFehler::AnbindungFehlt) => "Kein Faxzugang eingerichtet",
+        (KanalArt::Fax, AusgangFehler::AnbindungAngehalten) => "Der Faxzugang ist angehalten",
+        (KanalArt::Fax, _) => "Der Faxzugang ist nicht nutzbar; Einstellungen prüfen",
+        (_, AusgangFehler::AnbindungFehlt) => "Kein Mailserver eingerichtet",
+        (_, AusgangFehler::AnbindungAngehalten) => "Der Mailserver ist angehalten",
+        _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
+    }
+}
+
+/// Baut das PDF je Fax-Empfänger und prüft die Fax-Grenze (`zu_gross`). Liest die Bytes der
+/// Anlagen, aber nur, wenn ein Fax dabei ist; kein Netz, kein Geheimnis.
+async fn pruefe_fax_pdf(
+    state: &AppState,
+    einsatz: &Einsatz,
+    quelle: QuelleArt,
+    quelle_id: i64,
+    schnappschuss: &nachricht::Schnappschuss,
+    faxe: &[&(ExterneStelle, ExterneStelleKanal, String)],
+) -> Result<(), AppError> {
+    let anlagen =
+        match nachricht::load_anhaenge_quelle(&state.pool, quelle, einsatz.id, quelle_id).await {
+            Ok(a) => a,
+            Err(nachricht::AnhangFehler::ZuGross) => {
+                return Err(mit_grund(
+                    AusgangFehler::ZuGross,
+                    "Die Anlagen sind zusammen größer als 20 MiB",
+                ))
+            }
+            Err(nachricht::AnhangFehler::App(e)) => return Err(e),
+        };
+    let kennung = crate::adapter::repo::load_fuer_org(
+        &state.pool,
+        einsatz.org_id,
+        crate::adapter::sipgate_fax_art::CODE,
+    )
+    .await?
+    .and_then(|a| {
+        a.einstellungen()
+            .get("absender_kennung")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+    });
+    let kopf = nachricht::pdf_kopf_laden(
+        &state.pool,
+        einsatz.id,
+        quelle,
+        quelle_id,
+        kennung.as_deref(),
+    )
+    .await?;
+    for (stelle, kanal, _) in faxe {
+        let an = nachricht::an_text(kanal.channel, &stelle.bezeichnung, &kanal.address);
+        let pdf = nachricht::baue_pdf_fuer(
+            &kopf,
+            &an,
+            &schnappschuss.betreff,
+            &schnappschuss.inhalt,
+            &anlagen,
+            chrono::Utc::now(),
+        )
+        .map_err(|_| {
+            mit_grund(
+                AusgangFehler::ZuGross,
+                "Aus diesem Dokument lässt sich kein Fax bauen (Anlage nicht lesbar)",
+            )
+        })?;
+        if !ausgang::pdf::passt_fuer_fax(&pdf) {
+            return Err(mit_grund(
+                AusgangFehler::ZuGross,
+                &format!(
+                    "Das Fax hätte {} Seiten; erlaubt sind höchstens {} Seiten und 10 MiB",
+                    pdf.seiten,
+                    ausgang::pdf::FAX_SEITEN_MAX
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Der Einsatz ist ein Spiegel (von einer anderen Instanz geführt): hier wird nicht zugestellt.
@@ -242,18 +326,22 @@ async fn anlegen(
         }
     }
 
-    // Eine nicht angehaltene SMTP-Anbindung der Org (sonst 422 mit Code). Nur Zustand, kein
+    // Je Kanal eine nicht angehaltene Anbindung der Org (sonst 422 mit Code). Nur Zustand, kein
     // Entschlüsseln: das Geheimnis liest allein der Lauf.
-    if let Err(fehler) =
-        crate::adapter::lauf::pruefe_versand_moeglich(&state.pool, &state.adapter, einsatz.org_id)
-            .await?
-    {
-        let meldung = match fehler {
-            AusgangFehler::AnbindungFehlt => "Kein Mailserver eingerichtet",
-            AusgangFehler::AnbindungAngehalten => "Der Mailserver ist angehalten",
-            _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
-        };
-        return Err(mit_grund(fehler, meldung));
+    let mut kanaele: Vec<KanalArt> = adressen.iter().map(|(_, k, _)| k.channel).collect();
+    kanaele.sort_by_key(|k| k.as_str());
+    kanaele.dedup();
+    for kanal in &kanaele {
+        if let Err(fehler) = crate::adapter::lauf::pruefe_versand_moeglich(
+            &state.pool,
+            &state.adapter,
+            einsatz.org_id,
+            *kanal,
+        )
+        .await?
+        {
+            return Err(mit_grund(fehler, anbindung_meldung(*kanal, fehler)));
+        }
     }
 
     let geladen = match quelle {
@@ -280,6 +368,16 @@ async fn anlegen(
         }
     };
     let schnappschuss = &geladen;
+
+    // Ein Fax darf höchstens 30 Seiten und 10 MiB haben (nur Fax, Spec Abschnitt 6): geprüft,
+    // bevor irgendetwas angelegt wird, auch für die Mail-Empfänger derselben Anfrage.
+    let faxe: Vec<_> = adressen
+        .iter()
+        .filter(|(_, k, _)| k.channel == KanalArt::Fax)
+        .collect();
+    if !faxe.is_empty() {
+        pruefe_fax_pdf(state, einsatz, quelle, quelle_id, schnappschuss, &faxe).await?;
+    }
 
     let neu = crate::write_retry!(&state.pool, |conn| {
         let mut out = Vec::with_capacity(adressen.len());

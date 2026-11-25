@@ -340,25 +340,7 @@ async fn load_anhaenge(
     pool: &SqlitePool,
     zeile: &VersandZeile,
 ) -> Result<Vec<(String, Vec<u8>)>, AnhangFehler> {
-    match zeile.quelle_art {
-        QuelleArt::Lagebericht => {
-            nachricht::load_anhaenge::<crate::lagebericht::Lagebericht>(
-                pool,
-                zeile.einsatz_id,
-                zeile.quelle_id,
-            )
-            .await
-        }
-        QuelleArt::Befehl => {
-            nachricht::load_anhaenge::<crate::befehl::Befehl>(
-                pool,
-                zeile.einsatz_id,
-                zeile.quelle_id,
-            )
-            .await
-        }
-        QuelleArt::Nachforderung => Ok(Vec::new()),
-    }
+    nachricht::load_anhaenge_quelle(pool, zeile.quelle_art, zeile.einsatz_id, zeile.quelle_id).await
 }
 
 /// Die Domain der Absenderadresse für die Message-ID (Spec Abschnitt 4). Ohne konfigurierten
@@ -399,14 +381,16 @@ async fn run_one(
         let e = fehlgeschlagen(AusgangFehler::Ueberholt);
         return abschliessen(pool, live, &zeile, None, e, Some(text)).await;
     }
-    let zugang = match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id).await?
-    {
-        Ok(z) => z,
-        Err(f) => {
-            let text = etb_text(&zeile, f, None);
-            return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
-        }
-    };
+    let zugang =
+        match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id, zeile.kanal)
+            .await?
+        {
+            Ok(z) => z,
+            Err(f) => {
+                let text = etb_text(&zeile, f, None);
+                return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
+            }
+        };
     // Gespeichert ist die Adresse nur getrimmt (Task 5); hinaus geht sie normalisiert.
     let Some(von) = zugang
         .absender()

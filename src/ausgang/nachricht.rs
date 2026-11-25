@@ -2,8 +2,9 @@
 //! aus der freigegebenen Fassung bzw. der Nachforderung, die PNG-Anlagen und die fertige
 //! RFC-5322-Nachricht.
 
-use super::zustand::AusgangFehler;
+use super::zustand::{AusgangFehler, QuelleArt};
 use crate::error::AppError;
+use crate::externe_stelle::KanalArt;
 use crate::vorlagendokument::{anlage, repo as dokument_repo, Dokumentart};
 use chrono::Utc;
 use lettre::message::header::ContentType;
@@ -231,6 +232,108 @@ pub async fn load_anhaenge<T: Dokumentart>(
     }
     pruefe_anhang_groesse(&out).map_err(|_| AnhangFehler::ZuGross)?;
     Ok(out)
+}
+
+/// Die PNG-Anlagen der Quelle eines Versands (Nachforderung: keine).
+pub async fn load_anhaenge_quelle(
+    pool: &SqlitePool,
+    quelle: QuelleArt,
+    einsatz_id: i64,
+    quelle_id: i64,
+) -> Result<Vec<(String, Vec<u8>)>, AnhangFehler> {
+    match quelle {
+        QuelleArt::Lagebericht => {
+            load_anhaenge::<crate::lagebericht::Lagebericht>(pool, einsatz_id, quelle_id).await
+        }
+        QuelleArt::Befehl => {
+            load_anhaenge::<crate::befehl::Befehl>(pool, einsatz_id, quelle_id).await
+        }
+        QuelleArt::Nachforderung => Ok(Vec::new()),
+    }
+}
+
+/// Was das PDF über Absender, Einsatz und Quelle braucht (LLH-2095, Spec Abschnitt 6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PdfKopf {
+    /// Absenderkennung der Fax-Anbindung oder der Name der Organisation.
+    pub absender: String,
+    pub einsatz: String,
+    pub uebung: bool,
+    /// Version der Kette bei Lagebericht und Befehl, für den Dateinamen.
+    pub version: Option<i64>,
+}
+
+/// Lädt den Kopf des PDFs. `absender_kennung` ohne Inhalt gilt als nicht gesetzt.
+pub async fn pdf_kopf_laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    quelle: QuelleArt,
+    quelle_id: i64,
+    absender_kennung: Option<&str>,
+) -> Result<PdfKopf, AppError> {
+    let mut conn = pool.acquire().await?;
+    let (einsatz, art, org): (String, String, String) = sqlx::query_as(
+        "SELECT e.bezeichnung, e.einsatzart, o.name FROM einsatz e \
+         JOIN organisation o ON o.id = e.org_id WHERE e.id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let version = match quelle {
+        QuelleArt::Lagebericht => Some(
+            dokument_repo::laden::<crate::lagebericht::Lagebericht>(
+                &mut *conn, einsatz_id, quelle_id,
+            )
+            .await?
+            .version,
+        ),
+        QuelleArt::Befehl => Some(
+            dokument_repo::laden::<crate::befehl::Befehl>(&mut *conn, einsatz_id, quelle_id)
+                .await?
+                .version,
+        ),
+        QuelleArt::Nachforderung => None,
+    };
+    let absender = absender_kennung
+        .map(str::trim)
+        .filter(|k| !k.is_empty())
+        .map_or(org, str::to_string);
+    Ok(PdfKopf {
+        absender,
+        einsatz,
+        uebung: art == crate::einsatz::EINSATZART_UEBUNG,
+        version,
+    })
+}
+
+/// Die Zeile „An:“ des PDFs: Stelle und Adresse mit Kanal.
+pub fn an_text(kanal: KanalArt, stelle: &str, adresse: &str) -> String {
+    match kanal {
+        KanalArt::Fax => format!("{stelle} (Fax {adresse})"),
+        _ => format!("{stelle} ({adresse})"),
+    }
+}
+
+/// Baut das PDF eines Versands aus Kopf, Schnappschuss und Anlagen.
+pub fn baue_pdf_fuer(
+    kopf: &PdfKopf,
+    an: &str,
+    betreff: &str,
+    inhalt: &str,
+    anlagen: &[(String, Vec<u8>)],
+    erzeugt_at: chrono::DateTime<Utc>,
+) -> Result<super::pdf::PdfDatei, super::pdf::PdfFehler> {
+    super::pdf::baue_pdf(&super::pdf::PdfVorlage {
+        absender: &kopf.absender,
+        erzeugt_at,
+        uebung: kopf.uebung,
+        betreff,
+        an,
+        einsatz: &kopf.einsatz,
+        inhalt,
+        anlagen,
+    })
 }
 
 /// Baut die Nachricht als RFC-5322-Bytes: `text/plain; charset=utf-8`, mit Anhängen als
