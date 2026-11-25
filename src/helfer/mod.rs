@@ -8,7 +8,7 @@
 //! - [`position`]: Position senden und pausieren.
 //! - [`ende`]: die Personenposition endet mit der Kopplung, auf jedem Weg.
 //! - Die Helfer-Kopplung ist eine Zeile in `geraet_kopplung` mit `ansicht = 'helfer'`
-//!   (Migration 0373); [`liste`] zeigt sie der Leitung.
+//!   (Migration 0376); [`liste`] zeigt sie der Leitung.
 
 pub mod anmeldung;
 pub mod bestaetigung;
@@ -24,7 +24,7 @@ use utoipa::ToSchema;
 
 wire_enum! {
     /// Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in
-    /// `geraet_kopplung.helfer_zustand` (CHECK in Migration 0373); `beendet` leitet der Server
+    /// `geraet_kopplung.helfer_zustand` (CHECK in Migration 0376); `beendet` leitet der Server
     /// ab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
     pub enum HelferStatus {

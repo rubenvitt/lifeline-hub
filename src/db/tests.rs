@@ -15129,13 +15129,13 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
     );
 }
 
-/// Helfer-App (0373): Der Umbau von `geraet_kopplung` und `geraet_kopplung_ereignis` hält
+/// Helfer-App (0376): Der Umbau von `geraet_kopplung` und `geraet_kopplung_ereignis` hält
 /// Kopplungen, Codes, Ereignisse und Gerätesitzungen 1:1 samt Einheitsbindung; der Bestand mit
 /// Position bekommt `manuell`, auch am Spiegel (dessen Schutz-Trigger sonst abbräche); die neuen
 /// CHECKs und Teilindizes greifen.
 #[tokio::test]
-async fn migration_0373_baut_kopplung_um_und_setzt_positionsquelle() {
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 372).await;
+async fn migration_0376_baut_kopplung_um_und_setzt_positionsquelle() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 375).await;
     let (e, b) = bild_grundlage(&pool).await;
     let konto = |name: &'static str| {
         let pool = pool.clone();
@@ -15263,7 +15263,7 @@ async fn migration_0373_baut_kopplung_um_und_setzt_positionsquelle() {
     };
     let vorher = (kopplungen().await, ereignisse().await);
 
-    migriere_bis(&pool, 373).await;
+    migriere_bis(&pool, 376).await;
 
     assert_eq!(
         (kopplungen().await, ereignisse().await),

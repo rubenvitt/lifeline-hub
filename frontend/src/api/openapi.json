@@ -11699,7 +11699,7 @@
       },
       "HelferStatus": {
         "type": "string",
-        "description": "Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in\n`geraet_kopplung.helfer_zustand` (CHECK in Migration 0373); `beendet` leitet der Server\nab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.",
+        "description": "Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in\n`geraet_kopplung.helfer_zustand` (CHECK in Migration 0376); `beendet` leitet der Server\nab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.",
         "enum": [
           "unbestaetigt",
           "aktiv",
@@ -19735,7 +19735,7 @@
       },
       "Positionsquelle": {
         "type": "string",
-        "description": "Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration\n0373) `manuell`, `einwurf`, `helfer`.",
+        "description": "Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration\n0376) `manuell`, `einwurf`, `helfer`.",
         "enum": [
           "manuell",
           "einwurf",

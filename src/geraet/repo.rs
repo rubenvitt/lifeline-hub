@@ -12,7 +12,7 @@ wire_enum! {
     #[wire(ohne_serde)]
     /// Ereignis der Kopplungsspur. Wire-Werte stehen als CHECK in
     /// `migrations/0147_geraet_kopplung.sql`, die drei der Helfer-App in
-    /// `migrations/0373_helfer_app.sql`.
+    /// `migrations/0376_helfer_app.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum KopplungEreignis {
         Angelegt => "angelegt",

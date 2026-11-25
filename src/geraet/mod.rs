@@ -48,7 +48,7 @@ wire_enum! {
         Verpflegung => "verpflegung",
         Einheit => "einheit",
         /// Helfer-App (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`,
-        /// Migration 0373): entsteht nur über die Einladung (`POST /api/devices/helpers/redeem`).
+        /// Migration 0376): entsteht nur über die Einladung (`POST /api/devices/helpers/redeem`).
         Helfer => "helfer",
     }
     try_from = |s| format!("Ungültige Funktionsansicht: {s}");

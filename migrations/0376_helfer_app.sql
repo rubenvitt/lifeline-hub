@@ -21,7 +21,7 @@
 -- Deshalb `-- no-transaction` und PRAGMA foreign_keys = OFF (Muster 0286, migrations/AGENTS.md);
 -- `db::migrate` rahmt die Migration trotzdem in eine Transaktion. Die ids bleiben 1:1, sodass alle
 -- Kind-FKs nach dem RENAME weiter auflösen. Schema = 0286 1:1 plus die neuen Spalten am Ende.
--- Abgesichert von db::tests::migration_0373_*.
+-- Abgesichert von db::tests::migration_0376_*.
 
 PRAGMA foreign_keys = OFF;
 

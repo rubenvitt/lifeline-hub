@@ -695,7 +695,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
-            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            // Positionsbaustein der Helfer-App (0376): Zeitpunkt und Quelle, kein Personenbezug.
             retain("position_aktualisiert_at", G_ZEIT),
             retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),

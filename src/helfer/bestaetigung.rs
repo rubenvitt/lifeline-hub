@@ -6,7 +6,7 @@
 //!   ändert an einem schon aktiven Helfer Ziel, Person und Ortungsrolle, ohne das Ende zu
 //!   verschieben.
 //! - Höchstens ein Ortungsgerät je Einheit und je Fahrzeug: die Teilindizes
-//!   `ux_helfer_ortung_*` (Migration 0373) sichern es; [`bestaetigen`] prüft vorher und nennt den
+//!   `ux_helfer_ortung_*` (Migration 0376) sichern es; [`bestaetigen`] prüft vorher und nennt den
 //!   bisherigen Halter. Mit `ersetzen` verliert er die Rolle in derselben Transaktion.
 //! - Die Person ordnet nur die Leitung zu, und nur, wenn die Organisation „Auch Personen orten“
 //!   erlaubt.
