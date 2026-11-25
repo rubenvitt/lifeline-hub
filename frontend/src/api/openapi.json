@@ -3411,6 +3411,21 @@
           }
         }
       },
+      "AusgangFehler": {
+        "type": "string",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.",
+        "enum": [
+          "voruebergehend",
+          "abgelehnt",
+          "ungewiss",
+          "ueberholt",
+          "anbindung_fehlt",
+          "anbindung_angehalten",
+          "anbindung_fehler",
+          "zu_gross",
+          "spiegel"
+        ]
+      },
       "Ausmass": {
         "type": "string",
         "enum": [
@@ -19314,6 +19329,15 @@
           }
         }
       },
+      "QuelleArt": {
+        "type": "string",
+        "description": "Dokument, aus dem ein Versand stammt.",
+        "enum": [
+          "lagebericht",
+          "befehl",
+          "nachforderung"
+        ]
+      },
       "Raeumungszustand": {
         "type": "string",
         "description": "Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.",
@@ -23069,6 +23093,107 @@
           "geplant",
           "aktiv",
           "aufgeloest"
+        ]
+      },
+      "Versand": {
+        "type": "object",
+        "description": "Ein Versand, wie ihn die Versandliste am Dokument zeigt. Wire englisch, Rust-Feld = Wire-Feld;\nder Text (`inhalt`) steht nicht auf dem Wire.",
+        "required": [
+          "id",
+          "source_kind",
+          "source_id",
+          "channel",
+          "agency_name",
+          "address",
+          "subject",
+          "state",
+          "attempts",
+          "created_by_id",
+          "created_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "agency_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "agency_name": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/KanalArt"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_by_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AusgangFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handed_over_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "smtp_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "source_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_kind": {
+            "$ref": "#/components/schemas/QuelleArt"
+          },
+          "state": {
+            "$ref": "#/components/schemas/VersandZustand"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      },
+      "VersandZustand": {
+        "type": "string",
+        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver oder `fehlgeschlagen`.",
+        "enum": [
+          "wartet",
+          "uebergeben",
+          "fehlgeschlagen"
         ]
       },
       "VersionsstandAnzeige": {

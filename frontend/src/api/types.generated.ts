@@ -1280,6 +1280,11 @@ export interface components {
             ausgabe_id: number;
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"];
         };
+        /**
+         * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+         * @enum {string}
+         */
+        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel";
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -7778,6 +7783,11 @@ export interface components {
             label: string;
         };
         /**
+         * @description Dokument, aus dem ein Versand stammt.
+         * @enum {string}
+         */
+        QuelleArt: "lagebericht" | "befehl" | "nachforderung";
+        /**
          * @description Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.
          * @enum {string}
          */
@@ -9237,6 +9247,39 @@ export interface components {
          * @enum {string}
          */
         VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
+        /**
+         * @description Ein Versand, wie ihn die Versandliste am Dokument zeigt. Wire englisch, Rust-Feld = Wire-Feld;
+         *     der Text (`inhalt`) steht nicht auf dem Wire.
+         */
+        Versand: {
+            address: string;
+            /** Format: int64 */
+            agency_id?: number | null;
+            agency_name: string;
+            /** Format: int64 */
+            attempts: number;
+            channel: components["schemas"]["KanalArt"];
+            created_at: string;
+            /** Format: int64 */
+            created_by_id: number;
+            created_by_name?: string | null;
+            error?: components["schemas"]["AusgangFehler"] | null;
+            handed_over_at?: string | null;
+            id: string;
+            /** Format: int32 */
+            smtp_status?: number | null;
+            /** Format: int64 */
+            source_id: number;
+            source_kind: components["schemas"]["QuelleArt"];
+            state: components["schemas"]["VersandZustand"];
+            subject: string;
+        };
+        /**
+         * @description Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den
+         *     Mailserver oder `fehlgeschlagen`.
+         * @enum {string}
+         */
+        VersandZustand: "wartet" | "uebergeben" | "fehlgeschlagen";
         /** @description Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */

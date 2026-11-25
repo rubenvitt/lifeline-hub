@@ -366,6 +366,27 @@ fn serde_wire_gleich_as_str() {
         Hilfsorganisation,
         Sonstige,
     });
+    enum_wire_as_str!(lifeline_hub::ausgang::QuelleArt {
+        Lagebericht,
+        Befehl,
+        Nachforderung,
+    });
+    enum_wire_as_str!(lifeline_hub::ausgang::VersandZustand {
+        Wartet,
+        Uebergeben,
+        Fehlgeschlagen,
+    });
+    enum_wire_as_str!(lifeline_hub::ausgang::AusgangFehler {
+        Voruebergehend,
+        Abgelehnt,
+        Ungewiss,
+        Ueberholt,
+        AnbindungFehlt,
+        AnbindungAngehalten,
+        AnbindungFehler,
+        ZuGross,
+        Spiegel,
+    });
     enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
         Email,
         Fax,

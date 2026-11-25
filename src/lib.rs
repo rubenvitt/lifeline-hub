@@ -5,6 +5,7 @@ pub mod api_doc;
 pub mod app;
 pub mod aufbewahrung;
 pub mod auftrag;
+pub mod ausgang;
 pub mod ausgehend;
 pub mod auth;
 pub mod backup;
