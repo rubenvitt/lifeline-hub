@@ -59,6 +59,17 @@ const vorEigenenLagen = (map: MapLibreMap) =>
   map.getLayer(ERSTER_EIGENER_LAYER) ? ERSTER_EIGENER_LAYER : undefined;
 
 /**
+ * Anker eines Bild-Hintergrunds: unter der untersten Fremdebene, ohne Fremdebene vor den eigenen
+ * Lage-Layern. Ein Bild, das bei sichtbarer Fremdebene hinzukommt, läge sonst zwischen ihr und
+ * `abschnitte-fill`, also über ihr, und ein deckendes Luftbild verdeckte sie ganz.
+ */
+export function bildAnker(map: MapLibreMap): string {
+  return (
+    map.getLayersOrder().find((id) => /^fremdebene-\d+-flaeche$/.test(id)) ?? ERSTER_EIGENER_LAYER
+  );
+}
+
+/**
  * Idempotent: Quelle und vier Layer einer Fremdebene anlegen, Daten einspielen, Farbe nachziehen
  * (ein Moduswechsel oder „Farbe …“ legt keinen Layer neu an).
  */

@@ -94,6 +94,7 @@ import {
 } from './fachebenenLayer';
 import {
   entferneFremdebeneLayer,
+  bildAnker,
   fremdebeneClickLayerIds,
   fremdebeneIdVon,
   sorgeFuerFremdebeneLayer,
@@ -838,7 +839,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       for (const fe of fachebenenRef.current) {
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
       }
-      synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
+      synchronisiereBildLayer(map, bilderRef.current, bildAnker(map));
       for (const fr of fremdebenenRef.current) {
         sorgeFuerFremdebeneLayer(map, fr.id, fr.daten, fr.farbe);
       }
@@ -1389,14 +1390,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [fachebenen]);
 
-  // Bild-Overlays synchronisieren; `beforeId='abschnitte-fill'` hält sie unter den Vektorlayern.
+  // Bild-Overlays synchronisieren; der Anker (`bildAnker`) hält sie unter Fremdebenen und Vektorlayern.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const aktiv = bilder ?? [];
     bilderRef.current = aktiv;
     wendeKartenDatenAn(map, 'bilder', () => {
-      const aktivIds = synchronisiereBildLayer(map, aktiv, 'abschnitte-fill');
+      const aktivIds = synchronisiereBildLayer(map, aktiv, bildAnker(map));
       for (const id of vorherigeBilderRef.current) {
         if (!aktivIds.has(id)) entferneBildLayer(map, id);
       }

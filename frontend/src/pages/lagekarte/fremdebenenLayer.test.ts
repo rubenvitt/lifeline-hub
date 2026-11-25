@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FeatureCollection } from '../../api/fachebenen';
+import { synchronisiereBildLayer } from './bildLayer';
 import {
+  bildAnker,
   entferneFremdebeneLayer,
   fremdebeneIdVon,
   fremdebeneLayerIds,
@@ -21,7 +23,10 @@ interface LayerSpec {
 
 /** Fake-Map: Layer in Zeichenfolge (`beforeId` fügt davor ein), Quellen mit `setData`, Render-Takt. */
 function fakeMap(bereit = () => true) {
-  const quellen = new Map<string, { setData: ReturnType<typeof vi.fn> }>();
+  const quellen = new Map<
+    string,
+    { setData: ReturnType<typeof vi.fn>; setCoordinates: ReturnType<typeof vi.fn> }
+  >();
   const folge: string[] = [];
   const specs = new Map<string, LayerSpec>();
   const hoerer: Record<string, Array<() => void>> = {};
@@ -37,7 +42,7 @@ function fakeMap(bereit = () => true) {
     }),
     getSource: vi.fn((id: string) => quellen.get(id)),
     addSource: vi.fn((id: string) => {
-      quellen.set(id, { setData: vi.fn() });
+      quellen.set(id, { setData: vi.fn(), setCoordinates: vi.fn() });
     }),
     removeSource: vi.fn((id: string) => quellen.delete(id)),
     getLayer: vi.fn((id: string) => (specs.has(id) ? specs.get(id) : undefined)),
@@ -57,6 +62,7 @@ function fakeMap(bereit = () => true) {
       if (spec) spec.paint = { ...spec.paint, [name]: wert };
     }),
     getStyle: vi.fn(() => undefined),
+    getLayersOrder: () => [...folge],
     feuere: (ev: string) => (hoerer[ev] ?? []).slice().forEach((h) => h()),
     _quellen: quellen,
     _folge: folge,
@@ -115,6 +121,32 @@ describe('Fremdebenen auf der Karte (LLH-2099)', () => {
       'abschnitte-fill',
       'zonen-fill',
     ]);
+  });
+
+  it('ein später hinzugekommenes Bild legt sich unter die Fremdebene, nicht darüber', () => {
+    const map = fakeMap();
+    map.addLayer({ id: 'abschnitte-fill', type: 'fill' });
+    sorgeFuerFremdebeneLayer(map as never, 7, DATEN, FARBE);
+    const bild = {
+      id: 3,
+      blobUrl: 'blob:x',
+      ecken: [
+        [0, 1],
+        [1, 1],
+        [1, 0],
+        [0, 0],
+      ],
+      opazitaet: 100,
+      sichtbar: true,
+    };
+    synchronisiereBildLayer(map as never, [bild as never], bildAnker(map as never));
+    expect(map._folge).toEqual(['bild-3-raster', ...fremdebeneLayerIds(7), 'abschnitte-fill']);
+  });
+
+  it('ohne Fremdebene liegt der Anker der Bilder vor den eigenen Lage-Layern', () => {
+    const map = fakeMap();
+    map.addLayer({ id: 'abschnitte-fill', type: 'fill' });
+    expect(bildAnker(map as never)).toBe('abschnitte-fill');
   });
 
   it('ist idempotent: ein zweiter Lauf spielt Daten ein und zieht die Farbe nach', () => {
