@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as dateiSpeichern from '../components/dateiSpeichern';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
 import { DEFAULT_KONVENTIONEN } from '../anzeige/format';
 import type { LagebesprechungStand } from '../api/types';
@@ -185,5 +186,89 @@ describe('TerminPaneel · Termin setzen', () => {
     await userEvent.click(within(p).getByRole('button', { name: '+30 min' }));
     expect(await within(p).findByText('Termin nicht gesetzt')).toBeInTheDocument();
     expect(gesendet).toEqual([{ naechste_at: wireAb(30) }]);
+  });
+});
+
+describe('TerminPaneel · In Kalender übernehmen', () => {
+  let gespeichert: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    gespeichert = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
+  });
+  afterEach(() => gespeichert.mockRestore());
+
+  it('ohne Termin gesperrt, der Grund „Kein Termin“ steht sichtbar am Knopf', () => {
+    const p = zeige(stand());
+    expect(within(p).getByRole('button', { name: /In Kalender übernehmen/ })).toBeDisabled();
+    expect(within(p).getByText('Kein Termin')).toBeVisible();
+  });
+
+  it('mit Termin ohne Schreibrecht aktiv (nur Lesen nötig)', () => {
+    const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }), false);
+    expect(within(p).getByRole('button', { name: 'In Kalender übernehmen' })).toBeEnabled();
+    expect(within(p).queryByText('Kein Termin')).not.toBeInTheDocument();
+  });
+
+  it('ein Klick lädt die Datei und speichert sie als lagebesprechung-einsatz-….ics', async () => {
+    server.use(
+      http.get('/api/incidents/1/briefing/schedule/export', () =>
+        HttpResponse.text('BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n', {
+          headers: { 'Content-Type': 'text/calendar' },
+        }),
+      ),
+    );
+    const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }), false);
+    await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
+    await waitFor(() => expect(gespeichert).toHaveBeenCalledTimes(1));
+    const [datei, name] = gespeichert.mock.calls[0] as [Blob, string];
+    // Der Name trägt die Terminzeit (lokal), nicht die Uhrzeit des Klicks.
+    const termin = dayjs(JETZT).add(45, 'minute');
+    expect(name).toBe(`lagebesprechung-einsatz-1-${termin.format('YYYY-MM-DD-HHmm')}.ics`);
+    expect(await datei.text()).toContain('BEGIN:VCALENDAR');
+  });
+
+  it('solange der Stand lädt, steht kein „Kein Termin“ am Knopf', () => {
+    // `zeige(undefined)` griffe den Vorgabewert; der ladende Stand ist wirklich `undefined`.
+    renderMitProviders(
+      <TerminPaneel einsatzId={1} stand={undefined} zustand="laden" darfSchreiben />,
+    );
+    const p = screen.getByRole('region', { name: 'Termin' });
+    expect(within(p).getByRole('button', { name: /In Kalender übernehmen/ })).toBeDisabled();
+    expect(within(p).queryByText('Kein Termin')).not.toBeInTheDocument();
+  });
+
+  it('ein Einsatzwechsel räumt „Nicht übernommen“ des alten Einsatzes', async () => {
+    server.use(http.get('/api/incidents/1/briefing/schedule/export', () => HttpResponse.error()));
+    const mitTermin = stand({ naechste_lagebesprechung_at: wireAb(45) });
+    const { rerender } = renderMitProviders(
+      <TerminPaneel einsatzId={1} stand={mitTermin} zustand="daten" darfSchreiben />,
+    );
+    const p = screen.getByRole('region', { name: 'Termin' });
+    await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
+    expect(await within(p).findByText('Nicht übernommen')).toBeInTheDocument();
+    rerender(<TerminPaneel einsatzId={2} stand={mitTermin} zustand="daten" darfSchreiben />);
+    expect(
+      within(screen.getByRole('region', { name: 'Termin' })).queryByText('Nicht übernommen'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ohne Verbindung steht die Netzmeldung („Keine Verbindung …“) unter „Nicht übernommen“', async () => {
+    server.use(http.get('/api/incidents/1/briefing/schedule/export', () => HttpResponse.error()));
+    const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
+    await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
+    expect(await within(p).findByText('Nicht übernommen')).toBeInTheDocument();
+    expect(within(p).getByText(/^Keine Verbindung/)).toBeInTheDocument();
+    expect(gespeichert).not.toHaveBeenCalled();
+  });
+
+  it('eine Fehlerantwort zeigt deren Meldung am Paneel', async () => {
+    server.use(
+      http.get('/api/incidents/1/briefing/schedule/export', () =>
+        HttpResponse.json({ error: 'Kein Termin gesetzt' }, { status: 404 }),
+      ),
+    );
+    const p = zeige(stand({ naechste_lagebesprechung_at: wireAb(45) }));
+    await userEvent.click(within(p).getByRole('button', { name: 'In Kalender übernehmen' }));
+    expect(await within(p).findByText('Nicht übernommen')).toBeInTheDocument();
+    expect(within(p).getByText('Kein Termin gesetzt')).toBeInTheDocument();
   });
 });

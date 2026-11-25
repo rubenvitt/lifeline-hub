@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -210,6 +210,10 @@ in `src/db.rs`, `src/db/physisch.rs`). Regeln: [`src/AGENTS.md`](../../src/AGENT
 [`aufbewahrung-loeschersuchen`](../../openspec/specs/aufbewahrung-loeschersuchen/spec.md). Was das
 Gerät danach räumt: [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md),
 Abschnitt „Räumen nach einer Schwärzung“.
+
+Daten ohne Einsatz löscht derselbe Lauf nach eigener Frist (Phase C), darunter die abgerufenen
+Veranstaltungen 14 Tage nach ihrem Ende (`veranstaltung_extern::repo::purge`,
+`AUFBEWAHRUNG_TAGE` in `src/veranstaltung_extern/repo.rs`).
 
 ## 8.15 Audit und Zugangsprotokoll
 
@@ -497,13 +501,17 @@ Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs
   Konzepts [`2026-11-10-schnittstellen-ausbau.md`](../konzepte/2026-11-10-schnittstellen-ausbau.md)).
 - **Gekoppelter ELW:** Eingehendes kommt am Hub an; meldet sich eine Org bei einem Hub, läuft hier
   kein Adapter, und die Verwaltung ist gesperrt.
+- **Ablage einer Art:** eine Art, die nicht flüchtig ist, schreibt in eine eigene Tabelle, idempotent
+  in der Übernahme. Vorbild `src/veranstaltung_extern/` (LLH-2097): je Adapter eine Zeile je
+  Veranstaltung, Fingerabdruck statt Versionen, ein unveränderter Abruf schreibt nichts; der
+  Vertrag ist neutral ([`docs/schnittstellen/veranstaltungen-abruf.md`](../schnittstellen/veranstaltungen-abruf.md)).
 
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.
 
 ## 8.33 Nachrichten an Menschen: Ausgangskorb
 
 Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur über die Tabelle
-`ausgang` und den Lauf `src/ausgang/` ([ADR-0100](entscheidungen/ADR-0100-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
+`ausgang` und den Lauf `src/ausgang/` ([ADR-0103](entscheidungen/ADR-0103-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
 [`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
 
 - **Getrennt von Webhooks und Abruf:** ein Webhook meldet einem Fremdsystem, ein Adapter ruft ab;

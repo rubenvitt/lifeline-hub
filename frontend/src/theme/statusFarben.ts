@@ -8,6 +8,7 @@ import {
   fachebeneFarbenDunkel,
   fachebeneFarbenHell,
   farbenDunkel,
+  FREMDEBENEN_PALETTE,
   farbenHell,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
@@ -971,6 +972,9 @@ const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
   kritis: 'kritis',
   energie: 'energie',
   copernicus: 'copernicus',
+  // Die Satellitenbilder zeichnen keinen Ebenenpunkt; Panel und Akzent teilen den Ton der
+  // Vektorebene derselben Quelle (LLH-2021), kein neuer Farbton.
+  copernicus_bilder: 'copernicus',
   drohne: 'drohne',
 };
 
@@ -978,6 +982,16 @@ export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): str
   return (istDunklerModus(token) ? fachebeneFarbenDunkel : fachebeneFarbenHell)[
     FACHEBENE_TON[quelle]
   ];
+}
+
+/**
+ * Ebenenfarbe einer Fremdebene (LLH-2099) aus ihrem Palettenschlüssel (`color` am Draht) im
+ * aktiven Modus. Ein unbekannter Schlüssel (älterer oder neuerer Server) fällt auf den ersten Ton,
+ * statt die Ebene ohne Farbe zu zeichnen.
+ */
+export function fremdebeneFarbe(schluessel: string, token: GlobalToken): string {
+  const palette = istDunklerModus(token) ? FREMDEBENEN_PALETTE.dunkel : FREMDEBENEN_PALETTE.hell;
+  return palette[schluessel as keyof typeof palette] ?? palette['fremd-1'];
 }
 
 /**

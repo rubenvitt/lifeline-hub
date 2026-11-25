@@ -215,6 +215,11 @@ export const server = setupServer(
     HttpResponse.json({ ereignisse: [], perioden: [] }),
   ),
   /**
+   * Helfer der Einsatzleitung (Helfer-App) — keine Einladung, kein Helfer als Default. Geräte-Sektion
+   * und Einsatzkopf (Hinweis auf wartende Helfer) fragen sie für die Einsatzleitung beim Mount ab.
+   */
+  http.get('/api/incidents/:einsatzId/helpers', () => HttpResponse.json({ helpers: [] })),
+  /**
    * Org-Einstellungen: 403 als Default — der echte Zustand für Rollen ohne Leserecht. Der
    * `OrgAnzeigeProvider` (LFH-692) fragt sie außerhalb eines Einsatzes ab („Einsatz anlegen“,
    * Archivakte) und bleibt dann bei der Browserzone. Tests mit Zone überschreiben per

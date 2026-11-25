@@ -45,6 +45,7 @@ vi.mock('maplibre-gl', () => {
         getCanvas: () => document.createElement('canvas'),
         getContainer: () => document.createElement('div'),
         getStyle: () => ({ layers: [] }),
+        getLayersOrder: () => [...ebenen],
         // Der Stil gilt als angewandt: ein vertagter Start (Zonen, LFH-825) läuft sofort.
         once: (ev: string, cb: () => void) => {
           if (ev === 'style.load' || ev === 'load') cb();

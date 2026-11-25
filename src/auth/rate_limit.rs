@@ -113,31 +113,50 @@ pub enum Sperre {
     },
 }
 
-fn laeuft(v: &Versuch, jetzt: Instant) -> bool {
-    jetzt.saturating_duration_since(v.zeit) < FENSTER
+fn laeuft(v: &Versuch, jetzt: Instant, fenster: Duration) -> bool {
+    jetzt.saturating_duration_since(v.zeit) < fenster
 }
 
 /// Fehlversuche je Quelle ([`quelle`]). Die Zeit kommt von außen, damit Tests das Fenster ohne
 /// Warten überspringen.
-#[derive(Default)]
 struct Tabelle {
     quellen: HashMap<IpAddr, Eintrag>,
     /// Frühester Zeitpunkt des nächsten Aufräumlaufs.
     naechste_raeumung: Option<Instant>,
+    /// Versuche je Quelle bis zur Sperre und ihr Fenster; die Anmeldesperre nimmt
+    /// [`MAX_FEHLVERSUCHE`] je [`FENSTER`].
+    max: usize,
+    fenster: Duration,
+}
+
+impl Default for Tabelle {
+    fn default() -> Self {
+        Self::mit(MAX_FEHLVERSUCHE, FENSTER)
+    }
 }
 
 impl Tabelle {
+    fn mit(max: usize, fenster: Duration) -> Self {
+        Self {
+            quellen: HashMap::new(),
+            naechste_raeumung: None,
+            max,
+            fenster,
+        }
+    }
+
     fn ist_gesperrt(&mut self, ip: IpAddr, jetzt: Instant) -> bool {
         let ip = quelle(ip);
         let Some(eintrag) = self.quellen.get_mut(&ip) else {
             return false;
         };
-        eintrag.versuche.retain(|v| laeuft(v, jetzt));
+        let fenster = self.fenster;
+        eintrag.versuche.retain(|v| laeuft(v, jetzt, fenster));
         if eintrag.versuche.is_empty() {
             self.quellen.remove(&ip);
             return false;
         }
-        eintrag.versuche.len() >= MAX_FEHLVERSUCHE
+        eintrag.versuche.len() >= self.max
     }
 
     fn sperre(&mut self, ip: IpAddr, jetzt: Instant) -> Sperre {
@@ -163,10 +182,11 @@ impl Tabelle {
 
     fn fehlversuch(&mut self, ip: IpAddr, konto: Option<Konto>, jetzt: Instant) {
         let ip = quelle(ip);
+        let (max, fenster) = (self.max, self.fenster);
         if !self.quellen.contains_key(&ip) && self.quellen.len() >= AUFRAEUM_SCHWELLE {
             if self.naechste_raeumung.is_none_or(|t| jetzt >= t) {
                 self.quellen.retain(|_, eintrag| {
-                    eintrag.versuche.retain(|v| laeuft(v, jetzt));
+                    eintrag.versuche.retain(|v| laeuft(v, jetzt, fenster));
                     !eintrag.versuche.is_empty()
                 });
                 self.naechste_raeumung = Some(jetzt + AUFRAEUM_PAUSE);
@@ -176,9 +196,9 @@ impl Tabelle {
             }
         }
         let versuche = &mut self.quellen.entry(ip).or_default().versuche;
-        versuche.retain(|v| laeuft(v, jetzt));
+        versuche.retain(|v| laeuft(v, jetzt, fenster));
         // Über der Schwelle zählt nichts mehr dazu; die ältesten bleiben (s. Modulkopf).
-        if versuche.len() < MAX_FEHLVERSUCHE {
+        if versuche.len() < max {
             versuche.push(Versuch { zeit: jetzt, konto });
         }
     }
@@ -267,6 +287,37 @@ pub mod maschine {
 
     /// Vermerkt einen Fehlversuch der Quelle auf einem Maschinenweg.
     pub fn fehlversuch(ip: IpAddr) {
+        tabelle().fehlversuch(ip, None, Instant::now());
+    }
+}
+
+/// Zähler für **gelungene** Einlösungen einer Helfer-Einladung je Quelle (Spec Helfer-App,
+/// „Einladung“): der Code hängt ausgedruckt am Einsatzort, und jede Einlösung legt Gerätekonto,
+/// Kopplung und Sitzung an. Höchstens [`helfer_einloesung::MAX`] je
+/// [`helfer_einloesung::FENSTER`] und Quelle; eine ganze Wache hinter einer NAT-Adresse kommt
+/// damit aus. Eigene Tabelle: sie berührt die Anmeldesperre nicht und sie ihn nicht.
+pub mod helfer_einloesung {
+    use super::{Duration, Instant, IpAddr, LazyLock, Mutex, Tabelle};
+
+    /// Einlösungen je Quelle innerhalb von [`FENSTER`].
+    pub const MAX: usize = 20;
+    /// Beobachtungsfenster der Einlösungen.
+    pub const FENSTER: Duration = Duration::from_secs(600);
+
+    static EINLOESUNGEN: LazyLock<Mutex<Tabelle>> =
+        LazyLock::new(|| Mutex::new(Tabelle::mit(MAX, FENSTER)));
+
+    fn tabelle() -> std::sync::MutexGuard<'static, Tabelle> {
+        EINLOESUNGEN.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Hat diese Quelle ihre Einlösungen im Fenster aufgebraucht?
+    pub fn ist_gesperrt(ip: IpAddr) -> bool {
+        tabelle().ist_gesperrt(ip, Instant::now())
+    }
+
+    /// Vermerkt eine gelungene Einlösung der Quelle.
+    pub fn vermerke(ip: IpAddr) {
         tabelle().fehlversuch(ip, None, Instant::now());
     }
 }

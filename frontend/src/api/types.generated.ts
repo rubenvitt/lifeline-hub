@@ -576,12 +576,12 @@ export interface components {
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
          *     `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
-         *     `0301_admin_audit_instanz.sql` — beide Seiten
+         *     `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten
          *     müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen" | "maschinenzugang_webhook_pin_gesetzt" | "maschinenzugang_webhook_pin_entfernt" | "maschinenzugang_webhook_zertifikat_abgerufen" | "adapter_angelegt" | "adapter_geaendert" | "adapter_geloescht" | "adapter_geheimnis_gesetzt" | "adapter_geheimnis_entfernt" | "adapter_lan_erlaubt" | "adapter_lan_entzogen" | "adapter_angehalten" | "adapter_fortgesetzt";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen" | "maschinenzugang_webhook_pin_gesetzt" | "maschinenzugang_webhook_pin_entfernt" | "maschinenzugang_webhook_zertifikat_abgerufen" | "adapter_angelegt" | "adapter_geaendert" | "adapter_geloescht" | "adapter_geheimnis_gesetzt" | "adapter_geheimnis_entfernt" | "adapter_lan_erlaubt" | "adapter_lan_entzogen" | "adapter_angehalten" | "adapter_fortgesetzt" | "fremdebenen_lan_erlaubt" | "fremdebenen_lan_entzogen";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -2597,6 +2597,12 @@ export interface components {
             nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
             /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
+            /**
              * @description Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;
              *     `None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M.
              */
@@ -3010,6 +3016,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             opta?: string | null;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             soll_besatzung?: components["schemas"]["Staerke"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
@@ -4234,6 +4246,52 @@ export interface components {
              */
             zeichen_spec: string;
         };
+        /** @description Eine Fremdebene, wie die Liste sie zeigt (ohne Inhalt). Wire-Felder englisch. */
+        FremdebeneAnzeige: {
+            /** @description Letzter Abrufversuch, nur URL-Ebene. */
+            attempted_at?: string | null;
+            /**
+             * @description Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein
+             *     `wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen
+             *     wird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.
+             *     Ein Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client
+             *     fällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück.
+             */
+            color: string;
+            created_at: string;
+            /**
+             * Format: int64
+             * @description Zahl der Objekte ohne lesbare Geometrie.
+             */
+            dropped_count: number;
+            error?: components["schemas"]["FremdebeneFehler"] | null;
+            /** Format: int64 */
+            feature_count: number;
+            /** @description Letzter erfolgreicher Abruf (auch 304), nur URL-Ebene. */
+            fetched_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            source: components["schemas"]["FremdebeneQuelle"];
+            /**
+             * @description Volle Adresse der URL-Ebene; nur für Schreibende (Entwurf, „URL mit Geheimnis im Query“),
+             *     sonst fehlt sie ([`FremdebeneAnzeige::fuer_leser`]).
+             */
+            url?: string | null;
+            /** @description Nur der Host der URL-Ebene, für alle Lesenden. */
+            url_host?: string | null;
+        };
+        /**
+         * @description Warum eine Datei oder ein Abruf abgelehnt ist (`grund` im 400 bzw. 413, an der URL-Ebene
+         *     in `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.
+         * @enum {string}
+         */
+        FremdebeneFehler: "unlesbar" | "dtd" | "zu_gross" | "zu_umfangreich" | "zu_viele_objekte" | "leer" | "koordinaten" | "virus" | "nicht_erreichbar" | "weiterleitung" | "abgelehnt" | "status" | "ziel_intern" | "zeitlimit";
+        /**
+         * @description Woher eine Fremdebene kommt.
+         * @enum {string}
+         */
+        FremdebeneQuelle: "datei" | "url";
         /** @description Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4). */
         FuehrungAnfrageEingang: {
             kennung: string;
@@ -4388,6 +4446,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             name: string;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
@@ -4460,7 +4524,7 @@ export interface components {
          *     `migrations/0286_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit" | "helfer";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
@@ -4628,6 +4692,130 @@ export interface components {
              */
             nummer: number;
             personen: components["schemas"]["RegistriertePerson"][];
+        };
+        /** @description Eine Helfer-Kopplung, wie die Leitung sie sieht. */
+        HelferAnzeige: {
+            created_at: string;
+            /** @description Name, den die Kraft beim Anmelden eingegeben hat. */
+            display_name: string;
+            expires_at: string;
+            /**
+             * Format: int64
+             * @description Kennung der Kopplung (`geraet_kopplung.id`).
+             */
+            id: number;
+            /** @description Das Gerät schreibt die Position seines Ziels („Ortungsgerät“). */
+            is_tracker: boolean;
+            /** @description Zeitpunkt der letzten Position, die dieses Gerät geschrieben hat (Quelle `helfer`). */
+            last_position_at?: string | null;
+            /** @description Die Kraft hat die Ortung pausiert. */
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            /** @description Die Kraft hat „Mich als Person orten“ gewählt. */
+            person_requested: boolean;
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
+        };
+        /** @description Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal. */
+        HelferEinladungAnzeige: {
+            /** @description Der Code (8 Zeichen); fehlt außer in der Antwort auf das Anlegen. */
+            code?: string | null;
+            expires_at: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description `https://<server>/helfer#<CODE>`, wenn der Server seine öffentliche Adresse kennt; sonst
+             *     baut der Client die Adresse aus seinem Origin (`helferAdresse`).
+             */
+            url?: string | null;
+        };
+        /** @description Der Einsatz einer Helfer-Kopplung, nur Kennung und Bezeichnung. */
+        HelferEinsatz: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Warum eine Helfer-Kopplung endet. Jedes Ende ist für das Gerät 401, auch die Ablehnung:
+         *     sie löscht die Sitzungen (`routes::helfer::ablehnen`). Die App nennt den Grund aus der
+         *     letzten bekannten Antwort selbst; `rejected` liefert `GET /api/devices/me` nur für eine
+         *     abgelehnte Kopplung, die noch eine Sitzung hätte.
+         * @enum {string}
+         */
+        HelferEndeGrund: "incident_closed" | "revoked" | "expired" | "rejected" | "signed_out";
+        /** @description Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung. */
+        HelferPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in
+         *     `geraet_kopplung.helfer_zustand` (CHECK in Migration 0377); `beendet` leitet der Server
+         *     ab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.
+         * @enum {string}
+         */
+        HelferStatus: "unbestaetigt" | "aktiv" | "abgelehnt" | "beendet";
+        /** @description Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen. */
+        HelferUebersicht: {
+            helpers: components["schemas"]["HelferAnzeige"][];
+            invitation?: components["schemas"]["HelferEinladungAnzeige"] | null;
+            /** @description „Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu. */
+            person_tracking_allowed: boolean;
+            /** @description „Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich. */
+            tracking_enabled: boolean;
+        };
+        /** @description Ziel einer Helfer-Kopplung. */
+        HelferZiel: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+        };
+        /**
+         * @description Art des Ziels einer Helfer-Kopplung.
+         * @enum {string}
+         */
+        HelferZielArt: "unit" | "vehicle";
+        /** @description Ein wählbares Ziel vor dem Einlösen. */
+        HelferZielOption: {
+            /** @description Eigener Funkrufname der Einheit; fehlt beim Fahrzeug (der Name ist sein Rufname). */
+            call_sign?: string | null;
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+            /** @description Taktisches Zeichen: Fachaufgabe (`tz_fachaufgabe`). */
+            sign_function?: string | null;
+            /** @description Taktisches Zeichen: Organisation (`tz_organisation`). */
+            sign_organization?: string | null;
+        };
+        /**
+         * @description Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
+         *     Personen.
+         */
+        HelferZielliste: {
+            /** @description Ob die Organisation „Auch Personen orten“ erlaubt; sonst blendet die App das Häkchen aus. */
+            person_tracking_allowed: boolean;
+            targets: components["schemas"]["HelferZielOption"][];
+        };
+        /** @description Der eigene Zustand einer Helfer-Kopplung (`GET /api/devices/me`, Antwort auf das Einlösen). */
+        HelferZustand: {
+            /** @description Ablauf der Kopplung (UTC, `%Y-%m-%d %H:%M:%S`). */
+            expires_at: string;
+            incident: components["schemas"]["HelferEinsatz"];
+            /** @description Das Gerät schreibt die Position seines Ziels. */
+            is_tracker: boolean;
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            reason?: components["schemas"]["HelferEndeGrund"] | null;
+            /** @description Uhrzeit des Servers in derselben Form, für Restzeiten auf dem Gerät. */
+            server_time: string;
+            /** @description `beendet` kommt hier nicht vor: nach dem Ende ist die Sitzung ungültig (401). */
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
         };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
@@ -5060,6 +5248,12 @@ export interface components {
          *     `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
          */
         KarteConfigAntwort: {
+            /**
+             * @description Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit
+             *     `--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet
+             *     404. Leer, wenn alle Ebenen an sind.
+             */
+            fachebenen_abgeschaltet: string[];
             /**
              * @description True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
              *     anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
@@ -6018,7 +6212,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -6792,6 +6986,8 @@ export interface components {
             einheiten?: components["schemas"]["EinheitenSystem"] | null;
             einsatz_nummer_praefix?: string | null;
             etb_nummer_praefix?: string | null;
+            /** @description Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099); Standard `false`. */
+            fremdebenen_lan_erlaubt: boolean;
             geaendert_at?: string | null;
             /** Format: int64 */
             geaendert_von?: number | null;
@@ -6807,6 +7003,12 @@ export interface components {
             nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
+            /** @description Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde. */
+            ortung_bestaetigt_at?: string | null;
+            /** @description „Ortung im Einsatz“ (Helfer-App); Vorgabe aus. */
+            ortung_im_einsatz: boolean;
+            /** @description „Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist. */
+            ortung_personen: boolean;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
             /**
@@ -7799,6 +8001,22 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /** @description Antwort von `PUT /api/devices/me/position`. */
+        PositionAntwort: {
+            /** @description Uhrzeit des Servers (UTC, `%Y-%m-%d %H:%M:%S`). */
+            server_time: string;
+            /**
+             * @description Mindestens ein Ziel hat die Position übernommen; `false` bei einer älteren als der
+             *     gespeicherten, während einer Pause und beim Pausieren selbst.
+             */
+            stored: boolean;
+        };
+        /**
+         * @description Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration
+         *     0377) `manuell`, `einwurf`, `helfer`.
+         * @enum {string}
+         */
+        Positionsquelle: "manuell" | "einwurf" | "helfer";
         /**
          * @description Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.
          * @enum {string}

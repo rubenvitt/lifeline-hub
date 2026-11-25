@@ -104,6 +104,10 @@ import {
   hilfePfad,
   parseHilfeGruppe,
   parseModulHinweis,
+  HELFER_PFAD,
+  einsatzHelferPfad,
+  helferAdresse,
+  helferAppLink,
 } from './deeplinks';
 import { ETB_INHALT_MAX } from '../api/eingabegrenzen';
 import { STANDARDUMFANG } from '../druck/einsatzbericht/auswahl';
@@ -1219,6 +1223,24 @@ describe('einsatzEinstellungenPfad (LFH-345 · C10, H15/M15)', () => {
     expect(adresse.pathname).toBe('/koppeln');
     expect(adresse.search).toBe('');
     expect(adresse.hash).toBe('#ABCD1234');
+  });
+
+  it('trägt den Code der Helfer-Einladung im Fragment der Weiche (Helfer-App)', () => {
+    const adresse = new URL(helferAdresse('https://hub.example', 'ABCD2345'));
+    expect(adresse.pathname).toBe('/helfer');
+    expect(adresse.search).toBe('');
+    expect(adresse.hash).toBe('#ABCD2345');
+    expect(HELFER_PFAD).toBe('/helfer');
+  });
+
+  it('öffnet die Helfer-App mit Server als Abfrage und Code im Fragment', () => {
+    expect(helferAppLink('https://hub.example', 'ABCD2345')).toBe(
+      'lifeline-helfer://anmelden?server=https://hub.example#ABCD2345',
+    );
+  });
+
+  it('springt auf den Bereich „Helfer“ der Geräte-Sektion', () => {
+    expect(einsatzHelferPfad(E)).toBe('/einsaetze/5/einstellungen/geraete#helfer');
   });
 
   it('trägt den Schlüssel des Lagebild-Links im Fragment (LLH-1496)', () => {

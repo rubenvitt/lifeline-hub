@@ -250,6 +250,10 @@ async fn werde_spiegel(conn: &mut SqliteConnection, akte: &AkteZeile) -> Result<
     let Some(einsatz_id) = akte.einsatz_id else {
         return Ok(());
     };
+    // Helfer-Kopplungen und Personenpositionen enden hier, noch vor dem Spiegel: Danach schriebe
+    // kein Weg mehr an den Einsatz, und nichts über georteten Personen soll zum neuen Führer
+    // gehen (Spec Helfer-App, „Personenposition“).
+    crate::helfer::ende::beende_alle_im_einsatz(conn, einsatz_id).await?;
     let kopplung_org_id = kopplung_org_des_fuehrers(conn, akte).await?;
     // Was das Gegenüber sicher kennt: den bestätigten Stand seines Spiegels, und alles bis zur
     // eigenen Übernahme (das kam von ihm).

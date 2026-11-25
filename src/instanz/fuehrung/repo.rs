@@ -118,6 +118,14 @@ pub async fn ich(conn: &mut SqliteConnection) -> Result<Ich, AppError> {
     })
 }
 
+/// Eigene Instanzkennung, nur lesend: `None`, solange die Identität nie angelegt wurde. Legt
+/// nichts an (anders als `identitaet::load_or_create`).
+pub async fn load_kennung(pool: &sqlx::SqlitePool) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar("SELECT kennung FROM instanz_identitaet")
+        .fetch_optional(pool)
+        .await?)
+}
+
 /// Ob die Führung an ist, auf der Verbindung des Aufrufers.
 pub async fn is_enabled_tx(conn: &mut SqliteConnection) -> Result<bool, AppError> {
     Ok(

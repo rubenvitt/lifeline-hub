@@ -48,6 +48,9 @@ pub struct AppState {
     /// Weckt den Lauf des Ausgangskorbs (LLH-2093, `ausgang::lauf`), sobald ein Versand angelegt
     /// oder erneut gesendet wird; sonst sieht er erst im nächsten Takt nach.
     pub ausgang_wecker: Arc<tokio::sync::Notify>,
+    /// Weg nach draußen der URL-Fremdebenen (LLH-2100) samt Single-Flight je Ebene. Vorgabe: der
+    /// echte Abruf über `adapter::ziel`; Tests setzen einen eigenen Abrufer ein.
+    pub fremdebene_abrufer: crate::karte_fremdebene::abruf::Abrufer,
     /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
     /// `adapter_einsatz`, nur im Arbeitsspeicher.
     pub drohne: std::sync::Arc<crate::drohne::Store>,
@@ -184,6 +187,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/devices/pair",
             post(routes::geraet::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        // Helfer-App (Spec 2026-11-24-vakwvkpg): Zielliste und Einlösen der Einladung (öffentlich,
+        // Rate-Limit je Quelle wie `/api/devices/pair`), der eigene Zustand der Helfer-Kopplung.
+        .route(
+            "/api/devices/helpers/targets",
+            post(routes::helfer::ziele).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            "/api/devices/helpers/redeem",
+            post(routes::helfer::einloesen).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            "/api/devices/me",
+            get(routes::helfer::zustand).put(routes::helfer::ziel_aendern),
+        )
+        .route(
+            "/api/devices/me/position",
+            put(routes::helfer::position_senden),
         )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
@@ -891,6 +912,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             put(routes::lagebesprechung::set_termin),
         )
         .route(
+            "/api/incidents/{id}/briefing/schedule/export",
+            get(routes::lagebesprechung::export_termin),
+        )
+        .route(
             "/api/incidents/{id}/briefings",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
@@ -1591,6 +1616,39 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
         )
+        // Helfer-App (Spec 2026-11-24-vakwvkpg, ADR-0101): Einladung und Helfer der Leitung.
+        .route(
+            "/api/incidents/{id}/helpers",
+            get(routes::helfer::uebersicht),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations",
+            post(routes::helfer::einladung_anlegen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations/{einladung_id}/revoke",
+            post(routes::helfer::einladung_widerrufen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/revoke",
+            post(routes::helfer::alle_entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/confirm",
+            post(routes::helfer::bestaetigen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/reject",
+            post(routes::helfer::ablehnen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/revoke",
+            post(routes::helfer::entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/extend",
+            post(routes::helfer::verlaengern),
+        )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(
@@ -1968,6 +2026,29 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/incidents/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
+        )
+        // Fremdebenen (LLH-2099) unter dem neuen Präfix (ADR-0097); Grenzen wie die Bilder.
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            get(routes::karte_fremdebene::liste),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            post(routes::karte_fremdebene::anlegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}/data",
+            get(routes::karte_fremdebene::daten).route_layer(download_grenze()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            patch(routes::karte_fremdebene::aktualisieren),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            delete(routes::karte_fremdebene::loeschen),
         )
         // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
         .route(
@@ -2783,6 +2864,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = router
         .route("/api/map/config", get(routes::karte::config))
         .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
+        // LLH-2021: Satellitenbilder der Copernicus-Aktivierungen, Liste und Kacheln.
+        .route(
+            "/api/map/overlays/copernicus/images",
+            get(routes::karte::copernicus_bilder),
+        )
+        .route(
+            "/api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}",
+            get(routes::karte::copernicus_bild_kachel),
+        )
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
@@ -3301,6 +3391,7 @@ mod tests {
             datentraeger: Default::default(),
             adapter: Default::default(),
             ausgang_wecker: Default::default(),
+            fremdebene_abrufer: Default::default(),
             drohne: Default::default(),
         }
     }

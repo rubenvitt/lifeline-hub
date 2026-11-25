@@ -1,6 +1,7 @@
 import { GEDAEMPFT_DECKKRAFT } from './abschnittFokus';
 import type { KartenAufnahme, KartenBuendel } from './kartenAufnahme';
 import {
+  FREMDE_DATEN,
   massstabLeiste,
   nordpfeilDrehung,
   veraltetHinweis,
@@ -267,6 +268,7 @@ export async function setzeLageplanAnlage(d: LageplanAnlageDaten): Promise<Blob 
     ...legende.zonen.map((z) => ({ text: z.text, zone: z })),
     ...legende.fachebenen.map((z) => ({ text: z.text, zone: null })),
     ...legende.bilder.map((z) => ({ text: `Bild: ${z.text}`, zone: null })),
+    ...legende.fremdebenen.map((z) => ({ text: `${FREMDE_DATEN}: ${z.text}`, zone: z })),
   ];
   const zeilenJeSpalte = Math.ceil(eintraege.length / spalten);
   const legendeHoehe =

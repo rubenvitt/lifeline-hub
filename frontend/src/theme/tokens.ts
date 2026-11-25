@@ -618,6 +618,41 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
 };
 
 /**
+ * Palette der Fremdebenen (LLH-2099, Entwurf „Oberfläche“): sechs Töne, deren Schlüssel der Server
+ * speichert (`color`, `fremd-1` … `fremd-6`). Bewusst weg von den BBK-Farben (Rot, Gelb, Grün,
+ * Blau, Schwarz) und den Zonen- und Gefahrenfarben (Rot, Orange, Gelb): Indigo, Petrol, Pflaume,
+ * Oliv, Violett, Ocker. Geprüft (`statusFarben.test.ts`): jeder Ton ≥ 3 : 1 auf jedem Leistengrund
+ * seines Modus, Paare ΔE ≥ 20. Die Ebenenfarbe ist eine Identität, kein Status; der zweite Kanal
+ * ist der Name in Zeile, Detailkarte und Legende.
+ */
+export type FremdebeneTon = 'fremd-1' | 'fremd-2' | 'fremd-3' | 'fremd-4' | 'fremd-5' | 'fremd-6';
+
+export const FREMDEBENEN_PALETTE: {
+  hell: Record<FremdebeneTon, string>;
+  dunkel: Record<FremdebeneTon, string>;
+} = {
+  hell: {
+    'fremd-1': '#2f54eb',
+    'fremd-2': '#006d75',
+    'fremd-3': '#9e1068',
+    'fremd-4': '#5b7a00',
+    'fremd-5': '#6a3fb5',
+    'fremd-6': '#8a5a2b',
+  },
+  dunkel: {
+    'fremd-1': '#6f95ff',
+    'fremd-2': '#2fc6c0',
+    'fremd-3': '#f06bb8',
+    'fremd-4': '#a8c83a',
+    'fremd-5': '#c77ff0',
+    'fremd-6': '#d9a066',
+  },
+};
+
+/** Die Töne in ihrer Folge (Wahl im Menü „Farbe …“). */
+export const FREMDEBENE_TOENE = Object.keys(FREMDEBENEN_PALETTE.hell) as FremdebeneTon[];
+
+/**
  * Säulen des Paneels „Verlauf“ im Lagebild Sanitätsdienst (LLH-1574, design.md D3): Kontakte je
  * Stunde, gestapelt nach Anlass. Vier feste Anlässe tragen eine eigene Farbe, die übrigen vier und
  * „ohne Anlass“ teilen sich das Grau `uebrige`: neun Farben liest niemand auseinander, und die

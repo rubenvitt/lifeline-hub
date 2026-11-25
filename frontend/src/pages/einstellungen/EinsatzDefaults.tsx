@@ -40,6 +40,8 @@ import { mitVorgabe } from '../../components/vorgabeText';
 import { useStammdatenHerkunft, VOM_HUB_TEXT } from '../../instanz/herkunft';
 import { NUR_ADMIN } from '../../components/nurAnsicht';
 import { ZahlFeld } from '../../components/ZahlFeld';
+import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 
 /** Vorgabe des Servers für ein leeres Einsatznummer-Präfix (`einsatz/nummer.rs`, `PRAEFIX_VORGABE`). */
 const EINSATZ_PRAEFIX_VORGABE = 'E-';
@@ -88,6 +90,8 @@ export default function EinsatzDefaults() {
   const [rueckfrage, setRueckfrage] = useState<OrgEinstellungenUpdate | null>(null);
   // Vor den frühen Returns: ein Hook danach bräche die Hook-Reihenfolge.
   const einsatzPraefix = Form.useWatch('einsatz_nummer_praefix', form);
+  const ortungAn = Form.useWatch('ortung_im_einsatz', form);
+  const { konventionen: konv } = useAnzeigeKonventionen();
 
   const einstellungenQuery = useQuery({
     queryKey: globalKeys.orgEinstellungen(),
@@ -289,6 +293,26 @@ export default function EinsatzDefaults() {
             </Feld>
           </Formularpaneel>
 
+          {/* Helfer-App: Einschalten nur über den Bestätigungsdialog (Spec
+              2026-11-24-vakwvkpg, „Ortung der Organisation“); der Server hält fest, wer wann. */}
+          <Formularpaneel titel="Ortung">
+            <Feld
+              label="Ortung im Einsatz"
+              name="ortung_im_einsatz"
+              valuePropName="checked"
+              extra={
+                einstellungen.ortung_im_einsatz && einstellungen.ortung_bestaetigt_at
+                  ? `Eingeschaltet und bestätigt ${zeitKurz(einstellungen.ortung_bestaetigt_at, konv)}`
+                  : 'Helfende melden ihre Position über die Helfer-App.'
+              }
+            >
+              <OrtungSchalter onAus={() => form.setFieldValue('ortung_personen', false)} />
+            </Feld>
+            <Feld label="Auch Personen orten" name="ortung_personen" valuePropName="checked">
+              <Switch disabled={!darf || !ortungAn} />
+            </Feld>
+          </Formularpaneel>
+
           {/* Ohne Recht steht der Knopf gesperrt da, der Grund als `RechteHinweis` im Kopf. */}
           <div {...speicherLeiste}>
             <SpeicherKnopf loading={speichernMutation.isPending} disabled={!darf} />
@@ -371,5 +395,64 @@ export default function EinsatzDefaults() {
         )}
       </Modal>
     </AdminPage>
+  );
+}
+
+/** Wortlaut der Bestätigung beim Einschalten der Ortung (Spec 2026-11-24-vakwvkpg). */
+const ORTUNG_EINWILLIGUNG =
+  'Ich bestätige, dass für diese Organisation eine Einwilligung der Helfenden bzw. eine Betriebsvereinbarung vorliegt.';
+
+/** Pfad der Vorlage im Repository (`docs/datenschutz/`); die App liefert die Docs nicht aus. */
+const ORTUNG_DSFA_VORLAGE = 'docs/datenschutz/dsfa-vorlage-ortung.md';
+
+interface OrtungSchalterProps {
+  id?: string;
+  checked?: boolean;
+  onChange?: (an: boolean) => void;
+  /** Läuft beim Ausschalten mit, etwa um „Auch Personen orten“ mitzunehmen. */
+  onAus: () => void;
+}
+
+/**
+ * Schalter „Ortung im Einsatz“ als Formularfeld: Einschalten öffnet erst den Dialog, nur
+ * „Bestätigen“ setzt den Wert. Ausschalten geht ohne Rückfrage. Gesperrt wird er über das
+ * Formular (`disabled` am `Form`).
+ */
+function OrtungSchalter({ id, checked, onChange, onAus }: OrtungSchalterProps) {
+  const [frage, setFrage] = useState(false);
+  return (
+    <>
+      <Switch
+        id={id}
+        checked={checked}
+        onChange={(an) => {
+          if (an) {
+            setFrage(true);
+            return;
+          }
+          onChange?.(false);
+          onAus();
+        }}
+      />
+      <Modal
+        open={frage}
+        title="Ortung im Einsatz einschalten?"
+        okText="Bestätigen"
+        cancelText="Abbrechen"
+        onOk={() => {
+          onChange?.(true);
+          setFrage(false);
+        }}
+        onCancel={() => setFrage(false)}
+        destroyOnHidden
+      >
+        <Typography.Paragraph>{ORTUNG_EINWILLIGUNG}</Typography.Paragraph>
+        {/* Die Docs liefert die App nicht aus: der Pfad steht als Text, die Vorlage liegt im Repository. */}
+        <Typography.Paragraph type="secondary">
+          {'Vorlage zur Datenschutz-Folgenabschätzung: '}
+          <Typography.Text code>{ORTUNG_DSFA_VORLAGE}</Typography.Text>
+        </Typography.Paragraph>
+      </Modal>
+    </>
   );
 }

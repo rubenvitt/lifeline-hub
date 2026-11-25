@@ -12,6 +12,7 @@ on:
       - "android/**"
       - "src-tauri/faelle/**"
       - "scripts/android/**"
+      - "scripts/ios/helfer-version.sh"
       - ".github/workflows/android-pruefung.yml"
       - ".github/workflows/android-pruefung-alpha.yml"
 

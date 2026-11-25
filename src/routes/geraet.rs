@@ -79,7 +79,10 @@ pub async fn liste(
     ctx.fordere_einsatzleitung()?;
     let kopplungen = repo::liste(&state.pool, ctx.einsatz.id).await?;
     let mut sperren = Vec::new();
-    for ansicht in Funktionsansicht::ALLE {
+    for ansicht in Funktionsansicht::ALLE
+        .into_iter()
+        .filter(|a| !a.nur_per_einladung())
+    {
         let gesperrt = gesperrt_fuer_geraet(
             &state.pool,
             ctx.einsatz.id,
@@ -94,7 +97,7 @@ pub async fn liste(
     }
     let ansichten = Funktionsansicht::ALLE
         .into_iter()
-        .filter(|a| a.ist_verfuegbar())
+        .filter(|a| a.ist_verfuegbar() && !a.nur_per_einladung())
         .map(|ansicht| AnsichtAuswahl {
             ansicht,
             stellenart: ansicht.stellenart(),
@@ -121,7 +124,7 @@ pub struct NeueKopplungBody {
 }
 
 /// Normalisiert und prüft ein gewünschtes Ende (400 bei Form, Vergangenheit, über 72 h).
-fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
+pub(crate) fn ende_aus(eingabe: Option<&str>) -> Result<String, AppError> {
     let jetzt = chrono::Utc::now();
     let ende = match eingabe {
         None => crate::zeit::formatiere_utc(jetzt + chrono::Duration::hours(STANDARD_STUNDEN)),
@@ -230,6 +233,13 @@ pub async fn anlegen(
             "bezeichnung darf höchstens {BEZEICHNUNG_MAX} Zeichen haben"
         )));
     }
+    // Helfer melden sich selbst über die Einladung an (Spec Helfer-App, „Anmelden“).
+    if ansicht.nur_per_einladung() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{} entstehen nur über die Helfer-Einladung",
+            ansicht.label()
+        )));
+    }
     if !ansicht.ist_verfuegbar() {
         return Err(AppError::UnprocessableEntity(format!(
             "Die Ansicht {} ist noch nicht verfügbar",
@@ -325,6 +335,22 @@ pub async fn anlegen(
     ))
 }
 
+/// Eine Kopplung der Geräteübersicht; fremd, unbekannt oder eine Helfer-Kopplung → 404. Helfer
+/// verwaltet die Leitung nur über `/api/incidents/{id}/helpers…` (Spec Helfer-App): Verlängern,
+/// Widerruf und Code an der Helfer-Kopplung vorbei umgingen Wartezeit, Personenposition,
+/// ETB-Wortlaut und Einladung.
+async fn lade_geraet(
+    state: &AppState,
+    einsatz_id: i64,
+    kopplung_id: i64,
+) -> Result<KopplungAnzeige, AppError> {
+    let k = repo::laden(&state.pool, einsatz_id, kopplung_id).await?;
+    if k.ansicht.nur_per_einladung() {
+        return Err(AppError::NotFound);
+    }
+    Ok(k)
+}
+
 /// POST /api/incidents/{id}/devices/{gid}/code — neuen Code ausstellen (Gerät getauscht, Browser
 /// geleert). Der alte Code verfällt; beim Einlösen des neuen enden die alten Sitzungen.
 pub async fn code_ausstellen(
@@ -333,7 +359,7 @@ pub async fn code_ausstellen(
     PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<KopplungMitCode>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let von = ctx.benutzer.id;
     let (code, laeuft_ab_at) = crate::write_retry!(&state.pool, |conn| {
         repo::code_ausstellen(conn, kopplung_id, von).await
@@ -358,7 +384,7 @@ pub async fn verlaengern(
     JsonBody(body): JsonBody<VerlaengernBody>,
 ) -> Result<Json<KopplungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let ende = ende_aus(Some(&body.laeuft_ab_at))?;
     let von = ctx.benutzer.id;
     crate::write_retry!(&state.pool, |conn| {
@@ -378,7 +404,7 @@ pub async fn widerrufen(
     PfadParam((_eid, kopplung_id)): PfadParam<(i64, i64)>,
 ) -> Result<Json<KopplungAnzeige>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    let vorher = repo::laden(&state.pool, einsatz_id, kopplung_id).await?; // 404 falls fremd
+    let vorher = lade_geraet(&state, einsatz_id, kopplung_id).await?; // 404 falls fremd oder Helfer
     let von = ctx.benutzer.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let etb_text = format!(

@@ -2959,6 +2959,220 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
     );
 }
 
+/// Bilderliste der Copernicus-Satellitenbilder (LLH-2021): bbox-pflichtig wie die Vektorebene.
+#[tokio::test]
+async fn copernicus_bilder_ohne_oder_mit_zu_grosser_bbox_ist_400() {
+    let app = app_mit_pool(pool().await);
+    for uri in [
+        "/api/map/overlays/copernicus/images".to_string(),
+        "/api/map/overlays/copernicus/images?bbox=6.0,47.0,10.0,49.0".to_string(),
+    ] {
+        let res = anfrage(&app, "GET", &uri, None, None).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "{uri}");
+        let fehler = json(res).await["error"].as_str().unwrap().to_string();
+        assert!(fehler.contains("bbox"), "{uri}: {fehler}");
+    }
+}
+
+/// Mit und ohne Archiv sind es zwei Stände der Bilderliste (Schlüssel als Literal).
+#[tokio::test]
+async fn copernicus_bilder_trennt_archiv_im_cache() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = app_mit(pool().await, karten_dir.clone());
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let leer = FachebeneAntwort::ok(
+        "copernicus_bilder",
+        "x",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [] }),
+    );
+    let archiv = FachebeneAntwort::ok(
+        "copernicus_bilder",
+        "x",
+        Some("2024-06-10 10:13:00".into()),
+        serde_json::json!({ "type": "FeatureCollection", "features": [{
+            "type": "Feature",
+            "geometry": { "type": "Polygon", "coordinates": [[[12.6, 48.9], [12.7, 48.9], [12.7, 49.0], [12.6, 48.9]]] },
+            "properties": { "bild": "0123456789abcdef", "emsr": "EMSR728" }
+        }] }),
+    );
+    let k = "12.50,48.80,12.80,49.00";
+    lifeline_hub::karte::cache::setze(&cache_pool, &format!("copernicus-bilder:{k}"), &leer).await;
+    lifeline_hub::karte::cache::setze(
+        &cache_pool,
+        &format!("copernicus-bilder-archiv:{k}"),
+        &archiv,
+    )
+    .await;
+    let basis = "/api/map/overlays/copernicus/images?bbox=12.5,48.8,12.8,49.0";
+    let res = anfrage(&app, "GET", basis, None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let a = json(res).await;
+    assert_eq!(
+        (a["quelle"].as_str(), a["status"].as_str()),
+        (Some("copernicus_bilder"), Some("leer"))
+    );
+    let res = anfrage(&app, "GET", &format!("{basis}&archiv=1"), None, None).await;
+    assert_eq!(json(res).await["status"], "ok");
+}
+
+/// Kachelroute: nur Kennungen, nie Pfade; falsche Kachel 400, unbekanntes Bild 404, eine Kachel
+/// im Cache kommt mit festem Cache-Kopf.
+#[tokio::test]
+async fn copernicus_bildkachel_pruefungen_und_cache() {
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = app_mit(pool, karten_dir.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let pfad = |rest: &str| format!("/api/map/overlays/copernicus/images/{rest}");
+    // Wie die Proxy-Kacheln (LFH-1072): ohne Sitzung 401, bevor irgendetwas geprüft wird.
+    for rest in [
+        "0123456789abcdef/10/1/2",
+        "0123456789abcdef/25/0/0",
+        "zu-kurz/10/1/2",
+    ] {
+        let res = anfrage(&app, "GET", &pfad(rest), None, None).await;
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{rest}");
+    }
+    for (rest, soll) in [
+        ("0123456789abcdef/25/0/0", StatusCode::BAD_REQUEST),
+        ("0123456789abcdef/10/1024/0", StatusCode::BAD_REQUEST),
+        ("0123456789abcdef/10/1/2", StatusCode::NOT_FOUND),
+        ("zu-kurz/10/1/2", StatusCode::NOT_FOUND),
+        ("..%2F..%2Fetc/10/1/2", StatusCode::NOT_FOUND),
+    ] {
+        let res = anfrage(&app, "GET", &pfad(rest), Some(&cookie), None).await;
+        assert_eq!(res.status(), soll, "{rest}");
+    }
+    let cache = lifeline_hub::karte::tile_cache::cache_oeffnen(&karten_dir)
+        .await
+        .unwrap();
+    lifeline_hub::karte::tile_cache::schreibe_eintrag(
+        &cache,
+        "cog:0123456789abcdef/10/1/2",
+        b"\x89PNG",
+        "image/png",
+    )
+    .await;
+    let res = anfrage(
+        &app,
+        "GET",
+        &pfad("0123456789abcdef/10/1/2"),
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()["content-type"], "image/png");
+    assert_eq!(
+        res.headers()["cache-control"],
+        "private, max-age=86400, immutable"
+    );
+}
+
+// ===== NINA abschaltbar (LLH-2104) =====
+
+/// Attrappe von warnung.bund.de: zählt jede Anfrage und liefert eine leere Warnliste. Gibt die
+/// Basis-URL (wie `NINA_BASIS_URL`, ohne `/` am Ende) und den Zähler zurück.
+async fn nina_attrappe() -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    let zaehler = Arc::new(AtomicUsize::new(0));
+    let z = zaehler.clone();
+    let stub = axum::Router::new().fallback(move || {
+        let z = z.clone();
+        async move {
+            z.fetch_add(1, Ordering::SeqCst);
+            axum::Json(serde_json::json!([]))
+        }
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let basis = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, stub).await.unwrap() });
+    (basis, zaehler)
+}
+
+/// Router mit eigenem Karten-Verzeichnis und einem `FachebenenState` nach Wahl.
+async fn nina_app(fachebenen: lifeline_hub::karte::FachebenenState) -> axum::Router {
+    katalog_ohne_netz();
+    let pool = pool().await;
+    build_router(AppState {
+        karten_dir: lifeline_hub::db::test_karten_dir(),
+        fachebenen,
+        ..common::test_state(&pool, &LiveHub::new())
+    })
+}
+
+/// Gegenprobe zu den Abschalt-Tests: eingeschaltet fragt die Ebene die Quelle wirklich ab,
+/// sonst bewiese ein Zähler von 0 dort nichts.
+#[tokio::test]
+async fn nina_eingeschaltet_fragt_die_quelle_ab() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_nina_basis_url(&basis)).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/nina", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(zaehler.load(std::sync::atomic::Ordering::SeqCst) >= 1);
+}
+
+/// Akzeptanzkriterium LLH-2104: abgeschaltet geht kein Request an die Quelle, und die Route
+/// antwortet 404 statt einer Offline-Ebene.
+#[tokio::test]
+async fn abgeschaltete_nina_ist_404_ohne_abruf() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app = nina_app(
+        lifeline_hub::karte::FachebenenState::neu()
+            .mit_nina_basis_url(&basis)
+            .mit_abgeschaltet(&["nina"]),
+    )
+    .await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/nina", None, None).await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+/// Eine bedingte Anfrage mit altem ETag bekommt kein 304, sondern ebenfalls 404.
+#[tokio::test]
+async fn abgeschaltete_nina_ist_auch_bedingt_404() {
+    let (basis, zaehler) = nina_attrappe().await;
+    let app = nina_app(
+        lifeline_hub::karte::FachebenenState::neu()
+            .mit_nina_basis_url(&basis)
+            .mit_abgeschaltet(&["nina"]),
+    )
+    .await;
+    let res = anfrage_bedingt(&app, "/api/map/overlays/nina", "\"x\"").await;
+    assert_eq!(res.status(), StatusCode::NOT_FOUND);
+    assert_eq!(zaehler.load(std::sync::atomic::Ordering::SeqCst), 0);
+}
+
+/// Die Abschaltung betrifft nur die genannte Ebene; eine unbekannte Quelle bleibt 400.
+#[tokio::test]
+async fn abschaltung_laesst_unbekannte_quelle_bei_400() {
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let res = anfrage(&app, "GET", "/api/map/overlays/gibtsnicht", None, None).await;
+    assert_eq!(res.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn config_meldet_abgeschaltete_fachebenen() {
+    let app =
+        nina_app(lifeline_hub::karte::FachebenenState::neu().mit_abgeschaltet(&["nina"])).await;
+    let v = json(anfrage(&app, "GET", "/api/map/config", None, None).await).await;
+    assert_eq!(v["fachebenen_abgeschaltet"], serde_json::json!(["nina"]));
+
+    let app = nina_app(lifeline_hub::karte::FachebenenState::neu()).await;
+    let v = json(anfrage(&app, "GET", "/api/map/config", None, None).await).await;
+    assert_eq!(v["fachebenen_abgeschaltet"], serde_json::json!([]));
+}
+
 /// Die Parken-Ebene (LLH-1637) ist eine bekannte Quelle und liefert ihren Cache-Stand,
 /// hermetisch wie `fachebenen_autobahn_liefert_gecachte_antwort`.
 #[tokio::test]

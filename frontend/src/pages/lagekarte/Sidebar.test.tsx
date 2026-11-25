@@ -22,6 +22,7 @@ import { AusgangUnbekannt, NetzFehler } from '../../api/client';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import type { SidebarProps } from './Sidebar';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
@@ -88,6 +89,7 @@ const basisProps: SidebarProps = {
     autobahn: false,
     autobahn_parken: false,
     copernicus: false,
+    copernicus_bilder: false,
     drohne: false,
   },
   onFachebeneToggle: vi.fn(),
@@ -512,6 +514,27 @@ describe('Sidebar Bild-Hintergründe', () => {
     }
   });
 
+  it('blendet eine vom Betreiber abgeschaltete Fachebene aus (LLH-2104)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
+        fachebenenAbgeschaltet={['nina']}
+      />,
+    );
+    expect(document.querySelector('[data-fachebene="nina"]')).toBeNull();
+    expect(screen.queryByText(FACHEBENEN.nina.label)).toBeNull();
+    // Die Gruppe „Warnungen“ bleibt mit DWD stehen.
+    expect(document.querySelector('[data-fachebene="dwd"]')).not.toBeNull();
+    // Der Zähler „N an“ der Fachebenen zählt die abgeschaltete NINA nicht mit.
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).not.toHaveTextContent(/\d+ an/);
+  });
+
+  it('ohne Abschaltung bleibt NINA im Ebenenbaum (LLH-2104)', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} fachebenenAbgeschaltet={[]} />);
+    expect(document.querySelector('[data-fachebene="nina"]')).not.toBeNull();
+  });
+
   // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
     screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;
@@ -637,7 +660,11 @@ describe('Sidebar Bild-Hintergründe', () => {
   };
 
   it('keine klassenabhängige Ebene zeigt ihren Rückfallton im Panel, ein- wie ausgeschaltet (LFH-592)', () => {
-    const klassig = fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben);
+    // Die Satellitenbilder haben keine Klassenfarben und keinen eigenen Ton (LLH-2021).
+    const klassig = fachebeneKeys().filter(
+      (k): k is Exclude<FachebeneQuelle, 'copernicus_bilder'> =>
+        k !== 'copernicus_bilder' && !!FACHEBENEN[k].klassenfarben,
+    );
     expect(klassig.length).toBeGreaterThan(0);
     for (const an of [false, true]) {
       const sichtbar = { ...basisProps.fachebenenSichtbar };
@@ -1833,5 +1860,85 @@ describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
   it('ohne Schreibrecht kein Kontextmenü', () => {
     renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben={false} bilder={[bildLageplan]} />);
     erwarteBrowsermenue(namensteil());
+  });
+});
+
+describe('Sidebar · Fremdebenen (LLH-2099)', () => {
+  const fremd = {
+    ebenen: [
+      {
+        id: 4,
+        name: 'Lage Nachbarkreis',
+        color: 'fremd-1',
+        source: 'datei' as const,
+        feature_count: 2,
+        dropped_count: 0,
+        created_at: '2026-11-24T10:00:00Z',
+      },
+    ],
+    sichtbar: new Set([4]),
+    onToggle: vi.fn(),
+    onUmbenennen: vi.fn(),
+    onFarbe: vi.fn(),
+    onEntfernen: vi.fn(),
+  };
+
+  it('steht als eigene Gruppe im Baum, die Zeile ist der Schalter', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} fremdebenen={fremd} />);
+    expect(screen.getByRole('button', { name: /^Fremdebenen/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    const gruppe = screen.getByRole('group', { name: 'Fremdebenen' });
+    expect(within(gruppe).getByRole('switch', { name: 'Lage Nachbarkreis' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('ohne Fremdebenen keine Gruppe; „Ebene suchen“ findet sie', async () => {
+    const { unmount } = renderMitProviders(
+      <Sidebar {...ebenenProps} fremdebenen={{ ...fremd, ebenen: [] }} />,
+    );
+    expect(screen.queryByRole('group', { name: 'Fremdebenen' })).toBeNull();
+    unmount();
+    renderMitProviders(<Sidebar {...ebenenProps} fremdebenen={fremd} />);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Ebene suchen' }), 'Nachbar');
+    expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toBeInTheDocument();
+  });
+});
+
+describe('Sidebar · Copernicus-Satellitenbilder (LLH-2021)', () => {
+  beforeEach(paneeleOffen);
+  const copernicus = { archiv: false, onArchiv: vi.fn(), aktivierungen: [] };
+  const copernicusBilder = { liste: [], deckkraft: 80, onDeckkraft: vi.fn() };
+  const mit = (sichtbar: Partial<SidebarProps['fachebenenSichtbar']>) =>
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, ...sichtbar }}
+        fachebenenStatus={{ copernicus: 'ok', copernicus_bilder: 'ok' }}
+        copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
+      />,
+    );
+
+  it('zeigt Deckkraft-Regler und genau einen Archiv-Schalter, wenn beide Ebenen an sind', () => {
+    mit({ copernicus: true, copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(within(bilderZeile).getByRole('slider', { name: /Deckkraft/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /Ältere Aktivierungen/ })).toHaveLength(1);
+  });
+
+  it('trägt den Archiv-Schalter an der Bilderzeile, wenn nur sie an ist', () => {
+    mit({ copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(
+      within(bilderZeile).getByRole('checkbox', { name: /Ältere Aktivierungen/ }),
+    ).toBeInTheDocument();
   });
 });

@@ -9,12 +9,31 @@ afterEach(() => {
 describe('exportDateiname', () => {
   it('nennt Inhalt, Einsatz und den lokalen Zeitpunkt auf die Minute', () => {
     const jetzt = new Date(2026, 9, 1, 7, 5, 59);
-    expect(exportDateiname('personen', 42, jetzt)).toBe('personen-einsatz-42-2026-10-01-0705.csv');
+    expect(exportDateiname('personen', 42, 'csv', jetzt)).toBe(
+      'personen-einsatz-42-2026-10-01-0705.csv',
+    );
   });
 
   it('füllt einstellige Monate, Tage und Stunden auf', () => {
-    expect(exportDateiname('tiere', 3, new Date(2027, 0, 9, 23, 0))).toBe(
+    expect(exportDateiname('tiere', 3, 'csv', new Date(2027, 0, 9, 23, 0))).toBe(
       'tiere-einsatz-3-2027-01-09-2300.csv',
+    );
+  });
+});
+
+describe('exportDateiname · Endung', () => {
+  it('trägt die übergebene Endung', () => {
+    expect(exportDateiname('lagekarte', 42, 'kmz', new Date(2026, 10, 24, 14, 5))).toBe(
+      'lagekarte-einsatz-42-2026-11-24-1405.kmz',
+    );
+    expect(exportDateiname('lagebesprechung', 7, 'ics', new Date(2026, 10, 24, 14, 5))).toBe(
+      'lagebesprechung-einsatz-7-2026-11-24-1405.ics',
+    );
+  });
+
+  it('ohne Endung bleibt es csv', () => {
+    expect(exportDateiname('schaeden', 1, undefined, new Date(2026, 10, 24, 14, 5))).toBe(
+      'schaeden-einsatz-1-2026-11-24-1405.csv',
     );
   });
 });

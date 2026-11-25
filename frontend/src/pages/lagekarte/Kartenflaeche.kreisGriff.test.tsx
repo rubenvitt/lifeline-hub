@@ -31,6 +31,7 @@ vi.mock('maplibre-gl', () => {
         getCanvas: () => document.createElement('canvas'),
         getContainer: () => document.createElement('div'),
         getStyle: () => ({ layers: [] }),
+        getLayersOrder: () => [...ebenen],
         once: (ev: string, cb: () => void) => {
           if (ev === 'style.load' || ev === 'load') cb();
         },

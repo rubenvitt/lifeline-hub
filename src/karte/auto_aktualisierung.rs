@@ -717,6 +717,7 @@ mod tests {
             datentraeger: Default::default(),
             adapter: Default::default(),
             ausgang_wecker: Default::default(),
+            fremdebene_abrufer: Default::default(),
             drohne: Default::default(),
         }
     }

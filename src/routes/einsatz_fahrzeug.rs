@@ -31,7 +31,7 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
-pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
+pub(crate) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);

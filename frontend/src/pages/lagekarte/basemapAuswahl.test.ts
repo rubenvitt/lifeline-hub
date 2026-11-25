@@ -15,6 +15,7 @@ function config(over: Partial<KarteServerConfig> = {}): KarteServerConfig {
     // Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
     offline_regionen: [],
     karten_bau_verfuegbar: false,
+    fachebenen_abgeschaltet: [],
     ...over,
   };
 }

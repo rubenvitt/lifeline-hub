@@ -4222,6 +4222,7 @@ dependencies = [
  "p256 0.14.0",
  "percent-encoding",
  "proptest",
+ "quick-xml 0.42.0",
  "rayon",
  "rcgen",
  "reqwest",
@@ -4252,6 +4253,7 @@ dependencies = [
  "uuid",
  "webauthn-rs",
  "webauthn-rs-core",
+ "weezl",
  "zip",
 ]
 

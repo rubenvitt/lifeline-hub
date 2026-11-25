@@ -411,6 +411,7 @@ function basisHandler(
     // Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
     offline_regionen: [],
     karten_bau_verfuegbar: false,
+    fachebenen_abgeschaltet: [],
   },
 ) {
   // extra zuerst: MSW nimmt den ersten Treffer → Tests überschreiben einzelne GET-Defaults gezielt.
@@ -811,6 +812,14 @@ describe('LagekartePage', () => {
     expect(eventSourceUrls).toHaveLength(0);
   });
 
+  it('öffnet über „Fremdebene hinzufügen …“ den Dialog (nur mit Schreibrecht)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: /Fremdebene hinzufügen …/ }));
+    expect(await screen.findByRole('radio', { name: 'Adresse' })).toBeInTheDocument();
+  });
+
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {
     let patchBody: unknown = null;
     basisHandler([
@@ -1019,6 +1028,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1045,6 +1055,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1105,6 +1116,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1126,6 +1138,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1312,6 +1325,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -2132,6 +2146,71 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für benachbarte
     // Ausschnitte.
     await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
+  });
+});
+
+describe('LagekartePage · vom Betreiber abgeschaltete Fachebene (LLH-2104)', () => {
+  const leer = (quelle: string) =>
+    HttpResponse.json({
+      quelle,
+      status: 'leer',
+      attribution: 'Quelle',
+      features: { type: 'FeatureCollection', features: [] },
+    });
+
+  // Gespeicherte Ansicht mit NINA und DWD an; DWD ist der Taktgeber, an dem der Test erkennt,
+  // dass die Fachebenen abgefragt wurden.
+  function mitAnsicht(abgeschaltet: string[], angefragt: string[]) {
+    basisHandler(
+      [
+        http.get('/api/map/overlays/nina', () => {
+          angefragt.push('nina');
+          return leer('nina');
+        }),
+        http.get('/api/map/overlays/dwd', () => {
+          angefragt.push('dwd');
+          return leer('dwd');
+        }),
+        http.get('/api/incidents/1/map-views', () =>
+          HttpResponse.json([
+            {
+              id: 1,
+              einsatz_id: 1,
+              name: 'Standard',
+              reihenfolge: 0,
+              ist_standard: true,
+              erstellt_at: '',
+              geaendert_at: '',
+              fachebenen_sichtbar: { nina: true, dwd: true },
+            },
+          ]),
+        ),
+      ],
+      {
+        online_styles: [],
+        offline_verfuegbar: false,
+        offline_tiles_url: null,
+        offline_attribution: null,
+        offline_regionen: [],
+        karten_bau_verfuegbar: false,
+        fachebenen_abgeschaltet: abgeschaltet,
+      },
+    );
+  }
+
+  it('Gegenprobe: eingeschaltet fragt die Seite NINA aus der gespeicherten Ansicht ab', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht([], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('nina'));
+  });
+
+  it('abgeschaltet fragt die Seite NINA nie ab, obwohl die Ansicht sie gespeichert hat', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht(['nina'], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('dwd'));
+    expect(angefragt).not.toContain('nina');
   });
 });
 

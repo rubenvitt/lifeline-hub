@@ -301,6 +301,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
         ),
         ("ADAPTER_NAME_MAX", lifeline_hub::routes::adapter::NAME_MAX),
         (
+            "FREMDEBENE_NAME_MAX",
+            lifeline_hub::karte_fremdebene::NAME_MAX,
+        ),
+        (
             "ADAPTER_GEHEIMNIS_MAX",
             lifeline_hub::adapter::geheimnis::GEHEIMNIS_MAX,
         ),

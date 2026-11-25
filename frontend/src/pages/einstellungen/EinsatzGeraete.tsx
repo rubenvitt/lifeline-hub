@@ -70,6 +70,7 @@ import {
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import EinsatzAnbindungen from './EinsatzAnbindungen';
 import EinsatzLagebildExtern from './EinsatzLagebildExtern';
+import EinsatzHelfer from './EinsatzHelfer';
 import { pflicht } from '../../components/pflichtRegel';
 
 /**
@@ -402,6 +403,11 @@ export default function EinsatzGeraete() {
         />
         {kontext.menue}
       </Formularpaneel>
+
+      {/* Helfer-App: Einladen und Bestätigen schreiben wie das Koppeln einen ETB-Eintrag. */}
+      {daten.einsatz && (
+        <EinsatzHelfer einsatzId={einsatzId} einsatz={daten.einsatz} darf={darfKoppeln} />
+      )}
 
       <EinsatzAnbindungen einsatzId={einsatzId} darf={darfFreigeben} />
 

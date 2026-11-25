@@ -44,6 +44,16 @@ const blatt = (teil: Partial<LageplanBlatt> = {}): LageplanBlatt => ({
       },
     ],
     bilder: [{ schluessel: 'bild-3', text: 'Hallenplan' }],
+    fremdebenen: [
+      {
+        schluessel: 'fremdebene-4',
+        text: 'Lage Nachbarkreis',
+        fuellung: '#2f54eb',
+        fuellDeckung: 0.3,
+        linie: '#2f54eb',
+        gestrichelt: false,
+      },
+    ],
     veraltet: ['Pegel (Stand 0900)'],
   },
   ...teil,
@@ -102,7 +112,14 @@ describe('LageplanDruck', () => {
       'Brandstelle · Warnstufe: hoch',
       'Pegel · veraltet · Stand 0900',
       'Bild: Hallenplan',
+      'Fremde Daten: Lage Nachbarkreis',
     ]);
+    // Die Fremdebene trägt ihre Ebenenfarbe als Feld (LLH-2099).
+    expect(
+      [...wurzel.querySelectorAll('[data-lfh="lageplan-legende"] rect')].map((r) =>
+        r.getAttribute('fill'),
+      ),
+    ).toContain('#2f54eb');
     // Die Zone trägt ihr Feld mit Strichelung; die Warnstufe steht als Text.
     expect(
       wurzel.querySelector('[data-lfh="lageplan-legende"] rect')?.getAttribute('stroke-dasharray'),

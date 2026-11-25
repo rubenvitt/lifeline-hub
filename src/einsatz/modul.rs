@@ -297,6 +297,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/incidents/{id}/command", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/incidents/{id}/devices", None),
+    // Helfer-App (Spec 2026-11-24-vakwvkpg): Einladung und Helfer der Leitung, kein Modul.
+    ("/api/incidents/{id}/helpers", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/incidents/{id}/integrations", None),
     // Versandliste und „Erneut senden“ des Ausgangskorbs (LLH-2093): modul-los am Pfad. Das Modul

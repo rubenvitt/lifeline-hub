@@ -585,28 +585,109 @@ pub async fn hole_asset_via_cache_oder_direkt(
     }
 }
 
+// ===== Einträge ohne Upstream (LLH-2021) =====
+
+/// Gültigkeit eines Eintrags ohne Upstream. Gelesen wird er unabhängig davon
+/// ([`lies_eintrag`]); sie hält nur die Form der Zeile ein. Verdrängt wird nach LRU.
+const EINTRAG_TTL_SEK: i64 = 30 * 24 * 3600;
+
+/// Liest einen Eintrag, den [`schreibe_eintrag`] gelegt hat: Bytes und Content-Type. Ablaufzeit
+/// egal (gerenderte Kacheln und COG-Köpfe ändern sich nicht); ein Treffer zählt für den LRU.
+pub async fn lies_eintrag(cache: &TileCache, schluessel: &str) -> Option<(Vec<u8>, String)> {
+    let row = lade(cache, schluessel).await?;
+    beruehre(cache, schluessel, unix_now()).await;
+    Some((row.bytes, row.content_type))
+}
+
+/// Legt einen Eintrag ohne Upstream ab, etwa eine gerenderte COG-Kachel. Gleiche Tabelle, gleicher
+/// LRU und Größendeckel wie die geproxyten Kacheln; ein Schreibfehler wird nur geloggt.
+pub async fn schreibe_eintrag(
+    cache: &TileCache,
+    schluessel: &str,
+    bytes: &[u8],
+    content_type: &str,
+) {
+    let now = unix_now();
+    let a = AssetAntwort {
+        bytes: bytes.to_vec(),
+        content_type: content_type.to_string(),
+        content_encoding: None,
+        cache_control: None,
+        etag: None,
+    };
+    if speichere(cache, schluessel, &a, now + EINTRAG_TTL_SEK, now)
+        .await
+        .is_ok()
+    {
+        verdraenge_falls_noetig(cache).await;
+    } else {
+        tracing::warn!("Tile-Cache: Schreibfehler (ignoriert)");
+    }
+}
+
+/// Leerer Kachel-Cache im Speicher, für Tests anderer Module.
+#[cfg(test)]
+pub(crate) async fn test_cache() -> TileCache {
+    test_cache_mit_cap(TILE_CACHE_CAP_BYTES).await
+}
+
+/// Wie [`test_cache`], mit eigenem Größendeckel.
+#[cfg(test)]
+pub(crate) async fn test_cache_mit_cap(cap: i64) -> TileCache {
+    let pool = SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(":memory:")
+                .create_if_missing(true),
+        )
+        .await
+        .unwrap();
+    schema_anlegen(&pool).await.unwrap();
+    TileCache::neu(pool, cap)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ===== Einträge ohne Upstream (LLH-2021) =====
+
+    #[tokio::test]
+    async fn eintrag_hin_und_zurueck() {
+        let cache = test_cache().await;
+        schreibe_eintrag(&cache, "cog:abc/1/2/3", b"png", "image/png").await;
+        assert_eq!(
+            lies_eintrag(&cache, "cog:abc/1/2/3").await,
+            Some((b"png".to_vec(), "image/png".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn fehlender_eintrag_ist_none() {
+        assert_eq!(lies_eintrag(&test_cache().await, "cog:fehlt").await, None);
+    }
+
+    #[tokio::test]
+    async fn eintrag_zaehlt_in_groesse_und_lru() {
+        let cache = test_cache_mit_cap(150).await;
+        schreibe_eintrag(&cache, "a", &[1; 100], "x").await;
+        schreibe_eintrag(&cache, "b", &[2; 100], "x").await;
+        // Die Verdrängung läuft im Hintergrund.
+        for _ in 0..200 {
+            if schluessel(&cache).await == vec!["b"] {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+        panic!("nicht verdrängt: {:?}", schluessel(&cache).await);
+    }
+
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
     async fn test_cache_pool() -> TileCache {
-        test_cache_mit_cap(TILE_CACHE_CAP_BYTES).await
-    }
-
-    async fn test_cache_mit_cap(cap: i64) -> TileCache {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect_with(
-                SqliteConnectOptions::new()
-                    .filename(":memory:")
-                    .create_if_missing(true),
-            )
-            .await
-            .unwrap();
-        schema_anlegen(&pool).await.unwrap();
-        TileCache::neu(pool, cap)
+        test_cache().await
     }
 
     /// Loopback-Upstream mit Hit-Zähler und `If-None-Match`→304; belegt, dass ein Cache-Hit den

@@ -1,4 +1,4 @@
-//! Tabelle `ausgang` (LLH-2093, Migration 0377). Schreibwege nehmen eine Verbindung (`_tx`), damit
+//! Tabelle `ausgang` (LLH-2093, Migration 0381). Schreibwege nehmen eine Verbindung (`_tx`), damit
 //! der Aufrufer sie mit ETB und Quellprüfung in einer Transaktion bündelt; die Lesewege der
 //! Versandliste und der Lauf nehmen den Pool. Fremde Einsätze sind `NotFound` (404).
 
