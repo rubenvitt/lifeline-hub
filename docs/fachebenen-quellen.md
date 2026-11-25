@@ -415,9 +415,10 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   * Ein Teil der Verkehrsmeldungen stammt von **INRIX**, einem kommerziellen Datenanbieter
     (`source: inrix`, am 24.11. 3 von 8). Das Feld wird nicht übernommen. Webcam-Bilder liegen bei
     Drittbetreibern und werden nur verlinkt, nie zwischengespeichert.
-  * Eine schriftliche Anfrage an die Autobahn GmbH (kontakt@autobahn.de) ist gestellt: Lizenz,
-    Vermerk für INRIX, Einsatz in einer entgeltlichen Anwendung, Abrufgrenze. Bis zur Antwort
-    wird die Attribution `Autobahn GmbH des Bundes` an beiden Ebenen immer mitgeführt.
+  * Eine schriftliche Anfrage an die Autobahn GmbH (kontakt@autobahn.de) ist vorbereitet
+    (Entwurf im Anhang des Design-Docs zu LLH-1637): Lizenz, Vermerk für INRIX, Einsatz in einer
+    entgeltlichen Anwendung, Abrufgrenze. Bis zur Antwort wird die Attribution
+    `Autobahn GmbH des Bundes` an beiden Ebenen immer mitgeführt.
 - **Autobahn — Verkehrsmeldungen** (`warning`, LLH-1637): `abnormalTrafficType` fehlte am
   24.11.2026 bei 5 von 8 Meldungen; bekannt sind `QUEUING_TRAFFIC` (Stau), `SLOW_TRAFFIC`
   (zähfließend), `STATIONARY_TRAFFIC` (Stillstand), andere Werte fallen weg, der Titel trägt
