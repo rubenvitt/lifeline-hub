@@ -24,6 +24,11 @@ import {
  * (`pnpm doku:bilder --grep lagemonitor`, Mitänderungsregel in `docs/anwender/AGENTS.md`):
  *   lagemonitor.png    frontend/src/geraet/LagemonitorPage.tsx, frontend/src/geraet/LagemonitorKarte.tsx
  *   geraetemenue.png   frontend/src/geraet/LagemonitorPage.tsx (Gerätemenü nach langem Drücken)
+ *   livebild.png       frontend/src/geraet/LagemonitorPage.tsx, frontend/src/geraet/LagemonitorLivebild.tsx
+ *   livebild-schalter.png  frontend/src/pages/lagekarte/DrohnenQuelle.tsx (Gruppe „Drohne“ der Lagekarte)
+ *
+ * Die Demo-Daten tragen keinen Drohnen-Adapter: Quelle und Block `drohne` kommen aus
+ * `page.route`, der Videoabruf antwortet 503 (die Kachel zeigt „Kein Livebild“).
  */
 
 const KAPITEL = 'lagemonitor';
@@ -68,7 +73,11 @@ async function kartengrundlage(geraet: Page) {
  * `sofortmeldung` liegt vorher eine unbestätigte Sofortmeldung an (die Demo-Sofortmeldung ist
  * bestätigt), damit die Kachel „Meldungen“ eine Zahl zeigt; sie bleibt in der Temp-DB des Laufs.
  */
-async function monitor(page: Page, browser: Browser, { sofortmeldung = false } = {}) {
+async function monitor(
+  page: Page,
+  browser: Browser,
+  { sofortmeldung = false, livebild = false } = {},
+) {
   await anmelden(page);
   const demo = await demoEinsatz(page);
   if (sofortmeldung) {
@@ -101,6 +110,7 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   const geraet = await kontext.newPage();
   await uhrAnhalten(geraet);
   await kartengrundlage(geraet);
+  if (livebild) await livebildBeantworten(geraet, demo.id);
   await geraet.goto(`/koppeln#${k.code.code}`);
   await geraet.getByRole('button', { name: 'Gerät koppeln' }).click();
   await expect(geraet).toHaveURL(new RegExp(`/geraet/${demo.id}/monitor$`));
@@ -112,6 +122,22 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   );
   await expect(geraet.locator('[data-lfh="monitor-uhs"]').first()).toBeVisible();
   return { kontext, geraet, einsatz: demo.id, uhs, abschnitt };
+}
+
+/**
+ * Block `drohne` im Lagebild, wie ihn der Server bei eingeschaltetem Schalter liefert, und ein
+ * Videoabruf ohne Stream (LLH-2109).
+ */
+async function livebildBeantworten(geraet: Page, einsatz: number) {
+  await geraet.route(`**/api/incidents/${einsatz}/situation-monitor`, async (route) => {
+    const antwort = await route.fetch();
+    const lage = (await antwort.json()) as { stand_at: string };
+    await route.fulfill({
+      response: antwort,
+      json: { ...lage, drohne: { videos: ['v1'], stand_at: lage.stand_at } },
+    });
+  });
+  await geraet.route('**/drone/video/**', (route) => route.fulfill({ status: 503, body: '' }));
 }
 
 /** Der erste Abschnitt des Demo-Einsatzes. */
@@ -219,6 +245,54 @@ test.describe(KAPITEL, () => {
       await kontext.close();
       await orteZuruecksetzen(page, einsatz, uhs, abschnitt);
     }
+  });
+
+  test('Livebild der Drohne neben Meldungen und Ablauf', async ({ page, browser }) => {
+    const { kontext, geraet, einsatz, uhs, abschnitt } = await monitor(page, browser, {
+      sofortmeldung: true,
+      livebild: true,
+    });
+    try {
+      const livebild = geraet.getByRole('region', { name: 'Livebild' });
+      await expect(livebild.getByText('Kein Livebild')).toBeVisible({ timeout: 30_000 });
+      await expect(geraet.locator('[data-lfh="monitor-uhs"]').first()).toBeVisible();
+      await geraet.mouse.move(0, 0);
+      await fotografiere(geraet, KAPITEL, 'livebild');
+    } finally {
+      await kontext.close();
+      await orteZuruecksetzen(page, einsatz, uhs, abschnitt);
+    }
+  });
+
+  test('Schalter „Livebild auf dem Lagemonitor“ an der Lagekarte', async ({ page }) => {
+    await anmelden(page);
+    const demo = await demoEinsatz(page);
+    await page.route(`**/api/incidents/${demo.id}/drone/sources`, (route) =>
+      route.fulfill({
+        json: [
+          {
+            adapter_id: 'suchlage-1',
+            label: 'Suchlage Staffel Nord',
+            connected: true,
+            held_by_other_hidden: false,
+            lagemonitor: true,
+            state: 'aktiv',
+            mission_name: 'Waldsuche Ost',
+            video_keys: ['v1'],
+          },
+        ],
+      }),
+    );
+    await page.goto(`/einsaetze/${demo.id}/lagekarte`);
+    await page.getByRole('button', { name: /^Fachebenen/ }).click();
+    // Die Gruppe „Drohne“ steht per Vorgabe offen (`BAUM_KLAPP_VORGABE`).
+    const gruppe = page.getByRole('group', { name: 'Drohne' });
+    await expect(
+      gruppe.getByRole('switch', { name: /Livebild auf dem Lagemonitor/ }),
+    ).toBeVisible();
+    await gruppe.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    await fotografiere(gruppe, KAPITEL, 'livebild-schalter');
   });
 
   test('Gerätemenü nach langem Drücken auf die Statusleiste', async ({ page, browser }) => {

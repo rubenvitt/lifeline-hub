@@ -57,6 +57,24 @@ pub async fn find_active_holder(
     .await?)
 }
 
+/// Die Zuschaltung, deren Livebild auf den Lagemonitor geht (LLH-2109): die zuerst zugeschaltete
+/// mit `lagemonitor = 1`, nur in einem laufenden Einsatz.
+pub async fn find_lagemonitor(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Option<Zuschaltung>, AppError> {
+    Ok(sqlx::query_as::<_, Zuschaltung>(
+        "SELECT ae.adapter_id, ae.einsatz_id, ae.zugeschaltet_at, ae.lagemonitor \
+         FROM adapter_einsatz ae JOIN einsatz e ON e.id = ae.einsatz_id \
+         WHERE ae.einsatz_id = ? AND ae.lagemonitor = 1 AND e.status = ? \
+         ORDER BY ae.zugeschaltet_at, ae.adapter_id LIMIT 1",
+    )
+    .bind(einsatz_id)
+    .bind(STATUS_AKTIV)
+    .fetch_optional(conn)
+    .await?)
+}
+
 /// Schaltet zu oder aktualisiert die Zeile (`zugeschaltet_at` bleibt bei einer bestehenden Zeile).
 pub async fn upsert(conn: &mut SqliteConnection, z: &Zuschaltung) -> Result<(), AppError> {
     sqlx::query(
