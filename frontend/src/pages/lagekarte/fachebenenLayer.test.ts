@@ -374,8 +374,8 @@ describe('fachebeneClickLayerIds', () => {
  * Doppelkante weiß/schwarz trägt die Kontur gegen jeden Kartengrund.
  */
 describe('Trefferzone und Kante der Punkt-Fachebenen (LFH-600)', () => {
-  // Die Drohnenlage zeichnet je Art eigene Layer und hat weder Trefferzone noch Klickziel (eigener
-  // Block unten).
+  // Kante und Kreis prüfen nur die Punkt-Ebenen ohne Drohnenlage: die zeichnet je Art eigene Layer
+  // (eigener Block unten); ihre Trefferzone für die Fotos prüft `trefferEbenen`.
   const punktEbenen = Object.values(FACHEBENEN).filter(
     (d) => d.geometrieTyp === 'punkt' && !d.drohnenlage,
   );
