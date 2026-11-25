@@ -27,6 +27,7 @@ const ELTERN: Record<string, string> = {
   wasser: 'fachebenen',
   umwelt: 'fachebenen',
   verkehr: 'fachebenen',
+  drohne: 'fachebenen',
   grundlage: 'hintergrund',
   bilder: 'hintergrund',
 };
@@ -34,7 +35,7 @@ const ELTERN: Record<string, string> = {
 /**
  * Öffnet eine Gruppe des Ebenenbaums (`section[data-paneel=…]`) samt ihrer Elterngruppe und holt
  * dafür die Ansicht „Ebenen“ nach vorn. Kennungen: kraefte, lage, betroffene, fachebenen,
- * warnungen, wasser, umwelt, verkehr, hintergrund, grundlage, bilder.
+ * warnungen, wasser, umwelt, verkehr, drohne, hintergrund, grundlage, bilder.
  */
 export async function oeffneEbenenGruppe(page: Page, kennung: string) {
   await zeigeLeistenAnsicht(page, 'Ebenen');
