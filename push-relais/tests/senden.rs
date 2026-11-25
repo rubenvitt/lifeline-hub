@@ -557,7 +557,7 @@ async fn felder_die_apple_ablehnt_werden_frueh_abgewiesen() {
     assert_eq!(d.erfasst.lock().unwrap().len(), 100);
 }
 
-/// Wie [`aufbau`], aber mit weiteren erlaubten Bundle-IDs (ADR-0104).
+/// Wie [`aufbau`], aber mit weiteren erlaubten Bundle-IDs (ADR-0105).
 async fn aufbau_mit_themen(basis: &str, weitere: &str) -> (Router, String) {
     let pool = speicher::oeffnen(":memory:").await.unwrap();
     let zugang = speicher::registrieren(&pool, None, "1.0.0").await.unwrap();

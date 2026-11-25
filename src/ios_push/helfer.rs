@@ -1,4 +1,4 @@
-//! iOS-Push an die Helfer-App (Stufe 2, ADR-0104): je Anmeldung einer Helfer-Kopplung eine
+//! iOS-Push an die Helfer-App (Stufe 2, ADR-0105): je Anmeldung einer Helfer-Kopplung eine
 //! verschlüsselte Nutzlast wie bei der Lifeline-App (ADR-0090), mit `thema` = Helfer-Bundle an das
 //! Relais. Ein vom Relais als ungültig gemeldetes Token löscht die Anmeldung. Kein Wiederholen.
 

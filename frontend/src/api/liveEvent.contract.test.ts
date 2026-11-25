@@ -20,7 +20,14 @@ import {
  */
 
 /** Wire-Events, die der Client fest verdrahtet behandelt, ohne Registry-Eintrag. */
-const NICHT_REGISTRY = ['sofortmeldung', 'lagged', BENACHRICHTIGUNG_EREIGNIS, 'praesenz'] as const;
+const NICHT_REGISTRY = [
+  'sofortmeldung',
+  'lagged',
+  BENACHRICHTIGUNG_EREIGNIS,
+  'praesenz',
+  // Nur im Strom einer Helfer-Kopplung (Android-Helfer-App, ADR-0105); die Seite sieht es nie.
+  'helfer_auftrag',
+] as const;
 
 /** Alle Wire-Event-Namen, die das Frontend kennt: Registry-Keys ∪ {@link NICHT_REGISTRY}. */
 type FeWireEvent = EinsatzStreamEvent | (typeof NICHT_REGISTRY)[number];

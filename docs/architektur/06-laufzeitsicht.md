@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Auftrag an die Helfer-App, LLH-2111; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -971,3 +971,44 @@ sequenceDiagram
   [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „iOS-Push“; Hülle:
   [`ios/AGENTS.md`](../../ios/AGENTS.md), „Push über APNs“; Betrieb:
   [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md).
+
+### 6.8c Auftrag an die Helfer-App: zustellen und übernehmen
+
+Ein Auftrag an Einheit, Fahrzeug oder zugeordnete Person erreicht die bestätigten Helfer-Apps
+(LLH-2111, [ADR-0105](entscheidungen/ADR-0105-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend (Leitung)
+  participant BE as lifeline-hub (src/routes/auftrag.rs)
+  participant PG as src/helfer/pager.rs
+  participant IP as src/ios_push/helfer.rs
+  participant R as push-relais
+  participant HA as Helfer-App (Android, Dienst)
+  participant HI as Helfer-App (iOS, HelferDienst)
+  FE->>BE: POST /api/incidents/{id}/tasks
+  BE->>PG: nach_erteilung → deliver
+  PG->>PG: resolve: bestätigte Kopplungen mit eigener Zeile, Einsatz aktiv
+  PG->>PG: helfer_gesendet an Zeilen mit NULL
+  PG-->>HA: LiveHub::melde_helfer_auftrag → SSE helfer_auftrag {task_id}
+  PG->>IP: versenden_helfer (nur Ziele, für die der Auftrag neu ist)
+  IP->>R: POST /v1/senden, thema = dev.rubeen.lifeline.helfer
+  R-->>HI: APNs, Umschlag l
+  HA->>BE: GET /api/devices/me/tasks
+  HI->>BE: GET /api/devices/me/tasks (Tippen oder Vordergrund)
+  HA->>BE: POST /api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge
+  BE->>BE: auftrag::quittung::acknowledge (wie am Auftrag)
+  BE-->>FE: Live auftrag
+  BE-->>HA: SSE helfer_auftrag an die übrigen Helfer des Auftrags
+```
+
+- `deliver` läuft auch nach einer Berichtigung (`routes::auftrag::berichtigen`): neue Zeilen
+  tragen `helfer_gesendet IS NULL`, Push geht nur an Kopplungen ohne ältere eigene Zeile; die
+  übrigen laden über das Live-Ereignis neu. Aufhebung und Quittung melden nur live
+  (`notify_changed`).
+- Das SSE-Ereignis `helfer_auftrag` ist kein `LiveEvent`: es läuft über einen eigenen Broadcast am
+  Ring vorbei und nur im Strom der genannten Helfer-Kopplung (`helfer_auftraege` in
+  `src/routes/live.rs`); `lese_module(Helfer)` bleibt leer.
+- Die Push-Anmeldung (`helfer_push_anmeldung`, Migration 0385) endet mit der Kopplung:
+  `geraet::repo::beenden`, Ablauf-Takt (`geraet::ablauf::raeume_helfer`) und Einsatzabschluss
+  (`einsatz::repo::abschliessen`) löschen sie; `resolve` prüft trotzdem bei jeder Zustellung frisch.

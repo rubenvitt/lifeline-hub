@@ -492,7 +492,7 @@ pub async fn aufheben(
     )
     .await?;
     sse(&state, einsatz_id);
-    // Helfer-App Stufe 2: die App zeigt den Auftrag als aufgehoben (ADR-0104).
+    // Helfer-App Stufe 2: die App zeigt den Auftrag als aufgehoben (ADR-0105).
     crate::helfer::pager::notify_changed(&state, einsatz_id, auftrag_id).await;
     Ok(Json(d))
 }
@@ -536,7 +536,7 @@ pub async fn berichtigen(
         &berichtigt.hinzu,
     )
     .await;
-    // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0104).
+    // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0105).
     crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(

@@ -84,7 +84,7 @@ pub async fn senden(
     {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    // Ein Thema außerhalb der erlaubten Bundle-IDs (ADR-0104): nichts geht hinaus.
+    // Ein Thema außerhalb der erlaubten Bundle-IDs (ADR-0105): nichts geht hinaus.
     if nachrichten.iter().any(|n| {
         n.thema
             .as_deref()

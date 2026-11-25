@@ -29,7 +29,7 @@ Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026-11-24-v
   Messung), feste Texte `Anzeige`; `App/Modell/HelferModell.swift` und
   `App/Dienste/Ortungsdienst.swift` führen nur aus. Jede Seite hat ein Bild in
   `ios/HelferUITests` (Startargument `-HelferTestzustand <seite>`, ohne Netz und Ablage).
-- **Aufträge (Stufe 2, ADR-0104):** Push nur über das Relais an das Ziel `LifelineHelfer`
+- **Aufträge (Stufe 2, ADR-0105):** Push nur über das Relais an das Ziel `LifelineHelfer`
   (`aps-environment`), entschlüsselt im Mitteilungsdienst `ios/Helfer/Dienst`
   (`dev.rubeen.lifeline.helfer.dienst`). Ordnung der Liste, Quittungsstand, Nutzlast und
   „Mitteilung ja/nein“ entscheidet `HelferKern` (`Auftraege`, `PagerNutzlast`) mit den Fällen

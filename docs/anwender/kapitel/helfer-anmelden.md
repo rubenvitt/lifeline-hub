@@ -2,15 +2,16 @@
 titel: Helfer anmelden
 gruppen: [fuehrung, geraete]
 reihenfolge: 765
-quellen: [frontend/src/pages/einstellungen/EinsatzHelfer.tsx, frontend/src/pages/einstellungen/helferKern.ts, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/HelferWartenBand.tsx, frontend/src/geraet/HelferWeichePage.tsx, frontend/src/pages/lagekarte/GeortetListe.tsx, frontend/src/pages/lagekarte/positionsAlter.ts, src/helfer/, src/ortung/, ios/Helfer/, android/helfer/]
+quellen: [frontend/src/pages/einstellungen/EinsatzHelfer.tsx, frontend/src/pages/einstellungen/helferKern.ts, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/einsatz/HelferWartenBand.tsx, frontend/src/geraet/HelferWeichePage.tsx, frontend/src/pages/lagekarte/GeortetListe.tsx, frontend/src/pages/lagekarte/positionsAlter.ts, frontend/src/auftraege/helferZustellung.ts, src/helfer/, src/ios_push/helfer.rs, src/ortung/, ios/Helfer/, android/helfer/]
 ---
 
 ## Überblick
 
 Mit der App „Lifeline Helfer“ melden Helfende ihre Position an die Einsatzleitung, ohne ein
-Konto in Lifeline Hub zu haben. Die Einsatzleitung **lädt ein**, die Helfenden scannen den
+Konto in Lifeline Hub zu haben, und empfangen Aufträge im laufenden Einsatz. Die Einsatzleitung **lädt ein**, die Helfenden scannen den
 QR-Code, wählen Einheit oder Fahrzeug und warten, bis die Einsatzleitung sie **bestätigt**. Danach
-steht die Position auf der Lagekarte, mit Quelle und Alter.
+steht die Position auf der Lagekarte, mit Quelle und Alter, und Aufträge an ihre Einheit, ihr
+Fahrzeug oder ihre Person erreichen die App als Mitteilung.
 
 Das Kapitel richtet sich an die Einsatzleitung (Einladen und Bestätigen) und an die Helfenden
 (Installieren und Anmelden). Die Ortung muss die Organisation vorher in der Verwaltung einschalten
@@ -96,6 +97,32 @@ Für Helfende:
 6. Mit „Pausieren“ endet das Senden vorübergehend, mit „Fortsetzen“ geht es in der geöffneten App
    weiter. „Abmelden“ beendet die Ortung; für eine neue Anmeldung ist wieder ein Code nötig.
 
+### Aufträge an Helfer geben
+
+Für die Einsatzleitung:
+
+1. Einen Auftrag wie gewohnt erteilen und als Empfänger die Einheit, das Fahrzeug oder die Person
+   wählen, an die der Helfer gebunden ist (siehe [Aufträge und Befehle](auftraege-befehle.md)).
+2. Im Auftrag steht an der Empfängerzeile „an 2 Helfer-Apps gesendet“: so viele bestätigte Helfer
+   haben den Auftrag bekommen.
+3. Übernimmt ein Helfer den Auftrag, steht dort „quittiert von Max M. (Helfer-App)“, und die
+   Empfängerzeile gilt als quittiert.
+4. Bleibt die Quittung aus, über Funk nachfassen.
+
+### Aufträge empfangen und übernehmen
+
+Für Helfende:
+
+1. Ein neuer Auftrag kommt als Mitteilung mit Ton, auch bei gesperrtem Bildschirm. Unter Android
+   steht auf dem Sperrbildschirm nur „Neuer Auftrag“.
+2. Die Mitteilung antippen. Der Auftrag öffnet sich mit Text, Ort, Priorität, Frist und Empfänger.
+3. „Übernommen“ wählen. Danach steht dort „Übernommen um …“. War jemand derselben Einheit
+   schneller, steht „Übernommen von …“.
+4. Alle Aufträge stehen in der App im Bereich „Aufträge“. Ein aufgehobener Auftrag ist
+   durchgestrichen und trägt „aufgehoben“.
+5. Scheitert „Übernommen“, steht „Bitte über Funk bestätigen“ da: dann die Übernahme über Funk
+   melden.
+
 ## Hintergrund
 
 ### Wer das darf und was vorher nötig ist
@@ -144,7 +171,26 @@ Standortanzeige und die Live-Aktivität, unter Android durch die Benachrichtigun
 Die App ortet nur bei erlaubtem Standort „Beim Verwenden der App“, nie dauerhaft im Hintergrund
 ohne diese Anzeige.
 
+### Aufträge an die Helfer-App
+
+- **Wer empfängt:** jeder bestätigte Helfer, dessen Einheit oder Fahrzeug Empfänger ist, und der
+  Helfer, dem die Einsatzleitung die Person zugeordnet hat. Ein pausierter Helfer empfängt
+  ebenfalls. Vor der Bestätigung, nach dem Ende der Anmeldung und nach dem Einsatzende kommt
+  nichts mehr an. Aufträge an Abschnitte, Funktionen und externe Stellen gehen nicht an Helfer.
+- **Quittung:** „Übernommen“ ist die Quittung der Empfängerzeile, wie die Quittung in Lifeline
+  Hub. Die erste zählt; der Ersteller des Auftrags erfährt sie wie gewohnt.
+- **Zustellung:** Unter iOS kommt der Auftrag als Mitteilung über den Apple-Dienst, auch bei
+  beendeter App; der Inhalt ist verschlüsselt und nur auf dem Gerät lesbar. Unter Android hält die
+  App die Verbindung zum Server, solange die Anmeldung gilt; die Benachrichtigung „empfängt
+  Aufträge“ zeigt das. Beendet Android die App, kommt nichts an.
+- **Mitteilungen aus:** Wer Mitteilungen ablehnt, sieht in der App „Mitteilungen aus — du bekommst
+  Aufträge nur bei offener App“.
+- **Ohne Netz:** Es gibt keine Warteschlange. Ein Auftrag, der nicht ankommt, bleibt ohne Quittung;
+  die Einsatzleitung sieht das am Auftrag und greift zum Funk.
+- Die App legt Aufträge nicht in Dateien ab.
+
 ## Grundlagen und Quellen
 
 - Architekturentscheidung zur Ortung der Helfer-App: ADR-0101 (`docs/architektur/entscheidungen/`).
+- Architekturentscheidung zu Aufträgen an die Helfer-App: ADR-0105.
 - Datenschutz: `docs/datenschutz/dsfa-vorlage-ortung.md`.

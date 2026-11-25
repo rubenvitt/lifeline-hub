@@ -1800,6 +1800,7 @@ fn live_event_wire() {
         Benachrichtigung => "benachrichtigung",
         Praesenz => "praesenz",
         Helfer => "helfer",
+        HelferAuftrag => "helfer_auftrag",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }

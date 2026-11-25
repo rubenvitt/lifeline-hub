@@ -54,6 +54,8 @@ Verwaltung, dass diese Grundlage vorliegt; der Server hält fest, wer es wann be
 | Zielzuordnung (Einheit oder Fahrzeug) | bei der Anmeldung, von der Leitung bestätigt | |
 | Zuordnung zu einer Person des Einsatzes | nur mit Freigabe „Auch Personen orten“ und Bestätigung der Leitung | |
 | Quelle der Position („Helfer-App“) | mit jeder Position | für die Anzeige auf der Lagekarte |
+| Aufträge an Einheit, Fahrzeug oder Person (Text, Ort, Frist) und ihre Quittung | im laufenden Einsatz, nur bestätigte Kopplungen (ADR-0105) | kann Personendaten Dritter tragen, etwa Angaben zu Verletzten |
+| Push-Anmeldung der iOS-App (Gerätetoken, Schlüssel) | solange die Kopplung besteht | mit der Kopplung gelöscht, nicht in Sicherungen |
 
 Keine Bewegungsprofile, keine Geschwindigkeits- oder Routendaten, keine Weitergabe an Dritte. Die
 App sendet nur an den Server ihrer Kopplung (`ios/Helfer/AGENTS.md`, `android/helfer/AGENTS.md`).
@@ -104,6 +106,8 @@ Mildere Mittel, die die Software bietet:
 | Ortung nach dem Einsatz | Kopplung endet mit dem Einsatz oder nach 72 Stunden; die Leitung kann alle abmelden |
 | Zugriff Unbefugter | Positionen nur über die Rechte des Einsatzes; Live-Ereignis nur an die Leitung; Einladung per Code mit Drosselung |
 | Gerät geht verloren | die Leitung entfernt die Kopplung; die Sitzung endet sofort |
+| Auftragstext auf dem Sperrbildschirm eines Privatgeräts | Android zeigt dort nur „Neuer Auftrag“; unter iOS gilt die Einstellung „Vorschauen“ des Geräts; Aufträge liegen nicht in Dateien |
+| Auftrag über Apple-Push | Inhalt Ende-zu-Ende verschlüsselt, Relais und Apple sehen nur Token und Chiffrat |
 | Druck zur Teilnahme (Beschäftigte) | Betriebsvereinbarung; Freiwilligkeit der Personenortung als eigenes Häkchen |
 | `<weitere Risiken der Organisation>` | `<Maßnahme>` |
 

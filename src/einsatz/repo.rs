@@ -932,7 +932,7 @@ pub async fn abschliessen(
         // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
         // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
         crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
-        // Stufe 2 (ADR-0104): nach dem Einsatz geht kein Auftrag mehr an eine Helfer-App.
+        // Stufe 2 (ADR-0105): nach dem Einsatz geht kein Auftrag mehr an eine Helfer-App.
         sqlx::query(
             "DELETE FROM helfer_push_anmeldung WHERE kopplung_id IN \
                (SELECT id FROM geraet_kopplung WHERE einsatz_id = ?)",

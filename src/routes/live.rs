@@ -115,7 +115,7 @@ pub async fn stream(
         )),
         Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
     };
-    // Aufträge an die eigene Helfer-Kopplung (ADR-0104), am Ring vorbei und ohne `id:`; die App
+    // Aufträge an die eigene Helfer-Kopplung (ADR-0105), am Ring vorbei und ohne `id:`; die App
     // lädt danach `GET /api/devices/me/tasks`.
     let helfer_strom = match &ctx.geraet {
         Some(g) if g.ansicht == crate::geraet::Funktionsansicht::Helfer => {
@@ -167,7 +167,7 @@ fn helfer_auftraege(
     let rx = state.live.abonniere_helfer_auftrag();
     tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(move |n| match n {
         Ok((ids, auftrag_id)) if ids.contains(&kopplung_id) => Some(Ok(Event::default()
-            .event("helfer_auftrag")
+            .event(crate::live::LiveEvent::HelferAuftrag.as_str())
             .data(serde_json::json!({ "task_id": auftrag_id }).to_string()))),
         _ => None,
     })

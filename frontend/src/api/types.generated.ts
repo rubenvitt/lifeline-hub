@@ -1200,7 +1200,7 @@ export interface components {
             funktion_text?: string | null;
             /**
              * Format: int64
-             * @description An wie viele Helfer-Apps die Zeile ging (ADR-0104); fehlt vor der Zustellung und bei
+             * @description An wie viele Helfer-Apps die Zeile ging (ADR-0105); fehlt vor der Zustellung und bei
              *     Typen, die kein Helfer empfängt.
              */
             helfer_gesendet?: number | null;
@@ -1209,7 +1209,7 @@ export interface components {
             /** Format: int64 */
             person_id?: number | null;
             quittiert_at?: string | null;
-            /** @description Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0104). */
+            /** @description Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0105). */
             quittiert_von_helfer?: string | null;
             /** Format: int64 */
             quittiert_von_id?: number | null;
@@ -6269,7 +6269,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "helfer_auftrag" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
