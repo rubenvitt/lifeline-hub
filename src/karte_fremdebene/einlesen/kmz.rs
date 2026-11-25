@@ -24,7 +24,7 @@ pub fn read_kmz(bytes: &[u8], grenzen: &mut Grenzen) -> Result<Normiert, Fremdeb
         return Err(FremdebeneFehler::Unlesbar);
     }
     if roh.size() > KMZ_ENTPACKT_MAX as u64 {
-        return Err(FremdebeneFehler::ZuGross);
+        return Err(FremdebeneFehler::ZuUmfangreich);
     }
     let inhalt = match roh.compression() {
         CompressionMethod::Stored => lies_gedeckelt(roh)?,
@@ -36,7 +36,8 @@ pub fn read_kmz(bytes: &[u8], grenzen: &mut Grenzen) -> Result<Normiert, Fremdeb
     read_kml(text, grenzen)
 }
 
-/// Liest höchstens ein Byte über [`KMZ_ENTPACKT_MAX`]; ist es da, ist der Eintrag zu groß.
+/// Liest höchstens ein Byte über [`KMZ_ENTPACKT_MAX`]; ist es da, ist der Eintrag zu umfangreich
+/// (die Datei selbst kann klein sein, darum nicht `ZuGross`).
 fn lies_gedeckelt(quelle: impl Read) -> Result<Vec<u8>, FremdebeneFehler> {
     let mut inhalt = Vec::new();
     quelle
@@ -44,7 +45,7 @@ fn lies_gedeckelt(quelle: impl Read) -> Result<Vec<u8>, FremdebeneFehler> {
         .read_to_end(&mut inhalt)
         .map_err(|_| FremdebeneFehler::Unlesbar)?;
     if inhalt.len() > KMZ_ENTPACKT_MAX {
-        return Err(FremdebeneFehler::ZuGross);
+        return Err(FremdebeneFehler::ZuUmfangreich);
     }
     Ok(inhalt)
 }
@@ -142,16 +143,16 @@ mod tests {
     }
 
     #[test]
-    fn kmz_bombe_ist_zu_gross() {
+    fn kmz_bombe_ist_zu_umfangreich() {
         let mut inhalt = b"<kml>".to_vec();
         inhalt.resize(KMZ_ENTPACKT_MAX + 1024, b' ');
         inhalt.extend_from_slice(b"</kml>");
         let ehrlich = kmz(&[("doc.kml", &inhalt)]);
         assert!(ehrlich.len() < 1024 * 1024, "klein gepackt");
-        assert_eq!(read_datei(&ehrlich), Err(FremdebeneFehler::ZuGross));
+        assert_eq!(read_datei(&ehrlich), Err(FremdebeneFehler::ZuUmfangreich));
         // Der Kopf behauptet 64 Bytes: gedeckelt wird beim Lesen, nicht nach dem Kopf.
         let gelogen = kopf_luegt(ehrlich, 64);
-        assert_eq!(read_datei(&gelogen), Err(FremdebeneFehler::ZuGross));
+        assert_eq!(read_datei(&gelogen), Err(FremdebeneFehler::ZuUmfangreich));
 
         // Genau an der Grenze geht es noch.
         let mut inhalt = kml_mit("Rand");
@@ -177,7 +178,10 @@ mod tests {
 
     #[test]
     fn entpacken_liest_hoechstens_ein_byte_ueber_die_grenze() {
-        assert_eq!(lies_gedeckelt(Endlos(0)), Err(FremdebeneFehler::ZuGross));
+        assert_eq!(
+            lies_gedeckelt(Endlos(0)),
+            Err(FremdebeneFehler::ZuUmfangreich)
+        );
         assert_eq!(lies_gedeckelt(&b"<kml/>"[..]).unwrap(), b"<kml/>");
     }
 

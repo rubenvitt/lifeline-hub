@@ -23,6 +23,7 @@ export const FREMDEBENE_FEHLERTEXT: Record<FremdebeneFehler, string> = {
   unlesbar: 'Die Datei ist kein GeoJSON, KML oder KMZ.',
   dtd: 'Die Datei enthält eine DTD und wird aus Sicherheitsgründen nicht gelesen.',
   zu_gross: 'Die Datei ist zu groß (höchstens 10 MB).',
+  zu_umfangreich: 'Die Datei ist zu umfangreich.',
   zu_viele_objekte: 'Die Datei enthält zu viele Objekte (höchstens 5000).',
   leer: 'Die Datei enthält keine lesbaren Orte.',
   koordinaten: 'Die Koordinaten liegen außerhalb der Erde. Ist die Datei in WGS84?',

@@ -97,7 +97,7 @@ pub fn build_feature(geometrie: Value, name: Option<&str>, beschreibung: Option<
     json!({ "type": "Feature", "geometry": geometrie, "properties": props })
 }
 
-/// Schließt das Einlesen ab: keine Objekte → `Leer`, zu großes Ergebnis → `ZuGross`.
+/// Schließt das Einlesen ab: keine Objekte → `Leer`, zu großes Ergebnis → `ZuUmfangreich`.
 pub fn finish(
     features: Vec<Value>,
     verworfen: i64,
@@ -109,7 +109,7 @@ pub fn finish(
     let objekte = features.len() as i64;
     let geojson = json!({ "type": "FeatureCollection", "features": features }).to_string();
     if geojson.len() > GEOJSON_MAX {
-        return Err(FremdebeneFehler::ZuGross);
+        return Err(FremdebeneFehler::ZuUmfangreich);
     }
     let namensvorschlag = namensvorschlag
         .map(clean_name)
@@ -516,4 +516,13 @@ mod tests {
         );
     }
 
+    #[test]
+    fn zu_grosses_ergebnis_ist_zu_umfangreich() {
+        let f =
+            json!({"type":"Feature","geometry":null,"properties":{"x":"a".repeat(GEOJSON_MAX)}});
+        assert_eq!(
+            finish(vec![f], 0, None),
+            Err(FremdebeneFehler::ZuUmfangreich)
+        );
+    }
 }

@@ -2189,6 +2189,7 @@ fn fremdebene_fehler_wire() {
         Unlesbar => "unlesbar",
         Dtd => "dtd",
         ZuGross => "zu_gross",
+        ZuUmfangreich => "zu_umfangreich",
         ZuVieleObjekte => "zu_viele_objekte",
         Leer => "leer",
         Koordinaten => "koordinaten",

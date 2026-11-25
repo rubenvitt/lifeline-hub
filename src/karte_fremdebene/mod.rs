@@ -87,6 +87,8 @@ crate::wire_enum::wire_enum! {
         Unlesbar => "unlesbar",
         Dtd => "dtd",
         ZuGross => "zu_gross",
+        /// Klein genug, aber entpackt (KMZ) oder normiert über der Grenze.
+        ZuUmfangreich => "zu_umfangreich",
         ZuVieleObjekte => "zu_viele_objekte",
         Leer => "leer",
         Koordinaten => "koordinaten",
@@ -111,6 +113,7 @@ impl FremdebeneFehler {
                 "Die Datei enthält eine DTD und wird aus Sicherheitsgründen nicht gelesen."
             }
             Self::ZuGross => "Die Datei ist zu groß (höchstens 10 MB).",
+            Self::ZuUmfangreich => "Die Datei ist zu umfangreich.",
             Self::ZuVieleObjekte => "Die Datei enthält zu viele Objekte (höchstens 5000).",
             Self::Leer => "Die Datei enthält keine lesbaren Orte.",
             Self::Koordinaten => {
@@ -142,7 +145,11 @@ pub struct FremdebeneAnzeige {
     /// Nur der Host der URL-Ebene, für alle Lesenden.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url_host: Option<String>,
-    /// Palettenschlüssel (`fremd-1` … `fremd-6`).
+    /// Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein
+    /// `wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen
+    /// wird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.
+    /// Ein Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client
+    /// fällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück.
     pub color: String,
     pub feature_count: i64,
     /// Zahl der Objekte ohne lesbare Geometrie.

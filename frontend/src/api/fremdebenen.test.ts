@@ -67,7 +67,8 @@ describe('fremdebenen API (LLH-2099)', () => {
 
   it('Grenzen und Fehlertexte stehen wortgleich zum Server', () => {
     expect(FREMDEBENE_GRENZEN).toEqual({ dateiBytes: 10 * 1024 * 1024, nameMax: 120 });
-    expect(Object.keys(FREMDEBENE_FEHLERTEXT)).toHaveLength(13);
+    expect(Object.keys(FREMDEBENE_FEHLERTEXT)).toHaveLength(14);
+    expect(FREMDEBENE_FEHLERTEXT.zu_umfangreich).toBe('Die Datei ist zu umfangreich.');
     expect(FREMDEBENE_FEHLERTEXT.koordinaten).toBe(
       'Die Koordinaten liegen außerhalb der Erde. Ist die Datei in WGS84?',
     );

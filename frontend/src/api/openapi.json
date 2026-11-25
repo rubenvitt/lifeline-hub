@@ -10299,7 +10299,7 @@
           },
           "color": {
             "type": "string",
-            "description": "Palettenschlüssel (`fremd-1` … `fremd-6`)."
+            "description": "Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein\n`wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen\nwird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.\nEin Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client\nfällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück."
           },
           "created_at": {
             "type": "string"
@@ -10364,6 +10364,7 @@
           "unlesbar",
           "dtd",
           "zu_gross",
+          "zu_umfangreich",
           "zu_viele_objekte",
           "leer",
           "koordinaten",

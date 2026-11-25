@@ -4128,7 +4128,13 @@ export interface components {
         FremdebeneAnzeige: {
             /** @description Letzter Abrufversuch, nur URL-Ebene. */
             attempted_at?: string | null;
-            /** @description Palettenschlüssel (`fremd-1` … `fremd-6`). */
+            /**
+             * @description Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein
+             *     `wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen
+             *     wird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.
+             *     Ein Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client
+             *     fällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück.
+             */
             color: string;
             created_at: string;
             /**
@@ -4158,7 +4164,7 @@ export interface components {
          *     in `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.
          * @enum {string}
          */
-        FremdebeneFehler: "unlesbar" | "dtd" | "zu_gross" | "zu_viele_objekte" | "leer" | "koordinaten" | "virus" | "nicht_erreichbar" | "weiterleitung" | "abgelehnt" | "status" | "ziel_intern" | "zeitlimit";
+        FremdebeneFehler: "unlesbar" | "dtd" | "zu_gross" | "zu_umfangreich" | "zu_viele_objekte" | "leer" | "koordinaten" | "virus" | "nicht_erreichbar" | "weiterleitung" | "abgelehnt" | "status" | "ziel_intern" | "zeitlimit";
         /**
          * @description Woher eine Fremdebene kommt.
          * @enum {string}
