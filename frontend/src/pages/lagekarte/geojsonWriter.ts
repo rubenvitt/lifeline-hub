@@ -9,7 +9,7 @@
  *   (RFC 7946: immer WGS 84).
  * - Medientyp `application/geo+json`, Endung `.geojson`.
  */
-import type { ExportGeometrie, ExportObjekt } from './geoExport';
+import { schliesseRing, type ExportGeometrie, type ExportObjekt } from './geoExport';
 
 export const GEOJSON_MEDIENTYP = 'application/geo+json';
 export const GEOJSON_ENDUNG = 'geojson';
@@ -17,14 +17,6 @@ export const GEOJSON_ENDUNG = 'geojson';
 /** UTC `YYYY-MM-DD HH:MM:SS`. */
 function utcStand(d: Date): string {
   return d.toISOString().slice(0, 19).replace('T', ' ');
-}
-
-/** Ein Ring ist geschlossen, wenn erster und letzter Punkt gleich sind (RFC 7946, 3.1.6). */
-function schliesseRing(ring: number[][]): number[][] {
-  if (ring.length === 0) return ring;
-  const a = ring[0];
-  const z = ring[ring.length - 1];
-  return a[0] === z[0] && a[1] === z[1] ? ring : [...ring, [...a]];
 }
 
 function geometrie(g: ExportGeometrie): ExportGeometrie {

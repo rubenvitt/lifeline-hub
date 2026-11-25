@@ -219,7 +219,27 @@ describe('collectExportObjekte', () => {
   });
 });
 
-describe('Stand eines gesicherten Stands (Review)', () => {
+describe('Ringe und Stand (Review)', () => {
+  it('schließt einen offen angelieferten Ring, damit beide Schreiber dasselbe bekommen', () => {
+    const offen = {
+      type: 'Polygon' as const,
+      coordinates: [
+        [
+          [9, 54],
+          [9.1, 54],
+          [9.1, 54.1],
+        ],
+      ],
+    };
+    const [o] = collectExportObjekte(
+      eingabe({ flaechen: [{ id: 1, label: 'EA', polygon: offen }] }),
+    );
+    expect(o.geometrie.type).toBe('Polygon');
+    const ring = (o.geometrie as { coordinates: number[][][] }).coordinates[0];
+    expect(ring).toHaveLength(4);
+    expect(ring[3]).toEqual(ring[0]);
+  });
+
   it('liest den Stand eines gesicherten Stands als UTC, in SQLite- wie in ISO-Form', () => {
     expect(standAusWire('2026-11-24 09:00:00')?.toISOString()).toBe('2026-11-24T09:00:00.000Z');
     expect(standAusWire('2026-11-24T09:00:00Z')?.toISOString()).toBe('2026-11-24T09:00:00.000Z');

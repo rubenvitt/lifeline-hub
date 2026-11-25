@@ -269,6 +269,18 @@ function rundePunkt(lon: number, lat: number): [number, number] {
   return [runde(lon), runde(lat)];
 }
 
+/**
+ * Ein Ring ist geschlossen, wenn erster und letzter Punkt gleich sind (RFC 7946, 3.1.6; KML 2.2
+ * verlangt dasselbe für `LinearRing`). Geschlossen wird schon im Zwischenmodell, damit GeoJSON und
+ * KML dieselbe Geometrie bekommen.
+ */
+export function schliesseRing(ring: number[][]): number[][] {
+  if (ring.length === 0) return ring;
+  const a = ring[0];
+  const z = ring[ring.length - 1];
+  return a[0] === z[0] && a[1] === z[1] ? ring : [...ring, [...a]];
+}
+
 /** Stand eines gesicherten Stands (SQLite-Zeit `YYYY-MM-DD HH:MM:SS` oder ISO) als UTC-Datum. */
 export function standAusWire(wire: string): Date | null {
   const iso = wire.includes('T') ? wire : `${wire.replace(' ', 'T')}Z`;
@@ -281,7 +293,9 @@ function rundeFlaeche(g: GeoJsonPolygon | GeoJsonLineString): GeoJsonPolygon | G
   if (g.type === 'Polygon') {
     return {
       type: 'Polygon',
-      coordinates: g.coordinates.map((ring) => ring.map(([lon, lat]) => rundePunkt(lon, lat))),
+      coordinates: g.coordinates.map((ring) =>
+        schliesseRing(ring.map(([lon, lat]) => rundePunkt(lon, lat))),
+      ),
     };
   }
   return {
