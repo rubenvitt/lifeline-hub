@@ -55,7 +55,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 1: Kanaladressen der Externen Stelle (Backend)
 
 **Files:**
-- Create: `migrations/0381_org_externe_stelle_kanal.sql`
+- Create: `migrations/0382_org_externe_stelle_kanal.sql`
 - Create: `src/externe_stelle/kanal.rs`
 - Modify: `src/externe_stelle/mod.rs` (Modul, `KanalArt`)
 - Modify: `src/routes/externe_stelle.rs`, `src/app.rs` (Routen nahe 2318)
@@ -187,7 +187,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 6: Ausgangskorb — Tabelle, Zustand, Repo
 
 **Files:**
-- Create: `migrations/0382_ausgang.sql`
+- Create: `migrations/0383_ausgang.sql`
 - Create: `src/ausgang/mod.rs`, `src/ausgang/repo.rs`, `src/ausgang/zustand.rs`, `src/ausgang/tests.rs`
 - Modify: `src/lib.rs`, `src/instanz/spiegel/art.rs` (`AUSGENOMMEN`, Grund aus Spec 3), `src/einsatz/schwaerzung_registry.rs` (`ausgang`: `betreff`, `inhalt`, `adresse`, `stelle_bezeichnung`), `src/aufbewahrung/` (wie ETB einsortieren)
 
