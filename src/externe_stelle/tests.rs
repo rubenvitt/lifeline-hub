@@ -386,6 +386,21 @@ fn faxnummern_in_alltagsform_werden_e164() {
     );
 }
 
+#[test]
+fn die_null_der_vorwahl_hinter_plus_49_faellt_weg_und_jeder_leerraum_zaehlt_nicht() {
+    use super::kanal::normalize_fax;
+    assert_eq!(normalize_fax("+49 (0511) 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("+49 0511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("0049 0511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("0511\u{a0}123456").unwrap(), "+49511123456");
+    assert_eq!(
+        normalize_fax("0511\t123\u{2009}456").unwrap(),
+        "+49511123456"
+    );
+    // Nur bei +49: andere Länder behalten ihre Ziffern (Italien wählt die 0 mit).
+    assert_eq!(normalize_fax("+39 06 1234567").unwrap(), "+39061234567");
+}
+
 mod fax_eigenschaften {
     use super::super::kanal::normalize_fax;
     use proptest::prelude::*;

@@ -336,6 +336,31 @@ pub fn baue_pdf_fuer(
     })
 }
 
+/// Baut das PDF auf einem Blocking-Thread (Bilder dekodieren, verdichten): der Lauf und die Route
+/// halten so keinen Worker der Laufzeit an. Gibt die Anlagen zurück, damit die Mail sie danach
+/// noch anhängen kann.
+pub async fn baue_pdf_im_hintergrund(
+    kopf: PdfKopf,
+    an: String,
+    betreff: String,
+    inhalt: String,
+    anlagen: Vec<(String, Vec<u8>)>,
+    erzeugt_at: chrono::DateTime<Utc>,
+) -> (
+    Result<super::pdf::PdfDatei, super::pdf::PdfFehler>,
+    Vec<(String, Vec<u8>)>,
+) {
+    let geteilt = std::sync::Arc::new(anlagen);
+    let fuer_pdf = std::sync::Arc::clone(&geteilt);
+    let pdf = tokio::task::spawn_blocking(move || {
+        baue_pdf_fuer(&kopf, &an, &betreff, &inhalt, &fuer_pdf, erzeugt_at)
+    })
+    .await
+    .unwrap_or(Err(super::pdf::PdfFehler::Erzeugung));
+    let anlagen = std::sync::Arc::try_unwrap(geteilt).unwrap_or_else(|a| (*a).clone());
+    (pdf, anlagen)
+}
+
 /// Baut die Nachricht als RFC-5322-Bytes: `text/plain; charset=utf-8`, mit Anhängen als
 /// `multipart/mixed`: zuerst das PDF (`application/pdf`, LLH-2095), dann die `image/png`. Betreff und Anzeigename kodiert lettre nach RFC 2047.
 /// `message_id` steht mit den spitzen Klammern, wie sie in den Kopf kommen.

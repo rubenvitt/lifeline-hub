@@ -126,32 +126,38 @@ async fn pruefe_fax_pdf(
         kennung.as_deref(),
     )
     .await?;
-    for (stelle, kanal, _) in faxe {
-        let an = nachricht::an_text(kanal.channel, &stelle.bezeichnung, &kanal.address);
-        let pdf = nachricht::baue_pdf_fuer(
-            &kopf,
-            &an,
-            &schnappschuss.betreff,
-            &schnappschuss.inhalt,
-            &anlagen,
-            chrono::Utc::now(),
+    // Die Empfänger unterscheiden sich nur in der Zeile „An:“: einmal mit der längsten bauen.
+    let an = faxe
+        .iter()
+        .map(|(stelle, kanal, _)| {
+            nachricht::an_text(kanal.channel, &stelle.bezeichnung, &kanal.address)
+        })
+        .max_by_key(|a| a.chars().count())
+        .unwrap_or_default();
+    let (pdf, _) = nachricht::baue_pdf_im_hintergrund(
+        kopf,
+        an,
+        schnappschuss.betreff.clone(),
+        schnappschuss.inhalt.clone(),
+        anlagen,
+        chrono::Utc::now(),
+    )
+    .await;
+    let pdf = pdf.map_err(|_| {
+        mit_grund(
+            AusgangFehler::ZuGross,
+            "Aus diesem Dokument lässt sich kein Fax bauen (Anlage nicht lesbar)",
         )
-        .map_err(|_| {
-            mit_grund(
-                AusgangFehler::ZuGross,
-                "Aus diesem Dokument lässt sich kein Fax bauen (Anlage nicht lesbar)",
-            )
-        })?;
-        if !ausgang::pdf::passt_fuer_fax(&pdf) {
-            return Err(mit_grund(
-                AusgangFehler::ZuGross,
-                &format!(
-                    "Das Fax hätte {} Seiten; erlaubt sind höchstens {} Seiten und 10 MiB",
-                    pdf.seiten,
-                    ausgang::pdf::FAX_SEITEN_MAX
-                ),
-            ));
-        }
+    })?;
+    if !ausgang::pdf::passt_fuer_fax(&pdf) {
+        return Err(mit_grund(
+            AusgangFehler::ZuGross,
+            &format!(
+                "Das Fax hätte {} Seiten; erlaubt sind höchstens {} Seiten und 10 MiB",
+                pdf.seiten,
+                ausgang::pdf::FAX_SEITEN_MAX
+            ),
+        ));
     }
     Ok(())
 }

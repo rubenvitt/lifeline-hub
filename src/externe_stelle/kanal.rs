@@ -46,8 +46,8 @@ pub fn normalize_email(roh: &str) -> Result<String, String> {
 
 /// Prüft eine Faxnummer und bringt sie in Speicherform E.164 (`+` und 8–15 Ziffern, LLH-2095).
 /// Angenommen werden internationale Form (`+49…`, `0049…`) und nationale Form mit führender `0`
-/// (dann gilt `+49`). Leerzeichen, `-`, `/`, `.` und Klammern fallen weg, ein `(0)` direkt nach
-/// der Länderkennung ebenso. Der Fehlertext ist für die Oberfläche bestimmt.
+/// (dann gilt `+49`). Leerraum, `-`, `/`, `.` und Klammern fallen weg, ein `(0)` direkt nach
+/// der Länderkennung ebenso, und bei `+49` die Null der Vorwahl („+49 (0511) …“). Der Fehlertext ist für die Oberfläche bestimmt.
 pub fn normalize_fax(roh: &str) -> Result<String, String> {
     const FEHLER: &str = "Keine gültige Faxnummer (etwa +49 511 123456 oder 0511 123456)";
     let roh = roh.trim();
@@ -63,7 +63,8 @@ pub fn normalize_fax(roh: &str) -> Result<String, String> {
     let mut zeichen = String::new();
     for c in ohne_null.chars() {
         match c {
-            ' ' | '-' | '/' | '.' | '(' | ')' => {}
+            c if c.is_whitespace() => {}
+            '-' | '/' | '.' | '(' | ')' => {}
             '+' if zeichen.is_empty() => zeichen.push(c),
             c if c.is_ascii_digit() => zeichen.push(c),
             _ => return Err(FEHLER.into()),
@@ -77,6 +78,12 @@ pub fn normalize_fax(roh: &str) -> Result<String, String> {
         format!("49{r}")
     } else {
         return Err(FEHLER.into());
+    };
+    // „+49 (0511) …“ und „+49 0511 …“: eine deutsche Nummer hat hinter der 49 nie die Null der
+    // Vorwahl. Andere Länder behalten ihre Ziffern (Italien wählt die 0 mit).
+    let ziffern = match ziffern.strip_prefix("490") {
+        Some(rest) => format!("49{rest}"),
+        None => ziffern,
     };
     if !(8..=15).contains(&ziffern.len()) || ziffern.starts_with('0') {
         return Err(FEHLER.into());

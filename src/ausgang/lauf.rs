@@ -510,11 +510,26 @@ async fn run_one(
         }
     };
     let an = nachricht::an_text(zeile.kanal, &zeile.stelle_bezeichnung, &zeile.adresse);
-    let pdf = kopf.as_ref().and_then(|k| {
-        nachricht::baue_pdf_fuer(k, &an, &zeile.betreff, &zeile.inhalt, &anhaenge, jetzt())
-            .map_err(|e| tracing::warn!(versand = %zeile.id, "Ausgang: PDF nicht erzeugbar: {e:?}"))
-            .ok()
-    });
+    let (pdf, anhaenge) = match kopf.clone() {
+        Some(k) => {
+            let (pdf, anhaenge) = nachricht::baue_pdf_im_hintergrund(
+                k,
+                an,
+                zeile.betreff.clone(),
+                zeile.inhalt.clone(),
+                anhaenge,
+                jetzt(),
+            )
+            .await;
+            let pdf = pdf
+                .map_err(
+                    |e| tracing::warn!(versand = %zeile.id, "Ausgang: PDF nicht erzeugbar: {e:?}"),
+                )
+                .ok();
+            (pdf, anhaenge)
+        }
+        None => (None, anhaenge),
+    };
     let dateiname = super::pdf::dateiname(zeile.quelle_art, kopf.as_ref().and_then(|k| k.version));
 
     if let Some(faxline) = faxline.filter(|_| fax) {
@@ -644,20 +659,31 @@ async fn abfragen_one(
         .as_deref()
         .and_then(zeit::parse_utc)
         .unwrap_or(jetzt);
-    let antwort =
-        match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id, KanalArt::Fax)
-            .await?
-        {
-            Ok(zugang) => {
-                let a = zusteller.fax.status(&zugang, &session).await;
-                if let Err(SipgateFehler::Status(401 | 403)) = a {
-                    pruefung_vorziehen(pool, &zugang.adapter_id, jetzt).await;
-                }
-                a.ok()
+    let antwort = match crate::adapter::lauf::zugang_fuer_versand(
+        pool,
+        rahmen,
+        zeile.org_id,
+        KanalArt::Fax,
+    )
+    .await?
+    {
+        Ok(zugang) => {
+            let a = zusteller.fax.status(&zugang, &session).await;
+            if let Err(e) = &a {
+                // Nur der Code, nie ein Text von sipgate: zeigt, wenn jede Abfrage scheitert.
+                tracing::warn!(versand = %zeile.id, fehler = ?e, "Ausgang: Stand des Faxes nicht abgefragt");
             }
-            // Ohne nutzbaren Zugang wird weiter gewartet; die Frist entscheidet.
-            Err(_) => None,
-        };
+            if let Err(SipgateFehler::Status(401 | 403)) = a {
+                pruefung_vorziehen(pool, &zugang.adapter_id, jetzt).await;
+            }
+            a.ok()
+        }
+        // Ohne nutzbaren Zugang wird weiter gewartet; die Frist entscheidet.
+        Err(f) => {
+            tracing::warn!(versand = %zeile.id, fehler = f.as_str(), "Ausgang: Faxzugang für die Abfrage nicht nutzbar");
+            None
+        }
+    };
     let ziel = ziel_text(&zeile);
     let (abfrage, etb) = match antwort {
         Some(FaxStatus::Gesendet) => (
