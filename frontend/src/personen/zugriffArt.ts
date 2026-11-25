@@ -13,6 +13,9 @@ export const ZUGRIFF_ART_TEXT: Record<PersonZugriffArt, string> = {
   anhang: 'Datei geladen',
   // LLH-1616: Druck der Registrierliste einer Betreuungsstelle, je gedruckter Person.
   registrierliste: 'Registrierliste gedruckt',
+  // LLH-1198: Abruf der PASS-Liste für die Personenauskunftsstelle, ohne Person.
+  pass_export: 'PASS-Liste exportiert',
+  pass_druck: 'PASS-Liste gedruckt',
 };
 
 /**

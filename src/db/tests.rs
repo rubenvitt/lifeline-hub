@@ -79,6 +79,38 @@ async fn test_pool_datei_setzt_secure_delete() {
     assert_eq!(wert, 1);
 }
 
+/// Die zwischen Testprozessen geteilte Vorlage (`vorlagen_datei`) ist dieselbe wie eine frische
+/// Migration: gleiches Schema, gleiche Buchungen in `_sqlx_migrations`. Läuft der Test als
+/// zweiter Prozess, liest `test_pool` die abgelegte Datei, und genau die wird hier verglichen.
+#[tokio::test]
+async fn test_pool_aus_der_vorlage_gleicht_einer_frischen_migration() {
+    async fn stand(
+        pool: &SqlitePool,
+    ) -> (Vec<(String, String, Option<String>)>, Vec<(i64, Vec<u8>)>) {
+        let schema = sqlx::query_as(
+            "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' \
+             ORDER BY type, name",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        let buchungen =
+            sqlx::query_as("SELECT version, checksum FROM _sqlx_migrations ORDER BY version")
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        (schema, buchungen)
+    }
+    let frisch = leerer_test_pool().await;
+    migrate(&frisch).await.unwrap();
+    let vorlage = test_pool().await;
+    assert!(
+        vorlagen_datei().exists(),
+        "test_pool legt seine Vorlage für die folgenden Testprozesse ab"
+    );
+    assert_eq!(stand(&vorlage).await, stand(&frisch).await);
+}
+
 #[tokio::test]
 async fn connect_setzt_acquire_timeout() {
     // Regressionsschutz für `acquire_timeout`, über den PoolOptions-Getter statt durch
@@ -3871,10 +3903,14 @@ async fn migration_0112_person_verbleib_rebuild_erhaelt_zeilen_sequenz_und_schem
     let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(&pool).await.unwrap();
 
     let migration = include_str!("../../migrations/0112_person_verbleib_notunterkunft.sql");
-    assert!(
-        migration.starts_with("-- no-transaction"),
-        "sqlx erkennt die Direktive nur am Dateianfang"
-    );
+    // Ältere Umbauten tragen den Marker; ein Blatt-Umbau ab LLH-1659 kommt ohne aus
+    // (`migrations/AGENTS.md`, „Tabellenumbau“). Steht er da, dann am Dateianfang.
+    if migration.contains("-- no-transaction") {
+        assert!(
+            migration.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+    }
     sqlx::raw_sql(migration)
         .execute(&pool)
         .await
@@ -4315,7 +4351,7 @@ async fn migration_0141_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_
         .await
         .unwrap();
 
-    pruefe_audit_rebuild(&pool, MIGRATION_0141, "anhang").await;
+    pruefe_audit_rebuild(&pool, MIGRATION_0141, &["anhang"]).await;
 }
 
 #[tokio::test]
@@ -4366,7 +4402,50 @@ async fn migration_0311_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_
         .await
         .unwrap();
 
-    pruefe_audit_rebuild(&pool, MIGRATION_0311, "registrierliste").await;
+    pruefe_audit_rebuild(&pool, MIGRATION_0311, &["registrierliste"]).await;
+}
+
+const MIGRATION_0381: &str = include_str!("../../migrations/0381_person_zugriff_audit_pass.sql");
+
+// --- Migration 0381: Blatt-Umbau von person_zugriff_audit mit den Arten 'pass_export' und
+// 'pass_druck' (LLH-1198). Ausgangspunkt ist der 0311-Stand mit allen fünf Bestandsarten.
+#[tokio::test]
+async fn migration_0381_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema() {
+    let pool = alt_db_person_zugriff_audit_0132().await;
+    sqlx::raw_sql(MIGRATION_0141).execute(&pool).await.unwrap();
+    sqlx::raw_sql(MIGRATION_0311).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art, zugriff_at) \
+             VALUES (1, 1, 1, 'registrierliste', '2026-11-24 10:00:00'), \
+                    (1, NULL, 1, 'export', '2026-11-24 10:01:00'), \
+                    (1, NULL, 1, 'druck', '2026-11-24 10:02:00')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query("DELETE FROM person_zugriff_audit WHERE id = 3")
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    pruefe_audit_rebuild(&pool, MIGRATION_0381, &["pass_export", "pass_druck"]).await;
+    sqlx::query(
+        "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+             VALUES (1, NULL, 1, 'pass_druck')",
+    )
+    .execute(&pool)
+    .await
+    .expect("der neue CHECK nimmt auch 'pass_druck'");
+    assert!(
+        sqlx::query(
+            "INSERT INTO person_zugriff_audit (einsatz_id, person_id, benutzer_id, art) \
+                 VALUES (1, NULL, 1, 'pass_irgendwas')",
+        )
+        .execute(&pool)
+        .await
+        .is_err(),
+        "der CHECK lehnt eine erfundene PASS-Art ab"
+    );
 }
 
 const MIGRATION_0143: &str = include_str!("../../migrations/0143_auth_audit_passwortwechsel.sql");
@@ -5208,7 +5287,8 @@ async fn alt_db_person_zugriff_audit() -> SqlitePool {
 /// um `neue_art` erweitert (0132 `druck`, 0141 `anhang`). Erwartet eine befüllte Alt-DB, deren
 /// Zeile id 3 gelöscht ist (Sequenz > MAX(id)): Zeilen samt ids, Schema, DDL bis auf den
 /// CHECK, keine Reste der Zwischentabelle, Sequenz, CHECK-Grenze, keine FK-Verletzung.
-async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_art: &str) {
+async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_arten: &[&str]) {
+    let neue_art = neue_arten[0];
     let schema_vorher = schema_von(pool, "person_zugriff_audit").await;
     let ddl = || async {
         let sql: String = sqlx::query_scalar(
@@ -5231,10 +5311,14 @@ async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_a
                     FROM person_zugriff_audit ORDER BY id";
     let zeilen_vorher: Vec<Zeile> = sqlx::query_as(alle).fetch_all(pool).await.unwrap();
 
-    assert!(
-        migration.starts_with("-- no-transaction"),
-        "sqlx erkennt die Direktive nur am Dateianfang"
-    );
+    // Ältere Umbauten tragen den Marker; ein Blatt-Umbau ab LLH-1659 kommt ohne aus
+    // (`migrations/AGENTS.md`, „Tabellenumbau“). Steht er da, dann am Dateianfang.
+    if migration.contains("-- no-transaction") {
+        assert!(
+            migration.starts_with("-- no-transaction"),
+            "sqlx erkennt die Direktive nur am Dateianfang"
+        );
+    }
     sqlx::raw_sql(migration)
         .execute(pool)
         .await
@@ -5251,7 +5335,11 @@ async fn pruefe_audit_rebuild(pool: &SqlitePool, migration: &'static str, neue_a
         "Spalten, FKs und Indizes unverändert"
     );
     assert_eq!(
-        ddl().await.replacen(&format!(",'{neue_art}'"), "", 1),
+        neue_arten.iter().fold(ddl().await, |ddl, art| ddl.replacen(
+            &format!(",'{art}'"),
+            "",
+            1
+        )),
         ddl_vorher,
         "die DDL unterscheidet sich ausschließlich im art-CHECK"
     );
@@ -5315,7 +5403,7 @@ async fn migration_0132_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_
         .await
         .unwrap();
 
-    pruefe_audit_rebuild(&pool, MIGRATION_0132, "druck").await;
+    pruefe_audit_rebuild(&pool, MIGRATION_0132, &["druck"]).await;
 }
 
 // Sind ALLE Zeilen gelöscht, kopiert der Rebuild nichts; ohne Übernahme der Sequenz begänne die

@@ -7512,6 +7512,7 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
+          "ortung_gekoppelt",
           "disponiert_at",
           "ist_demo"
         ],
@@ -7629,6 +7630,10 @@
               "string",
               "null"
             ]
+          },
+          "ortung_gekoppelt": {
+            "type": "boolean",
+            "description": "Hängt das Fahrzeug an einer Ortungs-Kennung des Einwurfs? Nur der Wahrheitswert; Kennung\nund Zugang verlassen den Server hier nicht (LLH-2091)."
           },
           "position_aktualisiert_at": {
             "type": [
@@ -9223,6 +9228,17 @@
           "fuehrungsstelle": {
             "type": "boolean",
             "description": "Trug das Fahrzeug die Führungsstelle?"
+          },
+          "ortung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrtungVorzustand",
+                "description": "Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie\nnur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -17663,6 +17679,22 @@
           }
         }
       },
+      "OrtungVorzustand": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).",
+        "required": [
+          "zugang_id",
+          "kennung"
+        ],
+        "properties": {
+          "kennung": {
+            "type": "string"
+          },
+          "zugang_id": {
+            "type": "string"
+          }
+        }
+      },
       "PaketPostenArt": {
         "type": "string",
         "description": "Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren\nFunkrufnamen. Wire == `as_str()`.",
@@ -17672,6 +17704,54 @@
           "uhs",
           "pause"
         ]
+      },
+      "PassZeile": {
+        "type": "object",
+        "description": "Eine Zeile der PASS-Liste: je Spalte der fertige Text, leer = keine Angabe. Reihenfolge der\nFelder = Reihenfolge der CSV-Spalten ([`KOPF`]).",
+        "required": [
+          "id_label",
+          "last_name",
+          "first_name",
+          "birth_date",
+          "age",
+          "sex",
+          "address",
+          "affectedness",
+          "whereabouts",
+          "recorded_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "affectedness": {
+            "type": "string"
+          },
+          "age": {
+            "type": "string"
+          },
+          "birth_date": {
+            "type": "string"
+          },
+          "first_name": {
+            "type": "string"
+          },
+          "id_label": {
+            "type": "string"
+          },
+          "last_name": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string"
+          },
+          "sex": {
+            "type": "string"
+          },
+          "whereabouts": {
+            "type": "string"
+          }
+        }
       },
       "PegelAnzeige": {
         "type": "object",
@@ -22866,6 +22946,79 @@
           }
         }
       },
+      "TrackingCandidate": {
+        "type": "object",
+        "description": "Eine Kennung der letzten 24 Stunden, ohne Koordinaten.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "received_at",
+          "coupled"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled": {
+            "type": "boolean",
+            "description": "Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)?"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TrackingCandidates": {
+        "type": "object",
+        "description": "Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“\n(ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu\ndürfen, und erklärt, warum Koppeln gesperrt ist.",
+        "required": [
+          "tracking_enabled",
+          "candidates"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingCandidate"
+            }
+          },
+          "tracking_enabled": {
+            "type": "boolean",
+            "description": "Org-Schalter „Ortung im Einsatz“; aus = Koppeln antwortet 422, nichts wird übernommen."
+          }
+        }
+      },
+      "TrackingResponse": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "coupled_at"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled_at": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          }
+        }
+      },
       "TransportAnzeige": {
         "type": "object",
         "description": "Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“.",
@@ -27246,13 +27399,15 @@
       },
       "ZugriffArt": {
         "type": "string",
-        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang','registrierliste')`\n(migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).",
+        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`\n(migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).",
         "enum": [
           "detail",
           "export",
           "druck",
           "anhang",
-          "registrierliste"
+          "registrierliste",
+          "pass_export",
+          "pass_druck"
         ]
       },
       "ZugriffFassung": {

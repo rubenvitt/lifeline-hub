@@ -871,6 +871,11 @@ export function personenDruckPfad(einsatzId: number, auswahl: PersonenDruckAuswa
   });
 }
 
+/** Druckansicht der PASS-Liste (LLH-1198): ohne Auswahl, die PASS braucht alle Betroffenen. */
+export function passListeDruckPfad(einsatzId: number): string {
+  return `${einsatzModulPfad(einsatzId, 'personen')}/pass-druck`;
+}
+
 /** Umkehr von {@link personenDruckPfad}. */
 export function parsePersonenDruckAuswahl(params: URLSearchParams): PersonenDruckAuswahl {
   const filter = params.get('filter');

@@ -1,5 +1,5 @@
 ---
-id: ADR-0103
+id: ADR-0104
 titel: Nachrichten an Menschen gehen nur über den Ausgangskorb
 status: akzeptiert
 datum: 2026-11-25
@@ -13,7 +13,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md
 ---
 
-# ADR-0103: Nachrichten an Menschen gehen nur über den Ausgangskorb
+# ADR-0104: Nachrichten an Menschen gehen nur über den Ausgangskorb
 
 ## Regeln
 

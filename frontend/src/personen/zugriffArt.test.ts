@@ -11,6 +11,8 @@ describe('zugriffArtText (LFH-757)', () => {
       druck: 'Liste gedruckt',
       anhang: 'Datei geladen',
       registrierliste: 'Registrierliste gedruckt',
+      pass_export: 'PASS-Liste exportiert',
+      pass_druck: 'PASS-Liste gedruckt',
     });
     expect(zugriffArtText({ art: 'anhang', person_id: 9 })).toBe('Datei geladen');
     // LLH-1616: der Druck der Registrierliste steht je Person, getrennt vom Personenblatt.
@@ -37,5 +39,10 @@ describe('zugriffArtText (LFH-757)', () => {
     });
     expect(spalte.render?.('druck', zeile(9), 0)).toBe('Blatt gedruckt');
     expect(spalte.render?.('druck', zeile(null), 0)).toBe('Liste gedruckt');
+  });
+
+  it('nennt die Abrufe der PASS-Liste eigens (LLH-1198)', () => {
+    expect(zugriffArtText({ art: 'pass_export', person_id: null })).toBe('PASS-Liste exportiert');
+    expect(zugriffArtText({ art: 'pass_druck', person_id: null })).toBe('PASS-Liste gedruckt');
   });
 });

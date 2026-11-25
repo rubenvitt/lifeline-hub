@@ -116,8 +116,15 @@ curl -i 'https://hub.example/api/v1/intake/llh_ew_Q2x…/position?id=elw1&lat=52
   abgelegt und mit ihr ersetzt.
 - Eine Position wird 24 Stunden nach ihrem Empfang gelöscht, wenn keine neuere kam.
 
-Die Ablage zeigt noch nichts auf der Lagekarte: Die Zuordnung einer Kennung zu einem Fahrzeug
-folgt mit der Ortung (Zunder LLH-1199).
+Die Ablage selbst zeigt nichts auf der Lagekarte. Ein Fahrzeug bewegt sich nur, wenn die
+Organisation die Ortung freigegeben hat (Schalter „Ortung im Einsatz“) und die Kennung im
+laufenden Einsatz an ein Einsatzfahrzeug gekoppelt ist (Ortung, LLH-2091, ADR-0103); sonst ändert
+ein Einwurf keinen Einsatz. Die Antwort bleibt in jedem Fall `204`. Am Fahrzeug steht die Position
+mit der Quelle `einwurf` und dem `timestamp` des Absenders als Zeitpunkt; liegt er mehr als 60
+Sekunden in der Zukunft, gilt die Serverzeit. Ein Fix mit älterem Zeitpunkt als die Position am
+Fahrzeug (auch eine von Hand gesetzte) wird dort nicht übernommen. Je Fahrzeug schreibt die
+Ortung höchstens einen Fix je 15 Sekunden Messzeit; ein zu früher folgt als jüngste Position nach
+Ablauf.
 
 ## Antworten
 

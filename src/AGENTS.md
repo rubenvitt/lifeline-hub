@@ -452,7 +452,7 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
 
 Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbindung
 `src/adapter/smtp.rs` und `smtp_art.rs`, Routen `src/routes/ausgang.rs`
-([ADR-0103](../docs/architektur/entscheidungen/ADR-0103-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
+([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
 - **Nur ein Mensch löst aus:** Absenden am freigegebenen Dokument (`POST …/deliveries`) oder
   „Erneut senden“. Kein Ereignis, Webhook oder Adapterlauf legt einen Versand an; Webhooks
   (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.

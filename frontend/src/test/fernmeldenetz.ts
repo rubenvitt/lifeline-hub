@@ -65,6 +65,7 @@ export function fahrzeug(id: number, p: Partial<EinsatzFahrzeug> = {}): EinsatzF
   return {
     id,
     einsatz_id: 1,
+    ortung_gekoppelt: false,
     funkrufname: `Fahrzeug ${id}`,
     disponiert_at: '2026-10-08T08:00:00Z',
     ist_adhoc: false,

@@ -60,6 +60,10 @@ export const EINSATZ_KEYS = {
   // Einsätze; ein Sub-Key unter `nachforderungen` holte sie bei jedem Ereignis neu) und nicht im
   // Lagebild offline (Wortlaut anderer Einsätze gehört nicht auf die Platte).
   nachforderungArten: 'einsatz-nachforderung-arten',
+  // Kennungen der letzten 24 Stunden zum Koppeln der Ortung (LLH-2091): Abruf beim Öffnen des
+  // Dialogs, nicht live (der Einwurf einer Kennung ist kein Einsatzereignis) und nicht im
+  // Lagebild offline (Kennungen fremder Geräte gehören nicht auf die Platte).
+  ortungKandidaten: 'einsatz-ortung-kandidaten',
   meldungen: 'einsatz-meldungen',
   lagemeldungen: 'einsatz-lagemeldungen',
   br: 'einsatz-br',
@@ -212,6 +216,8 @@ export const EINSATZ_KEYS = {
   etbDruck: 'einsatz-etb-druck',
   // Druck der Modul-Listen (LFH-727): Schnappschüsse, eigene Prefixe außerhalb der Listen.
   personenDruck: 'einsatz-personen-druck',
+  // PASS-Liste (LLH-1198): Schnappschuss wie der Personendruck, eigener Prefix.
+  passListeDruck: 'einsatz-pass-liste-druck',
   tiereDruck: 'einsatz-tiere-druck',
   schaedenDruck: 'einsatz-schaeden-druck',
   // Einsatzbericht: ein Schnappschuss über alle Quellen (LFH-726).
@@ -652,6 +658,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.wetter,
   EINSATZ_KEYS.etbDruck,
   EINSATZ_KEYS.personenDruck,
+  EINSATZ_KEYS.passListeDruck,
   EINSATZ_KEYS.tiereDruck,
   EINSATZ_KEYS.schaedenDruck,
   EINSATZ_KEYS.einsatzberichtDruck,
@@ -665,6 +672,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.personenListenzugriffe,
   EINSATZ_KEYS.personenBestaetiger,
   EINSATZ_KEYS.nachforderungArten,
+  EINSATZ_KEYS.ortungKandidaten,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -891,6 +899,7 @@ export const einsatzKeys = {
   // Druck der Modul-Listen (LFH-727): Vollabruf ohne Filter im Key, nicht live (siehe
   // NICHT_LIVE_KEYS). Der Filter wählt im Client aus der geladenen Menge.
   personenDruck: (einsatzId: number) => [EINSATZ_KEYS.personenDruck, einsatzId] as const,
+  passListeDruck: (einsatzId: number) => [EINSATZ_KEYS.passListeDruck, einsatzId] as const,
   tiereDruck: (einsatzId: number) => [EINSATZ_KEYS.tiereDruck, einsatzId] as const,
   schaedenDruck: (einsatzId: number) => [EINSATZ_KEYS.schaedenDruck, einsatzId] as const,
   // Einsatzbericht: alle Quellen der gewählten Blöcke in einem Abruf, nicht live (siehe
@@ -1081,6 +1090,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.auftraege, einsatzId, 'einzeln', auftragId] as const,
   nachforderungen: (einsatzId: number) => [EINSATZ_KEYS.nachforderungen, einsatzId] as const,
   nachforderungArten: (einsatzId: number) => [EINSATZ_KEYS.nachforderungArten, einsatzId] as const,
+  ortungKandidaten: (einsatzId: number, efId: number) =>
+    [EINSATZ_KEYS.ortungKandidaten, einsatzId, efId] as const,
 
   // ETB
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,

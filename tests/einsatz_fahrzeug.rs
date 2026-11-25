@@ -2605,3 +2605,58 @@ async fn status_ruecknahme_etb_geht_live_hinaus() {
     etb.pruefe(&app, &admin, einsatz, "Statuswechsel zurücknehmen")
         .await;
 }
+
+// ---------- Positionsquelle und Ortung (LLH-2091) ----------
+
+/// Ein PATCH nur der taktischen Zeichen lässt Quelle und Zeitpunkt einer Einwurf-Position stehen
+/// (die Handwege setzen `manuell` nur mit `lat`/`lon`, Positionsbaustein ADR-0101).
+#[tokio::test]
+async fn nur_tz_felder_aendern_die_quelle_nicht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let pfad = format!("/api/incidents/{einsatz}/vehicles/{ef}/position");
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET lat = 52.0, lon = 10.0, position_quelle = 'einwurf', \
+         position_aktualisiert_at = '2026-11-24 10:00:00' WHERE id = ?",
+    )
+    .bind(ef)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let (s, json) = anfrage(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(r#"{"tz_fachaufgabe":"fuehrung"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{json}");
+    assert_eq!(json["position_quelle"], "einwurf");
+    assert_eq!(json["position_aktualisiert_at"], "2026-11-24 10:00:00");
+}
+
+#[tokio::test]
+async fn anzeige_traegt_keine_kennung() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    fahrzeug_disponieren(&app, &admin, einsatz, "Florian 1").await;
+    let (s, json) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/vehicles"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let zeile = &json[0];
+    assert_eq!(zeile["ortung_gekoppelt"], false, "{zeile}");
+    for verboten in ["kennung", "zugang", "zugang_id", "zugang_name"] {
+        assert!(zeile.get(verboten).is_none(), "{verboten} in {zeile}");
+    }
+}

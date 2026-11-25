@@ -973,6 +973,8 @@ fn orphan_enums_wire() {
         Druck => "druck",
         Anhang => "anhang",
         Registrierliste => "registrierliste",
+        PassExport => "pass_export",
+        PassDruck => "pass_druck",
     });
     // LFH-758: Fassung im Lese-Audit der UHS-Dateien; Wire = DB-CHECK in 0138.
     enum_wire!(lifeline_hub::anhang::audit_repo::ZugriffFassung {
