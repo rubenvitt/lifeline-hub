@@ -1955,6 +1955,8 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/drone/sources/{aid}",
             delete(routes::drohne::abschalten),
         )
+        // Drohnenlage als Fachebene der Lagekarte (LLH-2106).
+        .route("/api/incidents/{id}/map/drone", get(routes::drohne::karte))
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),

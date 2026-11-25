@@ -538,7 +538,7 @@ const FACHEBENEN_CACHE_CONTROL: &str = "private, no-cache";
 /// URL, unter der der Browser speichert und nachfragt, und zwei Ausschnitte mit gleichem Inhalt
 /// dürfen denselben ETag tragen. Serialisiert wird trotzdem bei jedem Abruf; gespart wird die
 /// Leitung (Autobahn ~1,3 MB je Poll), nicht die Serverarbeit.
-fn fachebene_antwort(
+pub(crate) fn fachebene_antwort(
     antwort: &crate::karte::typen::FachebeneAntwort,
     req_headers: &HeaderMap,
 ) -> Result<Response, AppError> {

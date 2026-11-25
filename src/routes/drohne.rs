@@ -4,7 +4,8 @@
 //! Adapter ist in höchstens einem laufenden Einsatz zugeschaltet.
 
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::Response;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -235,4 +236,37 @@ pub async fn abschalten(
         state.live.publiziere(einsatz_id, id);
     }
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/incidents/{id}/map/drone — die Drohnenlage als Fachebene (GeoJSON-Umschlag mit
+/// ETag). Die erste Zuschaltung des Einsatzes zählt; ohne Zuschaltung, ohne Stand oder in einem
+/// abgeschlossenen Einsatz ist die Ebene `offline`. Fotos vor dem Zuschalten fehlen.
+pub async fn karte(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    let antwort = if ctx.einsatz.status != crate::einsatz::EinsatzStatus::Aktiv {
+        crate::drohne::karte::offline()
+    } else {
+        let zuschaltungen = {
+            let mut conn = state.pool.acquire().await?;
+            repo::load_for_einsatz(&mut conn, ctx.einsatz.id).await?
+        };
+        let erste = zuschaltungen
+            .iter()
+            .filter_map(|z| {
+                let ms = crate::zeit::parse_utc(&z.zugeschaltet_at)?.timestamp_millis();
+                Some((ms, z))
+            })
+            .min_by_key(|(ms, _)| *ms);
+        match erste {
+            Some((ms, z)) => match state.drohne.get(&z.adapter_id) {
+                Some(stand) => crate::drohne::karte::build_fachebene(&stand.lage, ms),
+                None => crate::drohne::karte::offline(),
+            },
+            None => crate::drohne::karte::offline(),
+        }
+    };
+    crate::routes::karte::fachebene_antwort(&antwort, &headers)
 }
