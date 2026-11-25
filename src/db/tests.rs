@@ -15046,9 +15046,12 @@ async fn migration_0370_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
             .await
             .unwrap();
     assert_eq!(neu.len(), alt.len());
+    // Das Präfix zieht erst Migration 0375 auf `/api/incidents` um (LLH-2061); verglichen wird mit
+    // dem Stand, den beide Migrationen zusammen hinterlassen.
     for (vorher, nachher) in alt.iter().zip(&neu) {
+        let spaeter = nachher.replacen("/api/einsaetze/", "/api/incidents/", 1);
         assert!(
-            BEANTRAGBAR.iter().any(|b| b.pfad == nachher.as_str()),
+            BEANTRAGBAR.iter().any(|b| b.pfad == spaeter),
             "{vorher} → {nachher} ist kein beantragbarer Pfad"
         );
     }
