@@ -280,6 +280,11 @@ export interface SidebarProps {
   ansichtSpeichert: boolean;
   onAnsichtSpeichern: () => void;
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
+  /**
+   * Vom Betreiber abgeschaltete Fachebenen (`/api/map/config`, LLH-2104): Der Ebenenbaum zeigt
+   * sie nicht. Fehlt die Liste, gilt keine als abgeschaltet.
+   */
+  fachebenenAbgeschaltet?: readonly string[];
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
   fachebenenStatus: Partial<

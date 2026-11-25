@@ -436,6 +436,24 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
     .sort((a, b) => zeit(b).localeCompare(zeit(a)));
 }
 
+/**
+ * Sichtbarkeit, wie sie wirkt: Ebenen, die der Betreiber abgeschaltet hat
+ * (`KarteConfigAntwort.fachebenen_abgeschaltet`, LLH-2104), gelten als unsichtbar und werden
+ * nie abgefragt. Die gespeicherte Wahl bleibt unberührt; ohne Abschaltung kommt dasselbe Objekt
+ * zurück, damit Memo-Abhängigkeiten stabil bleiben.
+ */
+export function ohneAbgeschaltete(
+  sichtbar: Record<FachebeneQuelle, boolean>,
+  abgeschaltet: readonly string[] | undefined,
+): Record<FachebeneQuelle, boolean> {
+  if (!abgeschaltet?.length) return sichtbar;
+  const wirksam = { ...sichtbar };
+  for (const k of fachebeneKeys()) {
+    if (abgeschaltet.includes(k)) wirksam[k] = false;
+  }
+  return wirksam;
+}
+
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
   return [

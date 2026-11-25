@@ -389,20 +389,25 @@ export default function Ebenenbaum(props: SidebarProps) {
   const zeigeSichtungslegende =
     (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
 
-  const fachAn = fachebeneKeys().filter((k) => props.fachebenenSichtbar[k]).length;
+  const abgeschaltet = props.fachebenenAbgeschaltet ?? [];
+  const fachAn = fachebeneKeys().filter(
+    (k) => props.fachebenenSichtbar[k] && !abgeschaltet.includes(k),
+  ).length;
   const fach = FACHEBENEN_GRUPPEN.map((g) => {
-    const z = g.ebenen.map((key) => ({
-      key,
-      name: FACHEBENEN[key].label,
-      sichtbar: props.fachebenenSichtbar[key],
-    }));
+    const z = g.ebenen
+      .filter((key) => !abgeschaltet.includes(key))
+      .map((key) => ({
+        key,
+        name: FACHEBENEN[key].label,
+        sichtbar: props.fachebenenSichtbar[key],
+      }));
     return {
       ...g,
       zeilen: z,
       an: z.filter((x) => x.sichtbar).length,
       treffer: filtereGruppe(suche, ['Fachebenen', g.name], z),
     };
-  });
+  }).filter((g) => g.zeilen.length > 0);
   const fachTreffer = fach.some((g) => g.treffer.length > 0);
 
   const grundlageInhalt =
