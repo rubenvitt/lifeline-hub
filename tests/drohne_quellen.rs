@@ -357,3 +357,25 @@ async fn wiedereroeffnen_nach_uebernahme_ergibt_keinen_zweiten_halter() {
     assert_eq!(liste[0]["held_by_other"], "Lage B");
 }
 
+#[tokio::test]
+async fn ohne_leserecht_am_halter_kommt_kein_name_nur_das_merkmal() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let zweiter = einsatz_anlegen_mit(&u.app, &u.admin, "Lage B").await;
+    let (s, _) = u.zuschalten(zweiter, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+    // Die Beobachterin ist nur im ersten Einsatz Mitglied.
+    let beob = benutzer_anlegen(&u.app, &u.admin, "beobachter", "keine").await;
+    rolle_setzen(&u.app, &u.admin, u.einsatz, beob, "beobachter").await;
+    let cookie = login_cookie(&u.app, "beobachter", "beobachterpw1").await;
+
+    let (s, liste) = u.liste(u.einsatz, &cookie).await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    assert!(liste[0]["held_by_other"].is_null(), "{liste:?}");
+    assert_eq!(liste[0]["held_by_other_hidden"], true);
+
+    // Wer den anderen Einsatz lesen darf, bekommt den Namen und kein Merkmal.
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(liste[0]["held_by_other"], "Lage B");
+    assert_eq!(liste[0]["held_by_other_hidden"], false);
+}

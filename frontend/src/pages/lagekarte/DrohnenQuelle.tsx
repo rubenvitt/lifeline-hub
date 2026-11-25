@@ -20,6 +20,8 @@ export interface DrohnenQuelleProps {
 /** Zustand der Quelle in diesem Einsatz als Wort — der zweite Kanal neben jeder Farbe. */
 function zustandWort(q: DroneSourceView): string {
   if (q.held_by_other) return `Bereits an Einsatz ${q.held_by_other} zugeschaltet`;
+  // Ohne Leserecht am anderen Einsatz kommt kein Name, nur das Merkmal.
+  if (q.held_by_other_hidden) return 'Bereits an einem anderen Einsatz zugeschaltet';
   if (!q.connected) return 'Nicht zugeschaltet';
   return q.mission_name ? `Zugeschaltet · Mission ${q.mission_name}` : 'Zugeschaltet';
 }
@@ -29,9 +31,13 @@ function zustandWort(q: DroneSourceView): string {
  * des Zeilenknopfs: Name, Zustand und Missionsname als Text, dazu „Suchlage zuschalten“ bzw.
  * „Abschalten“ — beides nur für die Einsatzleitung (der Server prüft sie ebenso, `403`).
  *
- * Hält ein anderer laufender Einsatz die Quelle, steht „Bereits an Einsatz … zugeschaltet“ und kein
- * Knopf; das gilt auch, wenn die Anfrage erst am `409` des Servers scheitert (zwei Zuschaltungen
- * zugleich). Der Name des anderen Einsatzes kommt aus der Quellenliste, die danach neu geladen wird.
+ * Hält ein anderer laufender Einsatz die Quelle, steht „Bereits an Einsatz … zugeschaltet“ (ohne
+ * Leserecht an ihm „… an einem anderen Einsatz …“) und kein Knopf; das gilt auch, wenn die Anfrage
+ * erst am `409` des Servers scheitert (zwei Zuschaltungen zugleich). Der Name des anderen Einsatzes
+ * kommt aus der Quellenliste, die danach neu geladen wird.
+ *
+ * „Suchlage zuschalten“ steht nur, solange keine Quelle dieses Einsatzes zugeschaltet ist (Spec
+ * §5.4); danach nur „Abschalten“ an der zugeschalteten.
  */
 export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: DrohnenQuelleProps) {
   const { token, rollen } = useRollen();
@@ -43,6 +49,8 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
   const fehler = zuschalten.error ?? abschalten.error;
   const konflikt = istKonflikt(zuschalten.error);
   const liste = quellen.data ?? [];
+  const istGehalten = (q: DroneSourceView) => !!q.held_by_other || q.held_by_other_hidden;
+  const eineZugeschaltet = liste.some((q) => q.connected);
 
   return (
     <div
@@ -75,7 +83,9 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
       >
         {liste.map((q) => {
           const beschreibung = `${listeId}-${q.adapter_id}`;
-          const gehalten = !!q.held_by_other;
+          const gehalten = istGehalten(q);
+          // Zuschalten nur ohne zugeschaltete Quelle; Abschalten immer an der zugeschalteten.
+          const schaltbar = q.connected || (!gehalten && !eineZugeschaltet);
           const laeuft =
             (zuschalten.isPending && zuschalten.variables?.adapterId === q.adapter_id) ||
             (abschalten.isPending && abschalten.variables === q.adapter_id);
@@ -99,7 +109,7 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
                   Livebild
                 </Button>
               )}
-              {darfSchalten && !gehalten && (
+              {darfSchalten && schaltbar && (
                 <Button
                   size="small"
                   style={{ alignSelf: 'flex-start', minHeight: token.controlHeight }}
@@ -120,7 +130,7 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
         })}
       </ul>
       {/* Ein 409 ohne Namen in der Liste (noch nicht neu geladen) sagt es allgemein. */}
-      {konflikt && !liste.some((q) => q.held_by_other) && (
+      {konflikt && !liste.some(istGehalten) && (
         <span role="alert" style={{ color: rollen.achtungText }}>
           Bereits an einem anderen Einsatz zugeschaltet.
         </span>

@@ -28,6 +28,7 @@ const quelle = (o: Partial<DroneSourceView> = {}): DroneSourceView => ({
   adapter_id: 'suchlage-1',
   label: 'Suchlage Staffel Nord',
   connected: false,
+  held_by_other_hidden: false,
   lagemonitor: false,
   state: 'aktiv',
   video_keys: [],
@@ -98,6 +99,27 @@ describe('DrohnenQuelle (LLH-2106)', () => {
       await screen.findByText('Bereits an Einsatz Hochwasser Süd zugeschaltet'),
     ).toBeInTheDocument();
     expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('sagt ohne Leserecht am anderen Einsatz „einem anderen Einsatz“, ohne Platzhalternamen', async () => {
+    api.loadDrohnenQuellen.mockResolvedValue([quelle({ held_by_other_hidden: true })]);
+    renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
+    expect(
+      await screen.findByText('Bereits an einem anderen Einsatz zugeschaltet'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Einsatz anderer Einsatz/)).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('bietet kein weiteres Zuschalten an, solange eine Quelle hier zugeschaltet ist', async () => {
+    api.loadDrohnenQuellen.mockResolvedValue([
+      quelle({ connected: true }),
+      quelle({ adapter_id: 'suchlage-2', label: 'Suchlage Staffel Süd' }),
+    ]);
+    renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
+    expect(await screen.findByRole('button', { name: 'Abschalten' })).toBeInTheDocument();
+    expect(screen.getByText('Suchlage Staffel Süd')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Suchlage zuschalten' })).toBeNull();
   });
 
   it('zeigt nach einem 409 den Einsatz aus der neu geladenen Liste', async () => {

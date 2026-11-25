@@ -25,9 +25,6 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::http_begrenzt::{DECKEL_FOTO, DECKEL_PLAYLIST, DECKEL_VIDEO};
 use crate::zeit::jetzt;
 
-/// Name des anderen Einsatzes, wenn die Person ihn nicht lesen darf.
-const ANDERER_EINSATZ: &str = "anderer Einsatz";
-
 /// Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct DroneSourceView {
@@ -35,9 +32,11 @@ pub struct DroneSourceView {
     pub label: String,
     /// In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle).
     pub connected: bool,
-    /// Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die
-    /// Person ihn nicht lesen darf).
+    /// Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf.
     pub held_by_other: Option<String>,
+    /// Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen
+    /// (dann ist `held_by_other` leer).
+    pub held_by_other_hidden: bool,
     /// Das Livebild geht auch an den Lagemonitor.
     pub lagemonitor: bool,
     /// Zustand des Adapters (`aktiv`, `angehalten`, …).
@@ -51,8 +50,13 @@ pub struct DroneSourceUpdate {
     pub lagemonitor: bool,
 }
 
-/// Der andere laufende Einsatz, der den Adapter hält, mit dem Namen für diese Person.
-async fn halter_name(state: &AppState, benutzer_id: i64, halter: i64) -> Result<String, AppError> {
+/// Der Name des anderen laufenden Einsatzes, der den Adapter hält, wenn die Person ihn lesen
+/// darf; sonst `None`.
+async fn halter_name(
+    state: &AppState,
+    benutzer_id: i64,
+    halter: i64,
+) -> Result<Option<String>, AppError> {
     let name: Option<String> = sqlx::query_scalar("SELECT bezeichnung FROM einsatz WHERE id = ?")
         .bind(halter)
         .fetch_optional(&state.pool)
@@ -60,10 +64,7 @@ async fn halter_name(state: &AppState, benutzer_id: i64, halter: i64) -> Result<
     let darf = crate::einsatz::repo::rolle_von(&state.pool, halter, benutzer_id)
         .await?
         .is_some();
-    Ok(match name {
-        Some(n) if darf => n,
-        _ => ANDERER_EINSATZ.to_string(),
-    })
+    Ok(name.filter(|_| darf))
 }
 
 /// Führt den Store nach einem Commit für die genannten Adapter nach: zugeschaltet bleibt nur,
@@ -92,18 +93,18 @@ async fn sicht(
 ) -> Result<DroneSourceView, AppError> {
     let zuschaltung = zuschaltung.filter(|_| laufend);
     let connected = zuschaltung.is_some();
-    let held_by_other = if connected {
-        None
-    } else {
+    let mut held_by_other = None;
+    let mut held_by_other_hidden = false;
+    if !connected {
         let mut conn = state.pool.acquire().await?;
-        match repo::find_active_holder(&mut conn, &a.id).await? {
-            Some(h) if h != einsatz_id => {
+        if let Some(h) = repo::find_active_holder(&mut conn, &a.id).await? {
+            if h != einsatz_id {
                 drop(conn);
-                Some(halter_name(state, benutzer_id, h).await?)
+                held_by_other = halter_name(state, benutzer_id, h).await?;
+                held_by_other_hidden = held_by_other.is_none();
             }
-            _ => None,
         }
-    };
+    }
     let stand = if connected {
         state.drohne.get(&a.id)
     } else {
@@ -114,6 +115,7 @@ async fn sicht(
         label: a.name.clone(),
         connected,
         held_by_other,
+        held_by_other_hidden,
         lagemonitor: zuschaltung.is_some_and(|z| z.lagemonitor),
         state: a.zustand.clone(),
         mission_name: stand.as_ref().and_then(|s| s.lage.mission_name.clone()),

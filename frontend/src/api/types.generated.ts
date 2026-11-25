@@ -2472,13 +2472,15 @@ export interface components {
         /** @description Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz. */
         DroneSourceView: {
             adapter_id: string;
-            /** @description In diesem Einsatz zugeschaltet. */
+            /** @description In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle). */
             connected: boolean;
-            /**
-             * @description Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die
-             *     Person ihn nicht lesen darf).
-             */
+            /** @description Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf. */
             held_by_other?: string | null;
+            /**
+             * @description Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen
+             *     (dann ist `held_by_other` leer).
+             */
+            held_by_other_hidden: boolean;
             label: string;
             /** @description Das Livebild geht auch an den Lagemonitor. */
             lagemonitor: boolean;

@@ -6197,6 +6197,7 @@
           "adapter_id",
           "label",
           "connected",
+          "held_by_other_hidden",
           "lagemonitor",
           "state",
           "video_keys"
@@ -6207,14 +6208,18 @@
           },
           "connected": {
             "type": "boolean",
-            "description": "In diesem Einsatz zugeschaltet."
+            "description": "In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle)."
           },
           "held_by_other": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die\nPerson ihn nicht lesen darf)."
+            "description": "Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf."
+          },
+          "held_by_other_hidden": {
+            "type": "boolean",
+            "description": "Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen\n(dann ist `held_by_other` leer)."
           },
           "label": {
             "type": "string"
