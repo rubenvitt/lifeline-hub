@@ -13,6 +13,8 @@ export interface DrohnenQuelleProps {
   einsatzId: number;
   /** Nur die Einsatzleitung eines laufenden Einsatzes schaltet (`darfEinsatzLeiten`). */
   darfSchalten: boolean;
+  /** Öffnet das Livebild der Quelle (Fenster über der Karte); ohne sie kein Knopf. */
+  onLivebild?: (adapterId: string) => void;
 }
 
 /** Zustand der Quelle in diesem Einsatz als Wort — der zweite Kanal neben jeder Farbe. */
@@ -31,7 +33,7 @@ function zustandWort(q: DroneSourceView): string {
  * Knopf; das gilt auch, wenn die Anfrage erst am `409` des Servers scheitert (zwei Zuschaltungen
  * zugleich). Der Name des anderen Einsatzes kommt aus der Quellenliste, die danach neu geladen wird.
  */
-export default function DrohnenQuelle({ einsatzId, darfSchalten }: DrohnenQuelleProps) {
+export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: DrohnenQuelleProps) {
   const { token, rollen } = useRollen();
   const listeId = useId();
   const quellen = useDrohnenQuellen(einsatzId);
@@ -87,6 +89,16 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten }: DrohnenQuelle
               <span id={beschreibung} data-lfh="drohnen-zustand">
                 {zustandWort(q)}
               </span>
+              {onLivebild && q.connected && q.video_keys.length > 0 && (
+                <Button
+                  size="small"
+                  style={{ alignSelf: 'flex-start', minHeight: token.controlHeight }}
+                  aria-describedby={beschreibung}
+                  onClick={() => onLivebild(q.adapter_id)}
+                >
+                  Livebild
+                </Button>
+              )}
               {darfSchalten && !gehalten && (
                 <Button
                   size="small"

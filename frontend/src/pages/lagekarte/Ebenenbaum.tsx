@@ -265,7 +265,11 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
       )}
       {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
       {quelle === 'drohne' && props.drohne && (
-        <DrohnenQuelle einsatzId={props.einsatzId} darfSchalten={props.drohne.darfSchalten} />
+        <DrohnenQuelle
+          einsatzId={props.einsatzId}
+          darfSchalten={props.drohne.darfSchalten}
+          onLivebild={props.drohne.onLivebild}
+        />
       )}
     </div>
   );

@@ -126,4 +126,21 @@ describe('DrohnenQuelle (LLH-2106)', () => {
     renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
     expect(await screen.findByText('Keine Drohnenquelle eingerichtet.')).toBeInTheDocument();
   });
+
+  it('bietet „Livebild“ bei einer zugeschalteten Quelle mit Videostrom, auch ohne Schaltrecht', async () => {
+    api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true, video_keys: ['k1'] })]);
+    const onLivebild = vi.fn();
+    renderMitProviders(
+      <DrohnenQuelle einsatzId={7} darfSchalten={false} onLivebild={onLivebild} />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Livebild' }));
+    expect(onLivebild).toHaveBeenCalledWith('suchlage-1');
+  });
+
+  it('zeigt kein „Livebild“ ohne Videoschlüssel', async () => {
+    api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true, video_keys: [] })]);
+    renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten onLivebild={vi.fn()} />);
+    expect(await screen.findByText(/Zugeschaltet/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Livebild' })).toBeNull();
+  });
 });

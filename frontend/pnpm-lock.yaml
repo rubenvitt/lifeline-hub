@@ -49,6 +49,9 @@ importers:
       dayjs:
         specifier: ^1.11.23
         version: 1.11.23
+      hls.js:
+        specifier: 1.7.4
+        version: 1.7.4
       idb:
         specifier: ^8.0.4
         version: 8.0.4
@@ -2730,6 +2733,9 @@ packages:
 
   headers-polyfill@5.0.1:
     resolution: {integrity: sha512-1TJ6Fih/b8h5TIcv+1+Hw0PDQWJTKDKzFZzcKOiW1wJza3XoAQlkCuXLbymPYB8+ZQyw8mHvdw560e8zVFIWyA==}
+
+  hls.js@1.7.4:
+    resolution: {integrity: sha512-3GlxGdPvT2YHvQYOt+yOzT/DEior/qJVNIylHA77kgeoBTdQQqi70GwefNEUmHQeNGyjC8U62+bruqW/Tpm+tg==}
 
   html-encoding-sniffer@7.0.0:
     resolution: {integrity: sha512-UikN5yr7xsCDAq87Or5or0PAlD3HJJOKVzM05az588WnpDJ4Ux7a2A53Qi6gofGg2/EtvF/H4hCi/TXfCW4Y6w==}
@@ -6760,6 +6766,8 @@ snapshots:
     dependencies:
       '@types/set-cookie-parser': 2.4.10
       set-cookie-parser: 3.2.3
+
+  hls.js@1.7.4: {}
 
   html-encoding-sniffer@7.0.0:
     dependencies:

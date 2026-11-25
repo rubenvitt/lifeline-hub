@@ -109,6 +109,7 @@ import type { KarteMarker } from './lagekarte/marker';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
+import { DrohnenVideoHalter } from './lagekarte/DrohnenVideoFenster';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
 import KartenUeberlagerung, {
   GrundlageHinweis,
@@ -213,6 +214,8 @@ export default function LagekartePage() {
   // Dialog; die Quelle sagt, ob er das Suchfeld fokussiert.
   const werkzeugmenueId = useId();
   const [werkzeugmenueOffen, setWerkzeugmenueOffen] = useState(false);
+  // Livebild der Drohne (LLH-2107): die Quelle, deren Fenster über der Karte steht.
+  const [livebildQuelle, setLivebildQuelle] = useState<string | null>(null);
   const [zeichenWahl, setZeichenWahl] = useState<{ offen: boolean; quelle: 'maus' | 'touch' }>({
     offen: false,
     quelle: 'maus',
@@ -1765,6 +1768,13 @@ export default function LagekartePage() {
             : undefined
         }
       />
+      {livebildQuelle != null && (
+        <DrohnenVideoHalter
+          einsatzId={einsatzId}
+          adapterId={livebildQuelle}
+          onClose={() => setLivebildQuelle(null)}
+        />
+      )}
       {/* Gemeinsamer unterer Rand: Zeichnen-Steuerung, Maßstab und Zeitachse als Flow-Bänder in
           einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
           `lagekarte/KartenFuss.tsx`. */}
@@ -2044,7 +2054,7 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
-        drohne={{ darfSchalten: darfDrohneSchalten }}
+        drohne={{ darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }}
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}

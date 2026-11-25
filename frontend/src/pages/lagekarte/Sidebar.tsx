@@ -291,7 +291,7 @@ export interface SidebarProps {
   /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
   copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
   /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
-  drohne?: { darfSchalten: boolean };
+  drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
