@@ -120,8 +120,12 @@ describe('writeGpx', () => {
   });
 
   it('hält die Reihenfolge des Schemas: metadata, alle wpt, dann alle trk', () => {
-    const gpx = lies([flaeche(), punkt(), linie(), punkt({ name: 'B', beschriftung: 'B' })])
-      .documentElement;
+    const gpx = lies([
+      flaeche(),
+      punkt(),
+      linie(),
+      punkt({ name: 'B', beschriftung: 'B' }),
+    ]).documentElement;
     expect(kinder(gpx)).toEqual(['metadata', 'wpt', 'wpt', 'trk', 'trk']);
   });
 
