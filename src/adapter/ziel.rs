@@ -172,6 +172,11 @@ impl<'a> AbrufKontext<'a> {
         self.geheimnisse.get(name)
     }
 
+    /// Ob der Adapter Ziele im LAN erreichen darf.
+    pub fn is_lan_erlaubt(&self) -> bool {
+        self.lan_erlaubt
+    }
+
     /// Ein Textfeld der Einstellungen.
     pub fn einstellung_text(&self, name: &str) -> Option<&str> {
         self.einstellungen.get(name).and_then(Value::as_str)

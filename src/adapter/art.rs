@@ -265,7 +265,8 @@ impl Verzeichnis {
     /// Die Arten dieses Builds.
     pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
         Verzeichnis::new(vec![
-            Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
+            Arc::new(crate::drohne::art::SuchlageArt::new(drohne.clone())),
+            Arc::new(crate::drohne::hls::HlsAdresseArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
