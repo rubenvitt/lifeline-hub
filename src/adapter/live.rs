@@ -46,6 +46,7 @@ pub struct LiveKontext {
     adapter_id: String,
     org_id: i64,
     lan_erlaubt: bool,
+    http_im_lan: bool,
     einstellungen: Map<String, Value>,
     geheimnisse: HashMap<String, SecretString>,
 }
@@ -60,6 +61,12 @@ impl LiveKontext {
             self.lan_erlaubt,
             false,
         )
+        .with_http_im_lan(self.http_im_lan)
+    }
+
+    /// Ob der Adapter Ziele im LAN erreichen darf.
+    pub fn lan_erlaubt(&self) -> bool {
+        self.lan_erlaubt
     }
 
     pub fn adapter_id(&self) -> &str {
@@ -161,6 +168,7 @@ pub async fn live_kontext(
             adapter_id: a.id,
             org_id: a.org_id,
             lan_erlaubt: a.lan_erlaubt,
+            http_im_lan: art.http_im_lan(),
             einstellungen: v.einstellungen,
             geheimnisse: v.geheimnisse,
         }),
