@@ -716,3 +716,445 @@ async fn vorschau_schreibt_nichts() {
     }
     assert_eq!(anzahl(&pool, "qualifikation").await, katalog);
 }
+
+// ---------------------------------------------------------------------------------------------
+// HTTP (LLH-1633, Task 6): Routen unter /api/master-data/import
+// ---------------------------------------------------------------------------------------------
+
+mod http {
+    use super::{anzahl, FZ};
+    use axum::http::StatusCode;
+    use serde_json::{json, Value};
+
+    use crate::common::{benutzer_anlegen, login_cookie, multipart_post, setup_mit_pool};
+
+    const VORSCHAU: &str = "/api/master-data/import/preview";
+    const IMPORT: &str = "/api/master-data/import";
+
+    async fn start() -> (axum::Router, sqlx::SqlitePool, String) {
+        let (app, pool) = setup_mit_pool().await;
+        let admin = login_cookie(&app, "admin", "startpw12").await;
+        (app, pool, admin)
+    }
+
+    async fn hochladen(
+        app: &axum::Router,
+        pfad: &str,
+        cookie: &str,
+        csv: &str,
+        felder: &[(&str, &str)],
+    ) -> (StatusCode, Value) {
+        multipart_post(
+            app,
+            pfad,
+            cookie,
+            Some(("stamm.csv", csv.as_bytes())),
+            felder,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn preview_200_und_schreibt_nichts() {
+        let (app, pool, admin) = start().await;
+        let (s, v) = hochladen(
+            &app,
+            VORSCHAU,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 2);
+        assert_eq!(v["uebernehmbar"], true);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+        assert_eq!(anzahl(&pool, "stammdaten_kennung").await, 0);
+    }
+
+    #[tokio::test]
+    async fn import_200_zaehlung() {
+        let (app, pool, admin) = start().await;
+        let (s, v) = hochladen(
+            &app,
+            IMPORT,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 2);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 2);
+        // Zweiter Lauf: nichts mehr neu.
+        let (s, v) = hochladen(
+            &app,
+            IMPORT,
+            &admin,
+            FZ,
+            &[("herkunft", "Fahrzeugverwaltung")],
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["zaehlung"]["fahrzeuge"]["neu"], 0);
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 2);
+    }
+
+    #[tokio::test]
+    async fn ohne_admin_403() {
+        let (app, pool, admin) = start().await;
+        benutzer_anlegen(&app, &admin, "frieda", "keine").await;
+        let frieda = login_cookie(&app, "frieda", "friedapw1").await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &frieda, FZ, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::FORBIDDEN, "{pfad}");
+        }
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn org_am_hub_409() {
+        let (app, pool, admin) = start().await;
+        let org: i64 = sqlx::query_scalar("SELECT id FROM organisation ORDER BY id LIMIT 1")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let kopplung: i64 = sqlx::query_scalar(
+            "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+             gegenueber_name, richtung, gegenueber_adresse, zustand, art) VALUES ('hub-a', 'X', \
+             'Hub Kreis', 'meldet_sich', 'https://hub.example', 'aktiv', 'standard') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+             fremde_org_name) VALUES (?, ?, 'hub-a/1', 'Kreis')",
+        )
+        .bind(kopplung)
+        .bind(org)
+        .execute(&pool)
+        .await
+        .unwrap();
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &admin, FZ, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::CONFLICT, "{pfad}");
+        }
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn unbekanntes_feld_400() {
+        let (app, _pool, admin) = start().await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = hochladen(&app, pfad, &admin, FZ, &[("irgendwas", "x")]).await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{pfad}");
+        }
+        let (s, _) = hochladen(&app, VORSCHAU, &admin, FZ, &[("entscheidungen", "{kaputt")]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        let lang = "x".repeat(101);
+        let (s, _) = hochladen(&app, VORSCHAU, &admin, FZ, &[("herkunft", &lang)]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+        let (s, _) = multipart_post(&app, VORSCHAU, &admin, None, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn unlesbar_400() {
+        let (app, _pool, admin) = start().await;
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, _) = multipart_post(
+                &app,
+                pfad,
+                &admin,
+                Some(("x.xlsx", &[0u8, 1, 2, 3][..])),
+                &[("herkunft", "FV")],
+            )
+            .await;
+            assert_eq!(s, StatusCode::BAD_REQUEST, "{pfad}");
+        }
+        // Keine Herkunft nötig, aber keine genannt: Übernehmen ist 400, die Vorschau 200.
+        let (s, v) = hochladen(&app, VORSCHAU, &admin, FZ, &[]).await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        assert_eq!(v["herkunft_noetig"], true);
+        let (s, _) = hochladen(&app, IMPORT, &admin, FZ, &[]).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn nicht_uebernehmbar_422() {
+        let (app, pool, admin) = start().await;
+        // Zweimal derselbe Funkrufname in der Datei: Zeilenfehler.
+        let csv = "Kennung;Funkrufname\nfz-1;Florian 1\nfz-2;Florian 1\n";
+        let (s, v) = hochladen(&app, IMPORT, &admin, csv, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+        assert!(v["zeilen"].as_array().is_some_and(|z| !z.is_empty()), "{v}");
+        assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
+    }
+
+    #[tokio::test]
+    async fn iban_wert_nicht_in_antwort() {
+        let (app, _pool, admin) = start().await;
+        let csv = "Name;IBAN\nMuster, Max;DE89370400440532013000\n";
+        for pfad in [VORSCHAU, IMPORT] {
+            let (s, v) = hochladen(&app, pfad, &admin, csv, &[("herkunft", "FV")]).await;
+            assert_eq!(s, StatusCode::OK, "{pfad} {v}");
+            let text = v.to_string();
+            assert!(!text.contains("DE89370400440532013000"), "{text}");
+            if pfad == VORSCHAU {
+                assert_eq!(v["nicht_uebernommen"], json!(["IBAN"]));
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Musterdateien (Vertrag `docs/schnittstellen/stammdaten-datei.md`)
+// ---------------------------------------------------------------------------------------------
+
+const MUSTER_CSV: &[u8] = include_bytes!("../frontend/public/beispiele/stammdaten-beispiel.csv");
+const MUSTER_XLSX: &[u8] = include_bytes!("../frontend/public/beispiele/stammdaten-beispiel.xlsx");
+
+type Blatt = (&'static str, &'static [&'static [&'static str]]);
+
+/// Inhalt der Muster-Excel-Datei: ein Blatt je Art. Quelle der Wahrheit für
+/// `muster_xlsx_schreiben`; `muster_xlsx_entspricht_der_tabelle` hält die eingecheckte Datei daran.
+const MUSTER_BLAETTER: &[Blatt] = &[
+    (
+        "Fahrzeuge",
+        &[
+            &[
+                "kennung",
+                "herkunft",
+                "funkrufname",
+                "kennzeichen",
+                "opta",
+                "issi",
+                "typ",
+                "standort",
+            ],
+            &[
+                "fz-001",
+                "Musterquelle",
+                "RK Musterstadt 1/83-1",
+                "MS-RK 101",
+                "4-83-1",
+                "1234501",
+                "RTW",
+                "Wache Nord",
+            ],
+            &[
+                "fz-002",
+                "Musterquelle",
+                "RK Musterstadt 1/19-1",
+                "MS-RK 102",
+                "4-19-1",
+                "1234502",
+                "KTW",
+                "Wache Nord",
+            ],
+            &[
+                "fz-003",
+                "Musterquelle",
+                "RK Musterstadt 2/42-1",
+                "MS-RK 201",
+                "4-42-1",
+                "1234503",
+                "MTW",
+                "Wache Süd",
+            ],
+        ],
+    ),
+    (
+        "Personal",
+        &[
+            &[
+                "kennung",
+                "herkunft",
+                "name",
+                "personalnummer",
+                "telefon",
+                "traegerorganisation",
+                "qualifikationen",
+            ],
+            &[
+                "p-001",
+                "Musterquelle",
+                "Muster, Maria",
+                "10001",
+                "0151 00000001",
+                "Musterverband",
+                "q-san; q-fue",
+            ],
+            &[
+                "p-002",
+                "Musterquelle",
+                "Beispiel, Bernd",
+                "10002",
+                "0151 00000002",
+                "Musterverband",
+                "q-san",
+            ],
+            &[
+                "p-003",
+                "Musterquelle",
+                "Probe, Paula",
+                "10003",
+                "0151 00000003",
+                "Musterverband",
+                "q-fue",
+            ],
+        ],
+    ),
+    (
+        "Qualifikationen",
+        &[
+            &["kennung", "herkunft", "bezeichnung"],
+            &["q-san", "Musterquelle", "Sanitätshelfer (Muster)"],
+            &["q-fue", "Musterquelle", "Gruppenführer (Muster)"],
+        ],
+    ),
+];
+
+fn muster_mappe() -> Vec<u8> {
+    let mut wb = rust_xlsxwriter::Workbook::new();
+    for (name, zeilen) in MUSTER_BLAETTER {
+        let ws = wb.add_worksheet();
+        ws.set_name(*name).unwrap();
+        for (r, zeile) in zeilen.iter().enumerate() {
+            for (c, text) in zeile.iter().enumerate() {
+                ws.write_string(r as u32, c as u16, *text).unwrap();
+            }
+        }
+    }
+    wb.save_to_buffer().unwrap()
+}
+
+/// Schreibt `frontend/public/beispiele/stammdaten-beispiel.xlsx` neu:
+/// `cargo test --test stammdaten_eingang muster_xlsx_schreiben -- --ignored`.
+#[test]
+#[ignore = "erzeugt die eingecheckte Muster-Excel-Datei"]
+fn muster_xlsx_schreiben() {
+    let ziel = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/frontend/public/beispiele/stammdaten-beispiel.xlsx"
+    );
+    std::fs::write(ziel, muster_mappe()).unwrap();
+}
+
+#[test]
+fn muster_xlsx_entspricht_der_tabelle() {
+    let (soll, _, _) = lies_paket(&muster_mappe()).unwrap();
+    let (ist, _, _) = lies_paket(MUSTER_XLSX).unwrap();
+    assert_eq!(
+        format!("{soll:?}"),
+        format!("{ist:?}"),
+        "Datei veraltet: `muster_xlsx_schreiben` (siehe dort) neu laufen lassen"
+    );
+}
+
+#[tokio::test]
+async fn musterdateien_lesbar() {
+    for (name, bytes, arten) in [
+        ("CSV", MUSTER_CSV, (3, 0, 0)),
+        ("XLSX", MUSTER_XLSX, (3, 3, 2)),
+    ] {
+        let (pool, org) = pool().await;
+        let (p, m, n) = lies_paket(bytes).unwrap();
+        assert_eq!(
+            (p.fahrzeuge.len(), p.personal.len(), p.qualifikationen.len()),
+            arten,
+            "{name}"
+        );
+        let v = vorschau(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        assert!(v.meldungen.is_empty(), "{name}: {:?}", v.meldungen);
+        assert!(
+            v.nicht_uebernommen.is_empty(),
+            "{name}: {:?}",
+            v.nicht_uebernommen
+        );
+        assert!(!v.herkunft_noetig, "{name}");
+        assert!(v.uebernehmbar, "{name}: {v:?}");
+        assert!(
+            v.zeilen.iter().all(|z| z.ergebnis == ZeilenErgebnis::Neu),
+            "{name}: {:?}",
+            v.zeilen
+        );
+        // Zweiter Lauf: alles unverändert.
+        uebernehmen(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        let v2 = vorschau(&pool, org, &p, &m, &n, None, &keine())
+            .await
+            .unwrap();
+        assert!(
+            v2.zeilen
+                .iter()
+                .all(|z| z.ergebnis == ZeilenErgebnis::Unveraendert),
+            "{name}: {:?}",
+            v2.zeilen
+        );
+    }
+}
+
+/// Prüfstein (LLH-1633): kein Name der liefernden Anwendung im Code. Ganze Wörter, ohne Rücksicht
+/// auf Groß-/Kleinschreibung.
+#[test]
+fn kein_herstellername_im_code() {
+    const VERBOTEN: &[&str] = &["iuk", "hiorg", "divera", "fe2", "boswatch"];
+    let wurzel = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut dateien: Vec<std::path::PathBuf> = Vec::new();
+    fn sammle(pfad: &std::path::Path, aus: &mut Vec<std::path::PathBuf>) {
+        if pfad.is_dir() {
+            let mut eintraege: Vec<_> = std::fs::read_dir(pfad).unwrap().flatten().collect();
+            eintraege.sort_by_key(|e| e.path());
+            for e in eintraege {
+                sammle(&e.path(), aus);
+            }
+        } else {
+            aus.push(pfad.to_path_buf());
+        }
+    }
+    for rel in [
+        "src/stammdaten_eingang",
+        "src/einlesen",
+        "src/routes/stammdaten_eingang.rs",
+    ] {
+        sammle(&wurzel.join(rel), &mut dateien);
+    }
+    for rel in ["frontend/src/stammdaten"] {
+        let mut alle = Vec::new();
+        sammle(&wurzel.join(rel), &mut alle);
+        dateien.extend(alle.into_iter().filter(|p| {
+            p.file_name().and_then(|n| n.to_str()).is_some_and(|n| {
+                n.starts_with("StammdatenEinlesen") || n.starts_with("StammdatenVorschau")
+            })
+        }));
+    }
+    for e in std::fs::read_dir(wurzel.join("migrations"))
+        .unwrap()
+        .flatten()
+    {
+        if e.file_name().to_string_lossy().starts_with("0373_") {
+            dateien.push(e.path());
+        }
+    }
+    dateien.push(wurzel.join("frontend/src/api/stammdatenEingang.ts"));
+    dateien.push(wurzel.join("docs/schnittstellen/stammdaten-datei.md"));
+    assert!(
+        dateien.len() >= 10,
+        "zu wenige Dateien gefunden: {dateien:?}"
+    );
+    for pfad in dateien {
+        let text = std::fs::read_to_string(&pfad).unwrap().to_lowercase();
+        for wort in text.split(|c: char| !c.is_alphanumeric()) {
+            assert!(
+                !VERBOTEN.contains(&wort),
+                "{}: Herstellername „{wort}“",
+                pfad.display()
+            );
+        }
+    }
+}

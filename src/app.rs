@@ -110,6 +110,10 @@ pub const PUBLIC_API_BODY_MAX: usize = 64 * 1024;
 /// bleibt die Prüfung der Datei (400 mit Meldung) die wirksame Grenze.
 const SCHICHTPLAN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
 
+/// Body-Grenze der Stammdaten-Routen (LLH-1633): die Datei (höchstens 2 MiB,
+/// `stammdaten_eingang::datei`) plus Entscheidungen und Multipart-Rahmen.
+const STAMMDATEN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
+
 /// Zone anlegen und Abschnittsfläche setzen (LFH-1074): Geometrie bis 256 KiB
 /// (`lage_zone::pruefe_geometrie_groesse`) plus Rahmen. So bleibt die Geometrieprüfung (400 mit
 /// Feldmeldung) die wirksame Grenze.
@@ -2422,6 +2426,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/vehicles", get(routes::fahrzeug::liste))
         .route("/api/vehicles", post(routes::fahrzeug::anlegen))
+        // Stammdaten einlesen (LLH-1633): Datei, Vorschau schreibt nichts.
+        .route(
+            "/api/master-data/import/preview",
+            post(routes::stammdaten_eingang::vorschau)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
+        .route(
+            "/api/master-data/import",
+            post(routes::stammdaten_eingang::uebernehmen)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
         .route(
             "/api/vehicle-suggestions",
             get(routes::fahrzeug::vorschlaege),

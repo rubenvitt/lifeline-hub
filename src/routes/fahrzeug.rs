@@ -223,7 +223,7 @@ fn normalisiere_patch(
 /// `fahrzeug` an die Fahrzeugliste, `einheit` an die Einheit, deren Mitglied es ist, und
 /// `bereitstellungsraum`, wenn ein Raum es zeigt; jeder dieser GETs nennt das Fahrzeug ohnehin.
 /// Nach dem Schreiben aufrufen; ein Lesefehler kostet nur die Live-Meldung.
-async fn stamm_geaendert_melden(state: &AppState, org_id: i64, fahrzeug_id: i64) {
+pub(crate) async fn stamm_geaendert_melden(state: &AppState, org_id: i64, fahrzeug_id: i64) {
     let dispositionen =
         match disposition_repo::aktive_dispositionen(&state.pool, org_id, fahrzeug_id).await {
             Ok(d) => d,

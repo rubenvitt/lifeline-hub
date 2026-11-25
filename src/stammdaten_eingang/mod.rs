@@ -19,6 +19,7 @@ wire_enum! {
     #[derive(
         Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
     )]
+    #[schema(as = StammdatenDateiArt)]
     pub enum StammdatenArt {
         Fahrzeug => "fahrzeug",
         Personal => "personal",
