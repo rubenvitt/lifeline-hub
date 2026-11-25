@@ -17,6 +17,7 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -45,8 +46,9 @@ import kotlinx.coroutines.withContext
  * - Sichtbar durch die dauerhafte Benachrichtigung „Lifeline ortet dich für Einsatz …“ mit
  *   „Pausieren“; Tippen öffnet die App. Ab Android 16 bittet sie um ein Live-Update.
  * - Positionen vom `LocationManager` des Systems (der Fused Provider des Systems, wo es ihn gibt,
- *   sonst GPS und Netz), weil die App ohne Play-Dienste verteilt wird: höchstens alle 30 s, ab
- *   25 m Bewegung, dazu jede halbe Minute die Prüfung auf ein Lebenszeichen.
+ *   sonst GPS und Netz, bei nur ungefährem Standort allein das Netz), weil die App ohne
+ *   Play-Dienste verteilt wird: höchstens alle 30 s, ab 25 m Bewegung, dazu jede halbe Minute die
+ *   Prüfung, ob ein Lebenszeichen fällig ist (dann eine frische Messung, nie eine alte neu datiert).
  * - Was gesendet wird und wann, entscheidet der [Sendeplan] im Kern; hier stehen nur Uhr, Netz und
  *   System. Kein Verlauf: nur die letzte Position, nur im Speicher.
  */
@@ -59,7 +61,11 @@ class OrtungsDienst : Service() {
     private var ziel = ""
     private var ortet = false
 
-    private val zuhoerer = object : LocationListener {
+    /**
+     * Ein Zuhörer je Anbieter: das System ersetzt die Anmeldung eines Zuhörers, der schon für einen
+     * anderen Anbieter angemeldet ist. Ohne Messung (Anbieter aus, Recht entzogen) geht nichts raus.
+     */
+    private fun neuerZuhoerer(): LocationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) = messung(location)
 
         // Bis Android 10 sind diese Methoden abstrakt; ohne sie bräche der Aufruf des Systems ab.
@@ -71,9 +77,22 @@ class OrtungsDienst : Service() {
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
     }
 
+    /** Laufende Anforderungen im Takt (je Anbieter ein Zuhörer). */
+    private val zuhoerer = mutableListOf<LocationListener>()
+
+    /** Die Anforderung einer frischen Messung für das Lebenszeichen: ab API 30 abbrechbar, davor Zuhörer. */
+    private val einzelAbbrueche = mutableListOf<CancellationSignal>()
+    private val einzelZuhoerer = mutableListOf<LocationListener>()
+    private val einzelEnde = Runnable { beendeEinzelanforderung() }
+
+    /**
+     * Lebenszeichen ([Sendeplan.lebenszeichen]): ist eines fällig, fordert der Dienst **eine** frische
+     * Messung an; sie geht mit ihrer eigenen Zeit über [messung] raus. Eine alte Position mit neuer
+     * Zeit sendet er nie: kommt keine Messung, zeigt die Karte die Position ehrlich als veraltet.
+     */
     private val lebenszeichen = object : Runnable {
         override fun run() {
-            plan.lebenszeichen(Instant.now())?.let(::sende)
+            if (plan.lebenszeichen(Instant.now())) fordereMessungAn()
             hauptfaden.postDelayed(this, PRUEFUNG_MS)
         }
     }
@@ -130,27 +149,90 @@ class OrtungsDienst : Service() {
         hauptfaden.postDelayed(lebenszeichen, PRUEFUNG_MS)
     }
 
-    /** Fordert Positionen an; `false` ohne Recht oder ohne Anbieter. */
+    /**
+     * Anbieter, die das Recht hergibt: der Fused Provider des Systems (ab Android 12, nimmt auch nur
+     * „ungefähr“), sonst GPS und Netz bei genauem Standort, bei nur ungefährem allein das Netz (GPS
+     * würfe dort eine `SecurityException`). Leer ohne Recht.
+     */
+    private fun anbieter(manager: LocationManager): List<String> {
+        val fein = checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val grob = checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!fein && !grob) return emptyList()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && manager.hasProvider(LocationManager.FUSED_PROVIDER)) {
+            return listOf(LocationManager.FUSED_PROVIDER)
+        }
+        val moeglich = if (fein) {
+            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER)
+        } else {
+            listOf(LocationManager.NETWORK_PROVIDER)
+        }
+        return moeglich.filter { it in manager.allProviders }
+    }
+
+    /** Fordert Positionen an; `false` ohne Recht, ohne Anbieter oder wenn das System ablehnt. */
     @SuppressLint("MissingPermission")
     private fun fordereOrteAn(): Boolean {
-        val erlaubt = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            .any { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
-        if (!erlaubt) return false
         val manager = getSystemService(LocationManager::class.java) ?: return false
-        val anbieter = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && manager.hasProvider(LocationManager.FUSED_PROVIDER)) {
-            listOf(LocationManager.FUSED_PROVIDER)
-        } else {
-            listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER).filter { it in manager.allProviders }
+        for (name in anbieter(manager)) {
+            val z = neuerZuhoerer()
+            try {
+                manager.requestLocationUpdates(name, MINDESTABSTAND_MS, BEWEGUNG_M, z, Looper.getMainLooper())
+                zuhoerer += z
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Anbieter $name ohne Recht", e)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Anbieter $name fehlt", e)
+            }
         }
-        if (anbieter.isEmpty()) return false
-        for (name in anbieter) {
-            manager.requestLocationUpdates(name, MINDESTABSTAND_MS, BEWEGUNG_M, zuhoerer, Looper.getMainLooper())
+        return zuhoerer.isNotEmpty()
+    }
+
+    /**
+     * Eine frische Messung für das Lebenszeichen: ab Android 11 `getCurrentLocation`, davor
+     * `requestSingleUpdate`; nach [Sendeplan.LEBENSZEICHEN_FRIST_S] bricht der Dienst ab.
+     */
+    @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION") // `requestSingleUpdate` vor Android 11, dort ohne Nachfolger.
+    private fun fordereMessungAn() {
+        val manager = getSystemService(LocationManager::class.java) ?: return
+        beendeEinzelanforderung()
+        for (name in anbieter(manager)) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    // Je Anforderung ein eigenes Signal: ein Signal hält nur einen Abbruch.
+                    val abbruch = CancellationSignal()
+                    manager.getCurrentLocation(name, abbruch, mainExecutor) { location ->
+                        if (location != null) messung(location)
+                    }
+                    einzelAbbrueche += abbruch
+                } else {
+                    val z = neuerZuhoerer()
+                    manager.requestSingleUpdate(name, z, Looper.getMainLooper())
+                    einzelZuhoerer += z
+                }
+            } catch (e: SecurityException) {
+                Log.w(TAG, "Lebenszeichen: Anbieter $name ohne Recht", e)
+            } catch (e: IllegalArgumentException) {
+                Log.w(TAG, "Lebenszeichen: Anbieter $name fehlt", e)
+            }
         }
-        return true
+        hauptfaden.postDelayed(einzelEnde, (Sendeplan.LEBENSZEICHEN_FRIST_S * 1_000).toLong())
+    }
+
+    private fun beendeEinzelanforderung() {
+        hauptfaden.removeCallbacks(einzelEnde)
+        einzelAbbrueche.forEach { it.cancel() }
+        einzelAbbrueche.clear()
+        val manager = getSystemService(LocationManager::class.java)
+        einzelZuhoerer.forEach { manager?.removeUpdates(it) }
+        einzelZuhoerer.clear()
     }
 
     private fun stoppeOrtung() {
-        if (ortet) getSystemService(LocationManager::class.java)?.removeUpdates(zuhoerer)
+        val manager = getSystemService(LocationManager::class.java)
+        zuhoerer.forEach { manager?.removeUpdates(it) }
+        zuhoerer.clear()
+        beendeEinzelanforderung()
         hauptfaden.removeCallbacks(lebenszeichen)
         hauptfaden.removeCallbacks(versuch)
         plan.stoppe()
