@@ -54,6 +54,8 @@ interface InspectorProps {
   ) => void;
   /** Rohlisten für das Datenraster (Stärke, Abschnitt, Status …); ohne Angabe nur Ort. */
   roh?: AuswahlRoh;
+  /** Stand eines eingefrorenen Lagestands (ms): das GPS-Alter rechnet gegen ihn, nicht gegen die Uhr. */
+  bezugszeit?: number;
   /**
    * „Abschnitt fokussieren“ (LLH-1057): nur an einem Abschnitt. Ohne Handler fehlt der Knopf, etwa
    * wenn genau dieser Abschnitt schon im Fokus steht — dann trägt das Fuß-Band „Fokus aufheben“.
@@ -176,6 +178,7 @@ export default function Inspector({
   onVerortungLoeschen,
   onSymbolAendern,
   roh = LEERE_ROHDATEN,
+  bezugszeit,
   onAbschnittFokussieren,
   ohneOrt = false,
 }: InspectorProps) {
@@ -194,8 +197,8 @@ export default function Inspector({
   // Geometrie-Kennzahlen (z. B. Abschnittsfläche), rein clientseitig.
   const kennzahlen = marker.geometrie ? geoKennzahlen(marker.geometrie) : null;
   const bild = useMemo(() => markerBildUrl(marker, dunkel), [marker, dunkel]);
-  const jetzt = useMinutenTakt();
-  const raster = auswahlRaster(marker, roh, zeitKurz, jetzt);
+  const takt = useMinutenTakt();
+  const raster = auswahlRaster(marker, roh, zeitKurz, bezugszeit ?? takt);
   const letzte = letzteMeldungBlock(marker, roh, zeitKurz);
 
   const symbolAuswahl = darfSchreiben && onSymbolAendern && TAKTISCHE_TYPEN.includes(marker.typ);

@@ -1,7 +1,13 @@
 import { useMemo } from 'react';
 import { Checkbox, Form, Radio } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { koppleOrtung, listOrtungKandidaten, type TrackingCandidate } from '../api/ortung';
+import {
+  GRUND_EHRENAMT_ERFORDERLICH,
+  koppleOrtung,
+  listOrtungKandidaten,
+  type TrackingCandidate,
+} from '../api/ortung';
+import { ApiError } from '../api/client';
 import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug } from '../api/types';
 import { vorText } from '../anzeige/dauer';
@@ -61,12 +67,34 @@ export default function OrtungKoppelnDialog({
   const bereit = kennung != null && (!bestaetigungPflicht || ehrenamt === true);
 
   const mutation = useMutation({
-    mutationFn: (v: { efId: number; kandidat: TrackingCandidate; ehrenamt: boolean }) =>
-      koppleOrtung(einsatzId, v.efId, {
+    mutationFn: (v: { efId: number; kandidat: TrackingCandidate; ehrenamt: boolean }) => {
+      // Nach einem Neuabruf kann die gewählte Kennung inzwischen vergeben sein: nicht still schließen.
+      if (v.kandidat.coupled) {
+        form.setFieldValue('kennung', undefined);
+        return Promise.reject(
+          new Error('Diese Kennung ist inzwischen gekoppelt. Bitte eine andere wählen.'),
+        );
+      }
+      return koppleOrtung(einsatzId, v.efId, {
         access_id: v.kandidat.access_id,
         device_id: v.kandidat.device_id,
         volunteer_crew_confirmed: v.ehrenamt,
-      }),
+      });
+    },
+    // Der Server hat anders entschieden als die Liste beim Öffnen: die Kennung ist inzwischen
+    // vergeben (409) oder die Bestätigung ist jetzt Pflicht (422 `volunteer_crew_required`).
+    // Der Dialog bleibt offen, die Kandidaten werden neu geholt (Kästchen, ausgegraute Kennung),
+    // die Fehlerzeile nennt den Zustand.
+    onError: (fehler) => {
+      if (
+        fehler instanceof ApiError &&
+        (fehler.status === 409 ||
+          (fehler.status === 422 && fehler.grund === GRUND_EHRENAMT_ERFORDERLICH))
+      ) {
+        if (fehler.status === 409) form.setFieldValue('kennung', undefined);
+        void kandidatenQuery.refetch();
+      }
+    },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: einsatzKeys.fahrzeuge(einsatzId) });
       // Der Server schreibt einen ETB-Eintrag „Ortung gekoppelt: …“.
@@ -123,7 +151,7 @@ export default function OrtungKoppelnDialog({
       onErfassen={async (werte) => {
         if (!fahrzeug) return;
         const kandidat = kandidaten.find((k) => kennungWert(k) === werte.kennung);
-        if (!kandidat || kandidat.coupled) return;
+        if (!kandidat) return;
         await mutation.mutateAsync({
           efId: fahrzeug.id,
           kandidat,

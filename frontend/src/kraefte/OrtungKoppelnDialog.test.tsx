@@ -108,4 +108,56 @@ describe('OrtungKoppelnDialog', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.getByRole('button', { name: 'Koppeln' })).toBeDisabled();
   });
+
+  it('holt bei 422 `volunteer_crew_required` die Kandidaten neu: das Kästchen erscheint, der Dialog bleibt offen', async () => {
+    let pflicht = false;
+    server.use(
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
+        HttpResponse.json({ volunteer_crew_required: pflicht, candidates: KANDIDATEN }),
+      ),
+      http.put('/api/incidents/7/vehicles/10/tracking', () => {
+        pflicht = true;
+        return HttpResponse.json(
+          {
+            error: 'Die ehrenamtliche Besatzung muss bestätigt werden',
+            grund: 'volunteer_crew_required',
+          },
+          { status: 422 },
+        );
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
+    expect(screen.queryByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+    expect(
+      await screen.findByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' }),
+    ).toBeInTheDocument();
+    expect(await screen.findByText(/muss bestätigt werden/)).toBeInTheDocument();
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
+
+  it('holt bei 409 (Kennung vergeben) die Kandidaten neu, bleibt offen und nennt den Zustand', async () => {
+    let vergeben = false;
+    server.use(
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
+        HttpResponse.json({
+          volunteer_crew_required: false,
+          candidates: KANDIDATEN.map((k) =>
+            k.device_id === 'kennung-a' ? { ...k, coupled: vergeben } : k,
+          ),
+        }),
+      ),
+      http.put('/api/incidents/7/vehicles/10/tracking', () => {
+        vergeben = true;
+        return HttpResponse.json({ error: 'Kennung ist bereits gekoppelt' }, { status: 409 });
+      }),
+    );
+    render();
+    await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Koppeln' }));
+    expect(await screen.findByText(/bereits gekoppelt/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('radio', { name: /kennung-a/ })).toBeDisabled());
+    expect(onSchliessen).not.toHaveBeenCalled();
+  });
 });

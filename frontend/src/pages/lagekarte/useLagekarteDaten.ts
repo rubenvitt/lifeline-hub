@@ -66,6 +66,8 @@ import { buildTierMarker } from './tierMarker';
 import { buildSammelstelleMarker } from './sammelstelleMarker';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
 
+dayjs.extend(utc);
+
 /**
  * Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und „Nicht
  * verortet" heraus, die Personen nie enthalten.
@@ -742,6 +744,9 @@ export function useLagekarteDaten({
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine abgeschaltete
     // Live-Query meldet isLoading=false → sonst „fertig" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
+    // Bezugszeit (ms) für das Alter von GPS-Positionen: im Lagestand dessen Stand, sonst keine
+    // (dann gilt der Minutentakt).
+    bezugszeit: standAt ? jetzt : undefined,
     // Stehen alle Quellen der Marker fest (geladen oder gescheitert)? Die Startansicht
     // (`startAnsicht.ts`) braucht das vollständige Bild; `ladt` hängt nur an Einsatz und Config.
     markerLaden: istSnapshot
