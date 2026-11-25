@@ -7,8 +7,10 @@
 --
 -- Die Tabelle wird von der Instanzkopplung (LLH-1493) nicht verteilt; ein ELW sieht sie nicht.
 --
--- Drei echte Fremdschlüssel statt Art + Ziel-Id, damit Löschen kaskadiert und keine Waise entsteht;
--- genau eines davon ist gesetzt (CHECK). Die Herkunft ist normalisiert (getrimmt, Kleinschreibung).
+-- Drei echte Fremdschlüssel statt Art + Ziel-Id, damit keine Waise entsteht; genau eines davon ist
+-- gesetzt (CHECK). Fahrzeug und Personal halten fest (NO ACTION): Der Demo-Löschweg behält eine
+-- verwiesene Zeile (demo::schema_tests::kein_fk_kaskadiert_in_stammdaten), und eine übernommene
+-- Kennung zeigt echte Nutzung. Eine Qualifikation nimmt ihre Kennungen mit. Die Herkunft ist normalisiert (getrimmt, Kleinschreibung).
 -- Die Org des Ziels muss gleich `org_id` sein; das prüft Rust beim Schreiben. Abgesichert von
 -- db::tests::migration_0373_stammdaten_kennung.
 CREATE TABLE stammdaten_kennung (
@@ -16,8 +18,8 @@ CREATE TABLE stammdaten_kennung (
     org_id           INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,
     herkunft         TEXT    NOT NULL,
     kennung          TEXT    NOT NULL,
-    fahrzeug_id      INTEGER REFERENCES fahrzeug(id)      ON DELETE CASCADE,
-    personal_id      INTEGER REFERENCES personal(id)      ON DELETE CASCADE,
+    fahrzeug_id      INTEGER REFERENCES fahrzeug(id),
+    personal_id      INTEGER REFERENCES personal(id),
     qualifikation_id INTEGER REFERENCES qualifikation(id) ON DELETE CASCADE,
     angelegt_at      TEXT    NOT NULL,
     CHECK ((fahrzeug_id IS NOT NULL) + (personal_id IS NOT NULL) + (qualifikation_id IS NOT NULL) = 1)
