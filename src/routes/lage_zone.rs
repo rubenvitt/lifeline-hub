@@ -111,6 +111,9 @@ pub struct ZoneBody {
     /// Evakuierungsbezirk (LFH-673), nur bei `typ = evakuierungsbezirk`; absent/NULL = nicht
     /// zugeordnet. Geprüft von [`pruefe_bezirk_zuordnung`].
     pub evakuierungsbezirk_id: Option<i64>,
+    /// Übernahme aus einer Fremdebene dieses Einsatzes (LLH-2129): der System-ETB-Eintrag nennt
+    /// die Herkunft. Fremde oder unbekannte Ebene → 404.
+    pub fremdebene_id: Option<i64>,
 }
 
 /// Validiert typ/geometrie_typ/geometrie (statt DB-CHECK→500) über
@@ -173,6 +176,8 @@ pub async fn anlegen(
     if let Some(bid) = body.evakuierungsbezirk_id {
         pruefe_bezirk_zuordnung(&state, &ctx, &body.typ, bid).await?;
     }
+    let herkunft =
+        crate::karte_fremdebene::herkunft_fuer(&state.pool, einsatz_id, body.fremdebene_id).await?;
 
     // F06/LFH-244 Tier-A: Zonen-INSERT (+ ggf. Gruppen-INSERT) + System-ETB-Eintrag atomar
     // in EINER Tx (BEGIN IMMEDIATE + Retry). Der In-Tx-Reload liefert die frische Anzeige für
@@ -204,6 +209,14 @@ pub async fn anlegen(
             }
             None => etb_text(z.typ.as_str(), z.label.as_deref(), "eingerichtet"),
         };
+        let text = match &herkunft {
+            Some(h) => format!("{text} ({h})"),
+            None => text,
+        };
+        // Neuer Weg ins ETB: die Grenze selbst prüfen (`src/AGENTS.md`, `etb::INHALT_MAX`).
+        if text.chars().count() > crate::etb::INHALT_MAX {
+            return Err(AppError::Validation("ETB-Text zu lang".into()));
+        }
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, ctx.benutzer.id, startwert, &text)
                 .await?;
