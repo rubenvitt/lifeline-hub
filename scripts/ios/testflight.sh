@@ -88,14 +88,17 @@ for werkzeug in xcodebuild xcodegen; do
 done
 
 # Version aus [workspace.package]; sie muss die des Tags sein, sonst trüge der Build in TestFlight
-# eine andere Version als das Release. Auch die Helfer-App braucht die Datei: XcodeGen erzeugt das
-# ganze Projekt, die Ziele der Hülle binden sie ein.
+# eine andere Version als das Release. XcodeGen erzeugt immer das ganze Projekt und bricht ab, wenn
+# eine eingebundene xcconfig fehlt: beide Apps brauchen deshalb beide Dateien (ios/App und
+# ios/Helfer/App, beide nicht versioniert). Die Hülle schreibt die der Helfer-App mit Build 1; sie
+# baut das Schema `LifelineHub` und lädt nur dieses hoch.
 "$WURZEL/scripts/ios/version.sh"
 if [ "$APP" = hub ]; then
   ist="$(awk '$1 == "LIFELINE_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
   [ "$ist" = "$VERSION" ] \
     || fehler "Workspace-Version $ist passt nicht zum Tag $TAG (erwartet $VERSION)."
   BUILD_NUMMER="$(awk '$1 == "CURRENT_PROJECT_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/App/Version.xcconfig")"
+  "$WURZEL/scripts/ios/helfer-version.sh"
 else
   "$WURZEL/scripts/ios/helfer-version.sh" --build "$HELFER_BUILD"
   VERSION="$(awk '$1 == "MARKETING_VERSION" && $2 == "=" { print $3; exit }' "$WURZEL/ios/Helfer/App/Version.xcconfig")"

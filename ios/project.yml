@@ -14,6 +14,8 @@
 # Helfer-App (ADR-0098, Regeln: ios/Helfer/AGENTS.md): eigene native App `LifelineHelfer` mit der
 # Widget-Erweiterung `HelferAktivitaet` (Live-Aktivität) und dem Kern `HelferKern`. Ihre Version
 # schreibt scripts/ios/helfer-version.sh nach Helfer/App/Version.xcconfig (nicht versioniert).
+# XcodeGen braucht beide xcconfig für jedes Schema: vor `xcodegen generate` laufen immer
+# scripts/ios/version.sh und scripts/ios/helfer-version.sh (testflight.sh, simulator-pruefung.sh).
 name: LifelineHub
 
 options:
