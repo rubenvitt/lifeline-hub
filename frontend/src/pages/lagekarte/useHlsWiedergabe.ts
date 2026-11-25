@@ -124,6 +124,6 @@ export function useHlsWiedergabe(
       clearTimeout(wiederholung);
       abbau?.();
     };
-  }, [einsatzId, videoKey, versuch]);
+  }, [einsatzId, videoKey, versuch, videoRef]);
   return zustand;
 }
