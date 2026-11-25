@@ -265,6 +265,10 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
   `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
   (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
+- **Versandweg** (LLH-2093): Eine Art darf außer dem Abruf auch einen Versandweg haben (heute
+  `smtp`, `adapter::smtp_art`). Das Geheimnis entschlüsselt dafür allein
+  `adapter::lauf::zugang_fuer_versand` (neben dem Lauf); der Ausgangskorb hält es nur für die
+  Dauer einer Zustellung. Regeln: Abschnitt „Ausgang an Menschen“.
 
 ## Anhänge
 
@@ -388,6 +392,45 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt
   sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
   `--heic-decoder-verzeichnis` genau diese zwei Namen.
+
+## Ausgang an Menschen (LLH-2093)
+
+Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbindung
+`src/adapter/smtp.rs` und `smtp_art.rs`, Routen `src/routes/ausgang.rs`
+([ADR-0098](../docs/architektur/entscheidungen/ADR-0098-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
+- **Nur ein Mensch löst aus:** Absenden am freigegebenen Dokument (`POST …/deliveries`) oder
+  „Erneut senden“. Kein Ereignis, Webhook oder Adapterlauf legt einen Versand an; Webhooks
+  (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.
+- **Eine Zeile je Adresse, mit Schnappschuss** (`betreff`, `inhalt`, `stelle_bezeichnung`,
+  `adresse`). „Erneut senden“ sendet den Schnappschuss, nicht die neuere Fassung. `client_id`
+  macht das Absenden idempotent (`UNIQUE(org_id, client_id)`).
+- **Lauf ohne Datenbankverbindung während SMTP:** fällige Zeile lesen, Verbindung zurückgeben,
+  zustellen; Ergebnis und ETB-Eintrag in **einer** Transaktion (`write_retry!`),
+  `live.publiziere` und Einsatz-Ereignis erst **nach** dem Commit.
+- **Quellprüfung vor jeder Zustellung:** jüngste freigegebene Version (`is_juengste_freigabe`),
+  Nachforderung nicht zurückgezogen oder abgelehnt; sonst `fehlgeschlagen` mit `ueberholt` ohne
+  Netz. Auch „Erneut senden“ prüft das (422).
+- **Spiegel:** `ausgang` steht in `instanz::spiegel::art::AUSGENOMMEN`; am Spiegel lehnt das
+  Anlegen mit 422 `spiegel` ab, der Lauf setzt `fehlgeschlagen` mit `spiegel` **ohne** ETB-Eintrag
+  (am Spiegel gesperrt). Ein Versand ist nie halb: zugestellt und im ETB oder sichtbar
+  fehlgeschlagen.
+- **Wiederholung:** vorübergehende Fehler mit Backoff `30 s · 2^(n−1)`, gedeckelt auf 5 min,
+  höchstens **30 min** ab `erster_versuch_at`; dauerhafte Fehler sofort `fehlgeschlagen`.
+  `ungewiss` (Abbruch nach DATA, auch ein Absturz mitten in der Zustellung, `versuch_begonnen_at`)
+  wird **nie** selbst wiederholt.
+- **Fehlercodes:** Versandfehler sind `AusgangFehler` (`voruebergehend`, `abgelehnt`, `ungewiss`,
+  `ueberholt`, `anbindung_fehlt`, `anbindung_angehalten`, `anbindung_fehler`, `zu_gross`,
+  `spiegel`) mit Enum-Kontrakt und Text in `frontend/src/api/ausgang.ts`; die SMTP-Sitzung
+  nutzt die bestehenden `AdapterFehler` (535 → `abgelehnt`, TLS → `tls`). Ein 422 mit Grund ist
+  `AppError::UnprocessableGrund` (`{error, grund}`). Kein Text des Mailservers und kein
+  Geheimnis in Spalte, ETB, Log, Antwort oder Fehlertext.
+- **Geheimnis nur über `adapter::lauf::zugang_fuer_versand`;** keine zweite Tabelle für Zustand
+  oder Geheimnisse der Anbindung, `ausgang` hält Nachrichten. Der SMTP-Client ist
+  `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
+  `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
+- **Routen** bleiben unter `/api/einsaetze/{id}/…` (Segmente `deliveries`, `retry`): die
+  Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle
+  `org_externe_stelle_kanal` hat keine Änderungsspur (nicht Teil des ELW-Abgleichs).
 
 ## Backend — Schutzköpfe (LFH-797)
 

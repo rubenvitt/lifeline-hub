@@ -1,6 +1,7 @@
 //! Ausgangskorb (LLH-2093, Spec `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
 //! Abschnitt 3): die Tabelle `ausgang`, ihr Zustandsmodell, die Wiederholungsfrist und das Repo.
-//! Der Lauf ([`lauf`]) stellt zu und schreibt das Ergebnis ins ETB; die Routen kommen später.
+//! Der Lauf ([`lauf`]) stellt zu und schreibt das Ergebnis ins ETB; die Routen stehen in
+//! `src/routes/ausgang.rs`. Regeln: `src/AGENTS.md`, Ausgang an Menschen.
 
 pub mod lauf;
 pub mod nachricht;
