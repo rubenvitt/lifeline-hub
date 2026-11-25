@@ -59,6 +59,7 @@ pub mod infotelefon;
 pub mod instanz;
 pub mod ios_push;
 pub mod karte;
+pub mod karte_fremdebene;
 pub mod karte_hintergrundbild;
 pub mod karte_ort_suche;
 pub mod karten_ansicht;

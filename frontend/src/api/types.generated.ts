@@ -4124,6 +4124,46 @@ export interface components {
              */
             zeichen_spec: string;
         };
+        /** @description Eine Fremdebene, wie die Liste sie zeigt (ohne Inhalt). Wire-Felder englisch. */
+        FremdebeneAnzeige: {
+            /** @description Letzter Abrufversuch, nur URL-Ebene. */
+            attempted_at?: string | null;
+            /** @description Palettenschlüssel (`fremd-1` … `fremd-6`). */
+            color: string;
+            created_at: string;
+            /**
+             * Format: int64
+             * @description Zahl der Objekte ohne lesbare Geometrie.
+             */
+            dropped_count: number;
+            error?: components["schemas"]["FremdebeneFehler"] | null;
+            /** Format: int64 */
+            feature_count: number;
+            /** @description Letzter erfolgreicher Abruf (auch 304), nur URL-Ebene. */
+            fetched_at?: string | null;
+            /** Format: int64 */
+            id: number;
+            name: string;
+            source: components["schemas"]["FremdebeneQuelle"];
+            /**
+             * @description Volle Adresse der URL-Ebene; nur für Schreibende (Entwurf, „URL mit Geheimnis im Query“),
+             *     sonst fehlt sie ([`FremdebeneAnzeige::fuer_leser`]).
+             */
+            url?: string | null;
+            /** @description Nur der Host der URL-Ebene, für alle Lesenden. */
+            url_host?: string | null;
+        };
+        /**
+         * @description Warum eine Datei oder ein Abruf abgelehnt ist (`grund` im 400 bzw. 413, an der URL-Ebene
+         *     in `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.
+         * @enum {string}
+         */
+        FremdebeneFehler: "unlesbar" | "dtd" | "zu_gross" | "zu_viele_objekte" | "leer" | "koordinaten" | "virus" | "nicht_erreichbar" | "weiterleitung" | "abgelehnt" | "status" | "ziel_intern" | "zeitlimit";
+        /**
+         * @description Woher eine Fremdebene kommt.
+         * @enum {string}
+         */
+        FremdebeneQuelle: "datei" | "url";
         /** @description Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4). */
         FuehrungAnfrageEingang: {
             kennung: string;
@@ -5888,7 +5928,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];

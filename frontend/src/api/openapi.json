@@ -10275,6 +10275,113 @@
           }
         }
       },
+      "FremdebeneAnzeige": {
+        "type": "object",
+        "description": "Eine Fremdebene, wie die Liste sie zeigt (ohne Inhalt). Wire-Felder englisch.",
+        "required": [
+          "id",
+          "name",
+          "source",
+          "color",
+          "feature_count",
+          "dropped_count",
+          "created_at"
+        ],
+        "properties": {
+          "attempted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter Abrufversuch, nur URL-Ebene."
+          },
+          "color": {
+            "type": "string",
+            "description": "Palettenschlüssel (`fremd-1` … `fremd-6`)."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "dropped_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Objekte ohne lesbare Geometrie."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FremdebeneFehler",
+                "description": "Fehler des letzten Abrufs; der letzte Stand bleibt sichtbar."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feature_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fetched_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abruf (auch 304), nur URL-Ebene."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FremdebeneQuelle"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Volle Adresse der URL-Ebene; nur für Schreibende (Entwurf, „URL mit Geheimnis im Query“),\nsonst fehlt sie ([`FremdebeneAnzeige::fuer_leser`])."
+          },
+          "url_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nur der Host der URL-Ebene, für alle Lesenden."
+          }
+        }
+      },
+      "FremdebeneFehler": {
+        "type": "string",
+        "description": "Warum eine Datei oder ein Abruf abgelehnt ist (`grund` im 400 bzw. 413, an der URL-Ebene\nin `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.",
+        "enum": [
+          "unlesbar",
+          "dtd",
+          "zu_gross",
+          "zu_viele_objekte",
+          "leer",
+          "koordinaten",
+          "virus",
+          "nicht_erreichbar",
+          "weiterleitung",
+          "abgelehnt",
+          "status",
+          "ziel_intern",
+          "zeitlimit"
+        ]
+      },
+      "FremdebeneQuelle": {
+        "type": "string",
+        "description": "Woher eine Fremdebene kommt.",
+        "enum": [
+          "datei",
+          "url"
+        ]
+      },
       "FuehrungAnfrageEingang": {
         "type": "object",
         "description": "Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4).",
@@ -14643,6 +14750,7 @@
           "meldung",
           "bereitstellungsraum",
           "karte_bild",
+          "karte_fremdebene",
           "etb",
           "befehl",
           "lagebesprechung",

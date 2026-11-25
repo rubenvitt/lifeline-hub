@@ -379,18 +379,18 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `daten` antwortet mit `ETag` = `"<sha256>"`, 304 über `support::if_none_match_matcht`, `Content-Type: application/geo+json`, ungepackt.
   - `url` nur bei Schreibrecht, sonst `None` und `url_host` gesetzt.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Hochladen, Liste, Daten, 304 mit `If-None-Match`, PATCH `name`/`color`, DELETE;
   - 403 beim Hochladen als Beobachter, Lesen als Beobachter ok;
   - ungültige Datei → 400 mit `grund: "unlesbar"`, DTD → `grund: "dtd"`, über 10 MiB → 413;
   - ein Virus-Stub ist abgelehnt (wie die Tests der Hintergrundbilder mit `scan_config`);
   - ein Live-Ereignis `karte_fremdebene` nach dem Anlegen.
-- [ ] **Step 2:** `cargo test --test karte_fremdebene` → FAIL.
-- [ ] **Step 3:** Umsetzen in der Reihenfolge Größe → Einlesen → `anhang::scan` → speichern → Live. `scripts/check-typ-codegen.sh` schreibt die Typen.
-- [ ] **Step 4:** Prüfen:
+- [x] **Step 2:** `cargo test --test karte_fremdebene` → FAIL.
+- [x] **Step 3:** Umsetzen in der Reihenfolge Größe → Einlesen → `anhang::scan` → speichern → Live. `scripts/check-typ-codegen.sh` schreibt die Typen.
+- [x] **Step 4:** Prüfen:
   - `cargo test --test karte_fremdebene --test einsatz_kontext_guard --test zulassung_guard --test enum_wire_kontrakt` → PASS;
   - `scripts/check-api-routen.sh` und `scripts/check-typ-codegen.sh` → grün.
-- [ ] **Step 5:** Commit `feat: Routen für Fremdebenen aus Datei` (Zunder B), mit den generierten Typen.
+- [x] **Step 5:** Commit `feat: Routen für Fremdebenen aus Datei` (Zunder B), mit den generierten Typen.
 
 ## Teil C — Fremdebene aus URL (LLH-2100)
 

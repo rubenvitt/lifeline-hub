@@ -33,6 +33,34 @@ pub const OBJEKT_NAME_MAX: usize = 200;
 pub const BESCHREIBUNG_MAX: usize = 1_000;
 /// Nachkommastellen der gespeicherten Koordinaten (etwa 0,1 m).
 pub const NACHKOMMASTELLEN: i32 = 6;
+/// Palettenschlüssel einer Ebene; die Töne stehen im Client. Nie eine taktische Farbe.
+pub const FARBEN: [&str; 6] = [
+    "fremd-1", "fremd-2", "fremd-3", "fremd-4", "fremd-5", "fremd-6",
+];
+
+/// Prüft einen Palettenschlüssel aus einer Anfrage; ein fremder Wert ist 400.
+pub fn check_farbe(farbe: &str) -> Result<&'static str, crate::error::AppError> {
+    FARBEN
+        .iter()
+        .find(|f| **f == farbe)
+        .copied()
+        .ok_or_else(|| {
+            crate::error::AppError::Validation(format!(
+                "Unbekannte Farbe: {farbe} (erlaubt: {})",
+                FARBEN.join(", ")
+            ))
+        })
+}
+
+/// Die Farbe einer neuen Ebene: der erste Schlüssel, den keine Ebene des Einsatzes trägt; sind
+/// alle belegt, reihum nach der Zahl der Ebenen.
+pub fn naechste_farbe<'a>(belegt: impl IntoIterator<Item = &'a str> + Clone) -> &'static str {
+    FARBEN
+        .iter()
+        .find(|f| !belegt.clone().into_iter().any(|b| b == **f))
+        .copied()
+        .unwrap_or_else(|| FARBEN[belegt.into_iter().count() % FARBEN.len()])
+}
 
 crate::wire_enum::wire_enum! {
     /// Woher eine Fremdebene kommt.
@@ -153,5 +181,18 @@ mod tests {
             Some("geo.example.org")
         );
         assert_eq!(url_host("[geschwärzt]"), None);
+    }
+
+    #[test]
+    fn farbe_erster_freier_schluessel_sonst_reihum() {
+        assert_eq!(naechste_farbe([]), "fremd-1");
+        assert_eq!(naechste_farbe(["fremd-1", "fremd-3"]), "fremd-2");
+        let alle = FARBEN.to_vec();
+        assert_eq!(naechste_farbe(alle.clone()), "fremd-1");
+        let mut sieben = alle;
+        sieben.push("fremd-1");
+        assert_eq!(naechste_farbe(sieben), "fremd-2");
+        assert!(check_farbe("fremd-6").is_ok());
+        assert!(check_farbe("rot").is_err());
     }
 }

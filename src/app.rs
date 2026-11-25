@@ -1943,6 +1943,29 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
+        // Fremdebenen (LLH-2099) unter dem neuen Präfix (ADR-0097); Grenzen wie die Bilder.
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            get(routes::karte_fremdebene::liste),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            post(routes::karte_fremdebene::anlegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}/data",
+            get(routes::karte_fremdebene::daten).route_layer(download_grenze()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            patch(routes::karte_fremdebene::aktualisieren),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            delete(routes::karte_fremdebene::loeschen),
+        )
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
