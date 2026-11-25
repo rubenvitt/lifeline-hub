@@ -4,6 +4,8 @@ import android.os.Looper
 import dev.rubeen.lifeline.helferkern.Anzeige
 import dev.rubeen.lifeline.helferkern.Grund
 import dev.rubeen.lifeline.helferkern.Phase
+import dev.rubeen.lifeline.helferkern.Ruhegrund
+import dev.rubeen.lifeline.helferkern.Testzustand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -106,5 +108,14 @@ class HelferModellTest {
         assertEquals(Phase.Beendet(Grund.EINSATZ_BEENDET), beendet.phase)
         beendet.neuAnmelden()
         assertEquals(Phase.Start, beendet.phase)
+    }
+
+    @Test
+    fun `der Testzustand ruht bleibt angemeldet und ortet nicht`() {
+        val ruht = HelferModell.start(Testzustand.RUHT) { error("keine Dienste im Test") }
+        assertEquals(Phase.Ruht(Ruhegrund.KEINE_ROLLE), ruht.phase)
+        assertTrue("die Kopplung bleibt", ruht.phase.gekoppelt)
+        assertFalse(ruht.phase.ortet)
+        assertFalse(ruht.ortungLaeuft)
     }
 }

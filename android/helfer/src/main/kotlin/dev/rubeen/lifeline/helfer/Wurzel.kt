@@ -32,12 +32,12 @@ import dev.rubeen.lifeline.helfer.ui.eckig
 import dev.rubeen.lifeline.helfer.ui.farbe
 import dev.rubeen.lifeline.helferkern.Phase
 
-/** Grobe Art der Seite, damit ein Wechsel innerhalb einer Seite (aktiv ⇄ pausiert) nicht überblendet. */
+/** Grobe Art der Seite, damit ein Wechsel innerhalb einer Seite (aktiv ⇄ pausiert ⇄ ruht) nicht überblendet. */
 private fun seitenart(phase: Phase): Int = when (phase) {
     Phase.Start -> 0
     is Phase.Anmelden -> 1
     Phase.Unbestaetigt -> 2
-    Phase.Aktiv, Phase.Pausiert -> 3
+    Phase.Aktiv, Phase.Pausiert, is Phase.Ruht -> 3
     is Phase.Beendet -> 4
 }
 
@@ -107,7 +107,7 @@ fun Wurzel(modell: HelferModell, onEinstellungen: () -> Unit) {
                 Phase.Start -> StartSeite(modell, onScannen = { scannt = true })
                 is Phase.Anmelden -> AnmeldenSeite(modell, onAnmelden = { mitRechten(NACH_ANMELDEN) })
                 Phase.Unbestaetigt -> WartetSeite(modell, onOrtungStarten = { mitRechten(NACH_STARTEN) }, onEinstellungen = onEinstellungen)
-                Phase.Aktiv, Phase.Pausiert -> AngemeldetSeite(
+                Phase.Aktiv, Phase.Pausiert, is Phase.Ruht -> AngemeldetSeite(
                     modell,
                     onFortsetzen = { mitRechten(NACH_FORTSETZEN) },
                     onOrtungStarten = { mitRechten(NACH_STARTEN) },

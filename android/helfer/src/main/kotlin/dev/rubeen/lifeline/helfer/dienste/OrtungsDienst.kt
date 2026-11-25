@@ -201,11 +201,11 @@ class OrtungsDienst : Service() {
         val v = verbindung ?: return
         scope.launch {
             val rueckmeldung = withContext(Dispatchers.IO) { v.sende(position) }
-            if (ortet) verarbeite(rueckmeldung.antwort)
+            if (ortet) verarbeite(rueckmeldung.antwort, rueckmeldung.grund)
         }
     }
 
-    private fun verarbeite(antwort: Antwort) {
+    private fun verarbeite(antwort: Antwort, grund: String?) {
         val jetzt = Instant.now()
         val naechste = plan.antwort(antwort, jetzt)
         when (antwort) {
@@ -219,11 +219,12 @@ class OrtungsDienst : Service() {
                 hauptfaden.removeCallbacks(versuch)
                 hauptfaden.postDelayed(versuch, maxOf(0L, Duration.between(jetzt, zeit).toMillis()))
             }
-            Antwort.VERWERFEN -> Unit
-            Antwort.STOPPEN -> Unit
+            Antwort.VERWERFEN, Antwort.STOPPEN, Antwort.RUHEN -> Unit
         }
-        Ortungsstand.antworten.tryEmit(antwort)
-        if (antwort == Antwort.STOPPEN) {
+        // Das Modell entscheidet mit dem Grund, ob die Kopplung endet oder ruht (`Anmeldung`).
+        Ortungsstand.antworten.tryEmit(Entscheidung(antwort, grund))
+        // Ruhen heißt für den Dienst dasselbe wie Stoppen: Ortung aus, Benachrichtigung weg.
+        if (antwort == Antwort.STOPPEN || antwort == Antwort.RUHEN) {
             beenden()
             return
         }

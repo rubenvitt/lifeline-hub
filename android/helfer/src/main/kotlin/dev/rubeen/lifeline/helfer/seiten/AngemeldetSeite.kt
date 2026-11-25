@@ -24,6 +24,7 @@ import dev.rubeen.lifeline.helfer.ui.eckig
 import dev.rubeen.lifeline.helfer.ui.farbe
 import dev.rubeen.lifeline.helferkern.Anzeige
 import dev.rubeen.lifeline.helferkern.Phase
+import dev.rubeen.lifeline.helferkern.Ruhegrund
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -31,12 +32,14 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Bildschirm 4 „Angemeldet“ (Spec „Bildschirme“): große Anzeige „Ortung an“ mit Ziel, Alter der
- * letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“.
+ * letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe
+ * ([Phase.Ruht]) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“.
  */
 @Composable
 fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStarten: () -> Unit, onEinstellungen: () -> Unit) {
     var abmeldenFragen by rememberSaveable { mutableStateOf(false) }
     val pausiert = modell.phase == Phase.Pausiert
+    val ruhegrund = (modell.phase as? Phase.Ruht)?.grund
     val jetzt = modell.jetzt
     val ansicht = LocalView.current
     // Haptik beim Wechsel zwischen „an“ und „pausiert“, nicht beim ersten Zeigen.
@@ -48,7 +51,16 @@ fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStar
 
     Seite {
         Seitenkopf(untertitel = modell.servername)
-        if (pausiert) {
+        if (ruhegrund != null) {
+            Zustandsbuehne(
+                augenbraue = modell.einsatzname,
+                zustand = Ruhegrund.TITEL,
+                erklaerung = ruhegrund.text,
+                farbe = farbe.achtung,
+                flaeche = farbe.achtungFlaeche,
+                pulsiert = false,
+            )
+        } else if (pausiert) {
             Zustandsbuehne(
                 augenbraue = modell.einsatzname,
                 zustand = "Ortung pausiert",
@@ -97,7 +109,8 @@ fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStar
         OrtungsHinweise(modell, onOrtungStarten, onEinstellungen)
         modell.meldung?.let { Hinweis(it) }
         Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {
-            if (pausiert) {
+            // In der Ruhe gibt es nichts zu pausieren; die App prüft selbst.
+            if (ruhegrund == null && pausiert) {
                 Hauptknopf(
                     "Fortsetzen",
                     onClick = onFortsetzen,
@@ -106,7 +119,7 @@ fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStar
                     symbol = R.drawable.symbol_weiter,
                     beschaeftigt = modell.beschaeftigt,
                 )
-            } else {
+            } else if (ruhegrund == null) {
                 Hauptknopf(
                     "Pausieren",
                     onClick = { modell.pausieren() },

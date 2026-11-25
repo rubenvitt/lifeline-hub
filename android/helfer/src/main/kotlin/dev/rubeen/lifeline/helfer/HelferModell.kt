@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import dev.rubeen.lifeline.helfer.dienste.Dienste
+import dev.rubeen.lifeline.helfer.dienste.Entscheidung
 import dev.rubeen.lifeline.helfer.dienste.Ortungsstand
 import dev.rubeen.lifeline.helfer.dienste.Rueckmeldung
 import dev.rubeen.lifeline.helfer.dienste.Serververbindung
@@ -20,6 +21,8 @@ import dev.rubeen.lifeline.helferkern.Ereignis
 import dev.rubeen.lifeline.helferkern.Grund
 import dev.rubeen.lifeline.helferkern.HelferZiel
 import dev.rubeen.lifeline.helferkern.Phase
+import dev.rubeen.lifeline.helferkern.Rolle
+import dev.rubeen.lifeline.helferkern.Ruhegrund
 import dev.rubeen.lifeline.helferkern.Testzustand
 import dev.rubeen.lifeline.helferkern.Wire
 import dev.rubeen.lifeline.helferkern.ZielOption
@@ -115,6 +118,15 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     private var abfrage: Job? = null
     private var uhr: Job? = null
 
+    /** Prüfung während [Phase.Ruht], alle [Ruhegrund.PRUEFABSTAND_S] Sekunden. */
+    private var ruhePruefung: Job? = null
+
+    /** Ob die Activity sichtbar ist: die Ortung startet nur aus dem Vordergrund (ADR-0098). */
+    private var imVordergrund = false
+
+    /** Die Ruhe endete im Hintergrund; die Ortung startet beim nächsten Öffnen. */
+    private var startNachRuhe = false
+
     init {
         if (dienste != null) verbindeDienste(dienste)
     }
@@ -159,6 +171,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         abfrage = null
         uhr?.cancel()
         uhr = null
+        imVordergrund = aktiv
         if (!aktiv || dienste == null) return
         uhr = viewModelScope.launch {
             while (isActive) {
@@ -168,6 +181,10 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         }
         // Zurück aus den Einstellungen mit erteiltem Standortrecht: die Ortung startet jetzt.
         if (ortungVerweigert && dienste.isOrtungErlaubt) starteOrtung()
+        if (startNachRuhe) {
+            startNachRuhe = false
+            starteOrtung()
+        }
         abfrage = viewModelScope.launch {
             while (isActive) {
                 aktualisiereZustand()
@@ -295,8 +312,11 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                 dienste.speichern(Sitzung(ziel.server, cookie))
                 verbindung = neu
                 zustand = Wire.zustand(rueckmeldung.text)
+                val vorher = phase
                 ereignis(Ereignis.Eingeloest)
-                zustand?.let { ereignis(Ereignis.Zustand(it.state, it.reason)) }
+                zustand?.let { ereignis(Ereignis.Zustand(it.state, it.reason, it.rolle)) }
+                // Ohne Rolle, die orten darf, ruht die Kopplung gleich: dann startet keine Ortung.
+                nachWechsel(vorher)
                 starteOrtung()
             } finally {
                 beschaeftigt = false
@@ -443,25 +463,62 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
 
     // Antworten
 
-    /** Antwort des Servers auf eine Sendung des Ortungsdienstes. */
-    private fun verarbeite(antwort: Antwort) {
-        when (antwort) {
+    /** Antwort des Servers auf eine Sendung des Ortungsdienstes, mit `reason` des Fehler-Bodys. */
+    private fun verarbeite(entscheidung: Entscheidung) {
+        when (entscheidung.antwort) {
             Antwort.WEITER, Antwort.WARTEN -> verbindungsstand = Verbindungsstand.VERBUNDEN
             Antwort.WIEDERHOLEN -> verbindungsstand = Verbindungsstand.WIEDERHOLT
-            Antwort.VERWERFEN, Antwort.STOPPEN -> Unit
+            Antwort.VERWERFEN, Antwort.STOPPEN, Antwort.RUHEN -> Unit
         }
         val vorher = phase
-        ereignis(Ereignis.Antwortet(antwort))
+        ereignis(Ereignis.Antwortet(entscheidung.antwort, entscheidung.grund))
         nachWechsel(vorher)
     }
 
-    /** Eine Antwort außerhalb der Sendungen: 401, 403 und 404 beenden die Kopplung. */
+    /**
+     * Eine Antwort außerhalb der Sendungen: 401, 403 und 404 beenden die Kopplung, ein 403 mit
+     * `Ruhegrund` lässt sie ruhen (die Wirkung trägt [nachWechsel]).
+     */
     private fun reagiere(rueckmeldung: Rueckmeldung) {
-        if (rueckmeldung.antwort != Antwort.STOPPEN || !phase.gekoppelt) return
+        val antwort = rueckmeldung.antwort
+        if ((antwort != Antwort.STOPPEN && antwort != Antwort.RUHEN) || !phase.gekoppelt) return
         val vorher = phase
-        stoppeOrtung()
-        ereignis(Ereignis.Antwortet(Antwort.STOPPEN))
+        ereignis(Ereignis.Antwortet(antwort, rueckmeldung.grund))
         nachWechsel(vorher)
+    }
+
+    /**
+     * Während der Ruhe: alle [Ruhegrund.PRUEFABSTAND_S] Sekunden den eigenen Zustand holen (eine
+     * neue Rolle beendet [Ruhegrund.KEINE_ROLLE]), bei [Ruhegrund.pruefeMitFortsetzen] dazu
+     * fortsetzen ohne Position (`{paused: false}`); erst ein angenommenes Fortsetzen beendet die Ruhe.
+     */
+    private fun starteRuhePruefung() {
+        ruhePruefung?.cancel()
+        ruhePruefung = null
+        if (dienste == null) return
+        ruhePruefung = viewModelScope.launch {
+            while (isActive) {
+                delay(Ruhegrund.PRUEFABSTAND_S * 1_000)
+                pruefeRuhe()
+            }
+        }
+    }
+
+    private suspend fun pruefeRuhe() {
+        aktualisiereZustand()
+        val grund = (phase as? Phase.Ruht)?.grund ?: return
+        if (!grund.pruefeMitFortsetzen) return
+        val v = verbindung ?: return
+        val rueckmeldung = io { v.pausiere(false) }
+        if (phase !is Phase.Ruht) return
+        when (rueckmeldung.antwort) {
+            Antwort.WEITER, Antwort.WARTEN, Antwort.RUHEN, Antwort.STOPPEN -> {
+                val vorher = phase
+                ereignis(Ereignis.Antwortet(rueckmeldung.antwort, rueckmeldung.grund))
+                nachWechsel(vorher)
+            }
+            Antwort.WIEDERHOLEN, Antwort.VERWERFEN -> Unit
+        }
     }
 
     /** Eigener Zustand vom Server (Abfrage im Vordergrund und nach dem Start der App). */
@@ -485,7 +542,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         zustand = neu
         val vorher = phase
         // Nach einem Neustart der App führt der Zustand vom Start in die bestehende Kopplung.
-        ereignis(Ereignis.Zustand(neu.state, neu.reason))
+        ereignis(Ereignis.Zustand(neu.state, neu.reason, neu.rolle))
         if (neu.paused && phase == Phase.Aktiv) {
             // Pausiert in der Benachrichtigung, während die App nicht lief.
             ereignis(Ereignis.Pausiert)
@@ -497,10 +554,25 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         nachWechsel(vorher)
     }
 
-    /** Wirkungen eines Phasenwechsels: Bestätigung melden, am Ende alles abräumen. */
+    /**
+     * Wirkungen eines Phasenwechsels: Bestätigung melden, Ruhe beginnen und beenden, am Ende alles
+     * abräumen. In der Ruhe ist der Dienst aus (Benachrichtigung weg), Kopplung und Sitzung
+     * bleiben; endet sie, startet die Ortung nur aus dem Vordergrund, sonst beim nächsten Öffnen.
+     */
     private fun nachWechsel(vorher: Phase) {
         if (phase == vorher) return
         if (vorher == Phase.Unbestaetigt && phase == Phase.Aktiv) bestaetigungen += 1
+        val ruhteVorher = vorher is Phase.Ruht
+        if (phase is Phase.Ruht) {
+            stoppeOrtung()
+            if (!ruhteVorher) starteRuhePruefung()
+        } else if (ruhteVorher) {
+            ruhePruefung?.cancel()
+            ruhePruefung = null
+            if (phase.ortet) {
+                if (imVordergrund) starteOrtung() else startNachRuhe = true
+            }
+        }
         if (phase is Phase.Beendet) raeumeAb()
     }
 
@@ -508,6 +580,9 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         stoppeOrtung()
         abfrage?.cancel()
         abfrage = null
+        ruhePruefung?.cancel()
+        ruhePruefung = null
+        startNachRuhe = false
         dienste?.loeschen()
         verbindung = null
         Ortungsstand.vergessen()
@@ -543,8 +618,13 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                 ereignis(Ereignis.Pausiert)
                 ortungLaeuft = false
             }
+            Testzustand.RUHT -> {
+                // Bestätigt ohne Ortungsgerät und ohne Person (Entscheidung 7 der Spec).
+                ereignis(Ereignis.Zustand("aktiv", null, Rolle(isTracker = false, personId = null)))
+                ortungLaeuft = false
+            }
             Testzustand.BEENDET -> {
-                ereignis(Ereignis.Zustand("beendet", Grund.EINSATZ_BEENDET.wire))
+                ereignis(Ereignis.Zustand("beendet", Grund.EINSATZ_BEENDET.wire, Beispiel.zustand("aktiv").rolle))
                 ortungLaeuft = false
             }
             else -> Unit

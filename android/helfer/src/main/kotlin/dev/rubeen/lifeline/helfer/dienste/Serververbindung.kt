@@ -17,11 +17,15 @@ import java.net.URL
 
 /** Antwort des Servers; [status] `0` heißt Netzfehler ohne Antwort (wie [entscheide]). */
 data class Rueckmeldung(val status: Int, val text: String) {
-    val antwort: Antwort get() = entscheide(status)
+    /** Entscheidung nach Status und `reason` (ein 403 mit `Ruhegrund` ruht, statt zu stoppen). */
+    val antwort: Antwort get() = entscheide(status, grund)
     val isErfolg: Boolean get() = status in 200..299
 
     /** Fehler-Body `{error, reason?}`. */
     val fehler: Fehler get() = Wire.fehler(text)
+
+    /** `reason` des Fehler-Bodys; `null` bei Erfolg oder ohne Grund. */
+    val grund: String? get() = if (isErfolg) null else fehler.reason
 
     /** Satz für die Seite, wenn die Anfrage abgewiesen wurde. */
     val meldung: String get() = fehler.let { Anzeige.meldung(status, it.reason, it.error) }

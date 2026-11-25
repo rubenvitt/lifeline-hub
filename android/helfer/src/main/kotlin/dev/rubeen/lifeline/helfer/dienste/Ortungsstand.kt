@@ -5,6 +5,9 @@ import java.time.Instant
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
+/** Entscheidung zu einer Sendung und `reason` des Fehler-Bodys (für [Antwort.RUHEN] der Ruhegrund). */
+data class Entscheidung(val antwort: Antwort, val grund: String?)
+
 /**
  * Was der [OrtungsDienst] dem Modell meldet, im Speicher des Prozesses (kein Verlauf, keine Datei).
  * Der Dienst läuft auch ohne geöffnete App; öffnet sie sich wieder, liest das Modell hier, ob er
@@ -20,8 +23,8 @@ object Ortungsstand {
     /** Nächster Versuch nach einem Fehler; `null`, solange die Sendungen ankommen. */
     val naechsterVersuch = MutableStateFlow<Instant?>(null)
 
-    /** Jede Entscheidung zu einer Antwort des Servers ([dev.rubeen.lifeline.helferkern.entscheide]). */
-    val antworten = MutableSharedFlow<Antwort>(extraBufferCapacity = 16)
+    /** Jede Entscheidung zu einer Antwort des Servers ([dev.rubeen.lifeline.helferkern.entscheide]), mit Grund. */
+    val antworten = MutableSharedFlow<Entscheidung>(extraBufferCapacity = 16)
 
     /** Die Kraft hat in der Benachrichtigung pausiert; der Dienst hat es dem Server schon gemeldet. */
     val pausiert = MutableSharedFlow<Unit>(extraBufferCapacity = 1)

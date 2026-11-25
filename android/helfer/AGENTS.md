@@ -14,6 +14,12 @@ und der Wurzel. Entscheidung: ADR-0098; Herleitung: `docs/superpowers/specs/2026
   `ACCESS_BACKGROUND_LOCATION`; nur solange eine Kopplung besteht, Start nur aus dem Vordergrund;
   sichtbar durch die Benachrichtigung des Dienstes. Kein Verlauf, nur die letzte Position, nur im
   Speicher.
+- **Ruhe statt Ende** (403 `no_role`/`tracking_off`): Phase `Ruht` im Kern, der Dienst stoppt
+  (Benachrichtigung weg), Kopplung und Sitzung bleiben; die App prüft jede Minute
+  (`Ruhegrund.PRUEFABSTAND_S`: Zustand, bei `pruefeMitFortsetzen` dazu `{paused: false}`) und ortet
+  wieder, wenn der Kern es entscheidet, gestartet nur im Vordergrund (sonst beim nächsten Öffnen).
+  Ohne Ortungsgerät und Person startet sie gar nicht erst. Nur 401, 404 und ein 403 ohne
+  `Ruhegrund` beenden die Kopplung.
 - **Design-Tokens** nur aus dem Generator `scripts/design/tokens-nativ.mjs`, nie von Hand in
   `Tokens.kt`.
 - **Seite und Wirkung aus dem Kern:** welche Seite gilt, entscheidet `Anmeldung`, was der
