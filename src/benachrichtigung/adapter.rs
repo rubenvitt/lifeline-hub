@@ -114,6 +114,7 @@ pub fn fehler_text(fehler: AdapterFehler, status: Option<i64>) -> String {
         GeheimnisUnlesbar => "Geheimnis mit anderem Schlüssel gesetzt",
         GeheimnisspeicherGesperrt => "Geheimnisspeicher ohne Schlüssel",
         EinstellungUngueltig => "Einstellung ungültig",
+        VersionUnbekannt => "Unbekannte Schnittstellenversion",
         Intern => "Fehler im Server",
     };
     match status {

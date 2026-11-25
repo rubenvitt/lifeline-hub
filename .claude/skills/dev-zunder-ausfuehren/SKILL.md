@@ -175,8 +175,18 @@ nach eigener Empfehlung losbauen, auch wenn der Weg klar scheint.
 - **Was vorher ohne Halt läuft:** lesen, Scope klären, reproduzieren, messen, die Ursache eines
   Bugs suchen. Das ist Vorarbeit für den Entwurf, kein Bauen.
 - **Was du vorlegst, kurz:** was sich aus Bediensicht ändert, die Varianten mit Empfehlung und
-  Begründung, die offenen Fragen. Fragen mit konkreten Optionen stellen, nicht offen, und
-  gesammelt statt einzeln nacheinander. Bei `bug-unklar` kommt die gefundene Ursache dazu.
+  Begründung, die offenen Punkte. Bei `bug-unklar` kommt die gefundene Ursache dazu.
+- **Vorschlag statt Fragebogen** (Festlegung des Users vom 24.11.2026): du legst einen fertigen
+  Weg vor, dem er widersprechen kann, keinen Fragenkatalog. Die Form richtet sich nach der Lage:
+  - **Normalfall — Text im Chat:** offene Punkte nummeriert, je Punkt die Empfehlung mit
+    Begründung und die Alternative(n) als Buchstaben. Er antwortet mit „passt“ oder nur zu dem
+    Punkt, der ihn stört („2 lieber b“). Hängen Punkte voneinander ab, sagst du es dazu.
+  - **Artifact**, wenn es ums Aussehen geht (UI-Varianten, Layout, Abläufe) oder mehr als fünf
+    zusammenhängende Entscheidungen offen sind: Mockups oder Vergleichsseite, Antwort im Chat
+    oder als Kommentar am Artifact.
+  - **Fragen-Dialog (`AskUserQuestion`) nur** an einer einzelnen Weggabelung ohne klare
+    Empfehlung, an der du sonst nicht weiterkommst — dann ein bis zwei Fragen, nie vier, und
+    jede Frage trägt ihren Kontext selbst (der Dialog verdeckt den Text davor).
 - **Währenddessen** steht der Task auf `blocked` (Tabelle „Board-Status mitführen“). Erst mit
   der Zustimmung zurück auf `in_progress`, der abgestimmte Weg kommt in `plan`. Eine Rückfrage
   oder ein anderer Wunsch lässt ihn auf `blocked`, bis ihr euch einig seid.
@@ -336,6 +346,16 @@ in jedem PR. Mechanik: `scripts/AGENTS.md`, „Stau-Wächter“.
   nächsten Push den Branch holen.
 - **Dein PR ist doppelt** (du hast selbst einen Fix mit `alpha-rot` geöffnet, ein älterer
   existiert): deinen PR schließen, oder das Label entfernen, wenn er etwas anderes repariert.
+
+## Drei Runden, dann der Mensch
+
+**Festlegung vom 24.11.2026 (LLH-2090).** Bleibt ein Gate, ein Test oder das Ansehen mit dem
+Skill `verify` nach **drei** Reparaturrunden rot, hörst du auf zu reparieren. Eine Runde ist:
+Ursache vermuten, ändern, erneut prüfen. Dann setzt du die Aufgabe auf `blocked` und schreibst
+einen Kommentar: was rot ist (Kommando und Ausgabe), was du versucht hast und was du vermutest.
+Danach fragst du den Menschen. Keine vierte Runde aufs Geratewohl. Um grün zu werden, gibt es
+keinen zusätzlichen Wiederholversuch, keine Wartezeit, kein `skip` und kein Lockern der Prüfung
+(`frontend/e2e/AGENTS.md`, „Warten auf einen Zustand“; `scripts/AGENTS.md`, „Gate-Dateien“).
 
 ## Review nach Ermessen
 

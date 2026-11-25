@@ -170,6 +170,12 @@ export interface FachebeneDef {
    * (`copernicusBildLayer.ts`), unter allen Fachebenen, ohne Klickebene.
    */
   darstellung?: 'raster';
+  /**
+   * Nur die Drohnenlage (LLH-2106): Punkte, Linien und Flächen gemischt, je Feature nach
+   * `properties.kind` (`aircraft` | `track` | `element` | `photo`) gezeichnet. Lädt über die
+   * Einsatzroute, nicht über `/api/map/overlays` (`loadDrohneFachebene`).
+   */
+  drohnenlage?: boolean;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -314,7 +320,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     aufwaermPollMs: 15_000,
     bboxAbhaengig: true,
     minZoom: BBOX_MIN_ZOOM,
-    geltung: 'nur wo Copernicus aktiviert wurde, ab 2023',
+    geltung: 'nur wo Copernicus aktiviert wurde; vor 2023 nur ausgewählte',
     // Alter des Abrufs, nicht des Bildes: vier verpasste Erneuerungen. Das Alter der Aufnahme
     // zeigt der Inspector.
     veraltetNachMin: 120,
@@ -336,6 +342,19 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     minZoom: BBOX_MIN_ZOOM,
     geltung: 'nur optische Aufnahmen, nur wo Copernicus aktiviert wurde',
     veraltetNachMin: 120,
+  },
+  drohne: {
+    key: 'drohne',
+    label: 'Drohnenlage (Suchlage)',
+    geometrieTyp: 'punkt',
+    drohnenlage: true,
+    // Kein Server-Cache: die Lage liegt im Arbeitsspeicher und erneuert sich im Takt des Adapters
+    // (`intervall_vorschlag_s` = 5 s, `src/drohne/art.rs`). Ein Poll ohne neuen Stand kostet ein
+    // 304. Wächter in `fachebenen.test.ts`.
+    pollMs: 5_000,
+    bboxAbhaengig: false,
+    // Eine Minute ohne neuen Stand ist für ein Fluggerät eine alte Position, nicht „noch frisch“.
+    veraltetNachMin: 1,
   },
 };
 
@@ -374,6 +393,11 @@ export interface CopernicusAktivierung {
   gekuerzt: boolean;
   /** Jüngste Aufnahme ihrer gezeigten Gebiete, UTC im Wire-Format; fehlt, wenn die Quelle keine nennt. */
   aufnahme?: string;
+  /**
+   * Jüngste Lieferung, nur wenn keine Aufnahme bekannt ist (Altbestand vor 2023, LLH-2022): die
+   * Vector Packages nennen keine Aufnahmezeit.
+   */
+  geliefert?: string;
 }
 
 /**
@@ -386,6 +410,7 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
     const p = f.properties;
     if (p?.klasse !== 'gebiet' || typeof p.emsr !== 'string') continue;
     const aufnahme = typeof p.aufnahme === 'string' ? p.aufnahme : undefined;
+    const geliefert = typeof p.geliefert === 'string' ? p.geliefert : undefined;
     const bisher = je.get(p.emsr) ?? {
       emsr: p.emsr,
       aufnahme: undefined,
@@ -399,11 +424,21 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
         bisher.aufnahme === undefined || (aufnahme ?? '') > bisher.aufnahme
           ? aufnahme
           : bisher.aufnahme,
+      geliefert:
+        bisher.geliefert === undefined || (geliefert ?? '') > bisher.geliefert
+          ? geliefert
+          : bisher.geliefert,
       unvollstaendig: bisher.unvollstaendig || p.unvollstaendig === true,
       gekuerzt: bisher.gekuerzt || p.gekuerzt === true,
     });
   }
-  return [...je.values()].sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+  // Zeit, die zählt: Aufnahme, ersatzweise Lieferung (ADR-0098).
+  const zeit = (a: CopernicusAktivierung) => a.aufnahme ?? a.geliefert ?? '';
+  return [...je.values()]
+    .map(({ geliefert, ...a }) =>
+      a.aufnahme === undefined && geliefert !== undefined ? { ...a, geliefert } : a,
+    )
+    .sort((a, b) => zeit(b).localeCompare(zeit(a)));
 }
 
 /** Ein Satellitenbild der Ebene `copernicus_bilder`, wie Karte und Ebenenzeile es brauchen (LLH-2021). */
@@ -476,6 +511,7 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'autobahn',
     'copernicus',
     'copernicus_bilder',
+    'drohne',
   ];
 }
 

@@ -1,4 +1,4 @@
-import type { FachebeneQuelle } from './fachebenen';
+import type { UeberlagerungQuelle } from './fachebenen';
 import type { AbloesungStatus, EtbTyp } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
@@ -1398,7 +1398,7 @@ export const globalKeys = {
   // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
   // `string | null`, NICHT `undefined`.
   fachebene: (
-    quelle: Exclude<FachebeneQuelle, 'kritis' | 'energie' | 'copernicus' | 'copernicus_bilder'>,
+    quelle: Exclude<UeberlagerungQuelle, 'kritis' | 'energie' | 'copernicus' | 'copernicus_bilder'>,
   ) => [GLOBAL_KEYS.fachebene, quelle] as const,
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
   fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
@@ -1408,6 +1408,11 @@ export const globalKeys = {
   /** Copernicus-Satellitenbilder (LLH-2021): Schlüssel wie die Vektorebene. */
   fachebeneCopernicusBilder: (bbox: string | null, archiv: boolean) =>
     [GLOBAL_KEYS.fachebene, 'copernicus_bilder', bbox, archiv] as const,
+  /** Drohnenlage (LLH-2106): einsatzbezogen, darum die Einsatz-ID im Key. */
+  fachebeneDrohne: (einsatzId: number) => [GLOBAL_KEYS.fachebene, 'drohne', einsatzId] as const,
+  /** Drohnenquellen der Org aus Sicht eines Einsatzes (LLH-2106): Zuschaltung, Mission, Halter. */
+  drohnenQuellen: (einsatzId: number) =>
+    [GLOBAL_KEYS.fachebene, 'drohne-quellen', einsatzId] as const,
 } as const;
 
 /**

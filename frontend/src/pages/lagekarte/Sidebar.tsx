@@ -295,6 +295,8 @@ export interface SidebarProps {
     import('./CopernicusBilderZusatz').CopernicusBilderZusatzProps,
     'liste' | 'deckkraft' | 'onDeckkraft'
   >;
+  /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
+  drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */

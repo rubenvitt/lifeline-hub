@@ -17,6 +17,7 @@ import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
 import CopernicusBilderZusatz from './CopernicusBilderZusatz';
+import DrohnenQuelle from './DrohnenQuelle';
 import FachebeneStand from './FachebeneStand';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import Klassenlegende from './Klassenlegende';
@@ -272,6 +273,14 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
           // Der Archiv-Schalter steht an der Vektorebene; ist sie aus, hier (ein Zustand, ein
           // Schalter).
           archivHier={!props.fachebenenSichtbar.copernicus && !!props.copernicus}
+        />
+      )}
+      {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
+      {quelle === 'drohne' && props.drohne && (
+        <DrohnenQuelle
+          einsatzId={props.einsatzId}
+          darfSchalten={props.drohne.darfSchalten}
+          onLivebild={props.drohne.onLivebild}
         />
       )}
     </div>

@@ -30,6 +30,12 @@ bereiche_von() {
     frontend/src/api/* | frontend/src/heic/__fixtures__/* | frontend/src/einsatz/modulRegistry.ts \
       | frontend/public/beispiele/*)
       echo "rust frontend e2e" ;;
+    # Rust prüft Stammdaten-Eingang samt Dialog und Vertrag auf Herstellernamen
+    # (tests/stammdaten_eingang.rs, LLH-1633). Der Vertrag steht vor der Doku-Regel.
+    frontend/src/stammdaten/*)
+      echo "rust frontend e2e" ;;
+    docs/schnittstellen/stammdaten-datei.md)
+      echo "rust" ;;
     # Rust liest die gemeinsamen Fälle der Dauerform (`include_str!` in src/zeitdarstellung.rs,
     # LLH-1750); der Kern im Frontend liest sie ebenso.
     frontend/src/anzeige/dauer.faelle.json)
@@ -56,9 +62,10 @@ bereiche_von() {
     # Unterkunftsrechners (rechnerFixture.test.ts, richtwerte.ts, LLH-1520), dazu die Fälle der
     # Deckungsregel für Qualifikationen (qualiDeckung.test.ts, LLH-1553), dazu die Frist des
     # Wiederöffnens (`NACHLAUF_STUNDEN`, schreibrecht.test.ts, LLH-1814), dazu TTL und
-    # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200), dazu der Mindest-Zoom der
-    # Copernicus-Bilder (`MIN_ZOOM_BACKEND`, fachebenen.test.ts, LLH-2021).
-    src/karte/quellen.rs | src/karte/copernicus.rs | src/karte/cog.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
+    # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200), dazu der Abruftakt der
+    # Drohnenquelle (`intervall_vorschlag_s`, fachebenen.test.ts, LLH-2106), dazu der
+    # Mindest-Zoom der Copernicus-Bilder (`MIN_ZOOM_BACKEND`, fachebenen.test.ts, LLH-2021).
+    src/karte/quellen.rs | src/karte/copernicus.rs | src/drohne/art.rs | src/karte/cog.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
       | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json \
       | tests/fixtures/quali_deckung_faelle.json | src/einsatz/berechtigung.rs)
       echo "rust frontend e2e" ;;

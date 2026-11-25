@@ -85,7 +85,7 @@ async function countEtb(page: Page, basis: string): Promise<number> {
 }
 
 async function bezirkLaden(page: Page, basis: string, id: number): Promise<Bezirk | undefined> {
-  const antwort = await page.request.get(`${basis}/evakuierung`);
+  const antwort = await page.request.get(`${basis}/evacuation`);
   const { bezirke } = (await antwort.json()) as { bezirke: Bezirk[] };
   return bezirke.find((b) => b.id === id);
 }

@@ -291,7 +291,7 @@ test('Trefflächen des Primitivs folgen der Dichte-Staffel 30 / 48 / 72 px — I
   await anlegen(
     page,
     einsatzId,
-    'tiere',
+    'animals',
     { spezies: 'grosstier', rufname: TIER, rasse_beschreibung: 'Süddeutsches Kaltblut, 163 cm' },
     'Tier',
   );

@@ -96,6 +96,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     copernicus: o.copernicus === true,
     // Dasselbe für die Satellitenbilder (LLH-2021).
     copernicus_bilder: o.copernicus_bilder === true,
+    // Dasselbe für `drohne` (LLH-2106).
+    drohne: o.drohne === true,
   };
 }
 

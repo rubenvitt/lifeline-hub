@@ -140,8 +140,8 @@ for (const modus of ['light', 'dark'] as const) {
       ['verstorben', 'verstorben'],
       ['abgemeldet', 'abgemeldet'],
     ]) {
-      const p = await post(page, `${basis}/personen`, { antreff_ort: `Kontrast ${status}` });
-      if (status !== 'erfasst') await post(page, `${basis}/personen/${p.id}/status`, { status });
+      const p = await post(page, `${basis}/persons`, { antreff_ort: `Kontrast ${status}` });
+      if (status !== 'erfasst') await post(page, `${basis}/persons/${p.id}/status`, { status });
       personen.push({ id: p.id, label });
     }
     const schaeden = [];
@@ -204,7 +204,7 @@ async function misst(tag: Locator, minimum: number, name: string, werte: string[
 }
 
 async function personMit(page: Page, basis: string, daten: object): Promise<number> {
-  return ((await post(page, `${basis}/personen`, daten)) as { id: number }).id;
+  return ((await post(page, `${basis}/persons`, daten)) as { id: number }).id;
 }
 
 /** Kontrast zweier opaker rgb()-Farben (für den Cluster-Kern: er liegt in einem Ring mit
@@ -526,20 +526,20 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     const basis = await vorbereiten(page, modus);
     const einsatzId = basis.split('/').pop()!;
-    const person = (await post(page, `/einsaetze/${einsatzId}/personen`, {
+    const person = (await post(page, `/einsaetze/${einsatzId}/persons`, {
       name: 'Kontrast',
       status: 'betroffen',
       sichtung: 'sk2',
     })) as { id: number };
     // Eine Verletzung auf der Silhouette, eine am Mittelpunkt der Hand.
-    await post(page, `/einsaetze/${einsatzId}/personen/${person.id}/verletzungen`, {
+    await post(page, `/einsaetze/${einsatzId}/persons/${person.id}/injuries`, {
       ansicht: 'vorn',
       region: 'thorax',
       art: 'prellung_schwellung',
       x: 0.5,
       y: 0.3,
     });
-    await post(page, `/einsaetze/${einsatzId}/personen/${person.id}/verletzungen`, {
+    await post(page, `/einsaetze/${einsatzId}/persons/${person.id}/injuries`, {
       ansicht: 'vorn',
       region: 'hand_l',
       art: 'verbrennung',

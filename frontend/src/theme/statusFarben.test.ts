@@ -887,6 +887,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
     'kritis',
     'energie',
     'copernicus',
+    'drohne',
   ];
 
   it('gibt den Satellitenbildern den Ton der Copernicus-Vektorebene, keinen neuen', () => {
@@ -907,6 +908,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#531dab',
       '#d4b106',
       '#873800',
+      '#f5590f',
     ]);
   });
 
@@ -922,6 +924,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#9254de',
       '#fadb14',
       '#c48a5a',
+      '#ff8c5a',
     ]);
   });
 

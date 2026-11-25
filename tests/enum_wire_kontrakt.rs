@@ -812,6 +812,7 @@ fn serde_wire_gleich_as_str() {
         GeheimnisUnlesbar => "geheimnis_unlesbar",
         GeheimnisspeicherGesperrt => "geheimnisspeicher_gesperrt",
         EinstellungUngueltig => "einstellung_ungueltig",
+        VersionUnbekannt => "version_unbekannt",
         Intern => "intern",
     });
     enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {
@@ -1369,6 +1370,33 @@ fn schichtplan_wire() {
         Fahrzeug => "fahrzeug",
         Uhs => "uhs",
         Pause => "pause",
+    });
+    // Stammdaten-Eingang (LLH-1633): Wire = Spalte `art` der Datei bzw. Antwort der Vorschau.
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::StammdatenArt {
+        Fahrzeug,
+        Personal,
+        Qualifikation,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::abgleich::TrefferGrund {
+        Kennung,
+        Opta,
+        Issi,
+        Funkrufname,
+        Personalnummer,
+        Name,
+        Bezeichnung,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::repo::ZeilenErgebnis {
+        Neu,
+        Gefunden,
+        Mehrdeutig,
+        AusserDienst,
+        Fehler,
+        Unveraendert,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::repo::FeldAenderungArt {
+        Fuellt,
+        WeichtAb,
     });
     enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::MeldungStufe {
         Fehler => "fehler",

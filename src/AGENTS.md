@@ -140,6 +140,27 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   `#[schema(required)]`. **Testfalle:** Presence per `contains_key`, nicht `== Value::Null`
   (`tests/ort_vorschau.rs`).
 
+## Backend↔Frontend — Property-Tests (LLH-2090)
+
+Gilt für Backend (`proptest`) und Frontend (`fast-check`).
+
+- **Wofür:** eine reine Funktion (ohne DB, Netz, Uhr) mit einer Eigenschaft, die für jede Eingabe
+  gilt: Hin und zurück (formatieren/lesen, schreiben/parsen), Idempotenz (zweimal wie einmal),
+  Invarianten (liegt nach `jetzt`, sitzt auf dem Raster, Textfolge gleich Zeitfolge), Gleichwertigkeit
+  (schnell gegen einfach). Beispieltests bleiben daneben; die Eigenschaft ersetzt sie nicht.
+- **Form:** Rust in `mod eigenschaften` im Testmodul der Datei (`src/zeit.rs`,
+  `src/erinnerung/faelligkeit.rs`), Testname als Satz. Frontend als
+  `<name>.eigenschaften.test.ts` neben dem Beispieltest
+  (`frontend/src/routing/listenZustand.eigenschaften.test.ts`). Vorgabe der Fallzahl (256 bzw. 100)
+  nicht senken, um Laufzeit zu sparen; ein langsamer Generator wird enger, nicht seltener.
+- **Was die Kodierung bewusst verwirft,** steht als Erwartung im Test (Funktion `erwartet`), mit
+  Grund, nie als stiller Filter im Generator. So bleibt eine Grenze sichtbar, die fast-check findet.
+- **Ein Gegenbeispiel ist ein Befund:** beheben und den geschrumpften Fall zusätzlich als
+  Beispieltest festhalten. Die Saatdatei unter `proptest-regressions/` wird nur committet, wenn sie
+  einen echten Fehler festhält; Saaten aus einer Mutationsprobe werden gelöscht.
+- **Beleg:** eine Mutationsprobe am Code macht die Eigenschaft rot (wie bei jedem Test,
+  `AGENTS.md`, „Qualitäts-Gates“).
+
 ## Backend — Öffentliche API v1 (LLH-1653)
 
 Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0096](../docs/architektur/entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),
@@ -245,8 +266,14 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
   vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
-  entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
-  Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
+  entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
+  (`adapter::live::live_kontext`, LLH-2107,
+  [ADR-0098](../docs/architektur/entscheidungen/ADR-0098-adapter-rufen-fuer-ihre-eigenen-routen-auch-ausserhalb-des-laufs-ab.md)):
+  je Abruf entschlüsselt, nie zwischengespeichert, über denselben `AbrufKontext`; verweigert bei
+  unbekanntem, angehaltenem oder Eingriff brauchendem Adapter, gesperrtem Speicher und Org am Hub
+  (`LiveVerweigert`). `live_kontext` nimmt die Org der Anfrage und die Art, deren Route ihn
+  baut; ein Adapter einer anderen Org oder einer anderen Art ist `Unbekannt`. Ein Geheimnis geht nie in Log, Fehlertext, Antwort oder Admin-Spur; ein
+  `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
   Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
   (LLH-2025); sonst ändert nichts ein Chiffrat, ohne den Wert neu zu setzen.
   Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
@@ -255,6 +282,12 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert. Seine
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
   `frontend/src/api/adapter.ts`.
+- **Flüchtige Arten** (LLH-2105, `AdapterArt::fluechtig`): was die Art liefert, geht nur in den
+  Speicher, nie in die Datenbank (`uebernehmen` schreibt dort nichts Fachliches). Der Takt zählt ab
+  Laufbeginn (`repo::save_erfolg(…, ab)`, sonst ab Laufende), damit der Abstand der Bilder fest
+  bleibt. Eine Versuchszeile steht nur bei Zustandswechsel: bei Fehlschlag, und bei dem Erfolg, der
+  eine Störung beendet (`fehlversuche > 0` oder Meldung offen); ein Erfolg im Dauerlauf schreibt
+  keine, `letzter_erfolg_at` zeigt das Leben.
 - **Störung melden** (LLH-2026,
   [ADR-0086](../docs/architektur/entscheidungen/ADR-0086-stoerungen-einer-anbindung-melden-sich-am-ort-adapter-einmal-an-die-admins-der-org.md)):
   nur der Lauf meldet, über den Merker `adapter.gemeldet` (`repo::mark_gemeldet` in seiner
@@ -263,6 +296,13 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
   `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
   (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
+- **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
+  in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
+  `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er
+  wird beim Start in `main` mit `Store::load` gesetzt, bevor der Lauf beginnt, und von den Routen
+  nachgeführt (`set_zugeschaltet`, bei `false` wird der Stand geleert). „Laufend“ heißt
+  `einsatz.status = 'aktiv'` (wie `fordere_aktiv`, ohne Nachlauffrist). Ein Adapter hängt an
+  höchstens einem laufenden Einsatz (`find_active_holder`); ein abgeschlossener zählt nicht mehr.
 
 ## Anhänge
 
@@ -381,6 +421,14 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   In einer Überlagerung ohne Bedienelemente (Palettenvorschau) `grossansicht={false}`.
   Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
   erlauben (HEIC-Decoder, `frontend/src/heic/`).
+  Das Drohnen-Livebild (LLH-2107, hls.js) braucht zusätzlich `media-src 'self' blob:` und
+  `worker-src 'self' blob:`; der Spieler hängt die Segmente über MSE als `blob:` ein.
+- **Fremde, nicht gespeicherte Bilder** (Drohnenfoto-Vorschau, LLH-2108,
+  `GET …/drone/photos/{key}/thumb`) gehen **nicht über `anhang_antwort`**, sondern bereinigt
+  (`drohne::foto::clean_thumb` → `anhang::metadaten::bereinigen`, Fehler 422) mit `ANHANG_CSP`,
+  `nosniff`, `Content-Disposition: inline` und `Cache-Control: private, max-age=300`; nie die
+  Köpfe des Ziels. Das Bündel (5 min, 32 MiB) hält nur bereinigte Bytes. Der Vorschau-Pfad der
+  Quelle wird beim Einlesen und vor dem Abruf mit `suchlage::is_thumb_pfad` geprüft.
 - **HEIC-Decoder austauschbar halten** (LGPL 3.0, LFH-1000, `frontend/src/heic/LIESMICH.md`):
   Glue und WASM von libheif gehen unverändert unter `/bibliotheken/libheif/` aus, nie in einen
   Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt

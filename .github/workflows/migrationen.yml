@@ -153,6 +153,26 @@ jobs:
               -f state="$state" -f context=ADR-Nummern \
               -f description="$text" -f target_url="$LAUF" > /dev/null
           fi
+      # GATE-DATEIEN (LLH-2090, scripts/AGENTS.md, „Gate-Dateien“): Warnung je geänderter
+      # Prüfung am PR und ein Abschnitt in der Zusammenfassung. Wie oben vom Ziel-Branch, sonst aus
+      # dem PR. Beobachten, nicht sperren: kein Status, und ein Fehler des Skripts färbt nichts rot.
+      - name: Gate-Dateien im Diff
+        continue-on-error: true
+        env:
+          BASIS: ${{ github.event.pull_request.base.ref }}
+          KOPF: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/pruefung"
+          skript="$RUNNER_TEMP/pruefung/gate-dateien.sh"
+          if git cat-file -e "origin/$BASIS:scripts/gate-dateien.sh" 2> /dev/null; then
+            git show "origin/$BASIS:scripts/gate-dateien.sh" > "$skript"
+          elif [ -f scripts/gate-dateien.sh ]; then
+            cp scripts/gate-dateien.sh "$skript"
+          else
+            exit 0
+          fi
+          chmod +x "$skript"
+          "$skript" "origin/$BASIS" "$KOPF"
       # Der deutsche Bestand der API-Routen wächst nicht (LLH-1979, ADR-0097). Im Bündel `schnell`
       # fehlt der Basis-Ref (flacher Checkout), dort fällt nur dieser Vergleich laut aus; hier ist
       # die Basis geholt. Kein eigener Status: das Ergebnis geht in „Ergebnis der Prüfung“ ein,

@@ -9,6 +9,7 @@ pub mod auto_aktualisierung;
 pub mod cache;
 pub mod cog;
 pub mod copernicus;
+pub mod copernicus_alt;
 pub mod copernicus_bilder;
 pub mod download;
 pub mod katalog;

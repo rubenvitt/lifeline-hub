@@ -2083,3 +2083,24 @@ export type Verkehrsart = S['Verkehrsart'];
 export type VsVermerk = S['VsVermerk'];
 /** Kanal einer externen Stelle des Kommunikationsplans (`KommunikationsStelle.sprechgruppen`). */
 export type StellenKanal = S['StellenKanal'];
+
+// ============================== LLH-1633 Stammdaten einlesen ==============================
+/** Vorschau einer Stammdaten-Datei (Fahrzeuge, Personal, Qualifikationen); nichts geschrieben. */
+export type StammdatenVorschau = S['StammdatenVorschau'];
+export type StammdatenErgebnis = S['StammdatenErgebnis'];
+export type StammdatenZeile = S['StammdatenZeile'];
+export type StammdatenDateiArt = S['StammdatenDateiArt'];
+export type StammdatenTrefferGrund = S['StammdatenTrefferGrund'];
+export type StammdatenQualiZeile = S['QualiZeile'];
+export type StammdatenKandidat = S['Kandidat'];
+export type StammdatenFeldAenderung = S['FeldAenderungDto'];
+export type StammdatenFeldAenderungArt = S['FeldAenderungArt'];
+export type StammdatenZeilenErgebnis = S['ZeilenErgebnis'];
+export type StammdatenZeilenWahl = S['ZeilenWahl'];
+export type StammdatenZeilenEntscheidung = S['ZeilenEntscheidung'];
+export type StammdatenQualiWahl = S['QualiWahl'];
+export type StammdatenQualiEntscheidung = S['QualiEntscheidung'];
+export type StammdatenEntscheidungen = S['Entscheidungen'];
+export type StammdatenArtZaehlung = S['ArtZaehlung'];
+export type StammdatenZaehlung = S['Zaehlung'];
+export type StammdatenDateiMeldung = S['DateiMeldung'];

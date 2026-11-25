@@ -15,7 +15,7 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/map/overlays/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle =
+export type UeberlagerungQuelle =
   | 'dwd'
   | 'pegelonline'
   | 'nina'
@@ -28,6 +28,13 @@ export type FachebeneQuelle =
   | 'copernicus'
   /** Satellitenbilder der Copernicus-Aktivierungen (LLH-2021), Route `…/copernicus/images`. */
   | 'copernicus_bilder';
+
+/**
+ * Schlüssel der Fachebenen-Registry: die Quellen von `/api/map/overlays/:quelle` und die
+ * einsatzbezogene Drohnenlage (LLH-2106), die über die Einsatzroute lädt
+ * ({@link loadDrohneFachebene}), nie über `ladeFachebene`.
+ */
+export type FachebeneQuelle = UeberlagerungQuelle | 'drohne';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), Feature-Property `klasse` der
@@ -127,7 +134,7 @@ export type EnergieAnlagenart =
  * Die Bilderliste hat eine eigene Route unter der Vektorebene (LLH-2021).
  */
 export function ladeFachebene(
-  quelle: FachebeneQuelle,
+  quelle: UeberlagerungQuelle,
   bbox?: string,
   archiv = false,
 ): Promise<FachebeneAntwort> {
@@ -137,4 +144,13 @@ export function ladeFachebene(
   const q = teile.length ? `?${teile.join('&')}` : '';
   const pfad = quelle === 'copernicus_bilder' ? 'copernicus/images' : quelle;
   return apiGet<FachebeneAntwort>(`/api/map/overlays/${pfad}${q}`);
+}
+
+/**
+ * Lädt die Drohnenlage eines Einsatzes (LLH-2106): derselbe `FachebeneAntwort`-Umschlag mit ETag
+ * wie die Überlagerungen, aber unter der Einsatzroute — dort gelten Einsatzrolle und
+ * Modulfreigabe. Ohne Zuschaltung, Stand oder in einem beendeten Einsatz meldet sie `offline`.
+ */
+export function loadDrohneFachebene(einsatzId: number): Promise<FachebeneAntwort> {
+  return apiGet<FachebeneAntwort>(`/api/incidents/${einsatzId}/map/drone`);
 }
