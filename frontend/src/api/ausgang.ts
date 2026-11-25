@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiSend } from './client';
+import { ApiError, apiGet, apiSend } from './client';
 import { einsatzKeys } from './queryKeys';
 import type { AusgangFehler, QuelleArt, SendenAnfrage, Versand } from './types';
 
@@ -36,6 +36,20 @@ export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
 export function ausgangFehlerText(code: string | null | undefined): string | null {
   if (!code) return null;
   return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
+}
+
+/**
+ * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
+ * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist.
+ */
+export function versandFehler(fehler: unknown): unknown {
+  if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT) {
+    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[fehler.grund as AusgangFehler], {
+      grund: fehler.grund,
+      vomAnwendungsserver: fehler.vomAnwendungsserver,
+    });
+  }
+  return fehler;
 }
 
 export function fetchVersaende(einsatzId: number, quelle: Quelle): Promise<Versand[]> {
