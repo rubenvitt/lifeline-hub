@@ -508,9 +508,48 @@ async fn gleichzeitige_leser_ein_abruf() {
     );
     assert_eq!((a.0, b.0), (StatusCode::OK, StatusCode::OK));
     assert_eq!(u.doppel.anzahl(), 2, "Anlage und genau ein Nachholen");
-    // Beide Wartenden bekommen das Ergebnis des einen Abrufs.
-    assert_eq!(a.1["features"].as_array().unwrap().len(), 1);
-    assert_eq!(b.1["features"].as_array().unwrap().len(), 1);
+    // Wer den Versuch beansprucht, wartet auf den Abruf; der andere wartet nicht, er bekommt
+    // sofort den letzten Stand.
+    let mut objekte = [a.1, b.1].map(|v| v["features"].as_array().unwrap().len());
+    objekte.sort_unstable();
+    assert_eq!(objekte, [1, 2]);
+    assert_eq!(
+        daten(&u.app, u.einsatz, id, &u.admin).await.1["features"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn abgebrochener_leser_hinterlaesst_den_versuch() {
+    let u = umgebung().await;
+    let id = url_ebene(&u).await;
+    altern(&u.pool, id).await;
+    *u.doppel.warten.lock().unwrap() = Duration::from_millis(300);
+    u.doppel.plane(ok(EIN_PUNKT, Some("\"v2\"")));
+
+    // Der Leser bricht ab, während das Ziel noch antwortet.
+    let abgebrochen = tokio::time::timeout(
+        Duration::from_millis(50),
+        daten(&u.app, u.einsatz, id, &u.admin),
+    )
+    .await;
+    assert!(abgebrochen.is_err(), "der Leser wartet auf den Abruf");
+    let (s, v) = daten(&u.app, u.einsatz, id, &u.admin).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["features"].as_array().unwrap().len(), 2, "letzter Stand");
+    assert_eq!(
+        u.doppel.anzahl(),
+        2,
+        "der Versuch ist beansprucht: kein zweiter Abruf binnen 60 s"
+    );
+    // Der Abruf selbst läuft zu Ende und schreibt sein Ergebnis.
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    let (_, v) = daten(&u.app, u.einsatz, id, &u.admin).await;
+    assert_eq!(v["features"].as_array().unwrap().len(), 1);
+    assert_eq!(u.doppel.anzahl(), 2);
 }
 
 #[tokio::test]

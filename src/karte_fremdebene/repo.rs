@@ -101,13 +101,51 @@ pub async fn anlegen(
     farbe: &str,
     normiert: &Normiert,
 ) -> Result<FremdebeneAnzeige, AppError> {
+    anlegen_mit_abruf(
+        pool,
+        einsatz_id,
+        angelegt_von,
+        name,
+        quelle,
+        url,
+        farbe,
+        normiert,
+        None,
+    )
+    .await
+}
+
+/// Wie [`anlegen`], dazu der erste Abruf einer URL-Ebene in derselben Zeile: eine angelegte
+/// URL-Ebene trägt immer ihren Versuch und ihre Validatoren (Abschluss-Review, M3).
+#[allow(clippy::too_many_arguments)]
+pub async fn anlegen_mit_abruf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    angelegt_von: i64,
+    name: &str,
+    quelle: FremdebeneQuelle,
+    url: Option<&str>,
+    farbe: &str,
+    normiert: &Normiert,
+    abruf: Option<AbrufStand<'_>>,
+) -> Result<FremdebeneAnzeige, AppError> {
     let sha = sha256(&normiert.geojson);
     let jetzt = crate::zeit::jetzt();
+    let versucht_at = abruf.map(|_| jetzt.as_str());
+    let (abgerufen_at, etag, last_modified, fehler) = match abruf {
+        Some(AbrufStand::Erfolg {
+            etag,
+            last_modified,
+        }) => (Some(jetzt.as_str()), etag, last_modified, None),
+        Some(AbrufStand::Fehler(f)) => (None, None, None, Some(f.as_str())),
+        None => (None, None, None, None),
+    };
     let id = crate::write_retry!(pool, |conn| {
         let id: i64 = sqlx::query_scalar(
             "INSERT INTO karte_fremdebene \
-                (einsatz_id, name, quelle, url, farbe, angelegt_von, erstellt_at, geaendert_at) \
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
+                (einsatz_id, name, quelle, url, farbe, angelegt_von, erstellt_at, geaendert_at, \
+                 versucht_at, abgerufen_at, quelle_etag, quelle_last_modified, fehler) \
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(einsatz_id)
         .bind(name)
@@ -117,6 +155,11 @@ pub async fn anlegen(
         .bind(angelegt_von)
         .bind(&jetzt)
         .bind(&jetzt)
+        .bind(versucht_at)
+        .bind(abgerufen_at)
+        .bind(etag)
+        .bind(last_modified)
+        .bind(fehler)
         .fetch_one(&mut *conn)
         .await?;
         sqlx::query(
@@ -175,7 +218,8 @@ pub async fn laden_daten(
 }
 
 /// Ersetzt den Inhalt einer Ebene (neuer Abruf). `true`, wenn er sich geändert hat (dann ein
-/// Live-Ereignis); gleicher Inhalt schreibt nichts. `NotFound` ohne Ebene.
+/// Live-Ereignis); gleicher Inhalt schreibt nichts, ein nicht mehr aktiver Einsatz auch nicht
+/// (der letzte Stand ist Teil der Akte). `NotFound` ohne Ebene.
 pub async fn ersetze_daten(
     pool: &SqlitePool,
     einsatz_id: i64,
@@ -196,6 +240,9 @@ pub async fn ersetze_daten(
         let Some(bisher) = bisher else {
             return Err(AppError::NotFound);
         };
+        if !ist_aktiv(&mut *conn, einsatz_id).await? {
+            return Ok(false);
+        }
         if bisher.as_deref() == Some(sha.as_str()) {
             return Ok(false);
         }
@@ -235,24 +282,39 @@ pub enum AbrufStand<'a> {
     Fehler(FremdebeneFehler),
 }
 
-/// Hält einen Abrufversuch fest (`versucht_at` immer).
+/// Bedingung der Schreibwege eines Abrufs: nur am aktiven Einsatz (Abschluss-Review, M2).
+const NUR_AKTIV: &str =
+    "EXISTS (SELECT 1 FROM einsatz WHERE id = karte_fremdebene.einsatz_id AND status = 'aktiv')";
+
+async fn ist_aktiv(conn: &mut sqlx::SqliteConnection, einsatz_id: i64) -> Result<bool, AppError> {
+    let aktiv: Option<bool> =
+        sqlx::query_scalar("SELECT status = 'aktiv' FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_optional(conn)
+            .await?;
+    Ok(aktiv == Some(true))
+}
+
+/// Hält das Ergebnis eines Abrufversuchs fest (`versucht_at` immer). `false`, wenn nichts
+/// geschrieben wurde: die Ebene ist weg oder der Einsatz nicht mehr aktiv (der letzte Stand ist
+/// dann Teil der Akte).
 pub async fn setze_abruf(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
     stand: AbrufStand<'_>,
-) -> Result<(), AppError> {
+) -> Result<bool, AppError> {
     let jetzt = crate::zeit::jetzt();
-    let ergebnis =
-        match stand {
-            AbrufStand::Erfolg {
-                etag,
-                last_modified,
-            } => sqlx::query(
+    let ergebnis = match stand {
+        AbrufStand::Erfolg {
+            etag,
+            last_modified,
+        } => {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
                 "UPDATE karte_fremdebene SET versucht_at = ?, abgerufen_at = ?, fehler = NULL, \
                 quelle_etag = ?, quelle_last_modified = ? \
-             WHERE id = ? AND einsatz_id = ?",
-            )
+             WHERE id = ? AND einsatz_id = ? AND {NUR_AKTIV}"
+            )))
             .bind(&jetzt)
             .bind(&jetzt)
             .bind(etag)
@@ -260,24 +322,22 @@ pub async fn setze_abruf(
             .bind(id)
             .bind(einsatz_id)
             .execute(pool)
-            .await?,
-            AbrufStand::Fehler(fehler) => {
-                sqlx::query(
-                    "UPDATE karte_fremdebene SET versucht_at = ?, fehler = ? \
-             WHERE id = ? AND einsatz_id = ?",
-                )
-                .bind(&jetzt)
-                .bind(fehler.as_str())
-                .bind(id)
-                .bind(einsatz_id)
-                .execute(pool)
-                .await?
-            }
-        };
-    if ergebnis.rows_affected() == 0 {
-        return Err(AppError::NotFound);
-    }
-    Ok(())
+            .await?
+        }
+        AbrufStand::Fehler(fehler) => {
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE karte_fremdebene SET versucht_at = ?, fehler = ? \
+             WHERE id = ? AND einsatz_id = ? AND {NUR_AKTIV}"
+            )))
+            .bind(&jetzt)
+            .bind(fehler.as_str())
+            .bind(id)
+            .bind(einsatz_id)
+            .execute(pool)
+            .await?
+        }
+    };
+    Ok(ergebnis.rows_affected() > 0)
 }
 
 /// Was der Abruf der URL-Ebene von einer Ebene braucht (`karte_fremdebene::abruf`).
@@ -306,6 +366,32 @@ pub async fn laden_abrufstand(
     )
     .bind(id)
     .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// Beansprucht den nächsten Abrufversuch einer URL-Ebene, bevor abgerufen wird: setzt
+/// `versucht_at` auf `jetzt`, wenn der letzte Versuch vor `frisch_bis` liegt (oder fehlt) und der
+/// Einsatz aktiv ist. Genau ein Leser gewinnt (ein UPDATE); er bekommt den Abrufstand, jeder
+/// andere `None` und liefert sofort den letzten Stand. Ein Leser, der danach abbricht, lässt den
+/// Versuch stehen: binnen der Frist ruft niemand erneut ab (Abschluss-Review, I3).
+pub async fn beanspruche_abruf(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+    jetzt: &str,
+    frisch_bis: &str,
+) -> Result<Option<Abrufstand>, AppError> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "UPDATE karte_fremdebene SET versucht_at = ? \
+         WHERE id = ? AND einsatz_id = ? AND quelle = 'url' AND url IS NOT NULL \
+           AND (versucht_at IS NULL OR versucht_at < ?) AND {NUR_AKTIV} \
+         RETURNING quelle, url, versucht_at, quelle_etag, quelle_last_modified, fehler"
+    )))
+    .bind(jetzt)
+    .bind(id)
+    .bind(einsatz_id)
+    .bind(frisch_bis)
     .fetch_optional(pool)
     .await?)
 }
@@ -523,6 +609,109 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(etag.as_deref(), Some("\"v1\""));
+    }
+
+    #[tokio::test]
+    async fn abgeschlossener_einsatz_nimmt_keinen_abruf_mehr_an() {
+        let pool = crate::db::test_pool().await;
+        let (e, b) = einsatz(&pool).await;
+        let ebene = anlegen(
+            &pool,
+            e,
+            b,
+            "Lage",
+            FremdebeneQuelle::Url,
+            Some("https://geo.example.org/lage.geojson"),
+            "fremd-1",
+            &punkte(1),
+        )
+        .await
+        .unwrap();
+        let vorher = laden(&pool, e, ebene.id).await.unwrap();
+        // Der Einsatz wird abgeschlossen, während ein Abruf läuft.
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(!ersetze_daten(&pool, e, ebene.id, &punkte(3)).await.unwrap());
+        let _ = setze_abruf(
+            &pool,
+            e,
+            ebene.id,
+            AbrufStand::Fehler(FremdebeneFehler::Status),
+        )
+        .await;
+        assert_eq!(
+            laden(&pool, e, ebene.id).await.unwrap(),
+            vorher,
+            "die Akte bleibt beim letzten Stand"
+        );
+    }
+
+    #[tokio::test]
+    async fn anlage_traegt_den_ersten_abruf_und_nur_einer_beansprucht_den_naechsten() {
+        let pool = crate::db::test_pool().await;
+        let (e, b) = einsatz(&pool).await;
+        let ebene = anlegen_mit_abruf(
+            &pool,
+            e,
+            b,
+            "Lage",
+            FremdebeneQuelle::Url,
+            Some("https://geo.example.org/lage.geojson"),
+            "fremd-1",
+            &punkte(1),
+            Some(AbrufStand::Erfolg {
+                etag: Some("\"v1\""),
+                last_modified: None,
+            }),
+        )
+        .await
+        .unwrap();
+        assert!(ebene.fetched_at.is_some() && ebene.attempted_at.is_some());
+        let stand = laden_abrufstand(&pool, e, ebene.id).await.unwrap().unwrap();
+        assert_eq!(stand.etag.as_deref(), Some("\"v1\""));
+
+        let frisch_bis = ebene.attempted_at.clone().unwrap();
+        assert!(
+            beanspruche_abruf(&pool, e, ebene.id, "2099-01-01 00:00:00", &frisch_bis)
+                .await
+                .unwrap()
+                .is_none(),
+            "der Versuch ist nicht älter als die Frist"
+        );
+        let jetzt = "2099-01-01 00:00:00";
+        let gewonnen = beanspruche_abruf(&pool, e, ebene.id, jetzt, "2098-12-31 23:59:00")
+            .await
+            .unwrap()
+            .expect("erster Leser gewinnt");
+        assert_eq!(gewonnen.etag.as_deref(), Some("\"v1\""));
+        assert!(
+            beanspruche_abruf(&pool, e, ebene.id, jetzt, "2098-12-31 23:59:00")
+                .await
+                .unwrap()
+                .is_none(),
+            "der zweite nicht"
+        );
+        sqlx::query("UPDATE einsatz SET status = 'abgeschlossen' WHERE id = ?")
+            .bind(e)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert!(
+            beanspruche_abruf(
+                &pool,
+                e,
+                ebene.id,
+                "2100-01-01 00:00:00",
+                "2099-12-31 00:00:00"
+            )
+            .await
+            .unwrap()
+            .is_none(),
+            "abgeschlossen: kein Abruf mehr"
+        );
     }
 
     #[tokio::test]

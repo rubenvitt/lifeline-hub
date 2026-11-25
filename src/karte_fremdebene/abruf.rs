@@ -9,11 +9,14 @@
 //! - Zielschutz und LAN-Entscheidung rechnet [`holen`] vor jedem Abruf selbst
 //!   (`check_url` mit `is_fremdebenen_lan_erlaubt`); der Abrufer prüft sie noch einmal.
 //! - Nachgeholt wird beim Lesen ([`refresh_if_due`]): nur die führende Seite, nur am aktiven
-//!   Einsatz, frühestens 60 s nach dem letzten Versuch, je Ebene ein Abruf zugleich.
+//!   Einsatz, frühestens 60 s nach dem letzten Versuch, je Ebene ein Abruf zugleich. Den Versuch
+//!   beansprucht ein Leser vor dem Abruf in der Datenbank (`repo::beanspruche_abruf`); wer ihn
+//!   nicht bekommt, liefert sofort den letzten Stand. Der Abruf läuft abgekoppelt
+//!   (`tokio::spawn`): ein abbrechender Leser beendet ihn nicht.
+//! - Eingelesen wird in `spawn_blocking`: eine große Datei ist reine CPU-Arbeit.
 //! - Die URL geht nie in Log, Fehlertext oder Admin-Spur: `tracing` trägt `ebene_id` und Code.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use futures::future::BoxFuture;
 
@@ -77,13 +80,11 @@ impl FremdebeneAbrufer for HttpAbrufer {
     }
 }
 
-type Sperren = Arc<Mutex<HashMap<i64, Arc<tokio::sync::Mutex<()>>>>>;
-
-/// Abrufer samt Single-Flight je Ebene. Vorgabe: [`HttpAbrufer`].
+/// Der Weg nach draußen im `AppState`. Vorgabe: [`HttpAbrufer`]. Single-Flight je Ebene trägt
+/// die Datenbank (`repo::beanspruche_abruf`), nicht dieser Prozess.
 #[derive(Clone)]
 pub struct Abrufer {
     weg: Arc<dyn FremdebeneAbrufer>,
-    sperren: Sperren,
 }
 
 impl Default for Abrufer {
@@ -95,27 +96,7 @@ impl Default for Abrufer {
 impl Abrufer {
     /// Mit eigenem Weg nach draußen (Tests).
     pub fn mit(weg: Arc<dyn FremdebeneAbrufer>) -> Self {
-        Abrufer {
-            weg,
-            sperren: Default::default(),
-        }
-    }
-
-    fn sperre(&self, ebene_id: i64) -> Arc<tokio::sync::Mutex<()>> {
-        self.sperren
-            .lock()
-            .expect("Sperren der Fremdebenen")
-            .entry(ebene_id)
-            .or_default()
-            .clone()
-    }
-
-    /// Räumt die Sperre ab, wenn niemand sonst sie hält oder wartet (nur die Tabelle und `sperre`).
-    fn freigeben(&self, ebene_id: i64, sperre: Arc<tokio::sync::Mutex<()>>) {
-        let mut sperren = self.sperren.lock().expect("Sperren der Fremdebenen");
-        if Arc::strong_count(&sperre) == 2 {
-            sperren.remove(&ebene_id);
-        }
+        Abrufer { weg }
     }
 }
 
@@ -182,13 +163,21 @@ pub async fn holen(
         Ok(a) => match a.body {
             None => Err(FremdebeneFehler::Status),
             Some(body) if body.len() > DATEI_MAX => Err(FremdebeneFehler::ZuGross),
-            Some(body) => einlesen::read_datei(&body).map(|normiert| Geholt::Neu {
+            Some(body) => read_blocking(body).await?.map(|normiert| Geholt::Neu {
                 normiert,
                 etag: a.etag,
                 last_modified: a.last_modified,
             }),
         },
     })
+}
+
+/// Liest eine Datei in `spawn_blocking` ein: das Einlesen ist reine CPU-Arbeit und soll keinen
+/// Worker der Runtime blockieren (Muster `routes::abloesung_schichtplan`).
+pub async fn read_blocking(bytes: Vec<u8>) -> Result<Result<Normiert, FremdebeneFehler>, AppError> {
+    tokio::task::spawn_blocking(move || einlesen::read_datei(&bytes))
+        .await
+        .map_err(|e| AppError::Internal(format!("Einlesen der Fremdebene: {e}")))
 }
 
 /// Holt eine URL-Ebene beim Lesen nach, wenn sie fällig ist (siehe Modulkopf). Ein Abruffehler
@@ -198,20 +187,34 @@ pub async fn refresh_if_due(
     einsatz: &Einsatz,
     ebene_id: i64,
 ) -> Result<(), AppError> {
+    // Erst lesen, dann beanspruchen: ein frischer Stand kostet keinen Schreibzugriff.
     if !is_hier_abzurufen(einsatz) || faellig(state, einsatz.id, ebene_id).await?.is_none() {
         return Ok(());
     }
-    let sperre = state.fremdebene_abrufer.sperre(ebene_id);
-    let ergebnis = {
-        let _halt = sperre.lock().await;
-        // Wer gewartet hat, bekommt das Ergebnis des Vorgängers: nach ihm ist nichts mehr fällig.
-        match faellig(state, einsatz.id, ebene_id).await? {
-            Some(stand) => nachholen(state, einsatz, ebene_id, stand).await,
-            None => Ok(()),
-        }
+    let jetzt = chrono::Utc::now().naive_utc();
+    let frisch_bis = jetzt - chrono::Duration::seconds(FRISCH_SEKUNDEN);
+    let Some(stand) = repo::beanspruche_abruf(
+        &state.pool,
+        einsatz.id,
+        ebene_id,
+        &crate::zeit::formatiere(jetzt),
+        &crate::zeit::formatiere(frisch_bis),
+    )
+    .await?
+    else {
+        // Ein anderer Leser hat den Versuch: der letzte Stand gilt, ohne zu warten.
+        return Ok(());
     };
-    state.fremdebene_abrufer.freigeben(ebene_id, sperre);
-    ergebnis
+    let abruf = tokio::spawn(nachholen(
+        state.clone(),
+        einsatz.id,
+        einsatz.org_id,
+        ebene_id,
+        stand,
+    ));
+    abruf
+        .await
+        .map_err(|e| AppError::Internal(format!("Abruf der Fremdebene: {e}")))?
 }
 
 /// Der Abrufstand einer fälligen URL-Ebene, sonst `None`.
@@ -230,9 +233,12 @@ async fn faellig(
     .then_some(stand))
 }
 
+/// Ruft eine beanspruchte Ebene ab und schreibt das Ergebnis. Läuft als eigene Aufgabe, darum
+/// mit eigenem `AppState`.
 async fn nachholen(
-    state: &AppState,
-    einsatz: &Einsatz,
+    state: AppState,
+    einsatz_id: i64,
+    org_id: i64,
     ebene_id: i64,
     stand: repo::Abrufstand,
 ) -> Result<(), AppError> {
@@ -240,8 +246,8 @@ async fn nachholen(
         return Ok(());
     };
     let geholt = holen(
-        state,
-        einsatz.org_id,
+        &state,
+        org_id,
         url,
         stand.etag.as_deref(),
         stand.last_modified.as_deref(),
@@ -257,25 +263,25 @@ async fn nachholen(
             let last_modified = last_modified.or(stand.last_modified);
             repo::setze_abruf(
                 pool,
-                einsatz.id,
+                einsatz_id,
                 ebene_id,
                 AbrufStand::Erfolg {
                     etag: etag.as_deref(),
                     last_modified: last_modified.as_deref(),
                 },
             )
-            .await?;
-            stand.fehler.is_some()
+            .await?
+                && stand.fehler.is_some()
         }
         Ok(Geholt::Neu {
             normiert,
             etag,
             last_modified,
         }) => {
-            let geaendert = repo::ersetze_daten(pool, einsatz.id, ebene_id, &normiert).await?;
-            repo::setze_abruf(
+            let geaendert = repo::ersetze_daten(pool, einsatz_id, ebene_id, &normiert).await?;
+            let gesetzt = repo::setze_abruf(
                 pool,
-                einsatz.id,
+                einsatz_id,
                 ebene_id,
                 AbrufStand::Erfolg {
                     etag: etag.as_deref(),
@@ -283,7 +289,7 @@ async fn nachholen(
                 },
             )
             .await?;
-            geaendert || stand.fehler.is_some()
+            geaendert || (gesetzt && stand.fehler.is_some())
         }
         Err(fehler) => {
             tracing::info!(
@@ -291,14 +297,14 @@ async fn nachholen(
                 fehler = fehler.as_str(),
                 "Fremdebene: Abruf gescheitert, der letzte Stand bleibt"
             );
-            repo::setze_abruf(pool, einsatz.id, ebene_id, AbrufStand::Fehler(fehler)).await?;
-            stand.fehler != Some(fehler)
+            repo::setze_abruf(pool, einsatz_id, ebene_id, AbrufStand::Fehler(fehler)).await?
+                && stand.fehler != Some(fehler)
         }
     };
     if melden {
         state
             .live
-            .publiziere_einsatz(einsatz.id, LiveEvent::KarteFremdebene);
+            .publiziere_einsatz(einsatz_id, LiveEvent::KarteFremdebene);
     }
     Ok(())
 }
@@ -337,29 +343,5 @@ mod tests {
             !text.contains("geheim") && !text.contains("example"),
             "{text}"
         );
-    }
-
-    struct Zaehler(std::sync::atomic::AtomicUsize);
-
-    impl FremdebeneAbrufer for Zaehler {
-        fn abrufen(
-            &self,
-            _abruf: Abruf,
-        ) -> BoxFuture<'_, Result<BedingteAntwort, FremdebeneFehler>> {
-            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            Box::pin(async { Err(FremdebeneFehler::Status) })
-        }
-    }
-
-    #[tokio::test]
-    async fn sperre_wird_abgeraeumt() {
-        let a = Abrufer::mit(Arc::new(Zaehler(Default::default())));
-        let s = a.sperre(7);
-        let zweite = a.sperre(7);
-        assert!(Arc::ptr_eq(&s, &zweite), "eine Sperre je Ebene");
-        a.freigeben(7, zweite);
-        assert_eq!(a.sperren.lock().unwrap().len(), 1, "noch gehalten");
-        a.freigeben(7, s);
-        assert!(a.sperren.lock().unwrap().is_empty());
     }
 }

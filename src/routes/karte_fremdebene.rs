@@ -11,7 +11,7 @@ use crate::extract::{JsonBody, PfadParam};
 use crate::karte_fremdebene::{
     self as fremdebene,
     abruf::{self, Geholt},
-    einlesen, repo,
+    repo,
     repo::FremdebenePatch,
     FremdebeneAnzeige, FremdebeneFehler, FremdebeneQuelle,
 };
@@ -148,7 +148,8 @@ pub async fn anlegen(
     if bytes.len() > fremdebene::DATEI_MAX {
         return Err(FremdebeneFehler::ZuGross.into());
     }
-    let normiert = einlesen::read_datei(&bytes)?;
+    // Eingelesen wird abseits der Runtime-Worker (`spawn_blocking`); `Bytes` teilt den Puffer.
+    let normiert = abruf::read_blocking(bytes.to_vec()).await??;
     // AV-Scan vor dem Speichern über denselben Seam wie jeder Upload (LFH-238). Ein Fund ist hier
     // der Code `virus` (Entwurf, „Fehler“); ein unerreichbarer Scanner bleibt 503.
     crate::anhang::scan(crate::anhang::scan_config(), &bytes)
@@ -239,7 +240,8 @@ async fn anlegen_aus_url(
         .unwrap_or_else(|| NAME_VORGABE.into());
     let name: String = name.chars().take(fremdebene::NAME_MAX).collect();
     let farbe = farbe_oder_naechste(state, einsatz_id, farbe).await?;
-    let ebene = repo::anlegen(
+    // Ebene, Inhalt und erster Abruf in einer Transaktion.
+    let ebene = repo::anlegen_mit_abruf(
         &state.pool,
         einsatz_id,
         ctx.benutzer.id,
@@ -248,19 +250,12 @@ async fn anlegen_aus_url(
         Some(&url),
         farbe,
         &normiert,
-    )
-    .await?;
-    repo::setze_abruf(
-        &state.pool,
-        einsatz_id,
-        ebene.id,
-        repo::AbrufStand::Erfolg {
+        Some(repo::AbrufStand::Erfolg {
             etag: etag.as_deref(),
             last_modified: last_modified.as_deref(),
-        },
+        }),
     )
     .await?;
-    let ebene = repo::laden(&state.pool, einsatz_id, ebene.id).await?;
     sse_fremdebene(state, einsatz_id);
     Ok((StatusCode::CREATED, Json(ebene)))
 }
