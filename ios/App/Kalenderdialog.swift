@@ -31,6 +31,8 @@ enum Kalenderdialog {
         dialog.event = ereignis
         let begleiter = Begleiter(datei: datei)
         dialog.editViewDelegate = begleiter
+        // Kein Wegwischen: nur „Hinzufügen“ oder „Abbrechen“ schließt, und beide räumen die Datei weg.
+        dialog.isModalInPresentation = true
         // `editViewDelegate` ist schwach; der Dialog hält seinen Begleiter bis zum Schließen.
         objc_setAssociatedObject(dialog, &Begleiter.schluessel, begleiter, .OBJC_ASSOCIATION_RETAIN)
         oben.present(dialog, animated: true)
@@ -41,7 +43,6 @@ enum Kalenderdialog {
         try? FileManager.default.removeItem(at: datei.deletingLastPathComponent())
     }
 
-    @MainActor
     private final class Begleiter: NSObject, EKEventEditViewDelegate {
         nonisolated(unsafe) static var schluessel: UInt8 = 0
         let datei: URL
@@ -50,10 +51,15 @@ enum Kalenderdialog {
             self.datei = datei
         }
 
-        func eventEditViewController(
+        // Der Rückruf kommt auf dem Hauptthread; `nonisolated` wie in `Standortdienst`, damit die
+        // Konformanz unabhängig davon baut, ob das SDK das Protokoll an den Main Actor bindet.
+        nonisolated func eventEditViewController(
             _ controller: EKEventEditViewController, didCompleteWith action: EKEventEditViewAction
         ) {
-            controller.dismiss(animated: true)
+            let datei = self.datei
+            MainActor.assumeIsolated {
+                controller.dismiss(animated: true)
+            }
             Kalenderdialog.raeumeWeg(datei)
         }
     }
