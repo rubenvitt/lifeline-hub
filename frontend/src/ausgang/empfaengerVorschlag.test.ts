@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { KanalMitStelle } from '../api/types';
-import { empfaengerVorschlag } from './empfaengerVorschlag';
+import {
+  abschnittVorschau,
+  empfaengerVorschlag,
+  externeVerteilerNamen,
+} from './empfaengerVorschlag';
 
 const kanal = (id: number, stelle: string, stelleId = id): KanalMitStelle => ({
   agency_id: stelleId,
@@ -26,5 +30,21 @@ describe('empfaengerVorschlag', () => {
 
   it('ignoriert leere Namen', () => {
     expect(empfaengerVorschlag([kanal(1, 'ILS')], ['', '  ']).size).toBe(0);
+  });
+});
+
+describe('externeVerteilerNamen und abschnittVorschau', () => {
+  it('nimmt nur externe Einträge mit Bezeichnung', () => {
+    expect(
+      externeVerteilerNamen([
+        { empfaenger_typ: 'extern', extern_bezeichnung: 'ILS Nord' },
+        { empfaenger_typ: 'extern', extern_bezeichnung: null },
+        { empfaenger_typ: 'abschnitt', extern_bezeichnung: 'X' },
+      ]),
+    ).toEqual(['ILS Nord']);
+  });
+
+  it('fügt die nichtleeren Abschnittstexte zusammen', () => {
+    expect(abschnittVorschau([{ text: 'a' }, { text: ' ' }, { text: 'b' }])).toBe('a\nb');
   });
 });

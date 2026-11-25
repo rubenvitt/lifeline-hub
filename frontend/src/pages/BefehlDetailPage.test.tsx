@@ -1318,3 +1318,36 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
     expect(within(druckkopf()).queryByText('Verteiler')).toBeNull();
   });
 });
+
+/** Senden per E-Mail (LLH-2093): Aktion in der Aktionsleiste, nur freigegeben und mit Schreibrecht. */
+describe('BefehlDetailPage — Senden (LLH-2093)', () => {
+  beforeEach(() => {
+    server.use(
+      http.get('/api/einsaetze/1/deliveries', () => HttpResponse.json([])),
+      http.get('/api/external-agencies/channels', () => HttpResponse.json([])),
+    );
+  });
+
+  it('zeigt „Senden“ am freigegebenen Befehl, nicht am Entwurf', async () => {
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    const { unmount } = renderAt(7);
+    expect(await screen.findByRole('button', { name: 'Senden' })).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('entwurf') as never);
+    renderAt(7);
+    await screen.findByRole('button', { name: 'Freigeben' });
+    expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
+  });
+
+  it('blendet „Senden“ ohne Schreibrecht aus', async () => {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      ...einsatz,
+      meine_rolle: 'beobachter',
+    } as never);
+    vi.mocked(befehleApi.ladeBefehl).mockResolvedValue(befehl('freigegeben') as never);
+    renderAt(7);
+    await screen.findByRole('heading', { name: 'Befehl 1' });
+    expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
+  });
+});

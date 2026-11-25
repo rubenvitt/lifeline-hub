@@ -17,3 +17,20 @@ export function empfaengerVorschlag(
   const gesucht = new Set(namen.map(norm).filter((n) => n !== ''));
   return new Set(kanaele.filter((k) => gesucht.has(norm(k.agency_name))).map((k) => k.channel.id));
 }
+
+/** Namen der externen Einträge eines Verteilers (`extern_bezeichnung`), für die Vorbelegung. */
+export function externeVerteilerNamen(
+  verteiler: readonly { empfaenger_typ: string; extern_bezeichnung?: string | null }[] | undefined,
+): string[] {
+  return (verteiler ?? [])
+    .filter((e) => e.empfaenger_typ === 'extern' && e.extern_bezeichnung)
+    .map((e) => e.extern_bezeichnung as string);
+}
+
+/** Der Beginn des freigegebenen Textes für die Vorschau: Abschnittstexte hintereinander. */
+export function abschnittVorschau(abschnitte: readonly { text: string }[]): string {
+  return abschnitte
+    .map((a) => a.text)
+    .filter((t) => t.trim() !== '')
+    .join('\n');
+}
