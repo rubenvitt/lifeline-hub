@@ -103,6 +103,7 @@ const MIGRIERTE_RESPONSE_TYPEN = [
   'FeatureCollection',
   'FachebeneAntwort', // fachebenen.ts
   'Hintergrundbild', // kartenbilder.ts
+  'FremdebeneAnzeige', // fremdebenen.ts
   'Peilung',
   'OrtVorschau', // ortVorschau.ts
 ] as const;

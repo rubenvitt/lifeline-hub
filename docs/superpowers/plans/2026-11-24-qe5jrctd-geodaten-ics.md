@@ -466,12 +466,12 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `FREMDEBENE_GRENZEN = { dateiBytes: 10 * 1024 * 1024, nameMax: 120 }`;
   - `FREMDEBENE_FEHLERTEXT: Record<FremdebeneFehler, string>`, wortgleich mit dem Server.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Die Pfade lauten `/api/incidents/<id>/map/foreign-layers…`;
   - FormData trägt genau `file` bzw. `url`;
   - `lagebildOffline.guard.test.ts` und der Guard für die Live-Klassifikation sind grün mit den neuen Keys.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest (inklusive der Guards) → PASS.
-- [ ] **Step 5:** Commit `feat: Frontend-API für Fremdebenen` (Zunder B).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest (inklusive der Guards) → PASS.
+- [x] **Step 5:** Commit `feat: Frontend-API für Fremdebenen` (Zunder B).
 
 ### Task 17: Ebene zeichnen, Baumgruppe, Detailkarte
 

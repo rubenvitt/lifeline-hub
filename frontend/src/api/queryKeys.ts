@@ -1623,6 +1623,10 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.br,
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
+    // Fremdebenen (LLH-2099): Liste und je Ebene das normierte GeoJSON, damit die Karte ohne Netz
+    // dieselben Ebenen zeigt.
+    EINSATZ_KEYS.fremdebenen,
+    EINSATZ_KEYS.fremdebeneDaten,
     EINSATZ_KEYS.lageSnapshot,
     // Verlauf der eigenen Benachrichtigungen (LLH-1422): ohne Netz lesbar, „Alle gelesen“ wird
     // vorgemerkt (`offline/schreiben.ts`). Die Detailzeile liest der Server nur aus Retain-Spalten
