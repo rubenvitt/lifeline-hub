@@ -489,9 +489,18 @@ mod tests {
         let pool = crate::db::test_pool().await;
         let (e, b) = einsatz(&pool).await;
         let n = punkte(3);
-        anlegen(&pool, e, b, "Hydranten", FremdebeneQuelle::Datei, None, "fremd-1", &n)
-            .await
-            .unwrap();
+        anlegen(
+            &pool,
+            e,
+            b,
+            "Hydranten",
+            FremdebeneQuelle::Datei,
+            None,
+            "fremd-1",
+            &n,
+        )
+        .await
+        .unwrap();
         let liste = liste(&pool, e).await.unwrap();
         assert_eq!(liste[0].data_size, Some(n.geojson.len() as i64));
     }

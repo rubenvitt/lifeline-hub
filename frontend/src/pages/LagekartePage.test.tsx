@@ -2431,8 +2431,9 @@ describe('LagekartePage · Neuentwurf S5', () => {
     }
     const zeile = await screen.findByRole('switch', { name: 'Pegel damals' });
     expect(zeile).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Pegel damals.*Aktionen|Aktionen.*Pegel damals/ }))
-      .toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Pegel damals.*Aktionen|Aktionen.*Pegel damals/ }),
+    ).toBeNull();
   });
 
   it('zeigt die Drohnenquellen nur live, im gesicherten Stand weder Zeile noch Abfrage (LLH-2106)', async () => {

@@ -174,8 +174,14 @@ mod tests {
 
     fn punkte(n: usize) -> crate::karte_fremdebene::einlesen::Normiert {
         let f = vec![r#"{"type":"Feature","geometry":{"type":"Point","coordinates":[9,52]}}"#; n];
-        read_datei(format!(r#"{{"type":"FeatureCollection","features":[{}]}}"#, f.join(",")).as_bytes())
-            .unwrap()
+        read_datei(
+            format!(
+                r#"{{"type":"FeatureCollection","features":[{}]}}"#,
+                f.join(",")
+            )
+            .as_bytes(),
+        )
+        .unwrap()
     }
 
     async fn url_ebene(pool: &SqlitePool, e: i64, b: i64, n: usize) -> i64 {
@@ -241,7 +247,10 @@ mod tests {
         assert_eq!(liste[0]["url_host"], "geo.example.org");
         assert_eq!(liste[0]["feature_count"], 2);
         assert_eq!(liste[0]["sha256"].as_str().unwrap().len(), 64);
-        assert!(!daten.to_string().contains("geheim"), "keine volle URL im Stand");
+        assert!(
+            !daten.to_string().contains("geheim"),
+            "keine volle URL im Stand"
+        );
         assert_eq!(zeilen(&pool).await, 1);
     }
 
@@ -264,7 +273,9 @@ mod tests {
         let (sid, daten) = stand(&pool, e, b).await;
         let h = hashes(&daten).remove(0);
 
-        assert!(ebenen::ersetze_daten(&pool, e, id, &punkte(3)).await.unwrap());
+        assert!(ebenen::ersetze_daten(&pool, e, id, &punkte(3))
+            .await
+            .unwrap());
         assert_eq!(laden(&pool, e, sid, &h).await.unwrap(), Some(alt));
     }
 
@@ -277,7 +288,10 @@ mod tests {
         let h = hashes(&daten).remove(0);
 
         ebenen::loeschen(&pool, e, id).await.unwrap();
-        assert_eq!(laden(&pool, e, sid, &h).await.unwrap(), Some(punkte(1).geojson));
+        assert_eq!(
+            laden(&pool, e, sid, &h).await.unwrap(),
+            Some(punkte(1).geojson)
+        );
     }
 
     #[tokio::test]
@@ -286,7 +300,9 @@ mod tests {
         let (e, b) = einsatz(&pool).await;
         let id = url_ebene(&pool, e, b, 1).await;
         let (a, da) = stand(&pool, e, b).await;
-        ebenen::ersetze_daten(&pool, e, id, &punkte(2)).await.unwrap();
+        ebenen::ersetze_daten(&pool, e, id, &punkte(2))
+            .await
+            .unwrap();
         let (sb, db) = stand(&pool, e, b).await;
         let (sc, _) = stand(&pool, e, b).await;
         let (h1, h2) = (hashes(&da).remove(0), hashes(&db).remove(0));
@@ -296,7 +312,10 @@ mod tests {
         assert_eq!(zeilen(&pool).await, 1, "h1 hat keinen Stand mehr");
         assert!(repo::loesche(&pool, e, sb).await.unwrap());
         assert_eq!(zeilen(&pool).await, 1, "h2 trägt noch Stand C");
-        assert_eq!(laden(&pool, e, sc, &h2).await.unwrap(), Some(punkte(2).geojson));
+        assert_eq!(
+            laden(&pool, e, sc, &h2).await.unwrap(),
+            Some(punkte(2).geojson)
+        );
         assert_ne!(h1, h2);
     }
 
@@ -307,12 +326,18 @@ mod tests {
         let (anderer, b2) = einsatz(&pool).await;
         let id = url_ebene(&pool, e, b, 1).await;
         let (sa, _) = stand(&pool, e, b).await;
-        ebenen::ersetze_daten(&pool, e, id, &punkte(2)).await.unwrap();
+        ebenen::ersetze_daten(&pool, e, id, &punkte(2))
+            .await
+            .unwrap();
         let (sb, db) = stand(&pool, e, b).await;
         let h2 = hashes(&db).remove(0);
         let (s_anderer, _) = stand(&pool, anderer, b2).await;
 
-        assert_eq!(laden(&pool, e, sa, &h2).await.unwrap(), None, "Hash aus Stand B");
+        assert_eq!(
+            laden(&pool, e, sa, &h2).await.unwrap(),
+            None,
+            "Hash aus Stand B"
+        );
         assert_eq!(laden(&pool, anderer, s_anderer, &h2).await.unwrap(), None);
         assert!(laden(&pool, e, sb, &h2).await.unwrap().is_some());
     }

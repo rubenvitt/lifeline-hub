@@ -13,7 +13,8 @@ use sqlx::SqlitePool;
 /// Die Tabellen, deren Zeilen der Nachlauf einzeln löscht. Die eine Quelle für den Nachlauf, den
 /// Guard der Registry (`ZeileEinzelnLoeschen` nur hier) und das Warten der Skelett-Löschung.
 /// Jede trägt `id` und `einsatz_id`.
-pub const EINZELN_GELOESCHT: &[&str] = &["anhang", "karte_hintergrundbild", "karte_fremdebene_stand"];
+pub const EINZELN_GELOESCHT: &[&str] =
+    &["anhang", "karte_hintergrundbild", "karte_fremdebene_stand"];
 
 /// Kind-Tabellen einer Tabelle aus [`EINZELN_GELOESCHT`] als `(kind, elternteil)`: sie fallen
 /// per `ON DELETE CASCADE` mit deren Zeile, in derselben Transaktion des Nachlaufs (LFH-936, die
