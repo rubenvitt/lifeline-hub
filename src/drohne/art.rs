@@ -187,33 +187,22 @@ impl AdapterArt for SuchlageArt {
                 );
             }
 
-            let mut gemerkt_ms = photos_latest_ms;
-            let fotos_geaendert = vorher
-                .as_ref()
-                .is_none_or(|s| s.photos_latest_ms != photos_latest_ms);
-            if fotos_geaendert && photos_latest_ms.is_some() {
-                match self
+            let abgerufen = if braucht_fotos(vorher.as_ref(), photos_latest_ms) {
+                let r = self
                     .fotos_holen(kontext, basis, token.expose_secret())
-                    .await
-                {
-                    Ok((fotos, thumbs)) => {
-                        lage.fotos = fotos;
-                        upstream.fotos = thumbs;
-                    }
-                    Err(f) => {
-                        // Die Lage bleibt brauchbar; die Fotos kommen beim nächsten Takt neu.
-                        tracing::warn!(art = ?f.art, "Fotos der Drohnenquelle nicht abgerufen");
-                        gemerkt_ms = vorher.as_ref().and_then(|s| s.photos_latest_ms);
-                        if let Some(v) = &vorher {
-                            lage.fotos = v.lage.fotos.clone();
-                            upstream.fotos = v.upstream.fotos.clone();
-                        }
-                    }
+                    .await;
+                if let Err(f) = &r {
+                    // Die Lage bleibt brauchbar; die Fotos kommen beim nächsten Takt neu.
+                    tracing::warn!(art = ?f.art, "Fotos der Drohnenquelle nicht abgerufen");
                 }
-            } else if let Some(v) = &vorher {
-                lage.fotos = v.lage.fotos.clone();
-                upstream.fotos = v.upstream.fotos.clone();
-            }
+                Some(r)
+            } else {
+                None
+            };
+            let (fotos, thumbs, gemerkt_ms) =
+                fotos_waehlen(vorher.as_ref(), photos_latest_ms, abgerufen);
+            lage.fotos = fotos;
+            upstream.fotos = thumbs;
 
             let stand = Stand {
                 lage,
@@ -231,6 +220,48 @@ impl AdapterArt for SuchlageArt {
                 geaendert,
             }) as Box<dyn Uebernahme>)
         })
+    }
+}
+
+/// Ob die Fotos neu abzurufen sind: Quelle meldet welche und der Stand hat sich geändert.
+fn braucht_fotos(vorher: Option<&Stand>, photos_latest_ms: Option<i64>) -> bool {
+    photos_latest_ms.is_some() && vorher.is_none_or(|s| s.photos_latest_ms != photos_latest_ms)
+}
+
+/// Wählt Fotos, Vorschau-Pfade und den gemerkten Stand. Meldet die Quelle keine Fotos (keine
+/// vorhanden oder dem Zugang fehlt das Recht), bleibt nichts stehen. Scheitert ein nötiger Abruf,
+/// bleiben die alten Fotos samt altem Stand, damit der nächste Takt es erneut versucht.
+fn fotos_waehlen(
+    vorher: Option<&Stand>,
+    photos_latest_ms: Option<i64>,
+    abgerufen: Option<Result<FotosErgebnis, Fehlschlag>>,
+) -> (
+    Vec<super::vertrag::DrohnenFoto>,
+    std::collections::HashMap<String, String>,
+    Option<i64>,
+) {
+    if photos_latest_ms.is_none() {
+        return (Vec::new(), Default::default(), None);
+    }
+    let alt = || {
+        vorher.map_or_else(
+            || (Vec::new(), Default::default(), None),
+            |v| {
+                (
+                    v.lage.fotos.clone(),
+                    v.upstream.fotos.clone(),
+                    v.photos_latest_ms,
+                )
+            },
+        )
+    };
+    match abgerufen {
+        Some(Ok((fotos, thumbs))) => (fotos, thumbs, photos_latest_ms),
+        Some(Err(_)) => alt(),
+        None => {
+            let (f, t, _) = alt();
+            (f, t, photos_latest_ms)
+        }
     }
 }
 
@@ -306,5 +337,86 @@ mod tests {
     fn verzeichnis_enthaelt_suchlage() {
         let v = Verzeichnis::produktiv(Arc::new(Store::new()));
         assert!(v.find("suchlage").is_some());
+    }
+
+    fn stand_mit_fotos(ms: Option<i64>, key: &str) -> Stand {
+        use crate::drohne::vertrag::{DrohnenFoto, DrohnenLage};
+        Stand {
+            lage: DrohnenLage {
+                stand_ms: 0,
+                quelle_stand_ms: 0,
+                mission_name: None,
+                fluggeraete: Vec::new(),
+                karte: None,
+                videos: Vec::new(),
+                fotos: vec![DrohnenFoto {
+                    key: key.into(),
+                    taken_at_ms: 1,
+                    position: [1.0, 2.0],
+                    lens: "wide".into(),
+                    heading_deg: None,
+                    relative_altitude_m: None,
+                }],
+                verworfen: 0,
+            },
+            map_etag: None,
+            photos_latest_ms: ms,
+            upstream: Upstream {
+                videos: HashMap::new(),
+                fotos: HashMap::from([(key.to_string(), "/t".to_string())]),
+            },
+        }
+    }
+
+    #[test]
+    fn fotos_verschwinden_wenn_die_quelle_keine_mehr_meldet() {
+        let v = stand_mit_fotos(Some(5), "alt");
+        assert!(!braucht_fotos(Some(&v), None));
+        let (f, t, ms) = fotos_waehlen(Some(&v), None, None);
+        assert!(f.is_empty() && t.is_empty());
+        assert_eq!(ms, None);
+    }
+
+    #[test]
+    fn unveraenderte_fotos_bleiben() {
+        let v = stand_mit_fotos(Some(5), "alt");
+        assert!(!braucht_fotos(Some(&v), Some(5)));
+        let (f, t, ms) = fotos_waehlen(Some(&v), Some(5), None);
+        assert_eq!(f[0].key, "alt");
+        assert_eq!(t.len(), 1);
+        assert_eq!(ms, Some(5));
+    }
+
+    #[test]
+    fn geaenderte_fotos_ersetzen_die_alten() {
+        let v = stand_mit_fotos(Some(5), "alt");
+        assert!(braucht_fotos(Some(&v), Some(9)));
+        assert!(braucht_fotos(None, Some(9)));
+        let neu = stand_mit_fotos(Some(9), "neu");
+        let ok = (neu.lage.fotos.clone(), neu.upstream.fotos.clone());
+        let (f, t, ms) = fotos_waehlen(Some(&v), Some(9), Some(Ok(ok)));
+        assert_eq!(f[0].key, "neu");
+        assert!(t.contains_key("neu"));
+        assert_eq!(ms, Some(9));
+    }
+
+    #[test]
+    fn gescheiterter_fotoabruf_behaelt_alte_fotos_und_alten_stand() {
+        let v = stand_mit_fotos(Some(5), "alt");
+        let (f, _, ms) = fotos_waehlen(
+            Some(&v),
+            Some(9),
+            Some(Err(Fehlschlag::new(AdapterFehler::Verbindung))),
+        );
+        assert_eq!(f[0].key, "alt");
+        assert_eq!(ms, Some(5));
+        // Ohne früheren Stand: leer, und der Stand bleibt offen, also nächster Takt neuer Versuch.
+        let (f, _, ms) = fotos_waehlen(
+            None,
+            Some(9),
+            Some(Err(Fehlschlag::new(AdapterFehler::Verbindung))),
+        );
+        assert!(f.is_empty());
+        assert_eq!(ms, None);
     }
 }
