@@ -154,6 +154,9 @@ geprüft. Je Aktivierung:
 
 ### ZIP lesen: `src/karte/copernicus_zip.rs` (Arbeitstitel)
 
+- *Nachtrag Umsetzung:* Gemessen über alle 23 Pakete von EMSR517 sind die ZIPs bis 36,6 MB groß,
+  die gebrauchten Einträge aber höchstens 9,8 MB. Umgesetzt sind deshalb 48 MiB Download und
+  32 MiB entpackt (statt 16 und 64 MiB unten); Plan, „Global Constraints“.
 - **Abruf:** `http_begrenzt` mit eigenem Deckel 16 MiB gepackt (größtes geprüftes ZIP 7,1 MB),
   nur vom festen Präfix oben; eine Weiterleitung auf einen anderen Host scheitert.
 - **ZIP-Bombenschutz** nach `src/abloesung/schichtplan/uebernahme/datei.rs`
