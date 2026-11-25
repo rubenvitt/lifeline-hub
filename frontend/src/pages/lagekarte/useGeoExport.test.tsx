@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderMitProviders } from '../../test/utils';
 import { setzeViewportBreite, setzeViewportZurueck } from '../../test/viewport';
@@ -32,12 +32,12 @@ const einsatzort: KarteMarker = {
   farbe: '#1677ff',
 } as KarteMarker;
 
-const eingabe = (marker: KarteMarker[]): ExportEingabe => ({
+const eingabe = (marker: KarteMarker[], stand: Date | null = null): ExportEingabe => ({
   marker,
   flaechen: [],
   zonen: [],
   einsatzName: 'Hochwasser',
-  stand: new Date(Date.UTC(2026, 10, 24, 13, 5)),
+  stand,
 });
 
 function Seite({
@@ -79,9 +79,43 @@ describe('useGeoExport', () => {
     expect(screen.getByRole('button', { name: `${GEOJSON} (Nichts eingeblendet)` })).toBeDisabled();
   });
 
-  it('ohne Eingabe (Daten laden noch): gesperrt', () => {
+  it('ohne Eingabe (Daten laden noch): gesperrt mit „lädt“, nicht „Nichts eingeblendet“', () => {
     renderMitProviders(<Seite daten={null} />);
-    expect(screen.getByRole('button', { name: `${GEOJSON} (Nichts eingeblendet)` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: `${KMZ} (lädt)` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: `${GEOJSON} (lädt)` })).toBeDisabled();
+  });
+
+  it('ein gesicherter Stand trägt seine Zeit, nicht die des Klicks', async () => {
+    const gesichert = new Date(Date.UTC(2026, 10, 24, 9, 0, 0));
+    renderMitProviders(<Seite daten={eingabe([einsatzort], gesichert)} />);
+    await userEvent.click(screen.getByRole('button', { name: GEOJSON }));
+    await waitFor(() => expect(speichere).toHaveBeenCalledTimes(1));
+    const [blob] = speichere.mock.calls[0] as [Blob, string];
+    expect(JSON.parse(await blob.text())['lfh:stand']).toBe('2026-11-24 09:00:00');
+  });
+
+  it('die Live-Ansicht trägt den Moment des Klicks', async () => {
+    renderMitProviders(<Seite daten={eingabe([einsatzort])} />);
+    const vorher = Date.now();
+    await userEvent.click(screen.getByRole('button', { name: GEOJSON }));
+    await waitFor(() => expect(speichere).toHaveBeenCalledTimes(1));
+    const [blob] = speichere.mock.calls[0] as [Blob, string];
+    const stand = Date.parse(`${JSON.parse(await blob.text())['lfh:stand'].replace(' ', 'T')}Z`);
+    expect(stand).toBeGreaterThanOrEqual(Math.floor(vorher / 1000) * 1000);
+  });
+
+  it('ein zweiter Klick während des Erzeugens speichert keine zweite Datei', async () => {
+    let fertig: (b: Blob) => void = () => {};
+    packe.mockReturnValue(new Promise<Blob>((r) => (fertig = r)));
+    renderMitProviders(<Seite daten={eingabe([einsatzort])} />);
+    const knopf = screen.getByRole('button', { name: KMZ });
+    fireEvent.click(knopf);
+    fireEvent.click(knopf);
+    expect(await screen.findByRole('button', { name: `${KMZ} (läuft)` })).toBeDisabled();
+    fertig(new Blob(['x']));
+    await waitFor(() => expect(screen.getByRole('button', { name: KMZ })).toBeEnabled());
+    expect(packe).toHaveBeenCalledTimes(1);
+    expect(speichere).toHaveBeenCalledTimes(1);
   });
 
   it('GeoJSON: speichert einen Blob vom Typ geo+json unter dem Dateinamen des Einsatzes', async () => {

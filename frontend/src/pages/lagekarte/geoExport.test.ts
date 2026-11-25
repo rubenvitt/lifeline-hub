@@ -3,6 +3,7 @@ import {
   EXPORT_MARKER_ARTEN,
   GEFAHR_EXPORT_FARBE,
   collectExportObjekte,
+  standAusWire,
   type ExportEingabe,
 } from './geoExport';
 import type { ZoneFeature } from './kartenLayer';
@@ -215,5 +216,13 @@ describe('collectExportObjekte', () => {
       ['abschnitt', 'Polygon'],
       ['abschnitt', 'Point'],
     ]);
+  });
+});
+
+describe('Stand eines gesicherten Stands (Review)', () => {
+  it('liest den Stand eines gesicherten Stands als UTC, in SQLite- wie in ISO-Form', () => {
+    expect(standAusWire('2026-11-24 09:00:00')?.toISOString()).toBe('2026-11-24T09:00:00.000Z');
+    expect(standAusWire('2026-11-24T09:00:00Z')?.toISOString()).toBe('2026-11-24T09:00:00.000Z');
+    expect(standAusWire('kaputt')).toBeNull();
   });
 });

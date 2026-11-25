@@ -86,7 +86,11 @@ export interface ExportEingabe {
   flaechen: readonly { id: number; label: string; polygon: GeoJsonPolygon }[];
   zonen: ZoneFeature[];
   einsatzName: string;
-  stand: Date;
+  /**
+   * Stand der Datei: in der Historienansicht der gezeigte gesicherte Stand, `null` in der
+   * Live-Ansicht (dann der Moment des Klicks, `useGeoExport`).
+   */
+  stand: Date | null;
 }
 
 /** Die abschließende Liste der Markertypen im Export (Spec-Tabelle, „Meine Wahl“). */
@@ -263,6 +267,13 @@ function runde(x: number): number {
 
 function rundePunkt(lon: number, lat: number): [number, number] {
   return [runde(lon), runde(lat)];
+}
+
+/** Stand eines gesicherten Stands (SQLite-Zeit `YYYY-MM-DD HH:MM:SS` oder ISO) als UTC-Datum. */
+export function standAusWire(wire: string): Date | null {
+  const iso = wire.includes('T') ? wire : `${wire.replace(' ', 'T')}Z`;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function rundeFlaeche<G extends GeoJsonPolygon | GeoJsonLineString>(g: G): G;

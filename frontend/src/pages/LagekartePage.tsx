@@ -58,6 +58,7 @@ import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useFremdebenen } from './lagekarte/useFremdebenen';
 import { fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { standAusWire } from './lagekarte/geoExport';
 import FremdebeneDetail from './lagekarte/FremdebeneDetail';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -1353,16 +1354,34 @@ export default function LagekartePage() {
   const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
   // Export (Spec `lagekarte-geo-export`): nur, was die Karte gerade zeigt; ein Fehler steht im
   // Hinweis über der Karte. Die Farben der Marker folgen dem aktiven Modus (`rollenFarbe`).
-  const exportEingabe = useMemo(
-    () => ({
+  // Solange die Quellen laden, gibt es keine Eingabe (der Eintrag sagt „lädt“, nicht „Nichts
+  // eingeblendet“). Der Stand ist in der Historienansicht der gezeigte gesicherte Stand, live der
+  // Moment des Klicks (`stand: null`).
+  const snapshotStandWire = aktiverSnapshot?.stand_at ?? null;
+  const exportEingabe = useMemo(() => {
+    if (ladt || markerLaden) return null;
+    const stand =
+      quelle.typ === 'snapshot' && snapshotStandWire != null
+        ? standAusWire(snapshotStandWire)
+        : null;
+    if (quelle.typ === 'snapshot' && stand == null) return null;
+    return {
       marker: sichtbareMarker,
       flaechen: kartenFlaechen,
       zonen: zonenFeatures,
       einsatzName: rahmenEinsatz?.bezeichnung ?? '',
-      stand: new Date(),
-    }),
-    [sichtbareMarker, kartenFlaechen, zonenFeatures, rahmenEinsatz?.bezeichnung],
-  );
+      stand,
+    };
+  }, [
+    ladt,
+    markerLaden,
+    quelle.typ,
+    snapshotStandWire,
+    sichtbareMarker,
+    kartenFlaechen,
+    zonenFeatures,
+    rahmenEinsatz?.bezeichnung,
+  ]);
   const { beginne: beginneKartenhandlung } = kartenFehler;
   const beginneExport = useCallback(
     () => beginneKartenhandlung('export', 'Export nicht erstellt'),
