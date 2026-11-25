@@ -14,6 +14,9 @@ use sqlx::{SqliteConnection, SqlitePool};
 /// Höchstsumme der Anhänge einer Nachricht (20 MiB).
 pub const ANHANG_MAX_BYTES: usize = 20 * 1024 * 1024;
 
+/// Eine PNG-Anlage der Nachricht als `(Dateiname, Bytes)`.
+pub type Anhang = (String, Vec<u8>);
+
 /// Betreff und Text, wie sie beim Anlegen des Versands im Korb gespeichert werden.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Schnappschuss {
@@ -215,7 +218,7 @@ pub async fn load_anhaenge<T: Dokumentart>(
     pool: &SqlitePool,
     einsatz_id: i64,
     id: i64,
-) -> Result<Vec<(String, Vec<u8>)>, AnhangFehler> {
+) -> Result<Vec<Anhang>, AnhangFehler> {
     if T::ANLAGEN.is_none() {
         return Ok(Vec::new());
     }
@@ -242,7 +245,7 @@ pub fn baue_mail(
     an: &str,
     message_id: &str,
     s: &Schnappschuss,
-    anhaenge: &[(String, Vec<u8>)],
+    anhaenge: &[Anhang],
 ) -> Result<Vec<u8>, AusgangFehler> {
     fn fehler<E>(_: E) -> AusgangFehler {
         AusgangFehler::AnbindungFehler

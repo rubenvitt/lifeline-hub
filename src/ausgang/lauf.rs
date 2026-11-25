@@ -2,9 +2,10 @@
 //!
 //! Je [`TAKT`] oder beim Wecken ein Durchgang: die fälligen Versände laden, bis zu [`PARALLEL`]
 //! gleichzeitig zustellen, keinen doppelt. Je Versand, in dieser Reihenfolge: Spiegel? Quelle
-//! überholt? SMTP-Zugang der Org; Beginn merken (`mark_begonnen`); Anhänge laden; Mail bauen;
-//! zustellen, **ohne** eine Datenbankverbindung zu halten; Ergebnis und ETB-Eintrag in einer
-//! Transaktion (`write_retry!`); nach dem Commit `publiziere` und das Ereignis der Versandliste.
+//! überholt? SMTP-Zugang der Org; Beginn merken (`mark_begonnen`); Anhänge laden; dem
+//! [`Zusteller`] den [`Versandauftrag`] geben, **ohne** eine Datenbankverbindung zu halten;
+//! Ergebnis und ETB-Eintrag in einer Transaktion (`write_retry!`); nach dem Commit `publiziere`
+//! und das Ereignis der Versandliste.
 //!
 //! Ein Versand ist nie halb: entweder übergeben **und** im ETB, oder sichtbar fehlgeschlagen
 //! (am Spiegel ohne ETB, das dort gesperrt ist). Kein Geheimnis und kein Text des Mailservers
@@ -21,12 +22,13 @@ use sqlx::SqlitePool;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinHandle;
 
-use super::nachricht::{self, AnhangFehler, Schnappschuss};
+use super::nachricht::{self, Anhang, AnhangFehler};
 use super::repo::{self, Ergebnis};
 use super::zustand::naechster_versuch;
-pub use super::zusteller::{SmtpZusteller, Versandzugang, Zusteller};
+pub use super::zusteller::{
+    Fehlschlag, SmtpZusteller, Versandauftrag, Versandzugang, Zusteller, Zustellfehler, Zustellt,
+};
 use super::{AusgangFehler, QuelleArt, VersandZeile};
-use crate::adapter::smtp::SmtpFehler;
 use crate::adapter::Rahmen;
 use crate::error::AppError;
 use crate::etb::nachlauf::{self, Luecke};
@@ -339,7 +341,7 @@ pub(crate) async fn is_quelle_aktuell(
 async fn load_anhaenge(
     pool: &SqlitePool,
     zeile: &VersandZeile,
-) -> Result<Vec<(String, Vec<u8>)>, AnhangFehler> {
+) -> Result<Vec<Anhang>, AnhangFehler> {
     match zeile.quelle_art {
         QuelleArt::Lagebericht => {
             nachricht::load_anhaenge::<crate::lagebericht::Lagebericht>(
@@ -359,17 +361,6 @@ async fn load_anhaenge(
         }
         QuelleArt::Nachforderung => Ok(Vec::new()),
     }
-}
-
-/// Die Domain der Absenderadresse für die Message-ID (Spec Abschnitt 4). Ohne konfigurierten
-/// öffentlichen Hostnamen der Instanz ist sie der Name, unter dem die Mail ohnehin hinausgeht.
-fn message_id(zeile: &VersandZeile, von: &str) -> String {
-    let host = von
-        .rsplit_once('@')
-        .map(|(_, d)| d)
-        .filter(|d| !d.is_empty())
-        .unwrap_or(crate::adapter::smtp::EHLO_VORGABE);
-    format!("<ausgang-{}@{host}>", zeile.id)
 }
 
 /// Stellt einen Versand zu und schreibt sein Ergebnis.
@@ -407,15 +398,14 @@ async fn run_one(
             return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
         }
     };
-    // Gespeichert ist die Adresse nur getrimmt (Task 5); hinaus geht sie normalisiert.
-    let Some(von) = zugang
-        .absender()
-        .and_then(|a| crate::externe_stelle::kanal::normalize_email(a).ok())
-    else {
+    // Ohne gültige Absenderadresse geht keine Mail hinaus; das steht vor dem Versuch fest.
+    if zeile.kanal == crate::externe_stelle::KanalArt::Email
+        && super::zusteller::smtp_absender(&zugang).is_none()
+    {
         let f = AusgangFehler::AnbindungFehler;
         let text = etb_text(&zeile, f, None);
         return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
-    };
+    }
 
     let begonnen = jetzt();
     // Beanspruchen: eine veraltete Kopie (zweiter Durchgang, schon abgeschlossen) endet hier,
@@ -468,50 +458,40 @@ async fn run_one(
             return abschliessen(pool, live, &zeile, Some(&marke), e, text).await;
         }
     };
-    let schnappschuss = Schnappschuss {
-        betreff: zeile.betreff.clone(),
-        inhalt: zeile.inhalt.clone(),
+    let auftrag = Versandauftrag {
+        versand_id: &zeile.id,
+        kanal: zeile.kanal,
+        zugang: &zugang,
+        adresse: &zeile.adresse,
+        betreff: &zeile.betreff,
+        inhalt: &zeile.inhalt,
+        anhaenge: &anhaenge,
+        gesendet: &[],
     };
-    let mail = match nachricht::baue_mail(
-        &von,
-        zugang.absender_name(),
-        &zeile.adresse,
-        &message_id(&zeile, &von),
-        &schnappschuss,
-        &anhaenge,
-    ) {
-        Ok(m) => m,
-        Err(f) => {
-            let text = etb_text(&zeile, f, None);
-            return abschliessen(
-                pool,
-                live,
-                &zeile,
-                Some(&marke),
-                fehlgeschlagen(f),
-                Some(text),
-            )
-            .await;
-        }
-    };
-    drop(anhaenge);
 
     // Das Netz, ohne Datenbankverbindung.
-    let antwort = zusteller
-        .zustellen(&zugang, &von, &zeile.adresse, &mail)
-        .await;
+    let antwort = zusteller.zustellen(&auftrag).await;
+    drop(anhaenge);
     let t = jetzt();
-    let (ergebnis, text) = match antwort {
-        Ok(()) => (
+    // Die gesendeten Teile (`Zustellt::teile`, `Fehlschlag::teile`) merkt sich der Lauf noch
+    // nicht; bei SMTP sind sie leer.
+    let (ergebnis, text) = match &antwort {
+        Ok(_) => (
             Ergebnis::Uebergeben { at: t },
             Some(etb_text_uebergeben(&zeile)),
         ),
-        Err(e) => nach_fehler(&zeile, e, erster, versuche, t),
+        Err(f) => nach_fehler(&zeile, f, erster, versuche, t),
     };
     abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text).await?;
-    // Anmeldung oder TLS brauchen einen Eingriff: der Lauf der Anbindung soll es gleich selbst
-    // feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
-    if let Err(SmtpFehler::Anmeldung | SmtpFehler::Tls) = antwort {
+    // Braucht die Anbindung einen Eingriff (SMTP: Anmeldung, TLS), soll ihr Lauf es gleich
+    // selbst feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
+    if let Err(Fehlschlag {
+        fehler: Zustellfehler::Anbindung {
+            pruefung_vorziehen: true,
+        },
+        ..
+    }) = antwort
+    {
         if let Err(e) =
             crate::adapter::repo::postpone(pool, &zugang.adapter_id, &zeit::formatiere_utc(t)).await
         {
@@ -521,42 +501,45 @@ async fn run_one(
     Ok(())
 }
 
-/// Ordnet einen Fehler der Zustellung zu: vorübergehend wird im Fenster wiederholt (ohne ETB),
-/// alles andere ist endgültig und steht im ETB.
+/// Ordnet einen Fehlschlag der Zustellung zu, für jeden Kanal an dieser einen Stelle:
+/// vorübergehend wird im Fenster wiederholt (ohne ETB, frühestens zu `nicht_vor`), alles andere
+/// ist endgültig und steht im ETB mit dem Grund des Zustellers.
 fn nach_fehler(
     zeile: &VersandZeile,
-    e: SmtpFehler,
+    f: &Fehlschlag,
     erster: DateTime<Utc>,
     versuche: i64,
     jetzt: DateTime<Utc>,
 ) -> (Ergebnis, Option<String>) {
-    let status = e.status();
+    let status = f.smtp_status;
     let endgueltig = |fehler| {
         (
             Ergebnis::Fehlgeschlagen { fehler, status },
-            Some(etb_text(zeile, fehler, Some(e))),
+            Some(etb_text(zeile, fehler, Some(&f.grund))),
         )
     };
-    match e {
-        SmtpFehler::Voruebergehend(_)
-        | SmtpFehler::Verbindung
-        | SmtpFehler::Zeitueberschreitung
-        | SmtpFehler::Dns => match naechster_versuch(erster, versuche, jetzt) {
-            Some(naechster) => (
-                Ergebnis::Wiederholen {
-                    naechster,
-                    fehler: AusgangFehler::Voruebergehend,
-                    status,
-                },
-                None,
-            ),
-            None => endgueltig(AusgangFehler::Voruebergehend),
-        },
-        SmtpFehler::Abgelehnt(_) => endgueltig(AusgangFehler::Abgelehnt),
-        SmtpFehler::Ungewiss => endgueltig(AusgangFehler::Ungewiss),
-        SmtpFehler::Anmeldung | SmtpFehler::Tls | SmtpFehler::ZielIntern | SmtpFehler::Antwort => {
-            endgueltig(AusgangFehler::AnbindungFehler)
+    match f.fehler {
+        Zustellfehler::Voruebergehend { nicht_vor } => {
+            match naechster_versuch(erster, versuche, jetzt) {
+                Some(naechster) => (
+                    Ergebnis::Wiederholen {
+                        naechster: nicht_vor.map_or(naechster, |n| naechster.max(n)),
+                        fehler: AusgangFehler::Voruebergehend,
+                        status,
+                    },
+                    None,
+                ),
+                None => endgueltig(AusgangFehler::Voruebergehend),
+            }
         }
+        Zustellfehler::Abgelehnt => endgueltig(AusgangFehler::Abgelehnt),
+        Zustellfehler::Ungewiss => endgueltig(AusgangFehler::Ungewiss),
+        Zustellfehler::ZuGross => endgueltig(AusgangFehler::ZuGross),
+        // Eigene Codes für Matrix (`kein_zutritt`, `verschluesselung`) kommen mit dessen
+        // Zusteller; bis dahin erzeugt sie keiner.
+        Zustellfehler::Anbindung { .. }
+        | Zustellfehler::KeinZutritt
+        | Zustellfehler::Verschluesselung => endgueltig(AusgangFehler::AnbindungFehler),
     }
 }
 
@@ -587,8 +570,9 @@ fn etb_text_uebergeben(zeile: &VersandZeile) -> String {
 }
 
 /// Der ETB-Text eines endgültigen Fehlschlags (Spec Abschnitt 6). Der Grund ist ein fester,
-/// kurzer deutscher Text; nie ein Text des Mailservers.
-fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, smtp: Option<SmtpFehler>) -> String {
+/// kurzer deutscher Text: der des Zustellers (`grund`), sonst der feste je Fehler; nie ein Text
+/// des Mailservers.
+fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, grund: Option<&str>) -> String {
     let ziel = ziel_text(zeile);
     match fehler {
         AusgangFehler::Ueberholt => {
@@ -602,45 +586,26 @@ fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, smtp: Option<SmtpFehler
         AusgangFehler::Ungewiss => {
             format!("{ziel}: Zustellung unklar, Verbindung nach dem Senden abgebrochen")
         }
-        _ => format!("{ziel} nicht zugestellt: {}", grund(fehler, smtp)),
+        _ => format!(
+            "{ziel} nicht zugestellt: {}",
+            grund.unwrap_or_else(|| fester_grund(fehler))
+        ),
     }
 }
 
-fn grund(fehler: AusgangFehler, smtp: Option<SmtpFehler>) -> String {
-    match (fehler, smtp) {
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Voruebergehend(c))) => {
-            format!("Mailserver nimmt vorübergehend nicht an (SMTP {c})")
-        }
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Dns)) => {
-            "Mailserver nicht gefunden".into()
-        }
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Zeitueberschreitung)) => {
-            "Mailserver antwortet nicht".into()
-        }
-        (AusgangFehler::Voruebergehend, _) => "Mailserver nicht erreichbar".into(),
-        (AusgangFehler::Abgelehnt, Some(SmtpFehler::Abgelehnt(c))) => {
-            format!("vom Mailserver abgelehnt (SMTP {c})")
-        }
-        (AusgangFehler::Abgelehnt, _) => "vom Mailserver abgelehnt".into(),
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Anmeldung)) => {
-            "Anmeldung am Mailserver abgelehnt".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Tls)) => {
-            "verschlüsselte Verbindung zum Mailserver gescheitert".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::ZielIntern)) => {
-            "Adresse des Mailservers nicht erlaubt".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Antwort)) => {
-            "Antwort des Mailservers unlesbar".into()
-        }
-        (AusgangFehler::AnbindungFehler, _) => "Anbindung des Mailservers nicht nutzbar".into(),
-        (AusgangFehler::AnbindungFehlt, _) => "kein Mailserver eingerichtet".into(),
-        (AusgangFehler::AnbindungAngehalten, _) => "Mailserver angehalten".into(),
-        (AusgangFehler::Ungewiss, _) => "Zustellung unklar".into(),
-        (AusgangFehler::Ueberholt, _) => "Quelle überholt".into(),
-        (AusgangFehler::ZuGross, _) => "Anhänge zu groß".into(),
-        (AusgangFehler::Spiegel, _) => "Einsatz wird von einer anderen Instanz geführt".into(),
+/// Der feste Grund je Fehler, wenn kein Zusteller einen genaueren nennt (Fehlschlag vor dem
+/// Netz).
+fn fester_grund(fehler: AusgangFehler) -> &'static str {
+    match fehler {
+        AusgangFehler::Voruebergehend => "Mailserver nicht erreichbar",
+        AusgangFehler::Abgelehnt => "vom Mailserver abgelehnt",
+        AusgangFehler::AnbindungFehler => "Anbindung des Mailservers nicht nutzbar",
+        AusgangFehler::AnbindungFehlt => "kein Mailserver eingerichtet",
+        AusgangFehler::AnbindungAngehalten => "Mailserver angehalten",
+        AusgangFehler::Ungewiss => "Zustellung unklar",
+        AusgangFehler::Ueberholt => "Quelle überholt",
+        AusgangFehler::ZuGross => "Anhänge zu groß",
+        AusgangFehler::Spiegel => "Einsatz wird von einer anderen Instanz geführt",
     }
 }
 
@@ -738,7 +703,9 @@ async fn abschliessen(
 
 #[cfg(test)]
 mod tests {
+    use super::super::zusteller::smtp_fehlschlag;
     use super::*;
+    use crate::adapter::smtp::SmtpFehler;
 
     fn zeile(quelle: QuelleArt, betreff: &str) -> VersandZeile {
         VersandZeile {
@@ -782,7 +749,7 @@ mod tests {
             etb_text(
                 &z,
                 AusgangFehler::AnbindungFehler,
-                Some(SmtpFehler::Anmeldung)
+                Some(&smtp_fehlschlag(SmtpFehler::Anmeldung).grund)
             ),
             "Lagebericht Nr. 3 per E-Mail an Leitstelle Nord (lagedienst@ils.example) nicht \
              zugestellt: Anmeldung am Mailserver abgelehnt"
@@ -805,11 +772,11 @@ mod tests {
             SmtpFehler::Zeitueberschreitung,
             SmtpFehler::Dns,
         ] {
-            let (ergebnis, text) = nach_fehler(&z, e, t0, 1, t0);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0);
             assert!(matches!(ergebnis, Ergebnis::Wiederholen { .. }), "{e:?}");
             assert!(text.is_none());
             let spaet = t0 + chrono::Duration::minutes(31);
-            let (ergebnis, text) = nach_fehler(&z, e, t0, 2, spaet);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 2, spaet);
             assert!(
                 matches!(
                     ergebnis,
@@ -822,7 +789,7 @@ mod tests {
             );
             assert!(text.is_some());
         }
-        let fall = |e| match nach_fehler(&z, e, t0, 1, t0).0 {
+        let fall = |e| match nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0).0 {
             Ergebnis::Fehlgeschlagen { fehler, .. } => fehler,
             other => panic!("{other:?}"),
         };

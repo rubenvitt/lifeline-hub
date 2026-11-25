@@ -2,8 +2,8 @@
 //! Abschnitte 2, 3, 4 und 6): fällige Versände zustellen, Ergebnis und ETB in einer Transaktion,
 //! Wiederholung, überholte Quellen, Spiegel, angehaltene Anbindung, Neustart, keine Geheimnisse.
 //!
-//! Zugestellt wird über ein Skript (`Skript`), das die Ergebnisse vorgibt und mitschreibt, was es
-//! zustellen sollte. Die Versände legt der Test direkt in `ausgang` an (die Routen kommen
+//! Zugestellt wird über den echten `SmtpZusteller` mit einem Skript als SMTP-Transport (`Skript`),
+//! das die Ergebnisse vorgibt und mitschreibt, was es zustellen sollte. Die Versände legt der Test direkt in `ausgang` an (die Routen kommen
 //! später); Anbindung, Passwort, Lagebericht und Anlage entstehen über die echten Routen.
 
 use std::collections::VecDeque;
@@ -15,7 +15,8 @@ use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
 use lifeline_hub::adapter::smtp::SmtpFehler;
 use lifeline_hub::adapter::Rahmen;
-use lifeline_hub::ausgang::lauf::{self, Versandzugang, Zusteller};
+use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
+use lifeline_hub::ausgang::zusteller::SmtpTransport;
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use serde_json::json;
@@ -28,7 +29,7 @@ const PASSWORT: &str = "Geheim-Passwort-4711";
 const ADRESSE: &str = "lagedienst@leitstelle.example";
 const STELLE: &str = "Leitstelle Nord";
 
-/// Ein Zusteller, der vorgegebene Ergebnisse abspielt (leer heißt angenommen) und mitschreibt.
+/// Ein SMTP-Transport, der vorgegebene Ergebnisse abspielt (leer heißt angenommen) und mitschreibt.
 #[derive(Default)]
 struct Skript {
     ergebnisse: Mutex<VecDeque<Result<(), SmtpFehler>>>,
@@ -52,8 +53,8 @@ impl Skript {
     }
 }
 
-impl Zusteller for Skript {
-    fn zustellen<'a>(
+impl SmtpTransport for Skript {
+    fn senden<'a>(
         &'a self,
         zugang: &'a Versandzugang,
         von: &'a str,
@@ -144,7 +145,7 @@ async fn welt() -> Welt {
         org_id,
         benutzer_id,
         adapter_id,
-        zusteller: skript.clone(),
+        zusteller: Arc::new(SmtpZusteller::mit_transport(skript.clone())),
         skript,
     }
 }
@@ -693,8 +694,8 @@ struct Sperre {
     frei: tokio::sync::Semaphore,
 }
 
-impl Zusteller for Sperre {
-    fn zustellen<'a>(
+impl SmtpTransport for Sperre {
+    fn senden<'a>(
         &'a self,
         zugang: &'a Versandzugang,
         von: &'a str,
@@ -704,7 +705,7 @@ impl Zusteller for Sperre {
         Box::pin(async move {
             self.begonnen.notify_one();
             self.frei.acquire().await.unwrap().forget();
-            self.skript.zustellen(zugang, von, an, mail).await
+            self.skript.senden(zugang, von, an, mail).await
         })
     }
 }
@@ -766,7 +767,7 @@ async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
         begonnen: tokio::sync::Notify::new(),
         frei: tokio::sync::Semaphore::new(0),
     });
-    let gesperrt: Arc<dyn Zusteller> = sperre.clone();
+    let gesperrt: Arc<dyn Zusteller> = Arc::new(SmtpZusteller::mit_transport(sperre.clone()));
 
     // Lauf A beansprucht die Zeile und hängt im Netz.
     let a = {
@@ -866,7 +867,7 @@ async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
         begonnen: tokio::sync::Notify::new(),
         frei: tokio::sync::Semaphore::new(0),
     });
-    let gesperrt: Arc<dyn Zusteller> = sperre.clone();
+    let gesperrt: Arc<dyn Zusteller> = Arc::new(SmtpZusteller::mit_transport(sperre.clone()));
     let lauf_a = {
         let (pool, rahmen, live, z) = (
             w.pool.clone(),
