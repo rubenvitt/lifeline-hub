@@ -127,6 +127,8 @@ pub struct SpiegelPaket {
 
 /// Höchstens so viele Ortungsanfragen je Paket beantwortet der Hub; Überzählige überliest er.
 pub const TRACKING_ANFRAGEN_MAX: usize = 200;
+/// Höchstens so viele Kennungen je Org trägt eine Kandidatenliste, die jüngsten zuerst.
+pub const TRACKING_KANDIDATEN_MAX: usize = 200;
 
 /// Anfrage nach der letzten Position einer Kennung (`org` ist die Org-Kennung des Abgleichs).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

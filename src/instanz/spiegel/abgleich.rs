@@ -597,10 +597,21 @@ pub async fn handle_abgleich(
         })
     })?;
     // Fahrzeugortung (LLH-2119): rein lesend und nach dem Commit, damit ein Fehler dort den
-    // Abgleich nicht zurückrollt.
+    // Abgleich nicht zurückrollt. Sie bekommt nur den Platz, den die fertige Antwort bis
+    // `SPIEGEL_MAX` noch lässt; sonst lehnte das ELW die ganze Antwort ab.
     let mut antwort = antwort;
-    (antwort.tracking_positions, antwort.tracking_candidates) =
-        crate::ortung::fern::answer_hub(pool, eigen, kopplung, anfrage).await;
+    if !anfrage.tracking_requests.is_empty() || !anfrage.tracking_candidates_wanted.is_empty() {
+        let belegt = serde_json::to_vec(&antwort).map_or(SPIEGEL_MAX, |v| v.len());
+        (antwort.tracking_positions, antwort.tracking_candidates) =
+            crate::ortung::fern::answer_hub(
+                pool,
+                eigen,
+                kopplung,
+                anfrage,
+                SPIEGEL_MAX.saturating_sub(belegt),
+            )
+            .await;
+    }
     melde_live(pool, &uebernommen).await;
     lebensende::abraeumen_nach_commit(pool, Some(live), &abzuraeumen).await;
     super::hinweis::ausfuehren(pool, live, hinweis_folgen).await;
@@ -686,7 +697,7 @@ pub async fn abgleich_einmal(
             // Fahrzeugortung (LLH-2119): nur in der ersten Runde, sonst fragt ein Paket mit
             // mehreren Runden doppelt.
             let (tracking_requests, tracking_candidates_wanted) = if runde == 0 {
-                crate::ortung::fern::build_requests(pool, conn, kopplung).await?
+                crate::ortung::fern::build_requests(pool, conn, kopplung).await
             } else {
                 (Vec::new(), Vec::new())
             };

@@ -12,7 +12,8 @@ use lifeline_hub::auth::unterschrift::pruefen::test_authenticator::SoftwarePassk
 use lifeline_hub::auth::unterschrift::repo as unterschrift;
 use lifeline_hub::instanz::repo::KopplungZeile;
 use lifeline_hub::instanz::spiegel::paket::{
-    RemoteTrackingCandidates, RemoteTrackingRequest, SpiegelPaket,
+    RemoteTrackingCandidates, RemoteTrackingPosition, RemoteTrackingRequest, SpiegelPaket,
+    SPIEGEL_MAX, TRACKING_KANDIDATEN_MAX,
 };
 use lifeline_hub::instanz::{identitaet, org_kennung};
 use lifeline_hub::ortung::{fern, uebernahme};
@@ -200,12 +201,9 @@ async fn aufbau() -> Aufbau {
 async fn antworten(
     a: &Aufbau,
     anfrage: SpiegelPaket,
-) -> (
-    Vec<lifeline_hub::instanz::spiegel::paket::RemoteTrackingPosition>,
-    Vec<RemoteTrackingCandidates>,
-) {
+) -> (Vec<RemoteTrackingPosition>, Vec<RemoteTrackingCandidates>) {
     let eigen = identitaet::load_or_create(&a.hub.pool).await.unwrap();
-    fern::answer_hub(&a.hub.pool, &eigen, &a.kopplung, &anfrage).await
+    fern::answer_hub(&a.hub.pool, &eigen, &a.kopplung, &anfrage, SPIEGEL_MAX).await
 }
 
 fn anfrage(org: &str, zugang: &str, geraet: &str) -> RemoteTrackingRequest {
@@ -871,4 +869,147 @@ async fn abgabe_am_hub_trennt_lokale_kopplung() {
         0,
         "lokale Kopplung getrennt"
     );
+}
+
+// ── Befunde des Gesamt-Reviews ───────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn viele_kandidaten_bleiben_im_rahmen() {
+    let a = aufbau().await;
+    let jetzt = lifeline_hub::zeit::jetzt();
+    for i in 0..(TRACKING_KANDIDATEN_MAX + 100) {
+        sqlx::query(
+            "INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
+             empfangen_at, rohdaten) VALUES (1, ?, ?, 1.0, 2.0, ?, ?, '{}')",
+        )
+        .bind(&a.zugang)
+        .bind(format!("viele-{i:04}"))
+        .bind(&jetzt)
+        .bind(&jetzt)
+        .execute(&a.hub.pool)
+        .await
+        .unwrap();
+    }
+    let wunsch = SpiegelPaket {
+        tracking_requests: vec![anfrage(&a.org, &a.zugang, "fkw1")],
+        tracking_candidates_wanted: vec![a.org.clone()],
+        ..Default::default()
+    };
+    // Reichlich Platz: höchstens die Obergrenze je Org.
+    let (_, kandidaten) = antworten(&a, wunsch.clone()).await;
+    assert_eq!(kandidaten.len(), 1);
+    assert_eq!(kandidaten[0].items.len(), TRACKING_KANDIDATEN_MAX);
+
+    // Knapper Platz: was die Ortung dem Paket hinzufügt, passt in den Rest.
+    let eigen = identitaet::load_or_create(&a.hub.pool).await.unwrap();
+    let leer = serde_json::to_vec(&SpiegelPaket::default()).unwrap().len();
+    for platz in [0usize, 100, 300, 4096] {
+        let (p, k) = fern::answer_hub(&a.hub.pool, &eigen, &a.kopplung, &wunsch, platz).await;
+        let mit = SpiegelPaket {
+            tracking_positions: p,
+            tracking_candidates: k,
+            ..Default::default()
+        };
+        let zuwachs = serde_json::to_vec(&mit).unwrap().len() - leer;
+        assert!(zuwachs <= platz, "Platz {platz}, Zuwachs {zuwachs}");
+        if platz == 4096 {
+            assert!(!mit.tracking_positions.is_empty());
+            assert!(!mit.tracking_candidates[0].items.is_empty());
+        }
+    }
+}
+
+#[tokio::test]
+async fn direktkopplung_bekommt_keine_ortung() {
+    let a = aufbau().await;
+    let mut direkt = a.kopplung.clone();
+    direkt.art = "vor_ort".into();
+    let eigen = identitaet::load_or_create(&a.hub.pool).await.unwrap();
+    let wunsch = SpiegelPaket {
+        tracking_requests: vec![anfrage(&a.org, &a.zugang, "fkw1")],
+        tracking_candidates_wanted: vec![a.org.clone()],
+        ..Default::default()
+    };
+    let (p, k) = fern::answer_hub(&a.hub.pool, &eigen, &direkt, &wunsch, SPIEGEL_MAX).await;
+    assert!(p.is_empty() && k.is_empty(), "{p:?} {k:?}");
+}
+
+#[tokio::test]
+async fn fehler_im_elw_teil_laesst_abgleich_leben() {
+    let a = aufbau().await;
+    common::einsatz_anlegen(&a.elw.app, &a.elw.admin).await;
+    sqlx::query("DROP TABLE ortung_kopplung")
+        .execute(&a.elw.pool)
+        .await
+        .unwrap();
+    let kopplung = {
+        let mut conn = a.elw.pool.acquire().await.unwrap();
+        lifeline_hub::instanz::repo::find_kopplung(&mut conn, &a.hub.kennung)
+            .await
+            .unwrap()
+            .expect("Kopplung am ELW")
+    };
+    lifeline_hub::instanz::spiegel::abgleich::abgleich_einmal(
+        &a.elw.pool,
+        Some(&a.elw.app),
+        &kopplung,
+    )
+    .await
+    .expect("Abgleich gelingt trotz Fehler im Ortungsteil");
+    let gespiegelt: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM einsatz WHERE spiegel = 1")
+        .fetch_one(&a.hub.pool)
+        .await
+        .unwrap();
+    assert_eq!(gespiegelt, 1);
+}
+
+#[tokio::test]
+async fn position_unter_fremder_org_schreibt_nicht() {
+    let a = aufbau().await;
+    let (_, ef, kopplung) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    // Eine zweite Org ist über dieselbe Kopplung abgebildet.
+    let org2: i64 = sqlx::query_scalar(
+        "INSERT INTO organisation (name, tz_organisation) VALUES ('Zweite', 'hilfsorganisation') \
+         RETURNING id",
+    )
+    .fetch_one(&a.elw.pool)
+    .await
+    .unwrap();
+    schalter_setzen(&a.elw.pool, org2, true).await;
+    sqlx::query(
+        "INSERT INTO instanz_kopplung_org (kopplung_id, org_id, fremde_org_kennung, \
+         fremde_org_name) VALUES (?, ?, 'zweite-org', 'Zweite')",
+    )
+    .bind(kopplung.id)
+    .bind(org2)
+    .execute(&a.elw.pool)
+    .await
+    .unwrap();
+    let eigene: String = sqlx::query_scalar(
+        "SELECT fremde_org_kennung FROM instanz_kopplung_org WHERE kopplung_id = ? AND org_id = 1",
+    )
+    .bind(kopplung.id)
+    .fetch_one(&a.elw.pool)
+    .await
+    .unwrap();
+    let antwort = |org: &str| SpiegelPaket {
+        tracking_positions: vec![RemoteTrackingPosition {
+            org: org.into(),
+            access_id: a.zugang.clone(),
+            device_id: "fkw1".into(),
+            lat: 50.5,
+            lon: 8.5,
+            measured_at: lifeline_hub::zeit::jetzt(),
+        }],
+        ..Default::default()
+    };
+    fern::apply_answer(&a.elw.pool, &kopplung, &antwort("zweite-org")).await;
+    assert_eq!(
+        position_am_elw(&a, ef).await.0,
+        None,
+        "fremde Org schreibt nicht"
+    );
+    // Gegenprobe: unter der Org der Kopplungszeile wird geschrieben.
+    fern::apply_answer(&a.elw.pool, &kopplung, &antwort(&eigene)).await;
+    assert_eq!(position_am_elw(&a, ef).await.0, Some(50.5));
 }

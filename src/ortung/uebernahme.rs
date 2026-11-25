@@ -145,13 +145,15 @@ async fn apply_position_gedrosselt_tx(
 
 /// Position über den Hub (LLH-2119): wie [`apply_position_tx`], nur dass die Position aus der
 /// Antwort des Hubs kommt statt aus `position_letzte` und die Kopplung an einem Zugang des Hubs
-/// hängt (`fremder_zugang_id`). Die Drossel gilt; ein Nachlauf wird **nicht** vorgemerkt: der
-/// nächste Abgleich bringt die jüngste Position ohnehin (Entwurf, „Übernahme am ELW“). Gehört in
-/// eine Schreibtransaktion des Aufrufers.
+/// hängt (`fremder_zugang_id`). `org_id` ist die Org, unter deren Kennung die Position kam; nur
+/// Kopplungszeilen dieser Org werden getroffen (ADR-0105, ADR-0039). Die Drossel gilt; ein
+/// Nachlauf wird **nicht** vorgemerkt: der nächste Abgleich bringt die jüngste Position ohnehin
+/// (Entwurf, „Übernahme am ELW“). Gehört in eine Schreibtransaktion des Aufrufers.
 #[allow(clippy::too_many_arguments)]
 pub async fn apply_remote_position_tx(
     conn: &mut SqliteConnection,
     instanz_kopplung_id: i64,
+    org_id: i64,
     zugang_id: &str,
     kennung: &str,
     lat: f64,
@@ -166,9 +168,11 @@ pub async fn apply_remote_position_tx(
          JOIN einsatz_fahrzeug ef ON ef.id = k.einsatz_fahrzeug_id AND ef.beendet_at IS NULL \
          JOIN einsatz e ON e.id = ef.einsatz_id AND e.status = 'aktiv' AND e.spiegel = 0 \
          JOIN org_einstellungen o ON o.org_id = k.org_id AND o.ortung_im_einsatz = 1 \
-         WHERE k.instanz_kopplung_id = ? AND k.fremder_zugang_id = ? AND k.kennung = ?",
+         WHERE k.instanz_kopplung_id = ? AND k.org_id = ? AND k.fremder_zugang_id = ? \
+           AND k.kennung = ?",
     )
     .bind(instanz_kopplung_id)
+    .bind(org_id)
     .bind(zugang_id)
     .bind(kennung)
     .fetch_optional(&mut *conn)

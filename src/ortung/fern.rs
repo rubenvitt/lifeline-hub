@@ -16,30 +16,39 @@ use crate::instanz::org_kennung;
 use crate::instanz::repo::{self, KopplungZeile};
 use crate::instanz::spiegel::paket::{
     RemoteTrackingCandidate, RemoteTrackingCandidates, RemoteTrackingPosition,
-    RemoteTrackingRequest, SpiegelPaket, TRACKING_ANFRAGEN_MAX,
+    RemoteTrackingRequest, SpiegelPaket, TRACKING_ANFRAGEN_MAX, TRACKING_KANDIDATEN_MAX,
 };
+use crate::instanz::InstanzKopplungArt;
 use crate::log_drossel::SammelzeileJe;
 use crate::ortung::kopplung;
 use crate::ortung::uebernahme::{apply_remote_position_tx, Uebernahme};
 use crate::public_api::scope::Scope;
 use crate::write_retry;
+use serde::Serialize;
 use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// Beantwortet die Ortungsfelder der Anfrage: (Positionen, Kandidaten). Bei einem Fehler leere
-/// Listen.
+/// Listen. `platz` ist, was die Antwort bis [`crate::instanz::spiegel::paket::SPIEGEL_MAX`]
+/// noch an Bytes trägt: die Ortungsfelder wachsen serialisiert nie darüber hinaus (Entwurf,
+/// „die Kandidaten zählen gegen `SPIEGEL_MAX`“). Nur eine Standardkopplung bekommt eine Antwort;
+/// die Direktkopplung ELW↔ELW ist kein Ziel (Entwurf, „Nicht-Ziele“).
 pub async fn answer_hub(
     pool: &SqlitePool,
     eigen: &Identitaet,
     kopplung: &KopplungZeile,
     anfrage: &SpiegelPaket,
+    platz: usize,
 ) -> (Vec<RemoteTrackingPosition>, Vec<RemoteTrackingCandidates>) {
     if anfrage.tracking_requests.is_empty() && anfrage.tracking_candidates_wanted.is_empty() {
         return (Vec::new(), Vec::new());
     }
-    match antworten(pool, eigen, kopplung, anfrage).await {
+    if !matches!(kopplung.art(), InstanzKopplungArt::Standard) {
+        return (Vec::new(), Vec::new());
+    }
+    match antworten(pool, eigen, kopplung, anfrage, platz).await {
         Ok(a) => a,
         Err(_) => {
             // Je Kopplung gezählt; weder Kennung noch Zugang noch Koordinaten stehen im Log.
@@ -61,7 +70,10 @@ async fn antworten(
     eigen: &Identitaet,
     kopplung: &KopplungZeile,
     anfrage: &SpiegelPaket,
+    platz: usize,
 ) -> Result<(Vec<RemoteTrackingPosition>, Vec<RemoteTrackingCandidates>), AppError> {
+    // Restplatz in Bytes, siehe [`passt`].
+    let mut rest = platz;
     let orgs = {
         let mut conn = pool.acquire().await?;
         repo::list_orgs_aktiv(&mut conn, kopplung.id).await?
@@ -99,14 +111,17 @@ async fn antworten(
         .fetch_optional(pool)
         .await?;
         if let Some((breite, laenge, measured_at)) = zeile {
-            positionen.push(RemoteTrackingPosition {
+            let p = RemoteTrackingPosition {
                 org: r.org.clone(),
                 access_id: r.access_id.clone(),
                 device_id: r.device_id.clone(),
                 lat: breite,
                 lon: laenge,
                 measured_at,
-            });
+            };
+            if passt(&mut rest, &p) {
+                positionen.push(p);
+            }
         }
     }
 
@@ -125,27 +140,50 @@ async fn antworten(
         let enabled = crate::org::einstellungen::ortung_der_org(pool, org_id)
             .await?
             .im_einsatz;
-        let items = if enabled {
-            kopplung::list_kandidaten(pool, org_id, &jetzt)
+        let mut eintrag = RemoteTrackingCandidates {
+            org: wire.clone(),
+            tracking_enabled: enabled,
+            items: Vec::new(),
+        };
+        if !passt(&mut rest, &eintrag) {
+            continue;
+        }
+        if enabled {
+            // Die Liste kommt jüngste zuerst; was über die Obergrenze oder den Platz geht, fällt.
+            for k in kopplung::list_kandidaten(pool, org_id, &jetzt)
                 .await?
                 .into_iter()
-                .map(|k| RemoteTrackingCandidate {
+                .take(TRACKING_KANDIDATEN_MAX)
+            {
+                let item = RemoteTrackingCandidate {
                     access_id: k.zugang_id,
                     access_name: k.zugang_name,
                     device_id: k.kennung,
                     received_at: k.empfangen_at,
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-        kandidaten.push(RemoteTrackingCandidates {
-            org: wire.clone(),
-            tracking_enabled: enabled,
-            items,
-        });
+                };
+                if !passt(&mut rest, &item) {
+                    break;
+                }
+                eintrag.items.push(item);
+            }
+        }
+        kandidaten.push(eintrag);
     }
     Ok((positionen, kandidaten))
+}
+
+/// Bucht `wert` vom Restplatz ab, wenn er hineinpasst: seine serialisierte Länge und ein Komma.
+/// Das Komma fehlt vor dem ersten Element einer Liste; die Rechnung schätzt also nach oben.
+fn passt<T: Serialize>(rest: &mut usize, wert: &T) -> bool {
+    let kosten = serde_json::to_vec(wert)
+        .map_or(usize::MAX, |v| v.len())
+        .saturating_add(1);
+    if kosten <= *rest {
+        *rest -= kosten;
+        true
+    } else {
+        false
+    }
 }
 
 // ── Seite des ELW ────────────────────────────────────────────────────────────────────────────
@@ -209,7 +247,32 @@ pub fn cached_candidates(
 /// aktiven, nicht gespiegelten Einsatzes mit eingeschaltetem Org-Schalter eine Positionsanfrage,
 /// dazu die Org-Kennungen, deren Kandidatenliste gewünscht ist. `org` ist die Kennung der Org
 /// beim Hub (`fremde_org_kennung`).
+///
+/// Fehlerfrei nach außen (Entwurf, „Abgleich“): ein Fehler zählt eine Sammelzeile ohne Kennung
+/// und liefert leere Listen, der übrige Abgleich läuft weiter.
 pub async fn build_requests(
+    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
+    kopplung: &KopplungZeile,
+) -> (Vec<RemoteTrackingRequest>, Vec<String>) {
+    match anfragen_bauen(pool, conn, kopplung).await {
+        Ok(a) => a,
+        Err(_) => {
+            // Je Kopplung gezählt; weder Kennung noch Zugang noch Koordinaten stehen im Log.
+            static FEHLER: SammelzeileJe = SammelzeileJe::neu();
+            if let Some(f) = FEHLER.zaehlen(&kopplung.id.to_string()) {
+                tracing::warn!(
+                    anzahl = f.anzahl,
+                    seit_s = f.seit_s,
+                    "Ortungsanfragen an den Hub nicht gebaut, Sammelzeile"
+                );
+            }
+            (Vec::new(), Vec::new())
+        }
+    }
+}
+
+async fn anfragen_bauen(
     pool: &SqlitePool,
     conn: &mut SqliteConnection,
     kopplung: &KopplungZeile,
@@ -299,14 +362,16 @@ pub async fn apply_answer(pool: &SqlitePool, kopplung: &KopplungZeile, antwort: 
         .iter()
         .take(TRACKING_ANFRAGEN_MAX)
     {
-        if org_von(&p.org).is_none() {
+        // Die Position gilt nur für Kopplungszeilen genau der Org, unter der sie kam (ADR-0105).
+        let Some(org_id) = org_von(&p.org) else {
             continue;
-        }
+        };
         let jetzt = crate::zeit::jetzt();
         let ergebnis = write_retry!(pool, |conn| {
             apply_remote_position_tx(
                 conn,
                 kopplung.id,
+                org_id,
                 &p.access_id,
                 &p.device_id,
                 p.lat,

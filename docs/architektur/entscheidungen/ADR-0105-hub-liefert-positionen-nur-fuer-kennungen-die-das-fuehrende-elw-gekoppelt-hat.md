@@ -48,6 +48,8 @@ ausnimmt.
 verlange 'beende_bei_fuehrungsabgabe_tx' src/instanz/spiegel/fuehrung.rs
 verlange 'schreibe_position\(' src/ortung/uebernahme.rs
 verbiete 'UPDATE einsatz_fahrzeug' src/ortung/fern.rs
+# Der Hub hält keinen Zustand über die Anfragen des ELW.
+verbiete 'INSERT INTO|CREATE TABLE' src/ortung/fern.rs
 # Kein Logfeld trägt Kennung, Schlüssel oder Koordinaten (Einzeiler und umbrochen).
 verbiete 'tracing::[a-z]+!\(.*[%?( ](kennung|schluessel|lat|lon|koordinaten)[ ,=)]' src/ortung/fern.rs
 verbiete '^ *[%?]?(kennung|schluessel|lat|lon|koordinaten)( =|,$)' src/ortung/fern.rs
