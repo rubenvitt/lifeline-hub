@@ -1,6 +1,6 @@
 //! Wahl der Lagekennzahlen eines Einsatzes (LLH-1371).
 //!
-//! `PUT /api/einsaetze/{id}/situation-metric-selection` ersetzt die gewählten Lagekennzahlen vollständig.
+//! `PUT /api/incidents/{id}/situation-metric-selection` ersetzt die gewählten Lagekennzahlen vollständig.
 //! Wählbar sind „Nachforderungen offen“ (Lageplatz B hinter „Evakuiert“) und die Reihe
 //! „Sanitätsdienst“ (LLH-1574, ganze Reihe und Paneel „Verlauf“), beide im Frontend
 //! `pages/lage-dashboard/lagebild.ts`. Gelesen wird die Wahl nicht hier, sondern als Teil von
@@ -60,7 +60,7 @@ fn pruefe(eingabe: &[String]) -> Result<Vec<Lagekennzahl>, AppError> {
     Ok(gewaehlt)
 }
 
-/// PUT /api/einsaetze/{id}/situation-metric-selection — die gewählten Lagekennzahlen ersetzen.
+/// PUT /api/incidents/{id}/situation-metric-selection — die gewählten Lagekennzahlen ersetzen.
 pub async fn setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<OhneModul>,

@@ -32,7 +32,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 
 /** Lagevortrag zur Entscheidung: die Vorlage mit den meisten Abschnitten (acht). */
 async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/situation-reports`, {
     data: { vorlage: 'lagebeurteilung', titel: 'Lagevortrag zur Entscheidung 1000' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
@@ -41,7 +41,7 @@ async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number
 
 /** Eine Meldung anlegen und in die Lage übernehmen — erst dann hat die Liste eine Zeile. */
 async function lagemeldungAnlegen(page: Page, einsatzId: string) {
-  const m = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+  const m = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
     data: {
       absender: 'Florian Nord 1',
       meldeweg: 'funk',
@@ -52,7 +52,7 @@ async function lagemeldungAnlegen(page: Page, einsatzId: string) {
   expect(m.ok(), await m.text()).toBe(true);
   const meldung = await m.json();
   const l = await page.request.post(
-    `/api/einsaetze/${einsatzId}/reports/${meldung.id}/situation-relevant`,
+    `/api/incidents/${einsatzId}/reports/${meldung.id}/situation-relevant`,
     { data: { lat: 50.11, lon: 8.68 } },
   );
   expect(l.ok(), await l.text()).toBe(true);

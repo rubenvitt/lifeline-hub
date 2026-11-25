@@ -12,7 +12,7 @@ async fn anlegen_listen_und_erledigen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00","intervall_minuten":30}"#),
     )
@@ -28,7 +28,7 @@ async fn anlegen_listen_und_erledigen() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders?nur_offen=true"),
+        &format!("/api/incidents/{e}/reminders?nur_offen=true"),
         &admin,
         None,
     )
@@ -39,7 +39,7 @@ async fn anlegen_listen_und_erledigen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders/{eid}/complete"),
+        &format!("/api/incidents/{e}/reminders/{eid}/complete"),
         &admin,
         None,
     )
@@ -49,7 +49,7 @@ async fn anlegen_listen_und_erledigen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders?nur_offen=true"),
+        &format!("/api/incidents/{e}/reminders?nur_offen=true"),
         &admin,
         None,
     )
@@ -68,7 +68,7 @@ async fn anlegen_lehnt_leeren_titel_ab() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"  ","faellig_at":"2026-06-11 10:00"}"#),
     )
@@ -90,7 +90,7 @@ async fn anlegen_status(faellig_at: &str, intervall: Option<i64>) -> StatusCode 
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(&body),
     )
@@ -161,7 +161,7 @@ async fn erinnerung_bezug_fremde_meldung_ist_404() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/reports"),
+        &format!("/api/incidents/{e2}/reports"),
         &admin,
         Some(&meldung_body),
     )
@@ -175,7 +175,7 @@ async fn erinnerung_bezug_fremde_meldung_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e1}/reminders"),
+        &format!("/api/incidents/{e1}/reminders"),
         &admin,
         Some(&body),
     )
@@ -195,7 +195,7 @@ async fn erinnerung_bezug_unbekannter_typ_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"X","faellig_at":"2026-06-11 10:00","bezug_typ":"schaden","bezug_id":1}"#),
     )
@@ -217,7 +217,7 @@ async fn erinnerung_bezug_gueltige_etb_ist_201() {
     let (status, etb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil"}"#),
     )
@@ -231,7 +231,7 @@ async fn erinnerung_bezug_gueltige_etb_ist_201() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(&body),
     )
@@ -264,7 +264,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
         let (status, m) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             &admin,
             Some(&meldung_body),
         )
@@ -281,7 +281,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
         let (status, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e1}/tasks"),
+            &format!("/api/incidents/{e1}/tasks"),
             &admin,
             Some(&auftrag_body),
         )
@@ -291,7 +291,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
     let (status, auftrag) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/tasks"),
+        &format!("/api/incidents/{e2}/tasks"),
         &admin,
         Some(&auftrag_body),
     )
@@ -300,7 +300,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
     let (status, etb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/etb"),
+        &format!("/api/incidents/{e2}/etb"),
         &admin,
         Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich instabil"}"#),
     )
@@ -317,7 +317,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
         let (status, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e2}/reminders"),
+            &format!("/api/incidents/{e2}/reminders"),
             &admin,
             Some(&body),
         )
@@ -333,7 +333,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e2}/reminders"),
+        &format!("/api/incidents/{e2}/reminders"),
         &admin,
         None,
     )
@@ -348,7 +348,7 @@ async fn erinnerung_traegt_laufende_nummer_des_bezugs() {
     let (_, ohne) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/reminders"),
+        &format!("/api/incidents/{e2}/reminders"),
         &admin,
         Some(r#"{"titel":"Ohne Bezug","faellig_at":"2026-06-11 10:00"}"#),
     )
@@ -368,7 +368,7 @@ async fn erledigen_anderer_einsatz_ist_404() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e1}/reminders"),
+        &format!("/api/incidents/{e1}/reminders"),
         &admin,
         Some(r#"{"titel":"X","faellig_at":"2026-06-11 10:00"}"#),
     )
@@ -378,7 +378,7 @@ async fn erledigen_anderer_einsatz_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/reminders/{eid}/complete"),
+        &format!("/api/incidents/{e2}/reminders/{eid}/complete"),
         &admin,
         None,
     )
@@ -398,13 +398,13 @@ async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
     )
     .await;
     let eid = json["id"].as_i64().unwrap();
-    let oeffnen = format!("/api/einsaetze/{e}/reminders/{eid}/reopen");
+    let oeffnen = format!("/api/incidents/{e}/reminders/{eid}/reopen");
 
     // Aus `offen` heraus wäre die Rücknahme ein No-op, der wie Erfolg aussieht → 422.
     let (leerlauf, _) = anfrage(&app, "POST", &oeffnen, &admin, None).await;
@@ -414,7 +414,7 @@ async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders/{eid}/complete"),
+        &format!("/api/incidents/{e}/reminders/{eid}/complete"),
         &admin,
         None,
     )
@@ -432,7 +432,7 @@ async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders/{eid}/acknowledge"),
+        &format!("/api/incidents/{e}/reminders/{eid}/acknowledge"),
         &admin,
         None,
     )
@@ -446,7 +446,7 @@ async fn oeffnen_nimmt_erledigt_und_quittiert_zurueck() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders?nur_offen=true"),
+        &format!("/api/incidents/{e}/reminders?nur_offen=true"),
         &admin,
         None,
     )
@@ -473,7 +473,7 @@ async fn welt_concurrent() -> (
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
     )
@@ -537,8 +537,8 @@ async fn erledigen_ohne_commit<'a>(
 #[tokio::test]
 async fn abschliessen_ueberschreibt_keine_gleichzeitige_erledigung() {
     let (_dir, app, pool, admin, e, eid) = welt_concurrent().await;
-    let erledigen = format!("/api/einsaetze/{e}/reminders/{eid}/complete");
-    let quittieren = format!("/api/einsaetze/{e}/reminders/{eid}/acknowledge");
+    let erledigen = format!("/api/incidents/{e}/reminders/{eid}/complete");
+    let quittieren = format!("/api/incidents/{e}/reminders/{eid}/acknowledge");
 
     let erste = erledigen_ohne_commit(&pool, e, eid).await;
     let beide = async {
@@ -590,13 +590,13 @@ async fn wieder_oeffnen_gegen_gleichzeitige_ruecknahme_ist_422() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders/{eid}/complete"),
+        &format!("/api/incidents/{e}/reminders/{eid}/complete"),
         &admin,
         None,
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    let oeffnen = format!("/api/einsaetze/{e}/reminders/{eid}/reopen");
+    let oeffnen = format!("/api/incidents/{e}/reminders/{eid}/reopen");
 
     let mut andere = pool.begin_with("BEGIN IMMEDIATE").await.unwrap();
     sqlx::query("UPDATE erinnerung SET status = 'offen', erledigt_at = NULL WHERE id = ?")
@@ -641,14 +641,14 @@ async fn abschliessen_nur_aus_offen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(r#"{"titel":"Lagemeldung","faellig_at":"2026-06-11 10:00"}"#),
     )
     .await;
     let eid = json["id"].as_i64().unwrap();
-    let erledigen = format!("/api/einsaetze/{e}/reminders/{eid}/complete");
-    let quittieren = format!("/api/einsaetze/{e}/reminders/{eid}/acknowledge");
+    let erledigen = format!("/api/incidents/{e}/reminders/{eid}/complete");
+    let quittieren = format!("/api/incidents/{e}/reminders/{eid}/acknowledge");
 
     let (s, erledigt) = anfrage(&app, "POST", &erledigen, &admin, None).await;
     assert_eq!(s, StatusCode::OK);
@@ -663,7 +663,7 @@ async fn abschliessen_nur_aus_offen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders?nur_offen=false"),
+        &format!("/api/incidents/{e}/reminders?nur_offen=false"),
         &admin,
         None,
     )

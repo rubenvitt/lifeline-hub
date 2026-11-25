@@ -986,7 +986,7 @@
       },
       "AbschlussPruefung": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe.",
+        "description": "Antwort von `GET /api/incidents/{id}/closure/check`: die offenen Punkte je Gruppe.",
         "required": [
           "kraefte",
           "auftraege",
@@ -1204,6 +1204,7 @@
           "geheimnis_unlesbar",
           "geheimnisspeicher_gesperrt",
           "einstellung_ungueltig",
+          "version_unbekannt",
           "intern"
         ]
       },
@@ -1417,7 +1418,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -1479,7 +1480,9 @@
           "adapter_lan_erlaubt",
           "adapter_lan_entzogen",
           "adapter_angehalten",
-          "adapter_fortgesetzt"
+          "adapter_fortgesetzt",
+          "fremdebenen_lan_erlaubt",
+          "fremdebenen_lan_entzogen"
         ]
       },
       "AdressatKategorie": {
@@ -2683,6 +2686,51 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ArtZaehlung": {
+        "type": "object",
+        "description": "Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). Bei den\nQualifikationen zählt `neu` die angelegten: derselbe Text unter einer zweiten Herkunft legt\nnichts zusätzlich an und zählt als `ergaenzt` (er merkt dort nur seine Kennung).",
+        "required": [
+          "neu",
+          "ergaenzt",
+          "geaendert",
+          "unveraendert",
+          "ausgelassen",
+          "fehler",
+          "offen"
+        ],
+        "properties": {
+          "ausgelassen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "ergaenzt": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gefunden; die Datei füllt Lücken, fügt Qualifikationen hinzu oder merkt die Kennung."
+          },
+          "fehler": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "geaendert": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Gefunden; abweichende Werte werden übernommen."
+          },
+          "neu": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "offen": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unveraendert": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -4263,7 +4311,7 @@
       },
       "BenachrichtigungVorgaben": {
         "type": "object",
-        "description": "`GET /api/einsaetze/{id}/notification-defaults` (design.md D4).",
+        "description": "`GET /api/incidents/{id}/notification-defaults` (design.md D4).",
         "required": [
           "funktionen",
           "arten"
@@ -5719,6 +5767,40 @@
           }
         }
       },
+      "DateiMeldung": {
+        "type": "object",
+        "description": "Fehler oder Hinweis beim Lesen; `art` und `zeile` nur, wenn es sie gibt.",
+        "required": [
+          "stufe",
+          "text"
+        ],
+        "properties": {
+          "art": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenDateiArt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stufe": {
+            "$ref": "#/components/schemas/MeldungStufe"
+          },
+          "text": {
+            "type": "string"
+          },
+          "zeile": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
       "Datenkategorie": {
         "type": "string",
         "description": "Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,\ndesign.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry\n(`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und\n`einsatz_aufbewahrung_kategorie`.",
@@ -6178,6 +6260,73 @@
           "sonstiges"
         ]
       },
+      "DroneSourceUpdate": {
+        "type": "object",
+        "required": [
+          "lagemonitor"
+        ],
+        "properties": {
+          "lagemonitor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DroneSourceView": {
+        "type": "object",
+        "description": "Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz.",
+        "required": [
+          "adapter_id",
+          "label",
+          "connected",
+          "held_by_other_hidden",
+          "lagemonitor",
+          "state",
+          "video_keys"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle)."
+          },
+          "held_by_other": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf."
+          },
+          "held_by_other_hidden": {
+            "type": "boolean",
+            "description": "Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen\n(dann ist `held_by_other` leer)."
+          },
+          "label": {
+            "type": "string"
+          },
+          "lagemonitor": {
+            "type": "boolean",
+            "description": "Das Livebild geht auch an den Lagemonitor."
+          },
+          "mission_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "Zustand des Adapters (`aktiv`, `angehalten`, …)."
+          },
+          "video_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "EinheitAnzeige": {
         "type": "object",
         "description": "Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,\nMitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →\n`None`); `ist`/`ist_kumuliert` sind immer gesetzt.",
@@ -6333,6 +6482,24 @@
             "items": {
               "$ref": "#/components/schemas/EinheitMitgliedPerson"
             }
+          },
+          "position_aktualisiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "quali_soll": {
             "type": [
@@ -7286,7 +7453,6 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
-          "ortung_gekoppelt",
           "disponiert_at",
           "ist_demo"
         ],
@@ -7405,22 +7571,18 @@
               "null"
             ]
           },
-          "ortung_gekoppelt": {
-            "type": "boolean",
-            "description": "Hängt das Fahrzeug an einer Ortungs-Kennung? Nur der Wahrheitswert; Kennung und Zugang\nverlassen den Server hier nicht (LLH-2091)."
-          },
-          "position_gemessen_at": {
+          "position_aktualisiert_at": {
             "type": [
               "string",
               "null"
             ],
-            "description": "Zeitpunkt der Position (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die\nServerzeit des Setzens. Trägt die Altersanzeige."
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
           },
           "position_quelle": {
             "oneOf": [
               {
-                "$ref": "#/components/schemas/PositionQuelle",
-                "description": "Woher die Position stammt (LLH-2091); fehlt ohne Position."
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
               },
               {
                 "type": "null"
@@ -9002,19 +9164,27 @@
           "fuehrungsstelle": {
             "type": "boolean",
             "description": "Trug das Fahrzeug die Führungsstelle?"
-          },
-          "ortung": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/OrtungVorzustand",
-                "description": "Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie\nnur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu."
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         }
+      },
+      "Entscheidungen": {
+        "type": "object",
+        "description": "Die Wahl in der Vorschau. Je Zeile (Art + Zeilennummer) bzw. je Qualifikationstext; fehlt\nein Eintrag, gilt der Vorschlag. Doppelte Einträge: der letzte gilt.",
+        "properties": {
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualiEntscheidung"
+            }
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZeilenEntscheidung"
+            }
+          }
+        },
+        "additionalProperties": false
       },
       "Ereignis": {
         "type": "string",
@@ -9286,7 +9456,7 @@
       },
       "EtbAnzahlAnzeige": {
         "type": "object",
-        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/incidents/{id}/etb/count`).",
         "required": [
           "anzahl"
         ],
@@ -9615,7 +9785,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counts`.",
+        "description": "Antwort von `GET /api/incidents/{id}/etb/counts`.",
         "required": [
           "gesamt",
           "je_typ"
@@ -10153,6 +10323,50 @@
           }
         }
       },
+      "FeldAenderungArt": {
+        "type": "string",
+        "description": "Art einer Feldänderung. Wire == `as_str()`.",
+        "enum": [
+          "fuellt",
+          "weicht_ab"
+        ]
+      },
+      "FeldAenderungDto": {
+        "type": "object",
+        "description": "Eine Feldänderung. `feld` ist die Spalte des Vertrags (`funkrufname`, `issi`, `typ`, …,\n`qualifikationen` für eine hinzukommende Qualifikation); Werte nur aus Spalten des Vertrags.",
+        "required": [
+          "feld",
+          "neu",
+          "art",
+          "erkennungsfeld",
+          "uebernommen"
+        ],
+        "properties": {
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "art": {
+            "$ref": "#/components/schemas/FeldAenderungArt"
+          },
+          "erkennungsfeld": {
+            "type": "boolean",
+            "description": "Ein Erkennungsmerkmal; eine Abweichung wird nur bei Treffer über die Kennung übernommen."
+          },
+          "feld": {
+            "type": "string"
+          },
+          "neu": {
+            "type": "string"
+          },
+          "uebernommen": {
+            "type": "boolean",
+            "description": "Ob das Übernehmen mit der aktuellen Wahl dieses Feld schreibt."
+          }
+        }
+      },
       "FeldTyp": {
         "type": "string",
         "description": "Typ eines Einstellungsfelds.",
@@ -10308,6 +10522,114 @@
             "description": "Kanonische Zeichenbeschreibung von `@einsatzzeichen` (`serializeAnySpec`), unverändert wie\ngesendet. Bei einem Zeichen aus der Zeit vor LFH-836 die Hülle `{\"v\":1,\"alt\":{…}}` mit den\nAltwerten (Migration 0192, LLH-1160), bis es das nächste Mal geändert wird."
           }
         }
+      },
+      "FremdebeneAnzeige": {
+        "type": "object",
+        "description": "Eine Fremdebene, wie die Liste sie zeigt (ohne Inhalt). Wire-Felder englisch.",
+        "required": [
+          "id",
+          "name",
+          "source",
+          "color",
+          "feature_count",
+          "dropped_count",
+          "created_at"
+        ],
+        "properties": {
+          "attempted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter Abrufversuch, nur URL-Ebene."
+          },
+          "color": {
+            "type": "string",
+            "description": "Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein\n`wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen\nwird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.\nEin Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client\nfällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "dropped_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Objekte ohne lesbare Geometrie."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FremdebeneFehler",
+                "description": "Fehler des letzten Abrufs; der letzte Stand bleibt sichtbar."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feature_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fetched_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abruf (auch 304), nur URL-Ebene."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FremdebeneQuelle"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Volle Adresse der URL-Ebene; nur für Schreibende (Entwurf, „URL mit Geheimnis im Query“),\nsonst fehlt sie ([`FremdebeneAnzeige::fuer_leser`])."
+          },
+          "url_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nur der Host der URL-Ebene, für alle Lesenden."
+          }
+        }
+      },
+      "FremdebeneFehler": {
+        "type": "string",
+        "description": "Warum eine Datei oder ein Abruf abgelehnt ist (`grund` im 400 bzw. 413, an der URL-Ebene\nin `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.",
+        "enum": [
+          "unlesbar",
+          "dtd",
+          "zu_gross",
+          "zu_umfangreich",
+          "zu_viele_objekte",
+          "leer",
+          "koordinaten",
+          "virus",
+          "nicht_erreichbar",
+          "weiterleitung",
+          "abgelehnt",
+          "status",
+          "ziel_intern",
+          "zeitlimit"
+        ]
+      },
+      "FremdebeneQuelle": {
+        "type": "string",
+        "description": "Woher eine Fremdebene kommt.",
+        "enum": [
+          "datei",
+          "url"
+        ]
       },
       "FuehrungAnfrageEingang": {
         "type": "object",
@@ -10781,6 +11103,24 @@
           "name": {
             "type": "string"
           },
+          "position_aktualisiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "tz_fachaufgabe": {
             "type": [
               "string",
@@ -10920,7 +11260,8 @@
           "bereitstellungsraum",
           "einsatzabschnitt",
           "verpflegung",
-          "einheit"
+          "einheit",
+          "helfer"
         ]
       },
       "GefahrBewertungAnzeige": {
@@ -11314,6 +11655,360 @@
             "items": {
               "$ref": "#/components/schemas/RegistriertePerson"
             }
+          }
+        }
+      },
+      "HelferAnzeige": {
+        "type": "object",
+        "description": "Eine Helfer-Kopplung, wie die Leitung sie sieht.",
+        "required": [
+          "id",
+          "display_name",
+          "state",
+          "person_requested",
+          "is_tracker",
+          "paused",
+          "expires_at",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Name, den die Kraft beim Anmelden eingegeben hat."
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung der Kopplung (`geraet_kopplung.id`)."
+          },
+          "is_tracker": {
+            "type": "boolean",
+            "description": "Das Gerät schreibt die Position seines Ziels („Ortungsgerät“)."
+          },
+          "last_position_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position, die dieses Gerät geschrieben hat (Quelle `helfer`)."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Die Kraft hat die Ortung pausiert."
+          },
+          "person": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "person_requested": {
+            "type": "boolean",
+            "description": "Die Kraft hat „Mich als Person orten“ gewählt."
+          },
+          "state": {
+            "$ref": "#/components/schemas/HelferStatus"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferZiel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "HelferEinladungAnzeige": {
+        "type": "object",
+        "description": "Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal.",
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Der Code (8 Zeichen); fehlt außer in der Antwort auf das Anlegen."
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`https://<server>/helfer#<CODE>`, wenn der Server seine öffentliche Adresse kennt; sonst\nbaut der Client die Adresse aus seinem Origin (`helferAdresse`)."
+          }
+        }
+      },
+      "HelferEinsatz": {
+        "type": "object",
+        "description": "Der Einsatz einer Helfer-Kopplung, nur Kennung und Bezeichnung.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "HelferEndeGrund": {
+        "type": "string",
+        "description": "Warum eine Helfer-Kopplung endet. Jedes Ende ist für das Gerät 401, auch die Ablehnung:\nsie löscht die Sitzungen (`routes::helfer::ablehnen`). Die App nennt den Grund aus der\nletzten bekannten Antwort selbst; `rejected` liefert `GET /api/devices/me` nur für eine\nabgelehnte Kopplung, die noch eine Sitzung hätte.",
+        "enum": [
+          "incident_closed",
+          "revoked",
+          "expired",
+          "rejected",
+          "signed_out"
+        ]
+      },
+      "HelferPerson": {
+        "type": "object",
+        "description": "Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "HelferStatus": {
+        "type": "string",
+        "description": "Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in\n`geraet_kopplung.helfer_zustand` (CHECK in Migration 0377); `beendet` leitet der Server\nab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.",
+        "enum": [
+          "unbestaetigt",
+          "aktiv",
+          "abgelehnt",
+          "beendet"
+        ]
+      },
+      "HelferUebersicht": {
+        "type": "object",
+        "description": "Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen.",
+        "required": [
+          "helpers",
+          "tracking_enabled",
+          "person_tracking_allowed"
+        ],
+        "properties": {
+          "helpers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelferAnzeige"
+            }
+          },
+          "invitation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferEinladungAnzeige"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "person_tracking_allowed": {
+            "type": "boolean",
+            "description": "„Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu."
+          },
+          "tracking_enabled": {
+            "type": "boolean",
+            "description": "„Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich."
+          }
+        }
+      },
+      "HelferZiel": {
+        "type": "object",
+        "description": "Ziel einer Helfer-Kopplung.",
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HelferZielArt"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name der Einheit bzw. Funkrufname des Fahrzeugs."
+          }
+        }
+      },
+      "HelferZielArt": {
+        "type": "string",
+        "description": "Art des Ziels einer Helfer-Kopplung.",
+        "enum": [
+          "unit",
+          "vehicle"
+        ]
+      },
+      "HelferZielOption": {
+        "type": "object",
+        "description": "Ein wählbares Ziel vor dem Einlösen.",
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "call_sign": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigener Funkrufname der Einheit; fehlt beim Fahrzeug (der Name ist sein Rufname)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HelferZielArt"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name der Einheit bzw. Funkrufname des Fahrzeugs."
+          },
+          "sign_function": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Taktisches Zeichen: Fachaufgabe (`tz_fachaufgabe`)."
+          },
+          "sign_organization": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Taktisches Zeichen: Organisation (`tz_organisation`)."
+          }
+        }
+      },
+      "HelferZielliste": {
+        "type": "object",
+        "description": "Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne\nPersonen.",
+        "required": [
+          "targets",
+          "person_tracking_allowed"
+        ],
+        "properties": {
+          "person_tracking_allowed": {
+            "type": "boolean",
+            "description": "Ob die Organisation „Auch Personen orten“ erlaubt; sonst blendet die App das Häkchen aus."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelferZielOption"
+            }
+          }
+        }
+      },
+      "HelferZustand": {
+        "type": "object",
+        "description": "Der eigene Zustand einer Helfer-Kopplung (`GET /api/devices/me`, Antwort auf das Einlösen).",
+        "required": [
+          "state",
+          "incident",
+          "is_tracker",
+          "paused",
+          "expires_at",
+          "server_time"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "description": "Ablauf der Kopplung (UTC, `%Y-%m-%d %H:%M:%S`)."
+          },
+          "incident": {
+            "$ref": "#/components/schemas/HelferEinsatz"
+          },
+          "is_tracker": {
+            "type": "boolean",
+            "description": "Das Gerät schreibt die Position seines Ziels."
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "person": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferPerson",
+                "description": "Die Person, die die Leitung zugeordnet hat; fehlt vor der Bestätigung."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferEndeGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "server_time": {
+            "type": "string",
+            "description": "Uhrzeit des Servers in derselben Form, für Restzeiten auf dem Gerät."
+          },
+          "state": {
+            "$ref": "#/components/schemas/HelferStatus",
+            "description": "`beendet` kommt hier nicht vor: nach dem Ende ist die Sitzung ungültig (401)."
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferZiel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -11737,7 +12432,7 @@
       },
       "InfotelefonZaehler": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.",
+        "description": "Antwort von `GET /api/incidents/{id}/staff/info-line/counts`.",
         "required": [
           "gesamt",
           "offen",
@@ -12287,6 +12982,23 @@
           "aktuell"
         ]
       },
+      "Kandidat": {
+        "type": "object",
+        "description": "Ein Kandidat einer Zeile: ein Datensatz der eigenen Org.",
+        "required": [
+          "id",
+          "anzeige"
+        ],
+        "properties": {
+          "anzeige": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "KarteAktualisierung": {
         "type": "object",
         "description": "Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste.",
@@ -12323,9 +13035,17 @@
           "online_styles",
           "offline_verfuegbar",
           "offline_regionen",
-          "karten_bau_verfuegbar"
+          "karten_bau_verfuegbar",
+          "fachebenen_abgeschaltet"
         ],
         "properties": {
+          "fachebenen_abgeschaltet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit\n`--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet\n404. Leer, wenn alle Ebenen an sind."
+          },
           "karten_bau_verfuegbar": {
             "type": "boolean",
             "description": "True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds\nanstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret."
@@ -14677,6 +15397,7 @@
           "meldung",
           "bereitstellungsraum",
           "karte_bild",
+          "karte_fremdebene",
           "etb",
           "befehl",
           "lagebesprechung",
@@ -14694,6 +15415,7 @@
           "mitglieder",
           "benachrichtigung",
           "praesenz",
+          "helfer",
           "lagged"
         ]
       },
@@ -15479,7 +16201,7 @@
       },
       "ModulFreigabe": {
         "type": "object",
-        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
+        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/incidents/{id}/module-access` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
         "required": [
           "sichtbar",
           "zugriff"
@@ -15497,7 +16219,7 @@
       },
       "ModulZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
+        "description": "Antwort von `GET /api/incidents/{id}/module-counts`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
         "properties": {
           "auftraege": {
             "oneOf": [
@@ -16358,7 +17080,10 @@
         "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
         "required": [
           "org_id",
-          "aufbewahrung_kategorien"
+          "aufbewahrung_kategorien",
+          "fremdebenen_lan_erlaubt",
+          "ortung_im_einsatz",
+          "ortung_personen"
         ],
         "properties": {
           "aufbewahrung_kategorien": {
@@ -16409,6 +17134,10 @@
               "string",
               "null"
             ]
+          },
+          "fremdebenen_lan_erlaubt": {
+            "type": "boolean",
+            "description": "Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099); Standard `false`."
           },
           "geaendert_at": {
             "type": [
@@ -16464,13 +17193,20 @@
             "type": "integer",
             "format": "int64"
           },
-          "ortung_hauptamt": {
+          "ortung_bestaetigt_at": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "description": "Ortung auch bei hauptamtlicher Besatzung (LLH-2091): `1` = an, sonst aus."
+            "description": "Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde."
+          },
+          "ortung_im_einsatz": {
+            "type": "boolean",
+            "description": "„Ortung im Einsatz“ (Helfer-App); Vorgabe aus."
+          },
+          "ortung_personen": {
+            "type": "boolean",
+            "description": "„Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist."
           },
           "retention_dauer_tage": {
             "type": [
@@ -16800,26 +17536,6 @@
                 "type": "null"
               }
             ]
-          }
-        }
-      },
-      "OrtungVorzustand": {
-        "type": "object",
-        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).",
-        "required": [
-          "zugang_id",
-          "kennung",
-          "ehrenamt_bestaetigt"
-        ],
-        "properties": {
-          "ehrenamt_bestaetigt": {
-            "type": "boolean"
-          },
-          "kennung": {
-            "type": "string"
-          },
-          "zugang_id": {
-            "type": "string"
           }
         }
       },
@@ -19115,12 +19831,31 @@
           }
         }
       },
-      "PositionQuelle": {
+      "PositionAntwort": {
+        "type": "object",
+        "description": "Antwort von `PUT /api/devices/me/position`.",
+        "required": [
+          "stored",
+          "server_time"
+        ],
+        "properties": {
+          "server_time": {
+            "type": "string",
+            "description": "Uhrzeit des Servers (UTC, `%Y-%m-%d %H:%M:%S`)."
+          },
+          "stored": {
+            "type": "boolean",
+            "description": "Mindestens ein Ziel hat die Position übernommen; `false` bei einer älteren als der\ngespeicherten, während einer Pause und beim Pausieren selbst."
+          }
+        }
+      },
+      "Positionsquelle": {
         "type": "string",
-        "description": "Woher die Position eines Einsatzfahrzeugs stammt. Wire == `as_str()`.",
+        "description": "Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration\n0377) `manuell`, `einwurf`, `helfer`.",
         "enum": [
           "manuell",
-          "ortung"
+          "einwurf",
+          "helfer"
         ]
       },
       "PostenArt": {
@@ -19251,6 +19986,23 @@
           }
         }
       },
+      "QualiEntscheidung": {
+        "type": "object",
+        "required": [
+          "text",
+          "wahl"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Der Text der Qualifikation, wie die Vorschau ihn zeigt (`qualifikationen[].text`)."
+          },
+          "wahl": {
+            "$ref": "#/components/schemas/QualiWahl"
+          }
+        },
+        "additionalProperties": false
+      },
       "QualiSollEintrag": {
         "type": "object",
         "description": "Ein Eintrag in der Antwort, mit dem Label der Qualifikation.",
@@ -19270,6 +20022,124 @@
           "qualifikation_id": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "QualiWahl": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "neu"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Zu einer Qualifikation der eigenen Org; wird gemerkt und gilt in späteren Läufen.",
+            "required": [
+              "qualifikation_id",
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "zuordnen"
+                ]
+              },
+              "qualifikation_id": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "auslassen"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Was mit einer Qualifikation der Datei geschehen soll. Fehlt die Wahl, wird eine unbekannte\nneu angelegt und eine gefundene verknüpft."
+      },
+      "QualiZeile": {
+        "type": "object",
+        "description": "Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des\nPersonals, je Herkunft und normalisiertem Text einmal. `herkunft` und `text` sind zusammen\neindeutig; die Wahl gilt je Text (`QualiEntscheidung`), also für jede Herkunft.",
+        "required": [
+          "herkunft",
+          "text",
+          "zeilen",
+          "ergebnis",
+          "kandidaten",
+          "hinweise"
+        ],
+        "properties": {
+          "ergebnis": {
+            "$ref": "#/components/schemas/ZeilenErgebnis"
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenTrefferGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "herkunft": {
+            "type": "string",
+            "description": "Die wirksame Herkunft (normalisiert; leer ohne Herkunft)."
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Kandidat"
+            }
+          },
+          "text": {
+            "type": "string"
+          },
+          "wahl": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/QualiWahl"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            },
+            "description": "Zeilen im Blatt „Qualifikationen“ (leer, wenn sie nur das Personal nennt)."
           }
         }
       },
@@ -21033,6 +21903,26 @@
           "unterkunft_richtwert"
         ]
       },
+      "StammdatenDateiArt": {
+        "type": "string",
+        "description": "Art eines Stammdatensatzes. Wire == `as_str()`.",
+        "enum": [
+          "fahrzeug",
+          "personal",
+          "qualifikation"
+        ]
+      },
+      "StammdatenErgebnis": {
+        "type": "object",
+        "required": [
+          "zaehlung"
+        ],
+        "properties": {
+          "zaehlung": {
+            "$ref": "#/components/schemas/Zaehlung"
+          }
+        }
+      },
       "StammdatenHerkunftAnzeige": {
         "type": "object",
         "description": "Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9).",
@@ -21068,6 +21958,146 @@
             "propertyNames": {
               "type": "string"
             }
+          }
+        }
+      },
+      "StammdatenTrefferGrund": {
+        "type": "string",
+        "description": "Über welche Stufe eine Zeile einen Datensatz getroffen hat.",
+        "enum": [
+          "kennung",
+          "opta",
+          "issi",
+          "funkrufname",
+          "personalnummer",
+          "name",
+          "bezeichnung"
+        ]
+      },
+      "StammdatenVorschau": {
+        "type": "object",
+        "required": [
+          "zaehlung",
+          "zeilen",
+          "qualifikationen",
+          "meldungen",
+          "nicht_uebernommen",
+          "herkunft_noetig",
+          "uebernehmbar"
+        ],
+        "properties": {
+          "herkunft_noetig": {
+            "type": "boolean",
+            "description": "Eine Zeile hat eine Kennung, aber weder Zeile noch Hochladen nennen eine Herkunft."
+          },
+          "herkunft_vorschlag": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Die zuletzt in der Org gemerkte Herkunft (normalisiert)."
+          },
+          "meldungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DateiMeldung"
+            }
+          },
+          "nicht_uebernommen": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Spaltenköpfe, die der Vertrag nicht kennt (nie ihre Werte)."
+          },
+          "qualifikationen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QualiZeile"
+            }
+          },
+          "uebernehmbar": {
+            "type": "boolean",
+            "description": "Keine Fehler, nichts offen, Herkunft da: das Übernehmen schreibt."
+          },
+          "zaehlung": {
+            "$ref": "#/components/schemas/Zaehlung"
+          },
+          "zeilen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StammdatenZeile"
+            }
+          }
+        }
+      },
+      "StammdatenZeile": {
+        "type": "object",
+        "description": "Eine Fahrzeug- oder Personalzeile der Datei in der Vorschau.",
+        "required": [
+          "art",
+          "zeile",
+          "anzeige",
+          "ergebnis",
+          "kandidaten",
+          "aenderungen",
+          "hinweise"
+        ],
+        "properties": {
+          "aenderungen": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeldAenderungDto"
+            }
+          },
+          "anzeige": {
+            "type": "string"
+          },
+          "art": {
+            "$ref": "#/components/schemas/StammdatenDateiArt"
+          },
+          "ergebnis": {
+            "$ref": "#/components/schemas/ZeilenErgebnis"
+          },
+          "grund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StammdatenTrefferGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hinweise": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Hinweise; bei `fehler` steht der Grund zuerst."
+          },
+          "kandidaten": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Kandidat"
+            },
+            "description": "Getroffene Datensätze: einer bei `gefunden`/`ausser_dienst`, mehrere bei `mehrdeutig`."
+          },
+          "wahl": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ZeilenWahl",
+                "description": "Die wirksame Wahl: die gesendete, sonst `neu` bei einer neuen Zeile; fehlt bei einer\ngefundenen Zeile ohne Wahl (Vorschlag) und bei einer offenen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zeile": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
           }
         }
       },
@@ -21640,82 +22670,6 @@
           },
           "secret_base32": {
             "type": "string"
-          }
-        }
-      },
-      "TrackingCandidate": {
-        "type": "object",
-        "description": "Eine Kennung der letzten 24 Stunden, ohne Koordinaten.",
-        "required": [
-          "access_id",
-          "access_name",
-          "device_id",
-          "received_at",
-          "coupled"
-        ],
-        "properties": {
-          "access_id": {
-            "type": "string"
-          },
-          "access_name": {
-            "type": "string"
-          },
-          "coupled": {
-            "type": "boolean",
-            "description": "Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)?"
-          },
-          "device_id": {
-            "type": "string"
-          },
-          "received_at": {
-            "type": "string"
-          }
-        }
-      },
-      "TrackingCandidates": {
-        "type": "object",
-        "description": "Antwort der Kandidatenliste: die Kennungen und ob die Bestätigung „Besatzung ehrenamtlich“\nbeim Koppeln Pflicht ist (Org-Schalter `ortung_hauptamt` aus). Der Dialog liest so den Schalter,\nohne die Org-Einstellungen lesen zu dürfen.",
-        "required": [
-          "volunteer_crew_required",
-          "candidates"
-        ],
-        "properties": {
-          "candidates": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TrackingCandidate"
-            }
-          },
-          "volunteer_crew_required": {
-            "type": "boolean"
-          }
-        }
-      },
-      "TrackingResponse": {
-        "type": "object",
-        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.",
-        "required": [
-          "access_id",
-          "access_name",
-          "device_id",
-          "coupled_at",
-          "volunteer_crew_confirmed"
-        ],
-        "properties": {
-          "access_id": {
-            "type": "string"
-          },
-          "access_name": {
-            "type": "string"
-          },
-          "coupled_at": {
-            "type": "string"
-          },
-          "device_id": {
-            "type": "string"
-          },
-          "volunteer_crew_confirmed": {
-            "type": "boolean"
           }
         }
       },
@@ -24930,7 +25884,7 @@
       },
       "WetterAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/weather`.",
+        "description": "Antwort von `GET /api/incidents/{id}/weather`.",
         "required": [
           "warnungen",
           "vorhersage",
@@ -25286,6 +26240,25 @@
           }
         }
       },
+      "Zaehlung": {
+        "type": "object",
+        "required": [
+          "fahrzeuge",
+          "personal",
+          "qualifikationen"
+        ],
+        "properties": {
+          "fahrzeuge": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          },
+          "personal": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          },
+          "qualifikationen": {
+            "$ref": "#/components/schemas/ArtZaehlung"
+          }
+        }
+      },
       "ZeilenArt": {
         "type": "string",
         "description": "Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können\nkollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im\nEinsatz die der Disposition (LLH-1073). Wire == `as_str()`.",
@@ -25295,6 +26268,40 @@
           "material",
           "planschicht",
           "dateizeile"
+        ]
+      },
+      "ZeilenEntscheidung": {
+        "type": "object",
+        "required": [
+          "art",
+          "zeile",
+          "wahl"
+        ],
+        "properties": {
+          "art": {
+            "$ref": "#/components/schemas/StammdatenDateiArt"
+          },
+          "wahl": {
+            "$ref": "#/components/schemas/ZeilenWahl"
+          },
+          "zeile": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "ZeilenErgebnis": {
+        "type": "string",
+        "description": "Ergebnis des Abgleichs einer Zeile. Wire == `as_str()`.",
+        "enum": [
+          "neu",
+          "gefunden",
+          "mehrdeutig",
+          "ausser_dienst",
+          "fehler",
+          "unveraendert"
         ]
       },
       "ZeilenFehler": {
@@ -25338,6 +26345,76 @@
             "description": "Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition)."
           }
         }
+      },
+      "ZeilenWahl": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Die Zeile wird nicht übernommen.",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "auslassen"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Ein neuer Datensatz wird angelegt.",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "neu"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Einer der Kandidaten der Zeile (`kandidaten[].id`).",
+            "required": [
+              "id",
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "kandidat"
+                ]
+              },
+              "id": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Abweichende Werte der Datei übernehmen (Erkennungsfelder nur bei Treffer über die\nKennung).",
+            "required": [
+              "art"
+            ],
+            "properties": {
+              "art": {
+                "type": "string",
+                "enum": [
+                  "datei_uebernehmen"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Was mit einer Zeile geschehen soll. Fehlt die Wahl, gilt der Vorschlag: `neu` legt an,\n`gefunden` füllt nur Lücken und behält abweichende Werte; `mehrdeutig` bleibt offen."
       },
       "ZeitachseAnzeige": {
         "type": "object",

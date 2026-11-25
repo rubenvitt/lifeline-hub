@@ -96,7 +96,7 @@ fn wire_vor(minuten: i64) -> String {
 
 impl Welt {
     fn pfad(&self, rest: &str) -> String {
-        format!("/api/einsaetze/{}/{rest}", self.einsatz)
+        format!("/api/incidents/{}/{rest}", self.einsatz)
     }
 
     async fn einheit(&self, name: &str) -> i64 {

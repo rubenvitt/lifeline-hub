@@ -36,15 +36,15 @@ interface Person {
 
 /** Die Demo-UHS mit ihren Plätzen; Behandlungsplatz 1 und 2 sind danach belegt. */
 async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetail> {
-  const liste = await (await page.request.get(`/api/einsaetze/${einsatzId}/uhs`)).json();
+  const liste = await (await page.request.get(`/api/incidents/${einsatzId}/uhs`)).json();
   const uhsId = (liste as { id: number; bezeichnung: string }[]).find((u) =>
     u.bezeichnung.includes('Turnhalle'),
   )!.id;
   const uhs = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`)
+    await page.request.get(`/api/incidents/${einsatzId}/uhs/${uhsId}`)
   ).json()) as UhsDetail;
   const personen = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/persons`)
+    await page.request.get(`/api/incidents/${einsatzId}/persons`)
   ).json()) as Person[];
   for (const [name, platzName] of [
     ['Mustermann', 'Behandlungsplatz 1'],
@@ -55,7 +55,7 @@ async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetai
     if (personen.some((p) => p.aktueller_platz_id === platz.id)) continue;
     const person = personen.find((p) => p.name === name && p.aktuelle_uhs_id === uhs.id);
     expect(person, `Demo-Person ${name} in der UHS`).toBeDefined();
-    await fuelle(page, 'post', `/api/einsaetze/${einsatzId}/persons/${person!.id}/uhs-occupancy`, {
+    await fuelle(page, 'post', `/api/incidents/${einsatzId}/persons/${person!.id}/uhs-occupancy`, {
       art: 'wechsel',
       uhs_id: uhs.id,
       platz_id: platz.id,
@@ -66,7 +66,7 @@ async function grundrissBelegen(page: Page, einsatzId: number): Promise<UhsDetai
 
 /** Zwei Stellen neben der Turnhalle, damit die Liste Typ und Status unterscheidet; einmal je Lauf. */
 async function weitereStellenAnlegen(page: Page, einsatzId: number): Promise<void> {
-  const basis = `/api/einsaetze/${einsatzId}/uhs`;
+  const basis = `/api/incidents/${einsatzId}/uhs`;
   const vorhanden = (await (await page.request.get(basis)).json()) as { bezeichnung: string }[];
   if (vorhanden.some((u) => u.bezeichnung === 'Patientenablage Mühlbachweg')) return;
   await fuelle(page, 'post', basis, {
@@ -99,7 +99,7 @@ test.describe(KAPITEL, () => {
     const demo = await demoEinsatz(page);
     const uhs = await grundrissBelegen(page, demo.id);
     const personen = (await (
-      await page.request.get(`/api/einsaetze/${demo.id}/persons`)
+      await page.request.get(`/api/incidents/${demo.id}/persons`)
     ).json()) as Person[];
     const wartend = personen.find((p) => p.name === 'Musterfrau')!;
     await uhrAnhalten(page);

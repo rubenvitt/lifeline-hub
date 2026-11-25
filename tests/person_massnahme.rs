@@ -24,7 +24,7 @@ async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (Sta
 }
 
 fn pfad(e: i64, p: i64) -> String {
-    format!("/api/einsaetze/{e}/persons/{p}/interventions")
+    format!("/api/incidents/{e}/persons/{p}/interventions")
 }
 
 fn aufheben_pfad(e: i64, p: i64, m: &Value) -> String {
@@ -35,7 +35,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -115,7 +115,7 @@ async fn katalog_400_storniert_409_vermisst_422() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{storniert}"),
+        &format!("/api/incidents/{e}/persons/{storniert}"),
         &admin,
         None,
     )
@@ -129,7 +129,7 @@ async fn katalog_400_storniert_409_vermisst_422() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/persons/{p}/status"),
+            &format!("/api/incidents/{e}/persons/{p}/status"),
             &admin,
             Some(&json!({"status": status}).to_string()),
         )
@@ -328,7 +328,7 @@ async fn replay_derselben_client_id_legt_eine_massnahme_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -411,7 +411,7 @@ async fn durchfuehrung_vor_der_registrierung_bleibt_vor_dem_einsatzbeginn_400() 
     let (s, sichtung) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/persons/{p}/triage"),
+        &format!("/api/incidents/{e}/persons/{p}/triage"),
         json!({"kategorie": "sk2", "zeitpunkt_at": am_fundort}),
     )
     .await;

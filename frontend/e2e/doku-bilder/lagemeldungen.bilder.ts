@@ -33,7 +33,7 @@ interface Meldung {
  * nach laufender Nummer.
  */
 async function offeneMeldungen(page: Page, einsatzId: number): Promise<Meldung[]> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/reports`);
   expect(antwort.ok()).toBe(true);
   const liste = (await antwort.json()) as Meldung[];
   const offen = liste
@@ -78,7 +78,7 @@ test.describe(KAPITEL, () => {
     await fuelle(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/reports/${offen[0].id}/situation-relevant`,
+      `/api/incidents/${demo.id}/reports/${offen[0].id}/situation-relevant`,
       {
         lat: 50.952,
         lon: 10.246,
@@ -87,13 +87,13 @@ test.describe(KAPITEL, () => {
     await fuelle(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/reports/${offen[1].id}/situation-relevant`,
+      `/api/incidents/${demo.id}/reports/${offen[1].id}/situation-relevant`,
       {},
     );
     await fuelle(
       page,
       'post',
-      `/api/einsaetze/${demo.id}/reports/${offen[2].id}/situation-relevant`,
+      `/api/incidents/${demo.id}/reports/${offen[2].id}/situation-relevant`,
       {
         text: offen[2].inhalt,
       },

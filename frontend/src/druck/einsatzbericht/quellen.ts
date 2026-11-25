@@ -63,7 +63,7 @@ const nur = (block: BlockSchluessel): readonly BlockSchluessel[] => [block];
  * zeigte der Bericht ein gesperrtes Modul als lesbar an (der Server wiese es mit 403 ab).
  */
 export const QUELLEN: readonly Quelle[] = [
-  // GET /api/einsaetze/{id} — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:113).
+  // GET /api/incidents/{id} — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz.rs:113).
   // Kopf, Stand und Abschluss des Einsatzes braucht jeder Block.
   { schluessel: 'einsatz', bloecke: BLOECKE.map((b) => b.schluessel), modul: null },
   // GET …/command-post — `EinsatzLesezugriff` ohne Modul (src/routes/einsatz_fuehrungsstelle.rs).

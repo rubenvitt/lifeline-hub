@@ -1,4 +1,4 @@
-import type { FachebeneQuelle } from './fachebenen';
+import type { UeberlagerungQuelle } from './fachebenen';
 import type { AbloesungStatus, EtbTyp } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
@@ -80,6 +80,9 @@ export const EINSATZ_KEYS = {
   // Einheit, die dann kein Treffer mehr ist), nicht auf der Platte.
   brStammTreffer: 'einsatz-br-stamm-treffer',
   kartenbilder: 'einsatz-kartenbilder',
+  // Fremdebenen der Lagekarte (LLH-2099): Liste und je Ebene das normierte GeoJSON.
+  fremdebenen: 'einsatz-fremdebenen',
+  fremdebeneDaten: 'einsatz-fremdebene-daten',
   etb: 'etb',
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
@@ -148,6 +151,9 @@ export const EINSATZ_KEYS = {
   abschlussPruefung: 'einsatz-abschluss-pruefung',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
+  // Helfer-Übersicht der Einsatzleitung (Helfer-App): Einladung und Helfer-Kopplungen, live über
+  // `helfer` (nur an die Einsatzleitung).
+  helfer: 'einsatz-helfer',
   // Freigaben für Anbindungen (Maschinenzugänge) an diesem Einsatz (LLH-1638), Seite der Geräte.
   anbindungen: 'einsatz-anbindungen',
   // Links auf das Lagebild für Externe (LLH-1496), Seite der Geräte.
@@ -384,6 +390,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.brStammTreffer,
   ],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
+  karte_fremdebene: [EINSATZ_KEYS.fremdebenen, EINSATZ_KEYS.fremdebeneDaten],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
   // Invalidiert Befehls-Liste UND -Detail (Prefix-Match trifft alle befehlIds).
@@ -396,6 +403,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Fernmeldeskizze und Kommunikationsplan lesen sie direkt. Aufträge und Erinnerungen sind
   // gezählte Listen, deshalb geht der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn
   // sich die Zahl hier nicht ändert. Den Kopf (`meine_*`) frischt das zugleich verteilte `einsatz`.
+  // Helfer-App: Einlösen, Bestätigen, Ablehnen, Abmelden, Verlängern, Pause und (höchstens alle
+  // 30 s) eine neue Position eines Helfers. Der Server schickt es nur an die Einsatzleitung.
+  helfer: [EINSATZ_KEYS.helfer],
   mitglieder: [
     EINSATZ_KEYS.mitglieder,
     EINSATZ_KEYS.auftraege,
@@ -728,6 +738,8 @@ export const einsatzKeys = {
   abschlussPruefung: (einsatzId: number) => [EINSATZ_KEYS.abschlussPruefung, einsatzId] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
+  /** Helfer-Übersicht (Einladung und Helfer), live über `helfer`. */
+  helfer: (einsatzId: number) => [EINSATZ_KEYS.helfer, einsatzId] as const,
   /** Anbindungen der Org aus Sicht dieses Einsatzes (LLH-1638), nicht live. */
   anbindungen: (einsatzId: number) => [EINSATZ_KEYS.anbindungen, einsatzId] as const,
   /** Links auf das Lagebild für Externe an diesem Einsatz (LLH-1496), nicht live. */
@@ -861,6 +873,9 @@ export const einsatzKeys = {
   lageberichtAnlagen: (einsatzId: number, berichtId: number) =>
     [EINSATZ_KEYS.lageberichtAnlagen, einsatzId, berichtId] as const,
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
+  fremdebenen: (einsatzId: number) => [EINSATZ_KEYS.fremdebenen, einsatzId] as const,
+  fremdebeneDaten: (einsatzId: number, ebeneId: number) =>
+    [EINSATZ_KEYS.fremdebeneDaten, einsatzId, ebeneId] as const,
   // Maßgebliche Pegel, NICHT live (siehe NICHT_LIVE_KEYS).
   pegel: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId] as const,
   /** Vorschlag aus der Vorhersage-Reihe `WV` je Pegel, Sub-Key unter demselben Prefix. */
@@ -1404,13 +1419,22 @@ export const globalKeys = {
   // Externe Fachebenen. `kritis` und `energie` tragen eine BBox im Key und haben einen eigenen
   // Accessor, sonst entstünden zwei Cache-Fächer für denselben Zustand. `bbox` ist
   // `string | null`, NICHT `undefined`.
-  fachebene: (quelle: Exclude<FachebeneQuelle, 'kritis' | 'energie' | 'copernicus'>) =>
-    [GLOBAL_KEYS.fachebene, quelle] as const,
+  fachebene: (
+    quelle: Exclude<UeberlagerungQuelle, 'kritis' | 'energie' | 'copernicus' | 'copernicus_bilder'>,
+  ) => [GLOBAL_KEYS.fachebene, quelle] as const,
   fachebeneKritis: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'kritis', bbox] as const,
   fachebeneEnergie: (bbox: string | null) => [GLOBAL_KEYS.fachebene, 'energie', bbox] as const,
   /** Copernicus (LLH-1200): je Ausschnitt und Archiv-Schalter ein eigener Stand. */
   fachebeneCopernicus: (bbox: string | null, archiv: boolean) =>
     [GLOBAL_KEYS.fachebene, 'copernicus', bbox, archiv] as const,
+  /** Copernicus-Satellitenbilder (LLH-2021): Schlüssel wie die Vektorebene. */
+  fachebeneCopernicusBilder: (bbox: string | null, archiv: boolean) =>
+    [GLOBAL_KEYS.fachebene, 'copernicus_bilder', bbox, archiv] as const,
+  /** Drohnenlage (LLH-2106): einsatzbezogen, darum die Einsatz-ID im Key. */
+  fachebeneDrohne: (einsatzId: number) => [GLOBAL_KEYS.fachebene, 'drohne', einsatzId] as const,
+  /** Drohnenquellen der Org aus Sicht eines Einsatzes (LLH-2106): Zuschaltung, Mission, Halter. */
+  drohnenQuellen: (einsatzId: number) =>
+    [GLOBAL_KEYS.fachebene, 'drohne-quellen', einsatzId] as const,
 } as const;
 
 /**
@@ -1623,6 +1647,10 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.br,
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
+    // Fremdebenen (LLH-2099): Liste und je Ebene das normierte GeoJSON, damit die Karte ohne Netz
+    // dieselben Ebenen zeigt.
+    EINSATZ_KEYS.fremdebenen,
+    EINSATZ_KEYS.fremdebeneDaten,
     EINSATZ_KEYS.lageSnapshot,
     // Verlauf der eigenen Benachrichtigungen (LLH-1422): ohne Netz lesbar, „Alle gelesen“ wird
     // vorgemerkt (`offline/schreiben.ts`). Die Detailzeile liest der Server nur aus Retain-Spalten

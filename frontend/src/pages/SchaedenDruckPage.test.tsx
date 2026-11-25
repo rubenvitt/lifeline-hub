@@ -55,8 +55,8 @@ const BESTAND = [schaden(1, 'offen'), schaden(2, 'uebergeben'), schaden(3, 'offe
 function rendere(suche = '', client = neuerQueryClient()) {
   const abrufe = { liste: 0, parameter: [] as string[] };
   server.use(
-    http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/damages', ({ request }) => {
+    http.get('/api/incidents/7', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/7/damages', ({ request }) => {
       abrufe.liste += 1;
       abrufe.parameter.push(new URL(request.url).search);
       return HttpResponse.json(BESTAND);

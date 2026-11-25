@@ -101,17 +101,17 @@ function stelleBereit(a: Aufbau = {}) {
     laufende_schichten: 2,
   });
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
-    http.get('/api/einsaetze/1/settings', () =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatz(a.rolle, a.spiegel))),
+    http.get('/api/incidents/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/module-access', () =>
+    http.get('/api/incidents/1/module-access', () =>
       HttpResponse.json(a.freigaben ?? freigabenFixture()),
     ),
     http.get('/api/shift-models', () => HttpResponse.json(MODELLE)),
     // Das Paneel „Dienst und Ruhe“ liest nur `grenzwerte` aus dem Plan (LLH-1603, D2).
-    http.get('/api/einsaetze/1/reliefs/shift-plan', () => HttpResponse.json({ grenzwerte })),
-    http.patch('/api/einsaetze/1/reliefs/shift-plan/limits', async ({ request }) => {
+    http.get('/api/incidents/1/reliefs/shift-plan', () => HttpResponse.json({ grenzwerte })),
+    http.patch('/api/incidents/1/reliefs/shift-plan/limits', async ({ request }) => {
       const body = (await request.json()) as Record<string, number | null>;
       patches.push(body);
       const neu = { ...grenzwerte };
@@ -126,11 +126,11 @@ function stelleBereit(a: Aufbau = {}) {
       grenzwerte = neu;
       return HttpResponse.json({ grenzwerte });
     }),
-    http.get('/api/einsaetze/1/reliefs/shift-model', () => {
+    http.get('/api/incidents/1/reliefs/shift-model', () => {
       lesend += 1;
       return HttpResponse.json(antwort());
     }),
-    http.put('/api/einsaetze/1/reliefs/shift-model', async ({ request }) => {
+    http.put('/api/incidents/1/reliefs/shift-model', async ({ request }) => {
       const body = (await request.json()) as {
         schichtmodell_id?: number;
         schichtmodell?: Record<string, unknown> | null;

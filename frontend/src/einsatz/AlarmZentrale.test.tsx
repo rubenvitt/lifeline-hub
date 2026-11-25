@@ -29,12 +29,12 @@ import { server } from '../test/server';
  */
 const bekannt = new Map<number, BenachrichtigungAnzeige>();
 /**
- * Was `GET /api/einsaetze/{e}/reports/{id}` liefert (LLH-1052): Absender und Wortlaut holt die
+ * Was `GET /api/incidents/{e}/reports/{id}` liefert (LLH-1052): Absender und Wortlaut holt die
  * Zentrale über die Meldung selbst. Ohne Eintrag 404, dann bleibt der Text des Servers.
  */
 const meldungen = new Map<number, { absender: string; inhalt: string }>();
 /**
- * Was `GET /api/einsaetze/{e}/reminders` liefert (LLH-1737): den Titel einer fälligen
+ * Was `GET /api/incidents/{e}/reminders` liefert (LLH-1737): den Titel einer fälligen
  * Erinnerung holt die Zentrale aus der offenen Liste. Ohne Eintrag bleibt der Text des Servers.
  */
 const offeneErinnerungen = new Map<number, string>();
@@ -43,7 +43,7 @@ beforeEach(() => {
   meldungen.clear();
   offeneErinnerungen.clear();
   server.use(
-    http.get('/api/einsaetze/:einsatzId/reminders', ({ params }) =>
+    http.get('/api/incidents/:einsatzId/reminders', ({ params }) =>
       HttpResponse.json(
         [...offeneErinnerungen].map(([id, titel]) => ({
           id,
@@ -58,7 +58,7 @@ beforeEach(() => {
         ? HttpResponse.json(b)
         : HttpResponse.json({ error: 'nicht gefunden' }, { status: 404 });
     }),
-    http.get('/api/einsaetze/:einsatzId/reports/:id', ({ params }) => {
+    http.get('/api/incidents/:einsatzId/reports/:id', ({ params }) => {
       const m = meldungen.get(Number(params.id));
       return m
         ? HttpResponse.json({ id: Number(params.id), einsatz_id: Number(params.einsatzId), ...m })

@@ -36,7 +36,7 @@ async function seedeS2(page: Page, einsatzId: string) {
 
 async function vorbedingungFreigabe(page: Page, einsatzId: string) {
   const freigaben = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/module-access`)
+    await page.request.get(`/api/incidents/${einsatzId}/module-access`)
   ).json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
   expect(freigaben.stab, 'Vorbedingung: kein Modul Stab').toBeUndefined();
   expect(freigaben.fernmeldewesen, 'Vorbedingung: Fernmeldewesen frei').toEqual({

@@ -546,7 +546,7 @@ async fn geloeschtes_und_neu_angelegtes_material_im_einsatz_bleibt_eine_zeile() 
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &elw.admin,
         Some(&json!({"material_id": zelt})),
     )

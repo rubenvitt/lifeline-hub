@@ -11,14 +11,14 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
+    format!("/api/incidents/{einsatz}/reliefs/shift-plan")
 }
 
 async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": name})),
     )
@@ -55,7 +55,7 @@ async fn disponieren(app: &axum::Router, cookie: &str, einsatz: i64, personal_id
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&json!({"personal_id": personal_id})),
     )
@@ -311,7 +311,7 @@ async fn soll_aus_dem_posten_und_qualifikationsbefund() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/uhs/{markt}"),
+        &format!("/api/incidents/{e}/uhs/{markt}"),
         &admin,
         Some(&json!({"soll_anzahl": 1, "quali_soll": [{"qualifikation_id": rs, "anzahl": 1}]})),
     )
@@ -403,7 +403,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (_, kraefte_vorher) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         None,
     )
@@ -447,7 +447,7 @@ async fn befunde_doppelt_dienst_abweichung_und_person_ausserhalb_des_einsatzes()
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         None,
     )
@@ -513,7 +513,7 @@ async fn personen_und_helfer_pruefen() {
     let (s, adhoc) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         Some(
             &json!({"adhoc": {"name": "Notarzt Extern", "funktion": "Notarzt",
@@ -735,7 +735,7 @@ async fn schichten_erzeugen_aus_laenge_und_schichtmodell() {
     let (s, json) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/reliefs/shift-model"),
+        &format!("/api/incidents/{e}/reliefs/shift-model"),
         &admin,
         Some(
             &json!({"schichtmodell": {"bezeichnung": "4 h", "typ": "rhythmus",
@@ -954,7 +954,7 @@ async fn rechte_module_und_abgeschlossener_einsatz() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
+            &format!("/api/incidents/{e}/module-overrides/{modul}"),
             &admin,
             Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
         )
@@ -1019,7 +1019,7 @@ async fn rechte_module_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -1497,7 +1497,7 @@ async fn reihenfolge_der_bloecke_und_personen_im_einsatz() {
     let (s, kraft) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         Some(&json!({"adhoc": {"name": "Zora", "funktion": "Notarzt",
                                "staerke_position": "fuehrer"}})),

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Berechtigungen der Helfer-App (ADR-0101; CODE_SIGN_ENTITLEMENTS in ios/project.yml). Die App
+  Group teilt die App mit der Widget-Erweiterung HelferAktivitaet: dort legt „Pausieren“ der
+  Live-Aktivität die Anfrage ab, falls die App sie nicht selbst ausführen kann
+  (Helfer/Gemeinsam/Pausieranfrage.swift). Das Sitzungs-Cookie liegt im Schlüsselbund der App,
+  nicht in der Gruppe.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.dev.rubeen.lifeline.helfer</string>
+	</array>
+</dict>
+</plist>

@@ -18,9 +18,9 @@ import { freigabenFixture } from '../test/fixtures';
  * was als Hinweis dasteht.
  */
 
-const P_PERSONAL = '/api/einsaetze/7/personnel';
-const P_KOPFZAHL = '/api/einsaetze/7/care/occupancy';
-const P_KOSTFORMEN = '/api/einsaetze/7/care/diets';
+const P_PERSONAL = '/api/incidents/7/personnel';
+const P_KOPFZAHL = '/api/incidents/7/care/occupancy';
+const P_KOSTFORMEN = '/api/incidents/7/care/diets';
 
 /** Beginn 10:00 UTC (12:00 in Berlin), jetzt 10:30 UTC → hat begonnen. */
 const VON = '2026-09-24 10:00:00';

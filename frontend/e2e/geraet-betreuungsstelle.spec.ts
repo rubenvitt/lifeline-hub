@@ -26,12 +26,12 @@ async function senden<T = { id: number }>(
 }
 
 async function stelleInBetrieb(page: Page, e: number, bezeichnung: string): Promise<number> {
-  const stelle = await senden(page, 'post', `/api/einsaetze/${e}/care/positions`, {
+  const stelle = await senden(page, 'post', `/api/incidents/${e}/care/positions`, {
     bezeichnung,
     art: 'notunterkunft',
     kapazitaet_personen: 80,
   });
-  await senden(page, 'patch', `/api/einsaetze/${e}/care/positions/${stelle.id}`, {
+  await senden(page, 'patch', `/api/incidents/${e}/care/positions/${stelle.id}`, {
     status: 'in_betrieb',
   });
   return stelle.id;
@@ -42,21 +42,21 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await senden(page, 'post', '/api/einsaetze', {
+  const einsatz = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Betreuung ${Date.now()}`,
   });
   const e = einsatz.id;
   const nord = await stelleInBetrieb(page, e, 'NU Turnhalle Nord');
   const sued = await stelleInBetrieb(page, e, 'NU Schule Süd');
-  const fremd = await senden(page, 'post', `/api/einsaetze/${e}/persons`, { name: 'Südmann' });
-  await senden(page, 'post', `/api/einsaetze/${e}/persons/${fremd.id}/whereabouts`, {
+  const fremd = await senden(page, 'post', `/api/incidents/${e}/persons`, { name: 'Südmann' });
+  await senden(page, 'post', `/api/incidents/${e}/persons/${fremd.id}/whereabouts`, {
     art: 'notunterkunft',
     betreuungsstelle_id: sued,
   });
   const kopplung = await senden<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'betreuungsstelle', stelle_id: nord, bezeichnung: 'Tablet NU' },
   );
 
@@ -107,19 +107,19 @@ test('LFH-1041: Tablet der Betreuungsstelle nimmt auf, meldet die Belegung und m
 
     // Die Einsatzleitung sieht die Belegung, die Person in der Stelle und die Meldung mit der
     // Stelle als Absender.
-    const uebersicht = await page.request.get(`/api/einsaetze/${e}/care`);
+    const uebersicht = await page.request.get(`/api/incidents/${e}/care`);
     const stellen = (
       (await uebersicht.json()) as { stellen: { id: number; belegung?: { belegt: number } }[] }
     ).stellen;
     expect(stellen.find((s) => s.id === nord)?.belegung?.belegt).toBe(12);
-    const personen = (await (await page.request.get(`/api/einsaetze/${e}/persons`)).json()) as {
+    const personen = (await (await page.request.get(`/api/incidents/${e}/persons`)).json()) as {
       name: string | null;
       aktuelle_verbleib_betreuungsstelle_id: number | null;
     }[];
     expect(personen.find((p) => p.name === 'Nordhoff')?.aktuelle_verbleib_betreuungsstelle_id).toBe(
       nord,
     );
-    const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/reports`)).json()) as {
+    const meldungen = (await (await page.request.get(`/api/incidents/${e}/reports`)).json()) as {
       inhalt: string;
       absender: string;
     }[];
@@ -136,14 +136,14 @@ test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigen
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await senden(page, 'post', '/api/einsaetze', {
+  const einsatz = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Registrierliste Gerät ${Date.now()}`,
   });
   const e = einsatz.id;
   const nord = await stelleInBetrieb(page, e, 'NU Turnhalle Nord');
   const sued = await stelleInBetrieb(page, e, 'NU Schule Süd');
   const registrieren = (stelle: number, name: string) =>
-    senden(page, 'post', `/api/einsaetze/${e}/care/positions/${stelle}/registrations`, {
+    senden(page, 'post', `/api/incidents/${e}/care/positions/${stelle}/registrations`, {
       personen: [{ name, vorname: 'Ida', kostform: 'vegan' }],
     });
   await registrieren(nord, 'Nordhoff');
@@ -151,7 +151,7 @@ test('LLH-1616: Tablet der Betreuungsstelle druckt die Registrierliste der eigen
   const kopplung = await senden<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'betreuungsstelle', stelle_id: nord, bezeichnung: 'Tablet NU' },
   );
 

@@ -36,7 +36,7 @@ async fn posten(
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/reliefs/shift-plan/blocks"),
+        &format!("/api/incidents/{e}/reliefs/shift-plan/blocks"),
         cookie,
         Some(&json!({"posten": {"art": "einheit", "einheit_id": einheit},
                      "von": f(von), "bis": f(bis), "personen": []})),
@@ -57,7 +57,7 @@ async fn schicht(
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/reliefs"),
+        &format!("/api/incidents/{e}/reliefs"),
         cookie,
         Some(&json!({"einheit_id": einheit, "rhythmus_minuten": rhythmus,
                      "beginn_at": f(beginn)})),
@@ -116,7 +116,7 @@ async fn fuenfzehn_posten_mit_gleichem_wechsel_erzeugen_eine_benachrichtigung() 
     let (s, p) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reliefs/shift-plan"),
+        &format!("/api/incidents/{e}/reliefs/shift-plan"),
         &admin,
         None,
     )

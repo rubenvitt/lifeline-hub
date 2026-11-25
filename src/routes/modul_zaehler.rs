@@ -9,7 +9,7 @@ use crate::error::AppError;
 use axum::extract::State;
 use axum::Json;
 
-/// GET /api/einsaetze/{id}/module-counts — ein Zähler je erlaubtem Modul.
+/// GET /api/incidents/{id}/module-counts — ein Zähler je erlaubtem Modul.
 ///
 /// `EinsatzLesezugriff<OhneModul>`: Org-Floor + Lesezugriff, **kein** Modul-Gate — die Route
 /// gehört keinem Modul (wie `/live`). Die Modulrechte wirken als Filter über die Felder: ein

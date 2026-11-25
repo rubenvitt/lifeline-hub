@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, frontend/src/pages/einstellungen/OrtungHauptamt.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/routes/org_einstellungen.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs]
 ---
 
 ## Überblick
@@ -166,16 +166,17 @@ angelegt.
 Für den System-Admin; das Koppeln selbst übernehmen Einsatzleitung und Führungspersonal. Die Ortung zeigt die Position des Geräts in einem
 Fahrzeug auf der Lagekarte (Hintergrund: „Ortung von Fahrzeugen“).
 
-1. Wie unter „Einwurf-Zugang anlegen“ einen Zugang mit dem Zweck „Positionen einliefern“
+1. In der Verwaltung unter „Einstellungen“ „Einsatz-Vorgaben“ im Bereich „Ortung“ den Schalter
+   „Ortung im Einsatz“ einschalten (Kapitel [Helfer anmelden](helfer-anmelden.md)). Beim
+   Einschalten bestätigt der System-Admin, dass eine Einwilligung bzw. eine Betriebs- oder
+   Dienstvereinbarung vorliegt; der Server hält fest, wer es wann bestätigt hat. Der Schalter gilt
+   für die ganze Organisation, für die Helfer-App wie für die Ortung über den Einwurf.
+2. Wie unter „Einwurf-Zugang anlegen“ einen Zugang mit dem Zweck „Positionen einliefern“
    anlegen und die Adresse im Gerät eintragen, etwa als Server-URL in OsmAnd oder im Traccar
    Client. Als Kennung („Device ID“) eine Bezeichnung wählen, die sich dem Fahrzeug zuordnen lässt.
-2. Das Gerät sendet seine Position. Erst dann erscheint die Kennung in der Auswahl.
-3. Im Einsatz bei „Fahrzeuge“ in der Zeile des Fahrzeugs „Weitere Aktionen“ und „Ortung koppeln …“
+3. Das Gerät sendet seine Position. Erst dann erscheint die Kennung in der Auswahl.
+4. Im Einsatz bei „Fahrzeuge“ in der Zeile des Fahrzeugs „Weitere Aktionen“ und „Ortung koppeln …“
    wählen, die Kennung ankreuzen und „Koppeln“ wählen (Kapitel [Fahrzeuge und FMS](fahrzeuge.md)).
-4. Für hauptamtliche Besatzung zusätzlich in der Verwaltung unter „Einstellungen“ „Anbindungen“
-   im Paneel „Ortung“ den Schalter „Ortung auch bei hauptamtlicher Besatzung“ einschalten. Ihn
-   ändert nur der System-Admin; er gilt für die ganze Organisation. Eine Betriebs- oder
-   Dienstvereinbarung muss vorliegen, bevor er eingeschaltet wird.
 
 ### Einwurf-Zugang widerrufen
 
@@ -265,6 +266,22 @@ Eingriff“.
 2. Die Rückfrage mit „Löschen“ bestätigen.
 
 Der Adapter ist danach samt Geheimnissen und Verlauf gelöscht.
+
+### Veranstaltungen abrufen
+
+Geplante Sanitätsdienste, Betreuungen und Übungen kann Lifeline Hub aus einer anderen Anwendung
+abrufen, die den Vertrag „Veranstaltungen-Abruf v1“ anbietet (`docs/schnittstellen/veranstaltungen-abruf.md`).
+Für den System-Admin:
+
+1. In der liefernden Anwendung einen Zugang für den Abruf anlegen und den Schlüssel kopieren.
+2. Hier „Adapter anlegen“ wählen, unter „Art“ „Veranstaltungen (Schnittstelle v1)“ wählen und einen
+   „Name“ eintragen.
+3. Unter „Adresse der Schnittstelle“ die Adresse der liefernden Anwendung eintragen, unter der
+   sie den Abruf anbietet, und „Anlegen“ wählen. Das „Intervall“ schlägt 300 Sekunden vor, kürzer
+   als 60 geht nicht.
+4. Im Paneel „Geheimnisse“ an der Zeile „Abruf-Schlüssel“ „Setzen“ wählen, den Schlüssel einfügen
+   und „Speichern“ wählen.
+5. „Verbindung prüfen“ wählen. Das Ergebnis nennt die Zahl der Veranstaltungen als Einträge.
 
 ## Hintergrund
 
@@ -431,38 +448,43 @@ Auswahl stehen die Kennungen, von denen in den letzten 24 Stunden eine Position 
 Zugang nicht widerrufen und nicht abgelaufen ist, den Zweck „Positionen einliefern“ trägt und zur
 eigenen Organisation gehört. Die Liste zeigt keine Koordinaten.
 
-- **Ehrenamt:** Ohne den Schalter „Ortung auch bei hauptamtlicher Besatzung“ muss, wer koppelt,
-  „Besatzung ist ehrenamtlich“ bestätigen. Der Schalter trägt den Hinweis „Nur mit Betriebs- oder
-  Dienstvereinbarung (§ 87 Abs. 1 Nr. 6 BetrVG).“ Die App prüft weder die Vereinbarung noch die
-  Besatzung; beides verantwortet die Organisation.
+- **Freigabe der Organisation:** Ohne den Schalter „Ortung im Einsatz“ lässt sich nicht koppeln;
+  der Dialog „Ortung koppeln“ nennt den Grund. Wird der Schalter ausgeschaltet, bleiben bestehende
+  Kopplungen stehen, es kommt aber keine Position mehr am Fahrzeug an. Die App prüft die
+  Einwilligung oder Vereinbarung nicht; sie verantwortet die Organisation.
 - **Einsatzbezug:** Gekoppelt wird nur in einem laufenden, nicht gespiegelten Einsatz. Die Kopplung
-  endet mit „Ortung trennen“, dem Entlassen, dem Stornieren und dem Abschluss; jedes Ende und das
+  endet mit „Ortung trennen“, dem Entlassen, dem Stornieren, dem Ablehnen der Einheit und dem
+  Abschluss; jedes Ende und das
   Koppeln stehen im Einsatztagebuch. Wird der Zugang widerrufen, bleibt die Kopplung stehen, es
   kommt aber keine Position mehr an.
-- **Marker:** „GPS“ an der Marke, „veraltet“, wenn die Messung über zehn Minuten zurückliegt
-  (Kapitel [Lagekarte](lagekarte.md)). Je Fahrzeug schreibt die Ortung höchstens alle 15 Sekunden.
+- **Marker:** Unter dem Namen steht „Ortung · vor 3 min“; liegt die Messung fünf Minuten oder
+  länger zurück, wird der Marker blass und die Liste „Geortet“ nennt „veraltet“ (Kapitel
+  [Lagekarte](lagekarte.md)). Eine von Hand gesetzte Position bleibt stehen, bis eine später
+  gemessene Position kommt. Je Fahrzeug schreibt die Ortung höchstens alle 15 Sekunden.
 - **Kein Verlauf:** Es gibt keine Spur und keine Liste früherer Orte. Je Kennung hält die Ablage
   die letzte Position 24 Stunden, am Fahrzeug steht die letzte Position bis zum Abschluss; der
-  Abschluss löscht die GPS-Positionen.
+  Abschluss löscht die Positionen aus der Ortung.
 - **Spiegel-Instanzen:** Die Position am Fahrzeug geht wie jede Änderung an Spiegel-Instanzen des
   Einsatzes. Die Kopplung bleibt auf der Instanz.
 
 #### Vorlage für die Datenschutz-Folgenabschätzung
 
-Diese Vorlage ordnet, was die App tut; sie ersetzt keine rechtliche Prüfung. Zu ergänzen ist, was
-nur die Organisation weiß. Die Stellen in eckigen Klammern sind auszufüllen.
+Diese Vorlage ordnet, was die App bei der Ortung über den Einwurf tut; sie ersetzt keine rechtliche
+Prüfung. Sie ergänzt die gemeinsame Vorlage für die Ortung im Einsatz (Helfer-App und Einwurf),
+die im Repository unter `docs/datenschutz/dsfa-vorlage-ortung.md` liegt. Zu ergänzen ist, was nur
+die Organisation weiß. Die Stellen in eckigen Klammern sind auszufüllen.
 
 | Punkt | Inhalt |
 | --- | --- |
 | Zweck | Anzeige der Position von Einsatzfahrzeugen auf der Lagekarte während eines laufenden Einsatzes, zur Koordination der Kräfte. [Weitere Zwecke der Organisation oder „keine“] |
-| Rechtsgrundlage | [Vom Verantwortlichen einzutragen. Für ehrenamtliche Besatzung kommt Art. 6 DSGVO in Betracht, etwa Absatz 1 Buchstabe f; für hauptamtliche Besatzung zusätzlich die Betriebs- oder Dienstvereinbarung nach § 87 Abs. 1 Nr. 6 BetrVG bzw. dem Personalvertretungsrecht. Einschätzung der Organisation oder ihrer Datenschutzbeauftragten.] |
+| Rechtsgrundlage | [Vom Verantwortlichen einzutragen: Einwilligung der Besatzung oder Betriebs- bzw. Dienstvereinbarung nach § 87 Abs. 1 Nr. 6 BetrVG bzw. dem Personalvertretungsrecht; daneben kommt Art. 6 DSGVO in Betracht, etwa Absatz 1 Buchstabe f. Das Vorliegen bestätigt der System-Admin beim Einschalten von „Ortung im Einsatz“. Einschätzung der Organisation oder ihrer Datenschutzbeauftragten.] |
 | Betroffene | Besatzung des gekoppelten Fahrzeugs [ehrenamtlich / hauptamtlich] |
 | Daten | Kennung des Geräts, Koordinaten, Zeitpunkt der Messung. Es gibt keine Zuordnung zu Personen außer über die Besatzung, die am Fahrzeug eingetragen ist. |
-| Speicherdauer | Letzte Position je Kennung 24 Stunden nach dem Empfang in der Ablage. Am Fahrzeug bis zum Abschluss des Einsatzes; dann werden GPS-Positionen gelöscht. Eingefrorene Lagestände behalten die Position bis zur Löschung des Einsatzes. |
+| Speicherdauer | Letzte Position je Kennung 24 Stunden nach dem Empfang in der Ablage. Am Fahrzeug bis zum Abschluss des Einsatzes; dann werden die Positionen aus der Ortung gelöscht. Eingefrorene Lagestände behalten die Position bis zur Löschung des Einsatzes. |
 | Verlauf | Kein Positionsverlauf, keine Spur, kein Geofencing. |
 | Empfänger | Personen mit Zugriff auf den Einsatz in der Organisation und, bei gespiegelten Einsätzen, die Spiegel-Instanzen. [Weitere Empfänger der Organisation] |
-| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Bestätigung „Besatzung ist ehrenamtlich“ oder Freischaltung durch die Organisation; Kandidatenliste ohne Koordinaten; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
-| Risiken | Ortung von Beschäftigten ohne Vereinbarung; Weitergabe der Adresse eines Zugangs. [Bewertung der Organisation] |
+| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Freigabe durch die Organisation über den Schalter „Ortung im Einsatz“ (vorgabemäßig aus; wer ihn wann eingeschaltet hat, hält der Server fest); Kandidatenliste ohne Koordinaten; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
+| Risiken | Ortung von Kräften ohne Einwilligung oder Vereinbarung, wenn der Schalter ohne Grundlage eingeschaltet wird; Weitergabe der Adresse eines Zugangs. [Bewertung der Organisation] |
 
 ### Einwurf nur verschlüsselt
 
@@ -546,6 +568,23 @@ Geheimnisse auf den neuen um; die Adapter laufen weiter, und niemand muss etwas 
 Die Ziele eines Adapters prüft der Server wie die Ziele eines Webhooks: nur über https, keine
 Weiterleitung, kein Ziel in einem internen Netz. „Ziel im eigenen Netz erlauben“ öffnet private
 Netze; der Rechner selbst und Adressen wie `169.254.169.254` bleiben gesperrt.
+
+### Abgerufene Veranstaltungen
+
+Ein Adapter der Art „Veranstaltungen (Schnittstelle v1)“ legt jede Veranstaltung einmal ab, mit
+Name, Art, Status, Ort, Veranstalter, Bemerkung, Beginn und Ende in ihrem letzten Stand. Ein Abruf
+ohne Änderung schreibt nichts; eine Änderung oder Absage überschreibt den alten Stand. Fehlt eine
+Veranstaltung, die noch nicht länger als 7 Tage vorbei ist, in der Lieferung, gilt sie als
+entfernt. Die liefernde Anwendung gibt keine Personendaten heraus: „Veranstalter“ ist eine Stelle,
+kein Mensch.
+
+Enthält die Antwort auch nur eine ungültige Veranstaltung, verwirft der Adapter den ganzen Abruf
+mit „Antwort nicht lesbar“, behält den letzten Stand und steht auf „gestört“. Spricht die
+liefernde Anwendung eine neuere Fassung des Vertrags („Unbekannte Schnittstellenversion“) oder
+lehnt sie den Schlüssel ab („Zugang abgelehnt“), steht der Adapter auf „braucht Eingriff“.
+
+Eine Veranstaltung wird 14 Tage nach ihrem Ende gelöscht, und mit ihrem Adapter. Eine Ansicht
+der abgerufenen Veranstaltungen gibt es in der App nicht.
 
 ### Am ELW
 

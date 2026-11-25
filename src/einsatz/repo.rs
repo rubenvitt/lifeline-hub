@@ -382,7 +382,7 @@ async fn write_vorlage_overrides_tx(
 /// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
 /// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
 /// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
-/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Zeile korreliert, damit `GET /api/incidents` die Anträge einmal liest und nicht einmal je
 /// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
 macro_rules! teilschwaerzungen_spalte {
     () => {
@@ -839,8 +839,17 @@ pub async fn liste_fuer(
 pub struct MitEtbEintraegen {
     pub einsatz: Einsatz,
     pub etb_eintrag_ids: Vec<i64>,
-    /// Einsatzfahrzeuge, deren Kopplung oder GPS-Position der Abschluss entfernt hat (LLH-2091);
-    /// die Route meldet sie nach dem Commit als `fahrzeug`. Sonst leer.
+}
+
+/// Ergebnis von [`abschliessen`]: wie [`MitEtbEintraegen`], dazu die Drohnenquellen, deren
+/// Zuschaltung der Abschluss beendet hat (die Route führt damit `AppState.drohne` nach).
+#[derive(Debug)]
+pub struct Abgeschlossen {
+    pub einsatz: Einsatz,
+    pub etb_eintrag_ids: Vec<i64>,
+    pub drohnen_abgeschaltet: Vec<String>,
+    /// Einsatzfahrzeuge, deren Kopplung oder Einwurf-Position der Abschluss entfernt hat
+    /// (LLH-2091); die Route meldet sie nach dem Commit als `fahrzeug`.
     pub ortung_ef_ids: Vec<i64>,
 }
 
@@ -857,7 +866,7 @@ pub async fn abschliessen(
     pool: &SqlitePool,
     einsatz_id: i64,
     von_benutzer_id: i64,
-) -> Result<MitEtbEintraegen, AppError> {
+) -> Result<Abgeschlossen, AppError> {
     // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
     let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
@@ -875,6 +884,7 @@ pub async fn abschliessen(
 
     let mut etb_eintrag_ids = Vec::new();
     let mut ortung_ef_ids: Vec<i64> = Vec::new();
+    let mut drohnen_abgeschaltet = Vec::new();
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
         "UPDATE einsatz \
@@ -919,17 +929,22 @@ pub async fn abschliessen(
         // LLH-1638: Maschinenzugänge lesen nur laufende Einsätze; der Abschluss beendet ihre
         // Freigabe in derselben Transaktion (ADR-0035).
         crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
-        // LLH-2091: die Ortung endet mit dem Einsatz, je Fahrzeug ein ETB-Eintrag; GPS-Positionen
-        // gehören nicht in die Einsatzakte, manuelle bleiben.
-        for (ef_id, _) in
-            crate::ortung::kopplung::delete_kopplungen_einsatz_tx(&mut tx, einsatz_id).await?
-        {
-            ortung_ef_ids.push(ef_id);
-            let funkrufname =
-                crate::fahrzeug::disposition_repo::transport_fahrzeug(&mut *tx, einsatz_id, ef_id)
-                    .await?
-                    .map(|f| f.funkrufname)
-                    .unwrap_or_default();
+        // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
+        // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
+        crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
+        // LLH-2091 (ADR-0103): die Fahrzeugortung aus dem Einwurf endet mit dem Einsatz, je
+        // Fahrzeug ein ETB-Eintrag; GPS-Positionen gehören nicht in die Einsatzakte, manuelle
+        // bleiben. Unabhängig von den Helfer-Kopplungen oben (Personen), dieselbe Transaktion.
+        let ende = crate::ortung::kopplung::beende_im_einsatz_tx(&mut tx, einsatz_id).await?;
+        for k in &ende.getrennt {
+            let funkrufname = crate::fahrzeug::disposition_repo::transport_fahrzeug(
+                &mut *tx,
+                einsatz_id,
+                k.einsatz_fahrzeug_id,
+            )
+            .await?
+            .map(|f| f.funkrufname)
+            .unwrap_or_default();
             etb_eintrag_ids.push(
                 crate::etb::repo::anlegen_tx(
                     &mut tx,
@@ -951,25 +966,11 @@ pub async fn abschliessen(
                 .await?,
             );
         }
-        let geleert: Vec<i64> = sqlx::query_scalar(
-            "SELECT id FROM einsatz_fahrzeug WHERE einsatz_id = ? AND position_quelle = 'ortung'",
-        )
-        .bind(einsatz_id)
-        .fetch_all(&mut *tx)
-        .await?;
-        for id in geleert {
-            if !ortung_ef_ids.contains(&id) {
-                ortung_ef_ids.push(id);
-            }
-        }
-        sqlx::query(
-            "UPDATE einsatz_fahrzeug SET lat = NULL, lon = NULL, position_quelle = NULL, \
-                 position_gemessen_at = NULL, position_gesetzt_at = NULL \
-             WHERE einsatz_id = ? AND position_quelle = 'ortung'",
-        )
-        .bind(einsatz_id)
-        .execute(&mut *tx)
-        .await?;
+        ortung_ef_ids = ende.fahrzeuge();
+        // LLH-2105: ein abgeschlossener Einsatz hält keine Drohnenquelle mehr (sonst sähe er das
+        // Livebild eines Einsatzes, der sie danach zuschaltet, und hielte sie nach dem
+        // Wiederöffnen ein zweites Mal). Den Store führt der Aufrufer nach dem Commit nach.
+        drohnen_abgeschaltet = crate::drohne::repo::delete_for_einsatz(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {
@@ -1057,10 +1058,11 @@ pub async fn abschliessen(
         }
     }
     tx.commit().await?;
-    Ok(MitEtbEintraegen {
+    Ok(Abgeschlossen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
         ortung_ef_ids,
+        drohnen_abgeschaltet,
     })
 }
 
@@ -1410,7 +1412,6 @@ pub async fn frist_setzen(
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids: vec![etb_id],
-        ortung_ef_ids: Vec::new(),
     })
 }
 

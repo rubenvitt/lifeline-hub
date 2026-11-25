@@ -131,7 +131,7 @@ async fn umgebung() -> Umgebung {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         &admin,
         None,
     )
@@ -296,7 +296,7 @@ async fn ein_admin_spielt_ein_und_die_spur_nennt_ihn() {
     assert!(v["hinweise"].as_array().unwrap().is_empty(), "{v}");
 
     // Der Einsatz steht in der Liste, als Spiegel „aus dem Archiv“.
-    let (s, liste) = anfrage(&u.app, "GET", "/api/einsaetze", &u.admin, None).await;
+    let (s, liste) = anfrage(&u.app, "GET", "/api/incidents", &u.admin, None).await;
     assert_eq!(s, StatusCode::OK);
     let e = liste
         .as_array()

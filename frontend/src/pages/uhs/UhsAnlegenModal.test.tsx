@@ -38,13 +38,13 @@ const TREFFER = {
 
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/:eid', ({ params }) =>
+    http.get('/api/incidents/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/:eid/place-preview', () =>
+    http.get('/api/incidents/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/:eid/place-search', () => HttpResponse.json(TREFFER)),
+    http.get('/api/incidents/:eid/place-search', () => HttpResponse.json(TREFFER)),
   );
 });
 
@@ -62,12 +62,12 @@ function mitschnitt(pfad: string) {
 describe.each([
   {
     was: 'UHS',
-    pfad: '/api/einsaetze/1/uhs',
+    pfad: '/api/incidents/1/uhs',
     zeige: () => renderMitProviders(<UhsAnlegenModal einsatzId={1} open onClose={vi.fn()} />),
   },
   {
     was: 'Bereitstellungsraum',
-    pfad: '/api/einsaetze/1/staging-areas',
+    pfad: '/api/incidents/1/staging-areas',
     zeige: () => renderMitProviders(<BrAnlegenModal einsatzId={1} open onClose={vi.fn()} />),
   },
 ])('$was anlegen · Standort als Ortsfeld (LLH-1114)', ({ pfad, zeige }) => {
@@ -142,7 +142,7 @@ describe('UHS anlegen · Notiz unter „Weitere Angaben“ (LLH-1921)', () => {
   });
 
   it('nennt eine eingetragene Notiz im Kopf und schickt sie mit', async () => {
-    const rumpfe = mitschnitt('/api/einsaetze/1/uhs');
+    const rumpfe = mitschnitt('/api/incidents/1/uhs');
     zeige();
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(await within(dialog).findByLabelText('Bezeichnung'), 'Nord');

@@ -3,7 +3,7 @@ import { apiGet, apiSend, mitParametern } from './client';
 import { unterschreibeErklaerung } from './instanz';
 
 // Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`). Jede Aktion gibt es zweimal: am lokalen
-// Einsatz (`/api/einsaetze/{id}/command`, Einsatzleitung oder Admin der Einsatz-Org) und an einer
+// Einsatz (`/api/incidents/{id}/command`, Einsatzleitung oder Admin der Einsatz-Org) und an einer
 // Akte des Gegenübers (`/api/admin/instance/command/{akte}`, Admin der Org). Den Pfad einer
 // Aktion bildet `fuehrungPfad`.
 
@@ -16,14 +16,14 @@ export type FuehrungOrt = { einsatzId: number } | { akteId: number; kennung: str
 
 export function fuehrungPfad(ort: FuehrungOrt, aktion: string): string {
   return 'einsatzId' in ort
-    ? `/api/einsaetze/${ort.einsatzId}/command/${aktion}`
+    ? `/api/incidents/${ort.einsatzId}/command/${aktion}`
     : mitParametern(`/api/admin/instance/command/${ort.akteId}/${aktion}`, {
         kennung: ort.kennung,
       });
 }
 
 export function loadFuehrung(einsatzId: number): Promise<FuehrungAnzeige> {
-  return apiGet<FuehrungAnzeige>(`/api/einsaetze/${einsatzId}/command`);
+  return apiGet<FuehrungAnzeige>(`/api/incidents/${einsatzId}/command`);
 }
 
 /** Einsätze beim Gegenüber (Akten ohne lokalen Einsatz), für die Seite „Instanzkopplung“. */
@@ -54,7 +54,7 @@ export function lehneAnfrageAb(ort: FuehrungOrt): Promise<FuehrungAnzeige> {
 /** Einen Spiegel zurückholen, dessen Führer nicht mehr gekoppelt ist (LLH-1850): nur mit Grund,
  *  nur am lokalen Einsatz. */
 export function holeFuehrungZurueck(einsatzId: number, grund: string): Promise<FuehrungAnzeige> {
-  return apiSend<FuehrungAnzeige>(`/api/einsaetze/${einsatzId}/command/reclaim`, 'POST', {
+  return apiSend<FuehrungAnzeige>(`/api/incidents/${einsatzId}/command/reclaim`, 'POST', {
     grund,
   });
 }

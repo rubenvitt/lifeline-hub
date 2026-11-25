@@ -51,6 +51,9 @@ object Linkweiche {
     }
 }
 
+/** Wie die App eine abgelegte Datei übergibt: dem Ziel direkt zeigen oder im Teilen-Blatt anbieten. */
+enum class Oeffnen { ANZEIGEN, TEILEN }
+
 /** Wohin ein Download geht: nur der Name ist Logik des Kerns, das Verzeichnis wählt die App. */
 object Downloadablage {
     /** Längster Dateiname in UTF-8-Bytes; Dateisysteme erlauben 255, etwas Luft bleibt. */
@@ -71,6 +74,19 @@ object Downloadablage {
         val sauber = letzter.map { if (it == ':' || it == '\\' || Character.isISOControl(it)) '_' else it }.joinToString("")
         val ohnePunkte = sauber.dropWhile { it == '.' }.trim { it.isWhitespace() }
         return kuerze(ohnePunkte.ifEmpty { "Download" })
+    }
+
+    /**
+     * Kalenderdateien (`text/calendar` oder Endung `ics`) gehen per `ACTION_VIEW` an die
+     * Kalender-App; Google Kalender nimmt sie nur so an. Alles andere geht ins Teilen-Blatt.
+     */
+    fun oeffnenAls(mimetyp: String, endung: String): Oeffnen {
+        val typ = mimetyp.substringBefore(';').trim()
+        return if (typ.equals("text/calendar", ignoreCase = true) || endung.equals("ics", ignoreCase = true)) {
+            Oeffnen.ANZEIGEN
+        } else {
+            Oeffnen.TEILEN
+        }
     }
 
     private fun kuerze(name: String): String {

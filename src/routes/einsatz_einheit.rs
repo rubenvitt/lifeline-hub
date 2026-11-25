@@ -33,7 +33,7 @@ use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
-pub(super) fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
+pub(crate) fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Einheit, "einheit_id", einheit_id);
@@ -70,7 +70,7 @@ pub struct ListeParams {
     aufgeloeste: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/units — aktive Einheiten (aufgelöst), mit `?aufgeloeste=1` die
+/// GET /api/incidents/{id}/units — aktive Einheiten (aufgelöst), mit `?aufgeloeste=1` die
 /// aufgelösten (Spec `kraefte-entlassung`). Nur Lesezugriff.
 pub async fn liste(
     State(state): State<AppState>,
@@ -142,7 +142,7 @@ fn check_fahrzeug_ids(ids: Option<&[i64]>) -> Result<Vec<i64>, AppError> {
     Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
 }
 
-/// POST /api/einsaetze/{id}/units — Einheit bilden, optional mit Fahrzeugen („Als eigene
+/// POST /api/incidents/{id}/units — Einheit bilden, optional mit Fahrzeugen („Als eigene
 /// Einheit führen“, LLH-1073, Spec `fahrzeug-bearbeitung`). Alles oder nichts in einem
 /// `write_retry!` (design.md D9): Einheit, Sprechgruppen, Vorprüfung der Fahrzeuge (unbekannt,
 /// beendet, schon in einer Einheit → 422 mit Grund je Fahrzeug), Zuordnung, die mitkommende
@@ -287,7 +287,7 @@ pub struct AusNachforderungBody {
     pub in_bereitstellungsraum: bool,
 }
 
-/// POST /api/einsaetze/{id}/units/from-resource-request — eine eingetroffene Nachforderung als
+/// POST /api/incidents/{id}/units/from-resource-request — eine eingetroffene Nachforderung als
 /// Einheit übernehmen (LLH-1383, design.md D2–D6, Spec `nachforderung-einheit`): neue Einheiten
 /// anlegen oder bestehende verknüpfen, auf Wunsch in den Bereitstellungsraum des Ziels buchen, ein
 /// ETB-Eintrag. Reihenfolge: Gate Einheiten → 400 (Zeilen) → 403 (Freigabe Nachforderungen, bei
@@ -344,7 +344,7 @@ pub async fn aus_nachforderung(
     Ok((StatusCode::CREATED, Json(n)))
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/annul-takeover — eine Fehlübernahme aus einer
+/// POST /api/incidents/{id}/units/{eid}/annul-takeover — eine Fehlübernahme aus einer
 /// Nachforderung rückgängig machen (LLH-1388, design.md D1–D5, Spec `nachforderung-einheit`): den
 /// Verweis lösen, eine angelegte Einheit auflösen (samt Austritt aus dem Raum), eine verknüpfte
 /// aus dem gebuchten Raum austreten lassen, ein ETB-Eintrag. Reihenfolge: Gate Einheiten → 403
@@ -388,7 +388,7 @@ fn is_gesperrt(pruefung: Result<(), AppError>) -> Result<bool, AppError> {
     }
 }
 
-/// GET /api/einsaetze/{id}/units/from-template/{vorlage_id} — Vorschau einer Einheiten-Vorlage
+/// GET /api/incidents/{id}/units/from-template/{vorlage_id} — Vorschau einer Einheiten-Vorlage
 /// im Einsatz (LLH-1049, Spec `einheit-vorlagen`, „Vorschau im Einsatz“): Baum und Zustand jeder
 /// Kraft. Fahrzeuge und Personen nur mit Freigabe ihres Moduls, sonst leer und als gesperrt
 /// gemeldet. Fremde oder unbekannte Vorlage 404, deaktivierte oder zu große 422. Schreibt nichts.
@@ -480,7 +480,7 @@ fn check_wahl(
     Ok(crate::kraefte_disposition::dedupe(&liste, |w| w.id))
 }
 
-/// POST /api/einsaetze/{id}/units/from-template — Einheit samt Untereinheiten, Fahrzeugen und
+/// POST /api/incidents/{id}/units/from-template — Einheit samt Untereinheiten, Fahrzeugen und
 /// gewählter Stammbesetzung aus einer Vorlage bilden (LLH-1049, Spec `kraefte-disposition`,
 /// „Einheit aus Vorlage bilden“). Alles oder nichts in einer Transaktion: Gründe je Zeile 422,
 /// mit Fahrzeugen das Recht am Modul Fahrzeuge, mit Personen das am Modul Personal, mit Material
@@ -702,7 +702,7 @@ const WIRKSAM_SOLL_MANNSCHAFT: &str = "COALESCE(soll_mannschaft, \
 const WIRKSAM_QUALI_SOLL: &str = "COALESCE(quali_soll, \
      (SELECT t.quali_soll FROM einheit_typ t WHERE t.id = einsatz_einheit.typ_id))";
 
-/// PATCH /api/einsaetze/{id}/units/{eid} — echter Teil-Patch (LFH-306) inkl.
+/// PATCH /api/incidents/{id}/units/{eid} — echter Teil-Patch (LFH-306) inkl.
 /// authoritativem `fuehrer_id`. Führer-Wechsel und Abschnitts-Zuordnungs-Änderung
 /// schreiben je einen ETB-Eintrag.
 pub async fn update(
@@ -1036,7 +1036,7 @@ async fn etb_sprechgruppe(
     super::etb_sprechgruppe(state, einsatz_id, org_id, benutzer_id, name, sg, wirkung).await;
 }
 
-/// PUT /api/einsaetze/{id}/units/{eid}/talk-groups/{sg} — eine Sprechgruppe zuordnen
+/// PUT /api/incidents/{id}/units/{eid}/talk-groups/{sg} — eine Sprechgruppe zuordnen
 /// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
 /// PATCH mit `sprechgruppe_ids`. Anders als der PATCH schreibt eine wirksame Zuordnung einen
 /// System-Eintrag ins ETB (LLH-1265, D3), eine wiederholte keinen.
@@ -1063,7 +1063,7 @@ pub async fn sprechgruppe_zuordnen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/units/{eid}/talk-groups/{sg} — Zuordnung lösen, idempotent;
+/// DELETE /api/incidents/{id}/units/{eid}/talk-groups/{sg} — Zuordnung lösen, idempotent;
 /// eine wirksame Lösung schreibt einen System-Eintrag ins ETB (LLH-1265, D3).
 pub async fn sprechgruppe_loesen(
     State(state): State<AppState>,
@@ -1079,7 +1079,7 @@ pub async fn sprechgruppe_loesen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/units/{eid} — auflösen (LLH-1079, Spec `kraefte-entlassung`):
+/// DELETE /api/incidents/{id}/units/{eid} — auflösen (LLH-1079, Spec `kraefte-entlassung`):
 /// Kräfte lösen, die Zeile bleibt als aufgelöst mit Zeitachse, abgelösten Schichten und
 /// ETB-Verknüpfungen stehen; ohne jede Spur wird sie gelöscht. Aufgelöst → 409. ETB-Eintrag.
 pub async fn aufloesen(
@@ -1090,7 +1090,7 @@ pub async fn aufloesen(
     end_einheit(&state, &ctx, eid, einheit_repo::Aufloesung::Aufloesen).await
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/annul — Fehlanlage löschen (LLH-1079,
+/// POST /api/incidents/{id}/units/{eid}/annul — Fehlanlage löschen (LLH-1079,
 /// design.md D3): nur ohne jede Spur, sonst 422 mit dem Grund; aufgelöst → 409. ETB-Eintrag.
 pub async fn stornieren(
     State(state): State<AppState>,
@@ -1109,7 +1109,7 @@ pub struct UebernahmeBody {
     pub ueber_einheit_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/take-over — eine unangemeldete Einheit übernehmen
+/// POST /api/incidents/{id}/units/{eid}/take-over — eine unangemeldete Einheit übernehmen
 /// (LLH-1075, design.md D10, Spec `bereitstellungsraum-belegung`): Kennzeichen aufheben, gewählte
 /// Unterstellung, Meldung des Eintreffens bestätigen, genau ein ETB. Bleibt im Raum.
 pub async fn uebernehmen(
@@ -1161,7 +1161,7 @@ pub async fn uebernehmen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/reject — eine unangemeldete Einheit abweisen
+/// POST /api/incidents/{id}/units/{eid}/reject — eine unangemeldete Einheit abweisen
 /// (LLH-1075, design.md D11): auflösen (Austritt, Zeitachsen-Entlassung), jedes ihrer Fahrzeuge
 /// entlassen, Meldung bestätigen, genau ein ETB. Verlangt zusätzlich das Recht Fahrzeuge.
 pub async fn abweisen(
@@ -1311,6 +1311,9 @@ async fn notify_aufgeloest(
     for g in &ergebnis.geraete {
         state.live.melde_kopplung_ende(g.kopplung_id);
         state.live.publiziere(einsatz_id, g.etb_id);
+        // Ein Helfer der Einheit: die Leitung sieht das Ende, die Lagekarte die Person ohne
+        // Position (`helfer::ende`).
+        super::helfer::melde_helfer_ende(state, einsatz_id, g.kopplung_id).await;
     }
     super::abloesung::publish_kopplung(
         state,
@@ -1564,7 +1567,7 @@ pub struct PositionBody {
     pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
-/// PATCH /api/einsaetze/{id}/units/{eid}/position — reine Lage-Pflege, KEIN ETB.
+/// PATCH /api/incidents/{id}/units/{eid}/position — reine Lage-Pflege, KEIN ETB.
 pub async fn position(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,
@@ -1611,7 +1614,7 @@ pub struct StatusBody {
     pub status_id: Option<Option<i64>>,
 }
 
-/// PUT /api/einsaetze/{id}/units/{eid}/status — Handstatus einer Einheit OHNE
+/// PUT /api/incidents/{id}/units/{eid}/status — Handstatus einer Einheit OHNE
 /// Fahrzeug (LFH-609). Mit Fahrzeugen wird der Status aus ihnen abgeleitet → Setzen ist
 /// 422, Löschen (`null`) bleibt erlaubt.
 /// Ein echter Wechsel schreibt einen System-ETB-Eintrag (atomar) und setzt „Seit“.
@@ -1727,7 +1730,7 @@ pub async fn status_setzen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/units/{eid}/status/undo — „Rückgängig“ nach einem
+/// POST /api/incidents/{id}/units/{eid}/status/undo — „Rückgängig“ nach einem
 /// Wechsel des Handstatus, auch nach dem Löschen (LLH-1986, Regel
 /// `frontend/src/kraefte/AGENTS.md`, „Quittung und Rücknahme eines Statuswechsels“). Body ist der
 /// Beleg aus der Antwort des PUT. Ein Einheitengerät nimmt nur den Wechsel der eigenen Einheit

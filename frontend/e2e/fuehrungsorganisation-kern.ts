@@ -34,7 +34,7 @@ export async function post(
   pfad: string,
   data: unknown,
 ): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
   expect(antwort.ok(), `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }

@@ -153,25 +153,37 @@ pub async fn anlegen_mit(
     schliesst_ein_id: Option<i64>,
 ) -> Result<Qualifikation, AppError> {
     crate::write_retry!(pool, |conn| {
-        if let Some(ziel) = schliesst_ein_id {
-            pruefe_einschluss_tx(conn, org_id, None, ziel).await?;
-        }
-        let ergebnis = sqlx::query_scalar::<_, i64>(
-            "INSERT INTO qualifikation (org_id, label, sortier, schliesst_ein_id) \
-             VALUES (?, ?, ?, ?) RETURNING id",
-        )
-        .bind(org_id)
-        .bind(label)
-        .bind(sortier)
-        .bind(schliesst_ein_id)
-        .fetch_one(&mut *conn)
-        .await;
-        let id = match ergebnis {
-            Ok(id) => id,
-            Err(e) => return label_conflict(e),
-        };
-        laden_tx(conn, org_id, id).await
+        anlegen_tx(conn, org_id, label, sortier, schliesst_ein_id).await
     })
+}
+
+/// Wie [`anlegen_mit`] auf einer offenen Verbindung (Stammdaten-Eingang LLH-1633 in EINER
+/// Transaktion). Öffnet und committet nichts.
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    label: &str,
+    sortier: i64,
+    schliesst_ein_id: Option<i64>,
+) -> Result<Qualifikation, AppError> {
+    if let Some(ziel) = schliesst_ein_id {
+        pruefe_einschluss_tx(conn, org_id, None, ziel).await?;
+    }
+    let ergebnis = sqlx::query_scalar::<_, i64>(
+        "INSERT INTO qualifikation (org_id, label, sortier, schliesst_ein_id) \
+         VALUES (?, ?, ?, ?) RETURNING id",
+    )
+    .bind(org_id)
+    .bind(label)
+    .bind(sortier)
+    .bind(schliesst_ein_id)
+    .fetch_one(&mut *conn)
+    .await;
+    let id = match ergebnis {
+        Ok(id) => id,
+        Err(e) => return label_conflict(e),
+    };
+    laden_tx(conn, org_id, id).await
 }
 
 /// Teil-Patch: `None` lässt die Spalte unverändert. `schliesst_ein_id` ist Tri-State

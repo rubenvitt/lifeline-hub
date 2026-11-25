@@ -264,6 +264,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "SCHICHTPLAN_DATEI_MAX_BYTES",
             schichtplan::uebernahme::DATEI_MAX_BYTES,
         ),
+        (
+            "STAMMDATEN_DATEI_MAX_BYTES",
+            lifeline_hub::einlesen::tabelle::DATEI_MAX_BYTES,
+        ),
         ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
         (
             "SCHICHTPLAN_HELFER_TELEFON_MAX",
@@ -296,6 +300,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             lifeline_hub::public_api::webhook::URL_MAX,
         ),
         ("ADAPTER_NAME_MAX", lifeline_hub::routes::adapter::NAME_MAX),
+        (
+            "FREMDEBENE_NAME_MAX",
+            lifeline_hub::karte_fremdebene::NAME_MAX,
+        ),
         (
             "ADAPTER_GEHEIMNIS_MAX",
             lifeline_hub::adapter::geheimnis::GEHEIMNIS_MAX,

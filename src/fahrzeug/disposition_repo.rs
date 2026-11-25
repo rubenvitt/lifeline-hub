@@ -15,7 +15,7 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
-           ef.lat, ef.lon, ef.position_quelle, ef.position_gemessen_at, \
+           ef.lat, ef.lon, ef.position_aktualisiert_at, ef.position_quelle, \
            EXISTS(SELECT 1 FROM ortung_kopplung k WHERE k.einsatz_fahrzeug_id = ef.id) \
                AS ortung_gekoppelt, \
            ef.tz_fachaufgabe, ef.tz_organisation, \
@@ -49,8 +49,8 @@ struct Row {
     bemerkung: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
-    position_quelle: Option<crate::ortung::PositionQuelle>,
-    position_gemessen_at: Option<String>,
+    position_aktualisiert_at: Option<String>,
+    position_quelle: Option<String>,
     ortung_gekoppelt: bool,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
@@ -123,8 +123,8 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         bemerkung: row.bemerkung,
         lat: row.lat,
         lon: row.lon,
+        position_aktualisiert_at: row.position_aktualisiert_at,
         position_quelle: row.position_quelle,
-        position_gemessen_at: row.position_gemessen_at,
         ortung_gekoppelt: row.ortung_gekoppelt,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
@@ -617,24 +617,16 @@ pub async fn update_position(
     // Feld-CAS (LLH-1945): je Altwert `AND <spalte> IS ?` an demselben UPDATE.
     let sql = format!(
         "UPDATE einsatz_fahrzeug SET \
-            position_quelle = CASE WHEN ?11 OR ?12 \
-                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
-                          THEN NULL ELSE 'manuell' END \
-                ELSE position_quelle END, \
-            position_gemessen_at = CASE WHEN ?11 OR ?12 \
-                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
-                          THEN NULL ELSE ?13 END \
-                ELSE position_gemessen_at END, \
-            position_gesetzt_at = CASE WHEN ?11 OR ?12 \
-                THEN CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL \
-                          THEN NULL ELSE ?13 END \
-                ELSE position_gesetzt_at END, \
             lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
             lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
             tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END, \
+            position_quelle = CASE WHEN ?1 OR ?3 THEN 'manuell' ELSE position_quelle END, \
+            position_aktualisiert_at = CASE WHEN ?1 OR ?3 THEN \
+                (CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL THEN NULL ELSE ?11 END) \
+                ELSE position_aktualisiert_at END \
          WHERE id = ?9 AND einsatz_id = ?10{}",
-        erwartet.sql_suffix(14)
+        erwartet.sql_suffix(12)
     );
     let q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.lat.is_some())
@@ -647,9 +639,6 @@ pub async fn update_position(
         .bind(daten.tz_organisation.flatten())
         .bind(ef_id)
         .bind(einsatz_id)
-        // Quelle und Zeiten ändern sich nur, wenn der Patch lat oder lon trägt (LLH-2091).
-        .bind(daten.lat.is_some())
-        .bind(daten.lon.is_some())
         .bind(crate::zeit::jetzt());
     let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
@@ -807,7 +796,6 @@ impl Entlassen {
                 .map(|k| crate::fahrzeug::OrtungVorzustand {
                     zugang_id: k.zugang_id.clone(),
                     kennung: k.kennung.clone(),
-                    ehrenamt_bestaetigt: k.ehrenamt_bestaetigt,
                 }),
         }
     }
@@ -1401,9 +1389,9 @@ pub async fn zuruecknehmen_tx(
 }
 
 /// Stellt die Ortungs-Kopplung des Vorzustands her (LLH-2091). Der Vorzustand kommt vom Client:
-/// Zugang (Org, Scope, nicht widerrufen, nicht abgelaufen), freie Kennung und die
-/// Ehrenamt-Bedingung des Org-Schalters werden neu geprüft wie beim PUT. Was nicht geht, bleibt
-/// aus und steht in `ausgelassen`.
+/// Org-Schalter „Ortung im Einsatz“ (ADR-0101), Zugang (Org, Scope, nicht widerrufen, nicht
+/// abgelaufen) und freie Kennung werden neu geprüft wie beim PUT. Was nicht geht, bleibt aus und
+/// steht in `ausgelassen`.
 async fn restore_ortung_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1416,16 +1404,7 @@ async fn restore_ortung_tx(
     let kennung_ok = !ortung.kennung.is_empty()
         && ortung.kennung.chars().count()
             <= crate::public_api::einwurf::ablage::POSITION_KENNUNG_MAX;
-    let hauptamt: bool = sqlx::query_scalar(
-        "SELECT COALESCE((SELECT ortung_hauptamt FROM org_einstellungen \
-                          WHERE org_id = e.org_id), 0) = 1 \
-         FROM einsatz e WHERE e.id = ?",
-    )
-    .bind(einsatz_id)
-    .fetch_one(&mut *conn)
-    .await?;
-    if !kennung_ok || !crate::ortung::kopplung::is_ehrenamt_ok(hauptamt, ortung.ehrenamt_bestaetigt)
-    {
+    if !kennung_ok {
         ergebnis.ausgelassen.push(ausgelassen(
             "Ortung",
             "Kopplung nicht mehr zulässig; bitte neu koppeln",
@@ -1438,7 +1417,6 @@ async fn restore_ortung_tx(
         ef_id,
         &ortung.zugang_id,
         &ortung.kennung,
-        ortung.ehrenamt_bestaetigt,
         benutzer_id,
         jetzt,
     )
@@ -1450,12 +1428,12 @@ async fn restore_ortung_tx(
                 .await?;
             ergebnis.ortung = Some(k);
         }
-        Err(AppError::Conflict(_) | AppError::UnprocessableEntity(_) | AppError::NotFound) => {
-            ergebnis.ausgelassen.push(ausgelassen(
-                "Ortung",
-                "Kennung inzwischen anderweitig gekoppelt oder Zugang nicht mehr gültig",
-            ))
-        }
+        // Schalter aus, Zugang ungültig oder Kennung belegt: der Grund steht im Fehler.
+        Err(
+            e @ (AppError::Conflict(_) | AppError::UnprocessableEntity(_) | AppError::NotFound),
+        ) => ergebnis
+            .ausgelassen
+            .push(ausgelassen("Ortung", &e.to_string())),
         Err(e) => return Err(e),
     }
     Ok(())

@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Ortung von Fahrzeugen, LLH-2091; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -14,7 +14,7 @@ Fähigkeits-Specs unter `openspec/specs/` (eingefroren, ADR-0069), die Design-Do
 Jeder Datensatz mit Fachbezug hängt über `org_id` an einer Organisation; die Organisation ist
 die Mandantengrenze (`Benutzer.org_id` in `src/auth/mod.rs`). Der Org-Floor läuft in jedem
 einsatzgebundenen Handler im Extractor `EinsatzKontext` (`src/einsatz/kontext.rs`, Prüfung
-`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/einsaetze/{id}/…` ihn
+`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/incidents/{id}/…` ihn
 zieht, erzwingt `tests/einsatz_kontext_guard.rs`; die Grenze gegen eine echte zweite Organisation
 prüft `tests/cross_org.rs`. Wie ein System-Admin über die Org-Grenze liest und schreibt, regelt
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Admin-Schreibwege am Einsatz“.
@@ -210,6 +210,10 @@ in `src/db.rs`, `src/db/physisch.rs`). Regeln: [`src/AGENTS.md`](../../src/AGENT
 [`aufbewahrung-loeschersuchen`](../../openspec/specs/aufbewahrung-loeschersuchen/spec.md). Was das
 Gerät danach räumt: [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md),
 Abschnitt „Räumen nach einer Schwärzung“.
+
+Daten ohne Einsatz löscht derselbe Lauf nach eigener Frist (Phase C), darunter die abgerufenen
+Veranstaltungen 14 Tage nach ihrem Ende (`veranstaltung_extern::repo::purge`,
+`AUFBEWAHRUNG_TAGE` in `src/veranstaltung_extern/repo.rs`).
 
 ## 8.15 Audit und Zugangsprotokoll
 
@@ -497,28 +501,42 @@ Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs
   Konzepts [`2026-11-10-schnittstellen-ausbau.md`](../konzepte/2026-11-10-schnittstellen-ausbau.md)).
 - **Gekoppelter ELW:** Eingehendes kommt am Hub an; meldet sich eine Org bei einem Hub, läuft hier
   kein Adapter, und die Verwaltung ist gesperrt.
+- **Ablage einer Art:** eine Art, die nicht flüchtig ist, schreibt in eine eigene Tabelle, idempotent
+  in der Übernahme. Vorbild `src/veranstaltung_extern/` (LLH-2097): je Adapter eine Zeile je
+  Veranstaltung, Fingerabdruck statt Versionen, ein unveränderter Abruf schreibt nichts; der
+  Vertrag ist neutral ([`docs/schnittstellen/veranstaltungen-abruf.md`](../schnittstellen/veranstaltungen-abruf.md)).
 
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.
 
 ## 8.33 Ortung von Fahrzeugen
 
-Positionen von Einsatzfahrzeugen sind personenbezogen. Die Ortung (`src/ortung/`, LLH-2091,
-[ADR-0098](entscheidungen/ADR-0098-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md),
+Positionen von Einsatzfahrzeugen sind personenbezogen. Die Ortung aus dem Einwurf (`src/ortung/`,
+LLH-2091,
+[ADR-0103](entscheidungen/ADR-0103-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md),
 Design-Doc [`2026-11-24-fjftaovq-fahrzeugortung-design.md`](../superpowers/specs/2026-11-24-fjftaovq-fahrzeugortung-design.md))
-begrenzt sie auf das, was der Einsatz braucht:
+begrenzt sie auf das, was der Einsatz braucht, und teilt Schalter und Schreibstelle mit der
+Helfer-App (ADR-0101, Spec
+[`2026-11-24-vakwvkpg-helfer-app-design.md`](../superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md),
+„Ortung der Organisation und Positionsbaustein“):
 
+- **Nur mit Freigabe der Organisation:** der Org-Schalter „Ortung im Einsatz“
+  (`org_einstellungen.ortung_im_einsatz`, Verwaltung → Einsatz-Vorgaben) ist vorgabemäßig aus; wer
+  ihn einschaltet, bestätigt Einwilligung bzw. Betriebs- oder Dienstvereinbarung, der Server hält
+  Person und Zeitpunkt fest. Ohne ihn antwortet Koppeln 422 und die Übernahme schreibt nichts.
+  Risiko: R56.
 - **Nur gekoppelt und nur im Einsatz:** ohne bewusste Kopplung einer Kennung an ein Fahrzeug ändert
-  ein Einwurf keinen Einsatz; die Kopplung endet mit Trennen, Entlassen, Stornieren und Abschluss
-  (Ablauf 6.6e1).
+  ein Einwurf keinen Einsatz; die Kopplung endet mit Trennen, Entlassen, Stornieren, Ablehnen der
+  Einheit und Abschluss (Ablauf 6.6e1).
+- **Eine Schreibstelle:** die Übernahme schreibt über `ortung::schreibe_position` mit Quelle
+  `einwurf`; Vorrang hat der jüngere Zeitpunkt, die Handwege schreiben `manuell` mit Serverzeit.
 - **Kein Verlauf:** je Kennung eine Position in der Ablage (24 h), je Fahrzeug eine am Einsatzfahrzeug;
   Schema-Test `keine_tabelle_haelt_einen_positionsverlauf` in `tests/ortung.rs`. Der Abschluss
-  löscht die GPS-Positionen des Einsatzes, manuell gesetzte bleiben (`src/einsatz/repo.rs`).
-- **Ehrenamt als Voraussetzung:** ohne den Org-Schalter `ortung_hauptamt` (Verwaltung,
-  „Ortung auch bei hauptamtlicher Besatzung“; lokal je Instanz, nicht Teil der
-  Stammdaten-Synchronisation, `migrations/0373_fahrzeugortung.sql`) verlangt das Koppeln die
-  Bestätigung „Besatzung ist ehrenamtlich“ (422, Grund `GRUND_EHRENAMT_ERFORDERLICH`). Risiko: R55.
+  löscht die Einwurf-Positionen des Einsatzes, manuell und von der Helfer-App gesetzte bleiben
+  (`src/ortung/kopplung.rs`, `beende_im_einsatz_tx`).
 - **Kein Koordinatenweg über die Kopplung:** die Kandidatenliste und die Abfrage der
   Kopplung tragen keine Koordinaten und kein Protokoll Kennung, Schlüssel oder Koordinaten (Prüfung
-  in ADR-0098); `EinsatzFahrzeugAnzeige` nennt nur `ortung_gekoppelt`, `position_quelle` und
-  `position_gemessen_at`.
+  in ADR-0103); `EinsatzFahrzeugAnzeige` nennt nur `ortung_gekoppelt`, `position_quelle` und
+  `position_aktualisiert_at`.
+- **Anzeige:** Quelle und Alter zeigt die Lagekarte wie für die Helfer-App („Ortung · vor 3 min“,
+  ab 5 min blass und „veraltet“, `positionsAlter.ts`); ein Lagestand misst gegen seinen Stand.
 - **Anwender:** DSFA-Vorlage und Einrichtung im Kapitel [Anbindungen](../anwender/kapitel/anbindungen.md).

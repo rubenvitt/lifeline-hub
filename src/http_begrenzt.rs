@@ -31,6 +31,16 @@ pub const DECKEL_OIDC: usize = 1024 * 1024;
 /// endet, und dann verworfen. Mehr als eine kurze Quittung erwartet niemand.
 pub const DECKEL_WEBHOOK: usize = 16 * 1024;
 
+/// Deckel für ein Videosegment des Drohnen-Livebilds (LLH-2107): fMP4- oder TS-Segmente der
+/// Suchlage-Medienkette sind wenige hundert KB bis wenige MB groß.
+pub const DECKEL_VIDEO: usize = 8 * 1024 * 1024;
+
+/// Deckel für eine HLS-Playlist des Drohnen-Livebilds (LLH-2107): Textdateien von einigen KB.
+pub const DECKEL_PLAYLIST: usize = 256 * 1024;
+
+/// Deckel für die Vorschau eines Drohnenfotos (LLH-2108): ein verkleinertes JPEG der Quelle.
+pub const DECKEL_FOTO: usize = 2 * 1024 * 1024;
+
 /// Fehler beim begrenzten Einlesen.
 #[derive(Debug)]
 pub enum LeseFehler {

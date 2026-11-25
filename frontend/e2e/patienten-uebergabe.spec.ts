@@ -20,13 +20,13 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function seedePerson(page: Page, einsatzId: string, data: unknown): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/persons`, { data });
   expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }
 
 async function seedeFahrzeug(page: Page, einsatzId: string, funkrufname: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/vehicles`, {
     data: { adhoc: { funkrufname } },
   });
   expect(antwort.ok(), `Seeding Fahrzeug: ${antwort.status()}`).toBeTruthy();
@@ -130,14 +130,14 @@ test('Eigentransport aus dem Wartebereich, Übergabe aus „Unterwegs“', async
   await anmelden(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Wartebereich ${Date.now()}`);
   await seedeFahrzeug(page, einsatzId, '1/83-1');
-  const uhs = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+  const uhs = await page.request.post(`/api/incidents/${einsatzId}/uhs`, {
     data: { typ: 'behandlungsplatz', bezeichnung: 'BHP Übergabe' },
   });
   expect(uhs.ok()).toBeTruthy();
   const uhsId = ((await uhs.json()) as { id: number }).id;
   expect(
     (
-      await page.request.post(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`, {
+      await page.request.post(`/api/incidents/${einsatzId}/uhs/${uhsId}/status`, {
         data: { status: 'aktiv' },
       })
     ).ok(),

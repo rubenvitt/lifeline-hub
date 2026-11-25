@@ -23,6 +23,7 @@ import {
 import type { Personal, StaerkePosition } from '../api/types';
 import PersonalFormModal from './PersonalFormModal';
 import { globalKeys } from '../api/queryKeys';
+import StammdatenEinlesen from './StammdatenEinlesen';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import { personalDetailPfad } from './stammdatenDetail';
 import {
@@ -180,16 +181,19 @@ export default function PersonalTab() {
            Knopf ist von „diese Seite kann das gar nicht" nicht zu unterscheiden, „ausgegraut" allein
            wäre eine Ein-Kanal-Aussage (WCAG 1.4.1). Der Slot liegt AUSSERHALB jedes `<form>`
            (`AdminPage`) — hier steht deshalb ein Modal-Öffner, nie ein `htmlType="submit"`. */
-        <Button
-          type="primary"
-          disabled={!istAdmin}
-          onClick={() => {
-            setBearbeite(null);
-            setModalOffen(true);
-          }}
-        >
-          Person anlegen
-        </Button>
+        <>
+          <StammdatenEinlesen disabled={!istAdmin} />
+          <Button
+            type="primary"
+            disabled={!istAdmin}
+            onClick={() => {
+              setBearbeite(null);
+              setModalOffen(true);
+            }}
+          >
+            Person anlegen
+          </Button>
+        </>
       }
       hinweis={
         <SeitenHinweise

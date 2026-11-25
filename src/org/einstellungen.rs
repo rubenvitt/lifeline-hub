@@ -40,13 +40,39 @@ pub struct OrgEinstellungen {
     pub rueckmeldung_frist_min: Option<i64>,
     // Auto-ETB-Schalter: 0 = aus; NULL/1 = an.
     pub auto_etb_eintraege: Option<i64>,
-    // Fahrzeugortung auch bei hauptamtlicher Besatzung (LLH-2091): nur `1` = an, sonst aus.
-    // Bleibt lokal: nicht in der Stammdaten-Synchronisation (`instanz/stammdaten/art.rs`).
-    pub ortung_hauptamt: Option<i64>,
     // Geocoder-Basis-URL (serverseitig; kein Leak an Mitglieder).
     pub geocoder_url: Option<String>,
+    // Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099): 0 = nein (Standard), 1 = ja.
+    pub fremdebenen_lan_erlaubt: i64,
+    // Helfer-App: „Ortung im Einsatz“ und „Auch Personen orten“, 0 = aus (Vorgabe), 1 = an.
+    pub ortung_im_einsatz: i64,
+    pub ortung_personen: i64,
+    /// Wer „Ortung im Einsatz“ zuletzt eingeschaltet und damit Einwilligung bzw.
+    /// Betriebsvereinbarung bestätigt hat, und wann.
+    pub ortung_bestaetigt_von: Option<i64>,
+    pub ortung_bestaetigt_at: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
+}
+
+/// Was die Organisation an Ortung freigegeben hat (Helfer-App, Spec
+/// `2026-11-24-vakwvkpg-helfer-app-design.md`, „Ortung der Organisation“).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OrtungFreigabe {
+    /// „Ortung im Einsatz“: Helfer-Einladung und Positionsmeldung sind erlaubt.
+    pub im_einsatz: bool,
+    /// „Auch Personen orten“: nur zusammen mit `im_einsatz`.
+    pub personen: bool,
+}
+
+/// Liest die Ortungs-Freigabe der Organisation; ohne Zeile ist beides aus.
+pub async fn ortung_der_org(pool: &SqlitePool, org_id: i64) -> Result<OrtungFreigabe, AppError> {
+    let e = laden_oder_default(pool, org_id).await?;
+    let im_einsatz = e.ortung_im_einsatz != 0;
+    Ok(OrtungFreigabe {
+        im_einsatz,
+        personen: im_einsatz && e.ortung_personen != 0,
+    })
 }
 
 impl OrgEinstellungen {
@@ -68,16 +94,15 @@ impl OrgEinstellungen {
             auftrag_quittierung_frist_min: None,
             rueckmeldung_frist_min: None,
             auto_etb_eintraege: None,
-            ortung_hauptamt: None,
             geocoder_url: None,
+            fremdebenen_lan_erlaubt: 0,
+            ortung_im_einsatz: 0,
+            ortung_personen: 0,
+            ortung_bestaetigt_von: None,
+            ortung_bestaetigt_at: None,
             geaendert_at: None,
             geaendert_von: None,
         }
-    }
-
-    /// Ortung auch bei hauptamtlicher Besatzung (LLH-2091): nur `Some(1)` ist an.
-    pub fn is_ortung_hauptamt(&self) -> bool {
-        self.ortung_hauptamt == Some(1)
     }
 
     /// API-Darstellung: flache 1:1-Spiegelung aller Felder inkl. Audit (Admin-Endpunkt), dazu
@@ -104,8 +129,11 @@ impl OrgEinstellungen {
             auftrag_quittierung_frist_min: self.auftrag_quittierung_frist_min,
             rueckmeldung_frist_min: self.rueckmeldung_frist_min,
             auto_etb_eintraege: self.auto_etb_eintraege,
-            ortung_hauptamt: self.ortung_hauptamt,
             geocoder_url: self.geocoder_url.clone(),
+            fremdebenen_lan_erlaubt: self.fremdebenen_lan_erlaubt != 0,
+            ortung_im_einsatz: self.ortung_im_einsatz != 0,
+            ortung_personen: self.ortung_personen != 0,
+            ortung_bestaetigt_at: self.ortung_bestaetigt_at.clone(),
             geaendert_at: self.geaendert_at.clone(),
             geaendert_von: self.geaendert_von,
         }
@@ -163,9 +191,15 @@ pub struct OrgEinstellungenAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
-    /// Ortung auch bei hauptamtlicher Besatzung (LLH-2091): `1` = an, sonst aus.
-    pub ortung_hauptamt: Option<i64>,
     pub geocoder_url: Option<String>,
+    /// Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099); Standard `false`.
+    pub fremdebenen_lan_erlaubt: bool,
+    /// „Ortung im Einsatz“ (Helfer-App); Vorgabe aus.
+    pub ortung_im_einsatz: bool,
+    /// „Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist.
+    pub ortung_personen: bool,
+    /// Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde.
+    pub ortung_bestaetigt_at: Option<String>,
     pub geaendert_at: Option<String>,
     pub geaendert_von: Option<i64>,
 }
@@ -212,8 +246,17 @@ pub struct OrgEinstellungenDaten<'a> {
     pub auftrag_quittierung_frist_min: Option<i64>,
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
-    pub ortung_hauptamt: Option<i64>,
     pub geocoder_url: Option<&'a str>,
+    /// Fremdebenen im eigenen Netz (LLH-2099). `None` lässt den gespeicherten Wert stehen (wie
+    /// ein fehlendes Feld des Clients); aufgelöst wird in der Speicher-Transaktion, damit die
+    /// Admin-Spur zum Endzustand passt ([`Gespeichert::lan_vorher`]).
+    pub fremdebenen_lan_erlaubt: Option<bool>,
+    /// „Ortung im Einsatz“: `None` lässt den gespeicherten Wert stehen. Geht der Schalter von aus
+    /// auf an, hält `speichern` den Erfasser als Bestätigenden fest.
+    pub ortung_im_einsatz: Option<bool>,
+    /// „Auch Personen orten“: `None` = unverändert. Den Zusammenhang mit `ortung_im_einsatz`
+    /// prüft der Handler.
+    pub ortung_personen: Option<bool>,
     /// Kategorie-Vorgaben (LFH-749), bereits geprüft: `Some` ersetzt die Liste, `None` lässt sie
     /// unverändert (anders als die übrigen Felder kein Vollersatz, damit ein älterer Client sie
     /// nicht still löscht).
@@ -230,14 +273,28 @@ pub async fn laden_oder_default(
         "SELECT org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
                 retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
                 meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, meldung_bestaetigung_frist_min, \
-                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, ortung_hauptamt, geocoder_url, \
-                geaendert_at, geaendert_von \
+                auftrag_quittierung_frist_min, rueckmeldung_frist_min, auto_etb_eintraege, geocoder_url, \
+                fremdebenen_lan_erlaubt, ortung_im_einsatz, ortung_personen, ortung_bestaetigt_von, \
+                ortung_bestaetigt_at, geaendert_at, geaendert_von \
          FROM org_einstellungen WHERE org_id = ?",
     )
     .bind(org_id)
     .fetch_optional(executor)
     .await?;
     Ok(row.unwrap_or_else(|| OrgEinstellungen::leer(org_id)))
+}
+
+/// Dürfen Fremdebenen dieser Org Ziele im eigenen Netz abrufen (LLH-2099)? Ohne Zeile `false`.
+/// Der Abruf einer URL-Ebene (`karte::fremdebene`) fragt vor jedem Abruf, nicht beim Anlegen:
+/// ein Entzug wirkt sofort.
+pub async fn is_fremdebenen_lan_erlaubt(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
+    let wert: Option<i64> = sqlx::query_scalar(
+        "SELECT fremdebenen_lan_erlaubt FROM org_einstellungen WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(wert.is_some_and(|w| w != 0))
 }
 
 /// Speichert die Org-Einstellungen (UPSERT auf `org_id`); setzt die Audit-Felder.
@@ -248,16 +305,35 @@ pub async fn speichern(
     org_id: i64,
     erfasser_id: i64,
     daten: OrgEinstellungenDaten<'_>,
-) -> Result<OrgEinstellungen, AppError> {
-    let mut tx = pool.begin().await?;
+) -> Result<Gespeichert, AppError> {
+    let im = daten.ortung_im_einsatz.map(i64::from);
+    let personen = daten.ortung_personen.map(i64::from);
+    // `BEGIN IMMEDIATE`: die LAN-Erlaubnis vor dem Speichern wird in derselben Transaktion unter
+    // Schreibsperre gelesen. Zwei Admins, die gleichzeitig schalten, sehen je den Stand des
+    // anderen, und der Eintrag der Admin-Spur folgt dem echten Wechsel (LLH-2099,
+    // Abschluss-Review, M5).
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let lan_vorher: Option<i64> = sqlx::query_scalar(
+        "SELECT fremdebenen_lan_erlaubt FROM org_einstellungen WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let lan_vorher = lan_vorher.is_some_and(|w| w != 0);
+    let lan_neu = daten.fremdebenen_lan_erlaubt.unwrap_or(lan_vorher);
     sqlx::query(
         "INSERT INTO org_einstellungen \
             (org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
              retention_dauer_tage, skelett_dauer_tage, nachbereitung_tage, etb_nummer_praefix, \
              meldung_nummer_praefix, auftrag_nummer_praefix, einsatz_nummer_praefix, \
              meldung_bestaetigung_frist_min, auftrag_quittierung_frist_min, rueckmeldung_frist_min, \
-             auto_etb_eintraege, ortung_hauptamt, geocoder_url, geaendert_at, geaendert_von) \
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?) \
+             auto_etb_eintraege, geocoder_url, fremdebenen_lan_erlaubt, ortung_im_einsatz, \
+             ortung_personen, ortung_bestaetigt_von, ortung_bestaetigt_at, geaendert_at, \
+             geaendert_von) \
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \
+                 COALESCE(?, 0), COALESCE(?, 0), \
+                 CASE WHEN ? = 1 THEN ? END, CASE WHEN ? = 1 THEN datetime('now') END, \
+                 datetime('now'), ?) \
          ON CONFLICT(org_id) DO UPDATE SET \
              zeitzone = excluded.zeitzone, \
              zeitdarstellung = excluded.zeitdarstellung, \
@@ -274,8 +350,14 @@ pub async fn speichern(
              auftrag_quittierung_frist_min = excluded.auftrag_quittierung_frist_min, \
              rueckmeldung_frist_min = excluded.rueckmeldung_frist_min, \
              auto_etb_eintraege = excluded.auto_etb_eintraege, \
-             ortung_hauptamt = excluded.ortung_hauptamt, \
              geocoder_url = excluded.geocoder_url, \
+             fremdebenen_lan_erlaubt = excluded.fremdebenen_lan_erlaubt, \
+             ortung_im_einsatz = COALESCE(?, ortung_im_einsatz), \
+             ortung_personen = COALESCE(?, ortung_personen), \
+             ortung_bestaetigt_von = CASE WHEN ? = 1 AND ortung_im_einsatz = 0 THEN ? \
+                                          ELSE ortung_bestaetigt_von END, \
+             ortung_bestaetigt_at = CASE WHEN ? = 1 AND ortung_im_einsatz = 0 \
+                                         THEN datetime('now') ELSE ortung_bestaetigt_at END, \
              geaendert_at = excluded.geaendert_at, \
              geaendert_von = excluded.geaendert_von",
     )
@@ -295,16 +377,50 @@ pub async fn speichern(
     .bind(daten.auftrag_quittierung_frist_min)
     .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
-    .bind(daten.ortung_hauptamt)
     .bind(daten.geocoder_url)
+    .bind(i64::from(lan_neu))
+    // Ortung, erst für die neue Zeile, dann für das Update (SET liest die alten Werte, die
+    // Bestätigung greift also nur beim Wechsel von aus auf an).
+    .bind(im)
+    .bind(personen)
+    .bind(im)
     .bind(erfasser_id)
+    .bind(im)
+    .bind(erfasser_id)
+    .bind(im)
+    .bind(personen)
+    .bind(im)
+    .bind(erfasser_id)
+    .bind(im)
     .execute(&mut *tx)
     .await?;
     if let Some(vorgaben) = daten.aufbewahrung_kategorien {
         super::aufbewahrung_kategorie::ersetzen(&mut tx, org_id, erfasser_id, vorgaben).await?;
     }
+    // Ohne Personenortung (auch mit „Ortung im Einsatz“ aus) verschwinden die Personen der
+    // laufenden Helfer von der Karte, in derselben Transaktion (Spec Helfer-App, „Org-Schalter“).
+    let personen_geloescht = if daten.ortung_personen == Some(false) {
+        crate::helfer::position::personen_der_org_loeschen(&mut tx, org_id).await?
+    } else {
+        Vec::new()
+    };
     tx.commit().await?;
-    laden_oder_default(pool, org_id).await
+    Ok(Gespeichert {
+        einstellungen: laden_oder_default(pool, org_id).await?,
+        personen_geloescht,
+        lan_vorher,
+    })
+}
+
+/// Ergebnis von [`speichern`].
+pub struct Gespeichert {
+    pub einstellungen: OrgEinstellungen,
+    /// `(einsatz_id, person_id)` der Helfer, deren Personenposition gelöscht wurde; der Aufrufer
+    /// meldet sie nach dem Commit live.
+    pub personen_geloescht: Vec<(i64, i64)>,
+    /// LAN-Erlaubnis der Fremdebenen vor dem Speichern (LLH-2099), in derselben Transaktion
+    /// gelesen; der Handler schreibt bei echtem Wechsel die Admin-Spur.
+    pub lan_vorher: bool,
 }
 
 #[cfg(test)]
@@ -327,16 +443,6 @@ mod tests {
         .fetch_one(pool)
         .await
         .unwrap()
-    }
-
-    #[test]
-    fn is_ortung_hauptamt_ist_nur_bei_eins_an() {
-        let mut e = OrgEinstellungen::leer(1);
-        assert!(!e.is_ortung_hauptamt());
-        e.ortung_hauptamt = Some(0);
-        assert!(!e.is_ortung_hauptamt());
-        e.ortung_hauptamt = Some(1);
-        assert!(e.is_ortung_hauptamt());
     }
 
     #[tokio::test]
@@ -394,13 +500,16 @@ mod tests {
                 auftrag_quittierung_frist_min: Some(45),
                 rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
-                ortung_hauptamt: Some(1),
                 geocoder_url: Some("https://nominatim.example.org"),
+                fremdebenen_lan_erlaubt: Some(true),
+                ortung_im_einsatz: Some(true),
+                ortung_personen: Some(true),
                 aufbewahrung_kategorien: Some(&vorgaben),
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+        .einstellungen;
 
         assert_eq!(g.org_id, 1);
         assert_eq!(g.zeitzone.as_deref(), Some("Europe/Berlin"));
@@ -423,13 +532,17 @@ mod tests {
         assert_eq!(g.auftrag_quittierung_frist_min, Some(45));
         assert_eq!(g.rueckmeldung_frist_min, Some(90));
         assert_eq!(g.auto_etb_eintraege, Some(0));
-        assert_eq!(g.ortung_hauptamt, Some(1));
+        assert_eq!(g.fremdebenen_lan_erlaubt, 1);
+        assert!(is_fremdebenen_lan_erlaubt(&pool, 1).await.unwrap());
         assert_eq!(
             g.geocoder_url.as_deref(),
             Some("https://nominatim.example.org")
         );
         assert!(g.geaendert_at.is_some());
         assert_eq!(g.geaendert_von, Some(bid));
+        assert_eq!((g.ortung_im_einsatz, g.ortung_personen), (1, 1));
+        assert_eq!(g.ortung_bestaetigt_von, Some(bid), "Einschalten bestätigt");
+        assert!(g.ortung_bestaetigt_at.is_some());
 
         // Anzeige spiegelt alle Felder.
         let a = g.anzeige(Vec::new());
@@ -452,7 +565,8 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+        .einstellungen;
         assert_eq!(zweite.zeitzone.as_deref(), Some("UTC"));
         assert_eq!(zweite.zeitdarstellung, None);
         assert_eq!(zweite.retention_dauer_tage, None);
@@ -461,6 +575,18 @@ mod tests {
             "Vollersatz leert die Nachbereitung"
         );
         assert_eq!(zweite.auto_etb_eintraege, None);
+        assert_eq!(
+            zweite.fremdebenen_lan_erlaubt, 1,
+            "ohne Angabe bleibt die Erlaubnis stehen"
+        );
+        assert_eq!(
+            ortung_der_org(&pool, 1).await.unwrap(),
+            OrtungFreigabe {
+                im_einsatz: true,
+                personen: true
+            },
+            "die Ortung fällt nicht dem Vollersatz zum Opfer"
+        );
 
         // COUNT == 1 nach zwei Speichervorgängen (UPSERT, kein zweiter Insert).
         let anzahl: i64 =
@@ -480,6 +606,32 @@ mod tests {
                 .await
                 .unwrap(),
             vorgaben
+        );
+    }
+
+    #[tokio::test]
+    async fn lan_vorher_kommt_aus_der_speicher_transaktion() {
+        let pool = db::test_pool().await;
+        let bid = fixture(&pool).await;
+        let lan = |wert: Option<bool>| OrgEinstellungenDaten {
+            fremdebenen_lan_erlaubt: wert,
+            ..Default::default()
+        };
+        let g = speichern(&pool, 1, bid, lan(Some(true))).await.unwrap();
+        assert_eq!(
+            (g.einstellungen.fremdebenen_lan_erlaubt, g.lan_vorher),
+            (1, false)
+        );
+        let g = speichern(&pool, 1, bid, lan(None)).await.unwrap();
+        assert_eq!(
+            (g.einstellungen.fremdebenen_lan_erlaubt, g.lan_vorher),
+            (1, true),
+            "unverändert"
+        );
+        let g = speichern(&pool, 1, bid, lan(Some(false))).await.unwrap();
+        assert_eq!(
+            (g.einstellungen.fremdebenen_lan_erlaubt, g.lan_vorher),
+            (0, true)
         );
     }
 }

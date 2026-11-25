@@ -1,4 +1,4 @@
-//! GET /api/einsaetze/:id/map/place-search?q=
+//! GET /api/incidents/:id/map/place-search?q=
 //!
 //! Adresssuche der Lagekarte (LFH-638, Spec `lagekarte-ortssuche`): Suchtext → bis zu fünf
 //! Treffer über den Geocoder der Organisation (Default Nominatim). Mit verortetem Einsatzort

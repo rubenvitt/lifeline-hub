@@ -12,12 +12,12 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await anmeldenPerApi(page, 'admin', PW);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Führungsstelle ${Date.now()}` },
   });
   expect(antwort.ok()).toBeTruthy();
   const id = (await antwort.json()).id as number;
-  const ort = await page.request.patch(`/api/einsaetze/${id}`, {
+  const ort = await page.request.patch(`/api/incidents/${id}`, {
     data: { einsatzort: 'Industriestraße 4', einsatzort_lat: 52.103, einsatzort_lon: 9.356 },
   });
   expect(ort.ok()).toBeTruthy();
@@ -25,7 +25,7 @@ async function anmeldenUndAnlegen(page: Page): Promise<number> {
 }
 
 async function fuehrungsstelle(page: Page, id: number): Promise<Record<string, unknown>> {
-  return (await (await page.request.get(`/api/einsaetze/${id}/command-post`)).json()) as Record<
+  return (await (await page.request.get(`/api/incidents/${id}/command-post`)).json()) as Record<
     string,
     unknown
   >;

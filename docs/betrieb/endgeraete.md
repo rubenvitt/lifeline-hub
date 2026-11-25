@@ -2,7 +2,8 @@
 
 Gilt für jedes Gerät, auf dem Lifeline Hub läuft: Laptop, Tablet und Handy im Browser, die
 [Desktop-App](desktop-app.md), die [iOS-App](ios-app.md) auf iPhone und iPad, die
-[Android-App](android-app.md) auf Handy und Tablet, gekoppelte Geräte an UHS oder Lagemonitor.
+[Android-App](android-app.md) auf Handy und Tablet, die [Helfer-App](helfer-app.md) für
+Ortung im Einsatz, gekoppelte Geräte an UHS oder Lagemonitor.
 Für den Rechner, der den **Server** trägt, gilt zusätzlich [packaging.md](packaging.md#datenträgerverschlüsselung-ist-pflicht-lfh-1004).
 
 ## Was auf dem Gerät liegt

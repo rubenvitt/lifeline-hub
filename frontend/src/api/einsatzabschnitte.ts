@@ -28,14 +28,14 @@ export interface AbschnittEingabe {
 }
 
 export function listeAbschnitte(einsatzId: number): Promise<Einsatzabschnitt[]> {
-  return apiGet<Einsatzabschnitt[]>(`/api/einsaetze/${einsatzId}/sectors`);
+  return apiGet<Einsatzabschnitt[]>(`/api/incidents/${einsatzId}/sectors`);
 }
 
 export function legeAbschnittAn(
   einsatzId: number,
   daten: AbschnittEingabe,
 ): Promise<Einsatzabschnitt> {
-  return apiSend<Einsatzabschnitt>(`/api/einsaetze/${einsatzId}/sectors`, 'POST', daten);
+  return apiSend<Einsatzabschnitt>(`/api/incidents/${einsatzId}/sectors`, 'POST', daten);
 }
 
 /**
@@ -59,7 +59,7 @@ export function patcheAbschnitt(
   erwartet?: Partial<AbschnittPatch>,
 ): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(
-    `/api/einsaetze/${einsatzId}/sectors/${aid}`,
+    `/api/incidents/${einsatzId}/sectors/${aid}`,
     'PATCH',
     erwartet ? { ...patch, erwartet } : patch,
   );
@@ -75,7 +75,7 @@ export function ordneAbschnittSprechgruppeZu(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/sectors/${aid}/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/sectors/${aid}/talk-groups/${sprechgruppeId}`,
     'PUT',
   );
 }
@@ -87,13 +87,13 @@ export function loeseAbschnittSprechgruppe(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/sectors/${aid}/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/sectors/${aid}/talk-groups/${sprechgruppeId}`,
     'DELETE',
   );
 }
 
 export function loeseAbschnittAuf(einsatzId: number, aid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/sectors/${aid}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/sectors/${aid}`, 'DELETE');
 }
 
 /** L‑2: Fläche (GeoJSON-String) und Verortungs-Metadaten eines Abschnitts.
@@ -116,7 +116,7 @@ export function zeichneAbschnitt(
   erwartet?: FlaechePatch,
 ): Promise<Einsatzabschnitt> {
   return apiSend<Einsatzabschnitt>(
-    `/api/einsaetze/${einsatzId}/sectors/${aid}/area`,
+    `/api/incidents/${einsatzId}/sectors/${aid}/area`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );

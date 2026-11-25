@@ -145,7 +145,9 @@ Entwürfe daneben (`neuentwurf.dc.html`, `shell.dc.html`, Inline-Styles maßgebl
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` in Textschrift mit gleich breiten Ziffern, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
-  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wechselt eine Kopfaktion
+  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um (LLH-1463). Wächst die Meta aus
+  mehreren Abrufen zusammen, hält die Seite den Platz ihrer späten Teile selbst, sobald sie weiß,
+  dass sie kommen (Überblick: Pegel-Notiz bei Lagekennzahl `pegel`, LLH-2085). Wechselt eine Kopfaktion
   ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, jetzt im ⋮; LLH-1722), hält
   `components/BreiteHalten.tsx` die Breite der breitesten Form (LLH-1627). `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.
@@ -1959,7 +1961,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
   `EINSATZ_STREAM_EVENTS` oder `NICHT_LIVE_KEYS`. `globalKeys` (`GLOBAL_KEYS`) für alles darüber.
 - **Der Einsatzkopf ist live** (LFH-555, `openspec/changes/archive/2026-09-30-lfh-555-einsatzkopf-live/design.md`):
   Ereignis `einsatz` mit leerer Gate-Menge (Tür des Stroms = Tür des Kopf-GET; leer steht nur
-  `einsatz`, `mitglieder`, `lagged` und der empfängergebundenen `benachrichtigung` zu, Guard
+  `einsatz`, `mitglieder`, `lagged`, der empfängergebundenen `benachrichtigung` und dem
+  leitungsgebundenen `helfer` zu, Guard
   `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`), invalidiert Kopf und
   Stand der Lagebesprechung. **`mitglieder`** (i6k6mzed, D2) feuert bei `PUT`/`DELETE
 …/members/…` neben `einsatz` und invalidiert Mitglieder, Aufträge, Erinnerungen und

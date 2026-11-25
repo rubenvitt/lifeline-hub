@@ -29,10 +29,10 @@ async function seede(page: Page): Promise<{ einsatzId: number; stelleId: number 
     expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();
     return (await a.json()) as { id: number };
   };
-  const { id: einsatzId } = await sende('post', '/api/einsaetze', {
+  const { id: einsatzId } = await sende('post', '/api/incidents', {
     bezeichnung: `E2E Registrierliste ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const { id: stelleId } = await sende('post', `${basis}/positions`, {
     bezeichnung: 'Turnhalle Ost',
     art: 'notunterkunft',

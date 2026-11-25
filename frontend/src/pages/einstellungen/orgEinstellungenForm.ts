@@ -16,7 +16,12 @@ import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
  *
  * **Ausnahme `aufbewahrung_kategorien`** (LFH-749, design.md D8): die Liste ist KEIN Vollersatz —
  * fehlt das Feld, bleibt sie am Server unverändert. `zuUpdate` lässt sie deshalb weg; nur die
- * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit.
+ * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit. Ebenso die beiden
+ * Ortungs-Schalter der Helfer-App (`ortung_im_einsatz`, `ortung_personen`): fehlen sie, bleiben sie.
+ *
+ * **Ausnahme `fremdebenen_lan_erlaubt`** (LLH-2099): ebenfalls kein Vollersatz, fehlt das Feld,
+ * bleibt der Wert am Server. `zuUpdate` lässt es weg; nur die Sektion „Anzeige“ (Paneel
+ * „Fremdebenen“) schickt es über {@link normalisiereAnzeige} mit.
  */
 
 /** Anzeige-Sektion: Darstellungs-Defaults + Geocoder. */
@@ -26,6 +31,8 @@ export interface FormWerteAnzeige {
   einheiten?: EinheitenSystem;
   koordinatenformat?: Koordinatenformat;
   geocoder_url?: string;
+  /** Fremdebenen der Lagekarte dürfen Ziele im eigenen Netz abrufen (LLH-2099). */
+  fremdebenen_lan_erlaubt: boolean;
 }
 
 /** Einsatz-Defaults-Sektion: Aufbewahrung, Nummernkreise, Fristen, Auto-ETB. */
@@ -41,6 +48,10 @@ export interface FormWerteEinsatz {
   auftrag_quittierung_frist_min?: number;
   rueckmeldung_frist_min?: number;
   auto_etb_eintraege: boolean;
+  /** „Ortung im Einsatz“ (Helfer-App); an erst nach dem Bestätigungsdialog. */
+  ortung_im_einsatz: boolean;
+  /** „Auch Personen orten“; gesperrt, solange `ortung_im_einsatz` aus ist. */
+  ortung_personen: boolean;
   /** Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leere Dauer = keine eigene Frist. */
   kategorien?: Partial<Record<Datenkategorie, KategorieFormWert>>;
 }
@@ -82,7 +93,12 @@ export function normalisiereAnzeige(
   w: FormWerteAnzeige,
 ): Pick<
   OrgEinstellungenUpdate,
-  'zeitzone' | 'zeitdarstellung' | 'einheiten' | 'koordinatenformat' | 'geocoder_url'
+  | 'zeitzone'
+  | 'zeitdarstellung'
+  | 'einheiten'
+  | 'koordinatenformat'
+  | 'geocoder_url'
+  | 'fremdebenen_lan_erlaubt'
 > {
   return {
     zeitzone: w.zeitzone?.trim() || null,
@@ -90,6 +106,7 @@ export function normalisiereAnzeige(
     einheiten: w.einheiten ?? null,
     koordinatenformat: w.koordinatenformat ?? null,
     geocoder_url: w.geocoder_url?.trim() || null,
+    fremdebenen_lan_erlaubt: w.fremdebenen_lan_erlaubt,
   };
 }
 
@@ -110,6 +127,8 @@ export function normalisiereEinsatz(
   | 'rueckmeldung_frist_min'
   | 'auto_etb_eintraege'
   | 'aufbewahrung_kategorien'
+  | 'ortung_im_einsatz'
+  | 'ortung_personen'
 > {
   return {
     retention_dauer_tage: w.retention_dauer_tage ?? null,
@@ -124,6 +143,9 @@ export function normalisiereEinsatz(
     rueckmeldung_frist_min: w.rueckmeldung_frist_min ?? null,
     auto_etb_eintraege: w.auto_etb_eintraege,
     aufbewahrung_kategorien: kategorieVorgaben(w.kategorien),
+    ortung_im_einsatz: w.ortung_im_einsatz,
+    // Spiegel von `routes::org_einstellungen::setzen`: Personen nur mit Ortung im Einsatz.
+    ortung_personen: w.ortung_im_einsatz && w.ortung_personen,
   };
 }
 
@@ -151,6 +173,7 @@ export function initialAnzeige(e: OrgEinstellungen): FormWerteAnzeige {
     einheiten: e.einheiten ?? undefined,
     koordinatenformat: e.koordinatenformat ?? undefined,
     geocoder_url: e.geocoder_url ?? undefined,
+    fremdebenen_lan_erlaubt: e.fremdebenen_lan_erlaubt === true,
   };
 }
 
@@ -168,6 +191,8 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? undefined,
     rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
+    ortung_im_einsatz: e.ortung_im_einsatz,
+    ortung_personen: e.ortung_im_einsatz && e.ortung_personen,
     kategorien: Object.fromEntries(
       (e.aufbewahrung_kategorien ?? []).map((v) => [
         v.kategorie,

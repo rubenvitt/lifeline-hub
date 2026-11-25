@@ -38,11 +38,11 @@ test('vorgemerkte Standmeldung eines vorgehenden Geräts wird nach kurzem Ausfal
   await page.clock.install({ time: new Date(Date.now() + VORLAUF_MS) });
   await anmelden(page);
 
-  const { id: einsatzId } = await senden(page, '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, '/api/incidents', {
     bezeichnung: `E2E Uhrversatz ${Date.now()}`,
   });
   // Bezirke gehören seit LLH-1034 zum Modul Evakuierung.
-  const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+  const basis = `/api/incidents/${einsatzId}/evacuation`;
   await senden(page, `${basis}/districts`, {
     bezeichnung: BEZIRK,
     plan_personen: 640,

@@ -45,6 +45,8 @@ export interface MarkerProps {
   isGeplant?: true;
   /** Kraft eines fremden Abschnitts im Fokus (`KarteMarker.gedaempft`, LLH-1057): Deckkraft. */
   gedaempft?: true;
+  /** Faktor auf die Deckkraft (`KarteMarker.deckkraft`): veraltete automatische Position. */
+  deckkraft?: number;
 }
 
 export type MarkerFeature = {
@@ -81,7 +83,9 @@ function beschriftungVon(mk: KarteMarker): string | undefined {
   const text = mk.label.trim();
   if (text === '') return undefined;
   // Raum: „BR Sportplatz · 0/2/9//11 · 3 Fz" (LLH-1107); der Name bleibt vorn.
-  return mk.beschriftungZusatz ? `${text} · ${mk.beschriftungZusatz}` : text;
+  const zeile = mk.beschriftungZusatz ? `${text} · ${mk.beschriftungZusatz}` : text;
+  // Quelle und Alter einer automatischen Position als zweite Zeile (Helfer-App).
+  return mk.untertitel ? `${zeile}\n${mk.untertitel}` : zeile;
 }
 
 function toFeature(mk: KarteMarker, plakette: Plakette, kartenTheme: KartenTheme): MarkerFeature {
@@ -95,6 +99,7 @@ function toFeature(mk: KarteMarker, plakette: Plakette, kartenTheme: KartenTheme
   if (mk.clusterQuelle) properties.quelle = mk.clusterQuelle;
   if (mk.isGeplant) properties.isGeplant = true;
   if (mk.gedaempft) properties.gedaempft = true;
+  if (mk.deckkraft != null && mk.deckkraft < 1) properties.deckkraft = mk.deckkraft;
   const beschriftung = beschriftungVon(mk);
   if (beschriftung) {
     properties.beschriftung = beschriftung;
@@ -243,10 +248,16 @@ const MARKER_LAYER_REIHENFOLGE = [
  * Deckkraft im Fokus auf einen Abschnitt (LLH-1057, Spec `lagekarte-abschnitt-fokus`): ein Feature
  * mit `gedaempft` zeichnet mit dem Bruchteil `GEDAEMPFT_DECKKRAFT` der vollen Deckkraft, alle
  * übrigen voll. Datengetrieben, damit der Fokus nur die Daten ändert und kein Layer neu entsteht.
- * Die Trefferzone bleibt, wie sie ist: gedämpft heißt nicht entfernt.
+ * Die Trefferzone bleibt, wie sie ist: gedämpft heißt nicht entfernt. Dazu kommt der Faktor
+ * `deckkraft` einer veralteten automatischen Position (Helfer-App, `VERALTET_DECKKRAFT`); beide
+ * Faktoren multiplizieren sich.
  */
 export function deckkraftImFokus(voll: number): ExpressionSpecification {
-  return ['case', ['==', ['get', 'gedaempft'], true], voll * GEDAEMPFT_DECKKRAFT, voll];
+  return [
+    '*',
+    ['case', ['==', ['get', 'gedaempft'], true], voll * GEDAEMPFT_DECKKRAFT, voll],
+    ['coalesce', ['get', 'deckkraft'], 1],
+  ];
 }
 
 // Geteilte Paint/Layout-Configs für Einzelmarker- und Spider-Leaf-Layer. Die Spider-Source ist

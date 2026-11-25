@@ -53,6 +53,9 @@ const ERWARTET_EINSATZ = new Set([
   'einsatz-evakuierung',
   'einsatz-karten-ansicht',
   'einsatz-kartenbilder',
+  // Fremdebenen der Lagekarte (LLH-2099): Liste und normiertes GeoJSON je Ebene.
+  'einsatz-fremdebenen',
+  'einsatz-fremdebene-daten',
   'einsatz-lage-snapshot',
   // Verlauf der eigenen Benachrichtigungen (LLH-1422): lesbar ohne Netz, „Alle gelesen“ wird
   // vorgemerkt. Die Detailzeile trägt nur Retain-Spalten (Nummern, Labels), keine Freitexte.

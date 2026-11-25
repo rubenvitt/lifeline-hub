@@ -19,11 +19,11 @@ import type {
 import { apiGet, apiSend } from './client';
 
 export function listeEinsaetze(): Promise<EinsatzAnzeige[]> {
-  return apiGet<EinsatzAnzeige[]>('/api/einsaetze');
+  return apiGet<EinsatzAnzeige[]>('/api/incidents');
 }
 
 export function ladeEinsatz(id: number): Promise<EinsatzAnzeige> {
-  return apiGet<EinsatzAnzeige>(`/api/einsaetze/${id}`);
+  return apiGet<EinsatzAnzeige>(`/api/incidents/${id}`);
 }
 
 /**
@@ -50,32 +50,32 @@ interface NeuerEinsatz {
 }
 
 export function legeEinsatzAn(daten: NeuerEinsatz): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>('/api/einsaetze', 'POST', daten);
+  return apiSend<EinsatzAnzeige>('/api/incidents', 'POST', daten);
 }
 
 export function schliesseEinsatzAb(id: number): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/close`, 'POST');
+  return apiSend<EinsatzAnzeige>(`/api/incidents/${id}/close`, 'POST');
 }
 
 /** Offene Punkte vor dem Abschluss (LLH-1814, Spec `einsatz-abschluss`): je Gruppe Anzahl und
  *  Kurzliste, unabhängig von den Modulfreigaben. Nur die Einsatzleitung eines aktiven Einsatzes. */
 export function loadAbschlussPruefung(id: number): Promise<AbschlussPruefung> {
-  return apiGet<AbschlussPruefung>(`/api/einsaetze/${id}/closure/check`);
+  return apiGet<AbschlussPruefung>(`/api/incidents/${id}/closure/check`);
 }
 
 /** Einen abgeschlossenen Einsatz binnen 24 Stunden wieder öffnen (LLH-1814); der Grund ist
  *  Pflicht und steht danach im ETB. */
 export function oeffneEinsatzWieder(id: number, grund: string): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${id}/reopen`, 'POST', { grund });
+  return apiSend<EinsatzAnzeige>(`/api/incidents/${id}/reopen`, 'POST', { grund });
 }
 
 export function ladeMitglieder(id: number): Promise<MitgliedAnzeige[]> {
-  return apiGet<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members`);
+  return apiGet<MitgliedAnzeige[]>(`/api/incidents/${id}/members`);
 }
 
 /** Personen, die die Einsatzleitung aufnehmen kann (LFH-1141): nur Kennung und Anzeigename. */
 export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
-  return apiGet<MitgliedAuswahl[]>(`/api/einsaetze/${id}/members/selection`);
+  return apiGet<MitgliedAuswahl[]>(`/api/incidents/${id}/members/selection`);
 }
 
 /**
@@ -83,7 +83,7 @@ export function ladeMitgliedAuswahl(id: number): Promise<MitgliedAuswahl[]> {
  * unter „Zugriff“, ohne die anlegende Person. Nur Kennung und Anzeigename.
  */
 export function loadMitgliedAuswahlAnlage(): Promise<MitgliedAuswahl[]> {
-  return apiGet<MitgliedAuswahl[]>('/api/einsaetze/member-selection');
+  return apiGet<MitgliedAuswahl[]>('/api/incidents/member-selection');
 }
 
 /**
@@ -102,14 +102,14 @@ export function setzeMitglied(
   rolle: EinsatzRolle,
   stelle?: FuehrungsstelleUpdate,
 ): Promise<MitgliedAnzeige[]> {
-  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members/${benutzerId}`, 'PUT', {
+  return apiSend<MitgliedAnzeige[]>(`/api/incidents/${id}/members/${benutzerId}`, 'PUT', {
     einsatz_rolle: rolle,
     ...(stelle ?? {}),
   });
 }
 
 export function entferneMitglied(id: number, benutzerId: number): Promise<MitgliedAnzeige[]> {
-  return apiSend<MitgliedAnzeige[]>(`/api/einsaetze/${id}/members/${benutzerId}`, 'DELETE');
+  return apiSend<MitgliedAnzeige[]>(`/api/incidents/${id}/members/${benutzerId}`, 'DELETE');
 }
 
 /** Editierbare Kopffelder; geschrieben wird nur als Teil-PATCH (`patcheEinsatz`). */
@@ -154,7 +154,7 @@ export function patcheEinsatz(
   erwartet?: Partial<KopfdatenPatch>,
 ): Promise<EinsatzAnzeige> {
   return apiSend<EinsatzAnzeige>(
-    `/api/einsaetze/${id}`,
+    `/api/incidents/${id}`,
     'PATCH',
     erwartet ? { ...patch, erwartet } : patch,
   );
@@ -162,7 +162,7 @@ export function patcheEinsatz(
 
 /** Eigene Führungsstelle (LFH-849); ohne erfasste Angaben nur `sprechgruppen: []`. */
 export function ladeFuehrungsstelle(id: number): Promise<Fuehrungsstelle> {
-  return apiGet<Fuehrungsstelle>(`/api/einsaetze/${id}/command-post`);
+  return apiGet<Fuehrungsstelle>(`/api/incidents/${id}/command-post`);
 }
 
 /**
@@ -176,7 +176,7 @@ export function patcheFuehrungsstelle(
   erwartet?: Record<string, unknown>,
 ): Promise<Fuehrungsstelle> {
   return apiSend<Fuehrungsstelle>(
-    `/api/einsaetze/${id}/command-post`,
+    `/api/incidents/${id}/command-post`,
     'PATCH',
     erwartet ? { ...patch, erwartet } : patch,
   );
@@ -191,7 +191,7 @@ export function ordneFuehrungsstelleSprechgruppeZu(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
     'PUT',
   );
 }
@@ -202,14 +202,14 @@ export function loeseFuehrungsstelleSprechgruppe(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/command-post/talk-groups/${sprechgruppeId}`,
     'DELETE',
   );
 }
 
 /** Einsatz-Einstellungen laden (LFH-131); existiert keine Zeile → Defaults (alle null). */
 export function ladeEinstellungen(id: number): Promise<EinsatzEinstellungen> {
-  return apiGet<EinsatzEinstellungen>(`/api/einsaetze/${id}/settings`);
+  return apiGet<EinsatzEinstellungen>(`/api/incidents/${id}/settings`);
 }
 
 /** Einsatz-Einstellungen setzen (Vollersatz); nur bei aktivem Einsatz (sonst 409). */
@@ -217,12 +217,12 @@ export function speichereEinstellungen(
   id: number,
   felder: EinstellungenUpdate,
 ): Promise<EinsatzEinstellungen> {
-  return apiSend<EinsatzEinstellungen>(`/api/einsaetze/${id}/settings`, 'PUT', felder);
+  return apiSend<EinsatzEinstellungen>(`/api/incidents/${id}/settings`, 'PUT', felder);
 }
 
 /** Modul-Overrides eines Einsatzes laden (LFH-132); Map modul_key→Override (leer = Defaults). */
 export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
-  return apiGet<ModulOverrides>(`/api/einsaetze/${id}/module-overrides`);
+  return apiGet<ModulOverrides>(`/api/incidents/${id}/module-overrides`);
 }
 
 /**
@@ -231,7 +231,7 @@ export function ladeModulOverrides(id: number): Promise<ModulOverrides> {
  * Org-Rolle; daraus zeigt der Editor „Module“ die Herkunft von Rolle und Sichtbarkeit.
  */
 export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
-  return apiGet<OrgModulEinstellungen>(`/api/einsaetze/${id}/module-defaults`);
+  return apiGet<OrgModulEinstellungen>(`/api/incidents/${id}/module-defaults`);
 }
 
 /**
@@ -239,7 +239,7 @@ export function fetchModulVorgaben(id: number): Promise<OrgModulEinstellungen> {
  * `{ sichtbar, zugriff }`, ausgewertet vom Server mit derselben Regel wie die Modul-Gates.
  */
 export function ladeModulFreigaben(id: number): Promise<ModulFreigaben> {
-  return apiGet<ModulFreigaben>(`/api/einsaetze/${id}/module-access`);
+  return apiGet<ModulFreigaben>(`/api/incidents/${id}/module-access`);
 }
 
 /** Sichtbarkeit + benötigte Rolle eines Moduls überschreiben; nur Einsatzleitung/Admin, aktiver Einsatz. */
@@ -248,5 +248,5 @@ export function setzeModulOverride(
   modulKey: string,
   update: ModulOverrideUpdate,
 ): Promise<ModulOverride> {
-  return apiSend<ModulOverride>(`/api/einsaetze/${id}/module-overrides/${modulKey}`, 'PUT', update);
+  return apiSend<ModulOverride>(`/api/incidents/${id}/module-overrides/${modulKey}`, 'PUT', update);
 }

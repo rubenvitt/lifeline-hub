@@ -1,5 +1,4 @@
 import type { GlobalToken } from 'antd';
-import { ortungStand } from './ortungAlter';
 import { rollenFarbe } from '../../theme/statusFarben';
 import type {
   Betreuungsstelle,
@@ -12,6 +11,7 @@ import type {
   FuehrungskraftKarte,
   Fuehrungsstelle,
   LageMeldungStand,
+  Positionsquelle,
   SchadenMarker,
   Sichtungskategorie,
   Uhs,
@@ -27,6 +27,8 @@ import {
 } from './taktischesZeichen';
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
+import { positionsAlter } from './positionsAlter';
+import { relativ } from '../../anzeige/dauer';
 import { staerkeText } from '../../anzeige/staerke';
 import { staerkeImRaum, type RaumEinheit } from '../../bereitstellungsraum/brZahlen';
 import {
@@ -147,10 +149,47 @@ export interface KarteMarker {
    */
   gedaempft?: true;
   /**
+   * Quelle und Alter einer automatischen Position (Helfer-App): „Helfer-App · vor 6 min“ oder
+   * „Ortung · vor 4 min“, als zweite Zeile der Plakette. Eine Handposition trägt keinen.
+   */
+  untertitel?: string;
+  /**
+   * Faktor auf die Deckkraft von Zeichen und Plakette: {@link VERALTET_DECKKRAFT}, wenn die
+   * automatische Position veraltet ist (`positionsAlter`). Nur gesetzt, wenn kleiner als 1.
+   */
+  deckkraft?: number;
+  /**
    * Lagemeldungs-Herkunft für den Inspector-Backlink (nur typ='lagemeldung'). `meldungId` = id der
    * Quell-Meldung (Deeplink ?meldung=), `meldungLfdNr` = Anzeigenummer.
    */
   lageMeldung?: { meldungId: number; meldungLfdNr: number; absender: string; inhalt: string };
+}
+
+/** Deckkraft eines Ziels, dessen automatische Position veraltet ist (Helfer-App, ab 5 min). */
+export const VERALTET_DECKKRAFT = 0.5;
+
+/** So nennt der Untertitel die automatischen Quellen; `manuell` bekommt keinen. */
+const QUELLEN_NAME: Partial<Record<Positionsquelle, string>> = {
+  helfer: 'Helfer-App',
+  einwurf: 'Ortung',
+};
+
+/**
+ * Untertitel und Deckkraft aus Quelle und Zeitpunkt einer Position: nur für automatische Quellen
+ * mit lesbarem Zeitpunkt. Eine Handposition veraltet nicht — sie steht, bis jemand sie ändert.
+ */
+function positionsHinweis(
+  quelle: Positionsquelle | null | undefined,
+  aktualisiertAt: string | null | undefined,
+  jetzt: Date,
+): Pick<KarteMarker, 'untertitel' | 'deckkraft'> {
+  const name = quelle ? QUELLEN_NAME[quelle] : undefined;
+  const alter = name ? positionsAlter(aktualisiertAt, jetzt) : null;
+  if (!name || !alter) return {};
+  return {
+    untertitel: `${name} · ${relativ(alter.minuten, 'vor')}`,
+    ...(alter.veraltet ? { deckkraft: VERALTET_DECKKRAFT } : {}),
+  };
 }
 
 export interface NichtVerortet {
@@ -442,16 +481,6 @@ export function buildFreieZeichenMarker(
   });
 }
 
-/**
- * Marke einer geortenen Fahrzeugposition an der Plakette (LLH-2091): „GPS“, jenseits der Schwelle
- * „GPS · veraltet“ — das Wort ist der Kanal, nicht die Farbe. Manuell und ohne Quelle: keine Marke.
- */
-function ortungMarke(f: EinsatzFahrzeug, jetzt: number): string | undefined {
-  const s = ortungStand(f, jetzt);
-  if (s.quelle !== 'gps') return undefined;
-  return s.veraltet ? 'GPS · veraltet' : 'GPS';
-}
-
 export interface TaktischeQuelle {
   einheiten: Einheit[];
   fahrzeuge: EinsatzFahrzeug[];
@@ -459,12 +488,15 @@ export interface TaktischeQuelle {
   orgDefault: string | null;
 }
 
-/** Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. */
+/**
+ * Leitet taktische Marker (Einheit/Fahrzeug/Führung) + Nicht-verortet-Liste ab. `jetzt` misst das
+ * Alter automatischer Positionen; der Aufrufer reicht den Minutentakt (`useMinutenTakt`), damit
+ * ein Ziel ohne neue Daten blass wird.
+ */
 export function buildTaktischeMarker(
   q: TaktischeQuelle,
   token: Pick<GlobalToken, 'controlHeight'>,
-  /** Takt in ms (`useMinutenTakt`) für das Alter der GPS-Marke; ohne ihn die Uhr. */
-  jetzt: number = Date.now(),
+  jetzt: Date = new Date(),
 ): {
   verortet: KarteMarker[];
   nichtVerortet: NichtVerortet[];
@@ -478,8 +510,8 @@ export function buildTaktischeMarker(
     lat: number | null | undefined,
     lon: number | null | undefined,
     tz: TzProps,
+    position: Pick<Einheit, 'position_quelle' | 'position_aktualisiert_at'>,
     statusFarbe?: string | null,
-    beschriftungZusatz?: string,
   ) => {
     if (lat != null && lon != null) {
       verortet.push({
@@ -493,7 +525,7 @@ export function buildTaktischeMarker(
         tz,
         statusFarbe,
         trefferDurchmesser: token.controlHeight,
-        ...(beschriftungZusatz ? { beschriftungZusatz } : {}),
+        ...positionsHinweis(position.position_quelle, position.position_aktualisiert_at, jetzt),
       });
     } else {
       nichtVerortet.push({ typ, id, label });
@@ -513,6 +545,7 @@ export function buildTaktischeMarker(
         organisation: e.tz_organisation,
         orgDefault: q.orgDefault,
       }),
+      e,
     );
   }
   for (const f of q.fahrzeuge) {
@@ -531,8 +564,8 @@ export function buildTaktischeMarker(
         opta: f.opta,
         traegerorganisation: f.traegerorganisation,
       }),
+      f,
       f.status_farbe,
-      ortungMarke(f, jetzt),
     );
   }
   for (const p of q.fuehrungskraefte) {
@@ -552,6 +585,7 @@ export function buildTaktischeMarker(
         funktion: p.funktion,
         istFuehrungskraft: p.ist_einheitsfuehrer || p.ist_abschnittsleiter,
       }),
+      p,
     );
   }
   return { verortet, nichtVerortet };

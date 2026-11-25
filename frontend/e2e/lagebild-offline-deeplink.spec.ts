@@ -73,10 +73,10 @@ test('ETB-Deeplink nach dem Neuladen: der vorgehaltene Stand entscheidet nichts'
 }) => {
   test.setTimeout(120_000);
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Vorhalt Deeplink ${Date.now()}`,
   });
-  await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+  await post(page, `/api/incidents/${einsatzId}/etb`, {
     typ: 'meldung',
     inhalt: 'Vorhalt alter Eintrag',
     von: 'ELW 1',
@@ -90,7 +90,7 @@ test('ETB-Deeplink nach dem Neuladen: der vorgehaltene Stand entscheidet nichts'
     .toContain('Vorhalt alter Eintrag');
 
   // Am vorgehaltenen Stand vorbei: der neue Eintrag entsteht per API.
-  const neu = await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+  const neu = await post(page, `/api/incidents/${einsatzId}/etb`, {
     typ: 'meldung',
     inhalt: 'Vorhalt neuer Eintrag',
     von: 'ELW 1',
@@ -98,7 +98,7 @@ test('ETB-Deeplink nach dem Neuladen: der vorgehaltene Stand entscheidet nichts'
   });
   expect(await vorgehalteneEtbInhalte(page)).not.toContain('Vorhalt neuer Eintrag');
 
-  await page.route(/\/api\/einsaetze\/\d+\/etb(\?|$)/, async (anfrage) => {
+  await page.route(/\/api\/incidents\/\d+\/etb(\?|$)/, async (anfrage) => {
     await new Promise((fertig) => setTimeout(fertig, 1500));
     await anfrage.continue().catch(() => {});
   });

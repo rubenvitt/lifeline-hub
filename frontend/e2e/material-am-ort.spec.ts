@@ -20,15 +20,15 @@ async function post<T = { id: number }>(page: Page, pfad: string, data: unknown)
 }
 
 async function etbInhalte(page: Page, einsatzId: number): Promise<string[]> {
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
 async function seed(page: Page) {
-  const { id: einsatzId } = await post(page, '/api/einsaetze', {
+  const { id: einsatzId } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Material am Ort ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const einheit = await post(page, `${basis}/units`, { name: 'Staffel A' });
   const fahrzeug = await post(page, `${basis}/vehicles`, { adhoc: { funkrufname: 'Florian 1' } });
   const zuordnung = await page.request.put(`${basis}/units/${einheit.id}/vehicles/${fahrzeug.id}`);
@@ -155,7 +155,7 @@ test('UHS: Teilmenge hierher – 20 von 50 Rettungsdecken, der Rest bleibt an de
   page,
 }) => {
   const s = await seed(page);
-  await post(page, `/api/einsaetze/${s.einsatzId}/material`, {
+  await post(page, `/api/incidents/${s.einsatzId}/material`, {
     adhoc: { bezeichnung: 'Rettungsdecke' },
     menge: 50,
     art: 'verbrauchsgut',
@@ -187,7 +187,7 @@ test('Einheit: zwei Klicks auf dieselbe Stelle lösen nur einen Posten (LLH-1254
   page,
 }) => {
   const s = await seed(page);
-  const basis = `/api/einsaetze/${s.einsatzId}`;
+  const basis = `/api/incidents/${s.einsatzId}`;
   await post(page, `${basis}/material`, {
     adhoc: { bezeichnung: 'Spineboard' },
     einheit_id: s.einheitId,

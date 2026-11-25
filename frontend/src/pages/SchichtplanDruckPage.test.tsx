@@ -44,14 +44,14 @@ const PLAN: Schichtplan = {
 function zeigen(handler: Parameters<typeof server.use>, client = neuerQueryClient()) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/einsaetze/5', () =>
+    http.get('/api/incidents/5', () =>
       HttpResponse.json({ id: 5, bezeichnung: 'Stadtfest', status: 'aktiv' }),
     ),
     http.get('/api/organization', () => HttpResponse.json({ id: 1, name: 'DRK Musterstadt' })),
-    http.get('/api/einsaetze/5/reliefs/shift-plan', () => HttpResponse.json(PLAN)),
-    http.get('/api/einsaetze/5/reliefs/defaults', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/5/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/5/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/5/reliefs/shift-plan', () => HttpResponse.json(PLAN)),
+    http.get('/api/incidents/5/reliefs/defaults', () => HttpResponse.json([])),
+    http.get('/api/incidents/5/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/5/uhs', () => HttpResponse.json([])),
     http.get('/api/qualifications', () => HttpResponse.json([])),
   );
   // Eigener Aufruf: innerhalb eines `server.use` gewinnt der erste passende Handler.
@@ -69,7 +69,7 @@ const druckKnopf = () => screen.getByRole('button', { name: 'Drucken / als PDF' 
 describe('SchichtplanDruckPage (LLH-1557)', () => {
   it('403 an der UHS-Liste: Blatt trotzdem da, Druck frei', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
+      http.get('/api/incidents/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
     ]);
     await waitFor(() => expect(druckKnopf()).toBeEnabled());
     expect(screen.getByRole('heading', { name: /Aushang – UHS Marktplatz/ })).toBeInTheDocument();
@@ -77,10 +77,10 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern: Listen trotzdem gefragt, ihr Fehler sperrt den Druck', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/module-access', () =>
+      http.get('/api/incidents/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
-      http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
+      http.get('/api/incidents/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 500 })),
     ]);
     expect(await screen.findByText('Der Schichtplan konnte nicht geladen werden')).toBeVisible();
     expect(druckKnopf()).toBeDisabled();
@@ -88,10 +88,10 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
 
   it('Freigaben scheitern, UHS-Liste 403: Blatt trotzdem da, Druck frei', async () => {
     zeigen([
-      http.get('/api/einsaetze/5/module-access', () =>
+      http.get('/api/incidents/5/module-access', () =>
         HttpResponse.json({ error: 'x' }, { status: 500 }),
       ),
-      http.get('/api/einsaetze/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
+      http.get('/api/incidents/5/uhs', () => HttpResponse.json({ error: 'x' }, { status: 403 })),
     ]);
     await waitFor(() => expect(druckKnopf()).toBeEnabled());
     expect(screen.getByRole('heading', { name: /Aushang – UHS Marktplatz/ })).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe('SchichtplanDruckPage (LLH-1557)', () => {
     let uhsAbrufe = 0;
     zeigen(
       [
-        http.get('/api/einsaetze/5/uhs', () => {
+        http.get('/api/incidents/5/uhs', () => {
           uhsAbrufe += 1;
           return HttpResponse.json([]);
         }),

@@ -697,6 +697,8 @@ fn serde_wire_gleich_as_str() {
         AdapterLanEntzogen,
         AdapterAngehalten,
         AdapterFortgesetzt,
+        FremdebenenLanErlaubt,
+        FremdebenenLanEntzogen,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
@@ -812,6 +814,7 @@ fn serde_wire_gleich_as_str() {
         GeheimnisUnlesbar => "geheimnis_unlesbar",
         GeheimnisspeicherGesperrt => "geheimnisspeicher_gesperrt",
         EinstellungUngueltig => "einstellung_ungueltig",
+        VersionUnbekannt => "version_unbekannt",
         Intern => "intern",
     });
     enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {
@@ -831,6 +834,20 @@ fn serde_wire_gleich_as_str() {
         Text => "text",
         Zahl => "zahl",
         Url => "url",
+    });
+    // Veranstaltungen-Abruf v1 (LLH-2097): Wire des Vertrags und Spalten `art`/`status` von
+    // `veranstaltung_extern`.
+    enum_wire!(lifeline_hub::veranstaltung_extern::vertrag::VeranstaltungsArt {
+        Sanitaetsdienst => "sanitaetsdienst",
+        Betreuung => "betreuung",
+        Uebung => "uebung",
+        Sonstiges => "sonstiges",
+    });
+    enum_wire!(lifeline_hub::veranstaltung_extern::vertrag::VeranstaltungsStatus {
+        Angefragt => "angefragt",
+        Zugesagt => "zugesagt",
+        Abgesagt => "abgesagt",
+        Entfernt => "entfernt",
     });
     enum_wire!(lifeline_hub::routes::adapter::GeheimnisspeicherZustand {
         Bereit => "bereit",
@@ -1184,6 +1201,49 @@ fn fuehrungsfunktion_wire() {
     } in lifeline_hub::fuehrung::Fuehrungsfunktion::ALLE);
 }
 
+/// Helfer-App: Quelle einer Position; Werte = CHECK von `position_quelle` (Migration 0377).
+#[test]
+fn positionsquelle_wire() {
+    enum_wire!(lifeline_hub::ortung::Positionsquelle {
+        Manuell => "manuell",
+        Einwurf => "einwurf",
+        Helfer => "helfer",
+    } in lifeline_hub::ortung::Positionsquelle::ALLE);
+}
+
+/// Helfer-App: Zustand einer Helfer-Kopplung; die ersten drei = CHECK von `helfer_zustand`
+/// (Migration 0377), `beendet` leitet der Server ab.
+#[test]
+fn helfer_status_wire() {
+    enum_wire!(lifeline_hub::helfer::HelferStatus {
+        Unbestaetigt => "unbestaetigt",
+        Aktiv => "aktiv",
+        Abgelehnt => "abgelehnt",
+        Beendet => "beendet",
+    } in lifeline_hub::helfer::HelferStatus::ALLE);
+}
+
+/// Helfer-App: Grund des Endes einer Helfer-Kopplung (die App nennt ihn).
+#[test]
+fn helfer_ende_grund_wire() {
+    enum_wire!(lifeline_hub::helfer::anmeldung::HelferEndeGrund {
+        EinsatzBeendet => "incident_closed",
+        Widerrufen => "revoked",
+        Abgelaufen => "expired",
+        Abgelehnt => "rejected",
+        Abgemeldet => "signed_out",
+    } in lifeline_hub::helfer::anmeldung::HelferEndeGrund::ALLE);
+}
+
+/// Helfer-App: Art des Ziels einer Helfer-Kopplung.
+#[test]
+fn helfer_ziel_art_wire() {
+    enum_wire!(lifeline_hub::helfer::HelferZielArt {
+        Einheit => "unit",
+        Fahrzeug => "vehicle",
+    } in lifeline_hub::helfer::HelferZielArt::ALLE);
+}
+
 #[test]
 fn fuehrungsfunktion_art_wire() {
     enum_wire!(lifeline_hub::fuehrung::FunktionsArt {
@@ -1369,6 +1429,33 @@ fn schichtplan_wire() {
         Fahrzeug => "fahrzeug",
         Uhs => "uhs",
         Pause => "pause",
+    });
+    // Stammdaten-Eingang (LLH-1633): Wire = Spalte `art` der Datei bzw. Antwort der Vorschau.
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::StammdatenArt {
+        Fahrzeug,
+        Personal,
+        Qualifikation,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::abgleich::TrefferGrund {
+        Kennung,
+        Opta,
+        Issi,
+        Funkrufname,
+        Personalnummer,
+        Name,
+        Bezeichnung,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::repo::ZeilenErgebnis {
+        Neu,
+        Gefunden,
+        Mehrdeutig,
+        AusserDienst,
+        Fehler,
+        Unveraendert,
+    });
+    enum_wire_as_str!(lifeline_hub::stammdaten_eingang::repo::FeldAenderungArt {
+        Fuellt,
+        WeichtAb,
     });
     enum_wire!(lifeline_hub::abloesung::schichtplan::uebernahme::MeldungStufe {
         Fehler => "fehler",
@@ -1672,6 +1759,7 @@ fn live_event_wire() {
         Meldung => "meldung",
         Bereitstellungsraum => "bereitstellungsraum",
         KarteBild => "karte_bild",
+        KarteFremdebene => "karte_fremdebene",
         Etb => "etb",
         Befehl => "befehl",
         Lagebesprechung => "lagebesprechung",
@@ -1689,6 +1777,7 @@ fn live_event_wire() {
         Mitglieder => "mitglieder",
         Benachrichtigung => "benachrichtigung",
         Praesenz => "praesenz",
+        Helfer => "helfer",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }
@@ -2074,6 +2163,7 @@ fn geraet_kopplung_wire() {
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegung => "verpflegung",
         Einheit => "einheit",
+        Helfer => "helfer",
     } in lifeline_hub::geraet::Funktionsansicht::ALLE);
     enum_wire!(lifeline_hub::geraet::Bindungsart {
         Uhs => "uhs",
@@ -2179,6 +2269,34 @@ fn lese_sperre_wire() {
         NachlaufAbgelaufen => "nachlauf_abgelaufen",
         NichtMehrLesbar => "nicht_mehr_lesbar",
     } in lifeline_hub::error::LeseSperre::ALLE);
+}
+
+#[test]
+fn fremdebene_quelle_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneQuelle {
+        Datei => "datei",
+        Url => "url",
+    } in lifeline_hub::karte_fremdebene::FremdebeneQuelle::ALLE);
+}
+
+#[test]
+fn fremdebene_fehler_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneFehler {
+        Unlesbar => "unlesbar",
+        Dtd => "dtd",
+        ZuGross => "zu_gross",
+        ZuUmfangreich => "zu_umfangreich",
+        ZuVieleObjekte => "zu_viele_objekte",
+        Leer => "leer",
+        Koordinaten => "koordinaten",
+        Virus => "virus",
+        NichtErreichbar => "nicht_erreichbar",
+        Weiterleitung => "weiterleitung",
+        Abgelehnt => "abgelehnt",
+        Status => "status",
+        ZielIntern => "ziel_intern",
+        Zeitlimit => "zeitlimit",
+    } in lifeline_hub::karte_fremdebene::FremdebeneFehler::ALLE);
 }
 
 #[test]

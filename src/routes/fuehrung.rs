@@ -1,6 +1,6 @@
 //! Führung je Einsatz (LLH-1491, Spec `instanz-fuehrung`, Herleitung
 //! `openspec/changes/archive/2026-11-09-v6hj7xl2-fuehrung-epoche/design.md`): Bedienung an einem lokalen Einsatz
-//! (`/api/einsaetze/{id}/command/…`, Einsatzleitung oder Admin der Einsatz-Org) und an einer Akte
+//! (`/api/incidents/{id}/command/…`, Einsatzleitung oder Admin der Einsatz-Org) und an einer Akte
 //! des Gegenübers (`/api/admin/instance/command/{akte}/…`, Admin der Org). Regeln und
 //! Transaktionen liegen in `instanz::fuehrung::dienst`. Ohne Schalter `LIFELINE_FUEHRUNG` 404.
 
@@ -460,7 +460,7 @@ async fn akte_des_einsatzes(state: &AppState, einsatz_id: i64) -> Result<AkteZei
     dienst::load_fuer_einsatz(&state.pool, einsatz_id).await
 }
 
-/// GET /api/einsaetze/{id}/command — Führung des Einsatzes samt Verlauf; jede Person, die den
+/// GET /api/incidents/{id}/command — Führung des Einsatzes samt Verlauf; jede Person, die den
 /// Einsatz liest. Gerätekonten erreichen die Route nicht (`geraet::darf_route`, Spec
 /// `instanz-fuehrung`, „Den Verlauf der Führung lesen nur Personen“, LLH-1676).
 pub async fn lesen(
@@ -472,7 +472,7 @@ pub async fn lesen(
     Ok(Json(anzeige(&state, a.as_akte_ref()).await?))
 }
 
-/// POST /api/einsaetze/{id}/command/hand-over — reguläre Übergabe an ein Gegenüber.
+/// POST /api/incidents/{id}/command/hand-over — reguläre Übergabe an ein Gegenüber.
 pub async fn uebergeben(
     State(state): State<AppState>,
     ctx: EinsatzFuehrungszugriff,
@@ -484,7 +484,7 @@ pub async fn uebergeben(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/code — Abgabe per Code (meldende Seite).
+/// POST /api/incidents/{id}/command/code — Abgabe per Code (meldende Seite).
 pub async fn code_abgeben(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -497,7 +497,7 @@ pub async fn code_abgeben(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/request — die Führung beim Gegenüber erbitten.
+/// POST /api/incidents/{id}/command/request — die Führung beim Gegenüber erbitten.
 pub async fn anfragen(
     State(state): State<AppState>,
     ctx: EinsatzFuehrungszugriff,
@@ -506,7 +506,7 @@ pub async fn anfragen(
     Ok(Json(run_anfragen(&state, &a).await?))
 }
 
-/// POST /api/einsaetze/{id}/command/request/decline — die Anfrage der Gegenstelle vor Ort
+/// POST /api/incidents/{id}/command/request/decline — die Anfrage der Gegenstelle vor Ort
 /// ablehnen (LLH-1678).
 pub async fn anfrage_ablehnen(
     State(state): State<AppState>,
@@ -516,7 +516,7 @@ pub async fn anfrage_ablehnen(
     Ok(Json(run_anfrage_ablehnen(&state, &a, &ctx.benutzer).await?))
 }
 
-/// POST /api/einsaetze/{id}/command/emergency-takeover — gegen die erreichte Seite, mit Grund.
+/// POST /api/incidents/{id}/command/emergency-takeover — gegen die erreichte Seite, mit Grund.
 pub async fn notuebernahme(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -529,7 +529,7 @@ pub async fn notuebernahme(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/reclaim — einen Spiegel zurückholen, dessen Führer
+/// POST /api/incidents/{id}/command/reclaim — einen Spiegel zurückholen, dessen Führer
 /// nicht mehr gekoppelt ist (LLH-1850), mit Grund und ohne Beweis.
 pub async fn zurueckholen(
     State(state): State<AppState>,
@@ -543,7 +543,7 @@ pub async fn zurueckholen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/emergency-takeover/start — Erklärung gegen die meldende Seite
+/// POST /api/incidents/{id}/command/emergency-takeover/start — Erklärung gegen die meldende Seite
 /// zum Unterschreiben.
 pub async fn notuebernahme_start(
     State(state): State<AppState>,
@@ -556,7 +556,7 @@ pub async fn notuebernahme_start(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/emergency-takeover/finish — prüft die Unterschrift und
+/// POST /api/incidents/{id}/command/emergency-takeover/finish — prüft die Unterschrift und
 /// übernimmt.
 pub async fn notuebernahme_abschluss(
     State(state): State<AppState>,
@@ -570,7 +570,7 @@ pub async fn notuebernahme_abschluss(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/emergency-takeover/code — mit dem Abgabecode des Gegenübers.
+/// POST /api/incidents/{id}/command/emergency-takeover/code — mit dem Abgabecode des Gegenübers.
 pub async fn notuebernahme_code(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -583,7 +583,7 @@ pub async fn notuebernahme_code(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/confirm — offene Übernahme gelten lassen.
+/// POST /api/incidents/{id}/command/confirm — offene Übernahme gelten lassen.
 pub async fn bestaetigen(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -595,7 +595,7 @@ pub async fn bestaetigen(
     ))
 }
 
-/// POST /api/einsaetze/{id}/command/object — offene Übernahme zurückweisen, weiter
+/// POST /api/incidents/{id}/command/object — offene Übernahme zurückweisen, weiter
 /// führen.
 pub async fn widersprechen(
     State(state): State<AppState>,

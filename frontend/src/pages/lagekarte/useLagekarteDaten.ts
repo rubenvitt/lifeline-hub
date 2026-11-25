@@ -1,7 +1,4 @@
 import { useMemo } from 'react';
-import dayjs from 'dayjs';
-import utc from 'dayjs/plugin/utc';
-import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { theme } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { einsatzKeys, globalKeys } from '../../api/queryKeys';
@@ -20,7 +17,7 @@ import { listeTiere } from '../../api/einsatzTier';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { ohneAbgeschlossene } from '../../personen/personenBilanz';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
@@ -62,11 +59,11 @@ import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
 import { checkBrZugriff } from './brEbene';
 import { checkTierZugriff } from './tierEbene';
+import { parseZeitpunkt } from './positionsAlter';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { buildTierMarker } from './tierMarker';
 import { buildSammelstelleMarker } from './sammelstelleMarker';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
-
-dayjs.extend(utc);
 
 /**
  * Name der Personen-Quelle im Ausfallhinweis — die Seite filtert sie für Kopfzahl und „Nicht
@@ -119,8 +116,6 @@ export function useLagekarteDaten({
   // keinen `useToken()`-Zugang; diese Ebene reicht den Token des aktiven Modus durch, statt ihn aus
   // `document.documentElement` zu raten.
   const { token } = theme.useToken();
-  // Minutentakt: die GPS-Marke („veraltet“) altert ohne neuen Abruf mit.
-  const takt = useMinutenTakt();
   const istSnapshot = quelle.typ === 'snapshot';
   const liveAn = !istSnapshot;
   const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
@@ -130,11 +125,6 @@ export function useLagekarteDaten({
     queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
     enabled: snapshotId != null,
   });
-
-  // Ein eingefrorener Lagestand altert gegen seinen Stand, nicht gegen die Uhr: eine GPS-Marke
-  // war beim Sichern frisch oder veraltet, und bleibt es (LLH-2091).
-  const standAt = istSnapshot ? snapQuery.data?.stand_at : undefined;
-  const jetzt = standAt ? dayjs.utc(standAt).valueOf() : takt;
 
   const einsatzQuery = useQuery({
     queryKey: einsatzKeys.einsatz(einsatzId),
@@ -409,6 +399,9 @@ export function useLagekarteDaten({
 
   // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
   const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz);
+  // Die Drohnenquelle zuschalten (LLH-2106): Leitungsaktion wie am Server (`EinsatzLeitungszugriff`),
+  // im Stand-Modus nie.
+  const darfDrohneSchalten = istSnapshot ? false : darfEinsatzLeiten(einsatz);
 
   // Ansichts-Filter (client-seitig): Objekte der aktiven Ansicht plus die ansichtslosen. `== null`
   // fängt `null` und das per skip_serializing_if weggelassene Feld.
@@ -482,6 +475,10 @@ export function useLagekarteDaten({
     ],
   );
 
+  // Alter automatischer Positionen (Helfer-App): live im Minutentakt, damit ein Ziel ohne neue
+  // Daten blass wird; im Rückblick gegen den Stand des Snapshots, nicht gegen heute.
+  const takt = useMinutenTakt();
+  const positionsJetzt = istSnapshot ? (parseZeitpunkt(snap?.stand_at) ?? takt) : takt;
   const taktisch = useMemo(
     () =>
       buildTaktischeMarker(
@@ -492,9 +489,9 @@ export function useLagekarteDaten({
           orgDefault,
         },
         token,
-        jetzt,
+        new Date(positionsJetzt),
       ),
-    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token, jetzt],
+    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token, positionsJetzt],
   );
 
   const flaechen = useMemo(
@@ -567,6 +564,9 @@ export function useLagekarteDaten({
             id: z.id,
             geometrie: g,
             label: beschriftung,
+            rohLabel: z.label,
+            ...(gebietId != null ? { warnstufe: warnstufe ?? 'unbekannt' } : {}),
+            ...(kreis ? { kreis } : {}),
             typ: z.typ,
             stil,
             // Gefahrenzonen gestrichelt — reine Darstellung am Zonentyp.
@@ -741,12 +741,10 @@ export function useLagekarteDaten({
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,
+    darfDrohneSchalten,
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine abgeschaltete
     // Live-Query meldet isLoading=false → sonst „fertig" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,
-    // Bezugszeit (ms) für das Alter von GPS-Positionen: im Lagestand dessen Stand, sonst keine
-    // (dann gilt der Minutentakt).
-    bezugszeit: standAt ? jetzt : undefined,
     // Stehen alle Quellen der Marker fest (geladen oder gescheitert)? Die Startansicht
     // (`startAnsicht.ts`) braucht das vollständige Bild; `ladt` hängt nur an Einsatz und Config.
     markerLaden: istSnapshot

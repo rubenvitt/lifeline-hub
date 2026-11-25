@@ -197,15 +197,16 @@ pub struct EinsatzFahrzeugAnzeige {
     pub bemerkung: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
-    /// Woher die Position stammt (LLH-2091); fehlt ohne Position.
+    /// Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+    /// Bestand vor der Quelle.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub position_quelle: Option<crate::ortung::PositionQuelle>,
-    /// Zeitpunkt der Position (UTC): bei `ortung` die Messzeit des Geräts, bei `manuell` die
-    /// Serverzeit des Setzens. Trägt die Altersanzeige.
+    pub position_aktualisiert_at: Option<String>,
+    /// Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub position_gemessen_at: Option<String>,
-    /// Hängt das Fahrzeug an einer Ortungs-Kennung? Nur der Wahrheitswert; Kennung und Zugang
-    /// verlassen den Server hier nicht (LLH-2091).
+    #[schema(value_type = Option<crate::ortung::Positionsquelle>)]
+    pub position_quelle: Option<String>,
+    /// Hängt das Fahrzeug an einer Ortungs-Kennung des Einwurfs? Nur der Wahrheitswert; Kennung
+    /// und Zugang verlassen den Server hier nicht (LLH-2091).
     pub ortung_gekoppelt: bool,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
@@ -265,7 +266,6 @@ pub struct EntlassungVorzustand {
 pub struct OrtungVorzustand {
     pub zugang_id: String,
     pub kennung: String,
-    pub ehrenamt_bestaetigt: bool,
 }
 
 /// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): mehr
@@ -385,20 +385,9 @@ pub fn etb_text_disponiert(funkrufname: &str) -> String {
     format!("Fahrzeug «{}» disponiert", funkrufname)
 }
 
-/// System-ETB beim Koppeln eines Fahrzeugs an eine Ortungs-Kennung (LLH-2091). Mit Zusatz, wenn
-/// die ehrenamtliche Besatzung bestätigt wurde.
-pub fn etb_text_gekoppelt(
-    funkrufname: &str,
-    zugang_name: &str,
-    kennung: &str,
-    ehrenamt: bool,
-) -> String {
-    let zusatz = if ehrenamt {
-        ", Besatzung ehrenamtlich bestätigt"
-    } else {
-        ""
-    };
-    format!("Ortung gekoppelt: {funkrufname} ({zugang_name} / {kennung}){zusatz}")
+/// System-ETB beim Koppeln eines Fahrzeugs an eine Ortungs-Kennung (LLH-2091).
+pub fn etb_text_gekoppelt(funkrufname: &str, zugang_name: &str, kennung: &str) -> String {
+    format!("Ortung gekoppelt: {funkrufname} ({zugang_name} / {kennung})")
 }
 
 /// System-ETB beim Trennen der Ortung (von Hand oder automatisch, LLH-2091).

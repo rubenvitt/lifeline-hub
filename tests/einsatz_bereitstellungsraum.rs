@@ -23,7 +23,7 @@ async fn br_anlegen_und_aktivieren(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({"bezeichnung": bez})),
     )
@@ -33,7 +33,7 @@ async fn br_anlegen_und_aktivieren(
     let (s, _) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -47,7 +47,7 @@ async fn etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Stri
     let (s, v) = anfrage_json(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -73,7 +73,7 @@ async fn anlegen_liefert_geplant_und_keinen_etb() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Nord"})),
     )
@@ -97,7 +97,7 @@ async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Süd"})),
     )
@@ -108,7 +108,7 @@ async fn status_aktiv_schreibt_etb_in_betrieb_genommen() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/status"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/status"),
         &cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -135,7 +135,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/status"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/status"),
         &cookie,
         Some(&json!({"status": "geplant"})),
     )
@@ -164,7 +164,7 @@ async fn crud_und_belegung_einheit_erscheint_in_detail() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -176,7 +176,7 @@ async fn crud_und_belegung_einheit_erscheint_in_detail() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}"),
         &cookie,
         None,
     )
@@ -206,7 +206,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -215,7 +215,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "austritt"})),
     )
@@ -224,7 +224,7 @@ async fn austritt_entfernt_einheit_aus_detail() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}"),
         &cookie,
         None,
     )
@@ -256,7 +256,7 @@ async fn aufloesen_blockt_bei_belegung_409() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -265,7 +265,7 @@ async fn aufloesen_blockt_bei_belegung_409() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/status"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/status"),
         &cookie,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -302,7 +302,7 @@ async fn fahrzeug_mit_einheit_belegen_409() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "fahrzeug", "objekt_id": fz_id, "art": "eintritt"})),
     )
@@ -330,7 +330,7 @@ async fn fahrzeug_ohne_einheit_belegung_201() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "fahrzeug", "objekt_id": fz_id, "art": "eintritt"})),
     )
@@ -341,7 +341,7 @@ async fn fahrzeug_ohne_einheit_belegung_201() {
     let (_, d) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}"),
         &cookie,
         None,
     )
@@ -362,7 +362,7 @@ async fn unbekannter_objekt_typ_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "person", "objekt_id": 1, "art": "eintritt"})),
     )
@@ -381,7 +381,7 @@ async fn geplanter_br_akzeptiert_keine_belegung_422() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Geplant"})),
     )
@@ -400,7 +400,7 @@ async fn geplanter_br_akzeptiert_keine_belegung_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -418,7 +418,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Alpha"})),
     )
@@ -430,7 +430,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/status"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/status"),
         &cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -455,7 +455,7 @@ async fn etb_inbetriebnahme_und_belegung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -482,7 +482,7 @@ async fn patch_stammfelder_kein_etb() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Patch Neu"})),
     )
@@ -509,7 +509,7 @@ async fn eingabegrenzen_400_mit_feldnamen() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
-    let basis = format!("/api/einsaetze/{eid}/staging-areas");
+    let basis = format!("/api/incidents/{eid}/staging-areas");
     // Gezählt wird in Zeichen, nicht in Bytes.
     let lang = |n: usize| "ä".repeat(n);
 
@@ -631,7 +631,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/members/{beob_id}"),
+        &format!("/api/incidents/{eid}/members/{beob_id}"),
         &cookie_admin,
         Some(&json!({"einsatz_rolle": "beobachter"})),
     )
@@ -644,7 +644,7 @@ async fn beobachter_kann_nicht_schreiben_403() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie_beob,
         Some(&json!({"bezeichnung": "BR Geheim"})),
     )
@@ -661,7 +661,7 @@ async fn fremder_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        "/api/einsaetze/9999/staging-areas",
+        "/api/incidents/9999/staging-areas",
         &cookie,
         None,
     )
@@ -690,7 +690,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Neu"})),
     )
@@ -704,7 +704,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Geaendert"})),
     )
@@ -733,7 +733,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_a}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_a}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -744,7 +744,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_b}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_b}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "wechsel"})),
     )
@@ -755,7 +755,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     let (_, vb) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_b}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_b}"),
         &cookie,
         None,
     )
@@ -768,7 +768,7 @@ async fn wechsel_verschiebt_einheit_zwischen_br() {
     let (_, va) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_a}"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_a}"),
         &cookie,
         None,
     )
@@ -802,7 +802,7 @@ async fn belegung_einheit_feuert_einheit_sse() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": einheit_id, "art": "eintritt"})),
     )
@@ -844,7 +844,7 @@ async fn belegung_fahrzeug_feuert_fahrzeug_sse() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "fahrzeug", "objekt_id": fz_id, "art": "eintritt"})),
     )
@@ -874,7 +874,7 @@ async fn belegung_unbekanntes_objekt_404() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas/{br_id}/occupancy"),
+        &format!("/api/incidents/{eid}/staging-areas/{br_id}/occupancy"),
         &cookie,
         Some(&json!({"objekt_typ": "einheit", "objekt_id": 99999, "art": "eintritt"})),
     )
@@ -887,7 +887,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -906,7 +906,7 @@ async fn abschnitt_eines_fremden_einsatzes_ist_404() {
     let fremder_einsatz = einsatz_anlegen(&app, &cookie).await;
     let eigener = abschnitt_anlegen(&app, &cookie, einsatz, "Nord").await;
     let fremder = abschnitt_anlegen(&app, &cookie, fremder_einsatz, "Fremd").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/staging-areas");
+    let pfad = format!("/api/incidents/{einsatz}/staging-areas");
 
     let (s, v) = anfrage_json(
         &app,
@@ -968,7 +968,7 @@ async fn belegen(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/occupancy"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/occupancy"),
         cookie,
         Some(&json!({"objekt_typ": typ, "objekt_id": objekt, "art": art})),
     )
@@ -988,7 +988,7 @@ async fn adhoc_fahrzeug(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&json!({"adhoc": {"funkrufname": funkrufname}})),
     )
@@ -999,7 +999,7 @@ async fn adhoc_fahrzeug(
         let (s, v) = anfrage_json(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
+            &format!("/api/incidents/{einsatz}/units/{e}/vehicles/{ef}"),
             cookie,
             None,
         )
@@ -1016,7 +1016,7 @@ async fn fetch_json(app: &axum::Router, cookie: &str, pfad: &str) -> serde_json:
 }
 
 fn br_pfad(einsatz: i64, br: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staging-areas/{br}")
+    format!("/api/incidents/{einsatz}/staging-areas/{br}")
 }
 
 /// Akzeptanzkriterium LLH-1095: zwei Einheiten mit je einem Fahrzeug und ein Fahrzeug ohne
@@ -1125,7 +1125,7 @@ async fn liste_traegt_dieselben_kennzahlen_wie_detail() {
     let liste = fetch_json(
         &app,
         &cookie,
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
     )
     .await;
     let liste = liste.as_array().unwrap();
@@ -1194,7 +1194,7 @@ async fn verlauf_zeigt_austritte_und_wechsel() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{eid}/units/{staffel}"),
+        &format!("/api/incidents/{eid}/units/{staffel}"),
         &cookie,
         None,
     )
@@ -1361,7 +1361,7 @@ async fn verlauf_modul_ausgeblendet_403() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/bereitstellungsraeume"),
+        &format!("/api/incidents/{eid}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(&json!({"sichtbar": false, "benoetigte_rolle": null})),
     )
@@ -1399,7 +1399,7 @@ async fn fahrzeug_zuordnen_meldet_den_raum_der_einheit() {
     let fz = adhoc_fahrzeug(&app, &cookie, eid, "Florian 1", None).await;
     let fz2 = adhoc_fahrzeug(&app, &cookie, eid, "Florian 2", None).await;
     let zuordnen =
-        |einheit: i64, ef: i64| format!("/api/einsaetze/{eid}/units/{einheit}/vehicles/{ef}");
+        |einheit: i64, ef: i64| format!("/api/incidents/{eid}/units/{einheit}/vehicles/{ef}");
 
     let mut rx = live.abonniere(eid);
     let (s, _) = anfrage_json(&app, "PUT", &zuordnen(zug, fz), &cookie, None).await;
@@ -1441,7 +1441,7 @@ async fn umhaengen_meldet_beide_raeume() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/units/{zug2}/vehicles/{fz}"),
+        &format!("/api/incidents/{eid}/units/{zug2}/vehicles/{fz}"),
         &cookie,
         None,
     )
@@ -1469,7 +1469,7 @@ async fn weitere_wege_melden_den_raum_der_einheit() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{eid}/units/{zug}/vehicles/{fz1}"),
+        &format!("/api/incidents/{eid}/units/{zug}/vehicles/{fz1}"),
         &cookie,
         None,
     )
@@ -1477,7 +1477,7 @@ async fn weitere_wege_melden_den_raum_der_einheit() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(br_ereignisse(&mut rx), vec![br], "Freigeben");
 
-    let einheit = format!("/api/einsaetze/{eid}/units/{zug}");
+    let einheit = format!("/api/incidents/{eid}/units/{zug}");
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
@@ -1506,7 +1506,7 @@ async fn weitere_wege_melden_den_raum_der_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}/vehicles/{fz2}"),
+        &format!("/api/incidents/{eid}/vehicles/{fz2}"),
         &cookie,
         Some(&json!({"funkrufname": "Florian 2 neu"})),
     )
@@ -1517,7 +1517,7 @@ async fn weitere_wege_melden_den_raum_der_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/vehicles/{fz2}/stand-down"),
+        &format!("/api/incidents/{eid}/vehicles/{fz2}/stand-down"),
         &cookie,
         None,
     )
@@ -1579,7 +1579,7 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/vehicles"),
+        &format!("/api/incidents/{eid}/vehicles"),
         &cookie,
         Some(&json!({"fahrzeug_id": stamm})),
     )
@@ -1589,7 +1589,7 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/units/{alt}/vehicles/{ef}"),
+        &format!("/api/incidents/{eid}/units/{alt}/vehicles/{ef}"),
         &cookie,
         None,
     )
@@ -1600,7 +1600,7 @@ async fn aus_vorlage_umhaengen_meldet_den_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/units/from-template"),
+        &format!("/api/incidents/{eid}/units/from-template"),
         &cookie,
         Some(&json!({"vorlage_id": vorlage,
                      "fahrzeuge": [{"fahrzeug_id": stamm, "umhaengen": true}]})),
@@ -1637,7 +1637,7 @@ async fn sammel_disposition_an_einheit_meldet_den_raum() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/vehicles/bulk"),
+        &format!("/api/incidents/{eid}/vehicles/bulk"),
         &cookie,
         Some(&json!({"fahrzeug_ids": [stamm], "einheit_id": zug})),
     )
@@ -2121,7 +2121,7 @@ async fn eintreffen_unangemeldet_benachrichtigt_einsatzleitung_einmal() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/personnel"),
+        &format!("/api/incidents/{eid}/personnel"),
         &admin,
         Some(&json!({"personal_id": v["id"]})),
     )
@@ -2155,7 +2155,7 @@ async fn eintreffen_unangemeldet_benachrichtigt_einsatzleitung_einmal() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &admin,
         Some(&json!({"bezeichnung": "Sportplatz", "abschnitt_id": nord})),
     )
@@ -2348,7 +2348,7 @@ async fn eintreffen_raum_und_rechte() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &admin,
         Some(&json!({"bezeichnung": "Geplant"})),
     )
@@ -2373,7 +2373,7 @@ async fn eintreffen_raum_und_rechte() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
+            &format!("/api/incidents/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
         )
@@ -2394,7 +2394,7 @@ async fn eintreffen_raum_und_rechte() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
+            &format!("/api/incidents/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": null})),
         )
@@ -2419,7 +2419,7 @@ async fn eintreffen_raum_und_rechte() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/einheiten"),
+        &format!("/api/incidents/{eid}/module-overrides/einheiten"),
         &admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2469,7 +2469,7 @@ async fn meldung_bestaetigt(pool: &sqlx::SqlitePool, meldung: i64) -> bool {
 }
 
 fn einheit_pfad(einsatz: i64, einheit: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/units/{einheit}")
+    format!("/api/incidents/{einsatz}/units/{einheit}")
 }
 
 async fn einheit_json(
@@ -2478,7 +2478,7 @@ async fn einheit_json(
     einsatz: i64,
     einheit: i64,
 ) -> serde_json::Value {
-    let liste = fetch_json(app, cookie, &format!("/api/einsaetze/{einsatz}/units")).await;
+    let liste = fetch_json(app, cookie, &format!("/api/incidents/{einsatz}/units")).await;
     liste
         .as_array()
         .unwrap()
@@ -2595,7 +2595,7 @@ async fn uebernehmen_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/persons"),
+        &format!("/api/incidents/{eid}/persons"),
         &cookie,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": einheit})),
     )
@@ -2676,7 +2676,7 @@ async fn uebernehmen_bezuege_und_zustaende() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/einheiten"),
+        &format!("/api/incidents/{eid}/module-overrides/einheiten"),
         &cookie,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2689,7 +2689,7 @@ async fn uebernehmen_bezuege_und_zustaende() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/reports/{meldung}/confirm"),
+        &format!("/api/incidents/{eid}/reports/{meldung}/confirm"),
         &cookie,
         None,
     )
@@ -2747,7 +2747,7 @@ async fn abweisen_loest_auf_und_entlaesst() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/fahrzeuge"),
+        &format!("/api/incidents/{eid}/module-overrides/fahrzeuge"),
         &cookie,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": "admin"})),
     )
@@ -2801,7 +2801,7 @@ async fn abweisen_loest_auf_und_entlaesst() {
     let aufgeloeste = fetch_json(
         &app,
         &cookie,
-        &format!("/api/einsaetze/{eid}/units?aufgeloeste=1"),
+        &format!("/api/incidents/{eid}/units?aufgeloeste=1"),
     )
     .await;
     let abgewiesen = aufgeloeste
@@ -2946,7 +2946,7 @@ async fn modul_sperren(app: &axum::Router, admin: &str, eid: i64, modul: &str, g
     let (s, v) = anfrage_json(
         app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
+        &format!("/api/incidents/{eid}/module-overrides/{modul}"),
         admin,
         Some(&json!({"sichtbar": true, "benoetigte_rolle": rolle})),
     )
@@ -3039,7 +3039,7 @@ async fn abruf_mit_abschnitt_meldet_versorgte_personen() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/persons", l.eid),
+        &format!("/api/incidents/{}/persons", l.eid),
         &l.admin,
         Some(&json!({"name": "Muster", "versorgende_einheit_id": l.hlf})),
     )
@@ -3075,7 +3075,7 @@ async fn liste_nennt_die_abrufe_je_raum() {
     let l = abruf_lage().await;
     let rw = einheit_bilden(&l.app, &l.admin, l.eid, "RW 1").await;
     belegen(&l.app, &l.admin, l.eid, l.br, "einheit", rw, "eintritt").await;
-    let liste_pfad = format!("/api/einsaetze/{}/staging-areas", l.eid);
+    let liste_pfad = format!("/api/incidents/{}/staging-areas", l.eid);
     let zeile = |liste: serde_json::Value| {
         liste
             .as_array()
@@ -3199,7 +3199,7 @@ async fn abruf_mit_auftrag_legt_auftrag_an_einheit_an() {
         let a = fetch_json(
             &l.app,
             &l.admin,
-            &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
+            &format!("/api/incidents/{}/tasks/{auftrag}", l.eid),
         )
         .await;
         assert_eq!(a["auftrag_text"], "Sandsackverbau");
@@ -3400,7 +3400,7 @@ async fn abruf_fahrzeug_ohne_einheit_mit_auftrag_an_fahrzeug() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
+        &format!("/api/incidents/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["empfaenger"][0]["empfaenger_typ"], "fahrzeug");
@@ -3661,7 +3661,7 @@ async fn abruf_zuruecknehmen_laesst_unterstellung_und_auftrag() {
     let a = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/tasks/{auftrag}", l.eid),
+        &format!("/api/incidents/{}/tasks/{auftrag}", l.eid),
     )
     .await;
     assert_eq!(a["vollzug_status"], "offen", "Auftrag bleibt: {a}");
@@ -3901,7 +3901,7 @@ async fn abgerufene_kraft_bleibt_in_belegung_und_kennzahlen() {
     let liste = fetch_json(
         &l.app,
         &l.admin,
-        &format!("/api/einsaetze/{}/staging-areas", l.eid),
+        &format!("/api/incidents/{}/staging-areas", l.eid),
     )
     .await;
     assert_eq!(liste[0]["belegung"]["einheiten"], 2);
@@ -4082,7 +4082,7 @@ async fn verortung_ohne_etb_und_live() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Sportplatz"})),
     )
@@ -4110,7 +4110,7 @@ async fn verortung_ohne_etb_und_live() {
     let liste = fetch_json(
         &app,
         &cookie,
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
     )
     .await;
     assert_eq!(liste[0]["lon"].as_f64(), Some(8.87), "{liste}");
@@ -4197,7 +4197,7 @@ async fn verortung_stornierter_raum_409() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Storno"})),
     )
@@ -4220,7 +4220,7 @@ async fn patch_aufgeloester_raum_409() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({"bezeichnung": "BR Ende"})),
     )
@@ -4264,7 +4264,7 @@ async fn anlegen_mit_koordinate() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/staging-areas"),
+        &format!("/api/incidents/{eid}/staging-areas"),
         &cookie,
         Some(&json!({
             "bezeichnung": "BR Sportplatz",
@@ -4290,7 +4290,7 @@ async fn anlegen_mit_halbem_paar_ist_422() {
     let (app, _pool) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &cookie).await;
-    let pfad = format!("/api/einsaetze/{eid}/staging-areas");
+    let pfad = format!("/api/incidents/{eid}/staging-areas");
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -4346,7 +4346,7 @@ async fn eintreffen_beginnt_die_schicht_der_einheit() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/reliefs/shift-model"),
+        &format!("/api/incidents/{eid}/reliefs/shift-model"),
         &cookie,
         Some(
             &json!({"schichtmodell": {"bezeichnung": "Sanitätsdienst", "typ": "rhythmus",
@@ -4372,7 +4372,7 @@ async fn eintreffen_beginnt_die_schicht_der_einheit() {
     let (s, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/reliefs?status=laufend"),
+        &format!("/api/incidents/{eid}/reliefs?status=laufend"),
         &cookie,
         None,
     )
@@ -4438,7 +4438,7 @@ async fn zuordnen_beendet_die_belegung_des_fahrzeugs() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/units/{zug}/vehicles/{fz}"),
+        &format!("/api/incidents/{eid}/units/{zug}/vehicles/{fz}"),
         &cookie,
         None,
     )
@@ -4489,7 +4489,7 @@ async fn zuordnen_an_einheit_im_raum_fuehrt_das_fahrzeug_nur_unter_ihr() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/units/{zug}/vehicles/{fz}"),
+        &format!("/api/incidents/{eid}/units/{zug}/vehicles/{fz}"),
         &cookie,
         None,
     )
@@ -4523,7 +4523,7 @@ async fn abgerufenes_fahrzeug_zuordnen_ist_409() {
     let (s, v) = anfrage_json(
         &l.app,
         "PUT",
-        &format!("/api/einsaetze/{}/units/{}/vehicles/{fz}", l.eid, l.hlf),
+        &format!("/api/incidents/{}/units/{}/vehicles/{fz}", l.eid, l.hlf),
         &l.admin,
         None,
     )
@@ -4555,7 +4555,7 @@ async fn einheit_bilden_mit_fahrzeug_aus_dem_raum_beendet_die_belegung() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/units"),
+        &format!("/api/incidents/{eid}/units"),
         &cookie,
         Some(&json!({"name": "Florian 1/83-1", "fahrzeug_ids": [fz]})),
     )
@@ -4590,7 +4590,7 @@ async fn raum_im_abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, br: i
 }
 
 fn abschnitt_pfad(einsatz: i64, ab: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/sectors/{ab}")
+    format!("/api/incidents/{einsatz}/sectors/{ab}")
 }
 
 /// `abschnitt_name` des Raums `br` in der Liste (das Detail trägt ihn nicht).
@@ -4603,7 +4603,7 @@ async fn abschnitt_name_in_liste(
     let l = fetch_json(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
     )
     .await;
     l.as_array()
@@ -4721,19 +4721,19 @@ async fn umbenennen_erreicht_br_leser_ohne_abschnittsrecht() {
         let (s, v) = anfrage_json(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{eid}/module-overrides/{modul}"),
+            &format!("/api/incidents/{eid}/module-overrides/{modul}"),
             &admin,
             Some(&json!({"sichtbar": true, "benoetigte_rolle": "fuehrungskraft"})),
         )
         .await;
         assert_eq!(s, StatusCode::OK, "Override {modul}: {v}");
     }
-    let liste = format!("/api/einsaetze/{eid}/staging-areas");
+    let liste = format!("/api/incidents/{eid}/staging-areas");
     assert_eq!(abschnitt_name_in_liste(&app, &frieda, eid, a).await, "Nord");
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/sectors"),
+        &format!("/api/incidents/{eid}/sectors"),
         &frieda,
         None,
     )
@@ -4792,7 +4792,7 @@ async fn stamm_fahrzeug(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&json!({"fahrzeug_id": fz})),
     )
@@ -4817,7 +4817,7 @@ async fn umbenennen_im_stamm_zeigt_der_raum_live() {
     let (s, v) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/units/{zug}/vehicles/{im_zug}"),
+        &format!("/api/incidents/{eid}/units/{zug}/vehicles/{im_zug}"),
         &cookie,
         None,
     )

@@ -47,7 +47,7 @@ vi.mock('../pages/einsatzabschnitte/AbschnittVorschau', () => ({
 describe('Vorschau (LFH-645/664)', () => {
   it('bildet art: person auf die Personenvorschau ab', async () => {
     server.use(
-      http.get('/api/einsaetze/5/persons/11', () =>
+      http.get('/api/incidents/5/persons/11', () =>
         HttpResponse.json({
           id: 11,
           einsatz_id: 5,

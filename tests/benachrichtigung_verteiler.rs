@@ -100,7 +100,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
+            &format!("/api/incidents/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": "fuehrungspersonal", "fuehrungsfunktion": funktion })),
         )
@@ -112,7 +112,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/module-overrides/{modul}", self.einsatz),
+            &format!("/api/incidents/{}/module-overrides/{modul}", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -121,7 +121,7 @@ impl Welt {
     }
 
     fn dok(&self, art: &Dok, id: i64) -> String {
-        format!("/api/einsaetze/{}/{}/{id}", self.einsatz, art.praefix)
+        format!("/api/incidents/{}/{}/{id}", self.einsatz, art.praefix)
     }
 
     /// Legt als `cookie` einen Entwurf mit diesem Verteiler an; liefert seine id.
@@ -129,7 +129,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/{}", self.einsatz, art.praefix),
+            &format!("/api/incidents/{}/{}", self.einsatz, art.praefix),
             cookie,
             Some(art.anlegen),
         )
@@ -283,7 +283,7 @@ async fn einheit_abschnitt_extern_und_freitext_benachrichtigen_niemanden() {
     let (s, v) = anfrage_json(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/sectors", w.einsatz),
+        &format!("/api/incidents/{}/sectors", w.einsatz),
         &w.admin,
         Some(&json!({ "name": "Süd" })),
     )

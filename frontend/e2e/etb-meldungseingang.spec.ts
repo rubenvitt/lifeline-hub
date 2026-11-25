@@ -13,13 +13,13 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  */
 
 async function einsatzPerApi(page: Page, bezeichnung: string): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBe(true);
   return ((await antwort.json()) as { id: number }).id;
 }
 
 async function lagemeldungenText(page: Page, einsatzId: number): Promise<string> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/situation/reports`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/situation/reports`);
   expect(antwort.ok(), `Lagemeldungen: ${antwort.status()}`).toBe(true);
   return antwort.text();
 }

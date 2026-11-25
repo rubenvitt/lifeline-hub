@@ -1,7 +1,7 @@
 //! Verletzungen am Körperschema (LLH-1113, Change `y18v58dt-pat-kern`, Spec
 //! `personen-verletzungen`, design.md D1/D4–D7):
-//! - `POST /api/einsaetze/{id}/persons/{pid}/injuries` — markieren,
-//! - `POST /api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void` — genau einmal aufheben.
+//! - `POST /api/incidents/{id}/persons/{pid}/injuries` — markieren,
+//! - `POST /api/incidents/{id}/persons/{pid}/injuries/{vid}/void` — genau einmal aufheben.
 //!
 //! Beide schreiben **kein ETB** und melden nur das `person`-Ereignis (Einsatz und Person): Region,
 //! Art und Notiz stehen weder im ETB noch im Live-Kanal.

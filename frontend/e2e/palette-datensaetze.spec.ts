@@ -119,7 +119,7 @@ async function seedeEtb(
   einsatzId: string,
   inhalt: string,
 ): Promise<{ id: number; lfd_nr: number }> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
   });
   expect(antwort.ok(), `Seeding ETB: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -148,7 +148,7 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
    */
   let letztePerson = { registrier_nr: 0 };
   for (let i = 1; i <= ziel.lfd_nr; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data: {} });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/persons`, { data: {} });
     expect(
       antwort.ok(),
       `Seeding Person: ${antwort.status()} ${await antwort.text()}`,
@@ -170,7 +170,7 @@ test('findet einen ETB-Eintrag jenseits der ersten Seite über „#" und Nummer 
    * VORBEDINGUNG, gemessen: der Zieleintrag liegt NICHT auf der ersten Seite — sonst bliebe
    * der Test grün, ohne den Nachladeweg je zu betreten.
    */
-  const ersteSeite = await page.request.get(`/api/einsaetze/${einsatzId}/etb?limit=${ETB_SEITE}`);
+  const ersteSeite = await page.request.get(`/api/incidents/${einsatzId}/etb?limit=${ETB_SEITE}`);
   expect(ersteSeite.ok(), await ersteSeite.text()).toBeTruthy();
   const ids = ((await ersteSeite.json()) as { id: number }[]).map((e) => e.id);
   expect(ids, 'der Zieleintrag liegt hinter der ersten Seite').not.toContain(ziel.id);

@@ -67,7 +67,7 @@ async function vorgehalteneKeys(page: Page): Promise<string[] | null> {
 /** Admin legt einen Einsatz und eine Person darin an. */
 async function vorbereiten(page: Page) {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Sitzung beenden ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBe(true);
@@ -91,7 +91,7 @@ async function verlorenesGeraet(
   // Vor der Navigation abonniert: beendet wird erst, wenn der Live-Strom steht. Sonst bekäme der
   // erste Aufbau die 401 und das Gerät räumte, ohne dass ein offener Strom geschlossen wurde.
   const strom = geraet.waitForResponse(
-    (r) => new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/live` && r.ok(),
+    (r) => new URL(r.url()).pathname === `/api/incidents/${einsatzId}/live` && r.ok(),
   );
   await geraet.goto(`/einsaetze/${einsatzId}/etb`);
   await strom;

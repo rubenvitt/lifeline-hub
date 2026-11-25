@@ -24,10 +24,10 @@ test('alter Bezirkslink unter Betreuung führt auf die Detailseite des Bezirks',
   page,
 }) => {
   await anmelden(page, { startseite: false });
-  const { id: einsatzId } = await senden(page, '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, '/api/incidents', {
     bezeichnung: `E2E Evakuierungsmodul ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/evacuation`;
+  const basis = `/api/incidents/${einsatzId}/evacuation`;
   await senden(page, `${basis}/districts`, {
     bezeichnung: 'Deichweg 1–9',
     plan_personen: 120,

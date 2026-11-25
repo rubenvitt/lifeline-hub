@@ -167,7 +167,7 @@ async fn einsatz_strom_traegt_stammdaten_ohne_id() {
     let eid = einsatz_anlegen(&app, &admin).await;
     let resp = oeffnen(
         &app,
-        &format!("/api/einsaetze/{eid}/live"),
+        &format!("/api/incidents/{eid}/live"),
         Some(&admin),
         None,
     )
@@ -193,7 +193,7 @@ async fn org_ereignis_laesst_den_einsatz_replay_unberuehrt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let org = org_von(&pool, "admin").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{eid}/live");
+    let pfad = format!("/api/incidents/{eid}/live");
 
     // Einsatz- und Org-Teil laufen zusammengeführt; gleichzeitig bereitliegende Frames beider
     // Teile kommen in beliebiger Reihenfolge. Deshalb wird nach jedem Ereignis gelesen.
@@ -324,7 +324,7 @@ async fn abgelehnte_anlage_meldet_nichts() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &ohne,
         Some(r#"{"bezeichnung":"X"}"#),
     )
@@ -333,7 +333,7 @@ async fn abgelehnte_anlage_meldet_nichts() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin,
         Some(r#"{"bezeichnung":"  "}"#),
     )
@@ -358,12 +358,12 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
     let schritte: [(&str, String, Option<&str>); 5] = [
         (
             "PATCH",
-            format!("/api/einsaetze/{eid}"),
+            format!("/api/incidents/{eid}"),
             Some(r#"{"stichwort":"H 2"}"#),
         ),
         (
             "POST",
-            format!("/api/einsaetze/{eid}/briefings"),
+            format!("/api/incidents/{eid}/briefings"),
             Some(
                 r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00","naechste_at":"2026-09-12 12:00:00"}"#,
             ),
@@ -371,15 +371,15 @@ async fn kopfaenderungen_melden_einsatz_und_einsatzliste() {
         // LLH-1111: der Termin ohne Abschluss meldet die Liste ebenso.
         (
             "PUT",
-            format!("/api/einsaetze/{eid}/briefing/schedule"),
+            format!("/api/incidents/{eid}/briefing/schedule"),
             Some(r#"{"naechste_at":"2026-09-12 14:00:00"}"#),
         ),
         (
             "PUT",
-            format!("/api/einsaetze/{eid}/retention-period"),
+            format!("/api/incidents/{eid}/retention-period"),
             Some(r#"{"retention_bis":"2099-01-01 00:00:00","bestaetigt":true}"#),
         ),
-        ("POST", format!("/api/einsaetze/{eid}/close"), None),
+        ("POST", format!("/api/incidents/{eid}/close"), None),
     ];
     for (methode, pfad, rumpf) in schritte {
         let (status, json) = anfrage(&app, methode, &pfad, &admin, rumpf).await;
@@ -411,7 +411,7 @@ async fn besprechung_ohne_neuen_termin_meldet_keine_einsatzliste() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{eid}/briefings"),
+        &format!("/api/incidents/{eid}/briefings"),
         &admin,
         Some(r#"{"entschluss":"A","abgehalten_at":"2026-09-12 10:00:00"}"#),
     )
@@ -456,7 +456,7 @@ async fn entferntes_mitglied_erfaehrt_die_aenderung_noch() {
     let (status, json) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{eid}/members/{}", b.mitglied_id),
+        &format!("/api/incidents/{eid}/members/{}", b.mitglied_id),
         &admin,
         None,
     )
@@ -495,7 +495,7 @@ async fn faelliger_einsatz(
     let (status, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{eid}/close"),
+        &format!("/api/incidents/{eid}/close"),
         admin,
         None,
     )
@@ -787,7 +787,7 @@ async fn einsatz_strom_eines_mitglieds_traegt_einsatzliste() {
     let mitglied = login_cookie(&app, "mitglied", "mitgliedpw1").await;
     let strom = oeffnen(
         &app,
-        &format!("/api/einsaetze/{eid}/live"),
+        &format!("/api/incidents/{eid}/live"),
         Some(&mitglied),
         None,
     )
@@ -797,7 +797,7 @@ async fn einsatz_strom_eines_mitglieds_traegt_einsatzliste() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}"),
+        &format!("/api/incidents/{eid}"),
         &admin,
         Some(r#"{"stichwort":"H 3"}"#),
     )

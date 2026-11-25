@@ -57,27 +57,27 @@ beforeEach(() => {
   anzahlAdressen = [];
   freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/module-access', () => {
+    http.get('/api/incidents/:id/module-access', () => {
       zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/persons/selection', json('personen', [PERSON])),
-    http.get('/api/einsaetze/:id/damages/selection', json('schaeden', [])),
-    http.get('/api/einsaetze/:id/uhs', json('uhs', [])),
-    http.get('/api/einsaetze/:id/reports', json('meldungen', [])),
-    http.get('/api/einsaetze/:id/tasks', json('auftraege', [])),
-    http.get('/api/einsaetze/:id/vehicles', json('fahrzeuge', [FAHRZEUG])),
-    http.get('/api/einsaetze/:id/personnel', json('personal', [])),
-    http.get('/api/einsaetze/:id/units', json('einheiten', [])),
-    http.get('/api/einsaetze/:id/situation-reports', json('lageberichte', [])),
-    http.get('/api/einsaetze/:id/hazard-areas', json('gefahrengebiete', [])),
-    http.get('/api/einsaetze/:id/sectors', json('abschnitte', [])),
-    http.get('/api/einsaetze/:id/etb/count', ({ request }) => {
+    http.get('/api/incidents/:id/persons/selection', json('personen', [PERSON])),
+    http.get('/api/incidents/:id/damages/selection', json('schaeden', [])),
+    http.get('/api/incidents/:id/uhs', json('uhs', [])),
+    http.get('/api/incidents/:id/reports', json('meldungen', [])),
+    http.get('/api/incidents/:id/tasks', json('auftraege', [])),
+    http.get('/api/incidents/:id/vehicles', json('fahrzeuge', [FAHRZEUG])),
+    http.get('/api/incidents/:id/personnel', json('personal', [])),
+    http.get('/api/incidents/:id/units', json('einheiten', [])),
+    http.get('/api/incidents/:id/situation-reports', json('lageberichte', [])),
+    http.get('/api/incidents/:id/hazard-areas', json('gefahrengebiete', [])),
+    http.get('/api/incidents/:id/sectors', json('abschnitte', [])),
+    http.get('/api/incidents/:id/etb/count', ({ request }) => {
       zaehler['etb-anzahl'] = (zaehler['etb-anzahl'] ?? 0) + 1;
       anzahlAdressen.push(new URL(request.url));
       return HttpResponse.json({ anzahl: 31 });
     }),
-    http.get('/api/einsaetze/:id/etb', ({ request }) => {
+    http.get('/api/incidents/:id/etb', ({ request }) => {
       zaehler.etb = (zaehler.etb ?? 0) + 1;
       etbAdressen.push(new URL(request.url));
       return HttpResponse.json([]);
@@ -188,7 +188,7 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
    */
   it('fragt keine Liste ab, wenn der Abruf der Freigaben scheitert', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/module-access', () => {
+      http.get('/api/incidents/:id/module-access', () => {
         zaehler['modul-freigaben'] = (zaehler['modul-freigaben'] ?? 0) + 1;
         return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
       }),
@@ -211,13 +211,13 @@ describe('useDatensaetze — Rechte-Gate vor dem Request', () => {
      */
     const reihenfolge: string[] = [];
     server.use(
-      http.get('/api/einsaetze/:id/module-access', async () => {
+      http.get('/api/incidents/:id/module-access', async () => {
         // Verzögert, damit „danach“ nicht bloß die schnellere Leitung ist.
         await new Promise((r) => setTimeout(r, 20));
         reihenfolge.push('modul-freigaben');
         return HttpResponse.json(freigabenFixture());
       }),
-      http.get('/api/einsaetze/:id/persons/selection', () => {
+      http.get('/api/incidents/:id/persons/selection', () => {
         zaehler.personen = (zaehler.personen ?? 0) + 1;
         reihenfolge.push('personen');
         return HttpResponse.json([PERSON]);

@@ -23,12 +23,12 @@ const KAPITEL = [
 ];
 
 async function seede(page: Page): Promise<number> {
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Einsatzakte ${Date.now()}` },
   });
   expect(neu.ok(), `Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
+  const person = await page.request.post(`/api/incidents/${einsatzId}/persons`, {
     data: { name: 'Aktenfeld', vorname: 'Agathe' },
   });
   expect(person.ok(), `Person: ${person.status()} ${await person.text()}`).toBeTruthy();
@@ -88,7 +88,7 @@ test('Einsatzakte: jedes Kapitel auf neuer Seite mit Druckkopf, ZIP abrufbar', a
   }
   await page.emulateMedia({ media: null });
 
-  const zip = await page.request.get(`/api/einsaetze/${einsatzId}/case-file/attachments.zip`);
+  const zip = await page.request.get(`/api/incidents/${einsatzId}/case-file/attachments.zip`);
   expect(zip.status()).toBe(200);
   expect(zip.headers()['content-type']).toBe('application/zip');
   // Lokaler Kopf einer ZIP-Datei: „PK\x03\x04“.

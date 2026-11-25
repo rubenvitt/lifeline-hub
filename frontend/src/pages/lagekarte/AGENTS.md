@@ -29,6 +29,10 @@ diese Zusage.
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
   wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
   Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
+- **Einsatzbezogene Ebenen laden über die Einsatzroute** (LLH-2106): eine Ebene, die vom Einsatz
+  abhängt (Drohnenlage: `/api/incidents/{id}/map/drone`), kommt nie über `/api/map/overlays/{quelle}`;
+  dort gibt es keinen Einsatz, keine Rolle und kein Modul-Gate. Antwort ist derselbe
+  `FachebeneAntwort`-Umschlag mit ETag.
 - **Ein Tipp gehört genau einem Ziel** (LFH-764,
   `openspec/changes/archive/2026-09-30-lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
   `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`
@@ -311,7 +315,7 @@ diese Zusage.
   `preserveDrawingBuffer`, kein Warten auf Kacheln). DOM über der Karte gehört nicht aufs Bild;
   die Bündel-Donuts sind DOM und kommen als Daten (`donutBild`) mit, `lageplanBild.ts` zeichnet
   sie nach. Legende nur aus dem Gezeichneten (`lageplan.ts`: Marker, Flächen, `zonenFeatures`,
-  aktive Fachebenen, sichtbare Bilder), nie aus den Schaltern. Anlage nur mit Art `lageplan`
+  aktive Fachebenen, sichtbare Fremdebenen, sichtbare Bilder), nie aus den Schaltern. Anlage nur mit Art `lageplan`
   über den bestehenden Anlagen-Weg; ein neuer Lagevortrag über die API, nie über die Seite.
 - **Zeichnen per Link** (LFH-825, Spec `lagekarte-zeichnen`,
   `openspec/changes/archive/2026-10-03-lfh-825-zeichnen-deeplink-lagekarte/design.md`): `?zeichnen=<zonentyp>[:flaeche|:linie]`

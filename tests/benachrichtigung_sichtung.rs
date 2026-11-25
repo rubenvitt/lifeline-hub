@@ -68,7 +68,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
+        &format!("/api/incidents/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -87,7 +87,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/persons", self.einsatz),
+            &format!("/api/incidents/{}/persons", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -100,7 +100,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/persons/{person}/triage", self.einsatz),
+            &format!("/api/incidents/{}/persons/{person}/triage", self.einsatz),
             cookie,
             Some(&json!({ "kategorie": kategorie, "notiz": "Atemnot, Brustschmerz" }).to_string()),
         )
@@ -231,7 +231,7 @@ async fn ohne_wechsel_auf_sk1_bleibt_es_still() {
     let (s, v) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/persons/{person}", w.einsatz),
+        &format!("/api/incidents/{}/persons/{person}", w.einsatz),
         &anna,
         Some(&json!({ "notiz": "Angehörige verständigt" }).to_string()),
     )

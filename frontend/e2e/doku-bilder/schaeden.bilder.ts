@@ -24,7 +24,7 @@ interface Schaden {
 
 /** Legt die Schäden einmal je Lauf an (die Datenbank gilt für alle Tests eines Laufs). */
 async function schaedenAnlegen(page: Page, einsatzId: number): Promise<Schaden[]> {
-  const basis = `/api/einsaetze/${einsatzId}/damages`;
+  const basis = `/api/incidents/${einsatzId}/damages`;
   const vorhanden = (await (await page.request.get(basis)).json()) as Schaden[];
   if (vorhanden.length > 0) return vorhanden;
   await fuelle(page, 'post', basis, {

@@ -43,12 +43,12 @@ test('Ablösung: Besatzungswechsel planen, verteilt vollziehen und zurücknehmen
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page, { startseite: false });
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Besatzungswechsel ${Date.now()}` },
   });
   expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (methode: 'post' | 'put', pfad: string, data: unknown, was: string) => {
     const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
     expect(

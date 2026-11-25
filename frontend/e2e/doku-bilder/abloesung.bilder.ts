@@ -97,7 +97,7 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     try {
       const demo = await demoEinsatz(api);
-      const basis = `/api/einsaetze/${demo.id}`;
+      const basis = `/api/incidents/${demo.id}`;
       const jetzt = new Date();
       const einheiten = await liste<Einheit>(api, `${basis}/units`);
       const einheit = (name: string) => {

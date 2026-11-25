@@ -36,12 +36,12 @@ function setup(antwort?: () => Response) {
   const stand = { rumpf: null as Record<string, unknown> | null, auswahlAbrufe: 0 };
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/member-selection', () => {
+    http.get('/api/incidents', () => HttpResponse.json([])),
+    http.get('/api/incidents/member-selection', () => {
       stand.auswahlAbrufe += 1;
       return HttpResponse.json(AUSWAHL);
     }),
-    http.post('/api/einsaetze', async ({ request }) => {
+    http.post('/api/incidents', async ({ request }) => {
       stand.rumpf = (await request.json()) as Record<string, unknown>;
       if (antwort) return antwort();
       return HttpResponse.json(

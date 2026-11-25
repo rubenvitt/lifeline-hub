@@ -11,20 +11,21 @@
 const FREIGABE_NACH_MS = 10_000;
 
 /** Was exportiert wird — der erste Teil des Dateinamens. */
-export type ExportInhalt = 'personen' | 'tiere' | 'schaeden';
+export type ExportInhalt = 'personen' | 'tiere' | 'schaeden' | 'lagekarte' | 'lagebesprechung';
 
 const zweistellig = (n: number) => String(n).padStart(2, '0');
 
 /** `personen-einsatz-42-2026-10-01-0705.csv` — Inhalt, Einsatz, lokaler Zeitpunkt auf die
- *  Minute. Der Server schickt keinen Dateinamen; ohne Stempel überschrieben sich Exporte. */
+ *  Minute, Endung ohne Punkt (Vorgabe `csv`; `ics`, `kmz`, `geojson` für die Kartenausgabe). Der Server schickt keinen Dateinamen; ohne Stempel überschrieben sich Exporte. */
 export function exportDateiname(
   inhalt: ExportInhalt,
   einsatzId: number,
+  endung = 'csv',
   jetzt = new Date(),
 ): string {
   const datum = `${jetzt.getFullYear()}-${zweistellig(jetzt.getMonth() + 1)}-${zweistellig(jetzt.getDate())}`;
   const uhrzeit = `${zweistellig(jetzt.getHours())}${zweistellig(jetzt.getMinutes())}`;
-  return `${inhalt}-einsatz-${einsatzId}-${datum}-${uhrzeit}.csv`;
+  return `${inhalt}-einsatz-${einsatzId}-${datum}-${uhrzeit}.${endung}`;
 }
 
 export function speichereDatei(datei: Blob, dateiname: string): void {

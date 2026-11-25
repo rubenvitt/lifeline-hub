@@ -73,7 +73,7 @@ async function frischerTab(page: Page, einsatzId: string, breite: number): Promi
 }
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Alarmton ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);

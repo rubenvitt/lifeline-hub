@@ -37,6 +37,7 @@ const VOLL = {
   auto_etb_eintraege: 0,
   ortung_hauptamt: 1,
   geocoder_url: null,
+  fremdebenen_lan_erlaubt: false,
   geaendert_at: null,
   geaendert_von: null,
 };
@@ -92,7 +93,29 @@ describe('AnzeigeEinstellungen', () => {
         auto_etb_eintraege: false,
         ortung_hauptamt: true,
         geocoder_url: 'https://geo.example.org',
+        // LLH-2099: der Anzeige-Save schickt den Stand des Schalters mit.
+        fremdebenen_lan_erlaubt: false,
       }),
+    );
+  });
+
+  it('zeigt den Schalter für Fremdebenen im eigenen Netz und bindet ihn an die Mutation (LLH-2099)', async () => {
+    renderMitProviders(<AnzeigeEinstellungen />, { datenRouter: true });
+
+    const schalter = await screen.findByRole('switch', {
+      name: /Fremdebenen dürfen das eigene Netz abrufen/i,
+    });
+    expect(schalter).not.toBeChecked();
+    // Die Folge steht am Feld, nicht im Tooltip.
+    expect(screen.getByText(/Loopback und Link-Local bleiben gesperrt/)).toBeVisible();
+
+    await userEvent.click(schalter);
+    fireEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ fremdebenen_lan_erlaubt: true, etb_nummer_praefix: 'EB-' }),
+      ),
     );
   });
 

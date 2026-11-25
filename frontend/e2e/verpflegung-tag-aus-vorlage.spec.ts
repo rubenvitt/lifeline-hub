@@ -35,7 +35,7 @@ async function senden<T = { id: number }>(
 }
 
 async function einsatz(page: Page): Promise<number> {
-  const { id } = await senden(page, 'post', '/api/einsaetze', {
+  const { id } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Tag aus Vorlage ${LAUF} ${Date.now()}`,
   });
   return id;
@@ -105,7 +105,7 @@ test('Mahlzeit in Stab-Schreibweise anlegen und den 29.03. aus dem Plan anlegen'
     await expect(page).toHaveURL(new RegExp(`/einsaetze/${e}/verpflegung$`));
 
     // Der Server hat die Uhrzeiten in Sommerzeit bekommen: 06:30 MESZ = 04:30 UTC.
-    const v = (await (await page.request.get(`/api/einsaetze/${e}/catering`)).json()) as {
+    const v = (await (await page.request.get(`/api/incidents/${e}/catering`)).json()) as {
       zeitfenster: { bezeichnung: string; von_at: string; bis_at: string }[];
     };
     const zeiten = Object.fromEntries(

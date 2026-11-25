@@ -47,7 +47,7 @@ test('Einsatzdaten: verorteter Einsatzort ohne Kartengrafik, Paneel bleibt bedie
 }) => {
   const seitenFehler = await vorbereiten(page);
   const id = await einsatzAnlegen(page, `E2E Ausschnitt ohne Grafik ${Date.now()}`);
-  const verortet = await page.request.patch(`/api/einsaetze/${id}`, {
+  const verortet = await page.request.patch(`/api/incidents/${id}`, {
     data: { einsatzort: 'Bahnhofstraße 1', einsatzort_lat: ORT.lat, einsatzort_lon: ORT.lon },
   });
   expect(verortet.ok(), `Einsatzort: ${verortet.status()}`).toBe(true);
@@ -98,7 +98,7 @@ test('Einsatzliste: Anlegedialog mit Treffer ohne Kartengrafik, Anlegen geht', a
   await dialog.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const id = page.url().match(/\/einsaetze\/(\d+)/)![1];
-  const einsatz = await page.request.get(`/api/einsaetze/${id}`);
+  const einsatz = await page.request.get(`/api/incidents/${id}`);
   expect(await einsatz.json()).toEqual(
     expect.objectContaining({ einsatzort_lat: treffer.lat, einsatzort_lon: treffer.lon }),
   );

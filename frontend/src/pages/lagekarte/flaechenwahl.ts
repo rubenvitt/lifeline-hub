@@ -41,6 +41,9 @@ export function flaechenKennung<F extends Merkmal>(ziel: Flaechenziel<F>): Flaec
     return kennung(typ ? zoneTypLabel(typ as ZoneTyp) : 'Zone', pick(p, 'label'));
   }
   if (ziel.art === 'abschnitt') return kennung('Abschnitt', pick(p, 'label'));
+  // Fremdebene (LLH-2099): das Objekt trägt nur `name` und `description`.
+  if (/^fremdebene-\d+-/.test(ziel.merkmal.layer.id))
+    return kennung('Fremde Daten', pick(p, 'name'));
   const quelle = fachebeneQuelleVon(ziel.merkmal.layer.id);
   if (!quelle) return kennung('Fachebene', null);
   // NINA heißt im Inspector-Kopf immer „Amtliche Warnung"; im Menü unterscheidet die Überschrift.

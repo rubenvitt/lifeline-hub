@@ -1,18 +1,387 @@
-//! Übernahme eingeworfener Positionen in gekoppelte Einsatzfahrzeuge (LLH-2091). Die Tests rufen
+//! Positionsbaustein (Helfer-App, Spec `2026-11-24-vakwvkpg-helfer-app-design.md`, Abschnitt
+//! „Ortung der Organisation und Positionsbaustein“): eine Schreibstelle für alle Quellen, die
+//! ältere Zeitstempel verwirft, die Zeit des Geräts klemmt und das Live-Ereignis auslöst; die
+//! Handwege setzen die Quelle `manuell`.
+//!
+//! Dazu die Fahrzeugortung aus dem Einwurf (LLH-2091, ADR-0103): Kopplung, Übernahme über den
+//! Baustein mit Quelle `einwurf`, Drossel und Lebenszyklus. Die Übernahme-Tests rufen
 //! `apply_position_tx` mit gebauten Zeitstempeln auf, ohne zu schlafen.
 
 use axum::http::{Request, StatusCode};
 use lifeline_hub::app::RouterOptionen;
+use lifeline_hub::error::AppError;
 use lifeline_hub::live::LiveHub;
 use lifeline_hub::ortung::uebernahme::{
     apply_position, apply_position_tx, is_nachlauf_vorgemerkt, set_nachlauf_verzoegerung,
     Uebernahme,
 };
+use lifeline_hub::ortung::{
+    klemme_zeitpunkt, loesche_position, publiziere, schreibe_position, Ortungsziel, Positionsquelle,
+};
 use sqlx::SqlitePool;
+use std::time::Duration;
 use tower::ServiceExt;
 
 mod common;
 use common::*;
+
+type Spalten = (Option<f64>, Option<f64>, Option<String>, Option<String>);
+
+/// Liest über den übergebenen Zugang: der Test-Pool hat eine Verbindung, und die hält der Test
+/// beim Schreiben über die Schreibstelle selbst.
+async fn spalten<'e>(db: impl sqlx::SqliteExecutor<'e>, tabelle: &str, id: i64) -> Spalten {
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT lat, lon, position_quelle, position_aktualisiert_at FROM {tabelle} WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+async fn fahrzeug_adhoc(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
+    let (s, json) = anfrage(
+        app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/vehicles"),
+        cookie,
+        Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{json}");
+    json["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn aeltere_position_wird_verworfen() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ziel = Ortungsziel::Einheit(eid);
+    let mut conn = pool.acquire().await.unwrap();
+
+    let t2 = "2026-11-24T12:00:30Z";
+    let t1 = "2026-11-24T12:00:00Z";
+    let erst = schreibe_position(
+        &mut conn,
+        einsatz,
+        ziel,
+        52.5,
+        13.4,
+        t2,
+        Positionsquelle::Helfer,
+    )
+    .await
+    .unwrap();
+    assert!(erst, "die erste Position wird geschrieben");
+    let dann = schreibe_position(
+        &mut conn,
+        einsatz,
+        ziel,
+        50.0,
+        8.0,
+        t1,
+        Positionsquelle::Helfer,
+    )
+    .await
+    .unwrap();
+    assert!(!dann, "eine ältere Position wird verworfen");
+    let (lat, lon, quelle, at) = spalten(&mut *conn, "einsatz_einheit", eid).await;
+    assert_eq!((lat, lon), (Some(52.5), Some(13.4)), "lat bleibt bei t2");
+    assert_eq!(quelle.as_deref(), Some("helfer"));
+    assert_eq!(
+        at.as_deref(),
+        Some("2026-11-24 12:00:30"),
+        "kanonisches Zeitformat"
+    );
+
+    // Gleich alt oder jünger wird geschrieben, auch aus einer anderen automatischen Quelle.
+    let neu = schreibe_position(
+        &mut conn,
+        einsatz,
+        ziel,
+        51.0,
+        9.0,
+        "2026-11-24 12:01:00",
+        Positionsquelle::Einwurf,
+    )
+    .await
+    .unwrap();
+    assert!(neu);
+    let (lat, _, quelle, _) = spalten(&mut *conn, "einsatz_einheit", eid).await;
+    assert_eq!(lat, Some(51.0));
+    assert_eq!(quelle.as_deref(), Some("einwurf"));
+
+    // Die Quelle `manuell` wird nie verworfen, auch mit älterem Zeitpunkt.
+    let hand = schreibe_position(
+        &mut conn,
+        einsatz,
+        ziel,
+        49.0,
+        7.0,
+        t1,
+        Positionsquelle::Manuell,
+    )
+    .await
+    .unwrap();
+    assert!(hand, "eine Handposition gilt immer");
+    let (lat, _, quelle, _) = spalten(&mut *conn, "einsatz_einheit", eid).await;
+    assert_eq!(lat, Some(49.0));
+    assert_eq!(quelle.as_deref(), Some("manuell"));
+}
+
+#[tokio::test]
+async fn zukunftszeit_wird_auf_serverzeit_geklemmt() {
+    assert_eq!(
+        klemme_zeitpunkt("2026-11-24T12:05:00Z", "2026-11-24T12:00:00Z"),
+        "2026-11-24T12:00:00Z"
+    );
+    assert_eq!(
+        klemme_zeitpunkt("2026-11-24T12:00:30Z", "2026-11-24T12:00:00Z"),
+        "2026-11-24T12:00:30Z",
+        "30 s Vorlauf bleiben unverändert"
+    );
+    assert_eq!(
+        klemme_zeitpunkt("2026-11-24T12:01:00Z", "2026-11-24T12:00:00Z"),
+        "2026-11-24T12:01:00Z",
+        "genau 60 s Vorlauf bleiben unverändert"
+    );
+    assert_eq!(
+        klemme_zeitpunkt("2026-11-24T13:05:00+01:00", "2026-11-24 12:00:00"),
+        "2026-11-24 12:00:00",
+        "Versatz und kanonisches Format werden verglichen, nicht der Text"
+    );
+    assert_eq!(
+        klemme_zeitpunkt("kaputt", "2026-11-24T12:00:00Z"),
+        "2026-11-24T12:00:00Z",
+        "ein unlesbarer Gerätezeitpunkt wird die Serverzeit"
+    );
+}
+
+#[tokio::test]
+async fn manuelle_position_setzt_quelle_manuell() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
+    let ef = fahrzeug_adhoc(&app, &admin, einsatz).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
+
+    for (pfad, tabelle, id) in [
+        ("units", "einsatz_einheit", eid),
+        ("vehicles", "einsatz_fahrzeug", ef),
+        ("personnel", "einsatz_personal", ep),
+    ] {
+        let uri = format!("/api/incidents/{einsatz}/{pfad}/{id}/position");
+        let (s, json) = anfrage(
+            &app,
+            "PATCH",
+            &uri,
+            &admin,
+            Some(r#"{"lat":52.5,"lon":13.4}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{pfad}: {json}");
+        assert_eq!(json["position_quelle"], "manuell", "{pfad}: {json}");
+        let at = json["position_aktualisiert_at"]
+            .as_str()
+            .unwrap_or_default();
+        assert!(
+            lifeline_hub::zeit::parse(at).is_some(),
+            "{pfad}: Zeitpunkt gesetzt, kanonisch: {json}"
+        );
+
+        // Nur das Zeichen ändern lässt Quelle und Zeitpunkt stehen.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {tabelle} SET position_aktualisiert_at = '2026-01-01 00:00:00' WHERE id = ?"
+        )))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (s, json) = anfrage(
+            &app,
+            "PATCH",
+            &uri,
+            &admin,
+            Some(r#"{"tz_fachaufgabe":"fuehrung"}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{pfad}: {json}");
+        assert_eq!(
+            json["position_aktualisiert_at"], "2026-01-01 00:00:00",
+            "{pfad}"
+        );
+
+        // Eine Handposition gilt immer, auch wenn der gespeicherte Zeitpunkt jünger wäre.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE {tabelle} SET position_quelle = 'helfer', \
+                    position_aktualisiert_at = '2099-01-01 00:00:00' WHERE id = ?"
+        )))
+        .bind(id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let (s, json) = anfrage(
+            &app,
+            "PATCH",
+            &uri,
+            &admin,
+            Some(r#"{"lat":50.0,"lon":8.0}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{pfad}: {json}");
+        assert_eq!(json["lat"].as_f64(), Some(50.0), "{pfad}");
+        assert_eq!(json["position_quelle"], "manuell", "{pfad}");
+        assert_ne!(
+            json["position_aktualisiert_at"], "2099-01-01 00:00:00",
+            "{pfad}"
+        );
+
+        // Löschen leert den Zeitpunkt mit.
+        let (s, json) = anfrage(
+            &app,
+            "PATCH",
+            &uri,
+            &admin,
+            Some(r#"{"lat":null,"lon":null}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{pfad}: {json}");
+        let (lat, _, quelle, at) = spalten(&pool, tabelle, id).await;
+        assert_eq!(lat, None, "{pfad}");
+        assert_eq!(quelle.as_deref(), Some("manuell"), "{pfad}");
+        assert_eq!(at, None, "{pfad}: gelöschte Position hat keinen Zeitpunkt");
+    }
+}
+
+#[tokio::test]
+async fn schreibstelle_trifft_fahrzeug_und_person() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ef = fahrzeug_adhoc(&app, &admin, einsatz).await;
+    let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Helfer").await;
+    let mut conn = pool.acquire().await.unwrap();
+    let t = "2026-11-24T12:00:00Z";
+
+    for (ziel, tabelle, id) in [
+        (Ortungsziel::Fahrzeug(ef), "einsatz_fahrzeug", ef),
+        (Ortungsziel::Person(ep), "einsatz_personal", ep),
+    ] {
+        assert!(schreibe_position(
+            &mut conn,
+            einsatz,
+            ziel,
+            52.0,
+            13.0,
+            t,
+            Positionsquelle::Helfer
+        )
+        .await
+        .unwrap());
+        let (lat, _, quelle, at) = spalten(&mut *conn, tabelle, id).await;
+        assert_eq!(lat, Some(52.0));
+        assert_eq!(quelle.as_deref(), Some("helfer"));
+        assert_eq!(at.as_deref(), Some("2026-11-24 12:00:00"));
+
+        loesche_position(&mut conn, ziel).await.unwrap();
+        let (lat, lon, quelle, at) = spalten(&mut *conn, tabelle, id).await;
+        assert_eq!((lat, lon), (None, None), "lat/lon werden NULL");
+        assert_eq!(
+            quelle.as_deref(),
+            Some("helfer"),
+            "Quelle bleibt als Hinweis"
+        );
+        assert_eq!(
+            at.as_deref(),
+            Some("2026-11-24 12:00:00"),
+            "Zeitpunkt bleibt"
+        );
+    }
+}
+
+#[tokio::test]
+async fn fremdes_ziel_ist_404_und_kaputte_koordinate_422() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let eid = einheit_bilden(&app, &admin, anderer, "Fremd").await;
+    let mut conn = pool.acquire().await.unwrap();
+    let t = "2026-11-24T12:00:00Z";
+
+    let fremd = schreibe_position(
+        &mut conn,
+        einsatz,
+        Ortungsziel::Einheit(eid),
+        52.0,
+        13.0,
+        t,
+        Positionsquelle::Helfer,
+    )
+    .await;
+    assert!(matches!(fremd, Err(AppError::NotFound)), "{fremd:?}");
+
+    let kaputt = schreibe_position(
+        &mut conn,
+        anderer,
+        Ortungsziel::Einheit(eid),
+        95.0,
+        13.0,
+        t,
+        Positionsquelle::Helfer,
+    )
+    .await;
+    assert!(
+        matches!(kaputt, Err(AppError::UnprocessableEntity(_))),
+        "{kaputt:?}"
+    );
+
+    let unlesbar = schreibe_position(
+        &mut conn,
+        anderer,
+        Ortungsziel::Einheit(eid),
+        52.0,
+        13.0,
+        "gestern",
+        Positionsquelle::Helfer,
+    )
+    .await;
+    assert!(
+        matches!(unlesbar, Err(AppError::Validation(_))),
+        "{unlesbar:?}"
+    );
+}
+
+#[tokio::test]
+async fn publiziere_loest_das_live_ereignis_des_ziels_aus() {
+    let (app, pool, live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let state = test_state(&pool, &live);
+    let kurz = Duration::from_secs(2);
+    let mut rx = live.abonniere(einsatz);
+
+    for (ziel, tag, schluessel) in [
+        (Ortungsziel::Einheit(7), "einheit", "einheit_id"),
+        (Ortungsziel::Fahrzeug(8), "fahrzeug", "fahrzeug_id"),
+        (Ortungsziel::Person(9), "personal", "personal_id"),
+    ] {
+        publiziere(&state, einsatz, ziel);
+        let n = recv_until_tag(&mut rx, tag, kurz).await;
+        let id = match ziel {
+            Ortungsziel::Einheit(i) | Ortungsziel::Fahrzeug(i) | Ortungsziel::Person(i) => i,
+        };
+        assert!(
+            n.data.contains(&format!("\"{schluessel}\":{id}")),
+            "{}",
+            n.data
+        );
+    }
+}
+// ── Fahrzeugortung aus dem Einwurf (LLH-2091, ADR-0103) ────────────────────────────────────
 
 const KENNUNG: &str = "geraet-1";
 const T: &str = "2026-11-24 12:00:00";
@@ -26,6 +395,19 @@ struct Fix {
     einsatz: i64,
     ef: i64,
     zugang: String,
+}
+
+/// Setzt den Org-Schalter „Ortung im Einsatz“ direkt in der DB.
+async fn schalter_setzen(pool: &SqlitePool, org: i64, an: bool) {
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, ortung_im_einsatz) VALUES (?1, ?2) \
+         ON CONFLICT(org_id) DO UPDATE SET ortung_im_einsatz = ?2",
+    )
+    .bind(org)
+    .bind(i64::from(an))
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 async fn fix() -> Fix {
@@ -63,7 +445,7 @@ async fn fix_auf(app: axum::Router, pool: SqlitePool, echter_zugang: bool) -> Fi
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{fz}}}"#)),
     )
@@ -106,9 +488,11 @@ async fn fix_auf(app: axum::Router, pool: SqlitePool, echter_zugang: bool) -> Fi
         .unwrap();
         ("zugang-ortung".to_string(), String::new())
     };
+    // Org-Schalter „Ortung im Einsatz“ (ADR-0101) an; die Tests zum Schalter schalten ihn aus.
+    schalter_setzen(&pool, org, true).await;
     sqlx::query(
         "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
-         ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) VALUES (?, ?, ?, ?, ?, 1, ?, ?)",
+         gekoppelt_at, gekoppelt_von) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(ef)
     .bind(einsatz)
@@ -158,15 +542,14 @@ impl Fix {
             .unwrap()
     }
 
-    /// Setzt eine manuelle Position wie die Lagekarte: Quelle `manuell`, beide Zeiten gleich.
+    /// Setzt eine manuelle Position wie die Lagekarte: Quelle `manuell`, Zeitpunkt `at`.
     async fn manuell_setzen(&self, lat: f64, lon: f64, at: &str) {
         sqlx::query(
             "UPDATE einsatz_fahrzeug SET lat = ?, lon = ?, position_quelle = 'manuell', \
-             position_gemessen_at = ?, position_gesetzt_at = ? WHERE id = ?",
+             position_aktualisiert_at = ? WHERE id = ?",
         )
         .bind(lat)
         .bind(lon)
-        .bind(at)
         .bind(at)
         .bind(self.ef)
         .execute(&self.pool)
@@ -174,24 +557,9 @@ impl Fix {
         .unwrap();
     }
 
-    /// `(lat, lon, quelle, gemessen_at, gesetzt_at)` des Einsatzfahrzeugs.
-    async fn stand(
-        &self,
-    ) -> (
-        Option<f64>,
-        Option<f64>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-    ) {
-        sqlx::query_as(
-            "SELECT lat, lon, position_quelle, position_gemessen_at, position_gesetzt_at \
-             FROM einsatz_fahrzeug WHERE id = ?",
-        )
-        .bind(self.ef)
-        .fetch_one(&self.pool)
-        .await
-        .unwrap()
+    /// `(lat, lon, quelle, aktualisiert_at)` des Einsatzfahrzeugs.
+    async fn stand(&self) -> Spalten {
+        spalten(&self.pool, "einsatz_fahrzeug", self.ef).await
     }
 }
 
@@ -203,7 +571,7 @@ fn geschrieben(f: &Fix) -> Uebernahme {
 }
 
 #[tokio::test]
-async fn gekoppelte_kennung_schreibt_position_und_quelle_ortung() {
+async fn gekoppelte_kennung_schreibt_position_mit_quelle_einwurf_und_messzeit() {
     let f = fix().await;
     f.einwerfen(48.1, 11.5, "2026-11-24 11:59:50", T).await;
     assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
@@ -212,9 +580,8 @@ async fn gekoppelte_kennung_schreibt_position_und_quelle_ortung() {
         (
             Some(48.1),
             Some(11.5),
-            Some("ortung".into()),
+            Some("einwurf".into()),
             Some("2026-11-24 11:59:50".into()),
-            Some(T.into())
         )
     );
 }
@@ -229,6 +596,21 @@ async fn ohne_kopplung_aendert_nichts() {
     f.einwerfen(48.1, 11.5, T, T).await;
     assert_eq!(f.uebernehmen(T).await, Uebernahme::Nichts);
     assert_eq!(f.stand().await.0, None);
+}
+
+/// ADR-0101/ADR-0103: ohne Org-Schalter „Ortung im Einsatz“ schreibt die Übernahme nichts, die
+/// Kopplung bleibt stehen; mit dem Schalter kommt der nächste Fix wieder an.
+#[tokio::test]
+async fn ohne_org_schalter_schreibt_die_uebernahme_nichts() {
+    let f = fix().await;
+    schalter_setzen(&f.pool, f.org, false).await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, Uebernahme::Nichts);
+    assert_eq!(f.stand().await.0, None);
+
+    schalter_setzen(&f.pool, f.org, true).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    assert_eq!(f.stand().await.0, Some(48.1));
 }
 
 #[tokio::test]
@@ -271,40 +653,65 @@ async fn gespiegelter_einsatz_aendert_nichts() {
     assert_eq!(f.stand().await.0, None);
 }
 
+/// Vorrang nach dem Positionsbaustein: der jüngere Zeitpunkt gewinnt. Ein Fix, der vor dem
+/// manuellen Setzen gemessen wurde, wird verworfen; ein später gemessener übernommen.
 #[tokio::test]
-async fn manuelle_position_bleibt_bis_ein_spaeter_empfangener_fix_kommt() {
+async fn manuelle_position_bleibt_bis_ein_juenger_gemessener_fix_kommt() {
     let f = fix().await;
     f.manuell_setzen(50.0, 10.0, T).await;
-    f.einwerfen(48.1, 11.5, T, "2026-11-24 11:59:59").await;
+    f.einwerfen(48.1, 11.5, "2026-11-24 11:59:59", T).await;
     assert_eq!(f.uebernehmen(T).await, Uebernahme::Nichts);
     assert_eq!(f.stand().await.2.as_deref(), Some("manuell"));
     assert_eq!(f.stand().await.0, Some(50.0));
 
-    f.einwerfen(48.2, 11.6, T, "2026-11-24 12:00:01").await;
+    f.einwerfen(48.2, 11.6, "2026-11-24 12:00:01", "2026-11-24 12:00:01")
+        .await;
     assert_eq!(f.uebernehmen("2026-11-24 12:00:01").await, geschrieben(&f));
-    assert_eq!(f.stand().await.2.as_deref(), Some("ortung"));
+    assert_eq!(f.stand().await.2.as_deref(), Some("einwurf"));
     assert_eq!(f.stand().await.0, Some(48.2));
 }
 
+/// Eine vorgehende Geräteuhr überholt eine manuelle Position nicht: mehr als 60 s in der Zukunft
+/// wird die Messzeit auf die Serverzeit geklemmt (`klemme_zeitpunkt`).
 #[tokio::test]
-async fn vorgehende_geraeteuhr_aendert_den_vorrang_nicht() {
+async fn vorgehende_geraeteuhr_wird_auf_die_serverzeit_geklemmt() {
     let f = fix().await;
     f.manuell_setzen(50.0, 10.0, T).await;
-    // Die Geräteuhr geht eine Stunde vor; empfangen wurde der Fix aber vor dem manuellen Setzen.
+    // Die Geräteuhr geht eine Stunde vor; der Server steht eine Minute vor dem manuellen Setzen.
     f.einwerfen(48.1, 11.5, "2026-11-24 13:00:00", "2026-11-24 11:59:00")
         .await;
-    assert_eq!(f.uebernehmen(T).await, Uebernahme::Nichts);
+    assert_eq!(
+        f.uebernehmen("2026-11-24 11:59:00").await,
+        Uebernahme::Nichts
+    );
     assert_eq!(f.stand().await.0, Some(50.0));
+
+    // Ohne manuelle Position steht der Fix mit der Serverzeit statt der Gerätezeit.
+    let g = fix().await;
+    g.einwerfen(48.1, 11.5, "2026-11-24 13:00:00", T).await;
+    assert_eq!(g.uebernehmen(T).await, geschrieben(&g));
+    assert_eq!(g.stand().await.3.as_deref(), Some(T));
 }
 
 #[tokio::test]
 async fn geloeschte_position_wird_vom_naechsten_fix_gesetzt() {
     let f = fix().await;
-    // Wie nach dem Löschen der Position: Koordinaten, Quelle und Zeiten sind NULL.
+    // Wie nach dem Löschen der Position: Koordinaten, Quelle und Zeitpunkt sind NULL.
     f.einwerfen(48.1, 11.5, T, T).await;
     assert_eq!(f.stand().await.0, None);
     assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
     assert_eq!(f.stand().await.0, Some(48.1));
+}
+
+#[tokio::test]
+async fn derselbe_fix_ist_nichts_neues() {
+    let f = fix().await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    assert_eq!(
+        f.uebernehmen("2026-11-24 12:01:00").await,
+        Uebernahme::Nichts
+    );
 }
 
 #[tokio::test]
@@ -324,36 +731,52 @@ async fn zweiter_fix_binnen_15_s_wird_gedrosselt() {
 }
 
 #[tokio::test]
-async fn nachlauf_schreibt_die_juengste_position() {
+async fn fix_15_s_nach_dem_letzten_wird_wieder_geschrieben() {
     let f = fix().await;
     f.einwerfen(48.1, 11.5, T, T).await;
     assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
-    f.einwerfen(48.2, 11.6, "2026-11-24 12:00:05", "2026-11-24 12:00:05")
+    f.einwerfen(48.2, 11.6, "2026-11-24 12:00:15", "2026-11-24 12:00:15")
         .await;
-    assert!(matches!(
-        f.uebernehmen("2026-11-24 12:00:05").await,
-        Uebernahme::Gedrosselt { .. }
-    ));
-    // Der Nachlauf läuft 15 s nach dem gedrosselten Fix.
-    assert_eq!(f.uebernehmen("2026-11-24 12:00:20").await, geschrieben(&f));
-    let (lat, lon, quelle, _, gesetzt) = f.stand().await;
-    assert_eq!((lat, lon), (Some(48.2), Some(11.6)));
-    assert_eq!(quelle.as_deref(), Some("ortung"));
-    assert_eq!(gesetzt.as_deref(), Some("2026-11-24 12:00:05"));
+    assert_eq!(f.uebernehmen("2026-11-24 12:00:15").await, geschrieben(&f));
+    assert_eq!(
+        f.stand().await,
+        (
+            Some(48.2),
+            Some(11.6),
+            Some("einwurf".into()),
+            Some("2026-11-24 12:00:15".into()),
+        )
+    );
+}
+
+/// Die Drossel misst gegen die gespeicherte Einwurf-Position, nicht gegen eine manuelle: direkt
+/// nach dem manuellen Setzen kommt ein jüngerer Fix sofort an.
+#[tokio::test]
+async fn nach_manueller_position_greift_die_drossel_nicht() {
+    let f = fix().await;
+    f.manuell_setzen(50.0, 10.0, T).await;
+    f.einwerfen(48.1, 11.5, "2026-11-24 12:00:02", "2026-11-24 12:00:02")
+        .await;
+    assert_eq!(f.uebernehmen("2026-11-24 12:00:02").await, geschrieben(&f));
+}
+
+/// Die jetzige Serverzeit minus `s` Sekunden, kanonisch; für die Wege mit echter Uhr.
+fn vor_sekunden(s: i64) -> String {
+    lifeline_hub::zeit::formatiere_utc(chrono::Utc::now() - chrono::TimeDelta::seconds(s))
 }
 
 #[tokio::test]
 async fn gedrosselter_fix_merkt_genau_einen_nachlauf_vor() {
     let f = fix().await;
-    // Der Fix ist so frisch, wie die Uhr im Aufruf: `apply_position` nimmt die Serverzeit.
-    let jetzt = lifeline_hub::zeit::jetzt();
-    f.einwerfen(48.1, 11.5, &jetzt, &jetzt).await;
+    let erst = vor_sekunden(10);
+    f.einwerfen(48.1, 11.5, &erst, &erst).await;
     let state = test_state(&f.pool, &LiveHub::new());
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
     assert!(!is_nachlauf_vorgemerkt(&f.pool, f.ef));
 
-    f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
+    let dann = vor_sekunden(5);
+    f.einwerfen(48.2, 11.6, &dann, &dann).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
@@ -398,7 +821,7 @@ async fn einwurf_mit_gekoppelter_kennung_bewegt_das_fahrzeug_und_meldet_live() {
     assert_eq!(status, StatusCode::NO_CONTENT);
     let stand = f.stand().await;
     assert_eq!((stand.0, stand.1), (Some(48.1), Some(11.5)));
-    assert_eq!(stand.2.as_deref(), Some("ortung"));
+    assert_eq!(stand.2.as_deref(), Some("einwurf"));
     let n = recv_until_tag(&mut rx, "fahrzeug", std::time::Duration::from_secs(2)).await;
     let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(data["fahrzeug_id"].as_i64(), Some(f.ef));
@@ -524,11 +947,8 @@ async fn vor_stunden(pool: &SqlitePool, h: i64) -> String {
     .unwrap()
 }
 
-fn koppel_body(f: &Fix, bestaetigt: bool) -> String {
-    format!(
-        r#"{{"access_id":"{}","device_id":"{KENNUNG}","volunteer_crew_confirmed":{bestaetigt}}}"#,
-        f.zugang
-    )
+fn koppel_body(f: &Fix) -> String {
+    format!(r#"{{"access_id":"{}","device_id":"{KENNUNG}"}}"#, f.zugang)
 }
 
 #[tokio::test]
@@ -537,76 +957,65 @@ async fn koppeln_schreibt_etb_und_uebernimmt_vorhandene_position() {
     f.kopplung_loeschen().await;
     f.einwerfen(48.1, 11.5, T, T).await;
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let (s, v) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &admin,
-        Some(&koppel_body(&f, true)),
-    )
-    .await;
+    let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ortung_gekoppelt"], true);
-    assert_eq!(v["position_quelle"], "ortung");
+    assert_eq!(v["position_quelle"], "einwurf");
     assert_eq!(v["lat"], 48.1);
     assert_eq!(
         f.ortung_etb(&admin).await,
-        ["Ortung gekoppelt: Florian 1 (Tracker / geraet-1), Besatzung ehrenamtlich bestätigt"]
+        ["Ortung gekoppelt: Florian 1 (Tracker / geraet-1)"]
     );
     let (s, v) = anfrage(&f.app, "GET", &f.pfad(), &admin, None).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(v["access_id"], f.zugang.as_str());
     assert_eq!(v["access_name"], "Tracker");
     assert_eq!(v["device_id"], KENNUNG);
-    assert_eq!(v["volunteer_crew_confirmed"], true);
     assert!(v["coupled_at"].is_string());
+    let schluessel: Vec<&str> = v.as_object().unwrap().keys().map(String::as_str).collect();
+    assert_eq!(
+        schluessel.len(),
+        4,
+        "keine Bestätigung mehr an der Kopplung: {v}"
+    );
 }
 
+/// ADR-0101/ADR-0103: Koppeln braucht den Org-Schalter „Ortung im Einsatz“. Aus ist ein Zustand,
+/// kein kaputtes Feld: 422 (`src/AGENTS.md`, Statuscode-Konvention) mit lesbarem Grund, keine
+/// Kopplung, kein ETB-Eintrag.
 #[tokio::test]
-async fn koppeln_ohne_bestaetigung_bei_ausgeschaltetem_schalter_ist_422() {
+async fn koppeln_bei_ausgeschaltetem_org_schalter_ist_422() {
     let f = fix().await;
     f.kopplung_loeschen().await;
+    schalter_setzen(&f.pool, f.org, false).await;
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let (s, v) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &admin,
-        Some(&koppel_body(&f, false)),
-    )
-    .await;
+    let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
-    assert_eq!(v["grund"], "volunteer_crew_required");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap()
+            .contains("Ortung ist für diese Organisation ausgeschaltet"),
+        "{v}"
+    );
     assert_eq!(f.kopplungen().await, 0);
     assert!(f.ortung_etb(&admin).await.is_empty());
 }
 
+/// Ein Body mit dem früheren Feld `volunteer_crew_confirmed` stört nicht; es gibt keine
+/// Bestätigung „Besatzung ehrenamtlich“ mehr.
 #[tokio::test]
-async fn koppeln_ohne_bestaetigung_bei_eingeschaltetem_schalter_geht() {
+async fn koppeln_ignoriert_die_fruehere_ehrenamt_bestaetigung() {
     let f = fix().await;
     f.kopplung_loeschen().await;
-    sqlx::query(
-        "INSERT INTO org_einstellungen (org_id, ortung_hauptamt) VALUES (?, 1) \
-         ON CONFLICT(org_id) DO UPDATE SET ortung_hauptamt = 1",
-    )
-    .bind(f.org)
-    .execute(&f.pool)
-    .await
-    .unwrap();
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let (s, v) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &admin,
-        Some(&koppel_body(&f, false)),
-    )
-    .await;
-    assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(
-        f.ortung_etb(&admin).await,
-        ["Ortung gekoppelt: Florian 1 (Tracker / geraet-1)"]
+    let body = format!(
+        r#"{{"access_id":"{}","device_id":"{KENNUNG}","volunteer_crew_confirmed":false}}"#,
+        f.zugang
     );
+    let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(f.kopplungen().await, 1);
 }
 
 #[tokio::test]
@@ -625,7 +1034,7 @@ async fn belegte_kennung_ist_409() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/vehicles", f.einsatz),
+        &format!("/api/incidents/{}/vehicles", f.einsatz),
         &admin,
         Some(&format!(r#"{{"fahrzeug_id":{}}}"#, v["id"])),
     )
@@ -634,19 +1043,12 @@ async fn belegte_kennung_ist_409() {
     let ef2 = v["id"].as_i64().unwrap();
     // Die Kennung hängt aus der Fixture an `f.ef`.
     let pfad = format!("/api/incidents/{}/vehicles/{ef2}/tracking", f.einsatz);
-    let (s, _) = anfrage(&f.app, "PUT", &pfad, &admin, Some(&koppel_body(&f, true))).await;
+    let (s, _) = anfrage(&f.app, "PUT", &pfad, &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::CONFLICT);
     assert_eq!(f.kopplungen().await, 1);
     assert!(f.ortung_etb(&admin).await.is_empty());
     // Ein erneutes PUT am selben Fahrzeug ersetzt dessen Kopplung.
-    let (s, _) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &admin,
-        Some(&koppel_body(&f, true)),
-    )
-    .await;
+    let (s, _) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(f.kopplungen().await, 1);
 }
@@ -661,14 +1063,7 @@ async fn koppeln_im_gespiegelten_einsatz_ist_409_ohne_etb() {
         .await
         .unwrap();
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let (s, v) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &admin,
-        Some(&koppel_body(&f, true)),
-    )
-    .await;
+    let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::CONFLICT, "{v}");
     assert_eq!(f.kopplungen().await, 0);
     assert!(f.ortung_etb(&admin).await.is_empty());
@@ -693,9 +1088,7 @@ async fn fremder_oder_falscher_zugang_ist_422() {
         "zugang-widerrufen",
         "gibt-es-nicht",
     ] {
-        let body = format!(
-            r#"{{"access_id":"{id}","device_id":"{KENNUNG}","volunteer_crew_confirmed":true}}"#
-        );
+        let body = format!(r#"{{"access_id":"{id}","device_id":"{KENNUNG}"}}"#);
         let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&body)).await;
         assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{id}: {v}");
     }
@@ -710,14 +1103,7 @@ async fn lesende_rolle_darf_nicht_koppeln() {
     let erika = benutzer_anlegen(&f.app, &admin, "erika", "keine").await;
     rolle_setzen(&f.app, &admin, f.einsatz, erika, "beobachter").await;
     let cookie = login_cookie(&f.app, "erika", "erikapw1").await;
-    let (s, _) = anfrage(
-        &f.app,
-        "PUT",
-        &f.pfad(),
-        &cookie,
-        Some(&koppel_body(&f, true)),
-    )
-    .await;
+    let (s, _) = anfrage(&f.app, "PUT", &f.pfad(), &cookie, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
     let (s, _) = anfrage(&f.app, "DELETE", &f.pfad(), &cookie, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
@@ -733,10 +1119,10 @@ async fn trennen_schreibt_etb_und_laesst_die_position_stehen() {
     let (s, _) = anfrage(&f.app, "DELETE", &f.pfad(), &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(f.kopplungen().await, 0);
-    let (lat, lon, quelle, _, _) = f.stand().await;
+    let (lat, lon, quelle, _) = f.stand().await;
     assert_eq!(
         (lat, lon, quelle.as_deref()),
-        (Some(48.1), Some(11.5), Some("ortung"))
+        (Some(48.1), Some(11.5), Some("einwurf"))
     );
     assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 1"]);
     // Ohne Kopplung gibt es nichts zu trennen: 404, kein zweiter ETB-Eintrag.
@@ -835,9 +1221,7 @@ async fn abgelaufener_zugang_ist_422_beim_koppeln() {
         .await
         .unwrap();
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let body = format!(
-        r#"{{"access_id":"zugang-abgelaufen","device_id":"{KENNUNG}","volunteer_crew_confirmed":true}}"#
-    );
+    let body = format!(r#"{{"access_id":"zugang-abgelaufen","device_id":"{KENNUNG}"}}"#);
     let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&body)).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
     assert_eq!(f.kopplungen().await, 0);
@@ -881,25 +1265,21 @@ async fn abgelaufener_zugang_erscheint_nicht_in_den_kandidaten() {
         .all(|k| k["access_id"] != "zugang-abgelaufen"));
 }
 
+/// Die Kandidatenliste nennt den Org-Schalter, damit der Dialog erklärt, warum Koppeln gesperrt
+/// ist; die Org-Einstellungen selbst darf die Rolle nicht lesen.
 #[tokio::test]
-async fn kandidaten_nennen_ob_die_bestaetigung_pflicht_ist() {
+async fn kandidaten_nennen_den_org_schalter() {
     let f = fix().await;
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
     let pfad = format!("{}/candidates", f.pfad());
     let (s, v) = anfrage(&f.app, "GET", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(v["volunteer_crew_required"], true, "{v}");
-    sqlx::query(
-        "INSERT INTO org_einstellungen (org_id, ortung_hauptamt) VALUES (?, 1) \
-         ON CONFLICT(org_id) DO UPDATE SET ortung_hauptamt = 1",
-    )
-    .bind(f.org)
-    .execute(&f.pool)
-    .await
-    .unwrap();
+    assert_eq!(v["tracking_enabled"], true, "{v}");
+    assert!(v.get("volunteer_crew_required").is_none(), "{v}");
+    schalter_setzen(&f.pool, f.org, false).await;
     let (s, v) = anfrage(&f.app, "GET", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert_eq!(v["volunteer_crew_required"], false, "{v}");
+    assert_eq!(v["tracking_enabled"], false, "{v}");
 }
 
 // ── Lebenszyklus: Entlassen, Stornieren, Abschluss, Rückgängig (LLH-2091, Task 6) ───────────
@@ -919,7 +1299,7 @@ impl Fix {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/vehicles", self.einsatz),
+            &format!("/api/incidents/{}/vehicles", self.einsatz),
             cookie,
             Some(&format!(r#"{{"fahrzeug_id":{}}}"#, v["id"])),
         )
@@ -929,7 +1309,7 @@ impl Fix {
     }
 
     fn fahrzeug_pfad(&self, ef: i64, aktion: &str) -> String {
-        format!("/api/einsaetze/{}/vehicles/{ef}/{aktion}", self.einsatz)
+        format!("/api/incidents/{}/vehicles/{ef}/{aktion}", self.einsatz)
     }
 
     /// Entlassen mit Antwort; liefert den Vorzustand als JSON.
@@ -979,11 +1359,11 @@ async fn entlassen_trennt_die_ortung_mit_etb() {
     let vorzustand = f.entlassen(&admin).await;
     assert_eq!(vorzustand["ortung"]["zugang_id"], f.zugang.as_str());
     assert_eq!(vorzustand["ortung"]["kennung"], KENNUNG);
-    assert_eq!(vorzustand["ortung"]["ehrenamt_bestaetigt"], true);
+    assert!(vorzustand["ortung"].get("ehrenamt_bestaetigt").is_none());
     assert!(!f.hat_kopplung(f.ef).await);
     assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 1"]);
     // Die Position bleibt als letzter Stand stehen.
-    assert_eq!(f.stand().await.2.as_deref(), Some("ortung"));
+    assert_eq!(f.stand().await.2.as_deref(), Some("einwurf"));
 }
 
 #[tokio::test]
@@ -1013,7 +1393,7 @@ async fn abschluss_trennt_alle_kopplungen_und_loescht_gps_positionen_aber_keine_
     let ef2 = f.weiteres_fahrzeug(&admin, "Florian 2").await;
     sqlx::query(
         "UPDATE einsatz_fahrzeug SET lat = 1.5, lon = 2.5, position_quelle = 'manuell', \
-         position_gemessen_at = ?1, position_gesetzt_at = ?1 WHERE id = ?2",
+         position_aktualisiert_at = ?1 WHERE id = ?2",
     )
     .bind(T)
     .bind(ef2)
@@ -1022,8 +1402,8 @@ async fn abschluss_trennt_alle_kopplungen_und_loescht_gps_positionen_aber_keine_
     .unwrap();
     sqlx::query(
         "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
-         ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) \
-         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', 0, gekoppelt_at, gekoppelt_von \
+         gekoppelt_at, gekoppelt_von) \
+         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', gekoppelt_at, gekoppelt_von \
          FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
     )
     .bind(ef2)
@@ -1034,14 +1414,16 @@ async fn abschluss_trennt_alle_kopplungen_und_loescht_gps_positionen_aber_keine_
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &format!("/api/incidents/{}/close", f.einsatz),
         &admin,
         None,
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(f.kopplungen().await, 0);
-    assert_eq!(f.stand().await, (None, None, None, None, None));
+    // Die Einwurf-Position ist gelöscht; Quelle und Zeitpunkt bleiben als Hinweis (Baustein).
+    let (lat, lon, quelle, _) = f.stand().await;
+    assert_eq!((lat, lon, quelle.as_deref()), (None, None, Some("einwurf")));
     let manuell: (Option<f64>, Option<String>) =
         sqlx::query_as("SELECT lat, position_quelle FROM einsatz_fahrzeug WHERE id = ?")
             .bind(ef2)
@@ -1065,7 +1447,7 @@ async fn abschluss_ohne_kopplung_schreibt_keinen_ortung_etb() {
     let (s, _) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &format!("/api/incidents/{}/close", f.einsatz),
         &admin,
         None,
     )
@@ -1088,12 +1470,11 @@ async fn rueckgaengig_nach_entlassen_stellt_die_kopplung_her() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(k["device_id"], KENNUNG);
     assert_eq!(k["access_id"], f.zugang.as_str());
-    assert_eq!(k["volunteer_crew_confirmed"], true);
     assert_eq!(
         f.ortung_etb(&admin).await,
         [
             // Neuester Eintrag zuerst.
-            "Ortung gekoppelt: Florian 1 (Tracker / geraet-1), Besatzung ehrenamtlich bestätigt",
+            "Ortung gekoppelt: Florian 1 (Tracker / geraet-1)",
             "Ortung getrennt: Florian 1",
         ]
     );
@@ -1107,7 +1488,7 @@ async fn rueckgaengig_laesst_die_kopplung_aus_wenn_die_kennung_inzwischen_belegt
     // Dieselbe Kennung hängt jetzt an Fahrzeug B.
     let ef_b = f.weiteres_fahrzeug(&admin, "Florian 2").await;
     let pfad_b = format!("/api/incidents/{}/vehicles/{ef_b}/tracking", f.einsatz);
-    let (s, _) = anfrage(&f.app, "PUT", &pfad_b, &admin, Some(&koppel_body(&f, true))).await;
+    let (s, _) = anfrage(&f.app, "PUT", &pfad_b, &admin, Some(&koppel_body(&f))).await;
     assert_eq!(s, StatusCode::OK);
     let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -1153,7 +1534,6 @@ async fn rueckgaengig_prueft_zugang_der_org() {
         vorzustand["ortung"] = serde_json::json!({
             "zugang_id": zugang,
             "kennung": KENNUNG,
-            "ehrenamt_bestaetigt": true,
         });
         let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
         assert_eq!(s, StatusCode::OK, "{zugang}: {v}");
@@ -1166,14 +1546,21 @@ async fn rueckgaengig_prueft_zugang_der_org() {
 }
 
 #[tokio::test]
-async fn rueckgaengig_ohne_bestaetigung_bei_ausgeschaltetem_schalter_laesst_die_kopplung_aus() {
+async fn rueckgaengig_bei_ausgeschaltetem_org_schalter_laesst_die_kopplung_aus() {
     let f = fix().await;
     let admin = login_cookie(&f.app, "admin", "startpw12").await;
-    let mut vorzustand = f.entlassen(&admin).await;
-    vorzustand["ortung"]["ehrenamt_bestaetigt"] = false.into();
+    let vorzustand = f.entlassen(&admin).await;
+    schalter_setzen(&f.pool, f.org, false).await;
     let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ausgelassen"][0]["bezeichnung"], "Ortung", "{v}");
+    assert!(
+        v["ausgelassen"][0]["grund"]
+            .as_str()
+            .unwrap()
+            .contains("ausgeschaltet"),
+        "{v}"
+    );
     assert!(!f.hat_kopplung(f.ef).await);
 }
 
@@ -1198,7 +1585,7 @@ async fn wiedereroeffnen_stellt_keine_kopplung_her() {
     let (s, _) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &format!("/api/incidents/{}/close", f.einsatz),
         &admin,
         None,
     )
@@ -1207,7 +1594,7 @@ async fn wiedereroeffnen_stellt_keine_kopplung_her() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/reopen", f.einsatz),
+        &format!("/api/incidents/{}/reopen", f.einsatz),
         &admin,
         Some(r#"{"grund":"Falscher Einsatz abgeschlossen"}"#),
     )
@@ -1216,7 +1603,7 @@ async fn wiedereroeffnen_stellt_keine_kopplung_her() {
     assert_eq!(f.kopplungen().await, 0);
 }
 
-/// ADR-0098: keine Tabelle hält einen Positionsverlauf. Jede Tabelle mit den Spalten `lat` und
+/// ADR-0103: keine Tabelle hält einen Positionsverlauf. Jede Tabelle mit den Spalten `lat` und
 /// `lon` steht in einer der beiden Listen: Karten- und Lagedaten, die eine Einsatzkraft selbst
 /// setzt (je Zeile ein Ort, kein Messverlauf), oder Positionsablagen, deren eindeutiger Schlüssel
 /// höchstens eine Zeile je Fahrzeug bzw. Kennung erlaubt. Eine neue Tabelle mit `lat`/`lon` macht
@@ -1266,7 +1653,7 @@ async fn keine_tabelle_haelt_einen_positionsverlauf() {
         } else {
             assert!(
                 ORTE_VON_MENSCHEN.contains(&t.as_str()),
-                "Tabelle {t} hat lat und lon: ein Positionsverlauf ist nach ADR-0098 verboten; \
+                "Tabelle {t} hat lat und lon: ein Positionsverlauf ist nach ADR-0103 verboten; \
                  gehört sie zu den von Menschen gesetzten Orten, in die Liste eintragen"
             );
         }
@@ -1285,7 +1672,7 @@ async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/staging-areas", f.einsatz),
+        &format!("/api/incidents/{}/staging-areas", f.einsatz),
         &admin,
         Some(r#"{"bezeichnung":"Sportplatz"}"#),
     )
@@ -1295,7 +1682,7 @@ async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
     let (s, _) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/staging-areas/{br}/status", f.einsatz),
+        &format!("/api/incidents/{}/staging-areas/{br}/status", f.einsatz),
         &admin,
         Some(r#"{"status":"aktiv"}"#),
     )
@@ -1304,7 +1691,7 @@ async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/staging-areas/{br}/arrival", f.einsatz),
+        &format!("/api/incidents/{}/staging-areas/{br}/arrival", f.einsatz),
         &admin,
         Some(r#"{"unangemeldet":{"fahrzeuge":[{"funkrufname":"Florian 7"}]}}"#),
     )
@@ -1314,8 +1701,8 @@ async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
     let ef2 = v["fahrzeug_ids"][0].as_i64().unwrap();
     sqlx::query(
         "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
-         ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) \
-         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', 0, gekoppelt_at, gekoppelt_von \
+         gekoppelt_at, gekoppelt_von) \
+         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', gekoppelt_at, gekoppelt_von \
          FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
     )
     .bind(ef2)
@@ -1328,7 +1715,7 @@ async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/units/{einheit}/reject", f.einsatz),
+        &format!("/api/incidents/{}/units/{einheit}/reject", f.einsatz),
         &admin,
         None,
     )
@@ -1352,7 +1739,7 @@ async fn abschluss_meldet_fahrzeug_live_fuer_gekoppelte_und_geortete() {
     let (s, v) = anfrage(
         &f.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &format!("/api/incidents/{}/close", f.einsatz),
         &admin,
         None,
     )
@@ -1380,13 +1767,14 @@ async fn der_echte_nachlauf_schreibt_nach_der_drossel_genau_einmal_und_meldet_li
     let f = fix().await;
     let live = LiveHub::new();
     let state = test_state(&f.pool, &live);
-    let jetzt = lifeline_hub::zeit::jetzt();
-    f.einwerfen(48.1, 11.5, &jetzt, &jetzt).await;
+    let erst = vor_sekunden(10);
+    f.einwerfen(48.1, 11.5, &erst, &erst).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
 
     let mut rx = live.abonniere(f.einsatz);
-    f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
+    let dann = vor_sekunden(5);
+    f.einwerfen(48.2, 11.6, &dann, &dann).await;
     for _ in 0..3 {
         apply_position(&state, &f.zugang, KENNUNG).await;
     }
@@ -1408,10 +1796,11 @@ async fn nachlauf_uebernimmt_die_aktuelle_kopplung_nach_neukopplung() {
     set_nachlauf_verzoegerung(std::time::Duration::from_millis(300));
     let f = fix().await;
     let state = test_state(&f.pool, &LiveHub::new());
-    let jetzt = lifeline_hub::zeit::jetzt();
-    f.einwerfen(48.1, 11.5, &jetzt, &jetzt).await;
+    let erst = vor_sekunden(10);
+    f.einwerfen(48.1, 11.5, &erst, &erst).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
-    f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
+    let dann = vor_sekunden(5);
+    f.einwerfen(48.2, 11.6, &dann, &dann).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert!(is_nachlauf_vorgemerkt(&f.pool, f.ef));
 
@@ -1423,11 +1812,11 @@ async fn nachlauf_uebernimmt_die_aktuelle_kopplung_nach_neukopplung() {
         .unwrap();
     sqlx::query(
         "INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
-         empfangen_at, rohdaten) VALUES (?, ?, 'geraet-2', 50.5, 8.5, ?, '9999-01-02 00:00:00', '{}')",
+         empfangen_at, rohdaten) VALUES (?1, ?2, 'geraet-2', 50.5, 8.5, ?3, ?3, '{}')",
     )
     .bind(f.org)
     .bind(&f.zugang)
-    .bind(&jetzt)
+    .bind(vor_sekunden(2))
     .execute(&f.pool)
     .await
     .unwrap();

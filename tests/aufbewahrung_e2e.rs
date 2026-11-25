@@ -277,6 +277,41 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "alte und neue Besatzung beim Besatzungswechsel der Ablösung (LLH-1150): wer wann in welcher Einheit eingesetzt war",
     },
+    Ausnahme {
+        datei: "src/helfer/bestaetigung.rs",
+        funktion: "etb_text",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name, den die Helferin oder der Helfer selbst eingibt, beim Bestätigen und Ändern (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "ablehnen",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name der abgelehnten Helfer-Anmeldung (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "entfernen",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, den die Leitung abmeldet (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "abmelden_tx",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, der sich in der App abmeldet (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/geraet/ablauf.rs",
+        funktion: "warnung_text",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, dessen Anmeldung bald endet (Helfer-App)",
+    },
     // --- Lagestruktur: Bezeichnungen der Ordnung des Raums und der Betreuung (Zonen, Gebiete,
     // Bezirke, Stellen) und der Streichgrund der Kräfte-Zeitachse. Bewusst behalten, LFH-752. ---
     Ausnahme {
@@ -984,12 +1019,12 @@ async fn pruefe_skelett(
 
     // Reguläre Routen bleiben dem Admin gesperrt.
     for uri in [
-        format!("/api/einsaetze/{e}"),
-        format!("/api/einsaetze/{e}/etb"),
-        format!("/api/einsaetze/{e}/persons"),
-        format!("/api/einsaetze/{e}/animals"),
-        format!("/api/einsaetze/{e}/damages"),
-        format!("/api/einsaetze/{e}/live"),
+        format!("/api/incidents/{e}"),
+        format!("/api/incidents/{e}/etb"),
+        format!("/api/incidents/{e}/persons"),
+        format!("/api/incidents/{e}/animals"),
+        format!("/api/incidents/{e}/damages"),
+        format!("/api/incidents/{e}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{uri}");
@@ -1018,7 +1053,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     let (app, pool) = common::setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{e}");
+    let basis = format!("/api/incidents/{e}");
 
     // 1. Dauer vor dem Abschluss (danach sind die Einstellungen eingefroren) + Kopf-PII.
     // LFH-749: eine Kategorie-Vorgabe, die erst nach der Einsatz-Frist fällig wäre — ihre

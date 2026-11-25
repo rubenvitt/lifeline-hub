@@ -97,7 +97,7 @@ pub struct BenachrichtigungVorgabeArt {
     pub still: Vec<VorgabeFunktion>,
 }
 
-/// `GET /api/einsaetze/{id}/notification-defaults` (design.md D4).
+/// `GET /api/incidents/{id}/notification-defaults` (design.md D4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct BenachrichtigungVorgaben {
     /// Die Spalten in Katalogreihenfolge, `ohne` zuletzt; S7 nur, wenn die Organisation es

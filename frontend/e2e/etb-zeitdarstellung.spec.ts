@@ -31,7 +31,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function seedeEintrag(page: Page, einsatzId: string, inhalt: string, ereigniszeit?: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle', ereigniszeit },
   });
   expect(antwort.ok(), `Seeding: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

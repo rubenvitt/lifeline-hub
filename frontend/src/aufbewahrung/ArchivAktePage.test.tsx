@@ -322,7 +322,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
   it('Frist-Anzeige und Frist-Eingabe nennen dieselbe Berliner Uhrzeit', async () => {
     zeige('frist_laeuft');
     server.use(
-      http.get('/api/einsaetze/7/settings', () =>
+      http.get('/api/incidents/7/settings', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
       http.get('/api/org-settings', () =>
@@ -340,7 +340,7 @@ describe('ArchivAktePage — Frist in der Anzeigezone (LFH-692)', () => {
   it('lesbare Einsatz-Zone sticht die der Organisation (Einsatz New York, Org Berlin)', async () => {
     zeige('frist_laeuft');
     server.use(
-      http.get('/api/einsaetze/7/settings', () =>
+      http.get('/api/incidents/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           zeitzone: 'America/New_York',
@@ -386,7 +386,7 @@ describe('ArchivAktePage — Frist aufheben (LFH-756)', () => {
     const gesendet: unknown[] = [];
     zeige('faellig');
     server.use(
-      http.put('/api/einsaetze/7/retention-period', async ({ request }) => {
+      http.put('/api/incidents/7/retention-period', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ id: 7 });
       }),

@@ -356,9 +356,12 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         lifeline_hub::public_api::webhook::lauf::start(pool.clone(), stopp_empfang.clone());
     // Adapter (LLH-2017): Geheimnisspeicher (oben geladen), Abrufe im
     // Hintergrund. Ohne Schlüssel läuft der Server; Adapter mit Geheimnissen melden das selbst.
+    // Zuschaltungen der Drohnenquellen (LLH-2105) stehen, bevor der Lauf Abrufe beginnt.
+    let drohne = std::sync::Arc::new(lifeline_hub::drohne::Store::new());
+    drohne.load(&pool).await;
     let adapter_rahmen = lifeline_hub::adapter::Rahmen::new(
         speicher,
-        lifeline_hub::adapter::art::Verzeichnis::produktiv(),
+        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone()),
     );
     // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
     // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.
@@ -610,7 +613,14 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         "Offline-Karten: Vorgabe der automatischen Aktualisierung (gilt, solange in der \
          Verwaltung nichts gespeichert ist)"
     );
-    let fachebenen = lifeline_hub::karte::FachebenenState::neu();
+    let mut fachebenen = lifeline_hub::karte::FachebenenState::neu();
+    if !config.nina {
+        // LLH-2104: MoWaS-Auflage „nicht gewerblich“; der Betreiber hat die Ebene abgeschaltet.
+        fachebenen = fachebenen.mit_abgeschaltet(&["nina"]);
+        tracing::info!(
+            "Fachebene NINA abgeschaltet (--nina false): kein Abruf bei warnung.bund.de"
+        );
+    }
     // Der kurz getimeboxte Fachebenen-Client holt auch das Katalog-Manifest (wie `offline_katalog`).
     let auto_aktualisierung = lifeline_hub::karte::auto_aktualisierung::AutoAktualisierung::neu(
         auto_vorgabe,
@@ -635,6 +645,8 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
         adapter: adapter_rahmen,
+        fremdebene_abrufer: Default::default(),
+        drohne,
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());

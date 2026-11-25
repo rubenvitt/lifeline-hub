@@ -40,7 +40,7 @@ async function lagekarteMitKreis(page: Page) {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const eid = Number(page.url().match(/\/einsaetze\/(\d+)/)![1]);
-  const r = await page.request.post(`/api/einsaetze/${eid}/zones`, {
+  const r = await page.request.post(`/api/incidents/${eid}/zones`, {
     data: {
       typ: 'absperrbereich',
       label: 'Nord',
@@ -101,11 +101,11 @@ async function kartenMitte(page: Page) {
 }
 
 async function zonen(page: Page, eid: number): Promise<ZoneAntwort[]> {
-  return (await (await page.request.get(`/api/einsaetze/${eid}/zones`)).json()) as ZoneAntwort[];
+  return (await (await page.request.get(`/api/incidents/${eid}/zones`)).json()) as ZoneAntwort[];
 }
 
 async function etb(page: Page, eid: number): Promise<string[]> {
-  const r = await page.request.get(`/api/einsaetze/${eid}/etb`);
+  const r = await page.request.get(`/api/incidents/${eid}/etb`);
   return ((await r.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 

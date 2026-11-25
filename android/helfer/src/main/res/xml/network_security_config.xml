@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vertrauen wie die Lifeline-App (android/AGENTS.md, „Vertrauen wie das System“): System-CAs und vom
+  Nutzer installierte CAs (eigene CA eines Einsatzservers), keine Ausnahme, kein Pinning, kein
+  Klartext. Die Helfer-App spricht nur den Server ihrer Kopplung an.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

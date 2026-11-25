@@ -61,7 +61,10 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   Fall oder eine geänderte Regel kommt in die JSON, nicht in einen einzelnen Test; die Regel
   selbst bleibt in `adresse.rs`, `deeplink.rs`, `links.rs` und `vertrag.rs`. Zertifikatsfehler
   kennen nur die mobilen Hüllen; sie stehen in deren Tests. `scripts/bereiche.sh` ordnet
-  `src-tauri/faelle/*` allen drei Prüfungen zu.
+  `src-tauri/faelle/*` allen drei Prüfungen zu. Ausnahme `helfer.json` (Helfer-App): nur die
+  Kerne `ios/HelferKern` und `android/helferkern` lesen sie, die Desktop-Hülle hat keine Helfer-App;
+  `bereiche.sh` ordnet sie nur iOS und Android zu. Einen Wächter, der jede Datei in `faelle/` von
+  allen drei Hüllen gelesen verlangt, gibt es nicht.
 - **Fenster sind gleichrangig** (LLH-1281): Schließen des Hauptfensters schließt nichts mit;
   Maske und Serverwechsel bauen `main` bei Bedarf neu (`zeige_maske`, `lade_server`), alles
   andere nimmt `front_fenster`. „Neues Fenster“ (Menü, ⌘N/Strg+N als einziges Menükürzel) baut
