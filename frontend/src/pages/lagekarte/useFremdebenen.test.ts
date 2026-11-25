@@ -4,8 +4,10 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
 import type { FeatureCollection } from '../../api/fachebenen';
 import {
+  aktualisiereFremdebene,
   ladeFremdebeneDaten,
   ladeStandFremdebeneDaten,
+  loescheFremdebene,
   listeFremdebenen,
   type Fremdebene,
 } from '../../api/fremdebenen';
@@ -27,6 +29,8 @@ vi.mock('../../api/fremdebenen', async (original) => ({
   listeFremdebenen: vi.fn(),
   ladeFremdebeneDaten: vi.fn(),
   ladeStandFremdebeneDaten: vi.fn(),
+  aktualisiereFremdebene: vi.fn(),
+  loescheFremdebene: vi.fn(),
 }));
 vi.mock('../../api/lageSnapshot', async (original) => ({
   ...(await original<typeof import('../../api/lageSnapshot')>()),
@@ -206,6 +210,21 @@ describe('Fremdebenen im gesicherten Stand (LLH-2130)', () => {
     await waitFor(() => expect(dokument).toHaveBeenCalled());
     expect(result.current.ebenen).toEqual([]);
     expect(result.current.listenFehler).toBeNull();
+  });
+
+  it('schreibwege_sind_im_stand_ohne_wirkung (kein Umbenennen, Färben, Entfernen der Live-Ebene)', async () => {
+    dokument.mockResolvedValue(stand([IM_STAND]));
+    standDaten.mockResolvedValue(FC());
+    const { result } = rendereStand();
+    await waitFor(() => expect(result.current.aktive).toHaveLength(1));
+    act(() => {
+      result.current.umbenennen(4, 'Neu');
+      result.current.setzeFarbe(4, 'fremd-1');
+      result.current.entfernen(4);
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(vi.mocked(aktualisiereFremdebene)).not.toHaveBeenCalled();
+    expect(vi.mocked(loescheFremdebene)).not.toHaveBeenCalled();
   });
 
   it('ebene_ohne_id_ist_immer_sichtbar und nicht ausblendbar', async () => {

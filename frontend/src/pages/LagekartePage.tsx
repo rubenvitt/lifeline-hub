@@ -2168,20 +2168,18 @@ export default function LagekartePage() {
         }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
-        fremdebenen={
-          quelle.typ === 'live'
-            ? {
-                ebenen: fremd.ebenen,
-                sichtbar: fremd.sichtbar,
-                onToggle: fremd.toggle,
-                onUmbenennen: fremd.umbenennen,
-                onFarbe: fremd.setzeFarbe,
-                onEntfernen: fremd.entfernen,
-                fehler: fremd.fehler,
-                datenZustand: fremd.datenZustand,
-              }
-            : undefined
-        }
+        // Auch im gesicherten Stand (LLH-2130): die eingefrorenen Ebenen; ohne Schreibrecht kein Menü,
+        // die Schreibwege des Hooks sind dort ohne Wirkung.
+        fremdebenen={{
+          ebenen: fremd.ebenen,
+          sichtbar: fremd.sichtbar,
+          onToggle: fremd.toggle,
+          onUmbenennen: fremd.umbenennen,
+          onFarbe: fremd.setzeFarbe,
+          onEntfernen: fremd.entfernen,
+          fehler: fremd.fehler,
+          datenZustand: fremd.datenZustand,
+        }}
         bilder={bilder}
         onBildUpload={onBildUpload}
         bildUpload={bildUpload}

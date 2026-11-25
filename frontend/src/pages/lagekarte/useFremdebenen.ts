@@ -275,9 +275,16 @@ export function useFremdebenen(einsatzId: number, { quelle = LIVE }: Fremdebenen
     datenZustand,
     /** Die Ebene einer ID (Detailkarte). */
     finde: (id: number) => ebenen.find((e) => e.id === id),
-    umbenennen: (id: number, name: string) => aendern.mutate({ id, patch: { name } }),
-    setzeFarbe: (id: number, color: string) => aendern.mutate({ id, patch: { color } }),
-    entfernen: (id: number) => entfernen.mutate(id),
+    // Im gesicherten Stand ohne Wirkung (LLH-2130): die IDs dort benennen Live-Ebenen.
+    umbenennen: (id: number, name: string) => {
+      if (aktiv) aendern.mutate({ id, patch: { name } });
+    },
+    setzeFarbe: (id: number, color: string) => {
+      if (aktiv) aendern.mutate({ id, patch: { color } });
+    },
+    entfernen: (id: number) => {
+      if (aktiv) entfernen.mutate(id);
+    },
     /** Letzte Ablehnung eines Schreibwegs, für den Hinweis in der Gruppe. */
     fehler: aendern.error ?? entfernen.error ?? null,
     /** Fehler der Liste, für den Fehler-Slot der Gruppe. */
