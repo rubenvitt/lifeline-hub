@@ -24,12 +24,13 @@ enum GemeinsameFaelle {
     }
 }
 
-/// QR, Deeplink, Antwortcodes und Takt gegen `src-tauri/faelle/helfer.json`.
+/// QR, Deeplink, Antwortcodes, Takt und Wiederholung gegen `src-tauri/faelle/helfer.json`.
 final class HelferFaelleTests: XCTestCase {
     struct Datei: Decodable {
         let deute: [DeuteFall]
         let antwort: [AntwortFall]
         let takt: [TaktFall]
+        let wiederholung: [WiederholungFall]
     }
 
     struct Ergebnis: Decodable {
@@ -54,6 +55,12 @@ final class HelferFaelleTests: XCTestCase {
         let seit_letzter_s: Double
         let bewegt_m: Double
         let senden: Bool
+    }
+
+    struct WiederholungFall: Decodable {
+        let beschreibung: String
+        let fehler_in_folge: Int
+        let abstand_s: Int
     }
 
     func datei() throws -> Datei { try GemeinsameFaelle.load("helfer.json", as: Datei.self) }
@@ -84,6 +91,17 @@ final class HelferFaelleTests: XCTestCase {
             XCTAssertEqual(
                 takt.soll(senden: fall.seit_letzter_s, bewegtM: fall.bewegt_m), fall.senden,
                 fall.beschreibung)
+        }
+    }
+
+    func testJederGemeinsameFallVonWiederholungGilt() throws {
+        let faelle = try datei().wiederholung
+        XCTAssertGreaterThanOrEqual(faelle.count, 5)
+        for fall in faelle {
+            var w = Wiederholung()
+            var abstand = 0
+            for _ in 0..<fall.fehler_in_folge { abstand = w.naechsterAbstandS() }
+            XCTAssertEqual(abstand, fall.abstand_s, fall.beschreibung)
         }
     }
 

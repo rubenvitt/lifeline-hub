@@ -29,3 +29,30 @@ public func entscheide(status: Int) -> Antwort {
     default: .wiederholen
     }
 }
+
+/// Abstand bis zur nächsten Wiederholung nach Fehlern in Folge (ADR-0098: wachsender Abstand,
+/// höchstens jede Minute): 5, 10, 20, 40, 60, 60, … Sekunden. Ein `weiter` setzt zurück
+/// (gemeinsame Fälle `src-tauri/faelle/helfer.json`, Abschnitt `wiederholung`; Gegenstück
+/// `Wiederholung` in `android/helferkern`).
+public struct Wiederholung: Equatable, Sendable {
+    static let anfangS = 5
+    static let obergrenzeS = 60
+    /// 5 · 2^4 = 80 liegt schon über der Obergrenze; mehr Schritte zählt niemand.
+    static let maxSchritte = 4
+
+    public private(set) var fehlerInFolge = 0
+
+    public init() {}
+
+    /// Abstand in Sekunden nach dem nächsten Fehler; zählt den Fehler mit.
+    public mutating func naechsterAbstandS() -> Int {
+        let abstand = Self.anfangS << min(fehlerInFolge, Self.maxSchritte)
+        if fehlerInFolge < Self.maxSchritte { fehlerInFolge += 1 }
+        return min(abstand, Self.obergrenzeS)
+    }
+
+    /// Nach einer erfolgreichen Sendung beginnt der Abstand wieder bei 5 Sekunden.
+    public mutating func zuruecksetzen() {
+        fehlerInFolge = 0
+    }
+}
