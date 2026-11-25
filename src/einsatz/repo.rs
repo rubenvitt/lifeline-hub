@@ -915,6 +915,45 @@ pub async fn abschliessen(
         // LLH-1638: Maschinenzugänge lesen nur laufende Einsätze; der Abschluss beendet ihre
         // Freigabe in derselben Transaktion (ADR-0035).
         crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
+        // LLH-2091: die Ortung endet mit dem Einsatz, je Fahrzeug ein ETB-Eintrag; GPS-Positionen
+        // gehören nicht in die Einsatzakte, manuelle bleiben.
+        for (ef_id, _) in
+            crate::ortung::kopplung::delete_kopplungen_einsatz_tx(&mut tx, einsatz_id).await?
+        {
+            let funkrufname =
+                crate::fahrzeug::disposition_repo::transport_fahrzeug(&mut *tx, einsatz_id, ef_id)
+                    .await?
+                    .map(|f| f.funkrufname)
+                    .unwrap_or_default();
+            etb_eintrag_ids.push(
+                crate::etb::repo::anlegen_tx(
+                    &mut tx,
+                    einsatz_id,
+                    von_benutzer_id,
+                    einstellungen.etb_startwert(),
+                    crate::etb::repo::EintragDaten {
+                        typ: crate::etb::TYP_SYSTEM,
+                        inhalt: &crate::fahrzeug::etb_text_getrennt(&funkrufname),
+                        von: None,
+                        an: None,
+                        meldeweg: None,
+                        veranlassung: None,
+                        ereigniszeit: None,
+                        erfasst_lokal_at: None,
+                        berichtigt_eintrag_id: None,
+                    },
+                )
+                .await?,
+            );
+        }
+        sqlx::query(
+            "UPDATE einsatz_fahrzeug SET lat = NULL, lon = NULL, position_quelle = NULL, \
+                 position_gemessen_at = NULL, position_gesetzt_at = NULL \
+             WHERE einsatz_id = ? AND position_quelle = 'ortung'",
+        )
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {

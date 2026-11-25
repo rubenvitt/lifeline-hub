@@ -254,6 +254,18 @@ pub struct EntlassungVorzustand {
     /// Beladung (`einsatz_material.id`).
     #[serde(default)]
     pub beladung: Vec<i64>,
+    /// Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie
+    /// nur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu.
+    #[serde(default)]
+    pub ortung: Option<OrtungVorzustand>,
+}
+
+/// Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct OrtungVorzustand {
+    pub zugang_id: String,
+    pub kennung: String,
+    pub ehrenamt_bestaetigt: bool,
 }
 
 /// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): mehr

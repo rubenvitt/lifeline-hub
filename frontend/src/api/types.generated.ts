@@ -3574,6 +3574,7 @@ export interface components {
             entlassen_at: string;
             /** @description Trug das Fahrzeug die Führungsstelle? */
             fuehrungsstelle?: boolean;
+            ortung?: components["schemas"]["OrtungVorzustand"] | null;
         };
         /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
@@ -6807,6 +6808,12 @@ export interface components {
         OrtVorschauAntwort: {
             ortsname?: string | null;
             peilung?: components["schemas"]["PeilungAntwort"] | null;
+        };
+        /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091). */
+        OrtungVorzustand: {
+            ehrenamt_bestaetigt: boolean;
+            kennung: string;
+            zugang_id: string;
         };
         /**
          * @description Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren

@@ -9002,6 +9002,17 @@
           "fuehrungsstelle": {
             "type": "boolean",
             "description": "Trug das Fahrzeug die Führungsstelle?"
+          },
+          "ortung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrtungVorzustand",
+                "description": "Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie\nnur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -16789,6 +16800,26 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "OrtungVorzustand": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).",
+        "required": [
+          "zugang_id",
+          "kennung",
+          "ehrenamt_bestaetigt"
+        ],
+        "properties": {
+          "ehrenamt_bestaetigt": {
+            "type": "boolean"
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "zugang_id": {
+            "type": "string"
           }
         }
       },

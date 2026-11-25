@@ -879,3 +879,317 @@ async fn abgelaufener_zugang_erscheint_nicht_in_den_kandidaten() {
         .iter()
         .all(|k| k["access_id"] != "zugang-abgelaufen"));
 }
+
+// ── Lebenszyklus: Entlassen, Stornieren, Abschluss, Rückgängig (LLH-2091, Task 6) ───────────
+
+impl Fix {
+    /// Disponiert ein weiteres Stamm-Fahrzeug in den Einsatz und liefert seine `ef_id`.
+    async fn weiteres_fahrzeug(&self, cookie: &str, funkrufname: &str) -> i64 {
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            "/api/vehicles",
+            cookie,
+            Some(&format!(r#"{{"funkrufname":"{funkrufname}"}}"#)),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED);
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{}/vehicles", self.einsatz),
+            cookie,
+            Some(&format!(r#"{{"fahrzeug_id":{}}}"#, v["id"])),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED);
+        v["id"].as_i64().unwrap()
+    }
+
+    fn fahrzeug_pfad(&self, ef: i64, aktion: &str) -> String {
+        format!("/api/einsaetze/{}/vehicles/{ef}/{aktion}", self.einsatz)
+    }
+
+    /// Entlassen mit Antwort; liefert den Vorzustand als JSON.
+    async fn entlassen(&self, cookie: &str) -> serde_json::Value {
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &self.fahrzeug_pfad(self.ef, "stand-down"),
+            cookie,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v}");
+        v["vorzustand"].clone()
+    }
+
+    async fn zuruecknehmen(
+        &self,
+        cookie: &str,
+        vorzustand: &serde_json::Value,
+    ) -> (StatusCode, serde_json::Value) {
+        anfrage(
+            &self.app,
+            "POST",
+            &self.fahrzeug_pfad(self.ef, "stand-down/undo"),
+            cookie,
+            Some(&vorzustand.to_string()),
+        )
+        .await
+    }
+
+    async fn hat_kopplung(&self, ef: i64) -> bool {
+        sqlx::query_scalar("SELECT COUNT(*) > 0 FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?")
+            .bind(ef)
+            .fetch_one(&self.pool)
+            .await
+            .unwrap()
+    }
+}
+
+#[tokio::test]
+async fn entlassen_trennt_die_ortung_mit_etb() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    let vorzustand = f.entlassen(&admin).await;
+    assert_eq!(vorzustand["ortung"]["zugang_id"], f.zugang.as_str());
+    assert_eq!(vorzustand["ortung"]["kennung"], KENNUNG);
+    assert_eq!(vorzustand["ortung"]["ehrenamt_bestaetigt"], true);
+    assert!(!f.hat_kopplung(f.ef).await);
+    assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 1"]);
+    // Die Position bleibt als letzter Stand stehen.
+    assert_eq!(f.stand().await.2.as_deref(), Some("ortung"));
+}
+
+#[tokio::test]
+async fn stornieren_trennt_die_ortung_mit_etb() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &f.fahrzeug_pfad(f.ef, "annul"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    assert!(!f.hat_kopplung(f.ef).await);
+    assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 1"]);
+}
+
+#[tokio::test]
+async fn abschluss_trennt_alle_kopplungen_und_loescht_gps_positionen_aber_keine_manuellen() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    // Zweites Fahrzeug mit manueller Position und eigener Kopplung.
+    let ef2 = f.weiteres_fahrzeug(&admin, "Florian 2").await;
+    sqlx::query(
+        "UPDATE einsatz_fahrzeug SET lat = 1.5, lon = 2.5, position_quelle = 'manuell', \
+         position_gemessen_at = ?1, position_gesetzt_at = ?1 WHERE id = ?2",
+    )
+    .bind(T)
+    .bind(ef2)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
+         ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) \
+         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', 0, gekoppelt_at, gekoppelt_von \
+         FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
+    )
+    .bind(ef2)
+    .bind(f.ef)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(f.kopplungen().await, 0);
+    assert_eq!(f.stand().await, (None, None, None, None, None));
+    let manuell: (Option<f64>, Option<String>) =
+        sqlx::query_as("SELECT lat, position_quelle FROM einsatz_fahrzeug WHERE id = ?")
+            .bind(ef2)
+            .fetch_one(&f.pool)
+            .await
+            .unwrap();
+    assert_eq!(manuell, (Some(1.5), Some("manuell".to_string())));
+    let mut etb = f.ortung_etb(&admin).await;
+    etb.sort();
+    assert_eq!(
+        etb,
+        ["Ortung getrennt: Florian 1", "Ortung getrennt: Florian 2"]
+    );
+}
+
+#[tokio::test]
+async fn abschluss_ohne_kopplung_schreibt_keinen_ortung_etb() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    f.kopplung_loeschen().await;
+    let (s, _) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(f.ortung_etb(&admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn rueckgaengig_nach_entlassen_stellt_die_kopplung_her() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let vorzustand = f.entlassen(&admin).await;
+    assert!(!f.hat_kopplung(f.ef).await);
+    let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ausgelassen"].as_array().unwrap().len(), 0, "{v}");
+    assert_eq!(v["fahrzeug"]["ortung_gekoppelt"], true);
+    let (s, k) = anfrage(&f.app, "GET", &f.pfad(), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(k["device_id"], KENNUNG);
+    assert_eq!(k["access_id"], f.zugang.as_str());
+    assert_eq!(k["volunteer_crew_confirmed"], true);
+    assert_eq!(
+        f.ortung_etb(&admin).await,
+        [
+            // Neuester Eintrag zuerst.
+            "Ortung gekoppelt: Florian 1 (Tracker / geraet-1), Besatzung ehrenamtlich bestätigt",
+            "Ortung getrennt: Florian 1",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn rueckgaengig_laesst_die_kopplung_aus_wenn_die_kennung_inzwischen_belegt_ist() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let vorzustand = f.entlassen(&admin).await;
+    // Dieselbe Kennung hängt jetzt an Fahrzeug B.
+    let ef_b = f.weiteres_fahrzeug(&admin, "Florian 2").await;
+    let pfad_b = format!("/api/incidents/{}/vehicles/{ef_b}/tracking", f.einsatz);
+    let (s, _) = anfrage(&f.app, "PUT", &pfad_b, &admin, Some(&koppel_body(&f, true))).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let ausgelassen = v["ausgelassen"].as_array().unwrap();
+    assert_eq!(ausgelassen.len(), 1, "{v}");
+    assert_eq!(ausgelassen[0]["bezeichnung"], "Ortung");
+    assert!(!f.hat_kopplung(f.ef).await);
+    assert!(f.hat_kopplung(ef_b).await);
+    assert_eq!(v["fahrzeug"]["ortung_gekoppelt"], false);
+    let etb = system_etb_inhalte(&f.app, &admin, f.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t.contains("Entlassung zurückgenommen, ohne Ortung (")),
+        "{etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn rueckgaengig_prueft_zugang_der_org() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    // Ein Zugang einer anderen Org, ein widerrufener, einer mit falschem Scope und ein
+    // erfundener werden nie gekoppelt.
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (99, 'Fremd')")
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    f.zugang_anlegen("zugang-fremd", 99, "positionen:write", false)
+        .await;
+    f.zugang_anlegen("zugang-widerrufen", f.org, "positionen:write", true)
+        .await;
+    f.zugang_anlegen("zugang-scope", f.org, "alarmmeldungen:write", false)
+        .await;
+    for zugang in [
+        "zugang-fremd",
+        "zugang-widerrufen",
+        "zugang-scope",
+        "gibt-es-nicht",
+    ] {
+        // Der Riegel (`entlassen_at`) ist nach jeder Rücknahme verbraucht: erneut entlassen und
+        // eine Ortung mit dem untergeschobenen Zugang mitschicken.
+        let mut vorzustand = f.entlassen(&admin).await;
+        vorzustand["ortung"] = serde_json::json!({
+            "zugang_id": zugang,
+            "kennung": KENNUNG,
+            "ehrenamt_bestaetigt": true,
+        });
+        let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
+        assert_eq!(s, StatusCode::OK, "{zugang}: {v}");
+        assert_eq!(
+            v["ausgelassen"][0]["bezeichnung"], "Ortung",
+            "{zugang}: {v}"
+        );
+        assert!(!f.hat_kopplung(f.ef).await, "{zugang}");
+    }
+}
+
+#[tokio::test]
+async fn rueckgaengig_ohne_bestaetigung_bei_ausgeschaltetem_schalter_laesst_die_kopplung_aus() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let mut vorzustand = f.entlassen(&admin).await;
+    vorzustand["ortung"]["ehrenamt_bestaetigt"] = false.into();
+    let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ausgelassen"][0]["bezeichnung"], "Ortung", "{v}");
+    assert!(!f.hat_kopplung(f.ef).await);
+}
+
+#[tokio::test]
+async fn rueckgaengig_ohne_ortung_im_vorzustand_koppelt_nichts() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    f.kopplung_loeschen().await;
+    let mut vorzustand = f.entlassen(&admin).await;
+    assert!(vorzustand["ortung"].is_null());
+    vorzustand.as_object_mut().unwrap().remove("ortung");
+    let (s, v) = f.zuruecknehmen(&admin, &vorzustand).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ausgelassen"].as_array().unwrap().len(), 0);
+    assert_eq!(f.kopplungen().await, 0);
+}
+
+#[tokio::test]
+async fn wiedereroeffnen_stellt_keine_kopplung_her() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, _) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/reopen", f.einsatz),
+        &admin,
+        Some(r#"{"grund":"Falscher Einsatz abgeschlossen"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(f.kopplungen().await, 0);
+}

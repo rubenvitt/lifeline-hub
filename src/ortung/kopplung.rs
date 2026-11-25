@@ -18,6 +18,12 @@ pub struct Kopplung {
     pub gekoppelt_at: String,
 }
 
+/// Darf gekoppelt werden? Bei ausgeschaltetem Org-Schalter „Ortung auch bei hauptamtlicher
+/// Besatzung“ nur mit bestätigter ehrenamtlicher Besatzung (PUT und Rückgängig nach Entlassen).
+pub fn is_ehrenamt_ok(ortung_hauptamt: bool, ehrenamt_bestaetigt: bool) -> bool {
+    ortung_hauptamt || ehrenamt_bestaetigt
+}
+
 /// Eine Kennung der letzten 24 Stunden. Bewusst ohne Koordinaten.
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub struct Kandidat {

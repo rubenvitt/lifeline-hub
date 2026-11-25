@@ -117,7 +117,10 @@ pub async fn couple(
     }
     let einstellungen =
         crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
-    if !einstellungen.is_ortung_hauptamt() && !body.volunteer_crew_confirmed {
+    if !kopplung::is_ehrenamt_ok(
+        einstellungen.is_ortung_hauptamt(),
+        body.volunteer_crew_confirmed,
+    ) {
         return Err(AppError::UnprocessableGrund {
             meldung: "Die ehrenamtliche Besatzung muss bestätigt werden".into(),
             grund: GRUND_EHRENAMT_ERFORDERLICH,
