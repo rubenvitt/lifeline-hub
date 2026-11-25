@@ -250,6 +250,14 @@ export function pegelKennzahl(
 }
 
 /**
+ * Form der kurzen Notiz, solange der Pegel lädt (LLH-2085, Ziffern als `0` wie bei
+ * `metaPlatzhalter`). Der Überblick hält damit ihre Stelle im Seitenkopf, sonst bräche der Kopf
+ * beim Eintreffen um. „· veraltet“ fehlt bewusst: die häufige Form reicht, gemessen in
+ * `e2e/pegel-pruefliste.spec.ts`.
+ */
+export const PEGEL_NOTIZ_PLATZHALTER = 'Pegel 0,00 m steigend';
+
+/**
  * Kurze Notiz für die Warnstufen-Kennzahl des Überblicks: „Pegel 6,84 m steigend". Ohne Pegel
  * `null`, bei Ausfall „Pegel: Stand unbekannt". „· veraltet" ist hier der einzige Kanal, weil
  * die Kennzahl der Warnstufe gehört. Rein.

@@ -52,6 +52,8 @@ const einsatz = {
   abgeschlossen_at: null,
   abgeschlossen_von: null,
   meine_rolle: 'einsatzleitung',
+  // Pflichtfeld der API; der Überblick liest es für den Pegel-Platzhalter (LLH-2085).
+  lagekennzahlen: [],
 };
 
 afterEach(() => vi.restoreAllMocks());
