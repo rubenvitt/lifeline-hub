@@ -53,7 +53,7 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
 - Produces: Feature-Properties `kategorie: "verkehrsmeldung"`, `art: "stau"|"zaehfliessend"|
   "stillstand"` (optional), `verzoegerung_min: number` (optional, > 0).
 
-- [ ] **Step 1: Failing tests** in `mod autobahn_tests`:
+- [x] **Step 1: Failing tests** in `mod autobahn_tests`:
   - `verkehrsmeldung_wird_punkt_mit_art_und_verzoegerung`: `dienst("warning", [{title, subtitle,
     coordinate, startTimestamp: "2026-11-24T22:08:00Z", delayTimeValue: "17",
     abnormalTrafficType: "QUEUING_TRAFFIC", source: "inrix", future: false}])` →
@@ -64,14 +64,14 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
     `null`; zweiter Eintrag `abnormalTrafficType: "ACCIDENT"`, `delayTimeValue: "x"` → ebenso.
   - `verkehrsmeldung_slow_und_stationary_traffic`: `SLOW_TRAFFIC` → `zaehfliessend`,
     `STATIONARY_TRAFFIC` → `stillstand`.
-- [ ] **Step 2:** `cargo test --lib autobahn_tests` → die neuen Tests scheitern.
-- [ ] **Step 3:** `autobahn_kategorie("warning") = Some("verkehrsmeldung")`, Label
+- [x] **Step 2:** `cargo test --lib autobahn_tests` → die neuen Tests scheitern.
+- [x] **Step 3:** `autobahn_kategorie("warning") = Some("verkehrsmeldung")`, Label
   „Verkehrsmeldung“; in `normalisiere_autobahn` für diese Kategorie `art` und
   `verzoegerung_min` ergänzen (andere Kategorien bekommen die Felder nicht). In `quellen.rs`
   `AUTOBAHN_DIENSTE: [&str; 4] = ["webcam", "roadworks", "closure", "warning"]`; Kommentare zu
   Abrufzahl (~450) anpassen.
-- [ ] **Step 4:** `cargo test --lib autobahn` → grün, auch `autobahn_output_passt_auf_den_geojson_anker`.
-- [ ] **Step 5: Commit** `feat: Verkehrsmeldungen in der Autobahn-Ebene (LLH-1637)`.
+- [x] **Step 4:** `cargo test --lib autobahn` → grün, auch `autobahn_output_passt_auf_den_geojson_anker`.
+- [x] **Step 5: Commit** `feat: Verkehrsmeldungen in der Autobahn-Ebene (LLH-1637)`.
 
 ### Task 2: Normalisierung und Annahme des Parken-Laufs (Backend, rein)
 
@@ -89,7 +89,7 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
 - Produces: `pub(crate) fn autobahn_parken_antwort(gesamt: usize, roh: &[(String, Value)]) ->
   Option<FachebeneAntwort>` mit `quelle = "autobahn_parken"`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `rastanlage_liest_name_abschnitt_stellplaetze_und_ausstattung`: Eintrag wie im Live-Befund
     (`title: "A1 | Puttgarden"`, `subtitle: "Krummhörens Kuhlen"`, `description: ["PKW
     Stellplätze: 18", "LKW Stellplätze: 4"]`, zwei `lorryParkingFeatureIcons`) →
@@ -102,12 +102,12 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
   - `rastanlage_ohne_koordinate_faellt_weg`.
   - `parken_antwort_braucht_neunzig_prozent`: `gesamt = 10`, 9 brauchbar → `Some`; 8 brauchbar →
     `None`; 0 → `None`; Einträge ohne `parking_lorry`-Array zählen nicht.
-- [ ] **Step 2:** `cargo test --lib parken` → scheitert.
-- [ ] **Step 3:** Implementieren. Stellplätze per Präfix `PKW Stellplätze:` / `LKW Stellplätze:`
+- [x] **Step 2:** `cargo test --lib parken` → scheitert.
+- [x] **Step 3:** Implementieren. Stellplätze per Präfix `PKW Stellplätze:` / `LKW Stellplätze:`
   (getrimmt, `u32` parsen); `abschnitt` = `title` nach dem ersten `|`, getrimmt; Koordinate über
   `autobahn_zahl`. Schwelle: `brauchbar * 10 >= gesamt * 9 && brauchbar > 0`.
-- [ ] **Step 4:** `cargo test --lib parken` → grün.
-- [ ] **Step 5: Commit** `feat: Normalisierung der Autobahn-Rastanlagen (LLH-1637)`.
+- [x] **Step 4:** `cargo test --lib parken` → grün.
+- [x] **Step 5: Commit** `feat: Normalisierung der Autobahn-Rastanlagen (LLH-1637)`.
 
 ### Task 3: Hintergrund-Lauf und Route `autobahn_parken` (Backend)
 
@@ -125,7 +125,7 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
 - Produces: `pub async fn fetch_autobahn_parken(s: &FachebenenState, pool: &SqlitePool) ->
   FachebeneAntwort`; `GET /api/map/overlays/autobahn_parken`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - In `quellen.rs`: `parken_und_autobahn_teilen_die_einzelspur` — hält ein Test die
     `AUTOBAHN_EINZELSPUR`, wartet `erneuere_autobahn_parken` (Timeout 100 ms läuft ab, ohne
     dass ein Abruf startet; Client gegen eine nicht erreichbare Adresse oder über die bestehende
@@ -134,16 +134,16 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
     "overlays/autobahn" tests src`): `GET /api/map/overlays/autobahn_parken` mit kaltem Cache →
     200, `status == "offline"`, `quelle == "autobahn_parken"`,
     `attribution == "Autobahn GmbH des Bundes"`.
-- [ ] **Step 2:** Tests laufen lassen → scheitern.
-- [ ] **Step 3:** Implementieren nach dem Muster von `fetch_autobahn` (Frisch/Alt/Leer,
+- [x] **Step 2:** Tests laufen lassen → scheitern.
+- [x] **Step 3:** Implementieren nach dem Muster von `fetch_autobahn` (Frisch/Alt/Leer,
   Abkühlung, `inflight`-Schlüssel `autobahn_parken`); `erneuere_autobahn_parken` nimmt
   zuerst `AUTOBAHN_EINZELSPUR`, holt dann die Streckenliste, fächert `parking_lorry` mit
   `AUTOBAHN_PARALLEL` unter `AUTOBAHN_BUDGET`, nimmt über `autobahn_parken_antwort` an und
   schreibt `cache::setze(…, "autobahn_parken", …)` (Schreibfehler = Fehlschlag, wie beim
   Autobahn-Lauf).
-- [ ] **Step 4:** `cargo test --lib karte` und den Routen-Test → grün; `cargo clippy` ohne neue
+- [x] **Step 4:** `cargo test --lib karte` und den Routen-Test → grün; `cargo clippy` ohne neue
   Warnungen in den berührten Dateien.
-- [ ] **Step 5: Commit** `feat: Fachebene Lkw-Parkplätze an Bundesautobahnen (LLH-1637)`.
+- [x] **Step 5: Commit** `feat: Fachebene Lkw-Parkplätze an Bundesautobahnen (LLH-1637)`.
 
 ### Task 4: Verkehrsmeldung im Frontend
 
@@ -156,17 +156,17 @@ den Dienst `warning`. Ein zweiter Hintergrund-Lauf nach demselben Muster holt `p
 Farben bleiben je Ebene (es gibt keine Farbe je Kategorie); die Meldung unterscheidet sich über
 Marke und Kopfzeile.
 
-- [ ] **Step 1: Failing test** `'Autobahn/Verkehrsmeldung: Art und Reisezeitverlust stehen
+- [x] **Step 1: Failing test** `'Autobahn/Verkehrsmeldung: Art und Reisezeitverlust stehen
   oben'`: Feature `{kategorie: 'verkehrsmeldung', art: 'stau', verzoegerung_min: 17, titel,
   richtung}` → sichtbar „Verkehrsmeldung“, „Stau“, „+17 min“; zweiter Fall ohne `art` und
   `verzoegerung_min` → weder „Stau“ noch „min“ im Text.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run
+- [x] **Step 2:** `mise exec -- pnpm -C frontend exec vitest run
   src/pages/lagekarte/FachebenenInspector.test.tsx` → scheitert.
-- [ ] **Step 3:** In `AutobahnInhalt` für `verkehrsmeldung` eine Zeile über den Descriptions:
+- [x] **Step 3:** In `AutobahnInhalt` für `verkehrsmeldung` eine Zeile über den Descriptions:
   Art-Wort (`stau` → „Stau“, `zaehfliessend` → „Zähfließend“, `stillstand` → „Stillstand“) und
   „+N min Reisezeitverlust“.
-- [ ] **Step 4:** Test → grün.
-- [ ] **Step 5: Commit** `feat: Verkehrsmeldung im Inspector der Autobahn-Ebene (LLH-1637)`.
+- [x] **Step 4:** Test → grün.
+- [x] **Step 5: Commit** `feat: Verkehrsmeldung im Inspector der Autobahn-Ebene (LLH-1637)`.
 
 ### Task 5: Neue Ebene `autobahn_parken` im Frontend
 
@@ -192,7 +192,7 @@ Marke und Kopfzeile.
   'punkt', pollMs: 30 * 60_000, bboxAbhaengig: false, aufwaermPollMs: 20_000, geltung: 'nur
   Rastanlagen an Bundesautobahnen, ohne Belegung', veraltetNachMin: 48 * 60 }`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `fachebenen.test.ts`: Reihenfolge enthält `'autobahn', 'autobahn_parken'` hintereinander;
     `fachebeneTakt('autobahn_parken', 'offline') === 20_000`, `'ok'` → `30 * 60_000`;
     `istBboxAbhaengig('autobahn_parken') === false`; Default-Sichtbarkeit `false`.
@@ -201,12 +201,12 @@ Marke und Kopfzeile.
     pkw_stellplaetze: 18, lkw_stellplaetze: 4, ausstattung: ['Toilette vorhanden']}` →
     sichtbar „Pkw 18 · Lkw 4“, „Toilette vorhanden“; ohne Stellplätze → „Pkw k. A. · Lkw k. A.“.
   - `statusFarben.test.ts`: bestehende Abstandsprüfung der Töne schließt den neuen Ton ein.
-- [ ] **Step 2:** Vitest für die genannten Dateien → scheitert.
-- [ ] **Step 3:** Implementieren; `tsc` (`mise exec -- pnpm -C frontend exec tsc --noEmit`)
+- [x] **Step 2:** Vitest für die genannten Dateien → scheitert.
+- [x] **Step 3:** Implementieren; `tsc` (`mise exec -- pnpm -C frontend exec tsc --noEmit`)
   zeigt jede exhaustive `Record<FachebeneQuelle, …>`, die noch fehlt.
-- [ ] **Step 4:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte
+- [x] **Step 4:** `mise exec -- pnpm -C frontend exec vitest run src/pages/lagekarte
   src/theme` und `tsc --noEmit` → grün.
-- [ ] **Step 5: Commit** `feat: Ebene Lkw-Parkplätze (BAB) in der Lagekarte (LLH-1637)`.
+- [x] **Step 5: Commit** `feat: Ebene Lkw-Parkplätze (BAB) in der Lagekarte (LLH-1637)`.
 
 ### Task 6: Doku und Messung
 
@@ -220,16 +220,16 @@ Marke und Kopfzeile.
 - Modify: `docs/architektur/03-kontextabgrenzung.md`, `05-bausteinsicht.md` soweit dort
   Autobahn-Dienste oder Ebenen aufgezählt sind (`docs/architektur/AGENTS.md`)
 
-- [ ] **Step 1:** Messung am Backend: ein Lauf je Ebene mit `cargo run` und Abruf der Route,
+- [x] **Step 1:** Messung am Backend: ein Lauf je Ebene mit `cargo run` und Abruf der Route,
   Anzahl Features, Antwortgröße, Laufzeit aus dem Log notieren.
-- [ ] **Step 2:** Texte schreiben; `grep -rn "dl-de/by-2-0" docs/fachebenen-quellen.md` zeigt bei
+- [x] **Step 2:** Texte schreiben; `grep -rn "dl-de/by-2-0" docs/fachebenen-quellen.md` zeigt bei
   Autobahn keinen Treffer mehr.
-- [ ] **Step 3:** Wächter der Doku laufen lassen (`./scripts/check-all.sh --geaendert
+- [x] **Step 3:** Wächter der Doku laufen lassen (`./scripts/check-all.sh --geaendert
   --ohne-e2e` deckt sie ab).
-- [ ] **Step 4: Commit** `docs: Autobahn-Ebenen und Lizenzbefund (LLH-1637)`.
+- [x] **Step 4: Commit** `docs: Autobahn-Ebenen und Lizenzbefund (LLH-1637)`.
 
 ### Task 7: Abschluss
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] Bilder der Änderung (Verkehrsmeldung, Rastanlage, Leiste mit neuer Ebene) per Wegwerf-Spec.
-- [ ] Review nach Ermessen (Anlass prüfen: Größe, Backend + Frontend mit neuer Schnittstelle).
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün (in Portionen wegen des Plattenkontingents; `lifeline-desktop` baut in der Cloud-Sitzung nicht, `gdk-3.0` fehlt — Diff berührt `src-tauri/` nicht).
+- [x] Bilder der Änderung (Verkehrsmeldung, Rastanlage, Leiste mit neuer Ebene) per Wegwerf-Spec.
+- [x] Review nach Ermessen (Anlass prüfen: Größe, Backend + Frontend mit neuer Schnittstelle).
