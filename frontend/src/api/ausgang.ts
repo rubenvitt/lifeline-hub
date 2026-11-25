@@ -1,0 +1,101 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiSend } from './client';
+import { einsatzKeys } from './queryKeys';
+import type { AusgangFehler, QuelleArt, SendenAnfrage, Versand } from './types';
+
+/**
+ * Ausgang per E-Mail (LLH-2093): Versand eines freigegebenen Lageberichts, Befehls oder einer
+ * Nachforderung. Die Routen hängen am Dokument, die Liste und das Wiederholen am Einsatz.
+ */
+
+const QUELLE_SEGMENT: Record<QuelleArt, string> = {
+  lagebericht: 'situation-reports',
+  befehl: 'orders',
+  nachforderung: 'resource-requests',
+};
+
+export interface Quelle {
+  kind: QuelleArt;
+  id: number;
+}
+
+/** Wortlaut je `AusgangFehler` (Code in `Versand.error` und im `grund` einer 422-Antwort). */
+export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
+  voruebergehend: 'Mailserver vorübergehend nicht erreichbar',
+  abgelehnt: 'Vom Mailserver abgelehnt',
+  ungewiss: 'Zustellung unklar',
+  ueberholt: 'Neuere Fassung freigegeben',
+  anbindung_fehlt: 'Kein Mailserver eingerichtet',
+  anbindung_angehalten: 'Mailanbindung angehalten',
+  anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
+  zu_gross: 'Anhänge zu groß für eine Mail',
+  spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+};
+
+/** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */
+export function ausgangFehlerText(code: string | null | undefined): string | null {
+  if (!code) return null;
+  return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
+}
+
+export function fetchVersaende(einsatzId: number, quelle: Quelle): Promise<Versand[]> {
+  return apiGet<Versand[]>(
+    `/api/einsaetze/${einsatzId}/deliveries?source_kind=${quelle.kind}&source_id=${quelle.id}`,
+  );
+}
+
+export function createVersaende(
+  einsatzId: number,
+  quelle: Quelle,
+  body: SendenAnfrage,
+): Promise<Versand[]> {
+  return apiSend<Versand[]>(
+    `/api/einsaetze/${einsatzId}/${QUELLE_SEGMENT[quelle.kind]}/${quelle.id}/deliveries`,
+    'POST',
+    body,
+  );
+}
+
+export function retryVersand(einsatzId: number, versandId: string): Promise<Versand> {
+  return apiSend<Versand>(`/api/einsaetze/${einsatzId}/deliveries/${versandId}/retry`, 'POST');
+}
+
+/**
+ * Schreiben nur mit Netz, ohne Warteschlange (`frontend/src/offline/AGENTS.md`, „Schreiben ohne
+ * Netz“): eine Mail wird nie vorgemerkt, die Maske sperrt den Knopf ohne Netz.
+ */
+const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
+
+/** Versände einer Quelle; live über das Ereignis `ausgang`. Nicht in `LAGEBILD_OFFLINE`. */
+export function useVersaende(einsatzId: number, quelle: Quelle) {
+  return useQuery({
+    queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+    queryFn: () => fetchVersaende(einsatzId, quelle),
+    // Ohne Leserecht am Quellmodul antwortet der Server 403; die Liste bleibt dann weg.
+    retry: false,
+  });
+}
+
+export function useSendeVersaende(einsatzId: number, quelle: Quelle) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (body: SendenAnfrage) => createVersaende(einsatzId, quelle, body),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+      }),
+  });
+}
+
+export function useWiederholeVersand(einsatzId: number, quelle: Quelle) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (versandId: string) => retryVersand(einsatzId, versandId),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
+      }),
+  });
+}

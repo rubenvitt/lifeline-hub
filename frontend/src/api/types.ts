@@ -327,6 +327,12 @@ export type ExterneStelleKanal = S['ExterneStelleKanal'];
 export type KanalArt = S['KanalArt'];
 /** Adresse samt Stelle, für die Auswahl im Senden-Dialog. */
 export type KanalMitStelle = S['KanalMitStelle'];
+/** Ein Versand des Ausgangskorbs, wie ihn die Versandliste zeigt (LLH-2093). */
+export type Versand = S['Versand'];
+export type VersandZustand = S['VersandZustand'];
+/** Fehlercode eines Versands und `grund` einer 422-Antwort beim Senden (LLH-2093). */
+export type AusgangFehler = S['AusgangFehler'];
+export type SendenAnfrage = S['CreateDeliveriesBody'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 /** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */
