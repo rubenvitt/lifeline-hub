@@ -213,7 +213,7 @@ async fn takt(
 }
 
 /// Ob der Einsatz inzwischen von einer anderen Instanz geführt wird (ADR-0018).
-async fn is_spiegel(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
+pub(crate) async fn is_spiegel(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError> {
     Ok(
         sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = ?)")
             .bind(einsatz_id)
@@ -225,7 +225,10 @@ async fn is_spiegel(pool: &SqlitePool, einsatz_id: i64) -> Result<bool, AppError
 /// Ob die Quelle noch gesendet werden darf (Spec Abschnitt 3, „Quelle im richtigen Zustand“):
 /// Lagebericht und Befehl als jüngste Freigabe ihrer Kette, die Nachforderung weder
 /// zurückgezogen noch abgelehnt. Eine verschwundene Quelle ist überholt.
-async fn is_quelle_aktuell(pool: &SqlitePool, zeile: &VersandZeile) -> Result<bool, AppError> {
+pub(crate) async fn is_quelle_aktuell(
+    pool: &SqlitePool,
+    zeile: &VersandZeile,
+) -> Result<bool, AppError> {
     use crate::vorlagendokument::repo::is_juengste_freigabe;
     let mut conn = pool.acquire().await?;
     let aktuell = match zeile.quelle_art {

@@ -2285,6 +2285,16 @@ export interface components {
             /** Format: int64 */
             ungelesen: number;
         };
+        /** @description Body von `POST …/deliveries` am Dokument bzw. an der Nachforderung. */
+        CreateDeliveriesBody: {
+            /**
+             * @description Idempotenzschlüssel der Anfrage (höchstens 64 Zeichen); je Empfänger wird
+             *     `{client_id}:{channel_id}` daraus. Dieselbe Anfrage erneut liefert dieselben Versände.
+             */
+            client_id: string;
+            /** @description Die Kanaladressen, an die gesendet wird (1 bis 20, jede höchstens einmal). */
+            recipients: components["schemas"]["RecipientBody"][];
+        };
         /**
          * @description Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
          *     design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
@@ -7792,6 +7802,11 @@ export interface components {
          * @enum {string}
          */
         Raeumungszustand: "angeordnet" | "laeuft" | "geraeumt" | "aufgehoben";
+        /** @description Ein Empfänger: die Kanaladresse bestimmt Stelle, Kanal und Adresse. */
+        RecipientBody: {
+            /** Format: int64 */
+            channel_id: number;
+        };
         /**
          * @description Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).
          *     Auf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort

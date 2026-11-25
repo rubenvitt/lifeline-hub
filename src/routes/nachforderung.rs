@@ -751,3 +751,21 @@ pub async fn bearbeiten(
     }
     Ok(Json(n))
 }
+
+/// POST /api/einsaetze/{id}/resource-requests/{nid}/deliveries — die Nachforderung per E-Mail
+/// senden (LLH-2093). Schreibrecht im Modul + aktiv.
+pub async fn create_deliveries(
+    State(state): State<AppState>,
+    ctx: EinsatzSchreibzugriff<Nachforderungen>,
+    PfadParam((_eid, nachforderung_id)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<crate::routes::ausgang::CreateDeliveriesBody>,
+) -> Result<(StatusCode, Json<Vec<crate::ausgang::Versand>>), AppError> {
+    crate::routes::ausgang::anlegen_nachforderung(
+        &state,
+        ctx.benutzer.id,
+        &ctx.einsatz,
+        nachforderung_id,
+        body,
+    )
+    .await
+}

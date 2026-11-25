@@ -1066,6 +1066,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::nachforderung::zusage),
         )
         .route(
+            "/api/einsaetze/{id}/resource-requests/{nid}/deliveries",
+            post(routes::nachforderung::create_deliveries),
+        )
+        .route(
+            "/api/einsaetze/{id}/deliveries",
+            get(routes::ausgang::list_deliveries),
+        )
+        .route(
+            "/api/einsaetze/{id}/deliveries/{did}/retry",
+            post(routes::ausgang::retry_delivery),
+        )
+        .route(
             "/api/einsaetze/{id}/resource-requests/{nid}/withdraw",
             post(routes::nachforderung::zurueckziehen),
         )
@@ -1805,6 +1817,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::lagebericht::freigeben),
         )
         .route(
+            "/api/einsaetze/{id}/situation-reports/{lid}/deliveries",
+            post(routes::lagebericht::create_deliveries),
+        )
+        .route(
             "/api/einsaetze/{id}/situation-reports/{lid}/revise",
             post(routes::lagebericht::fortschreiben),
         )
@@ -1840,6 +1856,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/einsaetze/{id}/orders/{bid}/release",
             post(routes::befehl::freigeben),
+        )
+        .route(
+            "/api/einsaetze/{id}/orders/{bid}/deliveries",
+            post(routes::befehl::create_deliveries),
         )
         .route(
             "/api/einsaetze/{id}/orders/{bid}/revise",

@@ -5734,6 +5734,27 @@
           }
         }
       },
+      "CreateDeliveriesBody": {
+        "type": "object",
+        "description": "Body von `POST …/deliveries` am Dokument bzw. an der Nachforderung.",
+        "required": [
+          "client_id",
+          "recipients"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Idempotenzschlüssel der Anfrage (höchstens 64 Zeichen); je Empfänger wird\n`{client_id}:{channel_id}` daraus. Dieselbe Anfrage erneut liefert dieselben Versände."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipientBody"
+            },
+            "description": "Die Kanaladressen, an die gesendet wird (1 bis 20, jede höchstens einmal)."
+          }
+        }
+      },
       "Datenkategorie": {
         "type": "string",
         "description": "Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,\ndesign.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry\n(`Zuordnung::Kategorie`). Wire == [`Datenkategorie::as_str`], gepinnt in\n`tests/enum_wire_kontrakt.rs`; zugleich der Schlüssel in `org_aufbewahrung_kategorie` und\n`einsatz_aufbewahrung_kategorie`.",
@@ -19348,6 +19369,19 @@
           "geraeumt",
           "aufgehoben"
         ]
+      },
+      "RecipientBody": {
+        "type": "object",
+        "description": "Ein Empfänger: die Kanaladresse bestimmt Stelle, Kanal und Adresse.",
+        "required": [
+          "channel_id"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "RegionDto": {
         "type": "object",

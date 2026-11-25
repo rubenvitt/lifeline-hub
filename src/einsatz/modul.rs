@@ -299,6 +299,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/devices", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/einsaetze/{id}/integrations", None),
+    // Versandliste und „Erneut senden“ des Ausgangskorbs (LLH-2093): modul-los am Pfad. Das Modul
+    // der Quelle (Lageberichte, Aufträge, Nachforderungen) prüft der Handler je Quellart.
+    ("/api/einsaetze/{id}/deliveries", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.
     ("/api/einsaetze/{id}/situation-picture-shares", None),
 ];

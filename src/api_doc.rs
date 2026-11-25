@@ -26,6 +26,8 @@ use utoipa::OpenApi;
         crate::ausgang::QuelleArt,
         crate::ausgang::Versand,
         crate::ausgang::VersandZustand,
+        crate::routes::ausgang::CreateDeliveriesBody,
+        crate::routes::ausgang::RecipientBody,
         crate::auftrag::AuftragAnzeige,
         crate::auftrag::AuftragBearbeitungsstatus,
         crate::auftrag::AuftragDetail,

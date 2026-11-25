@@ -79,6 +79,8 @@
 /api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file
 /api/einsaetze/{id}/damages/{sid}/close
 /api/einsaetze/{id}/damages/{sid}/hand-over
+/api/einsaetze/{id}/deliveries
+/api/einsaetze/{id}/deliveries/{did}/retry
 /api/einsaetze/{id}/devices
 /api/einsaetze/{id}/devices/{gid}/code
 /api/einsaetze/{id}/devices/{gid}/extend
@@ -144,6 +146,7 @@
 /api/einsaetze/{id}/notifications/read
 /api/einsaetze/{id}/orders
 /api/einsaetze/{id}/orders/{bid}
+/api/einsaetze/{id}/orders/{bid}/deliveries
 /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/acknowledge
 /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/undo
 /api/einsaetze/{id}/orders/{bid}/enclosures
@@ -244,6 +247,7 @@
 /api/einsaetze/{id}/resource-requests/{nid}
 /api/einsaetze/{id}/resource-requests/{nid}/commitment
 /api/einsaetze/{id}/resource-requests/{nid}/decline
+/api/einsaetze/{id}/resource-requests/{nid}/deliveries
 /api/einsaetze/{id}/resource-requests/{nid}/status
 /api/einsaetze/{id}/resource-requests/{nid}/withdraw
 /api/einsaetze/{id}/retention-categories
@@ -260,6 +264,7 @@
 /api/einsaetze/{id}/situation-picture-shares/{fid}/revoke
 /api/einsaetze/{id}/situation-reports
 /api/einsaetze/{id}/situation-reports/{lid}
+/api/einsaetze/{id}/situation-reports/{lid}/deliveries
 /api/einsaetze/{id}/situation-reports/{lid}/enclosures
 /api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}
 /api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}/file
