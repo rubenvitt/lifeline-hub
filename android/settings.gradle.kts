@@ -26,3 +26,4 @@ rootProject.name = "lifeline-android"
 includeBuild("kern")
 includeBuild("helferkern")
 include(":app")
+include(":helfer")

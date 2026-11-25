@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Fenster vor dem ersten Bild: Tag- und Nachtgrund des Systems, ohne Leiste. Randlos und die
+      Farben des Design Systems setzt die Activity (enableEdgeToEdge, ui/Thema.kt).
+    -->
+    <style name="Theme.LifelineHelfer" parent="android:Theme.DeviceDefault.DayNight">
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

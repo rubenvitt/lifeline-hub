@@ -283,6 +283,19 @@ describe('Bildmarke — Android-App (LLH-1989)', () => {
       .digest('hex');
     expect(stempel).toEqual([summe, 'symbol.svg']);
   });
+
+  it('die Helfer-App trägt dasselbe Symbol (erzeuge-symbol.sh schreibt beide)', () => {
+    const helferRes = join(repo, 'android', 'helfer', 'src', 'main', 'res');
+    for (const datei of [
+      join('mipmap-xxxhdpi', 'ic_launcher_vordergrund.png'),
+      join('mipmap-anydpi-v26', 'ic_launcher.xml'),
+    ]) {
+      expect(
+        readFileSync(join(helferRes, datei)).equals(readFileSync(join(androidRes, datei))),
+        datei,
+      ).toBe(true);
+    }
+  });
 });
 
 describe('Bildmarke — Manifest (LFH-837)', () => {

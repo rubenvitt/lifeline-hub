@@ -538,11 +538,11 @@ public enum Ereignis { case gescannt(HelferZiel), eingeloest, bestaetigt, antwor
   - lädt die APK als Workflow-Artefakt hoch. Ein Release-Kanal folgt später: Der Updater-Kanal
     der Helfer-App ist hier nicht Teil.
 
-- [ ] **Step 1:** Failing Robolectric-Tests.
-- [ ] **Step 2:** Run `android/gradlew -p android :helfer:testDebugUnitTest` (braucht das SDK; ohne SDK in der CI über `android-pruefung.yml`, erweitert um `:helfer`) → FAIL.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run → PASS. ADR-Prüfung `foregroundServiceType` scharf schalten.
-- [ ] **Step 5:** Commit `feat: Android-App Lifeline Helfer`.
+- [x] **Step 1:** Failing Robolectric-Tests.
+- [x] **Step 2:** (CI am PR) Run `android/gradlew -p android :helfer:testDebugUnitTest` (braucht das SDK; ohne SDK in der CI über `android-pruefung.yml`, erweitert um `:helfer`) → FAIL.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** (CI am PR) Run → PASS. ADR-Prüfung `foregroundServiceType` scharf schalten.
+- [x] **Step 5:** Commit `feat: Android-App Lifeline Helfer`.
 
 ### Task 14: Doku
 

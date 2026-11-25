@@ -15,7 +15,8 @@
 set -euo pipefail
 
 # Version der Helfer-App; steigt von Hand mit einer Änderung, die eine neue Version in TestFlight
-# braucht.
+# braucht. Auch die Android-Helfer-App liest sie von hier (`versionName` in
+# android/helfer/build.gradle.kts); die Zeile bleibt `HELFER_VERSION="…"`.
 HELFER_VERSION="0.1.0"
 
 WURZEL="$(cd "$(dirname "$0")/../.." && pwd)"

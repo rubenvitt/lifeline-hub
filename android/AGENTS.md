@@ -3,7 +3,9 @@
 Gilt für `android/`, `scripts/android/` und `.github/workflows/android*.yml`, zusätzlich zur
 `AGENTS.md` der Wurzel. Entscheidung: ADR-0084; Herleitung:
 `docs/superpowers/specs/2026-11-22-y1dsr5i9-android-huelle-design.md` (D1–D11). Vorbild in allem
-ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`.
+ist die iOS-Hülle (`ios/AGENTS.md`). Betrieb: `docs/betrieb/android-app.md`. Die Helfer-App
+(`android/helfer`, `android/helferkern`) ist eine eigene native App; was für sie anders gilt, steht in
+`android/helfer/AGENTS.md`.
 
 - **Keine Anwendungslogik in der Hülle:** der WebView lädt die Oberfläche des Servers. Native
   Seiten (Compose) nur für Onboarding, Serverliste, Einstellungen der Hülle, Status und „Lifeline
