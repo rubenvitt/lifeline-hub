@@ -180,7 +180,7 @@ wire_enum! {
         /// Diese Erlaubnis zurückgenommen.
         FremdebenenLanEntzogen => "fremdebenen_lan_entzogen",
         /// Org-Schalter „Ortung im Einsatz“ (Helfer-App) eingeschaltet (LLH-2120, Migration
-        /// 0382); Ziel `ortung`. Das Einschalten bestätigt Einwilligung bzw.
+        /// 0385); Ziel `ortung`. Das Einschalten bestätigt Einwilligung bzw.
         /// Betriebsvereinbarung.
         OrtungEingeschaltet => "ortung_eingeschaltet",
         /// „Ortung im Einsatz“ ausgeschaltet.
