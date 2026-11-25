@@ -1,8 +1,8 @@
 //! Stammdaten-Eingang (LLH-1633): Fahrzeuge, Personal und Qualifikationen aus einer neutralen
-//! Datei (Vertrag „Stammdaten-Datei“). Dieses Modul liest die Datei zu einem [`StammdatenPaket`];
-//! Abgleich und Übernehmen folgen in eigenen Untermodulen.
+//! Datei (Vertrag „Stammdaten-Datei“). [`datei`] liest die Datei zu einem [`StammdatenPaket`],
+//! [`abgleich`] gleicht rein ab, [`repo`] rechnet Vorschau und Übernehmen gegen die Datenbank.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::abloesung::schichtplan::uebernahme::MeldungStufe;
@@ -10,10 +10,13 @@ use crate::wire_enum::wire_enum;
 
 pub mod abgleich;
 pub mod datei;
+pub mod repo;
 
 wire_enum! {
     /// Art eines Stammdatensatzes. Wire == `as_str()`.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, ToSchema)]
+    #[derive(
+        Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
+    )]
     pub enum StammdatenArt {
         Fahrzeug => "fahrzeug",
         Personal => "personal",

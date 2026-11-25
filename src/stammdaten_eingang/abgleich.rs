@@ -51,6 +51,9 @@ pub struct Bestand {
     pub fahrzeuge: Vec<BestandFahrzeug>,
     pub personal: Vec<BestandPersonal>,
     pub qualifikationen: Vec<BestandQualifikation>,
+    /// Jede `(Art, herkunft, kennung)` der Org in `stammdaten_kennung`, auch eine, deren Ziel
+    /// nicht zur Org gehört: sie trifft nie, belegt aber den Unique-Schlüssel.
+    pub belegte_kennungen: Vec<(StammdatenArt, String, String)>,
 }
 
 wire_enum! {
