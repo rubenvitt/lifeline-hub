@@ -226,12 +226,30 @@ fn lies_art(
 pub fn lies_paket(
     bytes: &[u8],
 ) -> Result<(StammdatenPaket, Vec<DateiMeldung>, Vec<String>), AppError> {
-    let blaetter = lies_blaetter(bytes, ZEILEN_MAX)?;
+    // Nur die Blätter des Vertrags werden gelesen, je Art das erste; ein anderes wird nur
+    // genannt und nie geparst, auch nicht an den Grenzen gemessen.
+    let mut gewaehlt: Vec<StammdatenArt> = Vec::new();
+    let blaetter = lies_blaetter(bytes, ZEILEN_MAX, |name| match art_vom_blatt(name) {
+        Some(art) if !gewaehlt.contains(&art) => {
+            gewaehlt.push(art);
+            true
+        }
+        _ => false,
+    })?;
     let mut paket = StammdatenPaket::default();
     let mut meldungen = Vec::new();
     let mut nicht = Vec::new();
     let mut gelesen: Vec<StammdatenArt> = Vec::new();
     for (name, tabelle) in blaetter {
+        let Some(tabelle) = tabelle else {
+            meldungen.push(DateiMeldung {
+                art: None,
+                zeile: None,
+                stufe: MeldungStufe::Hinweis,
+                text: format!("Blatt nicht gelesen: „{name}“"),
+            });
+            continue;
+        };
         if name.is_empty() {
             // CSV: eine Art je Datei, erkannt am Kopf.
             let art = art_von_kopf(&tabelle.kopf)?;
@@ -239,25 +257,13 @@ pub fn lies_paket(
             gelesen.push(art);
             continue;
         }
-        match art_vom_blatt(&name) {
-            Some(art) if !gelesen.contains(&art) => {
-                lies_art(art, tabelle, &mut paket, &mut meldungen, &mut nicht).map_err(
-                    |e| match e {
-                        AppError::Validation(t) => {
-                            AppError::Validation(format!("Blatt „{name}“: {t}"))
-                        }
-                        e => e,
-                    },
-                )?;
-                gelesen.push(art);
-            }
-            _ => meldungen.push(DateiMeldung {
-                art: None,
-                zeile: None,
-                stufe: MeldungStufe::Hinweis,
-                text: format!("Blatt nicht gelesen: „{name}“"),
-            }),
-        }
+        let art = art_vom_blatt(&name)
+            .ok_or_else(|| AppError::Internal(format!("Blatt „{name}“ ohne Art gelesen")))?;
+        lies_art(art, tabelle, &mut paket, &mut meldungen, &mut nicht).map_err(|e| match e {
+            AppError::Validation(t) => AppError::Validation(format!("Blatt „{name}“: {t}")),
+            e => e,
+        })?;
+        gelesen.push(art);
     }
     if gelesen.is_empty() {
         return Err(AppError::Validation(
@@ -341,6 +347,74 @@ mod tests {
         assert!(meldungen[0].text.contains("Blatt nicht gelesen"));
         assert!(meldungen[0].text.contains("Sonstiges"));
         assert_eq!(meldungen[0].stufe, MeldungStufe::Hinweis);
+    }
+
+    #[test]
+    fn nicht_gelesenes_blatt_wird_nicht_geparst() {
+        // Ein fremdes Blatt jenseits jeder Grenze (Spalten, Zeilen) darf die Datei nicht sperren:
+        // es wird nur genannt, nie gelesen.
+        let mut wb = Workbook::new();
+        let ws = wb.add_worksheet();
+        ws.set_name("Fahrzeuge").unwrap();
+        ws.write_string(0, 0, "Funkrufname").unwrap();
+        ws.write_string(1, 0, "RK 1").unwrap();
+        let ws = wb.add_worksheet();
+        ws.set_name("Notizen").unwrap();
+        ws.write_string(0, 150, "weit rechts").unwrap();
+        for r in 0..=(ZEILEN_MAX as u32 + 1) {
+            ws.write_number(r, 0, 1.0).unwrap();
+        }
+        let bytes = wb.save_to_buffer().unwrap();
+        let (paket, meldungen, _) = lies_paket(&bytes).unwrap();
+        assert_eq!(paket.fahrzeuge.len(), 1);
+        assert_eq!(meldungen.len(), 1);
+        assert!(meldungen[0].text.contains("Notizen"));
+    }
+
+    #[test]
+    fn zweites_blatt_derselben_art_wird_nicht_geparst() {
+        let mut wb = Workbook::new();
+        for name in ["Fahrzeuge", "fahrzeuge "] {
+            let ws = wb.add_worksheet();
+            ws.set_name(name).unwrap();
+            ws.write_string(0, 0, "Funkrufname").unwrap();
+            ws.write_string(1, 0, "RK 1").unwrap();
+        }
+        // Das zweite trägt eine Zelle jenseits der Spaltengrenze.
+        wb.worksheet_from_index(1)
+            .unwrap()
+            .write_string(0, 150, "x")
+            .unwrap();
+        let bytes = wb.save_to_buffer().unwrap();
+        let (paket, meldungen, _) = lies_paket(&bytes).unwrap();
+        assert_eq!(paket.fahrzeuge.len(), 1);
+        assert!(meldungen[0].text.contains("Blatt nicht gelesen"));
+    }
+
+    #[test]
+    fn textgrenze_gilt_fuer_die_ganze_mappe() {
+        // Je Blatt knapp über der Hälfte der Grenze: einzeln erlaubt, zusammen zu groß.
+        let lang = "x".repeat(32_000);
+        let blatt = |wb: &mut Workbook, name: &str, kopf: &str| {
+            let ws = wb.add_worksheet();
+            ws.set_name(name).unwrap();
+            ws.write_string(0, 0, kopf).unwrap();
+            for r in 1..=1_100u32 {
+                ws.write_string(r, 0, &lang).unwrap();
+            }
+        };
+        let mut eins = Workbook::new();
+        blatt(&mut eins, "Fahrzeuge", "Funkrufname");
+        assert!(lies_paket(&eins.save_to_buffer().unwrap()).is_ok());
+        let mut zwei = Workbook::new();
+        blatt(&mut zwei, "Fahrzeuge", "Funkrufname");
+        blatt(&mut zwei, "Personal", "Name");
+        let bytes = zwei.save_to_buffer().unwrap();
+        assert!(bytes.len() < crate::einlesen::tabelle::DATEI_MAX_BYTES);
+        match lies_paket(&bytes) {
+            Err(AppError::Validation(t)) => assert!(t.contains("entpackt zu groß"), "{t}"),
+            r => panic!("{:?}", r.map(|(p, _, _)| p.fahrzeuge.len())),
+        }
     }
 
     #[test]

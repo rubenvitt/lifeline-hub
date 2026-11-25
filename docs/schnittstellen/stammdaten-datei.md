@@ -18,11 +18,14 @@ Schnittstelle: `POST /api/master-data/import/preview` und `POST /api/master-data
 - **CSV**: eine Art je Datei. Trennzeichen `;`, `,` oder Tab (erkannt aus der Kopfzeile), UTF-8
   (sonst Windows-1252 mit Hinweis).
 - **XLSX**: ein Blatt je Art, Blattnamen `Fahrzeuge`, `Personal`, `Qualifikationen` (Groß-/Kleinschreibung
-  egal). Fehlende Blätter sind erlaubt, andere Blätter werden mit einem Hinweis übergangen.
+  egal). Fehlende Blätter sind erlaubt. Andere Blätter, und ein zweites Blatt derselben Art, werden
+  mit einem Hinweis übergangen und gar nicht gelesen: für sie gilt keine Grenze, und ihr Inhalt
+  kann die Datei nicht sperren.
 - **Kopfzeile Pflicht.** Spaltenköpfe gelten ohne Rücksicht auf Groß-/Kleinschreibung; Leerzeichen,
   `_` und `-` entfallen (`Funk-Rufname` = `funkrufname`). Umlaute werden nicht umgeschrieben: die
   Köpfe sind ASCII, also `traegerorganisation`, nicht `trägerorganisation`.
-- **Grenzen:** 2 MiB je Datei, 5.000 Zeilen je Art, entpackte XLSX höchstens 64 MiB.
+- **Grenzen:** 2 MiB je Datei, 5.000 Zeilen je Art, entpackte XLSX höchstens 64 MiB; der Text der
+  gelesenen Blätter zusammen ebenfalls höchstens 64 MiB.
 - Werte werden getrimmt. Eine leere Zelle heißt „keine Angabe“, nie „leeren“.
 - **Nur diese Spalten.** Jede andere Spalte wird nicht gelesen; die Vorschau zählt ihren Kopf als
   „nicht übernommen“ auf (nie die Werte). Personenbezogene Felder, die Lifeline nicht nutzt, gehören
