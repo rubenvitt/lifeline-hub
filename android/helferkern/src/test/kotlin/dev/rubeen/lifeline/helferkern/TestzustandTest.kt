@@ -26,7 +26,7 @@ class TestzustandTest {
             listOf(
                 "start", "anmelden", "wartet", "angemeldet", "pausiert", "ruht", "beendet",
                 "auftraege", "mitteilungen-aus", "auftrag-offen", "auftrag-uebernommen", "auftrag-aufgehoben",
-                "quittung-fehlgeschlagen",
+                "quittung-fehler",
             ),
             Testzustand.entries.map { it.wert },
         )

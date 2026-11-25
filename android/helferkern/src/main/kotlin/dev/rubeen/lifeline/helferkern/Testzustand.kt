@@ -34,7 +34,7 @@ enum class Testzustand(val wert: String) {
     AUFTRAG_AUFGEHOBEN("auftrag-aufgehoben"),
 
     /** Detail nach einer gescheiterten Quittung („Bitte über Funk bestätigen“). */
-    QUITTUNG_FEHLGESCHLAGEN("quittung-fehlgeschlagen");
+    QUITTUNG_FEHLER("quittung-fehler");
 
     companion object {
         const val EXTRA = "lifeline.helfer.testzustand"

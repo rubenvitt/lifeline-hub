@@ -120,11 +120,11 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     var offenerAuftrag: Long? by mutableStateOf(null)
         private set
 
-    /** Aufträge, deren Quittung nicht ankam („Bitte über Funk bestätigen“). */
+    /** Empfängerzeilen, deren Quittung nicht ankam („Bitte über Funk bestätigen“). */
     var quittungFehlgeschlagen: Set<Long> by mutableStateOf(emptySet())
         private set
 
-    /** Der Auftrag, dessen Quittung gerade läuft. */
+    /** Die Empfängerzeile, deren Quittung gerade läuft. */
     var quittiertGerade: Long? by mutableStateOf(null)
         private set
     var ortungVerweigert by mutableStateOf(false)
@@ -688,19 +688,20 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         if (id != null) dienste?.entferneMitteilung(id)
     }
 
-    /** Die eigene Zeile, die „Übernommen“ quittiert: die erste offene, sonst die erste. */
+    /** Die Zeile, deren Stand die Liste zeigt: die erste offene, sonst die erste. */
     fun eigeneZeile(a: HelperTask): HelperTaskRecipient? =
         a.recipients.firstOrNull { !it.isQuittiert } ?: a.recipients.firstOrNull()
 
     /**
-     * „Übernommen“: quittiert die eigene Zeile über denselben Weg wie die Einheitenansicht
-     * (ADR-0105). Scheitert es (ohne Netz, Serverfehler), zeigt das Detail „Bitte über Funk
-     * bestätigen“; ein aufgehobener oder fremder Auftrag (422, 404) lädt die Liste neu.
+     * „Übernommen“ an einer eigenen Zeile ([zeile]; je offene Zeile ein Knopf wie in der iOS-App):
+     * quittiert sie über denselben Weg wie die Einheitenansicht (ADR-0105). Scheitert es (ohne
+     * Netz, Serverfehler), zeigt die Zeile „Bitte über Funk bestätigen“; ein aufgehobener oder
+     * fremder Auftrag (422, 404) lädt die Liste neu.
      */
-    fun uebernehmen(a: HelperTask) {
-        val zeile = eigeneZeile(a)?.takeIf { !it.isQuittiert } ?: return
+    fun uebernehmen(a: HelperTask, zeile: HelperTaskRecipient) {
+        if (zeile.isQuittiert || a.recipients.none { it.id == zeile.id }) return
         if (a.isAufgehoben || quittiertGerade != null) return
-        quittungFehlgeschlagen = quittungFehlgeschlagen - a.id
+        quittungFehlgeschlagen = quittungFehlgeschlagen - zeile.id
         val v = verbindung
         if (v == null) {
             if (dienste == null) {
@@ -714,7 +715,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
             }
             return
         }
-        quittiertGerade = a.id
+        quittiertGerade = zeile.id
         viewModelScope.launch {
             try {
                 val rueckmeldung = io { v.quittiere(a.id, zeile.id) }
@@ -723,7 +724,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                     neu != null -> io { dienste?.ersetzeAuftrag(neu) }
                     rueckmeldung.status == 404 || rueckmeldung.status == 422 -> ladeAuftraege()
                     rueckmeldung.status == 401 -> reagiere(rueckmeldung)
-                    else -> quittungFehlgeschlagen = quittungFehlgeschlagen + a.id
+                    else -> quittungFehlgeschlagen = quittungFehlgeschlagen + zeile.id
                 }
             } finally {
                 quittiertGerade = null
@@ -781,9 +782,9 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
             Testzustand.AUFTRAG_OFFEN -> zeigeBeispiel(Beispiel.OFFEN)
             Testzustand.AUFTRAG_UEBERNOMMEN -> zeigeBeispiel(Beispiel.UEBERNOMMEN)
             Testzustand.AUFTRAG_AUFGEHOBEN -> zeigeBeispiel(Beispiel.AUFGEHOBEN)
-            Testzustand.QUITTUNG_FEHLGESCHLAGEN -> {
+            Testzustand.QUITTUNG_FEHLER -> {
                 zeigeBeispiel(Beispiel.OFFEN)
-                quittungFehlgeschlagen = setOf(Beispiel.OFFEN)
+                quittungFehlgeschlagen = setOf(Beispiel.OFFEN_EINHEIT)
             }
             else -> Unit
         }
@@ -824,6 +825,10 @@ object Beispiel {
     )
 
     const val OFFEN = 12L
+
+    /** Zeilen des offenen Auftrags: an die Einheit und an dich (wie in der iOS-App). */
+    const val OFFEN_EINHEIT = 120L
+    const val OFFEN_PERSON = 121L
     const val UEBERNOMMEN = 11L
     const val AUFGEHOBEN = 9L
 
@@ -845,7 +850,10 @@ object Beispiel {
                 priority = "dringend",
                 deadlineAt = jetzt(-15),
                 issuedAt = jetzt(2),
-                recipients = listOf(HelperTaskRecipient(120, "unit", "San-Trupp 2")),
+                recipients = listOf(
+                    HelperTaskRecipient(OFFEN_EINHEIT, "unit", "San-Trupp 2"),
+                    HelperTaskRecipient(OFFEN_PERSON, "person", "Max Mustermann"),
+                ),
             ),
             HelperTask(
                 id = UEBERNOMMEN,

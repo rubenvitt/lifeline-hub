@@ -26,6 +26,7 @@ import dev.rubeen.lifeline.helfer.ui.farbe
 import dev.rubeen.lifeline.helferkern.Auftraege
 import dev.rubeen.lifeline.helferkern.Dienstanzeige
 import dev.rubeen.lifeline.helferkern.HelperTask
+import dev.rubeen.lifeline.helferkern.HelperTaskRecipient
 import dev.rubeen.lifeline.helferkern.Quittungsstand
 import java.time.ZoneId
 
@@ -95,15 +96,15 @@ private fun Auftragszeile(modell: HelferModell, a: HelperTask) {
 }
 
 /**
- * Detail eines Auftrags: Text groß, Ort, Priorität, Frist, erteilt um, an wen; großer Knopf
- * „Übernommen“, danach die Quittung; aufgehoben durchgestrichen ohne Knopf.
+ * Detail eines Auftrags: Text groß, Ort, Priorität, Frist, erteilt um; je eigener Empfängerzeile
+ * (Einheit, Fahrzeug, Person) an wen und der große Knopf „Übernommen“ bzw. danach die Quittung, wie
+ * in der iOS-App; aufgehoben durchgestrichen ohne Knopf.
  */
 @Composable
 fun AuftragSeite(modell: HelferModell, a: HelperTask) {
     BackHandler { modell.zeigeAuftrag(null) }
     val zone = ZoneId.systemDefault()
-    val stand = Auftraege.stand(a, modell.eigeneZeile(a))
-    val aufgehoben = stand == Quittungsstand.Aufgehoben
+    val aufgehoben = a.isAufgehoben
     Seite {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Augenbraue(a.number?.let { "Auftrag $it" } ?: "Auftrag", modifier = Modifier.weight(1f))
@@ -126,22 +127,32 @@ fun AuftragSeite(modell: HelferModell, a: HelperTask) {
                 Wertzeile("Frist", Auftraege.uhrzeit(frist, zone) ?: frist, R.drawable.symbol_sanduhr, wertStil = Stil.wert)
             }
             Wertzeile("Erteilt um", Auftraege.uhrzeit(a.issuedAt, zone) ?: a.issuedAt, R.drawable.symbol_uhr, wertStil = Stil.wert)
-            Wertzeile("An", a.recipients.joinToString(", ") { Auftraege.empfaengertext(it) }, R.drawable.symbol_einheit)
         }
+        a.recipients.forEach { zeile -> Quittungszeile(modell, a, zeile, zone) }
+        Nebenknopf("Zurück zu den Aufträgen", onClick = { modell.zeigeAuftrag(null) }, modifier = Modifier.testTag("zurueck"))
+    }
+}
+
+/** Eine eigene Empfängerzeile: an wen, dann Knopf „Übernommen“ oder der Stand. */
+@Composable
+private fun Quittungszeile(modell: HelferModell, a: HelperTask, zeile: HelperTaskRecipient, zone: ZoneId) {
+    val stand = Auftraege.stand(a, zeile)
+    Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {
+        Karte { Wertzeile("An", Auftraege.empfaengertext(zeile), R.drawable.symbol_einheit) }
         when (stand) {
-            Quittungsstand.Offen -> Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {
+            Quittungsstand.Offen -> {
                 Hauptknopf(
                     Auftraege.UEBERNEHMEN,
-                    onClick = { modell.uebernehmen(a) },
-                    modifier = Modifier.testTag("uebernehmen"),
+                    onClick = { modell.uebernehmen(a, zeile) },
+                    modifier = Modifier.testTag("uebernehmen-${zeile.id}"),
                     rolle = Knopfrolle.NORMAL,
                     symbol = R.drawable.symbol_auftrag,
-                    beschaeftigt = modell.quittiertGerade == a.id,
+                    beschaeftigt = modell.quittiertGerade == zeile.id,
                 )
-                if (a.id in modell.quittungFehlgeschlagen) {
+                if (zeile.id in modell.quittungFehlgeschlagen) {
                     Hinweis(
                         Auftraege.QUITTUNG_FEHLGESCHLAGEN,
-                        modifier = Modifier.testTag("quittung-fehlgeschlagen"),
+                        modifier = Modifier.testTag("quittung-fehler"),
                         farbe = farbe.alarmText,
                         flaeche = farbe.alarmFlaeche,
                     )
@@ -157,7 +168,6 @@ fun AuftragSeite(modell: HelferModell, a: HelperTask) {
             )
             Quittungsstand.Aufgehoben -> Unit
         }
-        Nebenknopf("Zurück zu den Aufträgen", onClick = { modell.zeigeAuftrag(null) }, modifier = Modifier.testTag("zurueck"))
     }
 }
 
