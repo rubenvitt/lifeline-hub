@@ -7,15 +7,80 @@ use crate::ortung::{Ortungsziel, Positionsquelle};
 use crate::public_api::scope::Scope;
 use sqlx::{SqliteConnection, SqlitePool};
 
+/// Der Zugang, an dem eine Kopplung hängt: ein lokaler Einwurf-Zugang oder ein Zugang des Hubs
+/// (LLH-2119), also eines Einwurf-Zugangs einer gekoppelten Instanz.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KopplungZugang {
+    Lokal {
+        zugang_id: String,
+    },
+    Hub {
+        instanz_kopplung_id: i64,
+        zugang_id: String,
+    },
+}
+
 /// Eine Kopplung mit dem Namen ihres Zugangs.
-#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Kopplung {
     pub einsatz_fahrzeug_id: i64,
     pub einsatz_id: i64,
-    pub zugang_id: String,
+    pub zugang: KopplungZugang,
     pub zugang_name: String,
     pub kennung: String,
     pub gekoppelt_at: String,
+}
+
+impl Kopplung {
+    /// Der Schlüssel des Zugangs, beider Arten (lokal: `einwurf_zugang.id`, Hub: die ID des
+    /// Zugangs auf dem Hub).
+    pub fn access_id(&self) -> &str {
+        match &self.zugang {
+            KopplungZugang::Lokal { zugang_id } | KopplungZugang::Hub { zugang_id, .. } => {
+                zugang_id
+            }
+        }
+    }
+}
+
+/// Die Zeile, wie die Datenbank sie liefert; [`Kopplung`] macht daraus die Art des Zugangs.
+#[derive(sqlx::FromRow)]
+struct KopplungZeile {
+    einsatz_fahrzeug_id: i64,
+    einsatz_id: i64,
+    zugang_id: Option<String>,
+    instanz_kopplung_id: Option<i64>,
+    fremder_zugang_id: Option<String>,
+    zugang_name: Option<String>,
+    kennung: String,
+    gekoppelt_at: String,
+}
+
+impl TryFrom<KopplungZeile> for Kopplung {
+    type Error = AppError;
+
+    fn try_from(z: KopplungZeile) -> Result<Self, AppError> {
+        let zugang = match (z.zugang_id, z.instanz_kopplung_id, z.fremder_zugang_id) {
+            (Some(zugang_id), None, None) => KopplungZugang::Lokal { zugang_id },
+            (None, Some(instanz_kopplung_id), Some(zugang_id)) => KopplungZugang::Hub {
+                instanz_kopplung_id,
+                zugang_id,
+            },
+            _ => {
+                return Err(AppError::Internal(
+                    "Ortungs-Kopplung ohne eindeutigen Zugang".into(),
+                ))
+            }
+        };
+        Ok(Self {
+            einsatz_fahrzeug_id: z.einsatz_fahrzeug_id,
+            einsatz_id: z.einsatz_id,
+            zugang,
+            zugang_name: z.zugang_name.unwrap_or_default(),
+            kennung: z.kennung,
+            gekoppelt_at: z.gekoppelt_at,
+        })
+    }
 }
 
 /// Eine Kennung der letzten 24 Stunden. Bewusst ohne Koordinaten.
@@ -29,8 +94,9 @@ pub struct Kandidat {
 }
 
 const SELECT_KOPPLUNG: &str = "SELECT k.einsatz_fahrzeug_id, k.einsatz_id, k.zugang_id, \
-        z.name AS zugang_name, k.kennung, k.gekoppelt_at \
-     FROM ortung_kopplung k JOIN einwurf_zugang z ON z.id = k.zugang_id";
+        k.instanz_kopplung_id, k.fremder_zugang_id, \
+        COALESCE(z.name, k.zugang_name) AS zugang_name, k.kennung, k.gekoppelt_at \
+     FROM ortung_kopplung k LEFT JOIN einwurf_zugang z ON z.id = k.zugang_id";
 
 /// Die Kopplung des Einsatzfahrzeugs, wenn es eine hat.
 pub async fn load_kopplung_tx(
@@ -38,13 +104,15 @@ pub async fn load_kopplung_tx(
     einsatz_id: i64,
     ef_id: i64,
 ) -> Result<Option<Kopplung>, AppError> {
-    Ok(sqlx::query_as::<_, Kopplung>(sqlx::AssertSqlSafe(format!(
+    sqlx::query_as::<_, KopplungZeile>(sqlx::AssertSqlSafe(format!(
         "{SELECT_KOPPLUNG} WHERE k.einsatz_fahrzeug_id = ? AND k.einsatz_id = ?"
     )))
     .bind(ef_id)
     .bind(einsatz_id)
     .fetch_optional(&mut *conn)
-    .await?)
+    .await?
+    .map(Kopplung::try_from)
+    .transpose()
 }
 
 /// Meldung des 422, wenn der Org-Schalter „Ortung im Einsatz“ (ADR-0101) aus ist.
@@ -201,12 +269,15 @@ pub async fn beende_im_einsatz_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
 ) -> Result<EndeImEinsatz, AppError> {
-    let getrennt = sqlx::query_as::<_, Kopplung>(sqlx::AssertSqlSafe(format!(
+    let getrennt = sqlx::query_as::<_, KopplungZeile>(sqlx::AssertSqlSafe(format!(
         "{SELECT_KOPPLUNG} WHERE k.einsatz_id = ? ORDER BY k.einsatz_fahrzeug_id"
     )))
     .bind(einsatz_id)
     .fetch_all(&mut *conn)
-    .await?;
+    .await?
+    .into_iter()
+    .map(Kopplung::try_from)
+    .collect::<Result<Vec<_>, _>>()?;
     sqlx::query("DELETE FROM ortung_kopplung WHERE einsatz_id = ?")
         .bind(einsatz_id)
         .execute(&mut *conn)

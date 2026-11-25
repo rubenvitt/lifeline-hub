@@ -794,7 +794,7 @@ impl Entlassen {
                 .ortung
                 .as_ref()
                 .map(|k| crate::fahrzeug::OrtungVorzustand {
-                    zugang_id: k.zugang_id.clone(),
+                    zugang_id: k.access_id().to_string(),
                     kennung: k.kennung.clone(),
                 }),
         }
@@ -1424,7 +1424,7 @@ async fn restore_ortung_tx(
     {
         Ok(k) => {
             // Wie beim Koppeln: die vorhandene Position der Kennung gleich übernehmen.
-            crate::ortung::uebernahme::apply_position_tx(conn, &k.zugang_id, &k.kennung, jetzt)
+            crate::ortung::uebernahme::apply_position_tx(conn, k.access_id(), &k.kennung, jetzt)
                 .await?;
             ergebnis.ortung = Some(k);
         }

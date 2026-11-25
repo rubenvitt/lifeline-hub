@@ -32,7 +32,7 @@ pub struct TrackingResponse {
 impl From<Kopplung> for TrackingResponse {
     fn from(k: Kopplung) -> Self {
         Self {
-            access_id: k.zugang_id,
+            access_id: k.access_id().to_string(),
             access_name: k.zugang_name,
             device_id: k.kennung,
             coupled_at: k.gekoppelt_at,
@@ -139,7 +139,7 @@ pub async fn couple(
         .await?;
         // Die vorhandene Position der Kennung gleich übernehmen; ein gedrosseltes Ergebnis
         // holt der nächste Fix nach.
-        apply_position_tx(conn, &k.zugang_id, &k.kennung, &jetzt).await?;
+        apply_position_tx(conn, k.access_id(), &k.kennung, &jetzt).await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let text =
             crate::fahrzeug::etb_text_gekoppelt(&anzeige.funkrufname, &k.zugang_name, &k.kennung);

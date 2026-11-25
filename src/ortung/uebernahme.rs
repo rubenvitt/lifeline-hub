@@ -218,7 +218,8 @@ async fn run_nachlauf(state: AppState, ef_id: i64, wache: NachlaufWache, warten:
     tokio::time::sleep(warten).await;
     drop(wache);
     let kopplung: Result<Option<(String, String)>, _> = sqlx::query_as(
-        "SELECT zugang_id, kennung FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
+        "SELECT zugang_id, kennung FROM ortung_kopplung \
+         WHERE einsatz_fahrzeug_id = ? AND zugang_id IS NOT NULL",
     )
     .bind(ef_id)
     .fetch_optional(&state.pool)
