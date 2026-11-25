@@ -15059,6 +15059,7 @@
           "mitglieder",
           "benachrichtigung",
           "praesenz",
+          "helfer",
           "lagged"
         ]
       },
@@ -19466,6 +19467,24 @@
           },
           "sonderkost": {
             "$ref": "#/components/schemas/Sonderkost"
+          }
+        }
+      },
+      "PositionAntwort": {
+        "type": "object",
+        "description": "Antwort von `PUT /api/devices/me/position`.",
+        "required": [
+          "stored",
+          "server_time"
+        ],
+        "properties": {
+          "server_time": {
+            "type": "string",
+            "description": "Uhrzeit des Servers (UTC, `%Y-%m-%d %H:%M:%S`)."
+          },
+          "stored": {
+            "type": "boolean",
+            "description": "Mindestens ein Ziel hat die Position übernommen; `false` bei einer älteren als der\ngespeicherten, während einer Pause und beim Pausieren selbst."
           }
         }
       },

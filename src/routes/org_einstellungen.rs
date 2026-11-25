@@ -262,8 +262,15 @@ pub async fn setzen(
         },
     )
     .await?;
+    for (einsatz_id, person_id) in gespeichert.personen_geloescht {
+        crate::ortung::publiziere(
+            &state,
+            einsatz_id,
+            crate::ortung::Ortungsziel::Person(person_id),
+        );
+    }
     let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
-    Ok(Json(gespeichert.anzeige(kategorien)))
+    Ok(Json(gespeichert.einstellungen.anzeige(kategorien)))
 }
 
 /// Trimmt und filtert leere Strings (None bei leerem Wert).

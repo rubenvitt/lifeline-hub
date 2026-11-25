@@ -1723,6 +1723,7 @@ fn live_event_wire() {
         Mitglieder => "mitglieder",
         Benachrichtigung => "benachrichtigung",
         Praesenz => "praesenz",
+        Helfer => "helfer",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }

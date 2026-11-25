@@ -186,6 +186,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/devices/me",
             get(routes::helfer::zustand).put(routes::helfer::ziel_aendern),
         )
+        .route(
+            "/api/devices/me/position",
+            put(routes::helfer::position_senden),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(

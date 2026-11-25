@@ -176,7 +176,9 @@ impl Funktionsansicht {
 
     /// Ob die Einsatzleitung ein Gerät mit dieser Ansicht koppeln kann. Eine Ansicht wird erst
     /// verfügbar, wenn ihre Routenliste, Stellenfilter, Tests und Hülle stehen (LFH-1040:
-    /// Katalog und Bindung kommen vorab, jede Ansicht schaltet sich in ihrem Task frei).
+    /// Katalog und Bindung kommen vorab, jede Ansicht schaltet sich in ihrem Task frei). Der
+    /// Helfer ist verfügbar, die Maske bietet ihn trotzdem nie an: er entsteht nur über die
+    /// Einladung ([`Self::nur_per_einladung`]).
     pub fn ist_verfuegbar(self) -> bool {
         matches!(
             self,
@@ -188,6 +190,7 @@ impl Funktionsansicht {
                 | Funktionsansicht::Einsatzabschnitt
                 | Funktionsansicht::Verpflegung
                 | Funktionsansicht::Einheit
+                | Funktionsansicht::Helfer
         )
     }
 
@@ -288,10 +291,12 @@ impl Funktionsansicht {
 /// [`Funktionsansicht::lese_module`] nur Lebenszeichen und das Ende der Kopplung). Anders als jede
 /// andere Ansicht erbt sie weder [`ALLE_GERAETE`] noch [`ALLE_ANSICHTEN`]: kein Einsatzkopf, keine
 /// Karte, kein Branding ([`darf_route`]). Die Zielliste vor dem Einlösen ist öffentlich und steht
-/// deshalb nicht hier. `PUT /api/devices/me/position` kommt mit seiner Route (Task 7).
+/// deshalb nicht hier. `PUT /api/devices/me/position` steht auch im Zustand `unbestaetigt` hier;
+/// der Handler antwortet dort 409 ohne zu speichern.
 const HELFER: &[(&str, &str)] = &[
     ("GET", "/api/devices/me"),
     ("PUT", "/api/devices/me"),
+    ("PUT", "/api/devices/me/position"),
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/me"),
     ("GET", "/api/einsaetze/{id}/live"),
@@ -729,16 +734,14 @@ mod tests {
     fn helfer_erreicht_nur_den_eigenen_zustand() {
         let h = Funktionsansicht::Helfer;
         assert!(h.nur_per_einladung());
-        assert!(
-            !h.ist_verfuegbar(),
-            "erst mit Server, Seite und Hülle (Task 7)"
-        );
+        assert!(h.ist_verfuegbar(), "Server, Seite und Hülle stehen");
         assert_eq!(h.stellenart(), None);
         assert_eq!(h.rolle(), EinsatzRolle::Beobachter);
         assert!(h.lese_module().is_empty());
         for (m, p) in [
             ("GET", "/api/devices/me"),
             ("PUT", "/api/devices/me"),
+            ("PUT", "/api/devices/me/position"),
             ("POST", "/api/auth/logout"),
             ("GET", "/api/auth/me"),
             ("GET", "/api/einsaetze/{id}/live"),

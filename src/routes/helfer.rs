@@ -7,8 +7,11 @@
 //!   (`/api/devices/helpers/…`), gedrosselt wie `/api/devices/pair`.
 //! - Bestätigen, Ablehnen, Abmelden und Verlängern durch die Leitung
 //!   (`/api/incidents/{id}/helpers/{gid}/…`, `…/helpers/revoke` für alle).
-//! - Der eigene Zustand der Helfer-Kopplung (`/api/devices/me`), nur mit [`HelferSitzung`]; die
-//!   Schranke der Routenliste steht in `CurrentUser` (`crate::geraet::darf_route`).
+//! - Der eigene Zustand der Helfer-Kopplung (`/api/devices/me`) und das Senden der Position
+//!   (`/api/devices/me/position`), nur mit [`HelferSitzung`]; die Schranke der Routenliste steht
+//!   in `CurrentUser` (`crate::geraet::darf_route`).
+//! - Jede Änderung an einer Helfer-Kopplung meldet `helfer` an die Einsatzleitung
+//!   (`LiveHub::publiziere_helfer`), nur mit Kennungen.
 
 use crate::app::AppState;
 use crate::auth::session::{self, CurrentUser, SichererTransport, SESSION_COOKIE};
@@ -21,6 +24,7 @@ use crate::geraet::{Funktionsansicht, GeraetKontext, PROVIDER};
 use crate::helfer::anmeldung::{self, HelferZielliste, HelferZustand, ZielEingabe};
 use crate::helfer::bestaetigung::{self, Bestaetigt, Bestaetigung};
 use crate::helfer::einladung::{self, HelferEinladungAnzeige};
+use crate::helfer::position::{self, Abweisung};
 use crate::helfer::{self, HelferAnzeige};
 use crate::ortung::{self, Ortungsziel};
 use axum::extract::{FromRequestParts, Query, State};
@@ -253,11 +257,11 @@ pub async fn einloesen(
             let token =
                 session::anlegen_geraet(conn, neu.benutzer_id, neu.kopplung_id, &neu.laeuft_ab_at)
                     .await?;
-            Ok((neu, token))
+            Ok((neu, token, einsatz_id))
         }),
         Err(e) => Err(e),
     };
-    let (neu, token) = match ergebnis {
+    let (neu, token, einsatz_id) = match ergebnis {
         Ok(wert) => wert,
         Err(AppError::Unauthorized) => {
             fehlversuch(&state, peer_ip).await;
@@ -266,6 +270,7 @@ pub async fn einloesen(
         Err(e) => return Err(e),
     };
     tracing::info!(kopplung_id = neu.kopplung_id, peer_ip = ?peer_ip, "Helfer angemeldet");
+    state.live.publiziere_helfer(einsatz_id, neu.kopplung_id);
     crate::auth::audit::schreibe(
         &state.pool,
         crate::auth::audit::AuditEintrag {
@@ -329,7 +334,163 @@ pub async fn ziel_aendern(
         let ziel = anmeldung::pruefe_ziel(conn, g.einsatz_id, body.target).await?;
         geraet_repo::helfer_ziel_setzen(conn, g.kopplung_id, ziel).await
     })?;
+    state.live.publiziere_helfer(g.einsatz_id, g.kopplung_id);
     Ok(Json(anmeldung::zustand(&state.pool, g.kopplung_id).await?))
+}
+
+// ---------- Position senden (Helfer-Sitzung) ----------
+
+/// Wert von `reason` im 403 einer Sendung, wenn „Ortung im Einsatz“ der Organisation aus ist.
+pub const GRUND_ORTUNG_AUS: &str = "tracking_off";
+
+/// Body von `PUT /api/devices/me/position`: eine Position (`lat`, `lon`, `recorded_at`) oder
+/// `paused`.
+#[derive(Debug, Deserialize)]
+pub struct PositionBody {
+    #[serde(default)]
+    pub lat: Option<f64>,
+    #[serde(default)]
+    pub lon: Option<f64>,
+    /// Genauigkeit in Metern; angenommen, aber nicht gespeichert.
+    #[serde(default)]
+    pub accuracy_m: Option<f64>,
+    /// Zeitpunkt der Messung am Gerät, RFC 3339.
+    #[serde(default)]
+    pub recorded_at: Option<String>,
+    /// `true` pausiert die Ortung, `false` setzt sie fort; dann ohne Koordinate.
+    #[serde(default)]
+    pub paused: Option<bool>,
+}
+
+/// Antwort von `PUT /api/devices/me/position`.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct PositionAntwort {
+    /// Mindestens ein Ziel hat die Position übernommen; `false` bei einer älteren als der
+    /// gespeicherten, während einer Pause und beim Pausieren selbst.
+    pub stored: bool,
+    /// Uhrzeit des Servers (UTC, `%Y-%m-%d %H:%M:%S`).
+    pub server_time: String,
+}
+
+/// Abweisung mit Grund (`{error, reason}`), wie `tracker_taken` beim Bestätigen.
+fn abgewiesen(status: StatusCode, meldung: &str, grund: &str) -> Response {
+    (
+        status,
+        Json(serde_json::json!({ "error": meldung, "reason": grund })),
+    )
+        .into_response()
+}
+
+/// Prüft eine Position vor der Transaktion (422): Koordinate im Bereich, Zeitpunkt RFC 3339.
+fn pruefe_position(body: &PositionBody) -> Result<(f64, f64, String), AppError> {
+    let (Some(lat), Some(lon), Some(zeitpunkt)) = (body.lat, body.lon, body.recorded_at.as_deref())
+    else {
+        return Err(AppError::UnprocessableEntity(
+            "Erwartet lat, lon und recorded_at oder paused".into(),
+        ));
+    };
+    crate::routes::support::pruefe_koordinate(Some(lat), Some(lon), "lat", "lon")?;
+    chrono::DateTime::parse_from_rfc3339(zeitpunkt).map_err(|_| {
+        AppError::UnprocessableEntity("recorded_at muss ein Zeitpunkt nach RFC 3339 sein".into())
+    })?;
+    Ok((lat, lon, zeitpunkt.to_string()))
+}
+
+/// PUT /api/devices/me/position — die Helfer-App sendet ihre Position oder pausiert.
+///
+/// - 200 `{stored, server_time}`; geschrieben wird an das Ziel nur als Ortungsgerät, an die
+///   Person nur mit Zuordnung und „Auch Personen orten“ (Quelle `helfer`, Zeitpunkt geklemmt).
+/// - `{paused: true}` setzt `pausiert_at` und löscht die Personenposition, `{paused: false}`
+///   setzt fort.
+/// - 401 Sitzung ungültig (beendet, Einsatz beendet); 403 `{reason: "tracking_off"}` Ortung der
+///   Organisation aus, `"no_role"` weder Ortungsgerät noch Person, `"target_removed"` Ziel
+///   aufgelöst oder weg; 409 `{reason: "unconfirmed"}` noch nicht bestätigt, nichts gespeichert;
+///   422 Koordinate oder Zeitpunkt unbrauchbar.
+pub async fn position_senden(
+    State(state): State<AppState>,
+    HelferSitzung(g): HelferSitzung,
+    JsonBody(body): JsonBody<PositionBody>,
+) -> Result<Response, AppError> {
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(g.einsatz_id)
+        .fetch_one(&state.pool)
+        .await?;
+    // Vor der Schreibtransaktion: die Org-Einstellung liegt auf einer eigenen Verbindung.
+    let ortung = crate::org::einstellungen::ortung_der_org(&state.pool, org_id).await?;
+    if !ortung.im_einsatz {
+        return Ok(abgewiesen(
+            StatusCode::FORBIDDEN,
+            "Die Ortung ist für diese Organisation ausgeschaltet",
+            GRUND_ORTUNG_AUS,
+        ));
+    }
+    let einsatz_id = g.einsatz_id;
+    let kopplung_id = g.kopplung_id;
+    let antwort = |stored| {
+        Json(PositionAntwort {
+            stored,
+            server_time: crate::zeit::jetzt(),
+        })
+        .into_response()
+    };
+
+    if let Some(pausiert) = body.paused {
+        let person = crate::write_retry!(&state.pool, |conn| {
+            position::pausieren(conn, kopplung_id, pausiert).await
+        })?;
+        state.live.publiziere_helfer(einsatz_id, kopplung_id);
+        if let Some(pid) = person {
+            ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(pid));
+        }
+        return Ok(antwort(false));
+    }
+
+    let (lat, lon, zeitpunkt) = pruefe_position(&body)?;
+    let ergebnis = crate::write_retry!(&state.pool, |conn| {
+        position::senden(
+            conn,
+            einsatz_id,
+            kopplung_id,
+            ortung.personen,
+            lat,
+            lon,
+            &zeitpunkt,
+        )
+        .await
+    })?;
+    let gesendet = match ergebnis {
+        Ok(gesendet) => gesendet,
+        Err(a @ Abweisung::Unbestaetigt) => {
+            return Ok(abgewiesen(
+                StatusCode::CONFLICT,
+                "Die Leitung hat die Anmeldung noch nicht bestätigt",
+                a.grund(),
+            ))
+        }
+        Err(a @ Abweisung::KeineRolle) => {
+            return Ok(abgewiesen(
+                StatusCode::FORBIDDEN,
+                "Dieses Gerät ortet weder ein Ziel noch eine Person",
+                a.grund(),
+            ))
+        }
+        Err(a @ Abweisung::ZielEntfernt) => {
+            return Ok(abgewiesen(
+                StatusCode::FORBIDDEN,
+                "Das Ziel gibt es nicht mehr",
+                a.grund(),
+            ))
+        }
+    };
+    for ziel in &gesendet.geaendert {
+        ortung::publiziere(&state, einsatz_id, *ziel);
+    }
+    if gesendet.gespeichert {
+        state
+            .live
+            .publiziere_helfer_position(einsatz_id, kopplung_id);
+    }
+    Ok(antwort(gesendet.gespeichert))
 }
 
 // ---------- Bestätigen, Ablehnen, Entfernen (Leitung) ----------
@@ -427,6 +588,7 @@ pub async fn bestaetigen(
         }
     };
     state.live.publiziere(einsatz_id, etb_id);
+    state.live.publiziere_helfer(einsatz_id, kopplung_id);
     if let Some(pid) = alte_person {
         ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(pid));
     }
@@ -456,6 +618,7 @@ pub async fn ablehnen(
     })?;
     state.live.melde_kopplung_ende(kopplung_id);
     state.live.publiziere(einsatz_id, etb_id);
+    state.live.publiziere_helfer(einsatz_id, kopplung_id);
     Ok(Json(
         helfer::laden(&state.pool, einsatz_id, kopplung_id).await?,
     ))
@@ -502,6 +665,7 @@ pub async fn entfernen(
     state.live.melde_kopplung_ende(kopplung_id);
     if let Some((etb_id, person_id)) = beendet {
         state.live.publiziere(einsatz_id, etb_id);
+        state.live.publiziere_helfer(einsatz_id, kopplung_id);
         if let Some(pid) = person_id {
             ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(pid));
         }
@@ -546,6 +710,7 @@ pub async fn alle_entfernen(
     })?;
     for (id, person_id) in &beendet {
         state.live.melde_kopplung_ende(*id);
+        state.live.publiziere_helfer(einsatz_id, *id);
         if let Some(pid) = person_id {
             ortung::publiziere(&state, einsatz_id, Ortungsziel::Person(*pid));
         }
@@ -580,6 +745,7 @@ pub async fn verlaengern(
         }
         geraet_repo::verlaengern(conn, kopplung_id, &ende, von).await
     })?;
+    state.live.publiziere_helfer(einsatz_id, kopplung_id);
     Ok(Json(
         helfer::laden(&state.pool, einsatz_id, kopplung_id).await?,
     ))

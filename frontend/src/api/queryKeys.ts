@@ -144,6 +144,9 @@ export const EINSATZ_KEYS = {
   abschlussPruefung: 'einsatz-abschluss-pruefung',
   // Gerätekopplungen der Einsatzleitung (LFH-892).
   geraete: 'einsatz-geraete',
+  // Helfer-Übersicht der Einsatzleitung (Helfer-App): Einladung und Helfer-Kopplungen, live über
+  // `helfer` (nur an die Einsatzleitung).
+  helfer: 'einsatz-helfer',
   // Freigaben für Anbindungen (Maschinenzugänge) an diesem Einsatz (LLH-1638), Seite der Geräte.
   anbindungen: 'einsatz-anbindungen',
   // Links auf das Lagebild für Externe (LLH-1496), Seite der Geräte.
@@ -392,6 +395,9 @@ export const EINSATZ_STREAM_EVENTS = {
   // Fernmeldeskizze und Kommunikationsplan lesen sie direkt. Aufträge und Erinnerungen sind
   // gezählte Listen, deshalb geht der Modulzähler mit (Regel aus `queryKeys.test.ts`), auch wenn
   // sich die Zahl hier nicht ändert. Den Kopf (`meine_*`) frischt das zugleich verteilte `einsatz`.
+  // Helfer-App: Einlösen, Bestätigen, Ablehnen, Abmelden, Verlängern, Pause und (höchstens alle
+  // 30 s) eine neue Position eines Helfers. Der Server schickt es nur an die Einsatzleitung.
+  helfer: [EINSATZ_KEYS.helfer],
   mitglieder: [
     EINSATZ_KEYS.mitglieder,
     EINSATZ_KEYS.auftraege,
@@ -723,6 +729,8 @@ export const einsatzKeys = {
   abschlussPruefung: (einsatzId: number) => [EINSATZ_KEYS.abschlussPruefung, einsatzId] as const,
   /** Kopplungen und Modulsperren je Ansicht (LFH-892), nicht live. */
   geraete: (einsatzId: number) => [EINSATZ_KEYS.geraete, einsatzId] as const,
+  /** Helfer-Übersicht (Einladung und Helfer), live über `helfer`. */
+  helfer: (einsatzId: number) => [EINSATZ_KEYS.helfer, einsatzId] as const,
   /** Anbindungen der Org aus Sicht dieses Einsatzes (LLH-1638), nicht live. */
   anbindungen: (einsatzId: number) => [EINSATZ_KEYS.anbindungen, einsatzId] as const,
   /** Links auf das Lagebild für Externe an diesem Einsatz (LLH-1496), nicht live. */

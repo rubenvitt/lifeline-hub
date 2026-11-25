@@ -349,6 +349,7 @@ use utoipa::OpenApi;
         crate::routes::geraet::KopplungMitCode,
         crate::routes::geraet::KopplungsCode,
         crate::routes::helfer::HelferUebersicht,
+        crate::routes::helfer::PositionAntwort,
         crate::helfer::einladung::HelferEinladungAnzeige,
         crate::helfer::HelferAnzeige,
         crate::helfer::HelferZiel,

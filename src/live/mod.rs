@@ -66,6 +66,11 @@ wire_enum! {
         /// Wer gerade welche Einzelangabe bearbeitet (LLH-1946): der ganze sichtbare Stand eines
         /// Einsatzes, am Ring vorbei und ohne `id:` (`praesenz`, `routes::live`).
         Praesenz => "praesenz",
+        /// Helfer-Kopplungen eines Einsatzes (Helfer-App, Spec 2026-11-24-vakwvkpg): Einlösen,
+        /// Bestätigen, Ablehnen, Abmelden, Verlängern, Pause und neue Positionen (gedrosselt,
+        /// [`LiveHub::publiziere_helfer_position`]). Nur an die Einsatzleitung
+        /// ([`LiveEvent::nur_leitung`]); Nutzlast nur Kennungen.
+        Helfer => "helfer",
         Lagged => "lagged",
     }
 }
@@ -77,8 +82,10 @@ impl LiveEvent {
     /// jeden, der die Tür des Stroms passiert" (`EinsatzLesezugriff` ohne Modul, `routes/live.rs`).
     /// Sie steht nur vier Events zu: dem Kontroll-Event `lagged`, dem Einsatzkopf `einsatz` und
     /// der Mitgliederliste `mitglieder`, deren GETs hinter genau derselben Tür liegen (LFH-555,
-    /// i6k6mzed), und der Benachrichtigung, die statt eines Moduls eine Empfängerliste trägt
-    /// (LLH-1207). Gepinnt von `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`.
+    /// i6k6mzed), der Benachrichtigung, die statt eines Moduls eine Empfängerliste trägt
+    /// (LLH-1207), der Präsenz mit ihrem Gate je Eintrag (LLH-1946) und `helfer`, das nur die
+    /// Einsatzleitung erreicht ([`Self::nur_leitung`], Helfer-App). Gepinnt von
+    /// `ungegatet_sind_nur_lagged_einsatz_mitglieder_und_benachrichtigung`.
     ///
     /// **Füll-Regel (sicherheitstragend):** hier steht das Modul, zu dessen Datenobjekt
     /// das Event gehört — NICHT das Modul der Route, die es ausgelöst hat. Ein
@@ -221,6 +228,11 @@ impl LiveEvent {
             // Einheit wie `einheit`); `PraesenzStand::fuer` filtert je Verbindung. Läuft nie durch
             // den Ring, nur über den eigenen Präsenz-Broadcast.
             LiveEvent::Praesenz => &[],
+            // Helfer (Spec Helfer-App): ungegatet als Modul, weil das Gate die Rolle ist. Die
+            // Helfer-Übersicht (`GET /api/incidents/{id}/helpers`) liegt hinter
+            // `EinsatzLeitungszugriff`, keinem Modul; das Ereignis erreicht nur Verbindungen der
+            // Einsatzleitung ([`LiveEvent::nur_leitung`], `LiveNachricht::fuer_verbindung`).
+            LiveEvent::Helfer => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
             LiveEvent::Lagged => &[],
@@ -238,6 +250,13 @@ impl LiveEvent {
     /// erreicht es dann niemanden: fail-closed, damit ein Emitter ohne Liste nicht an jeden geht.
     pub const fn braucht_empfaenger(self) -> bool {
         matches!(self, LiveEvent::Benachrichtigung)
+    }
+
+    /// Ob dieses Event nur an Verbindungen der Einsatzleitung gehen darf (Helfer-App). Ohne das
+    /// Kennzeichen der Verbindung erreicht es niemanden: fail-closed wie
+    /// [`Self::braucht_empfaenger`].
+    pub const fn nur_leitung(self) -> bool {
+        matches!(self, LiveEvent::Helfer)
     }
 }
 
@@ -261,6 +280,10 @@ pub const REPLAY_KARENZ: Duration = Duration::from_secs(10 * 60);
 /// verschwindet damit zwischen `REPLAY_KARENZ` und `REPLAY_KARENZ + KANAL_SWEEP_TAKT` nach dem
 /// Moment, in dem sein letzter Empfänger wegfiel.
 const KANAL_SWEEP_TAKT: Duration = Duration::from_secs(5 * 60);
+
+/// Abstand, in dem eine neue Position eines Helfers der Leitung höchstens gemeldet wird
+/// ([`LiveHub::publiziere_helfer_position`]); der Takt der App ist 30 s.
+pub const HELFER_DROSSEL: Duration = Duration::from_secs(30);
 
 /// Eine Live-Nachricht im Einsatz-Kanal: eine monotone Id plus SSE-Event-Name und
 /// serialisierte Daten. Clients abonnieren denselben Kanal und filtern per Event-Name
@@ -303,7 +326,7 @@ impl LiveNachricht {
     /// Ein Event, das Empfänger braucht, geht ohne Liste an niemanden. Gilt für Live und Replay
     /// (`routes::support::sse_stream_mit_replay`).
     pub fn fuer(mut self, benutzer_id: i64, erlaubt: &HashSet<&'static str>) -> Option<Self> {
-        if !self.event.sichtbar_fuer(erlaubt) {
+        if !self.event.sichtbar_fuer(erlaubt) || self.event.nur_leitung() {
             return None;
         }
         match self.empfaenger.take() {
@@ -323,12 +346,19 @@ impl LiveNachricht {
     /// das Modul Meldungen; die Nutzlast ist `{}`, also weder Text noch Kennung. Alle anderen
     /// Ereignisse filtert das Modul-Gate wie sonst; das Gate von `sofortmeldung` selbst bleibt
     /// `meldungen` ([`LiveEvent::modul_keys`]).
+    ///
+    /// `leitung = true` heißt: die Verbindung gehört der Einsatzleitung (keine Gerätesitzung);
+    /// nur dann passieren die Ereignisse mit [`LiveEvent::nur_leitung`] (Helfer-App).
     pub fn fuer_verbindung(
         self,
         benutzer_id: i64,
         erlaubt: &HashSet<&'static str>,
         lagemonitor: bool,
+        leitung: bool,
     ) -> Option<Self> {
+        if self.event.nur_leitung() {
+            return leitung.then_some(self);
+        }
         if lagemonitor && self.event == LiveEvent::Sofortmeldung && self.empfaenger.is_none() {
             return Some(Self {
                 data: "{}".into(),
@@ -423,6 +453,9 @@ pub struct LiveHub {
     praesenz: Arc<praesenz::PraesenzSpeicher>,
     /// Geänderte Präsenzstände, am Replay-Ring vorbei (Entwurf D2): ohne Id, ohne Nachlieferung.
     praesenz_tx: broadcast::Sender<praesenz::PraesenzStand>,
+    /// Wann je Helfer-Kopplung zuletzt eine Position als `helfer` gemeldet wurde
+    /// ([`Self::publiziere_helfer_position`]); nur im Speicher.
+    helfer_drossel: Arc<std::sync::Mutex<HashMap<i64, Instant>>>,
 }
 
 impl Default for LiveHub {
@@ -503,6 +536,7 @@ impl LiveHub {
             ios_push: Arc::default(),
             praesenz: Arc::new(praesenz::PraesenzSpeicher::mit_melden(praesenz_tx.clone())),
             praesenz_tx,
+            helfer_drossel: Arc::default(),
         }
     }
 
@@ -794,6 +828,34 @@ impl LiveHub {
         );
     }
 
+    /// Helfer-Ereignis der Leitung (Helfer-App): Nutzlast `{"einsatz_id": …, "helfer_id": …}`.
+    pub fn publiziere_helfer(&self, einsatz_id: i64, kopplung_id: i64) {
+        self.publiziere_objekt(einsatz_id, LiveEvent::Helfer, "helfer_id", kopplung_id);
+    }
+
+    /// Wie [`Self::publiziere_helfer`] nach einer gespeicherten Position, höchstens einmal je
+    /// [`HELFER_DROSSEL`] und Kopplung: die Leitung sieht „letzte Position“, ohne dass jede
+    /// Sendung ihre Übersicht neu lädt. Die Lagekarte bekommt jede Position über ihr eigenes
+    /// Ereignis.
+    pub fn publiziere_helfer_position(&self, einsatz_id: i64, kopplung_id: i64) {
+        let jetzt = Instant::now();
+        {
+            let mut drossel = self
+                .helfer_drossel
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if drossel
+                .get(&kopplung_id)
+                .is_some_and(|t| jetzt.duration_since(*t) < HELFER_DROSSEL)
+            {
+                return;
+            }
+            drossel.retain(|_, t| jetzt.duration_since(*t) < HELFER_DROSSEL);
+            drossel.insert(kopplung_id, jetzt);
+        }
+        self.publiziere_helfer(einsatz_id, kopplung_id);
+    }
+
     /// Modul-Ereignis ohne Objekt-Kennung: Payload `{"einsatz_id": …}` (Listen-Refresh).
     pub fn publiziere_einsatz(&self, einsatz_id: i64, event: LiveEvent) {
         self.publiziere_event(
@@ -961,6 +1023,49 @@ mod tests {
 
     // --- F01/LFH-227: Modul-Gate-Registry ---
 
+    /// Helfer-App: `helfer` erreicht nur Verbindungen der Einsatzleitung, auch mit allen Modulen;
+    /// ohne Kennzeichen (`fuer`, etwa im Replay ohne Verbindung) niemanden.
+    #[test]
+    fn helfer_geht_nur_an_die_leitung() {
+        let n = LiveNachricht {
+            id: "1".into(),
+            event: LiveEvent::Helfer,
+            data: r#"{"einsatz_id":1,"helfer_id":3}"#.into(),
+            empfaenger: None,
+        };
+        let alle: HashSet<&'static str> =
+            crate::einsatz::modul::MODUL_KEYS.iter().copied().collect();
+        assert!(n.clone().fuer_verbindung(7, &alle, false, false).is_none());
+        assert!(n.clone().fuer(7, &alle).is_none());
+        let an_leitung = n
+            .fuer_verbindung(7, &HashSet::new(), false, true)
+            .expect("Leitung bekommt das Ereignis");
+        assert_eq!(an_leitung.data, r#"{"einsatz_id":1,"helfer_id":3}"#);
+    }
+
+    #[test]
+    fn helfer_position_ist_gedrosselt() {
+        let hub = LiveHub::new();
+        let mut rx = hub.abonniere(1);
+        hub.publiziere_helfer_position(1, 5);
+        hub.publiziere_helfer_position(1, 5);
+        hub.publiziere_helfer_position(1, 6);
+        hub.publiziere_helfer(1, 5);
+        let mut daten = Vec::new();
+        while let Ok(n) = rx.try_recv() {
+            assert_eq!(n.event, LiveEvent::Helfer);
+            daten.push(n.data);
+        }
+        assert_eq!(
+            daten,
+            vec![
+                r#"{"einsatz_id":1,"helfer_id":5}"#,
+                r#"{"einsatz_id":1,"helfer_id":6}"#,
+                r#"{"einsatz_id":1,"helfer_id":5}"#,
+            ]
+        );
+    }
+
     /// LLH-1743 D7: der Lagemonitor bekommt `sofortmeldung` ohne Inhalt, aber kein anderes
     /// Meldungsereignis; ohne den Schalter bleibt das Modul-Gate allein maßgeblich.
     #[test]
@@ -974,20 +1079,20 @@ mod tests {
         let monitor: HashSet<&'static str> = HashSet::from(["lagekarte", "unfallhilfsstellen"]);
 
         let n = nachricht(LiveEvent::Sofortmeldung)
-            .fuer_verbindung(7, &monitor, true)
+            .fuer_verbindung(7, &monitor, true, false)
             .expect("Signal an den Monitor");
         assert_eq!(n.data, "{}");
         assert!(nachricht(LiveEvent::Meldung)
-            .fuer_verbindung(7, &monitor, true)
+            .fuer_verbindung(7, &monitor, true, false)
             .is_none());
         // Ohne Lagemonitor: kein Modul Meldungen, kein Ereignis.
         assert!(nachricht(LiveEvent::Sofortmeldung)
-            .fuer_verbindung(7, &monitor, false)
+            .fuer_verbindung(7, &monitor, false, false)
             .is_none());
         // Mit dem Modul bleibt die Nutzlast für Personen unverändert.
         let leser: HashSet<&'static str> = HashSet::from(["meldungen"]);
         let n = nachricht(LiveEvent::Sofortmeldung)
-            .fuer_verbindung(7, &leser, false)
+            .fuer_verbindung(7, &leser, false, false)
             .unwrap();
         assert_eq!(n.data, r#"{"meldung_id":3}"#);
     }
@@ -1028,10 +1133,21 @@ mod tests {
             vec![
                 "benachrichtigung",
                 "einsatz",
+                "helfer",
                 "lagged",
                 "mitglieder",
                 "praesenz"
             ]
+        );
+        let nur_leitung: Vec<&str> = LiveEvent::ALLE
+            .iter()
+            .filter(|ev| ev.nur_leitung())
+            .map(|ev| ev.as_str())
+            .collect();
+        assert_eq!(
+            nur_leitung,
+            vec!["helfer"],
+            "ein ungegatetes Fach-Event braucht ein anderes Gate"
         );
         let mit_empfaengern: Vec<&str> = LiveEvent::ALLE
             .iter()
@@ -1179,6 +1295,8 @@ mod tests {
             (LiveEvent::Benachrichtigung, &[]),
             // Gate je Eintrag über das Bezugsereignis (LLH-1946, Begründung an der Variante).
             (LiveEvent::Praesenz, &[]),
+            // Gate ist die Einsatzleitung (Helfer-App, Begründung an der Variante).
+            (LiveEvent::Helfer, &[]),
             (LiveEvent::Lagged, &[]),
         ];
         for (ev, keys) in erwartet {

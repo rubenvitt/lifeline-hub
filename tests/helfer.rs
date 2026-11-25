@@ -1111,3 +1111,420 @@ async fn bestaetigter_helfer_warnt_30_minuten_vor_ablauf() {
         "{etb:?}"
     );
 }
+
+// ---------- Position senden (Helfer-Sitzung) ----------
+
+/// `PUT /api/devices/me/position` mit dem Cookie des Geräts.
+async fn senden(l: &Lage, cookie: &str, body: Value) -> (StatusCode, Value) {
+    anfrage_json(
+        &l.app,
+        "PUT",
+        "/api/devices/me/position",
+        cookie,
+        Some(&body),
+    )
+    .await
+}
+
+fn punkt(lat: f64, lon: f64) -> Value {
+    json!({"lat": lat, "lon": lon, "accuracy_m": 8.5, "recorded_at": chrono::Utc::now().to_rfc3339()})
+}
+
+/// `lat` und `position_quelle` einer Zeile in `einsatz_einheit`, `einsatz_fahrzeug` oder
+/// `einsatz_personal`.
+async fn position_von(
+    pool: &sqlx::SqlitePool,
+    tabelle: &str,
+    id: i64,
+) -> (Option<f64>, Option<String>) {
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT lat, position_quelle FROM {tabelle} WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Ein bestätigter Helfer an der Einheit, als Ortungsgerät und mit Person (Personenortung an).
+async fn helfer_mit_person(l: &Lage) -> (i64, String, i64) {
+    personenortung_einschalten(l).await;
+    let person = common::stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, "Erika M.").await;
+    let (gid, cookie) = anmelden(l, "unit", l.einheit, "Erika").await;
+    let (s, v) = bestaetigen(l, gid, json!({"is_tracker": true, "person_id": person})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    (gid, cookie, person)
+}
+
+/// Sammelt die bisher verteilten Live-Ereignisse mit Namen `tag`.
+fn ereignisse(
+    rx: &mut tokio::sync::broadcast::Receiver<lifeline_hub::live::LiveNachricht>,
+    tag: &str,
+) -> Vec<Value> {
+    let mut alle = Vec::new();
+    while let Ok(n) = rx.try_recv() {
+        if n.event.as_str() == tag {
+            alle.push(serde_json::from_str(&n.data).unwrap());
+        }
+    }
+    alle
+}
+
+#[tokio::test]
+async fn unbestaetigt_antwortet_409_ohne_speichern() {
+    let l = lage().await;
+    let (_gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["reason"], "unconfirmed", "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        None
+    );
+}
+
+#[tokio::test]
+async fn ortungsgeraet_schreibt_an_einheit_mit_quelle_helfer() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query("UPDATE geraet_kopplung SET letzter_zugriff_at = NULL WHERE id = ?")
+        .bind(gid)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let mut rx = l.live.abonniere(l.einsatz);
+
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], true, "{v}");
+    assert!(v["server_time"].is_string(), "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await,
+        (Some(50.1), Some("helfer".into()))
+    );
+    let zugriff: Option<String> =
+        sqlx::query_scalar("SELECT letzter_zugriff_at FROM geraet_kopplung WHERE id = ?")
+            .bind(gid)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert!(zugriff.is_some(), "letzter Zugriff gesetzt");
+    let helfer_live = ereignisse(&mut rx, "helfer");
+    assert_eq!(
+        helfer_live,
+        vec![json!({"einsatz_id": l.einsatz, "helfer_id": gid})],
+        "Leitung sieht die erste Position, nur mit Kennungen"
+    );
+
+    // Die zweite Position innerhalb von 30 s schreibt, meldet der Leitung aber nichts Neues;
+    // die Lagekarte bekommt jede.
+    let (s, v) = senden(&l, &cookie, punkt(50.2, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], true, "{v}");
+    let mut rx2 = l.live.abonniere(l.einsatz);
+    let (s, _) = senden(&l, &cookie, punkt(50.3, 8.6)).await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(ereignisse(&mut rx, "helfer").is_empty(), "gedrosselt");
+    assert_eq!(ereignisse(&mut rx2, "einheit").len(), 1, "Lagekarte live");
+
+    // Ein älterer Zeitpunkt wird verworfen.
+    let (s, v) = senden(
+        &l,
+        &cookie,
+        json!({"lat": 1.0, "lon": 1.0, "recorded_at": "2020-01-01T00:00:00Z"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], false, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.3)
+    );
+
+    // Die Leitung sieht den Zeitpunkt der letzten Position.
+    let (s, v) = anfrage(
+        &l.app,
+        "GET",
+        &format!("/api/incidents/{}/helpers", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["helpers"][0]["last_position_at"].is_string(), "{v}");
+}
+
+#[tokio::test]
+async fn ohne_ortungsrolle_nur_person() {
+    let l = lage().await;
+    personenortung_einschalten(&l).await;
+    let person = common::stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, "Erika M.").await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Erika").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": person})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], true, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await,
+        (Some(50.1), Some("helfer".into()))
+    );
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        None,
+        "ohne Ortungsrolle bleibt die Einheit unberührt"
+    );
+}
+
+#[tokio::test]
+async fn ohne_rolle_und_person_403() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["reason"], "no_role", "{v}");
+}
+
+#[tokio::test]
+async fn geloeschtes_ziel_403_target_removed() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query("UPDATE einsatz_einheit SET aufgeloest_at = datetime('now') WHERE id = ?")
+        .bind(l.einheit)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["reason"], "target_removed", "{v}");
+
+    // Ebenso, wenn das Fahrzeug ganz weg ist (Verweis auf NULL).
+    let (gid, cookie) = anmelden(&l, "vehicle", l.fahrzeug, "Fahrer").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query("UPDATE geraet_kopplung SET fahrzeug_id = NULL WHERE id = ?")
+        .bind(gid)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["reason"], "target_removed", "{v}");
+}
+
+#[tokio::test]
+async fn org_schalter_aus_403_und_personen_geloescht() {
+    let l = lage().await;
+    let (_gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        Some(50.1)
+    );
+
+    // „Auch Personen orten“ aus: die Person verschwindet von der Karte, die Einheit bleibt, und
+    // eine neue Position geht nur noch an die Einheit.
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PUT",
+        "/api/org-settings",
+        &l.admin,
+        Some(&json!({"ortung_im_einsatz": true, "ortung_personen": false})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None
+    );
+    let (s, v) = senden(&l, &cookie, punkt(50.2, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None,
+        "keine Personenposition ohne Personenortung"
+    );
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.2)
+    );
+
+    // Ortung ganz aus: 403 mit Grund, nichts geschrieben.
+    personenortung_einschalten(&l).await;
+    let (s, _) = senden(&l, &cookie, punkt(50.3, 8.6)).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage_json(
+        &l.app,
+        "PUT",
+        "/api/org-settings",
+        &l.admin,
+        Some(&json!({"ortung_im_einsatz": false})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None,
+        "Personenposition beim Ausschalten gelöscht"
+    );
+    let (s, v) = senden(&l, &cookie, punkt(50.4, 8.6)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(v["reason"], "tracking_off", "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.3)
+    );
+}
+
+#[tokio::test]
+async fn pausieren_loescht_personenposition() {
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut rx = l.live.abonniere(l.einsatz);
+
+    let (s, v) = senden(&l, &cookie, json!({"paused": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await,
+        (None, Some("helfer".into())),
+        "Person weg, Quelle bleibt"
+    );
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.1),
+        "Einheit behält den letzten Stand"
+    );
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![json!({"einsatz_id": l.einsatz, "helfer_id": gid})]
+    );
+    let (s, v) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["paused"], true, "{v}");
+
+    // Pausiert schreibt eine verspätete Position nichts.
+    let (s, v) = senden(&l, &cookie, punkt(50.2, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], false, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.1)
+    );
+
+    // Fortsetzen.
+    let (s, v) = senden(&l, &cookie, json!({"paused": false})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (_, v) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(v["paused"], false, "{v}");
+    let (s, v) = senden(&l, &cookie, punkt(50.3, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["stored"], true, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        Some(50.3)
+    );
+}
+
+#[tokio::test]
+async fn einsatz_beendet_401() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        &l.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED, "{v}");
+}
+
+#[tokio::test]
+async fn unplausible_koordinate_422() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    for body in [
+        punkt(91.0, 8.6),
+        punkt(50.1, 181.0),
+        json!({"lat": 50.1, "lon": 8.6, "recorded_at": "gestern"}),
+        json!({"lat": 50.1, "lon": 8.6}),
+    ] {
+        let (s, v) = senden(&l, &cookie, body.clone()).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {v}");
+    }
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        None
+    );
+}
+
+#[tokio::test]
+async fn leitung_hoert_helfer_live() {
+    let l = lage().await;
+    let mut rx = l.live.abonniere(l.einsatz);
+    let (gid, _cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let erwartet = json!({"einsatz_id": l.einsatz, "helfer_id": gid});
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![erwartet.clone()],
+        "Einlösen"
+    );
+    let (s, _) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![erwartet.clone()],
+        "Bestätigen"
+    );
+    let ende = chrono::Utc::now() + chrono::TimeDelta::hours(10);
+    let (s, v) = leitung(
+        &l,
+        &format!("/{gid}/extend"),
+        Some(json!({"laeuft_ab_at": ende.format("%Y-%m-%d %H:%M:%S").to_string()})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![erwartet.clone()],
+        "Verlängern"
+    );
+    let (s, _) = leitung(&l, &format!("/{gid}/revoke"), None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(ereignisse(&mut rx, "helfer"), vec![erwartet], "Abmelden");
+
+    let (b, _) = anmelden(&l, "unit", l.einheit, "B").await;
+    let (s, _) = leitung(&l, &format!("/{b}/reject"), None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        ereignisse(&mut rx, "helfer").len(),
+        2,
+        "Einlösen und Ablehnen"
+    );
+    let (c, _) = anmelden(&l, "unit", l.einheit, "C").await;
+    let _ = ereignisse(&mut rx, "helfer");
+    let (s, _) = leitung(&l, "/revoke", None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![json!({"einsatz_id": l.einsatz, "helfer_id": c})],
+        "alle abmelden"
+    );
+}

@@ -282,7 +282,7 @@ pub async fn speichern(
     org_id: i64,
     erfasser_id: i64,
     daten: OrgEinstellungenDaten<'_>,
-) -> Result<OrgEinstellungen, AppError> {
+) -> Result<Gespeichert, AppError> {
     let im = daten.ortung_im_einsatz.map(i64::from);
     let personen = daten.ortung_personen.map(i64::from);
     let mut tx = pool.begin().await?;
@@ -359,8 +359,26 @@ pub async fn speichern(
     if let Some(vorgaben) = daten.aufbewahrung_kategorien {
         super::aufbewahrung_kategorie::ersetzen(&mut tx, org_id, erfasser_id, vorgaben).await?;
     }
+    // Ohne Personenortung (auch mit „Ortung im Einsatz“ aus) verschwinden die Personen der
+    // laufenden Helfer von der Karte, in derselben Transaktion (Spec Helfer-App, „Org-Schalter“).
+    let personen_geloescht = if daten.ortung_personen == Some(false) {
+        crate::helfer::position::personen_der_org_loeschen(&mut tx, org_id).await?
+    } else {
+        Vec::new()
+    };
     tx.commit().await?;
-    laden_oder_default(pool, org_id).await
+    Ok(Gespeichert {
+        einstellungen: laden_oder_default(pool, org_id).await?,
+        personen_geloescht,
+    })
+}
+
+/// Ergebnis von [`speichern`].
+pub struct Gespeichert {
+    pub einstellungen: OrgEinstellungen,
+    /// `(einsatz_id, person_id)` der Helfer, deren Personenposition gelöscht wurde; der Aufrufer
+    /// meldet sie nach dem Commit live.
+    pub personen_geloescht: Vec<(i64, i64)>,
 }
 
 #[cfg(test)]
@@ -447,7 +465,8 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+        .einstellungen;
 
         assert_eq!(g.org_id, 1);
         assert_eq!(g.zeitzone.as_deref(), Some("Europe/Berlin"));
@@ -501,7 +520,8 @@ mod tests {
             },
         )
         .await
-        .unwrap();
+        .unwrap()
+        .einstellungen;
         assert_eq!(zweite.zeitzone.as_deref(), Some("UTC"));
         assert_eq!(zweite.zeitdarstellung, None);
         assert_eq!(zweite.retention_dauer_tage, None);

@@ -339,7 +339,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - Beim Ausschalten des Org-Schalters (Task 2, `setzen`): Personenpositionen aller aktiven
     Helfer der Org löschen.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `unbestaetigt_antwortet_409_ohne_speichern`;
   - `ortungsgeraet_schreibt_an_einheit_mit_quelle_helfer`;
   - `ohne_ortungsrolle_nur_person`;
@@ -349,10 +349,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - `pausieren_loescht_personenposition`;
   - `einsatz_beendet_401`;
   - `unplausible_koordinate_422` (lat 91).
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run `cargo test --test helfer --test geraet_kopplung` → PASS.
-- [ ] **Step 5:** Commit `feat: Helfer senden ihre Position`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** Run `cargo test --test helfer --test geraet_kopplung` → PASS.
+- [x] **Step 5:** Commit `feat: Helfer senden ihre Position`.
 
 ### Task 8: Frontend der Leitung und Weiche `/helfer`
 

@@ -239,8 +239,8 @@ async fn helfer_ansicht_entsteht_nur_ueber_die_einladung() {
     assert_eq!(n, 0);
 }
 
-/// Routenliste `helfer`: den Helferzustand erreicht nur eine Helfer-Kopplung; andere Geräte und
-/// Personen bekommen 403.
+/// Routenliste `helfer`: den Helferzustand und das Senden der Position erreicht nur eine
+/// Helfer-Kopplung; andere Geräte und Personen bekommen 403.
 #[tokio::test]
 async fn nur_helfer_erreichen_den_helferzustand() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;
@@ -257,6 +257,16 @@ async fn nur_helfer_erreichen_den_helferzustand() {
             "/api/devices/me",
             cookie,
             Some(r#"{"target":{"kind":"unit","id":1}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+        // Position senden ebenso (Task 7): nur die Helfer-Kopplung.
+        let (s, v) = anfrage(
+            &app,
+            "PUT",
+            "/api/devices/me/position",
+            cookie,
+            Some(r#"{"lat":50.1,"lon":8.6,"recorded_at":"2026-11-25T10:00:00Z"}"#),
         )
         .await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
