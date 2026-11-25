@@ -64,6 +64,41 @@ jobs:
           xcodebuild -version
       - name: XcodeGen (gepinnt)
         run: ./scripts/ios/xcodegen-installieren.sh
+      # Vorprüfung des API-Schlüssels: ruft App Store Connect direkt und nennt je Bereich nur den
+      # HTTP-Status und den Fehlercode. Xcode meldet bei fehlenden Rechten nur „Authentication
+      # failed“; hier steht, ob der Schlüssel gilt und welcher Bereich (Apps, Kennungen,
+      # Zertifikate, Profile) ihn ablehnt. Bricht nicht ab: das Archivieren entscheidet.
+      - name: API-Schlüssel prüfen
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: |
+          ruby -ropenssl -rjson -rnet/http -rbase64 -e '
+            b64 = ->(s) { Base64.urlsafe_encode64(s, padding: false) }
+            key = OpenSSL::PKey.read(ENV.fetch("APP_STORE_CONNECT_KEY_P8"))
+            kopf = b64.(JSON.generate(alg: "ES256", kid: ENV.fetch("APP_STORE_CONNECT_KEY_ID"), typ: "JWT"))
+            jetzt = Time.now.to_i
+            inhalt = b64.(JSON.generate(iss: ENV.fetch("APP_STORE_CONNECT_ISSUER_ID"), iat: jetzt,
+                                        exp: jetzt + 600, aud: "appstoreconnect-v1"))
+            der = key.sign(OpenSSL::Digest::SHA256.new, "#{kopf}.#{inhalt}")
+            r, s = OpenSSL::ASN1.decode(der).value.map { |z| z.value.to_s(2).rjust(32, "\0") }
+            token = "#{kopf}.#{inhalt}.#{b64.(r + s)}"
+            {
+              "Apps" => "/v1/apps?limit=1",
+              "Kennung helfer" => "/v1/bundleIds?filter[identifier]=dev.rubeen.lifeline.helfer",
+              "Kennung aktivitaet" => "/v1/bundleIds?filter[identifier]=dev.rubeen.lifeline.helfer.aktivitaet",
+              "Zertifikate" => "/v1/certificates?limit=1",
+              "Profile" => "/v1/profiles?limit=1",
+            }.each do |name, pfad|
+              uri = URI("https://api.appstoreconnect.apple.com#{pfad}")
+              antwort = Net::HTTP.get_response(uri, "Authorization" => "Bearer #{token}")
+              body = JSON.parse(antwort.body) rescue {}
+              codes = (body["errors"] || []).map { |e| e["code"] }.join(",")
+              anzahl = body["data"].is_a?(Array) ? " Treffer=#{body["data"].size}" : ""
+              puts "#{name}: HTTP #{antwort.code}#{anzahl} #{codes}"
+            end
+          ' || echo "Vorprüfung selbst fehlgeschlagen (kein Abbruch)."
       - name: Archivieren, signieren, hochladen
         env:
           LAUFNUMMER: ${{ github.run_number }}
