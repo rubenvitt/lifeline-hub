@@ -2,6 +2,9 @@ import type { EinsatzFahrzeug } from './types';
 import type { components } from './types.generated';
 import { apiGet, apiSend } from './client';
 
+/** Kandidatenliste samt Auskunft, ob die Bestätigung „Besatzung ehrenamtlich“ Pflicht ist. */
+export type TrackingCandidates = components['schemas']['TrackingCandidates'];
+
 /** Eine Kennung der letzten 24 Stunden, ohne Koordinaten (LLH-2091). */
 export type TrackingCandidate = components['schemas']['TrackingCandidate'];
 
@@ -24,11 +27,8 @@ function trackingPfad(einsatzId: number, efId: number): string {
 }
 
 /** Kennungen der letzten 24 Stunden zum Koppeln (nur mit Einsatzschreibrecht, ohne Koordinaten). */
-export function listOrtungKandidaten(
-  einsatzId: number,
-  efId: number,
-): Promise<TrackingCandidate[]> {
-  return apiGet<TrackingCandidate[]>(`${trackingPfad(einsatzId, efId)}/candidates`);
+export function listOrtungKandidaten(einsatzId: number, efId: number): Promise<TrackingCandidates> {
+  return apiGet<TrackingCandidates>(`${trackingPfad(einsatzId, efId)}/candidates`);
 }
 
 /** Fahrzeug an eine Kennung koppeln; die Antwort ist das Fahrzeug mit der vorhandenen Position. */

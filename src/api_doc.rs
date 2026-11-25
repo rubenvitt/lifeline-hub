@@ -325,6 +325,7 @@ use utoipa::OpenApi;
         crate::fahrzeug::EinsatzFahrzeugAnzeige,
         crate::routes::ortung::TrackingResponse,
         crate::routes::ortung::TrackingCandidate,
+        crate::routes::ortung::TrackingCandidates,
         crate::fahrzeug::EntlassungAntwort,
         crate::fahrzeug::EntlassungRuecknahmeAntwort,
         crate::fahrzeug::StatusRuecknahmeBeleg,

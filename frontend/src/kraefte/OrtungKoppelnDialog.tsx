@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Checkbox, Form, Radio } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ladeOrgEinstellungen } from '../api/orgEinstellungen';
 import { koppleOrtung, listOrtungKandidaten, type TrackingCandidate } from '../api/ortung';
-import { einsatzKeys, globalKeys } from '../api/queryKeys';
+import { einsatzKeys } from '../api/queryKeys';
 import type { EinsatzFahrzeug } from '../api/types';
 import { vorText } from '../anzeige/dauer';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -28,10 +27,10 @@ export interface OrtungKoppelnDialogProps {
  * Dialog „Ortung koppeln“ (LLH-2091, Spec `fahrzeugortung`, „Oberfläche“): wählt eine der
  * Kennungen, von denen in den letzten 24 Stunden eine Position eingegangen ist („Zugang · Kennung ·
  * vor 2 min“; schon gekoppelte stehen ausgegraut). „Besatzung ist ehrenamtlich“ ist Pflicht, solange
- * der Org-Schalter `ortung_hauptamt` nicht an ist; ist er an, steht das Kästchen nicht da. Den
- * Schalter liest nur, wer die Org-Einstellungen lesen darf (Admin, Führungskraft); fehlt das Recht
- * oder lädt er noch, gilt er als aus, das Kästchen bleibt Pflicht. Maßgeblich ist ohnehin der
- * Server (422 `volunteer_crew_required`). Die Kandidaten werden beim Öffnen geholt, nicht live und
+ * der Org-Schalter `ortung_hauptamt` nicht an ist; ist er an, steht das Kästchen nicht da. Ob es
+ * Pflicht ist, steht als `volunteer_crew_required` in der Kandidatenliste (die Org-Einstellungen
+ * darf nicht jeder Schreibberechtigte lesen). Maßgeblich ist ohnehin der Server (422
+ * `volunteer_crew_required`). Die Kandidaten werden beim Öffnen geholt, nicht live und
  * nicht im Lagebild ohne Netz (`NICHT_LIVE_KEYS`). Die Liste trägt keine Koordinaten.
  */
 export default function OrtungKoppelnDialog({
@@ -53,19 +52,13 @@ export default function OrtungKoppelnDialog({
     staleTime: 0,
     gcTime: 0,
   });
-  const orgQuery = useQuery({
-    queryKey: globalKeys.orgEinstellungen(),
-    queryFn: ladeOrgEinstellungen,
-    enabled: offen,
-    retry: false,
-  });
-  /** Nur ein gelesenes `1` schaltet die Bestätigung ab; alles andere gilt als aus. */
-  const hauptamtAn = orgQuery.data?.ortung_hauptamt === 1;
+  /** Der Server nennt den Org-Schalter mit der Liste; solange sie fehlt, ist die Bestätigung Pflicht. */
+  const bestaetigungPflicht = kandidatenQuery.data?.volunteer_crew_required ?? true;
 
   const kennung = Form.useWatch('kennung', form);
   const ehrenamt = Form.useWatch('ehrenamt', form);
-  const kandidaten = useMemo(() => kandidatenQuery.data ?? [], [kandidatenQuery.data]);
-  const bereit = kennung != null && (hauptamtAn || ehrenamt === true);
+  const kandidaten = useMemo(() => kandidatenQuery.data?.candidates ?? [], [kandidatenQuery.data]);
+  const bereit = kennung != null && (!bestaetigungPflicht || ehrenamt === true);
 
   const mutation = useMutation({
     mutationFn: (v: { efId: number; kandidat: TrackingCandidate; ehrenamt: boolean }) =>
@@ -141,7 +134,7 @@ export default function OrtungKoppelnDialog({
       onAbbrechen={onSchliessen}
     >
       {auswahl}
-      {!hauptamtAn && kandidaten.length > 0 && (
+      {bestaetigungPflicht && kandidaten.length > 0 && (
         <Feld
           name="ehrenamt"
           valuePropName="checked"

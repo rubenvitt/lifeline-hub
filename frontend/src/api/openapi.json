@@ -21672,6 +21672,25 @@
           }
         }
       },
+      "TrackingCandidates": {
+        "type": "object",
+        "description": "Antwort der Kandidatenliste: die Kennungen und ob die Bestätigung „Besatzung ehrenamtlich“\nbeim Koppeln Pflicht ist (Org-Schalter `ortung_hauptamt` aus). Der Dialog liest so den Schalter,\nohne die Org-Einstellungen lesen zu dürfen.",
+        "required": [
+          "volunteer_crew_required",
+          "candidates"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingCandidate"
+            }
+          },
+          "volunteer_crew_required": {
+            "type": "boolean"
+          }
+        }
+      },
       "TrackingResponse": {
         "type": "object",
         "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.",

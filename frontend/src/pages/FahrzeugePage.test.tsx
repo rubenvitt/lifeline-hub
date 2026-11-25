@@ -574,7 +574,9 @@ describe('FahrzeugePage', () => {
 
   it('öffnet aus „Ortung koppeln …“ den Dialog mit den Kennungen', async () => {
     server.use(
-      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
+        HttpResponse.json({ volunteer_crew_required: true, candidates: [] }),
+      ),
     );
     render(einsatz());
     await screen.findByText('Florian 1');

@@ -68,6 +68,15 @@ impl From<Kandidat> for TrackingCandidate {
     }
 }
 
+/// Antwort der Kandidatenliste: die Kennungen und ob die Bestätigung „Besatzung ehrenamtlich“
+/// beim Koppeln Pflicht ist (Org-Schalter `ortung_hauptamt` aus). Der Dialog liest so den Schalter,
+/// ohne die Org-Einstellungen lesen zu dürfen.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct TrackingCandidates {
+    pub volunteer_crew_required: bool,
+    pub candidates: Vec<TrackingCandidate>,
+}
+
 /// Body von `PUT …/tracking`.
 #[derive(Debug, Deserialize)]
 pub struct TrackingRequest {
@@ -95,10 +104,15 @@ pub async fn candidates(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,
     PfadParam((_eid, _ef_id)): PfadParam<(i64, i64)>,
-) -> Result<Json<Vec<TrackingCandidate>>, AppError> {
+) -> Result<Json<TrackingCandidates>, AppError> {
     let liste =
         kopplung::list_kandidaten(&state.pool, ctx.einsatz.org_id, &crate::zeit::jetzt()).await?;
-    Ok(Json(liste.into_iter().map(Into::into).collect()))
+    let einstellungen =
+        crate::org::einstellungen::laden_oder_default(&state.pool, ctx.einsatz.org_id).await?;
+    Ok(Json(TrackingCandidates {
+        volunteer_crew_required: !einstellungen.is_ortung_hauptamt(),
+        candidates: liste.into_iter().map(Into::into).collect(),
+    }))
 }
 
 /// PUT /api/incidents/{id}/vehicles/{ef_id}/tracking — Fahrzeug an eine Kennung koppeln, die

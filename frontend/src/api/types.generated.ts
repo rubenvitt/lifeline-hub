@@ -8694,6 +8694,15 @@ export interface components {
             device_id: string;
             received_at: string;
         };
+        /**
+         * @description Antwort der Kandidatenliste: die Kennungen und ob die Bestätigung „Besatzung ehrenamtlich“
+         *     beim Koppeln Pflicht ist (Org-Schalter `ortung_hauptamt` aus). Der Dialog liest so den Schalter,
+         *     ohne die Org-Einstellungen lesen zu dürfen.
+         */
+        TrackingCandidates: {
+            candidates: components["schemas"]["TrackingCandidate"][];
+            volunteer_crew_required: boolean;
+        };
         /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung. */
         TrackingResponse: {
             access_id: string;

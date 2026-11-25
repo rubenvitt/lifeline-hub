@@ -792,7 +792,7 @@ async fn kandidaten_ohne_koordinaten_ohne_fremde_org_ohne_widerrufene_und_ohne_a
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let liste = v.as_array().unwrap();
+    let liste = v["candidates"].as_array().unwrap();
     let mut gesehen: Vec<(&str, &str, bool)> = liste
         .iter()
         .map(|k| {
@@ -873,11 +873,32 @@ async fn abgelaufener_zugang_erscheint_nicht_in_den_kandidaten() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    assert!(v
+    assert!(v["candidates"]
         .as_array()
         .unwrap()
         .iter()
         .all(|k| k["access_id"] != "zugang-abgelaufen"));
+}
+
+#[tokio::test]
+async fn kandidaten_nennen_ob_die_bestaetigung_pflicht_ist() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let pfad = format!("{}/candidates", f.pfad());
+    let (s, v) = anfrage(&f.app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["volunteer_crew_required"], true, "{v}");
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, ortung_hauptamt) VALUES (?, 1) \
+         ON CONFLICT(org_id) DO UPDATE SET ortung_hauptamt = 1",
+    )
+    .bind(f.org)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    let (s, v) = anfrage(&f.app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["volunteer_crew_required"], false, "{v}");
 }
 
 // ── Lebenszyklus: Entlassen, Stornieren, Abschluss, Rückgängig (LLH-2091, Task 6) ───────────

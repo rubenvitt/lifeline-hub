@@ -31,15 +31,13 @@ const KANDIDATEN = [
 let bodies: unknown[];
 let onSchliessen: () => void;
 
-function handler(opts: { kandidaten?: unknown[]; hauptamt?: number | null | 'verboten' } = {}) {
+function handler(opts: { kandidaten?: unknown[]; pflicht?: boolean } = {}) {
   server.use(
     http.get('/api/incidents/7/vehicles/10/tracking/candidates', () =>
-      HttpResponse.json(opts.kandidaten ?? KANDIDATEN),
-    ),
-    http.get('/api/org-settings', () =>
-      opts.hauptamt === 'verboten' || opts.hauptamt === undefined
-        ? HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 })
-        : HttpResponse.json({ ortung_hauptamt: opts.hauptamt }),
+      HttpResponse.json({
+        volunteer_crew_required: opts.pflicht ?? true,
+        candidates: opts.kandidaten ?? KANDIDATEN,
+      }),
     ),
     http.put('/api/incidents/7/vehicles/10/tracking', async ({ request }) => {
       bodies.push(await request.json());
@@ -72,8 +70,8 @@ describe('OrtungKoppelnDialog', () => {
     ).toBeDisabled();
   });
 
-  it('verlangt bei ausgeschaltetem Schalter die Bestätigung „Besatzung ist ehrenamtlich“', async () => {
-    handler({ hauptamt: 0 });
+  it('verlangt bei Pflicht die Bestätigung „Besatzung ist ehrenamtlich“', async () => {
+    handler({ pflicht: true });
     render();
     await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
     const koppeln = screen.getByRole('button', { name: 'Koppeln' });
@@ -87,8 +85,8 @@ describe('OrtungKoppelnDialog', () => {
     ]);
   });
 
-  it('zeigt das Kästchen nicht, wenn der Schalter an ist, und koppelt ohne Bestätigung', async () => {
-    handler({ hauptamt: 1 });
+  it('zeigt das Kästchen nicht, wenn die Bestätigung nicht Pflicht ist, und koppelt ohne Bestätigung', async () => {
+    handler({ pflicht: false });
     render();
     await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
     await waitFor(() =>
@@ -99,16 +97,6 @@ describe('OrtungKoppelnDialog', () => {
     expect(bodies).toEqual([
       { access_id: 'z1', device_id: 'kennung-a', volunteer_crew_confirmed: false },
     ]);
-  });
-
-  it('behält das Kästchen als Pflicht, wenn der Schalter nicht lesbar ist (403)', async () => {
-    handler({ hauptamt: 'verboten' });
-    render();
-    await userEvent.click(await screen.findByRole('radio', { name: /kennung-a/ }));
-    expect(
-      screen.getByRole('checkbox', { name: 'Besatzung ist ehrenamtlich' }),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Koppeln' })).toBeDisabled();
   });
 
   it('nennt ohne Kennungen den Zustand und lässt nicht koppeln', async () => {
