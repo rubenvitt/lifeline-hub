@@ -38,7 +38,7 @@ herleitung:
 # Die Helfer-App ortet im Hintergrund (nur ihr Ziel trägt den Schlüssel; die Hülle nennt ihn nur im
 # Kommentar), unter Android nur als Vordergrund-Dienst vom Typ `location`.
 verlange '^        UIBackgroundModes:$' 'ios/project.yml'
-verlange 'foregroundServiceType="location"' 'android/helfer/src/main/AndroidManifest.xml'
+verlange 'foregroundServiceType="location[|"]' 'android/helfer/src/main/AndroidManifest.xml'
 verbiete 'NSLocationAlways' 'ios/Helfer/**/*.swift' 'ios/Helfer/**/*.plist' 'ios/project.yml'
 # Der Kern bleibt ohne System: kein UIKit, CoreLocation oder SwiftUI (ios/Helfer/AGENTS.md).
 verbiete '^import (UIKit|CoreLocation|SwiftUI)' 'ios/HelferKern/**/*.swift'

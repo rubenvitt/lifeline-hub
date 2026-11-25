@@ -38,6 +38,10 @@ herleitung:
 ```sh
 # Kein Google-Push in der Android-Helfer-App.
 verbiete 'firebase' 'android/helfer/**/*.kts' 'android/helfer/**/*.kt' 'android/helfer/**/*.xml'
+# iOS empfängt über APNs (nur das Ziel der Helfer-App), Android über einen Dienst vom Typ
+# remoteMessaging neben location.
+verlange 'aps-environment' 'ios/Helfer/App/LifelineHelfer.entitlements'
+verlange 'foregroundServiceType="location[|]remoteMessaging"' 'android/helfer/src/main/AndroidManifest.xml'
 ```
 
 ## Kontext
