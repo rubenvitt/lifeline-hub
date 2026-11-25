@@ -1,7 +1,7 @@
 import type { Drawing } from '@einsatzzeichen/schema';
 import { describe, expect, it } from 'vitest';
 import type { ExportObjekt } from './geoExport';
-import { iconDateiname, kmlFarbe, writeKml } from './kmlWriter';
+import { PUNKT_ICON, iconDateiname, kmlFarbe, writeKml } from './kmlWriter';
 
 const META = { stand: new Date('2026-11-24T09:05:07Z'), einsatzName: 'Hochwasser Nord' };
 const ICON = (schluessel: string) => iconDateiname(schluessel);
@@ -122,8 +122,22 @@ describe('writeKml', () => {
     expect(daten['lfh:zeichen']).toBe('a');
   });
 
-  it('gibt Objekten ohne Zeichen keinen IconStyle', () => {
+  it('gibt Flächen ohne Zeichen keinen IconStyle', () => {
     const d = dom(writeKml([zone()], META, ICON));
     expect(d.querySelectorAll('IconStyle')).toHaveLength(0);
+  });
+
+  it('ein Punkt ohne Zeichen behält seine Farbe: eingefärbter Kreis statt der gelben Nadel', () => {
+    const schaden: ExportObjekt = {
+      art: 'schaden',
+      name: 'Keller',
+      beschriftung: 'Keller',
+      geometrie: { type: 'Point', coordinates: [9.5, 54.5] },
+      stil: { markerFarbe: '#ff0000' },
+    };
+    const d = dom(writeKml([schaden], META, ICON));
+    const stil = d.querySelector('Placemark IconStyle');
+    expect(stil?.querySelector('color')?.textContent).toBe('ff0000ff');
+    expect(stil?.querySelector('Icon href')?.textContent).toBe(PUNKT_ICON);
   });
 });

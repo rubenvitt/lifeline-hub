@@ -2,6 +2,7 @@ import type { Drawing } from '@einsatzzeichen/schema';
 import { unzipSync } from 'fflate';
 import { describe, expect, it, vi } from 'vitest';
 import type { ExportObjekt } from './geoExport';
+import { PUNKT_ICON } from './kmlWriter';
 import { packKmz } from './kmzPacker';
 
 const META = { stand: new Date('2026-11-24T09:05:07Z'), einsatzName: 'Hochwasser Nord' };
@@ -25,6 +26,21 @@ async function entpacke(blob: Blob) {
 }
 
 describe('packKmz', () => {
+  it('legt für Punkte ohne Zeichen genau ein Kreis-PNG bei, sonst keins', async () => {
+    const ohne: ExportObjekt = {
+      art: 'schaden',
+      name: 'S',
+      beschriftung: 'S',
+      geometrie: { type: 'Point', coordinates: [9.5, 54.5] },
+      stil: { markerFarbe: '#ff0000' },
+    };
+    const mit = await entpacke(await packKmz([ohne, { ...ohne, name: 'T' }], META, stub()));
+    expect(Object.keys(mit)).toEqual(['doc.kml', PUNKT_ICON]);
+    expect([...mit[PUNKT_ICON].slice(0, 8)]).toEqual([...PNG]);
+    const ohneKreis = await entpacke(await packKmz([punkt('ez|a')], META, stub()));
+    expect(Object.keys(ohneKreis)).not.toContain(PUNKT_ICON);
+  });
+
   it('packt doc.kml als ersten Eintrag und je Zeichenschlüssel genau ein PNG', async () => {
     const render = stub();
     const blob = await packKmz([punkt('ez|a'), punkt('ez|b')], META, render);
@@ -52,9 +68,24 @@ describe('packKmz', () => {
     expect([...dateien[png]]).toEqual([...PNG]);
   });
 
-  it('packt ohne Zeichen nur doc.kml', async () => {
+  it('packt Flächen ohne Zeichen als doc.kml allein', async () => {
     const render = stub();
-    const o: ExportObjekt = { ...punkt('ez|a'), zeichen: undefined };
+    const o: ExportObjekt = {
+      art: 'zone',
+      name: 'Z',
+      beschriftung: 'Z',
+      geometrie: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [9, 54],
+            [9.1, 54],
+            [9, 54],
+          ],
+        ],
+      },
+      stil: {},
+    };
     const dateien = await entpacke(await packKmz([o], META, render));
     expect(Object.keys(dateien)).toEqual(['doc.kml']);
     expect(render).not.toHaveBeenCalled();

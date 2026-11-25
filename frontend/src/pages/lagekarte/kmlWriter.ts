@@ -46,6 +46,13 @@ export function iconDateiname(schluessel: string): string {
   return `files/${fnv1a(schluessel)}.png`;
 }
 
+/**
+ * Bild eines Punkts ohne taktisches Zeichen im KMZ: ein weißer Kreis, den `IconStyle/color` in der
+ * Markerfarbe einfärbt (KML multipliziert). Ohne eigenes Bild zeigte Google Earth die gelbe
+ * Standardnadel, und die Farbe ginge verloren; ein Verweis ins Netz bliebe offline leer.
+ */
+export const PUNKT_ICON = 'files/punkt.png';
+
 /** `#rrggbb` (oder `#rgb`) und Deckkraft 0 … 1 als KML-Farbe `aabbggrr`. */
 export function kmlFarbe(hex: string, deckkraft = 1): string {
   let h = hex.replace('#', '');
@@ -105,10 +112,25 @@ function linienStilKml(o: ExportObjekt): string {
   return `<Style>${linie}${flaeche}</Style>`;
 }
 
+/** Punkt ohne Zeichen: der eingefärbte Kreis aus {@link PUNKT_ICON}. */
+function punktStilKml(o: ExportObjekt): string {
+  const farbe = o.stil.markerFarbe ? `<color>${kmlFarbe(o.stil.markerFarbe)}</color>` : '';
+  return (
+    `<Style><IconStyle>${farbe}<scale>0.6</scale><Icon><href>${PUNKT_ICON}</href></Icon></IconStyle>` +
+    '<LabelStyle><scale>0.9</scale></LabelStyle></Style>'
+  );
+}
+
+/** Braucht das KMZ das Kreisbild? */
+export const brauchtPunktIcon = (objekte: readonly ExportObjekt[]) =>
+  objekte.some((o) => !o.zeichen && o.geometrie.type === 'Point');
+
 function placemark(o: ExportObjekt, styleId: (schluessel: string) => string): string {
   const stil = o.zeichen
     ? `<styleUrl>#${styleId(o.zeichen.schluessel)}</styleUrl>`
-    : linienStilKml(o);
+    : o.geometrie.type === 'Point'
+      ? punktStilKml(o)
+      : linienStilKml(o);
   const daten =
     `<Data name="lfh:art"><value>${esc(o.art)}</value></Data>` +
     (o.zeichen ? `<Data name="lfh:zeichen"><value>${esc(o.zeichen.spec)}</value></Data>` : '');
