@@ -15236,9 +15236,9 @@ async fn migration_0373_stammdaten_kennung() {
 /// LLH-1194: höchstens ein offener Schnappschuss je Adapter, nur ein offener trägt Inhalt, Löschen
 /// des Adapters kaskadiert; `adapter.vorlegen_erzwingen` steht auf 0.
 #[tokio::test]
-async fn migration_0374_stammdaten_schnappschuss() {
+async fn migration_0375_stammdaten_schnappschuss() {
     // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-    const VERSION: i64 = 374;
+    const VERSION: i64 = 375;
     let pool = pool_bis(
         SqliteConnectOptions::new().filename(":memory:"),
         VERSION - 1,
