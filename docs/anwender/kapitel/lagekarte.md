@@ -197,7 +197,7 @@ Dritter auf der Karte, etwa Suchgebiete eines Nachbarkreises als GeoJSON, KML od
    10 MB), bei „Adresse“ die Adresse eintragen; sie muss mit `https://` beginnen.
 3. Bei Bedarf einen „Name“ eintragen. Bleibt das Feld leer, schlägt der Server einen vor: der
    Name aus der Datei, bei einer Adresse der Name des Servers.
-4. „Hinzufügen“ wählen. Die App meldet „Fremdebene hinzugefügt“; die Ebene steht danach in der
+4. „Anlegen“ wählen. Die App meldet „Fremdebene hinzugefügt“; die Ebene steht danach in der
    Leiste unter „Fremdebenen“ und ist auf der Karte zu sehen.
 5. Scheitert das Hinzufügen, steht im Dialog „Nicht hinzugefügt“ mit dem Grund, etwa „Die Datei
    ist zu groß (höchstens 10 MB).“ oder „Die Adresse ist nicht erreichbar.“

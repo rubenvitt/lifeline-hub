@@ -139,7 +139,7 @@ export default function FremdebeneDialog({ offen, einsatzId, onSchliessen }: Pro
       onFertig={schliessen}
       onAbbrechen={schliessen}
       laeuft={mutation.isPending}
-      erfassenText="Hinzufügen"
+      erfassenText="Anlegen"
     >
       {gruendeText != null ? (
         <Alert type="error" showIcon title="Nicht hinzugefügt" description={gruendeText} />

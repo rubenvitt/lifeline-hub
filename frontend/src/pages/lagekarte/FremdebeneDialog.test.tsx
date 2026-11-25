@@ -69,7 +69,7 @@ describe('FremdebeneDialog', () => {
     const gross = kml('gross.kml');
     Object.defineProperty(gross, 'size', { value: FREMDEBENE_GRENZEN.dateiBytes + 1 });
     await userEvent.upload(dateiInput(d), gross);
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     expect(await within(d).findByText(FREMDEBENE_FEHLERTEXT.zu_gross)).toBeInTheDocument();
     expect(lege).not.toHaveBeenCalled();
   });
@@ -82,7 +82,7 @@ describe('FremdebeneDialog', () => {
       within(d).getByRole('textbox', { name: 'Adresse' }),
       'http://example.org/a.kml',
     );
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     expect(
       await within(d).findByText('Die Adresse muss mit https:// beginnen'),
     ).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('FremdebeneDialog', () => {
       within(d).getByRole('textbox', { name: 'Adresse' }),
       'HTTPS://example.org/a.kml',
     );
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(lege).toHaveBeenCalled());
     expect(within(d).queryByText('Die Adresse muss mit https:// beginnen')).toBeNull();
   });
@@ -125,7 +125,7 @@ describe('FremdebeneDialog', () => {
     fireEvent.change(within(d).getByRole('textbox', { name: 'Adresse' }), {
       target: { value: `https://example.org/${'a'.repeat(2048)}` },
     });
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     expect(await within(d).findByText(/höchstens 2048 Zeichen/)).toBeInTheDocument();
     expect(lege).not.toHaveBeenCalled();
   });
@@ -135,7 +135,7 @@ describe('FremdebeneDialog', () => {
     const { onSchliessen } = rendere();
     const d = await dialog();
     await userEvent.upload(dateiInput(d), kml());
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     expect(await within(d).findByText(FREMDEBENE_FEHLERTEXT.dtd)).toBeInTheDocument();
     expect(onSchliessen).not.toHaveBeenCalled();
     expect(within(d).getByRole('textbox', { name: 'Name' })).toHaveValue('Lage Nachbarkreis');
@@ -146,7 +146,7 @@ describe('FremdebeneDialog', () => {
     rendere();
     const d = await dialog();
     await userEvent.upload(dateiInput(d), kml());
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     expect(await within(d).findByText('Es ist ein Fehler aufgetreten')).toBeInTheDocument();
   });
 
@@ -156,7 +156,7 @@ describe('FremdebeneDialog', () => {
     const ungueltig = vi.spyOn(client, 'invalidateQueries');
     const d = await dialog();
     await userEvent.upload(dateiInput(d), kml());
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(onSchliessen).toHaveBeenCalled());
     expect(lege).toHaveBeenCalledWith(
       7,
@@ -176,7 +176,7 @@ describe('FremdebeneDialog', () => {
       'https://example.org/a.kml',
     );
     await userEvent.type(within(d).getByRole('textbox', { name: 'Name' }), 'Nachbar');
-    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(within(d).getByRole('button', { name: 'Anlegen' }));
     await waitFor(() => expect(lege).toHaveBeenCalled());
     expect(lege.mock.calls[0][1]).toEqual({ name: 'Nachbar', url: 'https://example.org/a.kml' });
   });
