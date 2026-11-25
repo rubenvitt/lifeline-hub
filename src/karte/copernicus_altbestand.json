@@ -1,0 +1,289 @@
+[
+  {
+    "code": "EMSR517",
+    "name": "Flood in Western Germany",
+    "kategorie": "Flood",
+    "gebiete": [
+      {
+        "nummer": 1,
+        "name": "Moselle",
+        "huelle": [6.345, 49.542, 7.588, 50.375],
+        "produkte": [
+          {
+            "typ": "DEL",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-15T19:47:53",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI01_DEL_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "DEL",
+            "monitoring": 1,
+            "version": 1,
+            "geliefert": "2021-07-16T23:13:12",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI01_DEL_MONIT01_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 3,
+        "name": "Hönningen",
+        "huelle": [6.781, 50.363, 7.24, 50.589],
+        "produkte": [
+          {
+            "typ": "DEL",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-16T01:42:28",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI03_DEL_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "DEL",
+            "monitoring": 1,
+            "version": 1,
+            "geliefert": "2021-07-16T22:46:30",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI03_DEL_MONIT01_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 4,
+        "name": "Prüm",
+        "huelle": [6.31, 49.812, 6.705, 50.366],
+        "produkte": [
+          {
+            "typ": "DEL",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-16T00:59:13",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI04_DEL_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "DEL",
+            "monitoring": 1,
+            "version": 1,
+            "geliefert": "2021-07-16T23:12:40",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI04_DEL_MONIT01_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 5,
+        "name": "Bonn",
+        "huelle": [6.027, 50.508, 7.278, 51.145],
+        "produkte": [
+          {
+            "typ": "DEL",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-16T02:20:07",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI05_DEL_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "DEL",
+            "monitoring": 1,
+            "version": 1,
+            "geliefert": "2021-07-16T20:34:49",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI05_DEL_MONIT01_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 6,
+        "name": "Duisburg",
+        "huelle": [6.638, 51.13, 7.732, 51.482],
+        "produkte": [
+          {
+            "typ": "DEL",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-16T03:18:44",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI06_DEL_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "DEL",
+            "monitoring": 1,
+            "version": 1,
+            "geliefert": "2021-07-16T14:48:02",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI06_DEL_MONIT01_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 7,
+        "name": "Erftstadt",
+        "huelle": [6.738, 50.752, 6.841, 50.844],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T09:45:21",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI07_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 8,
+        "name": "Euskirchen-Rheinbach-Steinbachtalsperre",
+        "huelle": [6.737, 50.499, 6.986, 50.697],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T15:09:20",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI08_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 9,
+        "name": "Eschweiler",
+        "huelle": [6.194, 50.702, 6.43, 50.896],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T10:36:12",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI09_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 10,
+        "name": "Wassenberg",
+        "huelle": [6.079, 51.05, 6.198, 51.121],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T11:44:06",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI10_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 11,
+        "name": "Leverkusen",
+        "huelle": [6.915, 50.981, 7.023, 51.07],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T12:41:16",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI11_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 14,
+        "name": "Düsseldorf",
+        "huelle": [6.681, 51.167, 6.808, 51.307],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T13:27:47",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI14_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 15,
+        "name": "Bad Neuenahr-Ahrweiler",
+        "huelle": [6.773, 50.367, 7.286, 50.569],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T11:36:42",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI15_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          },
+          {
+            "typ": "GRA",
+            "monitoring": 1,
+            "version": 3,
+            "geliefert": "2021-08-11T12:48:47",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI15_GRA_MONIT01_r1_RTP01_v3_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 16,
+        "name": "Gerolstein",
+        "huelle": [6.529, 49.778, 6.72, 50.248],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T11:45:31",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI16_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 17,
+        "name": "Irrel",
+        "huelle": [6.332, 49.822, 6.52, 50.119],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 2,
+            "geliefert": "2021-07-22T11:14:50",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI17_GRA_PRODUCT_r1_RTP01_v2_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 18,
+        "name": "Schleiden",
+        "huelle": [6.461, 50.514, 6.592, 50.582],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-19T12:05:05",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI18_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 20,
+        "name": "Garzweiler",
+        "huelle": [6.418, 51.027, 6.548, 51.104],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-20T07:34:03",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI20_GRA_PRODUCT_r1_RTP01_v1_vector.zip"
+          }
+        ]
+      },
+      {
+        "nummer": 21,
+        "name": "Berchtesgaden",
+        "huelle": [12.927, 47.579, 13.072, 47.713],
+        "produkte": [
+          {
+            "typ": "GRA",
+            "monitoring": 0,
+            "version": 1,
+            "geliefert": "2021-07-22T09:10:17",
+            "zip": "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/EMSR517/EMSR517_AOI21_GRA_PRODUCT_r1_VECTORS_v1_vector.zip"
+          }
+        ]
+      }
+    ]
+  }
+]

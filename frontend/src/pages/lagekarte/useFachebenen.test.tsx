@@ -8,6 +8,7 @@ import { neuerQueryClient } from '../../test/utils';
 import { GLOBAL_KEYS, globalKeys } from '../../api/queryKeys';
 import {
   ladeFachebene,
+  loadDrohneFachebene,
   type FachebeneAntwort,
   type FachebeneQuelle,
   type FeatureCollection,
@@ -129,6 +130,25 @@ vi.mock('../../api/fachebenen', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/fachebenen')>();
   return {
     ...actual,
+    loadDrohneFachebene: vi.fn((einsatzId: number): Promise<FachebeneAntwort> =>
+      Promise.resolve({
+        quelle: 'drohne',
+        status: 'ok',
+        attribution: 'Drohnenbild',
+        stand: null,
+        abgerufen: '2026-11-25T08:00:00Z',
+        features: {
+          type: 'FeatureCollection',
+          features: [
+            {
+              type: 'Feature',
+              geometry: { type: 'Point', coordinates: [8.4, 49.0] },
+              properties: { kind: 'aircraft', label: `Drohne ${einsatzId}`, heading_deg: 90 },
+            },
+          ],
+        },
+      }),
+    ),
     ladeFachebene: vi.fn((quelle: FachebeneQuelle, bbox?: string): Promise<FachebeneAntwort> => {
       if (quelle === 'nina')
         return Promise.resolve({
@@ -232,7 +252,11 @@ function rendere(controlHeight?: number, client?: QueryClient) {
   return renderHook(
     () => {
       const [sichtbar, setSichtbar] = useState<FachebenenSichtbar>(defaultFachebenenSichtbar);
-      return useFachebenen({ fachebenenSichtbar: sichtbar, setFachebenenSichtbar: setSichtbar });
+      return useFachebenen({
+        einsatzId: 7,
+        fachebenenSichtbar: sichtbar,
+        setFachebenenSichtbar: setSichtbar,
+      });
     },
     { wrapper: wrapper(controlHeight, client) },
   );
@@ -302,6 +326,32 @@ describe('useFachebenen: Liegezeit der Ausschnitte (LFH-945)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('useFachebenen: Drohnenlage (LLH-2106)', () => {
+  it('lädt erst mit dem Einschalten und über die Einsatzroute', async () => {
+    const lade = vi.mocked(loadDrohneFachebene);
+    lade.mockClear();
+    const client = neuerQueryClient();
+    const { result } = rendere(undefined, client);
+    expect(lade).not.toHaveBeenCalled();
+    act(() => result.current.onFachebeneToggle('drohne', true));
+    await waitFor(() => expect(result.current.fachebenenStatus.drohne).toBe('ok'));
+    expect(result.current.aktiveFachebenen.map((f) => f.def.key)).toEqual(['drohne']);
+    expect(lade).toHaveBeenCalledWith(7);
+    const f = result.current.aktiveFachebenen[0];
+    expect(f.daten.features).toHaveLength(1);
+    expect(result.current.fachebenenStatus.drohne).toBe('ok');
+    expect(result.current.fachebenenAbgerufen.drohne).toBe('2026-11-25T08:00:00Z');
+    expect(result.current.fachebenenAttribution).toEqual(['Drohnenbild']);
+    // Nie über die Überlagerungsroute: die kennt weder Einsatz noch Rolle.
+    expect(vi.mocked(ladeFachebene).mock.calls.some(([q]) => (q as string) === 'drohne')).toBe(
+      false,
+    );
+    // Der Schlüssel trägt die Einsatz-ID: ein anderer Einsatz teilt den Stand nicht.
+    expect(client.getQueryState(globalKeys.fachebeneDrohne(7))?.status).toBe('success');
+    expect(client.getQueryState(globalKeys.fachebeneDrohne(8))).toBeUndefined();
   });
 });
 

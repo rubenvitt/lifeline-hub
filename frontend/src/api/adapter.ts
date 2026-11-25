@@ -106,6 +106,7 @@ export const ADAPTER_FEHLER_TEXT: Record<AdapterFehler, string> = {
   geheimnis_unlesbar: 'Geheimnis mit anderem Schlüssel gesetzt',
   geheimnisspeicher_gesperrt: 'Geheimnisspeicher ohne Schlüssel',
   einstellung_ungueltig: 'Einstellung ungültig',
+  version_unbekannt: 'Unbekannte Schnittstellenversion',
   intern: 'Fehler im Server',
 };
 

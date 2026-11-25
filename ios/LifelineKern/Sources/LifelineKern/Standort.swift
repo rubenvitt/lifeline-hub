@@ -54,6 +54,58 @@ public enum Standortwirkung: Equatable, Sendable {
     case stoppe
 }
 
+/// Ein Fehler des `CLLocationManager`, wie ihn der Kern unterscheidet.
+public enum Ortungsfehler: Equatable, Sendable {
+    /// `CLError.denied`: die Person hat den Standort verweigert.
+    case denied
+    /// `CLError.locationUnknown`: noch kein Standort, der Manager versucht weiter.
+    case locationUnknown
+    /// Alles andere.
+    case andere
+}
+
+/// Wen ein Ereignis des `CLLocationManager` beendet: wartende Einzelabfragen (`location_current`)
+/// und die fortlaufende Ortung (`location_watch`), je mit diesem Fehler; `nil` heißt weiter warten.
+public struct Ortungsfolge: Equatable, Sendable {
+    public let einmal: Standortfehler?
+    public let beobachtung: Standortfehler?
+
+    public static let keine = Ortungsfolge(einmal: nil, beobachtung: nil)
+
+    public init(einmal: Standortfehler?, beobachtung: Standortfehler?) {
+        self.einmal = einmal
+        self.beobachtung = beobachtung
+    }
+}
+
+/// Was der `Standortdienst` der App bei Ereignissen des `CLLocationManager` tut (LLH-2082; Regel
+/// `ios/AGENTS.md`, „Standort“). Die App hält die wartenden Abfragen, der Kern entscheidet.
+public enum Ortungsablauf {
+    /// Ein Fehler des Managers. Läuft eine fortlaufende Ortung, ist „noch kein Standort“ für
+    /// niemanden ein Ende: eine wartende Einzelabfrage nimmt deren nächste Position. Ohne sie hat
+    /// `requestLocation()` aufgegeben, die Einzelabfrage endet.
+    public static func fehler(_ fehler: Ortungsfehler, beobachtet: Bool, einmalWartend: Bool)
+        -> Ortungsfolge
+    {
+        let text: Standortfehler = fehler == .denied ? .denied : .unavailable
+        if fehler == .locationUnknown && beobachtet { return .keine }
+        return Ortungsfolge(einmal: einmalWartend ? text : nil, beobachtung: beobachtet ? text : nil)
+    }
+
+    /// Die Freigabe hat sich geändert. Fällt sie weg, während eine Ortung läuft oder eine
+    /// Einzelabfrage wartet (etwa „Einmal erlauben“ ist abgelaufen, der Status ist dann wieder
+    /// „noch nie gefragt“), endet beides mit `denied`; der Manager meldet das nicht selbst.
+    public static func freigabe(erlaubt: Bool, beobachtet: Bool, einmalWartend: Bool) -> Ortungsfolge {
+        guard !erlaubt else { return .keine }
+        return Ortungsfolge(
+            einmal: einmalWartend ? .denied : nil, beobachtung: beobachtet ? .denied : nil)
+    }
+
+    /// Endet die fortlaufende Ortung, während eine Einzelabfrage noch auf deren nächste Position
+    /// wartet, muss die App sie selbst holen (`requestLocation()`), sonst kommt keine mehr.
+    public static func isRequestNachStopp(einmalWartend: Bool) -> Bool { einmalWartend }
+}
+
 /// Die laufenden Beobachtungen (`location_watch`) des einen Webviews (LLH-2071; Regel
 /// `ios/AGENTS.md`, „Standort“). Sie gelten für den Server, auf dem sie begannen: Positionen gehen
 /// nur an eine Seite dieses Servers, solange er aktiv ist; sonst endet alles. Navigation, Schließen

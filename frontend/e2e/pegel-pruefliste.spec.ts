@@ -924,6 +924,133 @@ for (const [route, text] of [
   });
 }
 
+/** Ein Gefahrengebiet mit Warnstufe akut, unbestätigt (es fehlt die Beurteilung). */
+async function gefahrengebietAkut(page: Page, einsatzId: string, versatz: number) {
+  const [w, s] = [13.4 + versatz, 52.52];
+  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
+    data: {
+      typ: 'gefahrengebiet',
+      geometrie_typ: 'Polygon',
+      geometrie: JSON.stringify({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [w, s],
+            [w + 0.005, s],
+            [w + 0.005, s + 0.005],
+            [w, s + 0.005],
+            [w, s],
+          ],
+        ],
+      }),
+      label: `Gebiet ${versatz}`,
+    },
+  });
+  expect(zone.ok(), `Gefahrengebiet: ${zone.status()} ${await zone.text()}`).toBeTruthy();
+  const { gefahrengebiet_id } = (await zone.json()) as { gefahrengebiet_id: number };
+  const stufe = await page.request.put(
+    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebiet_id}/matrix/rating`,
+    { data: { gefahrentyp: 'einsturz', schutzobjekt: 'menschen', warnstufe: 'akut' } },
+  );
+  expect(stufe.ok(), `Warnstufe: ${stufe.status()} ${await stufe.text()}`).toBeTruthy();
+}
+
+/**
+ * Einsatznamen in Stufen von rund 40 bis 70 px (LLH-2085). Der Kopf springt nur in einem Band der
+ * Namenslänge: ohne Pegel passt der Datenstand neben den Titel, mit Pegel nicht mehr (bei 1024 px
+ * rund 110 px breit). Wo das Band liegt, hängt an Ortspfad, Schrift und sogar an den Ziffern des
+ * Datenstands. Die Stufen sind enger als das Band, eine liegt also immer darin.
+ */
+const NAMENSSTUFEN = [
+  'Hochwasser Elbe',
+  'Hochwasser Elbe Dresden',
+  'Hochwasser Elbe Dresden Altstadt',
+  'Hochwasser Elbe Dresden Altstadt Nord',
+  'Hochwasser Elbe Dresden Altstadt Nord-Süd',
+  'Hochwasser Elbe Dresden Altstadt Nord-Süd-West',
+  'Hochwasser Elbe Dresden Altstadt Nord-Süd-West Pieschen',
+];
+
+// LLH-2085: der ungünstige Fall im Überblick. Kam der Pegel als erste Lage-Angabe, brach der Kopf
+// mit langem Einsatznamen bei 1024 px um (bis 0,40, Mutationsprobe dieses Falls). Steht schon
+// die Warnstufe mit unbestätigten Gebieten da, bricht die Meta bei 768 px in sich; ohne
+// Platzhalter 0,07, also knapp unter der Grenze: der Fall sichert ab, er belegt nichts. Gemessen
+// mit CI-Schriftsetzung.
+//
+// Offen bleibt 768 px mit veraltetem Pegel (0,25, LLH-2102): „· veraltet“ macht die Notiz
+// breiter als den Platzhalter. Ein Platzhalter mit dem Zusatz ließe dafür den frischen Pegel bei
+// mittellangen Namen springen (0,29 bis 0,32, Entscheidung 24.11.2026).
+for (const fall of [
+  {
+    name: 'der Pegel als erste Lage-Angabe',
+    breiten: [1024],
+    namen: NAMENSSTUFEN,
+    gefahren: false,
+    veraltet: false,
+  },
+  {
+    name: 'Warnstufe akut und unbestätigt',
+    breiten: [768, 1024],
+    namen: [NAMENSSTUFEN[4]],
+    gefahren: true,
+    veraltet: false,
+  },
+  {
+    name: 'Warnstufe akut, unbestätigt und Pegel veraltet',
+    breiten: [1024],
+    namen: [NAMENSSTUFEN[4]],
+    gefahren: true,
+    veraltet: true,
+  },
+]) {
+  test(`ueberblick, langer Einsatzname, ${fall.name}: das Nachladen des Pegels trägt ≤ 0,1 zur CLS bei (LLH-2085)`, async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+    await anmelden(page);
+    const einsatzId = await einsatzAnlegen(page, fall.namen[0]);
+    await legePegelFest(page, einsatzId);
+    if (fall.gefahren) {
+      for (const versatz of [0, 0.01, 0.02]) await gefahrengebietAkut(page, einsatzId, versatz);
+    }
+    await verschiebungenAufzeichnen(page);
+    const werte: string[] = [];
+    for (const [breite, bezeichnung] of fall.breiten.flatMap((b) =>
+      fall.namen.map((n) => [b, n] as const),
+    )) {
+      const umbenannt = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+        data: { bezeichnung },
+      });
+      expect(umbenannt.ok(), `Umbenennen: ${umbenannt.status()}`).toBeTruthy();
+      await page.setViewportSize({ width: breite, height: 844 });
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      const pegel = await zurueckhalten(page, [
+        [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(fall.veraltet ? 120 : 10)],
+      ]);
+      await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
+      await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
+      const kopf = page.locator('[data-lfh="ueberblick-lage-kopf"]');
+      if (fall.gefahren) await expect(kopf.getByText('3 unbestätigt')).toBeVisible();
+      await wartenBisRuhig(page);
+      const marke = await pegel.freigeben();
+      await expect(
+        kopf.getByText(
+          fall.veraltet ? /Pegel 6,84 m steigend · veraltet/ : /Pegel 6,84 m steigend/,
+        ),
+      ).toBeVisible();
+      await wartenBisRuhig(page);
+      const b = await beitragAb(page, marke);
+      werte.push(
+        `${breite} „${bezeichnung}“: Pegel ${b.pegel.toFixed(4)} [${b.pegelQuellen}] · Aufbau ${b.aufbau.toFixed(4)} [${b.aufbauQuellen}]`,
+      );
+      expect
+        .soft(b.pegel, `Pegel-Beitrag zur CLS, Überblick bei ${breite} px, „${bezeichnung}“`)
+        .toBeLessThanOrEqual(0.1);
+    }
+    test.info().annotations.push({ type: 'messwert', description: werte.join(' | ') });
+  });
+}
+
 test('Einstellungssektion Pegel: das Nachladen von Liste und Stationen trägt ≤ 0,1 zur CLS bei', async ({
   page,
 }) => {

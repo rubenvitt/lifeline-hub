@@ -43,6 +43,8 @@ Konvention: `AGENTS.md`, Abschnitt „Zunder“.
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` lokal grün
 - [ ] Review: gelaufen (Anlass, Befunde, Verbleib) oder nicht nötig (warum); `dev-zunder-ausfuehren`, „Review nach Ermessen“
 - [ ] Bei UI-Abläufen: die betroffene e2e-Spec lokal grün (Kommando: `scripts/AGENTS.md`, „Wann `voll`“)
+- [ ] Gate-Dateien (Warnung im Lauf „Migrationsnummern“): keine geändert, oder je Datei ein Satz, ob die Prüfung strenger oder lockerer wird und warum (`scripts/AGENTS.md`, „Gate-Dateien“)
+- [ ] Sichtbare Änderung in der laufenden App angesehen (Skill `verify`) oder nicht sichtbar (warum)
 - [ ] Bei Backend-Typänderungen: `openapi.json` + `types.generated.ts` mitcommittet
 - [ ] Bei neuer/umgebauter Seite: Prüfliste Einsatztauglichkeit ausgefüllt (15 Kriterien)
 - [ ] Anwenderdoku (`docs/anwender/`) nachgezogen oder nicht betroffen, Bilder neu erzeugt

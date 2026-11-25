@@ -576,7 +576,8 @@ export type FachebeneTon =
   | 'autobahn_parken'
   | 'kritis'
   | 'energie'
-  | 'copernicus';
+  | 'copernicus'
+  | 'drohne';
 
 export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   nina: '#cf1322',
@@ -596,6 +597,8 @@ export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   // Braun (LLH-1200): die Satellitenauswertung färbt je Klasse, der Ton ist nur Rückfall und
   // Panel-Quadrat. Weit genug von DWD-Gold und Energie-Gelb (ΔE ≥ 31).
   copernicus: '#873800',
+  // Orange (LLH-2106): die Drohnenlage. Bisher frei geblieben; ΔE ≥ 27 zu jedem Ton am Tag.
+  drohne: '#f5590f',
 };
 
 export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
@@ -610,6 +613,8 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
   kritis: '#9254de',
   energie: '#fadb14',
   copernicus: '#c48a5a',
+  // Nachts etwas heller, damit ΔE ≥ 25 zu jedem Ton und ≥ 3 : 1 auf dem Leistengrund halten.
+  drohne: '#ff8c5a',
 };
 
 /**

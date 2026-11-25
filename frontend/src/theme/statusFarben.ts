@@ -971,6 +971,7 @@ const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
   kritis: 'kritis',
   energie: 'energie',
   copernicus: 'copernicus',
+  drohne: 'drohne',
 };
 
 export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): string {

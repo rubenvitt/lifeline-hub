@@ -27,15 +27,7 @@ pub mod abgleich;
 pub mod datei;
 pub mod repo;
 
-/// Größte Datei in Bytes (400 darüber). Spiegel: `SCHICHTPLAN_DATEI_MAX_BYTES` in
-/// `frontend/src/api/eingabegrenzen.ts`.
-pub const DATEI_MAX_BYTES: usize = 2 * 1024 * 1024;
-
-/// Größte Zahl an Zeilen einer Datei ohne Kopfzeile (400 darüber).
-pub const ZEILEN_MAX: usize = 5_000;
-
-/// Entpackte Größe aller Teile einer XLSX (400 darüber): schützt vor einer Zip-Bombe.
-pub const XLSX_ENTPACKT_MAX_BYTES: u64 = 64 * 1024 * 1024;
+pub use crate::einlesen::tabelle::{DATEI_MAX_BYTES, XLSX_ENTPACKT_MAX_BYTES, ZEILEN_MAX};
 
 /// Externe Kennung einer Person.
 pub const KENNUNG_MAX: usize = 100;
