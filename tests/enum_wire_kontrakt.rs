@@ -697,6 +697,8 @@ fn serde_wire_gleich_as_str() {
         AdapterLanEntzogen,
         AdapterAngehalten,
         AdapterFortgesetzt,
+        FremdebenenLanErlaubt,
+        FremdebenenLanEntzogen,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
@@ -1748,6 +1750,7 @@ fn live_event_wire() {
         Meldung => "meldung",
         Bereitstellungsraum => "bereitstellungsraum",
         KarteBild => "karte_bild",
+        KarteFremdebene => "karte_fremdebene",
         Etb => "etb",
         Befehl => "befehl",
         Lagebesprechung => "lagebesprechung",
@@ -2257,6 +2260,34 @@ fn lese_sperre_wire() {
         NachlaufAbgelaufen => "nachlauf_abgelaufen",
         NichtMehrLesbar => "nicht_mehr_lesbar",
     } in lifeline_hub::error::LeseSperre::ALLE);
+}
+
+#[test]
+fn fremdebene_quelle_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneQuelle {
+        Datei => "datei",
+        Url => "url",
+    } in lifeline_hub::karte_fremdebene::FremdebeneQuelle::ALLE);
+}
+
+#[test]
+fn fremdebene_fehler_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneFehler {
+        Unlesbar => "unlesbar",
+        Dtd => "dtd",
+        ZuGross => "zu_gross",
+        ZuUmfangreich => "zu_umfangreich",
+        ZuVieleObjekte => "zu_viele_objekte",
+        Leer => "leer",
+        Koordinaten => "koordinaten",
+        Virus => "virus",
+        NichtErreichbar => "nicht_erreichbar",
+        Weiterleitung => "weiterleitung",
+        Abgelehnt => "abgelehnt",
+        Status => "status",
+        ZielIntern => "ziel_intern",
+        Zeitlimit => "zeitlimit",
+    } in lifeline_hub::karte_fremdebene::FremdebeneFehler::ALLE);
 }
 
 #[test]

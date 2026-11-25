@@ -564,6 +564,9 @@ export function useLagekarteDaten({
             id: z.id,
             geometrie: g,
             label: beschriftung,
+            rohLabel: z.label,
+            ...(gebietId != null ? { warnstufe: warnstufe ?? 'unbekannt' } : {}),
+            ...(kreis ? { kreis } : {}),
             typ: z.typ,
             stil,
             // Gefahrenzonen gestrichelt — reine Darstellung am Zonentyp.

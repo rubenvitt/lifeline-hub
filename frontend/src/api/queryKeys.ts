@@ -76,6 +76,9 @@ export const EINSATZ_KEYS = {
   // Einheit, die dann kein Treffer mehr ist), nicht auf der Platte.
   brStammTreffer: 'einsatz-br-stamm-treffer',
   kartenbilder: 'einsatz-kartenbilder',
+  // Fremdebenen der Lagekarte (LLH-2099): Liste und je Ebene das normierte GeoJSON.
+  fremdebenen: 'einsatz-fremdebenen',
+  fremdebeneDaten: 'einsatz-fremdebene-daten',
   etb: 'etb',
   befehle: 'einsatz-befehle',
   befehl: 'einsatz-befehl',
@@ -383,6 +386,7 @@ export const EINSATZ_STREAM_EVENTS = {
     EINSATZ_KEYS.brStammTreffer,
   ],
   karte_bild: [EINSATZ_KEYS.kartenbilder],
+  karte_fremdebene: [EINSATZ_KEYS.fremdebenen, EINSATZ_KEYS.fremdebeneDaten],
   // Prefix-Match deckt ['etb', einsatzId, filter] mit ab.
   etb: [EINSATZ_KEYS.etb, EINSATZ_KEYS.modulZaehler],
   // Invalidiert Befehls-Liste UND -Detail (Prefix-Match trifft alle befehlIds).
@@ -864,6 +868,9 @@ export const einsatzKeys = {
   lageberichtAnlagen: (einsatzId: number, berichtId: number) =>
     [EINSATZ_KEYS.lageberichtAnlagen, einsatzId, berichtId] as const,
   kartenbilder: (einsatzId: number) => [EINSATZ_KEYS.kartenbilder, einsatzId] as const,
+  fremdebenen: (einsatzId: number) => [EINSATZ_KEYS.fremdebenen, einsatzId] as const,
+  fremdebeneDaten: (einsatzId: number, ebeneId: number) =>
+    [EINSATZ_KEYS.fremdebeneDaten, einsatzId, ebeneId] as const,
   // Maßgebliche Pegel, NICHT live (siehe NICHT_LIVE_KEYS).
   pegel: (einsatzId: number) => [EINSATZ_KEYS.pegel, einsatzId] as const,
   /** Vorschlag aus der Vorhersage-Reihe `WV` je Pegel, Sub-Key unter demselben Prefix. */
@@ -1633,6 +1640,10 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.br,
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
+    // Fremdebenen (LLH-2099): Liste und je Ebene das normierte GeoJSON, damit die Karte ohne Netz
+    // dieselben Ebenen zeigt.
+    EINSATZ_KEYS.fremdebenen,
+    EINSATZ_KEYS.fremdebeneDaten,
     EINSATZ_KEYS.lageSnapshot,
     // Verlauf der eigenen Benachrichtigungen (LLH-1422): ohne Netz lesbar, „Alle gelesen“ wird
     // vorgemerkt (`offline/schreiben.ts`). Die Detailzeile liest der Server nur aus Retain-Spalten

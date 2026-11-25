@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Weg nach draußen der URL-Fremdebenen (LLH-2100) samt Single-Flight je Ebene. Vorgabe: der
+    /// echte Abruf über `adapter::ziel`; Tests setzen einen eigenen Abrufer ein.
+    pub fremdebene_abrufer: crate::karte_fremdebene::abruf::Abrufer,
     /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
     /// `adapter_einsatz`, nur im Arbeitsspeicher.
     pub drohne: std::sync::Arc<crate::drohne::Store>,
@@ -904,6 +907,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/incidents/{id}/briefing/schedule",
             put(routes::lagebesprechung::set_termin),
+        )
+        .route(
+            "/api/incidents/{id}/briefing/schedule/export",
+            get(routes::lagebesprechung::export_termin),
         )
         .route(
             "/api/incidents/{id}/briefings",
@@ -1996,6 +2003,29 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/incidents/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
+        )
+        // Fremdebenen (LLH-2099) unter dem neuen Präfix (ADR-0097); Grenzen wie die Bilder.
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            get(routes::karte_fremdebene::liste),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers",
+            post(routes::karte_fremdebene::anlegen)
+                .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
+                .route_layer(upload_grenze.clone()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}/data",
+            get(routes::karte_fremdebene::daten).route_layer(download_grenze()),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            patch(routes::karte_fremdebene::aktualisieren),
+        )
+        .route(
+            "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
+            delete(routes::karte_fremdebene::loeschen),
         )
         // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
         .route(
@@ -3323,6 +3353,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            fremdebene_abrufer: Default::default(),
             drohne: Default::default(),
         }
     }

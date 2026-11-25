@@ -645,6 +645,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
         adapter: adapter_rahmen,
+        fremdebene_abrufer: Default::default(),
         drohne,
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).

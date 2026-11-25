@@ -1,3 +1,4 @@
+use crate::karte_fremdebene::FremdebeneFehler;
 use crate::log_drossel::Sammelzeile;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -74,6 +75,9 @@ pub enum AppError {
     /// übrigen 409 (Lebenszyklus, doppelte Bezeichnung) trennt und nur hier „Zwischenzeitlich
     /// geändert“ fragt (`src/AGENTS.md`, Statuscode-Konvention).
     Veraltet,
+    /// Eine Fremdebene der Lagekarte ist abgelehnt (LLH-2099): `{error, grund}` mit dem Code aus
+    /// [`FremdebeneFehler`], 413 bei `zu_gross`, sonst 400. Der Client zeigt den Text zum Code.
+    Fremdebene(FremdebeneFehler),
 }
 
 /// Wert von `grund` im Umschlag von [`AppError::NichtInListe`]; der Client vergleicht ihn
@@ -168,11 +172,18 @@ impl std::fmt::Display for AppError {
             AppError::PayloadTooLarge(m) => write!(f, "{m}"),
             AppError::UpgradeRequired(m) => write!(f, "{m}"),
             AppError::Zeilen { meldung, .. } => write!(f, "{meldung}"),
+            AppError::Fremdebene(fehler) => write!(f, "{}", fehler.meldung()),
         }
     }
 }
 
 impl std::error::Error for AppError {}
+
+impl From<FremdebeneFehler> for AppError {
+    fn from(fehler: FremdebeneFehler) -> Self {
+        AppError::Fremdebene(fehler)
+    }
+}
 
 impl From<sqlx::Error> for AppError {
     fn from(err: sqlx::Error) -> Self {
@@ -216,6 +227,8 @@ impl AppError {
             AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             AppError::UpgradeRequired(_) => StatusCode::UPGRADE_REQUIRED,
             AppError::Zeilen { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::Fremdebene(FremdebeneFehler::ZuGross) => StatusCode::PAYLOAD_TOO_LARGE,
+            AppError::Fremdebene(_) => StatusCode::BAD_REQUEST,
         }
     }
 
@@ -359,6 +372,13 @@ impl IntoResponse for AppError {
             )
                 .into_response();
         }
+        if let AppError::Fremdebene(fehler) = self {
+            return (
+                status,
+                Json(json!({ "error": fehler.meldung(), "grund": fehler.as_str() })),
+            )
+                .into_response();
+        }
         if let AppError::NichtInListe = self {
             let message = self.public_message();
             return (
@@ -412,6 +432,28 @@ mod tests {
             "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
         );
         assert_eq!(json["grund"], GRUND_VERALTET);
+    }
+
+    /// LLH-2099: eine abgelehnte Fremdebene nennt ihren Code als `grund`; eine zu große Datei
+    /// ist 413, alles andere 400.
+    #[tokio::test]
+    async fn fremdebene_ist_400_mit_grund_und_413_bei_zu_gross() {
+        let resp = AppError::Fremdebene(FremdebeneFehler::Koordinaten).into_response();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(
+            json["error"],
+            "Die Koordinaten liegen außerhalb der Erde. Ist die Datei in WGS84?"
+        );
+        assert_eq!(json["grund"], "koordinaten");
+
+        let resp = AppError::Fremdebene(FremdebeneFehler::ZuGross).into_response();
+        assert_eq!(resp.status(), StatusCode::PAYLOAD_TOO_LARGE);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Die Datei ist zu groß (höchstens 10 MB).");
+        assert_eq!(json["grund"], "zu_gross");
     }
 
     #[tokio::test]

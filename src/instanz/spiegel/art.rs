@@ -53,6 +53,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     g("gefahr_bewertung", K::Lage),
     g("freies_zeichen", K::Lage),
     g("karte_hintergrundbild", K::Lage),
+    g("karte_fremdebene", K::Lage),
     g("karten_ansicht", K::Lage),
     g("lage_snapshot", K::Lage),
     g("einsatz_pegel", K::Lage),
@@ -136,6 +137,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     // Anhänge und ihre Verknüpfungen
     g("anhang", K::Anhaenge),
     g("karte_hintergrundbild_daten", K::Anhaenge),
+    g("karte_fremdebene_daten", K::Anhaenge),
     g("uhs_plan", K::Anhaenge),
     g("einsatz_dokument", K::Anhaenge),
     g("einsatz_schaden_anhang", K::Anhaenge),

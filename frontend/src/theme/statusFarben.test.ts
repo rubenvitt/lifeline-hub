@@ -11,6 +11,7 @@ import {
   fachebeneFarbenHell,
   farbenDunkel,
   farbenHell,
+  FREMDEBENEN_PALETTE,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
   type Farbrollen,
@@ -960,6 +961,41 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       for (const [i, a] of EBENEN.entries()) {
         for (const b of EBENEN.slice(i + 1)) {
           expect(abstand(palette[a], palette[b]), `${name}: ${a}/${b}`).toBeGreaterThanOrEqual(25);
+        }
+      }
+    }
+  });
+});
+
+describe('Palette der Fremdebenen (LLH-2099)', () => {
+  const TOENE = ['fremd-1', 'fremd-2', 'fremd-3', 'fremd-4', 'fremd-5', 'fremd-6'] as const;
+
+  it('hat sechs Töne mit je einem Wert für hell und dunkel und folgt dem Modus', () => {
+    expect(Object.keys(FREMDEBENEN_PALETTE.hell)).toEqual([...TOENE]);
+    expect(Object.keys(FREMDEBENEN_PALETTE.dunkel)).toEqual([...TOENE]);
+    for (const t of TOENE) {
+      expect(sf.fremdebeneFarbe(t, hellToken)).toBe(FREMDEBENEN_PALETTE.hell[t]);
+      expect(sf.fremdebeneFarbe(t, dunkelToken)).toBe(FREMDEBENEN_PALETTE.dunkel[t]);
+    }
+  });
+
+  it('fällt bei einem unbekannten Schlüssel auf den ersten Ton', () => {
+    expect(sf.fremdebeneFarbe('lila', hellToken)).toBe(FREMDEBENEN_PALETTE.hell['fremd-1']);
+  });
+
+  it('hebt sich in beiden Modi von jedem Leistengrund ab (≥ 3 : 1) und bleibt unterscheidbar', () => {
+    for (const [palette, grund, name] of [
+      [FREMDEBENEN_PALETTE.hell, farbenHell, 'Tag'],
+      [FREMDEBENEN_PALETTE.dunkel, farbenDunkel, 'Nacht'],
+    ] as const) {
+      for (const [i, t] of TOENE.entries()) {
+        for (const g of ['paneel', 'flaeche', 'flaeche2', 'flaeche3'] as const) {
+          expect(kontrast(palette[t], grund[g]), `${name}: ${t} auf ${g}`).toBeGreaterThanOrEqual(
+            3,
+          );
+        }
+        for (const u of TOENE.slice(i + 1)) {
+          expect(abstand(palette[t], palette[u]), `${name}: ${t}/${u}`).toBeGreaterThanOrEqual(20);
         }
       }
     }

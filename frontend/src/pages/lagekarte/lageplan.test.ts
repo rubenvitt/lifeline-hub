@@ -94,6 +94,7 @@ function quellen(teil: Partial<LegendenQuellen> = {}): LegendenQuellen {
     fachebenen: [],
     abgerufen: {},
     bilder: [],
+    fremdebenen: [],
     jetztMs: jetzt,
     zeitKurz: (iso) => iso.slice(11, 16).replace(':', ''),
     ...teil,
@@ -174,5 +175,20 @@ describe('lageplanLegende', () => {
   it('listet sichtbare Bild-Hintergründe', () => {
     const legende = lageplanLegende(quellen({ bilder: [{ id: 3, name: 'Hallenplan' }] }));
     expect(legendenTexte(legende)).toEqual(['Bild: Hallenplan']);
+  });
+
+  it('nennt eine sichtbare Fremdebene mit Name und Farbe (LLH-2099)', () => {
+    const legende = lageplanLegende(
+      quellen({ fremdebenen: [{ id: 4, name: 'Lage Nachbarkreis', farbe: '#2f54eb' }] }),
+    );
+    expect(legende.fremdebenen).toEqual([
+      expect.objectContaining({
+        schluessel: 'fremdebene-4',
+        text: 'Lage Nachbarkreis',
+        fuellung: '#2f54eb',
+        linie: '#2f54eb',
+      }),
+    ]);
+    expect(legendenTexte(legende)).toEqual(['Fremde Daten: Lage Nachbarkreis']);
   });
 });

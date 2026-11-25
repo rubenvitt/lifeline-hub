@@ -1418,7 +1418,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -1480,7 +1480,9 @@
           "adapter_lan_erlaubt",
           "adapter_lan_entzogen",
           "adapter_angehalten",
-          "adapter_fortgesetzt"
+          "adapter_fortgesetzt",
+          "fremdebenen_lan_erlaubt",
+          "fremdebenen_lan_entzogen"
         ]
       },
       "AdressatKategorie": {
@@ -10521,6 +10523,114 @@
           }
         }
       },
+      "FremdebeneAnzeige": {
+        "type": "object",
+        "description": "Eine Fremdebene, wie die Liste sie zeigt (ohne Inhalt). Wire-Felder englisch.",
+        "required": [
+          "id",
+          "name",
+          "source",
+          "color",
+          "feature_count",
+          "dropped_count",
+          "created_at"
+        ],
+        "properties": {
+          "attempted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter Abrufversuch, nur URL-Ebene."
+          },
+          "color": {
+            "type": "string",
+            "description": "Palettenschlüssel (`fremd-1` … `fremd-6`, [`FARBEN`]). Bewusst ein `String` und kein\n`wire_enum`: geprüft wird beim Schreiben (`check_farbe`, 400 bei fremdem Wert); gelesen\nwird, was die Spalte trägt, auch ein Wert, den ein Spiegel mit neuerer Palette liefert.\nEin Enum ließe eine solche Zeile beim Lesen scheitern (500 für die ganze Liste); der Client\nfällt bei einem unbekannten Schlüssel auf seine Vorgabe zurück."
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "dropped_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Zahl der Objekte ohne lesbare Geometrie."
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FremdebeneFehler",
+                "description": "Fehler des letzten Abrufs; der letzte Stand bleibt sichtbar."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "feature_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fetched_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Letzter erfolgreicher Abruf (auch 304), nur URL-Ebene."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/FremdebeneQuelle"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Volle Adresse der URL-Ebene; nur für Schreibende (Entwurf, „URL mit Geheimnis im Query“),\nsonst fehlt sie ([`FremdebeneAnzeige::fuer_leser`])."
+          },
+          "url_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Nur der Host der URL-Ebene, für alle Lesenden."
+          }
+        }
+      },
+      "FremdebeneFehler": {
+        "type": "string",
+        "description": "Warum eine Datei oder ein Abruf abgelehnt ist (`grund` im 400 bzw. 413, an der URL-Ebene\nin `karte_fremdebene.fehler`). Nie der Text des Ziels: nur der Code.",
+        "enum": [
+          "unlesbar",
+          "dtd",
+          "zu_gross",
+          "zu_umfangreich",
+          "zu_viele_objekte",
+          "leer",
+          "koordinaten",
+          "virus",
+          "nicht_erreichbar",
+          "weiterleitung",
+          "abgelehnt",
+          "status",
+          "ziel_intern",
+          "zeitlimit"
+        ]
+      },
+      "FremdebeneQuelle": {
+        "type": "string",
+        "description": "Woher eine Fremdebene kommt.",
+        "enum": [
+          "datei",
+          "url"
+        ]
+      },
       "FuehrungAnfrageEingang": {
         "type": "object",
         "description": "Eine Gegenstelle vor Ort, die um die Führung bittet (LLH-1678, design.md D4).",
@@ -15287,6 +15397,7 @@
           "meldung",
           "bereitstellungsraum",
           "karte_bild",
+          "karte_fremdebene",
           "etb",
           "befehl",
           "lagebesprechung",
@@ -16970,6 +17081,7 @@
         "required": [
           "org_id",
           "aufbewahrung_kategorien",
+          "fremdebenen_lan_erlaubt",
           "ortung_im_einsatz",
           "ortung_personen"
         ],
@@ -17022,6 +17134,10 @@
               "string",
               "null"
             ]
+          },
+          "fremdebenen_lan_erlaubt": {
+            "type": "boolean",
+            "description": "Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099); Standard `false`."
           },
           "geaendert_at": {
             "type": [

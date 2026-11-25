@@ -812,6 +812,14 @@ describe('LagekartePage', () => {
     expect(eventSourceUrls).toHaveLength(0);
   });
 
+  it('öffnet über „Fremdebene hinzufügen …“ den Dialog (nur mit Schreibrecht)', async () => {
+    basisHandler();
+    const user = userEvent.setup();
+    renderSeite();
+    await user.click(await screen.findByRole('button', { name: /Fremdebene hinzufügen …/ }));
+    expect(await screen.findByRole('radio', { name: 'Adresse' })).toBeInTheDocument();
+  });
+
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {
     let patchBody: unknown = null;
     basisHandler([

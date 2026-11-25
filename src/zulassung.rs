@@ -110,6 +110,13 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "GET",
         "/api/incidents/{id}/map/background-images/{bildId}/download",
     ),
+    // Fremdebenen (LLH-2099): Multipart bis 26 MiB + clamd-Scan; Daten bis 8 MiB GeoJSON. Nur
+    // POST bzw. GET der Daten — Liste, PATCH und DELETE bleiben geregelt.
+    ("POST", "/api/incidents/{id}/map/foreign-layers"),
+    (
+        "GET",
+        "/api/incidents/{id}/map/foreign-layers/{ebeneId}/data",
+    ),
     // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
     ("PUT", "/api/incidents/{id}/uhs/{uid}/plan"),

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { flushSync } from 'react-dom';
 import Druckkopf from '../../components/druck/Druckkopf';
 import {
+  FREMDE_DATEN,
   LAGEPLAN_BILD_MAX_MM,
   lageplanBildHoehe,
   lageplanFlaeche,
@@ -112,6 +113,7 @@ export default function LageplanDruck({ blatt }: { blatt: LageplanBlatt }) {
     ...legende.zonen.map((z) => ({ schluessel: z.schluessel, text: z.text, zone: z })),
     ...legende.fachebenen.map((z) => ({ ...z, zone: null })),
     ...legende.bilder.map((z) => ({ ...z, text: `Bild: ${z.text}`, zone: null })),
+    ...legende.fremdebenen.map((z) => ({ ...z, text: `${FREMDE_DATEN}: ${z.text}`, zone: z })),
   ];
   return (
     <div data-lfh="druckwurzel" className="lageplan-druck" ref={wurzelRef}>

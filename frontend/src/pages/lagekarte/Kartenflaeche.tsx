@@ -93,6 +93,14 @@ import {
   type FachebeneKlickZiel,
 } from './fachebenenLayer';
 import {
+  entferneFremdebeneLayer,
+  bildAnker,
+  fremdebeneClickLayerIds,
+  fremdebeneIdVon,
+  sorgeFuerFremdebeneLayer,
+  type AktiveFremdebene,
+} from './fremdebenenLayer';
+import {
   ABSCHNITT_KLICK_LAYER,
   ZONEN_KLICK_LAYER,
   entscheideKlickziel,
@@ -330,6 +338,10 @@ export interface KartenflaecheProps {
   fachebenen?: AktiveFachebene[];
   /** Bild-Hintergründe (Overlays über der Basemap, unter Abschnitten/Zonen/Markern). */
   bilder?: BildOverlay[];
+  /** Sichtbare Fremdebenen mit Daten (LLH-2099): über den Bildern, unter den eigenen Lagen. */
+  fremdebenen?: AktiveFremdebene[];
+  /** Klick auf ein Objekt einer Fremdebene → Properties (`name`, `description`) und Ebene. */
+  onFremdebeneKlick?: (properties: Record<string, unknown>, ebeneId: number) => void;
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
   /** Aktueller Zoom nach Bewegung — für „näher heranzoomen"-Hinweise bbox-abhängiger Ebenen. */
@@ -508,6 +520,8 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     onZoomAenderung,
     onFachebeneKlick,
     bilder,
+    fremdebenen,
+    onFremdebeneKlick,
     platzierBild,
     onPlatzierGeometrie,
     griffModus,
@@ -595,6 +609,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   fachebenenRef.current = fachebenen ?? [];
   // Aktuelle Bild-Overlays; nach setStyle re-angelegt.
   const bilderRef = useRef<BildOverlay[]>([]);
+  // Aktuelle Fremdebenen (LLH-2099); nach setStyle re-angelegt.
+  const fremdebenenRef = useRef<AktiveFremdebene[]>(fremdebenen ?? []);
+  fremdebenenRef.current = fremdebenen ?? [];
+  const vorherigeFremdebenenRef = useRef<Set<number>>(new Set());
   const vorherigeBilderRef = useRef<Set<number>>(new Set());
   // Zuletzt angewandter Style: der Konstruktor wendet den initialen an, der [style]-Effekt reagiert
   // nur auf echte Wechsel (sonst lüde `diff: false` beim Mount alles neu).
@@ -838,7 +856,10 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         if (fe.def.darstellung === 'raster') continue;
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
       }
-      synchronisiereBildLayer(map, bilderRef.current, 'abschnitte-fill');
+      synchronisiereBildLayer(map, bilderRef.current, bildAnker(map));
+      for (const fr of fremdebenenRef.current) {
+        sorgeFuerFremdebeneLayer(map, fr.id, fr.daten, fr.farbe);
+      }
       wendeRasterFachebenenAn(map, fachebenenRef.current);
     });
     // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
@@ -958,6 +979,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       () => bilderRef.current,
       () => markerDatenRef.current,
       () => einsatzortDatenRef.current,
+      () => fremdebenenRef.current,
     );
     wendeKartenDatenAn(map, 'suchnadel', () =>
       sorgeFuerSuchnadelLayer(map, suchnadelRef.current.daten, suchnadelRef.current.farbe),
@@ -1187,8 +1209,13 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
   } | null>(null);
   const flaechenwahlRef = useRef(flaechenwahl);
   flaechenwahlRef.current = flaechenwahl;
-  const flaechenKlickRef = useRef({ onZoneKlick, onFlaecheKlick, onFachebeneKlick });
-  flaechenKlickRef.current = { onZoneKlick, onFlaecheKlick, onFachebeneKlick };
+  const flaechenKlickRef = useRef({
+    onZoneKlick,
+    onFlaecheKlick,
+    onFachebeneKlick,
+    onFremdebeneKlick,
+  });
+  flaechenKlickRef.current = { onZoneKlick, onFlaecheKlick, onFachebeneKlick, onFremdebeneKlick };
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1284,6 +1311,7 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       onZoneKlick: zone,
       onFlaecheKlick: abschnitt,
       onFachebeneKlick: fachebene,
+      onFremdebeneKlick: fremdebene,
     } = flaechenKlickRef.current;
     const id = ziel.merkmal.properties?.id;
     if (ziel.art === 'zone') {
@@ -1292,6 +1320,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
     if (ziel.art === 'abschnitt') {
       if (id != null) abschnitt?.(Number(id));
+      return;
+    }
+    const fremdId = fremdebeneIdVon(ziel.merkmal.layer.id);
+    if (fremdId != null) {
+      fremdebene?.((ziel.merkmal.properties ?? {}) as Record<string, unknown>, fremdId);
       return;
     }
     const quelle = fachebeneQuelleVon(ziel.merkmal.layer.id);
@@ -1378,20 +1411,66 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     });
   }, [fachebenen]);
 
-  // Bild-Overlays synchronisieren; `beforeId='abschnitte-fill'` hält sie unter den Vektorlayern.
+  // Bild-Overlays synchronisieren; der Anker (`bildAnker`) hält sie unter Fremdebenen und Vektorlayern.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const aktiv = bilder ?? [];
     bilderRef.current = aktiv;
     wendeKartenDatenAn(map, 'bilder', () => {
-      const aktivIds = synchronisiereBildLayer(map, aktiv, 'abschnitte-fill');
+      const aktivIds = synchronisiereBildLayer(map, aktiv, bildAnker(map));
       for (const id of vorherigeBilderRef.current) {
         if (!aktivIds.has(id)) entferneBildLayer(map, id);
       }
       vorherigeBilderRef.current = aktivIds;
     });
   }, [bilder]);
+
+  // Fremdebenen (LLH-2099): je Ebene ein eigener Schlüssel für `wendeKartenDatenAn`
+  // (`lagekarte/AGENTS.md`, „Vertagte Kartendaten tragen einen Schlüssel“). `useFremdebenen` hält
+  // die Liste stabil, solange sich weder Daten noch Farbe ändern.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const aktiv = fremdebenen ?? [];
+    fremdebenenRef.current = aktiv;
+    const aktivIds = new Set(aktiv.map((f) => f.id));
+    for (const id of vorherigeFremdebenenRef.current) {
+      if (!aktivIds.has(id)) {
+        wendeKartenDatenAn(map, `fremdebene-${id}`, () => entferneFremdebeneLayer(map, id));
+      }
+    }
+    for (const fr of aktiv) {
+      wendeKartenDatenAn(map, `fremdebene-${fr.id}`, () =>
+        sorgeFuerFremdebeneLayer(map, fr.id, fr.daten, fr.farbe),
+      );
+    }
+    vorherigeFremdebenenRef.current = aktivIds;
+  }, [fremdebenen]);
+
+  // Klick auf ein Objekt einer Fremdebene → Detailkarte nur zum Lesen, wenn der Tipp ihm gehört.
+  // Die Fläche kommt über `klickzielAm` direkt oder aus dem Auswahlmenü (`waehleFlaeche`).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const binds = (fremdebenen ?? []).flatMap((fr) =>
+      fremdebeneClickLayerIds(fr.id).map((id) => {
+        const klick = (e: maplibregl.MapLayerMouseEvent) => {
+          const gewinner = klickzielAm(map, e);
+          if (!gewinner || !('merkmal' in gewinner) || gewinner.merkmal.layer.id !== id) return;
+          onFremdebeneKlick?.(
+            (gewinner.merkmal.properties ?? {}) as Record<string, unknown>,
+            fr.id,
+          );
+        };
+        map.on('click', id, klick);
+        return { id, klick };
+      }),
+    );
+    return () => {
+      for (const b of binds) map.off('click', b.id, b.klick);
+    };
+  }, [fremdebenen, onFremdebeneKlick]);
 
   // Marker als GeoJSON-Layer + Clustering. Als letzter Daten-Effekt registriert → sein Eintrag läuft
   // zuletzt, die Marker-Layer liegen über Abschnitten/Zonen/Bildern; `sorgeFuerMarkerLayer` pinnt

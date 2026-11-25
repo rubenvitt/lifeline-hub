@@ -8,6 +8,7 @@ import {
   fachebeneFarbenDunkel,
   fachebeneFarbenHell,
   farbenDunkel,
+  FREMDEBENEN_PALETTE,
   farbenHell,
   warnstufeFarbenDunkel,
   warnstufeFarbenHell,
@@ -981,6 +982,16 @@ export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): str
   return (istDunklerModus(token) ? fachebeneFarbenDunkel : fachebeneFarbenHell)[
     FACHEBENE_TON[quelle]
   ];
+}
+
+/**
+ * Ebenenfarbe einer Fremdebene (LLH-2099) aus ihrem Palettenschlüssel (`color` am Draht) im
+ * aktiven Modus. Ein unbekannter Schlüssel (älterer oder neuerer Server) fällt auf den ersten Ton,
+ * statt die Ebene ohne Farbe zu zeichnen.
+ */
+export function fremdebeneFarbe(schluessel: string, token: GlobalToken): string {
+  const palette = istDunklerModus(token) ? FREMDEBENEN_PALETTE.dunkel : FREMDEBENEN_PALETTE.hell;
+  return palette[schluessel as keyof typeof palette] ?? palette['fremd-1'];
 }
 
 /**

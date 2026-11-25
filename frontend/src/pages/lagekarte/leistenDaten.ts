@@ -378,11 +378,15 @@ export function filtereGruppe<Z extends { name: string }>(
   return zeilen.filter((z) => z.name.toLocaleLowerCase('de').includes(b));
 }
 
-/** Klappbare Knoten des Ebenenbaums: Gruppen, Fachebenen-Untergruppen, Hintergrund-Untergruppen. */
+/**
+ * Klappbare Knoten des Ebenenbaums: Gruppen, Fachebenen-Untergruppen, Fremdebenen (LLH-2099),
+ * Hintergrund-Untergruppen.
+ */
 export type BaumKnoten =
   | EbenenGruppeKennung
   | 'fachebenen'
   | FachebenenGruppeKennung
+  | 'fremdebenen'
   | 'hintergrund'
   | 'grundlage'
   | 'bilder';
@@ -390,7 +394,8 @@ export type BaumKnoten =
 /**
  * Vorgabe: offen, was im Einsatz laufend geschaltet wird (Kräfte, Lage); zu, was man einmal
  * einstellt (Betroffene, Fachebenen, Hintergrund). Innerhalb einer Gruppe stehen die Warnungen und
- * beide Hintergrund-Untergruppen offen — wer die Gruppe öffnet, sieht sie sofort.
+ * beide Hintergrund-Untergruppen offen — wer die Gruppe öffnet, sieht sie sofort. Fremdebenen
+ * (LLH-2099) stehen offen: wer eine hinzufügt, sucht sie dort.
  */
 export const BAUM_KLAPP_VORGABE: Record<BaumKnoten, boolean> = {
   kraefte: true,
@@ -402,6 +407,7 @@ export const BAUM_KLAPP_VORGABE: Record<BaumKnoten, boolean> = {
   umwelt: false,
   verkehr: false,
   satellit: false,
+  fremdebenen: true,
   drohne: true,
   hintergrund: false,
   grundlage: true,

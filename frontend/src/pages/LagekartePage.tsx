@@ -19,6 +19,7 @@ import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { useLageplan } from './lagekarte/useLageplan';
 import LageplanDruck from './lagekarte/LageplanDruck';
+import FremdebeneDialog, { fremdebeneNebenweg } from './lagekarte/FremdebeneDialog';
 import LageplanAnlageDialog, {
   ALS_ANLAGE,
   anlageSperrGrund,
@@ -55,6 +56,10 @@ import { useKartenAnsicht } from './lagekarte/useKartenAnsicht';
 import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDaten';
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
+import { useFremdebenen } from './lagekarte/useFremdebenen';
+import { fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { standAusWire } from './lagekarte/geoExport';
+import FremdebeneDetail from './lagekarte/FremdebeneDetail';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, ohneAbgeschaltete, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN, zoneStil, zoneTypLabel } from './lagekarte/zonenStil';
@@ -130,6 +135,7 @@ import type { Standquelle } from './lagekarte/snapshotDaten';
 import Datenstand from '../components/Datenstand';
 import { fehlerText } from '../api/client';
 import { useKartenFehler } from './lagekarte/useKartenFehler';
+import { useGeoExport } from './lagekarte/useGeoExport';
 import { KartenFehlerHinweis } from './lagekarte/KartenFehlerHinweis';
 import { useLinkAuftrag } from '../routing/useLinkAuftrag';
 import { useSprungSperre } from '../einsatz/useSprungSperre';
@@ -782,6 +788,24 @@ export default function LagekartePage() {
     beginneHandlung: kartenFehler.beginne,
   });
 
+  // Fremdebenen (LLH-2099): Liste, Sichtbarkeit je Arbeitsplatz, Daten der sichtbaren Ebenen. Der
+  // gesicherte Stand kennt keine Fremdebenen. Ein Objekt öffnet eine Detailkarte nur zum Lesen.
+  const fremd = useFremdebenen(einsatzId, { aktiv: quelle.typ === 'live' });
+  const [fremdAuswahl, setFremdAuswahl] = useState<{
+    ebeneId: number;
+    properties: Record<string, unknown>;
+  } | null>(null);
+  // Die Detailkarte gilt nur, solange das Objekt auf der Karte steht: ausgeblendet, entfernt oder
+  // beim Abgleich gestrichen räumt sie die Auswahl (sonst hielte sie `useAuswahlVorn` vorn).
+  const fremdAuswahlGilt =
+    fremdAuswahl != null &&
+    fremdObjektSichtbar(fremd.aktive, fremdAuswahl.ebeneId, fremdAuswahl.properties);
+  const fremdAuswahlEbene =
+    fremdAuswahl && fremdAuswahlGilt ? fremd.finde(fremdAuswahl.ebeneId) : undefined;
+  useEffect(() => {
+    if (fremdAuswahl != null && !fremdAuswahlGilt) setFremdAuswahl(null);
+  }, [fremdAuswahl, fremdAuswahlGilt]);
+
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
   const sichtbareMarker = useMemo(
@@ -844,17 +868,33 @@ export default function LagekartePage() {
     (aktiverMarker != null && aktiverMarker.typ !== 'freies_zeichen') ||
     ausgewaehltesZeichen != null ||
     fachebeneAuswahl != null ||
+    fremdAuswahlEbene != null ||
     ausgewaehlteZone != null;
-  // Eine Auswahl (Marker, Zone oder Fachebenen-Objekt) — die drei schließen einander aus.
+  // Eine Auswahl (Marker, Zone, Fachebenen- oder Fremdebenen-Objekt) — sie schließen einander aus.
   const hebeAuswahlAuf = () => {
     setAuswahl(null);
     setZoneAuswahl(null);
     setFachebeneAuswahl(null);
+    setFremdAuswahl(null);
   };
+  // Eine andere Auswahl löst die eines Fremdebenen-Objekts ab.
+  useEffect(() => {
+    if (auswahl != null || zoneAuswahl != null || fachebeneAuswahl != null) setFremdAuswahl(null);
+  }, [auswahl, zoneAuswahl, fachebeneAuswahl]);
+  const onFremdebeneKlick = useCallback(
+    (properties: Record<string, unknown>, ebeneId: number) => {
+      if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
+      setAuswahl(null);
+      setZoneAuswahl(null);
+      setFachebeneAuswahl(null);
+      setFremdAuswahl({ ebeneId, properties });
+    },
+    [exklusiverModusAktiv, setAuswahl, setZoneAuswahl, setFachebeneAuswahl],
+  );
   // Ansicht „Auswahl“ der Leiste (LLH-1033): eine neue Auswahl steht vorn, ein Tipp auf
   // „Ebenen“/„Objekte“ lässt sie bestehen. Seitenzustand, nie gespeichert (`leistenWahl.ts`).
   const auswahlVorn = useAuswahlVorn(
-    auswahl ?? (zoneAuswahl != null ? `zone-${zoneAuswahl}` : fachebeneAuswahl),
+    auswahl ?? (zoneAuswahl != null ? `zone-${zoneAuswahl}` : (fachebeneAuswahl ?? fremdAuswahl)),
   );
   const zeigeAuswahl = auswahlVorn.zeige;
   const verlasseAuswahl = auswahlVorn.verlasse;
@@ -1311,6 +1351,7 @@ export default function LagekartePage() {
       abschnitte: kartenFlaechen.length,
       zonen: zonenFeatures,
       fachebenen: aktiveFachebenen,
+      fremdebenen: fremd.aktive,
       abgerufen: fachebenenAbgerufen,
       bilder: bildOverlays
         .filter((o) => o.sichtbar && o.opazitaet > 0)
@@ -1323,10 +1364,47 @@ export default function LagekartePage() {
     beginneHandlung: kartenFehler.beginne,
   });
   const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
+  // Export (Spec `lagekarte-geo-export`): nur, was die Karte gerade zeigt; ein Fehler steht im
+  // Hinweis über der Karte. Die Farben der Marker folgen dem aktiven Modus (`rollenFarbe`).
+  // Solange die Quellen laden, gibt es keine Eingabe (der Eintrag sagt „lädt“, nicht „Nichts
+  // eingeblendet“). Der Stand ist in der Historienansicht der gezeigte gesicherte Stand, live der
+  // Moment des Klicks (`stand: null`).
+  const snapshotStandWire = aktiverSnapshot?.stand_at ?? null;
+  const exportEingabe = useMemo(() => {
+    if (ladt || markerLaden) return null;
+    const stand =
+      quelle.typ === 'snapshot' && snapshotStandWire != null
+        ? standAusWire(snapshotStandWire)
+        : null;
+    if (quelle.typ === 'snapshot' && stand == null) return null;
+    return {
+      marker: sichtbareMarker,
+      flaechen: kartenFlaechen,
+      zonen: zonenFeatures,
+      einsatzName: rahmenEinsatz?.bezeichnung ?? '',
+      stand,
+    };
+  }, [
+    ladt,
+    markerLaden,
+    quelle.typ,
+    snapshotStandWire,
+    sichtbareMarker,
+    kartenFlaechen,
+    zonenFeatures,
+    rahmenEinsatz?.bezeichnung,
+  ]);
+  const { beginne: beginneKartenhandlung } = kartenFehler;
+  const beginneExport = useCallback(
+    () => beginneKartenhandlung('export', 'Export nicht erstellt'),
+    [beginneKartenhandlung],
+  );
+  const { nebenwege: exportNebenwege } = useGeoExport(exportEingabe, einsatzId, beginneExport);
   const lageberichteFreigabe = useModulFreigabe(einsatzId, 'lageberichte');
   const befehleFreigabe = useModulFreigabe(einsatzId, 'auftraege');
   const ohneVerbindung = useOhneVerbindung();
   const [anlageOffen, setAnlageOffen] = useState(false);
+  const [fremdebeneOffen, setFremdebeneOffen] = useState(false);
   /**
    * Abschnittsfokus per Link: `?abschnitt=<id>` (LLH-1057) — fokussieren, dann räumen; der Fokus
    * wird nie gespeichert. Erst mit geladener Seite und entschiedener Startansicht: vorher fehlt die
@@ -1360,6 +1438,7 @@ export default function LagekartePage() {
     (aktiverMarker && aktiverMarker.typ !== 'freies_zeichen') ||
     ausgewaehltesZeichen ||
     fachebeneAuswahl ||
+    fremdAuswahlEbene ||
     ausgewaehlteZone ? (
       <>
         {aktiverMarker && aktiverMarker.typ !== 'freies_zeichen' && (
@@ -1401,6 +1480,13 @@ export default function LagekartePage() {
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
             einsatzId={einsatzId}
             abgerufen={fachebenenAbgerufen[fachebeneAuswahl.quelle]}
+          />
+        )}
+        {fremdAuswahl && fremdAuswahlEbene && (
+          <FremdebeneDetail
+            ebene={fremdAuswahlEbene}
+            properties={fremdAuswahl.properties}
+            onSchliessen={() => setFremdAuswahl(null)}
           />
         )}
         {ausgewaehlteZone && (
@@ -1502,6 +1588,14 @@ export default function LagekartePage() {
     : null;
   const nebenwege: Nebenweg[] = [
     ...druckNebenwege,
+    ...exportNebenwege,
+    ...[
+      fremdebeneNebenweg({
+        darfSchreiben: !!darfSchreiben && quelle.typ === 'live',
+        ohneVerbindung,
+        onWahl: () => setFremdebeneOffen(true),
+      }),
+    ].filter((weg) => weg != null),
     ...(rahmenEinsatz
       ? [
           {
@@ -1714,6 +1808,8 @@ export default function LagekartePage() {
         }
         onZoomAenderung={setKartenZoom}
         onFachebeneKlick={onFachebeneKlick}
+        fremdebenen={fremd.aktive}
+        onFremdebeneKlick={onFremdebeneKlick}
         bilder={bildOverlays}
         platzierBild={aktivesPlatzierBild}
         onPlatzierGeometrie={onPlatzierGeometrie}
@@ -2072,6 +2168,20 @@ export default function LagekartePage() {
         }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
+        fremdebenen={
+          quelle.typ === 'live'
+            ? {
+                ebenen: fremd.ebenen,
+                sichtbar: fremd.sichtbar,
+                onToggle: fremd.toggle,
+                onUmbenennen: fremd.umbenennen,
+                onFarbe: fremd.setzeFarbe,
+                onEntfernen: fremd.entfernen,
+                fehler: fremd.fehler,
+                datenZustand: fremd.datenZustand,
+              }
+            : undefined
+        }
         bilder={bilder}
         onBildUpload={onBildUpload}
         bildUpload={bildUpload}
@@ -2111,6 +2221,13 @@ export default function LagekartePage() {
                 text: 'Bild-Hintergründe konnten nicht geladen werden',
                 ursache: bilderFehlerUrsache,
                 onWiederholen: bilderNeuLaden,
+              }
+            : undefined,
+          fremdebenen: fremd.listenFehler
+            ? {
+                text: 'Fremdebenen konnten nicht geladen werden',
+                ursache: fremd.listenFehler,
+                onWiederholen: fremd.neuLaden,
               }
             : undefined,
           ansichten: ansichtenFehler
@@ -2221,6 +2338,11 @@ export default function LagekartePage() {
           befehleFrei={befehleFreigabe.zustand === 'frei'}
           erstelleAnlage={lageplan.erstelleAnlage}
           onSchliessen={() => setAnlageOffen(false)}
+        />
+        <FremdebeneDialog
+          offen={fremdebeneOffen}
+          einsatzId={einsatzId}
+          onSchliessen={() => setFremdebeneOffen(false)}
         />
       </div>
       {/* Das Druckblatt hängt nur vom Knopf bis `afterprint` (LLH-1051). */}

@@ -85,6 +85,7 @@ countersign	gegenzeichnen
 counts	Zähler
 crew	Besatzung
 damages	Schäden
+data	Daten
 deactivate	deaktivieren
 decision	Entscheidung
 decline	ablehnen
@@ -126,6 +127,7 @@ follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 forecast	Prognose
+foreign-layers	Fremdebenen
 free-symbols	freie Zeichen
 from-attachment	aus Anhang
 from-resource-request	aus Nachforderung

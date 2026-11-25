@@ -754,6 +754,55 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // Fremdebene der Lagekarte (LLH-2099/LLH-2100, Migration 0373): Freitext sind der Name und
+        // die Adresse der URL-Ebene (sie kann ein Geheimnis im Query tragen). `url` ist nullbar,
+        // aber ein CHECK verlangt sie bei `quelle = 'url'` → `PlatzhalterWennGesetzt`. Der Rest
+        // ist Struktur und Abrufstand; `fehler` ist ein Code, nie der Text des Ziels.
+        tabelle: "karte_fremdebene",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
+            retain("quelle", G_ENUM),
+            scrub("url", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
+            retain("farbe", G_ENUM),
+            retain("angelegt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+            retain(
+                "quelle_etag",
+                "Validator der Quelle für den bedingten Abruf (technisch, kein Personenbezug)",
+            ),
+            retain("quelle_last_modified", G_ZEIT),
+            retain("abgerufen_at", G_ZEIT),
+            retain("versucht_at", G_ZEIT),
+            retain("fehler", G_ENUM),
+        ],
+    },
+    TabellenRegel {
+        // Inhalt einer Fremdebene: fremde Objekte mit Name und Beschreibung, die Personen nennen
+        // können („Sammelstelle Fam. Müller“). Ganze Zeile löschen, kein Skelett; die Ebene
+        // selbst bleibt mit geschwärztem Namen stehen. Im atomaren Vorgang, nicht im Nachlauf:
+        // höchstens 8 MiB je Ebene statt der 25 MiB eines Bilds.
+        tabelle: "karte_fremdebene_daten",
+        scoping: Scoping::UeberParent {
+            fk: "ebene_id",
+            parent: "karte_fremdebene",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("ebene_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geojson", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("sha256", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("objekte", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("verworfen", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
+    TabellenRegel {
         // Kartenansicht: einsatzweit geteilte Layout-/Konfig-Daten; einziger Freitext ist der Name.
         tabelle: "karten_ansicht",
         scoping: Scoping::EinsatzId,

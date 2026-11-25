@@ -285,3 +285,5 @@ export const ARCHIV_BLOCK_MAX_BYTES = 268_435_456;
 export const ARCHIV_PRIVATSCHLUESSEL_MAX = 65_536;
 /** Passphrase einer geschützten Schlüsseldatei in Bytes (LLH-1711). */
 export const ARCHIV_PASSPHRASE_MAX = 1_024;
+/** Name einer Fremdebene der Lagekarte (LLH-2099), `karte_fremdebene::NAME_MAX`. */
+export const FREMDEBENE_NAME_MAX = 120;

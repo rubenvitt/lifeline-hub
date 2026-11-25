@@ -246,6 +246,9 @@ export interface OrgEinstellungenUpdate {
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   geocoder_url: string | null;
+  /** Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099). Kein Vollersatz: fehlt das Feld,
+   *  bleibt der Wert am Server; nur die Sektion „Anzeige“ schickt es mit. */
+  fremdebenen_lan_erlaubt?: boolean;
   /** Kategorie-Vorgaben (LFH-749). Fehlt das Feld, bleiben sie am Server unverändert — nur die
    *  Sektion „Einsatz-Defaults“ schickt es mit. */
   aufbewahrung_kategorien?: KategorieVorgabe[];

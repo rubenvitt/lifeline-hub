@@ -38,6 +38,8 @@ wire_enum! {
         Meldung => "meldung",
         Bereitstellungsraum => "bereitstellungsraum",
         KarteBild => "karte_bild",
+        /// Liste oder Daten einer Fremdebene der Lagekarte (LLH-2099).
+        KarteFremdebene => "karte_fremdebene",
         Etb => "etb",
         Befehl => "befehl",
         /// Termin, Abschluss und Verlauf der Lagebesprechung (LLH-1111).
@@ -141,6 +143,7 @@ impl LiveEvent {
             LiveEvent::Meldung => &["meldungen", "lagemeldungen"],
             LiveEvent::Bereitstellungsraum => &["bereitstellungsraeume"],
             LiveEvent::KarteBild => &["lagekarte"],
+            LiveEvent::KarteFremdebene => &["lagekarte"],
             LiveEvent::Etb => &["etb"],
             // Befehle sind Teil des Auftrags-Moduls (`routes::befehl::MODUL_KEY`).
             LiveEvent::Befehl => &["auftraege"],
@@ -1274,6 +1277,7 @@ mod tests {
             (LiveEvent::Meldung, &["meldungen", "lagemeldungen"]),
             (LiveEvent::Bereitstellungsraum, &["bereitstellungsraeume"]),
             (LiveEvent::KarteBild, &["lagekarte"]),
+            (LiveEvent::KarteFremdebene, &["lagekarte"]),
             (LiveEvent::Etb, &["etb"]),
             (LiveEvent::Befehl, &["auftraege"]),
             (LiveEvent::Lagebesprechung, &["lagebesprechung"]),

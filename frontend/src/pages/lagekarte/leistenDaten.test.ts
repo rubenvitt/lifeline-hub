@@ -947,6 +947,8 @@ describe('Klappzustand des Ebenenbaums', () => {
       betroffene: false,
       fachebenen: false,
       hintergrund: false,
+      // Fremdebenen (LLH-2099) stehen offen: wer eine hinzufügt, sieht sie sofort.
+      fremdebenen: true,
     });
   });
 
