@@ -16,7 +16,7 @@ use crate::live::LiveEvent;
 use crate::log_drossel::SammelzeileJe;
 use crate::write_retry;
 use crate::zeit;
-use sqlx::SqliteConnection;
+use sqlx::{SqliteConnection, SqlitePool};
 use std::collections::HashSet;
 use std::sync::Mutex;
 use std::time::Duration;
@@ -35,17 +35,47 @@ pub enum Uebernahme {
     Nichts,
 }
 
-/// Fahrzeuge mit vorgemerktem Nachlauf (je Fahrzeug höchstens einer).
-static NACHLAUF: Mutex<Option<HashSet<i64>>> = Mutex::new(None);
+/// Schlüssel eines vorgemerkten Nachlaufs: die Datenbank (Adresse des Pools) und das Fahrzeug.
+/// Die Datenbank gehört dazu, weil Einsatzfahrzeug-Nummern nur je Datenbank gelten; so teilen
+/// sich Tests mit je eigener Datenbank die Menge nicht.
+type NachlaufKey = (usize, i64);
 
-fn nachlauf_menge<T>(f: impl FnOnce(&mut HashSet<i64>) -> T) -> T {
+/// Fahrzeuge mit vorgemerktem Nachlauf (je Fahrzeug höchstens einer).
+static NACHLAUF: Mutex<Option<HashSet<NachlaufKey>>> = Mutex::new(None);
+
+fn nachlauf_menge<T>(f: impl FnOnce(&mut HashSet<NachlaufKey>) -> T) -> T {
     let mut g = NACHLAUF.lock().unwrap_or_else(|e| e.into_inner());
     f(g.get_or_insert_with(HashSet::new))
 }
 
+fn nachlauf_key(pool: &SqlitePool, ef_id: i64) -> NachlaufKey {
+    (std::ptr::from_ref(pool.options()) as usize, ef_id)
+}
+
 /// Testhaken: ist für das Einsatzfahrzeug ein Nachlauf vorgemerkt?
-pub fn is_nachlauf_vorgemerkt(ef_id: i64) -> bool {
-    nachlauf_menge(|m| m.contains(&ef_id))
+pub fn is_nachlauf_vorgemerkt(pool: &SqlitePool, ef_id: i64) -> bool {
+    nachlauf_menge(|m| m.contains(&nachlauf_key(pool, ef_id)))
+}
+
+thread_local! {
+    /// Verkürzte Wartezeit des Nachlaufs für Tests; gilt für den Thread, der ihn vormerkt (ein
+    /// Test mit eigener Laufzeit ist eigener Thread), nie für andere Tests.
+    static VERZOEGERUNG: std::cell::Cell<Option<Duration>> = const { std::cell::Cell::new(None) };
+}
+
+/// Testhaken: kürzt die Wartezeit des Nachlaufs, den dieser Thread danach vormerkt. Ohne
+/// Aufruf gilt [`ORTUNG_DROSSEL_S`].
+pub fn set_nachlauf_verzoegerung(d: Duration) {
+    VERZOEGERUNG.with(|v| v.set(Some(d)));
+}
+
+/// Entfernt die Vormerkung, auch wenn die Aufgabe abgebrochen wird (Ende der Laufzeit).
+struct NachlaufWache(NachlaufKey);
+
+impl Drop for NachlaufWache {
+    fn drop(&mut self) {
+        nachlauf_menge(|m| m.remove(&self.0));
+    }
 }
 
 /// Übernimmt die Ablage der Kennung in das gekoppelte Fahrzeug. `jetzt` ist die Serverzeit
@@ -55,6 +85,18 @@ pub async fn apply_position_tx(
     zugang_id: &str,
     kennung: &str,
     jetzt: &str,
+) -> Result<Uebernahme, AppError> {
+    apply_position_gedrosselt_tx(conn, zugang_id, kennung, jetzt, true).await
+}
+
+/// Wie [`apply_position_tx`]; `drosseln = false` für den Nachlauf, der die Drossel schon
+/// abgewartet hat.
+async fn apply_position_gedrosselt_tx(
+    conn: &mut SqliteConnection,
+    zugang_id: &str,
+    kennung: &str,
+    jetzt: &str,
+    drosseln: bool,
 ) -> Result<Uebernahme, AppError> {
     type Zeile = (
         i64,
@@ -85,7 +127,7 @@ pub async fn apply_position_tx(
         return Ok(Uebernahme::Nichts);
     };
 
-    if quelle.as_deref() == Some("ortung") {
+    if drosseln && quelle.as_deref() == Some("ortung") {
         let zuletzt = gesetzt_at.as_deref().and_then(zeit::parse);
         let jetzt_t = zeit::parse(jetzt);
         if let (Some(zuletzt), Some(jetzt_t)) = (zuletzt, jetzt_t) {
@@ -113,9 +155,13 @@ pub async fn apply_position_tx(
 /// vormerken. Fehler wirken nicht auf den Einwurf; sie werden ohne Kennung als Sammelzeile
 /// gezählt.
 pub async fn apply_position(state: &AppState, zugang_id: &str, kennung: &str) {
+    uebernehmen_und_melden(state, zugang_id, kennung, true).await;
+}
+
+async fn uebernehmen_und_melden(state: &AppState, zugang_id: &str, kennung: &str, drosseln: bool) {
     let jetzt = zeit::jetzt();
     let ergebnis = write_retry!(&state.pool, |conn| {
-        apply_position_tx(conn, zugang_id, kennung, &jetzt).await
+        apply_position_gedrosselt_tx(conn, zugang_id, kennung, &jetzt, drosseln).await
     });
     match ergebnis {
         Ok(Uebernahme::Geschrieben { einsatz_id, ef_id }) => {
@@ -123,7 +169,7 @@ pub async fn apply_position(state: &AppState, zugang_id: &str, kennung: &str) {
                 .live
                 .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
         }
-        Ok(Uebernahme::Gedrosselt { ef_id }) => schedule_nachlauf(state, zugang_id, kennung, ef_id),
+        Ok(Uebernahme::Gedrosselt { ef_id }) => schedule_nachlauf(state, ef_id),
         Ok(Uebernahme::Nichts) => {}
         Err(_) => {
             static FEHLER: SammelzeileJe = SammelzeileJe::neu();
@@ -140,22 +186,36 @@ pub async fn apply_position(state: &AppState, zugang_id: &str, kennung: &str) {
 }
 
 /// Merkt für das Fahrzeug einen Nachlauf vor, falls noch keiner läuft.
-fn schedule_nachlauf(state: &AppState, zugang_id: &str, kennung: &str, ef_id: i64) {
-    if !nachlauf_menge(|m| m.insert(ef_id)) {
+fn schedule_nachlauf(state: &AppState, ef_id: i64) {
+    let key = nachlauf_key(&state.pool, ef_id);
+    if !nachlauf_menge(|m| m.insert(key)) {
         return;
     }
+    let wache = NachlaufWache(key);
     let state = state.clone();
-    let zugang_id = zugang_id.to_string();
-    let kennung = kennung.to_string();
+    let warten = VERZOEGERUNG
+        .with(|v| v.get())
+        .unwrap_or(Duration::from_secs(ORTUNG_DROSSEL_S as u64));
     tokio::spawn(async move {
-        run_nachlauf(state, zugang_id, kennung, ef_id).await;
+        run_nachlauf(state, ef_id, wache, warten).await;
     });
 }
 
-/// Wartet die Drossel ab und übernimmt dann die jüngste Position. Der Eintrag fällt vor dem
-/// Lauf weg, damit ein erneut gedrosselter Lauf wieder einen Nachlauf vormerken kann.
-async fn run_nachlauf(state: AppState, zugang_id: String, kennung: String, ef_id: i64) {
-    tokio::time::sleep(Duration::from_secs(ORTUNG_DROSSEL_S as u64)).await;
-    nachlauf_menge(|m| m.remove(&ef_id));
-    apply_position(&state, &zugang_id, &kennung).await;
+/// Wartet die Drossel ab und übernimmt dann die jüngste Position der Kennung, die *jetzt* an
+/// das Fahrzeug gekoppelt ist (eine Neukopplung während des Wartens ersetzt die Kennung). Die
+/// Vormerkung fällt vor dem Lauf weg, damit ein erneut gedrosselter Fix wieder einen Nachlauf
+/// vormerken kann; die Drossel gilt für den Nachlauf nicht mehr, er kommt frühestens 15 s nach
+/// dem gedrosselten Fix.
+async fn run_nachlauf(state: AppState, ef_id: i64, wache: NachlaufWache, warten: Duration) {
+    tokio::time::sleep(warten).await;
+    drop(wache);
+    let kopplung: Result<Option<(String, String)>, _> = sqlx::query_as(
+        "SELECT zugang_id, kennung FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
+    )
+    .bind(ef_id)
+    .fetch_optional(&state.pool)
+    .await;
+    if let Ok(Some((zugang_id, kennung))) = kopplung {
+        uebernehmen_und_melden(&state, &zugang_id, &kennung, false).await;
+    }
 }

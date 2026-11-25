@@ -5,7 +5,8 @@ use axum::http::{Request, StatusCode};
 use lifeline_hub::app::RouterOptionen;
 use lifeline_hub::live::LiveHub;
 use lifeline_hub::ortung::uebernahme::{
-    apply_position, apply_position_tx, is_nachlauf_vorgemerkt, Uebernahme,
+    apply_position, apply_position_tx, is_nachlauf_vorgemerkt, set_nachlauf_verzoegerung,
+    Uebernahme,
 };
 use sqlx::SqlitePool;
 use tower::ServiceExt;
@@ -350,13 +351,13 @@ async fn gedrosselter_fix_merkt_genau_einen_nachlauf_vor() {
     let state = test_state(&f.pool, &LiveHub::new());
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
-    assert!(!is_nachlauf_vorgemerkt(f.ef));
+    assert!(!is_nachlauf_vorgemerkt(&f.pool, f.ef));
 
     f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     apply_position(&state, &f.zugang, KENNUNG).await;
     assert_eq!(f.stand().await.0, Some(48.1));
-    assert!(is_nachlauf_vorgemerkt(f.ef));
+    assert!(is_nachlauf_vorgemerkt(&f.pool, f.ef));
 }
 
 /// Ein Positions-Einwurf über den echten Router; liefert Status und Header.
@@ -1360,4 +1361,75 @@ async fn abschluss_meldet_fahrzeug_live_fuer_gekoppelte_und_geortete() {
     let n = recv_until_tag(&mut rx, "fahrzeug", std::time::Duration::from_secs(2)).await;
     let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
     assert_eq!(data["fahrzeug_id"].as_i64(), Some(f.ef));
+}
+
+/// Wartet höchstens 3 s, bis die Bedingung gilt.
+async fn bis<F: std::future::Future<Output = bool>>(mut f: impl FnMut() -> F) {
+    for _ in 0..60 {
+        if f().await {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    panic!("Bedingung nicht erreicht");
+}
+
+#[tokio::test]
+async fn der_echte_nachlauf_schreibt_nach_der_drossel_genau_einmal_und_meldet_live() {
+    set_nachlauf_verzoegerung(std::time::Duration::from_millis(300));
+    let f = fix().await;
+    let live = LiveHub::new();
+    let state = test_state(&f.pool, &live);
+    let jetzt = lifeline_hub::zeit::jetzt();
+    f.einwerfen(48.1, 11.5, &jetzt, &jetzt).await;
+    apply_position(&state, &f.zugang, KENNUNG).await;
+    assert_eq!(f.stand().await.0, Some(48.1));
+
+    let mut rx = live.abonniere(f.einsatz);
+    f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
+    for _ in 0..3 {
+        apply_position(&state, &f.zugang, KENNUNG).await;
+    }
+    assert_eq!(f.stand().await.0, Some(48.1), "gedrosselt");
+    assert!(is_nachlauf_vorgemerkt(&f.pool, f.ef));
+
+    bis(|| async { f.stand().await.0 == Some(48.2) }).await;
+    bis(|| async { !is_nachlauf_vorgemerkt(&f.pool, f.ef) }).await;
+    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+    assert_eq!(
+        objekt_ereignisse(&mut rx, &[("fahrzeug", "fahrzeug_id")]),
+        [("fahrzeug".to_string(), f.ef)],
+        "genau ein Nachlauf, genau eine Meldung"
+    );
+}
+
+#[tokio::test]
+async fn nachlauf_uebernimmt_die_aktuelle_kopplung_nach_neukopplung() {
+    set_nachlauf_verzoegerung(std::time::Duration::from_millis(300));
+    let f = fix().await;
+    let state = test_state(&f.pool, &LiveHub::new());
+    let jetzt = lifeline_hub::zeit::jetzt();
+    f.einwerfen(48.1, 11.5, &jetzt, &jetzt).await;
+    apply_position(&state, &f.zugang, KENNUNG).await;
+    f.einwerfen(48.2, 11.6, &jetzt, "9999-01-01 00:00:00").await;
+    apply_position(&state, &f.zugang, KENNUNG).await;
+    assert!(is_nachlauf_vorgemerkt(&f.pool, f.ef));
+
+    // Neukopplung an eine andere Kennung, deren letzte Position schon in der Ablage liegt.
+    sqlx::query("UPDATE ortung_kopplung SET kennung = 'geraet-2' WHERE einsatz_fahrzeug_id = ?")
+        .bind(f.ef)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
+         empfangen_at, rohdaten) VALUES (?, ?, 'geraet-2', 50.5, 8.5, ?, '9999-01-02 00:00:00', '{}')",
+    )
+    .bind(f.org)
+    .bind(&f.zugang)
+    .bind(&jetzt)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    bis(|| async { f.stand().await.0 == Some(50.5) }).await;
 }
