@@ -5,6 +5,7 @@ status: akzeptiert
 datum: 2026-11-24
 gilt_fuer:
   - ios/Helfer/**
+  - ios/HelferKern/**
   - android/helfer/**
 herleitung:
   - docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md
@@ -37,6 +38,8 @@ herleitung:
 # existieren: verlange 'UIBackgroundModes' 'ios/project.yml' und
 # verlange 'foregroundServiceType="location"' 'android/helfer/src/main/AndroidManifest.xml'.
 verbiete 'NSLocationAlways' 'ios/Helfer/**/*.swift' 'ios/Helfer/**/*.plist' 'ios/project.yml'
+# Der Kern bleibt ohne System: kein UIKit, CoreLocation oder SwiftUI (ios/Helfer/AGENTS.md).
+verbiete '^import (UIKit|CoreLocation|SwiftUI)' 'ios/HelferKern/**/*.swift'
 verbiete 'ACCESS_BACKGROUND_LOCATION' 'android/helfer/**/*.xml' 'android/helfer/**/*.kt' 'android/helfer/**/*.kts'
 ```
 

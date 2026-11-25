@@ -10,7 +10,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
 `check-openspec-eingefroren.sh` → `check-schreibweisen.sh` + `check-api-routen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
 `check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) und `check-design-tokens-nativ.sh` (Schritt 21, Bündel `schnell`) →
-`swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
+`swift test` in `ios/LifelineKern` und `ios/HelferKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
 `cargo build --bin lifeline-hub` + `cargo check -p karten-service` (Schritt 19, Bündel `rust` und
 allein `binaer`, LLH-2033/LLH-2038) →

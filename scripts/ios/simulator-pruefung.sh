@@ -5,7 +5,8 @@
 #
 #   scripts/ios/simulator-pruefung.sh [<ausgabe-verzeichnis>]   (Vorgabe: ios/build/pruefung)
 #
-# Ablauf: Version schreiben (scripts/ios/version.sh) → Wegwerf-Zertifikate des https-Testservers
+# Ablauf: Kern der Helfer-App (`swift test` in ios/HelferKern) → Version schreiben
+# (scripts/ios/version.sh) → Wegwerf-Zertifikate des https-Testservers
 # (scripts/ios/testserver-zertifikat.sh, LLH-1980) → Projekt erzeugen (`xcodegen`, gepinnt über
 # scripts/ios/xcodegen-installieren.sh, muss im PATH stehen) → je ein iPhone und ein iPad der
 # neuesten iOS-Laufzeit wählen und ihnen die Test-CA als Wurzel geben → `xcodebuild test` mit
@@ -24,12 +25,16 @@ WURZEL="$(cd "$(dirname "$0")/../.." && pwd)"
 AUSGABE="${1:-$WURZEL/ios/build/pruefung}"
 ERGEBNIS="$AUSGABE/LifelineHub.xcresult"
 
-for werkzeug in xcodebuild xcrun xcodegen jq; do
+for werkzeug in xcodebuild xcrun xcodegen jq swift; do
   command -v "$werkzeug" > /dev/null 2>&1 || { echo "FEHLER: $werkzeug fehlt im PATH." >&2; exit 2; }
 done
 
 rm -rf "$AUSGABE"
 mkdir -p "$AUSGABE/bilder"
+
+# Kern der Helfer-App (ADR-0098) mit dem Swift dieses Xcode auf macOS, vor dem Simulator: ein
+# roter Kern bricht hier ab. Unter Linux fährt ihn Schritt 18 von check-all.sh (`suiten.yml`).
+swift test --package-path "$WURZEL/ios/HelferKern"
 
 "$WURZEL/scripts/ios/version.sh"
 # Wegwerf-CA und Zertifikat des https-Testservers (LLH-1980); vor `xcodegen`, damit

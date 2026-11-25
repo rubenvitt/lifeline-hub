@@ -431,15 +431,15 @@ public struct Anmeldung { public private(set) var phase: Phase
 public enum Ereignis { case gescannt(HelferZiel), eingeloest, bestaetigt, antwort(Antwort), pausiert, fortgesetzt, abgemeldet, zustand(String, grund: String?) }
 ```
 
-- [ ] **Step 1: Failing tests:** `GemeinsameFaelle` liest `src-tauri/faelle/helfer.json` (Muster
+- [x] **Step 1: Failing tests:** `GemeinsameFaelle` liest `src-tauri/faelle/helfer.json` (Muster
   aus `LifelineKern`) und prüft `deute`, `antwort` und `takt`. Dazu:
   - `AnmeldungTests`: `stoppen` in `aktiv` → `beendet`; `warten` in `unbestaetigt` bleibt;
   - `PufferTests`: 601 s alt → nil; nur die letzte Position bleibt.
-- [ ] **Step 2:** Run `cd ios/HelferKern && swift test` → FAIL. Lokal gibt es kein Swift: dann in
+- [x] **Step 2:** Run `cd ios/HelferKern && swift test` → FAIL. Lokal gibt es kein Swift: dann in
   der CI über den Workflow `ios-pruefung.yml`, der um `HelferKern` ergänzt wird.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run (CI) → PASS.
-- [ ] **Step 5:** Commit `feat: Kern der iOS-Helfer-App`.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** Run (CI) → PASS (CI am PR).
+- [x] **Step 5:** Commit `feat: Kern der iOS-Helfer-App`.
 
 ### Task 11: iOS-App `LifelineHelfer`
 

@@ -13,8 +13,8 @@
 # `scripts/ios/xcodegen-installieren.sh`. Runner und Xcode sind gepinnt, wie in ios.yml: Xcode 26.6
 # auf macos-26, weil App Store Connect seit dem 28.04.2026 nur Builds mit Xcode 26 und dem
 # iOS-26-SDK annimmt (LLH-1988). Gebaut und getestet wird mit demselben Xcode, das hochlädt. Swift
-# ist hier damit 6.2, der Linux-Job (`suiten.yml`) bleibt bei 6.1.2; `LifelineKern` verlangt nur
-# swift-tools 6.1.
+# ist hier damit 6.2, der Linux-Job (`suiten.yml`) bleibt bei 6.1.2; `LifelineKern` und
+# `HelferKern` verlangen nur swift-tools 6.1.
 #
 # Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar), wie in pr.yml.
 name: iOS-Prüfung

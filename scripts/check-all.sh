@@ -544,11 +544,14 @@ schritt_17() {
 }
 
 schritt_18() {
-  echo "==> [18/$SCHRITTE] Swift-Kern der iOS-Hülle gegen die gemeinsamen Fälle (LLH-1978)"
+  echo "==> [18/$SCHRITTE] Swift-Kerne der iOS-Hülle und der Helfer-App gegen die gemeinsamen Fälle (LLH-1978, ADR-0098)"
   # `swift test` im Paket ios/LifelineKern: Adressprüfung, Deeplink und Linkregeln gegen
   # src-tauri/faelle/ (dieselben Fälle prüft die Desktop-Hülle in Schritt 4), dazu Serverliste,
-  # Vertragsprüfung, Onboarding und Haptik. Läuft unter Linux; das App-Target baut nur der
-  # macOS-Lauf `ios-pruefung.yml`. Ohne Toolchain lokal eine Lücke, nie grün; die CI setzt
+  # Vertragsprüfung, Onboarding und Haptik. Danach im Paket ios/HelferKern: QR und Deeplink,
+  # Antwortcodes und Takt gegen src-tauri/faelle/helfer.json, Anmeldung und Puffer. Explizites
+  # `|| return`, damit ein rotes erstes Paket nicht vom zweiten überdeckt wird, auch wo `set -e`
+  # nicht greift. Läuft unter Linux; die App-Targets baut nur der macOS-Lauf `ios-pruefung.yml`.
+  # Ohne Toolchain lokal eine Lücke, nie grün; die CI setzt
   # IOS_SWIFT_PFLICHT=1, dort ist das Fehlen rot.
   if ! command -v swift > /dev/null 2>&1; then
     if [ "${IOS_SWIFT_PFLICHT:-0}" = 1 ]; then
@@ -559,8 +562,8 @@ schritt_18() {
     echo "    Die CI prüft den Swift-Kern mit IOS_SWIFT_PFLICHT=1." >&2
     return "$UEBERSPRUNGEN_RC"
   fi
-  cd "$ROOT/ios/LifelineKern"
-  swift test
+  (cd "$ROOT/ios/LifelineKern" && swift test) || return 1
+  (cd "$ROOT/ios/HelferKern" && swift test) || return 1
 }
 
 schritt_19() {

@@ -188,10 +188,12 @@ fehlt "14 schnell fährt den Swift-Schritt nicht" '^Schritte: .*\b18\b'
 # eine installierte Toolchain den Fall „fehlt“ nicht verdeckt (der Schritt nutzt sonst nur
 # Builtins). Der Fall „lokal“ setzt IOS_SWIFT_PFLICHT=0 selbst: ein Aufrufer mit der Variable
 # (`IOS_SWIFT_PFLICHT=1 check-all.sh`) machte ihn sonst rot.
-mkdir -p "$ARBEIT/s18/ios/LifelineKern" "$ARBEIT/s18/leer" "$ARBEIT/s18/gruen" "$ARBEIT/s18/rot"
+mkdir -p "$ARBEIT/s18/ios/LifelineKern" "$ARBEIT/s18/ios/HelferKern" "$ARBEIT/s18/leer" "$ARBEIT/s18/gruen" "$ARBEIT/s18/rot" "$ARBEIT/s18/helfer-rot"
 printf '#!/bin/sh\necho "swift-lief $* in $(pwd)"\n' > "$ARBEIT/s18/gruen/swift"
 printf '#!/bin/sh\necho swift-rot; exit 1\n' > "$ARBEIT/s18/rot/swift"
-chmod +x "$ARBEIT/s18/gruen/swift" "$ARBEIT/s18/rot/swift"
+# Rot nur im Paket der Helfer-App: ein grünes LifelineKern davor darf es nicht überdecken.
+printf '#!/bin/sh\ncase "$(pwd)" in */HelferKern) echo helfer-rot; exit 1 ;; esac\n' > "$ARBEIT/s18/helfer-rot/swift"
+chmod +x "$ARBEIT/s18/gruen/swift" "$ARBEIT/s18/rot/swift" "$ARBEIT/s18/helfer-rot/swift"
 schritt_18_def="$(sed -n '/^schritt_18() {/,/^}/p' "$CHECK_ALL")"
 [ -n "$schritt_18_def" ] || { echo "FAIL 15 schritt_18 fehlt in check-all.sh" >&2; fehler=1; }
 rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/leer'; IOS_SWIFT_PFLICHT=0; $schritt_18_def" 0 18 || rc=$?
@@ -204,8 +206,11 @@ enthaelt "15 IOS_SWIFT_PFLICHT nennt den Grund" 'IOS_SWIFT_PFLICHT'
 rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/gruen'; $schritt_18_def" 0 18 || rc=$?
 pruefe "15 mit swift → grün" 0 "$rc"
 enthaelt "15 mit swift → swift test im Paket" "^swift-lief test in $ARBEIT/s18/ios/LifelineKern\$"
+enthaelt "15 mit swift → swift test im Paket der Helfer-App" "^swift-lief test in $ARBEIT/s18/ios/HelferKern\$"
 rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/rot'; $schritt_18_def" 0 18 || rc=$?
 pruefe "15 rotes swift test → rot" 1 "$rc"
+rc=0; fahren "ROOT='$ARBEIT/s18'; PATH='$ARBEIT/s18/helfer-rot'; $schritt_18_def" 0 18 || rc=$?
+pruefe "15 rotes swift test nur im HelferKern → rot" 1 "$rc"
 
 # 16 — Schritt 19, das Server-Binary wie im Release (LLH-2033): eigenes Bündel `binaer` für den
 # Pflicht-Check im PR, Teil von `rust` (also vom vollen Lauf und von `--geaendert` bei Rust),
