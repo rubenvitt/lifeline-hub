@@ -92,7 +92,13 @@ function hostVon(wert: unknown): string | null {
   }
 }
 
-/** Ein URL-Feld, dessen Host eine Änderung wechselt. */
+/** Der Wert eines Host-Felds (Hostname ohne Schema), getrimmt und kleingeschrieben. */
+function hostName(wert: unknown): string | null {
+  if (typeof wert !== 'string' || wert.trim() === '') return null;
+  return wert.trim().toLowerCase();
+}
+
+/** Ein URL- oder Host-Feld, dessen Host eine Änderung wechselt. */
 export interface HostWechsel {
   feld: string;
   bisher: string | null;
@@ -100,7 +106,7 @@ export interface HostWechsel {
 }
 
 /**
- * Welche URL-Felder einen neuen Host bekämen; wie `art::has_neues_ziel` im Server: zählt nur, wenn
+ * Welche URL- und Host-Felder einen neuen Host bekämen; wie `art::has_neues_ziel` im Server: zählt nur, wenn
  * danach ein lesbarer Host dasteht, der vorher nicht dastand. Dann entfernt der Server die
  * Geheimnisse, und die Ansicht fragt vorher.
  */
@@ -110,10 +116,11 @@ export function hostWechsel(
   nachher: Record<string, unknown>,
 ): HostWechsel[] {
   return felder
-    .filter((f) => f.typ === 'url')
+    .filter((f) => f.typ === 'url' || f.typ === 'host')
     .flatMap((f) => {
-      const neu = hostVon(nachher[f.name]);
-      const bisher = hostVon(vorher[f.name]);
+      const lies = f.typ === 'host' ? hostName : hostVon;
+      const neu = lies(nachher[f.name]);
+      const bisher = lies(vorher[f.name]);
       return neu != null && neu !== bisher ? [{ feld: f.bezeichnung, bisher, neu }] : [];
     });
 }

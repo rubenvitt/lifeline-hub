@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Weckt den Lauf des Ausgangskorbs (LLH-2093, `ausgang::lauf`), sobald ein Versand angelegt
+    /// oder erneut gesendet wird; sonst sieht er erst im nächsten Takt nach.
+    pub ausgang_wecker: Arc<tokio::sync::Notify>,
     /// Weg nach draußen der URL-Fremdebenen (LLH-2100) samt Single-Flight je Ebene. Vorgabe: der
     /// echte Abruf über `adapter::ziel`; Tests setzen einen eigenen Abrufer ein.
     pub fremdebene_abrufer: crate::karte_fremdebene::abruf::Abrufer,
@@ -1095,6 +1098,18 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::nachforderung::zusage),
         )
         .route(
+            "/api/incidents/{id}/resource-requests/{nid}/deliveries",
+            post(routes::nachforderung::create_deliveries),
+        )
+        .route(
+            "/api/incidents/{id}/deliveries",
+            get(routes::ausgang::list_deliveries),
+        )
+        .route(
+            "/api/incidents/{id}/deliveries/{did}/retry",
+            post(routes::ausgang::retry_delivery),
+        )
+        .route(
             "/api/incidents/{id}/resource-requests/{nid}/withdraw",
             post(routes::nachforderung::zurueckziehen),
         )
@@ -1878,6 +1893,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::lagebericht::freigeben),
         )
         .route(
+            "/api/incidents/{id}/situation-reports/{lid}/deliveries",
+            post(routes::lagebericht::create_deliveries),
+        )
+        .route(
             "/api/incidents/{id}/situation-reports/{lid}/revise",
             post(routes::lagebericht::fortschreiben),
         )
@@ -1913,6 +1932,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/incidents/{id}/orders/{bid}/release",
             post(routes::befehl::freigeben),
+        )
+        .route(
+            "/api/incidents/{id}/orders/{bid}/deliveries",
+            post(routes::befehl::create_deliveries),
         )
         .route(
             "/api/incidents/{id}/orders/{bid}/revise",
@@ -2459,9 +2482,23 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/external-agencies",
             get(routes::externe_stelle::list).post(routes::externe_stelle::create),
         )
+        // Kanaladressen (LLH-2093); die feste Sammelroute vor `{id}`.
+        .route(
+            "/api/external-agencies/channels",
+            get(routes::externe_stelle::kanal_sammlung),
+        )
         .route(
             "/api/external-agencies/{id}",
             patch(routes::externe_stelle::update),
+        )
+        .route(
+            "/api/external-agencies/{id}/channels",
+            get(routes::externe_stelle::kanal_list).post(routes::externe_stelle::kanal_create),
+        )
+        .route(
+            "/api/external-agencies/{id}/channels/{kanal_id}",
+            patch(routes::externe_stelle::kanal_update)
+                .delete(routes::externe_stelle::kanal_delete),
         )
         .route("/api/keyword-suggestions", get(routes::stichwort::liste))
         .route("/api/keyword-suggestions", post(routes::stichwort::anlegen))
@@ -3381,6 +3418,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            ausgang_wecker: Default::default(),
             fremdebene_abrufer: Default::default(),
             drohne: Default::default(),
         }

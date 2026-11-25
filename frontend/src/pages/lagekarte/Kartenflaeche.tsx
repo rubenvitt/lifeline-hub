@@ -341,7 +341,12 @@ export interface KartenflaecheProps {
   /** Sichtbare Fremdebenen mit Daten (LLH-2099): über den Bildern, unter den eigenen Lagen. */
   fremdebenen?: AktiveFremdebene[];
   /** Klick auf ein Objekt einer Fremdebene → Properties (`name`, `description`) und Ebene. */
-  onFremdebeneKlick?: (properties: Record<string, unknown>, ebeneId: number) => void;
+  /** `index` = MapLibre-`id` des Merkmals, dank `generateId` der Index in den Daten der Ebene. */
+  onFremdebeneKlick?: (
+    properties: Record<string, unknown>,
+    ebeneId: number,
+    index: number | undefined,
+  ) => void;
   /** Karten-Viewport (west,sued,ost,nord) nach Bewegung — für bbox-abhängige Ebenen. */
   onBboxAenderung?: (bbox: string) => void;
   /** Aktueller Zoom nach Bewegung — für „näher heranzoomen"-Hinweise bbox-abhängiger Ebenen. */
@@ -1324,7 +1329,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
     }
     const fremdId = fremdebeneIdVon(ziel.merkmal.layer.id);
     if (fremdId != null) {
-      fremdebene?.((ziel.merkmal.properties ?? {}) as Record<string, unknown>, fremdId);
+      const id = ziel.merkmal.id;
+      fremdebene?.(
+        (ziel.merkmal.properties ?? {}) as Record<string, unknown>,
+        fremdId,
+        typeof id === 'number' ? id : undefined,
+      );
       return;
     }
     const quelle = fachebeneQuelleVon(ziel.merkmal.layer.id);
@@ -1458,9 +1468,11 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
         const klick = (e: maplibregl.MapLayerMouseEvent) => {
           const gewinner = klickzielAm(map, e);
           if (!gewinner || !('merkmal' in gewinner) || gewinner.merkmal.layer.id !== id) return;
+          const merkmalId = gewinner.merkmal.id;
           onFremdebeneKlick?.(
             (gewinner.merkmal.properties ?? {}) as Record<string, unknown>,
             fr.id,
+            typeof merkmalId === 'number' ? merkmalId : undefined,
           );
         };
         map.on('click', id, klick);

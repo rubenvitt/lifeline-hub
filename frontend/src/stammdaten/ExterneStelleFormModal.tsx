@@ -16,6 +16,7 @@ import { leerZuNull } from '../api/patchTriState';
 import { EXTERNE_STELLE_BEZEICHNUNG_MAX, EXTERNE_STELLE_KURZ_MAX } from '../api/eingabegrenzen';
 import { EXTERNE_STELLE_ARTEN, EXTERNE_STELLE_ART_LABEL } from './externeStellenVorschlaege';
 import { pflicht } from '../components/pflichtRegel';
+import ExterneStelleKanaele from './ExterneStelleKanaele';
 
 interface FormWerte {
   bezeichnung: string;
@@ -176,6 +177,8 @@ export default function ExterneStelleFormModal({
           },
         ]}
       />
+      {/* Adressen gibt es erst an einer bestehenden Stelle (sie hängen an ihrer Kennung). */}
+      {stelle && <ExterneStelleKanaele stelle={stelle} />}
     </ErfassungsModal>
   );
 }

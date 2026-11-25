@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useState, type ComponentProps } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { ConfigProvider } from 'antd';
@@ -52,7 +52,8 @@ describe('NachforderungKarte — Zeiten in der Anzeigezone (LFH-913)', () => {
   mitProzessZone('UTC');
 
   function zeige(n: Nachforderung) {
-    render(
+    // Mit Providern: die Karte trägt die Versandliste, die eine Query braucht (LLH-2093).
+    renderMitProviders(
       <AnzeigeKonventionenProvider konventionen={{ zeitzone: 'Europe/Berlin' }}>
         <NachforderungKarte nachforderung={n} />
       </AnzeigeKonventionenProvider>,
@@ -773,7 +774,7 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     );
     await userEvent.click(screen.getByRole('button', { name: 'Aktionen zu Nachforderung 2× RTW' }));
     const eintraege = (await screen.findAllByRole('menuitem')).map((e) => e.textContent);
-    expect(eintraege).toEqual(['Bearbeiten', 'Zurückziehen', 'Ablehnen']);
+    expect(eintraege).toEqual(['Bearbeiten', 'Senden', 'Zurückziehen', 'Ablehnen']);
     expect(document.querySelectorAll('.ant-dropdown-menu-item-danger')).toHaveLength(2);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Zurückziehen' }));
     expect(onZurueckziehen).toHaveBeenCalledWith(1);
@@ -804,13 +805,14 @@ describe('NachforderungKarte — Zusage und Menü (LLH-1097)', () => {
     const eintraege = await screen.findAllByRole('menuitem');
     expect(eintraege.map((e) => e.textContent)).toEqual([
       'Bearbeiten',
+      'Senden',
       'Zurückziehen (Einheiten verknüpft)',
       'Ablehnen (Einheiten verknüpft)',
     ]);
-    expect(eintraege[1]).toHaveAttribute('aria-disabled', 'true');
     expect(eintraege[2]).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(eintraege[1]);
+    expect(eintraege[3]).toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(eintraege[2]);
+    await userEvent.click(eintraege[3]);
     expect(onZurueckziehen).not.toHaveBeenCalled();
     expect(onAblehnen).not.toHaveBeenCalled();
   });
@@ -1003,7 +1005,7 @@ describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
       within(menue)
         .getAllByRole('menuitem')
         .map((e) => e.textContent),
-    ).toEqual([fortschaltung.textContent, 'Bearbeiten', 'Zurückziehen', 'Ablehnen']);
+    ).toEqual([fortschaltung.textContent, 'Bearbeiten', 'Senden', 'Zurückziehen', 'Ablehnen']);
     expect(menue.querySelector('.ant-dropdown-menu-item-divider')).not.toBeNull();
   });
 
@@ -1026,6 +1028,7 @@ describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
     const punkte = within(menue).getAllByRole('menuitem');
     expect(punkte.map((e) => e.textContent)).toEqual([
       `Als Material übernehmen (${KEINE_BERECHTIGUNG})`,
+      'Senden',
       'Eintreffen zurücknehmen',
     ]);
     expect(punkte[0]).toHaveAttribute('aria-disabled', 'true');
@@ -1034,5 +1037,115 @@ describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
   it('ohne Schreibrecht bleibt das Browsermenü', () => {
     renderMitProviders(<NachforderungKarte nachforderung={nf()} onStatus={vi.fn()} />);
     expect(rechtsklick(screen.getByText(/2 RTW zur Verstärkung/))).toBe(true);
+  });
+});
+
+/** Senden per E-Mail (LLH-2093): Menüeintrag der Karte und Versandliste in ihr. */
+describe('NachforderungKarte — Senden (LLH-2093)', () => {
+  function stelle() {
+    server.use(
+      http.get('/api/external-agencies/channels', () =>
+        HttpResponse.json([
+          {
+            agency_id: 4,
+            agency_name: 'ILS Nord',
+            channel: { id: 21, externe_stelle_id: 4, channel: 'email', address: 'ils@example.org' },
+          },
+        ]),
+      ),
+      http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
+    );
+  }
+
+  it('bietet im ⋮-Menü „Senden“ und öffnet den Dialog, Adressat ist vorbelegt', async () => {
+    stelle();
+    renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ adressat_bezeichnung: 'ils nord' })}
+        darfSchreiben
+        onStatus={vi.fn()}
+        onZurueckziehen={vi.fn()}
+      />,
+    );
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: /Aktionen zu Nachforderung/ }),
+      'Senden',
+    );
+    const box = await screen.findByRole('checkbox', { name: /ILS Nord/ });
+    await waitFor(() => expect(box).toBeChecked());
+  });
+
+  it('bietet „Senden“ nicht an einer zurückgezogenen Karte und nicht ohne Schreibrecht', () => {
+    stelle();
+    const { unmount } = renderMitProviders(
+      <NachforderungKarte
+        nachforderung={nf({ status: 'zurueckgezogen', ist_offen: false })}
+        darfSchreiben
+        onStatus={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Aktionen zu Nachforderung/ })).toBeNull();
+    unmount();
+    renderMitProviders(<NachforderungKarte nachforderung={nf()} onStatus={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /Aktionen zu Nachforderung/ })).toBeNull();
+  });
+
+  it('zeigt die Versandliste in der Karte, sobald es einen Versand gibt', async () => {
+    server.use(
+      http.get('/api/incidents/1/deliveries', () =>
+        HttpResponse.json([
+          {
+            id: 'v1',
+            address: 'ils@example.org',
+            agency_name: 'ILS Nord',
+            attempts: 0,
+            channel: 'email',
+            created_at: '2026-11-24 14:00:00',
+            created_by_id: 1,
+            source_id: 1,
+            source_kind: 'nachforderung',
+            state: 'wartet',
+            subject: 'x',
+          },
+        ]),
+      ),
+    );
+    renderMitProviders(<NachforderungKarte nachforderung={nf()} />);
+    expect(await screen.findByText('wartet')).toBeInTheDocument();
+    expect(screen.getByText('Versand')).toBeInTheDocument();
+  });
+
+  it('holt für drei Karten eines Einsatzes die Versände mit einem Abruf und filtert je Karte', async () => {
+    const abrufe: string[] = [];
+    const versand = (id: string, quelle: number) => ({
+      id,
+      address: `a${quelle}@example.org`,
+      agency_name: `Stelle ${quelle}`,
+      attempts: 0,
+      channel: 'email',
+      created_at: '2026-11-24 14:00:00',
+      created_by_id: 1,
+      source_id: quelle,
+      source_kind: 'nachforderung',
+      state: 'wartet',
+      subject: 'x',
+    });
+    server.use(
+      http.get('/api/incidents/1/deliveries', ({ request }) => {
+        abrufe.push(new URL(request.url).search);
+        return HttpResponse.json([versand('v1', 11), versand('v2', 12)]);
+      }),
+    );
+    renderMitProviders(
+      <>
+        <NachforderungKarte nachforderung={nf({ id: 11 })} />
+        <NachforderungKarte nachforderung={nf({ id: 12 })} />
+        <NachforderungKarte nachforderung={nf({ id: 13 })} />
+      </>,
+    );
+    expect(await screen.findByText(/Stelle 11/)).toBeInTheDocument();
+    expect(screen.getByText(/Stelle 12/)).toBeInTheDocument();
+    expect(screen.queryByText(/Stelle 13/)).toBeNull();
+    expect(abrufe).toEqual(['?source_kind=nachforderung']);
   });
 });

@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -37,6 +38,7 @@ const eingabe = (marker: KarteMarker[], stand: Date | null = null): ExportEingab
   marker,
   flaechen: [],
   zonen: [],
+  token: theme.getDesignToken(),
   einsatzName: 'Hochwasser',
   stand,
 });

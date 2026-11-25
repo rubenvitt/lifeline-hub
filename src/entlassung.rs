@@ -199,6 +199,11 @@ mod tests {
             "Verweis auf übernommene und am Raum verknüpfte Einheiten, Rücknahme-, Ablehnungs- und Rückzugssperre sowie Mengenuntergrenze der Nachforderung zählen jede verknüpfte Einheit, auch aufgelöste (sie war da, LLH-1383, LLH-1387, LLH-1445)",
         ),
         (
+            "src/ortung/kopplung.rs",
+            1,
+            "Abschluss des Einsatzes leert die Einwurf-Position jedes Fahrzeugs des Einsatzes, auch eines schon entlassenen: nach dem Ende bleibt keine Position der Quelle `einwurf` stehen (LLH-2091, ADR-0103)",
+        ),
+        (
             "src/personal/disposition_repo.rs",
             1,
             "Disponieren einer Stamm-Person sucht ihre Zeile auch beendet, um sie wieder aufzunehmen",

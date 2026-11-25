@@ -141,6 +141,41 @@ pub fn anlage_text(
     text
 }
 
+/// Text der E-Mail zu einer Nachforderung (LLH-2093, Spec Abschnitt 4), im Stil von
+/// [`anlage_text`]: eine Angabe je Zeile, fehlende Felder entfallen. `ziel` ist der aufgelöste
+/// Name ([`ziel_name_tx`]), `stil` Zone und Darstellung des Einsatzes für „benötigt bis“.
+pub fn mail_text(
+    n: &NachforderungAnzeige,
+    einsatz_name: &str,
+    ziel: Option<&str>,
+    stil: &crate::zeitdarstellung::Zeitstil,
+) -> String {
+    let prio = match n.prioritaet {
+        crate::kommunikation::Prioritaet::Sofort => "Sofort",
+        crate::kommunikation::Prioritaet::Dringend => "Dringend",
+        crate::kommunikation::Prioritaet::Normal => "Normal",
+    };
+    let mut text = format!(
+        "Nachforderung: {}\nPriorität: {prio}\nAn: {}\n",
+        kurzname(n.anzahl, &n.art),
+        adressat_text(n.adressat_kategorie, n.adressat_bezeichnung.as_deref()),
+    );
+    if let Some(z) = ziel {
+        text.push_str(&format!("Ziel: {z}\n"));
+    }
+    if let Some(b) = &n.benoetigt_bis {
+        text.push_str(&format!("Benötigt bis: {}\n", stil.zeitpunkt_text(b)));
+    }
+    if let Some(d) = n.bezeichnung.as_deref().filter(|d| !d.trim().is_empty()) {
+        text.push_str(&format!("Details: {d}\n"));
+    }
+    if let Some(g) = n.begruendung.as_deref().filter(|g| !g.trim().is_empty()) {
+        text.push_str(&format!("Begründung: {g}\n"));
+    }
+    text.push_str(&format!("Einsatz: {einsatz_name}\n"));
+    text
+}
+
 /// Ziel einer Nachforderung: höchstens eines von Raum, Abschnitt und Freitext (LLH-1089 D5).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Ziel<'a> {
@@ -152,7 +187,7 @@ pub struct Ziel<'a> {
 /// Name des Ziels für den ETB-Wortlaut, in der Transaktion der Anlage aus der Zeile gelesen
 /// (Raum: Bezeichnung, Abschnitt: Name, sonst der Freitext). `NotFound`, wenn der Bezug nicht zum
 /// Einsatz gehört — die Route hat das geprüft, die Transaktion sieht es ein zweites Mal.
-async fn ziel_name_tx(
+pub(crate) async fn ziel_name_tx(
     conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     ziel: Ziel<'_>,
@@ -207,12 +242,17 @@ const ANZEIGE_SELECT: &str =
      FROM nachforderung n LEFT JOIN benutzer b ON b.id = n.erstellt_von_id";
 
 /// Lädt eine Nachforderung als Anzeige. `NotFound`, wenn unbekannt.
-pub async fn load(pool: &SqlitePool, id: i64) -> Result<NachforderungAnzeige, AppError> {
+///
+/// Executor-generisch (Pool oder offene Verbindung): der Ausgangskorb liest auf seiner Verbindung.
+pub async fn load(
+    executor: impl sqlx::Executor<'_, Database = sqlx::Sqlite>,
+    id: i64,
+) -> Result<NachforderungAnzeige, AppError> {
     sqlx::query_as::<_, NachforderungAnzeige>(sqlx::AssertSqlSafe(format!(
         "{ANZEIGE_SELECT} WHERE n.id = ?"
     )))
     .bind(id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?
     .ok_or(AppError::NotFound)
 }
