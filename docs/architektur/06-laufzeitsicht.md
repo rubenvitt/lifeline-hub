@@ -635,7 +635,7 @@ sequenceDiagram
   Fahrzeuge nach dem Commit live. „Rückgängig“ nach dem Entlassen stellt die Kopplung wieder her,
   wenn der Schalter an und die Kennung noch frei ist (`restore_ortung_tx` in
   `src/fahrzeug/disposition_repo.rs`).
-- Die Tabelle `ortung_kopplung` ist lokal (`migrations/0380_fahrzeugortung.sql`); in einem
+- Die Tabelle `ortung_kopplung` ist lokal (`migrations/0381_fahrzeugortung.sql`); in einem
   gespiegelten Einsatz lässt sich nicht koppeln (409), und eine dortige Kopplung wird nicht
   übernommen. Die Position selbst steht in `lat`/`lon`, `position_quelle` und
   `position_aktualisiert_at` von `einsatz_fahrzeug` und läuft wie jede Fahrzeugänderung zu den

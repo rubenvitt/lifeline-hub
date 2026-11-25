@@ -378,6 +378,6 @@ Design-Doc, Abschnitt „Nachtrag 25.11.2026“. Umgesetzt nach dem Merge-Commit
 - [x] Abschluss: `beende_ortung_im_einsatz` und `beende_im_einsatz_tx` in einer Transaktion.
 - [x] Anzeige auf `alpha` (`positionsHinweis`, 5 min); `ortungAlter.ts` entfernt, Zeile
   „Position“ über `positionsHinweisText`.
-- [x] Migration `0380_fahrzeugortung.sql`, ADR-0103, arc42 05/06/08/11 (R56)/12, Anwenderkapitel
+- [x] Migration `0381_fahrzeugortung.sql`, ADR-0103, arc42 05/06/08/11 (R56)/12, Anwenderkapitel
   Anbindungen, Fahrzeuge, Lagekarte, `docs/api/einwurf.md`.
 - [x] Tests: `tests/ortung.rs` vereint die Tests des Bausteins (`alpha`) und der Fahrzeugortung.

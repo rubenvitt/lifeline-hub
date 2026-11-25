@@ -315,7 +315,7 @@ entschieden; was oben anders steht, gilt in dieser Fassung:
   (`positionsHinweis`, `positionsAlter`, Liste „Geortet“), die Zeile „Position“ im Paneel
   „Auswahl“ liest denselben Text (`positionsHinweisText`). Im Lagestand misst das Alter gegen
   `stand_at` (`positionsJetzt` von `alpha`). Die Marke an der Fahrzeugzeile heißt „Ortung“.
-- **Nummern:** Migration `0380_fahrzeugortung.sql` (nur noch `ortung_kopplung` ohne
+- **Nummern:** Migration `0381_fahrzeugortung.sql` (nur noch `ortung_kopplung` ohne
   `ehrenamt_bestaetigt`), ADR-0103 (vorher ADR-0098, neu auf Schalter und Baustein geschrieben).
 - Alles Übrige bleibt wie entworfen: Koppeln im Zeilenmenü, Kennung eindeutig je Zugang, Ende mit
   Entlassen, Stornieren und Ablehnen der Einheit, Wiederherstellen beim Rückgängig, Spiegel über
