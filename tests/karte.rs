@@ -2958,3 +2958,37 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
         "EMSR728"
     );
 }
+
+/// Die Parken-Ebene (LLH-1637) ist eine bekannte Quelle und liefert ihren Cache-Stand,
+/// hermetisch wie `fachebenen_autobahn_liefert_gecachte_antwort`.
+#[tokio::test]
+async fn fachebenen_autobahn_parken_liefert_gecachte_antwort() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    let gecacht = FachebeneAntwort::ok(
+        "autobahn_parken",
+        "Autobahn GmbH des Bundes",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature",
+              "geometry": { "type": "Point", "coordinates": [8.83, 53.02] },
+              "properties": { "titel": "Krummhörens Kuhlen", "kategorie": "rastanlage",
+                              "lkw_stellplaetze": 4 } }
+        ]}),
+    );
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn_parken", &gecacht).await);
+
+    let app = app_mit(pool().await, dir);
+    let res = anfrage(&app, "GET", "/api/map/overlays/autobahn_parken", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(v["quelle"], "autobahn_parken");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["attribution"], "Autobahn GmbH des Bundes");
+    assert_eq!(
+        v["features"]["features"][0]["properties"]["kategorie"],
+        "rastanlage"
+    );
+}
