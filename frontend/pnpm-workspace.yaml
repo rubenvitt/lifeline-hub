@@ -85,22 +85,6 @@ overrides:
   # Same-Major-Patch.
   source-map-js@>=1.0.0 <1.2.2: ^1.2.2
 
-  # GHSA-5p4m-2wfm-xmqj (high): quadratische CPU bei !!omap-Auflösung.
-  # @redocly/openapi-core pinnt js-yaml exakt auf 4.2.0, openapi-typescript ist bereits
-  # die neueste Version (7.13.0) — es gibt keinen Upgrade-Pfad über die Kette. 4.3.1 war
-  # ein Same-Major-Update (Minor+Patch); verifiziert durch check-typ-codegen.sh, das
-  # diese Toolchain fährt (openapi.json → types.generated.ts).
-  # Bewusst `^4.3.2` und nicht `>=4.3.2`: letzteres zog js-yaml 5.2.1 herein — einen
-  # Major-Sprung mit Breaking Changes in eine Abhängigkeit, die wir gar nicht selbst rufen.
-  #
-  # NACHGEZOGEN 2026-09-09 (LFH-522-Gate-Lauf): DRITTES MAL DASSELBE MUSTER (siehe nanoid
-  # und fast-uri unten) — das Advisory ist gewandert, der Override nicht. Aus
-  # GHSA-5p4m-2wfm-xmqj ist zusätzlich GHSA-2883-xcg3-v3hh geworden (maxTotalMergeKeys
-  # begrenzt die CPU bei LEEREN Merge-Quellen nicht), die Schwelle steht jetzt bei 4.3.2.
-  # Der Override hob weiterhin korrekt auf 4.3.1 — nur reichte das Ziel nicht mehr, und
-  # `pnpm audit` brach Schritt 6. BEIDE Grenzen sind nachgezogen: Obergrenze UND Zielversion.
-  js-yaml@>=4.0.0 <4.3.2: ^4.3.2
-
   # GHSA-7p8r-x3mc-p8w7 (high): Host-Confusion über einen Backslash als Authority-Trenner.
   # Kette: vite-plugin-pwa → workbox-build → ajv (bzw.
   # @apideck/better-ajv-errors → ajv) → fast-uri. AJV fordert für fast-uri ^3.0.1
@@ -136,11 +120,10 @@ overrides:
   browserslist@>=4.0.0 <4.28.7: ^4.28.7
 
   # GHSA-rgw5-rvv9-x895 (high): DoS durch unbeschränkte Zwischenarrays bei Brace-Mustern.
-  # Ketten: openapi-typescript → @redocly/openapi-core → minimatch@5 sowie vite-plugin-pwa →
-  # workbox-build → rollup-plugin-off-main-thread → ejs → jake → filelist →
-  # minimatch@5 → brace-expansion@2.
-  # Der Backport ^2.1.4 bleibt im konsumierten Major und wird durch check-typ-codegen.sh
-  # sowie check-all.sh geprüft.
+  # Kette: vite-plugin-pwa → workbox-build → rollup-plugin-off-main-thread → ejs → jake →
+  # filelist → minimatch@5 → brace-expansion@2 (bis LLH-2141 auch openapi-typescript →
+  # @redocly/openapi-core → minimatch@5).
+  # Der Backport ^2.1.4 bleibt im konsumierten Major und wird durch check-all.sh geprüft.
   #
   # NACHGEZOGEN 2026-09-30: dasselbe Muster wie bei js-yaml und fast-uri. Zwei weitere
   # rekursionsbedingte DoS-Funde (Stack-Erschöpfung): GHSA-6j4f-fj2g-mc7p in parseCommaParts
