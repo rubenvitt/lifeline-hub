@@ -274,6 +274,7 @@ export default function LagekartePage() {
   // Seite spränge das HTTP/1.1-Limit von 6.
   const {
     darfSchreiben,
+    darfDrohneSchalten,
     ladt,
     markerLaden,
     gebiete,
@@ -333,7 +334,7 @@ export default function LagekartePage() {
     copernicus,
     setViewportBbox,
     setKartenZoom,
-  } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
+  } = useFachebenen({ einsatzId, fachebenenSichtbar, setFachebenenSichtbar });
 
   const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
@@ -2043,6 +2044,7 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
+        drohne={{ darfSchalten: darfDrohneSchalten }}
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}

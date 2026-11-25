@@ -3,6 +3,7 @@ import { theme } from 'antd';
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import {
   ladeFachebene,
+  loadDrohneFachebene,
   type FachebeneQuelle,
   type FachebeneStatus,
   type FeatureCollection,
@@ -36,6 +37,8 @@ const ENERGIE_AKKU_MAX = 2000;
 const leereFc = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 interface FachebenenArgs {
+  /** Einsatz der Karte: die Drohnenlage lädt über seine Route (LLH-2106). */
+  einsatzId: number;
   /** Sichtbarkeit + Setter kommen aus useKartenAnsicht (geteilte Ansicht = Wahrheit). */
   fachebenenSichtbar: FachebenenSichtbar;
   setFachebenenSichtbar: Dispatch<SetStateAction<FachebenenSichtbar>>;
@@ -65,7 +68,11 @@ const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
  * über die Closure.
  */
 
-export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
+export function useFachebenen({
+  einsatzId,
+  fachebenenSichtbar,
+  setFachebenenSichtbar,
+}: FachebenenArgs) {
   // Hochwasser, ODL und Luftqualität färben je Punkt nach Stufe und brauchen den aufgelösten
   // Modus-Token; die Kartenstil-Module haben ihn bewusst nicht, also wird er hier in die Features
   // gebacken.
@@ -154,8 +161,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       fachebeneTakt('copernicus', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
+  // Die Drohnenlage (LLH-2106) hängt am Einsatz und läuft darum als eigenes `useQuery` mit
+  // Einsatz-ID im Key, nicht im positionsweise gelesenen Tupel unten. Ihr Takt ist fest; ein Poll
+  // ohne neuen Stand kostet ein 304.
+  const drohne = useQuery({
+    queryKey: globalKeys.fachebeneDrohne(einsatzId),
+    queryFn: () => loadDrohneFachebene(einsatzId),
+    enabled: fachebenenSichtbar.drohne,
+    refetchInterval: FACHEBENEN.drohne.pollMs,
+  });
+
   // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
-  // `fachebeneKeys()` ohne kritis, energie und copernicus (nicht Panel-Reihenfolge). `byKey` greift
+  // `fachebeneKeys()` ohne kritis, energie, copernicus und drohne (nicht Panel-Reihenfolge). `byKey` greift
   // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
     queries: [
@@ -221,6 +238,7 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         kritis,
         energie,
         copernicus,
+        drohne,
         autobahn: ergebnisse[5],
         luftqualitaet: ergebnisse[6],
       } as const;

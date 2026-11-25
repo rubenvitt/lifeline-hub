@@ -9,10 +9,12 @@ import {
 } from './fachebenenLayer';
 import { farbenHell } from '../../theme/tokens';
 import { FACHEBENEN } from './fachebenen';
+import { ordneKlickebene } from './klickziel';
 
 function fakeMap() {
   const sources = new Set<string>();
   const layers = new Set<string>();
+  const images = new Set<string>();
   const specs = new Map<string, LayerSpec>();
   const sourceOptionen = new Map<string, Record<string, unknown>>();
   // Reihenfolge der angelegten Layer — MapLibre zeichnet später angelegte oben.
@@ -35,6 +37,9 @@ function fakeMap() {
     }),
     removeLayer: vi.fn((id: string) => layers.delete(id)),
     removeSource: vi.fn((id: string) => sources.delete(id)),
+    hasImage: vi.fn((id: string) => images.has(id)),
+    addImage: vi.fn((id: string) => images.add(id)),
+    _images: images,
     _sources: sources,
     _layers: layers,
     _specs: specs,
@@ -94,6 +99,10 @@ function wert(ausdruck: unknown, props: Record<string, unknown>): unknown {
       return props[args[0] as string];
     case 'geometry-type':
       return props.__geometrie ?? 'Polygon';
+    case 'typeof': {
+      const v = wert(args[0], props);
+      return v === null ? 'null' : typeof v;
+    }
     case 'case':
       return passt(args[0], props) ? wert(args[1], props) : wert(args[2], props);
     default:
@@ -365,7 +374,11 @@ describe('fachebeneClickLayerIds', () => {
  * Doppelkante weiß/schwarz trägt die Kontur gegen jeden Kartengrund.
  */
 describe('Trefferzone und Kante der Punkt-Fachebenen (LFH-600)', () => {
-  const punktEbenen = Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt');
+  // Die Drohnenlage zeichnet je Art eigene Layer und hat weder Trefferzone noch Klickziel (eigener
+  // Block unten).
+  const punktEbenen = Object.values(FACHEBENEN).filter(
+    (d) => d.geometrieTyp === 'punkt' && !d.drohnenlage,
+  );
   const kreisRadius = ['coalesce', ['get', 'radius'], 5];
 
   it('es gibt Punkt-Ebenen mit und ohne Bündel — sonst prüften die Schleifen nur eine Sorte', () => {
@@ -572,6 +585,127 @@ describe('gemischte Geometrie (Copernicus, LLH-1200)', () => {
   it('entfernt alle eigenen Layer', () => {
     const m = anlegen();
     entferneFachebeneLayer(m as never, 'copernicus');
+    expect([...m._layers]).toEqual([]);
+    expect(m._sources.size).toBe(0);
+  });
+});
+
+describe('Drohnenlage (LLH-2106)', () => {
+  const def = FACHEBENEN.drohne;
+  const anlegen = () => {
+    const m = fakeMap();
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    return m;
+  };
+  const filter = (m: ReturnType<typeof fakeMap>, id: string) => m._specs.get(id)?.filter;
+  const flugzeug = { kind: 'aircraft', heading_deg: 90, __geometrie: 'Point' };
+  const spur = { kind: 'track', __geometrie: 'LineString' };
+  const flaeche = { kind: 'element', __geometrie: 'Polygon' };
+  const foto = { kind: 'photo', __geometrie: 'Point' };
+
+  it('legt die Layer je Art an, idempotent, und stapelt Fluggerät oben', () => {
+    const m = anlegen();
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    expect(m.addSource).toHaveBeenCalledTimes(1);
+    expect(m._reihenfolge).toEqual([
+      'fachebene-drohne-elem-flaeche',
+      'fachebene-drohne-elem-umriss',
+      'fachebene-drohne-elem-strich',
+      'fachebene-drohne-elem-punkt',
+      'fachebene-drohne-spur-kante',
+      'fachebene-drohne-spur',
+      'fachebene-drohne-foto-kante',
+      'fachebene-drohne-foto',
+      'fachebene-drohne-flug-kante',
+      'fachebene-drohne-flug',
+      'fachebene-drohne-flug-pfeil',
+    ]);
+  });
+
+  it('zeichnet jede Art nur in ihren Layern', () => {
+    const m = anlegen();
+    const trifft = (props: Record<string, unknown>) =>
+      [...m._specs.keys()].filter((id) => passt(filter(m, id), props));
+    expect(trifft(flugzeug)).toEqual([
+      'fachebene-drohne-flug-kante',
+      'fachebene-drohne-flug',
+      'fachebene-drohne-flug-pfeil',
+    ]);
+    expect(trifft(spur)).toEqual(['fachebene-drohne-spur-kante', 'fachebene-drohne-spur']);
+    expect(trifft(flaeche)).toEqual([
+      'fachebene-drohne-elem-flaeche',
+      'fachebene-drohne-elem-umriss',
+    ]);
+    expect(trifft(foto)).toEqual(['fachebene-drohne-foto-kante', 'fachebene-drohne-foto']);
+    expect(trifft({ kind: 'element', __geometrie: 'Point' })).toEqual([
+      'fachebene-drohne-elem-punkt',
+    ]);
+    expect(trifft({ kind: 'element', __geometrie: 'LineString' })).toEqual([
+      'fachebene-drohne-elem-strich',
+    ]);
+  });
+
+  it('dreht den Pfeil mit der Blickrichtung und lässt ihn ohne sie weg', () => {
+    const m = anlegen();
+    const pfeil = m._specs.get('fachebene-drohne-flug-pfeil');
+    expect(pfeil?.layout?.['icon-rotate']).toEqual(['get', 'heading_deg']);
+    expect(pfeil?.layout?.['icon-rotation-alignment']).toBe('map');
+    expect(passt(pfeil?.filter, flugzeug)).toBe(true);
+    expect(passt(pfeil?.filter, { ...flugzeug, heading_deg: 0 })).toBe(true);
+    expect(passt(pfeil?.filter, { ...flugzeug, heading_deg: null })).toBe(false);
+    expect(passt(pfeil?.filter, { kind: 'aircraft', __geometrie: 'Point' })).toBe(false);
+  });
+
+  it('legt das Pfeilbild einmal an und nach einem Stilwechsel neu', () => {
+    const m = anlegen();
+    expect(m.addImage).toHaveBeenCalledTimes(1);
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    expect(m.addImage).toHaveBeenCalledTimes(1);
+    m._images.clear();
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, FARBE, TREFFER);
+    expect(m.addImage).toHaveBeenCalledTimes(2);
+  });
+
+  it('hält Elemente blass und Spuren voll, Elemente in der eigenen Farbe', () => {
+    const m = anlegen();
+    expect(m._specs.get('fachebene-drohne-elem-flaeche')?.paint?.['fill-opacity']).toBeLessThan(
+      0.2,
+    );
+    expect(m._specs.get('fachebene-drohne-elem-umriss')?.paint?.['line-opacity']).toBeLessThan(1);
+    expect(m._specs.get('fachebene-drohne-spur')?.paint?.['line-opacity']).toBeUndefined();
+    expect(m._specs.get('fachebene-drohne-elem-flaeche')?.paint?.['fill-color']).toEqual([
+      'coalesce',
+      ['get', 'color'],
+      FARBE,
+    ]);
+  });
+
+  it('zieht die Ebenenfarbe beim Moduswechsel nach, ohne Layer neu anzulegen', () => {
+    const m = anlegen();
+    const angelegt = m.addLayer.mock.calls.length;
+    const NACHT = '#654321';
+    sorgeFuerFachebeneLayer(m as never, def, leer as never, NACHT, TREFFER);
+    expect(m.addLayer).toHaveBeenCalledTimes(angelegt);
+    expect(m._specs.get('fachebene-drohne-flug')?.paint?.['circle-color']).toBe(NACHT);
+    expect(m._specs.get('fachebene-drohne-foto')?.paint?.['circle-color']).toBe(NACHT);
+    expect(m._specs.get('fachebene-drohne-spur')?.paint?.['line-color']).toEqual([
+      'coalesce',
+      ['get', 'color'],
+      NACHT,
+    ]);
+  });
+
+  it('ist noch kein Klickziel: keine Klickebene, keine Rolle im Schiedsspruch', () => {
+    expect(fachebeneClickLayerIds(def)).toEqual([]);
+    // Ein Layer mit einer Rolle (`ordneKlickebene`) risse Tipps an sich, ohne dass ein Handler sie
+    // beantwortet — und öffnete über die Flächenwahl den Inspector einer fremden Ebene.
+    const m = anlegen();
+    for (const id of m._layers) expect(ordneKlickebene(id), id).toBeNull();
+  });
+
+  it('entfernt alle eigenen Layer', () => {
+    const m = anlegen();
+    entferneFachebeneLayer(m as never, 'drohne');
     expect([...m._layers]).toEqual([]);
     expect(m._sources.size).toBe(0);
   });
