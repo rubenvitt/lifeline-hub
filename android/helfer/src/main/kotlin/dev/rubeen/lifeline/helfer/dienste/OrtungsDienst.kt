@@ -34,6 +34,7 @@ import dev.rubeen.lifeline.helferkern.Ortungslage
 import dev.rubeen.lifeline.helferkern.Position
 import dev.rubeen.lifeline.helferkern.Sendeplan
 import dev.rubeen.lifeline.helferkern.SseLeser
+import dev.rubeen.lifeline.helferkern.Wiederverbindung
 import dev.rubeen.lifeline.helferkern.Wire
 import java.time.Duration
 import java.time.Instant
@@ -108,6 +109,8 @@ class OrtungsDienst : Service() {
     @Volatile
     private var bestaetigt = false
 
+    /** Vom Hauptfaden gesetzt, von der Schleife des Empfangs (IO) gelesen. */
+    @Volatile
     private var einsatzId = 0L
     private var empfang: Job? = null
 
@@ -462,7 +465,7 @@ class OrtungsDienst : Service() {
         if (empfang?.isActive == true) return
         val v = verbindung ?: return
         empfang = scope.launch(Dispatchers.IO) {
-            var abbrueche = 0
+            val folge = Wiederverbindung()
             while (isActive) {
                 if (!bestaetigt) {
                     if (!pruefeBestaetigung(v)) {
@@ -480,11 +483,12 @@ class OrtungsDienst : Service() {
                 val status = v.live(
                     id,
                     offen = {
-                        abbrueche = 0
                         setzeVerbunden(true)
                         ladeAuftraege(v)
                     },
                 ) { zeile ->
+                    // Erst eine Zeile zeigt, dass die Verbindung trägt (`Wiederverbindung`).
+                    folge.daten()
                     if (leser.zeile(zeile) is LiveEreignis.Auftrag) ladeAuftraege(v)
                 }
                 setzeVerbunden(false)
@@ -496,8 +500,7 @@ class OrtungsDienst : Service() {
                     }
                     break
                 }
-                abbrueche += 1
-                delay(Empfang.nachAbbruch(abbrueche))
+                delay(folge.abbruch())
             }
         }
     }

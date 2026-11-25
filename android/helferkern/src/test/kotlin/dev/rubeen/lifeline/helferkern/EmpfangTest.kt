@@ -72,4 +72,16 @@ class EmpfangTest {
         assertEquals(Ortungslage.PAUSIERT, Ortungslage.aus(Phase.Pausiert, ortet = false))
         assertEquals(Ortungslage.RUHT, Ortungslage.aus(Phase.Ruht(Ruhegrund.KEINE_ROLLE), ortet = false))
     }
+
+    @Test
+    fun `erst Daten setzen den Abstand zurueck, ein blosses Oeffnen nicht`() {
+        val w = Wiederverbindung()
+        // Der Server nimmt an und schließt sofort, ohne eine Zeile: der Abstand wächst.
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L), (1..4).map { w.abbruch() })
+        // Eine Zeile kam an: der nächste Abbruch beginnt wieder bei einer Sekunde.
+        w.daten()
+        assertEquals(0, w.abbrueche)
+        assertEquals(1_000L, w.abbruch())
+        assertEquals(2_000L, w.abbruch())
+    }
 }

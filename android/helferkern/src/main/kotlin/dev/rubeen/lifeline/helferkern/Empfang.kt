@@ -22,7 +22,8 @@ object Empfang {
 
     /**
      * Wartezeit vor dem nächsten Verbinden nach [versuch] Abbrüchen in Folge (ab 1): 1 s, 2 s,
-     * 4 s, … höchstens 60 s. Eine Verbindung, die Daten liefert, setzt die Zählung zurück.
+     * 4 s, … höchstens 60 s. Eine Verbindung, die Daten liefert, setzt die Zählung zurück
+     * ([Wiederverbindung]).
      */
     fun nachAbbruch(versuch: Int): Long {
         val schritt = (versuch - 1).coerceIn(0, MAX_SCHRITTE)
@@ -42,6 +43,29 @@ object Empfang {
 
     /** 2^6 s = 64 s liegt schon über der Obergrenze. */
     private const val MAX_SCHRITTE = 6
+}
+
+/**
+ * Abbrüche des Live-Stroms in Folge (ADR-0105): erst Daten, also die erste Zeile, setzen die Zählung
+ * zurück, nicht schon der Verbindungsaufbau. Sonst wartete ein Server, der annimmt und sofort
+ * schließt, nie länger als [Empfang.ANFANG_MS]. Nur aus einem Faden nutzen (die Schleife des
+ * Empfangs).
+ */
+class Wiederverbindung {
+    /** Abbrüche seit der letzten Verbindung, die Daten lieferte. */
+    var abbrueche: Int = 0
+        private set
+
+    /** Eine Zeile kam an: die Verbindung trägt. */
+    fun daten() {
+        abbrueche = 0
+    }
+
+    /** Die Verbindung brach ab oder kam nicht zustande: Wartezeit bis zum nächsten Versuch. */
+    fun abbruch(): Long {
+        if (abbrueche < Int.MAX_VALUE) abbrueche += 1
+        return Empfang.nachAbbruch(abbrueche)
+    }
 }
 
 /** Wie die Ortung im Helfer-Dienst gerade steht (Zeile der Benachrichtigung). */

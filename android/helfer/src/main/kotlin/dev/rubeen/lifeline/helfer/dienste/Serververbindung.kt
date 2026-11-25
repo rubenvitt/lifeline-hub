@@ -14,6 +14,7 @@ import java.io.IOException
 import java.net.HttpCookie
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.concurrent.thread
 
 /** Antwort des Servers; [status] `0` heißt Netzfehler ohne Antwort (wie [entscheide]). */
 data class Rueckmeldung(val status: Int, val text: String) {
@@ -117,9 +118,15 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
         }
     }
 
-    /** Beendet die Live-Verbindung von außen (Dienst endet, Empfang aus). */
+    /**
+     * Beendet die Live-Verbindung von außen (Dienst endet, Empfang aus). Die offene Verbindung wird
+     * hier gegriffen, damit ein gleich danach geöffneter Strom bleibt; `disconnect` schließt den
+     * Socket (bei TLS mit einem Schreiben) und läuft deshalb auf einem eigenen Faden, nie auf dem
+     * Hauptfaden.
+     */
     fun trenneLive() {
-        liveVerbindung?.disconnect()
+        val offen = liveVerbindung ?: return
+        thread(name = "helfer-live-trennen", isDaemon = true) { offen.disconnect() }
     }
 
     private fun anfrage(methode: String, pfad: String, body: String? = null): Rueckmeldung {
