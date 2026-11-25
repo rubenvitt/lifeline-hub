@@ -85,7 +85,10 @@ pub fn build_feature(geometrie: Value, name: Option<&str>, beschreibung: Option<
     if let Some(n) = name.map(clean_name).filter(|n| !n.is_empty()) {
         props.insert("name".into(), Value::String(n));
     }
-    if let Some(b) = beschreibung.map(html_zu_text).filter(|b| !b.is_empty()) {
+    if let Some(b) = beschreibung
+        .map(|b| html_zu_text(kappe(b, BESCHREIBUNG_ROH_MAX)))
+        .filter(|b| !b.is_empty())
+    {
         props.insert(
             "description".into(),
             Value::String(kuerze(&b, BESCHREIBUNG_MAX)),
@@ -136,8 +139,40 @@ fn clean_name(s: &str) -> String {
     )
 }
 
+/// So viele Bytes einer Beschreibung werden höchstens angesehen: mehr als [`BESCHREIBUNG_MAX`]
+/// Zeichen Text bleiben ohnehin nicht, der Rest wäre nur Arbeit (Abschluss-Review, I1).
+const BESCHREIBUNG_ROH_MAX: usize = 16 * BESCHREIBUNG_MAX;
+
+/// Kürzt auf höchstens `max` Bytes, an einer Zeichengrenze.
+fn kappe(s: &str, max: usize) -> &str {
+    if s.len() <= max {
+        return s;
+    }
+    let mut ende = max;
+    while !s.is_char_boundary(ende) {
+        ende -= 1;
+    }
+    &s[..ende]
+}
+
+/// Die Stelle des nächsten `</name` (ohne Rücksicht auf Groß- und Kleinschreibung), ohne Kopie.
+fn finde_schluss(text: &str, name: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut ab = 0;
+    while let Some(p) = text[ab..].find("</") {
+        let i = ab + p;
+        let kandidat = bytes.get(i + 2..i + 2 + name.len())?;
+        if kandidat.eq_ignore_ascii_case(name.as_bytes()) {
+            return Some(i);
+        }
+        ab = i + 2;
+    }
+    None
+}
+
 /// Beschreibung als reiner Text: Tags entfernt (Inhalt von `script` und `style` mit),
 /// Entities aufgelöst, Leerraum zusammengezogen. Ein `<`, dem kein Tag folgt, bleibt Text.
+/// Linear in der Länge: jede Suche beginnt dort, wo die vorige aufhörte.
 pub fn html_zu_text(s: &str) -> String {
     let mut roh = String::with_capacity(s.len());
     let mut rest = s;
@@ -157,16 +192,14 @@ pub fn html_zu_text(s: &str) -> String {
             rest = "";
             break;
         };
-        let tag = nach[..ende].to_ascii_lowercase();
-        let tag_name: String = tag
-            .chars()
-            .take_while(|c| c.is_ascii_alphanumeric())
-            .collect();
+        let tag = &nach[..ende];
+        let tag_name = &tag[..tag
+            .find(|c: char| !c.is_ascii_alphanumeric())
+            .unwrap_or(tag.len())];
         rest = &nach[ende + 1..];
         roh.push(' ');
-        if tag_name == "script" || tag_name == "style" {
-            let schluss = format!("</{tag_name}");
-            match rest.to_ascii_lowercase().find(&schluss) {
+        if tag_name.eq_ignore_ascii_case("script") || tag_name.eq_ignore_ascii_case("style") {
+            match finde_schluss(rest, tag_name) {
                 Some(p) => {
                     let nach_schluss = &rest[p..];
                     rest = nach_schluss
@@ -447,4 +480,40 @@ mod tests {
         kmz.resize(DATEI_MAX + 1, 0);
         assert_eq!(read_datei(&kmz), Err(FremdebeneFehler::ZuGross));
     }
+
+    #[test]
+    fn viele_script_tags_bleiben_linear() {
+        let viele = format!(
+            "{}Text",
+            "<script>x</script><STYLE>y</Style >".repeat(50_000)
+        );
+        let start = std::time::Instant::now();
+        assert_eq!(html_zu_text(&viele), "Text");
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(2),
+            "{:?}",
+            start.elapsed()
+        );
+        assert_eq!(html_zu_text("a<SCRIPT>b</ScRiPt >c"), "a c");
+        assert_eq!(html_zu_text("a<script>b"), "a");
+    }
+
+    #[test]
+    fn beschreibung_wird_vor_dem_entfernen_gekappt() {
+        // Nach dem 16-Fachen von BESCHREIBUNG_MAX Bytes ist Schluss, auch mitten in einem Zeichen.
+        let leer = "<p></p>".repeat(BESCHREIBUNG_MAX * 16 / 7 + 1);
+        let f = build_feature(json!(null), None, Some(&format!("{leer}Ende")));
+        assert_eq!(f["properties"], json!({}));
+        let umlaute = format!("x{}", "ä".repeat(BESCHREIBUNG_MAX * 16));
+        let f = build_feature(json!(null), None, Some(&umlaute));
+        assert_eq!(
+            f["properties"]["description"]
+                .as_str()
+                .unwrap()
+                .chars()
+                .count(),
+            BESCHREIBUNG_MAX
+        );
+    }
+
 }
