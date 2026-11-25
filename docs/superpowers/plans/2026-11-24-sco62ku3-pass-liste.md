@@ -52,11 +52,11 @@
 **Interfaces:**
 - Produces: Wire-Werte `"pass_export"`, `"pass_druck"` für `audit_repo::create(…, art)`; `ZugriffArt::PassExport`, `ZugriffArt::PassDruck`.
 
-- [ ] **Step 1: Failing test** `migration_0380_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema` in `src/db/tests.rs`. Aufbau wie der 0311-Test: Alt-DB, 0141 und 0311 einspielen, drei Zeilen inklusive `registrierliste` einfügen, die höchste löschen, dann `pruefe_audit_rebuild(&pool, MIGRATION_0380, "pass_export")`. Dazu ein Insert mit `'pass_druck'`, der gelingt, und einer mit `'pass_irgendwas'`, der am CHECK scheitert.
-- [ ] **Step 2:** Ausführen mit `cargo test --lib migration_0380`. Erwartet: Kompilierfehler, `MIGRATION_0380` fehlt.
-- [ ] **Step 3:** Migration schreiben: Kopie von 0311 als Blatt-Umbau, **ohne** `-- no-transaction` (`migrations/AGENTS.md`, „Tabellenumbau“; die Tabelle hat keine Verweise auf sich). Der CHECK wird `('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`. Den Kopfkommentar nach dem Muster von 0311 mit Verweis auf LLH-1198. Dann `const MIGRATION_0380` per `include_str!`. Laut 0311 braucht der Spaltenkommentar den gleichen Wortlaut, das gilt auch hier.
-- [ ] **Step 4:** In `ZugriffArt` `PassExport` und `PassDruck` ergänzen, mit Doku-Zeile (Abruf über `?profile=pass`). Den Kommentar zum Wire-CHECK auf 0380 nachziehen. `enum_wire!` um `PassExport => "pass_export"` und `PassDruck => "pass_druck"` erweitern.
-- [ ] **Step 5:** Ausführen mit `cargo test --lib migration_0380 && cargo test --test enum_wire_kontrakt`. Erwartet: PASS.
+- [ ] **Step 1: Failing test** `migration_0381_person_zugriff_audit_rebuild_erhaelt_zeilen_sequenz_und_schema` in `src/db/tests.rs`. Aufbau wie der 0311-Test: Alt-DB, 0141 und 0311 einspielen, drei Zeilen inklusive `registrierliste` einfügen, die höchste löschen, dann `pruefe_audit_rebuild(&pool, MIGRATION_0381, "pass_export")`. Dazu ein Insert mit `'pass_druck'`, der gelingt, und einer mit `'pass_irgendwas'`, der am CHECK scheitert.
+- [ ] **Step 2:** Ausführen mit `cargo test --lib migration_0381`. Erwartet: Kompilierfehler, `MIGRATION_0381` fehlt.
+- [ ] **Step 3:** Migration schreiben: Kopie von 0311 als Blatt-Umbau, **ohne** `-- no-transaction` (`migrations/AGENTS.md`, „Tabellenumbau“; die Tabelle hat keine Verweise auf sich). Der CHECK wird `('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`. Den Kopfkommentar nach dem Muster von 0311 mit Verweis auf LLH-1198. Dann `const MIGRATION_0381` per `include_str!`. Laut 0311 braucht der Spaltenkommentar den gleichen Wortlaut, das gilt auch hier.
+- [ ] **Step 4:** In `ZugriffArt` `PassExport` und `PassDruck` ergänzen, mit Doku-Zeile (Abruf über `?profile=pass`). Den Kommentar zum Wire-CHECK auf 0381 nachziehen. `enum_wire!` um `PassExport => "pass_export"` und `PassDruck => "pass_druck"` erweitern.
+- [ ] **Step 5:** Ausführen mit `cargo test --lib migration_0381 && cargo test --test enum_wire_kontrakt`. Erwartet: PASS.
 - [ ] **Step 6:** Commit `feat(personen): Protokollarten pass_export und pass_druck`.
 
 ### Task 2: `src/person/pass.rs`: Zeilen, Betroffenheit, CSV
