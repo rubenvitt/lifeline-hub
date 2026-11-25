@@ -226,8 +226,8 @@ pub fn has_neues_ziel(
         })
 }
 
-/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105); Tests bringen ihre
-/// eigene mit.
+/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105) und
+/// `veranstaltungen_abruf` (LLH-2097); Tests bringen ihre eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -246,7 +246,10 @@ impl Verzeichnis {
 
     /// Die Arten dieses Builds.
     pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
-        Verzeichnis::new(vec![Arc::new(crate::drohne::art::SuchlageArt::new(drohne))])
+        Verzeichnis::new(vec![
+            Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
+            Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
+        ])
     }
 
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {

@@ -297,6 +297,12 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
   `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
   (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
+- **Ablage einer Art** (LLH-2097, `veranstaltung_extern`): eine Art, die nicht flüchtig ist, legt
+  in eine eigene Tabelle mit FK auf `adapter` (`ON DELETE CASCADE`) ab, je Adapter eine Zeile je
+  Fremdkennung. `uebernehmen` vergleicht einen Fingerabdruck und schreibt bei Gleichstand nichts;
+  eine Lieferung gilt ganz oder gar nicht (eine ungültige Zeile ist `antwort_ungueltig`). Keine
+  Admin-Spur je Zeile: der Lauf ist kein Admin. Kein Name einer liefernden Anwendung im Code
+  (Guard `veranstaltung_extern::tests::code_nennt_keine_liefernde_anwendung`).
 - **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
   in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
   `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er
@@ -1163,6 +1169,10 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 ## Backend — Aufbewahrung (LFH-23)
 
 Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md`.
+- **Abgerufene Veranstaltungen** (LLH-2097): `veranstaltung_extern` geht 14 Tage nach `ende_at`
+  (`veranstaltung_extern::repo::AUFBEWAHRUNG_TAGE`, Phase C des Purge-Laufs) oder mit dem Adapter.
+  Was die Quelle planmäßig nicht mehr liefert (Ende mehr als `FENSTER_TAGE` zurück), wird nicht
+  `entfernt`; eine Frist, die kürzer ist als das Fenster, holte eine Veranstaltung als neu zurück.
 - **Totalsperre bleibt** (`einsatz::berechtigung::darf_lesen`, auch für den System-Admin); das
   Archiv liest nur `/api/retention` (`routes/aufbewahrung.rs`), Guard
   `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) — neue Routen dort

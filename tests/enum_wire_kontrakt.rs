@@ -835,6 +835,20 @@ fn serde_wire_gleich_as_str() {
         Zahl => "zahl",
         Url => "url",
     });
+    // Veranstaltungen-Abruf v1 (LLH-2097): Wire des Vertrags und Spalten `art`/`status` von
+    // `veranstaltung_extern`.
+    enum_wire!(lifeline_hub::veranstaltung_extern::vertrag::VeranstaltungsArt {
+        Sanitaetsdienst => "sanitaetsdienst",
+        Betreuung => "betreuung",
+        Uebung => "uebung",
+        Sonstiges => "sonstiges",
+    });
+    enum_wire!(lifeline_hub::veranstaltung_extern::vertrag::VeranstaltungsStatus {
+        Angefragt => "angefragt",
+        Zugesagt => "zugesagt",
+        Abgesagt => "abgesagt",
+        Entfernt => "entfernt",
+    });
     enum_wire!(lifeline_hub::routes::adapter::GeheimnisspeicherZustand {
         Bereit => "bereit",
         Fehlt => "fehlt",
