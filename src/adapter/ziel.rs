@@ -165,6 +165,18 @@ impl<'a> AbrufKontext<'a> {
         }
     }
 
+    /// Liest Bytes mit Deckel (`http_begrenzt`).
+    pub async fn read_bytes(
+        &self,
+        antwort: reqwest::Response,
+        deckel: usize,
+    ) -> Result<axum::body::Bytes, Fehlschlag> {
+        http_begrenzt::lies_begrenzt(antwort, deckel)
+            .await
+            .map(axum::body::Bytes::from)
+            .map_err(|f| Fehlschlag::new(von_lesefehler(f)))
+    }
+
     /// Liest JSON mit Deckel (`http_begrenzt`).
     pub async fn read_json<T: DeserializeOwned>(
         &self,

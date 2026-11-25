@@ -1204,6 +1204,7 @@
           "geheimnis_unlesbar",
           "geheimnisspeicher_gesperrt",
           "einstellung_ungueltig",
+          "version_unbekannt",
           "intern"
         ]
       },
@@ -6279,6 +6280,73 @@
           "foto",
           "sonstiges"
         ]
+      },
+      "DroneSourceUpdate": {
+        "type": "object",
+        "required": [
+          "lagemonitor"
+        ],
+        "properties": {
+          "lagemonitor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DroneSourceView": {
+        "type": "object",
+        "description": "Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz.",
+        "required": [
+          "adapter_id",
+          "label",
+          "connected",
+          "held_by_other_hidden",
+          "lagemonitor",
+          "state",
+          "video_keys"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle)."
+          },
+          "held_by_other": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf."
+          },
+          "held_by_other_hidden": {
+            "type": "boolean",
+            "description": "Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen\n(dann ist `held_by_other` leer)."
+          },
+          "label": {
+            "type": "string"
+          },
+          "lagemonitor": {
+            "type": "boolean",
+            "description": "Das Livebild geht auch an den Lagemonitor."
+          },
+          "mission_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "Zustand des Adapters (`aktiv`, `angehalten`, …)."
+          },
+          "video_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
       },
       "EinheitAnzeige": {
         "type": "object",

@@ -2322,6 +2322,43 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull();
   });
 
+  it('zeigt die Drohnenquellen nur live, im gesicherten Stand weder Zeile noch Abfrage (LLH-2106)', async () => {
+    const abgefragt = vi.fn();
+    const quellen = http.get('/api/incidents/1/drone/sources', () => {
+      abgefragt();
+      return HttpResponse.json([]);
+    });
+    const stand = [
+      http.get('/api/einsaetze/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/einsaetze/1/situation-snapshots/3', () =>
+        HttpResponse.json({ ...STAND_A, daten: { einsatz: EINSATZ } }),
+      ),
+    ];
+    // Die Gruppe „Fachebenen“ merkt sich ihren Zustand über die Seite hinaus: nur zugeklappt öffnen.
+    const ebenenOeffnen = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole('tab', { name: 'Ebenen' }));
+      if (!screen.queryByRole('button', { name: /^Drohne / })) {
+        await user.click(await screen.findByRole('button', { name: /^Fachebenen/ }));
+      }
+      await screen.findByRole('button', { name: /^Drohne / });
+    };
+
+    basisHandler([quellen, ...stand]);
+    const live = renderSeite();
+    await ebenenOeffnen(userEvent.setup());
+    await waitFor(() => expect(abgefragt).toHaveBeenCalled());
+    expect(document.querySelector('[data-lfh="drohnen-quellen"]')).not.toBeNull();
+    expect(screen.getByRole('switch', { name: 'Drohnenlage (Suchlage)' })).toBeInTheDocument();
+    live.unmount();
+
+    abgefragt.mockClear();
+    renderSeite('/einsaetze/1/lagekarte?snapshot=3');
+    await screen.findByText('Historischer Stand — schreibgeschützt');
+    await ebenenOeffnen(userEvent.setup());
+    expect(document.querySelector('[data-lfh="drohnen-quellen"]')).toBeNull();
+    expect(abgefragt).not.toHaveBeenCalled();
+  });
+
   it('nennt ohne Schreibrecht nur den fehlenden Einsatzort, ohne Knöpfe', async () => {
     basisHandler([
       http.get('/api/einsaetze/1', () =>

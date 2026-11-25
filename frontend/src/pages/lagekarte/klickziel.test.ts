@@ -391,7 +391,8 @@ describe('Klickebenen-Guard (LFH-764)', () => {
     // Die Fachebenen tragen Punkte UND Flächen — sonst prüfte der Guard nur eine Sorte.
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebene')).toBe(true);
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebeneFlaeche')).toBe(true);
-    // Jede Punkt-Fachebene hängt ihren Klick-Hörer auch an die Trefferzone (LFH-600).
+    // Jede Punkt-Fachebene hängt ihren Klick-Hörer auch an die Trefferzone (LFH-600); die
+    // Drohnenlage tut es für ihre Fotos (LLH-2108).
     for (const def of Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt')) {
       expect(fachebeneClickLayerIds(def), def.key).toContain(`fachebene-${def.key}-treffer`);
     }

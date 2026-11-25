@@ -1,0 +1,29 @@
+{
+  "api_version": 1,
+  "server_time_ms": 1700000005000,
+  "mission": { "id": 7, "name": "Übung Waldsuche", "location": null, "started_at_ms": 1700000000000, "section": "A1" },
+  "map_etag": "abcd1234abcd1234",
+  "map": {
+    "type": "FeatureCollection",
+    "features": [
+      { "type": "Feature",
+        "geometry": { "type": "MultiLineString", "coordinates": [[[8.1, 50.1], [8.2, 50.2]]] },
+        "properties": { "kind": "flight_track", "flight_id": 3, "name": "Flug 1", "color": "#ff0000",
+                        "flugmappe_section_id": null, "started_at_ms": 1700000001000, "ended_at_ms": null } },
+      { "type": "Feature",
+        "geometry": { "type": "Polygon", "coordinates": [[[8.0, 50.0], [8.1, 50.0], [8.1, 50.1], [8.0, 50.0]]] },
+        "properties": { "kind": "map_element", "id": "e1", "name": "Suchgebiet Nord", "color": "#00ff00" } },
+      { "type": "Feature",
+        "geometry": { "type": "Point", "coordinates": [8.3, 50.3] },
+        "properties": { "kind": "etwas_neues", "name": "?" } }
+    ]
+  },
+  "aircraft": [
+    { "gateway_sn": "RC-TEST-1", "label": "Drohne Alpha", "position": { "lat": 50.2, "lon": 8.2 },
+      "heading_deg": 90.0, "elevation_takeoff_m": 42.5, "battery_percent": 77, "airborne": true, "flight_id": 3 },
+    { "gateway_sn": "RC-TEST-2", "label": null, "position": { "lat": 50.0, "lon": 8.0 },
+      "heading_deg": null, "elevation_takeoff_m": null, "battery_percent": null, "airborne": false, "flight_id": null }
+  ],
+  "videos": [ { "gateway_sn": "RC-TEST-1", "label": "Drohne Alpha" } ],
+  "photos_latest_ms": 1700000004000
+}

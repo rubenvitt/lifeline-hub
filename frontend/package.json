@@ -34,6 +34,7 @@
     "@tanstack/react-query": "^5.108.2",
     "antd": "^6.7.1",
     "dayjs": "^1.11.23",
+    "hls.js": "1.7.4",
     "idb": "^8.0.4",
     "libheif-js": "1.23.5",
     "maplibre-gl": "^6.19.0",

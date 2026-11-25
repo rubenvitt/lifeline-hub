@@ -57,6 +57,8 @@ wire_enum! {
         GeheimnisspeicherGesperrt => "geheimnisspeicher_gesperrt",
         /// Die gespeicherten Einstellungen bestehen die Prüfung der Art nicht mehr.
         EinstellungUngueltig => "einstellung_ungueltig",
+        /// Die Gegenstelle spricht eine Schnittstellenversion, die diese Art nicht kennt.
+        VersionUnbekannt => "version_unbekannt",
         /// Fehler im Server; steht im Log.
         Intern => "intern",
     }
@@ -104,7 +106,8 @@ pub fn braucht_eingriff(fehler: AdapterFehler) -> bool {
         | GeheimnisFehlt
         | GeheimnisUnlesbar
         | GeheimnisspeicherGesperrt
-        | EinstellungUngueltig => true,
+        | EinstellungUngueltig
+        | VersionUnbekannt => true,
         Status | Zeitueberschreitung | Verbindung | Tls | Dns | ZuGross | AntwortUngueltig
         | Intern => false,
     }
@@ -312,6 +315,7 @@ mod tests {
             GeheimnisUnlesbar,
             GeheimnisspeicherGesperrt,
             EinstellungUngueltig,
+            VersionUnbekannt,
         ] {
             assert!(braucht_eingriff(f), "{f:?}");
         }
@@ -327,7 +331,7 @@ mod tests {
         ] {
             assert!(!braucht_eingriff(f), "{f:?}");
         }
-        assert_eq!(AdapterFehler::ALLE.len(), 16);
+        assert_eq!(AdapterFehler::ALLE.len(), 17);
     }
 
     #[test]

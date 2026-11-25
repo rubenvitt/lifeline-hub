@@ -510,7 +510,7 @@ export interface components {
          * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
          * @enum {string}
          */
-        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "intern";
+        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern";
         /** @description Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert. */
         AdapterGeheimnisAnzeige: {
             bezeichnung: string;
@@ -2510,6 +2510,29 @@ export interface components {
          * @enum {string}
          */
         DokumentKategorie: "lagekarte_plan" | "befehl" | "formular" | "foto" | "sonstiges";
+        DroneSourceUpdate: {
+            lagemonitor: boolean;
+        };
+        /** @description Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz. */
+        DroneSourceView: {
+            adapter_id: string;
+            /** @description In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle). */
+            connected: boolean;
+            /** @description Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf. */
+            held_by_other?: string | null;
+            /**
+             * @description Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen
+             *     (dann ist `held_by_other` leer).
+             */
+            held_by_other_hidden: boolean;
+            label: string;
+            /** @description Das Livebild geht auch an den Lagemonitor. */
+            lagemonitor: boolean;
+            mission_name?: string | null;
+            /** @description Zustand des Adapters (`aktiv`, `angehalten`, …). */
+            state: string;
+            video_keys: string[];
+        };
         /**
          * @description Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
          *     Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →

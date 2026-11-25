@@ -812,6 +812,7 @@ fn serde_wire_gleich_as_str() {
         GeheimnisUnlesbar => "geheimnis_unlesbar",
         GeheimnisspeicherGesperrt => "geheimnisspeicher_gesperrt",
         EinstellungUngueltig => "einstellung_ungueltig",
+        VersionUnbekannt => "version_unbekannt",
         Intern => "intern",
     });
     enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {

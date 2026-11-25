@@ -62,8 +62,9 @@ bereiche_von() {
     # Unterkunftsrechners (rechnerFixture.test.ts, richtwerte.ts, LLH-1520), dazu die Fälle der
     # Deckungsregel für Qualifikationen (qualiDeckung.test.ts, LLH-1553), dazu die Frist des
     # Wiederöffnens (`NACHLAUF_STUNDEN`, schreibrecht.test.ts, LLH-1814), dazu TTL und
-    # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200).
-    src/karte/quellen.rs | src/karte/copernicus.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
+    # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200), dazu der Abruftakt der
+    # Drohnenquelle (`intervall_vorschlag_s`, fachebenen.test.ts, LLH-2106).
+    src/karte/quellen.rs | src/karte/copernicus.rs | src/drohne/art.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
       | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json \
       | tests/fixtures/quali_deckung_faelle.json | src/einsatz/berechtigung.rs)
       echo "rust frontend e2e" ;;

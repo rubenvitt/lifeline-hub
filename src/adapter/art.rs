@@ -117,6 +117,13 @@ pub trait AdapterArt: Send + Sync + 'static {
     /// Vorschlag beim Anlegen.
     fn intervall_vorschlag_s(&self) -> i64;
 
+    /// Ob die Art flüchtige Daten liefert: ihre Übernahme geht nur in den Speicher, der Takt
+    /// zählt ab Laufbeginn, und eine Versuchszeile steht nur bei Zustandswechsel
+    /// (`adapter::lauf::run_one`).
+    fn fluechtig(&self) -> bool {
+        false
+    }
+
     /// Prüfung über die Felder hinaus (Kombinationen); Meldung für die Verwaltung (400).
     fn check_extra(&self, _einstellungen: &Map<String, Value>) -> Result<(), String> {
         Ok(())
@@ -219,8 +226,8 @@ pub fn has_neues_ziel(
         })
 }
 
-/// Die Arten, die dieser Server kennt. In Produktion leer, bis die erste Art kommt (LLH-1193);
-/// Tests bringen ihre eigene mit.
+/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105); Tests bringen ihre
+/// eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -238,10 +245,11 @@ impl Verzeichnis {
     }
 
     /// Die Arten dieses Builds.
-    pub fn produktiv() -> Self {
-        Verzeichnis::new(vec![Arc::new(
-            super::arten::stammdaten_abruf::StammdatenAbruf,
-        )])
+    pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
+        Verzeichnis::new(vec![
+            Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
+            Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
+        ])
     }
 
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {
@@ -419,6 +427,8 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        assert!(Verzeichnis::produktiv().find("stammdaten_abruf").is_some());
+        let produktiv = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
+        assert!(produktiv.find("suchlage").is_some());
+        assert!(produktiv.find("stammdaten_abruf").is_some());
     }
 }

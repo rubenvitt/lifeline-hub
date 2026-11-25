@@ -1214,6 +1214,24 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
     expect(screen.getByText(/Aufnahme älter als 24 h/)).toBeInTheDocument();
   });
 
+  it('warnt ohne Aufnahme vor einer alten Lieferung (Altbestand, LLH-2022)', () => {
+    render(
+      <FachebenenInspector
+        quelle="copernicus"
+        properties={{
+          ...tiefe,
+          aufnahme: undefined,
+          sensor: undefined,
+          emsr: 'EMSR517',
+          geliefert: '2021-08-11 12:48:47',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Lieferung älter als 24 h/)).toBeInTheDocument();
+    expect(screen.queryByText(/Aufnahme älter/)).not.toBeInTheDocument();
+  });
+
   it('titelt ein Gebiet mit seinem Namen', () => {
     render(
       <FachebenenInspector
@@ -1223,5 +1241,58 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
       />,
     );
     expect(screen.getByText('Auswertungsgebiet Stuttgart')).toBeInTheDocument();
+  });
+});
+
+describe('FachebenenInspector: Drohnenfoto (LLH-2108)', () => {
+  const AUFNAHME_MS = Date.parse('2026-11-24T10:15:00Z');
+  const foto = (extra: Record<string, unknown> = {}) => ({
+    quelle: 'drohne' as const,
+    einsatzId: 7,
+    properties: {
+      kind: 'photo',
+      key: 'DJI_0001 (1).JPG',
+      taken_at_ms: AUFNAHME_MS,
+      lens: 'thermal',
+      heading_deg: 90,
+      ...extra,
+    },
+    onSchliessen: () => {},
+  });
+
+  it('zeigt die vorschau über die Einsatzroute mit Linse, Aufnahmezeit und Blickrichtung', () => {
+    render(<FachebenenInspector {...foto()} />);
+    const bild = screen.getByRole('img', { name: /Drohnenfoto/ });
+    expect(bild).toHaveAttribute('src', '/api/incidents/7/drone/photos/DJI_0001%20(1).JPG/thumb');
+    expect(screen.getByText('Wärmebild')).toBeInTheDocument();
+    expect(
+      screen.getByText(zeitpunkt(new Date(AUFNAHME_MS).toISOString(), DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Blickrichtung')).toBeInTheDocument();
+    expect(screen.getByText('90°')).toBeInTheDocument();
+  });
+
+  it('benennt die übrigen Linsen und lässt eine fehlende Blickrichtung weg', () => {
+    const { rerender } = render(<FachebenenInspector {...foto({ lens: 'wide' })} />);
+    expect(screen.getByText('Weitwinkel')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'zoom' })} />);
+    expect(screen.getByText('Zoom')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'visible' })} />);
+    expect(screen.getByText('Sichtbild')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'unknown', heading_deg: null })} />);
+    expect(screen.getByText('unbekannte Linse')).toBeInTheDocument();
+    expect(screen.queryByText('Blickrichtung')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei einem Ladefehler den Grund, und ein anderes Foto beginnt frisch', () => {
+    const { rerender } = render(<FachebenenInspector {...foto()} />);
+    fireEvent.error(screen.getByRole('img', { name: /Drohnenfoto/ }));
+    expect(screen.queryByRole('img', { name: /Drohnenfoto/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Vorschau nicht abrufbar')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ key: 'B.JPG' })} />);
+    expect(screen.getByRole('img', { name: /Drohnenfoto/ })).toHaveAttribute(
+      'src',
+      '/api/incidents/7/drone/photos/B.JPG/thumb',
+    );
   });
 });

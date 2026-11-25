@@ -211,6 +211,8 @@ use utoipa::OpenApi;
         crate::etb::zaehler::EtbZaehlerAnzeige,
         crate::etb::zaehler::EtbTypZaehler,
         crate::einsatz::zaehler::ModulZaehlerAnzeige,
+        crate::routes::drohne::DroneSourceView,
+        crate::routes::drohne::DroneSourceUpdate,
         crate::routes::lagemonitor::LagemonitorAnzeige,
         crate::routes::lagemonitor::LagemonitorBetroffene,
         crate::routes::lagemonitor::LagemonitorKraefte,

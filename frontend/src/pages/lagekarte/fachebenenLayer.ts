@@ -2,6 +2,7 @@ import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import type { FachebeneDef } from './fachebenen';
 import type { FeatureCollection, FachebeneQuelle } from '../../api/fachebenen';
 import { farbenHell } from '../../theme/tokens';
+import { DROHNEN_PFEIL_ID, drohnenPfeilBild } from './drohnenSymbol';
 
 export const fachebeneSourceId = (key: string) => `fachebene-${key}`;
 
@@ -89,6 +90,10 @@ export function sorgeFuerFachebeneLayer(
   }
   if (def.gemischteGeometrie) {
     sorgeFuerGemischteLayer(map, def.key, src, treffer);
+    return;
+  }
+  if (def.drohnenlage) {
+    sorgeFuerDrohnenLayer(map, def.key, src, farbe, treffer);
     return;
   }
   if (def.geometrieTyp === 'polygon') {
@@ -316,6 +321,178 @@ function sorgeFuerGemischteLayer(
   map.setPaintProperty(`fachebene-${key}-treffer`, 'circle-radius', treffer / 2);
 }
 
+const IST_KIND = (kind: string) => ['==', ['get', 'kind'], kind];
+
+/** Ein Element oder eine Spur darf seine Farbe mitbringen (`color`, Suchlage); sonst die Ebenenfarbe. */
+const kindFarbe = (farbe: string) => ['coalesce', ['get', 'color'], farbe];
+
+/**
+ * Layer der Drohnenlage (LLH-2106), je Feature nach `properties.kind`:
+ *
+ * - `element` (Einsatzelemente aus Suchlage: Flächen, Linien, Punkte) blass — sie tragen die Lage,
+ *   dürfen aber weder Spur noch Fluggerät verdecken;
+ * - `track` als Linie mit schwarzer Unterlage (Kontrast gegen jeden Grund, wie die Doppelkante der
+ *   Ebenenpunkte);
+ * - `photo` als Bildpunkt (Aufnahmeort), kleiner als das Fluggerät;
+ * - `aircraft` als Kreis in der Ebenenfarbe mit Pfeil, der mit `heading_deg` dreht. Ohne
+ *   Blickrichtung steht nur der Kreis da: ein Pfeil nach Norden wäre eine falsche Aussage.
+ *
+ * Klickziel sind nur die Fotos, über die Trefferzone `-treffer` (`fachebeneClickLayerIds`); sie
+ * öffnen den Inspector mit der Vorschau. Fluggerät, Spur und Element sind keine Ziele, darum
+ * enden ihre Layer-IDs nie auf `-circle`, `-linie`, `-fill` oder `-treffer`: das Schema in
+ * `ordneKlickebene` (`klickziel.ts`) machte sie sonst zu Klickzielen ohne Handler. Spät gezeichnet
+ * liegt oben, die Reihenfolge unten ist die Stapelung.
+ */
+function sorgeFuerDrohnenLayer(
+  map: MapLibreMap,
+  key: FachebeneQuelle,
+  src: string,
+  farbe: string,
+  treffer: number,
+) {
+  const anlegen = (spec: Parameters<MapLibreMap['addLayer']>[0]) => {
+    if (!map.getLayer(spec.id)) map.addLayer(spec);
+  };
+  // Das Pfeilbild geht mit einem Stilwechsel verloren; dieser Aufruf läuft nach jedem Stil.
+  if (!map.hasImage(DROHNEN_PFEIL_ID)) {
+    const { pixelRatio, ...bild } = drohnenPfeilBild();
+    map.addImage(DROHNEN_PFEIL_ID, bild, { pixelRatio });
+  }
+  const istElement = IST_KIND('element');
+  anlegen({
+    id: `fachebene-${key}-elem-flaeche`,
+    type: 'fill',
+    source: src,
+    filter: ['all', istElement, isGeometrieTyp('Polygon')] as never,
+    paint: { 'fill-color': kindFarbe(farbe) as never, 'fill-opacity': 0.12 },
+  });
+  anlegen({
+    id: `fachebene-${key}-elem-umriss`,
+    type: 'line',
+    source: src,
+    filter: ['all', istElement, isGeometrieTyp('Polygon')] as never,
+    paint: { 'line-color': kindFarbe(farbe) as never, 'line-width': 1, 'line-opacity': 0.5 },
+  });
+  anlegen({
+    id: `fachebene-${key}-elem-strich`,
+    type: 'line',
+    source: src,
+    filter: ['all', istElement, isGeometrieTyp('LineString')] as never,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': kindFarbe(farbe) as never, 'line-width': 2, 'line-opacity': 0.55 },
+  });
+  anlegen({
+    id: `fachebene-${key}-elem-punkt`,
+    type: 'circle',
+    source: src,
+    filter: ['all', istElement, isGeometrieTyp('Point')] as never,
+    paint: {
+      'circle-radius': 4,
+      'circle-color': kindFarbe(farbe) as never,
+      'circle-opacity': 0.55,
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': 1,
+      'circle-stroke-opacity': 0.55,
+    },
+  });
+  const spur = ['all', IST_KIND('track'), isGeometrieTyp('LineString')] as never;
+  anlegen({
+    id: `fachebene-${key}-spur-kante`,
+    type: 'line',
+    source: src,
+    filter: spur,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': KANTE_FARBE, 'line-width': 3 + 2 * KANTE_BREITE },
+  });
+  anlegen({
+    id: `fachebene-${key}-spur`,
+    type: 'line',
+    source: src,
+    filter: spur,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': kindFarbe(farbe) as never, 'line-width': 3 },
+  });
+  // Unsichtbare Trefferzone der Fotos (LLH-2108, wie `-treffer` der Punkt-Ebenen, LFH-600):
+  // `controlHeight` statt des 5-px-Bildpunkts. Fluggerät, Spur und Element bleiben ohne Ziel.
+  anlegen({
+    id: `fachebene-${key}-treffer`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('photo') as never,
+    paint: { 'circle-radius': treffer / 2, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+  });
+  anlegen({
+    id: `fachebene-${key}-foto-kante`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('photo') as never,
+    paint: { 'circle-radius': mitKante(5) as never, 'circle-color': KANTE_FARBE },
+  });
+  anlegen({
+    id: `fachebene-${key}-foto`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('photo') as never,
+    paint: {
+      'circle-radius': 5,
+      'circle-color': farbe,
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': RAND_BREITE,
+    },
+  });
+  anlegen({
+    id: `fachebene-${key}-flug-kante`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('aircraft') as never,
+    paint: { 'circle-radius': mitKante(11) as never, 'circle-color': KANTE_FARBE },
+  });
+  anlegen({
+    id: `fachebene-${key}-flug`,
+    type: 'circle',
+    source: src,
+    filter: IST_KIND('aircraft') as never,
+    paint: {
+      'circle-radius': 11,
+      'circle-color': farbe,
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': RAND_BREITE,
+    },
+  });
+  anlegen({
+    id: `fachebene-${key}-flug-pfeil`,
+    type: 'symbol',
+    source: src,
+    filter: [
+      'all',
+      IST_KIND('aircraft'),
+      ['==', ['typeof', ['get', 'heading_deg']], 'number'],
+    ] as never,
+    layout: {
+      'icon-image': DROHNEN_PFEIL_ID,
+      'icon-rotate': ['get', 'heading_deg'] as never,
+      // Der Pfeil zeigt in Himmelsrichtung, nicht zum Bildschirmrand: er dreht mit der Karte.
+      'icon-rotation-alignment': 'map',
+      'icon-allow-overlap': true,
+      'icon-ignore-placement': true,
+    },
+  });
+  // Ein Moduswechsel legt keinen Layer neu an: die Ebenenfarbe an den Layern nachziehen, die sie
+  // ohne eigene `color` tragen.
+  for (const id of ['elem-flaeche', 'elem-umriss', 'elem-strich', 'elem-punkt', 'spur']) {
+    const eigenschaft =
+      id === 'elem-flaeche' ? 'fill-color' : id === 'elem-punkt' ? 'circle-color' : 'line-color';
+    if (map.getLayer(`fachebene-${key}-${id}`)) {
+      map.setPaintProperty(`fachebene-${key}-${id}`, eigenschaft, kindFarbe(farbe) as never);
+    }
+  }
+  for (const id of ['foto', 'flug']) {
+    if (map.getLayer(`fachebene-${key}-${id}`)) {
+      map.setPaintProperty(`fachebene-${key}-${id}`, 'circle-color', farbe);
+    }
+  }
+}
+
 /**
  * Setzt die Ebenenfarbe an jedem vorhandenen Layer der Ebene. Frisch angelegte tragen sie schon;
  * MapLibre verwirft einen unveränderten Wert selbst, der Aufruf ist also billig.
@@ -347,6 +524,17 @@ const layerIds = (key: FachebeneQuelle) => [
   `fachebene-${key}-buendel`,
   `fachebene-${key}-buendel-kante`,
   `fachebene-${key}-buendel-zahl`,
+  `fachebene-${key}-elem-flaeche`,
+  `fachebene-${key}-elem-umriss`,
+  `fachebene-${key}-elem-strich`,
+  `fachebene-${key}-elem-punkt`,
+  `fachebene-${key}-spur-kante`,
+  `fachebene-${key}-spur`,
+  `fachebene-${key}-foto-kante`,
+  `fachebene-${key}-foto`,
+  `fachebene-${key}-flug-kante`,
+  `fachebene-${key}-flug`,
+  `fachebene-${key}-flug-pfeil`,
 ];
 
 /** Entfernt alle Layer + Source einer Fachebene (idempotent). */
@@ -374,6 +562,9 @@ export function setzeFachebeneDaten(
  * ist Kontur.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
+  // Nur die Fotos der Drohnenlage sind ein Ziel (LLH-2108), über ihre Trefferzone; Fluggerät, Spur
+  // und Element haben keinen Inspector.
+  if (def.drohnenlage) return [`fachebene-${def.key}-treffer`];
   if (def.gemischteGeometrie) {
     return ['fill', 'linie', 'circle', 'treffer'].map((t) => `fachebene-${def.key}-${t}`);
   }
