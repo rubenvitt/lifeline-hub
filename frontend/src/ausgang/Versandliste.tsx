@@ -1,6 +1,11 @@
 import { Button, Typography, theme } from 'antd';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
-import { ausgangFehlerText, useVersaende, useWiederholeVersand, type Quelle } from '../api/ausgang';
+import {
+  ausgangFehlerText,
+  useVersaende,
+  useWiederholeVersand,
+  type QuelleFilter,
+} from '../api/ausgang';
 import type { Versand } from '../api/types';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { schriftStil } from '../components/instrument';
@@ -26,7 +31,7 @@ export default function Versandliste({
   darfSchreiben = true,
 }: {
   einsatzId: number;
-  quelle: Quelle;
+  quelle: QuelleFilter;
   /** Ohne Schreibrecht entfällt „Erneut senden“. */
   darfSchreiben?: boolean;
 }) {
@@ -65,7 +70,6 @@ export default function Versandliste({
                 <>
                   {' '}
                   <Button
-                    size="small"
                     loading={laeuftDieser}
                     disabled={!online}
                     onClick={() => wiederhole.mutate(v.id)}

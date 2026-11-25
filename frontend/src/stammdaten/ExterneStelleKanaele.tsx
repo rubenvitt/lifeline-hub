@@ -83,7 +83,6 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 )}
                 {!vomHub && (
                   <Button
-                    size="small"
                     danger
                     aria-label={`Mailadresse ${k.address} entfernen`}
                     disabled={ohneNetz}

@@ -14,7 +14,7 @@ const QUELLE_SEGMENT: Record<QuelleArt, string> = {
   nachforderung: 'resource-requests',
 };
 
-export interface Quelle {
+export interface QuelleFilter {
   kind: QuelleArt;
   id: number;
 }
@@ -52,7 +52,7 @@ export function versandFehler(fehler: unknown): unknown {
   return fehler;
 }
 
-export function fetchVersaende(einsatzId: number, quelle: Quelle): Promise<Versand[]> {
+export function fetchVersaende(einsatzId: number, quelle: QuelleFilter): Promise<Versand[]> {
   return apiGet<Versand[]>(
     `/api/einsaetze/${einsatzId}/deliveries?source_kind=${quelle.kind}&source_id=${quelle.id}`,
   );
@@ -60,7 +60,7 @@ export function fetchVersaende(einsatzId: number, quelle: Quelle): Promise<Versa
 
 export function createVersaende(
   einsatzId: number,
-  quelle: Quelle,
+  quelle: QuelleFilter,
   body: SendenAnfrage,
 ): Promise<Versand[]> {
   return apiSend<Versand[]>(
@@ -81,7 +81,7 @@ export function retryVersand(einsatzId: number, versandId: string): Promise<Vers
 const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
 
 /** Versände einer Quelle; live über das Ereignis `ausgang`. Nicht in `LAGEBILD_OFFLINE`. */
-export function useVersaende(einsatzId: number, quelle: Quelle) {
+export function useVersaende(einsatzId: number, quelle: QuelleFilter) {
   return useQuery({
     queryKey: einsatzKeys.deliveries(einsatzId, quelle.kind, quelle.id),
     queryFn: () => fetchVersaende(einsatzId, quelle),
@@ -90,7 +90,7 @@ export function useVersaende(einsatzId: number, quelle: Quelle) {
   });
 }
 
-export function useSendeVersaende(einsatzId: number, quelle: Quelle) {
+export function useSendeVersaende(einsatzId: number, quelle: QuelleFilter) {
   const qc = useQueryClient();
   return useMutation({
     ...SOFORT_ODER_NIE,
@@ -102,7 +102,7 @@ export function useSendeVersaende(einsatzId: number, quelle: Quelle) {
   });
 }
 
-export function useWiederholeVersand(einsatzId: number, quelle: Quelle) {
+export function useWiederholeVersand(einsatzId: number, quelle: QuelleFilter) {
   const qc = useQueryClient();
   return useMutation({
     ...SOFORT_ODER_NIE,

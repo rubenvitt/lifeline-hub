@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { adminSektionPfad, anbindungenPfad } from '../admin/adminPfade';
 import { ApiError } from '../api/client';
 import { useKanaeleSammlung } from '../api/externeStellen';
-import { useSendeVersaende, versandFehler, type Quelle } from '../api/ausgang';
+import { useSendeVersaende, versandFehler, type QuelleFilter } from '../api/ausgang';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Feld, schriftStil } from '../components/instrument';
@@ -45,7 +45,7 @@ export default function SendenDialog({
   offen: boolean;
   onClose: () => void;
   einsatzId: number;
-  quelle: Quelle;
+  quelle: QuelleFilter;
   /** Namen aus dem Verteiler (`extern_bezeichnung`) bzw. `adressat_bezeichnung`. */
   vorschlagNamen: readonly string[];
   /** Betreff, soweit der Client ihn kennt; der Server baut den endgültigen. */
