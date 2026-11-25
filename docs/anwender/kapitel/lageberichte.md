@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/ausgang/SendenDialog.tsx, frontend/src/ausgang/SendenAktion.tsx, frontend/src/ausgang/Versandliste.tsx, frontend/src/api/ausgang.ts, src/ausgang/lauf.rs, src/ausgang/nachricht.rs, src/ausgang/zustand.rs, src/routes/ausgang.rs]
 ---
 
 ## Überblick
@@ -92,6 +92,22 @@ sie.
    „Stand der Übernahme“ mit ⧖ und „aus der Vorfassung“; eine neue Übernahme im Abschnitt bringt
    die aktuellen Zahlen.
 
+### Einen Lagebericht per E-Mail senden
+
+Für Einsatzleitung und Führungspersonal, mit freigegebenem Bericht:
+
+1. Einen freigegebenen Bericht öffnen und „Senden“ wählen.
+2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen. Vorbelegt sind die Stellen aus dem
+   Verteiler des Berichts, die eine Mailadresse haben; hat eine Stelle mehrere, steht jede Adresse
+   einzeln da.
+3. „Senden“ wählen. Unter dem Berichtstext erscheint der Abschnitt „Versand“ mit einer Zeile je
+   Adresse und ihrem Stand: „wartet“, „übergeben 14:32“ oder „fehlgeschlagen: …“.
+4. Ist ein Versand fehlgeschlagen oder die Zustellung unklar, in seiner Zeile „Erneut senden“
+   wählen.
+
+Fehlt jede Mailadresse, steht im Dialog „Keine Mailadresse hinterlegt“ mit dem Weg zu den Externen
+Stellen; ist kein Mailserver eingerichtet, meldet der Dialog „Kein Mailserver eingerichtet“.
+
 ## Hintergrund
 
 ### Übernahmen im Lagevortrag zur Information
@@ -177,6 +193,32 @@ Stellen und eigener Text im Verteiler erreichen niemanden, ebenso wer die Lagebe
 sehen darf. Wer freigibt, bekommt nichts, auch wenn die eigene Funktion im Verteiler steht.
 Entwürfe melden nichts; eine Fortschreibung meldet sich erst mit ihrer eigenen Freigabe, und jede
 Freigabe meldet sich genau einmal.
+
+### Versand per E-Mail
+
+Der Versand gilt nur für Stellen mit hinterlegter Mailadresse (Kapitel [Stammdaten](stammdaten.md),
+„Externe Stellen“) und braucht eine eingerichtete Mailanbindung der Organisation (Kapitel
+[Anbindungen](anbindungen.md)). Ein Mensch löst jeden Versand aus; nichts geht von selbst hinaus.
+
+- **Nur freigegebene, jüngste Fassung.** Gesendet wird der Text der Freigabe mit den Anlagen als
+  Bilder und einem Fuß mit Einsatz, Absender und Zeit. Wird inzwischen eine neuere Fassung
+  freigegeben, geht ein noch wartender Versand nicht mehr hinaus und steht als „fehlgeschlagen:
+  Neuere Fassung freigegeben“ da. „Erneut senden“ sendet den Text, wie er beim Absenden war; für
+  eine Fortschreibung die neue Fassung senden. Übersteigen die Anlagen zusammen 20 MB, meldet der
+  Versand „Anhänge zu groß für eine Mail“.
+- **Wiederholung.** Ist der Mailserver nicht erreichbar, versucht die App es bis zu 30 Minuten
+  lang weiter; danach steht der Versand als „fehlgeschlagen“ da. Eine Ablehnung durch den
+  Mailserver, eine falsche Anmeldung oder eine gestörte Anbindung scheitern sofort.
+- **„Zustellung unklar“.** Bricht die Verbindung ab, nachdem der Text übertragen wurde, aber bevor
+  der Mailserver bestätigt, ist offen, ob die Mail raus ist. Die App wiederholt dann nicht von
+  selbst; ob „Erneut senden“, entscheidet die Person (sonst käme dieselbe Meldung doppelt an).
+- **Einsatztagebuch.** Jedes Ergebnis steht im ETB, etwa „Lagebericht Nr. 3 per E-Mail an Leitstelle
+  Nord (lagedienst@…) übergeben“; ein Wiederholungsversuch im Fenster schreibt nichts. Ein Versand
+  ist nie halb: er ist übergeben und im ETB, oder er steht sichtbar als fehlgeschlagen da.
+- **Rechte und Netz.** Senden und „Erneut senden“ brauchen das Schreibrecht; die Liste „Versand“
+  sehen alle, die den Bericht lesen dürfen. Ohne Netz ist „Senden“ gesperrt („Ohne Netz nicht
+  möglich“). Führt eine andere Instanz den Einsatz, sendet dieser Rechner nicht
+  („Einsatz wird von einer anderen Instanz geführt“).
 
 ### Anlagen
 

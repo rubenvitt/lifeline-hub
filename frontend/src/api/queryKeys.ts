@@ -1,5 +1,5 @@
 import type { UeberlagerungQuelle } from './fachebenen';
-import type { AbloesungStatus, EtbTyp } from './types';
+import type { AbloesungStatus, EtbTyp, QuelleArt } from './types';
 import type { SchaedenFilter, SchadenSortierung } from './einsatzSchaden';
 
 /**
@@ -120,6 +120,8 @@ export const EINSATZ_KEYS = {
   // Informationstelefon (LFH-554, seit i6k6mzed ein eigenes Modul): NICHT im Lagebild offline
   // (Personenbezug).
   infotelefon: 'einsatz-infotelefon',
+  // Versandliste des Ausgangskorbs (LLH-2093), live über das `ausgang`-Ereignis.
+  deliveries: 'einsatz-deliveries',
   // Einsatzkopf, live über das `einsatz`-Ereignis (LFH-555).
   einsatz: 'einsatz',
   // Eigene Anträge am Spiegel (LLH-1492, design.md D13): live über das `einsatz`-Ereignis (die
@@ -469,6 +471,9 @@ export const EINSATZ_STREAM_EVENTS = {
   ],
   // Anrufe des Moduls Informationstelefon; der Server gatet das Ereignis nach `infotelefon`.
   infotelefon: [EINSATZ_KEYS.infotelefon],
+  // Versandliste an Lagebericht, Befehl und Nachforderung (LLH-2093); der Server gatet das
+  // Ereignis nach den drei Modulen der Quellen.
+  ausgang: [EINSATZ_KEYS.deliveries],
 } as const satisfies Record<string, readonly EinsatzKey[]>;
 
 export type EinsatzStreamEvent = keyof typeof EINSATZ_STREAM_EVENTS;
@@ -992,6 +997,15 @@ export const einsatzKeys = {
   /** Ein Anruf für den Deeplink auf eine nicht geladene Zeile. */
   infotelefonAnruf: (einsatzId: number, anrufId: number) =>
     [EINSATZ_KEYS.infotelefon, einsatzId, 'anruf', anrufId] as const,
+  /** Versandliste einer Quelle (LLH-2093); das `ausgang`-Ereignis trifft alle per Prefix. */
+  deliveries: (einsatzId: number, kind: QuelleArt, id: number) =>
+    [EINSATZ_KEYS.deliveries, einsatzId, kind, id] as const,
+  /**
+   * Alle Versände einer Quellart im Einsatz (ein Abruf je Board statt je Karte). Zugleich Prefix
+   * der Keys je Quelle: wer ihn invalidiert, trifft beide.
+   */
+  deliveriesArt: (einsatzId: number, kind: QuelleArt) =>
+    [EINSATZ_KEYS.deliveries, einsatzId, kind] as const,
   /**
    * Kommunikationsplan (LFH-848), unter dem Prefix des Fernmeldewesens (LLH-1180): das
    * `fernmeldewesen`-Ereignis trifft ihn mit. Als einziger Key des Moduls ohne Netz lesbar
@@ -1384,6 +1398,15 @@ export const globalKeys = {
    */
   externeStellen: () => [GLOBAL_KEYS.externeStellen] as const,
   externeStellenListe: (umfang: 'aktiv' | 'alle') => [GLOBAL_KEYS.externeStellen, umfang] as const,
+  /**
+   * Kanaladressen (LLH-2093), unter dem Prefix der Stellen einsortiert: dasselbe Org-Ereignis
+   * (Stammdaten) frischt sie auf, und sie bleiben wie die Stellen aus dem Lagebild draußen.
+   * Je Stelle für das Formular, als Sammlung (`kanal`) für die Auswahl im Senden-Dialog.
+   */
+  externeStelleKanaele: (stelleId: number) =>
+    [GLOBAL_KEYS.externeStellen, 'kanaele', stelleId] as const,
+  externeStellenKanaeleSammlung: (kanal: string) =>
+    [GLOBAL_KEYS.externeStellen, 'kanaele-sammlung', kanal] as const,
   /**
    * Einheiten-Vorlagen (LLH-1042): `'alle'` für die Verwaltung, `'aktiv'` für das Bilden im
    * Einsatz (LLH-1049). Der argumentlose Accessor ist der Invalidierungs-Prefix beider Fächer.

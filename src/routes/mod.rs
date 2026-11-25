@@ -8,6 +8,7 @@ pub mod archiv_einspielen;
 pub mod archiv_empfaenger;
 pub mod aufbewahrung;
 pub mod auftrag;
+pub mod ausgang;
 pub mod auth;
 pub mod backup;
 pub mod befehl;

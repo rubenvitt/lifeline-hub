@@ -1316,6 +1316,11 @@ export interface components {
             ausgabe_id: number;
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"];
         };
+        /**
+         * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+         * @enum {string}
+         */
+        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel";
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -2315,6 +2320,16 @@ export interface components {
         ChatZaehler: {
             /** Format: int64 */
             ungelesen: number;
+        };
+        /** @description Body von `POST …/deliveries` am Dokument bzw. an der Nachforderung. */
+        CreateDeliveriesBody: {
+            /**
+             * @description Idempotenzschlüssel der Anfrage (höchstens 64 Zeichen); je Empfänger wird
+             *     `{client_id}:{channel_id}` daraus. Dieselbe Anfrage erneut liefert dieselben Versände.
+             */
+            client_id: string;
+            /** @description Die Kanaladressen, an die gesendet wird (1 bis 20, jede höchstens einmal). */
+            recipients: components["schemas"]["RecipientBody"][];
         };
         /** @description Fehler oder Hinweis beim Lesen; `art` und `zeile` nur, wenn es sie gibt. */
         DateiMeldung: {
@@ -4038,6 +4053,16 @@ export interface components {
          * @enum {string}
          */
         ExterneStelleArt: "leitstelle" | "polizei" | "behoerde" | "hilfsorganisation" | "sonstige";
+        /** @description Eine Kanaladresse einer externen Stelle. Wire englisch, Rust-Feld = Wire-Feld. */
+        ExterneStelleKanal: {
+            address: string;
+            channel: components["schemas"]["KanalArt"];
+            /** Format: int64 */
+            externe_stelle_id: number;
+            /** Format: int64 */
+            id: number;
+            label?: string | null;
+        };
         /** @description Einheitlicher Umschlag für jede Fachebene. */
         FachebeneAntwort: {
             /**
@@ -4164,7 +4189,7 @@ export interface components {
          * @description Typ eines Einstellungsfelds.
          * @enum {string}
          */
-        FeldTyp: "text" | "zahl" | "url";
+        FeldTyp: "text" | "zahl" | "url" | "host";
         /**
          * @description Der Vermerk einer Angabe: Zeitpunkt (SQLite-Format, UTC) und Anzeigename des Benutzers
          *     (`None`, wenn der Benutzer fehlt).
@@ -5205,6 +5230,20 @@ export interface components {
          * @enum {string}
          */
         JetztPhase: "laedt" | "bau_wartet" | "baut" | "aktuell";
+        /**
+         * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
+         *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
+         *     angenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).
+         * @enum {string}
+         */
+        KanalArt: "email" | "fax" | "matrix" | "threema";
+        /** @description Eine Kanaladresse samt ihrer Stelle, für die Auswahl im Senden-Dialog. */
+        KanalMitStelle: {
+            /** Format: int64 */
+            agency_id: number;
+            agency_name: string;
+            channel: components["schemas"]["ExterneStelleKanal"];
+        };
         /** @description Ein Kandidat einer Zeile: ein Datensatz der eigenen Org. */
         Kandidat: {
             anzeige: string;
@@ -6188,7 +6227,7 @@ export interface components {
          *     die Emitter routen über `as_str()`, das Frontend filtert exakt auf diese Wire-Tags.
          * @enum {string}
          */
-        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "lagged";
+        LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "lagged";
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -8137,10 +8176,20 @@ export interface components {
             label: string;
         };
         /**
+         * @description Dokument, aus dem ein Versand stammt.
+         * @enum {string}
+         */
+        QuelleArt: "lagebericht" | "befehl" | "nachforderung";
+        /**
          * @description Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.
          * @enum {string}
          */
         Raeumungszustand: "angeordnet" | "laeuft" | "geraeumt" | "aufgehoben";
+        /** @description Ein Empfänger: die Kanaladresse bestimmt Stelle, Kanal und Adresse. */
+        RecipientBody: {
+            /** Format: int64 */
+            channel_id: number;
+        };
         /**
          * @description Eine vom zentralen karten-service baubare Region (LFH-323, verschoben aus `karten-service`).
          *     Auf `String`-Felder umgebaut (vorher `&'static str`), damit `lifeline-hub` die Proxy-Antwort
@@ -9677,6 +9726,39 @@ export interface components {
          * @enum {string}
          */
         VerpflegungsstelleStatus: "geplant" | "aktiv" | "aufgeloest";
+        /**
+         * @description Ein Versand, wie ihn die Versandliste am Dokument zeigt. Wire englisch, Rust-Feld = Wire-Feld;
+         *     der Text (`inhalt`) steht nicht auf dem Wire.
+         */
+        Versand: {
+            address: string;
+            /** Format: int64 */
+            agency_id?: number | null;
+            agency_name: string;
+            /** Format: int64 */
+            attempts: number;
+            channel: components["schemas"]["KanalArt"];
+            created_at: string;
+            /** Format: int64 */
+            created_by_id: number;
+            created_by_name?: string | null;
+            error?: components["schemas"]["AusgangFehler"] | null;
+            handed_over_at?: string | null;
+            id: string;
+            /** Format: int32 */
+            smtp_status?: number | null;
+            /** Format: int64 */
+            source_id: number;
+            source_kind: components["schemas"]["QuelleArt"];
+            state: components["schemas"]["VersandZustand"];
+            subject: string;
+        };
+        /**
+         * @description Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den
+         *     Mailserver oder `fehlgeschlagen`.
+         * @enum {string}
+         */
+        VersandZustand: "wartet" | "uebergeben" | "fehlgeschlagen";
         /** @description Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */
@@ -10733,7 +10815,7 @@ export interface components {
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
          *     `art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`
-         *     (migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
+         *     (migrations/0384_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
          * @enum {string}
          */
         ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste" | "pass_export" | "pass_druck";

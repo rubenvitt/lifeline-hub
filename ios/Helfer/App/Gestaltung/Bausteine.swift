@@ -183,17 +183,12 @@ struct Wertzeile: View {
     }
 }
 
-/// Markenzeichen: rotes Quadrat mit Kreuz (Rolle `marke`).
+/// Markenzeichen: die Bildmarke „Lebenslinie“ als Kachel, wie das App-Symbol. Kein Kreuz.
 struct Markenzeichen: View {
     @ScaledMetric(relativeTo: .title) private var groesse: CGFloat = 40
 
     var body: some View {
-        Image(systemName: "cross.fill")
-            .font(.system(size: groesse * 0.5, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: groesse, height: groesse)
-            .background(Farbe.marke, in: eckig)
-            .accessibilityHidden(true)
+        Markenkachel().frame(width: groesse, height: groesse)
     }
 }
 

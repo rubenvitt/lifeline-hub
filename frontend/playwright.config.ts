@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { leseAnteil, verteile } from '../scripts/e2e-anteile.mjs';
 import {
   backendBinaer,
+  e2eGeheimnisSchluessel,
   fallbackChromiumPath,
   freiePorts,
   umgebungRaeumen,
@@ -215,12 +216,14 @@ export default defineConfig({
       // Deutschland-Extrakt (mehrere GB je Lauf); die Specs brauchen keinen Bestand.
       // `--einwurf-allow-http`: der Test-Server spricht kein TLS; ohne den Schalter lehnte er
       // jeden Einwurf mit 403 ab (ADR-0023, `e2e/anbindungen.spec.ts`).
-      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false --einwurf-allow-http --lizenz-akzeptiert`,
+      command: `${binaer} --db-path ${datenbank} --bind 127.0.0.1:${backendPort} --admin-password e2e-admin-pw --kritis-extrakt false --einwurf-allow-http --ausgang-testzusteller --lizenz-akzeptiert`,
       url: `${backendUrl}/api/health`,
       // Nie einen fremden Server übernehmen: ein laufender Dev-Stack hätte eine andere DB und ein
       // anderes Admin-Passwort.
       reuseExistingServer: false,
       timeout: 60_000,
+      // Geheimnisspeicher für die Mail-Anbindung des Ausgangs (`e2e/ausgang.spec.ts`).
+      env: { LIFELINE_GEHEIMNIS_SCHLUESSEL: e2eGeheimnisSchluessel() },
     },
     // Vite-Dev-Server samt Node-26-Schutz (Herleitung in `e2e/lauf-kern.ts`, LFH-659).
     viteServer(frontendPort, backendUrl),

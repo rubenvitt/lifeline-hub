@@ -3486,6 +3486,21 @@
           }
         }
       },
+      "AusgangFehler": {
+        "type": "string",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.",
+        "enum": [
+          "voruebergehend",
+          "abgelehnt",
+          "ungewiss",
+          "ueberholt",
+          "anbindung_fehlt",
+          "anbindung_angehalten",
+          "anbindung_fehler",
+          "zu_gross",
+          "spiegel"
+        ]
+      },
       "Ausmass": {
         "type": "string",
         "enum": [
@@ -5791,6 +5806,27 @@
           "ungelesen": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "CreateDeliveriesBody": {
+        "type": "object",
+        "description": "Body von `POST …/deliveries` am Dokument bzw. an der Nachforderung.",
+        "required": [
+          "client_id",
+          "recipients"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Idempotenzschlüssel der Anfrage (höchstens 64 Zeichen); je Empfänger wird\n`{client_id}:{channel_id}` daraus. Dieselbe Anfrage erneut liefert dieselben Versände."
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RecipientBody"
+            },
+            "description": "Die Kanaladressen, an die gesendet wird (1 bis 20, jede höchstens einmal)."
           }
         }
       },
@@ -10057,6 +10093,38 @@
           "sonstige"
         ]
       },
+      "ExterneStelleKanal": {
+        "type": "object",
+        "description": "Eine Kanaladresse einer externen Stelle. Wire englisch, Rust-Feld = Wire-Feld.",
+        "required": [
+          "id",
+          "externe_stelle_id",
+          "channel",
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/KanalArt"
+          },
+          "externe_stelle_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "FachebeneAntwort": {
         "type": "object",
         "description": "Einheitlicher Umschlag für jede Fachebene.",
@@ -10416,7 +10484,8 @@
         "enum": [
           "text",
           "zahl",
-          "url"
+          "url",
+          "host"
         ]
       },
       "FeldVermerk": {
@@ -13025,6 +13094,37 @@
           "aktuell"
         ]
       },
+      "KanalArt": {
+        "type": "string",
+        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).",
+        "enum": [
+          "email",
+          "fax",
+          "matrix",
+          "threema"
+        ]
+      },
+      "KanalMitStelle": {
+        "type": "object",
+        "description": "Eine Kanaladresse samt ihrer Stelle, für die Auswahl im Senden-Dialog.",
+        "required": [
+          "channel",
+          "agency_id",
+          "agency_name"
+        ],
+        "properties": {
+          "agency_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "agency_name": {
+            "type": "string"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/ExterneStelleKanal"
+          }
+        }
+      },
       "Kandidat": {
         "type": "object",
         "description": "Ein Kandidat einer Zeile: ein Datensatz der eigenen Org.",
@@ -15443,6 +15543,7 @@
           "karte_fremdebene",
           "etb",
           "befehl",
+          "ausgang",
           "lagebesprechung",
           "fernmeldewesen",
           "dokument",
@@ -20297,6 +20398,15 @@
           }
         }
       },
+      "QuelleArt": {
+        "type": "string",
+        "description": "Dokument, aus dem ein Versand stammt.",
+        "enum": [
+          "lagebericht",
+          "befehl",
+          "nachforderung"
+        ]
+      },
       "Raeumungszustand": {
         "type": "string",
         "description": "Räumungszustand eines Evakuierungsbezirks. Wire == `as_str()`.",
@@ -20306,6 +20416,19 @@
           "geraeumt",
           "aufgehoben"
         ]
+      },
+      "RecipientBody": {
+        "type": "object",
+        "description": "Ein Empfänger: die Kanaladresse bestimmt Stelle, Kanal und Adresse.",
+        "required": [
+          "channel_id"
+        ],
+        "properties": {
+          "channel_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       },
       "RegionDto": {
         "type": "object",
@@ -24334,6 +24457,107 @@
           "aufgeloest"
         ]
       },
+      "Versand": {
+        "type": "object",
+        "description": "Ein Versand, wie ihn die Versandliste am Dokument zeigt. Wire englisch, Rust-Feld = Wire-Feld;\nder Text (`inhalt`) steht nicht auf dem Wire.",
+        "required": [
+          "id",
+          "source_kind",
+          "source_id",
+          "channel",
+          "agency_name",
+          "address",
+          "subject",
+          "state",
+          "attempts",
+          "created_by_id",
+          "created_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "agency_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "agency_name": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/KanalArt"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_by_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AusgangFehler"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "handed_over_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "smtp_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "minimum": 0
+          },
+          "source_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source_kind": {
+            "$ref": "#/components/schemas/QuelleArt"
+          },
+          "state": {
+            "$ref": "#/components/schemas/VersandZustand"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      },
+      "VersandZustand": {
+        "type": "string",
+        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver oder `fehlgeschlagen`.",
+        "enum": [
+          "wartet",
+          "uebergeben",
+          "fehlgeschlagen"
+        ]
+      },
       "VersionsstandAnzeige": {
         "type": "object",
         "description": "Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`.",
@@ -27179,7 +27403,7 @@
       },
       "ZugriffArt": {
         "type": "string",
-        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`\n(migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).",
+        "description": "LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK\n`art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`\n(migrations/0384_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).",
         "enum": [
           "detail",
           "export",
