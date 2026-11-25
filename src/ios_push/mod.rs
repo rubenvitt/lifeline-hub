@@ -9,6 +9,7 @@
 //!   Geräts ([`krypto`]), sodass Relais und Apple nichts davon lesen.
 //! - Kein Token, kein Schlüssel und keine Nutzlast in einem Log.
 
+pub mod helfer;
 pub mod inhalt;
 pub mod krypto;
 pub mod relais;

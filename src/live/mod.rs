@@ -444,6 +444,9 @@ pub struct LiveHub {
     /// Beendete Gerätekopplungen (LFH-892, design.md D7): Widerruf, neuer Code, Einsatzabschluss.
     /// Ein Live-Strom einer Gerätesitzung endet, sobald seine Kopplung hier erscheint.
     kopplung_ende: broadcast::Sender<i64>,
+    /// Aufträge an Helfer-Apps (ADR-0104): `(Kopplungen, Auftrag)`. Nur der Live-Strom einer
+    /// genannten Helfer-Kopplung reicht es weiter (SSE `helfer_auftrag`); kein [`LiveEvent`].
+    helfer_auftrag: broadcast::Sender<(Vec<i64>, i64)>,
     /// Beendete Sitzungen, als öffentliche Kennung (LFH-1092, design.md D6): Beenden über die
     /// Sitzungsliste, Logout, Passwortwechsel, Deaktivieren, Zweitfaktor-Reset. Ein Live-Strom
     /// endet, sobald seine Sitzung hier erscheint.
@@ -539,6 +542,7 @@ impl LiveHub {
             org: broadcast::channel(org::ORG_KANAL_KAPAZITAET).0,
             epoch,
             kopplung_ende: broadcast::channel(256).0,
+            helfer_auftrag: broadcast::channel(256).0,
             sitzung_ende: broadcast::channel(256).0,
             stroeme: strom::StromZulassung::neu(grenzen),
             web_push: Arc::default(),
@@ -619,6 +623,20 @@ impl LiveHub {
     pub fn melde_kopplung_ende(&self, kopplung_id: i64) {
         // Ohne Abonnenten ist `send` ein Fehler ohne Folgen: dann ist kein Strom offen.
         let _ = self.kopplung_ende.send(kopplung_id);
+    }
+
+    /// Meldet den Helfer-Kopplungen `kopplung_ids` einen neuen oder geänderten Auftrag (ADR-0104).
+    pub fn melde_helfer_auftrag(&self, kopplung_ids: Vec<i64>, auftrag_id: i64) {
+        if kopplung_ids.is_empty() {
+            return;
+        }
+        // Ohne Abonnenten ist `send` ein Fehler ohne Folgen: dann ist kein Strom offen.
+        let _ = self.helfer_auftrag.send((kopplung_ids, auftrag_id));
+    }
+
+    /// Abonniert die Aufträge an Helfer-Apps.
+    pub fn abonniere_helfer_auftrag(&self) -> broadcast::Receiver<(Vec<i64>, i64)> {
+        self.helfer_auftrag.subscribe()
     }
 
     /// Abonniert die beendeten Gerätekopplungen.

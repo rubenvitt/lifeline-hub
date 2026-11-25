@@ -115,9 +115,20 @@ pub async fn stream(
         )),
         Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
     };
+    // Aufträge an die eigene Helfer-Kopplung (ADR-0104), am Ring vorbei und ohne `id:`; die App
+    // lädt danach `GET /api/devices/me/tasks`.
+    let helfer_strom = match &ctx.geraet {
+        Some(g) if g.ansicht == crate::geraet::Funktionsansicht::Helfer => {
+            futures::StreamExt::boxed(helfer_auftraege(&state, g.kopplung_id))
+        }
+        _ => futures::StreamExt::boxed(futures::stream::empty()),
+    };
     // Das Lebenszeichen nach dem Filter: es erreicht jede Verbindung, auch ein Gerät (LLH-1935).
     let stream = strom::mit_heartbeat(
-        einsatz_strom.merge(org_strom).merge(praesenz_strom),
+        einsatz_strom
+            .merge(org_strom)
+            .merge(praesenz_strom)
+            .merge(helfer_strom),
         state.live.stroeme.heartbeat(),
     );
 
@@ -145,6 +156,21 @@ pub async fn stream(
         state.live.stroeme.lebensdauer(),
     ))
     .keep_alive(KeepAlive::default()))
+}
+
+/// SSE `helfer_auftrag` mit `{"task_id": n}` für jeden Auftrag an `kopplung_id`. Verpasste Meldungen
+/// (`Lagged`) fallen weg: die App lädt nach jedem Neuverbinden ohnehin die Liste.
+fn helfer_auftraege(
+    state: &AppState,
+    kopplung_id: i64,
+) -> impl Stream<Item = Result<Event, Infallible>> + Send + 'static {
+    let rx = state.live.abonniere_helfer_auftrag();
+    tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(move |n| match n {
+        Ok((ids, auftrag_id)) if ids.contains(&kopplung_id) => Some(Ok(Event::default()
+            .event("helfer_auftrag")
+            .data(serde_json::json!({ "task_id": auftrag_id }).to_string()))),
+        _ => None,
+    })
 }
 
 /// Abstand, in dem ein Strom einer Gerätesitzung seine Kopplung neu prüft (Ablauf,
