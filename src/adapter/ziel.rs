@@ -32,14 +32,21 @@ pub const VERBINDUNG_ZEITLIMIT: Duration = Duration::from_secs(5);
 /// Anfrage der Verwaltung wartet.
 pub const ZEITLIMIT: Duration = Duration::from_secs(20);
 
-fn build_client(lan_erlaubt: bool, nur_https: bool) -> reqwest::Client {
+/// Die Schutzeinstellungen des Adapter-Clients, an einer Stelle: kein Proxy, keine
+/// Weiterleitung, nur `https`, Zeitlimits, pinnender Resolver. Die Tests des echten Abrufs
+/// (`ziel_fetch_tests.rs`) bauen darauf auf.
+fn protected_client_builder(lan_erlaubt: bool) -> reqwest::ClientBuilder {
     client_builder(Zweck::Adapter)
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
-        .https_only(nur_https)
+        .https_only(true)
         .connect_timeout(VERBINDUNG_ZEITLIMIT)
         .timeout(ZEITLIMIT)
         .dns_resolver(Arc::new(WebhookResolver { lan_erlaubt }))
+}
+
+fn build_client(lan_erlaubt: bool) -> reqwest::Client {
+    protected_client_builder(lan_erlaubt)
         .build()
         .expect("Adapter-Client baubar")
 }
@@ -49,16 +56,21 @@ fn client(lan_erlaubt: bool) -> &'static reqwest::Client {
     static OEFFENTLICH: OnceLock<reqwest::Client> = OnceLock::new();
     static MIT_LAN: OnceLock<reqwest::Client> = OnceLock::new();
     if lan_erlaubt {
-        MIT_LAN.get_or_init(|| build_client(true, true))
+        MIT_LAN.get_or_init(|| build_client(true))
     } else {
-        OEFFENTLICH.get_or_init(|| build_client(false, true))
+        OEFFENTLICH.get_or_init(|| build_client(false))
     }
 }
 
 /// Der Client für `http` im LAN ([`check_adapter_url`] hat das Ziel vorher geprüft).
 fn client_http_lan() -> &'static reqwest::Client {
     static HTTP_LAN: OnceLock<reqwest::Client> = OnceLock::new();
-    HTTP_LAN.get_or_init(|| build_client(true, false))
+    HTTP_LAN.get_or_init(|| {
+        protected_client_builder(true)
+            .https_only(false)
+            .build()
+            .expect("Adapter-Client baubar")
+    })
 }
 
 /// Zielschutz einer Adapter-URL: [`check_url`], dazu `http` nur, wenn die Art es erlaubt
@@ -342,8 +354,29 @@ pub async fn fetch_bedingt(
     etag: Option<&str>,
     last_modified: Option<&str>,
 ) -> Result<BedingteAntwort, FremdebeneFehler> {
+    fetch_bedingt_via(
+        client(lan_erlaubt),
+        url,
+        lan_erlaubt,
+        deckel,
+        etag,
+        last_modified,
+    )
+    .await
+}
+
+/// [`fetch_bedingt`] über einen gegebenen Client; die Naht für die Tests gegen einen echten
+/// Server. Bleibt crate-intern: ein Client ohne pinnenden Resolver umginge den Zielschutz.
+async fn fetch_bedingt_via(
+    client: &reqwest::Client,
+    url: &str,
+    lan_erlaubt: bool,
+    deckel: usize,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<BedingteAntwort, FremdebeneFehler> {
     let ziel = check_url(url, lan_erlaubt).map_err(fremdebene_fehler_aus_ziel)?;
-    let antwort = client(lan_erlaubt)
+    let antwort = client
         .get(ziel)
         .headers(bedingte_koepfe(etag, last_modified))
         .send()
@@ -588,3 +621,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "ziel_fetch_tests.rs"]
+mod fetch_tests;
