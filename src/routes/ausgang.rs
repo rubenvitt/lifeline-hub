@@ -141,8 +141,9 @@ async fn lade_dokument_schnappschuss<T: DokumentRoute>(
     let schnappschuss =
         nachricht::schnappschuss_dokument::<T>(&mut conn, einsatz_id, id, &absender).await?;
     drop(conn);
-    // Nur die Größe zählt hier; der Lauf liest die Anhänge beim Zustellen erneut.
-    match nachricht::load_anhaenge::<T>(&state.pool, einsatz_id, id).await {
+    // Nur die gespeicherte Größe zählt hier, ohne Bytes zu lesen; der Lauf liest die Anhänge
+    // beim Zustellen und prüft die echten Bytes.
+    match nachricht::pruefe_anhaenge_gespeichert::<T>(&state.pool, einsatz_id, id).await {
         Ok(_) => {}
         Err(nachricht::AnhangFehler::ZuGross) => {
             return Err(mit_grund(

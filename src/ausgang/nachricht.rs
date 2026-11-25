@@ -183,6 +183,29 @@ impl From<sqlx::Error> for AnhangFehler {
     }
 }
 
+fn pruefe_gespeicherte_summe(liste: &[anlage::DokumentAnlageAnzeige]) -> Result<(), AnhangFehler> {
+    let summe: i64 = liste.iter().map(|a| a.groesse).sum();
+    if summe > ANHANG_MAX_BYTES as i64 {
+        return Err(AnhangFehler::ZuGross);
+    }
+    Ok(())
+}
+
+/// Prüft die Summe der Anlagen eines Dokuments an den gespeicherten Größen (`anhang.groesse`),
+/// ohne ein Byte zu lesen: für das Anlegen eines Versands. Die echten Bytes prüft der Lauf beim
+/// Zustellen ([`load_anhaenge`]).
+pub async fn pruefe_anhaenge_gespeichert<T: Dokumentart>(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<(), AnhangFehler> {
+    if T::ANLAGEN.is_none() {
+        return Ok(());
+    }
+    let liste = anlage::liste::<T>(pool, einsatz_id, id).await?;
+    pruefe_gespeicherte_summe(&liste)
+}
+
 /// Die PNG-Anlagen eines freigegebenen Dokuments als `(anlage-{n}.png, Bytes)` in der
 /// Reihenfolge der Anlagen. Die Anlagen einer freigegebenen Fassung sind unveränderlich. Summe
 /// über [`ANHANG_MAX_BYTES`] → [`AnhangFehler::ZuGross`] (der Aufrufer macht daraus 422 beim
@@ -196,14 +219,8 @@ pub async fn load_anhaenge<T: Dokumentart>(
         return Ok(Vec::new());
     }
     let liste = anlage::liste::<T>(pool, einsatz_id, id).await?;
-    let mut summe: i64 = 0;
-    for a in &liste {
-        summe += a.groesse;
-        if summe > ANHANG_MAX_BYTES as i64 {
-            // Vor dem Lesen der Bytes abbrechen.
-            return Err(AnhangFehler::ZuGross);
-        }
-    }
+    // Vor dem Lesen der Bytes abbrechen.
+    pruefe_gespeicherte_summe(&liste)?;
     let mut out = Vec::with_capacity(liste.len());
     for a in &liste {
         let anhang_id = anlage::anhang_id_fuer_download::<T>(pool, einsatz_id, id, a.id).await?;

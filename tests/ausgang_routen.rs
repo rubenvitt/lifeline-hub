@@ -10,7 +10,7 @@ mod adapter_testart;
 mod common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie,
-    rolle_setzen,
+    multipart_post, png_bytes, rolle_setzen,
 };
 
 struct Welt {
@@ -760,4 +760,69 @@ async fn wiederholte_anfrage_mit_einem_neuen_empfaenger_prueft_nur_den_neuen() {
     assert_eq!(v2.as_array().unwrap().len(), 2);
     assert_eq!(v2[0]["id"], v1[0]["id"]);
     assert_eq!(w.anzahl().await, 2);
+}
+
+/// Legt einen Lagebericht mit einer PNG-Anlage an, gibt ihn frei und liefert (Lagebericht,
+/// anhang.id der Anlage).
+async fn lagebericht_mit_anlage(w: &Welt) -> (i64, i64) {
+    let lid = w.lagebericht(false).await;
+    let png = png_bytes(32, 24);
+    let (s, v) = multipart_post(
+        &w.app,
+        &w.lb(&format!("/{lid}/enclosures")),
+        &w.admin,
+        Some(("skizze.png", &png)),
+        &[
+            ("art", "fernmeldeskizze"),
+            ("titel", "Fernmeldeskizze"),
+            ("stand_at", "2026-10-08 12:15:00"),
+        ],
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    w.freigeben(lid).await;
+    let anhang_id: i64 = sqlx::query_scalar(
+        "SELECT a.id FROM anhang a WHERE a.einsatz_id = ? AND a.mime = 'image/png' \
+         ORDER BY a.id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    (lid, anhang_id)
+}
+
+const UEBER_20_MIB: i64 = 20 * 1024 * 1024 + 1;
+
+#[tokio::test]
+async fn anlagen_ueber_20_mib_nach_gespeicherter_groesse_sind_422_zu_gross() {
+    let w = welt().await;
+    let (lid, anhang_id) = lagebericht_mit_anlage(&w).await;
+    sqlx::query("UPDATE anhang SET groesse = ? WHERE id = ?")
+        .bind(UEBER_20_MIB)
+        .bind(anhang_id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v) = w.lb_senden(lid, "gross-1", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "zu_gross");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn anlegen_liest_keine_anlagenbytes_sondern_die_gespeicherte_groesse() {
+    let w = welt().await;
+    let (lid, anhang_id) = lagebericht_mit_anlage(&w).await;
+    // Die Bytes sind größer als die gespeicherte Größe: das Anlegen sieht sie nicht (erst der
+    // Lauf prüft die echten Bytes).
+    sqlx::query("UPDATE anhang SET daten = zeroblob(?) WHERE id = ?")
+        .bind(UEBER_20_MIB)
+        .bind(anhang_id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v) = w.lb_senden(lid, "gross-2", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(w.anzahl().await, 1);
 }

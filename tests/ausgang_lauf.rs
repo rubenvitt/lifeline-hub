@@ -890,3 +890,27 @@ async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
     assert_eq!(w.skript.gesehen().len(), 1);
     assert_eq!(w.etb_anzahl().await, vorher);
 }
+
+#[tokio::test]
+async fn lauf_prueft_die_echten_bytes_der_anlagen() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    // Die gespeicherte Größe ist klein, die Bytes sind über 20 MiB.
+    sqlx::query(
+        "UPDATE anhang SET daten = zeroblob(?) WHERE einsatz_id = ? AND mime = 'image/png'",
+    )
+    .bind(20 * 1024 * 1024 + 1)
+    .bind(w.einsatz)
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+
+    w.durchgang(t0).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::ZuGross));
+    assert!(w.skript.gesehen().is_empty());
+}
