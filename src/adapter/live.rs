@@ -65,10 +65,6 @@ impl LiveKontext {
         &self.adapter_id
     }
 
-    pub fn org_id(&self) -> i64 {
-        self.org_id
-    }
-
     /// Eine GET-Anfrage, nachdem die URL den Zielschutz bestanden hat.
     pub fn get(&self, url: &str) -> Result<reqwest::RequestBuilder, Fehlschlag> {
         self.kontext().get(url)
@@ -111,12 +107,14 @@ impl LiveKontext {
     }
 }
 
-/// Bereitet einen Live-Abruf für den Adapter `adapter_id` vor. Ob der Adapter zur Org der Anfrage
-/// gehört, prüft der Aufrufer anhand von [`LiveKontext::org_id`].
+/// Bereitet einen Live-Abruf für den Adapter `adapter_id` der Org `org_id` (der Anfrage) vor. Ein
+/// Adapter einer anderen Org ist [`LiveVerweigert::Unbekannt`], nicht von einem fehlenden zu
+/// unterscheiden.
 pub async fn live_kontext(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     verzeichnis: &Verzeichnis,
+    org_id: i64,
     adapter_id: &str,
 ) -> Result<LiveKontext, LiveVerweigert> {
     let intern = |e: &dyn std::fmt::Display| {
@@ -125,7 +123,7 @@ pub async fn live_kontext(
     };
     let a = {
         let mut conn = pool.acquire().await.map_err(|e| intern(&e))?;
-        repo::load(&mut conn, adapter_id)
+        repo::load_in_org(&mut conn, org_id, adapter_id)
             .await
             .map_err(|e| intern(&e))?
     }

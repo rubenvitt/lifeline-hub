@@ -19,6 +19,7 @@ struct Umgebung {
     rahmen: Rahmen,
     art: std::sync::Arc<adapter_testart::TestArt>,
     id: String,
+    org_id: i64,
 }
 
 /// Ein Adapter der Test-Art; mit Token, wenn `mit_token`.
@@ -48,11 +49,17 @@ async fn umgebung(mit_token: bool) -> Umgebung {
         .await;
         assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
     }
+    let org_id = sqlx::query_scalar("SELECT org_id FROM adapter WHERE id = ?")
+        .bind(&id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     Umgebung {
         pool,
         rahmen,
         art,
         id,
+        org_id,
     }
 }
 
@@ -65,7 +72,7 @@ impl Umgebung {
         &self,
         rahmen: &Rahmen,
     ) -> Result<lifeline_hub::adapter::live::LiveKontext, LiveVerweigert> {
-        live_kontext(&self.pool, rahmen, &rahmen.arten, &self.id).await
+        live_kontext(&self.pool, rahmen, &rahmen.arten, self.org_id, &self.id).await
     }
 
     async fn sql(&self, sql: &str) {
@@ -105,10 +112,27 @@ async fn jeder_aufruf_entschluesselt_neu() {
 #[tokio::test]
 async fn unbekannt_ist_unbekannt() {
     let u = umgebung(true).await;
-    let r = live_kontext(&u.pool, &u.rahmen, &u.rahmen.arten, "gibt-es-nicht").await;
+    let r = live_kontext(
+        &u.pool,
+        &u.rahmen,
+        &u.rahmen.arten,
+        u.org_id,
+        "gibt-es-nicht",
+    )
+    .await;
     assert_eq!(r.err(), Some(LiveVerweigert::Unbekannt));
     u.sql("UPDATE adapter SET art = 'weg'").await;
     assert_eq!(u.kontext().await.err(), Some(LiveVerweigert::Unbekannt));
+}
+
+#[tokio::test]
+async fn fremde_org_ist_unbekannt() {
+    let u = umgebung(true).await;
+    // Ein Adapter einer anderen Org ist von einem nicht vorhandenen nicht zu unterscheiden.
+    let r = live_kontext(&u.pool, &u.rahmen, &u.rahmen.arten, u.org_id + 1000, &u.id).await;
+    assert_eq!(r.err(), Some(LiveVerweigert::Unbekannt));
+    // Die eigene Org bekommt ihn weiterhin.
+    assert!(u.kontext().await.is_ok());
 }
 
 #[tokio::test]

@@ -28,6 +28,8 @@ Nachtrag zu ADR-0077: dort entschlüsselt nur der Lauf (`adapter::lauf`) Geheimn
   einem Admin angehaltenen Adapter, bei einem, der einen Eingriff braucht
   (`zustand::braucht_eingriff`), bei gesperrtem Geheimnisspeicher und bei einer Org, die sich bei
   einem Hub meldet.
+- MUST: `live_kontext` nimmt die Org der Anfrage und liefert für fremde Adapter `Unbekannt`
+  (nicht von einem fehlenden zu unterscheiden); es gibt keinen org-blinden Weg zum Zugang.
 - MUST NOT: Ein Geheimnis, ein Token oder eine Seriennummer steht in Antwort, Log oder Fehler
   einer Route, die einen `LiveKontext` nutzt; sie meldet nur die Verweigerung als Code.
 
@@ -35,6 +37,7 @@ Nachtrag zu ADR-0077: dort entschlüsselt nur der Lauf (`adapter::lauf`) Geheimn
 
 ```sh
 verlange 'pub async fn live_kontext\(' src/adapter/live.rs
+verlange 'load_in_org' src/adapter/live.rs
 verlange 'is_org_am_hub' src/adapter/live.rs
 verlange 'braucht_eingriff' src/adapter/live.rs
 verbiete 'static .*LiveKontext|Cache.*LiveKontext|LiveKontext.*Cache' 'src/**/*.rs'
@@ -54,4 +57,4 @@ nicht abruft.
 Die Routen der Art bekommen den Zugang kurzlebig und über denselben Weg nach draußen wie der
 Lauf. Jeder Live-Abruf kostet eine Entschlüsselung und eine Datenbankabfrage; dafür bleibt das
 Geheimnis außerhalb von Speicher, der länger lebt als ein Abruf. Ob der Adapter zur Org der
-Anfrage gehört, prüft die Route selbst (`LiveKontext::org_id`).
+Anfrage gehört, prüft `live_kontext` selbst; eine Route kann das nicht vergessen.
