@@ -1,5 +1,5 @@
 ---
-id: ADR-0099
+id: ADR-0100
 titel: Copernicus-Rasterbilder werden serverseitig gekachelt, der Browser sieht nur Kennungen
 status: akzeptiert
 datum: 2026-11-25
@@ -13,7 +13,7 @@ herleitung:
   - ADR-0079
 ---
 
-# ADR-0099: Copernicus-Rasterbilder werden serverseitig gekachelt, der Browser sieht nur Kennungen
+# ADR-0100: Copernicus-Rasterbilder werden serverseitig gekachelt, der Browser sieht nur Kennungen
 
 ## Regeln
 

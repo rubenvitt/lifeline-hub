@@ -584,7 +584,7 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   nach außen). Der Gebietsumriss kommt immer mit.
 - **Archiv:** Der Schalter „Ältere Aktivierungen“ in der Ebenenzeile gilt nur bis zum Neuladen;
   er reist weder in gespeicherte Kartenansichten noch in den Browserspeicher.
-- **Altbestand vor 2023 (LLH-2022, ADR-0098):** Die Detail-Schnittstelle verlangt dort eine
+- **Altbestand vor 2023 (LLH-2022, ADR-0099):** Die Detail-Schnittstelle verlangt dort eine
   Anmeldung. Ausgewählte Aktivierungen stehen deshalb im Katalog
   `src/karte/copernicus_altbestand.json`, heute EMSR517 (Hochwasser Westdeutschland 2021, 17
   Gebiete, 23 Produkte). Mit „Ältere Aktivierungen“ lädt der Server das Vector Package je
@@ -610,7 +610,7 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
 Zu optischen Produkten liefert Copernicus das Orthobild als Cloud Optimized GeoTIFF unter dem
 S3-Host der Ebenen (`layers[]` mit `format: "cog"`, Sensor und Aufnahme aus `images[]` über den
 Dateinamen). Die Ebene `copernicus_bilder` zeigt sie als Kacheln des eigenen Servers
-(`karte::cog`, `karte::copernicus_bilder`, ADR-0099, Entwurf
+(`karte::cog`, `karte::copernicus_bilder`, ADR-0100, Entwurf
 `docs/superpowers/specs/2026-11-24-h11vkn1p-copernicus-cog-rasterbilder-design.md`).
 
 - **Auswahl:** dieselbe Kette wie die Auswertung (`select_im_ausschnitt`); Bilder nur der dort

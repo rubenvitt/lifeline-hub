@@ -570,7 +570,7 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
 
 impl Produkt {
     /// Zeit, die zählt: die Aufnahme, ersatzweise die Lieferung (Altbestand ohne Aufnahmezeit,
-    /// ADR-0098).
+    /// ADR-0099).
     pub(crate) fn zeit(&self) -> Option<&String> {
         self.aufnahme.as_ref().or(self.geliefert.as_ref())
     }
@@ -814,7 +814,7 @@ where
         return None;
     }
     let vollstaendig = details.len() == kandidaten.len();
-    // Altbestand nur mit „Ältere Aktivierungen“ (ADR-0098); führt die Liste den Code schon,
+    // Altbestand nur mit „Ältere Aktivierungen“ (ADR-0099); führt die Liste den Code schon,
     // gilt sie. Seine Produkte tragen keine Bilder (das Vector Package enthält keine).
     if archiv {
         details.extend(
@@ -1123,7 +1123,7 @@ pub async fn fetch_copernicus(
                 let c = client.clone();
                 async move { quellen::hole_json(&c, &url).await }
             };
-            // Eigener Client mit Redirect-Regel (ADR-0098), nicht der der Fachebenen.
+            // Eigener Client mit Redirect-Regel (ADR-0099), nicht der der Fachebenen.
             let fetch_paket = |url: String| async move { copernicus_alt::fetch_paket(&url).await };
             let jetzt = chrono::Utc::now().naive_utc();
             let gebaut = build_antwort(
