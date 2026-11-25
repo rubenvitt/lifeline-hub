@@ -405,8 +405,11 @@ pub async fn schicht(
     }
 }
 
+/// Der Einsatz aus einem konkreten Pfad unter einer der beiden Einsatzwurzeln
+/// (`einsatz::modul::EINSATZ_WURZELN`).
 fn einsatz_aus_pfad(pfad: &str) -> Option<i64> {
-    pfad.strip_prefix("/api/einsaetze/")?
+    pfad.strip_prefix("/api/einsaetze/")
+        .or_else(|| pfad.strip_prefix("/api/incidents/"))?
         .split('/')
         .next()?
         .parse()
@@ -1749,6 +1752,17 @@ mod tests {
             .await
             .unwrap();
         assert!(leer.is_empty());
+    }
+
+    #[test]
+    fn einsatz_aus_pfad_unter_beiden_wurzeln() {
+        assert_eq!(einsatz_aus_pfad("/api/einsaetze/7/lage"), Some(7));
+        assert_eq!(
+            einsatz_aus_pfad("/api/incidents/8/map/foreign-layers"),
+            Some(8)
+        );
+        assert_eq!(einsatz_aus_pfad("/api/retention/incidents/9"), None);
+        assert_eq!(einsatz_aus_pfad("/api/incidents/x"), None);
     }
 
     /// Am Spiegel trägt genau die Positivliste des Erfassungs-Gates (ADR-0072) das Recht
