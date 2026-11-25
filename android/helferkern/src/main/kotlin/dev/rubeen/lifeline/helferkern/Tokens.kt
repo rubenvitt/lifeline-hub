@@ -124,6 +124,7 @@ object LifelineFarbe {
     val fachebeneKritis = Paar(nacht = 0xFF9254DE, tag = 0xFF531DAB)
     val fachebeneEnergie = Paar(nacht = 0xFFFADB14, tag = 0xFFD4B106)
     val fachebeneCopernicus = Paar(nacht = 0xFFC48A5A, tag = 0xFF873800)
+    val fachebeneDrohne = Paar(nacht = 0xFFFF8C5A, tag = 0xFFF5590F)
     val koerperschemaSilhouette = Paar(nacht = 0xFF27292B, tag = 0xFFDBDCDE)
     val koerperschemaKontur = Paar(nacht = 0xFF6C747D, tag = 0xFF747C85)
     val koerperschemaStern = Paar(nacht = 0xFFE8EBEE, tag = 0xFF111418)

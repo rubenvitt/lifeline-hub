@@ -142,6 +142,7 @@ public enum LifelineFarbe {
     public static let fachebeneKritis = Paar(nacht: 0xFF9254DE, tag: 0xFF531DAB)
     public static let fachebeneEnergie = Paar(nacht: 0xFFFADB14, tag: 0xFFD4B106)
     public static let fachebeneCopernicus = Paar(nacht: 0xFFC48A5A, tag: 0xFF873800)
+    public static let fachebeneDrohne = Paar(nacht: 0xFFFF8C5A, tag: 0xFFF5590F)
     public static let koerperschemaSilhouette = Paar(nacht: 0xFF27292B, tag: 0xFFDBDCDE)
     public static let koerperschemaKontur = Paar(nacht: 0xFF6C747D, tag: 0xFF747C85)
     public static let koerperschemaStern = Paar(nacht: 0xFFE8EBEE, tag: 0xFF111418)
