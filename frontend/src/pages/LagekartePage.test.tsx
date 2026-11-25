@@ -2163,7 +2163,7 @@ describe('LagekartePage · vom Betreiber abgeschaltete Fachebene (LLH-2104)', ()
           angefragt.push('dwd');
           return leer('dwd');
         }),
-        http.get('/api/einsaetze/1/map-views', () =>
+        http.get('/api/incidents/1/map-views', () =>
           HttpResponse.json([
             {
               id: 1,
