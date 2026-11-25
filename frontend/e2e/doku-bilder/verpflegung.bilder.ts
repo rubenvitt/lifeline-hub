@@ -76,7 +76,7 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     try {
       const demo = await demoEinsatz(api);
-      const basis = `/api/einsaetze/${demo.id}/catering`;
+      const basis = `/api/incidents/${demo.id}/catering`;
       const jetzt = new Date();
 
       const stelle = async (
@@ -99,7 +99,7 @@ test.describe(KAPITEL, () => {
         empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
       };
       for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
-        await fuelle(api, 'post', `/api/einsaetze/${demo.id}/units/${e.id}/timeline`, {
+        await fuelle(api, 'post', `/api/incidents/${demo.id}/units/${e.id}/timeline`, {
           art: 'eintreffen',
           zeitpunkt_at: eintreffenVor(jetzt, 120).toISOString(),
         });

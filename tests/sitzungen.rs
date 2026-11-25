@@ -591,7 +591,7 @@ async fn geraet_koppeln(app: &axum::Router, admin: &str, einsatz: i64) -> (i64, 
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         admin,
         Some(&json!({"ansicht": "lagemonitor", "bezeichnung": "Monitor"})),
     )
@@ -694,7 +694,7 @@ async fn offener_strom_endet_mit_seiner_sitzung() {
         "Safari · iPadOS",
     );
 
-    let feed = format!("/api/einsaetze/{einsatz}/live");
+    let feed = format!("/api/incidents/{einsatz}/live");
     let mut einsatz_strom = strom_oeffnen(&app, &verloren, &feed).await;
     let mut org_strom = strom_oeffnen(&app, &verloren, "/api/live").await;
     let mut eigener = strom_oeffnen(&app, &admin, &feed).await;

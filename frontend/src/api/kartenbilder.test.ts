@@ -28,13 +28,13 @@ describe('kartenbilder API', () => {
       .mockResolvedValue(new Response('[]', { status: 200 }));
     await listeHintergrundbilder(7);
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/einsaetze/7/map/background-images',
+      '/api/incidents/7/map/background-images',
       expect.anything(),
     );
   });
 
   it('download-pfad ist stabil', () => {
-    expect(bildDownloadPfad(7, 3)).toBe('/api/einsaetze/7/map/background-images/3/download');
+    expect(bildDownloadPfad(7, 3)).toBe('/api/incidents/7/map/background-images/3/download');
   });
 
   it('begrenzt auch den direkten Bilddownload auf 15 Sekunden', async () => {
@@ -48,7 +48,7 @@ describe('kartenbilder API', () => {
     await expect(ladeBildBlobUrl(7, 3)).resolves.toBe('blob:test');
     expect(timeout).toHaveBeenCalledWith(15_000);
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/einsaetze/7/map/background-images/3/download',
+      '/api/incidents/7/map/background-images/3/download',
       expect.objectContaining({ credentials: 'same-origin', signal }),
     );
   });
@@ -114,7 +114,7 @@ describe('kartenbilder API', () => {
     const ergebnis = ladeHintergrundbildHoch(7, datei, ECKEN, 'Plan', 4);
     const [xhr] = anfragen;
     expect(xhr.methode).toBe('POST');
-    expect(xhr.url).toBe('/api/einsaetze/7/map/background-images');
+    expect(xhr.url).toBe('/api/incidents/7/map/background-images');
     const fd = xhr.body as FormData;
     expect(fd.get('datei')).toBe(datei);
     expect(fd.get('ecken')).toBe('[[9,50],[9.1,50],[9.1,49.9],[9,49.9]]');

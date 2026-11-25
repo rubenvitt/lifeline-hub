@@ -48,7 +48,7 @@ describe('PersonDetailDrawer', () => {
   it('Fokuswechsel ruft das Detail nicht neu ab (Zugriffsprotokoll)', async () => {
     let detailAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/persons/10', () => {
+      http.get('/api/incidents/1/persons/10', () => {
         detailAbrufe += 1;
         return HttpResponse.json(detail);
       }),

@@ -85,12 +85,12 @@ export function stelleWiederHer(
   return apiSend<ArchivAkte>(`${BASIS}/incidents/${einsatzId}/restore`, 'POST', body);
 }
 
-/** `PUT /api/einsaetze/{id}/retention-period` — Frist setzen, ändern oder aufheben. */
+/** `PUT /api/incidents/{id}/retention-period` — Frist setzen, ändern oder aufheben. */
 export function setzeAufbewahrungsfrist(
   einsatzId: number,
   body: FristSetzenBody,
 ): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/retention-period`, 'PUT', body);
+  return apiSend<EinsatzAnzeige>(`/api/incidents/${einsatzId}/retention-period`, 'PUT', body);
 }
 
 /** `PUT …/follow-up` — Ende der Nachbereitung setzen oder aufheben (LLH-1494). */
@@ -98,7 +98,7 @@ export function setzeNachbereitung(
   einsatzId: number,
   body: NachbereitungSetzenBody,
 ): Promise<EinsatzAnzeige> {
-  return apiSend<EinsatzAnzeige>(`/api/einsaetze/${einsatzId}/follow-up`, 'PUT', body);
+  return apiSend<EinsatzAnzeige>(`/api/incidents/${einsatzId}/follow-up`, 'PUT', body);
 }
 
 /** `GET …/redaction-requests` — Löschersuchen nach Art. 17 des Einsatzes, neueste zuerst. */
@@ -142,12 +142,12 @@ export function suchePersonen(einsatzId: number, suchtext: string): Promise<Pers
   });
 }
 
-/** `GET /api/einsaetze/{id}/retention-categories` — Aufbewahrung je Datenkategorie (LFH-749). */
+/** `GET /api/incidents/{id}/retention-categories` — Aufbewahrung je Datenkategorie (LFH-749). */
 export function ladeKategorieAufbewahrung(einsatzId: number): Promise<KategorieAufbewahrung[]> {
-  return apiGet<KategorieAufbewahrung[]>(`/api/einsaetze/${einsatzId}/retention-categories`);
+  return apiGet<KategorieAufbewahrung[]>(`/api/incidents/${einsatzId}/retention-categories`);
 }
 
-/** `PUT /api/einsaetze/{id}/retention-period/{kategorie}` — Frist einer Datenkategorie setzen,
+/** `PUT /api/incidents/{id}/retention-period/{kategorie}` — Frist einer Datenkategorie setzen,
  *  ändern oder aufheben; in der Karenz nimmt eine künftige Frist die Vormerkung zurück. */
 export function setzeKategorieFrist(
   einsatzId: number,
@@ -155,7 +155,7 @@ export function setzeKategorieFrist(
   body: KategorieFristBody,
 ): Promise<KategorieAufbewahrung[]> {
   return apiSend<KategorieAufbewahrung[]>(
-    `/api/einsaetze/${einsatzId}/retention-period/${kategorie}`,
+    `/api/incidents/${einsatzId}/retention-period/${kategorie}`,
     'PUT',
     body,
   );

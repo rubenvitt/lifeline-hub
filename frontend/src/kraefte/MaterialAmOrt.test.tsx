@@ -57,12 +57,12 @@ const ANGEBOT = [
 
 function grundHandler() {
   server.use(
-    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigabenFixture())),
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([{ id: 2, name: 'Staffel A', ueber_einheit_id: null }]),
     ),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
   );
 }
 
@@ -104,7 +104,7 @@ async function waehleLoesen(user: ReturnType<typeof userEvent.setup>, bezeichnun
 function patchMitschnitt(antwort?: () => Response) {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
-    http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
+    http.patch('/api/incidents/1/material/:emId', async ({ request }) => {
       const url = new URL(request.url);
       gesendet.push({ url: url.pathname + url.search, body: await request.json() });
       return antwort ? antwort() : HttpResponse.json({});
@@ -143,7 +143,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
     await waitFor(() =>
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/1', body: { ausgegeben: 25 } }]),
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/1', body: { ausgegeben: 25 } }]),
     );
     expect(await screen.findByText('Wolldecke: 5 ausgegeben')).toBeInTheDocument();
   });
@@ -172,7 +172,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     zeige();
     await userEvent.click(within(zeile('Trage')).getByRole('button', { name: 'Trage lösen' }));
     await waitFor(() =>
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/2', body: { uhs_id: null } }]),
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/2', body: { uhs_id: null } }]),
     );
     expect(await within(zeile('Trage')).findByText('Material ist verliehen')).toHaveAttribute(
       'data-fehler',
@@ -200,7 +200,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     await userEvent.click(within(menue).getByRole('menuitem', { name: /einsatzbereit/ }));
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/2', body: { status: 'einsatzbereit' } },
+        { url: '/api/incidents/1/material/2', body: { status: 'einsatzbereit' } },
       ]),
     );
   });
@@ -253,7 +253,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     expect(screen.queryByText(/^Trage ·/)).toBeNull();
     await userEvent.click(screen.getByText('Feldbett · 1 · Staffel A'));
     await waitFor(() =>
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/11', body: { uhs_id: 7 } }]),
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/11', body: { uhs_id: 7 } }]),
     );
     // Ein Gerät holt die Wahl sofort, ohne Mengenfrage (t1hvaqzu, design.md D6).
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -262,7 +262,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
   function aufteilenMitschnitt(antwort?: () => Response) {
     const gesendet: { url: string; body: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:emId/split', async ({ request }) => {
+      http.post('/api/incidents/1/material/:emId/split', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
         return antwort ? antwort() : HttpResponse.json([{}, {}]);
       }),
@@ -292,7 +292,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/12/split', body: { menge: 20, uhs_id: 7 } },
+        { url: '/api/incidents/1/material/12/split', body: { menge: 20, uhs_id: 7 } },
       ]),
     );
     expect(patches).toEqual([]);
@@ -305,7 +305,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     const dialog = await waehleRettungsdecke();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Hierher' }));
     await waitFor(() =>
-      expect(patches).toEqual([{ url: '/api/einsaetze/1/material/12', body: { uhs_id: 7 } }]),
+      expect(patches).toEqual([{ url: '/api/incidents/1/material/12', body: { uhs_id: 7 } }]),
     );
     expect(gesendet).toEqual([]);
   });
@@ -349,7 +349,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
     const posts: unknown[] = [];
     const patches = patchMitschnitt();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json(em({ id: 99, bezeichnung: 'Sauerstoff 2 l', uhs_id: 7 }));
       }),
@@ -379,7 +379,7 @@ describe('MaterialAmOrt (LLH-1225 D8)', () => {
   it('am Fahrzeug geht der Posten mit dem Fahrzeug als Ort', async () => {
     const posts: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         posts.push(await request.json());
         return HttpResponse.json(em({ id: 99 }));
       }),
@@ -643,9 +643,9 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     await user.click(within(hinweis as HTMLElement).getByRole('button', { name: 'Rückgängig' }));
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
+        { url: '/api/incidents/1/material/2', body: { uhs_id: null } },
         // Nimmt den Posten keinem anderen Ort weg (LLH-1924).
-        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
+        { url: '/api/incidents/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });
@@ -708,8 +708,8 @@ describe('MaterialAmOrt: gelöste Zeile hält ihre Stelle (LLH-1254)', () => {
     );
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/2', body: { uhs_id: null } },
-        { url: '/api/einsaetze/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
+        { url: '/api/incidents/1/material/2', body: { uhs_id: null } },
+        { url: '/api/incidents/1/material/2?nur_wenn_frei=1', body: { uhs_id: 7 } },
       ]),
     );
     neu({ posten: POSTEN });
@@ -784,7 +784,7 @@ describe('MaterialAmOrt: Lösen bei Verbrauchsgut im ⋮ (LLH-1924)', () => {
     ).toEqual(['Lösen']);
     await user.click(within(liste).getByRole('menuitem', { name: 'Lösen' }));
     await waitFor(() =>
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/1', body: { uhs_id: null } }]),
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/1', body: { uhs_id: null } }]),
     );
     // Gehalten: „Gelöst“ steht träge an der Stelle des ⋮.
     const marke = await within(decke).findByRole('button', { name: 'Wolldecke gelöst' });

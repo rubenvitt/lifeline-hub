@@ -42,7 +42,7 @@ test.describe(KAPITEL, () => {
   test('Dialog „Gerät koppeln“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const uhs = await page.request.get(`/api/einsaetze/${demo.id}/uhs`);
+    const uhs = await page.request.get(`/api/incidents/${demo.id}/uhs`);
     expect(uhs.ok(), `UHS des Demo-Einsatzes: ${uhs.status()}`).toBe(true);
     const [erste] = (await uhs.json()) as { bezeichnung: string }[];
     expect(erste, 'der Demo-Einsatz hat eine UHS').toBeDefined();

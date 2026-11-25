@@ -35,7 +35,7 @@ async fn liste_fuer(
     ))
 }
 
-/// GET /api/einsaetze/{id}/integrations — die Maschinenzugänge der Org, für die sich ein Einsatz
+/// GET /api/incidents/{id}/integrations — die Maschinenzugänge der Org, für die sich ein Einsatz
 /// freigeben lässt, aus Sicht dieses Einsatzes. Nur die Einsatzleitung, wie die Geräte.
 pub async fn liste(
     State(state): State<AppState>,
@@ -106,7 +106,7 @@ async fn im_frueheren_vermerken(
     }
 }
 
-/// PUT /api/einsaetze/{id}/integrations/{zid}/grant — der Zugang liest ab jetzt diesen Einsatz.
+/// PUT /api/incidents/{id}/integrations/{zid}/grant — der Zugang liest ab jetzt diesen Einsatz.
 /// Las er einen anderen, endet dessen Freigabe; beide ETBs nennen das. Idempotent.
 pub async fn freigeben(
     State(state): State<AppState>,
@@ -163,7 +163,7 @@ pub async fn freigeben(
     liste_fuer(&state, org_id, einsatz_id).await
 }
 
-/// DELETE /api/einsaetze/{id}/integrations/{zid}/grant — der Zugang liest diesen Einsatz nicht
+/// DELETE /api/incidents/{id}/integrations/{zid}/grant — der Zugang liest diesen Einsatz nicht
 /// mehr. Idempotent; das ETB nennt nur die Wirkung.
 pub async fn freigabe_beenden(
     State(state): State<AppState>,

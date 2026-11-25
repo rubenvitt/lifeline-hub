@@ -30,26 +30,26 @@ interface Einsatz {
 
 /** Legt die beiden abgeschlossenen Einsätze an, falls sie in diesem Lauf noch fehlen. */
 async function abgeschlosseneEinsaetze(page: Page): Promise<Record<string, Einsatz>> {
-  const liste = await page.request.get('/api/einsaetze');
+  const liste = await page.request.get('/api/incidents');
   expect(liste.ok(), `Einsatzliste: ${liste.status()}`).toBe(true);
   const vorhanden = (await liste.json()) as Einsatz[];
   const ergebnis: Record<string, Einsatz> = {};
   for (const bezeichnung of [MIT_FRIST, OHNE_FRIST]) {
     let einsatz = vorhanden.find((e) => e.bezeichnung === bezeichnung);
     if (!einsatz) {
-      einsatz = await fuelle<Einsatz>(page, 'post', '/api/einsaetze', {
+      einsatz = await fuelle<Einsatz>(page, 'post', '/api/incidents', {
         bezeichnung,
         einsatzart: 'realeinsatz',
       });
       if (bezeichnung === MIT_FRIST) {
         const frist = new Date(Date.now() + 180 * 24 * 3600 * 1000);
         frist.setUTCHours(22, 0, 0, 0);
-        await fuelle(page, 'put', `/api/einsaetze/${einsatz.id}/retention-period`, {
+        await fuelle(page, 'put', `/api/incidents/${einsatz.id}/retention-period`, {
           retention_bis: frist.toISOString(),
           bestaetigt: true,
         });
       }
-      await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/close`);
+      await fuelle(page, 'post', `/api/incidents/${einsatz.id}/close`);
     }
     ergebnis[bezeichnung] = einsatz;
   }

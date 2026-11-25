@@ -24,7 +24,7 @@ const ohneMessung = { id: 1, station_uuid: 'a', name: 'A', reihenfolge: 0 };
 function abrufe(antworten: unknown[][]) {
   let n = 0;
   server.use(
-    http.get('/api/einsaetze/1/gauges', () => {
+    http.get('/api/incidents/1/gauges', () => {
       const antwort = antworten[Math.min(n, antworten.length - 1)];
       n += 1;
       return HttpResponse.json(antwort);

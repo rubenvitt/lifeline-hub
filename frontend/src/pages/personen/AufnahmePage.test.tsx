@@ -94,8 +94,8 @@ function render(
 ) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
   );
   if (extra.length > 0) server.use(...extra);
   return renderMitProviders(
@@ -134,7 +134,7 @@ describe('AufnahmePage', () => {
   it('legt den Startfokus auf die Sichtungsgruppe; ein verirrtes Enter wählt nichts und sendet nicht', async () => {
     let gesendet = 0;
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => {
+      http.post('/api/incidents/1/persons', () => {
         gesendet += 1;
         return HttpResponse.json(angelegt, { status: 201 });
       }),
@@ -150,7 +150,7 @@ describe('AufnahmePage', () => {
   it('erfasst in Serie, ohne die Seite zu verlassen', async () => {
     let gesendet: { sichtung?: string } = {};
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         gesendet = (await request.json()) as { sichtung?: string };
         return HttpResponse.json(angelegt, { status: 201 });
       }),
@@ -170,7 +170,7 @@ describe('AufnahmePage', () => {
   it('schickt Zustand und die Koordinate des Fundorts im selben POST (LFH-613, LLH-1407)', async () => {
     let gesendet: Record<string, unknown> = {};
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(angelegt, { status: 201 });
       }),
@@ -195,7 +195,7 @@ describe('AufnahmePage', () => {
 
   it('leert die Felder nach dem Serien-Speichern und setzt den Fokus zurück', async () => {
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
+      http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
     ]);
     await screen.findByRole('radiogroup');
 
@@ -215,7 +215,7 @@ describe('AufnahmePage', () => {
 
   it('geht nach dem Primär-Knopf zurück in die Liste', async () => {
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
+      http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
     ]);
     await screen.findByRole('radiogroup');
 
@@ -232,7 +232,7 @@ describe('AufnahmePage', () => {
    */
   it('merkt den Fundort für die Sitzung und setzt ihn beim Wiederkommen ein', async () => {
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
+      http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
     ]);
     await screen.findByRole('radiogroup', { name: 'Sichtungskategorie' });
 
@@ -281,7 +281,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     const { client } = render(
       einsatzAktiv,
       [
-        http.post('/api/einsaetze/1/persons', async ({ request }) => {
+        http.post('/api/incidents/1/persons', async ({ request }) => {
           daten = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(
             { ...angelegt, aktuelle_uhs_id: 7, aktueller_platz_id: null },
@@ -304,7 +304,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(client.getQueryState(einsatzKeys.uhs(1))?.isInvalidated).toBe(true);
     expect(client.getQueryState(einsatzKeys.uhsDetail(1, 7))?.isInvalidated).toBe(true);
     expect(daten).toMatchObject({ uhs_id: 7, client_id: expect.any(String) });
-    expect(schreibrequests).toEqual(['/api/einsaetze/1/persons']);
+    expect(schreibrequests).toEqual(['/api/incidents/1/persons']);
   });
 
   it.each(['', '?uhs=kaputt'])(
@@ -314,7 +314,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
       render(
         einsatzAktiv,
         [
-          http.post('/api/einsaetze/1/persons', async ({ request }) => {
+          http.post('/api/incidents/1/persons', async ({ request }) => {
             daten = (await request.json()) as Record<string, unknown>;
             return HttpResponse.json(angelegt, { status: 201 });
           }),
@@ -325,7 +325,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));
       await screen.findByText('PERSONENLISTE');
       expect(daten).not.toHaveProperty('uhs_id');
-      expect(schreibrequests).toEqual(['/api/einsaetze/1/persons']);
+      expect(schreibrequests).toEqual(['/api/incidents/1/persons']);
     },
   );
 
@@ -357,7 +357,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     render(
       einsatzAktiv,
       [
-        http.post('/api/einsaetze/1/persons', () =>
+        http.post('/api/incidents/1/persons', () =>
           HttpResponse.json({ error: 'UHS ist nicht aktiv' }, { status: 422 }),
         ),
       ],
@@ -369,14 +369,14 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
     expect(aktuellerPfad()).toBe('/einsaetze/1/personen/aufnahme?uhs=7');
     expect(screen.queryByText(/Erfasst als/)).not.toBeInTheDocument();
     expect(await schreibaktionenLaden(1, 1)).toHaveLength(0);
-    expect(schreibrequests).toEqual(['/api/einsaetze/1/persons']);
+    expect(schreibrequests).toEqual(['/api/incidents/1/persons']);
   });
 
   it('liest den Wartebereich aus der Antwort, auch beim Replay nach einem Austritt', async () => {
     render(
       einsatzAktiv,
       [
-        http.post('/api/einsaetze/1/persons', () =>
+        http.post('/api/incidents/1/persons', () =>
           HttpResponse.json(
             { ...angelegt, aktuelle_uhs_id: null, aktueller_platz_id: null },
             { status: 201 },
@@ -393,7 +393,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it('kehrt mit „Erfassen" zur beauftragenden UHS zurück, nicht in die Personenliste', async () => {
     render(
       einsatzAktiv,
-      [http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 }))],
+      [http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 }))],
       '/einsaetze/1/personen/aufnahme?uhs=7',
     );
     await screen.findByRole('radiogroup');
@@ -407,7 +407,7 @@ describe('AufnahmePage — UHS-Auftrag (LFH-341 · C6, Befund H38)', () => {
   it('bestätigt „Erfassen“ nach dem Seitenwechsel mit der Quittung als Toast (LLH-1760)', async () => {
     render(
       einsatzAktiv,
-      [http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 }))],
+      [http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 }))],
       '/einsaetze/1/personen/aufnahme?uhs=7',
     );
     await screen.findByRole('radiogroup');
@@ -443,7 +443,7 @@ describe('AufnahmePage — Ablehnung am Formular (LFH-1077)', () => {
     HttpResponse.json({ error: 'Sichtung passt nicht zum Status' }, { status: 422 });
 
   it('nennt den Grund am Formular, behält die Eingabe und zeigt keinen Toast', async () => {
-    render(einsatzAktiv, [http.post('/api/einsaetze/1/persons', abgelehnt)]);
+    render(einsatzAktiv, [http.post('/api/incidents/1/persons', abgelehnt)]);
     await screen.findByRole('radiogroup');
     await userEvent.type(screen.getByLabelText('Fundort'), 'Sammelstelle Süd');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern und nächste' }));
@@ -459,7 +459,7 @@ describe('AufnahmePage — Ablehnung am Formular (LFH-1077)', () => {
   it('das nächste Absenden räumt den Grund, solange die Antwort aussteht', async () => {
     let zweiter = false;
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.post('/api/incidents/1/persons', async () => {
         if (zweiter) return new Promise<never>(() => {});
         zweiter = true;
         return abgelehnt();
@@ -478,7 +478,7 @@ describe('AufnahmePage — Ablehnung am Formular (LFH-1077)', () => {
   it('räumt die Quittung der vorigen Person beim nächsten Absenden', async () => {
     let zweiter = false;
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => {
+      http.post('/api/incidents/1/persons', () => {
         if (zweiter) return abgelehnt();
         zweiter = true;
         return HttpResponse.json(angelegt, { status: 201 });
@@ -510,11 +510,11 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
       ),
-      http.get('/api/einsaetze/:eid/persons', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.get('/api/incidents/:eid/persons', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/persons', async () => {
         await antwortGate;
         return HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
       }),
@@ -551,11 +551,11 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     const antwortGate = new Promise<void>((r) => (antwortFreigeben = r));
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
       ),
-      http.get('/api/einsaetze/:eid/persons', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.get('/api/incidents/:eid/persons', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/persons', async () => {
         await antwortGate;
         return HttpResponse.json(angelegt, { status: 201 });
       }),
@@ -610,15 +610,15 @@ describe('AufnahmePage — Einsatzwechsel während des Anlegens (LFH-1077)', () 
     let inB = 0;
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json({ ...einsatzAktiv, id: Number(params.eid) }),
       ),
-      http.get('/api/einsaetze/:eid/persons', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.get('/api/incidents/:eid/persons', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/persons', async () => {
         await antwortGate;
         return HttpResponse.json(angelegt, { status: 201 });
       }),
-      http.post('/api/einsaetze/2/persons', () => {
+      http.post('/api/incidents/2/persons', () => {
         inB += 1;
         return HttpResponse.json({ ...angelegt, einsatz_id: 2 }, { status: 201 });
       }),
@@ -674,7 +674,7 @@ describe('AufnahmePage — Haptik in der Hülle', () => {
   it('meldet `success`, wenn der Server die Person annimmt, genau einmal', async () => {
     const haptik = mitIosHuelle();
     render(einsatzAktiv, [
-      http.post('/api/einsaetze/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
+      http.post('/api/incidents/1/persons', () => HttpResponse.json(angelegt, { status: 201 })),
     ]);
     await screen.findByRole('radiogroup');
     await userEvent.click(screen.getByRole('button', { name: 'Erfassen' }));

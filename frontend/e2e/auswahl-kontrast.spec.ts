@@ -175,7 +175,7 @@ for (const modus of ['light', 'dark'] as const) {
         ['gross', 'Deichweg 2'],
         ['gering', 'Bachstraße 1'],
       ]) {
-        const r = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+        const r = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
           data: { typ: 'sachschaden', ausmass, ort },
         });
         expect(r.ok(), `POST schaeden: ${r.status()}`).toBe(true);

@@ -99,7 +99,7 @@ Upload eines Fotos mit EXIF-GPS kommt ganz zuletzt und braucht einen GPS-Leser i
 
 ### Video-Proxy
 
-- Neue Route `GET /api/einsaetze/{id}/drone/video/{key}/hls/{*file}`: Rechte wie die
+- Neue Route `GET /api/incidents/{id}/drone/video/{key}/hls/{*file}`: Rechte wie die
   Lagekarte, nur bei zugeschaltetem Einsatz. Die Kennung ist eine eigene, die Seriennummer der
   Fernsteuerung erreicht den Browser nie.
 - **Gleiche Herkunft** wie die App: Damit stören weder das fehlende CORS bei Suchlage noch die CSP

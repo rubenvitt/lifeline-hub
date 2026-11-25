@@ -83,12 +83,12 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   const id = String(((await r.json()) as { id: number }).id);
   // Ein verorteter Einsatzort fern aller Stationen: ohne ihn stünde das Band „Einsatzort fehlt“
   // im Kartenfuß (LLH-1953) und deckte bei 390 px die Station, die der Test anklickt.
-  const ort = await page.request.patch(`/api/einsaetze/${id}`, {
+  const ort = await page.request.patch(`/api/incidents/${id}`, {
     data: { einsatzort: 'Bereitstellung Süd', einsatzort_lat: 50.0, einsatzort_lon: 9.0 },
   });
   expect(ort.ok(), `Seeding Einsatzort: ${ort.status()}`).toBeTruthy();
@@ -101,7 +101,7 @@ async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> 
  * Pegelliste. Der PUT wartet nicht auf die Quelle.
  */
 async function legePegelFest(page: Page, einsatzId: string) {
-  const r = await page.request.put(`/api/einsaetze/${einsatzId}/gauges`, {
+  const r = await page.request.put(`/api/incidents/${einsatzId}/gauges`, {
     data: { stationen: [{ station_uuid: UUID[0], name: 'HANN. MÜNDEN', gewaesser: 'WESER' }] },
   });
   expect(r.ok(), `Pegel festlegen: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -109,7 +109,7 @@ async function legePegelFest(page: Page, einsatzId: string) {
 
 /** Stellt die Pegel-Abfrage und die Stationsliste auf Literale. */
 async function stellePegel(page: Page, einsatzId: string, liste: unknown[]) {
-  await page.route(`**/api/einsaetze/${einsatzId}/gauges`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/gauges`, (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: liste }) : route.continue(),
   );
   await page.route('**/api/map/overlays/pegelonline', (route) =>
@@ -893,7 +893,7 @@ for (const [route, text] of [
       await page.setViewportSize({ width: breite, height: 844 });
       await page.unrouteAll({ behavior: 'ignoreErrors' });
       const pegel = await zurueckhalten(page, [
-        [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(10)],
+        [`**/api/incidents/${einsatzId}/gauges`, pegelListe(10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/${route}`);
       // Das Lagebild trägt das Band „Lage in Zahlen“, der Überblick seit LLH-1748 keins. Dort
@@ -927,7 +927,7 @@ for (const [route, text] of [
 /** Ein Gefahrengebiet mit Warnstufe akut, unbestätigt (es fehlt die Beurteilung). */
 async function gefahrengebietAkut(page: Page, einsatzId: string, versatz: number) {
   const [w, s] = [13.4 + versatz, 52.52];
-  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
+  const zone = await page.request.post(`/api/incidents/${einsatzId}/zones`, {
     data: {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
@@ -949,7 +949,7 @@ async function gefahrengebietAkut(page: Page, einsatzId: string, versatz: number
   expect(zone.ok(), `Gefahrengebiet: ${zone.status()} ${await zone.text()}`).toBeTruthy();
   const { gefahrengebiet_id } = (await zone.json()) as { gefahrengebiet_id: number };
   const stufe = await page.request.put(
-    `/api/einsaetze/${einsatzId}/hazard-areas/${gefahrengebiet_id}/matrix/rating`,
+    `/api/incidents/${einsatzId}/hazard-areas/${gefahrengebiet_id}/matrix/rating`,
     { data: { gefahrentyp: 'einsturz', schutzobjekt: 'menschen', warnstufe: 'akut' } },
   );
   expect(stufe.ok(), `Warnstufe: ${stufe.status()} ${await stufe.text()}`).toBeTruthy();
@@ -1018,14 +1018,14 @@ for (const fall of [
     for (const [breite, bezeichnung] of fall.breiten.flatMap((b) =>
       fall.namen.map((n) => [b, n] as const),
     )) {
-      const umbenannt = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+      const umbenannt = await page.request.patch(`/api/incidents/${einsatzId}`, {
         data: { bezeichnung },
       });
       expect(umbenannt.ok(), `Umbenennen: ${umbenannt.status()}`).toBeTruthy();
       await page.setViewportSize({ width: breite, height: 844 });
       await page.unrouteAll({ behavior: 'ignoreErrors' });
       const pegel = await zurueckhalten(page, [
-        [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(fall.veraltet ? 120 : 10)],
+        [`**/api/incidents/${einsatzId}/gauges`, pegelListe(fall.veraltet ? 120 : 10)],
       ]);
       await page.goto(`/einsaetze/${einsatzId}/ueberblick`);
       await expect(page.getByRole('status', { name: 'Was brennt' })).toBeVisible();
@@ -1063,7 +1063,7 @@ test('Einstellungssektion Pegel: das Nachladen von Liste und Stationen trägt �
     await page.setViewportSize({ width: breite, height: 844 });
     await page.unrouteAll({ behavior: 'ignoreErrors' });
     const antworten = await zurueckhalten(page, [
-      [`**/api/einsaetze/${einsatzId}/gauges`, pegelListe(10)],
+      [`**/api/incidents/${einsatzId}/gauges`, pegelListe(10)],
       ['**/api/map/overlays/pegelonline', STATIONEN],
     ]);
     await page.goto(`/einsaetze/${einsatzId}/einstellungen/pegel`);

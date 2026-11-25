@@ -27,7 +27,7 @@ export { einsatzAnlegen } from './einsatz-kern';
  */
 export async function seedeKraefte(page: Page, einsatzId: string, anzahl: number) {
   for (let i = 0; i < anzahl; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
       data: {
         adhoc: {
           name: `Kirchgassner-Wohlfahrt, Maximiliane ${i}`,
@@ -58,7 +58,7 @@ export interface GesaeterBaum {
  * Besatzung zeigte das Meldebild nur flache Zeilen — jede Baum-Messung wäre grün durch Nichtstun.
  */
 export async function seedKraeftebaum(page: Page, einsatzId: string): Promise<GesaeterBaum> {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const neu = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}${pfad}`, { data });
     expect(

@@ -27,14 +27,14 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 }
 
 async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
-  const schaden = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+  const schaden = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
     data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Hauptstr. 1' },
   });
   expect(schaden.ok(), await schaden.text()).toBeTruthy();
   const schadenId = (await schaden.json()).id as number;
   for (const name of ['dach.jpg', 'giebel.jpg']) {
     const antwort = await page.request.post(
-      `/api/einsaetze/${einsatzId}/damages/${schadenId}/attachments`,
+      `/api/incidents/${einsatzId}/damages/${schadenId}/attachments`,
       { multipart: { datei: { name, mimeType: 'image/jpeg', buffer: FOTO_JPEG } } },
     );
     expect(antwort.status(), await antwort.text()).toBe(201);
@@ -43,12 +43,12 @@ async function schadenMitFoto(page: Page, einsatzId: string): Promise<number> {
 }
 
 async function etbEintragMitHeic(page: Page, einsatzId: string): Promise<number> {
-  const anhang = await page.request.post(`/api/einsaetze/${einsatzId}/etb/attachments`, {
+  const anhang = await page.request.post(`/api/incidents/${einsatzId}/etb/attachments`, {
     multipart: { datei: { name: 'IMG_0001.HEIC', mimeType: 'image/heic', buffer: HEIC } },
   });
   expect(anhang.status(), await anhang.text()).toBe(201);
   const aid = (await anhang.json())[0].id as number;
-  const eintrag = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const eintrag = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: {
       typ: 'meldung',
       von: 'ELW 1',

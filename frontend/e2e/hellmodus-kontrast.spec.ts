@@ -40,10 +40,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 618 ${modus} ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     const ids: Record<string, number> = {};
     for (const typ of ['meldung', 'anordnung', 'entscheidung', 'lage']) {
       ids[typ] = (
@@ -140,10 +140,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 652 ${modus} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/damages`, {
+    await post(page, `/api/incidents/${einsatzId}/damages`, {
       typ: 'sachschaden',
       ausmass: 'gering',
       ort: 'Messung Titel-Link',
@@ -177,7 +177,7 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 643 ${modus} ${Date.now()}`,
     });
     await expect(page.locator('html')).toHaveAttribute('data-theme', modus);

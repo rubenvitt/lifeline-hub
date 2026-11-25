@@ -64,8 +64,8 @@ describe('freigabeZeile', () => {
 function bereit(liste: LagebildFreigabeAnzeige[] = []) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   server.use(
-    http.get('/api/einsaetze/1/situation-picture-shares', () => HttpResponse.json(liste)),
-    http.post('/api/einsaetze/1/situation-picture-shares', async ({ request }) => {
+    http.get('/api/incidents/1/situation-picture-shares', () => HttpResponse.json(liste)),
+    http.post('/api/incidents/1/situation-picture-shares', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       aufrufe.push({ pfad: 'anlegen', body });
       return HttpResponse.json(
@@ -79,7 +79,7 @@ function bereit(liste: LagebildFreigabeAnzeige[] = []) {
         { status: 201 },
       );
     }),
-    http.post('/api/einsaetze/1/situation-picture-shares/1/revoke', () => {
+    http.post('/api/incidents/1/situation-picture-shares/1/revoke', () => {
       aufrufe.push({ pfad: 'widerrufen', body: null });
       return HttpResponse.json([
         freigabe(1, {

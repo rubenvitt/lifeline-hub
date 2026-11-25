@@ -10,7 +10,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )
@@ -40,7 +40,7 @@ async fn melden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports"),
+        &format!("/api/incidents/{einsatz}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -51,7 +51,7 @@ async fn rueckmeldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Value
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/reports/check-ins"),
+        &format!("/api/incidents/{einsatz}/reports/check-ins"),
         cookie,
         None,
     )
@@ -122,7 +122,7 @@ async fn unbekannter_oder_fremder_bezug_wird_herabgestuft_statt_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e1}/units/{aufgeloest}"),
+        &format!("/api/incidents/{e1}/units/{aufgeloest}"),
         &admin,
         None,
     )
@@ -257,7 +257,7 @@ async fn frist_aus_einsatz_einstellung_schlaegt_vorgabe() {
     let (s, einst) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"rueckmeldung_frist_min":20}"#),
     )
@@ -288,7 +288,7 @@ async fn ungueltige_rueckmeldefrist_ist_400() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{e}/settings"),
+            &format!("/api/incidents/{e}/settings"),
             &admin,
             Some(&json!({ "rueckmeldung_frist_min": wert }).to_string()),
         )
@@ -316,7 +316,7 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/units/{a}"),
+        &format!("/api/incidents/{e}/units/{a}"),
         &admin,
         None,
     )
@@ -330,7 +330,7 @@ async fn aufgeloeste_einheit_laesst_meldung_stehen_und_verschwindet_aus_rueckmel
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         None,
     )

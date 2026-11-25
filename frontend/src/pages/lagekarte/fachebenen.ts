@@ -427,7 +427,7 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
       gekuerzt: bisher.gekuerzt || p.gekuerzt === true,
     });
   }
-  // Zeit, die zählt: Aufnahme, ersatzweise Lieferung (ADR-0098).
+  // Zeit, die zählt: Aufnahme, ersatzweise Lieferung (ADR-0099).
   const zeit = (a: CopernicusAktivierung) => a.aufnahme ?? a.geliefert ?? '';
   return [...je.values()]
     .map(({ geliefert, ...a }) =>

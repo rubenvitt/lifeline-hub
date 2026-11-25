@@ -68,10 +68,10 @@ function setup(vorlagen: EinsatzVorlage[] = VORLAGEN) {
   const rumpf: { wert: Record<string, unknown> | null } = { wert: null };
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([])),
+    http.get('/api/incidents', () => HttpResponse.json([])),
     http.get('/api/incident-templates', () => HttpResponse.json(vorlagen)),
     http.get('/api/keyword-suggestions', () => HttpResponse.json(VORSCHLAEGE)),
-    http.post('/api/einsaetze', async ({ request }) => {
+    http.post('/api/incidents', async ({ request }) => {
       rumpf.wert = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json(
         {

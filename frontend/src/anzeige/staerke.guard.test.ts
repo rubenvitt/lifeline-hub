@@ -52,6 +52,6 @@ describe('Eine Schreibweise der Stärke (LLH-1750)', () => {
     expect(staerkeTreffer('`${a}/${b}/${c}//${d}`')).toEqual([]);
     expect(staerkeTreffer('staerkeText(s)')).toEqual([]);
     expect(staerkeTreffer('// Gesamt der Einheiten')).toEqual([]);
-    expect(staerkeTreffer('`/api/einsaetze/${einsatzId}/${modul}/${id}/zeitachse`')).toEqual([]);
+    expect(staerkeTreffer('`/api/incidents/${einsatzId}/${modul}/${id}/zeitachse`')).toEqual([]);
   });
 });

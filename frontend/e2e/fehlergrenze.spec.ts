@@ -21,7 +21,7 @@ import { anmelden, FUEKW } from './trefflaeche-kern';
 
 /** Nur die offenen Erinnerungen (ohne Parameter), nicht die abgeschlossenen. */
 const offeneErinnerungen = (url: URL) =>
-  /\/api\/einsaetze\/\d+\/reminders$/.test(url.pathname) && url.search === '';
+  /\/api\/incidents\/\d+\/reminders$/.test(url.pathname) && url.search === '';
 
 const istBericht = (r: Request) => r.method() === 'POST' && r.url().endsWith('/api/client-errors');
 

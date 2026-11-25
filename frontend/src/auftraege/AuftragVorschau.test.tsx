@@ -68,7 +68,7 @@ const auftrag = (over: Partial<Auftrag> = {}): Auftrag => ({
 
 function auftraegeHandler(antwort: Auftrag[], zaehler?: { n: number }) {
   server.use(
-    http.get('/api/einsaetze/5/tasks', () => {
+    http.get('/api/incidents/5/tasks', () => {
       if (zaehler) zaehler.n += 1;
       return HttpResponse.json(antwort);
     }),

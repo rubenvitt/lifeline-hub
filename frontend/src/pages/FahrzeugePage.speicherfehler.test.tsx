@@ -83,13 +83,13 @@ function render({
 } = {}) {
   server.use(
     meHandler(benutzerFixture()),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/vehicles', ({ request }) =>
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents/7/vehicles', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
     ),
-    http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(personal)),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/personnel', () => HttpResponse.json(personal)),
+    http.get('/api/incidents/7/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/sectors', () => HttpResponse.json([])),
     http.get('/api/vehicle-statuses', () => HttpResponse.json(stati)),
     http.get('/api/vehicles', () => HttpResponse.json(pool)),
   );
@@ -118,7 +118,7 @@ async function waehleStatus(wurzel: HTMLElement, funkrufname: string, label: Reg
 }
 
 const statusAbgelehnt = () =>
-  http.patch('/api/einsaetze/7/vehicles/10', () =>
+  http.patch('/api/incidents/7/vehicles/10', () =>
     HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 }),
   );
 
@@ -127,7 +127,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     const zweiterVersuch = tor();
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/7/vehicles', async () => {
+      http.post('/api/incidents/7/vehicles', async () => {
         versuche += 1;
         if (versuche > 1) await zweiterVersuch.offen;
         return HttpResponse.json({ error: 'Funkrufname schon disponiert' }, { status: 409 });
@@ -162,7 +162,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Disponieren aus dem Bestand: der Grund steht im Dialog, kein Toast', async () => {
     server.use(
-      http.post('/api/einsaetze/7/vehicles/bulk', () =>
+      http.post('/api/incidents/7/vehicles/bulk', () =>
         HttpResponse.json({ error: 'Fahrzeug außer Dienst' }, { status: 409 }),
       ),
     );
@@ -215,7 +215,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     setzeViewportBreite(390);
     server.use(
       statusAbgelehnt(),
-      http.post('/api/einsaetze/7/vehicles/11/stand-down', () =>
+      http.post('/api/incidents/7/vehicles/11/stand-down', () =>
         HttpResponse.json({ error: 'Das Fahrzeug ist storniert' }, { status: 409 }),
       ),
     );
@@ -258,11 +258,11 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Bemerkung an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile, der Wortlaut bleibt', async () => {
     const ersteAntwort = tor();
     server.use(
-      http.patch('/api/einsaetze/7/vehicles/10', async () => {
+      http.patch('/api/incidents/7/vehicles/10', async () => {
         await ersteAntwort.offen;
         return HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 });
       }),
-      http.patch('/api/einsaetze/7/vehicles/11', () =>
+      http.patch('/api/incidents/7/vehicles/11', () =>
         HttpResponse.json({ ...zweites, bemerkung: 'ok' }),
       ),
     );
@@ -298,7 +298,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Bemerkung mit Altwert: ein 409 ohne fremde Änderung steht als Grund an der Zeile (LLH-1945)', async () => {
     const koerper: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/7/vehicles/10', async ({ request }) => {
+      http.patch('/api/incidents/7/vehicles/10', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json({ error: 'Einsatz ist abgeschlossen' }, { status: 409 });
       }),
@@ -328,7 +328,7 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
     setzeViewportBreite(1600);
     let patches = 0;
     server.use(
-      http.patch('/api/einsaetze/7/vehicles/10', () => {
+      http.patch('/api/incidents/7/vehicles/10', () => {
         patches += 1;
         return HttpResponse.json({ ...ef, bemerkung: 'x' });
       }),
@@ -354,10 +354,10 @@ describe('FahrzeugePage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Besatzung: Zuordnen und „Vom Fahrzeug lösen“ melden im Besatzungsblock', async () => {
     server.use(
-      http.put('/api/einsaetze/7/vehicles/10/crew/101', () =>
+      http.put('/api/incidents/7/vehicles/10/crew/101', () =>
         HttpResponse.json({ error: 'Kraft ist schon auf einem Fahrzeug' }, { status: 409 }),
       ),
-      http.delete('/api/einsaetze/7/vehicles/10/crew/100', () =>
+      http.delete('/api/incidents/7/vehicles/10/crew/100', () =>
         HttpResponse.json({ error: 'Kraft ist Fahrzeugführer' }, { status: 409 }),
       ),
     );

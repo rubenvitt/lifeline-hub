@@ -59,7 +59,7 @@ async fn lagebild(app: &axum::Router, schluessel: &str) -> Value {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/situation-picture-shares")
+    format!("/api/incidents/{einsatz}/situation-picture-shares")
 }
 
 /// Legt einen Link an und liefert `(antwort, schluessel)`.
@@ -229,8 +229,8 @@ async fn ohne_gueltigen_schluessel_ist_401_und_der_schluessel_oeffnet_nichts_and
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (_, schluessel) = freigabe(&app, &admin, einsatz, "Krisenstab", "lagebild", "24h").await;
     for uri in [
-        "/api/einsaetze".to_string(),
-        format!("/api/einsaetze/{einsatz}"),
+        "/api/incidents".to_string(),
+        format!("/api/incidents/{einsatz}"),
         pfad(einsatz),
         "/api/v1/situation".to_string(),
     ] {
@@ -261,7 +261,7 @@ async fn stufe_lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_namen() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(&json!({
             "sachverhalt": "Herr Muster gestürzt",
@@ -276,7 +276,7 @@ async fn stufe_lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_namen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Vermisstfrau", "vorname": "Vera", "status": "vermisst"})),
     )
@@ -285,7 +285,7 @@ async fn stufe_lagebild_traegt_zahlen_karte_und_lagemeldung_aber_keine_namen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/free-symbols"),
+        &format!("/api/incidents/{einsatz}/free-symbols"),
         &admin,
         Some(&json!({
             "lat": 52.95, "lon": 10.55,
@@ -353,7 +353,7 @@ async fn stufe_oeffentlich_zeigt_nur_gesamtzahlen_einsatzort_und_absperrungen() 
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(&json!({ "einsatzort_lat": 52.96, "einsatzort_lon": 10.56 })),
     )
@@ -366,7 +366,7 @@ async fn stufe_oeffentlich_zeigt_nur_gesamtzahlen_einsatzort_und_absperrungen() 
         let (s, z) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/zones"),
+            &format!("/api/incidents/{einsatz}/zones"),
             &admin,
             Some(&body),
         )
@@ -376,7 +376,7 @@ async fn stufe_oeffentlich_zeigt_nur_gesamtzahlen_einsatzort_und_absperrungen() 
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         &admin,
         Some(&json!({"name": "Muster", "status": "vermisst"})),
     )
@@ -476,7 +476,7 @@ async fn widerruf_ablauf_und_abschluss_beenden_den_link() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )

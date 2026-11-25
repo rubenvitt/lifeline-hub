@@ -21,7 +21,7 @@ import { cssForm } from '../test/cssForm';
 /**
  * Seite „Lagebesprechung“ (LLH-1111): Termin, Vorbereitung (LFH-550), Abschluss und Verlauf — aus
  * der Stab-Seite herausgelöst. Die Seite fragt den Stab nie an: es gibt hier keinen Handler für
- * `/api/einsaetze/1/stab`, ein Abruf scheiterte an `onUnhandledFrame: 'error'`.
+ * `/api/incidents/1/stab`, ein Abruf scheiterte an `onUnhandledFrame: 'error'`.
  */
 
 beforeEach(() => {
@@ -123,30 +123,30 @@ function rendere({
   const termine: Array<Record<string, unknown>> = [];
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/briefing', () => {
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1/briefing', () => {
       if (standStatus === 'haengt') return new Promise<Response>(() => {});
       return standStatus === 200
         ? HttpResponse.json(stand)
         : HttpResponse.json({ error: 'kaputt' }, { status: standStatus });
     }),
-    http.get('/api/einsaetze/1/briefings', () => HttpResponse.json(verlauf)),
-    http.post('/api/einsaetze/1/briefings', () => post()),
-    http.put('/api/einsaetze/1/briefing/schedule', async ({ request }) => {
+    http.get('/api/incidents/1/briefings', () => HttpResponse.json(verlauf)),
+    http.post('/api/incidents/1/briefings', () => post()),
+    http.put('/api/incidents/1/briefing/schedule', async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       termine.push(body);
       return HttpResponse.json({ ...stand, naechste_lagebesprechung_at: body.naechste_at });
     }),
-    http.get('/api/einsaetze/1/module-access', () => {
+    http.get('/api/incidents/1/module-access', () => {
       if (freigaben === 'haengt') return new Promise<Response>(() => {});
       if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/1/personnel', () => {
+    http.get('/api/incidents/1/personnel', () => {
       zaehle('personal');
       return HttpResponse.json(lage.personal ?? []);
     }),
-    http.get('/api/einsaetze/1/persons', () => {
+    http.get('/api/incidents/1/persons', () => {
       zaehle('personen');
       return lage.personenStatus
         ? HttpResponse.json({ error: 'gesperrt' }, { status: lage.personenStatus })
@@ -164,14 +164,14 @@ function rendere({
     ].map((l) =>
       // Gezählt wird der Modulname, abgefragt der englische Pfad (ADR-0097).
       http.get(
-        `/api/einsaetze/1/${({ einheiten: 'units', fahrzeuge: 'vehicles' } as Record<string, string>)[l] ?? l}`,
+        `/api/incidents/1/${({ einheiten: 'units', fahrzeuge: 'vehicles' } as Record<string, string>)[l] ?? l}`,
         () => {
           zaehle(l);
           return HttpResponse.json([]);
         },
       ),
     ),
-    http.get('/api/einsaetze/1/module-counts', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
+    http.get('/api/incidents/1/module-counts', () => HttpResponse.json(lage.zaehler ?? ZAEHLER)),
   );
   const seite = (
     <Routes>
@@ -277,7 +277,7 @@ describe('LagebesprechungPage · Aufbau', () => {
     const knopf = screen.getByRole('button', { name: 'Erneut abrufen' });
     await waitFor(() => expect(knopf).not.toHaveClass('ant-btn-loading'));
 
-    server.use(http.get('/api/einsaetze/1/briefing', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/incidents/1/briefing', () => new Promise<never>(() => {})));
     await userEvent.click(knopf);
 
     await waitFor(() => expect(knopf).toHaveClass('ant-btn-loading'));
@@ -393,7 +393,7 @@ describe('LagebesprechungPage · Kopfaktion „Lagebesprechung abschließen"', (
     await waitFor(() => expect(screen.queryByText('Nur Ansicht')).toBeNull());
     expect(await kopfaktion()).toBeDisabled();
 
-    server.use(http.get('/api/einsaetze/1/briefing', () => HttpResponse.json(leererStand)));
+    server.use(http.get('/api/incidents/1/briefing', () => HttpResponse.json(leererStand)));
     await userEvent.click(screen.getByRole('button', { name: /Wiederholen|Erneut/ }));
     await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
   });
@@ -412,13 +412,13 @@ describe('LagebesprechungPage · Kopfaktion „Lagebesprechung abschließen"', (
     await screen.findByRole('dialog', { name: 'Lagebesprechung abschließen' });
 
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ status: 'abgeschlossen' }))),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatz({ status: 'abgeschlossen' }))),
     );
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     expect(await screen.findByText('Einsatz abgeschlossen')).toBeInTheDocument();
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
 
-    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
+    server.use(http.get('/api/incidents/1', () => HttpResponse.json(einsatz())));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
     expect(screen.queryAllByRole('dialog')).toHaveLength(0);
@@ -487,12 +487,12 @@ describe('LagebesprechungPage · ?neu=1 (Schnellaktion)', () => {
     await waitFor(() => expect(screen.queryAllByRole('dialog')).toHaveLength(0));
 
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz({ meine_rolle: 'beobachter' }))),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatz({ meine_rolle: 'beobachter' }))),
     );
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     expect(await screen.findByText('Nur Ansicht')).toBeInTheDocument();
 
-    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz())));
+    server.use(http.get('/api/incidents/1', () => HttpResponse.json(einsatz())));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(async () => expect(await kopfaktion()).toBeEnabled());
     expect(screen.queryAllByRole('dialog')).toHaveLength(0);
@@ -588,7 +588,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     let offen = 3;
     const { client } = rendere({});
     server.use(
-      http.get('/api/einsaetze/1/module-counts', () =>
+      http.get('/api/incidents/1/module-counts', () =>
         HttpResponse.json({ ...ZAEHLER, meldungen: { ...ZAEHLER.meldungen, offen } }),
       ),
     );
@@ -704,7 +704,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
     const anfragen: Array<Record<string, unknown>> = [];
     rendere({ lage: { personen: [person(1)] } });
     server.use(
-      http.post('/api/einsaetze/1/situation-reports', async ({ request }) => {
+      http.post('/api/incidents/1/situation-reports', async ({ request }) => {
         anfragen.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json({ id: 77 }, { status: 201 });
       }),
@@ -731,7 +731,7 @@ describe('LagebesprechungPage · Vorbereitung der Lagebesprechung (LFH-550)', ()
   it('scheitert die Übernahme, steht der Fehler an der Seite, und es geht nicht weiter', async () => {
     rendere({});
     server.use(
-      http.post('/api/einsaetze/1/situation-reports', () =>
+      http.post('/api/incidents/1/situation-reports', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

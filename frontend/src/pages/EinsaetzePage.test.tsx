@@ -93,7 +93,7 @@ describe('EinsaetzePage — Willkommenskarte schiebt nichts', () => {
   }
 
   it('ohne Stand kein Raster; mit dem Stand stehen Karte und Raster zugleich', async () => {
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     const oeffne = einstellungenNachTor(() => HttpResponse.json({ eintraege: {} }));
     setup();
     // Positive Gegenprobe derselben Seite: der Kopf steht schon.
@@ -110,7 +110,7 @@ describe('EinsaetzePage — Willkommenskarte schiebt nichts', () => {
   });
 
   it('scheitert der Stand, steht das Raster ohne Karte und ohne auf Wiederholungen zu warten', async () => {
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     const oeffne = einstellungenNachTor(() => HttpResponse.json({}, { status: 500 }));
     setup();
     expect(await screen.findByRole('heading', { level: 1, name: 'Einsätze' })).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('EinsaetzePage — Willkommenskarte schiebt nichts', () => {
 
 describe('EinsaetzePage', () => {
   it('listet Einsätze mit Bezeichnung und eigener Rolle', async () => {
-    server.use(http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])));
+    server.use(http.get('/api/incidents', () => HttpResponse.json([einsatz()])));
     setup();
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
     expect(screen.getByText('Eigene Rolle: Einsatzleitung')).toBeInTheDocument();
@@ -133,8 +133,8 @@ describe('EinsaetzePage', () => {
   it('öffnet den neuen Einsatz direkt nach dem Anlegen', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', () =>
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', () =>
         HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
       ),
     );
@@ -156,8 +156,8 @@ describe('EinsaetzePage', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', async ({ request }) => {
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
@@ -187,7 +187,7 @@ describe('EinsaetzePage', () => {
   it('führt fünf Felder — der Einsatzort ist das optionale fünfte (LFH-1175)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
     );
     renderMitProviders(<EinsaetzePage />);
 
@@ -205,7 +205,7 @@ describe('EinsaetzePage', () => {
   it('nennt das Schichtmodell der Organisation als Zeile, nicht als Feld (LLH-1122)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
       http.get('/api/shift-models', () =>
         HttpResponse.json([
           {
@@ -235,7 +235,7 @@ describe('EinsaetzePage', () => {
     let beantwortet = false;
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
       http.get('/api/shift-models', () => {
         beantwortet = true;
         return HttpResponse.json([
@@ -264,8 +264,8 @@ describe('EinsaetzePage', () => {
   it('setzt den Fokus beim Öffnen ins erste Feld und sendet per Enter', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', () =>
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', () =>
         HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 }),
       ),
     );
@@ -287,7 +287,7 @@ describe('EinsaetzePage', () => {
     const ohneRecht = adminFixture({ system_rolle: 'keiner' });
     server.use(
       meHandler(ohneRecht),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz()])),
     );
     renderMitProviders(<EinsaetzePage />);
     await waitFor(() => expect(screen.getByText('Hochwasser Nord')).toBeInTheDocument());
@@ -296,7 +296,7 @@ describe('EinsaetzePage', () => {
 
   it('trennt aktive und abgeschlossene Einsätze in eigene Sektionen', async () => {
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz(),
           einsatz({
@@ -319,7 +319,7 @@ describe('EinsaetzePage', () => {
   it('oeffnet beim Klick auf eine Kachel den Workspace unter /einsaetze/:id', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz()])),
     );
     renderMitProviders(
       <Routes>
@@ -335,7 +335,7 @@ describe('EinsaetzePage', () => {
     const user = userEvent.setup();
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json([
           einsatz(),
           einsatz({ id: 8, bezeichnung: 'Sturmtief Abschluss', status: 'abgeschlossen' }),
@@ -371,7 +371,7 @@ describe('EinsaetzePage', () => {
   it('lässt Modifier-Klicks auf den Einsatz-Titel browsernativ und ohne Karten-Navigation', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz()])),
       http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     renderMitProviders(
@@ -403,7 +403,7 @@ describe('EinsaetzePage', () => {
     const freigabe = new Promise<void>((r) => (antworten = r));
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', async () => {
+      http.get('/api/incidents', async () => {
         await freigabe;
         return HttpResponse.json([einsatz()]);
       }),
@@ -429,7 +429,7 @@ describe('EinsaetzePage', () => {
     let abrufe = 0;
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => {
+      http.get('/api/incidents', () => {
         abrufe += 1;
         return abrufe === 1
           ? HttpResponse.json({ error: 'Serverfehler' }, { status: 500 })
@@ -453,7 +453,7 @@ describe('EinsaetzePage', () => {
   it('zeigt bei leerer Liste den Leer-Zustand — auch für Anlegeberechtigte', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
     );
     const { container } = renderMitProviders(<EinsaetzePage />);
 
@@ -479,7 +479,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
   function mockEinsaetze(liste: EinsatzAnzeige[]) {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json(liste)),
+      http.get('/api/incidents', () => HttpResponse.json(liste)),
       http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   }
@@ -729,7 +729,7 @@ describe('Einsatzkarte — Lagebild statt vier Felder (LFH-336 · M4/M5)', () =>
 
     // Die Liste schrumpft unter SUCHE_AB — der Suchbegriff trifft weiterhin nichts.
     server.use(
-      http.get('/api/einsaetze', () =>
+      http.get('/api/incidents', () =>
         HttpResponse.json(
           Array.from({ length: 3 }, (_, i) => e({ id: i + 1, bezeichnung: `Einsatz ${i + 1}` })),
         ),
@@ -949,7 +949,7 @@ describe('Demo-Daten-Hinweis (LFH-690)', () => {
   ) {
     server.use(
       meHandler(me),
-      http.get('/api/einsaetze', async () => {
+      http.get('/api/incidents', async () => {
         await liste?.();
         return HttpResponse.json(einsaetze);
       }),
@@ -1116,8 +1116,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
       http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
-      http.post('/api/einsaetze', async ({ request }) => {
+      http.get('/api/incidents', () => HttpResponse.json([einsatz()])),
+      http.post('/api/incidents', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
@@ -1153,8 +1153,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
       http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz()])),
-      http.post('/api/einsaetze', async ({ request }) => {
+      http.get('/api/incidents', () => HttpResponse.json([einsatz()])),
+      http.post('/api/incidents', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
@@ -1179,8 +1179,8 @@ describe('EinsaetzePage — Zone der Organisation (LFH-692)', () => {
   it('LFH-966: ein abgelehntes Anlegen steht im Dialog, ohne Toast; Abbrechen räumt es', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', () =>
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', () =>
         HttpResponse.json({ error: 'Bezeichnung bereits vergeben' }, { status: 409 }),
       ),
     );
@@ -1210,8 +1210,8 @@ describe('EinsaetzePage — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
     let rumpf: Record<string, unknown> | null = null;
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', async ({ request }) => {
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', async ({ request }) => {
         rumpf = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
@@ -1232,8 +1232,8 @@ describe('EinsaetzePage · Einsatzort beim Anlegen (LFH-1175)', () => {
     const begriffe: string[] = [];
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
-      http.post('/api/einsaetze', async ({ request }) => {
+      http.get('/api/incidents', () => HttpResponse.json([])),
+      http.post('/api/incidents', async ({ request }) => {
         rumpfe.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(einsatz({ bezeichnung: 'Sturm Süd' }), { status: 201 });
       }),
@@ -1368,7 +1368,7 @@ describe('EinsaetzePage · Zufluss unter Zeiger und Fokus (LLH-1204)', () => {
     let liste = start;
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json(liste)),
+      http.get('/api/incidents', () => HttpResponse.json(liste)),
       http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(<EinsaetzePage />);
@@ -1518,7 +1518,7 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
     rundgang.ort.mockClear();
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
       http.get('/api/keyword-suggestions', () => HttpResponse.json([])),
     );
   });
@@ -1532,7 +1532,7 @@ describe('EinsaetzePage · Rundgang (LLH-1990)', () => {
   it('solange die Liste lädt, startet nichts (sonst fehlte der Schritt „Einsätze“)', async () => {
     server.use(
       http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
-      http.get('/api/einsaetze', () => new Promise<never>(() => {})),
+      http.get('/api/incidents', () => new Promise<never>(() => {})),
     );
     renderMitProviders(<EinsaetzePage />);
     await waitFor(() => expect(rundgang.ort).toHaveBeenCalled());

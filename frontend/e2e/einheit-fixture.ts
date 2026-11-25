@@ -8,8 +8,8 @@ export async function einheitMitZuordnungen(page: Page) {
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   }
-  const einsatzId = await post('/api/einsaetze', { bezeichnung: `E2E 446 ${Date.now()}` });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const einsatzId = await post('/api/incidents', { bezeichnung: `E2E 446 ${Date.now()}` });
+  const basis = `/api/incidents/${einsatzId}`;
   const einheitId = await post(`${basis}/units`, { name: 'Messzug 446' });
   const namen = { personal: 'Messperson 446', fahrzeug: 'Florian 446', material: 'Messkiste 446' };
   const zugeordnet: Record<string, number> = {};
@@ -63,7 +63,7 @@ export type SperrRolle = 'beobachter' | 'fuehrungspersonal';
 export async function seedEinheitPersonalGesperrt(page: Page, rolle: SperrRolle) {
   const { pfad, namen } = await einheitMitZuordnungen(page);
   const einsatzId = pfad.split('/')[2];
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/module-overrides/personal`, {
+  const sperre = await page.request.put(`/api/incidents/${einsatzId}/module-overrides/personal`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   // Ein still gescheitertes Seeding mäße den freien Zweig — grün durch Nichtstun.

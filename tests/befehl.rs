@@ -15,7 +15,7 @@ async fn befehl_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (status, b) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         cookie,
         Some(r#"{"vorlage":"befehl_lad","titel":"Erstbefehl"}"#),
     )
@@ -34,7 +34,7 @@ async fn patch_unbekannter_abschnitts_schluessel_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let bid = befehl_anlegen(&app, &admin, einsatz).await;
-    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
+    let u = format!("/api/incidents/{einsatz}/orders/{bid}");
 
     let (status, antwort) = anfrage(
         &app,
@@ -68,7 +68,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (status, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         Some(
             r#"{"vorlage":"befehl_lad","titel":"Befehl 10:00","zeitstand":"2026-06-02 10:00:00"}"#,
@@ -77,7 +77,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     .await;
     assert_eq!(status, StatusCode::CREATED, "{b:?}");
     let bid = b["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
+    let u = format!("/api/incidents/{einsatz}/orders/{bid}");
 
     // Leerer Befehl: Struktur vollständig (Skelett), aber ohne Text → 422 mit Wortlaut.
     let (s, antwort) = anfrage(&app, "POST", &format!("{u}/release"), &admin, None).await;
@@ -111,7 +111,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -141,7 +141,7 @@ async fn freigabe_schreibt_gerenderten_snapshot_byte_genau_ins_etb() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -165,7 +165,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (s, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         None,
     )
@@ -180,7 +180,7 @@ async fn liste_liefert_koepfe_ohne_abschnitte() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/orders/{id}"),
+        &format!("/api/incidents/{einsatz}/orders/{id}"),
         &admin,
         None,
     )
@@ -199,14 +199,14 @@ async fn einzelauftrag_befehl_bleibt_freigebbar_und_fortschreibbar() {
     let (status, b) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         Some(r#"{"vorlage":"befehl_ea_zmw","titel":"EA 2. Zug"}"#),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED, "{b:?}");
     let bid = b["id"].as_i64().unwrap();
-    let u = format!("/api/einsaetze/{einsatz}/orders/{bid}");
+    let u = format!("/api/incidents/{einsatz}/orders/{bid}");
 
     let (s, _) = anfrage(
         &app,

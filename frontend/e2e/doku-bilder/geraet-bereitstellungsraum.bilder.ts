@@ -48,7 +48,7 @@ const UNANGEMELDET = 'Florian Nachbarort 1/46-1';
 
 /** Ein geplanter Bereitstellungsraum, einmal je Lauf. */
 async function geplanterRaum(page: Page, einsatz: number): Promise<number> {
-  const pfad = `/api/einsaetze/${einsatz}/staging-areas`;
+  const pfad = `/api/incidents/${einsatz}/staging-areas`;
   const liste = (await (await page.request.get(pfad)).json()) as {
     id: number;
     bezeichnung: string;
@@ -70,7 +70,7 @@ async function raumTablet(page: Page, browser: Browser) {
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/devices`,
+    `/api/incidents/${demo.id}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: br, bezeichnung: 'Tablet Einweiser' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });
@@ -146,16 +146,16 @@ test.describe(KAPITEL, () => {
       // Die Einsatzleitung ruft eine der Kräfte ab (LLH-1085); das Tablet zeigt sie unter
       // „Abgerufen“ mit „Ausrücken buchen“.
       const raum = (await (
-        await page.request.get(`/api/einsaetze/${einsatzId}/staging-areas/${brId}`)
+        await page.request.get(`/api/incidents/${einsatzId}/staging-areas/${brId}`)
       ).json()) as { einheiten: { id: number; name: string }[] };
       const kraft = raum.einheiten.find((x) => x.name !== UNANGEMELDET);
       expect(kraft, 'eine eingebuchte Einheit').toBeDefined();
       const abschnitte = (await (
-        await page.request.get(`/api/einsaetze/${einsatzId}/sectors`)
+        await page.request.get(`/api/incidents/${einsatzId}/sectors`)
       ).json()) as { id: number; name: string }[];
       const ziel = abschnitte.find((a) => a.name === 'Sanitätsdienst');
       expect(ziel, 'Abschnitt „Sanitätsdienst“').toBeDefined();
-      await fuelle(page, 'post', `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch`, {
+      await fuelle(page, 'post', `/api/incidents/${einsatzId}/staging-areas/${brId}/dispatch`, {
         objekt_typ: 'einheit',
         objekt_id: kraft!.id,
         abschnitt_id: ziel!.id,
@@ -205,7 +205,7 @@ test.describe(KAPITEL, () => {
   test('Material des Raums ansehen', async ({ page, browser }) => {
     const { kontext, geraet, einsatzId, brId } = await raumTablet(page, browser);
     try {
-      const basis = `/api/einsaetze/${einsatzId}/material`;
+      const basis = `/api/incidents/${einsatzId}/material`;
       const betten = await fuelle<{ id: number }>(page, 'post', basis, {
         adhoc: { bezeichnung: 'Feldbetten' },
         menge: 20,

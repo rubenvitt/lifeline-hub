@@ -20,10 +20,10 @@ import {
  */
 
 async function einsatzMitSchaeden(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Tabelle filtern ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   const einsatzId = String(((await r.json()) as { id: number }).id);
   const schaeden = [
     { ausmass: 'gering', ort: 'Bachstraße 1' },
@@ -33,7 +33,7 @@ async function einsatzMitSchaeden(page: Page): Promise<string> {
   ];
   // Nacheinander: die Registriernummern folgen so der Liste.
   for (const s of schaeden) {
-    const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+    const a = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
       data: { typ: 'sachschaden', ...s },
     });
     expect(a.ok(), `POST schaeden: ${a.status()} ${await a.text()}`).toBe(true);

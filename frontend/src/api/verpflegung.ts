@@ -19,7 +19,7 @@ import type {
  * Deckung und Fehlmenge rechnet der Server (design.md D2); die zeitabhängige Einstufung
  * rechnet `verpflegung/deckung.ts` im Client. Zeiten am Draht: UTC ohne Zonenkennung.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/catering`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/catering`;
 
 /** Alle Zeitfenster des Einsatzes, nach Beginn geordnet (Ordnung vom Server), und die
  *  Verpflegungsstellen nach Bezeichnung (LLH-1040, keine eigene Leseroute). */

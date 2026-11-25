@@ -25,32 +25,32 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Abschnitt ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
-  const ost = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Nord' });
+  const ost = await anlegen(page, `/api/incidents/${e}/sectors`, {
     name: 'UA Nord-Ost',
     ueber_abschnitt_id: nord.id,
   });
-  const sued = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Süd' });
-  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Zug Ost', abschnitt_id: ost.id });
-  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Zug Süd', abschnitt_id: sued.id });
-  await anlegen(page, `/api/einsaetze/${e}/tasks`, {
+  const sued = await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Süd' });
+  await anlegen(page, `/api/incidents/${e}/units`, { name: 'Zug Ost', abschnitt_id: ost.id });
+  await anlegen(page, `/api/incidents/${e}/units`, { name: 'Zug Süd', abschnitt_id: sued.id });
+  await anlegen(page, `/api/incidents/${e}/tasks`, {
     auftrag_text: 'Deich Nord sichern',
     empfaenger: [
       { empfaenger_typ: 'abschnitt', abschnitt_id: ost.id },
       { empfaenger_typ: 'abschnitt', abschnitt_id: sued.id },
     ],
   });
-  await anlegen(page, `/api/einsaetze/${e}/tasks`, {
+  await anlegen(page, `/api/incidents/${e}/tasks`, {
     auftrag_text: 'Pumpe Süd',
     empfaenger: [{ empfaenger_typ: 'abschnitt', abschnitt_id: sued.id }],
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'einsatzabschnitt', stelle_id: nord.id, bezeichnung: 'Tablet A' },
   );
 
@@ -96,7 +96,7 @@ test('LFH-1043: Abschnittsgerät sieht seinen Teilbaum, quittiert und meldet', a
     await expect(tablet.getByLabel('Inhalt')).toHaveValue('');
     await expect(tablet.getByText('Deich hält')).toBeVisible();
 
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
+    const meldungen = await page.request.get(`/api/incidents/${e}/reports`);
     const gesendet = ((await meldungen.json()) as { inhalt: string; abschnitt_id?: number }[]).find(
       (m) => m.inhalt === 'Deich hält',
     );
@@ -119,32 +119,32 @@ test('LLH-1190: Abschnittsgerät quittiert einen Einsatzbefehl an seinen Bereich
   browser,
 }) => {
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Befehl Abschnitt ${Date.now()}`,
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
-  const ost = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Nord' });
+  const ost = await anlegen(page, `/api/incidents/${e}/sectors`, {
     name: 'UA Nord-Ost',
     ueber_abschnitt_id: nord.id,
   });
-  const sued = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Süd' });
+  const sued = await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Süd' });
   const abschnitte = [
     { schluessel: 'lage', text: 'Pegel steigt' },
     { schluessel: 'auftrag', text: 'Deich halten' },
     { schluessel: 'durchfuehrung', text: 'Sandsäcke an die Deichkrone' },
   ];
   async function befehl(titel: string, verteiler: unknown[]): Promise<number> {
-    const b = await anlegen(page, `/api/einsaetze/${e}/orders`, {
+    const b = await anlegen(page, `/api/incidents/${e}/orders`, {
       vorlage: 'befehl_lad',
       titel,
       abschnitte,
     });
-    const patch = await page.request.patch(`/api/einsaetze/${e}/orders/${b.id}`, {
+    const patch = await page.request.patch(`/api/incidents/${e}/orders/${b.id}`, {
       data: { verteiler },
     });
     expect(patch.ok(), `Verteiler: ${patch.status()}`).toBeTruthy();
-    await anlegen(page, `/api/einsaetze/${e}/orders/${b.id}/release`);
+    await anlegen(page, `/api/incidents/${e}/orders/${b.id}/release`);
     return b.id;
   }
   const bid = await befehl('Deichverteidigung', [
@@ -152,7 +152,7 @@ test('LLH-1190: Abschnittsgerät quittiert einen Einsatzbefehl an seinen Bereich
     { empfaenger_typ: 'abschnitt', abschnitt_id: sued.id },
   ]);
   await befehl('Pumpstation Süd', [{ empfaenger_typ: 'abschnitt', abschnitt_id: sued.id }]);
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'einsatzabschnitt',
     stelle_id: nord.id,
     bezeichnung: 'Tablet B',
@@ -186,7 +186,7 @@ test('LLH-1190: Abschnittsgerät quittiert einen Einsatzbefehl an seinen Bereich
     await expect(tablet.getByText('Empfang quittiert')).toBeVisible();
     await expect(eigen).toHaveCount(0);
     const quittiert = async () => {
-      const b = await page.request.get(`/api/einsaetze/${e}/orders/${bid}`);
+      const b = await page.request.get(`/api/incidents/${e}/orders/${bid}`);
       const v = (await b.json()) as {
         verteiler: { abschnitt_id?: number; quittiert_at?: string }[];
       };

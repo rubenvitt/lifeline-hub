@@ -63,7 +63,7 @@ export function listeEtb(einsatzId: number, params: EtbAbfrage = {}): Promise<Et
   if (params.before_lfd_nr != null) qs.set('before_lfd_nr', String(params.before_lfd_nr));
   if (params.after_lfd_nr != null) qs.set('after_lfd_nr', String(params.after_lfd_nr));
   qs.set('limit', String(params.limit ?? SEITENGROESSE));
-  return apiGet<EtbEintragAnzeige[]>(`/api/einsaetze/${einsatzId}/etb?${qs.toString()}`);
+  return apiGet<EtbEintragAnzeige[]>(`/api/incidents/${einsatzId}/etb?${qs.toString()}`);
 }
 
 /** Exakte Zahl der Einträge gesamt und je Typ, über denselben Filter wie die Liste. */
@@ -72,7 +72,7 @@ export function ladeEtbZaehler(
   filter: EtbFilterWerte = {},
 ): Promise<EtbZaehler> {
   const qs = filterParameter(filter).toString();
-  return apiGet<EtbZaehler>(`/api/einsaetze/${einsatzId}/etb/counts${qs ? `?${qs}` : ''}`);
+  return apiGet<EtbZaehler>(`/api/incidents/${einsatzId}/etb/counts${qs ? `?${qs}` : ''}`);
 }
 
 /**
@@ -81,7 +81,7 @@ export function ladeEtbZaehler(
  */
 export function zaehleEtb(einsatzId: number, params: EtbFilterWerte = {}): Promise<EtbAnzahl> {
   const qs = filterParameter(params).toString();
-  return apiGet<EtbAnzahl>(`/api/einsaetze/${einsatzId}/etb/count${qs ? `?${qs}` : ''}`);
+  return apiGet<EtbAnzahl>(`/api/incidents/${einsatzId}/etb/count${qs ? `?${qs}` : ''}`);
 }
 
 export interface NeuerEintrag {
@@ -128,7 +128,7 @@ export async function ladeEtbAnhangHoch(
   const fd = new FormData();
   fd.append('datei', datei);
   const angelegt = await apiUploadMitFortschritt<Anhang[]>(
-    `/api/einsaetze/${einsatzId}/etb/attachments`,
+    `/api/incidents/${einsatzId}/etb/attachments`,
     fd,
     { timeoutMs: UPLOAD_TIMEOUT_MS, onFortschritt },
   );
@@ -140,7 +140,7 @@ export async function ladeEtbAnhangHoch(
  * `routing/deeplinks.ts`. Die generische Route `/attachments/{aid}` antwortet für ETB-Anhänge 404.
  */
 export function etbAnhangPfad(einsatzId: number, eintragId: number, anhangId: number): string {
-  return `/api/einsaetze/${einsatzId}/etb/${eintragId}/attachments/${anhangId}`;
+  return `/api/incidents/${einsatzId}/etb/${eintragId}/attachments/${anhangId}`;
 }
 
 export function erfasseEtb(
@@ -148,7 +148,7 @@ export function erfasseEtb(
   eintrag: NeuerEintrag,
   optionen?: ApiSendOptionen,
 ): Promise<EtbEintragAnzeige> {
-  return apiSend<EtbEintragAnzeige>(`/api/einsaetze/${einsatzId}/etb`, 'POST', eintrag, optionen);
+  return apiSend<EtbEintragAnzeige>(`/api/incidents/${einsatzId}/etb`, 'POST', eintrag, optionen);
 }
 
 /** Aus einem ETB-Eintrag direkt einen Auftrag erteilen. Setzt `auftrag.quell_etb_eintrag_id`
@@ -158,7 +158,7 @@ export function erteileAuftragAusEtb(
   eintragId: number,
   daten: NeuerAuftrag,
 ): Promise<Auftrag> {
-  return apiSend<Auftrag>(`/api/einsaetze/${einsatzId}/etb/${eintragId}/task`, 'POST', daten);
+  return apiSend<Auftrag>(`/api/incidents/${einsatzId}/etb/${eintragId}/task`, 'POST', daten);
 }
 
 /**
@@ -166,7 +166,7 @@ export function erteileAuftragAusEtb(
  * `kwc2yszv-etb-neuentwurf`, Review S4).
  */
 function lesemarkeAdresse(einsatzId: number, ohneSystem: boolean): string {
-  return `/api/einsaetze/${einsatzId}/etb/read-marker${ohneSystem ? '?ohne_system=true' : ''}`;
+  return `/api/incidents/${einsatzId}/etb/read-marker${ohneSystem ? '?ohne_system=true' : ''}`;
 }
 
 /** Eigener Lesestand im Tagebuch: Marke, letzte Sichtung, fremde Einträge darüber. */

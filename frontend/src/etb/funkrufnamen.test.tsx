@@ -16,13 +16,13 @@ function wrapper(client = neuerQueryClient()) {
 describe('useFunkrufnamen', () => {
   it('sammelt Funkrufnamen aus Fahrzeugen (mit OPTA) und Einheiten', async () => {
     server.use(
-      http.get('/api/einsaetze/1/vehicles', () =>
+      http.get('/api/incidents/1/vehicles', () =>
         HttpResponse.json([
           { id: 1, funkrufname: 'Florian Musterstadt 1', opta: 'FL MUST 1' },
           { id: 2, funkrufname: 'RTW 1', opta: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([{ id: 9, name: 'Zug 1' }])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([{ id: 9, name: 'Zug 1' }])),
     );
     const { result } = renderHook(() => useFunkrufnamen(1), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.length).toBeGreaterThan(0));
@@ -33,13 +33,13 @@ describe('useFunkrufnamen', () => {
 
   it('dedupliziert und sortiert alphabetisch (de)', async () => {
     server.use(
-      http.get('/api/einsaetze/1/vehicles', () =>
+      http.get('/api/incidents/1/vehicles', () =>
         HttpResponse.json([
           { id: 1, funkrufname: 'Zebra', opta: null },
           { id: 2, funkrufname: 'Anton', opta: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([{ id: 9, name: 'Anton' }])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([{ id: 9, name: 'Anton' }])),
     );
     const { result } = renderHook(() => useFunkrufnamen(1), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.length).toBeGreaterThan(0));

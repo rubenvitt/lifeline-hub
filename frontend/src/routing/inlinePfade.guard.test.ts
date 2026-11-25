@@ -20,7 +20,7 @@ import { describe, expect, it } from 'vitest';
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
 const QUELLE = join(SRC, 'routing', 'deeplinks.ts');
 /**
- * Eine Frontend-Route steht am Anfang des Literals. `/api/einsaetze/${…}` und
+ * Eine Frontend-Route steht am Anfang des Literals. `/api/incidents/${…}` und
  * `${BASIS}/einsaetze/${…}` (API-Clients) sind Server-Pfade und bleiben außen vor.
  */
 const VERBOTEN = /`\/einsaetze\/\$\{/;

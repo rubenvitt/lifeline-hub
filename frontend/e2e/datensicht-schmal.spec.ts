@@ -64,7 +64,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function anlegen(page: Page, einsatzId: string, pfad: string, data: unknown, was: string) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
   expect(antwort.ok(), `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
 }
 

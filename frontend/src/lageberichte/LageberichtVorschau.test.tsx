@@ -32,7 +32,7 @@ const bericht = (o: Partial<LageberichtAnzeige> = {}): LageberichtAnzeige =>
 function liefereDetail(b: LageberichtAnzeige | null) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/situation-reports/11', () => {
+    http.get('/api/incidents/5/situation-reports/11', () => {
       abrufe += 1;
       return b
         ? HttpResponse.json(b)

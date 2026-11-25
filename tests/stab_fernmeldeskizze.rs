@@ -15,7 +15,7 @@ mod common;
 use common::*;
 
 fn basis(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-sketch")
+    format!("/api/incidents/{einsatz}/staff/comms-sketch")
 }
 
 async fn skizze(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -38,7 +38,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -57,7 +57,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -70,7 +70,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, body: Value) -> 
     let (status, plan) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions"),
+        &format!("/api/incidents/{einsatz}/staff/comms-plan/positions"),
         cookie,
         Some(&body),
     )
@@ -174,7 +174,7 @@ async fn ohne_recht_am_fernmeldewesen_ist_lesen_und_schreiben_403() {
     let (status, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/fernmeldewesen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/fernmeldewesen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -1066,7 +1066,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1145,7 +1145,7 @@ async fn einheit_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/units/{zug}"),
+        &format!("/api/incidents/{einsatz}/units/{zug}"),
         &admin,
         None,
     )
@@ -1207,7 +1207,7 @@ async fn abschnitt_stelle_und_komponente_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/sectors/{ab}"),
+        &format!("/api/incidents/{einsatz}/sectors/{ab}"),
         &admin,
         None,
     )
@@ -1220,7 +1220,7 @@ async fn abschnitt_stelle_und_komponente_geloescht() {
     let (status, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}"),
+        &format!("/api/incidents/{einsatz}/staff/comms-plan/positions/{ils}"),
         &admin,
         None,
     )
@@ -1262,7 +1262,7 @@ async fn schwaerzung_nimmt_namen_und_hinweise_und_behaelt_das_skelett() {
         &app,
         &admin,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{ils}/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/staff/comms-plan/positions/{ils}/talk-groups/{sg}"),
         Some(json!({"status": "geplant"})),
     )
     .await;
@@ -1358,7 +1358,7 @@ async fn aufgeloeste_einheit_bekommt_keine_lage() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let eh = einheit_bilden(&app, &admin, einsatz, "1. Zug").await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Anna").await;
-    let einheit = format!("/api/einsaetze/{einsatz}/units/{eh}");
+    let einheit = format!("/api/incidents/{einsatz}/units/{eh}");
     let (status, _) = anfrage(
         &app,
         "PUT",

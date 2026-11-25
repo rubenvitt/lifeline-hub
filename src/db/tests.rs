@@ -15129,13 +15129,57 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
     );
 }
 
+/// LLH-2061 (Paket 15 von LLH-1979): Das Präfix `/api/einsaetze` heißt jetzt `/api/incidents`.
+/// Ein offener Antrag eines Spiegels trägt die Vorlage seines Pfads; ohne Umschreiben fände der
+/// Führer sie nicht mehr unter den beantragbaren Erfassungen. Die Migration tauscht nur das Präfix
+/// und lässt fremde Vorlagen stehen, auch eine, die bloß mit denselben Buchstaben beginnt.
+#[tokio::test]
+async fn migration_0374_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 374;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO spiegel_antrag (id, einsatz_id, art, methode, pfad_vorlage, daten, \
+         benutzer_id, erfasst_at, geaendert_at) VALUES \
+         (1, 1, 'eintreffen', 'POST', '/api/einsaetze/{id}/staging-areas/{bid}/arrival', '{}', 1, 'x', 'x'), \
+         (2, 1, 'etb', 'POST', '/api/einsaetze/{id}/etb', '{}', 1, 'x', 'x'), \
+         (3, 1, 'x', 'POST', '/api/einsaetze-alt/{id}', '{}', 1, 'x', 'x'), \
+         (4, 1, 'x', 'POST', '/api/fremd/einsaetze/{id}', '{}', 1, 'x', 'x')",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
+    }
+    migriere_bis(&pool, VERSION).await;
+    let vorlagen: Vec<String> =
+        sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        vorlagen,
+        [
+            "/api/incidents/{id}/staging-areas/{bid}/arrival",
+            "/api/incidents/{id}/etb",
+            "/api/einsaetze-alt/{id}",
+            "/api/fremd/einsaetze/{id}",
+        ]
+    );
+}
+
 /// LLH-1633: Zuordnungstabelle Kennung + Herkunft für Fahrzeuge, Personal und Qualifikationen.
 /// Genau ein Ziel, je Art/Org/Herkunft/Kennung höchstens ein Ziel, je Fahrzeug bzw. Person nur eine
 /// Kennung je Herkunft (Qualifikationen dürfen Aliasse tragen), Löschen des Ziels kaskadiert.
 #[tokio::test]
-async fn migration_0373_stammdaten_kennung() {
+async fn migration_0374_stammdaten_kennung() {
     // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-    const VERSION: i64 = 373;
+    const VERSION: i64 = 374;
     let pool = pool_bis(
         SqliteConnectOptions::new().filename(":memory:"),
         VERSION - 1,

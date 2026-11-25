@@ -121,10 +121,10 @@ test('Betreuungsstelle: aus dem Modul verorten, Marker live auf einer zweiten Ka
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Weserlage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
@@ -203,10 +203,10 @@ test('Evakuierungsbezirk: Fläche mit Räumung, Sprung aus dem Modul, Storno lö
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Räumungslage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
@@ -278,10 +278,10 @@ test('ohne Module Betreuung und Evakuierung: Sperrzeile, Fläche nur mit Typwort
   const NUTZER = `e2e-betreuung-${LAUF}`;
   const NUTZER_PW = 'e2e-betreuung-pw-123';
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Sperrlage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

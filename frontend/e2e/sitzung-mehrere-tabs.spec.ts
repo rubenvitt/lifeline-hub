@@ -88,7 +88,7 @@ async function zweitenBenutzerAnlegen(
 }
 
 async function einsatzAnlegen(ctx: BrowserContext): Promise<number> {
-  const antwort = await ctx.request.post('/api/einsaetze', {
+  const antwort = await ctx.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Tabs ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBeTruthy();
@@ -231,7 +231,7 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
 
   const inhalt = `Aus dem alten Tab ${Date.now()}`;
   const antwort = tab1.waitForResponse(
-    (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/etb`),
+    (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/incidents/${einsatzId}/etb`),
   );
   await etbVonSetzen(tab1);
   await tab1.getByPlaceholder('Inhalt …').fill(inhalt);
@@ -248,7 +248,7 @@ test('(b) gleichzeitige Mutation aus dem veralteten Tab: 412, kein Eintrag, B bl
     data: { benutzername: ADMIN, passwort: ADMIN_PW },
   });
   expect(pl.ok()).toBeTruthy();
-  const etb = (await (await pruefer.request.get(`/api/einsaetze/${einsatzId}/etb`)).json()) as {
+  const etb = (await (await pruefer.request.get(`/api/incidents/${einsatzId}/etb`)).json()) as {
     inhalt: string;
   }[];
   expect(etb.map((e) => e.inhalt)).not.toContain(inhalt);
@@ -276,7 +276,7 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
   const einsatzId = await einsatzAnlegen(ctx);
   // Das Ereignis von außen braucht den stehenden Einsatzstrom, noch als Admin geöffnet.
   const live = tab1.waitForResponse(
-    (r) => pfad(r.request()) === `/api/einsaetze/${einsatzId}/live`,
+    (r) => pfad(r.request()) === `/api/incidents/${einsatzId}/live`,
   );
   await tab1.goto(`/einsaetze/${einsatzId}/etb`);
   await expect(tab1.getByPlaceholder('Inhalt …')).toBeVisible();
@@ -289,7 +289,7 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
   const verweigert = tab1.waitForResponse(
     (r) =>
       r.request().method() === 'GET' &&
-      pfad(r.request()) === `/api/einsaetze/${einsatzId}/etb` &&
+      pfad(r.request()) === `/api/incidents/${einsatzId}/etb` &&
       r.status() === 403,
   );
   const login = await ctx.request.post('/api/auth/login', {
@@ -301,7 +301,7 @@ test('(b2) Lesen aus dem veralteten Tab: 403 unter der fremden Sitzung zeigt den
     data: { benutzername: ADMIN, passwort: ADMIN_PW },
   });
   expect(al.ok()).toBeTruthy();
-  const eintrag = await admin.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const eintrag = await admin.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt: `Von außen ${Date.now()}` },
   });
   expect(eintrag.ok(), `ETB-Eintrag: ${eintrag.status()}`).toBeTruthy();
@@ -365,7 +365,7 @@ test('(c) Sitzungsablauf: Tab 1 zeigt „Sitzung beendet“ über der Seite, die
   await einsatzDialogOeffnen(tab1);
   await tab1.getByLabel('Bezeichnung').fill('nach Ablauf');
   const schreiben = tab1.waitForResponse(
-    (r) => r.request().method() === 'POST' && pfad(r.request()) === '/api/einsaetze',
+    (r) => r.request().method() === 'POST' && pfad(r.request()) === '/api/incidents',
   );
   await tab1.getByRole('button', { name: 'Anlegen', exact: true }).click();
   expect((await schreiben).status()).toBe(401);

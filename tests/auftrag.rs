@@ -33,7 +33,7 @@ async fn anlegen_erzeugt_auftrag_und_etb_anordnung() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("Deich sichern", "Abschnitt Nord")),
     )
@@ -49,7 +49,7 @@ async fn anlegen_erzeugt_auftrag_und_etb_anordnung() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -75,7 +75,7 @@ async fn anlegen_ohne_empfaenger_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(body),
     )
@@ -91,7 +91,7 @@ async fn anlegen_ohne_text_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("   ", "EA1")),
     )
@@ -107,7 +107,7 @@ async fn liste_zeigt_angelegte_auftraege() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("A", "EA1")),
     )
@@ -115,7 +115,7 @@ async fn liste_zeigt_angelegte_auftraege() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         None,
     )
@@ -137,7 +137,7 @@ async fn fremder_empfaenger_abschnitt_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -153,7 +153,7 @@ async fn quittieren_aendert_quittung_nicht_vollzug() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -164,7 +164,7 @@ async fn quittieren_aendert_quittung_nicht_vollzug() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
         &admin,
         None,
     )
@@ -183,7 +183,7 @@ async fn vollzug_melden_erzeugt_etb_meldung_und_setzt_status() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -194,7 +194,7 @@ async fn vollzug_melden_erzeugt_etb_meldung_und_setzt_status() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &admin,
         Some(body),
     )
@@ -206,7 +206,7 @@ async fn vollzug_melden_erzeugt_etb_meldung_und_setzt_status() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -229,7 +229,7 @@ async fn abnehmen_vor_vollzug_ist_422() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -238,7 +238,7 @@ async fn abnehmen_vor_vollzug_ist_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/accept"),
+        &format!("/api/incidents/{e}/tasks/{aid}/accept"),
         &admin,
         None,
     )
@@ -255,7 +255,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -272,7 +272,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &erika_c,
         None,
     )
@@ -283,7 +283,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &erika_c,
         Some(&body_mit_funktion("Y", "EA2")),
     )
@@ -294,7 +294,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
         &erika_c,
         None,
     )
@@ -305,7 +305,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &erika_c,
         Some(r#"{"status":"in_arbeit"}"#),
     )
@@ -316,7 +316,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/accept"),
+        &format!("/api/incidents/{e}/tasks/{aid}/accept"),
         &erika_c,
         None,
     )
@@ -333,7 +333,7 @@ async fn cross_einsatz_abnehmen_ist_404() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a_einsatz}/tasks"),
+        &format!("/api/incidents/{a_einsatz}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -343,7 +343,7 @@ async fn cross_einsatz_abnehmen_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b_einsatz}/tasks/{aid_a}/accept"),
+        &format!("/api/incidents/{b_einsatz}/tasks/{aid_a}/accept"),
         &admin,
         None,
     )
@@ -359,7 +359,7 @@ async fn status_filter_trennt_offen_und_vollzogen() {
     let (_, a1) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("A", "EA1")),
     )
@@ -368,7 +368,7 @@ async fn status_filter_trennt_offen_und_vollzogen() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("B", "EA2")),
     )
@@ -378,7 +378,7 @@ async fn status_filter_trennt_offen_und_vollzogen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid1}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid1}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"x"}"#),
     )
@@ -388,7 +388,7 @@ async fn status_filter_trennt_offen_und_vollzogen() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks?status=vollzogen"),
+        &format!("/api/incidents/{e}/tasks?status=vollzogen"),
         &admin,
         None,
     )
@@ -401,7 +401,7 @@ async fn status_filter_trennt_offen_und_vollzogen() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks?status=offen"),
+        &format!("/api/incidents/{e}/tasks?status=offen"),
         &admin,
         None,
     )
@@ -420,7 +420,7 @@ async fn vollzug_in_arbeit_setzt_status() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -429,7 +429,7 @@ async fn vollzug_in_arbeit_setzt_status() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &admin,
         Some(r#"{"status":"in_arbeit"}"#),
     )
@@ -446,7 +446,7 @@ async fn vollzogen_ohne_meldung_ist_400() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -455,7 +455,7 @@ async fn vollzogen_ohne_meldung_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen"}"#),
     )
@@ -471,7 +471,7 @@ async fn ungueltiger_vollzug_status_ist_400() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -480,7 +480,7 @@ async fn ungueltiger_vollzug_status_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &admin,
         Some(r#"{"status":"quatsch","vollzugsmeldung":"x"}"#),
     )
@@ -496,7 +496,7 @@ async fn abnehmen_nach_vollzug_ist_erfolgreich() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
@@ -505,7 +505,7 @@ async fn abnehmen_nach_vollzug_ist_erfolgreich() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+        &format!("/api/incidents/{e}/tasks/{aid}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"fertig"}"#),
     )
@@ -514,7 +514,7 @@ async fn abnehmen_nach_vollzug_ist_erfolgreich() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/accept"),
+        &format!("/api/incidents/{e}/tasks/{aid}/accept"),
         &admin,
         None,
     )
@@ -538,7 +538,7 @@ async fn anlegen_mit_externem_adressat_und_richtung_extern() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -563,7 +563,7 @@ async fn extern_ohne_bezeichnung_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -583,7 +583,7 @@ async fn extern_ungueltige_kategorie_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -603,7 +603,7 @@ async fn extern_plus_zweites_ziel_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -619,7 +619,7 @@ async fn richtung_filter_trennt_intern_extern() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("intern-auftrag", "EA")),
     )
@@ -631,7 +631,7 @@ async fn richtung_filter_trennt_intern_extern() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&extern_body),
     )
@@ -640,7 +640,7 @@ async fn richtung_filter_trennt_intern_extern() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks?richtung=extern"),
+        &format!("/api/incidents/{e}/tasks?richtung=extern"),
         &admin,
         None,
     )
@@ -653,7 +653,7 @@ async fn richtung_filter_trennt_intern_extern() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks?richtung=quatsch"),
+        &format!("/api/incidents/{e}/tasks?richtung=quatsch"),
         &admin,
         None,
     )
@@ -672,7 +672,7 @@ async fn auftrag_default_quittierfrist_aus_einstellungen() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )
@@ -687,7 +687,7 @@ async fn auftrag_default_quittierfrist_aus_einstellungen() {
     let (status, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -705,7 +705,7 @@ async fn auftrag_ohne_setting_keine_frist() {
     let (status, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA")),
     )
@@ -722,7 +722,7 @@ async fn auftrag_explizite_frist_schlaegt_default() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )
@@ -737,7 +737,7 @@ async fn auftrag_explizite_frist_schlaegt_default() {
     let (status, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -756,7 +756,7 @@ async fn auto_etb_aus_unterdrueckt_anordnung_am_http_rand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -766,7 +766,7 @@ async fn auto_etb_aus_unterdrueckt_anordnung_am_http_rand() {
     let (status, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA")),
     )
@@ -780,7 +780,7 @@ async fn auto_etb_aus_unterdrueckt_anordnung_am_http_rand() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -805,7 +805,7 @@ async fn anlegen_mit_frist_legt_auftrag_frist_erinnerung_an() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -836,7 +836,7 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -854,7 +854,7 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
     let (s1, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{auftrag_id}/recipients/{empf0}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{auftrag_id}/recipients/{empf0}/acknowledge"),
         &admin,
         None,
     )
@@ -870,7 +870,7 @@ async fn quittieren_schliesst_frist_erinnerung_erst_beim_letzten_empfaenger() {
     let (s2, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{auftrag_id}/recipients/{empf1}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{auftrag_id}/recipients/{empf1}/acknowledge"),
         &admin,
         None,
     )
@@ -904,7 +904,7 @@ async fn frist_erinnerung_schliesst_erst_beim_fuenften_von_fuenf_empfaengern() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -927,7 +927,7 @@ async fn frist_erinnerung_schliesst_erst_beim_fuenften_von_fuenf_empfaengern() {
         let (s, d) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/tasks/{auftrag_id}/recipients/{empf}/acknowledge"),
+            &format!("/api/incidents/{e}/tasks/{auftrag_id}/recipients/{empf}/acknowledge"),
             &admin,
             None,
         )
@@ -958,13 +958,13 @@ async fn vollzug_offen_nimmt_in_arbeit_zurueck_und_ist_sonst_422() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body_mit_funktion("X", "EA1")),
     )
     .await;
     let aid = a["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{e}/tasks/{aid}/execution");
+    let pfad = format!("/api/incidents/{e}/tasks/{aid}/execution");
 
     // Aus `offen` heraus ist die Rücknahme ein No-op, der wie Erfolg aussähe → 422.
     let (leerlauf, _) = anfrage(&app, "POST", &pfad, &admin, Some(r#"{"status":"offen"}"#)).await;
@@ -1008,7 +1008,7 @@ async fn zeitpunkte_ausserhalb_des_jahresbereichs_sind_400() {
     let (s, j) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auftrag_quittierung_frist_min":60}"#),
     )
@@ -1028,7 +1028,7 @@ async fn zeitpunkte_ausserhalb_des_jahresbereichs_sind_400() {
         let (s, j) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/tasks"),
+            &format!("/api/incidents/{e}/tasks"),
             &admin,
             Some(&body.to_string()),
         )
@@ -1054,7 +1054,7 @@ async fn weg_wird_getrimmt_gespeichert_und_gelesen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&body),
     )
@@ -1066,7 +1066,7 @@ async fn weg_wird_getrimmt_gespeichert_und_gelesen() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -1076,7 +1076,7 @@ async fn weg_wird_getrimmt_gespeichert_und_gelesen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         None,
     )
@@ -1092,7 +1092,7 @@ async fn weg_wird_getrimmt_gespeichert_und_gelesen() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&leer),
     )

@@ -23,7 +23,7 @@ async function anmelden(page: Page) {
 }
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok()).toBeTruthy();
   return (await antwort.json()).id as number;
 }
@@ -57,12 +57,12 @@ test('LFH-734: im Einsatz verliert der Switcher einen anderswo abgeschlossenen E
   const dort = `E2E Org-live dort ${jetzt}`;
   const hierId = await einsatzAnlegen(page, hier);
   const dortId = await einsatzAnlegen(page, dort);
-  await oeffnenMitStrom(page, ueberblickPfad(hierId), `/api/einsaetze/${hierId}/live`);
+  await oeffnenMitStrom(page, ueberblickPfad(hierId), `/api/incidents/${hierId}/live`);
 
   await page.locator(`button[title="${hier}"]`).click();
   await expect(page.getByRole('menuitem', { name: dort })).toBeVisible();
 
-  const abschluss = await page.request.post(`/api/einsaetze/${dortId}/close`);
+  const abschluss = await page.request.post(`/api/incidents/${dortId}/close`);
   expect(abschluss.ok()).toBeTruthy();
 
   await expect(page.getByRole('menuitem', { name: dort })).toHaveCount(0);

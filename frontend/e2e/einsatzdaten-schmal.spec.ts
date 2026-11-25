@@ -23,7 +23,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 const BREITE = 390;
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Einsatzdaten schmal ${Date.now()}` },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();

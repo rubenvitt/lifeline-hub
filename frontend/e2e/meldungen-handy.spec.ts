@@ -31,17 +31,17 @@ const WORTLAUT =
   'Nächste Meldung in 30 Minuten oder sofort bei Veränderung.';
 
 async function einsatzMitMeldungen(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Meldungen Handy ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   const einsatzId = String(((await r.json()) as { id: number }).id);
   // Die erste Karte trägt den vollen Kopf: Priorität Sofort, Bestätigung offen.
   for (const [inhalt, prioritaet, pflicht] of [
     [WORTLAUT, 'sofort', true],
     ['Lage ruhig, keine Veränderung', 'normal', false],
   ] as const) {
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+    const angelegt = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
       data: {
         absender: 'Florian Nord 1',
         empfaenger: 'ELW 1',

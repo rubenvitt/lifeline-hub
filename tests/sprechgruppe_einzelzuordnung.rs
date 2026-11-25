@@ -28,7 +28,7 @@ async fn lokale_sprechgruppe(
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": bezeichnung, "betriebsart": betriebsart})),
     )
@@ -41,7 +41,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -54,7 +54,7 @@ async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, body: Value) -> 
     let (status, plan) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions"),
+        &format!("/api/incidents/{einsatz}/staff/comms-plan/positions"),
         cookie,
         Some(&body),
     )
@@ -79,7 +79,7 @@ enum Ziel {
 
 impl Ziel {
     fn pfad(self, einsatz: i64, sg: i64) -> String {
-        let b = format!("/api/einsaetze/{einsatz}");
+        let b = format!("/api/incidents/{einsatz}");
         match self {
             Ziel::Abschnitt(id) => format!("{b}/sectors/{id}/talk-groups/{sg}"),
             Ziel::Einheit(id) => format!("{b}/units/{id}/talk-groups/{sg}"),
@@ -108,7 +108,7 @@ impl Ziel {
 
     /// Die zugeordneten Sprechgruppen-Bezeichnungen, gelesen über den Datensatz.
     async fn namen(self, app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<String> {
-        let b = format!("/api/einsaetze/{einsatz}");
+        let b = format!("/api/incidents/{einsatz}");
         let liste: Vec<Value> = match self {
             Ziel::Abschnitt(id) | Ziel::Einheit(id) => {
                 let pfad = match self {
@@ -282,7 +282,7 @@ async fn gleiches_live_und_etb_ausser_an_der_stelle() {
         "je zwei Einträge an Abschnitt, Einheit und Führungsstelle"
     );
     // Der PATCH mit derselben Wirkung schreibt ebenfalls nichts ins ETB.
-    let b = format!("/api/einsaetze/{}", a.einsatz);
+    let b = format!("/api/incidents/{}", a.einsatz);
     let mut rx = a.live.abonniere(a.einsatz);
     let ids = json!({"sprechgruppe_ids": [a.tmo311]});
     if let Ziel::Abschnitt(id) = a.ziele[0] {
@@ -374,7 +374,7 @@ async fn etb_je_wirksamer_aenderung_an_abschnitt_einheit_und_fuehrungsstelle() {
 #[tokio::test]
 async fn etb_nennt_die_bezeichnung_der_fuehrungsstelle() {
     let a = aufbau().await;
-    let b = format!("/api/einsaetze/{}", a.einsatz);
+    let b = format!("/api/incidents/{}", a.einsatz);
     let (status, json) = anfrage_json(
         &a.app,
         "PATCH",
@@ -540,7 +540,7 @@ async fn recht_auf_stab_nicht_auf_einheiten() {
     let (status, _) = anfrage(
         &a.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/einheiten", a.einsatz),
+        &format!("/api/incidents/{}/module-overrides/einheiten", a.einsatz),
         &a.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -584,7 +584,7 @@ async fn stelle_status_und_funktion_ohne_sprechgruppe() {
     )
     .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
-    let plan_pfad = format!("/api/einsaetze/{}/staff/comms-plan", a.einsatz);
+    let plan_pfad = format!("/api/incidents/{}/staff/comms-plan", a.einsatz);
     let (_, plan) = anfrage(&a.app, "GET", &plan_pfad, &a.admin, None).await;
     let kanal = &plan[0]["sprechgruppen"][0];
     assert_eq!(kanal["status"], "geplant");
@@ -651,7 +651,7 @@ async fn stelle_mit_kanal_entfernen_nimmt_die_zuordnung_mit() {
         &a.app,
         "DELETE",
         &format!(
-            "/api/einsaetze/{}/staff/comms-plan/positions/{ils}",
+            "/api/incidents/{}/staff/comms-plan/positions/{ils}",
             a.einsatz
         ),
         &a.admin,

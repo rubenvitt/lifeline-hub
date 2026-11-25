@@ -18,7 +18,7 @@ async fn patchen(
     anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         Some(&body),
     )
@@ -29,7 +29,7 @@ async fn lesen(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
@@ -242,7 +242,7 @@ async fn geraet(app: &axum::Router, admin: &str, einsatz: i64, body: Value) -> S
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         admin,
         Some(&body),
     )
@@ -273,7 +273,7 @@ async fn geraet_bekommt_keine_vermerke() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/units/{eid}"),
+        &format!("/api/incidents/{einsatz}/units/{eid}"),
         &admin,
         Some(&json!({"funkrufname": "Florian 1"})),
     )
@@ -282,7 +282,7 @@ async fn geraet_bekommt_keine_vermerke() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/command-post"),
+        &format!("/api/incidents/{einsatz}/command-post"),
         &admin,
         Some(&json!({"rufname": "Florian 10"})),
     )
@@ -299,9 +299,9 @@ async fn geraet_bekommt_keine_vermerke() {
     for body in geraete {
         let cookie = geraet(&app, &admin, einsatz, body).await;
         for pfad in [
-            format!("/api/einsaetze/{einsatz}"),
-            format!("/api/einsaetze/{einsatz}/command-post"),
-            format!("/api/einsaetze/{einsatz}/units"),
+            format!("/api/incidents/{einsatz}"),
+            format!("/api/incidents/{einsatz}/command-post"),
+            format!("/api/incidents/{einsatz}/units"),
         ] {
             let (s, j) = anfrage(&app, "GET", &pfad, &cookie, None).await;
             if s != StatusCode::OK {

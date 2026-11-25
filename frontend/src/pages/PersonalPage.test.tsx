@@ -77,15 +77,15 @@ function render(
 ) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatzObj)),
     // Aktive und entlassene Kräfte teilen den Pfad (LLH-1079, `?entlassene=1`).
-    http.get('/api/einsaetze/7/personnel', ({ request }) =>
+    http.get('/api/incidents/7/personnel', ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : personalDaten,
       ),
     ),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheitenDaten)),
-    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+    http.get('/api/incidents/7/units', () => HttpResponse.json(einheitenDaten)),
+    http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -271,7 +271,7 @@ describe('PersonalPage', () => {
     setzeViewportBreite(1440);
     let patchBody: unknown = 'NICHT_AUFGERUFEN';
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async ({ request }) => {
+      http.patch('/api/incidents/7/personnel/10', async ({ request }) => {
         patchBody = await request.json();
         return HttpResponse.json({ ...disponiert[0], einsatzfunktion: 'Notfallsanitäter' });
       }),
@@ -279,7 +279,7 @@ describe('PersonalPage', () => {
     render(einsatz());
     // Nach dem Speichern liefert die Liste den neuen Stand.
     server.use(
-      http.get('/api/einsaetze/7/personnel', ({ request }) =>
+      http.get('/api/incidents/7/personnel', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('entlassene')
             ? []
@@ -324,7 +324,7 @@ describe('PersonalPage', () => {
       freigeben = resolve;
     });
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async () => {
+      http.patch('/api/incidents/7/personnel/10', async () => {
         await gate;
         return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
       }),
@@ -357,7 +357,7 @@ describe('PersonalPage', () => {
       refetchFreigeben = resolve;
     });
     server.use(
-      http.get('/api/einsaetze/7/personnel', async () => {
+      http.get('/api/incidents/7/personnel', async () => {
         await refetchGate;
         return HttpResponse.json([{ ...disponiert[0], name: 'Extern geändert' }, zweitePerson]);
       }),
@@ -386,10 +386,10 @@ describe('PersonalPage', () => {
   it('hebt per ?personal=<id> die Zeile hervor (LFH-25 Inspector-Deeplink)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
-      http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json(disponiert)),
+      http.get('/api/incidents/7/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
       http.get('/api/personnel-statuses', () =>
         HttpResponse.json([
           { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -413,10 +413,10 @@ describe('PersonalPage', () => {
   it('?personal=<id> einer Kraft, die nicht in der Liste steht, zeigt den Hinweis', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
-      http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json(disponiert)),
+      http.get('/api/incidents/7/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
       http.get('/api/personnel-statuses', () => HttpResponse.json([])),
       http.get('/api/personnel', () => HttpResponse.json([])),
     );
@@ -470,7 +470,7 @@ describe('PersonalPage', () => {
   it('?personal=<id> bei gescheiterter Liste der Entlassenen bleibt still statt eines Hinweises', async () => {
     render(einsatz(), disponiert, [], einheiten, '/einsaetze/7/personal?personal=11');
     server.use(
-      http.get('/api/einsaetze/7/personnel', ({ request }) =>
+      http.get('/api/incidents/7/personnel', ({ request }) =>
         new URL(request.url).searchParams.has('entlassene')
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
           : HttpResponse.json(disponiert),
@@ -499,10 +499,10 @@ describe('PersonalPage', () => {
     try {
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-        http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
-        http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
-        http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+        http.get('/api/incidents/7/personnel', () => HttpResponse.json(disponiert)),
+        http.get('/api/incidents/7/units', () => HttpResponse.json(einheiten)),
+        http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
         http.get('/api/personnel-statuses', () =>
           HttpResponse.json([
             { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -561,7 +561,7 @@ describe('PersonalPage', () => {
   it('zeigt Entlassene eingeklappt unter der Liste, verlinkt sie und disponiert sie erneut', async () => {
     let reaktiviert: number | null = null;
     server.use(
-      http.post('/api/einsaetze/7/personnel/:ep/reactivate', ({ params }) => {
+      http.post('/api/incidents/7/personnel/:ep/reactivate', ({ params }) => {
         reaktiviert = Number(params.ep);
         return HttpResponse.json(disponiert[0]);
       }),
@@ -643,7 +643,7 @@ describe('PersonalPage', () => {
     // und das Backend behält den Altwert.
     let patchBody: unknown = 'NICHT_AUFGERUFEN';
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async ({ request }) => {
+      http.patch('/api/incidents/7/personnel/10', async ({ request }) => {
         patchBody = await request.json();
         return HttpResponse.json({ ...disponiert[0], staerke_position: null });
       }),
@@ -686,7 +686,7 @@ describe('PersonalPage', () => {
     const koerper: Record<string, unknown>[] = [];
     let stand = { ...disponiert[0] };
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async ({ request }) => {
+      http.patch('/api/incidents/7/personnel/10', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         koerper.push(body);
         const erwartet = body.erwartet as { staerke_position?: string | null } | undefined;
@@ -704,7 +704,7 @@ describe('PersonalPage', () => {
     );
     // Ein anderer Arbeitsplatz stellt inzwischen auf Unterführer.
     stand = { ...stand, staerke_position: 'unterfuehrer' };
-    server.use(http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([stand])));
+    server.use(http.get('/api/incidents/7/personnel', () => HttpResponse.json([stand])));
     await waehle('Position zu Thomas Müller', 'Mannschaft');
     await userEvent.click(
       screen.getByRole('button', { name: 'Position zu Thomas Müller speichern' }),
@@ -726,7 +726,7 @@ describe('PersonalPage', () => {
   it('ordnet eine Person in der Zeile einer Einheit zu: PUT erst nach „Speichern“', async () => {
     const aufrufe: string[] = [];
     server.use(
-      http.put('/api/einsaetze/7/units/:eid/personnel/:ep', ({ params }) => {
+      http.put('/api/incidents/7/units/:eid/personnel/:ep', ({ params }) => {
         aufrufe.push(`PUT ${params.eid}/${params.ep}`);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -744,11 +744,11 @@ describe('PersonalPage', () => {
   it('Escape verwirft eine gewählte Einheit ohne Schreiben', async () => {
     let gesendet = 0;
     server.use(
-      http.put('/api/einsaetze/7/units/:eid/personnel/:ep', () => {
+      http.put('/api/incidents/7/units/:eid/personnel/:ep', () => {
         gesendet += 1;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.delete('/api/einsaetze/7/units/:eid/personnel/:ep', () => {
+      http.delete('/api/incidents/7/units/:eid/personnel/:ep', () => {
         gesendet += 1;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -770,7 +770,7 @@ describe('PersonalPage', () => {
     render(einsatz(), [{ ...disponiert[0], fahrzeug_id: null }]);
     // Nach `render`: dessen Grundhandler gingen sonst vor.
     server.use(
-      http.get('/api/einsaetze/7/vehicles', () =>
+      http.get('/api/incidents/7/vehicles', () =>
         HttpResponse.json([
           { ...fahrzeuge[0], id: 9, funkrufname: 'Akkon 2', einheit_id: null },
           ...fahrzeuge,
@@ -798,7 +798,7 @@ describe('PersonalPage', () => {
     // Den Abruf selbst prüft die Personenansicht: die Verdichtungszeile über der Liste liest die
     // Fahrzeuge für ihre eigenen Zahlen (Bestand, LFH-973).
     server.use(
-      http.get('/api/einsaetze/7/module-access', () =>
+      http.get('/api/incidents/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -817,7 +817,7 @@ describe('PersonalPage', () => {
 
   it('ohne Freigabe des Moduls Einheiten: keine Spalte „Einheit“ und keine Gruppen', async () => {
     server.use(
-      http.get('/api/einsaetze/7/module-access', () =>
+      http.get('/api/incidents/7/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -877,7 +877,7 @@ describe('PersonalPage', () => {
     const koerper: Record<string, unknown>[] = [];
     let stand = { ...disponiert[0], bemerkung: 'Tor 3' };
     server.use(
-      http.patch('/api/einsaetze/7/personnel/10', async ({ request }) => {
+      http.patch('/api/incidents/7/personnel/10', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         koerper.push(body);
         return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
@@ -890,7 +890,7 @@ describe('PersonalPage', () => {
       screen.getByRole('button', { name: 'Bemerkung zu Thomas Müller bearbeiten' }),
     );
     stand = { ...stand, bemerkung: 'Tor 5' };
-    server.use(http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([stand])));
+    server.use(http.get('/api/incidents/7/personnel', () => HttpResponse.json([stand])));
     const feld = screen.getByRole('textbox');
     await userEvent.clear(feld);
     await userEvent.type(feld, 'Halle 2');
@@ -966,7 +966,7 @@ describe('PersonalPage', () => {
       { ...epOhne, id: 12, einheit_id: 5 },
     ]);
     server.use(
-      http.get('/api/einsaetze/7/units', () =>
+      http.get('/api/incidents/7/units', () =>
         HttpResponse.json([
           { ...einheiten[0], id: 4, name: 'Staffel A', ueber_einheit_id: 5 },
           { ...einheiten[0], id: 5, name: 'Zug 1' },
@@ -1100,10 +1100,10 @@ function zelleNachKopf(container: HTMLElement, zeile: HTMLElement, kopf: string)
 describe('PersonalPage · Datenzustände', () => {
   const gruenerBoden = () => [
     meHandler(admin),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-    http.get('/api/einsaetze/7/personnel', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+    http.get('/api/incidents/7/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/units', () => HttpResponse.json(einheiten)),
+    http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
     http.get('/api/personnel-statuses', () =>
       HttpResponse.json([
         { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -1124,7 +1124,7 @@ describe('PersonalPage · Datenzustände', () => {
   }
 
   it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
-    zeige(http.get('/api/einsaetze/7/personnel', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/7/personnel', () => new HttpResponse(null, { status: 500 })));
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch kein Personal disponiert')).not.toBeInTheDocument();
   });
@@ -1145,12 +1145,12 @@ describe('PersonalPage · Datenzustände', () => {
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     const { client } = zeige(
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(disponiert)),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json(disponiert)),
     );
     await screen.findByText('Thomas Müller');
 
     server.use(
-      http.get('/api/einsaetze/7/personnel', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/7/personnel', () => new HttpResponse(null, { status: 500 })),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.personal(7) });
 
@@ -1217,7 +1217,7 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     render(einsatz());
     server.use(
-      http.post('/api/einsaetze/7/personnel', async ({ request }) => {
+      http.post('/api/incidents/7/personnel', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...disponiert[0], id: 99 });
       }),
@@ -1312,7 +1312,7 @@ describe('PersonalPage — Ad-hoc-Schnellerfassung', () => {
     // Ohne `mutateAsync` leerte die Hülle die Felder, obwohl nichts ankam.
     render(einsatz());
     server.use(
-      http.post('/api/einsaetze/7/personnel', () =>
+      http.post('/api/incidents/7/personnel', () =>
         HttpResponse.json({ error: 'Name bereits disponiert' }, { status: 409 }),
       ),
     );
@@ -1366,7 +1366,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
       .slice(0, 19)
       .replace('T', ' ');
     server.use(
-      http.get('/api/einsaetze/7/personnel/timeline', () =>
+      http.get('/api/incidents/7/personnel/timeline', () =>
         HttpResponse.json([
           { personal_id: 10, perioden: [{ beginn_at: beginn, anker: 'alarmierung' }] },
         ]),
@@ -1402,7 +1402,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
       { beginn_at: vor(60), anker: 'alarmierung' },
     ];
     server.use(
-      http.get('/api/einsaetze/7/personnel/timeline', () =>
+      http.get('/api/incidents/7/personnel/timeline', () =>
         HttpResponse.json([{ personal_id: 10, perioden }]),
       ),
     );
@@ -1430,7 +1430,7 @@ describe('PersonalPage — Kräfte-Zeitachse (LFH-552)', () => {
       },
     ];
     server.use(
-      http.get('/api/einsaetze/7/personnel/timeline', () =>
+      http.get('/api/incidents/7/personnel/timeline', () =>
         HttpResponse.json([{ personal_id: 10, perioden }]),
       ),
     );
@@ -1469,10 +1469,10 @@ describe('PersonalPage · Demo-Marke', () => {
   function zeige(eps: unknown[], pool: ReturnType<typeof stamm>[]) {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz())),
-      http.get('/api/einsaetze/7/personnel', () => HttpResponse.json(eps)),
-      http.get('/api/einsaetze/7/units', () => HttpResponse.json(einheiten)),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json(fahrzeuge)),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz())),
+      http.get('/api/incidents/7/personnel', () => HttpResponse.json(eps)),
+      http.get('/api/incidents/7/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json(fahrzeuge)),
       http.get('/api/personnel-statuses', () =>
         HttpResponse.json([
           { id: 2, label: 'alarmiert', kategorie: 'gebunden', farbe: null, sortier: 20 },
@@ -1491,7 +1491,7 @@ describe('PersonalPage · Demo-Marke', () => {
   it('Auswahl: echte Personen vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/7/personnel/bulk', async ({ request }) => {
+      http.post('/api/incidents/7/personnel/bulk', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([{ ...disponiert[0], id: 30, personal_id: 2, ist_demo: true }], {
           status: 201,

@@ -1,4 +1,4 @@
-//! `PATCH /api/einsaetze/{id}/reports/{mid}` — eine Meldung nachträglich korrigieren (LLH-1066,
+//! `PATCH /api/incidents/{id}/reports/{mid}` — eine Meldung nachträglich korrigieren (LLH-1066,
 //! Spec `meldungseingang`). Eigene Datei neben `routes/meldung.rs`: die Prüfung der Felder steht
 //! hier, das Schreiben in [`crate::meldung::korrektur`].
 use crate::app::AppState;
@@ -121,7 +121,7 @@ impl MeldungAenderung {
     }
 }
 
-/// PATCH /api/einsaetze/{id}/reports/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger,
+/// PATCH /api/incidents/{id}/reports/{mid} — Art, Priorität, Richtung, Von-Bezug, Empfänger,
 /// Empfängerfunktion und Lage-Angaben korrigieren (Erfassungsrecht, Freigabe Meldungen,
 /// aktiver Einsatz). Fremde Meldung 404. Gekoppelte Geräte erreichen die Route nicht (keine
 /// Routenliste, D10). Antwortet mit dem Stand; ohne wirksame Änderung ohne ETB-Eintrag und ohne
