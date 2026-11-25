@@ -14,6 +14,7 @@ final class LinkTests: XCTestCase {
     private var geoeffnet: [URL] = []
     private var gemeldet: [Ablauf.Event] = []
     private var geteilt: [URL] = []
+    private var kalender: [IcsTermin] = []
     private var halter: [AnyObject] = []
 
     /// Der erste Webview-Test fing sonst den Kaltstart von WebKit ab (`WebkitVorlauf`).
@@ -83,6 +84,41 @@ final class LinkTests: XCTestCase {
         XCTAssertTrue(datei.path.hasPrefix(Downloads.basis.path))
     }
 
+    /// „In Kalender übernehmen“ (LLH-2127): eine Kalenderdatei mit einem Termin geht an den Dialog
+    /// „Neues Ereignis“, nicht ins Teilen-Blatt.
+    func testEineKalenderdateiOeffnetDenDialogNeuesEreignis() async throws {
+        let web = try await lade("<p>Termin</p>")
+        _ = try await web.evaluateJavaScript("""
+            const ics = 'BEGIN:VCALENDAR\\r\\nBEGIN:VEVENT\\r\\nDTSTART:20261124T143000Z\\r\\n'
+              + 'DTEND:20261124T150000Z\\r\\nSUMMARY:Lagebesprechung\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+            a.download = 'lagebesprechung.ics';
+            document.body.appendChild(a);
+            a.click(); 0
+            """)
+        await warte(sekunden: 30) { !self.kalender.isEmpty || !self.geteilt.isEmpty }
+        XCTAssertEqual(kalender.map(\.titel), ["Lagebesprechung"], "geteilt: \(geteilt)")
+        XCTAssertEqual(geteilt, [])
+    }
+
+    /// Eine Kalenderdatei, die der Kern nicht liest (hier eine Serie), bleibt beim Teilen-Blatt.
+    func testEineSerieImKalenderformatLandetImTeilenBlatt() async throws {
+        let web = try await lade("<p>Termin</p>")
+        _ = try await web.evaluateJavaScript("""
+            const ics = 'BEGIN:VCALENDAR\\r\\nBEGIN:VEVENT\\r\\nDTSTART:20261124T143000Z\\r\\n'
+              + 'RRULE:FREQ=WEEKLY\\r\\nEND:VEVENT\\r\\nEND:VCALENDAR\\r\\n';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+            a.download = 'serie.ics';
+            document.body.appendChild(a);
+            a.click(); 0
+            """)
+        await warte(sekunden: 30) { !self.kalender.isEmpty || !self.geteilt.isEmpty }
+        XCTAssertEqual(geteilt.map(\.lastPathComponent), ["serie.ics"])
+        XCTAssertEqual(kalender, [])
+    }
+
     // MARK: Hilfen
 
     private func lade(_ html: String, server: ServerAdresse? = nil) async throws -> WKWebView {
@@ -90,7 +126,9 @@ final class LinkTests: XCTestCase {
         let begleiter = Navigationsbegleiter(
             aktiverServer: { adresse },
             oeffne: { [weak self] url in self?.geoeffnet.append(url) },
-            downloads: Downloads(zeige: { [weak self] datei, _ in self?.geteilt.append(datei) })
+            downloads: Downloads(
+                zeige: { [weak self] datei, _ in self?.geteilt.append(datei) },
+                zeigeKalender: { [weak self] termin, _, _ in self?.kalender.append(termin) })
         ) { [weak self] _, event in self?.gemeldet.append(event) }
         var liste = Serverliste()
         let web = Webviewfabrik.make(
