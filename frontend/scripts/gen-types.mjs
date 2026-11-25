@@ -1,5 +1,5 @@
 /**
- * Typ-Codegen (LLH-2141, ADR-0105): schreibt `src/api/types.generated.ts` aus `src/api/openapi.json`.
+ * Typ-Codegen (LLH-2141, ADR-0106): schreibt `src/api/types.generated.ts` aus `src/api/openapi.json`.
  *
  * Löst openapi-typescript 7.13 ab, das die Compiler-API von TypeScript 6 brauchte. Die Ausgabe
  * ahmt dessen Form nach (Regeln aus `transform/schema-object` und `lib/ts` von 7.13, Optionen wie

@@ -1,5 +1,5 @@
 ---
-id: ADR-0105
+id: ADR-0106
 titel: Antworttypen kommen per eigenem Generator ohne TS-Compiler-API aus dem Rust-Code
 status: akzeptiert
 datum: 2026-11-25
@@ -16,7 +16,7 @@ herleitung:
   - docs/superpowers/plans/2026-07-08-lfh120-typ-codegen.md
 ---
 
-# ADR-0105: Antworttypen kommen per eigenem Generator ohne TS-Compiler-API aus dem Rust-Code
+# ADR-0106: Antworttypen kommen per eigenem Generator ohne TS-Compiler-API aus dem Rust-Code
 
 ## Regeln
 

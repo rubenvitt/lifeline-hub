@@ -66,7 +66,7 @@ beide Seiten Name für Name.
 Response-Typen entstehen aus dem Rust-Code: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 `frontend/src/api/openapi.json` → `frontend/scripts/gen-types.mjs` → `frontend/src/api/types.generated.ts`
 (Skript `gen:types` in `frontend/package.json`; eigener Generator ohne Abhängigkeiten und ohne
-TS-Compiler-API, [ADR-0105](entscheidungen/ADR-0105-frontend-typen-kommen-aus-einem-eigenen-generator-ohne-ts-compiler-api.md)). Ablauf, Wire-Enums und handgepflegte Reste
+TS-Compiler-API, [ADR-0106](entscheidungen/ADR-0106-frontend-typen-kommen-aus-einem-eigenen-generator-ohne-ts-compiler-api.md)). Ablauf, Wire-Enums und handgepflegte Reste
 regelt [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“. Drift fängt
 `scripts/check-typ-codegen.sh` (Schritt 3 des Sammel-Gates) mit `tests/openapi_spec_aktuell.rs`;
 die Wire-Werte der Enums hält `tests/enum_wire_kontrakt.rs` fest.

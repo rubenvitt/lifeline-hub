@@ -74,12 +74,12 @@ Abgedeckt durch den Byte-Vergleich in Task 1 (Fälle 1–4) und den Abbruchtest 
 ### Task 3: ADR und Doku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0105-frontend-typen-kommen-aus-eigenem-generator.md`
+- Create: `docs/architektur/entscheidungen/ADR-0106-frontend-typen-kommen-aus-eigenem-generator.md`
   (nächste freie Nummer auf `origin/alpha` vorher prüfen), `ersetzt: ADR-0004`, übernimmt deren
   Regeln mit `frontend/scripts/gen-types.mjs` statt `openapi-typescript`; Prüfung verlangt
   `"gen:types": "node scripts/gen-types.mjs` und verbietet `openapi-typescript` und
   `@typescript/typescript6` in `frontend/package.json`.
-- Modify: `ADR-0004-…` (`status: ersetzt`, `ersetzt_durch: ADR-0105`),
+- Modify: `ADR-0004-…` (`status: ersetzt`, `ersetzt_durch: ADR-0106`),
   `docs/architektur/08-querschnittliche-konzepte.md:67-69`, `docs/architektur/02-randbedingungen.md:22`,
   `docs/architektur/11-risiken-und-technische-schulden.md` (R53 erledigt),
   `src/AGENTS.md:129`, `frontend/AGENTS.md:2051`.
@@ -88,7 +88,7 @@ Abgedeckt durch den Byte-Vergleich in Task 1 (Fälle 1–4) und den Abbruchtest 
 - [x] **Step 2:** `scripts/check-adr.sh` (bzw. ADR-Schritt in `check-all.sh`) → grün;
   `git grep -n 'openapi-typescript\|typescript6\|ts6-fuer-codegen' -- ':!docs/superpowers' ':!openspec' ':!*.lock*'`
   trifft nur ADR-0004/0089 (unveränderlich) und die neue ADR.
-- [x] **Step 3:** Commit `docs(architektur): ADR-0105 eigener Typ-Generator, Doku nachgezogen (LLH-2141)`.
+- [x] **Step 3:** Commit `docs(architektur): ADR-0106 eigener Typ-Generator, Doku nachgezogen (LLH-2141)`.
 
 ### Task 4: Gates
 

@@ -127,7 +127,7 @@ Spec `eingabegrenzen`, Herleitung
 
 Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
 `frontend/src/api/openapi.json` → `frontend/scripts/gen-types.mjs` → `frontend/src/api/types.generated.ts`; `types.ts` ist nur Barrel.
-- **Der Generator kennt nur, was utoipa heute erzeugt** (ADR-0105). Bricht `gen:types` mit
+- **Der Generator kennt nur, was utoipa heute erzeugt** (ADR-0106). Bricht `gen:types` mit
   „unbekannter Schlüssel“ oder „unbekannte type-Angabe“ ab, die neue Form in
   `frontend/scripts/gen-types.mjs` nach dem Vorbild von openapi-typescript 7.13 ergänzen und
   einen Fall in `frontend/src/api/genTypes.test.ts` dazulegen; nie den Abbruch abschwächen.
