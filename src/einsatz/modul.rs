@@ -348,11 +348,19 @@ mod tests {
     fn incidents_praefix_hat_denselben_modulschluessel() {
         assert_eq!(
             key_fuer_pfad("/api/incidents/{id}/map/foreign-layers"),
-            key_fuer_pfad("/api/einsaetze/{id}/map/background-images")
+            Some(Some("lagekarte"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/map/background-images"),
+            Some(Some("lagekarte"))
         );
         assert_eq!(
             key_fuer_pfad("/api/incidents/{id}/briefing/schedule/export"),
-            key_fuer_pfad("/api/einsaetze/{id}/briefing")
+            Some(Some("lagebesprechung"))
+        );
+        assert_eq!(
+            key_fuer_pfad("/api/einsaetze/{id}/briefing"),
+            Some(Some("lagebesprechung"))
         );
     }
 
