@@ -264,7 +264,11 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Transaktion des Laufs. `uebernehmen` kann bei belegter Datenbank mehrmals laufen; es schreibt
   idempotent in den Vertrag der Art.
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
-  vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
+  vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters. Jede
+  Adapter-URL prüft `ziel::check_adapter_url`; `http` nur für eine Art mit
+  `AdapterArt::http_im_lan`, nur mit LAN-Ausnahme und nur zu einem privaten IP-Literal, nie zu
+  einem Hostnamen (LLH-2110,
+  [ADR-0106](../docs/architektur/entscheidungen/ADR-0106-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
   Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
@@ -305,6 +309,10 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   eine Lieferung gilt ganz oder gar nicht (eine ungültige Zeile ist `antwort_ungueltig`). Keine
   Admin-Spur je Zeile: der Lauf ist kein Admin. Kein Name einer liefernden Anwendung im Code
   (Guard `veranstaltung_extern::tests::code_nennt_keine_liefernde_anwendung`).
+- **Drohnenarten** (LLH-2110): `drohne::ARTEN` (`suchlage`, `hls_adresse`); die Drohnenrouten
+  geben `live_kontext` die Art des Adapters aus der Datenbank (`drohne::drohnen_art`), nie eine
+  feste. Jede Playlist geht durch `drohne::video::rewrite_playlist` (nur Dateien im selben
+  Verzeichnis desselben Ziels, umgeschrieben auf den Dateinamen).
 - **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
   in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
   `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er
@@ -454,7 +462,7 @@ Nachrichten an Menschen (E-Mail und Fax an Externe Stellen): `src/ausgang/`, Anb
 `src/adapter/smtp.rs`, `smtp_art.rs`, `sipgate.rs` und `sipgate_fax_art.rs`, Routen
 `src/routes/ausgang.rs`
 ([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
-[ADR-0105](../docs/architektur/entscheidungen/ADR-0105-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
+[ADR-0106](../docs/architektur/entscheidungen/ADR-0106-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
 Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md` und
 `docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md`):
 - **Ein Kanal, eine Anbindung:** `KanalArt::adapter_art` wählt die Art (`email` → `smtp`,
@@ -463,7 +471,7 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   ohne zweiten Korb oder Lauf. Ein neuer Kanal kommt in `KanalArt`, bekommt eine Art und einen
   Zusteller in `ausgang::zusteller::Zustellwege`.
 - **Faxnummern** stehen in E.164 (`externe_stelle::kanal::normalize_fax`, `+49` bei nationaler
-  Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0105); die Grenze von 30 Seiten und 10 MiB
+  Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0106); die Grenze von 30 Seiten und 10 MiB
   gilt nur für Fax und wird **beim Anlegen** geprüft (der ganze Antrag 422 `zu_gross`). Eine Mail
   trägt dasselbe PDF als ersten Anhang; ist es zu groß oder nicht erzeugbar, geht sie ohne PDF
   und trägt `ohne_pdf`.

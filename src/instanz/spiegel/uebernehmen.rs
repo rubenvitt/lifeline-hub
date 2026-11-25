@@ -1070,7 +1070,9 @@ async fn ziel_abbilden(
 }
 
 /// Bildet im eingefrorenen Lagestand nur `bilder[].id` ab (Nachtrag D3); der Client lädt das
-/// Kartenbild live über diese Kennung.
+/// Kartenbild live über diese Kennung. Ebenso `fremdebenen[].id` (LLH-2130): sie dient nur der
+/// Sichtbarkeit je Arbeitsplatz, gelesen wird der Inhalt über den Hash; eine Ebene, die es hier
+/// nicht (mehr) gibt, wird `null`.
 async fn snapshot_bilder(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
@@ -1090,6 +1092,15 @@ async fn snapshot_bilder(
             let lokal =
                 ziel_lokal(conn, einsatz_id, "karte_hintergrundbild", &id.to_string()).await?;
             b["id"] = lokal.map_or(Value::Null, Value::from);
+        }
+    }
+    if let Some(Value::Array(ebenen)) = doc.get_mut("fremdebenen") {
+        for f in ebenen.iter_mut() {
+            let Some(id) = f.get("id").and_then(Value::as_i64) else {
+                continue;
+            };
+            let lokal = ziel_lokal(conn, einsatz_id, "karte_fremdebene", &id.to_string()).await?;
+            f["id"] = lokal.map_or(Value::Null, Value::from);
         }
     }
     Ok(Value::from(doc.to_string()))
@@ -1346,4 +1357,47 @@ pub(super) fn zu_gross_hinweis(art: &str, schluessel: &str) -> String {
         "{} für den Abgleich und liegt nur an der führenden Instanz.",
         zu_gross_anfang(art, schluessel)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stand_bildet_fremdebenen_ids_ab() {
+        let pool = crate::db::test_pool().await;
+        let mut conn = pool.acquire().await.unwrap();
+        sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Orga')")
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        let e: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung, status) VALUES (1, 'Lage', 'aktiv') \
+             RETURNING id",
+        )
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO spiegel_herkunft (einsatz_id, art, fremder_schluessel, lokaler_schluessel) \
+             VALUES (?, 'karte_fremdebene', '7', '42')",
+        )
+        .bind(e)
+        .execute(&mut *conn)
+        .await
+        .unwrap();
+        let doc = serde_json::json!({"fremdebenen": [
+            {"id": 7, "name": "A", "sha256": "aa"},
+            {"id": 8, "name": "B", "sha256": "bb"},
+        ]});
+
+        let neu = snapshot_bilder(&mut conn, e, &Value::from(doc.to_string()))
+            .await
+            .unwrap();
+        let neu: Value = serde_json::from_str(neu.as_str().unwrap()).unwrap();
+        assert_eq!(neu["fremdebenen"][0]["id"], 42);
+        assert_eq!(neu["fremdebenen"][0]["sha256"], "aa");
+        assert_eq!(neu["fremdebenen"][1]["id"], Value::Null, "Ebene fehlt hier");
+        assert_eq!(neu["fremdebenen"][1]["sha256"], "bb");
+    }
 }

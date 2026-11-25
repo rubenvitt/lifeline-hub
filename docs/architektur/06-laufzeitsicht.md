@@ -795,7 +795,7 @@ sequenceDiagram
 - Beim Start behandelt `beim_start` eine mitten in der Zustellung unterbrochene Zeile wie
   `ungewiss`.
 
-Ein Fax (LLH-2095, [ADR-0105](entscheidungen/ADR-0105-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md))
+Ein Fax (LLH-2095, [ADR-0106](entscheidungen/ADR-0106-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md))
 läuft durch denselben Korb; sipgate nimmt nur an, ob es durchging, zeigt erst die Abfrage.
 
 ```mermaid

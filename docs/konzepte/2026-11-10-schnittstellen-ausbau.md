@@ -50,7 +50,7 @@ Erst die Verträge herausarbeiten, dann Adapter schreiben.
 | E5 | Fristen | Offen → abgelaufen nach 12 h; verworfene, abgelaufene und von der Quelle beendete samt Rohdaten nach 7 Tagen löschen; Rohdaten bei Annahme oder Verknüpfung sofort löschen. |
 | E6 | Ungekoppelte Instanz | **Eigene Alarmübernahme**; gekoppelte ELW nutzen den Hub. |
 | E7 | HiOrg-Einstieg | **EFS-API zuerst** (lesen, API-Key): Veranstaltungen als Vorschläge, Personal-Abgleich. Helferstunden danach über die Core-API (OAuth). |
-| E8 | Form im Ausgang | Zuerst **Klartext**; PDF wird mit dem Fax entschieden (Tendenz: Server). **Entschieden 25.11.2026 (LLH-2095, ADR-0105): PDF am Server, für Fax und als Anhang der Mail.** |
+| E8 | Form im Ausgang | Zuerst **Klartext**; PDF wird mit dem Fax entschieden (Tendenz: Server). **Entschieden 25.11.2026 (LLH-2095, ADR-0106): PDF am Server, für Fax und als Anhang der Mail.** |
 | E9 | Drohnenvideo | **Kein eigener Medienserver.** Lifeline Hub zeigt WHEP/HLS-Quellen an (Suchlage, MediaMTX des Kunden). |
 | E10 | Stammdaten-Eingang | **Eigene Unteraufgabe, Stufe 1.** |
 | E11 | Meshtastic | **Weiter verfolgen**, aber zuerst allgemein klären, wie eine Funk-/Mesh-Anbindung als Adapter aussieht. |

@@ -5,6 +5,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Was der WebView mit einer Navigation tut. Die Regeln selbst prüft [LinkregelnTest]; hier steht,
@@ -103,12 +105,23 @@ class LinkweicheTest {
         assertEquals("kurz.pdf", Downloadablage.dateiname("kurz.pdf"))
     }
 
-    /** Google Kalender nimmt `text/calendar` nur über `ACTION_VIEW`; alles andere geht ins Teilen-Blatt. */
+    @Serializable
+    private class Kalenderfaelle(@SerialName("oeffnen_als") val oeffnenAls: List<OeffnenFall>)
+
+    @Serializable
+    private class OeffnenFall(val beschreibung: String, val mimetyp: String, val endung: String, val erwartet: String)
+
+    /**
+     * Google Kalender nimmt `text/calendar` nur über `ACTION_VIEW`; alles andere geht ins
+     * Teilen-Blatt. Die Fälle teilt der Kern mit der iOS-Hülle (`kalender.json`, LLH-2127).
+     */
     @Test
     fun `kalenderdatei wird angezeigt sonst geteilt`() {
-        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("text/calendar", "ics"))
-        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("application/octet-stream", "ICS"))
-        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("TEXT/Calendar", ""))
-        assertEquals(Oeffnen.TEILEN, Downloadablage.oeffnenAls("text/csv", "csv"))
+        val faelle = GemeinsameFaelle.load("kalender.json", Kalenderfaelle.serializer()).oeffnenAls
+        assertTrue(faelle.isNotEmpty())
+        for (fall in faelle) {
+            val erwartet = Oeffnen.valueOf(fall.erwartet.uppercase())
+            assertEquals(erwartet, Downloadablage.oeffnenAls(fall.mimetyp, fall.endung), fall.beschreibung)
+        }
     }
 }

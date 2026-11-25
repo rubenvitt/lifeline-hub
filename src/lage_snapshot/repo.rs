@@ -119,7 +119,7 @@ pub async fn lade_dokument(
 /// Rohe INSERT-Primitive (genutzt von `erzeuge` und Tests). `daten` wird als JSON-String abgelegt.
 #[allow(clippy::too_many_arguments)]
 pub async fn insert_roh(
-    pool: &SqlitePool,
+    conn: &mut sqlx::SqliteConnection,
     einsatz_id: i64,
     benutzer_id: i64,
     bezeichnung: Option<&str>,
@@ -138,19 +138,27 @@ pub async fn insert_roh(
     .bind(stand_at)
     .bind(daten.to_string())
     .bind(benutzer_id)
-    .fetch_one(pool)
+    .fetch_one(conn)
     .await?;
     Ok(id)
 }
 
 /// Snapshot löschen (Dokumenten-Vernichtung). `true`, wenn eine Zeile getroffen wurde.
+/// Räumt in derselben Transaktion die eingefrorenen Fremdebenen-Inhalte, auf die kein Stand mehr
+/// zeigt (LLH-2130).
 pub async fn loesche(pool: &SqlitePool, einsatz_id: i64, id: i64) -> Result<bool, AppError> {
-    let res = sqlx::query("DELETE FROM lage_snapshot WHERE einsatz_id = ? AND id = ?")
-        .bind(einsatz_id)
-        .bind(id)
-        .execute(pool)
-        .await?;
-    Ok(res.rows_affected() > 0)
+    crate::write_retry!(pool, |conn| {
+        let res = sqlx::query("DELETE FROM lage_snapshot WHERE einsatz_id = ? AND id = ?")
+            .bind(einsatz_id)
+            .bind(id)
+            .execute(&mut *conn)
+            .await?;
+        if res.rows_affected() == 0 {
+            return Ok(false);
+        }
+        super::fremdebene::raeumen(conn, einsatz_id).await?;
+        Ok(true)
+    })
 }
 
 /// Aktualisiert nur die Metadaten (Tri-State). `daten`/`stand_at`/`erstellt_*` bleiben
@@ -224,6 +232,9 @@ struct SnapshotDaten {
     /// Kennzeichnung und Notiz (LLH-1123); am Modul Tiere gegatet (`REDIGIERBARE_MODUL_FELDER`).
     /// Ältere Stände tragen das Feld nicht.
     tiere: Vec<crate::tier::TierKarte>,
+    /// Fremdebenen mit Inhalt (LLH-2130): Angaben und Hash, der Inhalt liegt in
+    /// `karte_fremdebene_stand` (`super::fremdebene`). Ältere Stände tragen das Feld nicht.
+    fremdebenen: Vec<super::fremdebene::FremdebeneImStand>,
 }
 
 /// Friert das volle Lagebild eines Einsatzes in EIN JSON-Dokument ein.
@@ -266,7 +277,7 @@ pub async fn erzeuge(
         .collect();
     let evakuierungsbezirke = crate::betreuung::repo::bezirke(pool, einsatz_id).await?;
 
-    let daten = SnapshotDaten {
+    let mut daten = SnapshotDaten {
         version: 1,
         stand_at: stand_at.clone(),
         org_default,
@@ -335,20 +346,26 @@ pub async fn erzeuge(
         )
         .await?,
         tiere: crate::tier::repo::karte_liste(pool, einsatz_id).await?,
+        fremdebenen: Vec::new(),
     };
 
-    let daten_value = serde_json::to_value(&daten)
-        .map_err(|e| AppError::Internal(format!("Snapshot-Serialisierung: {e}")))?;
-    let id = insert_roh(
-        pool,
-        einsatz_id,
-        benutzer_id,
-        bezeichnung,
-        notiz,
-        &stand_at,
-        &daten_value,
-    )
-    .await?;
+    // Fremdebenen kopieren und Stand anlegen in EINER Transaktion (LLH-2130): kein Stand zeigt
+    // auf einen fehlenden Inhalt.
+    let id = crate::write_retry!(pool, |conn| {
+        daten.fremdebenen = super::fremdebene::sichern(conn, einsatz_id).await?;
+        let daten_value = serde_json::to_value(&daten)
+            .map_err(|e| AppError::Internal(format!("Snapshot-Serialisierung: {e}")))?;
+        insert_roh(
+            conn,
+            einsatz_id,
+            benutzer_id,
+            bezeichnung,
+            notiz,
+            &stand_at,
+            &daten_value,
+        )
+        .await
+    })?;
     lade_dokument(pool, einsatz_id, id)
         .await?
         .ok_or_else(|| AppError::Internal("Snapshot direkt nach Anlegen nicht auffindbar".into()))

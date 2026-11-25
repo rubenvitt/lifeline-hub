@@ -5,6 +5,7 @@ import {
   adapterPath,
   adapterZustandAnzeige,
   einstellungenVon,
+  einstellungsRegeln,
   hostWechsel,
   isZustandSichtbar,
 } from './adapterAnzeige';
@@ -102,6 +103,30 @@ describe('hostWechsel', () => {
     expect(hostWechsel(felder, { url: 'https://a.example' }, { url: 'kein url' })).toEqual([]);
     expect(hostWechsel(felder, { url: 'https://a.example' }, { url: '' })).toEqual([]);
     expect(hostWechsel(felder, { standort: 'A' }, { standort: 'B' })).toEqual([]);
+  });
+});
+
+describe('einstellungsRegeln', () => {
+  const url = {
+    name: 'playlist_url',
+    bezeichnung: 'Adresse',
+    typ: 'url',
+    pflicht: true,
+    max: 512,
+  } as const;
+  const muster = (httpImLan: boolean) =>
+    einstellungsRegeln(url, httpImLan).find((r) => 'pattern' in r && r.pattern) as {
+      pattern: RegExp;
+      message: string;
+    };
+
+  it('verlangt https://, außer die Art erlaubt http:// im LAN (Server prüft den Rest)', () => {
+    expect(muster(false).pattern.test('http://10.0.0.5/x')).toBe(false);
+    expect(muster(false).pattern.test('https://a.example')).toBe(true);
+    expect(muster(true).pattern.test('http://10.0.0.5:8888/d/index.m3u8')).toBe(true);
+    expect(muster(true).pattern.test('https://a.example')).toBe(true);
+    expect(muster(true).pattern.test('ftp://10.0.0.5/x')).toBe(false);
+    expect(muster(true).message).toBe('Adresse beginnt mit https:// oder, im LAN, mit http://');
   });
 });
 
