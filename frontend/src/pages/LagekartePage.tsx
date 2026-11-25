@@ -1769,7 +1769,8 @@ export default function LagekartePage() {
             : undefined
         }
       />
-      {livebildQuelle != null && (
+      {/* Das Livebild gehört zur laufenden Lage, nicht zu einem gesicherten Stand (LLH-2107). */}
+      {livebildQuelle != null && snapshotParam == null && (
         <DrohnenVideoHalter
           einsatzId={einsatzId}
           adapterId={livebildQuelle}
@@ -2055,7 +2056,12 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
-        drohne={{ darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }}
+        // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
+        drohne={
+          snapshotParam == null
+            ? { darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }
+            : undefined
+        }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}
