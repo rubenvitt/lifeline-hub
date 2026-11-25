@@ -470,6 +470,21 @@ pub struct Config {
     )]
     pub kritis_extrakt: bool,
 
+    /// Fachebene „Amtliche Warnungen (NINA)“ aus MoWaS (warnung.bund.de, LLH-2104). **Vorgabe
+    /// an.** Auflage des BBK: MoWaS-Meldungen dürfen nur inhaltlich unverändert und nicht zu
+    /// gewerblichen Zwecken verwendet werden. Hilfsorganisationen, Behörden und BOS betrifft das
+    /// nicht; ein gewerblicher Betreiber (etwa ein privater Sanitätsdienst) schaltet die Ebene mit
+    /// `--nina false` bzw. `LIFELINE_NINA=false` ab. Dann ruft die Instanz warnung.bund.de nie
+    /// ab, die Route der Ebene antwortet 404 und die Lagekarte zeigt sie nicht. Die
+    /// Umgebungsvariable nimmt nur `true`/`false`.
+    #[arg(
+        long,
+        env = "LIFELINE_NINA",
+        default_value_t = true,
+        action = clap::ArgAction::Set
+    )]
+    pub nina: bool,
+
     /// Vorgabe der automatischen Aktualisierung der Offline-Karten (LFH-993): lädt neuere
     /// Katalog-Stände heruntergeladener Karten ohne Klick. **Vorgabe, solange in der
     /// Verwaltung nichts gespeichert ist** — dort schaltet ein Admin sie ohne Neustart um.
@@ -1226,6 +1241,15 @@ mod tests {
             "nur parse_hermetisch/parse_mit_env/try_parse_mit_env dürfen Config parsen — \
              neue Tests nehmen parse_hermetisch"
         );
+    }
+
+    /// NINA-Fachebene (LLH-2104): Vorgabe an; Flag und Umgebungsvariable schalten sie ab.
+    #[test]
+    fn nina_ist_vorgabe_an_und_abschaltbar() {
+        assert!(parse_hermetisch(["lifeline-hub"]).nina);
+        assert!(!parse_hermetisch(["lifeline-hub", "--nina", "false"]).nina);
+        assert!(!parse_mit_env("LIFELINE_NINA", "false", &["lifeline-hub"]).nina);
+        assert!(parse_mit_env("LIFELINE_NINA", "true", &["lifeline-hub"]).nina);
     }
 
     /// Instanzkopplung (LLH-1490): ohne Angabe meldet sich eine Instanz alle 60 s; unter zehn

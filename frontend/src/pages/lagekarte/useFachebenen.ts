@@ -10,6 +10,7 @@ import {
 } from '../../api/fachebenen';
 import {
   copernicusAktivierungen,
+  copernicusBilder,
   fitsCopernicusAusschnitt,
   fitsEnergieAusschnitt,
   energieNennung,
@@ -52,6 +53,9 @@ interface FachebenenArgs {
  * betroffen) und ein kurzes Zurückschieben — dafür reichen 5 min. Die `staleTime` bleibt eigen.
  */
 const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
+
+/** Deckkraft der Satellitenbilder in Prozent, bis jemand sie ändert (LLH-2021). */
+export const BILDER_DECKKRAFT_VORGABE = 80;
 
 /**
  * Fachebenen-Leg der Lagekarte: die externen Daten-Queries (eine je Fachebene) und ihre
@@ -117,6 +121,9 @@ export function useFachebenen({
     copernicusMinZoom === undefined || (kartenZoom !== null && kartenZoom >= copernicusMinZoom);
   const copernicusBboxZuGross = viewportBbox !== null && !fitsCopernicusAusschnitt(viewportBbox);
   const copernicusPasst = copernicusZoomReicht && viewportBbox !== null && !copernicusBboxZuGross;
+  // Satellitenbilder (LLH-2021): dieselben Riegel und derselbe Archiv-Schalter. Die Deckkraft lebt
+  // wie der Schalter nur im Speicher.
+  const [bilderDeckkraft, setBilderDeckkraft] = useState(BILDER_DECKKRAFT_VORGABE);
 
   const kritis = useQuery({
     queryKey: globalKeys.fachebeneKritis(viewportBbox),
@@ -163,6 +170,19 @@ export function useFachebenen({
       fachebeneTakt('copernicus', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
+  const copernicusBilderQuery = useQuery({
+    queryKey: globalKeys.fachebeneCopernicusBilder(viewportBbox, copernicusArchiv),
+    queryFn: () => ladeFachebene('copernicus_bilder', viewportBbox!, copernicusArchiv),
+    enabled: fachebenenSichtbar.copernicus_bilder && copernicusPasst,
+    placeholderData: keepPreviousData,
+    gcTime: BBOX_ABFRAGE_GC_MS,
+    refetchInterval: (q) =>
+      fachebeneTakt(
+        'copernicus_bilder',
+        q.state.status === 'error' ? 'offline' : q.state.data?.status,
+      ),
+  });
+
   // Die Drohnenlage (LLH-2106) hängt am Einsatz und läuft darum als eigenes `useQuery` mit
   // Einsatz-ID im Key, nicht im positionsweise gelesenen Tupel unten. Ihr Takt ist fest; ein Poll
   // ohne neuen Stand kostet ein 304.
@@ -174,7 +194,8 @@ export function useFachebenen({
   });
 
   // Acht Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
-  // `fachebeneKeys()` ohne kritis, energie, copernicus und drohne (nicht Panel-Reihenfolge). `byKey` greift
+  // `fachebeneKeys()` ohne kritis, energie, copernicus, copernicus_bilder und drohne (nicht
+  // Panel-Reihenfolge). `byKey` greift
   // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
     queries: [
@@ -247,6 +268,7 @@ export function useFachebenen({
         kritis,
         energie,
         copernicus,
+        copernicus_bilder: copernicusBilderQuery,
         drohne,
         autobahn: ergebnisse[5],
         luftqualitaet: ergebnisse[6],
@@ -270,7 +292,13 @@ export function useFachebenen({
                 : def.klassenfarben
                   ? def.klassenfarben.faerbe(roh, token)
                   : roh;
-          return { def, daten, farbe: fachebeneFarbe(k, token), treffer: token.controlHeight };
+          return {
+            def,
+            daten,
+            farbe: fachebeneFarbe(k, token),
+            treffer: token.controlHeight,
+            ...(def.darstellung === 'raster' ? { deckkraft: bilderDeckkraft } : {}),
+          };
         });
 
       const fachebenenStatus: Partial<Record<FachebeneQuelle, FachebeneStatus>> = {};
@@ -297,7 +325,9 @@ export function useFachebenen({
           const d = byKey[k].data;
           return d && d.status !== 'offline' ? d.attribution : '';
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        // Beide Copernicus-Ebenen nennen dieselbe Quelle; sie steht einmal da.
+        .filter((n, i, alle) => alle.indexOf(n) === i);
 
       return {
         aktiveFachebenen,
@@ -366,7 +396,7 @@ export function useFachebenen({
     zoomZuKlein[k] =
       kartenZoom < minZoom ||
       (k === 'energie' && energieBboxZuGross) ||
-      (k === 'copernicus' && copernicusBboxZuGross);
+      ((k === 'copernicus' || k === 'copernicus_bilder') && copernicusBboxZuGross);
   }
 
   // EMSR-Nummern im Ausschnitt mit jüngster Aufnahme, für die Zeile im Ebenenbaum.
@@ -374,6 +404,12 @@ export function useFachebenen({
   const copernicusListe = useMemo(
     () => (copernicusFeatures ? copernicusAktivierungen(copernicusFeatures) : []),
     [copernicusFeatures],
+  );
+
+  const bilderFeatures = copernicusBilderQuery.data?.features;
+  const bilderListe = useMemo(
+    () => (bilderFeatures ? copernicusBilder(bilderFeatures) : []),
+    [bilderFeatures],
   );
 
   const onFachebeneToggle = (k: FachebeneQuelle, an: boolean) =>
@@ -392,6 +428,11 @@ export function useFachebenen({
       archiv: copernicusArchiv,
       onArchiv: setCopernicusArchiv,
       aktivierungen: copernicusListe,
+    },
+    copernicusBilder: {
+      liste: bilderListe,
+      deckkraft: bilderDeckkraft,
+      onDeckkraft: setBilderDeckkraft,
     },
     setViewportBbox,
     setKartenZoom,

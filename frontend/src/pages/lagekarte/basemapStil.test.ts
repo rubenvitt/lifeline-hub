@@ -52,6 +52,7 @@ const beides: KarteServerConfig = {
   offline_attribution: ODBL,
   offline_regionen: [region(1)],
   karten_bau_verfuegbar: false,
+  fachebenen_abgeschaltet: [],
 };
 const nurOffline: KarteServerConfig = {
   online_styles: [],
@@ -60,6 +61,7 @@ const nurOffline: KarteServerConfig = {
   offline_attribution: ODBL,
   offline_regionen: [region(5)],
   karten_bau_verfuegbar: false,
+  fachebenen_abgeschaltet: [],
 };
 const leer: KarteServerConfig = {
   online_styles: [],
@@ -68,6 +70,7 @@ const leer: KarteServerConfig = {
   offline_attribution: null,
   offline_regionen: [],
   karten_bau_verfuegbar: false,
+  fachebenen_abgeschaltet: [],
 };
 
 describe('basemapStil', () => {
@@ -188,6 +191,7 @@ describe('basemapStil', () => {
       offline_tiles_url: '/api/map/offline/tiles/{z}/{x}/{y}?v=abc',
       offline_attribution: ODBL,
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     };
     const s = baueBasemapStyle('offline', 'light', alt, undefined) as {
       sources: Record<string, { type: string; tiles: string[] }>;

@@ -58,6 +58,7 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 | Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
+| Copernicus-Satellitenbilder | 1 800 s | 600 s | 120 min | Wie die Auswertung; das Alter jedes Bildes steht in der Ebenenzeile |
 | Drohne (LLH-2106) | — (Arbeitsspeicher) | 5 s | 1 min | Der Adapter erneuert den Stand alle 5 s (`intervall_vorschlag_s`); eine Minute ohne neuen Stand ist ein altes Fluggerät. Einsatzroute `/api/incidents/{id}/map/drone`, ein Poll ohne Änderung kostet ein 304 |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
@@ -112,7 +113,7 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 | Quelle (`quelle`) | Endpoint | Format / Geometrie | Lizenz | Pflicht-Attribution | Cache-TTL / Aktualisierung | Offline |
 |---|---|---|---|---|---|---|
-| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Auflage des BBK je Meldung: „nur inhaltlich unverändert und nicht zu gewerblichen Zwecken“**, keine Lizenz im engeren Sinn. Geprüft am 24.11.2026 (LLH-1203): **unbedenklich**, Begründung unter „Lizenz NINA / MoWaS“. Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
+| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Auflage des BBK je Meldung: „nur inhaltlich unverändert und nicht zu gewerblichen Zwecken“**, keine Lizenz im engeren Sinn. Geprüft am 24.11.2026 (LLH-1203): **unbedenklich**, Begründung unter „Lizenz NINA / MoWaS“. Quellennennung Pflicht. **Vorgabe an; ein gewerblicher Betreiber schaltet die Ebene mit `--nina false` ab** (s. u., LLH-2104). Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
 | **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **CC BY 4.0 — offen, auch kommerziell und verändert**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). Laut den rechtlichen Hinweisen des DWD gilt CC BY 4.0 für alle frei zugänglichen Geodaten und Geodatendienste (geprüft 24.11.2026, LLH-1203; vorher GeoNutzV). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
@@ -134,6 +135,15 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Leitung, jeder Abruf risse die 8-s-Schranke des Clients, und der Cache füllte sich nie.
   Gilt für alle Ebenen über `liefere_mit_swr` (DWD, NINA, PEGELONLINE, ODL, Hochwasser,
   Luftqualität); Energie und Autobahn hatten den Riegel schon.
+- **NINA abschalten (LLH-2104).** Die Auflage des BBK erlaubt MoWaS-Meldungen nur inhaltlich
+  unverändert und nicht zu gewerblichen Zwecken. Hilfsorganisationen, Behörden und BOS betrifft
+  das nicht; ein gewerblicher Betreiber (etwa ein privater Sanitätsdienst) startet den Server mit
+  `--nina false` bzw. `LIFELINE_NINA=false`. **Vorgabe: an.** Abgeschaltet ruft die Instanz
+  warnung.bund.de nie ab: `GET /api/map/overlays/nina` antwortet 404, bevor Cache oder Quelle
+  gefragt werden, `GET /api/map/config` meldet `fachebenen_abgeschaltet: ["nina"]`, und die
+  Lagekarte zeigt die Ebene gar nicht (nicht als offline). Eine gespeicherte Sichtbarkeit bleibt
+  stehen und gilt wieder, sobald die Ebene eingeschaltet ist. Belegt durch
+  `abgeschaltete_nina_ist_404_ohne_abruf` in `tests/karte.rs` (Attrappe zählt 0 Anfragen).
 - **NINA** ist die einzige Quelle mit einem zweistufigen Abruf (Übersichtsliste ohne
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
@@ -402,8 +412,8 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     nicht gewerblich. Lifeline Hub selbst gibt die Meldungen nicht weiter: Jede Instanz holt sie
     selbst bei warnung.bund.de, und die Software enthält keine Meldungen.
   * **Folgeaufgaben:** Link zur Vollmeldung auf warnung.bund.de im Inspector (LLH-2103:
-    Authentizität, Handlungsanweisung) und die NINA-Ebene je Instanz abschaltbar machen, etwa
-    für einen gewerblichen Betreiber (LLH-2104).
+    Authentizität, Handlungsanweisung). Die Abschaltung je Instanz für einen gewerblichen
+    Betreiber steht seit LLH-2104 bereit (`--nina false`, Abschnitt „NINA abschalten“ oben).
 - **Lizenz-Vorbehalt Autobahn: nicht belegt** (Befund 24.11.2026, LLH-1637). Die frühere
   Einordnung als dl-de/by-2-0 hatte keine Quelle und ist gestrichen.
   * Die API-Antwort trägt keinen Lizenz- oder Copyright-Kopf.
@@ -627,5 +637,31 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   (`[west, süd, ost, nord]`, nach außen gerundet) in den Katalog, je Produkt Typ (`DEL`, `GRA`),
   Monitoring-Nummer (0 für `PRODUCT`), Version, Lieferzeit (UTC) und ZIP-Adresse. Die Tests in
   `copernicus_alt.rs` prüfen Format, Präfix und doppelte Codes.
-- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs und die Rasterbilder
-  (COG). EFAS-Echtzeitdaten gibt es nur für Partner.
+- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs, und für den
+  Altbestand die Rasterbilder (COG): Die Vector Packages enthalten keine. EFAS-Echtzeitdaten gibt
+  es nur für Partner.
+
+## Copernicus-Satellitenbilder (LLH-2021)
+
+Zu optischen Produkten liefert Copernicus das Orthobild als Cloud Optimized GeoTIFF unter dem
+S3-Host der Ebenen (`layers[]` mit `format: "cog"`, Sensor und Aufnahme aus `images[]` über den
+Dateinamen). Die Ebene `copernicus_bilder` zeigt sie als Kacheln des eigenen Servers
+(`karte::cog`, `karte::copernicus_bilder`, ADR-0100, Entwurf
+`docs/superpowers/specs/2026-11-24-h11vkn1p-copernicus-cog-rasterbilder-design.md`).
+
+- **Auswahl:** dieselbe Kette wie die Auswertung (`select_im_ausschnitt`); Bilder nur der dort
+  gewählten Produkte. Ein Gebiet, dessen gezeigtes Produkt Radar ist, hat kein Bild, auch wenn ein
+  jüngeres Monitoring ohne Flächen eines hätte (EMSR728 Stuttgart).
+- **Liste:** `GET /api/map/overlays/copernicus/images?bbox=…[&archiv=1]`, Umschlag wie jede
+  Fachebene; je Bild Umriss, Kennung (16 Hex-Zeichen von SHA-256 über den Pfad), Zoomgrenzen und
+  `darstellbar`. Höchstens 20 Bilder (`MAX_BILDER`), darüber `gekuerzt`.
+- **Kacheln:** `GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}`, PNG 256 px,
+  nur mit Sitzung (`KartenZugriff`), `Cache-Control: private, max-age=86400, immutable`. Der Server liest per HTTP-Range erst 16 KiB
+  Kopf (höchstens 1 MiB in bis zu 8 Runden), dann je Zielkachel höchstens 4 Quellkacheln der
+  passenden Übersicht (je höchstens 2 MiB komprimiert, entpackt nie mehr als eine Kachel; höchstens
+  4 Render-Läufe gleichzeitig). Kopf und Kacheln liegen im Kachel-Cache (256 MiB, LRU); jede
+  Listenantwort legt verdrängte Köpfe neu an.
+- **Nur EPSG:3857:** Gelesen werden gekachelte 8-Bit-Bilder mit höchstens 512 px Kachelkante mit 1, 3 oder 4 Kanälen, Deflate, LZW,
+  JPEG oder unkomprimiert, Prädiktor 1 oder 2. Anderes heißt „nicht darstellbar“, nie umprojiziert.
+- **Fehler:** unbekannte Kennung 404, falsche Kachel 400, außerhalb des Bildes oder unter dem
+  Mindest-Zoom 204, Quelle weg und Kachel nicht im Cache 502.
