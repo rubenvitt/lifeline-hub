@@ -50,21 +50,21 @@ kotlinx.serialization), Rust (cargo test).
   `public static func oeffnenAls(mimetyp: String, endung: String) -> Oeffnen` in `Downloadablage`.
 - JSON `oeffnen_als`: `[{ "beschreibung", "mimetyp", "endung", "erwartet": "anzeigen"|"teilen" }]`.
 
-- [ ] **Step 1:** `kalender.json` mit `zweck` (wer liest: `ios/LifelineKern`, `android/kern`,
+- [x] **Step 1:** `kalender.json` mit `zweck` (wer liest: `ios/LifelineKern`, `android/kern`,
   `src/lagebesprechung/ics.rs`; die Desktop-Hülle nicht) und `oeffnen_als` mit den vier
   Android-Fällen plus: `text/calendar; charset=utf-8; method=PUBLISH` + `ics` → anzeigen (so
   liefert `src/routes/lagebesprechung.rs` aus), `application/pdf` + `pdf` → teilen,
   leerer Typ + `ics` → anzeigen.
-- [ ] **Step 2:** Kotlin-Test auf die JSON umstellen (`@Serializable`-Klassen im Test,
+- [x] **Step 2:** Kotlin-Test auf die JSON umstellen (`@Serializable`-Klassen im Test,
   `GemeinsameFaelle.load("kalender.json", …)`, `erwartet` → `Oeffnen.valueOf(erwartet.uppercase())`).
-- [ ] **Step 3:** `./android/kern/gradlew -p android/kern test` (bzw. wie `check-all.sh --nur android`)
+- [x] **Step 3:** `./android/kern/gradlew -p android/kern test` (bzw. wie `check-all.sh --nur android`)
   → PASS (Verhalten unverändert).
-- [ ] **Step 4:** Swift-Test `testJederGemeinsameFallFuerOeffnenAlsGilt` in `KalenderTests.swift`
+- [x] **Step 4:** Swift-Test `testJederGemeinsameFallFuerOeffnenAlsGilt` in `KalenderTests.swift`
   schreiben (schlägt fehl: `oeffnenAls` fehlt).
-- [ ] **Step 5:** `Oeffnen` und `oeffnenAls` im Swift-Kern, gleiche Regel wie Kotlin (Typ vor `;`,
+- [x] **Step 5:** `Oeffnen` und `oeffnenAls` im Swift-Kern, gleiche Regel wie Kotlin (Typ vor `;`,
   getrimmt, ohne Groß-/Kleinschreibung).
-- [ ] **Step 6:** `swift test` in `ios/LifelineKern` → PASS (ohne Toolchain: Lücke im PR nennen).
-- [ ] **Step 7:** Commit `feat: Kalenderdateien als gemeinsamer Fall für iOS und Android (LLH-2127)`.
+- [x] **Step 6:** `swift test` in `ios/LifelineKern` → PASS (ohne Toolchain: Lücke im PR nennen).
+- [x] **Step 7:** Commit `feat: Kalenderdateien als gemeinsamer Fall für iOS und Android (LLH-2127)`.
 
 ### Task 2: `IcsTermin.lies` mit Server-Fall
 
@@ -80,26 +80,26 @@ kotlinx.serialization), Rust (cargo test).
 - JSON `termin`: `{ beschreibung, eingabe: { einsatz_id, bezeichnung, termin, instanz_kennung, jetzt }, ics, erwartet }`;
   `lesen`: `[{ beschreibung, ics, erwartet | null }]`; `erwartet` = `{ titel, beginn, ende, erinnerung_minuten | null }`, Zeiten RFC 3339 UTC.
 
-- [ ] **Step 1:** `termin` mit Bezeichnung `Hochwasser Ölbachtal, Abschnitt Nord; Deichverteidigung`
+- [x] **Step 1:** `termin` mit Bezeichnung `Hochwasser Ölbachtal, Abschnitt Nord; Deichverteidigung`
   (erzwingt Escaping und Faltung), Termin `2026-11-24T14:30:00Z`, jetzt `2026-11-24T12:00:00Z`,
   Kennung `kennung-1`, `ics` = Ausgabe von `build_ics`, `erwartet` mit Titel
   `Lagebesprechung – Hochwasser Ölbachtal, Abschnitt Nord; Deichverteidigung`, Ende 15:00Z,
   Erinnerung 10.
-- [ ] **Step 2:** Rust-Test `gemeinsamer_fall_ist_genau_die_ausgabe_des_generators` in `ics.rs`
+- [x] **Step 2:** Rust-Test `gemeinsamer_fall_ist_genau_die_ausgabe_des_generators` in `ics.rs`
   (liest `../../src-tauri/faelle/kalender.json` per `include_str!`, `assert_eq!` auf `ics`) →
   `cargo test -p lifeline-hub lagebesprechung::ics` PASS.
-- [ ] **Step 3:** `lesen`-Fälle: LF statt CRLF; Faltung mit Tab; ganztägig (`DTSTART;VALUE=DATE:…`) → null; ohne `DTEND` (Ende = Beginn + 30 min);
+- [x] **Step 3:** `lesen`-Fälle: LF statt CRLF; Faltung mit Tab; ganztägig (`DTSTART;VALUE=DATE:…`) → null; ohne `DTEND` (Ende = Beginn + 30 min);
   ohne `VALARM` (`erinnerung_minuten` null); `TRIGGER:-PT1H` (60); `DTSTART;TZID=Europe/Berlin:…` → null;
   `RRULE` → null; zwei `VEVENT` → null; kein `DTSTART` → null; leerer Text → null;
   `DTEND` vor `DTSTART` → null.
-- [ ] **Step 4:** Swift-Tests `testDerServerFallWirdGelesen` und `testJederLesefallGilt` → FAIL.
-- [ ] **Step 5:** `IcsTermin.lies`: Zeilen trennen (CRLF oder LF), Fortsetzungszeilen (Beginn
+- [x] **Step 4:** Swift-Tests `testDerServerFallWirdGelesen` und `testJederLesefallGilt` → FAIL.
+- [x] **Step 5:** `IcsTermin.lies`: Zeilen trennen (CRLF oder LF), Fortsetzungszeilen (Beginn
   Leerzeichen/Tab) anhängen, Eigenschaftsname vor `;`/`:`; nur Eigenschaften im einzigen `VEVENT`
   (eine in `VALARM` getrennt); `SUMMARY` unescapen (`\\`, `\;`, `\,`, `\n`/`\N`); Zeiten nur Form
   `yyyyMMdd'T'HHmmss'Z'` ohne Parameter (`DateFormatter` mit `en_US_POSIX`, UTC, oder
   `ISO8601`-Parser mit Basisformat); `TRIGGER` nur `-PT<n>(M|H|S)`, sonst keine Erinnerung.
-- [ ] **Step 6:** `swift test` → PASS.
-- [ ] **Step 7:** Commit `feat: iOS-Kern liest den Lagebesprechungstermin aus der .ics (LLH-2127)`.
+- [x] **Step 6:** `swift test` → PASS.
+- [x] **Step 7:** Commit `feat: iOS-Kern liest den Lagebesprechungstermin aus der .ics (LLH-2127)`.
 
 ### Task 3: Kalenderdialog in der App
 
@@ -112,18 +112,18 @@ kotlinx.serialization), Rust (cargo test).
 - Consumes: `Downloadablage.oeffnenAls`, `IcsTermin.lies` (Tasks 1–2).
 - Produces: `enum Kalenderdialog { @MainActor static func zeige(_ termin: IcsTermin, datei: URL, von webView: WKWebView?) }`.
 
-- [ ] **Step 1:** In `download(_:decideDestinationUsing:suggestedFilename:)` zum Ziel auch
+- [x] **Step 1:** In `download(_:decideDestinationUsing:suggestedFilename:)` zum Ziel auch
   `oeffnenAls(mimetyp: response.mimeType ?? "", endung: ziel.pathExtension)` merken.
-- [ ] **Step 2:** In `downloadDidFinish`: bei `.anzeigen` Datei lesen, wenn ≤ 1 MiB und UTF-8, und
+- [x] **Step 2:** In `downloadDidFinish`: bei `.anzeigen` Datei lesen, wenn ≤ 1 MiB und UTF-8, und
   mit `IcsTermin.lies` einen Termin bilden; gelingt das, `Kalenderdialog.zeige`, sonst wie bisher
   `zeige` (Teilen-Blatt). Die Wahl als `zeigeKalender`-Parameter injizierbar wie `zeige`.
-- [ ] **Step 3:** `Kalenderdialog.zeige`: `EKEventStore()`, `EKEvent(eventStore:)` mit `title`,
+- [x] **Step 3:** `Kalenderdialog.zeige`: `EKEventStore()`, `EKEvent(eventStore:)` mit `title`,
   `startDate`, `endDate`, `alarms = [EKAlarm(relativeOffset: -erinnerung)]` falls gesetzt;
   `EKEventEditViewController` mit `eventStore`, `event`, `editViewDelegate` (eigene
   Delegate-Klasse, die sich bis zum Schließen hält), präsentiert auf dem obersten Controller wie
   `Teilen.zeige`; beim Schließen (jede Aktion) `dismiss` und Verzeichnis der Datei löschen.
-- [ ] **Step 4:** App-Code kann hier nicht gebaut werden; Prüfung über `ios-pruefung.yml` im PR.
-- [ ] **Step 5:** Commit `feat: iOS-Hülle zeigt Kalenderdateien im Dialog „Neues Ereignis“ (LLH-2127)`.
+- [x] **Step 4:** App-Code kann hier nicht gebaut werden; Prüfung über `ios-pruefung.yml` im PR.
+- [x] **Step 5:** Commit `feat: iOS-Hülle zeigt Kalenderdateien im Dialog „Neues Ereignis“ (LLH-2127)`.
 
 ### Task 4: Regeln nachziehen
 
@@ -134,8 +134,8 @@ kotlinx.serialization), Rust (cargo test).
 - Modify: `scripts/bereiche.sh` nur, wenn `src-tauri/faelle/*` → `rust ios android` nicht passt
   (passt: `rust` ist `cargo test` des Workspaces samt `src/`).
 
-- [ ] **Step 1:** Texte schreiben; `ios/AGENTS.md`: Entscheidung `Downloadablage.oeffnenAls`,
+- [x] **Step 1:** Texte schreiben; `ios/AGENTS.md`: Entscheidung `Downloadablage.oeffnenAls`,
   Lesen `IcsTermin` (nur eigenes Format, sonst Teilen-Blatt), Dialog ohne Kalenderfreigabe
   (iOS 17, außerhalb der App), Fälle in `kalender.json`, `ics.rs` hält sie fest.
-- [ ] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün bzw. Lücken benennen.
-- [ ] **Step 3:** Commit `docs: Regeln für Kalenderdateien in iOS- und Fall-Anleitung (LLH-2127)`.
+- [x] **Step 2:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün bzw. Lücken benennen.
+- [x] **Step 3:** Commit `docs: Regeln für Kalenderdateien in iOS- und Fall-Anleitung (LLH-2127)`.
