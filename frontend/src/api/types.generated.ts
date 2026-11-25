@@ -500,6 +500,8 @@ export interface components {
             bezeichnung: string;
             code: string;
             felder: components["schemas"]["Feld"][];
+            /** @description Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105). */
+            http_im_lan: boolean;
             /** Format: int64 */
             intervall_min_s: number;
             /** Format: int64 */
@@ -4274,6 +4276,12 @@ export interface components {
              */
             color: string;
             created_at: string;
+            /**
+             * Format: int64
+             * @description Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne
+             *     den Inhalt zu serialisieren. Fehlt ohne Inhalt.
+             */
+            data_size?: number | null;
             /**
              * Format: int64
              * @description Zahl der Objekte ohne lesbare Geometrie.

@@ -39,6 +39,13 @@ hat eigene Regeln in `ios/Helfer/AGENTS.md`.
 - **Gemeinsame Fälle:** Adressprüfung, Deeplink, Linkregeln und Vertragsprüfung prüft der Kern
   gegen `src-tauri/faelle/` (`src-tauri/AGENTS.md`, „Gemeinsame Fälle“). Ein neuer Fall kommt in
   die JSON, nie nur in einen Swift-Test.
+- **Kalenderdateien** (LLH-2127): ob ein Download dem Kalender gezeigt oder geteilt wird,
+  entscheidet `Downloadablage.oeffnenAls` (wie im Kotlin-Kern), den Termin liest `IcsTermin` (nur
+  das Format des eigenen Servers: ein `VEVENT`, Zeiten in UTC). Gelesen → Dialog „Neues Ereignis“
+  (`ios/App/Kalenderdialog.swift`, `EKEventEditViewController`; seit iOS 17 außerhalb der App,
+  ohne Kalenderfreigabe und ohne `Info.plist`-Schlüssel), sonst Teilen-Blatt. Die App fragt nie
+  nach Kalenderzugriff. Fälle in `src-tauri/faelle/kalender.json`; `src/lagebesprechung/ics.rs`
+  prüft, dass der Server genau den Fall `termin` erzeugt.
 - **Bauen nur auf macOS:** keine `.xcodeproj` und keine Versionsangabe im Repo. Ablauf:
   `scripts/ios/version.sh` (Version aus `[workspace.package]`) und `scripts/ios/helfer-version.sh`
   (beide xcconfig braucht XcodeGen für jedes Schema, auch für die Hülle allein) → `xcodegen

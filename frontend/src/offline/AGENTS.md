@@ -47,6 +47,14 @@ draußen gelassen werden.
   Personenfeld aus der Liste anzeigt, prüft dasselbe. Herleitung:
   `/mnt/project-files/lfh-1095/design.md`, Bedrohungsmodell
   `/mnt/project-files/lfh-1003/bedrohungsmodell.md`, 5 a).
+- **Fremdebenen nur im Budget** (LLH-2130, Entscheidung Ruben 25.11.2026): Liste und Daten stehen
+  in `LAGEBILD_OFFLINE`, die Daten aber höchstens `FREMDEBENEN_OFFLINE_BUDGET` (16 MiB) je Einsatz
+  (`offline/fremdebenenBudget.ts`): nach `data_size` der Liste aufsteigend, Gleichstand neuere
+  zuerst; ohne `data_size` zählt der Höchstwert, ohne Listeneintrag fallen die Daten. Angewandt
+  auf den **zusammengeführten** Stand (Live + Vorrat) und vor dem `hydrate`, nie auf den Vorrat
+  allein: dort fehlt die Liste, sobald der Live-Stand sie überdeckt. Gezählt wird, was im Cache
+  liegt; eine ausgeblendete Ebene lädt nie. Die Daten eines gesicherten Stands
+  (`lageSnapshotFremdebeneDaten`) bleiben draußen wie das Dokument.
 - **Die Bereitstellungsräume nur als Liste, ungekürzt** (LLH-1318, Entscheidung Ruben
   01.11.2026): `EINSATZ_KEYS.br` trägt Modulseite, Kartenebene und Materialort. Standort und
   Notiz beschreiben den Raum, nicht eine Person, und bleiben wie bei den Betreuungsstellen auf
