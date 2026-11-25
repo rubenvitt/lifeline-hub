@@ -430,7 +430,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
     - holt nur, wenn `versucht_at` älter als 60 s ist, die Quelle `url` ist, der Einsatz nicht abgeschlossen bzw. gesperrt ist und hier geführt wird (kein Spiegel, `einsatz.spiegel`).
 - Die URL erscheint nie in `tracing`, Fehlertext oder Admin-Spur.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - `anlegen_mit_url_holt_sofort` (200 → Daten da; Tippfehler bzw. 404 → 400 mit `grund: "status"`);
   - `etag_304_aendert_nur_fetched_at`;
   - `neuer_inhalt_ersetzt_und_sendet_live`;
@@ -442,10 +442,10 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - `gleichzeitige_leser_ein_abruf` (zwei parallele `GET …/data` → der Testserver zählt 1);
   - `spiegel_und_abgeschlossen_holen_nicht`;
   - `beobachter_sieht_nur_url_host`.
-- [ ] **Step 2:** `cargo test --test karte_fremdebene_url` → FAIL.
-- [ ] **Step 3:** umsetzen.
-- [ ] **Step 4:** Tests → PASS; `cargo test --lib adapter` → PASS.
-- [ ] **Step 5:** Commit `feat: Fremdebenen aus URL, bedingt nachgeholt` (Zunder C).
+- [x] **Step 2:** `cargo test --test karte_fremdebene_url` → FAIL.
+- [x] **Step 3:** umsetzen.
+- [x] **Step 4:** Tests → PASS; `cargo test --lib adapter` → PASS.
+- [x] **Step 5:** Commit `feat: Fremdebenen aus URL, bedingt nachgeholt` (Zunder C).
 
 ## Teil B+C — Frontend
 

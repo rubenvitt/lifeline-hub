@@ -9,8 +9,11 @@ use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
 use crate::karte_fremdebene::{
-    self as fremdebene, einlesen, repo, repo::FremdebenePatch, FremdebeneAnzeige, FremdebeneFehler,
-    FremdebeneQuelle,
+    self as fremdebene,
+    abruf::{self, Geholt},
+    einlesen, repo,
+    repo::FremdebenePatch,
+    FremdebeneAnzeige, FremdebeneFehler, FremdebeneQuelle,
 };
 use crate::live::LiveEvent;
 use crate::routes::support::{etag_von, hoechstens, if_none_match_matcht, pflicht_max_tri};
@@ -82,7 +85,7 @@ fn name_aus_dateiname(dateiname: &str) -> Option<String> {
 /// POST multipart: `name` (optional), genau eines von `file` oder `url`, optional `color`.
 /// Reihenfolge: Felder → Größe → Einlesen → Virenscan → Speichern → Live.
 ///
-/// `url` ist bis zur URL-Ebene (LLH-2100) eine 400.
+/// Mit `url` (LLH-2100) läuft der erste Abruf in dieser Anfrage ([`anlegen_aus_url`]).
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Lagekarte>,
@@ -136,11 +139,8 @@ pub async fn anlegen(
                 "Eine Datei oder eine URL ist nötig".into(),
             ))
         }
-        // Die URL-Ebene kommt mit LLH-2100 (Abruf über `adapter::ziel`).
-        (None, Some(_)) => {
-            return Err(AppError::Validation(
-                "Fremdebenen aus einer URL werden noch nicht unterstützt".into(),
-            ))
+        (None, Some(url)) => {
+            return anlegen_aus_url(&state, &ctx, url, name, farbe).await;
         }
         (Some(d), None) => d,
     };
@@ -165,13 +165,7 @@ pub async fn anlegen(
         .or_else(|| dateiname.as_deref().and_then(name_aus_dateiname))
         .unwrap_or_else(|| NAME_VORGABE.into());
     let name: String = name.chars().take(fremdebene::NAME_MAX).collect();
-    let farbe = match farbe {
-        Some(f) => f,
-        None => {
-            let ebenen = repo::liste(&state.pool, einsatz_id).await?;
-            fremdebene::naechste_farbe(ebenen.iter().map(|e| e.color.as_str()))
-        }
-    };
+    let farbe = farbe_oder_naechste(&state, einsatz_id, farbe).await?;
 
     let ebene = repo::anlegen(
         &state.pool,
@@ -188,15 +182,101 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(ebene)))
 }
 
+/// Farbe einer neuen Ebene: die gewählte, sonst die nächste freie.
+async fn farbe_oder_naechste(
+    state: &AppState,
+    einsatz_id: i64,
+    farbe: Option<&'static str>,
+) -> Result<&'static str, AppError> {
+    Ok(match farbe {
+        Some(f) => f,
+        None => {
+            let ebenen = repo::liste(&state.pool, einsatz_id).await?;
+            fremdebene::naechste_farbe(ebenen.iter().map(|e| e.color.as_str()))
+        }
+    })
+}
+
+/// Anlegen einer URL-Ebene (LLH-2100): Zielschutz, erster Abruf synchron (ein Tippfehler kommt
+/// sofort als 400 mit `grund` zurück), Einlesen, Speichern samt Validatoren. Nur die führende
+/// Seite eines aktiven Einsatzes ruft ab. Die URL steht nie in Log oder Fehlertext.
+async fn anlegen_aus_url(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    url: String,
+    name: Option<String>,
+    farbe: Option<&'static str>,
+) -> Result<(StatusCode, Json<FremdebeneAnzeige>), AppError> {
+    let einsatz_id = ctx.einsatz.id;
+    hoechstens(&url, "URL", crate::public_api::webhook::URL_MAX)?;
+    if !abruf::is_hier_abzurufen(&ctx.einsatz) {
+        return Err(AppError::Conflict(
+            "Eine URL-Ebene ruft nur die führende Instanz eines aktiven Einsatzes ab".into(),
+        ));
+    }
+    let (normiert, etag, last_modified) =
+        match abruf::holen(state, ctx.einsatz.org_id, &url, None, None).await? {
+            Ok(Geholt::Neu {
+                normiert,
+                etag,
+                last_modified,
+            }) => (normiert, etag, last_modified),
+            // Ohne Validatoren gibt es kein 304; ein Ziel, das es dennoch schickt, liefert nichts.
+            Ok(Geholt::Unveraendert { .. }) => return Err(FremdebeneFehler::Status.into()),
+            Err(fehler) => {
+                tracing::info!(
+                    einsatz_id,
+                    fehler = fehler.as_str(),
+                    "Fremdebene: erster Abruf gescheitert"
+                );
+                return Err(fehler.into());
+            }
+        };
+
+    let name = name
+        .or_else(|| normiert.namensvorschlag.clone())
+        .or_else(|| fremdebene::url_host(&url))
+        .unwrap_or_else(|| NAME_VORGABE.into());
+    let name: String = name.chars().take(fremdebene::NAME_MAX).collect();
+    let farbe = farbe_oder_naechste(state, einsatz_id, farbe).await?;
+    let ebene = repo::anlegen(
+        &state.pool,
+        einsatz_id,
+        ctx.benutzer.id,
+        &name,
+        FremdebeneQuelle::Url,
+        Some(&url),
+        farbe,
+        &normiert,
+    )
+    .await?;
+    repo::setze_abruf(
+        &state.pool,
+        einsatz_id,
+        ebene.id,
+        repo::AbrufStand::Erfolg {
+            etag: etag.as_deref(),
+            last_modified: last_modified.as_deref(),
+        },
+    )
+    .await?;
+    let ebene = repo::laden(&state.pool, einsatz_id, ebene.id).await?;
+    sse_fremdebene(state, einsatz_id);
+    Ok((StatusCode::CREATED, Json(ebene)))
+}
+
 /// GET normiertes GeoJSON. `ETag` = sha256 des Inhalts, 304 bei passendem `If-None-Match`.
 /// Ungepackt: eine Antwort mit `ETag` packt die Kompression nicht (`src/AGENTS.md`,
-/// „Antwortkompression“, LFH-940).
+/// „Antwortkompression“, LFH-940). Eine fällige URL-Ebene wird vorher bedingt nachgeholt
+/// (`karte_fremdebene::abruf::refresh_if_due`); ein Abruffehler steht an der Ebene, die Daten
+/// bleiben.
 pub async fn daten(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
     PfadParam((_eid, ebene_id)): PfadParam<(i64, i64)>,
     req_headers: HeaderMap,
 ) -> Result<Response, AppError> {
+    abruf::refresh_if_due(&state, &ctx.einsatz, ebene_id).await?;
     let (geojson, sha) = repo::laden_daten(&state.pool, ctx.einsatz.id, ebene_id)
         .await?
         .ok_or(AppError::NotFound)?;

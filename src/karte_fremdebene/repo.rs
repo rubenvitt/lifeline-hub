@@ -280,6 +280,36 @@ pub async fn setze_abruf(
     Ok(())
 }
 
+/// Was der Abruf der URL-Ebene von einer Ebene braucht (`karte_fremdebene::abruf`).
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct Abrufstand {
+    pub quelle: FremdebeneQuelle,
+    /// Nicht loggen: kann ein Token tragen.
+    pub url: Option<String>,
+    pub versucht_at: Option<String>,
+    #[sqlx(rename = "quelle_etag")]
+    pub etag: Option<String>,
+    #[sqlx(rename = "quelle_last_modified")]
+    pub last_modified: Option<String>,
+    pub fehler: Option<FremdebeneFehler>,
+}
+
+/// Der Abrufstand einer Ebene; `None`, wenn sie nicht (zu diesem Einsatz) existiert.
+pub async fn laden_abrufstand(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<Option<Abrufstand>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT quelle, url, versucht_at, quelle_etag, quelle_last_modified, fehler \
+         FROM karte_fremdebene WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
 /// Änderbare Angaben einer Ebene; `None` heißt unverändert.
 #[derive(Debug, Default, Clone)]
 pub struct FremdebenePatch {

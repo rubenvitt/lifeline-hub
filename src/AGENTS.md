@@ -244,6 +244,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   idempotent in den Vertrag der Art.
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
   vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
+  Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
   Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.

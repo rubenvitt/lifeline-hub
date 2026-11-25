@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Weg nach draußen der URL-Fremdebenen (LLH-2100) samt Single-Flight je Ebene. Vorgabe: der
+    /// echte Abruf über `adapter::ziel`; Tests setzen einen eigenen Abrufer ein.
+    pub fremdebene_abrufer: crate::karte_fremdebene::abruf::Abrufer,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -3243,6 +3246,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            fremdebene_abrufer: Default::default(),
         }
     }
 

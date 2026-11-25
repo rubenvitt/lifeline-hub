@@ -6,6 +6,7 @@
 //! (Migration 0373, Teilung wie `karte_hintergrundbild_daten`, LFH-936): die Liste liest nie den
 //! Inhalt. Eingelesen wird in [`einlesen`]; gespeichert wird nur das Ergebnis, nie die Datei.
 
+pub mod abruf;
 pub mod einlesen;
 pub mod repo;
 

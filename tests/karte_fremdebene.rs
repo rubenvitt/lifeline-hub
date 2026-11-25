@@ -258,16 +258,7 @@ async fn genau_eine_quelle() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "Datei und URL zugleich");
 
-    // Die URL-Ebene folgt (Task 15); bis dahin ist sie 400 und legt nichts an.
-    let (s, _) = hochladen(
-        &app,
-        einsatz,
-        &admin,
-        &[("name", "A"), ("url", "https://example.org/a.kml")],
-        None,
-    )
-    .await;
-    assert_eq!(s, StatusCode::BAD_REQUEST);
+    // Die URL-Ebene selbst prüft `tests/karte_fremdebene_url.rs`.
     let (_, liste) = anfrage(&app, "GET", &basis(einsatz), &admin, None).await;
     assert!(liste.as_array().unwrap().is_empty());
 }
