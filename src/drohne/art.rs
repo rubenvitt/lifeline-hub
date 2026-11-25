@@ -111,12 +111,15 @@ impl Uebernahme for SuchlageUebernahme {
     ) -> BoxFuture<'a, Result<i64, AppError>> {
         Box::pin(async move {
             // Maßgeblich ist die Datenbank: sie sagt, ob ein laufender Einsatz die Quelle hält.
+            // Marke vor dem Lesen (`store.rs`, „Abgleich“): ein späterer Abgleich gewinnt.
+            let marke = self.store.marke();
             let aktiv = repo::is_active(conn, &adapter.id).await?;
-            self.store.set_zugeschaltet(&adapter.id, aktiv);
-            if !aktiv {
+            if !self
+                .store
+                .uebernehmen(&adapter.id, aktiv, marke, self.stand.clone())
+            {
                 return Ok(0);
             }
-            self.store.put(&adapter.id, self.stand.clone());
             Ok(i64::from(self.geaendert))
         })
     }

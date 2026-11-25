@@ -166,11 +166,11 @@ async fn find_active_holder_findet_den_anderen_einsatz() {
 #[tokio::test]
 async fn abschalten_leert_den_stand() {
     let store = Store::new();
-    store.set_zugeschaltet("a1", true);
+    store.set_zugeschaltet("a1", true, store.marke());
     store.put("a1", stand());
     assert!(store.get("a1").is_some());
 
-    store.set_zugeschaltet("a1", false);
+    store.set_zugeschaltet("a1", false, store.marke());
     assert!(!store.is_zugeschaltet("a1"));
     assert!(store.get("a1").is_none());
 }
@@ -207,4 +207,97 @@ async fn löschen_des_adapters_entfernt_die_zuschaltung() {
         .await
         .unwrap()
         .is_empty());
+}
+
+// LLH-2123: Wer seine Marke früher gezogen hat, hat die Datenbank früher gelesen. Sein Wert ist
+// veraltet, sobald ein späterer Abgleich schon gesetzt hat.
+#[tokio::test]
+async fn ein_älterer_abgleich_überschreibt_keinen_neueren() {
+    let store = Store::new();
+    let a = store.marke();
+    let b = store.marke();
+    assert!(store.set_zugeschaltet("a1", true, b));
+    assert!(!store.set_zugeschaltet("a1", false, a));
+    assert!(store.is_zugeschaltet("a1"));
+
+    // Und umgekehrt: ein späteres Abschalten gilt.
+    assert!(store.set_zugeschaltet("a1", false, store.marke()));
+    assert!(!store.is_zugeschaltet("a1"));
+}
+
+#[tokio::test]
+async fn marken_gelten_je_adapter() {
+    let store = Store::new();
+    let a = store.marke();
+    let b = store.marke();
+    assert!(store.set_zugeschaltet("a2", true, b));
+    assert!(store.set_zugeschaltet("a1", true, a));
+    assert!(store.is_zugeschaltet("a1"));
+}
+
+// Die Reihenfolge aus LLH-2123: Einsatz A schließt, sein Nachführen liest „nicht gehalten“;
+// bevor es den Merker setzt, schaltet Einsatz B zu und gleicht ab. Der Merker bleibt an.
+#[tokio::test]
+async fn abschluss_und_zuschalten_im_selben_moment_lassen_den_merker_an() {
+    let u = umgebung().await;
+    let zweiter = einsatz_anlegen_mit(&u.app, &u.cookie, "Lage B").await;
+    u.adapter("a1").await;
+    u.zuschalten("a1", u.einsatz).await;
+    let store = Store::new();
+    store.load(&u.pool).await;
+    assert!(store.is_zugeschaltet("a1"));
+
+    // A schließt: Zeile weg, das Nachführen zieht seine Marke und liest.
+    {
+        let mut conn = u.pool.acquire().await.unwrap();
+        repo::delete_for_einsatz(&mut conn, u.einsatz).await.unwrap();
+    }
+    let marke_a = store.marke();
+    let an_a = {
+        let mut conn = u.pool.acquire().await.unwrap();
+        repo::is_active(&mut conn, "a1").await.unwrap()
+    };
+    assert!(!an_a);
+
+    // B schaltet zu und gleicht nach seinem Commit ab.
+    u.zuschalten("a1", zweiter).await;
+    {
+        let mut conn = u.pool.acquire().await.unwrap();
+        store.abgleichen(&mut conn, "a1").await.unwrap();
+    }
+    assert!(store.is_zugeschaltet("a1"));
+
+    // Erst jetzt setzt A: zu spät, der Wert ist überholt.
+    store.set_zugeschaltet("a1", an_a, marke_a);
+    assert!(store.is_zugeschaltet("a1"));
+}
+
+#[tokio::test]
+async fn abgleichen_folgt_der_datenbank() {
+    let u = umgebung().await;
+    u.adapter("a1").await;
+    let store = Store::new();
+    let mut conn = u.pool.acquire().await.unwrap();
+    store.abgleichen(&mut conn, "a1").await.unwrap();
+    assert!(!store.is_zugeschaltet("a1"));
+    drop(conn);
+
+    u.zuschalten("a1", u.einsatz).await;
+    let mut conn = u.pool.acquire().await.unwrap();
+    store.abgleichen(&mut conn, "a1").await.unwrap();
+    assert!(store.is_zugeschaltet("a1"));
+}
+
+// Eine Übernahme, die ein späterer Abgleich überholt hat, legt keinen Stand ab.
+#[tokio::test]
+async fn eine_überholte_übernahme_legt_keinen_stand_ab() {
+    let store = Store::new();
+    let alt = store.marke();
+    store.set_zugeschaltet("a1", false, store.marke());
+    assert!(!store.uebernehmen("a1", true, alt, stand()));
+    assert!(!store.is_zugeschaltet("a1"));
+    assert!(store.get("a1").is_none());
+
+    assert!(store.uebernehmen("a1", true, store.marke(), stand()));
+    assert!(store.get("a1").is_some());
 }
