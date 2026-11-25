@@ -164,7 +164,8 @@ einheit })` in die vorbelegte Kopplungsmaske (`?einheit=` verfällt nach dem Öf
   eigene Schalter, und keine andere Ansicht erreicht den Proxy. Die Kachel „Livebild“
   (`geraet/LagemonitorLivebild.tsx`) ist stumm und ohne Bedienung, nennt den Datenstand und
   zeigt ohne Strom „Kein Livebild“ ohne Alarm; mit ihr steht unter der Karte eine Zeile aus
-  Livebild und Meldungen über Ablauf (Entwurf `docs/design/2026-11-25-lagemonitor-livebild/`).
+  Livebild und Meldungen über dem nächsten Programmpunkt, der Rest als „+n weitere“ (Entwurf
+  `docs/design/2026-11-25-lagemonitor-livebild/`).
   Seine Zahlen kommen nur aus `GET /api/incidents/{id}/situation-monitor` (`src/routes/lagemonitor.rs`,
   nur für diese Ansicht), auch Gefahrenzonen (Typ und Geometrie, bei einem Gefahrengebiet dazu
   `gebiet`: Bezeichnung, höchste Warnstufe und Bestätigung des Gebiets, LLH-1746) und

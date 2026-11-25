@@ -31,3 +31,10 @@ Flächen auf die Systemschrift zurück. Inline-Styles sind maßgeblich.
 5. **Schalter:** Unter der zugeschalteten Quelle, zwischen „Livebild“ und „Abschalten“, ein
    Schalter „Livebild auf dem Lagemonitor“, aus als Vorgabe, mit einer Zeile darunter, die sagt,
    was gilt. Nur die Einsatzleitung sieht ihn.
+
+## Nachtrag beim Bauen (25.11.2026)
+
+Ruben hat Variante A gewählt: Neben dem Livebild zeigt „Ablauf“ nur den nächsten Programmpunkt
+und darunter „+n weitere“; die Kachel „Livebild“ ist 600 statt 734 px breit, die Zeile mindestens
+440 px hoch und wächst mit einer langen Bezeichnung. Die Zeichenflächen oben zeigen noch den
+ersten Stand; maßgeblich ist der Code (`geraet/LagemonitorPage.tsx`).

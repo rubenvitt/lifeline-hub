@@ -130,9 +130,15 @@ Wie der Monitor von den Videos erfährt, war nicht offen: Die Konzeptnotiz legt 
   Kennung (wieder) da ist oder der nächste Datenstand kommt. Kein Eintrag in „Was brennt“, keine
   Alarmfarbe.
 - Eigene `KachelGrenze` in Form `gross`, Neuversuch mit dem nächsten Datenstand.
-- Kachelung nach dem Entwurf: in der linken Spalte unter der Karte eine Zeile von 440 px mit der
-  Kachel „Livebild“ (734 px breit) und rechts daneben „Sofortmeldungen“ über „Ablauf“. Fehlen
+- Kachelung nach dem Entwurf: in der linken Spalte unter der Karte eine Zeile von mindestens 440 px
+  mit der Kachel „Livebild“ (600 px breit) und rechts daneben „Meldungen“ über „Ablauf“. Fehlen
   beide, nimmt „Livebild“ die Zeile allein (Bild mittig). Ohne Block `drohne` bleibt alles wie heute.
+- **Nachtrag beim Bauen (Ruben, 25.11.2026, Variante A):** Drei lange Programmpunkte passten
+  nicht in die schmale Spalte (e2e: „Ablauf“ 321 × 225 px, Inhalt 910 px). Neben dem Livebild
+  zeigt „Ablauf“ deshalb nur den nächsten Punkt und darunter „+n weitere“; die Kachel „Livebild“
+  ist 600 statt 734 px breit, und die Zeile wächst mit einer langen Bezeichnung, die Karte gibt
+  die Höhe ab. Verworfen: alle Punkte in eigener Zeile (Karte schrumpft auf ~100 px), „Meldungen“
+  entfällt (trägt auch nur ~2 lange Punkte).
 - Beim Monitor die `pointerEvents: 'none'` der Kacheln gilt auch für das Video.
 
 ### 5.6 Regel (E2)

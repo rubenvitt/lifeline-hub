@@ -907,12 +907,21 @@ describe('Lagemonitor — Livebild der Drohne (LLH-2109)', () => {
       HttpResponse.json({
         ...lage,
         drohne,
-        programm: [{ id: 1, bezeichnung: 'Beginn', zeitpunkt_at: '2026-10-04 10:20:30' }],
+        programm: [
+          { id: 1, bezeichnung: 'Beginn', zeitpunkt_at: '2026-10-04 10:20:30' },
+          { id: 2, bezeichnung: 'Feuerwerk', zeitpunkt_at: '2026-10-04 11:05:30' },
+          { id: 3, bezeichnung: 'Ende', zeitpunkt_at: '2026-10-04 12:00:30' },
+        ],
       });
     renderApp('/geraet/7/monitor');
     const kachel = await screen.findByRole('region', { name: 'Livebild' });
     const meldungen = screen.getByRole('region', { name: 'Meldungen' });
     const ablauf = screen.getByRole('region', { name: 'Ablauf' });
+    // Neben dem Livebild nur der nächste Programmpunkt, der Rest als „+2 weitere“ (Ruben,
+    // 25.11.2026): drei lange Bezeichnungen passten nicht in die Spalte.
+    expect(within(ablauf).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(ablauf).getByText('Beginn')).toBeInTheDocument();
+    expect(within(ablauf).getByText('+2 weitere')).toBeInTheDocument();
     const spalte = meldungen.closest('[data-lfh="livebild-nebenspalte"]');
     expect(spalte).not.toBeNull();
     expect(spalte!.contains(ablauf)).toBe(true);

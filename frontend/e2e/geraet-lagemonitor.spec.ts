@@ -302,11 +302,13 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
         );
       expect(abgeschnitten).toEqual([]);
       const namen = punkte.locator('[data-lfh="monitor-ablauf-bezeichnung"]');
-      await expect(namen).toHaveText([
-        langeBezeichnung('Pause'),
-        langeBezeichnung('Feuerwerk'),
-        langeBezeichnung('Zugabe'),
-      ]);
+      // Neben dem Livebild steht nur der nächste Punkt, der Rest als „+2 weitere“ (LLH-2109).
+      await expect(namen).toHaveText(
+        mitLivebild
+          ? [langeBezeichnung('Pause')]
+          : [langeBezeichnung('Pause'), langeBezeichnung('Feuerwerk'), langeBezeichnung('Zugabe')],
+      );
+      if (mitLivebild) await expect(ablauf.getByText('+2 weitere')).toBeVisible();
       const quer = await namen.evaluateAll(
         (el) => el.filter((n) => n.scrollWidth > n.clientWidth + 1).length,
       );

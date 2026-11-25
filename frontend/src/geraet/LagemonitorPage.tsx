@@ -63,9 +63,13 @@ export const MENUE_ZU_MS = 30_000;
  */
 export const ABRUF_TAKT_MS = 30_000;
 
-/** Höhe der Zeile mit dem Livebild und Breite seiner Kachel bei 1920 × 1080 (LLH-2109, Entwurf). */
+/**
+ * Mindesthöhe der Zeile mit dem Livebild und Breite seiner Kachel bei 1920 × 1080 (LLH-2109).
+ * Daneben stehen Meldungen über dem nächsten Programmpunkt („+n weitere“, Ruben 25.11.2026); trägt
+ * er eine lange Bezeichnung, wächst die Zeile, und die Karte gibt die Höhe ab.
+ */
 const LIVEBILD_ZEILE_PX = 440;
-const LIVEBILD_BREITE_PX = 734;
+const LIVEBILD_BREITE_PX = 600;
 
 /**
  * So lange hebt der Monitor eine gestiegene Zahl hervor (Spec `lagemonitor`, „Neue Dringlichkeit
@@ -728,10 +732,22 @@ function abstandText(zeitpunktAt: string, jetztMs: number): string {
  * Bezeichnung, Abstand, ohne Alarm. Ein verstrichener Punkt fällt mit dem Takt der Monitoruhr
  * heraus, auch zwischen zwei Abrufen; ohne anstehenden Punkt fehlt die Kachel ganz.
  */
-function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: number }) {
+function AblaufKachel({
+  punkte,
+  jetzt,
+  weitere = 0,
+  nachInhalt = false,
+}: {
+  punkte: Programmpunkt[];
+  jetzt: number;
+  /** Höhe nach dem Inhalt statt nach der Zeile: neben dem Livebild wächst die Zeile mit. */
+  nachInhalt?: boolean;
+  /** Anstehende Punkte, die nicht gezeigt werden (neben dem Livebild, LLH-2109). */
+  weitere?: number;
+}) {
   const { rollen } = useRollen();
   return (
-    <Kachel titel="Ablauf" style={{ flex: '1 1 0', minWidth: 0 }}>
+    <Kachel titel="Ablauf" style={{ flex: nachInhalt ? '1 0 auto' : '1 1 0', minWidth: 0 }}>
       <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 12 }}>
         {punkte.map((p) => (
           // Uhrzeit und Abstand stehen über der Bezeichnung, die die ganze Breite der Kachel hat:
@@ -784,6 +800,11 @@ function AblaufKachel({ punkte, jetzt }: { punkte: Programmpunkt[]; jetzt: numbe
           </li>
         ))}
       </ol>
+      {weitere > 0 && (
+        <span style={{ fontSize: grossMass(GROSS_BEZUG.text), color: rollen.gedaempft }}>
+          +{weitere} weitere
+        </span>
+      )}
     </Kachel>
   );
 }
@@ -897,9 +918,10 @@ export default function LagemonitorPage() {
           </KachelGrenze>
           {drohne ? (
             // Livebild der Drohne (LLH-2109, Entwurf `docs/design/2026-11-25-lagemonitor-livebild/`):
-            // eine Zeile von 440 px unter der Karte, links das Bild in 16 : 9, rechts daneben
-            // Meldungen über Ablauf; fehlen beide, nimmt das Livebild die Zeile allein.
-            <div style={{ display: 'flex', gap: 16, height: LIVEBILD_ZEILE_PX, minWidth: 0 }}>
+            // eine Zeile von mindestens 440 px unter der Karte, links das Bild in 16 : 9, rechts
+            // daneben Meldungen über dem nächsten Programmpunkt; fehlen beide, nimmt das Livebild
+            // die Zeile allein.
+            <div style={{ display: 'flex', gap: 16, minHeight: LIVEBILD_ZEILE_PX, minWidth: 0 }}>
               <KachelGrenze
                 titel="Livebild"
                 form="gross"
@@ -947,7 +969,12 @@ export default function LagemonitorPage() {
                       neuversuch={lageQuery.dataUpdatedAt}
                       ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
                     >
-                      <AblaufKachel punkte={ablauf} jetzt={jetzt} />
+                      <AblaufKachel
+                        punkte={ablauf.slice(0, 1)}
+                        jetzt={jetzt}
+                        weitere={ablauf.length - 1}
+                        nachInhalt
+                      />
                     </KachelGrenze>
                   )}
                 </div>
