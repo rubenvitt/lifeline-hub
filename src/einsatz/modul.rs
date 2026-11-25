@@ -301,6 +301,9 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/incidents/{id}/integrations", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.
     ("/api/incidents/{id}/situation-picture-shares", None),
+    // Drohnenquellen je Einsatz (LLH-2105): zuschalten und lesen, Teil der Lagekarte.
+    ("/api/incidents/{id}/drone", Some("lagekarte")),
+    ("/api/incidents/{id}/map/drone", Some("lagekarte")),
 ];
 
 /// Der Einsatz selbst (`GET`/`PATCH /api/incidents/{id}`). In [`key_fuer_pfad`] trifft dieser

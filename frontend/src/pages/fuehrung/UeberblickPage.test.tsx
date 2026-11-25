@@ -59,6 +59,8 @@ const einsatz = {
   meine_sachgebiete: [],
   meine_rolle: 'fuehrungspersonal',
   naechste_lagebesprechung_at: nach(120),
+  // Pflichtfeld der Antwort (`[]`, nie fehlend); trägt es `pegel`, hält der Kopf Platz (LLH-2085).
+  lagekennzahlen: [],
 };
 
 const person = (id: number, erfasst_at: string) => ({
@@ -555,6 +557,42 @@ describe('UeberblickPage', () => {
     );
     // Der tote Pegel-Abruf macht die Warnstufe nicht unlesbar.
     await waitFor(() => expect(kopfLage()).toHaveTextContent('Warnstufe hoch'));
+  });
+
+  // LLH-2085: kam die Notiz als erste Lage-Angabe, brach der Kopf mit langem Einsatznamen bei
+  // 1024 px um (CLS 0,40). Der Einsatz sagt vorher, ob ein Pegel festgelegt ist.
+  const pegelHaengt = http.get('/api/incidents/1/gauges', async () => {
+    await delay('infinite');
+    return HttpResponse.json([]);
+  });
+  const platzhalter = () =>
+    document.querySelector<HTMLElement>('[data-lfh="kopf-pegel-platzhalter"]');
+
+  it('Pegel lädt: unsichtbarer Platzhalter „Pegel 0,00 m steigend“ hält die Stelle der Notiz (LLH-2085)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/incidents/1', () =>
+        HttpResponse.json({ ...einsatz, lagekennzahlen: ['pegel'] }),
+      ),
+      pegelHaengt,
+    ]);
+    rendern();
+    await koerperDa();
+    await waitFor(() => expect(platzhalter()).toHaveTextContent('Pegel 0,00 m steigend'));
+    expect(platzhalter()).toHaveAttribute('aria-hidden', 'true');
+    expect(platzhalter()).toHaveStyle({ visibility: 'hidden' });
+    expect(kopfLage()).toContainElement(platzhalter());
+    expect(document.querySelector('[data-lfh="kopf-pegel"]')).toBeNull();
+  });
+
+  it('Einsatz ohne Pegel: kein Platzhalter im Kopf, auch während der Pegel-Abruf lädt (LLH-2085)', async () => {
+    stelleBereit(volleDaten, [
+      http.get('/api/incidents/1', () => HttpResponse.json({ ...einsatz, lagekennzahlen: [] })),
+      pegelHaengt,
+    ]);
+    rendern();
+    await koerperDa();
+    await waitFor(() => expect(kopfLage()).toHaveTextContent('Warnstufe hoch'));
+    expect(platzhalter()).toBeNull();
   });
 
   it('Abschnittszeile: Leiter, Stärke, Einheiten nach Status ehrlich beschriftet, Auftrag, Deeplink', async () => {

@@ -886,6 +886,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
     'kritis',
     'energie',
     'copernicus',
+    'drohne',
   ];
 
   it('hält am Tag die bisherigen Töne — keine Umfärbung (Literale)', () => {
@@ -900,6 +901,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#531dab',
       '#d4b106',
       '#873800',
+      '#f5590f',
     ]);
   });
 
@@ -915,6 +917,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#9254de',
       '#fadb14',
       '#c48a5a',
+      '#ff8c5a',
     ]);
   });
 

@@ -15134,8 +15134,14 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
 /// Führer sie nicht mehr unter den beantragbaren Erfassungen. Die Migration tauscht nur das Präfix
 /// und lässt fremde Vorlagen stehen, auch eine, die bloß mit denselben Buchstaben beginnt.
 #[tokio::test]
-async fn migration_0373_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
-    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 372).await;
+async fn migration_0374_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 374;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
     for sql in [
         "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
         "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
@@ -15150,7 +15156,7 @@ async fn migration_0373_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
     ] {
         sqlx::query(sql).execute(&pool).await.unwrap();
     }
-    migriere_bis(&pool, 373).await;
+    migriere_bis(&pool, VERSION).await;
     let vorlagen: Vec<String> =
         sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
             .fetch_all(&pool)
@@ -15164,5 +15170,109 @@ async fn migration_0373_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
             "/api/einsaetze-alt/{id}",
             "/api/fremd/einsaetze/{id}",
         ]
+    );
+}
+
+/// LLH-1633: Zuordnungstabelle Kennung + Herkunft für Fahrzeuge, Personal und Qualifikationen.
+/// Genau ein Ziel, je Art/Org/Herkunft/Kennung höchstens ein Ziel, je Fahrzeug bzw. Person nur eine
+/// Kennung je Herkunft (Qualifikationen dürfen Aliasse tragen), Löschen des Ziels kaskadiert.
+#[tokio::test]
+async fn migration_0373_stammdaten_kennung() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 373;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Org')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    migriere_bis(&pool, VERSION).await;
+
+    async fn id(pool: &SqlitePool, sql: &'static str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(pool).await.unwrap()
+    }
+    let fz1 = id(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+    )
+    .await;
+    let fz2 = id(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 2') RETURNING id",
+    )
+    .await;
+    let p1 = id(
+        &pool,
+        "INSERT INTO personal (org_id, name) VALUES (1, 'Anna') RETURNING id",
+    )
+    .await;
+    let q1 = id(
+        &pool,
+        "INSERT INTO qualifikation (org_id, label) VALUES (1, 'Sanitäter') RETURNING id",
+    )
+    .await;
+
+    let einfuegen = |kennung: &'static str,
+                     herkunft: &'static str,
+                     fz: Option<i64>,
+                     p: Option<i64>,
+                     q: Option<i64>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO stammdaten_kennung \
+                 (org_id, herkunft, kennung, fahrzeug_id, personal_id, qualifikation_id, angelegt_at) \
+                 VALUES (1, ?, ?, ?, ?, ?, '2026-11-24T00:00:00Z')",
+            )
+            .bind(herkunft)
+            .bind(kennung)
+            .bind(fz)
+            .bind(p)
+            .bind(q)
+            .execute(&pool)
+            .await
+        }
+    };
+
+    einfuegen("1", "quelle", Some(fz1), Some(p1), None)
+        .await
+        .expect_err("zwei Ziele verletzen die CHECK-Bedingung");
+    einfuegen("1", "quelle", None, None, None)
+        .await
+        .expect_err("kein Ziel verletzt die CHECK-Bedingung");
+
+    einfuegen("4711", "quelle", Some(fz1), None, None)
+        .await
+        .unwrap();
+    einfuegen("4711", "quelle", Some(fz2), None, None)
+        .await
+        .expect_err("Kennung je Org, Art und Herkunft nur einmal");
+    einfuegen("4711", "quelle", None, Some(p1), None)
+        .await
+        .expect("gleiche Kennung für Personal ist eine andere Art");
+    einfuegen("4711", "quelle", None, None, Some(q1))
+        .await
+        .expect("gleiche Kennung für Qualifikation ist eine andere Art");
+
+    einfuegen("4712", "quelle", Some(fz1), None, None)
+        .await
+        .expect_err("je Fahrzeug und Herkunft nur eine Kennung");
+    einfuegen("4712", "andere", Some(fz1), None, None)
+        .await
+        .expect("andere Herkunft am selben Fahrzeug");
+    einfuegen("4712", "quelle", None, None, Some(q1))
+        .await
+        .expect("Qualifikation darf mehrere Kennungen derselben Herkunft tragen");
+
+    let geloescht = sqlx::query("DELETE FROM fahrzeug WHERE id = ?")
+        .bind(fz1)
+        .execute(&pool)
+        .await;
+    assert!(
+        geloescht.is_err(),
+        "ein Fahrzeug mit Kennung hält fest (NO ACTION, Demo-Löschweg behält es)"
     );
 }

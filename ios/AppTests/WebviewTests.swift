@@ -123,28 +123,29 @@ final class WebviewTests: XCTestCase {
     }
 
     /// Standort über die Brücke (LLH-2071): die Seite des aktiven Servers fragt die Hülle, eine
-    /// Verweigerung kommt als Code 1 der Web-API an.
+    /// Verweigerung kommt als Code 1 der Web-API an, mit der Meldung der Brücke (`denied`) statt
+    /// einer Ablehnung durch WebKit selbst (LLH-2082).
     func testDerStandortGehtUeberDieBrueckeUndEineVerweigerungIstCode1() async throws {
         let (web, _, _) = try await lade(basis: elw.url, aktiv: elw, html: """
             <script>
             navigator.geolocation.getCurrentPosition(
               () => { document.title = 'position'; },
-              (e) => { document.title = 'fehler ' + e.code; },
+              (e) => { document.title = 'fehler ' + e.code + ' ' + e.message; },
               { timeout: 5000 });
             </script>
             """)
-        await warte { await self.titel(web) == "fehler 1" }
+        await warte { await self.titel(web) == "fehler 1 denied" }
         let titel = await titel(web)
-        XCTAssertEqual(titel, "fehler 1")
+        XCTAssertEqual(titel, "fehler 1 denied")
     }
 
     func testEinUnterframeBekommtKeinenStandort() async throws {
         let (web, _, _) = try await lade(basis: elw.url, aktiv: elw, html: """
-            <iframe srcdoc="<script>navigator.geolocation.getCurrentPosition(() => { parent.document.title = 'position'; }, (e) => { parent.document.title = 'fehler ' + e.code; });</script>"></iframe>
+            <iframe srcdoc="<script>navigator.geolocation.getCurrentPosition(() => { parent.document.title = 'position'; }, (e) => { parent.document.title = 'fehler ' + e.code + ' ' + e.message; });</script>"></iframe>
             """)
-        await warte { await self.titel(web) == "fehler 1" }
+        await warte { await self.titel(web) == "fehler 1 denied" }
         let titel = await titel(web)
-        XCTAssertEqual(titel, "fehler 1")
+        XCTAssertEqual(titel, "fehler 1 denied")
     }
 
     func testNachEinemServerwechselGiltDieAlteSeiteNichtMehr() async throws {

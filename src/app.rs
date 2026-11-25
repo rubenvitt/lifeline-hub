@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
+    /// `adapter_einsatz`, nur im Arbeitsspeicher.
+    pub drohne: std::sync::Arc<crate::drohne::Store>,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -109,6 +112,10 @@ pub const PUBLIC_API_BODY_MAX: usize = 64 * 1024;
 /// (`abloesung::schichtplan::uebernahme::DATEI_MAX_BYTES`) plus Entscheidungen und Rahmen. So
 /// bleibt die Prüfung der Datei (400 mit Meldung) die wirksame Grenze.
 const SCHICHTPLAN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
+
+/// Body-Grenze der Stammdaten-Routen (LLH-1633): die Datei (höchstens 2 MiB,
+/// `stammdaten_eingang::datei`) plus Entscheidungen und Multipart-Rahmen.
+const STAMMDATEN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
 
 /// Zone anlegen und Abschnittsfläche setzen (LFH-1074): Geometrie bis 256 KiB
 /// (`lage_zone::pruefe_geometrie_groesse`) plus Rahmen. So bleibt die Geometrieprüfung (400 mit
@@ -1939,6 +1946,31 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
+        // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
+        .route(
+            "/api/incidents/{id}/drone/sources",
+            get(routes::drohne::liste),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            put(routes::drohne::zuschalten),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            delete(routes::drohne::abschalten),
+        )
+        // Drohnenlage als Fachebene der Lagekarte (LLH-2106).
+        .route("/api/incidents/{id}/map/drone", get(routes::drohne::karte))
+        // Livebild der Drohne als gebündelter HLS-Proxy (LLH-2107).
+        .route(
+            "/api/incidents/{id}/drone/video/{key}/hls/{*file}",
+            get(routes::drohne::video),
+        )
+        // Vorschau der Drohnenfotos über den Proxy (LLH-2108).
+        .route(
+            "/api/incidents/{id}/drone/photos/{key}/thumb",
+            get(routes::drohne::foto_vorschau),
+        )
         .route(
             "/api/incidents/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
@@ -2405,6 +2437,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/vehicles", get(routes::fahrzeug::liste))
         .route("/api/vehicles", post(routes::fahrzeug::anlegen))
+        // Stammdaten einlesen (LLH-1633): Datei, Vorschau schreibt nichts.
+        .route(
+            "/api/master-data/import/preview",
+            post(routes::stammdaten_eingang::vorschau)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
+        .route(
+            "/api/master-data/import",
+            post(routes::stammdaten_eingang::uebernehmen)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
         .route(
             "/api/vehicle-suggestions",
             get(routes::fahrzeug::vorschlaege),
@@ -2753,6 +2796,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
             get(routes::karte::proxy_glyphs),
+        )
+        .route(
+            "/api/map/proxy/{id}/asset/{slot}",
+            get(routes::karte::proxy_asset_slot),
         )
         // Admin-CRUD der Karten-Registry (Online-Quellen + Offline-Karten), hinter AdminUser.
         .route(
@@ -3216,6 +3263,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            drohne: Default::default(),
         }
     }
 

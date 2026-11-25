@@ -288,7 +288,8 @@ export const EBENEN_GRUPPEN: readonly {
 ];
 
 /** Kennungen der Fachebenen-Untergruppen. */
-export type FachebenenGruppeKennung = 'warnungen' | 'wasser' | 'umwelt' | 'verkehr' | 'satellit';
+export type FachebenenGruppeKennung =
+  'warnungen' | 'wasser' | 'umwelt' | 'verkehr' | 'satellit' | 'drohne';
 
 /** Untergruppen der Fachebenen — jede Quelle in genau einer (Vitest-Wächter). */
 export const FACHEBENEN_GRUPPEN: readonly {
@@ -306,6 +307,8 @@ export const FACHEBENEN_GRUPPEN: readonly {
   },
   // LLH-1200: Auswertungen von Satellitenbildern, später auch deren Rasterbilder.
   { kennung: 'satellit', name: 'Satellitenauswertung', ebenen: ['copernicus'] },
+  // LLH-2106: das Drohnenbild aus Suchlage; die Zeile der Quelle schaltet die Einsatzleitung zu.
+  { kennung: 'drohne', name: 'Drohne', ebenen: ['drohne'] },
 ];
 
 export interface EbenenGruppe {
@@ -395,6 +398,7 @@ export const BAUM_KLAPP_VORGABE: Record<BaumKnoten, boolean> = {
   umwelt: false,
   verkehr: false,
   satellit: false,
+  drohne: true,
   hintergrund: false,
   grundlage: true,
   bilder: true,

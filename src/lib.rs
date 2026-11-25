@@ -22,8 +22,10 @@ pub mod demo;
 #[cfg(feature = "dev-seeds")]
 pub mod dev;
 pub mod dokument;
+pub mod drohne;
 pub mod einheit;
 pub mod einheit_vorlage;
+pub mod einlesen;
 pub mod einsatz;
 pub mod einsatz_vorlage;
 pub mod einsatzabschnitt;
@@ -76,6 +78,7 @@ pub mod schaden;
 pub mod schichtmodell;
 pub mod sprechgruppe;
 pub mod staerke;
+pub mod stammdaten_eingang;
 pub mod static_files;
 pub mod status_ruecknahme;
 pub mod stichwort;
