@@ -727,6 +727,149 @@ fn quali_wahl(text: &str, wahl: QualiWahl) -> Entscheidungen {
     }
 }
 
+/// F1: Zuordnen geht zu jeder Qualifikation der eigenen Org, nicht nur zu einem Kandidaten —
+/// bei einer unbekannten, einer gefundenen und einer mehrdeutigen; eine fremde bleibt 400.
+#[tokio::test]
+async fn quali_zuordnen_zu_jeder_eigenen() {
+    let (pool, org) = pool().await;
+    let fahrer = qualifikation_repo::anlegen(&pool, org, "Fahrer", 10)
+        .await
+        .unwrap()
+        .id;
+    qualifikation_repo::anlegen(&pool, org, "Taucher", 20)
+        .await
+        .unwrap();
+    qualifikation_repo::anlegen(&pool, org, "taucher ", 30)
+        .await
+        .unwrap();
+    for text in ["Atemschutz", "Sanitäter", "Taucher"] {
+        let csv = format!("Name;Qualifikationen\nMeier, Anna;{text}\n");
+        let v = vor(&pool, org, &[&csv], None, &keine()).await;
+        assert!(
+            v.qualifikationen[0]
+                .kandidaten
+                .iter()
+                .all(|k| k.id != fahrer),
+            "{text}: Fahrer ist kein Kandidat"
+        );
+        let e = quali_wahl(
+            text,
+            QualiWahl::Zuordnen {
+                qualifikation_id: fahrer,
+            },
+        );
+        let v = vor(&pool, org, &[&csv], None, &e).await;
+        assert!(v.uebernehmbar, "{text}: {:?}", v.qualifikationen);
+    }
+    let csv = "Name;Qualifikationen\nMeier, Anna;Taucher\n";
+    let e = quali_wahl(
+        "Taucher",
+        QualiWahl::Zuordnen {
+            qualifikation_id: fahrer,
+        },
+    );
+    ueber(&pool, org, &[csv], None, &e).await.unwrap();
+    let anna = personal_id(&pool, org, "Meier, Anna").await;
+    assert_eq!(quali_ids(&pool, anna).await, vec![fahrer]);
+
+    let (andere, _) =
+        common::fremde_org_anlegen(&pool, "Fremd", "fremd", "fremdpw123", "keine").await;
+    let fremd = qualifikation_repo::anlegen(&pool, andere, "Fremd", 10)
+        .await
+        .unwrap()
+        .id;
+    let (p, m, n) = paket(&[csv]);
+    let r = vorschau(
+        &pool,
+        org,
+        &p,
+        &m,
+        &n,
+        None,
+        &quali_wahl(
+            "Taucher",
+            QualiWahl::Zuordnen {
+                qualifikation_id: fremd,
+            },
+        ),
+    )
+    .await;
+    assert!(matches!(r, Err(AppError::Validation(_))), "{r:?}");
+}
+
+/// F7: Derselbe Text unter zwei Herkünften ist zweimal in der Vorschau (unterscheidbar an der
+/// Herkunft), wird aber nur einmal angelegt und so gezählt.
+#[tokio::test]
+async fn quali_gleicher_text_zwei_herkuenfte_einmal_angelegt() {
+    let (pool, org) = pool().await;
+    let katalog = anzahl(&pool, "qualifikation").await;
+    let csv = "Kennung;Herkunft;Name;Qualifikationen\n\
+               p-1;MV;Meier, Anna;Atemschutz\n\
+               p-2;FV;Schulz, Bernd;Atemschutz\n";
+    let v = vor(&pool, org, &[csv], None, &keine()).await;
+    assert!(v.uebernehmbar);
+    let mut schluessel: Vec<(String, String)> = v
+        .qualifikationen
+        .iter()
+        .map(|q| (q.herkunft.clone(), q.text.clone()))
+        .collect();
+    schluessel.sort();
+    schluessel.dedup();
+    assert_eq!(schluessel.len(), v.qualifikationen.len(), "{schluessel:?}");
+    assert_eq!(v.zaehlung.qualifikationen.neu, 1);
+    let (erg, _) = ueber(&pool, org, &[csv], None, &keine()).await.unwrap();
+    assert_eq!(erg.zaehlung.qualifikationen.neu, 1);
+    assert_eq!(anzahl(&pool, "qualifikation").await, katalog + 1);
+    let q = quali_id(&pool, org, "Atemschutz").await.unwrap();
+    for name in ["Meier, Anna", "Schulz, Bernd"] {
+        let p = personal_id(&pool, org, name).await;
+        assert_eq!(quali_ids(&pool, p).await, vec![q], "{name}");
+    }
+    let herkuenfte: Vec<String> = sqlx::query_scalar(
+        "SELECT herkunft FROM stammdaten_kennung WHERE qualifikation_id = ? ORDER BY herkunft",
+    )
+    .bind(q)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(herkuenfte, ["fv", "mv"]);
+}
+
+/// F7: Zwei Qualifikationen der Datei, die dieselbe Kennung derselben Herkunft gemerkt
+/// bekämen, sind ein Fehler statt eines still verworfenen Eintrags; lässt man eine aus, geht es.
+#[tokio::test]
+async fn quali_kennung_doppelt_in_der_datei_fehler() {
+    let (pool, org) = pool().await;
+    let csv = "Kennung;Bezeichnung\nRS;Rettungssanitäter\n;RS\n";
+    let v = vor(&pool, org, &[csv], Some("MV"), &keine()).await;
+    assert!(!v.uebernehmbar);
+    assert_eq!(
+        v.zaehlung.qualifikationen.fehler, 2,
+        "{:?}",
+        v.qualifikationen
+    );
+    assert!(v
+        .qualifikationen
+        .iter()
+        .all(|q| q.ergebnis == ZeilenErgebnis::Fehler && !q.hinweise.is_empty()));
+    assert!(matches!(
+        ueber(&pool, org, &[csv], Some("MV"), &keine()).await,
+        Err(AppError::Zeilen { .. })
+    ));
+    let e = quali_wahl("RS", QualiWahl::Auslassen);
+    let v = vor(&pool, org, &[csv], Some("MV"), &e).await;
+    assert!(v.uebernehmbar, "{:?}", v.qualifikationen);
+    ueber(&pool, org, &[csv], Some("MV"), &e).await.unwrap();
+    let rs = quali_id(&pool, org, "Rettungssanitäter").await.unwrap();
+    let k: Vec<(String, i64)> = sqlx::query_as(
+        "SELECT kennung, qualifikation_id FROM stammdaten_kennung WHERE herkunft = 'mv'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(k, [("RS".to_string(), rs)]);
+}
+
 /// F8: Trifft die Kennung mehrere Datensätze und wählt man einen außer Dienst gestellten, wird
 /// die Zeile ausgelassen statt in ihn zu schreiben.
 #[tokio::test]

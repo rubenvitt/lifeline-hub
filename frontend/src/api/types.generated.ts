@@ -996,7 +996,11 @@ export interface components {
             status: components["schemas"]["TierStatus"];
             storniert_at?: string | null;
         };
-        /** @description Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). */
+        /**
+         * @description Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). Bei den
+         *     Qualifikationen zählt `neu` die angelegten: derselbe Text unter einer zweiten Herkunft legt
+         *     nichts zusätzlich an und zählt als `ergaenzt` (er merkt dort nur seine Kennung).
+         */
         ArtZaehlung: {
             /** Format: int64 */
             ausgelassen: number;
@@ -7814,11 +7818,14 @@ export interface components {
         };
         /**
          * @description Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des
-         *     Personals, je Herkunft und normalisiertem Text einmal.
+         *     Personals, je Herkunft und normalisiertem Text einmal. `herkunft` und `text` sind zusammen
+         *     eindeutig; die Wahl gilt je Text (`QualiEntscheidung`), also für jede Herkunft.
          */
         QualiZeile: {
             ergebnis: components["schemas"]["ZeilenErgebnis"];
             grund?: components["schemas"]["StammdatenTrefferGrund"] | null;
+            /** @description Die wirksame Herkunft (normalisiert; leer ohne Herkunft). */
+            herkunft: string;
             hinweise: string[];
             kandidaten: components["schemas"]["Kandidat"][];
             text: string;

@@ -2688,7 +2688,7 @@
       },
       "ArtZaehlung": {
         "type": "object",
-        "description": "Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen).",
+        "description": "Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). Bei den\nQualifikationen zählt `neu` die angelegten: derselbe Text unter einer zweiten Herkunft legt\nnichts zusätzlich an und zählt als `ergaenzt` (er merkt dort nur seine Kennung).",
         "required": [
           "neu",
           "ergaenzt",
@@ -19434,8 +19434,9 @@
       },
       "QualiZeile": {
         "type": "object",
-        "description": "Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des\nPersonals, je Herkunft und normalisiertem Text einmal.",
+        "description": "Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des\nPersonals, je Herkunft und normalisiertem Text einmal. `herkunft` und `text` sind zusammen\neindeutig; die Wahl gilt je Text (`QualiEntscheidung`), also für jede Herkunft.",
         "required": [
+          "herkunft",
           "text",
           "zeilen",
           "ergebnis",
@@ -19455,6 +19456,10 @@
                 "type": "null"
               }
             ]
+          },
+          "herkunft": {
+            "type": "string",
+            "description": "Die wirksame Herkunft (normalisiert; leer ohne Herkunft)."
           },
           "hinweise": {
             "type": "array",

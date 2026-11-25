@@ -925,6 +925,40 @@ fn ziel_von(a: Absicht) -> Option<Ziel> {
     }
 }
 
+/// Einträge, die unter derselben Herkunft dieselbe Kennung gemerkt bekämen (Index → Kennung).
+/// Die Datenbank hielte nur eine davon; welche, entschiede die Reihenfolge. Ein ausgelassener
+/// Eintrag merkt nichts und zählt nicht mit.
+fn kennung_doppelt(
+    eintraege: &[QualiEintrag],
+    quali_wahl: &HashMap<String, QualiWahl>,
+) -> HashMap<usize, String> {
+    let mut nach_kennung: HashMap<(&str, String), Vec<usize>> = HashMap::new();
+    for (i, e) in eintraege.iter().enumerate() {
+        if e.herkunft.is_empty() || quali_wahl.get(&norm(&e.text)) == Some(&QualiWahl::Auslassen) {
+            continue;
+        }
+        for a in &e.aliase {
+            let liste = nach_kennung.entry((&e.herkunft, norm(a))).or_default();
+            if liste.last() != Some(&i) {
+                liste.push(i);
+            }
+        }
+    }
+    let mut doppelt: HashMap<usize, String> = HashMap::new();
+    for e in eintraege {
+        for a in &e.aliase {
+            if let Some(liste) = nach_kennung.get(&(e.herkunft.as_str(), norm(a))) {
+                if liste.len() > 1 {
+                    for i in liste {
+                        doppelt.entry(*i).or_insert_with(|| a.clone());
+                    }
+                }
+            }
+        }
+    }
+    doppelt
+}
+
 type QualiPlan = (
     Vec<QualiZeile>,
     Vec<QualiSchreiben>,
@@ -943,12 +977,20 @@ fn qualifikationen_aufloesen(
     let mut q_schreiben: Vec<QualiSchreiben> = Vec::with_capacity(eintraege.len());
     let mut q_zaehlung = ArtZaehlung::default();
     let mut sperren: Vec<ZeilenGrund> = Vec::new();
-    for e in eintraege {
+    let doppelt = kennung_doppelt(eintraege, quali_wahl);
+    // Normalisierte Bezeichnungen, die das Übernehmen anlegt: derselbe Text unter einer zweiten
+    // Herkunft wird dieselbe Qualifikation (`schreiben`, `angelegt`).
+    let mut angelegt: HashSet<String> = HashSet::new();
+    for (nr, e) in eintraege.iter().enumerate() {
         let h = &e.herkunft;
         let aliase_norm: Vec<String> = e.aliase.iter().map(|a| norm(a)).collect();
         let ueber_kennung = ix.qualifikationen_mit_kennung(h, aliase_norm.iter());
         let zuordnung = if let Some(f) = &e.fehler {
             Zuordnung::Fehler(f.clone())
+        } else if let Some(a) = doppelt.get(&nr) {
+            Zuordnung::Fehler(format!(
+                "Die Kennung „{a}“ steht in der Datei für mehrere Qualifikationen; eine davon auslassen"
+            ))
         } else {
             match ueber_kennung.as_slice() {
                 [] => qualifikation_zuordnen(ix, h, &e.text),
@@ -1063,7 +1105,8 @@ fn qualifikationen_aufloesen(
             QualiZiel::Aus => q_zaehlung.ausgelassen += 1,
             QualiZiel::Offen => q_zaehlung.offen += 1,
             QualiZiel::Fehler => q_zaehlung.fehler += 1,
-            QualiZiel::Neu => q_zaehlung.neu += 1,
+            QualiZiel::Neu if angelegt.insert(norm(&e.text)) => q_zaehlung.neu += 1,
+            QualiZiel::Neu => q_zaehlung.ergaenzt += 1,
             QualiZiel::Id(q) => {
                 let umgehaengt = kandidaten.first() != Some(&q) || kandidaten.len() != 1;
                 if kennungen.is_empty() && !umgehaengt {
@@ -1088,6 +1131,7 @@ fn qualifikationen_aufloesen(
             });
         }
         q_vorschau.push(QualiZeile {
+            herkunft: h.clone(),
             text: e.text.clone(),
             zeilen: e.zeilen.clone(),
             ergebnis,

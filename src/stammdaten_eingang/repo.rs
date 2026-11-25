@@ -170,9 +170,12 @@ pub struct StammdatenZeile {
 }
 
 /// Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des
-/// Personals, je Herkunft und normalisiertem Text einmal.
+/// Personals, je Herkunft und normalisiertem Text einmal. `herkunft` und `text` sind zusammen
+/// eindeutig; die Wahl gilt je Text (`QualiEntscheidung`), also für jede Herkunft.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub struct QualiZeile {
+    /// Die wirksame Herkunft (normalisiert; leer ohne Herkunft).
+    pub herkunft: String,
     pub text: String,
     /// Zeilen im Blatt „Qualifikationen“ (leer, wenn sie nur das Personal nennt).
     pub zeilen: Vec<u32>,
@@ -185,7 +188,9 @@ pub struct QualiZeile {
     pub wahl: Option<QualiWahl>,
 }
 
-/// Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen).
+/// Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). Bei den
+/// Qualifikationen zählt `neu` die angelegten: derselbe Text unter einer zweiten Herkunft legt
+/// nichts zusätzlich an und zählt als `ergaenzt` (er merkt dort nur seine Kennung).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ArtZaehlung {
     pub neu: i64,
