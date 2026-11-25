@@ -641,6 +641,7 @@ fn grund(fehler: AusgangFehler, smtp: Option<SmtpFehler>) -> String {
         (AusgangFehler::Ueberholt, _) => "Quelle überholt".into(),
         (AusgangFehler::ZuGross, _) => "Anhänge zu groß".into(),
         (AusgangFehler::Spiegel, _) => "Einsatz wird von einer anderen Instanz geführt".into(),
+        (AusgangFehler::NichtZugestellt, _) => "Fax nicht zugestellt".into(),
     }
 }
 
@@ -765,6 +766,10 @@ mod tests {
             erstellt_at: String::new(),
             uebergeben_at: None,
             etb_eintrag_id: None,
+            anbieter_ref: None,
+            zugestellt_at: None,
+            naechste_abfrage_at: None,
+            ohne_pdf: false,
         }
     }
 

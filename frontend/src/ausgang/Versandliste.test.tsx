@@ -23,6 +23,7 @@ const versand = (over: Partial<Versand>): Versand => ({
   source_kind: 'lagebericht',
   state: 'wartet',
   subject: 'Lagebericht',
+  without_pdf: false,
   ...over,
 });
 

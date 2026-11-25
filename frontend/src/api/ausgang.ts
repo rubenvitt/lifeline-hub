@@ -30,6 +30,7 @@ export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
   anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
   zu_gross: 'Anhänge zu groß für eine Mail',
   spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+  nicht_zugestellt: 'Fax nicht zugestellt',
 };
 
 /** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */

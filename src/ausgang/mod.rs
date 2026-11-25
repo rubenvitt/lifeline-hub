@@ -40,6 +40,11 @@ pub struct Versand {
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub handed_over_at: Option<String>,
+    /// Wann der Fax-Anbieter die Zustellung bestätigt hat (nur Fax, LLH-2095).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivered_at: Option<String>,
+    /// Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war.
+    pub without_pdf: bool,
 }
 
 /// Eine Zeile von `ausgang` mit allem, was der Lauf braucht (intern, nie auf dem Wire).
@@ -69,6 +74,11 @@ pub struct VersandZeile {
     pub erstellt_at: String,
     pub uebergeben_at: Option<String>,
     pub etb_eintrag_id: Option<i64>,
+    /// Session-ID des Fax-Anbieters nach der Übergabe (nur Fax).
+    pub anbieter_ref: Option<String>,
+    pub zugestellt_at: Option<String>,
+    pub naechste_abfrage_at: Option<String>,
+    pub ohne_pdf: bool,
 }
 
 /// Was beim Absenden in den Korb gelegt wird. Betreff, Text, Adresse und Name der Stelle sind

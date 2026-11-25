@@ -14,13 +14,14 @@ use sqlx::{SqliteConnection, SqlitePool};
 const ZEILE: &str = "id, org_id, einsatz_id, client_id, quelle_art, quelle_id, kanal, \
      externe_stelle_id, stelle_bezeichnung, adresse, betreff, inhalt, zustand, versuche, \
      naechster_versuch_at, erster_versuch_at, versuch_begonnen_at, fehler_art, fehler_status, \
-     erstellt_von_id, erstellt_at, uebergeben_at, etb_eintrag_id";
+     erstellt_von_id, erstellt_at, uebergeben_at, etb_eintrag_id, anbieter_ref, zugestellt_at, \
+     naechste_abfrage_at, ohne_pdf";
 
 /// Spalten der Versandliste (ohne Text), mit dem Namen des Absenders.
 const ANZEIGE: &str = "a.id, a.quelle_art, a.quelle_id, a.kanal, a.externe_stelle_id, \
      a.stelle_bezeichnung, a.adresse, a.betreff, a.zustand, a.fehler_art, a.fehler_status, \
      a.versuche, a.erstellt_von_id, b.anzeigename AS erstellt_von_name, a.erstellt_at, \
-     a.uebergeben_at";
+     a.uebergeben_at, a.zugestellt_at, a.ohne_pdf";
 
 #[derive(sqlx::FromRow)]
 struct AnzeigeZeile {
@@ -41,6 +42,8 @@ struct AnzeigeZeile {
     erstellt_von_name: Option<String>,
     erstellt_at: String,
     uebergeben_at: Option<String>,
+    zugestellt_at: Option<String>,
+    ohne_pdf: bool,
 }
 
 impl From<AnzeigeZeile> for Versand {
@@ -62,6 +65,8 @@ impl From<AnzeigeZeile> for Versand {
             created_by_name: z.erstellt_von_name,
             created_at: z.erstellt_at,
             handed_over_at: z.uebergeben_at,
+            delivered_at: z.zugestellt_at,
+            without_pdf: z.ohne_pdf,
         }
     }
 }
@@ -233,7 +238,8 @@ pub async fn retry_tx(
     let geaendert = sqlx::query(
         "UPDATE ausgang SET zustand = 'wartet', versuche = 0, erster_versuch_at = ?, \
              naechster_versuch_at = ?, versuch_begonnen_at = NULL, fehler_art = NULL, \
-             fehler_status = NULL, uebergeben_at = NULL \
+             fehler_status = NULL, uebergeben_at = NULL, anbieter_ref = NULL, \
+             zugestellt_at = NULL, naechste_abfrage_at = NULL, ohne_pdf = 0 \
          WHERE id = ? AND einsatz_id = ? AND zustand = 'fehlgeschlagen'",
     )
     .bind(&t)

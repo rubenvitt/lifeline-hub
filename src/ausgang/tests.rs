@@ -25,6 +25,22 @@ fn backoff_30s_60s_120s_dann_5min_deckel() {
 }
 
 #[test]
+fn abfrage_erst_nach_30s_dann_jede_minute_und_nach_zwei_stunden_nicht_mehr() {
+    use super::zustand::{erste_abfrage, naechste_abfrage};
+    let t0 = t0();
+    assert_eq!(erste_abfrage(t0), t0 + Duration::seconds(30));
+    assert_eq!(
+        naechste_abfrage(t0, t0 + Duration::seconds(31)),
+        Some(t0 + Duration::seconds(91))
+    );
+    assert_eq!(
+        naechste_abfrage(t0, t0 + Duration::minutes(120)),
+        Some(t0 + Duration::minutes(121))
+    );
+    assert_eq!(naechste_abfrage(t0, t0 + Duration::minutes(121)), None);
+}
+
+#[test]
 fn nach_30_minuten_keine_wiederholung() {
     let jetzt = t0();
     let erster = jetzt - Duration::minutes(30) - Duration::seconds(1);
