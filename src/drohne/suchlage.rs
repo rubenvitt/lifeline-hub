@@ -210,19 +210,51 @@ fn karte_umschreiben(map: &serde_json::Value, verworfen: &mut u32) -> serde_json
     serde_json::json!({ "type": "FeatureCollection", "features": features })
 }
 
+/// Ob `pfad` genau ein Vorschau-Pfad der Quelle ist: `/api/lagemonitor/v1/photos/{Ziffern}/thumb`,
+/// optional mit `?v={[A-Za-z0-9._-]+}`. Alles andere (`..`, `//`, `#`, weitere Parameter,
+/// absolute Adressen) ist keiner: der Pfad kommt aus der Antwort der Quelle und wird an die
+/// Basisadresse gehängt.
+pub fn is_thumb_pfad(pfad: &str) -> bool {
+    let Some(rest) = pfad.strip_prefix("/api/lagemonitor/v1/photos/") else {
+        return false;
+    };
+    let Some((id, tail)) = rest.split_once('/') else {
+        return false;
+    };
+    if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
+        return false;
+    }
+    match tail.strip_prefix("thumb") {
+        Some("") => true,
+        Some(query) => query.strip_prefix("?v=").is_some_and(|v| {
+            !v.is_empty()
+                && !v.contains("..")
+                && v.bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+        }),
+        None => false,
+    }
+}
+
+/// Ergebnis von [`parse_photos`]: Fotos, Kennung → Vorschau-Pfad (bleibt im Speicher) und die
+/// Zahl der Vorschauen mit unzulässigem Pfad, die samt Foto weggelassen wurden.
+pub type FotosErgebnis = (Vec<DrohnenFoto>, HashMap<String, String>, u32);
+
 /// Übersetzt `GET /photos`: je Linse ein Foto, Schlüssel `"{id}:{lens}"`. Auslösungen ohne
-/// Position fallen weg. Zweiter Wert: Kennung → Vorschau-Pfad (bleibt im Speicher).
-pub fn parse_photos(
-    adapter_id: &str,
-    json: &[u8],
-) -> Result<(Vec<DrohnenFoto>, HashMap<String, String>), ParseError> {
+/// Position fallen weg, ebenso Linsen, deren Vorschau-Pfad [`is_thumb_pfad`] nicht erfüllt.
+pub fn parse_photos(adapter_id: &str, json: &[u8]) -> Result<FotosErgebnis, ParseError> {
     let shots: Vec<LmPhotoShot> =
         serde_json::from_slice(json).map_err(|_| ParseError::Ungueltig)?;
     let mut fotos = Vec::new();
     let mut thumbs = HashMap::new();
+    let mut verworfen = 0;
     for shot in shots {
         let Some(p) = shot.position else { continue };
         for photo in shot.photos {
+            if !is_thumb_pfad(&photo.thumb_url) {
+                verworfen += 1;
+                continue;
+            }
             let key = key_for(adapter_id, &format!("{}:{}", shot.id, photo.lens));
             thumbs.insert(key.clone(), photo.thumb_url);
             fotos.push(DrohnenFoto {
@@ -235,7 +267,7 @@ pub fn parse_photos(
             });
         }
     }
-    Ok((fotos, thumbs))
+    Ok((fotos, thumbs, verworfen))
 }
 
 #[cfg(test)]
@@ -346,7 +378,7 @@ mod tests {
 
     #[test]
     fn fotos_ohne_position_fallen_weg() {
-        let (fotos, _) = parse_photos("a1", PHOTOS).unwrap();
+        let (fotos, ..) = parse_photos("a1", PHOTOS).unwrap();
         assert_eq!(fotos.len(), 2, "zwei Linsen der Auslösung 17, keine von 20");
         assert!(fotos.iter().all(|f| f.taken_at_ms == 1_700_000_003_000));
         assert_eq!(fotos[0].lens, "thermal");
@@ -357,11 +389,62 @@ mod tests {
 
     #[test]
     fn foto_kennung_bildet_auf_thumb_url_ab() {
-        let (fotos, up) = parse_photos("a1", PHOTOS).unwrap();
+        let (fotos, up, _) = parse_photos("a1", PHOTOS).unwrap();
         let k = key_for("a1", "17:thermal");
         assert_eq!(fotos[0].key, k);
         assert_eq!(up[&k], "/api/lagemonitor/v1/photos/17/thumb?v=1");
         assert_eq!(up.len(), 2);
         assert!(!serde_json::to_string(&fotos).unwrap().contains("/photos/"));
+    }
+
+    #[test]
+    fn thumb_pfad_nur_in_der_erwarteten_form() {
+        for ok in [
+            "/api/lagemonitor/v1/photos/17/thumb",
+            "/api/lagemonitor/v1/photos/0/thumb?v=1",
+            "/api/lagemonitor/v1/photos/17/thumb?v=a.b_c-D9",
+        ] {
+            assert!(is_thumb_pfad(ok), "{ok}");
+        }
+        for schlecht in [
+            "",
+            "https://evil.example/api/lagemonitor/v1/photos/17/thumb",
+            "//evil.example/api/lagemonitor/v1/photos/17/thumb",
+            "api/lagemonitor/v1/photos/17/thumb",
+            "/api/lagemonitor/v1/photos/../17/thumb",
+            "/api/lagemonitor/v1/photos//thumb",
+            "/api/lagemonitor/v1/photos/x/thumb",
+            "/api/lagemonitor/v1/photos/17/thumb/",
+            "/api/lagemonitor/v1/photos/17/thumbs",
+            "/api/lagemonitor/v1/photos/17/thumb?",
+            "/api/lagemonitor/v1/photos/17/thumb?v=",
+            "/api/lagemonitor/v1/photos/17/thumb?v=1&x=2",
+            "/api/lagemonitor/v1/photos/17/thumb?x=1",
+            "/api/lagemonitor/v1/photos/17/thumb?v=..",
+            "/api/lagemonitor/v1/photos/17/thumb?v=a/b",
+            "/api/lagemonitor/v1/photos/17/thumb?v=1#x",
+            "/api/lagemonitor/v1/photos/17/thumb#x",
+            "/api/lagemonitor/v1/photos/17/thumb?v=a%2fb",
+            "/api/lagemonitor/v1/photos/17/thumb\n",
+            "/api/lagemonitor/v1/photos/17/thumb?v=1\n",
+            "/api/lagemonitor/v1/photos/17/video",
+            "/api/other/photos/17/thumb",
+        ] {
+            assert!(!is_thumb_pfad(schlecht), "{schlecht:?}");
+        }
+    }
+
+    #[test]
+    fn feindlicher_thumb_pfad_verwirft_das_foto_und_zaehlt() {
+        let json = br#"[{"id": 1, "taken_at_ms": 5, "position": {"lat": 1.0, "lon": 2.0},
+            "photos": [
+              {"lens": "a", "thumb_url": "https://evil.example/x"},
+              {"lens": "b", "thumb_url": "/api/lagemonitor/v1/photos/1/thumb?v=1&x=2"},
+              {"lens": "c", "thumb_url": "/api/lagemonitor/v1/photos/1/thumb?v=1"}]}]"#;
+        let (fotos, up, verworfen) = parse_photos("a1", json).unwrap();
+        assert_eq!(fotos.len(), 1);
+        assert_eq!(fotos[0].lens, "c");
+        assert_eq!(up.len(), 1);
+        assert_eq!(verworfen, 2);
     }
 }

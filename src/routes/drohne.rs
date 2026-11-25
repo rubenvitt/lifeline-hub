@@ -21,7 +21,7 @@ use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
-use crate::http_begrenzt::{DECKEL_PLAYLIST, DECKEL_VIDEO};
+use crate::http_begrenzt::{DECKEL_FOTO, DECKEL_PLAYLIST, DECKEL_VIDEO};
 use crate::zeit::jetzt;
 
 /// Name des anderen Einsatzes, wenn die Person ihn nicht lesen darf.
@@ -374,7 +374,9 @@ pub async fn video(
         .map_err(|f| match f {
             VideoFehler::Verweigert => AppError::ServiceUnavailable("Kein Livebild".into()),
             VideoFehler::Intern => AppError::Internal("Livebild nicht abrufbar".into()),
-            VideoFehler::Upstream => AppError::BadGateway("Livebild nicht abrufbar".into()),
+            VideoFehler::Upstream | VideoFehler::Unbereinigbar => {
+                AppError::BadGateway("Livebild nicht abrufbar".into())
+            }
         })?;
     let cache = if is_playlist {
         "private, no-cache"
@@ -394,6 +396,138 @@ pub async fn video(
     kopf.insert(
         header::CACHE_CONTROL,
         header::HeaderValue::from_static(cache),
+    );
+    Ok(antwort)
+}
+
+/// Holt die Vorschau eines Fotos und bereinigt sie. Der `LiveKontext` entsteht hier, im Abruf,
+/// und fällt mit ihm (`src/AGENTS.md`, „Adapter“): ins Bündel kommen nur bereinigte Bytes.
+async fn foto_abrufen(
+    state: AppState,
+    org_id: i64,
+    adapter_id: String,
+    thumb_url: String,
+) -> Result<axum::body::Bytes, VideoFehler> {
+    use crate::adapter::live::{live_kontext, LiveVerweigert};
+    use age::secrecy::ExposeSecret;
+
+    // Tiefenverteidigung: auch was aus dem Speicher kommt, hängt nur in der erwarteten Form an
+    // die Basisadresse.
+    if !crate::drohne::suchlage::is_thumb_pfad(&thumb_url) {
+        return Err(VideoFehler::Upstream);
+    }
+    let kontext = live_kontext(
+        &state.pool,
+        &state.adapter,
+        &state.adapter.arten,
+        org_id,
+        &adapter_id,
+    )
+    .await
+    .map_err(|v| match v {
+        LiveVerweigert::Intern => VideoFehler::Intern,
+        _ => VideoFehler::Verweigert,
+    })?;
+    let basis = kontext
+        .einstellung_text("basis_url")
+        .ok_or(VideoFehler::Verweigert)?;
+    let token = kontext.geheimnis("token").ok_or(VideoFehler::Verweigert)?;
+    let url = format!("{}{thumb_url}", basis.trim_end_matches('/'));
+    let fehl = |f: crate::adapter::art::Fehlschlag| {
+        // Nur Code und Status, nie URL oder Token.
+        tracing::warn!("Fotovorschau-Abruf gescheitert: {:?}", f);
+        VideoFehler::Upstream
+    };
+    let anfrage = kontext
+        .get(&url)
+        .map_err(fehl)?
+        .bearer_auth(token.expose_secret());
+    let antwort = kontext.send(anfrage).await.map_err(fehl)?;
+    let roh = kontext
+        .read_bytes(antwort, DECKEL_FOTO)
+        .await
+        .map_err(fehl)?;
+    drop(kontext);
+    crate::drohne::foto::clean_thumb(&roh)
+        .map(axum::body::Bytes::from)
+        .map_err(|_| VideoFehler::Unbereinigbar)
+}
+
+/// GET /api/incidents/{id}/drone/photos/{key}/thumb — die Vorschau eines Drohnenfotos, bereinigt
+/// und kurz gebündelt; nichts wird gespeichert. Die Quelle muss in diesem laufenden Einsatz
+/// zugeschaltet sein, die Fotokennung zu ihr gehören und das Foto nicht vor der ersten
+/// Zuschaltung des Einsatzes entstanden sein (wie `map/drone`), sonst 404.
+pub async fn foto_vorschau(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
+    PfadParam((_eid, key)): PfadParam<(i64, String)>,
+) -> Result<Response, AppError> {
+    if ctx.einsatz.status != crate::einsatz::EinsatzStatus::Aktiv {
+        return Err(AppError::NotFound);
+    }
+    let (adapter_id, thumb_url) = state.drohne.find_photo(&key).ok_or(AppError::NotFound)?;
+    let zuschaltungen = {
+        let mut conn = state.pool.acquire().await?;
+        repo::load_for_einsatz(&mut conn, ctx.einsatz.id).await?
+    };
+    if !zuschaltungen.iter().any(|z| z.adapter_id == adapter_id) {
+        return Err(AppError::NotFound);
+    }
+    let erste_ms = zuschaltungen
+        .iter()
+        .filter_map(|z| crate::zeit::parse_utc(&z.zugeschaltet_at).map(|t| t.timestamp_millis()))
+        .min()
+        .ok_or(AppError::NotFound)?;
+    let aufgenommen = state.drohne.get(&adapter_id).and_then(|s| {
+        s.lage
+            .fotos
+            .iter()
+            .find(|f| f.key == key)
+            .map(|f| f.taken_at_ms)
+    });
+    if !aufgenommen.is_some_and(|ms| ms >= erste_ms) {
+        return Err(AppError::NotFound);
+    }
+    let org_id = ctx.einsatz.org_id;
+    let schluessel = (
+        adapter_id.clone(),
+        key,
+        crate::drohne::foto::DATEI.to_string(),
+    );
+    let bytes = crate::drohne::foto::buendel()
+        .get_or_fetch(schluessel, crate::drohne::foto::TTL, move || {
+            foto_abrufen(state, org_id, adapter_id, thumb_url)
+        })
+        .await
+        .map_err(|f| match f {
+            VideoFehler::Verweigert => AppError::ServiceUnavailable("Kein Foto".into()),
+            VideoFehler::Intern => AppError::Internal("Foto nicht abrufbar".into()),
+            VideoFehler::Upstream => AppError::BadGateway("Foto nicht abrufbar".into()),
+            VideoFehler::Unbereinigbar => {
+                AppError::UnprocessableEntity("Das Foto lässt sich nicht sicher anzeigen".into())
+            }
+        })?;
+    let mut antwort = Response::new(Body::from(bytes));
+    let kopf = antwort.headers_mut();
+    kopf.insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static("image/jpeg"),
+    );
+    kopf.insert(
+        header::CONTENT_DISPOSITION,
+        header::HeaderValue::from_static("inline"),
+    );
+    kopf.insert(
+        header::CONTENT_SECURITY_POLICY,
+        header::HeaderValue::from_static(crate::routes::support::ANHANG_CSP),
+    );
+    kopf.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        header::HeaderValue::from_static("nosniff"),
+    );
+    kopf.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static("private, max-age=300"),
     );
     Ok(antwort)
 }

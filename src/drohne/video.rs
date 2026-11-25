@@ -29,6 +29,8 @@ pub enum VideoFehler {
     Intern,
     /// Das Ziel ist gescheitert oder lieferte Ungültiges.
     Upstream,
+    /// Die Antwort des Ziels lässt sich nicht sicher ausliefern (Foto nicht bereinigbar).
+    Unbereinigbar,
 }
 
 fn endung(file: &str) -> Option<String> {

@@ -1962,6 +1962,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/drone/video/{key}/hls/{*file}",
             get(routes::drohne::video),
         )
+        // Vorschau der Drohnenfotos über den Proxy (LLH-2108).
+        .route(
+            "/api/incidents/{id}/drone/photos/{key}/thumb",
+            get(routes::drohne::foto_vorschau),
+        )
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),

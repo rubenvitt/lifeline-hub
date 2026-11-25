@@ -38,6 +38,9 @@ pub const DECKEL_VIDEO: usize = 8 * 1024 * 1024;
 /// Deckel für eine HLS-Playlist des Drohnen-Livebilds (LLH-2107): Textdateien von einigen KB.
 pub const DECKEL_PLAYLIST: usize = 256 * 1024;
 
+/// Deckel für die Vorschau eines Drohnenfotos (LLH-2108): ein verkleinertes JPEG der Quelle.
+pub const DECKEL_FOTO: usize = 2 * 1024 * 1024;
+
 /// Fehler beim begrenzten Einlesen.
 #[derive(Debug)]
 pub enum LeseFehler {

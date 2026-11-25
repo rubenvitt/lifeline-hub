@@ -10,7 +10,7 @@ use sqlx::SqliteConnection;
 
 use super::repo;
 use super::store::{Stand, Store};
-use super::suchlage::{parse_lage, parse_photos, ParseError, Upstream};
+use super::suchlage::{parse_lage, parse_photos, FotosErgebnis, ParseError, Upstream};
 use crate::adapter::art::{
     AdapterArt, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme,
 };
@@ -199,6 +199,11 @@ impl AdapterArt for SuchlageArt {
             } else {
                 None
             };
+            // Verworfene Vorschauen zählen in dem Takt, der sie abruft.
+            lage.verworfen += abgerufen
+                .as_ref()
+                .and_then(|r| r.as_ref().ok())
+                .map_or(0, |(_, _, v)| *v);
             let (fotos, thumbs, gemerkt_ms) =
                 fotos_waehlen(vorher.as_ref(), photos_latest_ms, abgerufen);
             lage.fotos = fotos;
@@ -256,7 +261,7 @@ fn fotos_waehlen(
         )
     };
     match abgerufen {
-        Some(Ok((fotos, thumbs))) => (fotos, thumbs, photos_latest_ms),
+        Some(Ok((fotos, thumbs, _))) => (fotos, thumbs, photos_latest_ms),
         Some(Err(_)) => alt(),
         None => {
             let (f, t, _) = alt();
@@ -264,11 +269,6 @@ fn fotos_waehlen(
         }
     }
 }
-
-type FotosErgebnis = (
-    Vec<super::vertrag::DrohnenFoto>,
-    std::collections::HashMap<String, String>,
-);
 
 impl SuchlageArt {
     async fn fotos_holen(
@@ -393,7 +393,7 @@ mod tests {
         assert!(braucht_fotos(Some(&v), Some(9)));
         assert!(braucht_fotos(None, Some(9)));
         let neu = stand_mit_fotos(Some(9), "neu");
-        let ok = (neu.lage.fotos.clone(), neu.upstream.fotos.clone());
+        let ok = (neu.lage.fotos.clone(), neu.upstream.fotos.clone(), 0);
         let (f, t, ms) = fotos_waehlen(Some(&v), Some(9), Some(Ok(ok)));
         assert_eq!(f[0].key, "neu");
         assert!(t.contains_key("neu"));

@@ -3,6 +3,7 @@
 //! Nichts hieraus kommt in die Datenbank; der Stand lebt nur im Arbeitsspeicher.
 
 pub mod art;
+pub mod foto;
 pub mod karte;
 pub mod repo;
 pub mod store;

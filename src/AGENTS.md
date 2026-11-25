@@ -402,6 +402,12 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   erlauben (HEIC-Decoder, `frontend/src/heic/`).
   Das Drohnen-Livebild (LLH-2107, hls.js) braucht zusätzlich `media-src 'self' blob:` und
   `worker-src 'self' blob:`; der Spieler hängt die Segmente über MSE als `blob:` ein.
+- **Fremde, nicht gespeicherte Bilder** (Drohnenfoto-Vorschau, LLH-2108,
+  `GET …/drone/photos/{key}/thumb`) gehen **nicht über `anhang_antwort`**, sondern bereinigt
+  (`drohne::foto::clean_thumb` → `anhang::metadaten::bereinigen`, Fehler 422) mit `ANHANG_CSP`,
+  `nosniff`, `Content-Disposition: inline` und `Cache-Control: private, max-age=300`; nie die
+  Köpfe des Ziels. Das Bündel (5 min, 32 MiB) hält nur bereinigte Bytes. Der Vorschau-Pfad der
+  Quelle wird beim Einlesen und vor dem Abruf mit `suchlage::is_thumb_pfad` geprüft.
 - **HEIC-Decoder austauschbar halten** (LGPL 3.0, LFH-1000, `frontend/src/heic/LIESMICH.md`):
   Glue und WASM von libheif gehen unverändert unter `/bibliotheken/libheif/` aus, nie in einen
   Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt
