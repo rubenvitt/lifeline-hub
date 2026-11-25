@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs]
 ---
 
 ## Überblick
@@ -250,6 +250,22 @@ Eingriff“.
 
 Der Adapter ist danach samt Geheimnissen und Verlauf gelöscht.
 
+### Veranstaltungen abrufen
+
+Geplante Sanitätsdienste, Betreuungen und Übungen kann Lifeline Hub aus einer anderen Anwendung
+abrufen, die den Vertrag „Veranstaltungen-Abruf v1“ anbietet (`docs/schnittstellen/veranstaltungen-abruf.md`).
+Für den System-Admin:
+
+1. In der liefernden Anwendung einen Zugang für den Abruf anlegen und den Schlüssel kopieren.
+2. Hier „Adapter anlegen“ wählen, unter „Art“ „Veranstaltungen (Schnittstelle v1)“ wählen und einen
+   „Name“ eintragen.
+3. Unter „Adresse der Schnittstelle“ die Adresse der liefernden Anwendung eintragen, unter der
+   sie den Abruf anbietet, und „Anlegen“ wählen. Das „Intervall“ schlägt 300 Sekunden vor, kürzer
+   als 60 geht nicht.
+4. Im Paneel „Geheimnisse“ an der Zeile „Abruf-Schlüssel“ „Setzen“ wählen, den Schlüssel einfügen
+   und „Speichern“ wählen.
+5. „Verbindung prüfen“ wählen. Das Ergebnis nennt die Zahl der Veranstaltungen als Einträge.
+
 ## Hintergrund
 
 ### Wer was darf
@@ -488,6 +504,23 @@ Geheimnisse auf den neuen um; die Adapter laufen weiter, und niemand muss etwas 
 Die Ziele eines Adapters prüft der Server wie die Ziele eines Webhooks: nur über https, keine
 Weiterleitung, kein Ziel in einem internen Netz. „Ziel im eigenen Netz erlauben“ öffnet private
 Netze; der Rechner selbst und Adressen wie `169.254.169.254` bleiben gesperrt.
+
+### Abgerufene Veranstaltungen
+
+Ein Adapter der Art „Veranstaltungen (Schnittstelle v1)“ legt jede Veranstaltung einmal ab, mit
+Name, Art, Status, Ort, Veranstalter, Bemerkung, Beginn und Ende in ihrem letzten Stand. Ein Abruf
+ohne Änderung schreibt nichts; eine Änderung oder Absage überschreibt den alten Stand. Fehlt eine
+Veranstaltung, die noch nicht länger als 7 Tage vorbei ist, in der Lieferung, gilt sie als
+entfernt. Die liefernde Anwendung gibt keine Personendaten heraus: „Veranstalter“ ist eine Stelle,
+kein Mensch.
+
+Enthält die Antwort auch nur eine ungültige Veranstaltung, verwirft der Adapter den ganzen Abruf
+mit „Antwort nicht lesbar“, behält den letzten Stand und steht auf „gestört“. Spricht die
+liefernde Anwendung eine neuere Fassung des Vertrags („Unbekannte Schnittstellenversion“) oder
+lehnt sie den Schlüssel ab („Zugang abgelehnt“), steht der Adapter auf „braucht Eingriff“.
+
+Eine Veranstaltung wird 14 Tage nach ihrem Ende gelöscht, und mit ihrem Adapter. Eine Ansicht
+der abgerufenen Veranstaltungen gibt es in der App nicht.
 
 ### Am ELW
 
