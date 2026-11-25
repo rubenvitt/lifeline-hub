@@ -47,6 +47,8 @@ pub enum ZielFehler {
     Fragment,
     OhneHost,
     Localhost,
+    /// Ein Host-Feld mit Schema, Pfad, Port, Anmeldedaten oder Sonderzeichen.
+    KeinHostname,
     /// Ein IP-Literal in einem gesperrten oder (ohne Ausnahme) privaten Netz.
     Intern,
 }
@@ -62,6 +64,9 @@ impl ZielFehler {
             }
             ZielFehler::Fragment => "Die Ziel-URL darf keinen Anker (#…) enthalten.",
             ZielFehler::OhneHost => "Die Ziel-URL nennt keinen Server.",
+            ZielFehler::KeinHostname => {
+                "Der Server ist nur ein Hostname, ohne Schema, Port und Pfad."
+            }
             ZielFehler::Localhost => "Ein Ziel auf diesem Rechner ist nicht erlaubt.",
             ZielFehler::Intern => {
                 "Das Ziel liegt in einem internen Netz. Ein privates Netz ist nur mit der \
@@ -104,6 +109,40 @@ pub fn check_url(roh: &str, lan_erlaubt: bool) -> Result<Url, ZielFehler> {
         }
     }
     Ok(url)
+}
+
+/// Prüft einen Hostnamen ohne Schema, Port und Pfad (Feldtyp `Host` der Adapter): getrimmt und
+/// kleingeschrieben zurück. Ein IP-Literal besteht nach [`is_erlaubt`], `localhost` nie. Ein Name
+/// wird hier nicht aufgelöst; die aufgelösten Adressen prüft der Verbindungsaufbau
+/// (`adapter::ziel`, kein Rebind-Fenster).
+pub fn check_host(roh: &str, lan_erlaubt: bool) -> Result<String, ZielFehler> {
+    let text = roh.trim().to_ascii_lowercase();
+    if text.is_empty() {
+        return Err(ZielFehler::OhneHost);
+    }
+    // Ein IPv6-Literal enthält `:`, darum vor der Zeichenprüfung (ohne eckige Klammern).
+    if let Ok(ip) = text.parse::<IpAddr>() {
+        return if is_erlaubt(&ip, lan_erlaubt) {
+            Ok(text)
+        } else {
+            Err(ZielFehler::Intern)
+        };
+    }
+    let name = text.trim_end_matches('.');
+    let gueltig = !name.is_empty()
+        && name.len() <= 253
+        && !name.starts_with('.')
+        && !name.contains("..")
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_'));
+    if !gueltig {
+        return Err(ZielFehler::KeinHostname);
+    }
+    if name == "localhost" || name.ends_with(".localhost") {
+        return Err(ZielFehler::Localhost);
+    }
+    Ok(name.to_string())
 }
 
 /// Host einer Ziel-URL für Admin-Spur und Anzeige; nie der Pfad (er kann ein Token tragen).
@@ -400,6 +439,46 @@ mod tests {
 
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap()
+    }
+
+    #[test]
+    fn check_host_nimmt_namen_und_oeffentliche_ip() {
+        assert_eq!(
+            check_host(" SMTP.Example.org ", false).as_deref(),
+            Ok("smtp.example.org")
+        );
+        assert_eq!(
+            check_host("203.0.113.5", false).as_deref(),
+            Ok("203.0.113.5")
+        );
+        assert_eq!(
+            check_host("mail.example.org.", false).as_deref(),
+            Ok("mail.example.org")
+        );
+        assert_eq!(check_host("10.0.0.1", true).as_deref(), Ok("10.0.0.1"));
+    }
+
+    #[test]
+    fn check_host_lehnt_url_port_loopback_ab() {
+        assert_eq!(
+            check_host("smtps://x", false),
+            Err(ZielFehler::KeinHostname)
+        );
+        assert_eq!(check_host("x:25", false), Err(ZielFehler::KeinHostname));
+        assert_eq!(check_host("x/pfad", false), Err(ZielFehler::KeinHostname));
+        assert_eq!(check_host("a b", false), Err(ZielFehler::KeinHostname));
+        assert_eq!(check_host("user@x", false), Err(ZielFehler::KeinHostname));
+        assert_eq!(check_host("", false), Err(ZielFehler::OhneHost));
+        assert_eq!(check_host("   ", false), Err(ZielFehler::OhneHost));
+        assert_eq!(check_host("localhost", true), Err(ZielFehler::Localhost));
+        assert_eq!(
+            check_host("Mail.LOCALHOST", true),
+            Err(ZielFehler::Localhost)
+        );
+        assert_eq!(check_host("127.0.0.1", true), Err(ZielFehler::Intern));
+        assert_eq!(check_host("::1", true), Err(ZielFehler::Intern));
+        assert_eq!(check_host("169.254.169.254", true), Err(ZielFehler::Intern));
+        assert_eq!(check_host("10.0.0.1", false), Err(ZielFehler::Intern));
     }
 
     #[test]

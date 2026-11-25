@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -540,3 +540,22 @@ Helfer-App (ADR-0101, Spec
 - **Anzeige:** Quelle und Alter zeigt die Lagekarte wie für die Helfer-App („Ortung · vor 3 min“,
   ab 5 min blass und „veraltet“, `positionsAlter.ts`); ein Lagestand misst gegen seinen Stand.
 - **Anwender:** DSFA-Vorlage und Einrichtung im Kapitel [Anbindungen](../anwender/kapitel/anbindungen.md).
+
+## 8.34 Nachrichten an Menschen: Ausgangskorb
+
+Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur über die Tabelle
+`ausgang` und den Lauf `src/ausgang/` ([ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
+[`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
+
+- **Getrennt von Webhooks und Abruf:** ein Webhook meldet einem Fremdsystem, ein Adapter ruft ab;
+  der Ausgangskorb stellt eine bewusst abgesandte Nachricht zu. Die Anbindung ist die Adapter-Art
+  `smtp` (Einstellungen und Passwort im Rahmen von 8.32); entschlüsselt wird das Passwort nur in
+  `adapter::lauf::zugang_fuer_versand`.
+- **Schnappschuss und Beleg:** Betreff, Text, Stelle und Adresse stehen beim Absenden in der
+  Zeile; jedes Ergebnis steht im ETB, Ergebnis und Eintrag in einer Transaktion. Der Mailserver
+  bestätigt mit 250 oder gar nicht: ein Abbruch nach DATA ist `ungewiss` und wird nie selbst
+  wiederholt.
+- **Spiegel und Schwärzung:** `ausgang` ist vom Spiegel ausgenommen (`src/instanz/spiegel/art.rs`),
+  am Spiegel wird nicht angelegt und nicht zugestellt; die Tabelle steht in der Schwärzung.
+
+Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Ausgang an Menschen“.

@@ -91,6 +91,7 @@ deactivate	deaktivieren
 decision	Entscheidung
 decline	ablehnen
 defaults	Vorgaben
+deliveries	Versände
 demo-data	Demo-Daten
 departures	Abmeldungen
 dev	-
@@ -283,6 +284,7 @@ resync	erneut abgleichen
 retention	Aufbewahrung
 retention-categories	Aufbewahrungskategorien
 retention-period	Aufbewahrungsfrist
+retry	Wiederholen
 revise	fortschreiben
 revoke	widerrufen
 row	Zeile
