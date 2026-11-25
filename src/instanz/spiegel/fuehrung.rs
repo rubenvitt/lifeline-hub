@@ -254,6 +254,11 @@ async fn werde_spiegel(conn: &mut SqliteConnection, akte: &AkteZeile) -> Result<
     // kein Weg mehr an den Einsatz, und nichts über georteten Personen soll zum neuen Führer
     // gehen (Spec Helfer-App, „Personenposition“).
     crate::helfer::ende::beende_alle_im_einsatz(conn, einsatz_id).await?;
+    // Fahrzeug-Kopplungen enden still, ohne ETB-Eintrag: Ein Eintrag käme nach `bekannt_bis`, würde
+    // zur Bruchstelle (`sichere_bruchstelle`) und ginge verloren, wenn der neue Führer den Spiegel
+    // neu aufbaut (Entscheidung Ruben 25.11.2026, Spec „Führungswechsel“). `ortung_kopplung` hat
+    // kein Spiegel-Log, das Löschen ist deshalb kein Bruch.
+    crate::ortung::kopplung::beende_bei_fuehrungsabgabe_tx(conn, einsatz_id).await?;
     let kopplung_org_id = kopplung_org_des_fuehrers(conn, akte).await?;
     // Was das Gegenüber sicher kennt: den bestätigten Stand seines Spiegels, und alles bis zur
     // eigenen Übernahme (das kam von ihm).

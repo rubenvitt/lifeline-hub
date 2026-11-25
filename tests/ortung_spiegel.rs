@@ -750,3 +750,125 @@ async fn ohne_hub_bleibt_alles_lokal() {
     assert_eq!(c["access_id"], zugang.as_str());
     assert_eq!(c["via_hub"], false);
 }
+
+// ── Führungsabgabe trennt still (Task 5) ─────────────────────────────────────────────────────
+
+/// Der ELW meldet sich und gleicht danach die Einsätze ab: erst danach kennt der Hub den Einsatz
+/// und der Führer den Stand des Spiegels (Voraussetzung jeder Übergabe).
+async fn elw_meldet(elw: &Instanz) {
+    sqlx::query("UPDATE instanz_kopplung SET naechste_meldung_at = NULL")
+        .execute(&elw.pool)
+        .await
+        .unwrap();
+    lifeline_hub::instanz::melden::run_durchlauf(&elw.pool)
+        .await
+        .unwrap();
+    abgleichen(elw).await;
+}
+
+async fn kopplungen_zaehlen(i: &Instanz, einsatz: i64) -> i64 {
+    sqlx::query_scalar("SELECT COUNT(*) FROM ortung_kopplung WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .fetch_one(&i.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn abgabe_trennt_hub_kopplung_still() {
+    let a = aufbau().await;
+    let (e, _, _) = elw_mit_gekoppeltem_fahrzeug(&a).await;
+    elw_meldet(&a.elw).await;
+    assert_eq!(kopplungen_zaehlen(&a.elw, e).await, 1);
+
+    let (s, v) = common::anfrage_json(
+        &a.elw.app,
+        "POST",
+        &format!("/api/incidents/{e}/command/hand-over"),
+        &a.elw.admin,
+        Some(&json!({"an": a.hub.kennung})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    assert_eq!(
+        kopplungen_zaehlen(&a.elw, e).await,
+        0,
+        "Hub-Kopplung getrennt"
+    );
+    let etb = common::system_etb_inhalte(&a.elw.app, &a.elw.admin, e).await;
+    assert!(
+        !etb.iter().any(|t| t.contains("Ortung getrennt")),
+        "kein ETB-Eintrag, der zur Bruchstelle würde: {etb:?}"
+    );
+    let offen: i64 =
+        sqlx::query_scalar("SELECT bruch_offen FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(e)
+            .fetch_one(&a.elw.pool)
+            .await
+            .unwrap();
+    assert_eq!(offen, 0, "keine Bruchstelle am neuen Spiegel");
+}
+
+#[tokio::test]
+async fn abgabe_am_hub_trennt_lokale_kopplung() {
+    let a = aufbau().await;
+    schalter_setzen(&a.hub.pool, 1, true).await;
+    let h = common::einsatz_anlegen(&a.hub.app, &a.hub.admin).await;
+    let (s, v) = common::anfrage(
+        &a.hub.app,
+        "POST",
+        &format!("/api/incidents/{h}/vehicles"),
+        &a.hub.admin,
+        Some(r#"{"adhoc":{"funkrufname":"FW Lokal 1","traegerorganisation":"Feuerwehr"}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let ef = v["id"].as_i64().unwrap();
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, \
+         kennung, gekoppelt_at, gekoppelt_von) VALUES (?, ?, 1, ?, 'fkw1', ?, 1)",
+    )
+    .bind(ef)
+    .bind(h)
+    .bind(&a.zugang)
+    .bind(lifeline_hub::zeit::jetzt())
+    .execute(&a.hub.pool)
+    .await
+    .unwrap();
+
+    // Der ELW fragt die Führung an und übernimmt beim nächsten Abgleich.
+    elw_meldet(&a.elw).await;
+    let (_, akten) = common::anfrage(
+        &a.elw.app,
+        "GET",
+        "/api/admin/instance/command",
+        &a.elw.admin,
+        None,
+    )
+    .await;
+    let akte = akten[0]["id"].as_i64().unwrap();
+    let (s, v) = common::anfrage_json(
+        &a.elw.app,
+        "POST",
+        &format!("/api/admin/instance/command/{akte}/request"),
+        &a.elw.admin,
+        Some(&json!({})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    elw_meldet(&a.elw).await;
+
+    let spiegel: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM einsatz_spiegel WHERE einsatz_id = ?")
+            .bind(h)
+            .fetch_one(&a.hub.pool)
+            .await
+            .unwrap();
+    assert_eq!(spiegel, 1, "der Hub ist jetzt Spiegel");
+    assert_eq!(
+        kopplungen_zaehlen(&a.hub, h).await,
+        0,
+        "lokale Kopplung getrennt"
+    );
+}

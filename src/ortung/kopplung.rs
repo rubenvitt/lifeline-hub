@@ -364,6 +364,21 @@ pub async fn beende_im_einsatz_tx(
     Ok(EndeImEinsatz { getrennt, geleert })
 }
 
+/// Führungsabgabe: löscht alle Kopplungen des Einsatzes, lokale und die an einen Hub, und liefert
+/// ihre Anzahl. Schreibt weder ETB noch Position; die Positionen bleiben stehen (Spec
+/// „Führungswechsel“). Läuft in der Transaktion von `werde_spiegel`.
+pub async fn beende_bei_fuehrungsabgabe_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<u64, AppError> {
+    let geloescht = sqlx::query("DELETE FROM ortung_kopplung WHERE einsatz_id = ?")
+        .bind(einsatz_id)
+        .execute(&mut *conn)
+        .await?
+        .rows_affected();
+    Ok(geloescht)
+}
+
 /// Kennungen der letzten 24 Stunden aus den nicht widerrufenen, nicht abgelaufenen Zugängen der Org mit
 /// `positionen:write`; jüngste zuerst. `jetzt` im Format [`crate::zeit::FORMAT`].
 pub async fn list_kandidaten(
