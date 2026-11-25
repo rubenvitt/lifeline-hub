@@ -15,7 +15,7 @@ async fn disponieren_stamm_setzt_status_und_schreibt_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -41,7 +41,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personnel"),
+            &format!("/api/incidents/{einsatz}/personnel"),
             &admin,
             Some(&body)
         )
@@ -53,7 +53,7 @@ async fn doppelte_stamm_disposition_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personnel"),
+            &format!("/api/incidents/{einsatz}/personnel"),
             &admin,
             Some(&body)
         )
@@ -83,7 +83,7 @@ async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -96,7 +96,7 @@ async fn stamm_person_ausser_dienst_ist_422_und_unbekannte_404() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(r#"{"personal_id":424242}"#),
     )
@@ -111,7 +111,7 @@ async fn adhoc_ohne_stamm() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let (status, json) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{einsatz}/personnel"), &admin,
+        &app, "POST", &format!("/api/incidents/{einsatz}/personnel"), &admin,
         Some(r#"{"adhoc":{"name":"Notarzt Extern","funktion":"Notarzt","staerke_position":"fuehrer"}}"#),
     ).await;
     assert_eq!(status, StatusCode::CREATED);
@@ -132,7 +132,7 @@ async fn beobachter_liest_disponiert_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/personnel"),
+            &format!("/api/incidents/{einsatz}/personnel"),
             &erika,
             None
         )
@@ -144,7 +144,7 @@ async fn beobachter_liest_disponiert_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &erika,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -162,7 +162,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/close"),
+            &format!("/api/incidents/{einsatz}/close"),
             &admin,
             None
         )
@@ -173,7 +173,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -190,7 +190,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -212,7 +212,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
         anfrage(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+            &format!("/api/incidents/{einsatz}/personnel/{ep}"),
             &admin,
             Some(&format!(r#"{{"status_id":{im_einsatz}}}"#))
         )
@@ -224,7 +224,7 @@ async fn status_wechsel_und_entfernen_schreiben_etb() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+            &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
             &admin,
             None
         )
@@ -254,7 +254,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
+            &format!("/api/incidents/{einsatz}/units/{einheit}/personnel/{ep}"),
             &admin,
             None,
         )
@@ -264,7 +264,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}"),
         &admin,
         Some(&format!(r#"{{"fuehrer_id":{chef}}}"#)),
     )
@@ -273,7 +273,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(&format!(r#"{{"name":"Nord","leiter_id":{leiter}}}"#)),
     )
@@ -304,7 +304,7 @@ async fn entlassen_feuert_einheit_und_abschnitt_nur_bei_betroffener_person() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+                &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -336,7 +336,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -354,7 +354,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let (_, live) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -364,7 +364,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -372,7 +372,7 @@ async fn snapshot_bleibt_nach_stamm_aenderung_bei_abgeschlossenem_einsatz() {
     let (_, snap) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -393,7 +393,7 @@ async fn disponieren_leerer_body_meldet_entweder_oder() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some("{}"),
     )
@@ -416,7 +416,7 @@ async fn disponieren_beides_meldet_nicht_beides() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&body),
     )
@@ -439,7 +439,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -453,7 +453,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, a) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -467,7 +467,7 @@ async fn dispo_position_explizit_null_entfernt_absent_behaelt() {
     let (_, b) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":null}"#),
     )
@@ -487,7 +487,7 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -497,7 +497,7 @@ async fn dispo_position_ungueltiger_wert_ist_400() {
     let (status, body) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":"quatsch"}"#),
     )
@@ -519,7 +519,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"personal_id":{person},"staerke_position":"fuehrer"}}"#
@@ -531,7 +531,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, gesetzt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -541,7 +541,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":null}"#),
     )
@@ -565,7 +565,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -575,7 +575,7 @@ async fn patch_leerstring_leert_bemerkung() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -583,7 +583,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"   "}"#),
     )
@@ -603,7 +603,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -613,7 +613,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"bemerkung":"vor Ort"}"#),
     )
@@ -621,7 +621,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, unberuehrt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(r#"{"staerke_position":"fuehrer"}"#),
     )
@@ -639,7 +639,7 @@ async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str, posit
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{name}","staerke_position":"{position}"}}}}"#
@@ -655,7 +655,7 @@ async fn uhs_mit_kraft(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) 
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"UHS 1"}"#),
     )
@@ -673,7 +673,7 @@ async fn uhs_mit_kraft(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) 
         let (s, json) = anfrage(
             app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &format!("/api/incidents/{einsatz}/{pfad}"),
             cookie,
             body,
         )
@@ -688,7 +688,7 @@ async fn einheit_mit(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) ->
     let (s, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}/personnel/{ep}"),
         cookie,
         None,
     )
@@ -723,7 +723,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/damages"),
+        &format!("/api/incidents/{einsatz}/damages"),
         &admin,
         Some(&format!(
             r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#
@@ -740,7 +740,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+                &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
                 &admin,
                 None,
             )
@@ -766,7 +766,7 @@ async fn entlassen_feuert_uhs_nur_bei_betroffener_kraft_und_laesst_den_schaden()
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/damages/{schaden}"),
+        &format!("/api/incidents/{einsatz}/damages/{schaden}"),
         &admin,
         None,
     )
@@ -798,7 +798,7 @@ async fn staerke_position_aendern_feuert_einheit_und_uhs_nur_bei_wirksamer_aende
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+                &format!("/api/incidents/{einsatz}/personnel/{ep}"),
                 &admin,
                 Some(body),
             )
@@ -863,7 +863,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{pid}}}"#)),
     )
@@ -892,7 +892,7 @@ async fn staerke_position_mit_stamm_default_feuert_nur_bei_wirksamer_aenderung()
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+                &format!("/api/incidents/{einsatz}/personnel/{ep}"),
                 &admin,
                 Some(&body),
             )
@@ -947,7 +947,7 @@ async fn namen(app: &axum::Router, cookie: &str, einsatz: i64, query: &str) -> V
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel{query}"),
+        &format!("/api/incidents/{einsatz}/personnel{query}"),
         cookie,
         None,
     )
@@ -970,7 +970,7 @@ async fn aktion(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/{was}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}/{was}"),
         cookie,
         None,
     )
@@ -991,7 +991,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}/personnel/{anna}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}/personnel/{anna}"),
         &admin,
         None,
     )
@@ -1000,7 +1000,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}"),
         &admin,
         Some(&format!(r#"{{"fuehrer_id":{anna}}}"#)),
     )
@@ -1009,7 +1009,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(&format!(r#"{{"name":"Süd","leiter_id":{anna}}}"#)),
     )
@@ -1028,7 +1028,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1058,7 +1058,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel/{anna}/stand-down/undo"),
+                &format!("/api/incidents/{einsatz}/personnel/{anna}/stand-down/undo"),
                 &admin,
                 Some(&body),
             )
@@ -1091,7 +1091,7 @@ async fn personal_entlassen_und_zuruecknehmen_ergibt_denselben_zustand() {
     let (_, einheiten_json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1169,7 +1169,7 @@ async fn entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel?entlassene=ja"),
+        &format!("/api/incidents/{einsatz}/personnel?entlassene=ja"),
         &admin,
         None,
     )
@@ -1188,7 +1188,7 @@ async fn entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}"),
+        &format!("/api/incidents/{einsatz}/personnel/{anna}"),
         &admin,
         Some(r#"{"bemerkung":"x"}"#),
     )
@@ -1201,7 +1201,7 @@ async fn entlassen_und_erneut_disponieren() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{anna}/position"),
+        &format!("/api/incidents/{einsatz}/personnel/{anna}/position"),
         &admin,
         Some(r#"{"lat":52.0,"lon":10.0}"#),
     )
@@ -1243,7 +1243,7 @@ async fn entlassene_stamm_person_erneut_disponieren_ist_201() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/personnel"),
+                &format!("/api/incidents/{einsatz}/personnel"),
                 &admin,
                 Some(&format!(r#"{{"personal_id":{person}}}"#)),
             )
@@ -1359,7 +1359,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         &admin,
         Some(r#"{"adhoc":{"funkrufname":"Florian 1","fahrzeugtyp":"ELW 2"}}"#),
     )
@@ -1387,7 +1387,7 @@ async fn schreibwege_an_einer_entlassenen_kraft_sind_409() {
         let (s, json) = anfrage(
             &app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/{pfad}"),
+            &format!("/api/incidents/{einsatz}/{pfad}"),
             &admin,
             body.as_deref(),
         )
@@ -1408,7 +1408,7 @@ async fn patch_kraft(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         cookie,
         Some(body),
     )
@@ -1420,7 +1420,7 @@ async fn adhoc_kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str)
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{name}","funktion":"Sanitäter","traegerorganisation":"ASB"}}}}"#
@@ -1451,7 +1451,7 @@ async fn einsatzfunktion_setzen_und_leeren() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1479,7 +1479,7 @@ async fn kartensicht_traegt_einsatzfunktion_neben_der_qualifikation() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let ep = adhoc_kraft(&app, &admin, einsatz, "Erika Funk").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/map/commanders");
+    let pfad = format!("/api/incidents/{einsatz}/map/commanders");
 
     let (s, karte) = anfrage(&app, "GET", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{karte}");
@@ -1518,7 +1518,7 @@ async fn einsatzfunktion_ueber_200_zeichen_ist_400_und_aendert_nichts() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1579,7 +1579,7 @@ async fn adhoc_disponieren_prueft_die_grenzen() {
         let (s, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/personnel"),
+            &format!("/api/incidents/{einsatz}/personnel"),
             &admin,
             Some(&body),
         )
@@ -1591,7 +1591,7 @@ async fn adhoc_disponieren_prueft_die_grenzen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(
             r#"{{"adhoc":{{"name":"{genau}","funktion":"{genau}","traegerorganisation":"{genau}"}}}}"#
@@ -1626,7 +1626,7 @@ async fn adhoc_angaben_im_patch_aenderbar() {
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1682,7 +1682,7 @@ async fn stamm_person_umbenennen_ist_422_im_stamm_pflegen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         None,
     )
@@ -1768,7 +1768,7 @@ async fn aenderungen_stehen_in_genau_einem_etb_eintrag() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{adhoc}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{adhoc}/stand-down"),
         &admin,
         None,
     )
@@ -1798,7 +1798,7 @@ async fn angaben_aendern_meldet_nur_betroffene_ansichten() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/damages"),
+        &format!("/api/incidents/{einsatz}/damages"),
         &admin,
         Some(&format!(
             r#"{{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1","geschaedigt_personal_id":{geschaedigt}}}"#
@@ -1886,7 +1886,7 @@ async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
     let (_, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         None,
     )
@@ -1906,7 +1906,7 @@ async fn einheit_und_uhs_tragen_die_einsatzfunktion() {
     let (s, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         &admin,
         None,
     )
@@ -1928,7 +1928,7 @@ async fn personal_patch(
     anfrage_json(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         cookie,
         Some(&body),
     )
@@ -2065,7 +2065,7 @@ async fn position_vergleicht_den_wirksamen_wert() {
     let (_, d) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{person}}}"#)),
     )
@@ -2240,7 +2240,7 @@ async fn personalstatus_zuruecknehmen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/status/undo"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}/status/undo"),
         cookie,
         Some(&beleg.to_string()),
     )
@@ -2433,7 +2433,7 @@ async fn entlassene_person_rueckname_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
         &admin,
         None,
     )

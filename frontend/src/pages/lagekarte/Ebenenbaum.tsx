@@ -16,6 +16,8 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
+import CopernicusBilderZusatz from './CopernicusBilderZusatz';
+import DrohnenQuelle from './DrohnenQuelle';
 import FachebeneStand from './FachebeneStand';
 import FremdebenenZeilen from './FremdebenenZeilen';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
@@ -240,6 +242,25 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
       {sichtbar && quelle === 'copernicus' && props.copernicus && (
         <CopernicusZusatz status={status} {...props.copernicus} />
       )}
+      {sichtbar && quelle === 'copernicus_bilder' && props.copernicusBilder && (
+        <CopernicusBilderZusatz
+          status={status}
+          {...props.copernicusBilder}
+          archiv={props.copernicus?.archiv ?? false}
+          onArchiv={props.copernicus?.onArchiv ?? (() => {})}
+          // Der Archiv-Schalter steht an der Vektorebene; ist sie aus, hier (ein Zustand, ein
+          // Schalter).
+          archivHier={!props.fachebenenSichtbar.copernicus && !!props.copernicus}
+        />
+      )}
+      {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
+      {quelle === 'drohne' && props.drohne && (
+        <DrohnenQuelle
+          einsatzId={props.einsatzId}
+          darfSchalten={props.drohne.darfSchalten}
+          onLivebild={props.drohne.onLivebild}
+        />
+      )}
     </div>
   );
 }
@@ -358,20 +379,25 @@ export default function Ebenenbaum(props: SidebarProps) {
   const zeigeSichtungslegende =
     (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
 
-  const fachAn = fachebeneKeys().filter((k) => props.fachebenenSichtbar[k]).length;
+  const abgeschaltet = props.fachebenenAbgeschaltet ?? [];
+  const fachAn = fachebeneKeys().filter(
+    (k) => props.fachebenenSichtbar[k] && !abgeschaltet.includes(k),
+  ).length;
   const fach = FACHEBENEN_GRUPPEN.map((g) => {
-    const z = g.ebenen.map((key) => ({
-      key,
-      name: FACHEBENEN[key].label,
-      sichtbar: props.fachebenenSichtbar[key],
-    }));
+    const z = g.ebenen
+      .filter((key) => !abgeschaltet.includes(key))
+      .map((key) => ({
+        key,
+        name: FACHEBENEN[key].label,
+        sichtbar: props.fachebenenSichtbar[key],
+      }));
     return {
       ...g,
       zeilen: z,
       an: z.filter((x) => x.sichtbar).length,
       treffer: filtereGruppe(suche, ['Fachebenen', g.name], z),
     };
-  });
+  }).filter((g) => g.zeilen.length > 0);
   const fachTreffer = fach.some((g) => g.treffer.length > 0);
 
   const grundlageInhalt =

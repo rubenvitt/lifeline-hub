@@ -13,7 +13,7 @@ import { seedeVorlage, seedeVorlagenMaterial } from './vorlage-kern';
  */
 test('Einheit aus Vorlage bilden: Dialog → Vorschau → Meldebild (LLH-1049)', async ({ page }) => {
   await anmelden(page, { startseite: false });
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Vorlage ${Date.now()}` },
   });
   expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
@@ -76,7 +76,7 @@ test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LL
   page,
 }) => {
   await anmelden(page, { startseite: false });
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Vorlagen-Material ${Date.now()}` },
   });
   expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
@@ -95,16 +95,16 @@ test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LL
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/kraefteuebersicht$`));
 
   const einheiten = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/units`)
+    await page.request.get(`/api/incidents/${einsatzId}/units`)
   ).json()) as { id: number; name: string }[];
   const staffel = einheiten.find((e) => e.name === v.staffel);
   expect(staffel, 'Staffel gebildet').toBeTruthy();
   const fahrzeuge = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/vehicles`)
+    await page.request.get(`/api/incidents/${einsatzId}/vehicles`)
   ).json()) as { id: number; funkrufname: string }[];
   const rtw1 = fahrzeuge.find((f) => f.funkrufname === v.fahrzeuge.rtw1);
   const posten = (await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/material`)
+    await page.request.get(`/api/incidents/${einsatzId}/material`)
   ).json()) as {
     bezeichnung: string;
     menge: number;
@@ -115,7 +115,7 @@ test('Einheit aus Vorlage bilden: Material am richtigen Ort, ein ETB-Eintrag (LL
   expect(p(m.decken)).toMatchObject({ menge: 50, einheit_id: staffel!.id });
   expect(p(m.rucksack)).toMatchObject({ menge: 1, einsatz_fahrzeug_id: rtw1!.id });
 
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   const inhalte = ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
   const gebildet = inhalte.filter((i) => i.includes('aus Vorlage'));
   expect(gebildet).toHaveLength(1);

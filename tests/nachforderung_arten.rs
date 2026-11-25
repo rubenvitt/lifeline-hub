@@ -14,7 +14,7 @@ async fn absetzen(app: &axum::Router, cookie: &str, e: i64, art: &str) {
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/resource-requests"),
+        &format!("/api/incidents/{e}/resource-requests"),
         cookie,
         Some(&body),
     )
@@ -26,7 +26,7 @@ async fn arten(app: &axum::Router, cookie: &str, e: i64) -> Vec<(String, i64)> {
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/resource-requests/types"),
+        &format!("/api/incidents/{e}/resource-requests/types"),
         cookie,
         None,
     )
@@ -93,7 +93,7 @@ async fn ohne_zugriff_auf_das_modul_im_anderen_einsatz_zaehlt_er_nicht() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{a}/module-overrides/nachforderungen"),
+        &format!("/api/incidents/{a}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":null,"benoetigte_rolle":"fuehrungskraft"}"#),
     )
@@ -104,7 +104,7 @@ async fn ohne_zugriff_auf_das_modul_im_anderen_einsatz_zaehlt_er_nicht() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{a}/resource-requests"),
+        &format!("/api/incidents/{a}/resource-requests"),
         &erika_c,
         None,
     )
@@ -228,7 +228,7 @@ async fn ein_beobachter_bekommt_die_arten_wie_die_liste() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{fremder}/resource-requests/types"),
+        &format!("/api/incidents/{fremder}/resource-requests/types"),
         &erika_c,
         None,
     )

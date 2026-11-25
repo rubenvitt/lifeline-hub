@@ -57,7 +57,7 @@ for (const [ansicht, groesse] of Object.entries(ANSICHTEN)) {
     let loslassen!: () => void;
     const tor = new Promise<void>((f) => (loslassen = f));
     let gehalten = 0;
-    await page.route(new RegExp(`/api/einsaetze/${einsatzId}/etb\\?`), async (route) => {
+    await page.route(new RegExp(`/api/incidents/${einsatzId}/etb\\?`), async (route) => {
       const url = new URL(route.request().url());
       if (url.searchParams.get('typ') === 'lage') {
         gehalten += 1;
@@ -136,7 +136,7 @@ test('letzter Punkt von einem anderen Schirm: das Paneel verschwindet über den 
 }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzPerApi(page, `E2E Startliste letzter Punkt ${Date.now()}`);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const ort = await page.request.patch(basis, {
     data: { einsatzort: 'Deich West', einsatzort_lat: 52.103, einsatzort_lon: 9.356 },
   });

@@ -16,7 +16,7 @@ const SAMMLUNG: Record<AnlagenDokument, string> = {
 };
 
 const basis = (dokument: AnlagenDokument, einsatzId: number, dokumentId: number) =>
-  `/api/einsaetze/${einsatzId}/${SAMMLUNG[dokument]}/${dokumentId}/enclosures`;
+  `/api/incidents/${einsatzId}/${SAMMLUNG[dokument]}/${dokumentId}/enclosures`;
 
 /** Anlagen in ihrer Reihenfolge (Nummer 1, 2, …). */
 export function listeDokumentAnlagen(

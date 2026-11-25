@@ -162,7 +162,7 @@ pub fn fordere_lesezugriff(
 
 /// Org-Isolations-Floor (LFH-121): der minimale, un-vergessliche Zugriffs-Boden für
 /// JEDEN einsatz-gebundenen Handler — gedacht, um vom `EinsatzKontext`-Extractor VOR
-/// jedem `/api/einsaetze/{id}/…`-Handler erzwungen zu werden, damit die Cross-Org-Lücke
+/// jedem `/api/incidents/{id}/…`-Handler erzwungen zu werden, damit die Cross-Org-Lücke
 /// (LFH-115) strukturell nicht mehr „vergessen" werden kann.
 ///
 /// Erlaubt, wenn der Benutzer Mitglied ist (`rolle.is_some()`) ODER den Einsatz als
@@ -247,7 +247,7 @@ pub fn fordere_aktiv(einsatz: &Einsatz) -> Result<(), AppError> {
 }
 
 /// Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
-/// `GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter
+/// `GET /api/incidents/{id}/module-access` und die EINE Auswertung hinter
 /// [`fordere_modul_zugriff`] und [`erlaubte_module`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 pub struct ModulFreigabe {

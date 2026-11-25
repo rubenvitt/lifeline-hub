@@ -24,16 +24,16 @@ async function post<T = { id: number }>(page: Page, pfad: string, data: unknown)
 }
 
 async function etbInhalte(page: Page, einsatzId: string): Promise<string[]> {
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
 async function seed(page: Page) {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Nachforderung Material ${Date.now()}`,
   });
   const einsatzId = String(id);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   await post(page, `${basis}/units`, { name: 'Staffel A' });
   const nf = await post(page, `${basis}/resource-requests`, {
     art: 'Tauchpumpe',
@@ -111,7 +111,7 @@ test('vorhandenen Posten einer eingetroffenen Nachforderung zuordnen: die Karte 
   page,
 }) => {
   const { einsatzId, nfId } = await seed(page);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   // Das Material stand schon von Hand im Einsatz, bevor die Nachforderung eintraf.
   const posten = await post(page, `${basis}/material`, {
     adhoc: { bezeichnung: 'Tauchpumpe THW' },
@@ -176,7 +176,7 @@ test('Fehlzuordnung in der Materialliste lösen: der Posten bleibt, die Rücknah
   page,
 }) => {
   const { einsatzId, nfId } = await seed(page);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const posten = await post(page, `${basis}/material`, {
     adhoc: { bezeichnung: 'Tauchpumpe THW' },
     menge: 1,

@@ -136,12 +136,23 @@ extension Bruecke {
     /// Frist in ms aus JS: fehlt sie oder ist sie `null`, gibt es keine (`wert` `nil`); `nil`
     /// insgesamt heißt ungültig (Text, negativ, nicht endlich).
     private static func frist(_ roh: Any?) -> (wert: Duration?, Void)? {
-        if roh == nil || roh is NSNull { return (nil, ()) }
-        if roh is String || roh is Bool { return nil }
-        guard let ms = (roh as? Double) ?? (roh as? Int).map(Double.init), ms.isFinite, ms >= 0 else {
-            return nil
-        }
+        guard let roh, !(roh is NSNull) else { return (nil, ()) }
+        if roh is String || isWahrheitswert(roh) { return nil }
+        let zahl = (roh as? NSNumber)?.doubleValue ?? (roh as? Double) ?? (roh as? Int).map(Double.init)
+        guard let ms = zahl, ms.isFinite, ms >= 0 else { return nil }
         return (.milliseconds(Int64(ms.rounded(.up))), ())
+    }
+
+    /// Ein Wahrheitswert, nicht bloß eine Zahl, die sich als `Bool` lesen lässt (LLH-2082): unter
+    /// Darwin gelingt `NSNumber(0) is Bool`, ein JS-Wahrheitswert kommt dort als `CFBoolean`.
+    private static func isWahrheitswert(_ roh: Any) -> Bool {
+        if type(of: roh) == Bool.self { return true }
+        #if canImport(Darwin)
+            guard let zahl = roh as? NSNumber else { return false }
+            return CFGetTypeID(zahl as CFTypeRef) == CFBooleanGetTypeID()
+        #else
+            return false
+        #endif
     }
 
     /// JSON-Objekt mit sortierten Schlüsseln, gültig als JS-Literal (wie `jsString`).

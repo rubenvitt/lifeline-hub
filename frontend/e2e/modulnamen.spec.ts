@@ -10,7 +10,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 test.setTimeout(120_000);
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Modulnamen ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz: ${antwort.status()}`).toBe(true);

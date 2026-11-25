@@ -264,6 +264,10 @@ fn backend() -> BTreeMap<&'static str, usize> {
             "SCHICHTPLAN_DATEI_MAX_BYTES",
             schichtplan::uebernahme::DATEI_MAX_BYTES,
         ),
+        (
+            "STAMMDATEN_DATEI_MAX_BYTES",
+            lifeline_hub::einlesen::tabelle::DATEI_MAX_BYTES,
+        ),
         ("SCHICHTPLAN_HELFER_TEXT_MAX", schichtplan::HELFER_TEXT_MAX),
         (
             "SCHICHTPLAN_HELFER_TELEFON_MAX",

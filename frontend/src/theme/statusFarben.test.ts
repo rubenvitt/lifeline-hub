@@ -876,7 +876,8 @@ describe('abschnittLagezustand (LFH-608)', () => {
 
 describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
   // Handgeschriebene Liste statt `fachebeneKeys()`: eine neue Ebene muss hier eine Farbe belegen.
-  const EBENEN: FachebeneQuelle[] = [
+  // Die Satellitenbilder (LLH-2021) teilen den Ton der Vektorebene, Test unten.
+  const EBENEN: Exclude<FachebeneQuelle, 'copernicus_bilder'>[] = [
     'nina',
     'dwd',
     'pegelonline',
@@ -887,7 +888,14 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
     'kritis',
     'energie',
     'copernicus',
+    'drohne',
   ];
+
+  it('gibt den Satellitenbildern den Ton der Copernicus-Vektorebene, keinen neuen', () => {
+    for (const t of [hellToken, dunkelToken]) {
+      expect(sf.fachebeneFarbe('copernicus_bilder', t)).toBe(sf.fachebeneFarbe('copernicus', t));
+    }
+  });
 
   it('hält am Tag die bisherigen Töne — keine Umfärbung (Literale)', () => {
     expect(EBENEN.map((q) => sf.fachebeneFarbe(q, hellToken))).toEqual([
@@ -901,6 +909,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#531dab',
       '#d4b106',
       '#873800',
+      '#f5590f',
     ]);
   });
 
@@ -916,6 +925,7 @@ describe('Ebenenfarbe der Fachebenen (LFH-593)', () => {
       '#9254de',
       '#fadb14',
       '#c48a5a',
+      '#ff8c5a',
     ]);
   });
 

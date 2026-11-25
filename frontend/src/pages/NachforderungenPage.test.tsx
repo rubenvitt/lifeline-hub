@@ -34,8 +34,8 @@ beforeEach(() => {
   // Vorschläge und Ziele der Erfassung (LLH-1089): leer, wenn ein Test nichts anderes setzt.
   server.use(
     http.get('/api/unit-types', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
   );
 });
 afterEach(() => {
@@ -203,7 +203,7 @@ describe('NachforderungenPage', () => {
 
   it('der Seitenkopf liest den Server-Zähler: offen und davon unterwegs', async () => {
     server.use(
-      http.get('/api/einsaetze/:einsatzId/module-counts', () =>
+      http.get('/api/incidents/:einsatzId/module-counts', () =>
         HttpResponse.json({
           nachforderungen: { offen: 5, angefordert: 1, zugesagt: 2, unterwegs: 2, ueberfaellig: 0 },
         }),
@@ -1224,20 +1224,20 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     const koerper: unknown[] = [];
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/1/material', ({ request }) => {
+      http.get('/api/incidents/1/material', ({ request }) => {
         abrufe.push(request.url);
         return HttpResponse.json(
           new URL(request.url).searchParams.has('entlassene') ? [] : liste(),
         );
       }),
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         koerper.push(await request.json());
         return post ? post() : HttpResponse.json(posten({ id: 8 }), { status: 201 });
       }),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])),
     );
     return { koerper, abrufe };
   }
@@ -1329,7 +1329,7 @@ describe('NachforderungenPage — Material übernehmen (LLH-1226 Teil II)', () =
     materialServer(() => [posten({ nachforderung_id: verknuepft ? 4 : null })]);
     const aufrufe: { em: string; koerper: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:em/resource-request', async ({ request, params }) => {
+      http.post('/api/incidents/1/material/:em/resource-request', async ({ request, params }) => {
         aufrufe.push({ em: String(params.em), koerper: await request.json() });
         verknuepft = true;
         return HttpResponse.json(posten());
@@ -1613,17 +1613,17 @@ describe('NachforderungenPage — Als Einheit übernehmen (LLH-1383)', () => {
   function einheitServer(einheiten: () => unknown[]) {
     const koerper: unknown[] = [];
     server.use(
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten())),
+      http.get('/api/incidents/1/units', () => HttpResponse.json(einheiten())),
       http.get('/api/unit-types', () =>
         HttpResponse.json([
           { id: 1, label: 'KTW', sortier: 1 },
           { id: 2, label: 'RTW', sortier: 2 },
         ]),
       ),
-      http.get('/api/einsaetze/1/staging-areas', () =>
+      http.get('/api/incidents/1/staging-areas', () =>
         HttpResponse.json([{ id: 3, einsatz_id: 1, bezeichnung: 'Nord' }]),
       ),
-      http.post('/api/einsaetze/1/units/from-resource-request', async ({ request }) => {
+      http.post('/api/incidents/1/units/from-resource-request', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json(rtw({ einheit_ids: [11, 12] }), { status: 201 });
       }),
@@ -1749,7 +1749,7 @@ describe('NachforderungenPage — Betreuungsstelle (LLH-1082)', () => {
     ladeModulFreigaben.mockResolvedValue(freigabenFixture());
     listeNachforderungen.mockResolvedValue([FELDBETTEN, DECKEN, RTW]);
     server.use(
-      http.get('/api/einsaetze/1/care', () => {
+      http.get('/api/incidents/1/care', () => {
         betreuungAbrufe += 1;
         return HttpResponse.json({ stellen: [turnhalle, stadion], namentlich: [] });
       }),
@@ -1867,7 +1867,7 @@ describe('NachforderungenPage — Personenbezug (LLH-1573)', () => {
   it('lädt das Detail beim Öffnen einmal frisch, auch wenn die Personenseite es hält', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/persons/10', () => {
+      http.get('/api/incidents/1/persons/10', () => {
         abrufe++;
         return HttpResponse.json({
           id: 10,
@@ -1894,7 +1894,7 @@ describe('NachforderungenPage — Personenbezug (LLH-1573)', () => {
   it('ein gescheitertes Detail steht als „nicht geladen“ mit „Erneut laden“', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/persons/10', () => {
+      http.get('/api/incidents/1/persons/10', () => {
         abrufe++;
         return abrufe === 1
           ? HttpResponse.json({ fehler: 'kaputt' }, { status: 500 })

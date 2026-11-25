@@ -63,6 +63,12 @@ richtigen Stelle. Nach dem Abschalten ist nichts davon mehr da, auch nicht in de
   `scripts/api-routen-bestand.txt` wächst nicht.
 - DTOs mit `ToSchema` → `openapi.json` + `types.generated.ts` (`scripts/check-typ-codegen.sh`).
 
+- **Benennung (Wurzel-`AGENTS.md`, „Bezeichner-Sprache“, ADR-0097):** neue Routen liegen unter
+  `/api/incidents/{id}/…` (`einsaetze` steht nicht im Glossar, der Bestand wächst nicht); neue
+  Request-/Response-Typen und GeoJSON-Eigenschaften haben englische Wire-Felder (`kind`,
+  `heading_deg`, `airborne`, `taken_at_ms`, `lens`, …). Deutsche Feldnamen in diesem Doc sind
+  sinngemäß gemeint; maßgeblich sind die Namen im Plan.
+
 ## 4. Ansätze
 
 Am Phase-1-Checkpoint entschieden (Ruben, 24.11.2026):
@@ -70,7 +76,7 @@ Am Phase-1-Checkpoint entschieden (Ruben, 24.11.2026):
 | Frage | Gewählt | Verworfen und warum |
 |---|---|---|
 | Wohin mit dem Lagestand | **Im Speicher der Art** (`fluechtig`), nichts in der DB | eigene Tabelle: widerspricht D2; Rahmen-Store: kein zweiter Nutzer, Traits nur bei zwei Implementierungen |
-| Kartenroute | **Einsatzroute** `/api/einsaetze/{id}/map/drone` mit Antwortform und ETag der Fachebenen | `/api/map/overlays/drohne`: global und ohne Anmeldung, bricht die Fachebenen-Regel |
+| Kartenroute | **Einsatzroute** `/api/incidents/{id}/map/drone` mit Antwortform und ETag der Fachebenen | `/api/map/overlays/drohne`: global und ohne Anmeldung, bricht die Fachebenen-Regel |
 | Zuschalten | **Neue Tabelle `adapter_einsatz`** mit Flag `lagemonitor`, gesetzt von der Einsatzleitung | `einsatz_anbindungen`: gibt eingehende Maschinenzugänge frei, nicht Adapter; Flag in `einsatz_einstellungen`: falsches Recht, getrennt von der Zuschaltung |
 | Token für Video und Fotos | **Live-Abruf außerhalb des Laufs** über `adapter::ziel`, Token je Abruf entschlüsselt, nie zwischengespeichert (ADR-Nachtrag) | Token im Speicher halten: verletzt ADR-0077; alles im Lauf vorladen: Video ist nicht vorladbar |
 | Video | **HLS ohne Low-Latency** über Proxy mit Bündelung im Speicher | LL-HLS: Query-Parameter zerstören die Bündelung, Gewinn 3–5 s; WHEP: nur im Tailnet (LLH-2117) |
@@ -85,9 +91,9 @@ Suchlage ──HTTPS/Bearer──▶ adapter::ziel ──▶ Art „suchlage“ 
                               ▲     ▲                                 │
                  Lauf (5 s) ──┘     └── adapter::live (Video, Fotos)  │
                                                                       ▼
-Browser ◀── /api/einsaetze/{id}/map/drone  (GeoJSON, ETag)  ◀── Lesezugriff + Zuschaltung
-Browser ◀── /api/einsaetze/{id}/drone/video/{key}/hls/{*file} ◀── drohne::video (Bündelung)
-Browser ◀── /api/einsaetze/{id}/drone/photos/{key}/thumb      ◀── bereinigt, kurz gecacht
+Browser ◀── /api/incidents/{id}/map/drone  (GeoJSON, ETag)  ◀── Lesezugriff + Zuschaltung
+Browser ◀── /api/incidents/{id}/drone/video/{key}/hls/{*file} ◀── drohne::video (Bündelung)
+Browser ◀── /api/incidents/{id}/drone/photos/{key}/thumb      ◀── bereinigt, kurz gecacht
 ```
 
 ### 5.1 Neutraler Vertrag `src/drohne/` (LLH-2105)
@@ -156,20 +162,20 @@ zugeschaltet_at TEXT NOT NULL, lagemonitor INTEGER NOT NULL DEFAULT 0, PRIMARY K
 Kein Personenbezug in der Tabelle; wer zugeschaltet hat, steht im ETB (Systemeintrag
 „Drohnenbild aus Suchlage zugeschaltet/abgeschaltet“).
 
-Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
-`/api/einsaetze/{id}/map/drone`):
-- `GET  /api/einsaetze/{id}/drone/sources` – Drohnenquellen der Org mit Zustand (Lesezugriff):
+Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/incidents/{id}/drone` und
+`/api/incidents/{id}/map/drone`):
+- `GET  /api/incidents/{id}/drone/sources` – Drohnenquellen der Org mit Zustand (Lesezugriff):
   je Quelle Bezeichnung, zugeschaltet an diesem Einsatz ja/nein, belegt durch einen anderen
-  Einsatz (nur dessen Name, wenn der Nutzer ihn lesen darf, sonst „anderer Einsatz“),
+  Einsatz (dessen Name, wenn der Nutzer ihn lesen darf; sonst nur der Hinweis `held_by_other_hidden`, angezeigt als „einem anderen Einsatz“),
   `lagemonitor`, Adapter-Zustand, Name des laufenden Suchlage-Einsatzes (`mission.name`) und die
   Video-Kennungen.
-- `PUT  /api/einsaetze/{id}/drone/sources/{aid}` `{ lagemonitor: bool }` – zuschalten oder Flag
+- `PUT  /api/incidents/{id}/drone/sources/{aid}` `{ lagemonitor: bool }` – zuschalten oder Flag
   ändern (`fordere_einsatzleitung`, aktiver Einsatz; Adapter derselben Org, Art mit
   Drohnenvertrag, sonst 422). **Exklusiv** (Ruben, 24.11.2026): Ist die Quelle an einem anderen
   laufenden Einsatz zugeschaltet, 409 mit Hinweis; eine Quelle gehört also höchstens einem
   laufenden Einsatz (Prüfung in der Schreibtransaktion; ein Teilindex o. Ä. ist dem Builder
   überlassen).
-- `DELETE /api/einsaetze/{id}/drone/sources/{aid}` – abschalten (Einsatzleitung).
+- `DELETE /api/incidents/{id}/drone/sources/{aid}` – abschalten (Einsatzleitung).
 - Beide Schreibwege setzen den Merker im Speicher sofort; beim Abschalten des letzten Einsatzes
   leert der Speicher den Stand des Adapters.
 - Eine Zuschaltung gilt nur, solange der Einsatz läuft; Abschluss und Löschung räumen über die
@@ -177,7 +183,7 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 
 ### 5.4 Fachebene „Drohne“ (LLH-2106)
 
-- `GET /api/einsaetze/{id}/map/drone` (`EinsatzLesezugriff<Lagekarte>`): die **unveränderte**
+- `GET /api/incidents/{id}/map/drone` (`EinsatzLesezugriff<Lagekarte>`): die **unveränderte**
   `FachebeneAntwort` über `fachebene_antwort` (ETag, 304), Status `ok`/`leer`/`offline` wie
   gehabt, `abgerufen` = Zeit des letzten Stands (Festlegung Builder-Check: kein neues Feld im
   gemeinsamen DTO; Videos und Missionsname liefert `GET …/drone/sources`, „veraltet“ leitet das
@@ -205,7 +211,7 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
   (Festlegung Builder-Check), wenn der Adapter angehalten ist, einen Eingriff braucht
   (`zustand::braucht_eingriff`), der Geheimnisspeicher gesperrt ist oder die Org sich bei einem
   Hub meldet; dann 503 und im Fenster „Kein Livebild“ bzw. „Vorschau nicht abrufbar“.
-- `GET /api/einsaetze/{id}/drone/video/{key}/hls/{*file}` (`EinsatzLesezugriff<Lagekarte>`,
+- `GET /api/incidents/{id}/drone/video/{key}/hls/{*file}` (`EinsatzLesezugriff<Lagekarte>`,
   Zuschaltung des Einsatzes Pflicht, sonst 404): `key` → Adapter und `gateway_sn` aus dem
   Speicher, `file` nur `[A-Za-z0-9._-]`, Query wird verworfen.
 - **`drohne::video::Buendel`:** In-Memory-Bündelung nach dem Muster `tile_cache::hole_gebuendelt`
@@ -224,7 +230,7 @@ Routen (Modul `lagekarte`, `PFAD_KEY`-Eintrag `/api/einsaetze/{id}/drone` und
 
 ### 5.6 Fotos (LLH-2108)
 
-- `GET /api/einsaetze/{id}/drone/photos/{key}/thumb` (`EinsatzLesezugriff<Lagekarte>`,
+- `GET /api/incidents/{id}/drone/photos/{key}/thumb` (`EinsatzLesezugriff<Lagekarte>`,
   Zuschaltung Pflicht, Foto ab `zugeschaltet_at`, sonst 404): holt `thumb_url` über
   `adapter::live`, Deckel 2 MiB, **bereinigt mit `anhang::metadaten::bereinigen(…, "image/jpeg")`**
   (fail-closed 422), kurz im Speicher (5 min, Deckel 32 MiB).

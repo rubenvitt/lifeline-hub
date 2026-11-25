@@ -36,11 +36,11 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 
 /** Einsatz mit einer verorteten Einheit. Kein Modulname im Einsatznamen (Palette). */
 async function einsatzMitPumpe(page: Page): Promise<number> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Ortssuche ${Date.now()}`,
   });
-  const id = await post(page, `/api/einsaetze/${einsatzId}/units`, { name: 'Pumpe Ost' });
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${id}/position`, {
+  const id = await post(page, `/api/incidents/${einsatzId}/units`, { name: 'Pumpe Ost' });
+  const antwort = await page.request.patch(`/api/incidents/${einsatzId}/units/${id}/position`, {
     data: { lat: PUMPE[1], lon: PUMPE[0] },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();

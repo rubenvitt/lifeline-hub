@@ -38,7 +38,7 @@ async function seede(page: Page, einsatzId: string) {
     name: 'Gruppe Feuerwehr',
     abschnitt_id: abschnitt,
   });
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${fw}/position`, {
+  const antwort = await page.request.patch(`/api/incidents/${einsatzId}/units/${fw}/position`, {
     data: { tz_organisation: 'feuerwehr' },
   });
   expect(antwort.ok(), `Organisation: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();

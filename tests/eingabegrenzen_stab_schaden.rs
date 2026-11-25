@@ -29,7 +29,7 @@ async fn infotelefon_notiz_name_rueckruf() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/staff/info-line");
+    let uri = format!("/api/incidents/{e}/staff/info-line");
     let anruf = |notiz: String, name: String, rueckruf: String| {
         json!({ "anliegen": "hinweis", "notiz": notiz, "anrufer_name": name,
                 "rueckruf": rueckruf, "rueckruf_noetig": true })
@@ -62,7 +62,7 @@ async fn schaden_ort_beschreibung_kontakt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/damages");
+    let uri = format!("/api/incidents/{e}/damages");
     let schaden = |ort: String, beschreibung: String| json!({ "typ": "sachschaden", "ausmass": "gering", "ort": ort, "beschreibung": beschreibung });
 
     let (s, j) = post(&app, &admin, &uri, schaden(x(500), x(8_000))).await;

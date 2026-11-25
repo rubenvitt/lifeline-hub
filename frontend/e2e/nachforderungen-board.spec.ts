@@ -19,10 +19,10 @@ async function post<T = { id: number }>(page: Page, pfad: string, data: unknown)
 
 /** Drei Nachforderungen: eine angefordert, eine zugesagt, eine unterwegs. */
 async function seed(page: Page) {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Nachforderungen Board ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${id}/resource-requests`;
+  const basis = `/api/incidents/${id}/resource-requests`;
   const anlegen = (art: string, bezeichnung: string) =>
     post(page, basis, { art, bezeichnung, adressat_kategorie: 'leitstelle' });
   const rtw = await anlegen('RTW', 'RTW Turnhalle');
@@ -103,10 +103,10 @@ test('am Handy eine Segmentleiste der Stufen mit Zahl, ohne waagrechten Überlau
 
 test('Teilzusage teilt in zwei Karten; Zurückziehen über das Menü (LLH-1097)', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Nachforderung Zusage ${Date.now()}`,
   });
-  const nf = await post(page, `/api/einsaetze/${id}/resource-requests`, {
+  const nf = await post(page, `/api/incidents/${id}/resource-requests`, {
     art: 'RTW',
     anzahl: 2,
     bezeichnung: 'RTW Teilzusage',

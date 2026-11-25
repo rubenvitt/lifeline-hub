@@ -13,7 +13,7 @@ async fn default_kanal(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
         cookie,
         None,
     )
@@ -44,7 +44,7 @@ async fn upload(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/attachments"))
+                .uri(format!("/api/incidents/{einsatz}/attachments"))
                 .header(header::COOKIE, cookie)
                 .header(
                     header::CONTENT_TYPE,
@@ -75,7 +75,7 @@ async fn download(
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{einsatz}/attachments/{anhang_id}"))
+                .uri(format!("/api/incidents/{einsatz}/attachments/{anhang_id}"))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -111,7 +111,7 @@ async fn anhang_roundtrip_hoch_und_runterladen() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(
             r#"{{"inhalt":"siehe Anhang","anhang_ids":[{anhang_id}]}}"#
@@ -126,7 +126,7 @@ async fn anhang_roundtrip_hoch_und_runterladen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         None,
     )
@@ -168,7 +168,7 @@ async fn anhang_only_nachricht_ohne_text() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"","anhang_ids":[{aid}]}}"#)),
     )
@@ -188,7 +188,7 @@ async fn leere_nachricht_ohne_anhang_abgelehnt() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"   ","anhang_ids":[]}"#),
     )
@@ -219,7 +219,7 @@ async fn fremder_anhang_kann_nicht_verknuepft_werden() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz_a}/chat/channels/{kid_a}/messages"),
+        &format!("/api/incidents/{einsatz_a}/chat/channels/{kid_a}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid_b}]}}"#)),
     )
@@ -230,7 +230,7 @@ async fn fremder_anhang_kann_nicht_verknuepft_werden() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz_a}/chat/channels/{kid_a}/messages"),
+        &format!("/api/incidents/{einsatz_a}/chat/channels/{kid_a}/messages"),
         &admin,
         None,
     )
@@ -314,7 +314,7 @@ async fn mehrere_anhaenge_an_einer_nachricht() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(
             r#"{{"inhalt":"zwei Dateien","anhang_ids":[{id1},{id2}]}}"#
@@ -356,7 +356,7 @@ async fn doppelte_anhang_id_wird_dedupliziert() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(
             r#"{{"inhalt":"doppelt","anhang_ids":[{aid},{aid}]}}"#
@@ -409,7 +409,7 @@ async fn nachricht_senden(
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"m","anhang_ids":[{ids}]}}"#)),
     )
@@ -423,7 +423,7 @@ async fn nachricht_loeschen(app: &axum::Router, einsatz: i64, mid: i64, cookie: 
     let (s, _) = anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}"),
         cookie,
         None,
     )
@@ -532,7 +532,7 @@ async fn delete_anhang(app: &axum::Router, einsatz: i64, aid: i64, cookie: &str)
     anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         cookie,
         None,
     )
@@ -662,7 +662,7 @@ async fn download_inm(
 ) -> (StatusCode, HeaderMap, Vec<u8>) {
     let mut req = Request::builder()
         .method("GET")
-        .uri(format!("/api/einsaetze/{einsatz}/attachments/{aid}"))
+        .uri(format!("/api/incidents/{einsatz}/attachments/{aid}"))
         .header(header::COOKIE, cookie);
     if let Some(etag) = if_none_match {
         req = req.header(header::IF_NONE_MATCH, etag);
@@ -875,7 +875,7 @@ async fn dokument_anhang_nicht_an_chat_verknuepfbar() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
     )
@@ -979,7 +979,7 @@ async fn etb_anhang_nicht_an_chat_verknuepfbar() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
     )
@@ -1031,7 +1031,7 @@ async fn schaden_anhang_generisches_loeschen_ist_422() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )
@@ -1069,7 +1069,7 @@ async fn schaden_anhang_nicht_an_chat_verknuepfbar() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
     )
@@ -1107,7 +1107,7 @@ async fn entfernte_schaden_datei_bleibt_generisch_gesperrt() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    let schaden_pfad = format!("/api/einsaetze/{einsatz}/damages/{sid}/attachments/{lid}");
+    let schaden_pfad = format!("/api/incidents/{einsatz}/damages/{sid}/attachments/{lid}");
 
     let (s, _) = anfrage(&app, "DELETE", &schaden_pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "über die Schadensroute entfernt");
@@ -1198,7 +1198,7 @@ async fn heraufstufen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         cookie,
         Some(&format!(
             r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Deich","anhang_ids":[{ids}]}}"#
@@ -1221,7 +1221,7 @@ async fn etb_download(
             Request::builder()
                 .method("GET")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz}/etb/{eintrag}/attachments/{aid}"
+                    "/api/incidents/{einsatz}/etb/{eintrag}/attachments/{aid}"
                 ))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
@@ -1242,7 +1242,7 @@ async fn etb_eintrag(app: &axum::Router, einsatz: i64, id: i64, cookie: &str) ->
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -1307,7 +1307,7 @@ async fn heraufstufen_ohne_auswahl_uebernimmt_nichts() {
     let (s, hoch) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &admin,
         Some(r#"{"typ":"meldung"}"#),
     )
@@ -1419,7 +1419,7 @@ async fn heraufstufen_einer_reinen_foto_nachricht_ohne_text_ist_400() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"","anhang_ids":[{foto}]}}"#)),
     )
@@ -1430,7 +1430,7 @@ async fn heraufstufen_einer_reinen_foto_nachricht_ohne_text_ist_400() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         &admin,
         Some(&format!(r#"{{"typ":"meldung","anhang_ids":[{foto}]}}"#)),
     )
@@ -1461,7 +1461,7 @@ async fn tier_und_uhs_anhang_sind_generisch_und_im_chat_gesperrt() {
         let (s, v) = anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+            &format!("/api/incidents/{einsatz}/attachments/{aid}"),
             &admin,
             None,
         )
@@ -1486,7 +1486,7 @@ async fn tier_und_uhs_anhang_sind_generisch_und_im_chat_gesperrt() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+            &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
             &admin,
             Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
         )
@@ -1517,7 +1517,7 @@ async fn entfernte_tier_und_uhs_datei_bleibt_generisch_gesperrt() {
         let (aid, besitzer, lid) =
             erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", MINI_JPEG).await;
         let modul_pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{lid}",
+            "/api/incidents/{einsatz}/{}/{besitzer}/attachments/{lid}",
             art.segment()
         );
         let (s, _) = anfrage(&app, "DELETE", &modul_pfad, &admin, None).await;
@@ -1571,7 +1571,7 @@ async fn person_anhang_generisches_loeschen_ist_422() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )
@@ -1609,7 +1609,7 @@ async fn person_anhang_nicht_an_chat_verknuepfbar() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"x","anhang_ids":[{aid}]}}"#)),
     )
@@ -1647,7 +1647,7 @@ async fn entfernte_personen_datei_bleibt_generisch_gesperrt() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    let person_pfad = format!("/api/einsaetze/{einsatz}/persons/{pid}/attachments/{lid}");
+    let person_pfad = format!("/api/incidents/{einsatz}/persons/{pid}/attachments/{lid}");
 
     let (s, _) = anfrage(&app, "DELETE", &person_pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT, "über die Personenroute entfernt");
@@ -1691,7 +1691,7 @@ async fn senden_roh(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"m","anhang_ids":[{ids}]}}"#)),
     )

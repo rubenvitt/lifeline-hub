@@ -15,7 +15,7 @@ use lifeline_hub::routes::live::{ist_stammdaten_pfad, STAMMDATEN_PFADE};
 use std::fs;
 
 /// Handler-Module der Stammdaten-Kataloge. Eine schreibende Route eines dieser Module außerhalb
-/// von `/api/einsaetze/…` ist eine Katalogänderung der Organisation.
+/// von `/api/incidents/…` ist eine Katalogänderung der Organisation.
 const KATALOG_MODULE: &[&str] = &[
     "fahrzeug",
     "fahrzeug_status",
@@ -105,10 +105,7 @@ fn jede_schreibende_katalogroute_ist_abgedeckt() {
         let Some(modul) = katalog_modul(block) else {
             continue;
         };
-        if !schreibend(block)
-            || pfad.starts_with("/api/einsaetze/")
-            || pfad.starts_with("/api/incidents/")
-        {
+        if !schreibend(block) || pfad.starts_with("/api/incidents/") {
             continue;
         }
         geprueft += 1;

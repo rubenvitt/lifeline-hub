@@ -20,6 +20,7 @@
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "doku:bilder": "node scripts/doku-bilder.mjs",
+    "verify": "playwright test -c playwright.verify.config.ts",
     "zeichen-werte": "node scripts/zeichen-werte.mjs",
     "design-system": "node scripts/design-system/run.mjs"
   },
@@ -35,6 +36,7 @@
     "antd": "^6.7.1",
     "dayjs": "^1.11.23",
     "fflate": "^0.8.3",
+    "hls.js": "1.7.4",
     "idb": "^8.0.4",
     "libheif-js": "1.23.5",
     "maplibre-gl": "^6.19.0",
@@ -63,6 +65,7 @@
     "@vitejs/plugin-react": "^6.3.0",
     "@vitest/coverage-v8": "^5.1.1",
     "fake-indexeddb": "^6.2.8",
+    "fast-check": "^4.11.0",
     "jsdom": "31.0.1",
     "msw": "^3.0.7",
     "openapi-typescript": "^7.13.0",

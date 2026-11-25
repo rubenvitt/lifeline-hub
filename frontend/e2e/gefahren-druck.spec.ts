@@ -30,7 +30,7 @@ const SUBPIXEL = 0.5;
 
 /** Ein Gefahrengebiet über die API; liefert seine id. */
 async function gebietAnlegen(page: Page, einsatzId: string, label: string): Promise<number> {
-  const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
+  const zone = await page.request.post(`/api/incidents/${einsatzId}/zones`, {
     data: {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
@@ -50,7 +50,7 @@ async function gebietAnlegen(page: Page, einsatzId: string, label: string): Prom
     },
   });
   expect(zone.ok(), `Zone: ${zone.status()} ${await zone.text()}`).toBe(true);
-  const gebiete = await page.request.get(`/api/einsaetze/${einsatzId}/hazard-areas`);
+  const gebiete = await page.request.get(`/api/incidents/${einsatzId}/hazard-areas`);
   const liste = (await gebiete.json()) as { id: number; label: string | null }[];
   return liste.find((g) => g.label === label)!.id;
 }
@@ -62,7 +62,7 @@ async function bewerten(
   daten: Record<string, string | null>,
 ) {
   const r = await page.request.put(
-    `/api/einsaetze/${einsatzId}/hazard-areas/${gebietId}/matrix/rating`,
+    `/api/incidents/${einsatzId}/hazard-areas/${gebietId}/matrix/rating`,
     { data: { beschreibung: null, gemeldet_von: null, ...daten } },
   );
   expect(r.ok(), `Bewertung: ${r.status()} ${await r.text()}`).toBe(true);

@@ -93,12 +93,12 @@ test.describe('Kommunikationsplan ohne Netz (LFH-848)', () => {
     test.setTimeout(180_000);
     await anmelden(page);
     await serviceWorkerZustaendig(page);
-    const einsatz = await page.request.post('/api/einsaetze', {
+    const einsatz = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Kommunikationsplan offline ${Date.now()}` },
     });
     expect(einsatz.ok(), await einsatz.text()).toBeTruthy();
     const einsatzId = ((await einsatz.json()) as { id: number }).id;
-    const basis = `/api/einsaetze/${einsatzId}/staff/comms-plan`;
+    const basis = `/api/incidents/${einsatzId}/staff/comms-plan`;
     await page.request.post(`${basis}/positions`, {
       data: { stellenart: 'funktion', funktion: 's2' },
     });

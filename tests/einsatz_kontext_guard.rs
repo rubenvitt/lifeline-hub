@@ -1,6 +1,6 @@
 //! Struktureller AuthZ-Guard (LFH-121, verschärft in LFH-230).
 //!
-//! Erzwingt: jede Route unter `/api/einsaetze/{id}/…`, deren Modul nicht in
+//! Erzwingt: jede Route unter `/api/incidents/{id}/…`, deren Modul nicht in
 //! [`DEFERRED_MODULE`] steht, trägt in ihrer Handler-Signatur **genau einen**
 //! sanktionierten Gate-Typ ([`SANKTIONIERTE_GATES`] —
 //! [`EinsatzLesezugriff`](lifeline_hub::einsatz::kontext::EinsatzLesezugriff) /
@@ -15,7 +15,7 @@
 //! `src/routes/<modul>.rs`-Handler-Signaturen als Quelltext — bewusst ohne
 //! `regex`-Dependency (das Projekt hält die Abhängigkeiten schlank).
 
-use lifeline_hub::einsatz::modul::{key_fuer_pfad, EINSATZ_WURZELN};
+use lifeline_hub::einsatz::modul::key_fuer_pfad;
 use std::fs;
 
 /// Module, deren einsatz-gebundene Handler in der LFH-121/LFH-230-**Teil**migration
@@ -187,7 +187,7 @@ fn jede_einsatz_route_traegt_ein_gate_mit_korrektem_key() {
         let Some(pfad) = erster_string(seg) else {
             continue;
         };
-        if !EINSATZ_WURZELN.iter().any(|w| pfad.starts_with(w)) {
+        if !pfad.starts_with("/api/incidents/{id}") {
             continue;
         }
         for (modul, handler) in handler_refs(seg) {

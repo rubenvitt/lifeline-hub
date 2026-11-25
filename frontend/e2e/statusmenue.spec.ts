@@ -29,12 +29,12 @@ const PW = process.env.E2E_ADMIN_PW ?? 'e2e-admin-pw';
 const RUFNAME = 'Florian Menü 1';
 
 async function seede(page: Page): Promise<number> {
-  const einsatz = await page.request.post('/api/einsaetze', {
+  const einsatz = await page.request.post('/api/incidents', {
     data: { bezeichnung: `Statusmenü ${Date.now()}` },
   });
   expect(einsatz.ok(), `Einsatz: ${await einsatz.text()}`).toBeTruthy();
   const einsatzId = ((await einsatz.json()) as { id: number }).id;
-  const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
+  const fahrzeug = await page.request.post(`/api/incidents/${einsatzId}/vehicles`, {
     data: { adhoc: { funkrufname: RUFNAME, fahrzeugtyp: 'RTW' } },
   });
   expect(fahrzeug.ok(), `Fahrzeug: ${await fahrzeug.text()}`).toBeTruthy();
@@ -170,12 +170,12 @@ test('Personal: nach dem Wechsel steht die Quittung, und „Rückgängig“ stel
 }) => {
   const NAME = 'Anna Quittung';
   await anmeldenPerApi(page, ADMIN, PW, { startseite: false });
-  const einsatz = await page.request.post('/api/einsaetze', {
+  const einsatz = await page.request.post('/api/incidents', {
     data: { bezeichnung: `Statusquittung ${Date.now()}` },
   });
   expect(einsatz.ok(), `Einsatz: ${await einsatz.text()}`).toBeTruthy();
   const einsatzId = ((await einsatz.json()) as { id: number }).id;
-  const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+  const kraft = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
     data: { adhoc: { name: NAME } },
   });
   expect(kraft.ok(), `Kraft: ${await kraft.text()}`).toBeTruthy();

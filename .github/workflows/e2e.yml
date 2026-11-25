@@ -253,6 +253,15 @@ jobs:
       - name: e2e-Bericht
         run: mise exec -- pnpm -C frontend exec playwright merge-reports --reporter html ./all-blob-reports
         continue-on-error: true
+      # WACKLER (LLH-2090): Tests, die erst im Wiederholversuch grün wurden (`retries: 1` in
+      # frontend/playwright.config.ts). Nur Bericht, kein Gate; auch bei fehlenden Blobs, denn
+      # jeder gefundene Wackler ist echt.
+      - name: e2e-Wackler
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mise exec -- pnpm -C frontend exec playwright merge-reports --reporter json ./all-blob-reports > e2e-wackler.json
+          mise exec -- node scripts/e2e-wackler.mjs e2e-wackler.json >> "$GITHUB_STEP_SUMMARY"
       # LAUFZEITEN DER e2e-ANTEILE (LFH-1117): die Anteile verteilen nach `frontend/e2e/laufzeiten.json`.
       # Hier entsteht dieselbe Tabelle aus diesem Lauf, als Artefakt `e2e-laufzeiten`; die
       # Zusammenfassung zeigt, wie die bisherige Tabelle unter den neuen Messwerten trägt. Liegt

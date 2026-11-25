@@ -13,7 +13,7 @@ fn export_pfad(einsatz: i64) -> String {
 }
 
 fn termin_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/briefing/schedule")
+    format!("/api/incidents/{einsatz}/briefing/schedule")
 }
 
 /// Roher GET mit Kopfzeilen und Body als Text.

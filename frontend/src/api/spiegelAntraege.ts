@@ -6,12 +6,12 @@ import type { AbgelehnterAntragAnzeige, SpiegelAntragAnzeige } from './types';
  * abgelehnten und übernommenen (deren Zeile der Spiegel noch nicht hat) Anträge der Person.
  */
 export function loadAntraege(einsatzId: number): Promise<SpiegelAntragAnzeige[]> {
-  return apiGet<SpiegelAntragAnzeige[]>(`/api/einsaetze/${einsatzId}/requests`);
+  return apiGet<SpiegelAntragAnzeige[]>(`/api/incidents/${einsatzId}/requests`);
 }
 
 /** Verwirft einen eigenen, abgelehnten Antrag (204; sonst 404). */
 export function verwerfeAntrag(einsatzId: number, antragId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/requests/${antragId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/requests/${antragId}`, 'DELETE');
 }
 
 /**

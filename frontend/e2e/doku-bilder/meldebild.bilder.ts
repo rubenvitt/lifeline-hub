@@ -52,7 +52,7 @@ function vor(basis: Date, minuten: number): Date {
 }
 
 async function einheitNamens(api: APIRequestContext, einsatzId: number, name: string) {
-  const antwort = await api.get(`/api/einsaetze/${einsatzId}/units`);
+  const antwort = await api.get(`/api/incidents/${einsatzId}/units`);
   expect(antwort.ok(), `Einheiten: ${antwort.status()}`).toBe(true);
   const einheit = ((await antwort.json()) as Einheit[]).find((e) => e.name === name);
   expect(einheit, `Einheit „${name}“ im Demo-Einsatz`).toBeDefined();
@@ -66,7 +66,7 @@ test.describe(KAPITEL, () => {
       const demo = await demoEinsatz(api);
       const jetzt = new Date();
       const nachtrag = (eid: number, art: string, zeit: Date, notiz?: string) =>
-        fuelle<Zeitachse>(api, 'post', `/api/einsaetze/${demo.id}/units/${eid}/timeline`, {
+        fuelle<Zeitachse>(api, 'post', `/api/incidents/${demo.id}/units/${eid}/timeline`, {
           art,
           zeitpunkt_at: draht(zeit),
           notiz,
@@ -87,7 +87,7 @@ test.describe(KAPITEL, () => {
       await fuelle(
         api,
         'post',
-        `/api/einsaetze/${demo.id}/units/${rettung.id}/timeline/${irrtum!.id}/correct`,
+        `/api/incidents/${demo.id}/units/${rettung.id}/timeline/${irrtum!.id}/correct`,
         { zeitpunkt_at: draht(eintreffenVor(jetzt, 179)), grund: 'Zeit verwechselt' },
       );
 

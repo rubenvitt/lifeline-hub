@@ -68,7 +68,7 @@ async fn setup_mit_pegel_basis(basis: &str) -> Umgebung {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/gauges")
+    format!("/api/incidents/{einsatz}/gauges")
 }
 
 fn station(uuid: &str, name: &str) -> String {
@@ -542,7 +542,7 @@ async fn put_und_post_warten_nicht_auf_den_abruf() {
 // ---------- Prognose (LFH-628) ----------
 
 fn prognose_pfad(einsatz: i64, pegel_id: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/forecast")
+    format!("/api/incidents/{einsatz}/gauges/{pegel_id}/forecast")
 }
 
 const PROGNOSE: &str = r#"{"hoechststand_cm":709.6,"zeitpunkt":"2026-09-22T18:00:00+02:00"}"#;
@@ -767,7 +767,7 @@ async fn wv_basis(reihe: Value) -> (String, std::sync::Arc<std::sync::atomic::At
 }
 
 fn vorhersage_pfad(einsatz: i64, pegel_id: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/gauges/{pegel_id}/prediction")
+    format!("/api/incidents/{einsatz}/gauges/{pegel_id}/prediction")
 }
 
 #[tokio::test]
@@ -838,7 +838,7 @@ async fn vorhersage_ohne_quelle_und_cache_ist_502_fremder_pegel_404() {
 // ---------- Verlauf (LFH-633) ----------
 
 fn verlauf_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/gauges/history")
+    format!("/api/incidents/{einsatz}/gauges/history")
 }
 
 /// Verlauf aus dem vorbelegten Cache, in der Reihenfolge der Pegel; eine Station ohne Stand
@@ -956,7 +956,7 @@ async fn lagekennzahlen(u: &Umgebung, cookie: &str, einsatz: i64) -> (Value, Val
     let (status, detail) = anfrage(
         &u.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
@@ -966,7 +966,7 @@ async fn lagekennzahlen(u: &Umgebung, cookie: &str, einsatz: i64) -> (Value, Val
         detail.as_object().unwrap().contains_key("lagekennzahlen"),
         "Detail: nie absent, leer ist []: {detail:?}"
     );
-    let (status, liste) = anfrage(&u.app, "GET", "/api/einsaetze", cookie, None).await;
+    let (status, liste) = anfrage(&u.app, "GET", "/api/incidents", cookie, None).await;
     assert_eq!(status, StatusCode::OK, "{liste:?}");
     let zeile = liste
         .as_array()
@@ -1060,7 +1060,7 @@ async fn pegel_und_evakuierung_schalten_beide_lagekennzahlen() {
     let (status, b) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/evacuation/districts"),
+        &format!("/api/incidents/{einsatz}/evacuation/districts"),
         &admin,
         Some(
             r#"{"bezeichnung":"Uferstraße 12–40","plan_personen":640,"plan_erhebung":"gezaehlt"}"#,

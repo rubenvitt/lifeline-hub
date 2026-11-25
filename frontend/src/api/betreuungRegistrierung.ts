@@ -18,7 +18,7 @@ import type {
  * Schreibwege mit `client_id` (Replay liefert den ersten Stand) und Erfassungszeit; ohne Netz
  * vormerken nur über `offline/schreiben.ts`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/care`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/care`;
 
 /** Haushalt registrieren oder Personen anhängen (`haushalt_id`); 201 mit dem Haushalt. */
 export function sendRegistrierung(

@@ -48,6 +48,9 @@ pub struct AppState {
     /// Weg nach draußen der URL-Fremdebenen (LLH-2100) samt Single-Flight je Ebene. Vorgabe: der
     /// echte Abruf über `adapter::ziel`; Tests setzen einen eigenen Abrufer ein.
     pub fremdebene_abrufer: crate::karte_fremdebene::abruf::Abrufer,
+    /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
+    /// `adapter_einsatz`, nur im Arbeitsspeicher.
+    pub drohne: std::sync::Arc<crate::drohne::Store>,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -112,6 +115,10 @@ pub const PUBLIC_API_BODY_MAX: usize = 64 * 1024;
 /// (`abloesung::schichtplan::uebernahme::DATEI_MAX_BYTES`) plus Entscheidungen und Rahmen. So
 /// bleibt die Prüfung der Datei (400 mit Meldung) die wirksame Grenze.
 const SCHICHTPLAN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
+
+/// Body-Grenze der Stammdaten-Routen (LLH-1633): die Datei (höchstens 2 MiB,
+/// `stammdaten_eingang::datei`) plus Entscheidungen und Multipart-Rahmen.
+const STAMMDATEN_IMPORT_BODY_MAX: usize = 2 * 1024 * 1024 + 512 * 1024;
 
 /// Zone anlegen und Abschnittsfläche setzen (LFH-1074): Geometrie bis 256 KiB
 /// (`lage_zone::pruefe_geometrie_groesse`) plus Rahmen. So bleibt die Geometrieprüfung (400 mit
@@ -304,20 +311,20 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Verlauf und „alle gelesen“ eines Einsatzes (LLH-1143, design.md D3/D4).
         .route(
-            "/api/einsaetze/{id}/notifications",
+            "/api/incidents/{id}/notifications",
             get(routes::benachrichtigung::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/notifications/read",
+            "/api/incidents/{id}/notifications/read",
             post(routes::benachrichtigung::gelesen),
         )
         // Vorgabe je Funktion am Einsatz (LLH-1421, design.md D4).
         .route(
-            "/api/einsaetze/{id}/notification-defaults",
+            "/api/incidents/{id}/notification-defaults",
             get(routes::benachrichtigung::vorgaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/notification-defaults/{art}",
+            "/api/incidents/{id}/notification-defaults/{art}",
             put(routes::benachrichtigung::vorgabe_setzen),
         )
         // Web Push (LLH-1223): ohne `--web-push` 404 aus dem Handler.
@@ -338,297 +345,297 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::ios_push::abmelden_mit_nachweis)
                 .layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
-        .route("/api/einsaetze", get(routes::einsatz::liste))
-        .route("/api/einsaetze", post(routes::einsatz::anlegen))
+        .route("/api/incidents", get(routes::einsatz::liste))
+        .route("/api/incidents", post(routes::einsatz::anlegen))
         .route(
-            "/api/einsaetze/member-selection",
+            "/api/incidents/member-selection",
             get(routes::einsatz::mitglied_auswahl_anlage),
         )
-        .route("/api/einsaetze/{id}", get(routes::einsatz::detail))
-        .route("/api/einsaetze/{id}", patch(routes::einsatz::aktualisieren))
+        .route("/api/incidents/{id}", get(routes::einsatz::detail))
+        .route("/api/incidents/{id}", patch(routes::einsatz::aktualisieren))
         .route(
-            "/api/einsaetze/{id}/close",
+            "/api/incidents/{id}/close",
             post(routes::einsatz::abschliessen),
         )
         // LLH-1814: binnen 24 Stunden wieder öffnen (Einsatzleitung oder Admin der Einsatz-Org).
         .route(
-            "/api/einsaetze/{id}/reopen",
+            "/api/incidents/{id}/reopen",
             post(routes::einsatz::wiedereroeffnen),
         )
         // LLH-1814: offene Punkte vor dem Abschluss (nur Einsatzleitung, aktiv).
         .route(
-            "/api/einsaetze/{id}/closure/check",
+            "/api/incidents/{id}/closure/check",
             get(routes::einsatz::abschluss_pruefung),
         )
         .route(
-            "/api/einsaetze/{id}/command-post",
+            "/api/incidents/{id}/command-post",
             get(routes::einsatz_fuehrungsstelle::lesen)
                 .patch(routes::einsatz_fuehrungsstelle::aendern),
         )
         // Präsenz an Einzelangaben (LLH-1946): nur Speicher, Gate wie der PATCH daneben.
         .route(
-            "/api/einsaetze/{id}/presence",
+            "/api/incidents/{id}/presence",
             put(routes::praesenz::einsatz_melden).delete(routes::praesenz::einsatz_beenden),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/presence",
+            "/api/incidents/{id}/units/{eid}/presence",
             put(routes::praesenz::einheit_melden).delete(routes::praesenz::einheit_beenden),
         )
         // Programmpunkte der Veranstaltung (LLH-1570): Lesen mit dem Einsatz, Schreiben mit den
         // Rechten der Kopfdaten.
         .route(
-            "/api/einsaetze/{id}/agenda-items",
+            "/api/incidents/{id}/agenda-items",
             get(routes::programmpunkt::liste).post(routes::programmpunkt::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/agenda-items/{pid}",
+            "/api/incidents/{id}/agenda-items/{pid}",
             patch(routes::programmpunkt::aendern).delete(routes::programmpunkt::loeschen),
         )
         // LFH-893: Einzel-Zuordnung (design.md D5), neben dem PATCH mit `sprechgruppe_ids`.
         .route(
-            "/api/einsaetze/{id}/command-post/talk-groups/{sg}",
+            "/api/incidents/{id}/command-post/talk-groups/{sg}",
             put(routes::einsatz_fuehrungsstelle::sprechgruppe_zuordnen)
                 .delete(routes::einsatz_fuehrungsstelle::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/retention-period",
+            "/api/incidents/{id}/retention-period",
             put(routes::einsatz::aufbewahrungsfrist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/follow-up",
+            "/api/incidents/{id}/follow-up",
             put(routes::einsatz::nachbereitung_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/retention-period/{kategorie}",
+            "/api/incidents/{id}/retention-period/{kategorie}",
             put(routes::einsatz::kategorie_frist_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/retention-categories",
+            "/api/incidents/{id}/retention-categories",
             get(routes::einsatz::kategorien_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/settings",
+            "/api/incidents/{id}/settings",
             get(routes::einsatz::einstellungen_laden).put(routes::einsatz::einstellungen_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/accommodation-guidelines",
+            "/api/incidents/{id}/accommodation-guidelines",
             get(routes::unterkunft_richtwerte::einsatz_lesen),
         )
         .route(
-            "/api/einsaetze/{id}/accommodation-guidelines/{schluessel}",
+            "/api/incidents/{id}/accommodation-guidelines/{schluessel}",
             put(routes::unterkunft_richtwerte::einsatz_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/module-overrides",
+            "/api/incidents/{id}/module-overrides",
             get(routes::einsatz::modul_overrides_laden),
         )
         .route(
-            "/api/einsaetze/{id}/module-access",
+            "/api/incidents/{id}/module-access",
             get(routes::einsatz::modul_freigaben_laden),
         )
         .route(
-            "/api/einsaetze/{id}/module-defaults",
+            "/api/incidents/{id}/module-defaults",
             get(routes::einsatz::load_modul_vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/module-overrides/{modul_key}",
+            "/api/incidents/{id}/module-overrides/{modul_key}",
             put(routes::einsatz::modul_override_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/members",
+            "/api/incidents/{id}/members",
             get(routes::einsatz::mitglieder),
         )
         // Statisches Segment vor `{benutzer_id}` (LFH-1141); Kennungen sind Zahlen.
         .route(
-            "/api/einsaetze/{id}/members/selection",
+            "/api/incidents/{id}/members/selection",
             get(routes::einsatz::mitglied_auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/members/{benutzer_id}",
+            "/api/incidents/{id}/members/{benutzer_id}",
             put(routes::einsatz::mitglied_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/members/{benutzer_id}",
+            "/api/incidents/{id}/members/{benutzer_id}",
             delete(routes::einsatz::mitglied_entfernen),
         )
-        .route("/api/einsaetze/{id}/etb", post(routes::etb::erfassen))
+        .route("/api/incidents/{id}/etb", post(routes::etb::erfassen))
         // Kanonischer Live-Feed des Einsatzes; die Modul-Berechtigung wirkt als Filter je Event
         // statt
         // als Gate der Route.
-        .route("/api/einsaetze/{id}/live", get(routes::live::stream))
+        .route("/api/incidents/{id}/live", get(routes::live::stream))
         // Org-Strom für Tabs außerhalb eines Einsatzes (LFH-734); bewusst NICHT unter
-        // `/api/einsaetze/`, damit er weder mit `{id}` noch mit `PFAD_KEY` kollidiert.
+        // `/api/incidents/`, damit er weder mit `{id}` noch mit `PFAD_KEY` kollidiert.
         .route("/api/live", get(routes::live::org_stream))
         // Modulzähler: modul-lose Gate-Route wie `/live`, die Modulrechte filtern die Felder.
         .route(
-            "/api/einsaetze/{id}/module-counts",
+            "/api/incidents/{id}/module-counts",
             get(routes::modul_zaehler::liste),
         )
         // Lagebild des Lagemonitors (LFH-892): modul-los, nur für die Ansicht `lagemonitor`.
         .route(
-            "/api/einsaetze/{id}/situation-monitor",
+            "/api/incidents/{id}/situation-monitor",
             get(routes::lagemonitor::lagebild),
         )
-        .route("/api/einsaetze/{id}/etb", get(routes::etb::liste))
-        .route("/api/einsaetze/{id}/etb/counts", get(routes::etb::zaehler))
-        .route("/api/einsaetze/{id}/etb/count", get(routes::etb::anzahl))
+        .route("/api/incidents/{id}/etb", get(routes::etb::liste))
+        .route("/api/incidents/{id}/etb/counts", get(routes::etb::zaehler))
+        .route("/api/incidents/{id}/etb/count", get(routes::etb::anzahl))
         .route(
-            "/api/einsaetze/{id}/etb/read-marker",
+            "/api/incidents/{id}/etb/read-marker",
             get(routes::etb::lesemarke).post(routes::etb::lesemarke_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/etb/{eintrag_id}/task",
+            "/api/incidents/{id}/etb/{eintrag_id}/task",
             post(routes::etb::auftrag_erteilen),
         )
         // ETB-Anhänge: Upload mit Body-Limit (die Vorgabe von 2 MiB kappte still) und Upload-Grenze,
         // Download mit Download-Grenze.
         .route(
-            "/api/einsaetze/{id}/etb/attachments",
+            "/api/incidents/{id}/etb/attachments",
             post(routes::etb::anhang_hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/etb/{eintrag_id}/attachments/{aid}",
+            "/api/incidents/{id}/etb/{eintrag_id}/attachments/{aid}",
             get(routes::etb::anhang_herunterladen).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/chat/channels",
+            "/api/incidents/{id}/chat/channels",
             get(routes::chat::kanaele_liste),
         )
         .route(
-            "/api/einsaetze/{id}/chat/channels",
+            "/api/incidents/{id}/chat/channels",
             post(routes::chat::kanal_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/chat/channels/{kid}/messages",
+            "/api/incidents/{id}/chat/channels/{kid}/messages",
             get(routes::chat::nachrichten_liste),
         )
         .route(
-            "/api/einsaetze/{id}/chat/channels/{kid}/messages",
+            "/api/incidents/{id}/chat/channels/{kid}/messages",
             post(routes::chat::nachricht_erfassen),
         )
         .route(
-            "/api/einsaetze/{id}/chat/channels/{kid}/read",
+            "/api/incidents/{id}/chat/channels/{kid}/read",
             post(routes::chat::kanal_gelesen_markieren),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}",
+            "/api/incidents/{id}/chat/messages/{mid}",
             patch(routes::chat::nachricht_bearbeiten),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}",
+            "/api/incidents/{id}/chat/messages/{mid}",
             delete(routes::chat::nachricht_loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}/promote-to-etb",
+            "/api/incidents/{id}/chat/messages/{mid}/promote-to-etb",
             post(routes::chat::heraufstufen),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}/promote-to-task",
+            "/api/incidents/{id}/chat/messages/{mid}/promote-to-task",
             post(routes::chat::heraufstufen_auftrag),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}/reference",
+            "/api/incidents/{id}/chat/messages/{mid}/reference",
             put(routes::chat::bezug_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/chat/messages/{mid}/reference",
+            "/api/incidents/{id}/chat/messages/{mid}/reference",
             delete(routes::chat::bezug_loeschen),
         )
         // Generische Anhänge. Body-Limit etwas über MAX_GROESSE (25 MiB) für den
         // Multipart-Overhead.
         .route(
-            "/api/einsaetze/{id}/attachments",
+            "/api/incidents/{id}/attachments",
             post(routes::anhang::hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/attachments/{aid}",
+            "/api/incidents/{id}/attachments/{aid}",
             get(routes::anhang::herunterladen).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/attachments/{aid}",
+            "/api/incidents/{id}/attachments/{aid}",
             delete(routes::anhang::loeschen),
         )
         // Dokumentenablage: eigener Präfix mit Modul-Gate; Upload/Download wie Anhänge.
         .route(
-            "/api/einsaetze/{id}/documents",
+            "/api/incidents/{id}/documents",
             get(routes::dokument::liste),
         )
         .route(
-            "/api/einsaetze/{id}/documents",
+            "/api/incidents/{id}/documents",
             post(routes::dokument::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/documents/{did}",
+            "/api/incidents/{id}/documents/{did}",
             delete(routes::dokument::entfernen).patch(routes::dokument::aendern),
         )
         .route(
-            "/api/einsaetze/{id}/documents/{did}/file",
+            "/api/incidents/{id}/documents/{did}/file",
             get(routes::dokument::datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/reminders",
+            "/api/incidents/{id}/reminders",
             get(routes::erinnerung::liste),
         )
         .route(
-            "/api/einsaetze/{id}/reminders",
+            "/api/incidents/{id}/reminders",
             post(routes::erinnerung::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/reminders/metrics",
+            "/api/incidents/{id}/reminders/metrics",
             get(routes::erinnerung::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/reminders/{eid}/complete",
+            "/api/incidents/{id}/reminders/{eid}/complete",
             post(routes::erinnerung::erledigen),
         )
         .route(
-            "/api/einsaetze/{id}/reminders/{eid}/acknowledge",
+            "/api/incidents/{id}/reminders/{eid}/acknowledge",
             post(routes::erinnerung::quittieren),
         )
         .route(
-            "/api/einsaetze/{id}/reminders/{eid}/reopen",
+            "/api/incidents/{id}/reminders/{eid}/reopen",
             post(routes::erinnerung::oeffnen),
         )
-        .route("/api/einsaetze/{id}/tasks", get(routes::auftrag::liste))
+        .route("/api/incidents/{id}/tasks", get(routes::auftrag::liste))
         .route(
-            "/api/einsaetze/{id}/tasks/metrics",
+            "/api/incidents/{id}/tasks/metrics",
             get(routes::auftrag::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}",
+            "/api/incidents/{id}/tasks/{aid}",
             get(routes::auftrag::detail).patch(routes::auftrag::berichtigen),
         )
-        .route("/api/einsaetze/{id}/tasks", post(routes::auftrag::anlegen))
+        .route("/api/incidents/{id}/tasks", post(routes::auftrag::anlegen))
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+            "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
             post(routes::auftrag::quittieren),
         )
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}/execution",
+            "/api/incidents/{id}/tasks/{aid}/execution",
             post(routes::auftrag::vollzug),
         )
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}/accept",
+            "/api/incidents/{id}/tasks/{aid}/accept",
             post(routes::auftrag::abnehmen),
         )
         .route(
-            "/api/einsaetze/{id}/tasks/{aid}/void",
+            "/api/incidents/{id}/tasks/{aid}/void",
             post(routes::auftrag::aufheben),
         )
         // Gewählte Lagekennzahlen (LLH-1371): Lageplatz B des Kennzahlenbands, Gate `OhneModul`.
         .route(
-            "/api/einsaetze/{id}/situation-metric-selection",
+            "/api/incidents/{id}/situation-metric-selection",
             put(routes::lagekennzahl_wahl::setzen),
         )
         // Maßgebliche Pegel: Kennzahl für Dashboard und Überblick, Gate `OhneModul`.
         .route(
-            "/api/einsaetze/{id}/gauges",
+            "/api/incidents/{id}/gauges",
             get(routes::pegel::liste)
                 .put(routes::pegel::ersetzen)
                 .post(routes::pegel::anfuegen),
@@ -636,251 +643,251 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         // 24-h-Verlauf je Pegel, modul-los wie die Liste. Das statische Segment `verlauf` schlägt
         // `{pegel_id}`.
         .route(
-            "/api/einsaetze/{id}/gauges/history",
+            "/api/incidents/{id}/gauges/history",
             get(routes::pegel::verlauf),
         )
         // Wetter am Einsatzort, am Modul `wetter-pegel` gegatet. Ein Quellausfall ist kein
         // HTTP-Fehler, sondern ein Zustand je Teil.
-        .route("/api/einsaetze/{id}/weather", get(routes::wetter::anzeige))
+        .route("/api/incidents/{id}/weather", get(routes::wetter::anzeige))
         // Prognose am einzelnen Pegel: eigene Routen, nicht im Vollersatz-PUT.
         .route(
-            "/api/einsaetze/{id}/gauges/{pegel_id}/forecast",
+            "/api/incidents/{id}/gauges/{pegel_id}/forecast",
             put(routes::pegel::prognose_setzen).delete(routes::pegel::prognose_loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/gauges/{pegel_id}/prediction",
+            "/api/incidents/{id}/gauges/{pegel_id}/prediction",
             get(routes::pegel::vorhersage_lesen),
         )
         // Stab (S1–S6) und Ablösung. `vorgaben` steht vor `{aid}` nur zur Lesbarkeit.
         .route(
-            "/api/einsaetze/{id}/reliefs",
+            "/api/incidents/{id}/reliefs",
             get(routes::abloesung::liste).post(routes::abloesung::beginnen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/defaults",
+            "/api/incidents/{id}/reliefs/defaults",
             get(routes::abloesung::vorgaben),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/defaults/{abschnitt_id}",
+            "/api/incidents/{id}/reliefs/defaults/{abschnitt_id}",
             put(routes::abloesung::vorgabe_setzen),
         )
         // Vorgabe des Einsatzes (LLH-1122): Kopie eines Schichtmodells.
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-model",
+            "/api/incidents/{id}/reliefs/shift-model",
             get(routes::abloesung::read_einsatz_vorgabe)
                 .put(routes::abloesung::set_einsatz_vorgabe),
         )
         // Schichtplan (LLH-1552): `schichtplan` ist ein festes Segment neben `{aid}`.
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan",
+            "/api/incidents/{id}/reliefs/shift-plan",
             get(routes::abloesung_schichtplan::lesen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/blocks",
+            "/api/incidents/{id}/reliefs/shift-plan/blocks",
             post(routes::abloesung_schichtplan::create_block),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}",
+            "/api/incidents/{id}/reliefs/shift-plan/blocks/{bid}",
             patch(routes::abloesung_schichtplan::update_block)
                 .delete(routes::abloesung_schichtplan::delete_block),
         )
         // Wechsel aus dem Plan an einer UHS und in der Pause (LLH-1555).
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/blocks/{bid}/handovers",
+            "/api/incidents/{id}/reliefs/shift-plan/blocks/{bid}/handovers",
             get(routes::abloesung_schichtplan::wechsel_vorlage)
                 .post(routes::abloesung_schichtplan::wechsel_vollziehen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/handovers/{wid}/undo",
+            "/api/incidents/{id}/reliefs/shift-plan/handovers/{wid}/undo",
             post(routes::abloesung_schichtplan::wechsel_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/generate",
+            "/api/incidents/{id}/reliefs/shift-plan/generate",
             post(routes::abloesung_schichtplan::erzeugen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/limits",
+            "/api/incidents/{id}/reliefs/shift-plan/limits",
             patch(routes::abloesung_schichtplan::update_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/helpers",
+            "/api/incidents/{id}/reliefs/shift-plan/helpers",
             post(routes::abloesung_schichtplan::create_helfer),
         )
         // Schichtplan als Excel-Mappe (LLH-1557): nur Lesen.
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/export",
+            "/api/incidents/{id}/reliefs/shift-plan/export",
             get(routes::abloesung_schichtplan::export),
         )
         // Schichtplan einlesen (LLH-1556): Multipart mit der Datei (höchstens 2 MiB) und den
         // Entscheidungen; die Datei-Grenze selbst prüft `uebernahme::datei` (400).
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/import/preview",
+            "/api/incidents/{id}/reliefs/shift-plan/import/preview",
             post(routes::abloesung_schichtplan::import_vorschau)
                 .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/import",
+            "/api/incidents/{id}/reliefs/shift-plan/import",
             post(routes::abloesung_schichtplan::import_uebernehmen)
                 .layer(DefaultBodyLimit::max(SCHICHTPLAN_IMPORT_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/shift-plan/helpers/{hid}",
+            "/api/incidents/{id}/reliefs/shift-plan/helpers/{hid}",
             patch(routes::abloesung_schichtplan::update_helfer)
                 .delete(routes::abloesung_schichtplan::delete_helfer),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/{aid}",
+            "/api/incidents/{id}/reliefs/{aid}",
             patch(routes::abloesung::aendern),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/{aid}/plan-template",
+            "/api/incidents/{id}/reliefs/{aid}/plan-template",
             get(routes::abloesung::plan_vorlage),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/{aid}/execution",
+            "/api/incidents/{id}/reliefs/{aid}/execution",
             post(routes::abloesung::vollziehen),
         )
         .route(
-            "/api/einsaetze/{id}/reliefs/{aid}/execution/undo",
+            "/api/incidents/{id}/reliefs/{aid}/execution/undo",
             post(routes::abloesung::zuruecknehmen),
         )
         // Betreuung: Betreuungsstellen mit ihrer Belegungsreihe. Rücknahmen hängen an der Meldung;
         // die Stelle kennt die Route erst aus ihr.
         .route(
-            "/api/einsaetze/{id}/care",
+            "/api/incidents/{id}/care",
             get(routes::betreuung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/care/occupancy",
+            "/api/incidents/{id}/care/occupancy",
             get(routes::betreuung::kopfzahl),
         )
         // Modul Evakuierung (LLH-1034): die Bezirksrouten sind aus `…/betreuung` umgezogen.
         .route(
-            "/api/einsaetze/{id}/evacuation",
+            "/api/incidents/{id}/evacuation",
             get(routes::evakuierung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/evacuation/districts",
+            "/api/incidents/{id}/evacuation/districts",
             post(routes::evakuierung::bezirk_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/evacuation/districts/{bid}",
+            "/api/incidents/{id}/evacuation/districts/{bid}",
             patch(routes::evakuierung::bezirk_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/evacuation/districts/{bid}/annul",
+            "/api/incidents/{id}/evacuation/districts/{bid}/annul",
             post(routes::evakuierung::bezirk_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/evacuation/districts/{bid}/progress",
+            "/api/incidents/{id}/evacuation/districts/{bid}/progress",
             get(routes::evakuierung::stand_verlauf).post(routes::evakuierung::stand_melden),
         )
         .route(
-            "/api/einsaetze/{id}/evacuation/progress/{sid}/undo",
+            "/api/incidents/{id}/evacuation/progress/{sid}/undo",
             post(routes::evakuierung::stand_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions",
+            "/api/incidents/{id}/care/positions",
             post(routes::betreuung::stelle_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}",
+            "/api/incidents/{id}/care/positions/{sid}",
             patch(routes::betreuung::stelle_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/annul",
+            "/api/incidents/{id}/care/positions/{sid}/annul",
             post(routes::betreuung::stelle_stornieren),
         )
         // Storno-Stand für die offene Detailseite (LLH-1832).
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/state",
+            "/api/incidents/{id}/care/positions/{sid}/state",
             get(routes::betreuung::stelle_stand),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
+            "/api/incidents/{id}/care/positions/{sid}/occupancies",
             get(routes::betreuung::belegung_verlauf).post(routes::betreuung::belegung_melden),
         )
         .route(
-            "/api/einsaetze/{id}/care/occupancies/{mid}/undo",
+            "/api/incidents/{id}/care/occupancies/{mid}/undo",
             post(routes::betreuung::belegung_zuruecknehmen),
         )
         // Registrierstelle (LLH-1612, Spec `betreuung-registrierung`).
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/registrations",
+            "/api/incidents/{id}/care/positions/{sid}/registrations",
             get(routes::betreuung_registrierung::liste)
                 .post(routes::betreuung_registrierung::registrieren),
         )
         // Registrierliste drucken (LLH-1616): je Person protokolliert.
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/registrations/print",
+            "/api/incidents/{id}/care/positions/{sid}/registrations/print",
             get(routes::betreuung_registrierung::druck),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/departures",
+            "/api/incidents/{id}/care/positions/{sid}/departures",
             post(routes::betreuung_registrierung::abmelden),
         )
         // Haushalte umbauen (LLH-1615): Bezugsperson wechseln, Person umhängen.
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/households/{hid}/contact-person",
+            "/api/incidents/{id}/care/positions/{sid}/households/{hid}/contact-person",
             put(routes::betreuung_registrierung::bezugsperson_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/care/positions/{sid}/persons/{pid}/household",
+            "/api/incidents/{id}/care/positions/{sid}/persons/{pid}/household",
             put(routes::betreuung_registrierung::haushalt_aendern),
         )
         .route(
-            "/api/einsaetze/{id}/care/diets",
+            "/api/incidents/{id}/care/diets",
             get(routes::betreuung_registrierung::kostformen),
         )
         // Verpflegung: Zeitfenster mit Bedarf, Ausgaben dagegen.
         .route(
-            "/api/einsaetze/{id}/catering",
+            "/api/incidents/{id}/catering",
             get(routes::verpflegung::uebersicht),
         )
         .route(
-            "/api/einsaetze/{id}/catering/time-slots",
+            "/api/incidents/{id}/catering/time-slots",
             post(routes::verpflegung::zeitfenster_anlegen),
         )
         // Tag aus der Vorlage (LLH-1058): mehrere Zeitfenster eines Tages in einer Transaktion.
         .route(
-            "/api/einsaetze/{id}/catering/time-slots/from-template",
+            "/api/incidents/{id}/catering/time-slots/from-template",
             post(routes::verpflegung::zeitfenster_aus_vorlage),
         )
         .route(
-            "/api/einsaetze/{id}/catering/time-slots/{zid}",
+            "/api/incidents/{id}/catering/time-slots/{zid}",
             patch(routes::verpflegung::zeitfenster_aendern)
                 .delete(routes::verpflegung::zeitfenster_loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/catering/time-slots/{zid}/distributions",
+            "/api/incidents/{id}/catering/time-slots/{zid}/distributions",
             post(routes::verpflegung::ausgabe_erfassen),
         )
         .route(
-            "/api/einsaetze/{id}/catering/distributions/{aid}/undo",
+            "/api/incidents/{id}/catering/distributions/{aid}/undo",
             post(routes::verpflegung::ausgabe_zuruecknehmen),
         )
         // Verpflegungsstellen (LLH-1040): keine eigene Leseroute, `stellen[]` kommt mit
         // `GET …/catering`.
         .route(
-            "/api/einsaetze/{id}/catering/positions",
+            "/api/incidents/{id}/catering/positions",
             post(routes::verpflegung::create_stelle),
         )
         .route(
-            "/api/einsaetze/{id}/catering/positions/{sid}",
+            "/api/incidents/{id}/catering/positions/{sid}",
             patch(routes::verpflegung::update_stelle)
                 .delete(routes::verpflegung::stelle_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/catering/positions/{sid}/status",
+            "/api/incidents/{id}/catering/positions/{sid}/status",
             post(routes::verpflegung::update_stelle_status),
         )
         // LLH-1111: Lagebesprechung als eigenes Modul (Termin, Abschluss, Verlauf).
         .route(
-            "/api/einsaetze/{id}/briefing",
+            "/api/incidents/{id}/briefing",
             get(routes::lagebesprechung::load),
         )
         .route(
-            "/api/einsaetze/{id}/briefing/schedule",
+            "/api/incidents/{id}/briefing/schedule",
             put(routes::lagebesprechung::set_termin),
         )
         .route(
@@ -888,782 +895,782 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::lagebesprechung::export_termin),
         )
         .route(
-            "/api/einsaetze/{id}/briefings",
+            "/api/incidents/{id}/briefings",
             get(routes::lagebesprechung::list).post(routes::lagebesprechung::abschliessen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/info-line",
+            "/api/incidents/{id}/staff/info-line",
             get(routes::infotelefon::liste).post(routes::infotelefon::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/info-line/counts",
+            "/api/incidents/{id}/staff/info-line/counts",
             get(routes::infotelefon::zaehler),
         )
         .route(
-            "/api/einsaetze/{id}/staff/info-line/{aid}",
+            "/api/incidents/{id}/staff/info-line/{aid}",
             get(routes::infotelefon::detail),
         )
         .route(
-            "/api/einsaetze/{id}/staff/info-line/{aid}/status",
+            "/api/incidents/{id}/staff/info-line/{aid}/status",
             post(routes::infotelefon::status_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan",
+            "/api/incidents/{id}/staff/comms-plan",
             get(routes::fernmeldewesen::kommunikationsplan_laden),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan/positions",
+            "/api/incidents/{id}/staff/comms-plan/positions",
             post(routes::fernmeldewesen::kommunikationsplan_stelle_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}",
+            "/api/incidents/{id}/staff/comms-plan/positions/{sid}",
             patch(routes::fernmeldewesen::kommunikationsplan_stelle_aendern)
                 .delete(routes::fernmeldewesen::kommunikationsplan_stelle_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/connections",
+            "/api/incidents/{id}/staff/comms-plan/positions/{sid}/connections",
             post(routes::fernmeldewesen::kommunikationsplan_verbindung_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan/connections/{vid}",
+            "/api/incidents/{id}/staff/comms-plan/connections/{vid}",
             patch(routes::fernmeldewesen::kommunikationsplan_verbindung_aendern)
                 .delete(routes::fernmeldewesen::kommunikationsplan_verbindung_entfernen),
         )
         // LFH-893: Kanäle externer Stellen und taktische Fernmeldeskizze (design.md D14).
         .route(
-            "/api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}",
+            "/api/incidents/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg}",
             put(routes::fernmeldewesen::kommunikationsplan_kanal_setzen)
                 .delete(routes::fernmeldewesen::kommunikationsplan_kanal_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch",
+            "/api/incidents/{id}/staff/comms-sketch",
             get(routes::fernmeldewesen::fernmeldeskizze_laden),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/layout",
+            "/api/incidents/{id}/staff/comms-sketch/layout",
             delete(routes::fernmeldewesen::fernmeldeskizze_lage_verwerfen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/layout/{element}",
+            "/api/incidents/{id}/staff/comms-sketch/layout/{element}",
             put(routes::fernmeldewesen::fernmeldeskizze_lage_setzen)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_lage_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/title-block",
+            "/api/incidents/{id}/staff/comms-sketch/title-block",
             put(routes::fernmeldewesen::fernmeldeskizze_schriftfeld_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/components",
+            "/api/incidents/{id}/staff/comms-sketch/components",
             post(routes::fernmeldewesen::fernmeldeskizze_komponente_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/components/{kid}",
+            "/api/incidents/{id}/staff/comms-sketch/components/{kid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_komponente_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}",
+            "/api/incidents/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}",
             put(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_setzen)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_komponente_kanal_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/connections",
+            "/api/incidents/{id}/staff/comms-sketch/connections",
             post(routes::fernmeldewesen::fernmeldeskizze_verbindung_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/connections/{vid}",
+            "/api/incidents/{id}/staff/comms-sketch/connections/{vid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_verbindung_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_verbindung_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/areas",
+            "/api/incidents/{id}/staff/comms-sketch/areas",
             post(routes::fernmeldewesen::fernmeldeskizze_bereich_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/staff/comms-sketch/areas/{bid}",
+            "/api/incidents/{id}/staff/comms-sketch/areas/{bid}",
             patch(routes::fernmeldewesen::fernmeldeskizze_bereich_aendern)
                 .delete(routes::fernmeldewesen::fernmeldeskizze_bereich_entfernen),
         )
-        .route("/api/einsaetze/{id}/reports", get(routes::meldung::liste))
+        .route("/api/incidents/{id}/reports", get(routes::meldung::liste))
         .route(
-            "/api/einsaetze/{id}/reports/check-ins",
+            "/api/incidents/{id}/reports/check-ins",
             get(routes::meldung::rueckmeldungen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/metrics",
+            "/api/incidents/{id}/reports/metrics",
             get(routes::meldung::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}",
+            "/api/incidents/{id}/reports/{mid}",
             get(routes::meldung::detail).patch(routes::meldung_korrektur::korrigieren),
         )
         .route(
-            "/api/einsaetze/{id}/reports",
+            "/api/incidents/{id}/reports",
             post(routes::meldung::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/status",
+            "/api/incidents/{id}/reports/{mid}/status",
             post(routes::meldung::status),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/assign",
+            "/api/incidents/{id}/reports/{mid}/assign",
             post(routes::meldung::zuweisen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/confirm",
+            "/api/incidents/{id}/reports/{mid}/confirm",
             post(routes::meldung::bestaetigen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/situation-relevant",
+            "/api/incidents/{id}/reports/{mid}/situation-relevant",
             post(routes::meldung::lagerelevant),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/task",
+            "/api/incidents/{id}/reports/{mid}/task",
             post(routes::meldung::auftrag_erteilen),
         )
         .route(
-            "/api/einsaetze/{id}/situation/reports",
+            "/api/incidents/{id}/situation/reports",
             get(routes::meldung::lage_liste),
         )
         // Kenntnisnahme über die Kennung der Meldung (LLH-1031); die alten Pfade mit der Kennung
         // des Lageobjekts gibt es nicht mehr.
         .route(
-            "/api/einsaetze/{id}/situation/seen",
+            "/api/incidents/{id}/situation/seen",
             post(routes::meldung::lage_angezeigte_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/reports/{mid}/situation-seen",
+            "/api/incidents/{id}/reports/{mid}/situation-seen",
             post(routes::meldung::lage_gesehen),
         )
         .route(
-            "/api/einsaetze/{id}/place-preview",
+            "/api/incidents/{id}/place-preview",
             get(routes::ort_vorschau::vorschau),
         )
         // Ortssuche des Ortsfelds (LFH-1175): Recht der Einsatzdaten, kein Modul.
         .route(
-            "/api/einsaetze/{id}/place-search",
+            "/api/incidents/{id}/place-search",
             get(routes::ort_suche::im_einsatz),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests",
+            "/api/incidents/{id}/resource-requests",
             get(routes::nachforderung::liste),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests",
+            "/api/incidents/{id}/resource-requests",
             post(routes::nachforderung::anlegen),
         )
         // Übliche Arten der Organisation (LLH-1379): Lesetür der Liste, keine Geräteroute.
         .route(
-            "/api/einsaetze/{id}/resource-requests/types",
+            "/api/incidents/{id}/resource-requests/types",
             get(routes::nachforderung::arten),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}/status",
+            "/api/incidents/{id}/resource-requests/{nid}/status",
             post(routes::nachforderung::status),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}/decline",
+            "/api/incidents/{id}/resource-requests/{nid}/decline",
             post(routes::nachforderung::ablehnen),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}/commitment",
+            "/api/incidents/{id}/resource-requests/{nid}/commitment",
             post(routes::nachforderung::zusage),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}/withdraw",
+            "/api/incidents/{id}/resource-requests/{nid}/withdraw",
             post(routes::nachforderung::zurueckziehen),
         )
         .route(
-            "/api/einsaetze/{id}/resource-requests/{nid}",
+            "/api/incidents/{id}/resource-requests/{nid}",
             patch(routes::nachforderung::bearbeiten),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles",
+            "/api/incidents/{id}/vehicles",
             get(routes::einsatz_fahrzeug::liste),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/position",
+            "/api/incidents/{id}/vehicles/{ef_id}/position",
             patch(routes::einsatz_fahrzeug::position),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles",
+            "/api/incidents/{id}/vehicles",
             post(routes::einsatz_fahrzeug::disponieren),
         )
         // LLH-1100: mehrere Stamm-Fahrzeuge in einem Schritt, optional in eine Einheit.
         .route(
-            "/api/einsaetze/{id}/vehicles/bulk",
+            "/api/incidents/{id}/vehicles/bulk",
             post(routes::einsatz_fahrzeug::sammel_disponieren),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}",
+            "/api/incidents/{id}/vehicles/{ef_id}",
             patch(routes::einsatz_fahrzeug::update),
         )
         // LLH-1079 Teil II: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/stand-down",
+            "/api/incidents/{id}/vehicles/{ef_id}/stand-down",
             post(routes::einsatz_fahrzeug::entlassen),
         )
         // LLH-1722: „Rückgängig“ nach dem Entlassen nimmt den Vorzustand vollständig zurück.
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/stand-down/undo",
+            "/api/incidents/{id}/vehicles/{ef_id}/stand-down/undo",
             post(routes::einsatz_fahrzeug::zuruecknehmen),
         )
         // LLH-1781: „Rückgängig“ nach einem Statuswechsel.
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/status/undo",
+            "/api/incidents/{id}/vehicles/{ef_id}/status/undo",
             post(routes::einsatz_fahrzeug::status_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/annul",
+            "/api/incidents/{id}/vehicles/{ef_id}/annul",
             post(routes::einsatz_fahrzeug::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/reactivate",
+            "/api/incidents/{id}/vehicles/{ef_id}/reactivate",
             post(routes::einsatz_fahrzeug::reaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/crew",
+            "/api/incidents/{id}/vehicles/{ef_id}/crew",
             post(routes::einsatz_fahrzeug::besatzung_uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id}",
+            "/api/incidents/{id}/vehicles/{ef_id}/crew/{ep_id}",
             put(routes::einsatz_fahrzeug::besatzung_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id}",
+            "/api/incidents/{id}/vehicles/{ef_id}/crew/{ep_id}",
             delete(routes::einsatz_fahrzeug::besatzung_freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/personnel",
+            "/api/incidents/{id}/personnel",
             get(routes::einsatz_personal::liste),
         )
         .route(
-            "/api/einsaetze/{id}/personnel",
+            "/api/incidents/{id}/personnel",
             post(routes::einsatz_personal::disponieren),
         )
         // LLH-1100: mehrere Stamm-Personen in einem Schritt, optional in Einheit und Fahrzeug.
         .route(
-            "/api/einsaetze/{id}/personnel/bulk",
+            "/api/incidents/{id}/personnel/bulk",
             post(routes::einsatz_personal::sammel_disponieren),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}",
+            "/api/incidents/{id}/personnel/{ep_id}",
             patch(routes::einsatz_personal::update),
         )
         // LLH-1079: entlassen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/status/undo",
+            "/api/incidents/{id}/personnel/{ep_id}/status/undo",
             post(routes::einsatz_personal::status_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/stand-down",
+            "/api/incidents/{id}/personnel/{ep_id}/stand-down",
             post(routes::einsatz_personal::entlassen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/stand-down/undo",
+            "/api/incidents/{id}/personnel/{ep_id}/stand-down/undo",
             post(routes::einsatz_personal::zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/annul",
+            "/api/incidents/{id}/personnel/{ep_id}/annul",
             post(routes::einsatz_personal::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/reactivate",
+            "/api/incidents/{id}/personnel/{ep_id}/reactivate",
             post(routes::einsatz_personal::reaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/position",
+            "/api/incidents/{id}/personnel/{ep_id}/position",
             patch(routes::einsatz_personal::position),
         )
         // Kräfte-Zeitachse (LFH-552) unter dem Personal-Präfix.
         .route(
-            "/api/einsaetze/{id}/personnel/timeline",
+            "/api/incidents/{id}/personnel/timeline",
             get(routes::zeitachse::personal_perioden),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/timeline/limits",
+            "/api/incidents/{id}/personnel/timeline/limits",
             get(routes::zeitachse::personal_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/timeline",
+            "/api/incidents/{id}/personnel/{ep_id}/timeline",
             get(routes::zeitachse::person_laden).post(routes::zeitachse::person_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/strike",
+            "/api/incidents/{id}/personnel/{ep_id}/timeline/{zid}/strike",
             post(routes::zeitachse::person_streichen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/{zid}/correct",
+            "/api/incidents/{id}/personnel/{ep_id}/timeline/{zid}/correct",
             post(routes::zeitachse::person_berichtigen),
         )
         .route(
-            "/api/einsaetze/{id}/personnel/{ep_id}/timeline/period",
+            "/api/incidents/{id}/personnel/{ep_id}/timeline/period",
             post(routes::zeitachse::person_periode_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/map/commanders",
+            "/api/incidents/{id}/map/commanders",
             get(routes::einsatz_personal::karte_fuehrungskraefte),
         )
         // Adresssuche der Lagekarte (LFH-638): Forward-Geocoding, am Modul Lagekarte (`/karte`).
         .route(
-            "/api/einsaetze/{id}/map/place-search",
+            "/api/incidents/{id}/map/place-search",
             get(routes::karte_ort_suche::ort_suche),
         )
         .route(
-            "/api/einsaetze/{id}/material",
+            "/api/incidents/{id}/material",
             get(routes::einsatz_material::liste),
         )
         .route(
-            "/api/einsaetze/{id}/material",
+            "/api/incidents/{id}/material",
             post(routes::einsatz_material::disponieren),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}",
+            "/api/incidents/{id}/material/{em_id}",
             patch(routes::einsatz_material::update),
         )
         // LLH-1079 Teil II: aus dem Einsatz nehmen statt löschen; Storno und erneutes Disponieren.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/stand-down",
+            "/api/incidents/{id}/material/{em_id}/stand-down",
             post(routes::einsatz_material::entlassen),
         )
         // LLH-1923: „Rückgängig“ nach dem Herausnehmen, mit dem Vorzustand aus der Antwort.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/stand-down/undo",
+            "/api/incidents/{id}/material/{em_id}/stand-down/undo",
             post(routes::einsatz_material::zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/annul",
+            "/api/incidents/{id}/material/{em_id}/annul",
             post(routes::einsatz_material::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/reactivate",
+            "/api/incidents/{id}/material/{em_id}/reactivate",
             post(routes::einsatz_material::reaktivieren),
         )
         // LLH-1259: einen vorhandenen Posten nachträglich mit einer Nachforderung verknüpfen;
         // LLH-1403: den Bezug wieder lösen.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/resource-request",
+            "/api/incidents/{id}/material/{em_id}/resource-request",
             post(routes::einsatz_material::verknuepfen).delete(routes::einsatz_material::loesen),
         )
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/status/undo",
+            "/api/incidents/{id}/material/{em_id}/status/undo",
             post(routes::einsatz_material::status_zuruecknehmen),
         )
         // LLH-1093: einen Posten auf zwei Zeilen aufteilen.
         .route(
-            "/api/einsaetze/{id}/material/{em_id}/split",
+            "/api/incidents/{id}/material/{em_id}/split",
             post(routes::einsatz_material::aufteilen),
         )
         .route(
-            "/api/einsaetze/{id}/persons",
+            "/api/incidents/{id}/persons",
             get(routes::einsatz_person::liste),
         )
         .route(
-            "/api/einsaetze/{id}/persons",
+            "/api/incidents/{id}/persons",
             post(routes::einsatz_person::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/persons/selection",
+            "/api/incidents/{id}/persons/selection",
             get(routes::einsatz_person::auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/persons/transport-means",
+            "/api/incidents/{id}/persons/transport-means",
             get(routes::einsatz_person::transportmittel),
         )
         .route(
-            "/api/einsaetze/{id}/persons/whereabouts-details",
+            "/api/incidents/{id}/persons/whereabouts-details",
             get(routes::einsatz_person::verbleib_angaben),
         )
         .route(
-            "/api/einsaetze/{id}/persons/units",
+            "/api/incidents/{id}/persons/units",
             get(routes::einsatz_person::einheiten),
         )
         .route(
-            "/api/einsaetze/{id}/persons/uhs",
+            "/api/incidents/{id}/persons/uhs",
             get(routes::einsatz_person::uhs_ziele),
         )
         .route(
-            "/api/einsaetze/{id}/persons/confirmers",
+            "/api/incidents/{id}/persons/confirmers",
             get(routes::einsatz_person::bestaetiger),
         )
         .route(
-            "/api/einsaetze/{id}/persons/export",
+            "/api/incidents/{id}/persons/export",
             get(routes::einsatz_person::export),
         )
         .route(
-            "/api/einsaetze/{id}/case-file/attachments.zip",
+            "/api/incidents/{id}/case-file/attachments.zip",
             get(routes::einsatzakte::anlagen_zip),
         )
         .route(
-            "/api/einsaetze/{id}/persons/print",
+            "/api/incidents/{id}/persons/print",
             get(routes::einsatz_person::druck),
         )
         .route(
-            "/api/einsaetze/{id}/persons/list-accesses",
+            "/api/incidents/{id}/persons/list-accesses",
             get(routes::einsatz_person::listenzugriffe),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/print",
+            "/api/incidents/{id}/persons/{pid}/print",
             get(routes::einsatz_person::detail_druck),
         )
         // Zeilenabruf des Live-Abgleichs (LLH-1682): nicht protokolliert wie die Liste.
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/row",
+            "/api/incidents/{id}/persons/{pid}/row",
             get(routes::einsatz_person::zeile),
         )
         // Storno-Stand für die offene Detailseite, ohne Zugriffsprotokoll (LLH-1832).
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/state",
+            "/api/incidents/{id}/persons/{pid}/state",
             get(routes::einsatz_person::stand),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}",
+            "/api/incidents/{id}/persons/{pid}",
             get(routes::einsatz_person::detail),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}",
+            "/api/incidents/{id}/persons/{pid}",
             patch(routes::einsatz_person::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/status",
+            "/api/incidents/{id}/persons/{pid}/status",
             post(routes::einsatz_person::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/triage",
+            "/api/incidents/{id}/persons/{pid}/triage",
             post(routes::einsatz_person::sichten),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/whereabouts",
+            "/api/incidents/{id}/persons/{pid}/whereabouts",
             post(routes::einsatz_person::verbleib),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/notes",
+            "/api/incidents/{id}/persons/{pid}/notes",
             post(routes::einsatz_person::notiz),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/transport",
+            "/api/incidents/{id}/persons/{pid}/transport",
             post(routes::person_transport::festlegen),
         )
         // LLH-1566: Anlass der Hilfeleistung (Kategorie Behandlung, kein ETB).
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/reason",
+            "/api/incidents/{id}/persons/{pid}/reason",
             post(routes::person_anlass::festlegen),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/interventions",
+            "/api/incidents/{id}/persons/{pid}/interventions",
             post(routes::person_massnahme::erfassen),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/interventions/{mid}/void",
+            "/api/incidents/{id}/persons/{pid}/interventions/{mid}/void",
             post(routes::person_massnahme::aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/injuries",
+            "/api/incidents/{id}/persons/{pid}/injuries",
             post(routes::person_verletzung::markieren),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/injuries/{vid}/void",
+            "/api/incidents/{id}/persons/{pid}/injuries/{vid}/void",
             post(routes::person_verletzung::aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/matches",
+            "/api/incidents/{id}/persons/{pid}/matches",
             post(routes::einsatz_person::abgleich_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/matches/{aid}/decision",
+            "/api/incidents/{id}/persons/{pid}/matches/{aid}/decision",
             post(routes::einsatz_person::abgleich_entscheiden),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/audit",
+            "/api/incidents/{id}/persons/{pid}/audit",
             get(routes::einsatz_person::audit),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}",
+            "/api/incidents/{id}/persons/{pid}",
             delete(routes::einsatz_person::stornieren),
         )
         // Personen-Anhänge (LFH-757): Modul-Gate `personen`; Upload/Download wie am Schaden,
         // der Download schreibt je Abruf eine Zeile ins Zugriffsprotokoll der Person.
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/attachments",
+            "/api/incidents/{id}/persons/{pid}/attachments",
             get(routes::person_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/attachments",
+            "/api/incidents/{id}/persons/{pid}/attachments",
             post(routes::person_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}",
+            "/api/incidents/{id}/persons/{pid}/attachments/{aid}",
             delete(routes::person_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/attachments/{aid}/file",
+            "/api/incidents/{id}/persons/{pid}/attachments/{aid}/file",
             get(routes::person_anhang::datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/animals",
+            "/api/incidents/{id}/animals",
             get(routes::einsatz_tier::liste),
         )
         .route(
-            "/api/einsaetze/{id}/animals",
+            "/api/incidents/{id}/animals",
             post(routes::einsatz_tier::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/animals/export",
+            "/api/incidents/{id}/animals/export",
             get(routes::einsatz_tier::export),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}",
+            "/api/incidents/{id}/animals/{tid}",
             get(routes::einsatz_tier::detail),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}",
+            "/api/incidents/{id}/animals/{tid}",
             patch(routes::einsatz_tier::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}/status",
+            "/api/incidents/{id}/animals/{tid}/status",
             post(routes::einsatz_tier::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}",
+            "/api/incidents/{id}/animals/{tid}",
             delete(routes::einsatz_tier::stornieren),
         )
         // Tier-Anhänge (LFH-758): Modul-Gate `tiere`; Upload/Download wie die Schaden-Anhänge.
         .route(
-            "/api/einsaetze/{id}/animals/{tid}/attachments",
+            "/api/incidents/{id}/animals/{tid}/attachments",
             get(routes::tier_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}/attachments",
+            "/api/incidents/{id}/animals/{tid}/attachments",
             post(routes::tier_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}",
+            "/api/incidents/{id}/animals/{tid}/attachments/{aid}",
             delete(routes::tier_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/animals/{tid}/attachments/{aid}/file",
+            "/api/incidents/{id}/animals/{tid}/attachments/{aid}/file",
             get(routes::tier_anhang::datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/damages",
+            "/api/incidents/{id}/damages",
             get(routes::einsatz_schaden::liste),
         )
         .route(
-            "/api/einsaetze/{id}/damages",
+            "/api/incidents/{id}/damages",
             post(routes::einsatz_schaden::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/damages/marker",
+            "/api/incidents/{id}/damages/marker",
             get(routes::einsatz_schaden::marker),
         )
         .route(
-            "/api/einsaetze/{id}/damages/metrics",
+            "/api/incidents/{id}/damages/metrics",
             get(routes::einsatz_schaden::kennzahlen),
         )
         .route(
-            "/api/einsaetze/{id}/damages/selection",
+            "/api/incidents/{id}/damages/selection",
             get(routes::einsatz_schaden::auswahl),
         )
         .route(
-            "/api/einsaetze/{id}/damages/export",
+            "/api/incidents/{id}/damages/export",
             get(routes::einsatz_schaden::export),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}",
+            "/api/incidents/{id}/damages/{sid}",
             get(routes::einsatz_schaden::detail),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}",
+            "/api/incidents/{id}/damages/{sid}",
             patch(routes::einsatz_schaden::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/hand-over",
+            "/api/incidents/{id}/damages/{sid}/hand-over",
             post(routes::einsatz_schaden::uebergeben),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/close",
+            "/api/incidents/{id}/damages/{sid}/close",
             post(routes::einsatz_schaden::abschliessen),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}",
+            "/api/incidents/{id}/damages/{sid}",
             delete(routes::einsatz_schaden::stornieren),
         )
         // Schaden-Anhänge: Modul-Gate `schaeden`; Upload/Download wie die Dokumentenablage.
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/attachments",
+            "/api/incidents/{id}/damages/{sid}/attachments",
             get(routes::schaden_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/attachments",
+            "/api/incidents/{id}/damages/{sid}/attachments",
             post(routes::schaden_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}",
+            "/api/incidents/{id}/damages/{sid}/attachments/{aid}",
             delete(routes::schaden_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/damages/{sid}/attachments/{aid}/file",
+            "/api/incidents/{id}/damages/{sid}/attachments/{aid}/file",
             get(routes::schaden_anhang::datei).route_layer(download_grenze()),
         )
         // LLH-1491: Führung je Einsatz zwischen gekoppelten Instanzen (Schalter
         // `LIFELINE_FUEHRUNG`, sonst 404). Bedienung ohne `fordere_aktiv`: sie geht auch, wenn eine
         // andere Instanz führt oder der Einsatz abgeschlossen ist.
-        .route("/api/einsaetze/{id}/command", get(routes::fuehrung::lesen))
+        .route("/api/incidents/{id}/command", get(routes::fuehrung::lesen))
         .route(
-            "/api/einsaetze/{id}/command/hand-over",
+            "/api/incidents/{id}/command/hand-over",
             post(routes::fuehrung::uebergeben),
         )
         .route(
-            "/api/einsaetze/{id}/command/code",
+            "/api/incidents/{id}/command/code",
             post(routes::fuehrung::code_abgeben),
         )
         .route(
-            "/api/einsaetze/{id}/command/request",
+            "/api/incidents/{id}/command/request",
             post(routes::fuehrung::anfragen),
         )
         .route(
-            "/api/einsaetze/{id}/command/request/decline",
+            "/api/incidents/{id}/command/request/decline",
             post(routes::fuehrung::anfrage_ablehnen),
         )
         .route(
-            "/api/einsaetze/{id}/command/emergency-takeover",
+            "/api/incidents/{id}/command/emergency-takeover",
             post(routes::fuehrung::notuebernahme),
         )
         .route(
-            "/api/einsaetze/{id}/command/reclaim",
+            "/api/incidents/{id}/command/reclaim",
             post(routes::fuehrung::zurueckholen),
         )
         .route(
-            "/api/einsaetze/{id}/command/emergency-takeover/start",
+            "/api/incidents/{id}/command/emergency-takeover/start",
             post(routes::fuehrung::notuebernahme_start),
         )
         .route(
-            "/api/einsaetze/{id}/command/emergency-takeover/finish",
+            "/api/incidents/{id}/command/emergency-takeover/finish",
             post(routes::fuehrung::notuebernahme_abschluss),
         )
         .route(
-            "/api/einsaetze/{id}/command/emergency-takeover/code",
+            "/api/incidents/{id}/command/emergency-takeover/code",
             post(routes::fuehrung::notuebernahme_code),
         )
         .route(
-            "/api/einsaetze/{id}/command/confirm",
+            "/api/incidents/{id}/command/confirm",
             post(routes::fuehrung::bestaetigen),
         )
         .route(
-            "/api/einsaetze/{id}/command/object",
+            "/api/incidents/{id}/command/object",
             post(routes::fuehrung::widersprechen),
         )
         // LFH-892: Gerätekopplung, verwaltet von der Einsatzleitung.
         .route(
-            "/api/einsaetze/{id}/devices",
+            "/api/incidents/{id}/devices",
             get(routes::geraet::liste).post(routes::geraet::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/devices/{gid}/code",
+            "/api/incidents/{id}/devices/{gid}/code",
             post(routes::geraet::code_ausstellen),
         )
         .route(
-            "/api/einsaetze/{id}/devices/{gid}/extend",
+            "/api/incidents/{id}/devices/{gid}/extend",
             post(routes::geraet::verlaengern),
         )
         .route(
-            "/api/einsaetze/{id}/devices/{gid}/revoke",
+            "/api/incidents/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
         )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(
-            "/api/einsaetze/{id}/integrations",
+            "/api/incidents/{id}/integrations",
             get(routes::einsatz_anbindungen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/integrations/{zid}/grant",
+            "/api/incidents/{id}/integrations/{zid}/grant",
             put(routes::einsatz_anbindungen::freigeben)
                 .delete(routes::einsatz_anbindungen::freigabe_beenden),
         )
         // LLH-1496: Lagebild für Externe, Links je Empfänger (Einsatzleitung, auch am Spiegel).
         .route(
-            "/api/einsaetze/{id}/situation-picture-shares",
+            "/api/incidents/{id}/situation-picture-shares",
             get(routes::lagebild_extern::liste).post(routes::lagebild_extern::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-picture-shares/{fid}/revoke",
+            "/api/incidents/{id}/situation-picture-shares/{fid}/revoke",
             post(routes::lagebild_extern::widerrufen),
         )
-        .route("/api/einsaetze/{id}/uhs", get(routes::einsatz_uhs::liste))
+        .route("/api/incidents/{id}/uhs", get(routes::einsatz_uhs::liste))
         .route(
-            "/api/einsaetze/{id}/uhs",
+            "/api/incidents/{id}/uhs",
             post(routes::einsatz_uhs::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}",
+            "/api/incidents/{id}/uhs/{uid}",
             get(routes::einsatz_uhs::detail),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}",
+            "/api/incidents/{id}/uhs/{uid}",
             patch(routes::einsatz_uhs::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/status",
+            "/api/incidents/{id}/uhs/{uid}/status",
             post(routes::einsatz_uhs::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}",
+            "/api/incidents/{id}/uhs/{uid}",
             delete(routes::einsatz_uhs::stornieren),
         )
         // Kräfte der UHS (LFH-1045, Spec `uhs-staerke`): Zuordnung aus `einsatz_personal`.
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/forces",
+            "/api/incidents/{id}/uhs/{uid}/forces",
             post(routes::einsatz_uhs_kraefte::adhoc),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/forces/available",
+            "/api/incidents/{id}/uhs/{uid}/forces/available",
             get(routes::einsatz_uhs_kraefte::verfuegbar),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}",
+            "/api/incidents/{id}/uhs/{uid}/forces/{epid}",
             put(routes::einsatz_uhs_kraefte::zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/forces/{epid}",
+            "/api/incidents/{id}/uhs/{uid}/forces/{epid}",
             delete(routes::einsatz_uhs_kraefte::loesen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/forces/unit/{eid}",
+            "/api/incidents/{id}/uhs/{uid}/forces/unit/{eid}",
             put(routes::einsatz_uhs_kraefte::einheit_zuordnen),
         )
         // UHS-Anhänge (LFH-758): Modul-Gate `unfallhilfsstellen`; jeder Download im Lese-Audit.
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/attachments",
+            "/api/incidents/{id}/uhs/{uid}/attachments",
             get(routes::uhs_anhang::liste),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/attachments",
+            "/api/incidents/{id}/uhs/{uid}/attachments",
             post(routes::uhs_anhang::ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/attachments/accesses",
+            "/api/incidents/{id}/uhs/{uid}/attachments/accesses",
             get(routes::uhs_anhang::zugriffe),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}",
+            "/api/incidents/{id}/uhs/{uid}/attachments/{aid}",
             delete(routes::uhs_anhang::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file",
+            "/api/incidents/{id}/uhs/{uid}/attachments/{aid}/file",
             get(routes::uhs_anhang::datei).route_layer(download_grenze()),
         )
         // UHS-Plan (LFH-999): eigene Bytes, kein Anhang; die Anzeige schreibt kein Lese-Audit.
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plan",
+            "/api/incidents/{id}/uhs/{uid}/plan",
             put(routes::uhs_plan::hinterlegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone())
@@ -1671,279 +1678,279 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .delete(routes::uhs_plan::entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plan/from-attachment",
+            "/api/incidents/{id}/uhs/{uid}/plan/from-attachment",
             post(routes::uhs_plan::uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/plan/image",
+            "/api/incidents/{id}/uhs/{uid}/plan/image",
             get(routes::uhs_plan::bild).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/seats",
+            "/api/incidents/{id}/uhs/{uid}/seats",
             post(routes::einsatz_uhs::platz_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/seats/bulk",
+            "/api/incidents/{id}/uhs/{uid}/seats/bulk",
             post(routes::einsatz_uhs::plaetze_bulk_anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}",
+            "/api/incidents/{id}/uhs/{uid}/seats/{pid}",
             patch(routes::einsatz_uhs::platz_aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}/availability",
+            "/api/incidents/{id}/uhs/{uid}/seats/{pid}/availability",
             post(routes::einsatz_uhs::platz_verfuegbarkeit),
         )
         .route(
-            "/api/einsaetze/{id}/uhs/{uid}/seats/{pid}",
+            "/api/incidents/{id}/uhs/{uid}/seats/{pid}",
             delete(routes::einsatz_uhs::platz_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy",
+            "/api/incidents/{id}/persons/{pid}/uhs-occupancy",
             post(routes::einsatz_uhs::belegung),
         )
         .route(
-            "/api/einsaetze/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
+            "/api/incidents/{id}/persons/{pid}/uhs-occupancy/{belegung_id}/undo",
             post(routes::einsatz_uhs::belegung_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas",
+            "/api/incidents/{id}/staging-areas",
             get(routes::einsatz_bereitstellungsraum::list),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas",
+            "/api/incidents/{id}/staging-areas",
             post(routes::einsatz_bereitstellungsraum::create),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}",
+            "/api/incidents/{id}/staging-areas/{bid}",
             get(routes::einsatz_bereitstellungsraum::detail),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/history",
+            "/api/incidents/{id}/staging-areas/{bid}/history",
             get(routes::einsatz_bereitstellungsraum::verlauf),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/expected",
+            "/api/incidents/{id}/staging-areas/{bid}/expected",
             get(routes::einsatz_bereitstellungsraum::erwartet),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/master-data-matches",
+            "/api/incidents/{id}/staging-areas/{bid}/master-data-matches",
             get(routes::einsatz_bereitstellungsraum::stamm_treffer),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}",
+            "/api/incidents/{id}/staging-areas/{bid}",
             patch(routes::einsatz_bereitstellungsraum::update),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/status",
+            "/api/incidents/{id}/staging-areas/{bid}/status",
             post(routes::einsatz_bereitstellungsraum::status_wechsel),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}",
+            "/api/incidents/{id}/staging-areas/{bid}",
             delete(routes::einsatz_bereitstellungsraum::stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy",
+            "/api/incidents/{id}/staging-areas/{bid}/occupancy",
             post(routes::einsatz_bereitstellungsraum::belegung),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
+            "/api/incidents/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo",
             post(routes::einsatz_bereitstellungsraum::belegung_zuruecknehmen),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
+            "/api/incidents/{id}/staging-areas/{bid}/arrival",
             post(routes::einsatz_bereitstellungsraum::eintreffen),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/dispatch",
+            "/api/incidents/{id}/staging-areas/{bid}/dispatch",
             post(routes::einsatz_bereitstellungsraum::abruf),
         )
         .route(
-            "/api/einsaetze/{id}/staging-areas/{bid}/dispatch/void",
+            "/api/incidents/{id}/staging-areas/{bid}/dispatch/void",
             post(routes::einsatz_bereitstellungsraum::abruf_aufheben),
         )
         .route(
-            "/api/einsaetze/{id}/sectors",
+            "/api/incidents/{id}/sectors",
             get(routes::einsatzabschnitt::list),
         )
         .route(
-            "/api/einsaetze/{id}/sectors",
+            "/api/incidents/{id}/sectors",
             post(routes::einsatzabschnitt::create),
         )
         .route(
-            "/api/einsaetze/{id}/sectors/{aid}",
+            "/api/incidents/{id}/sectors/{aid}",
             patch(routes::einsatzabschnitt::update),
         )
         .route(
-            "/api/einsaetze/{id}/sectors/{aid}/area",
+            "/api/incidents/{id}/sectors/{aid}/area",
             patch(routes::einsatzabschnitt::flaeche)
                 .layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/sectors/{aid}/talk-groups/{sg}",
+            "/api/incidents/{id}/sectors/{aid}/talk-groups/{sg}",
             put(routes::einsatzabschnitt::sprechgruppe_zuordnen)
                 .delete(routes::einsatzabschnitt::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/sectors/{aid}",
+            "/api/incidents/{id}/sectors/{aid}",
             delete(routes::einsatzabschnitt::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports",
+            "/api/incidents/{id}/situation-reports",
             get(routes::lagebericht::liste),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports",
+            "/api/incidents/{id}/situation-reports",
             post(routes::lagebericht::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}",
+            "/api/incidents/{id}/situation-reports/{lid}",
             get(routes::lagebericht::detail),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}",
+            "/api/incidents/{id}/situation-reports/{lid}",
             patch(routes::lagebericht::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/release",
+            "/api/incidents/{id}/situation-reports/{lid}/release",
             post(routes::lagebericht::freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/revise",
+            "/api/incidents/{id}/situation-reports/{lid}/revise",
             post(routes::lagebericht::fortschreiben),
         )
         // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/enclosures",
+            "/api/incidents/{id}/situation-reports/{lid}/enclosures",
             get(routes::lagebericht::anlagen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/enclosures",
+            "/api/incidents/{id}/situation-reports/{lid}/enclosures",
             post(routes::lagebericht::anlage_ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}",
+            "/api/incidents/{id}/situation-reports/{lid}/enclosures/{aid}",
             delete(routes::lagebericht::anlage_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}/file",
+            "/api/incidents/{id}/situation-reports/{lid}/enclosures/{aid}/file",
             get(routes::lagebericht::anlage_datei).route_layer(download_grenze()),
         )
-        .route("/api/einsaetze/{id}/orders", get(routes::befehl::liste))
-        .route("/api/einsaetze/{id}/orders", post(routes::befehl::anlegen))
+        .route("/api/incidents/{id}/orders", get(routes::befehl::liste))
+        .route("/api/incidents/{id}/orders", post(routes::befehl::anlegen))
         .route(
-            "/api/einsaetze/{id}/orders/{bid}",
+            "/api/incidents/{id}/orders/{bid}",
             get(routes::befehl::detail),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}",
+            "/api/incidents/{id}/orders/{bid}",
             patch(routes::befehl::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/release",
+            "/api/incidents/{id}/orders/{bid}/release",
             post(routes::befehl::freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/revise",
+            "/api/incidents/{id}/orders/{bid}/revise",
             post(routes::befehl::fortschreiben),
         )
         // LLH-1173: Quittung je Verteiler-Empfänger.
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/acknowledge",
+            "/api/incidents/{id}/orders/{bid}/distribution/{vid}/acknowledge",
             post(routes::befehl::quittieren),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/distribution/{vid}/undo",
+            "/api/incidents/{id}/orders/{bid}/distribution/{vid}/undo",
             post(routes::befehl::quittung_zuruecknehmen),
         )
         // LFH-1028: Bild-Anlagen; Upload mit den Grenzen der Anhang-Uploads.
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/enclosures",
+            "/api/incidents/{id}/orders/{bid}/enclosures",
             get(routes::befehl::anlagen),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/enclosures",
+            "/api/incidents/{id}/orders/{bid}/enclosures",
             post(routes::befehl::anlage_ablegen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/enclosures/{aid}",
+            "/api/incidents/{id}/orders/{bid}/enclosures/{aid}",
             delete(routes::befehl::anlage_entfernen),
         )
         .route(
-            "/api/einsaetze/{id}/orders/{bid}/enclosures/{aid}/file",
+            "/api/incidents/{id}/orders/{bid}/enclosures/{aid}/file",
             get(routes::befehl::anlage_datei).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/map-views",
+            "/api/incidents/{id}/map-views",
             get(routes::karten_ansicht::liste).post(routes::karten_ansicht::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/map-views/{aid}",
+            "/api/incidents/{id}/map-views/{aid}",
             patch(routes::karten_ansicht::patch).delete(routes::karten_ansicht::loeschen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-snapshots",
+            "/api/incidents/{id}/situation-snapshots",
             get(routes::lage_snapshot::liste).post(routes::lage_snapshot::erzeugen),
         )
         .route(
-            "/api/einsaetze/{id}/situation-snapshots/{sid}",
+            "/api/incidents/{id}/situation-snapshots/{sid}",
             get(routes::lage_snapshot::einzeln)
                 .patch(routes::lage_snapshot::patch)
                 .delete(routes::lage_snapshot::loeschen),
         )
-        .route("/api/einsaetze/{id}/zones", get(routes::lage_zone::liste))
+        .route("/api/incidents/{id}/zones", get(routes::lage_zone::liste))
         .route(
-            "/api/einsaetze/{id}/zones",
+            "/api/incidents/{id}/zones",
             post(routes::lage_zone::anlegen).layer(DefaultBodyLimit::max(GEOMETRIE_BODY_MAX)),
         )
         .route(
-            "/api/einsaetze/{id}/zones/{zid}",
+            "/api/incidents/{id}/zones/{zid}",
             patch(routes::lage_zone::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/zones/{zid}",
+            "/api/incidents/{id}/zones/{zid}",
             delete(routes::lage_zone::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/free-symbols",
+            "/api/incidents/{id}/free-symbols",
             get(routes::freies_zeichen::liste),
         )
         .route(
-            "/api/einsaetze/{id}/free-symbols",
+            "/api/incidents/{id}/free-symbols",
             post(routes::freies_zeichen::anlegen),
         )
         .route(
-            "/api/einsaetze/{id}/free-symbols/{zid}",
+            "/api/incidents/{id}/free-symbols/{zid}",
             patch(routes::freies_zeichen::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/free-symbols/{zid}",
+            "/api/incidents/{id}/free-symbols/{zid}",
             delete(routes::freies_zeichen::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/map/background-images",
+            "/api/incidents/{id}/map/background-images",
             get(routes::karte_hintergrundbild::liste),
         )
         .route(
-            "/api/einsaetze/{id}/map/background-images",
+            "/api/incidents/{id}/map/background-images",
             post(routes::karte_hintergrundbild::hochladen)
                 .layer(DefaultBodyLimit::max(UPLOAD_BODY_MAX))
                 .route_layer(upload_grenze.clone()),
         )
         .route(
-            "/api/einsaetze/{id}/map/background-images/{bildId}/download",
+            "/api/incidents/{id}/map/background-images/{bildId}/download",
             get(routes::karte_hintergrundbild::herunterladen).route_layer(download_grenze()),
         )
         .route(
-            "/api/einsaetze/{id}/map/background-images/{bildId}",
+            "/api/incidents/{id}/map/background-images/{bildId}",
             patch(routes::karte_hintergrundbild::aktualisieren),
         )
         .route(
-            "/api/einsaetze/{id}/map/background-images/{bildId}",
+            "/api/incidents/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
         // Fremdebenen (LLH-2099) unter dem neuen Präfix (ADR-0097); Grenzen wie die Bilder.
@@ -1969,24 +1976,49 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/map/foreign-layers/{ebeneId}",
             delete(routes::karte_fremdebene::loeschen),
         )
+        // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
         .route(
-            "/api/einsaetze/{id}/hazard-areas",
+            "/api/incidents/{id}/drone/sources",
+            get(routes::drohne::liste),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            put(routes::drohne::zuschalten),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            delete(routes::drohne::abschalten),
+        )
+        // Drohnenlage als Fachebene der Lagekarte (LLH-2106).
+        .route("/api/incidents/{id}/map/drone", get(routes::drohne::karte))
+        // Livebild der Drohne als gebündelter HLS-Proxy (LLH-2107).
+        .route(
+            "/api/incidents/{id}/drone/video/{key}/hls/{*file}",
+            get(routes::drohne::video),
+        )
+        // Vorschau der Drohnenfotos über den Proxy (LLH-2108).
+        .route(
+            "/api/incidents/{id}/drone/photos/{key}/thumb",
+            get(routes::drohne::foto_vorschau),
+        )
+        .route(
+            "/api/incidents/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
         )
         .route(
-            "/api/einsaetze/{id}/hazard-areas/{gid}",
+            "/api/incidents/{id}/hazard-areas/{gid}",
             patch(routes::gefahr::umbenennen),
         )
         .route(
-            "/api/einsaetze/{id}/hazard-areas/{gid}/matrix",
+            "/api/incidents/{id}/hazard-areas/{gid}/matrix",
             get(routes::gefahr::matrix),
         )
         .route(
-            "/api/einsaetze/{id}/hazard-areas/{gid}/matrix/rating",
+            "/api/incidents/{id}/hazard-areas/{gid}/matrix/rating",
             put(routes::gefahr::bewerten),
         )
         .route(
-            "/api/einsaetze/{id}/hazard-areas/{gid}/assessment",
+            "/api/incidents/{id}/hazard-areas/{gid}/assessment",
             post(routes::gefahr::beurteilen),
         )
         // Archiv-Namensraum der Aufbewahrung: nur System-Admin der eigenen Org, nur lesend bis auf
@@ -2243,28 +2275,28 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Anträge am Spiegel (LLH-1492): lesen und verwerfen.
         .route(
-            "/api/einsaetze/{id}/requests",
+            "/api/incidents/{id}/requests",
             get(routes::instanz::antraege_liste),
         )
         .route(
-            "/api/einsaetze/{id}/requests/{antrag_id}",
+            "/api/incidents/{id}/requests/{antrag_id}",
             delete(routes::instanz::antrag_verwerfen),
         )
         // Bruchstelle am Spiegel (LLH-1646): ansehen, nachreichen, verwerfen.
         .route(
-            "/api/einsaetze/{id}/breaks",
+            "/api/incidents/{id}/breaks",
             get(routes::instanz::bruchstelle_liste),
         )
         .route(
-            "/api/einsaetze/{id}/breaks/requests",
+            "/api/incidents/{id}/breaks/requests",
             post(routes::instanz::bruchstelle_alle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/breaks/{bruch_id}/request",
+            "/api/incidents/{id}/breaks/{bruch_id}/request",
             post(routes::instanz::bruchstelle_stellen),
         )
         .route(
-            "/api/einsaetze/{id}/breaks/{bruch_id}/discard",
+            "/api/incidents/{id}/breaks/{bruch_id}/discard",
             post(routes::instanz::bruchstelle_verwerfen),
         )
         // Abgelehnte Anträge nach der Verwahrung (LLH-1648): einsatzübergreifend, nur die eigenen.
@@ -2435,6 +2467,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         .route("/api/vehicles", get(routes::fahrzeug::liste))
         .route("/api/vehicles", post(routes::fahrzeug::anlegen))
+        // Stammdaten einlesen (LLH-1633): Datei, Vorschau schreibt nichts.
+        .route(
+            "/api/master-data/import/preview",
+            post(routes::stammdaten_eingang::vorschau)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
+        .route(
+            "/api/master-data/import",
+            post(routes::stammdaten_eingang::uebernehmen)
+                .layer(DefaultBodyLimit::max(STAMMDATEN_IMPORT_BODY_MAX)),
+        )
         .route(
             "/api/vehicle-suggestions",
             get(routes::fahrzeug::vorschlaege),
@@ -2594,117 +2637,117 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             post(routes::sprechgruppe::deaktivieren),
         )
         .route(
-            "/api/einsaetze/{id}/talk-groups",
+            "/api/incidents/{id}/talk-groups",
             get(routes::sprechgruppe::liste_fuer_einsatz),
         )
         .route(
-            "/api/einsaetze/{id}/talk-groups",
+            "/api/incidents/{id}/talk-groups",
             post(routes::sprechgruppe::anlegen_einsatz_lokal),
         )
         .route(
-            "/api/einsaetze/{id}/units",
+            "/api/incidents/{id}/units",
             get(routes::einsatz_einheit::liste),
         )
         .route(
-            "/api/einsaetze/{id}/units",
+            "/api/incidents/{id}/units",
             post(routes::einsatz_einheit::bilden),
         )
         // Statische Segmente vor `{eid}` (LLH-1049).
         .route(
-            "/api/einsaetze/{id}/units/from-template",
+            "/api/incidents/{id}/units/from-template",
             post(routes::einsatz_einheit::aus_vorlage_bilden),
         )
         .route(
-            "/api/einsaetze/{id}/units/from-template/{vorlage_id}",
+            "/api/incidents/{id}/units/from-template/{vorlage_id}",
             get(routes::einsatz_einheit::aus_vorlage_vorschau),
         )
         // LLH-1383: eingetroffene Nachforderung als Einheit übernehmen.
         .route(
-            "/api/einsaetze/{id}/units/from-resource-request",
+            "/api/incidents/{id}/units/from-resource-request",
             post(routes::einsatz_einheit::aus_nachforderung),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}",
+            "/api/incidents/{id}/units/{eid}",
             patch(routes::einsatz_einheit::update),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/position",
+            "/api/incidents/{id}/units/{eid}/position",
             patch(routes::einsatz_einheit::position),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/talk-groups/{sg}",
+            "/api/incidents/{id}/units/{eid}/talk-groups/{sg}",
             put(routes::einsatz_einheit::sprechgruppe_zuordnen)
                 .delete(routes::einsatz_einheit::sprechgruppe_loesen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/status",
+            "/api/incidents/{id}/units/{eid}/status",
             put(routes::einsatz_einheit::status_setzen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/status/undo",
+            "/api/incidents/{id}/units/{eid}/status/undo",
             post(routes::einsatz_einheit::status_zuruecknehmen),
         )
         // Kräfte-Zeitachse (LFH-552) unter dem Einheiten-Präfix.
         .route(
-            "/api/einsaetze/{id}/units/timeline",
+            "/api/incidents/{id}/units/timeline",
             get(routes::zeitachse::einheiten_perioden),
         )
         // Grenzwerte des Schichtplans für die Einstufung (LLH-730).
         .route(
-            "/api/einsaetze/{id}/units/timeline/limits",
+            "/api/incidents/{id}/units/timeline/limits",
             get(routes::zeitachse::einheiten_grenzwerte),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/timeline",
+            "/api/incidents/{id}/units/{eid}/timeline",
             get(routes::zeitachse::einheit_laden).post(routes::zeitachse::einheit_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/timeline/{zid}/strike",
+            "/api/incidents/{id}/units/{eid}/timeline/{zid}/strike",
             post(routes::zeitachse::einheit_streichen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/timeline/{zid}/correct",
+            "/api/incidents/{id}/units/{eid}/timeline/{zid}/correct",
             post(routes::zeitachse::einheit_berichtigen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/timeline/period",
+            "/api/incidents/{id}/units/{eid}/timeline/period",
             post(routes::zeitachse::einheit_periode_nachtragen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}",
+            "/api/incidents/{id}/units/{eid}",
             delete(routes::einsatz_einheit::aufloesen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/annul",
+            "/api/incidents/{id}/units/{eid}/annul",
             post(routes::einsatz_einheit::stornieren),
         )
         // LLH-1388: Fehlübernahme aus einer Nachforderung stornieren.
         .route(
-            "/api/einsaetze/{id}/units/{eid}/annul-takeover",
+            "/api/incidents/{id}/units/{eid}/annul-takeover",
             post(routes::einsatz_einheit::uebernahme_stornieren),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/take-over",
+            "/api/incidents/{id}/units/{eid}/take-over",
             post(routes::einsatz_einheit::uebernehmen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/reject",
+            "/api/incidents/{id}/units/{eid}/reject",
             post(routes::einsatz_einheit::abweisen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/personnel/{ep_id}",
+            "/api/incidents/{id}/units/{eid}/personnel/{ep_id}",
             put(routes::einsatz_einheit::personal_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/personnel/{ep_id}",
+            "/api/incidents/{id}/units/{eid}/personnel/{ep_id}",
             delete(routes::einsatz_einheit::personal_freigeben),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/vehicles/{ef_id}",
+            "/api/incidents/{id}/units/{eid}/vehicles/{ef_id}",
             put(routes::einsatz_einheit::fahrzeug_zuordnen),
         )
         .route(
-            "/api/einsaetze/{id}/units/{eid}/vehicles/{ef_id}",
+            "/api/incidents/{id}/units/{eid}/vehicles/{ef_id}",
             delete(routes::einsatz_einheit::fahrzeug_freigeben),
         );
 
@@ -2733,6 +2776,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = router
         .route("/api/map/config", get(routes::karte::config))
         .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
+        // LLH-2021: Satellitenbilder der Copernicus-Aktivierungen, Liste und Kacheln.
+        .route(
+            "/api/map/overlays/copernicus/images",
+            get(routes::karte::copernicus_bilder),
+        )
+        .route(
+            "/api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}",
+            get(routes::karte::copernicus_bild_kachel),
+        )
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(
@@ -3251,6 +3303,7 @@ mod tests {
             datentraeger: Default::default(),
             adapter: Default::default(),
             fremdebene_abrufer: Default::default(),
+            drohne: Default::default(),
         }
     }
 

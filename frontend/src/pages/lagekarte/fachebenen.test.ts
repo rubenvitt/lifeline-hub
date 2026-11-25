@@ -19,7 +19,9 @@ import {
   energieNennung,
   fachebeneAlter,
   copernicusAktivierungen,
+  copernicusBilder,
   fitsCopernicusAusschnitt,
+  ohneAbgeschaltete,
 } from './fachebenen';
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
@@ -49,8 +51,22 @@ describe('Fachebenen-Registry', () => {
       'kritis',
       'energie',
       'autobahn',
+      'autobahn_parken',
       'copernicus',
+      'copernicus_bilder',
+      'drohne',
     ]);
+  });
+  it('führt die Lkw-Parkplätze als eigene, selten getaktete Ebene neben der BAB-Lage (LLH-1637)', () => {
+    const def = FACHEBENEN.autobahn_parken;
+    expect(def.label).toBe('Lkw-Parkplätze (BAB)');
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.geltung).toBe('nur Rastanlagen an Bundesautobahnen, ohne Belegung');
+    expect(istBboxAbhaengig('autobahn_parken')).toBe(false);
+    // Erster Lauf im Hintergrund wie bei `autobahn`: kurz takten, solange `offline`.
+    expect(fachebeneTakt('autobahn_parken', 'offline')).toBe(20_000);
+    expect(fachebeneTakt('autobahn_parken', 'ok')).toBe(30 * 60_000);
+    expect(defaultFachebenenSichtbar().autobahn_parken).toBe(false);
   });
   it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
     expect(FACHEBENEN.energie.label).toBe('Energieanlagen');
@@ -128,11 +144,16 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.odl.klassenfarben?.faerbe).toBe(faerbeOdl);
     expect(FACHEBENEN.luftqualitaet.klassenfarben?.faerbe).toBe(faerbeLuftqualitaet);
   });
-  it('markiert genau kritis, energie und copernicus als bbox-abhängig', () => {
+  it('markiert genau kritis, energie und die beiden Copernicus-Ebenen als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
     expect(istBboxAbhaengig('energie')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
-    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie', 'copernicus']);
+    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual([
+      'kritis',
+      'energie',
+      'copernicus',
+      'copernicus_bilder',
+    ]);
     // Die Autobahn-Ebene aggregiert serverseitig — im bbox-Zweig bliebe sie ohne Viewport-Meldung
     // leer.
     expect(istBboxAbhaengig('autobahn')).toBe(false);
@@ -183,11 +204,20 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
-  it('nur ODL, Luftqualität, KRITIS, Autobahn und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+  it('nur ODL, Luftqualität, KRITIS, Autobahn, Lkw-Parken und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+    expect(FACHEBENEN.copernicus_bilder.geltung).toMatch(/optisch/);
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn', 'copernicus']);
+    expect(mitGeltung).toEqual([
+      'odl',
+      'luftqualitaet',
+      'kritis',
+      'autobahn',
+      'autobahn_parken',
+      'copernicus',
+      'copernicus_bilder',
+    ]);
   });
   it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
     // Seit LFH-594 kostet ein Poll ohne neuen Stand nur ein 304. Mit `pollMs == TTL` verschenkte
@@ -207,10 +237,14 @@ describe('Fachebenen-Registry', () => {
       odl: 'ODL_TTL',
       luftqualitaet: 'LUFTQUALITAET_TTL',
       autobahn: 'AUTOBAHN_TTL',
+      autobahn_parken: 'AUTOBAHN_PARKEN_TTL',
       copernicus: 'COPERNICUS_TTL',
+      // Die Bilderliste nutzt dieselbe TTL (`copernicus_bilder.rs` importiert sie).
+      copernicus_bilder: 'COPERNICUS_TTL',
     };
-    // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL.
-    const pollend = fachebeneKeys().filter((k) => FACHEBENEN[k].pollMs > 0);
+    // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL. Die Drohnenlage
+    // hat keine Server-TTL (Arbeitsspeicher), ihren Takt prüft der Test darunter.
+    const pollend = fachebeneKeys().filter((k) => k !== 'drohne' && FACHEBENEN[k].pollMs > 0);
     expect(pollend.sort()).toEqual(Object.keys(ttlKonstante).sort());
     for (const k of pollend) {
       const name = ttlKonstante[k]!;
@@ -221,6 +255,27 @@ describe('Fachebenen-Registry', () => {
       const ttlMs = Number(treffer![1].replace(/_/g, '')) * 1000;
       expect(FACHEBENEN[k].pollMs, k).toBeLessThan(ttlMs);
     }
+  });
+  it('pollt die Drohnenlage nicht langsamer, als der Adapter den Stand erneuert (LLH-2106)', () => {
+    // Kein Server-Cache: die Lage liegt im Arbeitsspeicher und erneuert sich im Takt des Adapters
+    // (`intervall_vorschlag_s`, `src/drohne/art.rs`). Wer langsamer fragt, zeigt ein Fluggerät
+    // von vorgestern; ein Poll ohne neuen Stand kostet ein 304. Der Takt wird aus der Quelle
+    // gelesen, damit eine dort geänderte Zahl hier rot wird.
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const art = readFileSync(join(hier, '../../../../src/drohne/art.rs'), 'utf8');
+    const treffer = art.match(/fn intervall_vorschlag_s\(&self\) -> i64 \{\s*(\d+)\s*\}/);
+    expect(treffer, 'intervall_vorschlag_s in src/drohne/art.rs').not.toBeNull();
+    const adapterMs = Number(treffer![1]) * 1000;
+    expect(FACHEBENEN.drohne.pollMs).toBe(5_000);
+    expect(FACHEBENEN.drohne.pollMs).toBeLessThanOrEqual(adapterMs);
+    // Veraltet erst nach mehreren verpassten Erneuerungen, nicht schon nach einer.
+    expect(FACHEBENEN.drohne.veraltetNachMin * 60_000).toBeGreaterThan(4 * adapterMs);
+  });
+  it('lädt die Drohnenlage über die Einsatzroute, nicht über die Überlagerungen (LLH-2106)', () => {
+    expect(FACHEBENEN.drohne.drohnenlage).toBe(true);
+    expect(FACHEBENEN.drohne.bboxAbhaengig).toBe(false);
+    expect(fachebeneTakt('drohne', undefined)).toBe(5_000);
+    expect(fachebeneTakt('drohne', 'ok')).toBe(5_000);
   });
   it('jede Ebene hat Label, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {
@@ -511,7 +566,10 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
+      autobahn_parken: 36 * 60,
       copernicus: 120,
+      copernicus_bilder: 120,
+      drohne: 1,
     });
   });
 
@@ -572,6 +630,36 @@ describe('Copernicus (LLH-1200)', () => {
     ]);
   });
 
+  it('nimmt ohne Aufnahme die Lieferung (Altbestand, LLH-2022)', () => {
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-08-11 12:48:47' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-07-19 11:36:42' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00' },
+        },
+      ],
+    } as never;
+    expect(copernicusAktivierungen(fc)).toEqual([
+      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00', unvollstaendig: false, gekuerzt: false },
+      {
+        emsr: 'EMSR517',
+        aufnahme: undefined,
+        geliefert: '2021-08-11 12:48:47',
+        unvollstaendig: false,
+        gekuerzt: false,
+      },
+    ]);
+  });
+
   it('trägt unvollständige und gekürzte Gebiete an ihre Aktivierung', () => {
     const fc = {
       type: 'FeatureCollection',
@@ -611,5 +699,120 @@ describe('Copernicus (LLH-1200)', () => {
       'utf8',
     );
     expect(rs).toMatch(/const COPERNICUS_MAX_SPANNE_GRAD: f64 = 3\.0;/);
+  });
+});
+
+describe('Copernicus-Satellitenbilder (LLH-2021)', () => {
+  it('ist die einzige Rasterebene und hat weder Klassenfarben noch gemischte Geometrie', () => {
+    expect(fachebeneKeys().filter((k) => FACHEBENEN[k].darstellung === 'raster')).toEqual([
+      'copernicus_bilder',
+    ]);
+    const d = FACHEBENEN.copernicus_bilder;
+    expect(d.label).toBe('Copernicus-Satellitenbilder');
+    expect(d.klassenfarben).toBeUndefined();
+    expect(d.gemischteGeometrie).toBeUndefined();
+    expect(d.minZoom).toBe(BBOX_MIN_ZOOM);
+    expect(d.pollMs).toBe(FACHEBENEN.copernicus.pollMs);
+    expect(d.aufwaermPollMs).toBe(FACHEBENEN.copernicus.aufwaermPollMs);
+  });
+
+  it('pinnt den Mindest-Zoom gegen das Backend', () => {
+    const rs = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte/cog.rs'),
+      'utf8',
+    );
+    const treffer = rs.match(/const MIN_ZOOM_BACKEND: u8 = (\d+);/);
+    expect(treffer).not.toBeNull();
+    expect(Number(treffer![1])).toBe(BBOX_MIN_ZOOM);
+  });
+
+  const bildFeature = (props: Record<string, unknown>) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: {
+      bild: '0123456789abcdef',
+      emsr: 'EMSR728',
+      gebiet: 'Bogen',
+      min_zoom: 10,
+      max_zoom: 16,
+      bounds: [12.6, 48.8, 12.7, 48.9],
+      darstellbar: true,
+      gekuerzt: false,
+      ...props,
+    },
+  });
+
+  it('liest die Bilder, jüngste Aufnahme zuerst, fehlende Angaben bleiben leer', () => {
+    const fc = {
+      type: 'FeatureCollection' as const,
+      features: [
+        bildFeature({
+          bild: 'aaaaaaaaaaaaaaaa',
+          aufnahme: '2024-06-08 10:29:00',
+          sensor: 'Pleiades',
+        }),
+        bildFeature({
+          bild: 'bbbbbbbbbbbbbbbb',
+          aufnahme: '2024-06-10 10:13:00',
+          sensor: 'Pleiades',
+        }),
+        bildFeature({
+          bild: 'cccccccccccccccc',
+          darstellbar: false,
+          grund: 'nicht in Web-Mercator (EPSG:3857)',
+        }),
+        // Kein Bild-Feature: fällt weg.
+        { type: 'Feature' as const, geometry: null, properties: { emsr: 'EMSR1' } },
+      ],
+    };
+    const bilder = copernicusBilder(fc);
+    expect(bilder.map((b) => b.bild)).toEqual([
+      'bbbbbbbbbbbbbbbb',
+      'aaaaaaaaaaaaaaaa',
+      'cccccccccccccccc',
+    ]);
+    expect(bilder[0]).toEqual({
+      bild: 'bbbbbbbbbbbbbbbb',
+      emsr: 'EMSR728',
+      gebiet: 'Bogen',
+      sensor: 'Pleiades',
+      aufnahme: '2024-06-10 10:13:00',
+      minZoom: 10,
+      maxZoom: 16,
+      bounds: [12.6, 48.8, 12.7, 48.9],
+      darstellbar: true,
+      gekuerzt: false,
+    });
+    expect(bilder[2].sensor).toBeUndefined();
+    expect(bilder[2].darstellbar).toBe(false);
+  });
+
+  it('verwirft Bilder mit falsch geformter Kennung oder ohne Umriss', () => {
+    const fc = {
+      type: 'FeatureCollection' as const,
+      features: [
+        bildFeature({ bild: '../../etc' }),
+        bildFeature({ bounds: [1, 2, 3] }),
+        bildFeature({ min_zoom: 'x' }),
+      ],
+    };
+    expect(copernicusBilder(fc)).toEqual([]);
+  });
+});
+
+describe('ohneAbgeschaltete (LLH-2104)', () => {
+  it('setzt abgeschaltete Ebenen auf unsichtbar und lässt die übrigen stehen', () => {
+    const sichtbar = { ...defaultFachebenenSichtbar(), nina: true, dwd: true };
+    const wirksam = ohneAbgeschaltete(sichtbar, ['nina']);
+    expect(wirksam.nina).toBe(false);
+    expect(wirksam.dwd).toBe(true);
+    // Die gespeicherte Wahl bleibt unberührt.
+    expect(sichtbar.nina).toBe(true);
+  });
+
+  it('ohne Liste (alter Server) oder mit leerer Liste dasselbe Objekt', () => {
+    const sichtbar = { ...defaultFachebenenSichtbar(), nina: true };
+    expect(ohneAbgeschaltete(sichtbar, undefined)).toBe(sichtbar);
+    expect(ohneAbgeschaltete(sichtbar, [])).toBe(sichtbar);
   });
 });

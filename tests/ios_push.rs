@@ -122,7 +122,7 @@ async fn geraetekonto_403() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         &admin,
         Some(r#"{"ansicht":"lagemonitor","bezeichnung":"Monitor"}"#),
     )
@@ -1032,7 +1032,7 @@ async fn ohne_leserecht_fehlen_absender_und_wortlaut() {
     let (s, _) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/reports/{m}", w.einsatz),
+        &format!("/api/incidents/{}/reports/{m}", w.einsatz),
         &cookie,
         None,
     )

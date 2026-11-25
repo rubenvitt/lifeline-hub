@@ -76,13 +76,13 @@ async fn zwei_benutzer(app: &axum::Router) -> (String, i64, i64) {
 async fn current_user_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let app = setup().await;
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
-    let vorher = anzahl(&app, &admin, "/api/einsaetze").await;
+    let vorher = anzahl(&app, &admin, "/api/incidents").await;
 
     let body = r#"{"bezeichnung":"Veralteter Tab"}"#;
     let (status, antwort) = anfrage_erwartet(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin,
         Some(body),
         &zweiter.to_string(),
@@ -93,19 +93,19 @@ async fn current_user_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
         antwort["error"],
         "Die Sitzung gehört inzwischen einem anderen Benutzer"
     );
-    assert_eq!(anzahl(&app, &admin, "/api/einsaetze").await, vorher);
+    assert_eq!(anzahl(&app, &admin, "/api/incidents").await, vorher);
 
     let (status, _) = anfrage_erwartet(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin,
         Some(body),
         &admin_id.to_string(),
     )
     .await;
     assert_eq!(status, StatusCode::CREATED);
-    assert_eq!(anzahl(&app, &admin, "/api/einsaetze").await, vorher + 1);
+    assert_eq!(anzahl(&app, &admin, "/api/incidents").await, vorher + 1);
 }
 
 #[tokio::test]
@@ -154,7 +154,7 @@ async fn etb_schreibt_und_replayt_nur_unter_dem_erwarteten_benutzer() {
     let app = setup().await;
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let etb = format!("/api/einsaetze/{einsatz}/etb");
+    let etb = format!("/api/incidents/{einsatz}/etb");
     let vorher = anzahl(&app, &admin, &etb).await;
 
     let body = r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Aus dem alten Tab","client_id":"lfh-387-1"}"#;
@@ -189,7 +189,7 @@ async fn einsatz_kontext_route_schreibt_nur_unter_dem_erwarteten_benutzer() {
     let app = setup().await;
     let (admin, admin_id, zweiter) = zwei_benutzer(&app).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let auftraege = format!("/api/einsaetze/{einsatz}/tasks");
+    let auftraege = format!("/api/incidents/{einsatz}/tasks");
     let vorher = anzahl(&app, &admin, &auftraege).await;
 
     let body = serde_json::json!({
@@ -230,7 +230,7 @@ async fn ohne_kopf_und_bei_lesenden_anfragen_bleibt_alles_wie_bisher() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin,
         Some(r#"{"bezeichnung":"Ohne Kopf"}"#),
     )
@@ -240,7 +240,7 @@ async fn ohne_kopf_und_bei_lesenden_anfragen_bleibt_alles_wie_bisher() {
     let (status, _) = anfrage_erwartet(
         &app,
         "GET",
-        "/api/einsaetze",
+        "/api/incidents",
         &admin,
         None,
         &zweiter.to_string(),
@@ -256,13 +256,13 @@ async fn ungueltiger_kopf_ist_412_und_tote_sitzung_bleibt_401() {
     let body = Some(r#"{"bezeichnung":"x"}"#);
 
     let (status, _) =
-        anfrage_erwartet(&app, "POST", "/api/einsaetze", &admin, body, "kein-wert").await;
+        anfrage_erwartet(&app, "POST", "/api/incidents", &admin, body, "kein-wert").await;
     assert_eq!(status, StatusCode::PRECONDITION_FAILED);
 
     let (status, _) = anfrage_erwartet(
         &app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         "lifeline_sid=abgelaufen",
         body,
         &admin_id.to_string(),

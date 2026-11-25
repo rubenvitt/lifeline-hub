@@ -53,11 +53,11 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await seedeEintrag(page, einsatzId);
     // Der Termin kommt aus dem Modul Lagebesprechung (LLH-1111): der eine Schreibweg ohne
     // Abschluss. Gesät mit Sekunden, damit die Wiedervorlage ihn nachweislich ungerundet übernimmt.
-    const gesetzt = await page.request.put(`/api/einsaetze/${einsatzId}/briefing/schedule`, {
+    const gesetzt = await page.request.put(`/api/incidents/${einsatzId}/briefing/schedule`, {
       data: { naechste_at: '2099-09-09T13:17:43Z' },
     });
     expect(gesetzt.ok(), `Termin setzen: ${gesetzt.status()}`).toBeTruthy();
-    let einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
+    let einsatz = (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as Record<
       string,
       unknown
     >;
@@ -80,7 +80,7 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await dialog.getByRole('button', { name: 'Nächste Lagebesprechung', exact: true }).click();
     const gespeichert = page.waitForResponse(
       (antwort) =>
-        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/reminders`) &&
+        antwort.url().endsWith(`/api/incidents/${einsatzId}/reminders`) &&
         antwort.request().method() === 'POST',
     );
     await dialog.getByRole('button', { name: 'Erfassen', exact: true }).click();
@@ -96,13 +96,13 @@ test.describe('LFH-463: Terminpflege und Wiedervorlage', () => {
     await expect(keinTermin).toBeEnabled();
     const geloescht = page.waitForResponse(
       (antwort) =>
-        antwort.url().endsWith(`/api/einsaetze/${einsatzId}/briefing/schedule`) &&
+        antwort.url().endsWith(`/api/incidents/${einsatzId}/briefing/schedule`) &&
         antwort.request().method() === 'PUT',
     );
     await keinTermin.click();
     expect((await geloescht).ok()).toBeTruthy();
     await expect(keinTermin).toBeDisabled();
-    einsatz = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
+    einsatz = (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as Record<
       string,
       unknown
     >;
@@ -283,7 +283,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function seedeEintrag(page: Page, einsatzId: string, inhalt: string = MELDUNG) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
   });
   expect(

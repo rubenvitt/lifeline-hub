@@ -114,6 +114,9 @@ import FlaechenwahlMenue from './FlaechenwahlMenue';
 import PunktankerMenue, { type PunktankerMenueProps } from '../../components/PunktankerMenue';
 import { erzeugeNachklickRiegel } from '../../components/nachklickRiegel';
 import { synchronisiereBildLayer, entferneBildLayer, type BildOverlay } from './bildLayer';
+import { synchronisiereCopernicusBilder } from './copernicusBildLayer';
+import { copernicusBilder } from './fachebenen';
+import { BILDER_DECKKRAFT_VORGABE } from './useFachebenen';
 import { eckenInitialPixel, type Punkt } from './bildGeometrie';
 import { erzeugeBildHandles, type BildHandles } from './bildHandles';
 import type { GriffKontext, GriffModus, KantenAus } from './bildGriffe';
@@ -452,6 +455,19 @@ const klickzielJeTipp = new WeakMap<Event, Klickziel<maplibregl.MapGeoJSONFeatur
  * liefe gegen `flyTo` zum Marker daneben. Gefragt wird über ALLE vorhandenen Klickebenen, einmal je
  * Tipp: die Hörer eines Tipps teilen über das Originalereignis dasselbe Urteil.
  */
+/**
+ * Rasterebenen der Fachebenen (heute nur die Copernicus-Satellitenbilder, LLH-2021) abgleichen;
+ * ohne aktive Rasterebene räumt der Abgleich ab.
+ */
+function wendeRasterFachebenenAn(map: maplibregl.Map, aktiv: AktiveFachebene[]) {
+  const raster = aktiv.find((f) => f.def.darstellung === 'raster');
+  synchronisiereCopernicusBilder(
+    map,
+    raster ? copernicusBilder(raster.daten) : [],
+    raster?.deckkraft ?? BILDER_DECKKRAFT_VORGABE,
+  );
+}
+
 function klickzielAm(map: maplibregl.Map, e: maplibregl.MapMouseEvent) {
   const schon = klickzielJeTipp.get(e.originalEvent);
   if (schon !== undefined) return schon;
@@ -837,12 +853,14 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       sorgeFuerAbschnittLayer(map, flaechenDatenRef.current);
       sorgeFuerZonenLayer(map, zonenDatenRef.current);
       for (const fe of fachebenenRef.current) {
+        if (fe.def.darstellung === 'raster') continue;
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
       }
       synchronisiereBildLayer(map, bilderRef.current, bildAnker(map));
       for (const fr of fremdebenenRef.current) {
         sorgeFuerFremdebeneLayer(map, fr.id, fr.daten, fr.farbe);
       }
+      wendeRasterFachebenenAn(map, fachebenenRef.current);
     });
     // Alle Kartenbilder (Plaketten, Fachobjekte, freie Zeichen) über den Resolver, NICHT über
     // `styleimagemissing` (LFH-841, Begründung in kartenbildResolver.ts). Zeichen synchron über
@@ -1380,9 +1398,12 @@ const Kartenflaeche = forwardRef<KartenHandle, KartenflaecheProps>(function Kart
       }
       // aktive an-/nachlegen + Daten setzen
       for (const fe of aktiv) {
+        if (fe.def.darstellung === 'raster') continue;
         sorgeFuerFachebeneLayer(map, fe.def, fe.daten, fe.farbe, fe.treffer);
         setzeFachebeneDaten(map, fe.def.key, fe.daten);
       }
+      // Satellitenbilder (LLH-2021) als Rasterquellen unter allen Fachebenen, nach deren Anlage.
+      wendeRasterFachebenenAn(map, aktiv);
       vorherigeFachebenenRef.current = aktivKeys as Set<string>;
       // Fachebenen-Layer landen oben → Marker erneut nach oben pinnen, sonst verdecken sie die
       // Marker und fangen deren Klicks ab.

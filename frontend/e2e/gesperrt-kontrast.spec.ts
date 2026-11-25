@@ -24,7 +24,7 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 const GESPERRT_BODEN = 4.5;
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Gesperrt-Kontrast ${Date.now()}` },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();

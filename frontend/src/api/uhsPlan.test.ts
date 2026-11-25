@@ -41,11 +41,11 @@ describe('uhsPlan API (LFH-999)', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:plan');
 
     await expect(ladePlanBild(7, 2, 'ab12')).resolves.toBe('blob:plan');
-    expect(planBildPfad(7, 2, 'ab12')).toBe('/api/einsaetze/7/uhs/2/plan/image?v=ab12');
+    expect(planBildPfad(7, 2, 'ab12')).toBe('/api/incidents/7/uhs/2/plan/image?v=ab12');
     // `?v=`: der Server erlaubt dem Browser, die Antwort ein Jahr zu behalten; ein neuer Plan
     // braucht deshalb eine neue Adresse, sonst käme der alte aus dem HTTP-Cache.
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/einsaetze/7/uhs/2/plan/image?v=ab12',
+      '/api/incidents/7/uhs/2/plan/image?v=ab12',
       expect.objectContaining({ credentials: 'same-origin' }),
     );
   });
@@ -77,7 +77,7 @@ describe('uhsPlan API (LFH-999)', () => {
     const datei = new File([new Uint8Array([0x89])], 'halle.png', { type: 'image/png' });
     hinterlegePlan(7, 2, datei).catch(() => undefined);
     expect(anfragen[0].methode).toBe('PUT');
-    expect(anfragen[0].url).toBe('/api/einsaetze/7/uhs/2/plan');
+    expect(anfragen[0].url).toBe('/api/incidents/7/uhs/2/plan');
     expect((anfragen[0].body as FormData).get('datei')).toBe(datei);
   });
 
@@ -95,9 +95,9 @@ describe('uhsPlan API (LFH-999)', () => {
       init?.body ?? null,
     ]);
     expect(aufrufe).toEqual([
-      ['/api/einsaetze/7/uhs/2/plan/from-attachment', 'POST', '{"anhang_id":31}'],
-      ['/api/einsaetze/7/uhs/2/plan', 'PATCH', '{"helligkeit":60}'],
-      ['/api/einsaetze/7/uhs/2/plan', 'DELETE', null],
+      ['/api/incidents/7/uhs/2/plan/from-attachment', 'POST', '{"anhang_id":31}'],
+      ['/api/incidents/7/uhs/2/plan', 'PATCH', '{"helligkeit":60}'],
+      ['/api/incidents/7/uhs/2/plan', 'DELETE', null],
     ]);
   });
 });

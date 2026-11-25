@@ -23,12 +23,12 @@ beforeEach(() => {
   zaehler = {};
   freigaben = freigabenFixture();
   server.use(
-    http.get('/api/einsaetze/:id/module-access', () => {
+    http.get('/api/incidents/:id/module-access', () => {
       zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/settings', () => HttpResponse.json({})),
-    http.get('/api/einsaetze/:id/map/place-search', () => {
+    http.get('/api/incidents/:id/settings', () => HttpResponse.json({})),
+    http.get('/api/incidents/:id/map/place-search', () => {
       zaehler.ortSuche = (zaehler.ortSuche ?? 0) + 1;
       return HttpResponse.json({ zustand: 'ok', treffer: [] });
     }),

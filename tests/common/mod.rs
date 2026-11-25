@@ -162,6 +162,7 @@ pub fn test_state(pool: &sqlx::SqlitePool, live: &LiveHub) -> AppState {
         datentraeger: Default::default(),
         adapter: Default::default(),
         fremdebene_abrufer: Default::default(),
+        drohne: Default::default(),
     }
 }
 
@@ -359,7 +360,7 @@ pub async fn einsatz_anlegen_mit(app: &axum::Router, cookie: &str, bezeichnung: 
     let (status, json) = anfrage(
         app,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         cookie,
         Some(&format!(r#"{{"bezeichnung":"{bezeichnung}"}}"#)),
     )
@@ -373,7 +374,7 @@ pub async fn person_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         cookie,
         Some(body),
     )
@@ -408,7 +409,7 @@ pub async fn stammpersonal_disponieren(
     let (status, dispo) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&format!(r#"{{"personal_id":{pid}}}"#)),
     )
@@ -422,7 +423,7 @@ pub async fn einheit_bilden(app: &axum::Router, cookie: &str, einsatz: i64, name
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -436,7 +437,7 @@ pub async fn standard_ansicht_id(app: &axum::Router, cookie: &str, einsatz: i64)
     let (status, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/map-views"),
+        &format!("/api/incidents/{einsatz}/map-views"),
         cookie,
         None,
     )
@@ -455,7 +456,7 @@ pub async fn karten_ansicht_anlegen(
     let (status, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/map-views"),
+        &format!("/api/incidents/{einsatz}/map-views"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -475,7 +476,7 @@ pub async fn rolle_setzen(
     let (status, _) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{benutzer_id}"),
+        &format!("/api/incidents/{einsatz}/members/{benutzer_id}"),
         leit_cookie,
         Some(&format!(r#"{{"einsatz_rolle":"{rolle}"}}"#)),
     )
@@ -502,7 +503,7 @@ pub async fn funktion_setzen(
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{benutzer_id}"),
+        &format!("/api/incidents/{einsatz}/members/{benutzer_id}"),
         leit_cookie,
         Some(&body.to_string()),
     )
@@ -555,7 +556,7 @@ pub async fn system_etb_anzahl(app: &axum::Router, cookie: &str, einsatz: i64) -
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -572,7 +573,7 @@ pub async fn system_etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) 
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -590,7 +591,7 @@ pub async fn system_etb_ids(app: &axum::Router, cookie: &str, einsatz: i64) -> V
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -687,7 +688,7 @@ pub async fn live_oeffnen(app: &axum::Router, cookie: &str, eid: i64) -> axum::r
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{eid}/live"))
+                .uri(format!("/api/incidents/{eid}/live"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -917,7 +918,7 @@ impl Erfassung {
         }
     }
 
-    /// Pfadsegment unter `/api/einsaetze/{id}/`.
+    /// Pfadsegment unter `/api/incidents/{id}/`.
     pub fn segment(self) -> &'static str {
         match self {
             Erfassung::Tier => "animals",
@@ -1037,7 +1038,7 @@ pub fn png_bytes(breite: u32, hoehe: u32) -> Vec<u8> {
     bild_bytes(breite, hoehe, image::ImageFormat::Png)
 }
 
-/// `PUT /api/einsaetze/{einsatz}/uhs/{uhs}/plan` als Multipart mit dem Feld `datei`.
+/// `PUT /api/incidents/{einsatz}/uhs/{uhs}/plan` als Multipart mit dem Feld `datei`.
 pub async fn plan_hochladen(
     app: &axum::Router,
     einsatz: i64,
@@ -1059,7 +1060,7 @@ pub async fn plan_hochladen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz}/uhs/{uhs}/plan"))
+                .uri(format!("/api/incidents/{einsatz}/uhs/{uhs}/plan"))
                 .header(header::COOKIE, cookie.to_string())
                 .header(
                     header::CONTENT_TYPE,

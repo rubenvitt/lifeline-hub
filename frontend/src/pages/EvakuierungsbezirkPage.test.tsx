@@ -427,7 +427,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
     /** Sammelstelle über das Ortsfeld (LLH-1121, design.md D7). */
     it('eine verortete Sammelstelle zeigt Text, Koordinate und Ort-Zeile', async () => {
       server.use(
-        http.get('/api/einsaetze/1/place-preview', () =>
+        http.get('/api/incidents/1/place-preview', () =>
           HttpResponse.json({ ortsname: 'Schulstraße 1, Musterstadt', peilung: null }),
         ),
       );
@@ -445,7 +445,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
 
     it('Bearbeiten: ein gewählter Treffer setzt Sammelstelle und Koordinate', async () => {
       server.use(
-        http.get('/api/einsaetze/1/place-search', () =>
+        http.get('/api/incidents/1/place-search', () =>
           HttpResponse.json({
             zustand: 'ok',
             treffer: [
@@ -458,7 +458,7 @@ describe('EvakuierungsbezirkPage (LLH-1076)', () => {
             ],
           }),
         ),
-        http.get('/api/einsaetze/1/place-preview', () =>
+        http.get('/api/incidents/1/place-preview', () =>
           HttpResponse.json({ ortsname: null, peilung: null }),
         ),
       );

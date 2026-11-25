@@ -79,10 +79,10 @@ function zeige({
   material?: Einheit;
 } = {}) {
   server.use(
-    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigaben)),
+    http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
   );
   const rechte = buildEinheitRechte(darfSchreiben, freigaben);
   return renderMitProviders(
@@ -106,7 +106,7 @@ const zeile = (text: string) =>
 function patchMitschnitt(antwort?: () => Response | Promise<Response>) {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
-    http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
+    http.patch('/api/incidents/1/material/:emId', async ({ request }) => {
       gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
       return antwort ? antwort() : HttpResponse.json({});
     }),
@@ -144,7 +144,7 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     );
     await waitFor(() =>
       expect(gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/41', body: { einheit_id: null } },
+        { url: '/api/incidents/1/material/41', body: { einheit_id: null } },
       ]),
     );
     expect(await within(zeile('Schlauch B')).findByText('Material ist verliehen')).toHaveAttribute(
@@ -176,7 +176,7 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     const gesendet = patchMitschnitt();
     const einheitenRoute: string[] = [];
     server.use(
-      http.all('/api/einsaetze/1/units/10/material/:emId', ({ request }) => {
+      http.all('/api/incidents/1/units/10/material/:emId', ({ request }) => {
         einheitenRoute.push(request.method);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -185,7 +185,7 @@ describe('EinheitMaterial (LLH-1036 D11, LLH-1225 D10)', () => {
     await userEvent.click(within(paneel()).getByRole('combobox', { name: 'Material zuordnen' }));
     await userEvent.click(await screen.findByText('Stromerzeuger · 1'));
     await waitFor(() =>
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/50', body: { einheit_id: 10 } }]),
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/50', body: { einheit_id: 10 } }]),
     );
     expect(einheitenRoute).toEqual([]);
   });

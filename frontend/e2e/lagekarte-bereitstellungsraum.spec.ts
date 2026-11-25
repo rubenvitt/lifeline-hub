@@ -107,10 +107,10 @@ test('Bereitstellungsraum: aus der Detailseite verorten, Marker mit Belegung liv
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Bereitstellung ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

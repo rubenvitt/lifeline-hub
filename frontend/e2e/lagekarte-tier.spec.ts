@@ -85,10 +85,10 @@ test('Tier: aus der Detailseite verorten, Tierzeichen, ohne ETB, zurück zur Det
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Tiere ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
@@ -151,10 +151,10 @@ test('Tier: ohne Modul Tiere keine Ebene und kein Marker', async ({ page }) => {
   test.setTimeout(120_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Tiere gesperrt ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

@@ -49,7 +49,7 @@ async fn fahrzeug_im_einsatz(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fid}}}"#)),
     )
@@ -60,7 +60,7 @@ async fn fahrzeug_im_einsatz(
         let (s, _) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
+            &format!("/api/incidents/{einsatz}/units/{e}/vehicles/{ef}"),
             admin,
             None,
         )
@@ -80,7 +80,7 @@ async fn sammel(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/{art}/bulk"),
+        &format!("/api/incidents/{einsatz}/{art}/bulk"),
         cookie,
         Some(body),
     )
@@ -91,7 +91,7 @@ async fn personal(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> 
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         None,
     )
@@ -104,7 +104,7 @@ async fn fahrzeuge(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value>
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         None,
     )
@@ -258,7 +258,7 @@ async fn schon_disponierte_unbekannte_und_entlassene_personen_nennen_ihren_grund
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep_entlassen}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep_entlassen}/stand-down"),
         &admin,
         None,
     )
@@ -359,7 +359,7 @@ async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )

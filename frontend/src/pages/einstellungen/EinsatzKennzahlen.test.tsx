@@ -33,7 +33,7 @@ function stelleBereit(a: Aufbau = {}) {
   let lagekennzahlen = a.lagekennzahlen ?? [];
   let einsatzAbrufe = 0;
   server.use(
-    http.get('/api/einsaetze/1', () => {
+    http.get('/api/incidents/1', () => {
       einsatzAbrufe++;
       return HttpResponse.json({
         id: 1,
@@ -44,10 +44,10 @@ function stelleBereit(a: Aufbau = {}) {
         spiegel: a.spiegel ?? null,
       });
     }),
-    http.get('/api/einsaetze/1/settings', () =>
+    http.get('/api/incidents/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.put('/api/einsaetze/1/situation-metric-selection', async ({ request }) => {
+    http.put('/api/incidents/1/situation-metric-selection', async ({ request }) => {
       const body = (await request.json()) as { gewaehlt: string[] };
       aufrufe.push(body);
       if (a.putStatus) return HttpResponse.json({ error: 'nein' }, { status: a.putStatus });

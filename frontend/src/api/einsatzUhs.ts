@@ -33,19 +33,19 @@ export function listeUhs(
   abschnittId?: number,
 ): Promise<Uhs[]> {
   return apiGet<Uhs[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/uhs`, { status, abschnitt_id: abschnittId }),
+    mitParametern(`/api/incidents/${einsatzId}/uhs`, { status, abschnitt_id: abschnittId }),
   );
 }
 
 export function ladeUhs(einsatzId: number, uhsId: number): Promise<UhsDetail> {
-  return apiGet<UhsDetail>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`);
+  return apiGet<UhsDetail>(`/api/incidents/${einsatzId}/uhs/${uhsId}`);
 }
 
 // ---------- Kräfte der UHS (LFH-1045) ----------
 
 /** Einsatzkräfte ohne UHS: die Auswahl beim Zuordnen. */
 export function listeKraefteOhneUhs(einsatzId: number, uhsId: number): Promise<UhsKraft[]> {
-  return apiGet<UhsKraft[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/available`);
+  return apiGet<UhsKraft[]>(`/api/incidents/${einsatzId}/uhs/${uhsId}/forces/available`);
 }
 
 /**
@@ -59,7 +59,7 @@ export function ordneKraftZu(
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<UhsKraft> {
   return apiSend<UhsKraft>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/${kraftId}${zuruecknahmeQuery(optionen)}`,
+    `/api/incidents/${einsatzId}/uhs/${uhsId}/forces/${kraftId}${zuruecknahmeQuery(optionen)}`,
     'PUT',
   );
 }
@@ -76,12 +76,12 @@ export function erfasseAdhocKraft(
   uhsId: number,
   daten: AdhocKraftEingabe,
 ): Promise<UhsKraft> {
-  return apiSend<UhsKraft>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces`, 'POST', daten);
+  return apiSend<UhsKraft>(`/api/incidents/${einsatzId}/uhs/${uhsId}/forces`, 'POST', daten);
 }
 
 /** Kraft von der UHS abziehen; sie bleibt im Einsatz. */
 export function zieheKraftAb(einsatzId: number, uhsId: number, kraftId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/${kraftId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/uhs/${uhsId}/forces/${kraftId}`, 'DELETE');
 }
 
 /** Alle Kräfte einer Einheit ohne UHS zuordnen (nur Einsatzleitung, kein Gerät). */
@@ -91,7 +91,7 @@ export function ordneEinheitZu(
   einheitId: number,
 ): Promise<UhsKraft[]> {
   return apiSend<UhsKraft[]>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/forces/unit/${einheitId}`,
+    `/api/incidents/${einsatzId}/uhs/${uhsId}/forces/unit/${einheitId}`,
     'PUT',
   );
 }
@@ -108,7 +108,7 @@ export interface UhsEingabe {
 }
 
 export function legeUhsAn(einsatzId: number, daten: UhsEingabe): Promise<Uhs> {
-  return apiSend<Uhs>(`/api/einsaetze/${einsatzId}/uhs`, 'POST', daten);
+  return apiSend<Uhs>(`/api/incidents/${einsatzId}/uhs`, 'POST', daten);
 }
 
 export interface UhsPatch {
@@ -132,15 +132,15 @@ export interface UhsPatch {
 }
 
 export function aktualisiereUhs(einsatzId: number, uhsId: number, daten: UhsPatch): Promise<Uhs> {
-  return apiSend<Uhs>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`, 'PATCH', daten);
+  return apiSend<Uhs>(`/api/incidents/${einsatzId}/uhs/${uhsId}`, 'PATCH', daten);
 }
 
 export function setzeUhsStatus(einsatzId: number, uhsId: number, status: UhsStatus): Promise<Uhs> {
-  return apiSend<Uhs>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/status`, 'POST', { status });
+  return apiSend<Uhs>(`/api/incidents/${einsatzId}/uhs/${uhsId}/status`, 'POST', { status });
 }
 
 export function storniereUhs(einsatzId: number, uhsId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/uhs/${uhsId}`, 'DELETE');
 }
 
 // ---------- Plätze ----------
@@ -157,7 +157,7 @@ export function legePlaetzeAn(
   uhsId: number,
   daten: PlatzBulkEingabe,
 ): Promise<UhsPlatz[]> {
-  return apiSend<UhsPlatz[]>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/bulk`, 'POST', daten);
+  return apiSend<UhsPlatz[]>(`/api/incidents/${einsatzId}/uhs/${uhsId}/seats/bulk`, 'POST', daten);
 }
 
 interface PlatzPatch {
@@ -173,7 +173,7 @@ export function aktualisierePlatz(
   daten: PlatzPatch,
 ): Promise<UhsPlatz> {
   return apiSend<UhsPlatz>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}`,
+    `/api/incidents/${einsatzId}/uhs/${uhsId}/seats/${platzId}`,
     'PATCH',
     daten,
   );
@@ -187,14 +187,14 @@ export function setzePlatzVerfuegbarkeit(
   reserviertFuerPersonId?: number | null,
 ): Promise<UhsPlatz> {
   return apiSend<UhsPlatz>(
-    `/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}/availability`,
+    `/api/incidents/${einsatzId}/uhs/${uhsId}/seats/${platzId}/availability`,
     'POST',
     { verfuegbarkeit, reserviert_fuer_person_id: reserviertFuerPersonId ?? null },
   );
 }
 
 export function stornierePlatz(einsatzId: number, uhsId: number, platzId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/uhs/${uhsId}/seats/${platzId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/uhs/${uhsId}/seats/${platzId}`, 'DELETE');
 }
 
 // ---------- Belegung ----------
@@ -212,7 +212,7 @@ export function aenderePersonBelegung(
   daten: BelegungEingabe,
 ): Promise<UhsBelegung> {
   return apiSend<UhsBelegung>(
-    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy`,
+    `/api/incidents/${einsatzId}/persons/${personId}/uhs-occupancy`,
     'POST',
     daten,
   );
@@ -229,7 +229,7 @@ export function nimmUhsAustrittZurueck(
   belegungId: number,
 ): Promise<UhsBelegungRuecknahme> {
   return apiSend<UhsBelegungRuecknahme>(
-    `/api/einsaetze/${einsatzId}/persons/${personId}/uhs-occupancy/${belegungId}/undo`,
+    `/api/incidents/${einsatzId}/persons/${personId}/uhs-occupancy/${belegungId}/undo`,
     'POST',
   );
 }
@@ -237,7 +237,7 @@ export function nimmUhsAustrittZurueck(
 // ---------- Fotos, Pläne und Dateien (LFH-758) ----------
 
 const anhangBasis = (einsatzId: number, uhsId: number) =>
-  `/api/einsaetze/${einsatzId}/uhs/${uhsId}/attachments`;
+  `/api/incidents/${einsatzId}/uhs/${uhsId}/attachments`;
 
 /** Lebende Anhänge einer UHS, neueste zuerst. Die Liste selbst wird nicht protokolliert. */
 export function listeUhsAnhaenge(einsatzId: number, uhsId: number): Promise<UhsAnhang[]> {

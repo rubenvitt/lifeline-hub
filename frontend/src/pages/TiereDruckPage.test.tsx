@@ -59,8 +59,8 @@ const BESTAND = [
 function rendere(suche = '', client = neuerQueryClient()) {
   const abrufe = { liste: 0, parameter: [] as string[] };
   server.use(
-    http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/animals', ({ request }) => {
+    http.get('/api/incidents/7', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/7/animals', ({ request }) => {
       abrufe.liste += 1;
       abrufe.parameter.push(new URL(request.url).search);
       return HttpResponse.json(BESTAND);

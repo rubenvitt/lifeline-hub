@@ -16,7 +16,7 @@ import { anmeldenPerApi } from './anmelde-kern';
  *    `GET /api/demo-data` antwortet „nicht importiert“, sonst ist die Route ohne
  *    `--demo-daten` gar nicht registriert.
  *  · Fehler: „Erneut abrufen“ im Ladefehler der Einsatzliste (Knopf im `action`-Slot).
- *    `GET /api/einsaetze` antwortet 500.
+ *    `GET /api/incidents` antwortet 500.
  *
  * Dass der Grund außen die Statusfläche IST, sichert der Spec nach den Kontrastwerten zu (eine
  * Regression scheitert so zuerst am Befund); sonst wäre „gegen die Hinweisfläche“ gegen
@@ -82,7 +82,7 @@ for (const modus of ['light', 'dark'] as const) {
     test('Fehler: Ladefehler der Einsatzliste', async ({ page }) => {
       await anmelden(page);
       await page.route(
-        (url) => url.pathname === '/api/einsaetze',
+        (url) => url.pathname === '/api/incidents',
         (route) =>
           route.request().method() === 'GET'
             ? route.fulfill({ status: 500, json: { fehler: 'E2E 739' } })

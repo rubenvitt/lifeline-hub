@@ -17,7 +17,7 @@ import { listeTiere } from '../../api/einsatzTier';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { ohneAbgeschlossene } from '../../personen/personenBilanz';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
@@ -397,6 +397,9 @@ export function useLagekarteDaten({
 
   // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
   const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz);
+  // Die Drohnenquelle zuschalten (LLH-2106): Leitungsaktion wie am Server (`EinsatzLeitungszugriff`),
+  // im Stand-Modus nie.
+  const darfDrohneSchalten = istSnapshot ? false : darfEinsatzLeiten(einsatz);
 
   // Ansichts-Filter (client-seitig): Objekte der aktiven Ansicht plus die ansichtslosen. `== null`
   // fängt `null` und das per skip_serializing_if weggelassene Feld.
@@ -731,6 +734,7 @@ export function useLagekarteDaten({
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,
+    darfDrohneSchalten,
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine abgeschaltete
     // Live-Query meldet isLoading=false → sonst „fertig" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,

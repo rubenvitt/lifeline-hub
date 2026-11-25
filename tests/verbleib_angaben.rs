@@ -34,7 +34,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/vehicles", self.einsatz),
+            &format!("/api/incidents/{}/vehicles", self.einsatz),
             &self.admin,
             Some(&json!({ "adhoc": { "funkrufname": funkrufname } }).to_string()),
         )
@@ -48,7 +48,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/persons/{person}/whereabouts",
+                "/api/incidents/{}/persons/{person}/whereabouts",
                 self.einsatz
             ),
             &self.admin,
@@ -61,7 +61,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/persons/{person}", self.einsatz),
+            &format!("/api/incidents/{}/persons/{person}", self.einsatz),
             &self.admin,
             None,
         )

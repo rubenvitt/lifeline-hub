@@ -199,7 +199,7 @@ impl LiveEvent {
             // sehen darf, darf die Anlage/Änderung/Löschung eines Standes erfahren.
             LiveEvent::LageSnapshot => &["lagekarte"],
             LiveEvent::Sofortmeldung => &["meldungen"],
-            // Einsatzkopf (LFH-555): gehört keinem Modul. `GET /api/einsaetze/{id}` liegt hinter
+            // Einsatzkopf (LFH-555): gehört keinem Modul. `GET /api/incidents/{id}` liegt hinter
             // derselben Tür wie der Strom (`EinsatzLesezugriff` ohne Modul) — wer den Strom
             // öffnen darf, darf den Kopf lesen und damit auch erfahren, dass er sich geändert
             // hat. Ein Modul-Key hier (etwa `einsatzdaten`) ließe genau die Kopf-Leser ohne

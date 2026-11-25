@@ -19,7 +19,10 @@ import Sidebar, {
 import type { MarkerTyp, NichtVerortet } from './marker';
 import type { ObjektEintrag } from './objektsuche';
 import { AusgangUnbekannt, NetzFehler } from '../../api/client';
+import { http, HttpResponse } from 'msw';
+import { server } from '../../test/server';
 import type { SidebarProps } from './Sidebar';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
@@ -84,7 +87,10 @@ const basisProps: SidebarProps = {
     kritis: false,
     energie: false,
     autobahn: false,
+    autobahn_parken: false,
     copernicus: false,
+    copernicus_bilder: false,
+    drohne: false,
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -508,6 +514,27 @@ describe('Sidebar Bild-Hintergründe', () => {
     }
   });
 
+  it('blendet eine vom Betreiber abgeschaltete Fachebene aus (LLH-2104)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
+        fachebenenAbgeschaltet={['nina']}
+      />,
+    );
+    expect(document.querySelector('[data-fachebene="nina"]')).toBeNull();
+    expect(screen.queryByText(FACHEBENEN.nina.label)).toBeNull();
+    // Die Gruppe „Warnungen“ bleibt mit DWD stehen.
+    expect(document.querySelector('[data-fachebene="dwd"]')).not.toBeNull();
+    // Der Zähler „N an“ der Fachebenen zählt die abgeschaltete NINA nicht mit.
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).not.toHaveTextContent(/\d+ an/);
+  });
+
+  it('ohne Abschaltung bleibt NINA im Ebenenbaum (LLH-2104)', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} fachebenenAbgeschaltet={[]} />);
+    expect(document.querySelector('[data-fachebene="nina"]')).not.toBeNull();
+  });
+
   // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
     screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;
@@ -633,7 +660,11 @@ describe('Sidebar Bild-Hintergründe', () => {
   };
 
   it('keine klassenabhängige Ebene zeigt ihren Rückfallton im Panel, ein- wie ausgeschaltet (LFH-592)', () => {
-    const klassig = fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben);
+    // Die Satellitenbilder haben keine Klassenfarben und keinen eigenen Ton (LLH-2021).
+    const klassig = fachebeneKeys().filter(
+      (k): k is Exclude<FachebeneQuelle, 'copernicus_bilder'> =>
+        k !== 'copernicus_bilder' && !!FACHEBENEN[k].klassenfarben,
+    );
     expect(klassig.length).toBeGreaterThan(0);
     for (const an of [false, true]) {
       const sichtbar = { ...basisProps.fachebenenSichtbar };
@@ -1650,6 +1681,7 @@ describe('Sidebar: Ebenenbaum', () => {
       'Umwelt: alle Ebenen',
       'Verkehr & Infrastruktur: alle Ebenen',
       'Satellitenauswertung: alle Ebenen',
+      'Drohne: alle Ebenen',
     ]);
   });
 
@@ -1683,6 +1715,41 @@ describe('Sidebar: Ebenenbaum', () => {
     ).toHaveLength(1);
     fireEvent.click(zeile);
     expect(onFachebeneToggle).toHaveBeenCalledWith('dwd', false);
+  });
+
+  it('hängt die Quellenzeile der Drohne an die Drohnenebene, nicht an eine andere (LLH-2106)', async () => {
+    server.use(
+      http.get('/api/incidents/1/drone/sources', () =>
+        HttpResponse.json([
+          {
+            adapter_id: 'suchlage-1',
+            label: 'Suchlage Staffel Nord',
+            connected: false,
+            lagemonitor: false,
+            state: 'aktiv',
+            video_keys: [],
+          },
+        ]),
+      ),
+    );
+    renderMitProviders(<Sidebar {...ebenenProps} drohne={{ darfSchalten: true }} />);
+    const zeile = screen.getByRole('switch', { name: FACHEBENEN.drohne.label });
+    const zusatz = await screen.findByRole('button', { name: 'Suchlage zuschalten' });
+    expect(zeile.closest('[data-fachebene="drohne"]')).toContainElement(zusatz);
+    expect(screen.getAllByRole('button', { name: 'Suchlage zuschalten' })).toHaveLength(1);
+  });
+
+  it('zeigt ohne `drohne` keine Quellenzeile und fragt nichts ab (LLH-2106)', () => {
+    const abgefragt = vi.fn();
+    server.use(
+      http.get('/api/incidents/1/drone/sources', () => {
+        abgefragt();
+        return HttpResponse.json([]);
+      }),
+    );
+    renderMitProviders(<Sidebar {...ebenenProps} />);
+    expect(screen.queryByText('Suchlage zuschalten')).toBeNull();
+    expect(abgefragt).not.toHaveBeenCalled();
   });
 
   it('„Ebene suchen" öffnet Gruppen mit Treffern, ohne den gemerkten Zustand zu ändern', () => {
@@ -1838,5 +1905,40 @@ describe('Sidebar · Fremdebenen (LLH-2099)', () => {
     renderMitProviders(<Sidebar {...ebenenProps} fremdebenen={fremd} />);
     await userEvent.type(screen.getByRole('textbox', { name: 'Ebene suchen' }), 'Nachbar');
     expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toBeInTheDocument();
+  });
+});
+
+describe('Sidebar · Copernicus-Satellitenbilder (LLH-2021)', () => {
+  beforeEach(paneeleOffen);
+  const copernicus = { archiv: false, onArchiv: vi.fn(), aktivierungen: [] };
+  const copernicusBilder = { liste: [], deckkraft: 80, onDeckkraft: vi.fn() };
+  const mit = (sichtbar: Partial<SidebarProps['fachebenenSichtbar']>) =>
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, ...sichtbar }}
+        fachebenenStatus={{ copernicus: 'ok', copernicus_bilder: 'ok' }}
+        copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
+      />,
+    );
+
+  it('zeigt Deckkraft-Regler und genau einen Archiv-Schalter, wenn beide Ebenen an sind', () => {
+    mit({ copernicus: true, copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(within(bilderZeile).getByRole('slider', { name: /Deckkraft/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /Ältere Aktivierungen/ })).toHaveLength(1);
+  });
+
+  it('trägt den Archiv-Schalter an der Bilderzeile, wenn nur sie an ist', () => {
+    mit({ copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(
+      within(bilderZeile).getByRole('checkbox', { name: /Ältere Aktivierungen/ }),
+    ).toBeInTheDocument();
   });
 });

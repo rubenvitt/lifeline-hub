@@ -15,14 +15,14 @@ use common::{
 };
 
 fn marke_uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/etb/read-marker")
+    format!("/api/incidents/{einsatz}/etb/read-marker")
 }
 
 async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> i64 {
     let (status, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(body),
     )
@@ -235,7 +235,7 @@ async fn beobachter_darf_setzen_auch_im_abgeschlossenen_einsatz() {
     let (status, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -305,7 +305,7 @@ async fn ausgeblendetes_etb_modul_sperrt_lesemarke() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
+        &format!("/api/incidents/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )

@@ -35,10 +35,10 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function seede(page: Page): Promise<number> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `FMS-Tableau ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const abschnittId = await post(page, `${basis}/sectors`, { name: ABSCHNITT });
   const einheitId = await post(page, `${basis}/units`, {
     name: EINHEIT,

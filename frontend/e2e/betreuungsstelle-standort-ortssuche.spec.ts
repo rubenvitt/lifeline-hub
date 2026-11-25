@@ -28,11 +28,11 @@ const TREFFER = {
 
 async function geocoder(page: Page) {
   const anfragen: string[] = [];
-  await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, async (route) => {
+  await page.route(/\/api\/incidents\/\d+\/place-search\?/, async (route) => {
     anfragen.push(new URL(route.request().url()).searchParams.get('q') ?? '');
     await route.fulfill({ json: { zustand: 'ok', treffer: [TREFFER] } });
   });
-  await page.route(/\/api\/einsaetze\/\d+\/place-preview\?/, (route) =>
+  await page.route(/\/api\/incidents\/\d+\/place-preview\?/, (route) =>
     route.fulfill({ json: { ortsname: TREFFER.kurz, peilung: null } }),
   );
   return anfragen;
@@ -62,10 +62,10 @@ test('Betreuungsstelle anlegen: gewählter Standort verortet, Marker auf der Lag
   test.setTimeout(180_000);
   const anfragen = await geocoder(page);
   await anmeldenAlsAdmin(page, { startseite: false });
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Standort ${Date.now()}`,
   });
-  await senden(page, 'patch', `/api/einsaetze/${e}`, {
+  await senden(page, 'patch', `/api/incidents/${e}`, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
     einsatzort_lon: ORT[0],
@@ -91,7 +91,7 @@ test('Betreuungsstelle anlegen: gewählter Standort verortet, Marker auf der Lag
   await expect(dialog).toBeHidden();
 
   // Gespeichert sind Standort und Koordinate.
-  const uebersicht = (await (await page.request.get(`/api/einsaetze/${e}/care`)).json()) as {
+  const uebersicht = (await (await page.request.get(`/api/incidents/${e}/care`)).json()) as {
     stellen: { id: number; bezeichnung: string; standort?: string; lat?: number; lon?: number }[];
   };
   const stelle = uebersicht.stellen.find((s) => s.bezeichnung === 'NU Sporthalle')!;

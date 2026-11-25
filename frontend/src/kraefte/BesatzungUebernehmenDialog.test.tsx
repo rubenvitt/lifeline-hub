@@ -42,7 +42,7 @@ let bodies: unknown[];
 beforeEach(() => {
   bodies = [];
   server.use(
-    http.post('/api/einsaetze/1/vehicles/3/crew', async ({ request }) => {
+    http.post('/api/incidents/1/vehicles/3/crew', async ({ request }) => {
       bodies.push(await request.json());
       return new HttpResponse(null, { status: 204 });
     }),
@@ -113,7 +113,7 @@ describe('BesatzungUebernehmenDialog — Personal der Einheit übernehmen (LLH-1
 
   it('nennt den Grund an der abgelehnten Person und bleibt offen', async () => {
     server.use(
-      http.post('/api/einsaetze/1/vehicles/3/crew', () =>
+      http.post('/api/incidents/1/vehicles/3/crew', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Personen lassen sich zuordnen',
@@ -180,7 +180,7 @@ describe('BesatzungUebernehmenDialog — Personal der Einheit übernehmen (LLH-1
 
   it('nennt eine abgelehnte Kraft, die danach aus der Liste fällt, mit Namen', async () => {
     server.use(
-      http.post('/api/einsaetze/1/vehicles/3/crew', () =>
+      http.post('/api/incidents/1/vehicles/3/crew', () =>
         HttpResponse.json(
           {
             error: 'Nicht alle Personen lassen sich zuordnen',

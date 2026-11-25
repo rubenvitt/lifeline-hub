@@ -41,7 +41,7 @@ beforeEach(() => {
   gesendet = [];
   putAntwort = () => HttpResponse.json(stand());
   server.use(
-    http.put('/api/einsaetze/1/briefing/schedule', async ({ request }) => {
+    http.put('/api/incidents/1/briefing/schedule', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return putAntwort();
     }),

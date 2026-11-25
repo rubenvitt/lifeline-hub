@@ -35,7 +35,9 @@
   const version = rohVersion === '__LIFELINE_' + 'VERSION__' ? undefined : rohVersion;
 
   const offen = new Map();
-  let naechsteId = 0;
+  // Jedes Dokument beginnt bei einem Zufallswert (LLH-2082): eine späte Antwort der Hülle an das
+  // vorige Dokument trifft sonst dieselbe id im neuen. Ganzzahlig und weit unter 2^53.
+  let naechsteId = Math.floor(Math.random() * 2 ** 40);
 
   Object.defineProperty(window, '__LIFELINE_REPLY__', {
     configurable: true,

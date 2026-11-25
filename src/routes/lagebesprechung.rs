@@ -30,7 +30,7 @@ fn sse(state: &AppState, einsatz_id: i64) {
         .publiziere_einsatz(einsatz_id, LiveEvent::Lagebesprechung);
 }
 
-/// GET /api/einsaetze/{id}/briefing — Stand (Termin, Zahl, letzte Besprechung).
+/// GET /api/incidents/{id}/briefing — Stand (Termin, Zahl, letzte Besprechung).
 pub async fn load(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagebesprechung>,
@@ -83,7 +83,7 @@ pub async fn export_termin(
     Ok((headers, datei).into_response())
 }
 
-/// GET /api/einsaetze/{id}/briefings — Verlauf, absteigend.
+/// GET /api/incidents/{id}/briefings — Verlauf, absteigend.
 pub async fn list(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagebesprechung>,
@@ -103,7 +103,7 @@ pub struct LagebesprechungAbschluss {
     naechste_at: Option<Option<String>>,
 }
 
-/// POST /api/einsaetze/{id}/briefings — Lagebesprechung abschliessen.
+/// POST /api/incidents/{id}/briefings — Lagebesprechung abschliessen.
 ///
 /// Die Antwort wird **nach** dem Schreiben frisch geladen: die Quittung darf keinen Zustand
 /// tragen, den es nie gab (LFH-340/C5).
@@ -174,7 +174,7 @@ pub struct TerminSetzen {
     naechste_at: Option<Option<String>>,
 }
 
-/// PUT /api/einsaetze/{id}/briefing/schedule — Termin ohne Abschluss setzen (LLH-1111,
+/// PUT /api/incidents/{id}/briefing/schedule — Termin ohne Abschluss setzen (LLH-1111,
 /// design.md D3). Kein ETB-Eintrag: der Termin ist eine Wiedervorlage, keine Entscheidung.
 pub async fn set_termin(
     State(state): State<AppState>,

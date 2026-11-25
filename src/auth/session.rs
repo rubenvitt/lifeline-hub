@@ -600,7 +600,7 @@ async fn fordere_geraeteroute(
     if !crate::geraet::darf_route(geraet.ansicht, parts.method.as_str(), &pfad) {
         return Err(AppError::Forbidden);
     }
-    if ist_einsatzroute(&pfad) {
+    if pfad.starts_with("/api/incidents/{id}") {
         use axum::extract::Path;
         use std::collections::HashMap;
         let Path(params) = Path::<HashMap<String, String>>::from_request_parts(parts, state)
@@ -612,15 +612,6 @@ async fn fordere_geraeteroute(
         }
     }
     Ok(())
-}
-
-/// Ob eine Route einen Einsatz im Pfad trägt und damit an den gekoppelten Einsatz gebunden ist:
-/// unter jeder Einsatzwurzel (`einsatz::modul::EINSATZ_WURZELN`), wie die Wächter in
-/// `tests/geraet_routen_guard.rs` sie zulassen.
-fn ist_einsatzroute(pfad: &str) -> bool {
-    crate::einsatz::modul::EINSATZ_WURZELN
-        .iter()
-        .any(|w| pfad.starts_with(w))
 }
 
 /// Extractor: der aktuell angemeldete Benutzer, der zusätzlich Admin sein muss.
@@ -671,15 +662,6 @@ mod tests {
         let mut headers = axum::http::HeaderMap::new();
         headers.insert(ERWARTETER_BENUTZER_ID_HEADER, wert.parse().unwrap());
         headers
-    }
-
-    #[test]
-    fn einsatzbindung_gilt_unter_beiden_wurzeln() {
-        assert!(ist_einsatzroute("/api/einsaetze/{id}/lage"));
-        assert!(ist_einsatzroute("/api/incidents/{id}/map/foreign-layers"));
-        assert!(ist_einsatzroute("/api/incidents/{id}"));
-        assert!(!ist_einsatzroute("/api/geraet/ich"));
-        assert!(!ist_einsatzroute("/api/organizations/{id}"));
     }
 
     #[test]

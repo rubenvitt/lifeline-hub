@@ -29,6 +29,10 @@ diese Zusage.
   (`pages/lagekarte/bildGriffe.ts`) in `max(controlHeight, 44)`, je Modus scharf, Moduswechsel
   wartet auf `dragend`; in „Größe" Ecken immer, eine Kante nur ohne Überlappung mit Ecke oder
   Kante (`scharfeGriffe`, neu bei `move`/`dragend`/`setzeEcken`, nie im Zug; LFH-764).
+- **Einsatzbezogene Ebenen laden über die Einsatzroute** (LLH-2106): eine Ebene, die vom Einsatz
+  abhängt (Drohnenlage: `/api/incidents/{id}/map/drone`), kommt nie über `/api/map/overlays/{quelle}`;
+  dort gibt es keinen Einsatz, keine Rolle und kein Modul-Gate. Antwort ist derselbe
+  `FachebeneAntwort`-Umschlag mit ETag.
 - **Ein Tipp gehört genau einem Ziel** (LFH-764,
   `openspec/changes/archive/2026-09-30-lfh-764-lagekarte-griffe-klickwege/design.md`): jeder Karten-Klickhörer fragt
   `klickzielAm` (`Kartenflaeche.tsx`, ein Urteil je Originalereignis) → `entscheideKlickziel`

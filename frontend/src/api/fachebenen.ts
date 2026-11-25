@@ -15,17 +15,27 @@ export type FeatureCollection = S['GeoJsonFeatureCollection'];
 export type FachebeneAntwort = S['FachebeneAntwort'];
 
 /** Pfad-Parameter von `/api/map/overlays/:quelle` — FE-lokal (Eingabeseite, kein Response-DTO). */
-export type FachebeneQuelle =
+export type UeberlagerungQuelle =
   | 'dwd'
   | 'pegelonline'
   | 'nina'
   | 'kritis'
   | 'hochwasser'
   | 'autobahn'
+  | 'autobahn_parken'
   | 'odl'
   | 'luftqualitaet'
   | 'energie'
-  | 'copernicus';
+  | 'copernicus'
+  /** Satellitenbilder der Copernicus-Aktivierungen (LLH-2021), Route `…/copernicus/images`. */
+  | 'copernicus_bilder';
+
+/**
+ * Schlüssel der Fachebenen-Registry: die Quellen von `/api/map/overlays/:quelle` und die
+ * einsatzbezogene Drohnenlage (LLH-2106), die über die Einsatzroute lädt
+ * ({@link loadDrohneFachebene}), nie über `ladeFachebene`.
+ */
+export type FachebeneQuelle = UeberlagerungQuelle | 'drohne';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), Feature-Property `klasse` der
@@ -118,12 +128,14 @@ export type EnergieAnlagenart =
 
 /**
  * Lädt eine Fachebene. `bbox` (west,sued,ost,nord) brauchen die bbox-abhängigen Ebenen
- * (`kritis`, `energie`, `copernicus` — siehe `istBboxAbhaengig`); das Backend lehnt sie dort ohne
- * ab. `archiv` gilt nur für `copernicus`: auch abgeschlossene Aktivierungen, die älter als 30 Tage
- * sind (LLH-1200).
+ * (`kritis`, `energie`, `copernicus`, `copernicus_bilder` — siehe `istBboxAbhaengig`); das Backend
+ * lehnt sie dort ohne ab. `archiv` gilt nur für die beiden Copernicus-Ebenen: auch abgeschlossene
+ * Aktivierungen, die älter als 30 Tage sind (LLH-1200).
+ *
+ * Die Bilderliste hat eine eigene Route unter der Vektorebene (LLH-2021).
  */
 export function ladeFachebene(
-  quelle: FachebeneQuelle,
+  quelle: UeberlagerungQuelle,
   bbox?: string,
   archiv = false,
 ): Promise<FachebeneAntwort> {
@@ -131,5 +143,15 @@ export function ladeFachebene(
   if (bbox) teile.push(`bbox=${encodeURIComponent(bbox)}`);
   if (archiv) teile.push('archiv=1');
   const q = teile.length ? `?${teile.join('&')}` : '';
-  return apiGet<FachebeneAntwort>(`/api/map/overlays/${quelle}${q}`);
+  const pfad = quelle === 'copernicus_bilder' ? 'copernicus/images' : quelle;
+  return apiGet<FachebeneAntwort>(`/api/map/overlays/${pfad}${q}`);
+}
+
+/**
+ * Lädt die Drohnenlage eines Einsatzes (LLH-2106): derselbe `FachebeneAntwort`-Umschlag mit ETag
+ * wie die Überlagerungen, aber unter der Einsatzroute — dort gelten Einsatzrolle und
+ * Modulfreigabe. Ohne Zuschaltung, Stand oder in einem beendeten Einsatz meldet sie `offline`.
+ */
+export function loadDrohneFachebene(einsatzId: number): Promise<FachebeneAntwort> {
+  return apiGet<FachebeneAntwort>(`/api/incidents/${einsatzId}/map/drone`);
 }

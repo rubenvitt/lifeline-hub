@@ -49,10 +49,10 @@ function EinsatzWechsel() {
 function render(route: string) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/:einsatzId', ({ params }) =>
+    http.get('/api/incidents/:einsatzId', ({ params }) =>
       HttpResponse.json({ ...einsatzAktiv, id: Number(params.einsatzId) }),
     ),
-    http.get('/api/einsaetze/:einsatzId/animals', () => HttpResponse.json([])),
+    http.get('/api/incidents/:einsatzId/animals', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>

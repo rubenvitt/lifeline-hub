@@ -696,13 +696,13 @@ describe('AuftragFormular — Berichtigen (LLH-1098)', () => {
 describe('AuftragFormular — Ziel als Ortsfeld (LLH-1114)', () => {
   function mitOrtssuche() {
     server.use(
-      http.get('/api/einsaetze/:eid', ({ params }) =>
+      http.get('/api/incidents/:eid', ({ params }) =>
         HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
       ),
-      http.get('/api/einsaetze/:eid/place-preview', () =>
+      http.get('/api/incidents/:eid/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
-      http.get('/api/einsaetze/:eid/place-search', () =>
+      http.get('/api/incidents/:eid/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [

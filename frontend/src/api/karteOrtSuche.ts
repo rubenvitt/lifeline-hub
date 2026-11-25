@@ -4,7 +4,7 @@ import type { components } from './types.generated';
 
 type S = components['schemas'];
 
-/** Antwort von GET /api/einsaetze/:id/map/place-search. Rust: `OrtSucheAntwort` (LFH-638).
+/** Antwort von GET /api/incidents/:id/map/place-search. Rust: `OrtSucheAntwort` (LFH-638).
  *  Ein Geocoder-Ausfall kommt als `zustand`, nie als Fehlerstatus; `ok` ohne Treffer heißt
  *  „nichts gefunden“. */
 export type OrtSucheAntwort = S['OrtSucheAntwort'];
@@ -14,6 +14,6 @@ export type OrtTreffer = S['OrtTreffer'];
 /** Sucht eine Adresse über den Geocoder der Organisation (Modul Lagekarte). */
 export function sucheOrt(einsatzId: number, begriff: string): Promise<OrtSucheAntwort> {
   return apiGet<OrtSucheAntwort>(
-    mitParametern(`/api/einsaetze/${einsatzId}/map/place-search`, { q: begriff }),
+    mitParametern(`/api/incidents/${einsatzId}/map/place-search`, { q: begriff }),
   );
 }
