@@ -45,6 +45,9 @@ pub struct AppState {
     /// Adapter-Rahmen (LLH-2017): Geheimnisspeicher mit dem Schlüssel aus der Umgebung und die
     /// bekannten Arten. Vorgabe: kein Schlüssel, die Arten dieses Builds.
     pub adapter: crate::adapter::Rahmen,
+    /// Zuschaltungen der Drohnenquellen und ihr letzter Stand (LLH-2105): Abbild von
+    /// `adapter_einsatz`, nur im Arbeitsspeicher.
+    pub drohne: std::sync::Arc<crate::drohne::Store>,
 }
 
 /// Schalter, die nur das Routing betreffen (LFH-690).
@@ -3220,6 +3223,7 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            drohne: Default::default(),
         }
     }
 

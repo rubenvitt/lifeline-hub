@@ -415,6 +415,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
              Geheimnisse lassen sich nicht speichern"
         ),
     }
+    // Zuschaltungen der Drohnenquellen (LLH-2105) stehen, bevor der Lauf Abrufe beginnt.
+    let drohne = std::sync::Arc::new(lifeline_hub::drohne::Store::new());
+    drohne.load(&pool).await;
     let adapter_task = lifeline_hub::adapter::lauf::start(
         pool.clone(),
         adapter_rahmen.clone(),
@@ -635,6 +638,7 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
         backup_empfaenger,
         datentraeger: datentraeger.clone(),
         adapter: adapter_rahmen,
+        drohne,
     };
     // LFH-993: Wächter der Offline-Karten (erste Prüfung 60 s nach dem Start).
     lifeline_hub::karte::auto_aktualisierung::starte_waechter(state.clone());

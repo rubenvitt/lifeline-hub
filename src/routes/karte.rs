@@ -2728,6 +2728,7 @@ mod finalisierung_tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            drohne: Default::default(),
         };
         let url = reqwest::Url::parse("https://example.test/de.mbtiles").unwrap();
 

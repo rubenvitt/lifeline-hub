@@ -269,6 +269,13 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
   `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
   (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
+- **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
+  in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
+  `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er
+  wird beim Start in `main` mit `Store::load` gesetzt, bevor der Lauf beginnt, und von den Routen
+  nachgeführt (`set_zugeschaltet`, bei `false` wird der Stand geleert). „Laufend“ heißt
+  `einsatz.status = 'aktiv'` (wie `fordere_aktiv`, ohne Nachlauffrist). Ein Adapter hängt an
+  höchstens einem laufenden Einsatz (`find_active_holder`); ein abgeschlossener zählt nicht mehr.
 
 ## Anhänge
 
