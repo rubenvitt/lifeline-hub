@@ -79,17 +79,19 @@ pub async fn create_kopplung_tx(
     crate::fahrzeug::disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
 
     let zugang: Option<(String, Option<String>)> = sqlx::query_as(
-        "SELECT scope, widerrufen_at FROM einwurf_zugang WHERE id = ? AND org_id = ?",
+        "SELECT scope, widerrufen_at FROM einwurf_zugang WHERE id = ? AND org_id = ? \
+           AND (gueltig_bis IS NULL OR gueltig_bis > ?)",
     )
     .bind(zugang_id)
     .bind(org_id)
+    .bind(jetzt)
     .fetch_optional(&mut *conn)
     .await?;
     match zugang {
         Some((scope, None)) if scope == Scope::PositionenWrite.as_str() => {}
         _ => {
             return Err(AppError::UnprocessableEntity(
-                "Der Zugang ist unbekannt, widerrufen oder nicht für Positionen eingerichtet"
+                "Der Zugang ist unbekannt, widerrufen, abgelaufen oder nicht für Positionen eingerichtet"
                     .into(),
             ))
         }
@@ -172,7 +174,7 @@ pub async fn delete_kopplungen_einsatz_tx(
         .collect())
 }
 
-/// Kennungen der letzten 24 Stunden aus den nicht widerrufenen Zugängen der Org mit
+/// Kennungen der letzten 24 Stunden aus den nicht widerrufenen, nicht abgelaufenen Zugängen der Org mit
 /// `positionen:write`; jüngste zuerst. `jetzt` im Format [`crate::zeit::FORMAT`].
 pub async fn list_kandidaten(
     pool: &SqlitePool,
@@ -185,11 +187,13 @@ pub async fn list_kandidaten(
                         WHERE k.zugang_id = p.zugang_id AND k.kennung = p.kennung) AS gekoppelt \
          FROM position_letzte p JOIN einwurf_zugang z ON z.id = p.zugang_id \
          WHERE z.org_id = ? AND z.scope = ? AND z.widerrufen_at IS NULL \
+           AND (z.gueltig_bis IS NULL OR z.gueltig_bis > ?) \
            AND p.empfangen_at >= datetime(?, '-24 hours') \
          ORDER BY p.empfangen_at DESC, z.name, p.kennung",
     )
     .bind(org_id)
     .bind(Scope::PositionenWrite.as_str())
+    .bind(jetzt)
     .bind(jetzt)
     .fetch_all(pool)
     .await?)

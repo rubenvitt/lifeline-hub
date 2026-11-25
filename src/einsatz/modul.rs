@@ -313,6 +313,16 @@ const EINSATZ_WURZEL: &str = "/api/einsaetze/{id}";
 /// ein Präfix trifft nur bei Gleichheit oder wenn direkt danach `/` folgt — sonst würde
 /// z. B. `…/meldungenarchiv` fälschlich als `…/meldungen`-Kind matchen.
 pub fn key_fuer_pfad(pfad: &str) -> Option<Option<&'static str>> {
+    // Während der Umbenennung der Einsatzrouten (LLH-1979, ADR-0097) tragen Routen den Präfix
+    // `/api/incidents/{id}`; die Tabelle führt ihn weiter unter dem alten Namen.
+    let alt;
+    let pfad = match pfad.strip_prefix("/api/incidents/{id}") {
+        Some(rest) => {
+            alt = format!("/api/einsaetze/{{id}}{rest}");
+            alt.as_str()
+        }
+        None => pfad,
+    };
     PFAD_KEY
         .iter()
         .filter(|(prefix, _)| {

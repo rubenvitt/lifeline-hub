@@ -821,3 +821,61 @@ async fn kandidaten_ohne_koordinaten_ohne_fremde_org_ohne_widerrufene_und_ohne_a
         assert!(k["access_name"].is_string());
     }
 }
+
+#[tokio::test]
+async fn abgelaufener_zugang_ist_422_beim_koppeln() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    f.zugang_anlegen("zugang-abgelaufen", f.org, "positionen:write", false)
+        .await;
+    sqlx::query("UPDATE einwurf_zugang SET gueltig_bis = datetime('now', '-1 hours') WHERE id = ?")
+        .bind("zugang-abgelaufen")
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let body = format!(
+        r#"{{"access_id":"zugang-abgelaufen","device_id":"{KENNUNG}","volunteer_crew_confirmed":true}}"#
+    );
+    let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(f.kopplungen().await, 0);
+}
+
+#[tokio::test]
+async fn abgelaufener_zugang_erscheint_nicht_in_den_kandidaten() {
+    let f = fix().await;
+    f.zugang_anlegen("zugang-abgelaufen", f.org, "positionen:write", false)
+        .await;
+    sqlx::query("UPDATE einwurf_zugang SET gueltig_bis = datetime('now', '-1 hours') WHERE id = ?")
+        .bind("zugang-abgelaufen")
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let jung = vor_stunden(&f.pool, 1).await;
+    sqlx::query(
+        "INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
+         empfangen_at, rohdaten) VALUES (?, 'zugang-abgelaufen', 'x', 1.5, 2.5, ?, ?, '{}')",
+    )
+    .bind(f.org)
+    .bind(&jung)
+    .bind(&jung)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "GET",
+        &format!("{}/candidates", f.pfad()),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|k| k["access_id"] != "zugang-abgelaufen"));
+}
