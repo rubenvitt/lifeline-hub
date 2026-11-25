@@ -22,7 +22,7 @@ async fn uhs_anlegen_und_aktivieren(
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": bez})),
     )
@@ -32,7 +32,7 @@ async fn uhs_anlegen_und_aktivieren(
     let (s, _) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -46,7 +46,7 @@ async fn platz_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64,
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats"),
         cookie,
         Some(&json!({"typ": "bett", "bezeichnung": bez})),
     )
@@ -60,7 +60,7 @@ async fn etb_inhalte(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Stri
     let (_, v) = anfrage_json(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -83,7 +83,7 @@ async fn anlegen_liefert_geplant_und_keinen_etb() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -104,7 +104,7 @@ async fn anlegen_mit_standort_und_koordinate_halbes_paar_ist_422() {
     let (app, _) = setup_mit_pool().await;
     let cookie = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &cookie).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs");
+    let pfad = format!("/api/incidents/{einsatz}/uhs");
     let (s, v) = anfrage_json(
         &app,
         "POST",
@@ -157,7 +157,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let (_, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -167,7 +167,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let (s_ok, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         &cookie,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -176,7 +176,7 @@ async fn ungueltiger_status_uebergang_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         &cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -193,7 +193,7 @@ async fn geplante_uhs_akzeptiert_keine_belegung() {
     let (_, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -202,7 +202,7 @@ async fn geplante_uhs_akzeptiert_keine_belegung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -220,7 +220,7 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -230,7 +230,7 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         &cookie,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -240,7 +240,7 @@ async fn aufloesen_blockt_bei_aktiver_belegung_409() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         &cookie,
         None,
     )
@@ -260,7 +260,7 @@ async fn inbox_mehrfach_belegung_erlaubt() {
         let (s, _) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/persons/{p}/uhs-occupancy"),
+            &format!("/api/incidents/{einsatz}/persons/{p}/uhs-occupancy"),
             &cookie,
             Some(&json!({"art": "eintritt", "uhs_id": uhs})),
         )
@@ -286,7 +286,7 @@ async fn doppelbelegung_eines_platzes_ist_konflikt() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{p1}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{p1}/uhs-occupancy"),
         &cookie,
         Some(&body),
     )
@@ -295,7 +295,7 @@ async fn doppelbelegung_eines_platzes_ist_konflikt() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{p2}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{p2}/uhs-occupancy"),
         &cookie,
         Some(&body),
     )
@@ -315,7 +315,7 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs, "platz_id": platz})),
     )
@@ -324,7 +324,7 @@ async fn auto_aufbereitung_und_etb_text_inbox() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "austritt"})),
     )
@@ -364,7 +364,7 @@ async fn manueller_austritt_nennt_die_notiz_nicht_im_etb() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -373,7 +373,7 @@ async fn manueller_austritt_nennt_die_notiz_nicht_im_etb() {
     let (s, austritt) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "austritt", "notiz": "an Hausarzt Dr. Geheim"})),
     )
@@ -405,7 +405,7 @@ async fn reservierte_person_belegt_loest_reservierung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
         &cookie,
         Some(&json!({"verfuegbarkeit": "reserviert", "reserviert_fuer_person_id": person})),
     )
@@ -415,7 +415,7 @@ async fn reservierte_person_belegt_loest_reservierung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs, "platz_id": platz})),
     )
@@ -447,7 +447,7 @@ async fn fremde_person_auf_reservierten_platz_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
         &cookie,
         Some(&json!({"verfuegbarkeit": "reserviert", "reserviert_fuer_person_id": p_res})),
     )
@@ -456,7 +456,7 @@ async fn fremde_person_auf_reservierten_platz_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{p_andere}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{p_andere}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs, "platz_id": platz})),
     )
@@ -475,7 +475,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/status"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/status"),
         &cookie,
         Some(&json!({"status": "betroffen"})),
     )
@@ -484,7 +484,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -494,7 +494,7 @@ async fn cross_modul_status_verstorben_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/status"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/status"),
         &cookie,
         Some(&json!({"status": "verstorben"})),
     )
@@ -526,7 +526,7 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/status"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/status"),
         &cookie,
         Some(&json!({"status": "betroffen"})),
     )
@@ -535,7 +535,7 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -544,7 +544,7 @@ async fn cross_modul_verbleib_transport_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/whereabouts"),
         &cookie,
         Some(&json!({"art": "transport", "ziel": "KH Mitte"})),
     )
@@ -570,7 +570,7 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/status"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/status"),
         &cookie,
         Some(&json!({"status": "betroffen"})),
     )
@@ -579,7 +579,7 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -588,7 +588,7 @@ async fn cross_modul_verbleib_notunterkunft_loest_auto_austritt_aus() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/whereabouts"),
         &cookie,
         Some(&json!({"art": "notunterkunft", "ziel": "Turnhalle Ost"})),
     )
@@ -621,7 +621,7 @@ async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/{platz}/availability"),
         &cookie,
         Some(&json!({"verfuegbarkeit": "reserviert", "reserviert_fuer_person_id": person})),
     )
@@ -631,7 +631,7 @@ async fn cross_modul_storno_loest_reservierung_auf_auch_ohne_belegung() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
+        &format!("/api/incidents/{einsatz}/persons/{person}"),
         &cookie,
         None,
     )
@@ -660,7 +660,7 @@ async fn etb_text_enthaelt_nur_pseudonym_keinen_namen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         &cookie,
         Some(&json!({"name": "Müller", "vorname": "Anna"})),
     )
@@ -670,7 +670,7 @@ async fn etb_text_enthaelt_nur_pseudonym_keinen_namen() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy"),
         &cookie,
         Some(&json!({"art": "eintritt", "uhs_id": uhs})),
     )
@@ -695,7 +695,7 @@ async fn material_verortung_schreibt_den_ortswechsel() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &cookie,
         Some(&json!({"adhoc": {"bezeichnung": "Wolldecke"}, "menge": 10})),
     )
@@ -707,7 +707,7 @@ async fn material_verortung_schreibt_den_ortswechsel() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &cookie,
         Some(&json!({"uhs_id": uhs})),
     )
@@ -746,7 +746,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     let (s, _) = anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{beob_id}"),
+        &format!("/api/incidents/{einsatz}/members/{beob_id}"),
         &admin_cookie,
         Some(&json!({"einsatz_rolle": "beobachter"})),
     )
@@ -757,7 +757,7 @@ async fn beobachter_kann_keine_uhs_anlegen() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &beob_cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -776,7 +776,7 @@ async fn fremder_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz_b}/uhs/{uhs_a}"),
+        &format!("/api/incidents/{einsatz_b}/uhs/{uhs_a}"),
         &cookie,
         None,
     )
@@ -803,7 +803,7 @@ async fn abgeschlossener_einsatz_blockt_schreibrouten() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         &cookie,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -823,7 +823,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -834,7 +834,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": 50.1, "lon": 8.6})),
     )
@@ -846,7 +846,7 @@ async fn verorten_setzt_lat_lon_und_liste_liefert_sie() {
     let (s, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         None,
     )
@@ -863,7 +863,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -872,7 +872,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": 50.1, "lon": 8.6})),
     )
@@ -881,7 +881,7 @@ async fn verorten_loeschen_setzt_beide_auf_null() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": null, "lon": null})),
     )
@@ -899,7 +899,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -908,7 +908,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     let (s, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         None,
     )
@@ -917,7 +917,7 @@ async fn patch_auf_storniertem_uhs_ist_409() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"bezeichnung": "BHP 99"})),
     )
@@ -939,7 +939,7 @@ async fn patch_auf_aufgeloester_uhs_ist_409() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 51"})),
     )
@@ -948,7 +948,7 @@ async fn patch_auf_aufgeloester_uhs_ist_409() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}/status"),
         &cookie,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -961,7 +961,7 @@ async fn patch_auf_aufgeloester_uhs_ist_409() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+            &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
             &cookie,
             Some(&body),
         )
@@ -976,7 +976,7 @@ async fn patch_auf_aufgeloester_uhs_ist_409() {
     let (_s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         None,
     )
@@ -993,7 +993,7 @@ async fn plaetze_bulk_legt_mehrere_mit_auto_namen_an() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/bulk"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/bulk"),
         &cookie,
         Some(&json!({"typ": "bett", "menge": 3})),
     )
@@ -1017,7 +1017,7 @@ async fn plaetze_bulk_unbekannter_typ_ist_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/bulk"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/bulk"),
         &cookie,
         Some(&json!({"typ": "zeltbett", "menge": 2})),
     )
@@ -1039,7 +1039,7 @@ async fn plaetze_bulk_menge_null_oder_zu_gross_ist_422() {
         let (s, _) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/seats/bulk"),
+            &format!("/api/incidents/{einsatz}/uhs/{uhs}/seats/bulk"),
             &cookie,
             Some(&json!({"typ": "bett", "menge": menge})),
         )
@@ -1060,7 +1060,7 @@ async fn verorten_nur_lat_ist_422() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -1069,7 +1069,7 @@ async fn verorten_nur_lat_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": 50.1})),
     )
@@ -1089,7 +1089,7 @@ async fn verorten_nur_lon_ist_422() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -1098,7 +1098,7 @@ async fn verorten_nur_lon_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lon": 8.6})),
     )
@@ -1118,7 +1118,7 @@ async fn verorten_ausserhalb_range_ist_422() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -1127,7 +1127,7 @@ async fn verorten_ausserhalb_range_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": 99.0, "lon": 8.6})),
     )
@@ -1143,7 +1143,7 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     let (_s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 50"})),
     )
@@ -1152,7 +1152,7 @@ async fn verorten_lon_ausserhalb_range_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs_id}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs_id}"),
         &cookie,
         Some(&json!({"lat": 50.0, "lon": 200.0})),
     )
@@ -1165,7 +1165,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, name:
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({"name": name})),
     )
@@ -1184,7 +1184,7 @@ async fn abschnitt_eines_fremden_einsatzes_ist_404() {
     let fremder_einsatz = einsatz_anlegen(&app, &cookie).await;
     let eigener = abschnitt_anlegen(&app, &cookie, einsatz, "Nord").await;
     let fremder = abschnitt_anlegen(&app, &cookie, fremder_einsatz, "Fremd").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs");
+    let pfad = format!("/api/incidents/{einsatz}/uhs");
 
     let (s, v) = anfrage_json(
         &app,
@@ -1242,7 +1242,7 @@ async fn austragen_zuruecknehmen() {
     let zelt = uhs_anlegen_und_aktivieren(&app, &cookie, einsatz, "Zelt Nord").await;
     let platz = platz_anlegen(&app, &cookie, einsatz, uhs, "Bett 3").await;
     let person = person_anlegen(&app, &cookie, einsatz, "{}").await;
-    let belegung = format!("/api/einsaetze/{einsatz}/persons/{person}/uhs-occupancy");
+    let belegung = format!("/api/incidents/{einsatz}/persons/{person}/uhs-occupancy");
     let (s, ein) = anfrage_json(
         &app,
         "POST",
@@ -1280,7 +1280,7 @@ async fn austragen_zuruecknehmen() {
     let (_, p) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
+        &format!("/api/incidents/{einsatz}/persons/{person}"),
         &cookie,
         None,
     )
@@ -1311,7 +1311,7 @@ async fn austragen_zuruecknehmen() {
     let (_, p) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
+        &format!("/api/incidents/{einsatz}/persons/{person}"),
         &cookie,
         None,
     )

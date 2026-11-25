@@ -43,6 +43,16 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   Sperrzweig von Kräfteübersicht, Fahrzeugen, FMS-Tableau, Bereitstellungsräumen und Ablösung
   (LLH-1462, `SPERR_SZENARIEN` in `e2e/kraefte-sperre-fixture.ts`): Vorbedingung je Seite ist
   der sichtbare Grund und keine 403 beim Laden.
+- **Warten auf einen Zustand, nie auf die Uhr; ein Wackler wird behoben oder gestrichen**
+  (LLH-2090): kein `waitForTimeout`, auf einen Zustand warten (`expect(…)`, `expect.poll`,
+  `toPass`). Ist das Abwarten selbst der Prüfgegenstand (Doppeltipp-Fenster, „bleibt stehen“),
+  steht der Grund an der Zeile: `// oxlint-disable-next-line lfh/e2e-wartezeit -- <Grund>`.
+  Riegel `lfh/e2e-wartezeit`, Bestand vom 24.11.2026 in `frontend/.oxlintrc.json`; die Liste
+  wird nur kürzer. Ein Test, der erst im Wiederholversuch grün wird, steht in der Zusammenfassung
+  des Jobs „e2e-Bericht“ (`scripts/e2e-wackler.mjs`). Wer ihn anfasst, sucht die Ursache; kein
+  zusätzlicher Wiederholversuch, keine Wartezeit, kein `test.skip`/`fixme`, um ihn grün zu
+  bekommen. Ist die Ursache nicht zu finden, wird der Test gestrichen und der Grund steht im
+  Commit, mit einer Aufgabe für die Lücke. `retries` in `playwright.config.ts` bleibt bei 1.
 - **e2e wartet nie auf `networkidle`** (LFH-385): der SSE-Strom der Einsatzrouten lässt das Netz
   nie ruhen (parallel rot, `--workers=1` grün). Gewartet wird auf einen Inhaltsanker; Riegel
   `lfh/e2e-riegel` für `e2e/**` (`frontend/lint/riegel-plugin.js`).
@@ -117,7 +127,7 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   LLH-1370, Lagemonitor LLH-1377): in Firefox wie sie sind, in Chromium mit dem Init-Skript `ohneWebgl2`
   (`e2e/kartenFixture.ts`), das `getContext('webgl2')` `null` liefern lässt.
 - **Wer eine Fremdänderung über den Live-Strom erwartet, wartet vorher auf `/live`** (LLH-1317):
-  der Server abonniert erst mit der Antwort auf `GET /api/einsaetze/<id>/live`, und die Seite
+  der Server abonniert erst mit der Antwort auf `GET /api/incidents/<id>/live`, und die Seite
   ruft beim Verbindungsaufbau nicht nach. Schreibt der „andere Schirm“ früher, bleibt das Banner
   unter Last aus (Gate 1, Sammelbanner 390 px). Je Seitenaufbau (`goto`, `reload`) eigens warten:
   `waitForResponse` vor dem Schritt anlegen, danach abwarten.

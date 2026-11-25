@@ -48,7 +48,7 @@ const BEDIENELEMENTE = 'button, textarea, input, [role="button"], [role="combobo
 
 async function oeffnenMitStrom(page: Page, pfad: string, einsatzId: number) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await page.goto(pfad);
   await strom;
@@ -65,7 +65,7 @@ async function fokusLoesen(page: Page) {
 /** Genug Einträge, dass das ETB weit über das Fenster rollt und die Erfassung am Fuß klebt. */
 async function etbFuellen(page: Page, einsatzId: number, anzahl = 25) {
   for (let i = 0; i < anzahl; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: {
         typ: 'meldung',
         inhalt: `Bandprobe ${i}: Lagemeldung aus dem Abschnitt, Pegel steigt weiter.`,
@@ -86,7 +86,7 @@ async function klebtAmFuss(page: Page, leiste: string) {
 }
 
 async function lagemeldung(zweiter: APIRequestContext, einsatzId: number, absender: string) {
-  const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
+  const r = await zweiter.post(`/api/incidents/${einsatzId}/reports`, {
     data: {
       absender,
       meldeweg: 'funk',
@@ -153,12 +153,12 @@ test('Eingangsband rückt über die ETB-Erfassung und die Aktionsleiste des Befe
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Band weicht aus ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
-  const befehl = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
+  const befehl = await page.request.post(`/api/incidents/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Einsatzbefehl Übung' },
   });
   expect(befehl.ok(), await befehl.text()).toBe(true);
@@ -315,7 +315,7 @@ async function verdeckungenSchwebend(page: Page) {
 
 /** Ein Eintrag eines fremden Erfassers: hochgerollt wartet er im Sammelbanner. */
 async function fremderEintrag(zweiter: APIRequestContext, einsatzId: number) {
-  const r = await zweiter.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const r = await zweiter.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', inhalt: 'Fremder Eintrag', von: 'ELW 2', an: 'Leitstelle' },
   });
   expect(r.ok(), `ETB zweiter Schirm: ${r.status()} ${await r.text()}`).toBe(true);
@@ -357,10 +357,10 @@ test('Eingangsband rückt im ETB auch über „Nach oben“ und das Sammelbanner
   test.setTimeout(150_000);
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Band schwebend ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
   // Mehr als im ersten Fall: hochgerollt soll noch mehr als eine Fensterhöhe darüber liegen.
   // Die Spaltenzeile ab `lg` ist niedrig (kwc2yszv: ≤ 36 px je einzeiligem Eintrag), deshalb 80.
@@ -482,14 +482,14 @@ test('Eingangsband rückt auf der Lagekarte über die Bänder des Kartenfußes, 
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Band Karte ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
   // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur ein Knopf (LLH-1936), und das
   // Band reichte nicht unter die Meldung.
-  const stand = await page.request.post(`/api/einsaetze/${einsatzId}/situation-snapshots`, {
+  const stand = await page.request.post(`/api/incidents/${einsatzId}/situation-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
   expect(stand.ok(), `POST lage-snapshots: ${stand.status()}`).toBe(true);

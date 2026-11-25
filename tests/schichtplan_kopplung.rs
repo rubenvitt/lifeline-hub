@@ -13,11 +13,11 @@ mod common;
 use common::*;
 
 fn abloesung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs")
+    format!("/api/incidents/{einsatz}/reliefs")
 }
 
 fn plan(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
+    format!("/api/incidents/{einsatz}/reliefs/shift-plan")
 }
 
 fn f(t: DateTime<Utc>) -> String {
@@ -131,7 +131,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Op
     let (s, p) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name}})),
     )
@@ -142,7 +142,7 @@ async fn adhoc(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: Op
         let (s, j) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{id}"),
+            &format!("/api/incidents/{e}/units/{einheit}/personnel/{id}"),
             cookie,
             None,
         )
@@ -157,7 +157,7 @@ async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> V
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         cookie,
         None,
     )
@@ -178,7 +178,7 @@ async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> V
 }
 
 async fn etb_mit(app: &axum::Router, cookie: &str, e: i64, nadel: &str) -> usize {
-    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (_, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     etb.as_array()
         .unwrap()
         .iter()
@@ -444,7 +444,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         None,
     )
@@ -460,7 +460,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personal"),
+        &format!("/api/incidents/{e}/module-overrides/personal"),
         &admin,
         Some(&override_personal(false)),
     )
@@ -482,7 +482,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personal"),
+        &format!("/api/incidents/{e}/module-overrides/personal"),
         &admin,
         Some(&override_personal(true)),
     )
@@ -499,7 +499,7 @@ async fn vollzug_aus_dem_plan_mit_bleibenden_und_uebernahme() {
     let (_, kraefte) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         &admin,
         None,
     )

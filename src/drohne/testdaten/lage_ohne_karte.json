@@ -1,0 +1,9 @@
+{
+  "api_version": 1,
+  "server_time_ms": 1700000010000,
+  "mission": { "id": 7, "name": "Übung Waldsuche", "location": null, "started_at_ms": 1700000000000, "section": "A1" },
+  "map_etag": "abcd1234abcd1234",
+  "aircraft": [],
+  "videos": [],
+  "photos_latest_ms": null
+}

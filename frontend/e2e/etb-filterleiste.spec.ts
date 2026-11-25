@@ -21,12 +21,12 @@ async function anmelden(page: Page, modus: 'light' | 'dark' = 'light') {
 }
 
 async function einsatzMitEintrag(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Filterleiste ${Date.now()}` },
   });
   expect(r.ok(), await r.text()).toBeTruthy();
   const { id } = (await r.json()) as { id: number };
-  const e = await page.request.post(`/api/einsaetze/${id}/etb`, {
+  const e = await page.request.post(`/api/incidents/${id}/etb`, {
     data: { typ: 'meldung', inhalt: 'Pegel steigt', von: 'ELW 1', an: 'Leitstelle' },
   });
   expect(e.ok(), await e.text()).toBeTruthy();
@@ -94,7 +94,7 @@ test('1440 × 900 kompakt, am Ende der Zeitachse: Kopf und Filterleiste kleben, 
   await anmelden(page);
   const id = await einsatzMitEintrag(page);
   for (let n = 1; n <= 40; n += 1) {
-    const e = await page.request.post(`/api/einsaetze/${id}/etb`, {
+    const e = await page.request.post(`/api/incidents/${id}/etb`, {
       data: { typ: 'meldung', inhalt: `Probe ${n}: Lage unverändert`, von: 'ELW 1', an: 'ILS' },
     });
     expect(e.ok(), await e.text()).toBeTruthy();

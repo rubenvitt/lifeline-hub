@@ -59,13 +59,13 @@ vi.mock('../anzeige/Kartenausschnitt', () => ({
 /** Einsatzkopf (Umgebung „Auf Karte wählen“), Ort-Zeile und Ortssuche der Ortsfelder (LLH-1121). */
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({ id: 1, einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/1/place-preview', () =>
+    http.get('/api/incidents/1/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/1/place-search', () =>
+    http.get('/api/incidents/1/place-search', () =>
       HttpResponse.json({
         zustand: 'ok',
         treffer: [
@@ -584,7 +584,7 @@ describe('BezirkAnlegenDialog', () => {
 
   it('Gebiet „Radius“ ohne verorteten Einsatzort: nur der Radius geht mit (LLH-1346)', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ id: 1, einsatzort_lat: null, einsatzort_lon: null }),
       ),
     );

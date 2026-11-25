@@ -32,7 +32,7 @@ Frontend relativ zu `frontend/src/`, im Backend relativ zu `src/`.
 | `frontend/e2e/AGENTS.md` | e2e-Suite |
 | `docs/architektur/AGENTS.md` | Architekturdokumentation (arc42): Kapitel, Mitänderungsregel, Entscheidungen (ADRs), ihre Nummern und Prüfungen |
 | `docs/anwender/AGENTS.md` | Anwenderdokumentation: Kapitelform, Bilder und Bildlauf, Wächter, Mitänderungsregel, Kapitelpakete, Hilfe in der App |
-| `src/AGENTS.md` | Statuscodes, Typ-Codegen, öffentliche API v1, Adapter (Geheimnisse, Abrufe), Ausgang an Menschen, Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, ETB live verteilen, Präsenz, Benachrichtigungen, iOS-Push, Demo-Daten, Aufbewahrung, ClamAV |
+| `src/AGENTS.md` | Statuscodes, Typ-Codegen, Property-Tests, öffentliche API v1, Adapter (Geheimnisse, Abrufe), Ausgang an Menschen, Anhänge, Schutzköpfe, Instanzkopplung, Admin-Schreibwege am Einsatz, Org-Ereignisse, ETB live verteilen, Präsenz, Benachrichtigungen, iOS-Push, Demo-Daten, Aufbewahrung, ClamAV |
 | `migrations/AGENTS.md` | Migrationsvergabe (Nummern, Autofix, Stau-Wächter), Tabellenumbau und `-- no-transaction` |
 | `src-tauri/AGENTS.md` | Desktop-Hülle |
 | `ios/AGENTS.md` | iOS-Hülle: keine Anwendungslogik, Logik im Kern, Brücke nur für den aktiven Server, gemeinsame Fälle, Push über APNs, Bauen nur auf macOS |

@@ -36,6 +36,10 @@ pub struct TestArt {
     pub uebernahme_scheitert: Arc<AtomicBool>,
     /// SQL, das während des nächsten Abrufs läuft (ein Admin ändert inzwischen etwas).
     pub waehrenddessen: Mutex<Option<(sqlx::SqlitePool, String)>>,
+    /// Die Art gibt sich als flüchtig aus (`AdapterArt::fluechtig`).
+    pub fluechtig: AtomicBool,
+    /// Wie lange ein Abruf dauert (Millisekunden), damit Beginn und Ende auseinanderliegen.
+    pub verzoegerung_ms: std::sync::atomic::AtomicU64,
 }
 
 /// Übernahme der Test-Art: zählt nur, oder scheitert auf Wunsch.
@@ -124,6 +128,9 @@ impl AdapterArt for TestArt {
     fn intervall_vorschlag_s(&self) -> i64 {
         60
     }
+    fn fluechtig(&self) -> bool {
+        self.fluechtig.load(Ordering::SeqCst)
+    }
     fn abrufen<'a>(
         &'a self,
         kontext: &'a AbrufKontext<'a>,
@@ -141,6 +148,10 @@ impl AdapterArt for TestArt {
                     .execute(&pool)
                     .await
                     .unwrap();
+            }
+            let warte = self.verzoegerung_ms.load(Ordering::SeqCst);
+            if warte > 0 {
+                tokio::time::sleep(std::time::Duration::from_millis(warte)).await;
             }
             let ergebnis = self.skript.lock().unwrap().pop_front().unwrap_or(Ok(1));
             ergebnis.map(|n| {

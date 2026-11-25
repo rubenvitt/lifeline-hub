@@ -64,9 +64,9 @@ function render(
 ) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
     // Aktives und herausgenommenes Material teilen den Pfad (LLH-1079 Teil II, `?entlassene=1`).
-    http.get('/api/einsaetze/1/material', ({ request }) =>
+    http.get('/api/incidents/1/material', ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.has('entlassene') ? entlasseneDaten : materialListe,
       ),
@@ -74,10 +74,10 @@ function render(
     http.get('/api/material', () => HttpResponse.json([])),
     // Die Spalte „Ort“ löst Namen über Einheiten und UHS auf. Ohne diese Handler fiele ihre Query
     // auf `isError` (`onUnhandledFrame: 'error'`), und der Ort hieße nur „zugeordnet“.
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json(orte.einheiten ?? EINHEITEN)),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
-    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json(orte.fahrzeuge ?? FAHRZEUGE)),
-    http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json(orte.br ?? BR)),
+    http.get('/api/incidents/1/units', () => HttpResponse.json(orte.einheiten ?? EINHEITEN)),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json(UHS)),
+    http.get('/api/incidents/1/vehicles', () => HttpResponse.json(orte.fahrzeuge ?? FAHRZEUGE)),
+    http.get('/api/incidents/1/staging-areas', () => HttpResponse.json(orte.br ?? BR)),
   );
   return renderMitProviders(
     <>
@@ -288,7 +288,7 @@ describe('MaterialPage', () => {
       freigeben = resolve;
     });
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async () => {
+      http.patch('/api/incidents/1/material/10', async () => {
         await gate;
         return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });
       }),
@@ -320,7 +320,7 @@ describe('MaterialPage', () => {
       refetchFreigeben = resolve;
     });
     server.use(
-      http.get('/api/einsaetze/1/material', async () => {
+      http.get('/api/incidents/1/material', async () => {
         await refetchGate;
         return HttpResponse.json([{ ...em, bezeichnung: 'Extern geändert' }, zweitesMaterial]);
       }),
@@ -439,7 +439,7 @@ describe('MaterialPage', () => {
   it('Einheiten stehen in der Folge des Kräftebaums: der Rang der Abschnitte, nicht die Anlage (D3/D4)', async () => {
     // Staffel B (Abschnitt B) ist zuerst angelegt; Abschnitt A steht im Baum vor B.
     server.use(
-      http.get('/api/einsaetze/1/sectors', () =>
+      http.get('/api/incidents/1/sectors', () =>
         HttpResponse.json([
           { id: 32, name: 'Abschnitt A', ueber_abschnitt_id: null },
           { id: 31, name: 'Abschnitt B', ueber_abschnitt_id: null },
@@ -489,12 +489,12 @@ describe('MaterialPage', () => {
 
   it('ein Einsatzwechsel nimmt die Wahl der Gruppierung nicht mit', async () => {
     server.use(
-      http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
-      http.get('/api/einsaetze/2/material', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/units', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/staging-areas', () => HttpResponse.json([])),
+      http.get('/api/incidents/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+      http.get('/api/incidents/2/material', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/staging-areas', () => HttpResponse.json([])),
     );
     render(einsatzAktiv, [em]);
     await screen.findByText('Wolldecke');
@@ -687,16 +687,16 @@ describe('MaterialPage', () => {
     const aufrufe: string[] = [];
     let body: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/material/10/stand-down', () => {
+      http.post('/api/incidents/1/material/10/stand-down', () => {
         aufrufe.push('entlassen');
         return herausnehmenAntwort();
       }),
-      http.post('/api/einsaetze/1/material/10/stand-down/undo', async ({ request }) => {
+      http.post('/api/incidents/1/material/10/stand-down/undo', async ({ request }) => {
         aufrufe.push('zuruecknehmen');
         body = await request.json();
         return HttpResponse.json({ material: em, ausgelassen: [] });
       }),
-      http.post('/api/einsaetze/1/material/10/reactivate', () => {
+      http.post('/api/incidents/1/material/10/reactivate', () => {
         aufrufe.push('reaktivieren');
         return HttpResponse.json(em);
       }),
@@ -715,8 +715,8 @@ describe('MaterialPage', () => {
 
   it('nennt im Seitenhinweis den Ort, den die Rücknahme ausgelassen hat (LLH-1923)', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/stand-down', () => herausnehmenAntwort()),
-      http.post('/api/einsaetze/1/material/10/stand-down/undo', () =>
+      http.post('/api/incidents/1/material/10/stand-down', () => herausnehmenAntwort()),
+      http.post('/api/incidents/1/material/10/stand-down/undo', () =>
         HttpResponse.json({
           material: em,
           ausgelassen: [{ bezeichnung: 'Einheit «Staffel A»', grund: 'inzwischen aufgelöst' }],
@@ -737,8 +737,8 @@ describe('MaterialPage', () => {
   /** Rückgängig aus dem Toast hat keine Zeile mehr: der Grund steht im Seitenhinweis. */
   it('scheitert Rückgängig, steht der Grund im Seitenhinweis', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/stand-down', () => herausnehmenAntwort()),
-      http.post('/api/einsaetze/1/material/10/stand-down/undo', () =>
+      http.post('/api/incidents/1/material/10/stand-down', () => herausnehmenAntwort()),
+      http.post('/api/incidents/1/material/10/stand-down/undo', () =>
         HttpResponse.json(
           { error: 'Die Herausnahme lässt sich nicht mehr zurücknehmen' },
           { status: 409 },
@@ -760,7 +760,7 @@ describe('MaterialPage', () => {
   it('Stornieren fragt im Dialog nach, die Ablehnung steht an der Zeile', async () => {
     let gesendet = 0;
     server.use(
-      http.post('/api/einsaetze/1/material/10/annul', () => {
+      http.post('/api/incidents/1/material/10/annul', () => {
         gesendet += 1;
         return HttpResponse.json(
           {
@@ -795,7 +795,7 @@ describe('MaterialPage', () => {
   it('zeigt herausgenommenes Material eingeklappt und disponiert es erneut', async () => {
     let reaktiviert: number | null = null;
     server.use(
-      http.post('/api/einsaetze/1/material/:em/reactivate', ({ params }) => {
+      http.post('/api/incidents/1/material/:em/reactivate', ({ params }) => {
         reaktiviert = Number(params.em);
         return HttpResponse.json(em);
       }),
@@ -832,11 +832,11 @@ describe('MaterialPage', () => {
 describe('MaterialPage · Datenzustände', () => {
   const gruenerBoden = () => [
     meHandler(admin),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+    http.get('/api/incidents/1/material', () => HttpResponse.json([])),
     http.get('/api/material', () => HttpResponse.json([])),
     // Die Spalte „Ort“ löst Namen über Einheiten und UHS auf.
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
   ];
 
   function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
@@ -851,13 +851,13 @@ describe('MaterialPage · Datenzustände', () => {
   }
 
   it('gescheiterter Einsatz: der Seitenrahmen bietet den erneuten Abruf an', async () => {
-    zeige(http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/1', () => new HttpResponse(null, { status: 500 })));
     expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
   it('gescheiterte Dispositionsliste: Fehler statt Leertext', async () => {
-    zeige(http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/1/material', () => new HttpResponse(null, { status: 500 })));
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch kein Material disponiert')).not.toBeInTheDocument();
   });
@@ -874,11 +874,11 @@ describe('MaterialPage · Datenzustände', () => {
    * Aktualisierung; die Zeilen müssen stehen bleiben.
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
-    const { client } = zeige(http.get('/api/einsaetze/1/material', () => HttpResponse.json([em])));
+    const { client } = zeige(http.get('/api/incidents/1/material', () => HttpResponse.json([em])));
     await screen.findByText('Wolldecke');
 
     server.use(
-      http.get('/api/einsaetze/1/material', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/material', () => new HttpResponse(null, { status: 500 })),
     );
     await client.refetchQueries({ queryKey: einsatzKeys.material(1) });
 
@@ -986,7 +986,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1010,7 +1010,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1044,7 +1044,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1069,7 +1069,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1093,7 +1093,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1115,7 +1115,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const gesendet: unknown[] = [];
     const dialog = await openAdhoc();
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1132,7 +1132,7 @@ describe('MaterialPage · Ad-hoc-Schnellerfassung', () => {
     const dialog = await openAdhoc();
     const treffer: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         treffer.push(await request.json());
         return HttpResponse.json({ ...em, id: 99, ist_adhoc: true });
       }),
@@ -1180,10 +1180,10 @@ describe('MaterialPage · Demo-Marke', () => {
   function zeige(ems: unknown[], pool: ReturnType<typeof stamm>[]) {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/material', () => HttpResponse.json(ems)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/material', () => HttpResponse.json(ems)),
       http.get('/api/material', () => HttpResponse.json(pool)),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <Routes>
@@ -1196,7 +1196,7 @@ describe('MaterialPage · Demo-Marke', () => {
   it('Auswahl: echtes Material vorn, die Gruppe „Demo-Daten“ dahinter, Demo wählbar', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 30, material_id: 2, ist_demo: true });
       }),
@@ -1274,14 +1274,14 @@ describe('MaterialPage · Disponieren im Dialog (LFH-983)', () => {
     const gesendet: unknown[] = [];
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/material', () => HttpResponse.json(ems)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/material', () => HttpResponse.json(ems)),
       http.get('/api/material', () => HttpResponse.json(pool)),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json(UHS)),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json(EINHEITEN)),
-      http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/material', async ({ request }) => {
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json(UHS)),
+      http.get('/api/incidents/1/units', () => HttpResponse.json(EINHEITEN)),
+      http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/material', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, id: 40 });
       }),
@@ -1498,7 +1498,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Ausgeben“: der Dialog nimmt die Menge, die Zeile zeigt den Rest, der Toast nennt sie (LLH-1225 D5)', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, ausgegeben: 20 });
       }),
@@ -1512,7 +1512,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       'Danach 30 von 50 übrig',
     );
     server.use(
-      http.get('/api/einsaetze/1/material', () => HttpResponse.json([{ ...em, ausgegeben: 20 }])),
+      http.get('/api/incidents/1/material', () => HttpResponse.json([{ ...em, ausgegeben: 20 }])),
     );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ausgeben' }));
     await waitFor(() => expect(gesendet).toEqual([{ ausgegeben: 20 }]));
@@ -1524,7 +1524,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Ausgabe zurücknehmen …“ sendet den Stand minus n', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, ausgegeben: 15 });
       }),
@@ -1545,7 +1545,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Menge ändern …“ sendet die neue Gesamtmenge erst mit „Speichern“', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...em, menge: 80 });
       }),
@@ -1583,13 +1583,13 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   it('Ort: Fahrzeug und Bereitstellungsraum stehen mit Namen, ohne Ort heißt „ohne Ort“', async () => {
     server.use(
-      http.get('/api/einsaetze/1/vehicles', () =>
+      http.get('/api/incidents/1/vehicles', () =>
         HttpResponse.json([{ id: 4, funkrufname: 'Florian 1/83-1' }]),
       ),
-      http.get('/api/einsaetze/1/staging-areas', () =>
+      http.get('/api/incidents/1/staging-areas', () =>
         HttpResponse.json([{ id: 6, bezeichnung: 'BR Nord' }]),
       ),
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           einheiten: { sichtbar: true, zugriff: false },
@@ -1612,16 +1612,16 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     await waitFor(() => expect(ort(11)).toHaveTextContent(/^BR Nord$/));
     expect(ort(12)).toHaveTextContent(/^ohne Ort$/);
     // Gesperrte Ortsarten erzeugen keinen Abruf (D3), die freien je einen.
-    expect(abrufe('/api/einsaetze/1/units')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/uhs')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/vehicles')).toBeGreaterThan(0);
-    expect(abrufe('/api/einsaetze/1/staging-areas')).toBeGreaterThan(0);
+    expect(abrufe('/api/incidents/1/units')).toBe(0);
+    expect(abrufe('/api/incidents/1/sectors')).toBe(0);
+    expect(abrufe('/api/incidents/1/uhs')).toBe(0);
+    expect(abrufe('/api/incidents/1/vehicles')).toBeGreaterThan(0);
+    expect(abrufe('/api/incidents/1/staging-areas')).toBeGreaterThan(0);
   });
 
   it('Ort: ohne Zugriff auf Fahrzeuge und Bereitstellungsräume kein Abruf, auch mit Posten dort', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           fahrzeuge: { sichtbar: true, zugriff: false },
@@ -1639,22 +1639,22 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       within(container.querySelector(`[data-row-key="${id}"]`) as HTMLElement).getByTestId(
         'material-ort',
       );
-    await waitFor(() => expect(abrufe('/api/einsaetze/1/units')).toBeGreaterThan(0));
-    expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0);
+    await waitFor(() => expect(abrufe('/api/incidents/1/units')).toBeGreaterThan(0));
+    expect(abrufe('/api/incidents/1/uhs')).toBeGreaterThan(0);
     expect(ort(10)).toHaveTextContent(/zugeordnet/);
     expect(ort(11)).toHaveTextContent(/zugeordnet/);
-    expect(abrufe('/api/einsaetze/1/vehicles')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/staging-areas')).toBe(0);
+    expect(abrufe('/api/incidents/1/vehicles')).toBe(0);
+    expect(abrufe('/api/incidents/1/staging-areas')).toBe(0);
   });
 
   it('Ort: Umhängen geht in EINER Anfrage über die Disposition, nie über die Einheiten (LLH-1225 D2)', async () => {
     const aufrufe: unknown[] = [];
     server.use(
-      http.put('/api/einsaetze/1/units/:eid/material/10', () => {
+      http.put('/api/incidents/1/units/:eid/material/10', () => {
         aufrufe.push('PUT Einheit');
         return new HttpResponse(null, { status: 204 });
       }),
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         aufrufe.push(await request.json());
         return HttpResponse.json(em);
       }),
@@ -1682,7 +1682,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const aufrufe: unknown[] = [];
     let stand = { ...em, einheit_id: 1 as number | null };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         aufrufe.push(await request.json());
         return HttpResponse.json({ error: 'veraltet', grund: 'veraltet' }, { status: 409 });
       }),
@@ -1694,7 +1694,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     );
     // Ein anderer Arbeitsplatz hängt den Posten inzwischen an Staffel B.
     stand = { ...stand, einheit_id: 2 };
-    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([stand])));
+    server.use(http.get('/api/incidents/1/material', () => HttpResponse.json([stand])));
     await waehle('Ort zu Wolldecke', 'UHS Turnhalle');
     await userEvent.click(screen.getByRole('button', { name: 'Ort zu Wolldecke speichern' }));
     const dialog = await screen.findByRole('dialog');
@@ -1709,7 +1709,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('Ort: „ohne Ort“ löst über das Feld des bisherigen Orts', async () => {
     const aufrufe: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         aufrufe.push(await request.json());
         return HttpResponse.json(em);
       }),
@@ -1735,7 +1735,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
 
   it('Ort: ohne Zugriff auf Einheiten steht „zugeordnet“; die Angabe bleibt bedienbar, ohne Einheiten', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json({
           ...freigabenFixture(),
           einheiten: { sichtbar: true, zugriff: false },
@@ -1748,9 +1748,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const zeile = container.querySelector('[data-row-key="10"]') as HTMLElement;
     const knopf = await within(zeile).findByRole('button', { name: 'Ort zu Wolldecke bearbeiten' });
     await waitFor(() => expect(knopf).toHaveTextContent(/^zugeordnet$/));
-    await waitFor(() => expect(abrufe('/api/einsaetze/1/uhs')).toBeGreaterThan(0));
-    expect(abrufe('/api/einsaetze/1/units')).toBe(0);
-    expect(abrufe('/api/einsaetze/1/sectors')).toBe(0);
+    await waitFor(() => expect(abrufe('/api/incidents/1/uhs')).toBeGreaterThan(0));
+    expect(abrufe('/api/incidents/1/units')).toBe(0);
+    expect(abrufe('/api/incidents/1/sectors')).toBe(0);
     await userEvent.click(knopf);
     await oeffne('Ort zu Wolldecke');
     const gruppen = [
@@ -1908,9 +1908,9 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     ];
     const decke = { ...em, id: 12, material_id: 5, is_bestandsdoppel: false };
     server.use(
-      http.post('/api/einsaetze/1/material/11/stand-down', () => {
+      http.post('/api/incidents/1/material/11/stand-down', () => {
         server.use(
-          http.get('/api/einsaetze/1/material', ({ request }) =>
+          http.get('/api/incidents/1/material', ({ request }) =>
             HttpResponse.json(
               new URL(request.url).searchParams.has('entlassene')
                 ? []
@@ -1955,7 +1955,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       is_bestandsdoppel: true,
     };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...posten, art: 'geraet', menge: 1, is_bestandsdoppel: false });
       }),
@@ -2034,7 +2034,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const gesendet: unknown[] = [];
     const adhoc = { ...em, ist_adhoc: true, material_id: null, bezeichnung: 'Feldbeten' };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...adhoc, bezeichnung: 'Feldbetten' });
       }),
@@ -2069,7 +2069,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       menge: 1,
     };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ ...adhoc, art: 'verbrauchsgut' });
       }),
@@ -2088,7 +2088,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
       'Stornieren',
     ]);
     server.use(
-      http.get('/api/einsaetze/1/material', () =>
+      http.get('/api/incidents/1/material', () =>
         HttpResponse.json([{ ...adhoc, art: 'verbrauchsgut' }]),
       ),
     );
@@ -2107,7 +2107,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('eine Ablehnung des Artwechsels steht an der Zeile', async () => {
     const adhoc = { ...em, ist_adhoc: true, material_id: null, art: 'geraet', menge: 1 };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', () =>
+      http.patch('/api/incidents/1/material/10', () =>
         HttpResponse.json({ error: 'Art passt nicht zum Status' }, { status: 422 }),
       ),
     );
@@ -2124,7 +2124,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Aufteilen“ schickt die abgeteilte Menge an den eigenen Weg', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/10/split', async ({ request }) => {
+      http.post('/api/incidents/1/material/10/split', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([
           { ...em, menge: 30 },
@@ -2146,7 +2146,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Aufteilen“ bringt 20 von 50 in einem Schritt an die UHS (t1hvaqzu, design.md D5)', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/10/split', async ({ request }) => {
+      http.post('/api/incidents/1/material/10/split', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json([
           { ...em, einheit_id: 1, menge: 30 },
@@ -2189,7 +2189,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
    */
   it('„Aufteilen“ bleibt offen, wenn die Zeile live entfällt, und trägt die 409', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material/10/split', () =>
+      http.post('/api/incidents/1/material/10/split', () =>
         HttpResponse.json({ error: 'Material ist nicht mehr im Einsatz' }, { status: 409 }),
       ),
     );
@@ -2198,7 +2198,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const menue = await openZeilenmenue('Wolldecke');
     await userEvent.click(within(menue).getByRole('menuitem', { name: 'Aufteilen …' }));
     const dialog = await screen.findByRole('dialog');
-    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/material', () => HttpResponse.json([])));
     act(() => {
       client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), []);
     });
@@ -2214,7 +2214,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
   it('„Angaben ändern“ bleibt offen, wenn die Zeile live entfällt, und trägt die 409', async () => {
     const adhoc = { ...em, ist_adhoc: true, material_id: null, bezeichnung: 'Feldbeten' };
     server.use(
-      http.patch('/api/einsaetze/1/material/10', () =>
+      http.patch('/api/incidents/1/material/10', () =>
         HttpResponse.json({ error: 'Material ist nicht mehr im Einsatz' }, { status: 409 }),
       ),
     );
@@ -2225,7 +2225,7 @@ describe('MaterialPage · Materialliste (LLH-1093)', () => {
     const dialog = await screen.findByRole('dialog');
     const feld = within(dialog).getByLabelText('Bezeichnung');
     await waitFor(() => expect(feld).toHaveValue('Feldbeten'));
-    server.use(http.get('/api/einsaetze/1/material', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/material', () => HttpResponse.json([])));
     act(() => {
       client.setQueryData<(typeof em)[]>(einsatzKeys.material(1), []);
     });
@@ -2265,7 +2265,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
   function nachforderungen(antwort: () => Response): () => number {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/resource-requests', () => {
+      http.get('/api/incidents/1/resource-requests', () => {
         abrufe += 1;
         return antwort();
       }),
@@ -2334,7 +2334,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
 
   it('ohne Freigabe für Nachforderungen: „aus Nachforderung #4“ ohne Link, kein Abruf', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );
@@ -2361,11 +2361,11 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
     nachforderungen(() => HttpResponse.json([nachforderung]));
     const aufrufe: unknown[] = [];
     server.use(
-      http.delete('/api/einsaetze/1/material/21/resource-request', () => {
+      http.delete('/api/incidents/1/material/21/resource-request', () => {
         aufrufe.push('loesen');
         return HttpResponse.json({ ...uebernommen, nachforderung_id: null });
       }),
-      http.post('/api/einsaetze/1/material/21/resource-request', async ({ request }) => {
+      http.post('/api/incidents/1/material/21/resource-request', async ({ request }) => {
         aufrufe.push(await request.json());
         return HttpResponse.json(uebernommen);
       }),
@@ -2388,7 +2388,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
   it('eine Ablehnung des Lösens steht an der Zeile', async () => {
     nachforderungen(() => HttpResponse.json([nachforderung]));
     server.use(
-      http.delete('/api/einsaetze/1/material/21/resource-request', () =>
+      http.delete('/api/incidents/1/material/21/resource-request', () =>
         HttpResponse.json(
           { error: 'Das Material ist aus dem Einsatz genommen; erst erneut disponieren' },
           { status: 409 },
@@ -2407,7 +2407,7 @@ describe('MaterialPage · Herkunft aus einer Nachforderung (LLH-1226 D11)', () =
 
   it('„Von Nachforderung lösen“ fehlt ohne Bezug und ohne Freigabe für Nachforderungen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );
@@ -2527,12 +2527,12 @@ describe('MaterialPage · Rückfrage bei geänderter Inline-Angabe (LLH-1468)', 
   /** Einsatz 2 als Ziel des Routenwechsels. */
   function zielEinsatz2() {
     server.use(
-      http.get('/api/einsaetze/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
-      http.get('/api/einsaetze/2/material', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/units', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/uhs', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/vehicles', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/2/staging-areas', () => HttpResponse.json([])),
+      http.get('/api/incidents/2', () => HttpResponse.json({ ...einsatzAktiv, id: 2 })),
+      http.get('/api/incidents/2/material', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents/2/staging-areas', () => HttpResponse.json([])),
     );
   }
 

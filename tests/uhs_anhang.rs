@@ -1,5 +1,5 @@
 //! Integrationstests der UHS-Anhänge (LFH-758, Spec `uhs-anhaenge`): je Spec-Szenario ein Test
-//! über die Routen `/api/einsaetze/{id}/uhs/{uid}/attachments…` — Ablegen, Allowlist und Größe,
+//! über die Routen `/api/incidents/{id}/uhs/{uid}/attachments…` — Ablegen, Allowlist und Größe,
 //! Rechte über das Modul Unfallhilfsstellen, Zugehörigkeit zu Einsatz und UHS, Lebenszyklus,
 //! Entfernen, Download mit ETag, pseudonyme ETB-Spur, Live-Verteilung und das Lese-Audit samt
 //! Einsicht für die Einsatzleitung.
@@ -19,7 +19,7 @@ use common::*;
 const ADMIN_PW: &str = "startpw12";
 
 fn pfad(einsatz: i64, uhs: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/uhs/{uhs}/attachments")
+    format!("/api/incidents/{einsatz}/uhs/{uhs}/attachments")
 }
 
 /// Multipart-POST mit beliebig vielen Datei-Feldern `datei` (auch keinem).
@@ -148,7 +148,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (_, l) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         None,
     )
@@ -157,7 +157,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&format!(
             r#"{{"typ":"behandlungsplatz","bezeichnung":"BHP {}","standort":"Turnhalle Nord"}}"#,
@@ -218,7 +218,7 @@ async fn override_uhs(app: &axum::Router, admin: &str, einsatz: i64, body: &str)
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/unfallhilfsstellen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/unfallhilfsstellen"),
         admin,
         Some(body),
     )
@@ -230,7 +230,7 @@ async fn einsatz_abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         admin,
         None,
     )
@@ -529,7 +529,7 @@ async fn stornierte_uhs_ist_409_beim_schreiben_und_bleibt_lesbar() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         &admin,
         None,
     )
@@ -568,7 +568,7 @@ async fn aktive_und_aufgeloeste_uhs_nehmen_dateien_an() {
         let (s, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/uhs/{u1}/status"),
+            &format!("/api/incidents/{einsatz}/uhs/{u1}/status"),
             &admin,
             Some(&format!(r#"{{"status":"{status}"}}"#)),
         )
@@ -880,7 +880,7 @@ async fn abgewiesene_downloads_protokollieren_nichts() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/attachments/{aid}"),
+        &format!("/api/incidents/{einsatz}/attachments/{aid}"),
         &admin,
         None,
     )

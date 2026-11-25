@@ -21,6 +21,7 @@ import { einsatzEinstellungenPfad } from '../../routing/deeplinks';
 import type { EnergieAnlagenart, FachebeneQuelle } from '../../api/fachebenen';
 import GeoKennzahlen from '../../components/GeoKennzahlen';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
+import { useOnline } from '../../offline/useOnline';
 import {
   capSchwereVon,
   dwdStufeAusSeverity,
@@ -40,6 +41,8 @@ import { luftqualitaetDarstellung } from './luftqualitaetStil';
 import { odlDarstellung, odlGrundlage } from './odlStil';
 import KartenDetailCard from './KartenDetailCard';
 import FachebeneStand from './FachebeneStand';
+import { dauer } from '../../anzeige/dauer';
+import { drohnenFotoVorschauPfad } from '../../api/drohne';
 import { zeitpunkt } from '../../anzeige/zeitDarstellung';
 import { Status } from '../../components/instrument/Status';
 import { Marke } from '../../components/instrument/Marke';
@@ -57,6 +60,8 @@ interface FachebenenInspectorProps {
    * Einsatz-Schreibrecht der Lagekarte (im Snapshot-Modus `false`).
    */
   pegelBezug?: { einsatzId: number; darfSchreiben: boolean };
+  /** Einsatz der Lagekarte; die Vorschau eines Drohnenfotos kommt über dessen Route (LLH-2108). */
+  einsatzId?: number;
   /**
    * Abrufzeitpunkt der Ebene durch den Server (LFH-591). Steht neben den Zeitangaben der Quelle
    * am Objekt, ersetzt sie nicht: eine Meldeklasse kann frisch gemessen und trotzdem vor zwei
@@ -124,6 +129,45 @@ const WARNQUELLE_RUECKFALL: Record<'nina' | 'dwd', string> = {
   dwd: 'Deutscher Wetterdienst',
 };
 
+/**
+ * Vollmeldung einer NINA-Warnung bei warnung.bund.de (LLH-2103). Die Ebene trägt nur einen Auszug;
+ * Echtheit, Beschreibung und Handlungsanweisung stehen dort (MoWaS-Auflage,
+ * `docs/fachebenen-quellen.md`). `/meldungen/<id>/` ist die Form, die die NINA-Seite selbst
+ * verlinkt. Der Link geht ans Internet, nicht an den Server: ohne Netz gesperrt mit Grund.
+ */
+function ninaVollmeldungUrl(id: string): string {
+  return `https://warnung.bund.de/meldungen/${encodeURIComponent(id)}/`;
+}
+
+function NinaVollmeldung({ id }: { id: string }) {
+  const { token } = theme.useToken();
+  const online = useOnline();
+  return (
+    <div style={{ marginTop: token.marginSM }}>
+      {online ? (
+        <Button
+          type="link"
+          href={ninaVollmeldungUrl(id)}
+          target="_blank"
+          rel="noreferrer noopener"
+          style={{ paddingInline: 0 }}
+        >
+          Vollmeldung bei warnung.bund.de
+        </Button>
+      ) : (
+        <>
+          <Button type="link" disabled style={{ paddingInline: 0 }}>
+            Vollmeldung bei warnung.bund.de
+          </Button>
+          <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+            Ohne Netz nicht abrufbar
+          </Textstufe>
+        </>
+      )}
+    </div>
+  );
+}
+
 function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina' | 'dwd' }) {
   const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
@@ -142,6 +186,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
   const quelle = pick(p, 'SENDERNAME') ?? WARNQUELLE_RUECKFALL[ebene];
   const beschreibung = pick(p, 'DESCRIPTION', 'description');
   const hinweis = pick(p, 'INSTRUCTION', 'instruction');
+  const ninaId = ebene === 'nina' ? s(p.id) : null;
 
   return (
     <>
@@ -197,6 +242,7 @@ function WarnungInhalt({ p, ebene }: { p: Record<string, unknown>; ebene: 'nina'
           </Stapel>
         </div>
       )}
+      {ninaId && <NinaVollmeldung id={ninaId} />}
     </>
   );
 }
@@ -578,6 +624,65 @@ function WebcamStandbild({ bild, titel }: { bild: string; titel: string | null }
   );
 }
 
+const LINSE: Record<string, string> = {
+  thermal: 'Wärmebild',
+  wide: 'Weitwinkel',
+  zoom: 'Zoom',
+  visible: 'Sichtbild',
+};
+
+/**
+ * Vorschau eines Drohnenfotos vom Backend-Proxy, nach `WebcamStandbild`: ohne Fehlerzustand ein
+ * nacktes `<img>`, bei einem Fehler der Grund statt eines kaputten Bildsymbols.
+ */
+function DrohnenFotoVorschau({ src }: { src: string }) {
+  const { token } = theme.useToken();
+  const [fehler, setFehler] = useState(false);
+  if (fehler) {
+    return (
+      <div style={{ marginBottom: token.marginSM }}>
+        <Textstufe als="p" stufe="textKlein" ton="gedaempft">
+          Vorschau nicht abrufbar
+        </Textstufe>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt="Drohnenfoto"
+      onError={() => setFehler(true)}
+      style={{
+        width: '100%',
+        display: 'block',
+        marginBottom: token.marginXS,
+        borderRadius: token.borderRadius,
+      }}
+    />
+  );
+}
+
+function DrohnenFotoInhalt({ p, einsatzId }: { p: Record<string, unknown>; einsatzId?: number }) {
+  const fmtZeit = useFmtZeit();
+  const key = s(p.key);
+  const src = key && einsatzId != null ? drohnenFotoVorschauPfad(einsatzId, key) : null;
+  const linse = LINSE[s(p.lens) ?? ''] ?? 'unbekannte Linse';
+  const aufnahme =
+    typeof p.taken_at_ms === 'number' ? fmtZeit(new Date(p.taken_at_ms).toISOString()) : null;
+  const blick = typeof p.heading_deg === 'number' ? `${Math.round(p.heading_deg)}°` : null;
+  return (
+    <>
+      {/* Der `key` bindet den Fehlerzustand an die URL — jedes andere Foto beginnt frisch. */}
+      {src && <DrohnenFotoVorschau key={src} src={src} />}
+      <Descriptions column={1}>
+        <Descriptions.Item label="Linse">{linse}</Descriptions.Item>
+        {aufnahme && <Descriptions.Item label="Aufnahme">{aufnahme}</Descriptions.Item>}
+        {blick && <Descriptions.Item label="Blickrichtung">{blick}</Descriptions.Item>}
+      </Descriptions>
+    </>
+  );
+}
+
 const ANLAGENART: Record<EnergieAnlagenart, string> = {
   kohle: 'Kohle',
   gas: 'Gas',
@@ -667,6 +772,22 @@ function EnergieInhalt({ p }: { p: Record<string, unknown> }) {
   );
 }
 
+/** Wire-Wörter der Verkehrsmeldung (`art`, LLH-1637) → Anzeige. */
+const MELDUNGSART: Record<string, string> = {
+  stau: 'Stau',
+  zaehfliessend: 'Zähfließend',
+  stillstand: 'Stillstand',
+};
+
+/** Kopfzeile einer Verkehrsmeldung: Art und Reisezeitverlust, was davon da ist. */
+function meldungsKopf(p: Record<string, unknown>): string | undefined {
+  const art = MELDUNGSART[s(p.art) ?? ''];
+  const minuten = typeof p.verzoegerung_min === 'number' ? p.verzoegerung_min : 0;
+  const teile = [art, minuten > 0 ? `+${dauer(minuten)} Reisezeitverlust` : undefined];
+  const kopf = teile.filter(Boolean).join(' · ');
+  return kopf || undefined;
+}
+
 function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
   const fmtZeit = useFmtZeit();
   const { token } = theme.useToken();
@@ -679,6 +800,11 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
     <>
       {kategorie && (
         <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel(kategorie)}</Marke>
+      )}
+      {kategorie === 'verkehrsmeldung' && meldungsKopf(p) && (
+        <Typography.Paragraph strong style={{ marginBottom: token.marginSM }}>
+          {meldungsKopf(p)}
+        </Typography.Paragraph>
       )}
       {/* Der `key` bindet den Fehlerzustand an die URL — jeder Kamerawechsel beginnt frisch. */}
       {bild && <WebcamStandbild key={bild} bild={bild} titel={titel} />}
@@ -721,6 +847,54 @@ function AutobahnInhalt({ p }: { p: Record<string, unknown> }) {
             Livebild beim Betreiber öffnen
           </Button>
         </div>
+      )}
+    </>
+  );
+}
+
+/** Stellplatzzahl oder „k. A.“; die Quelle führt sie nur als Text, nicht bei jeder Anlage. */
+function stellplaetze(v: unknown): string {
+  return typeof v === 'number' ? String(v) : 'k. A.';
+}
+
+/** Lkw-Parkplätze an Bundesautobahnen (LLH-1637). Die Quelle liefert keine Belegung. */
+function RastanlageInhalt({ p }: { p: Record<string, unknown> }) {
+  const { token } = theme.useToken();
+  const ausstattung = Array.isArray(p.ausstattung)
+    ? p.ausstattung.filter((a): a is string => typeof a === 'string' && a.trim() !== '')
+    : [];
+  const beschreibung = s(p.beschreibung);
+  return (
+    <>
+      <Marke style={{ marginBottom: token.marginSM }}>{kategorieLabel('rastanlage')}</Marke>
+      <Descriptions column={1}>
+        {s(p.strasse) && <Descriptions.Item label="Autobahn">{s(p.strasse)}</Descriptions.Item>}
+        {s(p.abschnitt) && (
+          <Descriptions.Item label="Abschnitt">{s(p.abschnitt)}</Descriptions.Item>
+        )}
+        <Descriptions.Item label="Stellplätze">
+          {`Pkw ${stellplaetze(p.pkw_stellplaetze)} · Lkw ${stellplaetze(p.lkw_stellplaetze)}`}
+        </Descriptions.Item>
+      </Descriptions>
+      {ausstattung.length > 0 && (
+        <ul
+          style={{
+            marginTop: token.marginSM,
+            marginBottom: 0,
+            paddingInlineStart: token.paddingLG,
+          }}
+        >
+          {ausstattung.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      )}
+      {beschreibung && (
+        <Typography.Paragraph
+          style={{ marginTop: token.marginSM, marginBottom: 0, whiteSpace: 'pre-line' }}
+        >
+          {beschreibung}
+        </Typography.Paragraph>
       )}
     </>
   );
@@ -775,12 +949,14 @@ function CopernicusInhalt({ p }: { p: Record<string, unknown> }) {
       <div style={{ marginBottom: token.marginSM }}>
         <Status darstellung={copernicusDarstellung(p.klasse)} />
       </div>
-      {isCopernicusAufnahmeAlt(aufnahme, jetzt) && (
+      {isCopernicusAufnahmeAlt(aufnahme ?? s(p.geliefert), jetzt) && (
         <div
           data-lfh="copernicus-aufnahme-alt"
           style={{ marginBottom: token.marginSM, color: rollen.achtungText }}
         >
-          <span aria-hidden="true">⧖ </span>Aufnahme älter als 24 h
+          {/* Altbestand (LLH-2022): ohne Aufnahmezeit zählt die Lieferung. */}
+          <span aria-hidden="true">⧖ </span>
+          {aufnahme ? 'Aufnahme' : 'Lieferung'} älter als 24 h
         </div>
       )}
       <Descriptions column={1}>
@@ -830,6 +1006,7 @@ export default function FachebenenInspector({
   geometrie,
   onSchliessen,
   pegelBezug,
+  einsatzId,
   abgerufen,
 }: FachebenenInspectorProps) {
   const { token } = theme.useToken();
@@ -879,10 +1056,14 @@ export default function FachebenenInspector({
         <OdlInhalt p={p} />
       ) : quelle === 'autobahn' ? (
         <AutobahnInhalt p={p} />
+      ) : quelle === 'autobahn_parken' ? (
+        <RastanlageInhalt p={p} />
       ) : quelle === 'luftqualitaet' ? (
         <LuftqualitaetInhalt p={p} />
       ) : quelle === 'copernicus' ? (
         <CopernicusInhalt p={p} />
+      ) : quelle === 'drohne' ? (
+        <DrohnenFotoInhalt p={p} einsatzId={einsatzId} />
       ) : quelle === 'energie' ? (
         // Vor dem Rückfall: jede unbekannte Quelle fiele sonst still in den KRITIS-Inhalt.
         <EnergieInhalt p={p} />

@@ -87,8 +87,8 @@ async function senden(page: Page, methode: 'post' | 'patch', pfad: string, data:
 /** Einsatz mit Einsatzort über die API. Kein Modulname im Namen: die Kommandopalette durchsucht
  *  Module und Einsätze gemeinsam. */
 async function einsatzMitOrt(page: Page, bezeichnung: string): Promise<number> {
-  const e = await senden(page, 'post', '/api/einsaetze', { bezeichnung });
-  await senden(page, 'patch', `/api/einsaetze/${e.id}`, {
+  const e = await senden(page, 'post', '/api/incidents', { bezeichnung });
+  await senden(page, 'patch', `/api/incidents/${e.id}`, {
     bezeichnung: e.bezeichnung,
     stichwort: e.stichwort ?? null,
     einsatzart: e.einsatzart,
@@ -203,7 +203,7 @@ test('Wechsel zwischen zwei Online-Vektorkarten: neue Grundlage gelesen, Lagebil
 
   await anmelden(page, { startseite: false });
   const eid = await einsatzMitOrt(page, `E2E Grundlagewechsel ${Date.now()}`);
-  const basis = `/api/einsaetze/${eid}`;
+  const basis = `/api/incidents/${eid}`;
   await senden(page, 'post', `${basis}/zones`, {
     typ: 'absperrbereich',
     geometrie_typ: 'Polygon',

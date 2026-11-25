@@ -16,17 +16,17 @@ export type KraftArt = 'einheit' | 'person';
 
 function kraftPfad(einsatzId: number, art: KraftArt, id: number): string {
   const segment = art === 'einheit' ? 'units' : 'personnel';
-  return `/api/einsaetze/${einsatzId}/${segment}/${id}/timeline`;
+  return `/api/incidents/${einsatzId}/${segment}/${id}/timeline`;
 }
 
 /** Perioden je Einheit (nur Einheiten mit Ereignissen) — Spalte „Im Einsatz" im Meldebild. */
 export function listeEinheitenPerioden(einsatzId: number): Promise<EinheitPerioden[]> {
-  return apiGet<EinheitPerioden[]>(`/api/einsaetze/${einsatzId}/units/timeline`);
+  return apiGet<EinheitPerioden[]>(`/api/incidents/${einsatzId}/units/timeline`);
 }
 
 /** Perioden je Person (nur Personen mit Ereignissen) — Personal-Seite. */
 export function listePersonalPerioden(einsatzId: number): Promise<PersonPerioden[]> {
-  return apiGet<PersonPerioden[]>(`/api/einsaetze/${einsatzId}/personnel/timeline`);
+  return apiGet<PersonPerioden[]>(`/api/incidents/${einsatzId}/personnel/timeline`);
 }
 
 /**
@@ -38,7 +38,7 @@ export function ladeZeitachseGrenzwerte(
   modul: 'einheiten' | 'personal',
 ): Promise<SchichtplanGrenzwerte> {
   const segment = modul === 'einheiten' ? 'units' : 'personnel';
-  return apiGet<SchichtplanGrenzwerte>(`/api/einsaetze/${einsatzId}/${segment}/timeline/limits`);
+  return apiGet<SchichtplanGrenzwerte>(`/api/incidents/${einsatzId}/${segment}/timeline/limits`);
 }
 
 export function ladeZeitachse(einsatzId: number, art: KraftArt, id: number): Promise<Zeitachse> {

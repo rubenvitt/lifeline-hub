@@ -538,16 +538,18 @@ pub async fn load_faellige(pool: &SqlitePool, jetzt: &str) -> Result<Vec<Adapter
     .await
 }
 
-/// Ein erfolgreicher Abruf: Störung vorbei, nächster nach dem Intervall.
+/// Ein erfolgreicher Abruf: Störung vorbei, nächster nach dem Intervall. `ab` ist der Zeitpunkt,
+/// ab dem das Intervall zählt: das Ende des Laufs, bei flüchtigen Arten sein Beginn.
 pub async fn save_erfolg(
     conn: &mut SqliteConnection,
     a: &Adapter,
     anzahl: i64,
     jetzt: &str,
+    ab: &str,
 ) -> Result<(), sqlx::Error> {
-    let naechster = crate::zeit::parse(jetzt)
+    let naechster = crate::zeit::parse(ab)
         .map(|t| crate::zeit::formatiere(t + chrono::Duration::seconds(a.intervall_s)))
-        .unwrap_or_else(|| jetzt.to_string());
+        .unwrap_or_else(|| ab.to_string());
     sqlx::query(
         "UPDATE adapter SET fehler_seit = NULL, fehlversuche = 0, letzter_erfolg_at = ?, \
                 letzte_anzahl = ?, naechster_abruf_at = ? \

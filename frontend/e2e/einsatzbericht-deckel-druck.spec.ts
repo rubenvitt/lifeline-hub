@@ -49,11 +49,11 @@ test('Einsatzbericht: Deckel hält Titel, Kopf und erste Zeile einer langen Tabe
   browserName,
 }) => {
   await anmelden(page);
-  const { id: einsatzId } = await sende(page, '/api/einsaetze', {
+  const { id: einsatzId } = await sende(page, '/api/incidents', {
     bezeichnung: `E2E Einsatzbericht Deckel ${Date.now()}`,
   });
   for (let i = 1; i <= KOEPFE; i++) {
-    await sende(page, `/api/einsaetze/${einsatzId}/personnel`, {
+    await sende(page, `/api/incidents/${einsatzId}/personnel`, {
       adhoc: { name: `Kraft ${String(i).padStart(2, '0')}` },
     });
   }

@@ -14,16 +14,16 @@ import { anmeldenAlsAdmin } from './rollen-kern';
  */
 
 async function einsatzMitSchaeden(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Ortspfad ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   const einsatzId = String(((await r.json()) as { id: number }).id);
   for (const s of [
     { ausmass: 'gering', ort: 'Bachstraße 1' },
     { ausmass: 'gross', ort: 'Deichweg 2' },
   ]) {
-    const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+    const a = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
       data: { typ: 'sachschaden', ...s },
     });
     expect(a.ok(), `POST schaeden: ${a.status()} ${await a.text()}`).toBe(true);
@@ -62,7 +62,7 @@ test.describe('Ortspfad der Detailseite', () => {
   test('führt direkt geöffnet auf die Liste mit ihrer Vorgabe', async ({ page }) => {
     await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
-    const liste = await page.request.get(`/api/einsaetze/${einsatzId}/damages`);
+    const liste = await page.request.get(`/api/incidents/${einsatzId}/damages`);
     const [erster] = (await liste.json()) as { id: number }[];
 
     await page.goto(`/einsaetze/${einsatzId}/schaeden/${erster.id}`);
@@ -82,7 +82,7 @@ test.describe('Ortspfad der Detailseite', () => {
     await anmeldenAlsAdmin(page, { startseite: false });
     const einsatzId = await einsatzMitSchaeden(page);
     for (let i = 0; i < 40; i++) {
-      const a = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+      const a = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
         data: { typ: 'sachschaden', ausmass: 'gross', ort: `Uferweg ${i + 10}` },
       });
       expect(a.ok(), `POST schaeden: ${a.status()}`).toBe(true);

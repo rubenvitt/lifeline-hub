@@ -27,7 +27,7 @@ const uhs = {
 describe('BewegungenTab (LFH-25)', () => {
   it('verlinkt die Person der Belegung auf ihre Detailseite', async () => {
     server.use(
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([{ id: 10, registrier_nr: 7, name: 'Müller' }]),
       ),
     );
@@ -37,7 +37,7 @@ describe('BewegungenTab (LFH-25)', () => {
   });
 
   it('zeigt #id ohne Link, wenn die Person nicht geladen ist (bewusster Fallback)', async () => {
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
     /**
      * Auf die Personenzelle verengt: über der Sicht steht eine Werkzeugzeile, ein dokumentweites
@@ -51,7 +51,7 @@ describe('BewegungenTab (LFH-25)', () => {
   // Zeiten laufen Mono mit `tabular-nums`; umhüllt wird an der Aufrufstelle, weil `ZeitAnzeige` ein
   // Fragment rendert.
   it('setzt die Zeit in die Zahlenschrift', async () => {
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([])));
     renderMitProviders(<BewegungenTab uhs={uhs} />, { route: '/einsaetze/1/unfallhilfsstellen/3' });
     const zeit = await screen.findByText(/jun26$/);
     expect(zeit.style.fontFamily).toContain('JetBrains Mono');
@@ -59,7 +59,7 @@ describe('BewegungenTab (LFH-25)', () => {
   });
 
   it('nennt die Rücknahme eines Austritts „Austragen zurückgenommen“ (LLH-1924)', async () => {
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([])));
     const mitRuecknahme = {
       ...uhs,
       belegungen: [
@@ -134,7 +134,7 @@ const DREI_PERSONEN = [
 
 /** Rendert die Drei-Zeilen-Fixture und wartet, bis die Personen aufgelöst SIND. */
 async function rendereDrei() {
-  server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json(DREI_PERSONEN)));
+  server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json(DREI_PERSONEN)));
   const gerendert = renderMitProviders(<BewegungenTab uhs={uhsDreiZeilen} />, {
     route: '/einsaetze/1/unfallhilfsstellen/3',
   });
@@ -169,7 +169,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
     // `setzeViewportBreite` vor dem Render: antds Beobachter liest `matches` nur beim Abonnieren.
     setzeViewportBreite(390);
     server.use(
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([{ id: 10, registrier_nr: 7, name: 'Müller' }]),
       ),
     );
@@ -185,7 +185,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
   it('am Fükw-Schirm steht die Tabelle im Baum (Gegenprobe)', async () => {
     // 1024 = VIEWPORT_STANDARD, bewusst nicht gesetzt — das belegt den Default.
     server.use(
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([{ id: 10, registrier_nr: 7, name: 'Müller' }]),
       ),
     );
@@ -256,7 +256,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('findet eine nicht aufgelöste Person unter ihrem angezeigten #id', async () => {
     // Gesucht wird, was angezeigt wird: `render` und `suchText` teilen `personEtikett`.
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([])));
     const { container } = renderMitProviders(<BewegungenTab uhs={uhs} />, {
       route: '/einsaetze/1/unfallhilfsstellen/3',
     });
@@ -286,7 +286,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
      */
     setzeViewportBreite(390);
     server.use(
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([{ id: 10, registrier_nr: 7, name: 'Müller' }]),
       ),
     );
@@ -308,7 +308,7 @@ describe('BewegungenTab · Datensicht (LFH-330)', () => {
 
   it('die Werkzeugzeile steht auch ohne Daten im Baum', async () => {
     // Eine Zeile, die erst mit der ersten Bewegung erschiene, verschöbe Inhalt (CLS ≤ 0,1).
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([])));
     const uhsOhneBewegungen = { ...uhs, belegungen: [] } as unknown as UhsDetail;
     renderMitProviders(<BewegungenTab uhs={uhsOhneBewegungen} />, {
       route: '/einsaetze/1/unfallhilfsstellen/3',

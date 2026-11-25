@@ -239,7 +239,7 @@ const GESPERRT_SPRUNG = 'Entscheidungen, springt zu ETB · Entscheidung';
 
 async function modulSperren(page: Page, einsatzId: string, modulKey: string) {
   const antwort = await page.request.put(
-    `/api/einsaetze/${einsatzId}/module-overrides/${modulKey}`,
+    `/api/incidents/${einsatzId}/module-overrides/${modulKey}`,
     { data: { sichtbar: true, benoetigte_rolle: 'admin' } },
   );
   // Ein still gescheitertes Seeding führte zurück in den ungesperrten Zustand.

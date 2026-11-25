@@ -141,7 +141,7 @@ describe('HilfePage', () => {
           org_id: 1,
         }),
       ),
-      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+      http.get('/api/incidents', () => HttpResponse.json(einsaetze)),
     );
   }
   const aktiv = { id: 5, bezeichnung: 'Starkregen Nord', status: 'aktiv' };
@@ -361,7 +361,13 @@ describe('HilfePage — Rückmeldung und Lizenzen (LLH-1642)', () => {
   for (const wort of ['F/UF/M', 'SK', 'Glossar', 'EA 1']) {
     it(`die Suche nach „${wort}“ findet „Zeiten und Kürzel“`, async () => {
       zeige('/hilfe');
-      await userEvent.type(screen.getByRole('searchbox', { name: 'Kapitel durchsuchen' }), wort);
+      // Der Begriff kommt in einem Zug wie beim Einfügen, nicht Zeichen für Zeichen: jeder
+      // Zwischenstand („E“ passt auf fast jedes Kapitel) startete die Mappe mit bis zu 1 MB
+      // Markdown im Hintergrund neu (LLH-2087), und vier Durchläufe rissen in der CI die 10 s.
+      // Geprüft wird die Suche, nicht das Tippen.
+      const feld = screen.getByRole('searchbox', { name: 'Kapitel durchsuchen' });
+      await userEvent.click(feld);
+      await userEvent.paste(wort);
       expect(
         (await screen.findAllByRole('link', { name: 'Zeiten und Kürzel' })).length,
       ).toBeGreaterThan(0);

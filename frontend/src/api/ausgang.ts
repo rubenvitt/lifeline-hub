@@ -54,13 +54,13 @@ export function versandFehler(fehler: unknown): unknown {
 
 export function fetchVersaende(einsatzId: number, quelle: QuelleFilter): Promise<Versand[]> {
   return apiGet<Versand[]>(
-    `/api/einsaetze/${einsatzId}/deliveries?source_kind=${quelle.kind}&source_id=${quelle.id}`,
+    `/api/incidents/${einsatzId}/deliveries?source_kind=${quelle.kind}&source_id=${quelle.id}`,
   );
 }
 
 /** Alle Versände einer Quellart im Einsatz: ein Abruf für ein ganzes Board. */
 export function fetchVersaendeArt(einsatzId: number, kind: QuelleArt): Promise<Versand[]> {
-  return apiGet<Versand[]>(`/api/einsaetze/${einsatzId}/deliveries?source_kind=${kind}`);
+  return apiGet<Versand[]>(`/api/incidents/${einsatzId}/deliveries?source_kind=${kind}`);
 }
 
 export function createVersaende(
@@ -69,14 +69,14 @@ export function createVersaende(
   body: SendenAnfrage,
 ): Promise<Versand[]> {
   return apiSend<Versand[]>(
-    `/api/einsaetze/${einsatzId}/${QUELLE_SEGMENT[quelle.kind]}/${quelle.id}/deliveries`,
+    `/api/incidents/${einsatzId}/${QUELLE_SEGMENT[quelle.kind]}/${quelle.id}/deliveries`,
     'POST',
     body,
   );
 }
 
 export function retryVersand(einsatzId: number, versandId: string): Promise<Versand> {
-  return apiSend<Versand>(`/api/einsaetze/${einsatzId}/deliveries/${versandId}/retry`, 'POST');
+  return apiSend<Versand>(`/api/incidents/${einsatzId}/deliveries/${versandId}/retry`, 'POST');
 }
 
 /**

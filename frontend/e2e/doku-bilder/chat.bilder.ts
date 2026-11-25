@@ -34,7 +34,7 @@ test.describe(KAPITEL, () => {
   test('Chat eines Einsatzes', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}`;
+    const basis = `/api/incidents/${demo.id}`;
 
     // Zweite Person im Einsatz: Führungspersonal, schreibt über die API.
     const eva = { benutzername: 'e.beispiel', passwort: 'doku-passwort-123' };

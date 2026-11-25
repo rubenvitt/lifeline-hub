@@ -573,9 +573,11 @@ export type FachebeneTon =
   | 'luftqualitaet'
   | 'odl'
   | 'autobahn'
+  | 'autobahn_parken'
   | 'kritis'
   | 'energie'
-  | 'copernicus';
+  | 'copernicus'
+  | 'drohne';
 
 export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   nina: '#cf1322',
@@ -586,12 +588,17 @@ export const fachebeneFarbenHell: Record<FachebeneTon, string> = {
   luftqualitaet: '#5b6b82',
   odl: '#7cb305',
   autobahn: '#c41d7f',
+  // LLH-1637: Rastanlagen derselben Quelle; ruhiges Grau-Blau, weit weg vom BAB-Magenta und vom
+  // Schiefer der Luftqualität.
+  autobahn_parken: '#3f6e8c',
   kritis: '#531dab',
   // Gelb liegt nah am DWD-Gold, ist aber unterscheidbar und war die letzte freie Tonlücke (LFH-81).
   energie: '#d4b106',
   // Braun (LLH-1200): die Satellitenauswertung färbt je Klasse, der Ton ist nur Rückfall und
   // Panel-Quadrat. Weit genug von DWD-Gold und Energie-Gelb (ΔE ≥ 31).
   copernicus: '#873800',
+  // Orange (LLH-2106): die Drohnenlage. Bisher frei geblieben; ΔE ≥ 27 zu jedem Ton am Tag.
+  drohne: '#f5590f',
 };
 
 export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
@@ -602,9 +609,12 @@ export const fachebeneFarbenDunkel: Record<FachebeneTon, string> = {
   luftqualitaet: '#8c9bb3',
   odl: '#a0d911',
   autobahn: '#f759ab',
+  autobahn_parken: '#7fb0cf',
   kritis: '#9254de',
   energie: '#fadb14',
   copernicus: '#c48a5a',
+  // Nachts etwas heller, damit ΔE ≥ 25 zu jedem Ton und ≥ 3 : 1 auf dem Leistengrund halten.
+  drohne: '#ff8c5a',
 };
 
 /**

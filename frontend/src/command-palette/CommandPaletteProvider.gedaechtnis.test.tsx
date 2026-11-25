@@ -23,7 +23,7 @@ beforeEach(() => {
   puts = [];
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze', () => HttpResponse.json([])),
+    http.get('/api/incidents', () => HttpResponse.json([])),
     http.put('/api/user-settings/:schluessel', async ({ params, request }) => {
       const body = (await request.json()) as { wert: string };
       puts.push({ schluessel: String(params.schluessel), wert: body.wert });

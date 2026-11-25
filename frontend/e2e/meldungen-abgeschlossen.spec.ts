@@ -13,14 +13,14 @@ const ERLEDIGT = 105;
 async function einsatzMitErledigten(
   page: Page,
 ): Promise<{ einsatzId: string; aeltesteId: number }> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Meldungen blättern ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBe(true);
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBe(true);
   const einsatzId = String(((await r.json()) as { id: number }).id);
   const ids: number[] = [];
   for (let i = 0; i < ERLEDIGT; i += 1) {
-    const angelegt = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+    const angelegt = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
       data: {
         absender: 'Florian Nord 1',
         meldeweg: 'funk',
@@ -30,14 +30,14 @@ async function einsatzMitErledigten(
     });
     expect(angelegt.ok(), `Meldung ${i}: ${angelegt.status()}`).toBe(true);
     const { id } = (await angelegt.json()) as { id: number };
-    const erledigt = await page.request.post(`/api/einsaetze/${einsatzId}/reports/${id}/status`, {
+    const erledigt = await page.request.post(`/api/incidents/${einsatzId}/reports/${id}/status`, {
       data: { status: 'erledigt' },
     });
     expect(erledigt.ok(), `Status ${i}: ${erledigt.status()}`).toBe(true);
     ids.push(id);
   }
   // Eine offene daneben: die Vorgabeansicht hat Inhalt.
-  const offen = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+  const offen = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
     data: {
       absender: 'RTW 2',
       meldeweg: 'funk',

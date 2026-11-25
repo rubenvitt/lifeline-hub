@@ -102,7 +102,7 @@ async fn shape_mit_peilung_und_ortsname_null() {
     // Anfrage 0.1° südlich des Einsatzorts → Peilung Richtung Norden.
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
+        &format!("/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -137,7 +137,7 @@ async fn ohne_marker_ist_peilung_null() {
     .unwrap();
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
+        &format!("/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -156,7 +156,7 @@ async fn exclude_schliesst_einsatzort_aus() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     // Einsatzort ausschließen → kein weiterer Marker → peilung null.
     let uri =
-        format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
+        format!("/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0&exclude=einsatzort:{eid}");
     let (s, v) = get(&app, &uri, &cookie).await;
     assert_eq!(s, StatusCode::OK);
     // LFH-265: ABSENT statt present-null (contains_key, sonst blind — s. o.).
@@ -181,7 +181,7 @@ async fn nicht_mitglied_wird_abgewiesen() {
     let gast = login_cookie(&app, "gast", "gastpw12").await;
     let (s, _v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
+        &format!("/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0"),
         &gast,
     )
     .await;
@@ -201,7 +201,7 @@ async fn ohne_login_ist_401() {
             Request::builder()
                 .method("GET")
                 .uri(format!(
-                    "/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"
+                    "/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0"
                 ))
                 .body(Body::empty())
                 .unwrap(),
@@ -224,7 +224,7 @@ async fn ortsname_aus_cache_ohne_netz() {
 
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=50.9&lon=10.0"),
+        &format!("/api/incidents/{eid}/place-preview?lat=50.9&lon=10.0"),
         &cookie,
     )
     .await;
@@ -241,7 +241,7 @@ async fn out_of_range_koordinate_ist_400() {
     // lat=999 liegt außerhalb des gültigen Bereichs (-90..=90) → Handler gibt 400 zurück.
     let (s, _v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=999&lon=10.0"),
+        &format!("/api/incidents/{eid}/place-preview?lat=999&lon=10.0"),
         &cookie,
     )
     .await;
@@ -386,7 +386,7 @@ async fn ortsname_aus_dem_adressindex_der_offline_karte() {
     let eid = einsatz_mit_einsatzort(&pool).await;
     let (s, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=52.6201&lon=13.78"),
+        &format!("/api/incidents/{eid}/place-preview?lat=52.6201&lon=13.78"),
         &cookie,
     )
     .await;
@@ -399,7 +399,7 @@ async fn ortsname_aus_dem_adressindex_der_offline_karte() {
     // Fern jeder Adresse im Index: kein Ortsname (Geocoder unerreichbar).
     let (_, v) = get(
         &app,
-        &format!("/api/einsaetze/{eid}/place-preview?lat=52.70&lon=13.70"),
+        &format!("/api/incidents/{eid}/place-preview?lat=52.70&lon=13.70"),
         &cookie,
     )
     .await;

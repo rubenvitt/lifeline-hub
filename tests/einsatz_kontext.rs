@@ -1,5 +1,5 @@
 //! End-to-end-Contract des `EinsatzKontext`-Extractors (LFH-121) über eine MIGRIERTE
-//! Route (`GET /api/einsaetze/{id}/reports`):
+//! Route (`GET /api/incidents/{id}/reports`):
 //! - Der Org-Isolations-Floor sperrt eine org-fremde Führungskraft ohne Mitgliedschaft
 //!   strukturell VOR dem Handler-Gate (LFH-115-Regression-Lock).
 //! - Unbekannter Einsatz → 404 (Extractor `einsatz_repo::laden`).
@@ -57,7 +57,7 @@ async fn org_floor_sperrt_fremde_org_fuehrungskraft_ueber_migrierte_route() {
 
     let status = status_von(
         &app,
-        &format!("/api/einsaetze/{fremd_einsatz}/reports"),
+        &format!("/api/incidents/{fremd_einsatz}/reports"),
         Some(&frieda),
     )
     .await;
@@ -72,13 +72,13 @@ async fn org_floor_sperrt_fremde_org_fuehrungskraft_ueber_migrierte_route() {
 async fn extractor_unbekannter_einsatz_ist_404() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
-    let status = status_von(&app, "/api/einsaetze/999999/reports", Some(&admin)).await;
+    let status = status_von(&app, "/api/incidents/999999/reports", Some(&admin)).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn extractor_ohne_session_ist_401() {
     let (app, _pool) = setup_mit_pool().await;
-    let status = status_von(&app, "/api/einsaetze/1/reports", None).await;
+    let status = status_von(&app, "/api/incidents/1/reports", None).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }

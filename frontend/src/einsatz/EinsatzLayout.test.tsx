@@ -110,8 +110,8 @@ function setup(
 ) {
   server.use(
     meHandler(aktuellerBenutzer),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () =>
       fehler.einsatzVerweigert
         ? HttpResponse.json(
             { error: 'Keine Berechtigung', grund: 'kein_mitglied' },
@@ -121,10 +121,10 @@ function setup(
           ? new HttpResponse(null, { status: 500 })
           : HttpResponse.json(einsatz),
     ),
-    http.get('/api/einsaetze/7/module-access', () =>
+    http.get('/api/incidents/7/module-access', () =>
       fehler.freigaben ? new HttpResponse(null, { status: 500 }) : HttpResponse.json(freigaben),
     ),
-    http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
+    http.get('/api/incidents/7/settings', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>
@@ -155,9 +155,9 @@ function setup(
 function setupRoute(route: string, childPath: string) {
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents/7/settings', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>
@@ -175,7 +175,7 @@ describe('EinsatzLayout', () => {
   /**
    * LFH-438: eine verbogene Einsatz-ID (Hand-URL, kaputtes Lesezeichen) führt auf die Einsatzliste,
    * wie die Detailseiten unter `pages/`. Vorher entstand `NaN` und damit Abrufe gegen
-   * `/api/einsaetze/NaN`; die Anfrage-Sonde belegt, dass der Rahmen gar nicht erst abruft.
+   * `/api/incidents/NaN`; die Anfrage-Sonde belegt, dass der Rahmen gar nicht erst abruft.
    */
   it.each(['abc', '0', '-3', '1.5'])(
     'leitet bei ungültiger Einsatz-ID „%s“ auf die Einsatzliste um, ohne abzurufen',
@@ -202,7 +202,7 @@ describe('EinsatzLayout', () => {
         expect(await screen.findByText('Einsatzliste')).toBeInTheDocument();
         expect(pfad()).toBe('/einsaetze');
         expect(screen.queryByText('ETB-Inhalt')).not.toBeInTheDocument();
-        expect(anfragen.filter((a) => a.startsWith('/api/einsaetze/'))).toEqual([]);
+        expect(anfragen.filter((a) => a.startsWith('/api/incidents/'))).toEqual([]);
       } finally {
         server.events.removeListener('request:start', sonde);
       }
@@ -325,7 +325,7 @@ describe('EinsatzLayout', () => {
     setup();
     await waitFor(() => expect(screen.getByText('ETB-Inhalt')).toBeInTheDocument());
     expect(urls).toHaveLength(1);
-    expect(urls[0]).toBe('/api/einsaetze/7/live');
+    expect(urls[0]).toBe('/api/incidents/7/live');
   });
 
   /**
@@ -497,11 +497,11 @@ describe('EinsatzLayout', () => {
     setzeViewportBreite(1440);
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () =>
         HttpResponse.json({ ...einsatz, meine_sachgebiete: ['s4'], meine_funktion: 'S2/S3' }),
       ),
-      http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
+      http.get('/api/incidents/7/settings', () => HttpResponse.json({})),
     );
     renderMitProviders(
       <CommandPaletteProvider>
@@ -580,7 +580,7 @@ describe('EinsatzLayout', () => {
   // Review LLH-1726: Lädt der Einsatz lange (Wiederholungen), führt sonst nichts aus dem Kopf.
   it('zeigt die Suchzelle nach einer Sekunde auch dann, wenn der Einsatz noch lädt', async () => {
     setup();
-    server.use(http.get('/api/einsaetze/7', () => new Promise<never>(() => {})));
+    server.use(http.get('/api/incidents/7', () => new Promise<never>(() => {})));
     const zelle = await waitFor(() => {
       const el = document.querySelector<HTMLElement>('[data-lfh="kopf-suche"]');
       expect(el).not.toBeNull();
@@ -595,7 +595,7 @@ describe('EinsatzLayout', () => {
     const geladen = new Promise<void>((r) => (freigeben = r));
     setup();
     server.use(
-      http.get('/api/einsaetze/7', async () => {
+      http.get('/api/incidents/7', async () => {
         await geladen;
         return HttpResponse.json(einsatz);
       }),
@@ -1189,10 +1189,10 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     server.use(
       ...weitere,
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/settings', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/7/hazard-areas', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/settings', () => HttpResponse.json({})),
+      http.get('/api/incidents/7/hazard-areas', () =>
         HttpResponse.json([
           { id: 1, einsatz_id: 7, hoechste_warnstufe: stufe, label: 'Deich', zonen_ids: [] },
         ]),
@@ -1234,7 +1234,7 @@ describe('Warnsperre des Helligkeitsreglers (LFH-397)', () => {
     const um = (ms: number) => new Date(Date.now() + ms).toISOString();
     mitWarnstufe(
       'keine',
-      http.get('/api/einsaetze/7/weather', () =>
+      http.get('/api/incidents/7/weather', () =>
         HttpResponse.json({
           warnungen: {
             zustand: 'ok',
@@ -1277,14 +1277,14 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
     const meinEinsatz = { ...einsatz, meine_rolle: rolle };
     server.use(
       meHandler(benutzer),
-      http.get('/api/einsaetze', () => HttpResponse.json([meinEinsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(meinEinsatz)),
-      http.get('/api/einsaetze/7/module-access', async () => {
+      http.get('/api/incidents', () => HttpResponse.json([meinEinsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(meinEinsatz)),
+      http.get('/api/incidents/7/module-access', async () => {
         if (freigaben === 'laden') await new Promise(() => {});
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
         return HttpResponse.json(freigaben);
       }),
-      http.get('/api/einsaetze/7/settings', () => HttpResponse.json(einstellungen)),
+      http.get('/api/incidents/7/settings', () => HttpResponse.json(einstellungen)),
     );
     return renderMitProviders(
       <CommandPaletteProvider>
@@ -1377,7 +1377,7 @@ describe('EinsatzLayout · Modulwächter (LFH-888)', () => {
       zugewiesen_at: '2026-11-19 08:00:00',
     });
     server.use(
-      http.get('/api/einsaetze/7/members', () =>
+      http.get('/api/incidents/7/members', () =>
         HttpResponse.json([
           mitglied('Anna Muster', 'einsatzleitung', 1),
           mitglied('Fritz Fuehrung', 'fuehrungspersonal', 2),
@@ -1542,7 +1542,7 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
 
   it('stellt die Zahl der ungelesenen Eingänge voran, dieselbe wie am Knopf (LLH-1143)', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/notifications', () =>
+      http.get('/api/incidents/:id/notifications', () =>
         HttpResponse.json({ eintraege: [], ungelesen: 3 }),
       ),
     );
@@ -1577,9 +1577,9 @@ describe('EinsatzLayout · Orientierung (LFH-954)', () => {
     }
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/module-access', () => HttpResponse.json(freigabenFixture())),
     );
     renderMitProviders(
       <CommandPaletteProvider>
@@ -1605,7 +1605,7 @@ describe('EinsatzLayout · Übung (LLH-1725)', () => {
   function setupUebung(route?: string) {
     const ergebnis = setup(freigabenFixture(), {}, admin, route);
     server.use(
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+      http.get('/api/incidents/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
     );
     return ergebnis;
   }
@@ -1677,7 +1677,7 @@ describe('EinsatzLayout · Rundgang (LLH-1990)', () => {
   it('eine Übung startet ihn für Erstnutzer von selbst', async () => {
     setup();
     server.use(
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+      http.get('/api/incidents/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
     );
     await screen.findByText('ETB-Inhalt');
     await waitFor(() => expect(rundgang.ort).toHaveBeenLastCalledWith('einsatz', true));
@@ -1686,7 +1686,7 @@ describe('EinsatzLayout · Rundgang (LLH-1990)', () => {
   it('wer die Karte geschlossen und keinen Rundgang gesehen hat, bleibt unbehelligt', async () => {
     setup();
     server.use(
-      http.get('/api/einsaetze/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+      http.get('/api/incidents/7', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
       http.get('/api/user-settings', () =>
         HttpResponse.json({ eintraege: { willkommen_geschlossen: '2026-11-19 09:00:00' } }),
       ),

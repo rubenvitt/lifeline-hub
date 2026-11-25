@@ -109,6 +109,7 @@ import type { KarteMarker } from './lagekarte/marker';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
+import { DrohnenVideoHalter } from './lagekarte/DrohnenVideoFenster';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
 import KartenUeberlagerung, {
   GrundlageHinweis,
@@ -213,6 +214,8 @@ export default function LagekartePage() {
   // Dialog; die Quelle sagt, ob er das Suchfeld fokussiert.
   const werkzeugmenueId = useId();
   const [werkzeugmenueOffen, setWerkzeugmenueOffen] = useState(false);
+  // Livebild der Drohne (LLH-2107): die Quelle, deren Fenster über der Karte steht.
+  const [livebildQuelle, setLivebildQuelle] = useState<string | null>(null);
   const [zeichenWahl, setZeichenWahl] = useState<{ offen: boolean; quelle: 'maus' | 'touch' }>({
     offen: false,
     quelle: 'maus',
@@ -274,6 +277,7 @@ export default function LagekartePage() {
   // Seite spränge das HTTP/1.1-Limit von 6.
   const {
     darfSchreiben,
+    darfDrohneSchalten,
     ladt,
     markerLaden,
     gebiete,
@@ -333,7 +337,7 @@ export default function LagekartePage() {
     copernicus,
     setViewportBbox,
     setKartenZoom,
-  } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
+  } = useFachebenen({ einsatzId, fachebenenSichtbar, setFachebenenSichtbar });
 
   const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
@@ -1387,6 +1391,7 @@ export default function LagekartePage() {
             onSchliessen={() => setFachebeneAuswahl(null)}
             // Schnellweg „Als maßgeblichen Pegel festlegen"; wirkt nur an PEGELONLINE-Punkten.
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
+            einsatzId={einsatzId}
             abgerufen={fachebenenAbgerufen[fachebeneAuswahl.quelle]}
           />
         )}
@@ -1764,6 +1769,14 @@ export default function LagekartePage() {
             : undefined
         }
       />
+      {/* Das Livebild gehört zur laufenden Lage, nicht zu einem gesicherten Stand (LLH-2107). */}
+      {livebildQuelle != null && snapshotParam == null && (
+        <DrohnenVideoHalter
+          einsatzId={einsatzId}
+          adapterId={livebildQuelle}
+          onClose={() => setLivebildQuelle(null)}
+        />
+      )}
       {/* Gemeinsamer unterer Rand: Zeichnen-Steuerung, Maßstab und Zeitachse als Flow-Bänder in
           einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
           `lagekarte/KartenFuss.tsx`. */}
@@ -2043,6 +2056,12 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
+        // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
+        drohne={
+          snapshotParam == null
+            ? { darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }
+            : undefined
+        }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}

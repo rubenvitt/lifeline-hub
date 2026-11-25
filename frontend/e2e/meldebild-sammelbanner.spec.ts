@@ -61,7 +61,7 @@ for (const viewport of BREITEN) {
     // kommt nur über den Live-Strom, und der Server abonniert erst mit der Antwort auf `/live`
     // (LLH-1317, `e2e/AGENTS.md`): vorher geschrieben, bliebe der Banner aus.
     const strom = page.waitForResponse(
-      (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+      (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
     );
     await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
     await strom;
@@ -84,7 +84,7 @@ for (const viewport of BREITEN) {
     await ruheShifts(page);
     await setzeShiftsZurueck(page);
 
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/units`, {
       data: { name: '2. Zug Musterstadt-Südost' },
     });
     expect(antwort.ok(), `Seeding Einheit: ${antwort.status()}`).toBeTruthy();

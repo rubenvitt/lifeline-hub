@@ -20,7 +20,7 @@ describe('dokumente-API', () => {
     });
     const [xhr] = anfragen;
     expect(xhr.methode).toBe('POST');
-    expect(xhr.url).toBe('/api/einsaetze/7/documents');
+    expect(xhr.url).toBe('/api/incidents/7/documents');
     const fd = xhr.body as FormData;
     expect(fd.get('datei')).toBe(datei);
     expect(fd.get('titel')).toBe('Plan');
@@ -40,7 +40,7 @@ describe('dokumente-API', () => {
   });
 
   it('baut den Download-Pfad', () => {
-    expect(dokumentDownloadPfad(7, 42)).toBe('/api/einsaetze/7/documents/42/file');
+    expect(dokumentDownloadPfad(7, 42)).toBe('/api/incidents/7/documents/42/file');
   });
 
   it('nutzt das 120-s-Upload-Timeout, nicht das 15-s-Standard-Timeout', () => {

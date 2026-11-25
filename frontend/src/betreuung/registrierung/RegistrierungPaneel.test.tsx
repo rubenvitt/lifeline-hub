@@ -19,8 +19,8 @@ import RegistrierungPaneel from './RegistrierungPaneel';
  * Draht (MSW): was gelesen, was gesendet wird.
  */
 
-const LISTE = '/api/einsaetze/7/care/positions/8/registrations';
-const ABMELDEN = '/api/einsaetze/7/care/positions/8/departures';
+const LISTE = '/api/incidents/7/care/positions/8/registrations';
+const ABMELDEN = '/api/incidents/7/care/positions/8/departures';
 const TURNHALLE = { id: 8, bezeichnung: 'Turnhalle Ost', status: 'in_betrieb' as const };
 
 const WEBER: RegistrierListe = {
@@ -300,7 +300,7 @@ describe('Vorgemerkt ohne Netz', () => {
   });
 });
 
-const BEZUGSPERSON = '/api/einsaetze/7/care/positions/8/households/3/contact-person';
+const BEZUGSPERSON = '/api/incidents/7/care/positions/8/households/3/contact-person';
 
 describe('Haushalte umbauen (LLH-1615)', () => {
   function rendereUmbau() {
@@ -315,7 +315,7 @@ describe('Haushalte umbauen (LLH-1615)', () => {
         return HttpResponse.json({ ...WEBER.haushalte[0], bezugsperson_id: 22 });
       }),
       http.put(
-        '/api/einsaetze/7/care/positions/8/persons/:pid/household',
+        '/api/incidents/7/care/positions/8/persons/:pid/household',
         async ({ request, params }) => {
           draht.haushalt.push({ pid: Number(params.pid), body: await request.json() });
           return HttpResponse.json({ id: 9, nummer: 4, bezugsperson_id: 23, personen: [] });

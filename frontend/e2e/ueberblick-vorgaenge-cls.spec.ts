@@ -88,9 +88,9 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 
 async function einsatzMitVorgaengen(page: Page): Promise<string> {
   const einsatzId = String(
-    await post(page, '/api/einsaetze', { bezeichnung: `${NAME_PRAEFIX} ${Date.now()}` }),
+    await post(page, '/api/incidents', { bezeichnung: `${NAME_PRAEFIX} ${Date.now()}` }),
   );
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const jetzt = Date.now();
   // Drahtformat des Servers: UTC ohne Zonenkennung, sekundengenau.
   const inMin = (min: number) =>
@@ -168,7 +168,7 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   let loslassen!: () => void;
   const tor = new Promise<void>((f) => (loslassen = f));
-  const kopf = `/api/einsaetze/${einsatzId}`;
+  const kopf = `/api/incidents/${einsatzId}`;
   const gehaltenePfade = (
     folge === 'Listen zuletzt'
       ? LISTEN
@@ -179,7 +179,7 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge) {
           : []
   ).map((l) => `${kopf}/${l}`);
   let gehalten = 0;
-  await page.route(new RegExp(`/api/einsaetze/${einsatzId}/`), async (route) => {
+  await page.route(new RegExp(`/api/incidents/${einsatzId}/`), async (route) => {
     const anfrage = route.request();
     const pfad = new URL(anfrage.url()).pathname;
     if (anfrage.method() === 'GET' && gehaltenePfade.includes(pfad)) {

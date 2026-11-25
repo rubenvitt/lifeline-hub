@@ -71,7 +71,7 @@ async fn upload_ohne_erreichbaren_scanner_wird_fail_closed_abgelehnt() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz}/map/background-images"))
+                .uri(format!("/api/incidents/{einsatz}/map/background-images"))
                 .header(header::COOKIE, admin.as_str())
                 .header(
                     header::CONTENT_TYPE,
@@ -94,7 +94,7 @@ async fn upload_ohne_erreichbaren_scanner_wird_fail_closed_abgelehnt() {
     let (sl, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/map/background-images"),
+        &format!("/api/incidents/{einsatz}/map/background-images"),
         &admin,
         None,
     )

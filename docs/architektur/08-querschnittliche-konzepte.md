@@ -14,7 +14,7 @@ Fähigkeits-Specs unter `openspec/specs/` (eingefroren, ADR-0069), die Design-Do
 Jeder Datensatz mit Fachbezug hängt über `org_id` an einer Organisation; die Organisation ist
 die Mandantengrenze (`Benutzer.org_id` in `src/auth/mod.rs`). Der Org-Floor läuft in jedem
 einsatzgebundenen Handler im Extractor `EinsatzKontext` (`src/einsatz/kontext.rs`, Prüfung
-`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/einsaetze/{id}/…` ihn
+`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/incidents/{id}/…` ihn
 zieht, erzwingt `tests/einsatz_kontext_guard.rs`; die Grenze gegen eine echte zweite Organisation
 prüft `tests/cross_org.rs`. Wie ein System-Admin über die Org-Grenze liest und schreibt, regelt
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Admin-Schreibwege am Einsatz“.
@@ -503,7 +503,7 @@ Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.
 ## 8.33 Nachrichten an Menschen: Ausgangskorb
 
 Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur über die Tabelle
-`ausgang` und den Lauf `src/ausgang/` ([ADR-0098](entscheidungen/ADR-0098-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
+`ausgang` und den Lauf `src/ausgang/` ([ADR-0100](entscheidungen/ADR-0100-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
 [`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
 
 - **Getrennt von Webhooks und Abruf:** ein Webhook meldet einem Fremdsystem, ein Adapter ruft ab;

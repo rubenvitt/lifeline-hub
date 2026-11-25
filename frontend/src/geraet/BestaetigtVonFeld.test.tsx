@@ -30,14 +30,14 @@ beforeEach(() => {
   gesendet = [];
   listenAbrufe = 0;
   server.use(
-    http.get('/api/einsaetze/1/persons/confirmers', () => {
+    http.get('/api/incidents/1/persons/confirmers', () => {
       listenAbrufe += 1;
       return HttpResponse.json([
         { id: 5, name: 'Dr. A. Muster', funktion: 'Notärztin' },
         { id: 6, name: 'Zander' },
       ]);
     }),
-    http.post('/api/einsaetze/1/persons/9/triage', async ({ request }) => {
+    http.post('/api/incidents/1/persons/9/triage', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return HttpResponse.json(
         {

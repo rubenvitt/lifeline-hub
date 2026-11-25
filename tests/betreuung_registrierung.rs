@@ -13,7 +13,7 @@ mod common;
 use common::*;
 
 fn b(e: i64) -> String {
-    format!("/api/einsaetze/{e}/care")
+    format!("/api/incidents/{e}/care")
 }
 
 async fn post(app: &axum::Router, cookie: &str, pfad: &str, body: Value) -> (StatusCode, Value) {
@@ -55,7 +55,7 @@ fn reg(e: i64, sid: i64) -> String {
 }
 
 async fn geraet(app: &axum::Router, admin: &str, e: i64, body: Value) -> String {
-    let (s, v) = post(app, admin, &format!("/api/einsaetze/{e}/devices"), body).await;
+    let (s, v) = post(app, admin, &format!("/api/incidents/{e}/devices"), body).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let code = v["code"]["code"].as_str().unwrap().to_string();
     let resp = app
@@ -237,7 +237,7 @@ async fn ohne_personen_nur_die_zaehlung() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personen"),
+        &format!("/api/incidents/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -328,7 +328,7 @@ async fn replay_nach_einsatzende() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -360,7 +360,7 @@ async fn kostform_im_personen_patch() {
     let sid = stelle(&app, &admin, e, "Turnhalle Ost", "gezaehlt").await;
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{e}/persons/{tom}");
+    let pfad = format!("/api/incidents/{e}/persons/{tom}");
 
     let (s, p) = anfrage(
         &app,
@@ -457,7 +457,7 @@ async fn kostform_zaehlung_ist_live_auch_an_gezaehlter_stelle() {
     let (_, h) = post(&app, &admin, &reg(e, sid), familie(None)).await;
     let anna = h["personen"][0]["id"].as_i64().unwrap();
     let tom = h["personen"][1]["id"].as_i64().unwrap();
-    let person = |p: i64| format!("/api/einsaetze/{e}/persons/{p}");
+    let person = |p: i64| format!("/api/incidents/{e}/persons/{p}");
 
     let feed = live_oeffnen(&app, &admin, e).await;
     let (s, _) = anfrage(
@@ -523,7 +523,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{tom}"),
+        &format!("/api/incidents/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -553,7 +553,7 @@ async fn storno_fuehrt_nach_und_geschlossene_namentliche_stelle_nimmt_nicht_auf(
     let (s, v) = post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/persons/{neu}/whereabouts"),
+        &format!("/api/incidents/{e}/persons/{neu}/whereabouts"),
         json!({"art": "notunterkunft", "betreuungsstelle_id": sid}),
     )
     .await;
@@ -723,7 +723,7 @@ async fn druck_ohne_personenrecht_ist_403_ohne_eintrag() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personen"),
+        &format!("/api/incidents/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -815,7 +815,7 @@ async fn bezugsperson_wechseln_und_umhaengen() {
     let (_, p) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/{tom}"),
+        &format!("/api/incidents/{e}/persons/{tom}"),
         &admin,
         None,
     )
@@ -891,7 +891,7 @@ async fn haushalt_aendern_body_und_rechte() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personen"),
+        &format!("/api/incidents/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -982,7 +982,7 @@ async fn storno_der_bezugsperson_rueckt_im_selben_eintrag_nach() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{anna}"),
+        &format!("/api/incidents/{e}/persons/{anna}"),
         &admin,
         None,
     )

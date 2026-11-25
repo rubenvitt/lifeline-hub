@@ -653,6 +653,9 @@ pub async fn delete(
             .ok_or(AppError::NotFound)?;
         Ok((a, erledigt))
     })?;
+    // Mit dem Adapter fallen seine Zuschaltungen (`ON DELETE CASCADE`); erst nach dem Commit
+    // vergisst der Store Merker und Stand (LLH-2105).
+    state.drohne.set_zugeschaltet(&id, false);
     crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(
         &state,

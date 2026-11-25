@@ -27,8 +27,8 @@ function renderPage(
 ) {
   const abrufe = { auftrag: 0 };
   server.use(
-    http.get('/api/einsaetze/5', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/5/tasks/31', () => {
+    http.get('/api/incidents/5', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/5/tasks/31', () => {
       abrufe.auftrag += 1;
       return antwort();
     }),

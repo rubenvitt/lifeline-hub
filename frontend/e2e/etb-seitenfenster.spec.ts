@@ -25,7 +25,7 @@ const BREITEN = [
 ];
 
 async function saeen(page: Page): Promise<{ einsatzId: string; zielId: number; kopfId: number }> {
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Seitenfenster ${Date.now()}` },
   });
   expect(neu.ok(), `Einsatz: ${neu.status()}`).toBe(true);
@@ -38,7 +38,7 @@ async function saeen(page: Page): Promise<{ einsatzId: string; zielId: number; k
     const block = Array.from({ length: Math.min(20, ANZAHL - start + 1) }, (_, i) => start + i);
     const antworten = await Promise.all(
       block.map((n) =>
-        page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+        page.request.post(`/api/incidents/${einsatzId}/etb`, {
           data: { typ: 'meldung', inhalt: `Seitenfenster ${n}`, von: 'ELW 1', an: 'Leitstelle' },
         }),
       ),

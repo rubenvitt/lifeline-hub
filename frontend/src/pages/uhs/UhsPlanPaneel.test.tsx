@@ -91,18 +91,18 @@ function planServer(anhaenge: UhsAnhang[] = [], patchStatus = 200) {
     });
   };
   server.use(
-    http.get('/api/einsaetze/1/uhs/1/attachments', () => HttpResponse.json(anhaenge)),
-    http.patch('/api/einsaetze/1/uhs/1/plan', async ({ request }) => {
+    http.get('/api/incidents/1/uhs/1/attachments', () => HttpResponse.json(anhaenge)),
+    http.patch('/api/incidents/1/uhs/1/plan', async ({ request }) => {
       await merke(request);
       return patchStatus === 200
         ? HttpResponse.json(PLAN)
         : HttpResponse.json({ error: 'Plan nicht gefunden' }, { status: patchStatus });
     }),
-    http.post('/api/einsaetze/1/uhs/1/plan/from-attachment', async ({ request }) => {
+    http.post('/api/incidents/1/uhs/1/plan/from-attachment', async ({ request }) => {
       await merke(request);
       return HttpResponse.json(PLAN);
     }),
-    http.delete('/api/einsaetze/1/uhs/1/plan', async ({ request }) => {
+    http.delete('/api/incidents/1/uhs/1/plan', async ({ request }) => {
       await merke(request);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -138,7 +138,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
     await userEvent.upload(eingabe, datei);
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0].methode).toBe('PUT');
-    expect(anfragen[0].url).toBe('/api/einsaetze/1/uhs/1/plan');
+    expect(anfragen[0].url).toBe('/api/incidents/1/uhs/1/plan');
     expect((anfragen[0].body as FormData).get('datei')).toBe(datei);
   });
 
@@ -169,7 +169,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
       expect(anfragen).toEqual([
         {
           methode: 'POST',
-          pfad: '/api/einsaetze/1/uhs/1/plan/from-attachment',
+          pfad: '/api/incidents/1/uhs/1/plan/from-attachment',
           body: { anhang_id: 32 },
         },
       ]),
@@ -188,7 +188,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
     await waitFor(() => expect(anfragen).toHaveLength(1));
     expect(anfragen[0]).toEqual({
       methode: 'PATCH',
-      pfad: '/api/einsaetze/1/uhs/1/plan',
+      pfad: '/api/incidents/1/uhs/1/plan',
       body: { helligkeit: 70 },
     });
   });
@@ -268,7 +268,7 @@ describe('UhsPlanPaneel (LFH-999)', () => {
     await userEvent.click(ja);
     await waitFor(() =>
       expect(anfragen).toEqual([
-        { methode: 'DELETE', pfad: '/api/einsaetze/1/uhs/1/plan', body: null },
+        { methode: 'DELETE', pfad: '/api/incidents/1/uhs/1/plan', body: null },
       ]),
     );
   });

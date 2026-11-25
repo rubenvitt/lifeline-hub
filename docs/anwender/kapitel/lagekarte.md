@@ -201,13 +201,27 @@ Quelle nicht laden, steht „—“ statt einer Zahl.
 Eine Fachebene nennt unter ihrem Namen, was sie zeigt, und eingeschaltet, von wann ihr Stand ist;
 „offline“, „keine Daten“ oder „näher heranzoomen“ sagen, warum sie gerade nichts zeigt.
 
+„Autobahn-Lage (BAB)“ zeigt Baustellen, Sperrungen und Verkehrsmeldungen an Bundesautobahnen. Eine
+Verkehrsmeldung nennt oben, was los ist, etwa „Stau · +17 min Reisezeitverlust“. „Lkw-Parkplätze
+(BAB)“ zeigt die Rastanlagen mit ihren Pkw- und Lkw-Stellplätzen und der Ausstattung, nützlich bei
+der Suche nach einem Bereitstellungsraum an der Autobahn. Wie voll eine Anlage gerade ist, weiß die
+Quelle nicht. Beide Ebenen holen ihre Daten nach dem Einschalten erst im Hintergrund und zeigen bis
+dahin „offline“, meist eine halbe Minute, sind beide zugleich an, bis zu einer Minute.
+
+Eine Warnung der Ebene „Amtliche Warnungen (NINA)“ zeigt in ihren Details nur einen Auszug. Die vollständige
+Meldung mit Beschreibung und Handlungsanweisung öffnet „Vollmeldung bei warnung.bund.de“ in einem
+neuen Tab. Dort lässt sich auch die Echtheit der Warnung prüfen. Ohne Netz ist der Knopf gesperrt
+und nennt den Grund.
+
 „Satellitenauswertung (Copernicus EMS)“ zeigt die Karten des europäischen Notfalldienstes, wo er
 für eine Großschadenslage aktiviert wurde: betroffene Flächen, Wassertiefe und Schäden an Gebäuden
 und Straßen, gestrichelt umrandet das ausgewertete Gebiet. Außerhalb dieses Umrisses hat niemand
 ausgewertet; eine leere Fläche dort heißt nicht „trocken“. Unter der Zeile stehen die Aktivierungen
 im Ausschnitt mit ihrer Aufnahmezeit, denn ein Satellitenbild ist Stunden bis Tage alt. Gezeigt
 werden laufende und in den letzten 30 Tagen geänderte Aktivierungen; „Ältere Aktivierungen“
-blendet frühere ein, bis die Seite neu lädt. Aktivierungen vor 2023 fehlen.
+blendet frühere ein, bis die Seite neu lädt. Von den Aktivierungen vor 2023 zeigt sie
+ausgewählte, etwa das Hochwasser im Ahrtal 2021; für sie steht statt der Aufnahmezeit die
+Lieferzeit da, denn diese Daten nennen keine Aufnahme.
 
 Ganz oben in „Ebenen“ steht die Kartenansicht mit „In dieser Ansicht speichern“. Welche Ansicht
 der Leiste vorn steht und welche Gruppen offen sind, merkt sich das Gerät. Zu Beginn sind

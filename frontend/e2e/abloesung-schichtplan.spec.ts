@@ -49,12 +49,12 @@ test('Schichtplan: Block aufziehen, verschieben, Kante ziehen, Person ziehen', a
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page, { startseite: false });
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan ${Date.now()}` },
   });
   expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -145,11 +145,11 @@ test('Schichtplan: derselbe Ablauf nur mit der Tastatur', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page, { startseite: false });
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan Tastatur ${Date.now()}` },
   });
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -225,11 +225,11 @@ test('Schichtplan: Kopie per Zug und per Dialog, Schichten erzeugen mit Konflikt
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page, { startseite: false });
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan Kopie ${Date.now()}` },
   });
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -351,11 +351,11 @@ test('Schichtplan (LLH-1600): Kontextmenü eines Blocks — kopieren, bearbeiten
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page, { startseite: false });
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan Kontextmenü ${Date.now()}` },
   });
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -454,12 +454,12 @@ test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nich
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmelden(page);
 
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan Schleuse ${Date.now()}` },
   });
   expect(neu.ok(), `Seeding Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -476,7 +476,7 @@ test('Schichtplan (LLH-1604): eine fremde Einheit wartet hinter dem Banner, nich
   });
 
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await page.goto(`/einsaetze/${einsatzId}/abloesung?ansicht=plan`);
   await strom;

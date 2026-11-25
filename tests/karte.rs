@@ -2030,6 +2030,7 @@ async fn proxy_ohne_sitzung_ist_401_ohne_abruf() {
         ("https://127.0.0.1/tiles.json", "tilejson"),      // slot 2
         ("https://127.0.0.1/sprite", "sprite"),            // slot 3
         ("https://127.0.0.1/{fontstack}/{range}.pbf", "glyphs"), // slot 4
+        ("https://127.0.0.1/punkte.geojson", "static"),    // slot 5
     ] {
         sqlx::query(
             "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (2, ?, ?)",
@@ -2049,6 +2050,7 @@ async fn proxy_ohne_sitzung_ist_401_ohne_abruf() {
         "/api/map/proxy/2/tilejson/2",
         "/api/map/proxy/2/sprite/3.json",
         "/api/map/proxy/2/glyphs/4/Arial/0-255",
+        "/api/map/proxy/2/asset/5",
     ];
     for pfad in pfade.iter().chain(&[
         "/api/map/proxy/999/style.json",
@@ -2357,6 +2359,56 @@ async fn proxy_tile_slot_auf_interne_adresse_ist_fehler_ssrf() {
         None,
     )
     .await;
+    assert!(
+        res.status().is_server_error(),
+        "SSRF-Gate blockt internen Slot: {}",
+        res.status()
+    );
+}
+
+/// LLH-2079: `rewrite_style` mintet die `data`-URL einer GeoJSON-Quelle als `static`-Slot unter
+/// `/api/map/proxy/{id}/asset/{slot}`. Die Route löst nur Slots der Art `static` derselben Quelle
+/// auf: ein anderer Slot oder eine fremde Quelle ist 404.
+#[tokio::test]
+async fn proxy_asset_art_mismatch_und_fremde_quelle_404() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "Q", "https://x/s.json?key=K", "vektor", 1, 1, 0).await; // id 1
+    insert_proxy_quelle(&pool, "Q2", "https://y/s.json?key=K", "vektor", 1, 1, 1).await; // id 2
+    for (url, art) in [
+        ("https://x/sprite?key=K", "sprite"),         // slot 1
+        ("https://x/punkte.geojson?key=K", "static"), // slot 2
+    ] {
+        sqlx::query(
+            "INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, ?, ?)",
+        )
+        .bind(url)
+        .bind(art)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+    let (app, cookie) = proxy_app(pool).await;
+    for (pfad, warum) in [
+        ("/api/map/proxy/1/asset/1", "art-Mismatch"),
+        ("/api/map/proxy/2/asset/2", "fremde quelle"),
+        ("/api/map/proxy/1/asset/99", "unbekannter slot"),
+        ("/api/map/proxy/999/asset/2", "unbekannte quelle"),
+    ] {
+        let res = anfrage(&app, "GET", pfad, Some(&cookie), None).await;
+        assert_eq!(res.status(), StatusCode::NOT_FOUND, "{warum}");
+    }
+}
+
+/// LLH-2079: ein `static`-Slot auf eine interne Adresse wird aufgelöst (kein 404) und endet am
+/// SSRF-Gate, bevor ein Abruf startet.
+#[tokio::test]
+async fn proxy_asset_slot_auf_interne_adresse_ist_fehler_ssrf() {
+    let pool = pool().await;
+    insert_proxy_quelle(&pool, "S", "https://x/s.json?key=K", "vektor", 1, 1, 0).await;
+    sqlx::query("INSERT INTO karte_proxy_asset (quelle_id, upstream_url, art) VALUES (1, 'https://169.254.169.254/punkte.geojson', 'static')")
+        .execute(&pool).await.unwrap();
+    let (app, cookie) = proxy_app(pool).await;
+    let res = anfrage(&app, "GET", "/api/map/proxy/1/asset/1", Some(&cookie), None).await;
     assert!(
         res.status().is_server_error(),
         "SSRF-Gate blockt internen Slot: {}",
@@ -2904,5 +2956,39 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
     assert_eq!(
         v["features"]["features"][0]["properties"]["emsr"],
         "EMSR728"
+    );
+}
+
+/// Die Parken-Ebene (LLH-1637) ist eine bekannte Quelle und liefert ihren Cache-Stand,
+/// hermetisch wie `fachebenen_autobahn_liefert_gecachte_antwort`.
+#[tokio::test]
+async fn fachebenen_autobahn_parken_liefert_gecachte_antwort() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let dir = lifeline_hub::db::test_karten_dir();
+    let cache = lifeline_hub::cache_db::cache_pool(&dir).await.unwrap();
+    let gecacht = FachebeneAntwort::ok(
+        "autobahn_parken",
+        "Autobahn GmbH des Bundes",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [
+            { "type": "Feature",
+              "geometry": { "type": "Point", "coordinates": [8.83, 53.02] },
+              "properties": { "titel": "Krummhörens Kuhlen", "kategorie": "rastanlage",
+                              "lkw_stellplaetze": 4 } }
+        ]}),
+    );
+    assert!(lifeline_hub::karte::cache::setze(&cache, "autobahn_parken", &gecacht).await);
+
+    let app = app_mit(pool().await, dir);
+    let res = anfrage(&app, "GET", "/api/map/overlays/autobahn_parken", None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let v: serde_json::Value =
+        serde_json::from_slice(&to_bytes(res.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(v["quelle"], "autobahn_parken");
+    assert_eq!(v["status"], "ok");
+    assert_eq!(v["attribution"], "Autobahn GmbH des Bundes");
+    assert_eq!(
+        v["features"]["features"][0]["properties"]["kategorie"],
+        "rastanlage"
     );
 }

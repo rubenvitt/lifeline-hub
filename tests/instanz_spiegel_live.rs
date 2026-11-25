@@ -38,7 +38,7 @@ async fn uebernahme_meldet_lagged_und_ein_neuer_spiegel_die_einsatzliste() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &elw.admin,
         Some(&json!({ "typ": "meldung", "inhalt": "Neu", "von": "A", "an": "B" })),
     )
@@ -76,7 +76,7 @@ async fn uebernahme_meldet_lagged_und_ein_neuer_spiegel_die_einsatzliste() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &hub.admin,
         Some(&json!({ "typ": "meldung", "inhalt": "Vom Stab", "von": "S", "an": "EL", "client_id": "live-1" })),
     )

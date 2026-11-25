@@ -26,7 +26,7 @@ async fn abgeschlossen(app: &axum::Router, admin: &str) -> i64 {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         admin,
         None,
     )
@@ -96,7 +96,7 @@ async fn archivzugriff_nur_fuer_den_admin_der_eigenen_org() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         &admin,
         None,
     )
@@ -211,7 +211,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/etb"),
+        &format!("/api/incidents/{id}/etb"),
         &admin,
         Some(r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Erstmeldung"}"#),
     )
@@ -221,7 +221,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/etb"),
+        &format!("/api/incidents/{id}/etb"),
         &admin,
         Some(&format!(
             r#"{{"von":"ELW 1","an":"ELW 1","typ":"berichtigung","inhalt":"Korrektur","berichtigt_eintrag_id":{erst_id}}}"#
@@ -232,7 +232,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         &admin,
         None,
     )
@@ -242,7 +242,7 @@ async fn archiv_etb_paginiert_filterbar_und_mit_berichtigungsverweis() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/retention-period"),
+        &format!("/api/incidents/{id}/retention-period"),
         &admin,
         Some(&format!(
             r#"{{"retention_bis":"{}","bestaetigt":true}}"#,
@@ -320,11 +320,11 @@ async fn anhang(pool: &SqlitePool, einsatz: i64) -> i64 {
 
 async fn regulaere_routen_gesperrt(app: &axum::Router, admin: &str, id: i64, aid: i64) {
     for uri in [
-        format!("/api/einsaetze/{id}"),
-        format!("/api/einsaetze/{id}/etb"),
-        format!("/api/einsaetze/{id}/persons"),
-        format!("/api/einsaetze/{id}/attachments/{aid}"),
-        format!("/api/einsaetze/{id}/live"),
+        format!("/api/incidents/{id}"),
+        format!("/api/incidents/{id}/etb"),
+        format!("/api/incidents/{id}/persons"),
+        format!("/api/incidents/{id}/attachments/{aid}"),
+        format!("/api/incidents/{id}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;
         assert_eq!(
@@ -397,7 +397,7 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         &admin,
         None,
     )
@@ -405,7 +405,7 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     assert_eq!(s, StatusCode::OK);
     setze(&pool, id, Some(&vor_tagen(6)), Some(&vor_tagen(5)), None).await;
     let leit = login_cookie(&app, "leitung", "leitungpw1").await;
-    let (s, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{id}"), &leit, None).await;
+    let (s, _) = anfrage(&app, "GET", &format!("/api/incidents/{id}"), &leit, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN, "vorher gesperrt");
 
     let frist = in_tagen(90);
@@ -421,7 +421,7 @@ async fn wiederherstellen_mit_frist_oeffnet_den_einsatz_wieder() {
     assert_eq!(v["kopf"]["retention_bis"], frist.as_str());
     assert!(!v["kopf"].as_object().unwrap().contains_key("geloescht_at"));
 
-    let (s, _) = anfrage(&app, "GET", &format!("/api/einsaetze/{id}"), &leit, None).await;
+    let (s, _) = anfrage(&app, "GET", &format!("/api/incidents/{id}"), &leit, None).await;
     assert_eq!(s, StatusCode::OK, "Einsatzleitung liest wieder");
     let admin_id: i64 = sqlx::query_scalar("SELECT id FROM benutzer WHERE benutzername = 'admin'")
         .fetch_one(&pool)
@@ -1073,7 +1073,7 @@ async fn frist_put(app: &axum::Router, cookie: &str, id: i64, frist: &str) -> (S
     anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{id}/retention-period"),
+        &format!("/api/incidents/{id}/retention-period"),
         cookie,
         Some(&format!(
             r#"{{"retention_bis":"{frist}","bestaetigt":true}}"#
@@ -1280,7 +1280,7 @@ async fn wieder_oeffnen(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/reopen"),
+        &format!("/api/incidents/{id}/reopen"),
         cookie,
         Some(r#"{"grund":"Falscher Einsatz abgeschlossen"}"#),
     )
@@ -1293,7 +1293,7 @@ async fn abschluss_post(app: &axum::Router, cookie: &str, id: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{id}/close"),
+        &format!("/api/incidents/{id}/close"),
         cookie,
         None,
     )
@@ -1420,7 +1420,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/retention-period"),
+        &format!("/api/incidents/{id}/retention-period"),
         &admin,
         Some(&serde_json::json!({ "retention_bis": frist })),
     )
@@ -1430,7 +1430,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/retention-period/personenauskunft"),
+        &format!("/api/incidents/{id}/retention-period/personenauskunft"),
         &admin,
         Some(&serde_json::json!({ "retention_bis": kategorie_frist })),
     )
@@ -1442,7 +1442,7 @@ async fn wiederoeffnen_laesst_von_hand_gesetzte_fristen_stehen() {
     let (s, v) = common::anfrage_json(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{id}/follow-up"),
+        &format!("/api/incidents/{id}/follow-up"),
         &admin,
         Some(&serde_json::json!({ "nachbereitung_bis": nachbereitung })),
     )
@@ -1509,7 +1509,7 @@ async fn wiederoeffnen_laesst_kopplung_und_api_freigabe_beendet() {
     let (s, v) = common::anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{id}/devices"),
+        &format!("/api/incidents/{id}/devices"),
         &admin,
         Some(&serde_json::json!({ "ansicht": "lagemonitor", "bezeichnung": "Monitor" })),
     )

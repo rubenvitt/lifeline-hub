@@ -1743,7 +1743,7 @@ const FUNKPLAN_LUECKEN_LINKS = 3;
 
 async function funkplanSaeen(page: Page, einsatzId: string) {
   const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(
       antwort.ok(),
       `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
@@ -1754,7 +1754,7 @@ async function funkplanSaeen(page: Page, einsatzId: string) {
   const einheit = await post('units', { name: '1. Zug', abschnitt_id: abschnitt });
   const fahrzeug = await post('vehicles', { adhoc: { funkrufname: 'Florian 1/42-1' } });
   const zuordnung = await page.request.put(
-    `/api/einsaetze/${einsatzId}/units/${einheit}/vehicles/${fahrzeug}`,
+    `/api/incidents/${einsatzId}/units/${einheit}/vehicles/${fahrzeug}`,
   );
   expect(zuordnung.ok(), `Zuordnung: ${await zuordnung.text()}`).toBeTruthy();
   return { einheit };
@@ -1967,7 +1967,7 @@ test('Baumtabellen: das Aufklappsymbol hält 30 / 48 / 72 px in Einheiten, Melde
 // misst ohne Aktionsspalte und ohne „Stelle hinzufügen“.
 
 async function kommunikationsplanSaeen(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const plan = await page.request.post(`${basis}/staff/comms-plan/positions`, {
     data: { stellenart: 'leitstelle', bezeichnung: 'ILS Nord' },
   });
@@ -2301,7 +2301,7 @@ const ORGANIGRAMM_KLAPPZIELE = 2;
 
 async function organigrammSaeen(page: Page, einsatzId: string) {
   const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(
       antwort.ok(),
       `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`,
@@ -2421,7 +2421,7 @@ test('Ablösung: Kartenaktionen und Vorgabe-Knopf folgen der Dichte-Staffel 30 /
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Abloesung`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(
       antwort.ok(),
       `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
@@ -2479,7 +2479,7 @@ test('Ablösung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folgen 
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Abloesung Lesend`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(
       antwort.ok(),
       `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`,
@@ -2563,7 +2563,7 @@ test('Evakuierung und Betreuung: Zeilenaktionen folgen der Dichte-Staffel 30 / 4
     data: unknown,
     was: string,
   ) => {
-    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/${modul}/${pfad}`, {
+    const antwort = await page.request[methode](`/api/incidents/${einsatzId}/${modul}/${pfad}`, {
       data,
     });
     expect(
@@ -2713,7 +2713,7 @@ test('Evakuierung und Betreuung (Beobachter): gesperrte Anlage-Knöpfe und Verla
     data: unknown,
     was: string,
   ) => {
-    const antwort = await page.request[methode](`/api/einsaetze/${einsatzId}/${modul}/${pfad}`, {
+    const antwort = await page.request[methode](`/api/incidents/${einsatzId}/${modul}/${pfad}`, {
       data,
     });
     expect(
@@ -2841,7 +2841,7 @@ const UNTERKUNFT_GRUNDLAGE_KNOEPFE = 6;
 const UNTERKUNFT_ZAHLENFELDER = 6;
 
 async function unterkunftStelleSaeen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/care/positions`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/care/positions`, {
     data: { bezeichnung: UNTERKUNFT_STELLE, art: 'notunterkunft', kapazitaet_personen: 30 },
   });
   expect(antwort.ok(), `Seeding Stelle: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -3534,7 +3534,7 @@ test('Verpflegung: Kartenaktionen folgen der Dichte-Staffel 30 / 48 / 72 px', as
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3712,7 +3712,7 @@ test('Ausgabeansicht: „+1“ ≥ 72 px in jeder Stufe und unten, übrige Zähl
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Zaehlen`);
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/time-slots`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/catering/time-slots`, {
     data: {
       bezeichnung: 'Mittag Deich',
       von_at: zeit(-10),
@@ -3807,7 +3807,7 @@ test('Verpflegung (Beobachter): gesperrte Primäraktion und Ansichtsleiste folge
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Essen Lesend`);
 
   const post = async (pfad: string, data: unknown, was: string) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/catering/${pfad}`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/catering/${pfad}`, {
       data,
     });
     expect(
@@ -3909,7 +3909,7 @@ test('Verpflegungsstellen: Zeilenaktionen und Stellenwahl der Ausgabeansicht fol
   await page.setViewportSize(FUEKW);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Stellen`);
-  const basis = `/api/einsaetze/${einsatzId}/catering`;
+  const basis = `/api/incidents/${einsatzId}/catering`;
   const senden = async (pfad: string, data: unknown, methode: 'post' | 'patch' = 'post') => {
     const antwort = await page.request[methode](`${basis}/${pfad}`, { data });
     expect(
@@ -3993,7 +3993,7 @@ const personZeile = (page: Page, id: number) =>
   page.locator(`tr.ant-table-row[data-row-key="${id}"]`);
 
 async function personAnlegen(page: Page, einsatzId: string, daten: object): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, { data: daten });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/persons`, { data: daten });
   expect(antwort.ok(), `Seeding Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }
@@ -4587,12 +4587,12 @@ test('Lagekarte (LFH-373): Objektliste, Kartenknöpfe, Werkzeugmenü, Kartengrun
   const einsatzId = await einsatzAnlegen(page, `E2E 373 Ost ${Date.now()}`);
   const ablagen = ['Ablage Ost 1', 'Ablage Ost 2'];
   for (const [i, bezeichnung] of ablagen.entries()) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/uhs`, {
       data: { typ: 'patientenablage', bezeichnung },
     });
     expect(antwort.ok(), `Seeding UHS: ${await antwort.text()}`).toBeTruthy();
     const { id } = (await antwort.json()) as { id: number };
-    const lage = await page.request.patch(`/api/einsaetze/${einsatzId}/uhs/${id}`, {
+    const lage = await page.request.patch(`/api/incidents/${einsatzId}/uhs/${id}`, {
       data: { lat: 49.35 + i / 100, lon: 9.14 },
     });
     expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
@@ -4797,12 +4797,12 @@ test('Lagekarte (LFH-711): Objektmarker tragen die Trefferzone der Staffel, dich
     ['Zone Nord', nord],
     ['Zone Süd', sued],
   ] as const) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/uhs`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/uhs`, {
       data: { typ: 'patientenablage', bezeichnung },
     });
     expect(antwort.ok(), `Seeding UHS: ${await antwort.text()}`).toBeTruthy();
     const { id } = (await antwort.json()) as { id: number };
-    const lage = await page.request.patch(`/api/einsaetze/${einsatzId}/uhs/${id}`, {
+    const lage = await page.request.patch(`/api/incidents/${einsatzId}/uhs/${id}`, {
       data: { lat, lon },
     });
     expect(lage.ok(), `Verortung UHS: ${await lage.text()}`).toBeTruthy();
@@ -5353,7 +5353,7 @@ const TABLET_QUER = { width: 1180, height: 820 };
 
 /** Lagebericht und Befehl, je freigegeben: erst dann trägt die Seite den Sprung. */
 async function freigegebeneDokumenteSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   // Die Freigabe verlangt jeden Abschnitt der Vorlage mit Text (sonst 422).
   const freigegeben = async (
     pfad: string,
@@ -5502,7 +5502,7 @@ test('Detailseiten (Beobachter, LFH-968): der ETB-Sprung hält ohne „Fortschre
   const seitenFrei = await freigegebeneDokumenteSaeen(page, frei);
   const [berichtGesperrt] = await freigegebeneDokumenteSaeen(page, gesperrt);
   // Modulsperre per Override (`e2e/AGENTS.md`, LFH-820): das ETB nur für Admins.
-  const sperre = await page.request.put(`/api/einsaetze/${gesperrt}/module-overrides/etb`, {
+  const sperre = await page.request.put(`/api/incidents/${gesperrt}/module-overrides/etb`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();
@@ -5569,7 +5569,7 @@ test('Kräfte ohne BR (LFH-968): zwei „zuweisen“-Knöpfe einer Gruppe halten
   test.setTimeout(240_000);
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} BR`);
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   // Drei einheitenlose Fahrzeuge: eine Gruppe „Fahrzeuge ohne Einheit“, Zeile an Zeile.
   for (const funkrufname of ['Florian BR 1', 'Florian BR 2', 'Florian BR 3']) {
     await anlegen(page, einsatzId, 'vehicles', { adhoc: { funkrufname } }, funkrufname);
@@ -5660,14 +5660,14 @@ test('Personenansicht: alle Ziele der vier Paneele halten 30 / 48 / 72 px, Entla
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht`);
   const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
   const einheitId = await post('units', { name: 'Messeinheit Ansicht' });
   const epId = await post('personnel', { adhoc: { name: KRAFT_ANSICHT } });
   const zu = await page.request.put(
-    `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`,
+    `/api/incidents/${einsatzId}/units/${einheitId}/personnel/${epId}`,
   );
   expect(zu.ok(), await zu.text()).toBeTruthy();
 
@@ -5730,14 +5730,14 @@ test('Personenansicht (Beobachter): die Sprünge folgen der Staffel, Schreibziel
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Gate3 ${Date.now()} Ansicht Lesend`);
   const post = async (pfad: string, data: unknown) => {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
     expect(antwort.ok(), `Seeding ${pfad}: ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
   const einheitId = await post('units', { name: 'Messeinheit Lesend' });
   const epId = await post('personnel', { adhoc: { name: KRAFT_ANSICHT } });
   const zu = await page.request.put(
-    `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`,
+    `/api/incidents/${einsatzId}/units/${einheitId}/personnel/${epId}`,
   );
   expect(zu.ok(), await zu.text()).toBeTruthy();
   await wechsleZuRolle(page, 'beobachter', einsatzId);
@@ -5841,7 +5841,7 @@ async function sortierTrefferHoehe(kopfZelle: Locator): Promise<number> {
 
 async function seedPersonal(page: Page, einsatzId: string) {
   for (const name of ['Messkraft Kopf A', 'Messkraft Kopf B']) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
       data: { adhoc: { name } },
     });
     expect(antwort.ok(), `Seeding ${name}: ${await antwort.text()}`).toBeTruthy();

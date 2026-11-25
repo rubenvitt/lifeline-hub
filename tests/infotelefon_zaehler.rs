@@ -12,7 +12,7 @@ mod common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, setup_mit_pool};
 
 fn pfad(e: i64) -> String {
-    format!("/api/einsaetze/{e}/staff/info-line")
+    format!("/api/incidents/{e}/staff/info-line")
 }
 
 async fn erfassen(app: &axum::Router, cookie: &str, e: i64, body: &str) {

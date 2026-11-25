@@ -108,12 +108,12 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
 
   function zeigeKarte(props: Partial<ComponentProps<typeof NachforderungKarte>>) {
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           { id: 3, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     return renderMitProviders(<NachforderungKarte nachforderung={eingetroffen()} {...props} />);
   }
@@ -1053,7 +1053,7 @@ describe('NachforderungKarte — Senden (LLH-2093)', () => {
           },
         ]),
       ),
-      http.get('/api/einsaetze/1/deliveries', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
     );
   }
 
@@ -1092,7 +1092,7 @@ describe('NachforderungKarte — Senden (LLH-2093)', () => {
 
   it('zeigt die Versandliste in der Karte, sobald es einen Versand gibt', async () => {
     server.use(
-      http.get('/api/einsaetze/1/deliveries', () =>
+      http.get('/api/incidents/1/deliveries', () =>
         HttpResponse.json([
           {
             id: 'v1',
@@ -1131,7 +1131,7 @@ describe('NachforderungKarte — Senden (LLH-2093)', () => {
       subject: 'x',
     });
     server.use(
-      http.get('/api/einsaetze/1/deliveries', ({ request }) => {
+      http.get('/api/incidents/1/deliveries', ({ request }) => {
         abrufe.push(new URL(request.url).search);
         return HttpResponse.json([versand('v1', 11), versand('v2', 12)]);
       }),

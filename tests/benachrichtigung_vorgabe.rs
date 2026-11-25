@@ -50,7 +50,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage_json(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/command-post", w.einsatz),
+        &format!("/api/incidents/{}/command-post", w.einsatz),
         &w.admin,
         Some(&json!({ "einsatzleiter": { "art": "personal", "personal_id": ep } })),
     )
@@ -70,14 +70,14 @@ impl Welt {
     }
 
     fn pfad(&self) -> String {
-        format!("/api/einsaetze/{}/notification-defaults", self.einsatz)
+        format!("/api/incidents/{}/notification-defaults", self.einsatz)
     }
 
     async fn funktion_setzen(&self, benutzer_id: i64, funktion: &str) {
         let (s, v) = anfrage_json(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
+            &format!("/api/incidents/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": "fuehrungspersonal", "fuehrungsfunktion": funktion })),
         )
@@ -99,7 +99,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personnel", self.einsatz),
+            &format!("/api/incidents/{}/personnel", self.einsatz),
             &self.admin,
             Some(&json!({ "personal_id": v["id"] })),
         )
@@ -123,7 +123,7 @@ impl Welt {
         let (s, v) = anfrage_json(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/tasks", self.einsatz),
+            &format!("/api/incidents/{}/tasks", self.einsatz),
             &self.admin,
             Some(&json!({ "auftrag_text": "Sandsäcke zum Deich", "empfaenger": empfaenger })),
         )
@@ -289,7 +289,7 @@ async fn statuscodes_und_rechte() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", w.einsatz),
+        &format!("/api/incidents/{}/close", w.einsatz),
         &w.admin,
         None,
     )
@@ -323,7 +323,7 @@ async fn still_fuer_s2_und_lauter_gewinnt() {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/notifications", w.einsatz),
+        &format!("/api/incidents/{}/notifications", w.einsatz),
         &bert,
         None,
     )

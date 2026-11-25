@@ -838,12 +838,12 @@ async fn kein_bearer_und_keine_sitzung_unter_v1() {
     // Umgekehrt nimmt die Oberfläche keinen Maschinen-Kopf an.
     let cred = angebunden(&app, &admin, json!(["lage:read"]), &schluessel(9), ip).await;
     let auth = cred
-        .sign_request("GET", "/api/einsaetze", b"", jetzt(), "m")
+        .sign_request("GET", "/api/incidents", b"", jetzt(), "m")
         .unwrap();
     let (s, _, _) = senden(
         &app,
         "GET",
-        "/api/einsaetze",
+        "/api/incidents",
         Some(("authorization", auth)),
         vec![],
         ip,
@@ -1037,7 +1037,7 @@ async fn kommando_loest_ein_und_ruft_me_und_lage_gegen_einen_echten_server() {
         &app,
         "PUT",
         &format!(
-            "/api/einsaetze/{einsatz}/integrations/{}/grant",
+            "/api/incidents/{einsatz}/integrations/{}/grant",
             cred.zugang_id
         ),
         &admin,

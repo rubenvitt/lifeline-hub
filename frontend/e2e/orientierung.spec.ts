@@ -33,7 +33,7 @@ function registryModule(): { route: string; label: string }[] {
 const DIREKTEINSTIEG = new Set(['unfallhilfsstellen', 'bereitstellungsraeume']);
 
 async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   return String(((await antwort.json()) as { id: number }).id);
 }
@@ -89,7 +89,7 @@ test.describe('Orientierung (LFH-954)', () => {
   }) => {
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page, `Abgeschlossen ${Date.now()}`);
-    const zu = await page.request.post(`/api/einsaetze/${id}/close`);
+    const zu = await page.request.post(`/api/incidents/${id}/close`);
     expect(zu.ok(), `Abschließen: ${zu.status()}`).toBe(true);
     for (const route of ['tiere', 'etb', 'lagekarte']) {
       await page.goto(`/einsaetze/${id}/${route}`);
@@ -130,7 +130,7 @@ test.describe('Orientierung (LFH-954)', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await anmeldenAlsAdmin(page);
     const id = await einsatzAnlegen(page, `Rückweg Detail ${Date.now()}`);
-    const antwort = await page.request.post(`/api/einsaetze/${id}/persons`, {
+    const antwort = await page.request.post(`/api/incidents/${id}/persons`, {
       data: { name: 'Rückweg', vorname: 'Rita', antreff_ort: 'Brücke' },
     });
     expect(antwort.ok(), `Person: ${antwort.status()}`).toBe(true);

@@ -40,7 +40,7 @@ describe('SendenDialog (LLH-2093)', () => {
     kanaele(KANAELE);
     const bodies: unknown[] = [];
     server.use(
-      http.post('/api/einsaetze/1/situation-reports/5/deliveries', async ({ request }) => {
+      http.post('/api/incidents/1/situation-reports/5/deliveries', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json([], { status: 201 });
       }),
@@ -60,7 +60,7 @@ describe('SendenDialog (LLH-2093)', () => {
   it('zeigt „Kein Mailserver eingerichtet“ bei 422 anbindung_fehlt', async () => {
     kanaele(KANAELE);
     server.use(
-      http.post('/api/einsaetze/1/situation-reports/5/deliveries', () =>
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
         HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
       ),
     );

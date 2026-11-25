@@ -3,6 +3,7 @@ import { theme } from 'antd';
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import {
   ladeFachebene,
+  loadDrohneFachebene,
   type FachebeneQuelle,
   type FachebeneStatus,
   type FeatureCollection,
@@ -36,6 +37,8 @@ const ENERGIE_AKKU_MAX = 2000;
 const leereFc = (): FeatureCollection => ({ type: 'FeatureCollection', features: [] });
 
 interface FachebenenArgs {
+  /** Einsatz der Karte: die Drohnenlage lädt über seine Route (LLH-2106). */
+  einsatzId: number;
   /** Sichtbarkeit + Setter kommen aus useKartenAnsicht (geteilte Ansicht = Wahrheit). */
   fachebenenSichtbar: FachebenenSichtbar;
   setFachebenenSichtbar: Dispatch<SetStateAction<FachebenenSichtbar>>;
@@ -65,7 +68,11 @@ const BBOX_ABFRAGE_GC_MS = 5 * 60_000;
  * über die Closure.
  */
 
-export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: FachebenenArgs) {
+export function useFachebenen({
+  einsatzId,
+  fachebenenSichtbar,
+  setFachebenenSichtbar,
+}: FachebenenArgs) {
   // Hochwasser, ODL und Luftqualität färben je Punkt nach Stufe und brauchen den aufgelösten
   // Modus-Token; die Kartenstil-Module haben ihn bewusst nicht, also wird er hier in die Features
   // gebacken.
@@ -77,6 +84,8 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   const [viewportBbox, setViewportBbox] = useState<string | null>(null);
   // Zuletzt gesehener Status der Autobahn-Ebene — steuert ihren Poll-Takt (Aufwärmphase).
   const [autobahnStatus, setAutobahnStatus] = useState<FachebeneStatus | undefined>(undefined);
+  // Dasselbe für die Lkw-Parkplätze (LLH-1637), deren erster Lauf ebenfalls im Hintergrund hängt.
+  const [parkenStatus, setParkenStatus] = useState<FachebeneStatus | undefined>(undefined);
   // Aktuelles Karten-Zoom-Level — steuert den „näher heranzoomen"-Hinweis der bbox-Ebenen.
   const [kartenZoom, setKartenZoom] = useState<number | null>(null);
 
@@ -154,8 +163,18 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
       fachebeneTakt('copernicus', q.state.status === 'error' ? 'offline' : q.state.data?.status),
   });
 
-  // Sieben Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
-  // `fachebeneKeys()` ohne kritis, energie und copernicus (nicht Panel-Reihenfolge). `byKey` greift
+  // Die Drohnenlage (LLH-2106) hängt am Einsatz und läuft darum als eigenes `useQuery` mit
+  // Einsatz-ID im Key, nicht im positionsweise gelesenen Tupel unten. Ihr Takt ist fest; ein Poll
+  // ohne neuen Stand kostet ein 304.
+  const drohne = useQuery({
+    queryKey: globalKeys.fachebeneDrohne(einsatzId),
+    queryFn: () => loadDrohneFachebene(einsatzId),
+    enabled: fachebenenSichtbar.drohne,
+    refetchInterval: FACHEBENEN.drohne.pollMs,
+  });
+
+  // Acht Fachebenen-Queries als ein `useQueries` + `combine`, in der Reihenfolge von
+  // `fachebeneKeys()` ohne kritis, energie, copernicus und drohne (nicht Panel-Reihenfolge). `byKey` greift
   // positionsweise ab: ein verschobener Index ist eine stille Verwechslung, kein Fehler.
   const kombiniert = useQueries({
     queries: [
@@ -202,12 +221,19 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // verliert seine Typen).
         refetchInterval: fachebeneTakt('autobahn', autobahnStatus),
       },
-      // Letzter Eintrag, bewusst am Ende: `byKey` greift positionsweise ab.
+      // Bewusst hinten: `byKey` greift positionsweise ab.
       {
         queryKey: globalKeys.fachebene('luftqualitaet'),
         queryFn: () => ladeFachebene('luftqualitaet'),
         enabled: fachebenenSichtbar.luftqualitaet,
         refetchInterval: FACHEBENEN.luftqualitaet.pollMs,
+      },
+      // LLH-1637, hinter Luftqualität angehängt: `byKey` greift positionsweise ab.
+      {
+        queryKey: globalKeys.fachebene('autobahn_parken'),
+        queryFn: () => ladeFachebene('autobahn_parken'),
+        enabled: fachebenenSichtbar.autobahn_parken,
+        refetchInterval: fachebeneTakt('autobahn_parken', parkenStatus),
       },
     ],
     // combine wird von react-query memoisiert + strukturell geteilt → stabile Ableitungen.
@@ -221,8 +247,10 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         kritis,
         energie,
         copernicus,
+        drohne,
         autobahn: ergebnisse[5],
         luftqualitaet: ergebnisse[6],
+        autobahn_parken: ergebnisse[7],
       } as const;
       const leerFc: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const aktiveFachebenen: AktiveFachebene[] = fachebeneKeys()
@@ -289,6 +317,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
         // Refetch die vorigen `data`, sonst bliebe der Takt der reguläre, während die Ebene schon
         // `offline` zeigt.
         autobahnStatusRoh: byKey.autobahn.isError ? 'offline' : byKey.autobahn.data?.status,
+        parkenStatusRoh: byKey.autobahn_parken.isError
+          ? 'offline'
+          : byKey.autobahn_parken.data?.status,
       };
     },
   });
@@ -322,6 +353,9 @@ export function useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar }: Fac
   useEffect(() => {
     setAutobahnStatus(kombiniert.autobahnStatusRoh);
   }, [kombiniert.autobahnStatusRoh]);
+  useEffect(() => {
+    setParkenStatus(kombiniert.parkenStatusRoh);
+  }, [kombiniert.parkenStatusRoh]);
 
   // „Zu weit herausgezoomt" bzw. „Ausschnitt zu groß" je Quelle, nur für sichtbare Ebenen mit
   // `minZoom` (heute allein Energie). Die Sidebar liest es für jede bbox-Ebene gleich.

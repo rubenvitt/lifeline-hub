@@ -77,4 +77,12 @@ describe('Listenzustand in der Adresse (LLH-1086)', () => {
     expect(hatListenZustand(new URLSearchParams('f.typ=sturm'))).toBe(true);
     expect(hatListenZustand(new URLSearchParams('q=Deich'))).toBe(true);
   });
+
+  it('ein Filter namens `__proto__` verbiegt nicht den Prototyp des Filters (LLH-2090)', () => {
+    // fast-check fand ihn (listenZustand.eigenschaften.test.ts): `filter['__proto__'] = [...]` auf
+    // einem Objektliteral setzt den Prototyp, statt einen Schlüssel anzulegen.
+    const zustand = parseListenZustand(new URLSearchParams('f.__proto__=x&f.typ=sturm'));
+    expect(Object.getPrototypeOf(zustand.filter)).toBe(Object.prototype);
+    expect(zustand.filter).toEqual({ typ: ['sturm'] });
+  });
 });

@@ -21,7 +21,7 @@ async fn erteilen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> Valu
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         cookie,
         Some(&body.to_string()),
     )
@@ -55,7 +55,7 @@ async fn patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -63,7 +63,7 @@ async fn patch(
 }
 
 async fn anordnungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
-    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (_, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     etb.as_array()
         .unwrap()
         .iter()
@@ -239,7 +239,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{qid}/recipients/{empf}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{qid}/recipients/{empf}/acknowledge"),
         &admin,
         None,
     )
@@ -258,7 +258,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+            &format!("/api/incidents/{e}/tasks/{aid}/execution"),
             &admin,
             Some(&body.to_string()),
         )
@@ -271,7 +271,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
+        &format!("/api/incidents/{e}/tasks/{aid}/void"),
         &admin,
         Some(r#"{"grund":"erledigt"}"#),
     )
@@ -282,7 +282,7 @@ async fn nach_quittung_in_arbeit_vollzogen_oder_aufgehoben_ist_422() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{qid}"),
+        &format!("/api/incidents/{e}/tasks/{qid}"),
         &admin,
         None,
     )
@@ -312,7 +312,7 @@ async fn feldfehler_sind_400() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -343,7 +343,7 @@ async fn rechte_und_einsatz_wie_beim_aufheben() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -409,7 +409,7 @@ async fn liste_traegt_berichtigbar() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         None,
     )
@@ -480,7 +480,7 @@ async fn einheit(app: &axum::Router, cookie: &str, e: i64, name: &str) -> i64 {
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )
@@ -516,7 +516,7 @@ async fn aufgeloeste_empfaenger_einheit_haelt_die_berichtigung_nicht_auf() {
     let (_, gelesen) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -617,7 +617,7 @@ async fn zwei_aufgeloeste_einheiten_sind_keine_empfaenger_aenderung() {
     let (_, gelesen) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -656,7 +656,7 @@ async fn anordnungen_der_einheit(
     let (s, etb) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb?einheit_id={einheit_id}&typ=anordnung"),
+        &format!("/api/incidents/{e}/etb?einheit_id={einheit_id}&typ=anordnung"),
         cookie,
         None,
     )

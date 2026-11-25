@@ -29,7 +29,7 @@ const versand = (over: Partial<Versand>): Versand => ({
 const quelle = { kind: 'lagebericht', id: 5 } as const;
 
 function liste(v: Versand[]) {
-  server.use(http.get('/api/einsaetze/1/deliveries', () => HttpResponse.json(v)));
+  server.use(http.get('/api/incidents/1/deliveries', () => HttpResponse.json(v)));
 }
 
 afterEach(() => setzeOnline(true));
@@ -55,14 +55,14 @@ describe('Versandliste (LLH-2093)', () => {
     liste([versand({ id: 'c', state: 'fehlgeschlagen', error: 'abgelehnt' })]);
     let pfad = '';
     server.use(
-      http.post('/api/einsaetze/1/deliveries/:id/retry', ({ request }) => {
+      http.post('/api/incidents/1/deliveries/:id/retry', ({ request }) => {
         pfad = new URL(request.url).pathname;
         return HttpResponse.json(versand({ id: 'c', state: 'wartet' }));
       }),
     );
     renderMitProviders(<Versandliste einsatzId={1} quelle={quelle} />);
     await userEvent.click(await screen.findByRole('button', { name: 'Erneut senden' }));
-    await waitFor(() => expect(pfad).toBe('/api/einsaetze/1/deliveries/c/retry'));
+    await waitFor(() => expect(pfad).toBe('/api/incidents/1/deliveries/c/retry'));
   });
 
   it('rendert nichts ohne Versand', async () => {

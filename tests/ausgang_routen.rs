@@ -103,7 +103,7 @@ async fn welt() -> Welt {
 
 impl Welt {
     fn lb(&self, rest: &str) -> String {
-        format!("/api/einsaetze/{}/situation-reports{rest}", self.einsatz)
+        format!("/api/incidents/{}/situation-reports{rest}", self.einsatz)
     }
 
     async fn lagebericht(&self, freigeben: bool) -> i64 {
@@ -180,7 +180,7 @@ impl Welt {
         let (s, n) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/resource-requests", self.einsatz),
+            &format!("/api/incidents/{}/resource-requests", self.einsatz),
             &self.admin,
             Some(
                 &json!({
@@ -251,7 +251,7 @@ async fn senden_legt_je_empfaenger_einen_versand_an() {
         &w.app,
         "GET",
         &format!(
-            "/api/einsaetze/{}/deliveries?source_kind=lagebericht&source_id={lid}",
+            "/api/incidents/{}/deliveries?source_kind=lagebericht&source_id={lid}",
             w.einsatz
         ),
         &w.admin,
@@ -264,7 +264,7 @@ async fn senden_legt_je_empfaenger_einen_versand_an() {
     let (s, l) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/deliveries", w.einsatz),
+        &format!("/api/incidents/{}/deliveries", w.einsatz),
         &w.admin,
         None,
     )
@@ -391,7 +391,7 @@ async fn leser_ohne_schreibrecht_403() {
     let (s, _) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/deliveries", w.einsatz),
+        &format!("/api/incidents/{}/deliveries", w.einsatz),
         &cookie,
         None,
     )
@@ -452,7 +452,7 @@ async fn erneut_senden_aus_fehlgeschlagen_setzt_wartet() {
     let lid = w.lagebericht(true).await;
     let (_, v) = w.lb_senden(lid, "w-1", &w.kanaele[..1]).await;
     let id = v[0]["id"].as_str().unwrap().to_string();
-    let url = format!("/api/einsaetze/{}/deliveries/{id}/retry", w.einsatz);
+    let url = format!("/api/incidents/{}/deliveries/{id}/retry", w.einsatz);
 
     // Aus `wartet` nicht.
     let (s, v) = anfrage(&w.app, "POST", &url, &w.admin, None).await;
@@ -479,7 +479,7 @@ async fn erneut_senden_ueberholter_fassung_422() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/deliveries/{id}/retry", w.einsatz),
+        &format!("/api/incidents/{}/deliveries/{id}/retry", w.einsatz),
         &w.admin,
         None,
     )
@@ -507,7 +507,7 @@ async fn erneut_senden_fremder_versand_404_und_leser_403() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{anderer}/deliveries/{id}/retry"),
+        &format!("/api/incidents/{anderer}/deliveries/{id}/retry"),
         &w.admin,
         None,
     )
@@ -520,7 +520,7 @@ async fn erneut_senden_fremder_versand_404_und_leser_403() {
     let (s, _) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/deliveries/{id}/retry", w.einsatz),
+        &format!("/api/incidents/{}/deliveries/{id}/retry", w.einsatz),
         &cookie,
         None,
     )
@@ -533,7 +533,7 @@ async fn nachforderung_senden_und_zurueckgezogen_ist_422() {
     let w = welt().await;
     let nid = w.nachforderung().await;
     let url = format!(
-        "/api/einsaetze/{}/resource-requests/{nid}/deliveries",
+        "/api/incidents/{}/resource-requests/{nid}/deliveries",
         w.einsatz
     );
 
@@ -556,7 +556,7 @@ async fn nachforderung_senden_und_zurueckgezogen_ist_422() {
         &w.app,
         "POST",
         &format!(
-            "/api/einsaetze/{}/resource-requests/{nid}/withdraw",
+            "/api/incidents/{}/resource-requests/{nid}/withdraw",
             w.einsatz
         ),
         &w.admin,
@@ -583,18 +583,18 @@ async fn befehl_senden() {
     let (s, b) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/orders", w.einsatz),
+        &format!("/api/incidents/{}/orders", w.einsatz),
         &w.admin,
         Some(r#"{"vorlage":"befehl_lad","titel":"Erstbefehl"}"#),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{b}");
     let bid = b["id"].as_i64().unwrap();
-    let url = format!("/api/einsaetze/{}/orders/{bid}/deliveries", w.einsatz);
+    let url = format!("/api/incidents/{}/orders/{bid}/deliveries", w.einsatz);
     let (s, v) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/orders/{bid}", w.einsatz),
+        &format!("/api/incidents/{}/orders/{bid}", w.einsatz),
         &w.admin,
         Some(r#"{"abschnitte":[{"schluessel":"lage","text":"Hochwasser steigt."},{"schluessel":"auftrag","text":"Sandsäcke füllen."},{"schluessel":"durchfuehrung","text":"Zug 2 rückt aus."}]}"#),
     )
@@ -613,7 +613,7 @@ async fn befehl_senden() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/orders/{bid}/release", w.einsatz),
+        &format!("/api/incidents/{}/orders/{bid}/release", w.einsatz),
         &w.admin,
         None,
     )
@@ -646,14 +646,14 @@ async fn liste_ohne_filter_zeigt_nur_lesbare_quellarten() {
     let mit = benutzer_anlegen(&w.app, &w.admin, "mitarbeiter", "keine").await;
     rolle_setzen(&w.app, &w.admin, w.einsatz, mit, "mitarbeit").await;
     let cookie = login_cookie(&w.app, "mitarbeiter", "mitarbeiterpw1").await;
-    let url = format!("/api/einsaetze/{}/deliveries", w.einsatz);
+    let url = format!("/api/incidents/{}/deliveries", w.einsatz);
     let (s, l) = anfrage(&w.app, "GET", &url, &cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{l}");
     assert_eq!(l.as_array().unwrap().len(), 1, "vorher sichtbar");
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/lageberichte", w.einsatz),
+        &format!("/api/incidents/{}/module-overrides/lageberichte", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -679,7 +679,7 @@ async fn liste_ohne_filter_zeigt_nur_lesbare_quellarten() {
         &w.app,
         "GET",
         &format!(
-            "/api/einsaetze/{}/deliveries?source_kind=quatsch",
+            "/api/incidents/{}/deliveries?source_kind=quatsch",
             w.einsatz
         ),
         &w.admin,

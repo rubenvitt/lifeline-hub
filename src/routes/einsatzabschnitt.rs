@@ -105,7 +105,7 @@ fn lage_wort(l: Option<AbschnittLagezustand>) -> &'static str {
     l.map_or("nicht beurteilt", |l| l.wort())
 }
 
-/// GET /api/einsaetze/{id}/sectors — flache Liste (Baum baut das FE). Nur Lesezugriff.
+/// GET /api/incidents/{id}/sectors — flache Liste (Baum baut das FE). Nur Lesezugriff.
 pub async fn list(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Einsatzabschnitte>,
@@ -144,7 +144,7 @@ pub struct AbschnittBody {
     pub abschnittsauftrag: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/sectors — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
+/// POST /api/incidents/{id}/sectors — anlegen. Schreibrecht + aktiv. ETB-Eintrag.
 pub async fn create(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
@@ -284,7 +284,7 @@ pub struct AbschnittErwartet {
     pub verbindungen: Option<Vec<VerbindungBody>>,
 }
 
-/// PATCH /api/einsaetze/{id}/sectors/{aid} — echter Teil-Patch (LFH-306).
+/// PATCH /api/incidents/{id}/sectors/{aid} — echter Teil-Patch (LFH-306).
 /// Kein ETB-Eintrag für Korrekturen — AUSSER beim Wechsel des Lagezustands (LFH-608):
 /// „Abschnitt Nord ist kritisch" ist eine Lagemeldung, keine Stammdatenpflege, und gehört
 /// mit Zeitpunkt und Urheber ins Tagebuch.
@@ -515,7 +515,7 @@ pub async fn update(
     Ok(Json(anzeige))
 }
 
-/// DELETE /api/einsaetze/{id}/sectors/{aid} — auflösen (Reparenting). ETB-Eintrag.
+/// DELETE /api/incidents/{id}/sectors/{aid} — auflösen (Reparenting). ETB-Eintrag.
 pub async fn aufloesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,
@@ -580,7 +580,7 @@ async fn etb_sprechgruppe(
     super::etb_sprechgruppe(state, einsatz_id, org_id, benutzer_id, name, sg, wirkung).await;
 }
 
-/// PUT /api/einsaetze/{id}/sectors/{aid}/talk-groups/{sg} — eine Sprechgruppe zuordnen
+/// PUT /api/incidents/{id}/sectors/{aid}/talk-groups/{sg} — eine Sprechgruppe zuordnen
 /// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung wie der
 /// PATCH mit `sprechgruppe_ids`. Anders als der PATCH schreibt eine wirksame Zuordnung einen
 /// System-Eintrag ins ETB (LLH-1456, D2), eine wiederholte keinen.
@@ -606,7 +606,7 @@ pub async fn sprechgruppe_zuordnen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/sectors/{aid}/talk-groups/{sg} — Zuordnung lösen, idempotent;
+/// DELETE /api/incidents/{id}/sectors/{aid}/talk-groups/{sg} — Zuordnung lösen, idempotent;
 /// eine wirksame Lösung schreibt einen System-Eintrag ins ETB (LLH-1456, D2).
 pub async fn sprechgruppe_loesen(
     State(state): State<AppState>,
@@ -634,7 +634,7 @@ pub struct FlaecheBody {
     pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
-/// PATCH /api/einsaetze/{id}/sectors/{aid}/area — Lage-Pflege, KEIN ETB.
+/// PATCH /api/incidents/{id}/sectors/{aid}/area — Lage-Pflege, KEIN ETB.
 pub async fn flaeche(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einsatzabschnitte>,

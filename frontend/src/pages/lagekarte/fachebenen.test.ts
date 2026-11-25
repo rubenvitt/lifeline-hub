@@ -49,8 +49,21 @@ describe('Fachebenen-Registry', () => {
       'kritis',
       'energie',
       'autobahn',
+      'autobahn_parken',
       'copernicus',
+      'drohne',
     ]);
+  });
+  it('führt die Lkw-Parkplätze als eigene, selten getaktete Ebene neben der BAB-Lage (LLH-1637)', () => {
+    const def = FACHEBENEN.autobahn_parken;
+    expect(def.label).toBe('Lkw-Parkplätze (BAB)');
+    expect(def.geometrieTyp).toBe('punkt');
+    expect(def.geltung).toBe('nur Rastanlagen an Bundesautobahnen, ohne Belegung');
+    expect(istBboxAbhaengig('autobahn_parken')).toBe(false);
+    // Erster Lauf im Hintergrund wie bei `autobahn`: kurz takten, solange `offline`.
+    expect(fachebeneTakt('autobahn_parken', 'offline')).toBe(20_000);
+    expect(fachebeneTakt('autobahn_parken', 'ok')).toBe(30 * 60_000);
+    expect(defaultFachebenenSichtbar().autobahn_parken).toBe(false);
   });
   it('führt die Energieanlagen als bbox-abhängige Punktebene ohne Polling (LFH-81)', () => {
     expect(FACHEBENEN.energie.label).toBe('Energieanlagen');
@@ -183,11 +196,18 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.kritis.geltung).toMatch(/nicht amtlich/);
   });
 
-  it('nur ODL, Luftqualität, KRITIS, Autobahn und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+  it('nur ODL, Luftqualität, KRITIS, Autobahn, Lkw-Parken und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
-    expect(mitGeltung).toEqual(['odl', 'luftqualitaet', 'kritis', 'autobahn', 'copernicus']);
+    expect(mitGeltung).toEqual([
+      'odl',
+      'luftqualitaet',
+      'kritis',
+      'autobahn',
+      'autobahn_parken',
+      'copernicus',
+    ]);
   });
   it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
     // Seit LFH-594 kostet ein Poll ohne neuen Stand nur ein 304. Mit `pollMs == TTL` verschenkte
@@ -207,10 +227,12 @@ describe('Fachebenen-Registry', () => {
       odl: 'ODL_TTL',
       luftqualitaet: 'LUFTQUALITAET_TTL',
       autobahn: 'AUTOBAHN_TTL',
+      autobahn_parken: 'AUTOBAHN_PARKEN_TTL',
       copernicus: 'COPERNICUS_TTL',
     };
-    // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL.
-    const pollend = fachebeneKeys().filter((k) => FACHEBENEN[k].pollMs > 0);
+    // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL. Die Drohnenlage
+    // hat keine Server-TTL (Arbeitsspeicher), ihren Takt prüft der Test darunter.
+    const pollend = fachebeneKeys().filter((k) => k !== 'drohne' && FACHEBENEN[k].pollMs > 0);
     expect(pollend.sort()).toEqual(Object.keys(ttlKonstante).sort());
     for (const k of pollend) {
       const name = ttlKonstante[k]!;
@@ -221,6 +243,27 @@ describe('Fachebenen-Registry', () => {
       const ttlMs = Number(treffer![1].replace(/_/g, '')) * 1000;
       expect(FACHEBENEN[k].pollMs, k).toBeLessThan(ttlMs);
     }
+  });
+  it('pollt die Drohnenlage nicht langsamer, als der Adapter den Stand erneuert (LLH-2106)', () => {
+    // Kein Server-Cache: die Lage liegt im Arbeitsspeicher und erneuert sich im Takt des Adapters
+    // (`intervall_vorschlag_s`, `src/drohne/art.rs`). Wer langsamer fragt, zeigt ein Fluggerät
+    // von vorgestern; ein Poll ohne neuen Stand kostet ein 304. Der Takt wird aus der Quelle
+    // gelesen, damit eine dort geänderte Zahl hier rot wird.
+    const hier = dirname(fileURLToPath(import.meta.url));
+    const art = readFileSync(join(hier, '../../../../src/drohne/art.rs'), 'utf8');
+    const treffer = art.match(/fn intervall_vorschlag_s\(&self\) -> i64 \{\s*(\d+)\s*\}/);
+    expect(treffer, 'intervall_vorschlag_s in src/drohne/art.rs').not.toBeNull();
+    const adapterMs = Number(treffer![1]) * 1000;
+    expect(FACHEBENEN.drohne.pollMs).toBe(5_000);
+    expect(FACHEBENEN.drohne.pollMs).toBeLessThanOrEqual(adapterMs);
+    // Veraltet erst nach mehreren verpassten Erneuerungen, nicht schon nach einer.
+    expect(FACHEBENEN.drohne.veraltetNachMin * 60_000).toBeGreaterThan(4 * adapterMs);
+  });
+  it('lädt die Drohnenlage über die Einsatzroute, nicht über die Überlagerungen (LLH-2106)', () => {
+    expect(FACHEBENEN.drohne.drohnenlage).toBe(true);
+    expect(FACHEBENEN.drohne.bboxAbhaengig).toBe(false);
+    expect(fachebeneTakt('drohne', undefined)).toBe(5_000);
+    expect(fachebeneTakt('drohne', 'ok')).toBe(5_000);
   });
   it('jede Ebene hat Label, Geometrietyp und Poll-Intervall', () => {
     for (const e of Object.values(FACHEBENEN)) {
@@ -511,7 +554,9 @@ describe('fachebeneAlter (LFH-591)', () => {
       kritis: 14 * 24 * 60,
       energie: 36 * 60,
       autobahn: 60,
+      autobahn_parken: 36 * 60,
       copernicus: 120,
+      drohne: 1,
     });
   });
 
@@ -569,6 +614,36 @@ describe('Copernicus (LLH-1200)', () => {
       { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00', unvollstaendig: false, gekuerzt: false },
       { emsr: 'EMSR712', aufnahme: '2023-12-24 06:00:00', unvollstaendig: false, gekuerzt: false },
       { emsr: 'EMSR900', aufnahme: undefined, unvollstaendig: false, gekuerzt: false },
+    ]);
+  });
+
+  it('nimmt ohne Aufnahme die Lieferung (Altbestand, LLH-2022)', () => {
+    const fc = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-08-11 12:48:47' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR517', geliefert: '2021-07-19 11:36:42' },
+        },
+        {
+          type: 'Feature',
+          properties: { klasse: 'gebiet', emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00' },
+        },
+      ],
+    } as never;
+    expect(copernicusAktivierungen(fc)).toEqual([
+      { emsr: 'EMSR728', aufnahme: '2024-06-10 10:13:00', unvollstaendig: false, gekuerzt: false },
+      {
+        emsr: 'EMSR517',
+        aufnahme: undefined,
+        geliefert: '2021-08-11 12:48:47',
+        unvollstaendig: false,
+        gekuerzt: false,
+      },
     ]);
   });
 

@@ -236,7 +236,7 @@ pub struct ListeParams {
     pub abschnitt_id: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/staging-areas — Räume mit Abschnittsname, Kennzahlen der
+/// GET /api/incidents/{id}/staging-areas — Räume mit Abschnittsname, Kennzahlen der
 /// Belegung und den Einheiten im Raum (LLH-1095). Eine feste Zahl Abfragen für alle Räume.
 pub async fn list(
     State(state): State<AppState>,
@@ -276,7 +276,7 @@ pub struct AnlegenBody {
     pub lon: Option<f64>,
 }
 
-/// POST /api/einsaetze/{id}/staging-areas
+/// POST /api/incidents/{id}/staging-areas
 /// KEIN ETB-Eintrag (erst Inbetriebnahme ist lagerelevant). SSE.
 pub async fn create(
     State(state): State<AppState>,
@@ -306,7 +306,7 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(br)))
 }
 
-/// GET /api/einsaetze/{id}/staging-areas/{bid}
+/// GET /api/incidents/{id}/staging-areas/{bid}
 pub async fn detail(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Bereitstellungsraeume>,
@@ -317,7 +317,7 @@ pub async fn detail(
     Ok(Json(lade_detail(&state, einsatz_id, br_id).await?))
 }
 
-/// GET /api/einsaetze/{id}/staging-areas/{bid}/history — Belegungsreihe des Raums,
+/// GET /api/incidents/{id}/staging-areas/{bid}/history — Belegungsreihe des Raums,
 /// ungeblättert, neueste zuerst (LLH-1095, design.md D5; Ausnahme von der Phasenregel in
 /// `src/AGENTS.md`, „Antwortkompression und Phasenlisten“). Rechte wie das Detail; das BR-Gerät
 /// liest nur den eigenen Raum (fremd 404). Auch ein stornierter oder aufgelöster Raum liefert
@@ -335,7 +335,7 @@ pub async fn verlauf(
     ))
 }
 
-/// GET /api/einsaetze/{id}/staging-areas/{bid}/expected — erwartete Kräfte aus
+/// GET /api/incidents/{id}/staging-areas/{bid}/expected — erwartete Kräfte aus
 /// Nachforderungen mit Ziel = dieser Raum (LLH-1387, design.md D1–D3): Rechte wie das Detail und
 /// dazu die Freigabe Nachforderungen (403 vor jedem Lesen); das BR-Gerät nur am eigenen Raum
 /// (fremd 404). Ohne Freitexte außer Art und Rufnamen (`nachforderung::erwartet`).
@@ -360,7 +360,7 @@ pub struct StammTrefferParams {
     pub suche: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/staging-areas/{bid}/master-data-matches?suche=… — Einheiten-Vorlagen
+/// GET /api/incidents/{id}/staging-areas/{bid}/master-data-matches?suche=… — Einheiten-Vorlagen
 /// der Organisation als Treffer für „Eintreffen buchen“ (LLH-1300, design.md D2): Rechte wie das
 /// Detail, das BR-Gerät nur am eigenen Raum (fremd 404). Kein Recht an den Stammdaten nötig; die
 /// Projektion nennt nur Namen und Funkrufnamen, ab drei Zeichen, höchstens zehn.
@@ -403,7 +403,7 @@ pub struct PatchBody {
     pub basis_geaendert_at: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id}/staging-areas/{bid}
+/// PATCH /api/incidents/{id}/staging-areas/{bid}
 /// KEIN ETB-Eintrag, auch nicht für die Koordinate (LLH-1107, design.md D2): die Verortung geht
 /// live über das Ereignis `bereitstellungsraum`. SSE.
 pub async fn update(
@@ -440,7 +440,7 @@ pub struct StatusBody {
     pub status: String,
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/status
+/// POST /api/incidents/{id}/staging-areas/{bid}/status
 /// ETB-Spur bei → aktiv und → aufgeloest. SSE.
 pub async fn status_wechsel(
     State(state): State<AppState>,
@@ -487,7 +487,7 @@ pub async fn status_wechsel(
     Ok(Json(nachher))
 }
 
-/// DELETE /api/einsaetze/{id}/staging-areas/{bid}
+/// DELETE /api/incidents/{id}/staging-areas/{bid}
 /// Soft-Delete. KEIN ETB. SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
@@ -511,7 +511,7 @@ pub struct BelegungBody {
     pub von_br_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/occupancy
+/// POST /api/incidents/{id}/staging-areas/{bid}/occupancy
 /// ETB bei Eintritt/Austritt/Wechsel mit realen Namen. SSE.
 pub async fn belegung(
     State(state): State<AppState>,
@@ -578,7 +578,7 @@ pub async fn belegung(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo —
+/// POST /api/incidents/{id}/staging-areas/{bid}/occupancy/{belegung_id}/undo —
 /// einen Austritt zurücknehmen (LLH-1924, Spec `bereitstellungsraum-belegung`, „Austritt
 /// zurücknehmen“, design.md D3). Rechte wie das Austragen, auch am Gerät des Raums. ETB und Live
 /// wie eine Belegung.
@@ -614,7 +614,7 @@ pub async fn belegung_zuruecknehmen(
     Ok((StatusCode::CREATED, Json(event)))
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/dispatch — eine Kraft aus dem Raum abrufen,
+/// POST /api/incidents/{id}/staging-areas/{bid}/dispatch — eine Kraft aus dem Raum abrufen,
 /// optional mit Ziel-Abschnitt (Unterstellung) und Auftrag, auf Wunsch gleich ausgerückt (LLH-1085,
 /// design.md D2, D6–D11, D15). Belegung, Unterstellung, Auftrag samt Anordnung und genau ein
 /// ETB-Eintrag entstehen in EINER Transaktion. Das BR-Gerät erreicht die Route nicht (fehlt in
@@ -787,7 +787,7 @@ pub async fn abruf(
     ))
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/dispatch/void — einen Abruf
+/// POST /api/incidents/{id}/staging-areas/{bid}/dispatch/void — einen Abruf
 /// zurücknehmen, samt der mit abgerufenen Untereinheiten (LLH-1085, design.md D13). Unterstellung
 /// und Auftrag bleiben, darum nur das BR-Schreibrecht (D7). Ereignisse und ETB in EINER
 /// Transaktion.
@@ -874,7 +874,7 @@ async fn check_kraft_im_einsatz(
     Ok(())
 }
 
-/// POST /api/einsaetze/{id}/staging-areas/{bid}/arrival — eine bekannte Kraft oder
+/// POST /api/incidents/{id}/staging-areas/{bid}/arrival — eine bekannte Kraft oder
 /// eine unangemeldete Kraft einbuchen (LLH-1075, design.md D1–D12, Spec
 /// `bereitstellungsraum-belegung`). `EinsatzSchreibfreigabe`, weil ein Replay auch nach dem
 /// Abschluss des Einsatzes antworten muss (D8); `fordere_aktiv` folgt erst nach dem Replay.

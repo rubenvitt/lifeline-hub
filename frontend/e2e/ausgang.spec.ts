@@ -57,7 +57,7 @@ test('Lagebericht freigeben, an die Leitstelle senden, Versandliste zeigt „üb
 
     // Ein freigegebener Lagebericht.
     const einsatzId = await einsatzPerApi(page, `E2E Ausgang ${marke}`);
-    const api = `/api/einsaetze/${einsatzId}/situation-reports`;
+    const api = `/api/incidents/${einsatzId}/situation-reports`;
     const bericht = await page.request.post(api, {
       data: {
         vorlage: 'freitext',

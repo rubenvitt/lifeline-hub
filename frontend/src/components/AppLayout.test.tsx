@@ -296,7 +296,7 @@ describe('AppLayout · Orientierung (LFH-954)', () => {
   function setupAn(route: string, einsaetze: unknown[] = []) {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json(einsaetze)),
+      http.get('/api/incidents', () => HttpResponse.json(einsaetze)),
     );
     return renderMitProviders(
       <CommandPaletteProvider>

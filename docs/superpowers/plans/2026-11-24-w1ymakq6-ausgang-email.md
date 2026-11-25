@@ -55,7 +55,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 1: Kanaladressen der Externen Stelle (Backend)
 
 **Files:**
-- Create: `migrations/0373_org_externe_stelle_kanal.sql`
+- Create: `migrations/0376_org_externe_stelle_kanal.sql`
 - Create: `src/externe_stelle/kanal.rs`
 - Modify: `src/externe_stelle/mod.rs` (Modul, `KanalArt`)
 - Modify: `src/routes/externe_stelle.rs`, `src/app.rs` (Routen nahe 2318)
@@ -187,7 +187,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 6: Ausgangskorb — Tabelle, Zustand, Repo
 
 **Files:**
-- Create: `migrations/0374_ausgang.sql`
+- Create: `migrations/0377_ausgang.sql`
 - Create: `src/ausgang/mod.rs`, `src/ausgang/repo.rs`, `src/ausgang/zustand.rs`, `src/ausgang/tests.rs`
 - Modify: `src/lib.rs`, `src/instanz/spiegel/art.rs` (`AUSGENOMMEN`, Grund aus Spec 3), `src/einsatz/schwaerzung_registry.rs` (`ausgang`: `betreff`, `inhalt`, `adresse`, `stelle_bezeichnung`), `src/aufbewahrung/` (wie ETB einsortieren)
 
@@ -341,7 +341,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 11: Regel, Entscheidung, Doku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0098-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md` (Nummer vorher gegen `origin/alpha` und offene PRs prüfen)
+- Create: `docs/architektur/entscheidungen/ADR-0100-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md` (Nummer vorher gegen `origin/alpha` und offene PRs prüfen)
 - Modify: `src/AGENTS.md` (Abschnitt „Ausgang an Menschen“, Ergänzung „Adapter“: Versandweg, `zugang_fuer_versand`), `AGENTS.md`-Tabelle nur falls eine neue Bereichsdatei entsteht (keine geplant)
 - Modify: `docs/architektur/` nach Mitänderungsregel (Bausteinsicht, Laufzeitsicht)
 - Modify: `docs/anwender/` Kapitel „Senden an Externe Stellen“ nach `docs/anwender/AGENTS.md` (Bilder über den Bildlauf, falls dort Pflicht)

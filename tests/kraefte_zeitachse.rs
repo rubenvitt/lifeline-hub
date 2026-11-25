@@ -69,7 +69,7 @@ async fn welt_in(app: axum::Router) -> Welt {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{ep}"),
+        &format!("/api/incidents/{e}/units/{einheit}/personnel/{ep}"),
         &admin,
         None,
     )
@@ -86,10 +86,10 @@ async fn welt_in(app: axum::Router) -> Welt {
 
 impl Welt {
     fn einheit_pfad(&self) -> String {
-        format!("/api/einsaetze/{}/units/{}", self.e, self.einheit)
+        format!("/api/incidents/{}/units/{}", self.e, self.einheit)
     }
     fn person_pfad(&self) -> String {
-        format!("/api/einsaetze/{}/personnel/{}", self.e, self.ep)
+        format!("/api/incidents/{}/personnel/{}", self.e, self.ep)
     }
     async fn nachtrag(&self, pfad: &str, body: &str) -> (StatusCode, Value) {
         anfrage(
@@ -180,7 +180,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let (s, fz) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/vehicles", w.e),
+        &format!("/api/incidents/{}/vehicles", w.e),
         &w.admin,
         Some(r#"{"adhoc":{"funkrufname":"HLF 1"}}"#),
     )
@@ -190,7 +190,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/units/{}/vehicles/{ef}", w.e, w.einheit),
+        &format!("/api/incidents/{}/units/{}/vehicles/{ef}", w.e, w.einheit),
         &w.admin,
         None,
     )
@@ -199,7 +199,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let (s, _) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/vehicles/{ef}", w.e),
+        &format!("/api/incidents/{}/vehicles/{ef}", w.e),
         &w.admin,
         Some(&format!(r#"{{"status_id":{am_ort}}}"#)),
     )
@@ -220,7 +220,7 @@ async fn fahrzeugstatus_wirkt_ueber_die_einheit() {
     let (s, liste) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/units/timeline", w.e),
+        &format!("/api/incidents/{}/units/timeline", w.e),
         &w.admin,
         None,
     )
@@ -483,7 +483,7 @@ async fn nachtrag_statuscodes() {
     let anderer = einsatz_anlegen_mit(&w.app, &w.admin, "Anderswo").await;
     let fremd = einheit_bilden(&w.app, &w.admin, anderer, "Fremd").await;
     let (s, _) = w
-        .nachtrag(&format!("/api/einsaetze/{}/units/{fremd}", w.e), eins)
+        .nachtrag(&format!("/api/incidents/{}/units/{fremd}", w.e), eins)
         .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
@@ -593,7 +593,7 @@ async fn rechte_und_modulsperre() {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/personal", w.e),
+        &format!("/api/incidents/{}/module-overrides/personal", w.e),
         &w.admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -604,7 +604,7 @@ async fn rechte_und_modulsperre() {
     let (s, _) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personnel/timeline", w.e),
+        &format!("/api/incidents/{}/personnel/timeline", w.e),
         &bea,
         None,
     )
@@ -618,7 +618,7 @@ async fn grenzwerte(w: &Welt, cookie: &str, modul: &str) -> (StatusCode, Value) 
     anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/{modul}/timeline/limits", w.e),
+        &format!("/api/incidents/{}/{modul}/timeline/limits", w.e),
         cookie,
         None,
     )
@@ -629,7 +629,7 @@ async fn modul_sichtbar(w: &Welt, modul: &str, sichtbar: bool) {
     let (s, _) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/{modul}", w.e),
+        &format!("/api/incidents/{}/module-overrides/{modul}", w.e),
         &w.admin,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":null}}"#
@@ -661,7 +661,7 @@ async fn grenzwerte_lesen_ohne_modul_abloesung() {
     let (s, _) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/reliefs/shift-plan/limits", w.e),
+        &format!("/api/incidents/{}/reliefs/shift-plan/limits", w.e),
         &w.admin,
         Some(r#"{"max_dienst_minuten":360}"#),
     )
@@ -699,7 +699,7 @@ async fn nachtrag_sendet_live_events() {
     anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{ep}"),
+        &format!("/api/incidents/{e}/units/{einheit}/personnel/{ep}"),
         &admin,
         None,
     )
@@ -710,7 +710,7 @@ async fn nachtrag_sendet_live_events() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{einheit}/timeline"),
+        &format!("/api/incidents/{e}/units/{einheit}/timeline"),
         &admin,
         Some(&format!(
             r#"{{"art":"eintreffen","zeitpunkt_at":"{jetzt}"}}"#
@@ -735,7 +735,7 @@ async fn grenzwerte_setzen_meldet_einheit_und_personal() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/reliefs/shift-plan/limits"),
+        &format!("/api/incidents/{e}/reliefs/shift-plan/limits"),
         &admin,
         Some(r#"{"max_dienst_minuten":360}"#),
     )
@@ -772,7 +772,7 @@ async fn schon_eingetroffen_in_einheit(w: &Welt, name: &str) -> i64 {
     let (s, _) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/personnel/{ep}", w.e),
+        &format!("/api/incidents/{}/personnel/{ep}", w.e),
         &w.admin,
         Some(&format!(r#"{{"status_id":{im_einsatz}}}"#)),
     )
@@ -811,7 +811,7 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
         let (s, fz) = anfrage(
             &w.app,
             "POST",
-            &format!("/api/einsaetze/{}/vehicles", w.e),
+            &format!("/api/incidents/{}/vehicles", w.e),
             &w.admin,
             Some(&format!(r#"{{"adhoc":{{"funkrufname":"{funkrufname}"}}}}"#)),
         )
@@ -837,7 +837,7 @@ async fn fahrzeugstatus_meldet_personal_fuer_den_fan_out() {
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{e}/vehicles/{ef}"),
+                &format!("/api/incidents/{e}/vehicles/{ef}"),
                 &admin,
                 Some(&format!(r#"{{"status_id":{status}}}"#)),
             )
@@ -956,7 +956,7 @@ async fn abloesung_bereit(w: &Welt) -> (i64, i64, i64) {
     let (s, _) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/personnel/{carla}", w.e),
+        &format!("/api/incidents/{}/personnel/{carla}", w.e),
         &w.admin,
         Some(&format!(r#"{{"status_id":{entlassen}}}"#)),
     )
@@ -965,7 +965,7 @@ async fn abloesung_bereit(w: &Welt) -> (i64, i64, i64) {
     let (s, schicht) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/reliefs", w.e),
+        &format!("/api/incidents/{}/reliefs", w.e),
         &w.admin,
         Some(&format!(
             r#"{{"einheit_id":{},"rhythmus_minuten":480}}"#,
@@ -981,7 +981,7 @@ async fn vollziehen(w: &Welt, schicht: i64) {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/reliefs/{schicht}/execution", w.e),
+        &format!("/api/incidents/{}/reliefs/{schicht}/execution", w.e),
         &w.admin,
         Some("{}"),
     )
@@ -996,7 +996,7 @@ async fn schicht_ohne_periode(w: &Welt) -> i64 {
     let (s, schicht) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/reliefs", w.e),
+        &format!("/api/incidents/{}/reliefs", w.e),
         &w.admin,
         Some(&format!(
             r#"{{"einheit_id":{einheit},"beginn_at":"{}","rhythmus_minuten":480}}"#,
@@ -1012,7 +1012,7 @@ async fn zuruecknehmen(w: &Welt, schicht: i64) {
     let (s, json) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/reliefs/{schicht}/execution/undo", w.e),
+        &format!("/api/incidents/{}/reliefs/{schicht}/execution/undo", w.e),
         &w.admin,
         None,
     )
@@ -1044,7 +1044,7 @@ async fn vollzug_meldet_einheit_und_personal() {
     let (_, z) = zeitachse(
         &w.app,
         &w.admin,
-        &format!("/api/einsaetze/{}/personnel/{carla}", w.e),
+        &format!("/api/incidents/{}/personnel/{carla}", w.e),
     )
     .await;
     assert!(
@@ -1153,7 +1153,7 @@ async fn einsatzvorgabe_6h(w: &Welt) {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/reliefs/shift-model", w.e),
+        &format!("/api/incidents/{}/reliefs/shift-model", w.e),
         &w.admin,
         Some(r#"{"schichtmodell":{"bezeichnung":"Sanitätsdienst","typ":"rhythmus","rhythmus_minuten":360}}"#),
     )
@@ -1165,7 +1165,7 @@ async fn laufende_schichten(w: &Welt) -> Vec<Value> {
     let (s, v) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/reliefs?status=laufend", w.e),
+        &format!("/api/incidents/{}/reliefs?status=laufend", w.e),
         &w.admin,
         None,
     )
@@ -1224,7 +1224,7 @@ async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
     let (s, fz) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/vehicles", w.e),
+        &format!("/api/incidents/{}/vehicles", w.e),
         &w.admin,
         Some(r#"{"adhoc":{"funkrufname":"HLF 1"}}"#),
     )
@@ -1243,7 +1243,7 @@ async fn fahrzeugstatus_beginnt_die_schicht_der_einheit() {
     let (s, json) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/vehicles/{ef}", w.e),
+        &format!("/api/incidents/{}/vehicles/{ef}", w.e),
         &w.admin,
         Some(&format!(r#"{{"status_id":{am_ort}}}"#)),
     )
@@ -1362,7 +1362,7 @@ async fn entlassene_person_berichtigt_ihre_zeitachse() {
     let (s, json) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personnel?entlassene=1", w.e),
+        &format!("/api/incidents/{}/personnel?entlassene=1", w.e),
         &w.admin,
         None,
     )
@@ -1486,7 +1486,7 @@ async fn fehleintrag_einer_frueheren_periode_streichen() {
     let (_, json) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personnel?entlassene=1", w.e),
+        &format!("/api/incidents/{}/personnel?entlassene=1", w.e),
         &w.admin,
         None,
     )
@@ -1501,7 +1501,7 @@ async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
     let nachtrag = format!(r#"{{"art":"eintreffen","zeitpunkt_at":"{}"}}"#, vor(1, 0));
 
     let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
-    let bert_pfad = format!("/api/einsaetze/{}/personnel/{bert}", w.e);
+    let bert_pfad = format!("/api/incidents/{}/personnel/{bert}", w.e);
     let (_, z) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
     let alarmierung = ereignis_id(&z, "alarmierung");
     let (s, json) = anfrage(
@@ -1527,7 +1527,7 @@ async fn storno_und_aufgeloeste_einheit_bleiben_gesperrt() {
 
     // Eine Einheit ohne Personal, aber mit Zeitachse, wird aufgelöst statt gelöscht.
     let leer = einheit_bilden(&w.app, &w.admin, w.e, "Florian 2").await;
-    let leer_pfad = format!("/api/einsaetze/{}/units/{leer}", w.e);
+    let leer_pfad = format!("/api/incidents/{}/units/{leer}", w.e);
     let (s, z) = w
         .nachtrag(
             &leer_pfad,
@@ -1822,7 +1822,7 @@ async fn abschliessende_entlassung_einer_entlassenen_person_berichtigen() {
     let (_, json) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personnel?entlassene=1", w.e),
+        &format!("/api/incidents/{}/personnel?entlassene=1", w.e),
         &w.admin,
         None,
     )
@@ -1895,7 +1895,7 @@ async fn berichtigung_statuscodes() {
     assert_eq!(s, StatusCode::NOT_FOUND, "Ereignis einer anderen Kraft");
 
     let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
-    let bert_pfad = format!("/api/einsaetze/{}/personnel/{bert}", w.e);
+    let bert_pfad = format!("/api/incidents/{}/personnel/{bert}", w.e);
     let (_, z) = zeitachse(&w.app, &w.admin, &bert_pfad).await;
     let bert_alarmierung = ereignis_id(&z, "alarmierung");
     let (s, _) = anfrage(
@@ -1979,7 +1979,7 @@ async fn fehlende_periode_an_entlassener_person_nachtragen() {
     let (_, json) = anfrage(
         &w.app,
         "GET",
-        &format!("/api/einsaetze/{}/personnel?entlassene=1", w.e),
+        &format!("/api/incidents/{}/personnel?entlassene=1", w.e),
         &w.admin,
         None,
     )
@@ -2029,7 +2029,7 @@ async fn periode_an_der_einheit_vor_der_laufenden() {
     assert_eq!(s, StatusCode::CREATED, "{json:?}");
 
     let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
-    let bert_pfad = format!("/api/einsaetze/{}/personnel/{bert}", w.e);
+    let bert_pfad = format!("/api/incidents/{}/personnel/{bert}", w.e);
     sqlx::query("UPDATE einsatz_kraft_zeitachse SET zeitpunkt_at = ? WHERE personal_id = ?")
         .bind(vor(8, 0))
         .bind(bert)
@@ -2047,7 +2047,7 @@ async fn periode_an_der_einheit_vor_der_laufenden() {
         &w.app,
         "PUT",
         &format!(
-            "/api/einsaetze/{}/units/{}/personnel/{bert}",
+            "/api/incidents/{}/units/{}/personnel/{bert}",
             w.e, w.einheit
         ),
         &w.admin,
@@ -2149,7 +2149,7 @@ async fn periode_statuscodes() {
         StatusCode::UNPROCESSABLE_ENTITY,
         "Alarmierung nach Eintreffen"
     );
-    let fremd = format!("/api/einsaetze/{}/units/999999", w.e);
+    let fremd = format!("/api/incidents/{}/units/999999", w.e);
     let (s, _) = periode(
         &w,
         &fremd,
@@ -2159,7 +2159,7 @@ async fn periode_statuscodes() {
     assert_eq!(s, StatusCode::NOT_FOUND);
 
     let bert = stammpersonal_disponieren(&w.app, &w.admin, w.e, "Bert").await;
-    let bert_pfad = format!("/api/einsaetze/{}/personnel/{bert}", w.e);
+    let bert_pfad = format!("/api/incidents/{}/personnel/{bert}", w.e);
     let (s, _) = anfrage(
         &w.app,
         "POST",

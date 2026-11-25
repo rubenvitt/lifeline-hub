@@ -114,15 +114,15 @@ sequenceDiagram
   participant DB as SQLite
   participant Hub as LiveHub (src/live)
   participant B as frontend Tab B (useEinsatzLiveStream)
-  B->>BE: GET /api/einsaetze/{id}/live (SSE, Last-Event-ID)
+  B->>BE: GET /api/incidents/{id}/live (SSE, Last-Event-ID)
   BE->>Hub: abonniere_mit_position
-  A->>BE: POST /api/einsaetze/{id}/etb {client_id, …}
+  A->>BE: POST /api/incidents/{id}/etb {client_id, …}
   BE->>DB: laden_nach_client_id, anlegen_idempotent_mit_meldung
   BE->>Hub: publiziere(einsatz_id, etb_id), nur wenn neu
   BE-->>A: 201 Created
   Hub-->>B: event: etb (nur Kennung), gefiltert nach Modulrecht
   B->>B: Sammler 300 ms, invalidateQueries([etb, id])
-  B->>BE: GET /api/einsaetze/{id}/etb
+  B->>BE: GET /api/incidents/{id}/etb
 ```
 
 - `erfassen` (`src/routes/etb.rs`) prüft Schreibfreigabe, Offline-Queue-Besitzer und
@@ -150,10 +150,10 @@ sequenceDiagram
   participant BE as lifeline-hub (src/routes/praesenz.rs)
   participant Hub as LiveHub (src/live)
   participant B as frontend Tab B (useEinsatzLiveStream)
-  B->>BE: GET /api/einsaetze/{id}/live
+  B->>BE: GET /api/incidents/{id}/live
   B->>B: onopen leert den Präsenzstand
   BE-->>B: event: praesenz (Stand beim Verbinden, ohne id, nur wenn nicht leer)
-  A->>BE: PUT /api/einsaetze/{id}/presence beim Öffnen, dann alle 15 s
+  A->>BE: PUT /api/incidents/{id}/presence beim Öffnen, dann alle 15 s
   BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
   Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)
   A->>BE: DELETE …/presence beim Schließen (pagehide mit keepalive)
@@ -259,14 +259,14 @@ sequenceDiagram
   participant DB as SQLite
   participant G as frontend Gerät (frontend/src/geraet)
   participant Hub as LiveHub
-  EL->>BE: POST /api/einsaetze/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
+  EL->>BE: POST /api/incidents/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
   G->>BE: POST /api/devices/pair {code}
   BE->>DB: session::anlegen_geraet (mit kopplung_id)
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
-  G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
+  G->>BE: GET /api/incidents/{id}/live, dann Anfragen der Ansicht
   BE->>BE: CurrentUser: fordere_geraeteroute gegen die Routenliste
   EL->>BE: POST …/devices/{gid}/revoke
   BE->>Hub: melde_kopplung_ende
@@ -363,7 +363,7 @@ sequenceDiagram
   participant H as Hub, erreicht (src/instanz/spiegel/abgleich.rs)
   participant E as ELW, meldet sich und führt (src/instanz/spiegel/takt.rs)
   participant ER as ELW, eigener Router (src/app.rs)
-  SB->>H: POST /api/einsaetze/{id}/etb
+  SB->>H: POST /api/incidents/{id}/etb
   H->>H: antrag::schicht: Spiegel, BEANTRAGBAR, Verweise lokal → fremd
   H-->>SB: 202 {antrag: ausstehend}
   loop Tick 1 s; je Kopplung 5 s bei Aktivität, sonst Takt der Meldung
@@ -660,7 +660,7 @@ sequenceDiagram
 
 ## 6.6h Versand an eine Externe Stelle
 
-Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0098](entscheidungen/ADR-0098-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)).
+Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0100](entscheidungen/ADR-0100-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)).
 
 ```mermaid
 sequenceDiagram

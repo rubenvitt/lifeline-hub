@@ -38,7 +38,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &i.admin,
         Some(&json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 1" })),
     )
@@ -50,17 +50,17 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     for (methode, pfad, body) in [
         (
             "PATCH",
-            format!("/api/einsaetze/{e}"),
+            format!("/api/incidents/{e}"),
             json!({ "bezeichnung": "Neu" }),
         ),
         (
             "POST",
-            format!("/api/einsaetze/{e}/damages"),
+            format!("/api/incidents/{e}/damages"),
             json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "Hauptstr. 2" }),
         ),
         (
             "PATCH",
-            format!("/api/einsaetze/{e}/damages/{schaden}"),
+            format!("/api/incidents/{e}/damages/{schaden}"),
             json!({ "ort": "Hauptstr. 3" }),
         ),
     ] {
@@ -84,7 +84,7 @@ async fn schreibende_routen_am_spiegel_enden_mit_409_die_lesemarke_nicht() {
     let (s, v) = common::anfrage(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb/read-marker"),
+        &format!("/api/incidents/{e}/etb/read-marker"),
         &i.admin,
         Some(&format!(r#"{{"bis_lfd_nr":{lfd}}}"#)),
     )
@@ -111,7 +111,7 @@ async fn etb_eintrag(i: &Instanz, einsatz: i64, inhalt: &str) {
     let (s, v) = common::anfrage_json(
         &i.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &i.admin,
         Some(&json!({ "typ": "meldung", "inhalt": inhalt, "von": "ELW", "an": "EL" })),
     )
@@ -127,7 +127,7 @@ async fn etb_inhalte(i: &Instanz, einsatz: i64) -> Vec<String> {
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &i.admin,
         None,
     )
@@ -179,7 +179,7 @@ async fn elw_fuehrt_und_der_hub_spiegelt() {
     let (st, kopf) = common::anfrage(
         &hub.app,
         "GET",
-        &format!("/api/einsaetze/{s}"),
+        &format!("/api/incidents/{s}"),
         &hub.admin,
         None,
     )
@@ -193,7 +193,7 @@ async fn elw_fuehrt_und_der_hub_spiegelt() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "PATCH",
-        &format!("/api/einsaetze/{s}"),
+        &format!("/api/incidents/{s}"),
         &hub.admin,
         Some(&json!({ "bezeichnung": "X" })),
     )
@@ -352,7 +352,7 @@ async fn konten_nur_einer_seite_werden_stellvertreter_ohne_anmeldung_und_ohne_mi
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &spontan_cookie,
         Some(&json!({ "typ": "meldung", "inhalt": "Sandsäcke da", "von": "A", "an": "B" })),
     )
@@ -711,7 +711,7 @@ async fn antraege(i: &Instanz, einsatz: i64, cookie: &str) -> Vec<serde_json::Va
     let (s, v) = common::anfrage(
         &i.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/requests"),
+        &format!("/api/incidents/{einsatz}/requests"),
         cookie,
         None,
     )
@@ -734,7 +734,7 @@ async fn ein_etb_eintrag_am_hub_wird_antrag_und_beim_elw_uebernommen() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(&body),
     )
@@ -745,7 +745,7 @@ async fn ein_etb_eintrag_am_hub_wird_antrag_und_beim_elw_uebernommen() {
     let (_, v2) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(&body),
     )
@@ -845,7 +845,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
+        &format!("/api/incidents/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Ansprechbar", "client_id": "n-1" })),
     )
@@ -855,7 +855,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &spontan_cookie,
         Some(&json!({ "typ": "meldung", "inhalt": "Spontan", "von": "A", "an": "B", "client_id": "s-1" })),
     )
@@ -866,7 +866,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(
             &json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "a-1",
@@ -898,7 +898,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage(
         &elw.app,
         "DELETE",
-        &format!("/api/einsaetze/{s}/requests/{id}"),
+        &format!("/api/incidents/{s}/requests/{id}"),
         &spontan_cookie,
         None,
     )
@@ -909,7 +909,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &hub.admin,
         None,
     )
@@ -918,7 +918,7 @@ async fn antraege_an_den_hub_und_ihre_ablehnungen() {
     let (st, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons/{p_spiegel}/notes"),
+        &format!("/api/incidents/{s}/persons/{p_spiegel}/notes"),
         &erika,
         Some(&json!({ "text": "Später", "client_id": "n-2" })),
     )
@@ -959,7 +959,7 @@ async fn ein_beobachter_stellt_keinen_antrag() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(
             &json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-1" }),
@@ -982,7 +982,7 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons/{p}/notes"),
+        &format!("/api/incidents/{s}/persons/{p}/notes"),
         &erika,
         Some(&json!({ "text": "Notiz", "client_id": "v-1" })),
     )
@@ -1004,7 +1004,7 @@ async fn ein_verschwundener_bezug_beim_fuehrer_lehnt_ab_und_ohne_anmeldung_gibt_
     let (st, _) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         "antrag_akteur=1",
         Some(&json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B" })),
     )
@@ -1051,7 +1051,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/reports"),
+        &format!("/api/incidents/{s}/reports"),
         &erika,
         Some(
             &json!({"absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -1067,7 +1067,7 @@ async fn eine_kennung_die_es_nirgends_gibt_ist_nicht_mehr_vorhanden() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons/999999/triage"),
+        &format!("/api/incidents/{s}/persons/999999/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "weg-2"})),
     )
@@ -1103,7 +1103,7 @@ async fn eine_zeile_die_hier_steht_wartet_auf_ihre_herkunft() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons/{p}/triage"),
+        &format!("/api/incidents/{s}/persons/{p}/triage"),
         &erika,
         Some(&json!({"kategorie": "sk2", "client_id": "da-1"})),
     )
@@ -1126,7 +1126,7 @@ async fn widerruf_beendet_den_abgleich_der_spiegel_bleibt_lesbar() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(&json!({ "typ": "meldung", "inhalt": "Offen", "von": "A", "an": "B", "client_id": "w-1" })),
     )
@@ -1159,7 +1159,7 @@ async fn widerruf_beendet_den_abgleich_der_spiegel_bleibt_lesbar() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "PATCH",
-        &format!("/api/einsaetze/{s}"),
+        &format!("/api/incidents/{s}"),
         &hub.admin,
         Some(&json!({ "bezeichnung": "X" })),
     )
@@ -1255,7 +1255,7 @@ async fn eine_fremde_kopplung_erreicht_weder_anhaenge_noch_quittungen_noch_spieg
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(
             &json!({ "typ": "meldung", "inhalt": "Vom Stab", "von": "S", "an": "EL",
@@ -1398,7 +1398,7 @@ async fn sprechgruppe_zuordnen(i: &Instanz, einsatz: i64, einheit: i64, sg: i64)
     let (s, v) = common::anfrage(
         &i.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{einheit}/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/units/{einheit}/talk-groups/{sg}"),
         &i.admin,
         None,
     )
@@ -1608,7 +1608,7 @@ async fn ein_antrag_ohne_gespeicherte_quittung_wird_nicht_doppelt_ausgefuehrt() 
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(&body),
     )
@@ -1790,20 +1790,20 @@ async fn neue_zuordnung_an_eine_andere_org_laesst_den_spiegel_bei_seiner_org() {
         "keine Lieferung über die Zuordnung der Org Y: {etb:?}"
     );
     let (st, _) =
-        common::anfrage(&hub.app, "GET", &format!("/api/einsaetze/{s}"), &y_fk, None).await;
+        common::anfrage(&hub.app, "GET", &format!("/api/incidents/{s}"), &y_fk, None).await;
     assert_eq!(
         st,
         StatusCode::FORBIDDEN,
         "die Führungskraft der Org Y liest ihn nicht"
     );
-    let (st, liste) = common::anfrage(&hub.app, "GET", "/api/einsaetze", &y_fk, None).await;
+    let (st, liste) = common::anfrage(&hub.app, "GET", "/api/incidents", &y_fk, None).await;
     assert_eq!(st, StatusCode::OK);
     assert_eq!(liste.as_array().map(Vec::len), Some(0), "{liste}");
     // Erika (Org X) behält ihren Lesezugriff auf den beendeten Spiegel ihrer Org.
     let (st, v) = common::anfrage(
         &hub.app,
         "GET",
-        &format!("/api/einsaetze/{s}"),
+        &format!("/api/incidents/{s}"),
         &erika,
         None,
     )
@@ -1857,7 +1857,7 @@ async fn neue_zuordnung_an_dieselbe_org_gleicht_den_spiegel_wieder_ab() {
     let (st, _) = common::anfrage(
         &hub.app,
         "GET",
-        &format!("/api/einsaetze/{s}"),
+        &format!("/api/incidents/{s}"),
         &erika,
         None,
     )
@@ -1891,7 +1891,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &hub.admin,
         None,
     )
@@ -1906,7 +1906,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{s}/reopen"),
+        &format!("/api/incidents/{s}/reopen"),
         &elw.admin,
         Some(&json!({ "grund": "Versehen" })),
     )
@@ -1916,7 +1916,7 @@ async fn ein_beim_fuehrer_wieder_geoeffneter_einsatz_ist_beim_gegenueber_wieder_
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/reopen"),
+        &format!("/api/incidents/{e}/reopen"),
         &hub.admin,
         Some(&json!({ "grund": "Versehen" })),
     )
@@ -2040,7 +2040,7 @@ async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet
     let (st, v) = common::anfrage(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &hub.admin,
         None,
     )
@@ -2064,7 +2064,7 @@ async fn am_spiegel_bleiben_kopplung_und_freigabe_nach_dem_wiederoeffnen_beendet
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{e}/reopen"),
+        &format!("/api/incidents/{e}/reopen"),
         &hub.admin,
         Some(&json!({ "grund": "Versehen" })),
     )
@@ -2103,7 +2103,7 @@ async fn mitarbeit_beantragt_etb_eintrag_am_spiegel() {
     let (st, v) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/etb"),
+        &format!("/api/incidents/{s}/etb"),
         &erika,
         Some(
             &json!({ "typ": "meldung", "inhalt": "Von der Mitarbeit", "von": "A", "an": "B",
@@ -2133,7 +2133,7 @@ async fn mitarbeit_beantragt_keine_person_am_spiegel() {
     let (st, _) = common::anfrage_json(
         &hub.app,
         "POST",
-        &format!("/api/einsaetze/{s}/persons"),
+        &format!("/api/incidents/{s}/persons"),
         &erika,
         Some(&json!({ "name": "Max", "client_id": "m-p-1" })),
     )
@@ -2153,11 +2153,11 @@ async fn beobachter_beantragt_weiter_nichts() {
     let s = spiegel_von(&hub).await;
     for (pfad, body) in [
         (
-            format!("/api/einsaetze/{s}/etb"),
+            format!("/api/incidents/{s}/etb"),
             json!({ "typ": "meldung", "inhalt": "X", "von": "A", "an": "B", "client_id": "b-e" }),
         ),
         (
-            format!("/api/einsaetze/{s}/reports"),
+            format!("/api/incidents/{s}/reports"),
             json!({ "inhalt": "X", "client_id": "b-m" }),
         ),
     ] {
@@ -2175,12 +2175,12 @@ async fn der_fuehrer_lehnt_lagemeldung_und_anordnung_der_mitarbeit_ab() {
     let (e, s, erika) = mitarbeit_am_spiegel(&hub, &elw).await;
     for (pfad, body) in [
         (
-            format!("/api/einsaetze/{s}/etb"),
+            format!("/api/incidents/{s}/etb"),
             json!({ "typ": "anordnung", "inhalt": "Befehl", "von": "A", "an": "B",
                     "client_id": "m-anordnung" }),
         ),
         (
-            format!("/api/einsaetze/{s}/reports"),
+            format!("/api/incidents/{s}/reports"),
             json!({ "inhalt": "Lage", "meldungsart": "lagemeldung",
                     "ereigniszeit": "2026-11-10 08:00:00", "client_id": "m-lage" }),
         ),

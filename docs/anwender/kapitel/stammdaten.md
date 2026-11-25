@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/admin/BereitschaftUebersicht.tsx, frontend/src/admin/bereitschaft.ts, src/routes/verwaltung.rs, frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, src/auth/bootstrap.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs, frontend/src/stammdaten/ExterneStelleKanaele.tsx, src/externe_stelle/kanal.rs]
+quellen: [frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/stammdaten/StammdatenVorschauAnsicht.tsx, src/stammdaten_eingang/repo.rs, src/stammdaten_eingang/repo/planen.rs, src/routes/stammdaten_eingang.rs, frontend/src/admin/BereitschaftUebersicht.tsx, frontend/src/admin/bereitschaft.ts, src/routes/verwaltung.rs, frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, src/auth/bootstrap.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs, frontend/src/stammdaten/ExterneStelleKanaele.tsx, src/externe_stelle/kanal.rs]
 ---
 
 ## Überblick
@@ -49,6 +49,19 @@ Personal („Person anlegen“) und Material („Material anlegen“) werden auf
 angelegt. Material trägt dazu die „Art“: „Gerät“ (Vorgabe) oder „Verbrauchsgut“. Mit „Speichern
 und nächste“ und „Werte behalten“ bleibt auch die Art für das nächste Material stehen. Die
 Materialliste lässt sich nach „Art“ filtern.
+
+### Fahrzeuge und Personal aus einer Datei einlesen
+
+1. Oben „Verwaltung“ öffnen und unter „Stammdaten“ „Fahrzeuge“ oder „Personal“ wählen.
+2. „Stammdaten einlesen“ wählen und mit „Datei wählen“ eine CSV- oder Excel-Datei hochladen. Wie
+   die Datei aufgebaut ist, zeigen die Beispieldateien im Dialog („CSV“, „Excel“).
+3. Trägt die Datei Kennungen ohne Herkunft, unter „Herkunft“ den Namen der liefernden Anwendung
+   eintragen; vorgeschlagen ist die zuletzt genutzte.
+4. Die Vorschau prüfen. Zeilen mit „Mehrdeutig“ brauchen eine Wahl (einen der Treffer, „Neu
+   anlegen“ oder „Auslassen“). Weicht ein schon gefüllter Wert ab, bleibt er stehen („Bestand
+   behalten“, mit Lücken „Lücken füllen, Bestand behalten“); „Datei übernehmen“ ersetzt ihn.
+   Unbekannte Qualifikationen werden neu angelegt oder einer vorhandenen zugeordnet.
+5. „Übernehmen“ wählen.
 
 ### Eine Liste sortieren und filtern
 
@@ -299,6 +312,18 @@ hat. Wie der Rechner sie nutzt, beschreibt [Betreuung](betreuung.md).
   „+ N aus der Demo“ in der Zeile. Eine Organisation mit nur Demo-Daten ist also nicht bereit.
 - Führungskräfte sehen die Übersicht mit allen Zahlen, aber ohne Verweis auf die Benutzer; die
   Benutzerverwaltung bleibt System-Admins vorbehalten.
+
+### Stammdaten aus einer Datei
+
+Das Einlesen schreibt alles oder nichts: Solange eine Zeile einen Fehler hat und nicht
+ausgelassen ist, lässt sich nicht übernehmen, und der Bestand bleibt unverändert. Jeder übernommene Datensatz merkt sich seine Kennung in der liefernden Anwendung und
+deren Herkunft. Ein zweites Einlesen findet ihn darüber wieder, legt ihn nicht doppelt an und
+füllt nur leere Felder. Funkrufname, OPTA, ISSI, Name und Personalnummer lassen sich nur dann aus
+der Datei ändern, wenn der Datensatz über seine Kennung gefunden wurde. Gelöscht oder außer Dienst
+genommen wird beim Einlesen nichts; ein außer Dienst gestellter Datensatz bleibt unverändert.
+Spalten, die der Vertrag nicht kennt (etwa Bankverbindung oder Geburtsdatum), werden nicht gelesen;
+die Vorschau nennt nur ihre Überschriften. Meldet sich die Organisation bei einem Hub, werden die
+Stammdaten dort eingelesen. Den Aufbau der Datei beschreibt `docs/schnittstellen/stammdaten-datei.md`.
 
 ### Wer was darf
 

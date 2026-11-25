@@ -25,7 +25,7 @@ const posten = (ort: Partial<Record<string, number>> = {}) => ({
 function renderSetOrt() {
   const gesendet: { url: string; body: unknown }[] = [];
   server.use(
-    http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
+    http.patch('/api/incidents/1/material/:emId', async ({ request }) => {
       gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
       return HttpResponse.json({});
     }),
@@ -57,7 +57,7 @@ describe('useMaterialOrt (LLH-1225 D2)', () => {
     it(`schickt den Körper des Ortswechsels ${name} an die Disposition`, async () => {
       const { setOrt, gesendet } = renderSetOrt();
       await setOrt(em, ziel);
-      expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/10', body: koerper }]);
+      expect(gesendet).toEqual([{ url: '/api/incidents/1/material/10', body: koerper }]);
     });
   }
 
@@ -84,7 +84,7 @@ describe('useMaterialOrt (LLH-1225 D2)', () => {
 
   it('reicht eine Ablehnung an den Aufrufer durch', async () => {
     server.use(
-      http.patch('/api/einsaetze/1/material/:emId', () =>
+      http.patch('/api/incidents/1/material/:emId', () =>
         HttpResponse.json({ error: 'UHS ist aufgelöst' }, { status: 422 }),
       ),
     );
@@ -107,7 +107,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
   function renderTeile() {
     const gesendet: { url: string; body: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/1/material/:emId/split', async ({ request }) => {
+      http.post('/api/incidents/1/material/:emId/split', async ({ request }) => {
         gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
         return HttpResponse.json([{}, {}]);
       }),
@@ -126,7 +126,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
     const { teileAufNach, gesendet } = renderTeile();
     await teileAufNach(posten({ einheit_id: 2 }), 20, { art: 'uhs', id: 7 });
     expect(gesendet).toEqual([
-      { url: '/api/einsaetze/1/material/10/split', body: { menge: 20, uhs_id: 7 } },
+      { url: '/api/incidents/1/material/10/split', body: { menge: 20, uhs_id: 7 } },
     ]);
   });
 
@@ -162,7 +162,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
     );
     expect(gesendet).toEqual([
       {
-        url: '/api/einsaetze/1/material/10',
+        url: '/api/incidents/1/material/10',
         body: {
           uhs_id: 7,
           erwartet: {
@@ -176,7 +176,7 @@ describe('useMaterialOrt().teileAufNach (t1hvaqzu)', () => {
   it('Handlungen ohne offenes Feld (Lösen, Rückgängig) schicken keinen Altwert', async () => {
     const { setOrt, gesendet } = renderSetOrt();
     await setOrt(posten({ einheit_id: 2 }), null);
-    expect(gesendet).toEqual([{ url: '/api/einsaetze/1/material/10', body: { einheit_id: null } }]);
+    expect(gesendet).toEqual([{ url: '/api/incidents/1/material/10', body: { einheit_id: null } }]);
   });
 
   it('`setOrt` bleibt über ein neues Rendern dieselbe Funktion', () => {

@@ -1,5 +1,5 @@
 //! Integrationstests des Verteilers an Befehl und Lagebericht (LLH-1172, Spec
-//! `dokument-verteiler`) über die Routen `/api/einsaetze/{id}/{befehle|lageberichte}/{did}`:
+//! `dokument-verteiler`) über die Routen `/api/incidents/{id}/{befehle|lageberichte}/{did}`:
 //! Ersetzen im Entwurf, Prüfung und Grenzen, Anzeigename, Freigabe ins ETB und Fortschreiben.
 //! Jeder Fall läuft für beide Arten.
 
@@ -48,14 +48,14 @@ async fn umgebung() -> Umgebung {
 
 impl Umgebung {
     fn dok(&self, art: &Art, id: i64) -> String {
-        format!("/api/einsaetze/{}/{}/{id}", self.einsatz, art.praefix)
+        format!("/api/incidents/{}/{}/{id}", self.einsatz, art.praefix)
     }
 
     async fn anlegen(&self, art: &Art) -> i64 {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/{}", self.einsatz, art.praefix),
+            &format!("/api/incidents/{}/{}", self.einsatz, art.praefix),
             &self.admin,
             Some(art.anlegen),
         )
@@ -98,7 +98,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/sectors", self.einsatz),
+            &format!("/api/incidents/{}/sectors", self.einsatz),
             &self.admin,
             Some(&format!(r#"{{"name":"{name}"}}"#)),
         )
@@ -111,7 +111,7 @@ impl Umgebung {
         let (_, etb) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/etb", self.einsatz),
+            &format!("/api/incidents/{}/etb", self.einsatz),
             &self.admin,
             None,
         )
@@ -359,7 +359,7 @@ async fn anzeigename_ueberlebt_das_loeschen_und_nennt_keine_besetzung() {
     let (s, j) = anfrage(
         &u.app,
         "DELETE",
-        &format!("/api/einsaetze/{}/sectors/{sued}", u.einsatz),
+        &format!("/api/incidents/{}/sectors/{sued}", u.einsatz),
         &u.admin,
         None,
     )

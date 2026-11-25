@@ -52,7 +52,7 @@ test('eine getippte Koordinate springt auf die Lagekarte, und die Karte steht do
 
   // Einsatzort setzen: sonst wäre „die Karte steht auf dem Ziel" von „stand schon da" nicht
   // sicher zu trennen. Der Kopf-PATCH liest nur vorhandene Schlüssel (Teil-PATCH).
-  const patch = await page.request.patch(`/api/einsaetze/${einsatzId}`, {
+  const patch = await page.request.patch(`/api/incidents/${einsatzId}`, {
     data: { einsatzort: 'München', einsatzort_lat: ORT.lat, einsatzort_lon: ORT.lon },
   });
   expect(patch.ok(), await patch.text()).toBeTruthy();
@@ -93,7 +93,7 @@ test('der ETB-Sammeltreffer nennt die Trefferzahl und springt auf die gefilterte
 
   // Sequentiell: `lfd_nr` wird per MAX+1 vergeben.
   for (const inhalt of ['Deich Nord durchfeuchtet', 'Sandsäcke an den Deich', 'Lage ruhig']) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: { typ: 'meldung', von: 'ELW 1', an: 'Leitstelle', inhalt },
     });
     expect(r.ok(), await r.text()).toBeTruthy();

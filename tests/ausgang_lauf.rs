@@ -151,7 +151,7 @@ async fn welt() -> Welt {
 
 impl Welt {
     fn lb(&self, rest: &str) -> String {
-        format!("/api/einsaetze/{}/situation-reports{rest}", self.einsatz)
+        format!("/api/incidents/{}/situation-reports{rest}", self.einsatz)
     }
 
     /// Legt einen Lagebericht an, füllt ihn, hängt auf Wunsch eine PNG-Anlage an und gibt ihn frei.

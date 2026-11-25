@@ -29,7 +29,7 @@ impl DokumentRoute for Lagebericht {
     const LIVE_ID: &'static str = "lagebericht_id";
 }
 
-/// GET /api/einsaetze/{id}/situation-reports — Liste der Köpfe ohne Abschnitte (LFH-931). Nur
+/// GET /api/incidents/{id}/situation-reports — Liste der Köpfe ohne Abschnitte (LFH-931). Nur
 /// Lesezugriff (inkl. Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
@@ -39,7 +39,7 @@ pub async fn liste(
     kern::liste::<Lagebericht>(&state, &benutzer, einsatz_id).await
 }
 
-/// GET /api/einsaetze/{id}/situation-reports/{lid} — Detail. Nur Lesezugriff.
+/// GET /api/incidents/{id}/situation-reports/{lid} — Detail. Nur Lesezugriff.
 pub async fn detail(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -48,7 +48,7 @@ pub async fn detail(
     kern::detail::<Lagebericht>(&state, &benutzer, einsatz_id, lid).await
 }
 
-/// POST /api/einsaetze/{id}/situation-reports — Entwurf anlegen. Schreibrecht + aktiv.
+/// POST /api/incidents/{id}/situation-reports — Entwurf anlegen. Schreibrecht + aktiv.
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -58,7 +58,7 @@ pub async fn anlegen(
     kern::anlegen::<Lagebericht>(&state, &benutzer, einsatz_id, body).await
 }
 
-/// PATCH /api/einsaetze/{id}/situation-reports/{lid} — nur solange Entwurf (sonst 422).
+/// PATCH /api/incidents/{id}/situation-reports/{lid} — nur solange Entwurf (sonst 422).
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -68,7 +68,7 @@ pub async fn aktualisieren(
     kern::aktualisieren::<Lagebericht>(&state, &benutzer, einsatz_id, lid, body).await
 }
 
-/// POST /api/einsaetze/{id}/situation-reports/{lid}/release — rendert + snapshottet ins ETB.
+/// POST /api/incidents/{id}/situation-reports/{lid}/release — rendert + snapshottet ins ETB.
 pub async fn freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -77,7 +77,7 @@ pub async fn freigeben(
     kern::freigeben::<Lagebericht>(&state, &benutzer, einsatz_id, lid).await
 }
 
-/// POST /api/einsaetze/{id}/situation-reports/{lid}/revise — neue Entwurfs-Version.
+/// POST /api/incidents/{id}/situation-reports/{lid}/revise — neue Entwurfs-Version.
 pub async fn fortschreiben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -87,7 +87,7 @@ pub async fn fortschreiben(
     kern::fortschreiben::<Lagebericht>(&state, &benutzer, einsatz_id, lid, body).await
 }
 
-/// GET /api/einsaetze/{id}/situation-reports/{lid}/enclosures — Bild-Anlagen (LFH-1028). Lesezugriff.
+/// GET /api/incidents/{id}/situation-reports/{lid}/enclosures — Bild-Anlagen (LFH-1028). Lesezugriff.
 pub async fn anlagen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -96,7 +96,7 @@ pub async fn anlagen(
     kern::anlagen::<Lagebericht>(&state, &benutzer, einsatz_id, lid).await
 }
 
-/// POST /api/einsaetze/{id}/situation-reports/{lid}/enclosures — Anlage anfügen (Multipart: `datei`,
+/// POST /api/incidents/{id}/situation-reports/{lid}/enclosures — Anlage anfügen (Multipart: `datei`,
 /// `art`, `titel`, `stand_at`), nur im Entwurf.
 pub async fn anlage_ablegen(
     State(state): State<AppState>,
@@ -107,7 +107,7 @@ pub async fn anlage_ablegen(
     kern::anlage_ablegen::<Lagebericht>(&state, &benutzer, einsatz_id, lid, multipart).await
 }
 
-/// GET /api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid}/file — Download (`?fassung=`).
+/// GET /api/incidents/{id}/situation-reports/{lid}/enclosures/{aid}/file — Download (`?fassung=`).
 pub async fn anlage_datei(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -128,7 +128,7 @@ pub async fn anlage_datei(
     .await
 }
 
-/// DELETE /api/einsaetze/{id}/situation-reports/{lid}/enclosures/{aid} — nur im Entwurf.
+/// DELETE /api/incidents/{id}/situation-reports/{lid}/enclosures/{aid} — nur im Entwurf.
 pub async fn anlage_entfernen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -137,7 +137,7 @@ pub async fn anlage_entfernen(
     kern::anlage_entfernen::<Lagebericht>(&state, &benutzer, einsatz_id, lid, aid).await
 }
 
-/// POST /api/einsaetze/{id}/situation-reports/{lid}/deliveries — die freigegebene Fassung per
+/// POST /api/incidents/{id}/situation-reports/{lid}/deliveries — die freigegebene Fassung per
 /// E-Mail senden (LLH-2093). Schreibrecht + aktiv.
 pub async fn create_deliveries(
     State(state): State<AppState>,

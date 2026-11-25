@@ -1,5 +1,5 @@
 //! Integrationstests der Bild-Anlagen an Lagebericht und Befehl (LFH-1028, Spec
-//! `dokument-anlagen`) über die Routen `/api/einsaetze/{id}/{situation-reports|orders}/{did}/enclosures…`:
+//! `dokument-anlagen`) über die Routen `/api/incidents/{id}/{situation-reports|orders}/{did}/enclosures…`:
 //! Anfügen im Entwurf, Sperre nach der Freigabe, Dateityp, Felder, Rechte, Download in den
 //! Fassungen, Abschottung gegen die generische Route und der Freigabe-Snapshot im ETB.
 //!
@@ -33,7 +33,7 @@ const BEFEHL: Art = Art {
 };
 
 fn pfad(art: &Art, einsatz: i64, dok: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/{}/{dok}/enclosures", art.praefix)
+    format!("/api/incidents/{einsatz}/{}/{dok}/enclosures", art.praefix)
 }
 
 /// Multipart-POST mit Textfeldern und höchstens einer Datei.
@@ -140,7 +140,7 @@ async fn start(art: &Art) -> (axum::Router, sqlx::SqlitePool, String, i64, i64) 
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/{}", art.praefix),
+        &format!("/api/incidents/{einsatz}/{}", art.praefix),
         &admin,
         Some(art.anlegen),
     )
@@ -224,7 +224,7 @@ async fn freigabe_fall(art: &Art) {
     let (s, d) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/{}/{dok}/release", art.praefix),
+        &format!("/api/incidents/{einsatz}/{}/{dok}/release", art.praefix),
         &admin,
         None,
     )
@@ -348,7 +348,7 @@ async fn anlage_ist_ueber_die_generische_route_weder_lad_noch_loeschbar() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    let generisch = format!("/api/einsaetze/{einsatz}/attachments/{anhang_id}");
+    let generisch = format!("/api/incidents/{einsatz}/attachments/{anhang_id}");
     let (s, _) = get_bytes(&app, &generisch, &admin).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     let (s, _) = anfrage(&app, "DELETE", &generisch, &admin, None).await;
@@ -387,7 +387,7 @@ async fn anfuegen_und_entfernen_melden_je_ein_anlagen_ereignis() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         Some(BEFEHL.anlegen),
     )

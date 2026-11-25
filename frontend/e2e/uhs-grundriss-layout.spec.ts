@@ -34,8 +34,8 @@ async function seede<T = { id: number }>(page: Page, pfad: string, data: unknown
 /** Einsatz, zwei Personen unter „Noch nicht aufgenommen", eine aktive UHS mit sechs Betten. */
 async function aufbauen(page: Page): Promise<Aufbau> {
   const stempel = Date.now();
-  const einsatz = await seede(page, '/api/einsaetze', { bezeichnung: `E2E UHS Form ${stempel}` });
-  const E = `/api/einsaetze/${einsatz.id}`;
+  const einsatz = await seede(page, '/api/incidents', { bezeichnung: `E2E UHS Form ${stempel}` });
+  const E = `/api/incidents/${einsatz.id}`;
   await seede(page, `${E}/persons`, { name: `FormPat${stempel}` });
   await seede(page, `${E}/persons`, { name: `FormZwei${stempel}` });
   const uhs = await seede(page, `${E}/uhs`, {
@@ -260,10 +260,10 @@ for (const rolle of ['admin', 'beobachter'] as const) {
  */
 async function wenigeBetten(page: Page): Promise<Aufbau & { uhsPfad: string }> {
   const stempel = Date.now();
-  const einsatz = await seede(page, '/api/einsaetze', {
+  const einsatz = await seede(page, '/api/incidents', {
     bezeichnung: `E2E UHS Wachsen ${stempel}`,
   });
-  const E = `/api/einsaetze/${einsatz.id}`;
+  const E = `/api/incidents/${einsatz.id}`;
   const uhs = await seede(page, `${E}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: `BHP Wachsen ${stempel}`,

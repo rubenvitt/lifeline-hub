@@ -1199,7 +1199,7 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
   const ABSCHNITT = { id: 3, name: 'EA Süd' };
 
   beforeEach(() => {
-    server.use(http.get('/api/einsaetze/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])));
+    server.use(http.get('/api/incidents/:einsatzId/sectors', () => HttpResponse.json([ABSCHNITT])));
     vi.mocked(befehleApi.aktualisiereBefehl).mockReset();
     vi.mocked(befehleApi.aktualisiereBefehl).mockResolvedValue(befehl('entwurf') as never);
   });
@@ -1323,7 +1323,7 @@ describe('BefehlDetailPage — Verteiler (LLH-1172)', () => {
 describe('BefehlDetailPage — Senden (LLH-2093)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/1/deliveries', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
       http.get('/api/external-agencies/channels', () => HttpResponse.json([])),
     );
   });

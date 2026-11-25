@@ -120,6 +120,13 @@ pub trait AdapterArt: Send + Sync + 'static {
     /// Vorschlag beim Anlegen.
     fn intervall_vorschlag_s(&self) -> i64;
 
+    /// Ob die Art flüchtige Daten liefert: ihre Übernahme geht nur in den Speicher, der Takt
+    /// zählt ab Laufbeginn, und eine Versuchszeile steht nur bei Zustandswechsel
+    /// (`adapter::lauf::run_one`).
+    fn fluechtig(&self) -> bool {
+        false
+    }
+
     /// Prüfung über die Felder hinaus (Kombinationen); Meldung für die Verwaltung (400).
     fn check_extra(&self, _einstellungen: &Map<String, Value>) -> Result<(), String> {
         Ok(())
@@ -238,7 +245,8 @@ pub fn has_neues_ziel(
     })
 }
 
-/// Die Arten, die dieser Server kennt. In Produktion `smtp` (LLH-2093); Tests bringen ihre eigene Art mit.
+/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105) und `smtp` (LLH-2093);
+/// Tests bringen ihre eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -256,8 +264,11 @@ impl Verzeichnis {
     }
 
     /// Die Arten dieses Builds.
-    pub fn produktiv() -> Self {
-        Verzeichnis::new(vec![Arc::new(super::smtp_art::SmtpArt::produktiv())])
+    pub fn produktiv(drohne: Arc<crate::drohne::Store>) -> Self {
+        Verzeichnis::new(vec![
+            Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
+            Arc::new(super::smtp_art::SmtpArt::produktiv()),
+        ])
     }
 
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {
@@ -506,6 +517,8 @@ mod tests {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
         assert!(v.find("divera").is_none());
-        assert!(Verzeichnis::produktiv().find("smtp").is_some());
+        let verzeichnis = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
+        assert!(verzeichnis.find("suchlage").is_some());
+        assert!(verzeichnis.find("smtp").is_some());
     }
 }

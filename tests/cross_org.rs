@@ -78,7 +78,7 @@ async fn mitglied_setzen_lehnt_org_fremden_benutzer_ab() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{eid}/members/{fremd_id}"))
+                .uri(format!("/api/incidents/{eid}/members/{fremd_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"einsatz_rolle":"fuehrungspersonal"}"#))
@@ -129,7 +129,7 @@ async fn fremde_org_fuehrungskraft_sieht_einsatz_nicht() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{eid}"))
+                .uri(format!("/api/incidents/{eid}"))
                 .header(header::COOKIE, fremd.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -146,7 +146,7 @@ async fn fremde_org_fuehrungskraft_sieht_einsatz_nicht() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, fremd)
                 .body(Body::empty())
                 .unwrap(),

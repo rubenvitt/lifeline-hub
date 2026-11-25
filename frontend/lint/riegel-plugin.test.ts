@@ -32,6 +32,9 @@ const EINBLENDUNG = [
   'await expect(page.locator(".ant-modal")).not.toHaveClass(/ant-zoom-big-appear/);',
 ].join('\n');
 
+/** LLH-2090: feste Wartezeit statt Warten auf einen Zustand. */
+const WARTEZEIT = 'await page.waitForTimeout(500);';
+
 const MUSTER: Record<string, string> = {
   'e2e/probe-aussen.spec.ts': VERSTOESSE,
   // Steht in der Ausnahmeliste des Anmeldeformular-Riegels.
@@ -52,6 +55,13 @@ const MUSTER: Record<string, string> = {
   'e2e/einblendung.spec.ts': EINBLENDUNG,
   'e2e/dialog-kern.ts': EINBLENDUNG,
   'e2e/doku-bilder/einblendung.bilder.ts': EINBLENDUNG,
+  // LLH-2090: neue Specs warten nie fest; der Bestand steht in der Ausnahmeliste.
+  'e2e/wartezeit.spec.ts': WARTEZEIT,
+  'e2e/lagekarte-touch.spec.ts': WARTEZEIT,
+  'e2e/wartezeit-unterdrueckt.spec.ts': [
+    '// oxlint-disable-next-line lfh/e2e-wartezeit -- Probe: Doppeltipp-Fenster abwarten',
+    WARTEZEIT,
+  ].join('\n'),
   // Außerhalb von `e2e/` gilt kein Riegel.
   'src/probe.ts': "await page.waitForLoadState('networkidle');",
   // Wie unter ESLint: ein führender Unterstrich macht nichts unbenutzt-erlaubt (Review LLH-2020).
@@ -127,6 +137,12 @@ describe('Riegel-Plugin lfh (LLH-2020)', () => {
     ]);
     expect(von('e2e/dialog-kern.ts')).toEqual([]);
     expect(von('e2e/doku-bilder/einblendung.bilder.ts')).toEqual([]);
+  });
+
+  it('verbietet feste Wartezeiten außer im Bestand und mit begründeter Unterdrückung (LLH-2090)', () => {
+    expect(von('e2e/wartezeit.spec.ts')).toEqual(['1 lfh(e2e-wartezeit)']);
+    expect(von('e2e/lagekarte-touch.spec.ts')).toEqual([]);
+    expect(von('e2e/wartezeit-unterdrueckt.spec.ts')).toEqual([]);
   });
 
   it('meldet nichts für andere Werte, Template-Literale, unterdrückte Zeilen und außerhalb von e2e', () => {

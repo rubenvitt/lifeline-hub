@@ -14,6 +14,8 @@ export function defaultFachebenenSichtbar(): FachebenenSichtbar {
     kritis: false,
     energie: false,
     autobahn: false,
+    autobahn_parken: false,
     copernicus: false,
+    drohne: false,
   };
 }

@@ -75,7 +75,7 @@ function einstellungen(format: EinsatzEinstellungen['koordinatenformat']): Einsa
 describe('Inspector Koordinatenanzeige', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -101,7 +101,7 @@ describe('Inspector Koordinatenanzeige', () => {
 describe('Inspector Kennzahlen (LFH-146)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -153,7 +153,7 @@ describe('Inspector Kennzahlen (LFH-146)', () => {
 describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -193,7 +193,7 @@ describe('Inspector Symbol-Auswahl — Beschriftung (LFH-328)', () => {
 describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -253,7 +253,7 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
 
   it('kürzt die Ortsangabe, statt die Karte damit vollzuschreiben', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({
           peilung: { distanz_m: 20, richtung: 'O', bezug_label: 'S-1' },
           ortsname:
@@ -280,7 +280,7 @@ describe('Inspector Aktionsreihe — Überlauf in der 300-px-Karte', () => {
 describe('Inspector Typ-Tag (LFH-276)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -346,7 +346,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
 
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -483,7 +483,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
 
   it('LFH-888: gesperrtes Zielmodul — „Im Fachmodul öffnen" gesperrt mit Grund, ohne Link', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personal: { zugriff: false } })),
       ),
     );
@@ -507,7 +507,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
 
   it('LFH-888: gesperrtes ETB — „ETB ↗" an der Einheit gesperrt mit Grund', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     );
@@ -547,7 +547,7 @@ describe('Inspector im Paneel „Ausgewählt"', () => {
 describe('Inspector für Betroffene (LFH-648)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -603,7 +603,7 @@ describe('Inspector für Betroffene (LFH-648)', () => {
 describe('Inspector für Bereitstellungsräume (LLH-1107)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -666,7 +666,7 @@ describe('Inspector für Bereitstellungsräume (LLH-1107)', () => {
 describe('Inspector „Verortung löschen" — Rückfrage nur, wo sie unumkehrbar ist (LFH-710)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -739,7 +739,7 @@ describe('Inspector „Verortung löschen" — Rückfrage nur, wo sie unumkehrba
 describe('Inspector Symbolkachel (LFH-835)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -827,7 +827,7 @@ describe('Inspector Symbolkachel (LFH-835)', () => {
 describe('Inspector: „Abschnitt fokussieren“ (LLH-1057)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -910,7 +910,7 @@ describe('Inspector: „Abschnitt fokussieren“ (LLH-1057)', () => {
 describe('Inspector für Tiere (LLH-1123)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -967,7 +967,7 @@ describe('Inspector für Tiere (LLH-1123)', () => {
 describe('Inspector für Lagemeldungen (LLH-1066)', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/:id/place-preview', () =>
+      http.get('/api/incidents/:id/place-preview', () =>
         HttpResponse.json({ peilung: null, ortsname: null }),
       ),
     );
@@ -999,7 +999,7 @@ describe('Inspector für Lagemeldungen (LLH-1066)', () => {
   it('mit Schreibrecht: „Lage-Angaben bearbeiten“ ändert den Lage-Text über die Meldung', async () => {
     let body: unknown = null;
     server.use(
-      http.patch('/api/einsaetze/1/reports/3', async ({ request }) => {
+      http.patch('/api/incidents/1/reports/3', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ id: 3, lfd_nr: 5 });
       }),
@@ -1026,7 +1026,7 @@ describe('Inspector für Lagemeldungen (LLH-1066)', () => {
 
   it('ohne Modul Meldungen kein Bearbeiten', async () => {
     server.use(
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ meldungen: { zugriff: false } })),
       ),
     );

@@ -16,7 +16,7 @@ import type {
  * LLH-1034 das eigene Modul Evakuierung (`api/evakuierung.ts`). Zeiten gehen als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über
  * `alsBackendZeit`, zurück über `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/care`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/care`;
 
 /** Die eine Lesequelle: alle nicht stornierten Stellen samt aktueller Meldung. */
 export function ladeBetreuung(einsatzId: number): Promise<BetreuungUebersicht> {

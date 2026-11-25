@@ -49,7 +49,7 @@ function eintrag(lfd_nr: number, over: Record<string, unknown> = {}) {
 /** Liste des Tagebuchs wie der Server: `typ` filtert, Cursor wird bedient. */
 function tagebuch(alle: ReturnType<typeof eintrag>[]) {
   server.use(
-    http.get('/api/einsaetze/7/etb', ({ request }) => {
+    http.get('/api/incidents/7/etb', ({ request }) => {
       const url = new URL(request.url);
       const typ = url.searchParams.get('typ');
       const vor = Number(url.searchParams.get('before_lfd_nr') ?? Infinity);
@@ -71,11 +71,11 @@ const ZONE = 'Asia/Tokyo';
 
 function rendere(suche = '', client = neuerQueryClient()) {
   server.use(
-    http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/settings', () =>
+    http.get('/api/incidents/7', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/7/settings', () =>
       HttpResponse.json({ einsatz_id: 7, zeitzone: ZONE, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),
+    http.get('/api/incidents/7/units', () => HttpResponse.json([{ id: 3, name: '1. Zug' }])),
   );
   client.setQueryData(einsatzKeys.einstellungen(7), {
     einsatz_id: 7,
@@ -117,7 +117,7 @@ async function fertig() {
 describe('EtbDruckPage', () => {
   it('ordnet aufsteigend nach laufender Nummer, anders als die Zeitachse', async () => {
     server.use(
-      http.get('/api/einsaetze/7/etb', () =>
+      http.get('/api/incidents/7/etb', () =>
         HttpResponse.json([eintrag(3), eintrag(1), eintrag(2)]),
       ),
     );
@@ -165,7 +165,7 @@ describe('EtbDruckPage', () => {
   it('ohne Merkmal druckt sie das vollständige Tagebuch (Spec `etb-druck`, „Ungefiltert“)', async () => {
     const abrufe: URLSearchParams[] = [];
     server.use(
-      http.get('/api/einsaetze/7/etb', ({ request }) => {
+      http.get('/api/incidents/7/etb', ({ request }) => {
         abrufe.push(new URL(request.url).searchParams);
         return HttpResponse.json([eintrag(1)]);
       }),
@@ -181,7 +181,7 @@ describe('EtbDruckPage', () => {
   it('mit `system=aus` (Vorgabe der Seite) druckt sie ohne Systemeinträge und sagt es im Kopf (Review S7)', async () => {
     const abrufe: URLSearchParams[] = [];
     server.use(
-      http.get('/api/einsaetze/7/etb', ({ request }) => {
+      http.get('/api/incidents/7/etb', ({ request }) => {
         abrufe.push(new URL(request.url).searchParams);
         return HttpResponse.json([eintrag(1)]);
       }),
@@ -226,7 +226,7 @@ describe('EtbDruckPage', () => {
   it('verwirft einen unbekannten Typ aus der Adresse: kein `typ` am Server, „vollständiges Tagebuch" im Kopf', async () => {
     const typen: (string | null)[] = [];
     server.use(
-      http.get('/api/einsaetze/7/etb', ({ request }) => {
+      http.get('/api/incidents/7/etb', ({ request }) => {
         typen.push(new URL(request.url).searchParams.get('typ'));
         return HttpResponse.json([eintrag(1)]);
       }),
@@ -334,7 +334,7 @@ describe('EtbDruckPage', () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((r) => (freigeben = r));
     server.use(
-      http.get('/api/einsaetze/7/etb', async () => {
+      http.get('/api/incidents/7/etb', async () => {
         await tor;
         return HttpResponse.json([eintrag(1)]);
       }),
@@ -349,7 +349,7 @@ describe('EtbDruckPage', () => {
   it('sperrt Drucken nach einem Fehler und bietet „Erneut laden" an', async () => {
     let scheitern = true;
     server.use(
-      http.get('/api/einsaetze/7/etb', () =>
+      http.get('/api/incidents/7/etb', () =>
         scheitern
           ? HttpResponse.json({ error: 'Interner Serverfehler' }, { status: 500 })
           : HttpResponse.json([eintrag(1)]),
@@ -444,7 +444,7 @@ describe('EtbDruckPage', () => {
 
   it('zeigt ohne Lesezugriff keine Einträge und bietet kein Drucken an', async () => {
     server.use(
-      http.get('/api/einsaetze/7/etb', () =>
+      http.get('/api/incidents/7/etb', () =>
         HttpResponse.json({ error: 'Modul gesperrt' }, { status: 403 }),
       ),
     );

@@ -34,18 +34,18 @@ const RANDBODEN = 3;
 const LANG = ['sk3', 'tot', 'unverletzt'];
 
 async function einsatzAnlegen(page: Page, sichtungen: readonly string[] = LANG): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E 978 Handschirm ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   const einsatzId = String(((await antwort.json()) as { id: number }).id);
   for (const kategorie of sichtungen) {
-    const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
+    const person = await page.request.post(`/api/incidents/${einsatzId}/persons`, {
       data: { antreff_ort: 'Sammelstelle Süd' },
     });
     expect(person.ok(), `Person: ${person.status()} ${await person.text()}`).toBe(true);
     const { id } = (await person.json()) as { id: number };
-    const sichtung = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${id}/triage`, {
+    const sichtung = await page.request.post(`/api/incidents/${einsatzId}/persons/${id}/triage`, {
       data: { kategorie },
     });
     expect(sichtung.ok(), `Sichtung ${kategorie}: ${sichtung.status()}`).toBe(true);

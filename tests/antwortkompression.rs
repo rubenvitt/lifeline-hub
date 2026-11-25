@@ -52,7 +52,7 @@ async fn json_liste_kommt_mit_gzip_und_br_gepackt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_mit_personen(&app, &admin, 12).await;
-    let pfad = format!("/api/einsaetze/{e}/persons");
+    let pfad = format!("/api/incidents/{e}/persons");
     let (_, roh) = anfrage(&app, "GET", &pfad, &admin, None).await;
     assert!(
         roh.to_string().len() > 1024,
@@ -88,7 +88,7 @@ async fn kleine_json_antwort_bleibt_roh() {
     let resp = holen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         Some("gzip"),
     )
     .await;
@@ -104,7 +104,7 @@ async fn live_strom_und_csv_bleiben_roh() {
     let resp = holen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/live"),
+        &format!("/api/incidents/{e}/live"),
         Some("gzip, br"),
     )
     .await;
@@ -118,7 +118,7 @@ async fn live_strom_und_csv_bleiben_roh() {
     let resp = holen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/persons/export"),
+        &format!("/api/incidents/{e}/persons/export"),
         Some("gzip"),
     )
     .await;

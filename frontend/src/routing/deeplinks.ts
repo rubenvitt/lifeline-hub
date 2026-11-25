@@ -307,7 +307,7 @@ export function einsatzaktePfad(einsatzId: number): string {
 
 /** Pfad des ZIP mit Anhängen und Tabellen der Einsatzakte (LLH-1835, `src/routes/einsatzakte.rs`). */
 export function einsatzakteZipPfad(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}/case-file/attachments.zip`;
+  return `/api/incidents/${einsatzId}/case-file/attachments.zip`;
 }
 
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
@@ -1840,6 +1840,8 @@ export interface ListenZustandAdresse {
 const SORT_PARAM = 'sort';
 const SUCHE_PARAM = 'q';
 const FILTER_PRAEFIX = 'f.';
+/** Kein Filtername: als Schlüssel eines Objektliterals verbiegt er den Prototyp (LLH-2090). */
+const PROTO = '__proto__';
 const SORT_AUS = 'aus';
 
 function istListenParam(name: string): boolean {
@@ -1874,7 +1876,7 @@ export function listenZustandParams(
   if (sortierung === null) neu.set(SORT_PARAM, SORT_AUS);
   else if (sortierung) neu.set(SORT_PARAM, `${sortierung.spalte}:${sortierung.richtung}`);
   for (const [spalte, werte] of Object.entries(zustand.filter)) {
-    if (werte.length === 0) continue;
+    if (werte.length === 0 || spalte === PROTO) continue;
     neu.set(`${FILTER_PRAEFIX}${spalte}`, werte.map(encodeURIComponent).join(','));
   }
   const suche = zustand.suche.trim();
@@ -1901,7 +1903,9 @@ export function parseListenZustand(params: URLSearchParams): ListenZustandAdress
   for (const [name, wert] of params) {
     if (!name.startsWith(FILTER_PRAEFIX) || wert === '') continue;
     const spalte = name.slice(FILTER_PRAEFIX.length);
-    if (spalte === '') continue;
+    // `filter['__proto__'] = …` setzte den Prototyp statt eines Schlüssels (LLH-2090); eine
+    // Spalte dieses Namens gibt es nicht.
+    if (spalte === '' || spalte === PROTO) continue;
     try {
       filter[spalte] = wert.split(',').map(decodeURIComponent);
     } catch {

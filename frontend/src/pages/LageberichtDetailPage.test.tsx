@@ -699,7 +699,7 @@ describe('LageberichtDetailPage — Verteiler (LLH-1172)', () => {
       bezeichnung: 'Übung',
     } as never);
     server.use(
-      http.get('/api/einsaetze/:einsatzId/sectors', () =>
+      http.get('/api/incidents/:einsatzId/sectors', () =>
         HttpResponse.json([{ id: 3, name: 'EA Süd' }]),
       ),
     );
@@ -1124,7 +1124,7 @@ describe('LageberichtDetailPage — Senden (LLH-2093)', () => {
     } as never);
     vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
     server.use(
-      http.get('/api/einsaetze/1/deliveries', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
       http.get('/api/external-agencies/channels', () => HttpResponse.json([])),
     );
   }

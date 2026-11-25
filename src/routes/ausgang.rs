@@ -45,7 +45,7 @@ pub struct RecipientBody {
     pub channel_id: i64,
 }
 
-/// Query von `GET /api/einsaetze/{id}/deliveries`.
+/// Query von `GET /api/incidents/{id}/deliveries`.
 #[derive(Debug, Deserialize)]
 pub struct DeliveriesQuery {
     /// Nur Versände dieser Quellart.
@@ -355,7 +355,7 @@ pub(crate) async fn anlegen_nachforderung(
     .await
 }
 
-/// GET /api/einsaetze/{id}/deliveries?source_kind&source_id — Versandliste. Mit `source_kind`
+/// GET /api/incidents/{id}/deliveries?source_kind&source_id — Versandliste. Mit `source_kind`
 /// gilt das Leserecht des Moduls der Quelle; ohne Filter kommen nur Versände von Quellarten,
 /// deren Modul die Person lesen darf.
 pub async fn list_deliveries(
@@ -408,7 +408,7 @@ pub async fn list_deliveries(
     }
 }
 
-/// POST /api/einsaetze/{id}/deliveries/{did}/retry — „Erneut senden“ aus `fehlgeschlagen`.
+/// POST /api/incidents/{id}/deliveries/{did}/retry — „Erneut senden“ aus `fehlgeschlagen`.
 /// Schreibrecht im Modul der Quelle; die Quelle darf nicht überholt oder zurückgezogen sein
 /// (422 `ueberholt`). Gesendet wird der gespeicherte Schnappschuss.
 pub async fn retry_delivery(

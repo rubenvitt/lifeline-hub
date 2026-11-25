@@ -1,6 +1,6 @@
 //! Personenauswahl der Einsatzleitung (LFH-1141, Spec `einsatz-zugriff`):
-//! `GET /api/einsaetze/{id}/members/selection` bietet genau die Personen an, die
-//! `PUT /api/einsaetze/{id}/members/{benutzer_id}` aufnimmt — ohne Systemrolle, ohne fremde
+//! `GET /api/incidents/{id}/members/selection` bietet genau die Personen an, die
+//! `PUT /api/incidents/{id}/members/{benutzer_id}` aufnimmt — ohne Systemrolle, ohne fremde
 //! Organisationen, nur mit Kennung und Anzeigename.
 
 use axum::http::StatusCode;
@@ -14,7 +14,7 @@ use common::{
 };
 
 fn auswahl_uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/members/selection")
+    format!("/api/incidents/{einsatz}/members/selection")
 }
 
 /// Die Kennungen der Auswahl, in Antwortreihenfolge.
@@ -201,7 +201,7 @@ async fn abgeschlossener_einsatz_verweigert_die_auswahl() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &leitung,
         None,
     )
@@ -213,10 +213,10 @@ async fn abgeschlossener_einsatz_verweigert_die_auswahl() {
 }
 
 // ── Auswahl beim Anlegen (LLH-1820) ─────────────────────────────────────────────────────────
-// `GET /api/einsaetze/member-selection`: dieselbe Grundmenge wie oben, aber für einen Einsatz,
+// `GET /api/incidents/member-selection`: dieselbe Grundmenge wie oben, aber für einen Einsatz,
 // den es noch nicht gibt — die Org der anfragenden Person, ohne sie selbst.
 
-const ANLAGE_URI: &str = "/api/einsaetze/member-selection";
+const ANLAGE_URI: &str = "/api/incidents/member-selection";
 
 #[tokio::test]
 async fn anlage_auswahl_bietet_die_org_ohne_mich() {
@@ -269,7 +269,7 @@ async fn auswahl_pfad_ist_kein_einsatz() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &leitung,
         None,
     )

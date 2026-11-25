@@ -33,9 +33,9 @@ export function isAntragAngenommen(antwort: unknown): antwort is AntragAngenomme
  */
 export const ANTRAG_EREIGNIS = 'lfh:spiegel-antrag';
 
-/** Einsatz-Kennung aus einem Pfad `/api/einsaetze/{id}/…`. */
+/** Einsatz-Kennung aus einem Pfad `/api/incidents/{id}/…`. */
 function parseEinsatzAusPfad(pfad: string): number | null {
-  const treffer = /^\/api\/einsaetze\/(\d+)\//.exec(pfad);
+  const treffer = /^\/api\/incidents\/(\d+)\//.exec(pfad);
   return treffer ? Number(treffer[1]) : null;
 }
 

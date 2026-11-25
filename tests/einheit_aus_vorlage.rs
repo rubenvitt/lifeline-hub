@@ -191,7 +191,7 @@ async fn vorschau(app: &axum::Router, cookie: &str, einsatz: i64, v: i64) -> (St
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units/from-template/{v}"),
+        &format!("/api/incidents/{einsatz}/units/from-template/{v}"),
         cookie,
         None,
     )
@@ -207,7 +207,7 @@ async fn bilden(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/units/from-template"),
+        &format!("/api/incidents/{einsatz}/units/from-template"),
         cookie,
         Some(&body.to_string()),
     )
@@ -226,7 +226,7 @@ async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, art: &str) -> Vec
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/{art}"),
+        &format!("/api/incidents/{einsatz}/{art}"),
         cookie,
         None,
     )
@@ -255,7 +255,7 @@ async fn fahrzeug_im_einsatz(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         admin,
         Some(&format!(r#"{{"fahrzeug_id":{fid}}}"#)),
     )
@@ -266,7 +266,7 @@ async fn fahrzeug_im_einsatz(
         let (s, _) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/units/{e}/vehicles/{ef}"),
+            &format!("/api/incidents/{einsatz}/units/{e}/vehicles/{ef}"),
             admin,
             None,
         )
@@ -291,7 +291,7 @@ async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -625,7 +625,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&format!(r#"{{"personal_id":{}}}"#, v.notarzt)),
     )
@@ -635,7 +635,7 @@ async fn entlassene_person_wird_erneut_disponiert() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}/stand-down"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}/stand-down"),
         &admin,
         None,
     )
@@ -678,7 +678,7 @@ async fn entlassenes_fahrzeug_wird_wieder_aufgenommen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
+        &format!("/api/incidents/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -868,7 +868,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -1125,7 +1125,7 @@ async fn material_gesperrt_und_schon_im_einsatz() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{se}}}"#)),
     )
