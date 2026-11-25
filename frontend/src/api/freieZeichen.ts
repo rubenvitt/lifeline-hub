@@ -6,9 +6,13 @@ export function listeFreieZeichen(einsatzId: number): Promise<FreiesZeichen[]> {
   return apiGet<FreiesZeichen[]>(`/api/incidents/${einsatzId}/free-symbols`);
 }
 
+/**
+ * `fremdebene_id` (LLH-2129) nur hier, nicht in `NeuesFreiesZeichen`: sonst erbte der PATCH-Typ
+ * `FreiesZeichenUpdate` das Feld. Mit ihm schreibt der Server einen System-ETB-Eintrag.
+ */
 export function legeFreiesZeichenAn(
   einsatzId: number,
-  daten: NeuesFreiesZeichen,
+  daten: NeuesFreiesZeichen & { fremdebene_id?: number },
 ): Promise<FreiesZeichen> {
   return apiSend<FreiesZeichen>(`/api/incidents/${einsatzId}/free-symbols`, 'POST', daten);
 }
