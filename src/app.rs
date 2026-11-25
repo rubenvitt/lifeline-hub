@@ -2746,6 +2746,15 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
     let router = router
         .route("/api/map/config", get(routes::karte::config))
         .route("/api/map/overlays/{quelle}", get(routes::karte::fachebenen))
+        // LLH-2021: Satellitenbilder der Copernicus-Aktivierungen, Liste und Kacheln.
+        .route(
+            "/api/map/overlays/copernicus/images",
+            get(routes::karte::copernicus_bilder),
+        )
+        .route(
+            "/api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}",
+            get(routes::karte::copernicus_bild_kachel),
+        )
         // Offline-Tiles der aktiven Karte über den gecachten read-only-Reader. Kompat-Route (erste
         // sichtbare Region); neue Clients nutzen die region-adressierte Route.
         .route(

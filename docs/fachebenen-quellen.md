@@ -58,6 +58,7 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 | Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
+| Copernicus-Satellitenbilder | 1 800 s | 600 s | 120 min | Wie die Auswertung; das Alter jedes Bildes steht in der Ebenenzeile |
 | Drohne (LLH-2106) | — (Arbeitsspeicher) | 5 s | 1 min | Der Adapter erneuert den Stand alle 5 s (`intervall_vorschlag_s`); eine Minute ohne neuen Stand ist ein altes Fluggerät. Einsatzroute `/api/incidents/{id}/map/drone`, ein Poll ohne Änderung kostet ein 304 |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
@@ -636,5 +637,31 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   (`[west, süd, ost, nord]`, nach außen gerundet) in den Katalog, je Produkt Typ (`DEL`, `GRA`),
   Monitoring-Nummer (0 für `PRODUCT`), Version, Lieferzeit (UTC) und ZIP-Adresse. Die Tests in
   `copernicus_alt.rs` prüfen Format, Präfix und doppelte Codes.
-- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs und die Rasterbilder
-  (COG). EFAS-Echtzeitdaten gibt es nur für Partner.
+- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs, und für den
+  Altbestand die Rasterbilder (COG): Die Vector Packages enthalten keine. EFAS-Echtzeitdaten gibt
+  es nur für Partner.
+
+## Copernicus-Satellitenbilder (LLH-2021)
+
+Zu optischen Produkten liefert Copernicus das Orthobild als Cloud Optimized GeoTIFF unter dem
+S3-Host der Ebenen (`layers[]` mit `format: "cog"`, Sensor und Aufnahme aus `images[]` über den
+Dateinamen). Die Ebene `copernicus_bilder` zeigt sie als Kacheln des eigenen Servers
+(`karte::cog`, `karte::copernicus_bilder`, ADR-0100, Entwurf
+`docs/superpowers/specs/2026-11-24-h11vkn1p-copernicus-cog-rasterbilder-design.md`).
+
+- **Auswahl:** dieselbe Kette wie die Auswertung (`select_im_ausschnitt`); Bilder nur der dort
+  gewählten Produkte. Ein Gebiet, dessen gezeigtes Produkt Radar ist, hat kein Bild, auch wenn ein
+  jüngeres Monitoring ohne Flächen eines hätte (EMSR728 Stuttgart).
+- **Liste:** `GET /api/map/overlays/copernicus/images?bbox=…[&archiv=1]`, Umschlag wie jede
+  Fachebene; je Bild Umriss, Kennung (16 Hex-Zeichen von SHA-256 über den Pfad), Zoomgrenzen und
+  `darstellbar`. Höchstens 20 Bilder (`MAX_BILDER`), darüber `gekuerzt`.
+- **Kacheln:** `GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}`, PNG 256 px,
+  nur mit Sitzung (`KartenZugriff`), `Cache-Control: private, max-age=86400, immutable`. Der Server liest per HTTP-Range erst 16 KiB
+  Kopf (höchstens 1 MiB in bis zu 8 Runden), dann je Zielkachel höchstens 4 Quellkacheln der
+  passenden Übersicht (je höchstens 2 MiB komprimiert, entpackt nie mehr als eine Kachel; höchstens
+  4 Render-Läufe gleichzeitig). Kopf und Kacheln liegen im Kachel-Cache (256 MiB, LRU); jede
+  Listenantwort legt verdrängte Köpfe neu an.
+- **Nur EPSG:3857:** Gelesen werden gekachelte 8-Bit-Bilder mit höchstens 512 px Kachelkante mit 1, 3 oder 4 Kanälen, Deflate, LZW,
+  JPEG oder unkomprimiert, Prädiktor 1 oder 2. Anderes heißt „nicht darstellbar“, nie umprojiziert.
+- **Fehler:** unbekannte Kennung 404, falsche Kachel 400, außerhalb des Bildes oder unter dem
+  Mindest-Zoom 204, Quelle weg und Kachel nicht im Cache 502.

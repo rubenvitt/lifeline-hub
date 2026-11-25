@@ -2959,6 +2959,123 @@ async fn fachebenen_copernicus_trennt_archiv_im_cache() {
     );
 }
 
+/// Bilderliste der Copernicus-Satellitenbilder (LLH-2021): bbox-pflichtig wie die Vektorebene.
+#[tokio::test]
+async fn copernicus_bilder_ohne_oder_mit_zu_grosser_bbox_ist_400() {
+    let app = app_mit_pool(pool().await);
+    for uri in [
+        "/api/map/overlays/copernicus/images".to_string(),
+        "/api/map/overlays/copernicus/images?bbox=6.0,47.0,10.0,49.0".to_string(),
+    ] {
+        let res = anfrage(&app, "GET", &uri, None, None).await;
+        assert_eq!(res.status(), StatusCode::BAD_REQUEST, "{uri}");
+        let fehler = json(res).await["error"].as_str().unwrap().to_string();
+        assert!(fehler.contains("bbox"), "{uri}: {fehler}");
+    }
+}
+
+/// Mit und ohne Archiv sind es zwei Stände der Bilderliste (Schlüssel als Literal).
+#[tokio::test]
+async fn copernicus_bilder_trennt_archiv_im_cache() {
+    use lifeline_hub::karte::typen::FachebeneAntwort;
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let app = app_mit(pool().await, karten_dir.clone());
+    let cache_pool = lifeline_hub::cache_db::cache_pool(&karten_dir)
+        .await
+        .unwrap();
+    let leer = FachebeneAntwort::ok(
+        "copernicus_bilder",
+        "x",
+        None,
+        serde_json::json!({ "type": "FeatureCollection", "features": [] }),
+    );
+    let archiv = FachebeneAntwort::ok(
+        "copernicus_bilder",
+        "x",
+        Some("2024-06-10 10:13:00".into()),
+        serde_json::json!({ "type": "FeatureCollection", "features": [{
+            "type": "Feature",
+            "geometry": { "type": "Polygon", "coordinates": [[[12.6, 48.9], [12.7, 48.9], [12.7, 49.0], [12.6, 48.9]]] },
+            "properties": { "bild": "0123456789abcdef", "emsr": "EMSR728" }
+        }] }),
+    );
+    let k = "12.50,48.80,12.80,49.00";
+    lifeline_hub::karte::cache::setze(&cache_pool, &format!("copernicus-bilder:{k}"), &leer).await;
+    lifeline_hub::karte::cache::setze(
+        &cache_pool,
+        &format!("copernicus-bilder-archiv:{k}"),
+        &archiv,
+    )
+    .await;
+    let basis = "/api/map/overlays/copernicus/images?bbox=12.5,48.8,12.8,49.0";
+    let res = anfrage(&app, "GET", basis, None, None).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let a = json(res).await;
+    assert_eq!(
+        (a["quelle"].as_str(), a["status"].as_str()),
+        (Some("copernicus_bilder"), Some("leer"))
+    );
+    let res = anfrage(&app, "GET", &format!("{basis}&archiv=1"), None, None).await;
+    assert_eq!(json(res).await["status"], "ok");
+}
+
+/// Kachelroute: nur Kennungen, nie Pfade; falsche Kachel 400, unbekanntes Bild 404, eine Kachel
+/// im Cache kommt mit festem Cache-Kopf.
+#[tokio::test]
+async fn copernicus_bildkachel_pruefungen_und_cache() {
+    let karten_dir = lifeline_hub::db::test_karten_dir();
+    let pool = pool().await;
+    bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
+        .await
+        .unwrap();
+    let app = app_mit(pool, karten_dir.clone());
+    let cookie = login_cookie(&app, "admin", "startpw12").await;
+    let pfad = |rest: &str| format!("/api/map/overlays/copernicus/images/{rest}");
+    // Wie die Proxy-Kacheln (LFH-1072): ohne Sitzung 401, bevor irgendetwas geprüft wird.
+    for rest in [
+        "0123456789abcdef/10/1/2",
+        "0123456789abcdef/25/0/0",
+        "zu-kurz/10/1/2",
+    ] {
+        let res = anfrage(&app, "GET", &pfad(rest), None, None).await;
+        assert_eq!(res.status(), StatusCode::UNAUTHORIZED, "{rest}");
+    }
+    for (rest, soll) in [
+        ("0123456789abcdef/25/0/0", StatusCode::BAD_REQUEST),
+        ("0123456789abcdef/10/1024/0", StatusCode::BAD_REQUEST),
+        ("0123456789abcdef/10/1/2", StatusCode::NOT_FOUND),
+        ("zu-kurz/10/1/2", StatusCode::NOT_FOUND),
+        ("..%2F..%2Fetc/10/1/2", StatusCode::NOT_FOUND),
+    ] {
+        let res = anfrage(&app, "GET", &pfad(rest), Some(&cookie), None).await;
+        assert_eq!(res.status(), soll, "{rest}");
+    }
+    let cache = lifeline_hub::karte::tile_cache::cache_oeffnen(&karten_dir)
+        .await
+        .unwrap();
+    lifeline_hub::karte::tile_cache::schreibe_eintrag(
+        &cache,
+        "cog:0123456789abcdef/10/1/2",
+        b"\x89PNG",
+        "image/png",
+    )
+    .await;
+    let res = anfrage(
+        &app,
+        "GET",
+        &pfad("0123456789abcdef/10/1/2"),
+        Some(&cookie),
+        None,
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::OK);
+    assert_eq!(res.headers()["content-type"], "image/png");
+    assert_eq!(
+        res.headers()["cache-control"],
+        "private, max-age=86400, immutable"
+    );
+}
+
 // ===== NINA abschaltbar (LLH-2104) =====
 
 /// Attrappe von warnung.bund.de: zählt jede Anfrage und liefert eine leere Warnliste. Gibt die

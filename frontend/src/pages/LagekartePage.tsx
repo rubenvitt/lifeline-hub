@@ -342,6 +342,7 @@ export default function LagekartePage() {
     fachebenenAttribution,
     zoomZuKlein,
     copernicus,
+    copernicusBilder,
     setViewportBbox,
     setKartenZoom,
   } = useFachebenen({ einsatzId, fachebenenSichtbar: fachebenenWirksam, setFachebenenSichtbar });
@@ -2062,6 +2063,7 @@ export default function LagekartePage() {
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
         // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
         drohne={
           snapshotParam == null

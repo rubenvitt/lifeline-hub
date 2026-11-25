@@ -295,6 +295,11 @@ export interface SidebarProps {
   >;
   /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
   copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
+  /** Copernicus-Satellitenbilder (LLH-2021): Bildliste und Deckkraft (`useFachebenen`). */
+  copernicusBilder?: Pick<
+    import('./CopernicusBilderZusatz').CopernicusBilderZusatzProps,
+    'liste' | 'deckkraft' | 'onDeckkraft'
+  >;
   /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
   drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */

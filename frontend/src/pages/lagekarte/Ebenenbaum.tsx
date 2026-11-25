@@ -16,6 +16,7 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
+import CopernicusBilderZusatz from './CopernicusBilderZusatz';
 import DrohnenQuelle from './DrohnenQuelle';
 import FachebeneStand from './FachebeneStand';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
@@ -262,6 +263,17 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
       )}
       {sichtbar && quelle === 'copernicus' && props.copernicus && (
         <CopernicusZusatz status={status} {...props.copernicus} />
+      )}
+      {sichtbar && quelle === 'copernicus_bilder' && props.copernicusBilder && (
+        <CopernicusBilderZusatz
+          status={status}
+          {...props.copernicusBilder}
+          archiv={props.copernicus?.archiv ?? false}
+          onArchiv={props.copernicus?.onArchiv ?? (() => {})}
+          // Der Archiv-Schalter steht an der Vektorebene; ist sie aus, hier (ein Zustand, ein
+          // Schalter).
+          archivHier={!props.fachebenenSichtbar.copernicus && !!props.copernicus}
+        />
       )}
       {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
       {quelle === 'drohne' && props.drohne && (

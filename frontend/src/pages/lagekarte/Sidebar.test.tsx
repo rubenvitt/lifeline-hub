@@ -22,6 +22,7 @@ import { AusgangUnbekannt, NetzFehler } from '../../api/client';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
 import type { SidebarProps } from './Sidebar';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
@@ -88,6 +89,7 @@ const basisProps: SidebarProps = {
     autobahn: false,
     autobahn_parken: false,
     copernicus: false,
+    copernicus_bilder: false,
     drohne: false,
   },
   onFachebeneToggle: vi.fn(),
@@ -658,7 +660,11 @@ describe('Sidebar Bild-Hintergründe', () => {
   };
 
   it('keine klassenabhängige Ebene zeigt ihren Rückfallton im Panel, ein- wie ausgeschaltet (LFH-592)', () => {
-    const klassig = fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben);
+    // Die Satellitenbilder haben keine Klassenfarben und keinen eigenen Ton (LLH-2021).
+    const klassig = fachebeneKeys().filter(
+      (k): k is Exclude<FachebeneQuelle, 'copernicus_bilder'> =>
+        k !== 'copernicus_bilder' && !!FACHEBENEN[k].klassenfarben,
+    );
     expect(klassig.length).toBeGreaterThan(0);
     for (const an of [false, true]) {
       const sichtbar = { ...basisProps.fachebenenSichtbar };
@@ -1854,5 +1860,40 @@ describe('Sidebar · Bild-Hintergründe · Kontextmenü (LLH-1599, D6)', () => {
   it('ohne Schreibrecht kein Kontextmenü', () => {
     renderMitProviders(<Sidebar {...ebenenProps} darfSchreiben={false} bilder={[bildLageplan]} />);
     erwarteBrowsermenue(namensteil());
+  });
+});
+
+describe('Sidebar · Copernicus-Satellitenbilder (LLH-2021)', () => {
+  beforeEach(paneeleOffen);
+  const copernicus = { archiv: false, onArchiv: vi.fn(), aktivierungen: [] };
+  const copernicusBilder = { liste: [], deckkraft: 80, onDeckkraft: vi.fn() };
+  const mit = (sichtbar: Partial<SidebarProps['fachebenenSichtbar']>) =>
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, ...sichtbar }}
+        fachebenenStatus={{ copernicus: 'ok', copernicus_bilder: 'ok' }}
+        copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
+      />,
+    );
+
+  it('zeigt Deckkraft-Regler und genau einen Archiv-Schalter, wenn beide Ebenen an sind', () => {
+    mit({ copernicus: true, copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(within(bilderZeile).getByRole('slider', { name: /Deckkraft/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox', { name: /Ältere Aktivierungen/ })).toHaveLength(1);
+  });
+
+  it('trägt den Archiv-Schalter an der Bilderzeile, wenn nur sie an ist', () => {
+    mit({ copernicus_bilder: true });
+    const bilderZeile = document.querySelector<HTMLElement>(
+      '[data-fachebene="copernicus_bilder"]',
+    )!;
+    expect(
+      within(bilderZeile).getByRole('checkbox', { name: /Ältere Aktivierungen/ }),
+    ).toBeInTheDocument();
   });
 });

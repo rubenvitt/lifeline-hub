@@ -19,6 +19,7 @@ import {
   energieNennung,
   fachebeneAlter,
   copernicusAktivierungen,
+  copernicusBilder,
   fitsCopernicusAusschnitt,
   ohneAbgeschaltete,
 } from './fachebenen';
@@ -52,6 +53,7 @@ describe('Fachebenen-Registry', () => {
       'autobahn',
       'autobahn_parken',
       'copernicus',
+      'copernicus_bilder',
       'drohne',
     ]);
   });
@@ -142,11 +144,16 @@ describe('Fachebenen-Registry', () => {
     expect(FACHEBENEN.odl.klassenfarben?.faerbe).toBe(faerbeOdl);
     expect(FACHEBENEN.luftqualitaet.klassenfarben?.faerbe).toBe(faerbeLuftqualitaet);
   });
-  it('markiert genau kritis, energie und copernicus als bbox-abhängig', () => {
+  it('markiert genau kritis, energie und die beiden Copernicus-Ebenen als bbox-abhängig', () => {
     expect(istBboxAbhaengig('kritis')).toBe(true);
     expect(istBboxAbhaengig('energie')).toBe(true);
     expect(istBboxAbhaengig('dwd')).toBe(false);
-    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual(['kritis', 'energie', 'copernicus']);
+    expect(fachebeneKeys().filter(istBboxAbhaengig)).toEqual([
+      'kritis',
+      'energie',
+      'copernicus',
+      'copernicus_bilder',
+    ]);
     // Die Autobahn-Ebene aggregiert serverseitig — im bbox-Zweig bliebe sie ohne Viewport-Meldung
     // leer.
     expect(istBboxAbhaengig('autobahn')).toBe(false);
@@ -198,6 +205,7 @@ describe('Fachebenen-Registry', () => {
   });
 
   it('nur ODL, Luftqualität, KRITIS, Autobahn, Lkw-Parken und Copernicus nennen einen einschränkenden Geltungsbereich', () => {
+    expect(FACHEBENEN.copernicus_bilder.geltung).toMatch(/optisch/);
     // „Nur BAB" als Zusicherung, mit Gegenaussage: stünde der Satz an jeder Ebene, sagte er nichts.
     expect(FACHEBENEN.autobahn.geltung).toMatch(/Bundesautobahn/i);
     const mitGeltung = fachebeneKeys().filter((k) => FACHEBENEN[k].geltung);
@@ -208,6 +216,7 @@ describe('Fachebenen-Registry', () => {
       'autobahn',
       'autobahn_parken',
       'copernicus',
+      'copernicus_bilder',
     ]);
   });
   it('pollt jede Hintergrund-Ebene schneller als ihre Server-TTL (LFH-856)', () => {
@@ -230,6 +239,8 @@ describe('Fachebenen-Registry', () => {
       autobahn: 'AUTOBAHN_TTL',
       autobahn_parken: 'AUTOBAHN_PARKEN_TTL',
       copernicus: 'COPERNICUS_TTL',
+      // Die Bilderliste nutzt dieselbe TTL (`copernicus_bilder.rs` importiert sie).
+      copernicus_bilder: 'COPERNICUS_TTL',
     };
     // Handgeschrieben: eine neue Ebene mit Hintergrund-Takt braucht hier ihre TTL. Die Drohnenlage
     // hat keine Server-TTL (Arbeitsspeicher), ihren Takt prüft der Test darunter.
@@ -557,6 +568,7 @@ describe('fachebeneAlter (LFH-591)', () => {
       autobahn: 60,
       autobahn_parken: 36 * 60,
       copernicus: 120,
+      copernicus_bilder: 120,
       drohne: 1,
     });
   });
@@ -687,6 +699,104 @@ describe('Copernicus (LLH-1200)', () => {
       'utf8',
     );
     expect(rs).toMatch(/const COPERNICUS_MAX_SPANNE_GRAD: f64 = 3\.0;/);
+  });
+});
+
+describe('Copernicus-Satellitenbilder (LLH-2021)', () => {
+  it('ist die einzige Rasterebene und hat weder Klassenfarben noch gemischte Geometrie', () => {
+    expect(fachebeneKeys().filter((k) => FACHEBENEN[k].darstellung === 'raster')).toEqual([
+      'copernicus_bilder',
+    ]);
+    const d = FACHEBENEN.copernicus_bilder;
+    expect(d.label).toBe('Copernicus-Satellitenbilder');
+    expect(d.klassenfarben).toBeUndefined();
+    expect(d.gemischteGeometrie).toBeUndefined();
+    expect(d.minZoom).toBe(BBOX_MIN_ZOOM);
+    expect(d.pollMs).toBe(FACHEBENEN.copernicus.pollMs);
+    expect(d.aufwaermPollMs).toBe(FACHEBENEN.copernicus.aufwaermPollMs);
+  });
+
+  it('pinnt den Mindest-Zoom gegen das Backend', () => {
+    const rs = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../../../src/karte/cog.rs'),
+      'utf8',
+    );
+    const treffer = rs.match(/const MIN_ZOOM_BACKEND: u8 = (\d+);/);
+    expect(treffer).not.toBeNull();
+    expect(Number(treffer![1])).toBe(BBOX_MIN_ZOOM);
+  });
+
+  const bildFeature = (props: Record<string, unknown>) => ({
+    type: 'Feature' as const,
+    geometry: { type: 'Polygon', coordinates: [] },
+    properties: {
+      bild: '0123456789abcdef',
+      emsr: 'EMSR728',
+      gebiet: 'Bogen',
+      min_zoom: 10,
+      max_zoom: 16,
+      bounds: [12.6, 48.8, 12.7, 48.9],
+      darstellbar: true,
+      gekuerzt: false,
+      ...props,
+    },
+  });
+
+  it('liest die Bilder, jüngste Aufnahme zuerst, fehlende Angaben bleiben leer', () => {
+    const fc = {
+      type: 'FeatureCollection' as const,
+      features: [
+        bildFeature({
+          bild: 'aaaaaaaaaaaaaaaa',
+          aufnahme: '2024-06-08 10:29:00',
+          sensor: 'Pleiades',
+        }),
+        bildFeature({
+          bild: 'bbbbbbbbbbbbbbbb',
+          aufnahme: '2024-06-10 10:13:00',
+          sensor: 'Pleiades',
+        }),
+        bildFeature({
+          bild: 'cccccccccccccccc',
+          darstellbar: false,
+          grund: 'nicht in Web-Mercator (EPSG:3857)',
+        }),
+        // Kein Bild-Feature: fällt weg.
+        { type: 'Feature' as const, geometry: null, properties: { emsr: 'EMSR1' } },
+      ],
+    };
+    const bilder = copernicusBilder(fc);
+    expect(bilder.map((b) => b.bild)).toEqual([
+      'bbbbbbbbbbbbbbbb',
+      'aaaaaaaaaaaaaaaa',
+      'cccccccccccccccc',
+    ]);
+    expect(bilder[0]).toEqual({
+      bild: 'bbbbbbbbbbbbbbbb',
+      emsr: 'EMSR728',
+      gebiet: 'Bogen',
+      sensor: 'Pleiades',
+      aufnahme: '2024-06-10 10:13:00',
+      minZoom: 10,
+      maxZoom: 16,
+      bounds: [12.6, 48.8, 12.7, 48.9],
+      darstellbar: true,
+      gekuerzt: false,
+    });
+    expect(bilder[2].sensor).toBeUndefined();
+    expect(bilder[2].darstellbar).toBe(false);
+  });
+
+  it('verwirft Bilder mit falsch geformter Kennung oder ohne Umriss', () => {
+    const fc = {
+      type: 'FeatureCollection' as const,
+      features: [
+        bildFeature({ bild: '../../etc' }),
+        bildFeature({ bounds: [1, 2, 3] }),
+        bildFeature({ min_zoom: 'x' }),
+      ],
+    };
+    expect(copernicusBilder(fc)).toEqual([]);
   });
 });
 
