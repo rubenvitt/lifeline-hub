@@ -382,7 +382,7 @@ async fn write_vorlage_overrides_tx(
 /// vollzogene Personen-Anträge plus geschwärzte Datenkategorien, `NULL` bei 0. Beide Mengen
 /// wachsen nur. Steht in `laden` und `liste_fuer` (Makros, damit beide wortgleich bleiben):
 /// die Spalte hinter das SELECT, die Joins hinter `FROM einsatz e`. Gruppiert gezählt statt je
-/// Zeile korreliert, damit `GET /api/einsaetze` die Anträge einmal liest und nicht einmal je
+/// Zeile korreliert, damit `GET /api/incidents` die Anträge einmal liest und nicht einmal je
 /// Einsatz (für Anträge gibt es keinen Index über `einsatz_id`, beide sind Teilindizes).
 macro_rules! teilschwaerzungen_spalte {
     () => {
@@ -841,6 +841,15 @@ pub struct MitEtbEintraegen {
     pub etb_eintrag_ids: Vec<i64>,
 }
 
+/// Ergebnis von [`abschliessen`]: wie [`MitEtbEintraegen`], dazu die Drohnenquellen, deren
+/// Zuschaltung der Abschluss beendet hat (die Route führt damit `AppState.drohne` nach).
+#[derive(Debug)]
+pub struct Abgeschlossen {
+    pub einsatz: Einsatz,
+    pub etb_eintrag_ids: Vec<i64>,
+    pub drohnen_abgeschaltet: Vec<String>,
+}
+
 /// Wortlaut des System-Eintrags, den der Abschluss schreibt (LLH-1814, Spec `einsatz-abschluss`,
 /// „Abschluss im Einsatztagebuch“).
 pub const ABSCHLUSS_ETB: &str = "Einsatz abgeschlossen";
@@ -854,7 +863,7 @@ pub async fn abschliessen(
     pool: &SqlitePool,
     einsatz_id: i64,
     von_benutzer_id: i64,
-) -> Result<MitEtbEintraegen, AppError> {
+) -> Result<Abgeschlossen, AppError> {
     // Dauer-Politik vor der tx laden (eigener Pool-Borrow); steuert die Auto-Befüllung.
     let einstellungen = super::einstellungen::laden_oder_default(pool, einsatz_id).await?;
     let org_id: Option<i64> = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
@@ -871,6 +880,7 @@ pub async fn abschliessen(
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
 
     let mut etb_eintrag_ids = Vec::new();
+    let mut drohnen_abgeschaltet = Vec::new();
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
         "UPDATE einsatz \
@@ -918,6 +928,10 @@ pub async fn abschliessen(
         // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
         // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
         crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
+        // LLH-2105: ein abgeschlossener Einsatz hält keine Drohnenquelle mehr (sonst sähe er das
+        // Livebild eines Einsatzes, der sie danach zuschaltet, und hielte sie nach dem
+        // Wiederöffnen ein zweites Mal). Den Store führt der Aufrufer nach dem Commit nach.
+        drohnen_abgeschaltet = crate::drohne::repo::delete_for_einsatz(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {
@@ -1005,9 +1019,10 @@ pub async fn abschliessen(
         }
     }
     tx.commit().await?;
-    Ok(MitEtbEintraegen {
+    Ok(Abgeschlossen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
+        drohnen_abgeschaltet,
     })
 }
 

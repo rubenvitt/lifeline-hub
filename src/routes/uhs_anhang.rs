@@ -32,7 +32,7 @@ use super::support::{
     KEINE_VORSCHAU_MELDUNG,
 };
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/attachments — lebende Anhänge, neueste zuerst.
+/// GET /api/incidents/{id}/uhs/{uid}/attachments — lebende Anhänge, neueste zuerst.
 /// Eine stornierte UHS bleibt lesbar; eine UHS eines anderen Einsatzes ist 404.
 pub async fn liste(
     State(state): State<AppState>,
@@ -45,7 +45,7 @@ pub async fn liste(
     ))
 }
 
-/// POST /api/einsaetze/{id}/uhs/{uid}/attachments — eine Datei ablegen (Multipart, Feld
+/// POST /api/incidents/{id}/uhs/{uid}/attachments — eine Datei ablegen (Multipart, Feld
 /// `datei`). Reihenfolge wie bei Schäden: Gate (403/409) → UHS im Einsatz (404) → storniert
 /// (409) → Datei lesen (400) → Typ, Größe, Scan (400/422/503) → EINE Transaktion aus Anhang,
 /// Linker und ETB-Nachweis (Storno dort erneut geprüft).
@@ -87,7 +87,7 @@ pub async fn ablegen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/attachments/{aid}/file — Download (ETag/304). Der
+/// GET /api/incidents/{id}/uhs/{uid}/attachments/{aid}/file — Download (ETag/304). Der
 /// Linker-Lookup IST die Zugriffsprüfung: fremder Einsatz, andere UHS, unbekannt oder
 /// entfernt → 404. Reihenfolge (design.md D5): Lookup → bei `Original` die Freigabe (403 oder
 /// ETB-Vermerk) → **Lese-Audit** → Antwort. Scheitert das Audit, scheitert der Abruf; eine
@@ -131,7 +131,7 @@ pub async fn datei(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// GET /api/einsaetze/{id}/uhs/{uid}/attachments/accesses — Lese-Audit der Dateien dieser UHS,
+/// GET /api/incidents/{id}/uhs/{uid}/attachments/accesses — Lese-Audit der Dateien dieser UHS,
 /// auch entfernter, neueste zuerst. Nur Einsatzleitung (sonst 403); fremde UHS → 404. Selbst
 /// NICHT protokolliert.
 pub async fn zugriffe(
@@ -146,7 +146,7 @@ pub async fn zugriffe(
     ))
 }
 
-/// DELETE /api/einsaetze/{id}/uhs/{uid}/attachments/{aid} — Soft-Delete mit ETB-Nachweis.
+/// DELETE /api/incidents/{id}/uhs/{uid}/attachments/{aid} — Soft-Delete mit ETB-Nachweis.
 /// Die Datei bleibt bis zur Schwärzung gespeichert.
 pub async fn entfernen(
     State(state): State<AppState>,

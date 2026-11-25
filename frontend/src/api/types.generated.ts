@@ -446,7 +446,7 @@ export interface components {
          * @enum {string}
          */
         AbschlussKraftArt: "einheit" | "fahrzeug";
-        /** @description Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe. */
+        /** @description Antwort von `GET /api/incidents/{id}/closure/check`: die offenen Punkte je Gruppe. */
         AbschlussPruefung: {
             auftraege: components["schemas"]["AbschlussGruppe"];
             /** @description Betroffene mit offenem oder unterwegs befindlichem Verbleib, vermisste eingeschlossen. */
@@ -510,7 +510,7 @@ export interface components {
          * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
          * @enum {string}
          */
-        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "intern";
+        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern";
         /** @description Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert. */
         AdapterGeheimnisAnzeige: {
             bezeichnung: string;
@@ -995,6 +995,33 @@ export interface components {
             spezies: components["schemas"]["Spezies"];
             status: components["schemas"]["TierStatus"];
             storniert_at?: string | null;
+        };
+        /**
+         * @description Zählung einer Art. `offen` = mehrdeutig ohne Wahl (sperrt das Übernehmen). Bei den
+         *     Qualifikationen zählt `neu` die angelegten: derselbe Text unter einer zweiten Herkunft legt
+         *     nichts zusätzlich an und zählt als `ergaenzt` (er merkt dort nur seine Kennung).
+         */
+        ArtZaehlung: {
+            /** Format: int64 */
+            ausgelassen: number;
+            /**
+             * Format: int64
+             * @description Gefunden; die Datei füllt Lücken, fügt Qualifikationen hinzu oder merkt die Kennung.
+             */
+            ergaenzt: number;
+            /** Format: int64 */
+            fehler: number;
+            /**
+             * Format: int64
+             * @description Gefunden; abweichende Werte werden übernommen.
+             */
+            geaendert: number;
+            /** Format: int64 */
+            neu: number;
+            /** Format: int64 */
+            offen: number;
+            /** Format: int64 */
+            unveraendert: number;
         };
         /**
          * @description Eine Zeile der Aufbewahrungsübersicht (`GET /api/retention`). Keine
@@ -1639,7 +1666,7 @@ export interface components {
             /** @description In der Reihenfolge von [`BenachrichtigungVorgaben::funktionen`]. */
             still: components["schemas"]["VorgabeFunktion"][];
         };
-        /** @description `GET /api/einsaetze/{id}/notification-defaults` (design.md D4). */
+        /** @description `GET /api/incidents/{id}/notification-defaults` (design.md D4). */
         BenachrichtigungVorgaben: {
             /** @description Jede einstellbare Art in Katalogreihenfolge. */
             arten: components["schemas"]["BenachrichtigungVorgabeArt"][];
@@ -2280,6 +2307,14 @@ export interface components {
             /** Format: int64 */
             ungelesen: number;
         };
+        /** @description Fehler oder Hinweis beim Lesen; `art` und `zeile` nur, wenn es sie gibt. */
+        DateiMeldung: {
+            art?: components["schemas"]["StammdatenDateiArt"] | null;
+            stufe: components["schemas"]["MeldungStufe"];
+            text: string;
+            /** Format: int32 */
+            zeile?: number | null;
+        };
         /**
          * @description Datenkategorie mit eigener Aufbewahrungsfrist (LFH-749, Spec `aufbewahrung-kategorien`,
          *     design.md D1). Welche Spalten dazugehören, sagt allein die Schwärzungs-Registry
@@ -2466,6 +2501,29 @@ export interface components {
          * @enum {string}
          */
         DokumentKategorie: "lagekarte_plan" | "befehl" | "formular" | "foto" | "sonstiges";
+        DroneSourceUpdate: {
+            lagemonitor: boolean;
+        };
+        /** @description Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz. */
+        DroneSourceView: {
+            adapter_id: string;
+            /** @description In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle). */
+            connected: boolean;
+            /** @description Name des anderen laufenden Einsatzes, der die Quelle hält, wenn die Person ihn lesen darf. */
+            held_by_other?: string | null;
+            /**
+             * @description Ein anderer laufender Einsatz hält die Quelle, die Person darf ihn aber nicht lesen
+             *     (dann ist `held_by_other` leer).
+             */
+            held_by_other_hidden: boolean;
+            label: string;
+            /** @description Das Livebild geht auch an den Lagemonitor. */
+            lagemonitor: boolean;
+            mission_name?: string | null;
+            /** @description Zustand des Adapters (`aktiv`, `angehalten`, …). */
+            state: string;
+            video_keys: string[];
+        };
         /**
          * @description Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
          *     Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →
@@ -3577,6 +3635,14 @@ export interface components {
             fuehrungsstelle?: boolean;
         };
         /**
+         * @description Die Wahl in der Vorschau. Je Zeile (Art + Zeilennummer) bzw. je Qualifikationstext; fehlt
+         *     ein Eintrag, gilt der Vorschlag. Doppelte Einträge: der letzte gilt.
+         */
+        Entscheidungen: {
+            qualifikationen?: components["schemas"]["QualiEntscheidung"][];
+            zeilen?: components["schemas"]["ZeilenEntscheidung"][];
+        };
+        /**
          * @description Protokolliertes Anmelde-Ereignis. Die Wire-Werte stehen als CHECK in
          *     `migrations/0091_auth_audit.sql`, erweitert in `0143_auth_audit_passwortwechsel.sql` und
          *     `0169_auth_audit_sitzung_beendet.sql` — beide Seiten müssen zusammenpassen (Test
@@ -3686,7 +3752,7 @@ export interface components {
             /** @description `zugesagt` oder `unterwegs`. */
             status: components["schemas"]["NachforderungStatus"];
         };
-        /** @description Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`). */
+        /** @description Trefferzahl eines ETB-Filters (`GET /api/incidents/{id}/etb/count`). */
         EtbAnzahlAnzeige: {
             /**
              * Format: int64
@@ -3864,7 +3930,7 @@ export interface components {
             /** Format: int64 */
             system: number;
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/etb/counts`. */
+        /** @description Antwort von `GET /api/incidents/{id}/etb/counts`. */
         EtbZaehlerAnzeige: {
             /**
              * Format: int64
@@ -4059,6 +4125,25 @@ export interface components {
             name: string;
             pflicht: boolean;
             typ: components["schemas"]["FeldTyp"];
+        };
+        /**
+         * @description Art einer Feldänderung. Wire == `as_str()`.
+         * @enum {string}
+         */
+        FeldAenderungArt: "fuellt" | "weicht_ab";
+        /**
+         * @description Eine Feldänderung. `feld` ist die Spalte des Vertrags (`funkrufname`, `issi`, `typ`, …,
+         *     `qualifikationen` für eine hinzukommende Qualifikation); Werte nur aus Spalten des Vertrags.
+         */
+        FeldAenderungDto: {
+            alt?: string | null;
+            art: components["schemas"]["FeldAenderungArt"];
+            /** @description Ein Erkennungsmerkmal; eine Abweichung wird nur bei Treffer über die Kennung übernommen. */
+            erkennungsfeld: boolean;
+            feld: string;
+            neu: string;
+            /** @description Ob das Übernehmen mit der aktuellen Wahl dieses Feld schreibt. */
+            uebernommen: boolean;
         };
         /**
          * @description Typ eines Einstellungsfelds.
@@ -4819,7 +4904,7 @@ export interface components {
          * @enum {string}
          */
         InfotelefonStatus: "offen" | "erledigt";
-        /** @description Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`. */
+        /** @description Antwort von `GET /api/incidents/{id}/staff/info-line/counts`. */
         InfotelefonZaehler: {
             /**
              * Format: int64
@@ -5059,6 +5144,12 @@ export interface components {
          * @enum {string}
          */
         JetztPhase: "laedt" | "bau_wartet" | "baut" | "aktuell";
+        /** @description Ein Kandidat einer Zeile: ein Datensatz der eigenen Org. */
+        Kandidat: {
+            anzeige: string;
+            /** Format: int64 */
+            id: number;
+        };
         /** @description Phase und letzter Fehler einer Karte; nur Karten mit einem von beiden stehen in der Liste. */
         KarteAktualisierung: {
             fehler?: string | null;
@@ -5072,6 +5163,12 @@ export interface components {
          *     `frontend/src/api/karte.ts`); nur die Datenquelle wechselte von ENV/Extension auf die DB.
          */
         KarteConfigAntwort: {
+            /**
+             * @description Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit
+             *     `--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet
+             *     404. Leer, wenn alle Ebenen an sind.
+             */
+            fachebenen_abgeschaltet: string[];
             /**
              * @description True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
              *     anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
@@ -6382,7 +6479,7 @@ export interface components {
         };
         /**
          * @description Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von
-         *     `GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter
+         *     `GET /api/incidents/{id}/module-access` und die EINE Auswertung hinter
          *     [`fordere_modul_zugriff`] und [`erlaubte_module`].
          */
         ModulFreigabe: {
@@ -6399,7 +6496,7 @@ export interface components {
             zugriff: boolean;
         };
         /**
-         * @description Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys
+         * @description Antwort von `GET /api/incidents/{id}/module-counts`. Feldnamen = Modul-Keys
          *     (`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt".
          */
         ModulZaehlerAnzeige: {
@@ -7883,6 +7980,11 @@ export interface components {
             /** @description Name der Instanz, wie sie sich meldet. */
             name: string;
         };
+        QualiEntscheidung: {
+            /** @description Der Text der Qualifikation, wie die Vorschau ihn zeigt (`qualifikationen[].text`). */
+            text: string;
+            wahl: components["schemas"]["QualiWahl"];
+        };
         /** @description Ein Eintrag in der Antwort, mit dem Label der Qualifikation. */
         QualiSollEintrag: {
             /** Format: int64 */
@@ -7890,6 +7992,39 @@ export interface components {
             label: string;
             /** Format: int64 */
             qualifikation_id: number;
+        };
+        /**
+         * @description Was mit einer Qualifikation der Datei geschehen soll. Fehlt die Wahl, wird eine unbekannte
+         *     neu angelegt und eine gefundene verknüpft.
+         */
+        QualiWahl: {
+            /** @enum {string} */
+            art: "neu";
+        } | {
+            /** @enum {string} */
+            art: "zuordnen";
+            /** Format: int64 */
+            qualifikation_id: number;
+        } | {
+            /** @enum {string} */
+            art: "auslassen";
+        };
+        /**
+         * @description Eine Qualifikation der Datei: aus dem Blatt „Qualifikationen“ und aus den Listen des
+         *     Personals, je Herkunft und normalisiertem Text einmal. `herkunft` und `text` sind zusammen
+         *     eindeutig; die Wahl gilt je Text (`QualiEntscheidung`), also für jede Herkunft.
+         */
+        QualiZeile: {
+            ergebnis: components["schemas"]["ZeilenErgebnis"];
+            grund?: components["schemas"]["StammdatenTrefferGrund"] | null;
+            /** @description Die wirksame Herkunft (normalisiert; leer ohne Herkunft). */
+            herkunft: string;
+            hinweise: string[];
+            kandidaten: components["schemas"]["Kandidat"][];
+            text: string;
+            wahl?: components["schemas"]["QualiWahl"] | null;
+            /** @description Zeilen im Blatt „Qualifikationen“ (leer, wenn sie nur das Personal nennt). */
+            zeilen: number[];
         };
         /**
          * @description Qualifikations-Katalog-Eintrag (org-weit). `aktiv` wird nicht serialisiert
@@ -8553,6 +8688,14 @@ export interface components {
          * @enum {string}
          */
         StammdatenArt: "konto" | "org_einstellungen" | "modul_einstellung" | "fuehrungsfunktion" | "fahrzeug_status" | "personal_status" | "qualifikation" | "einheit_typ" | "fahrzeug" | "material" | "personal" | "einheit_vorlage" | "schichtmodell" | "einsatz_vorlage" | "stichwort_vorschlag" | "verpflegung_vorlage" | "sprechgruppe" | "etb_baustein" | "externe_stelle" | "unterkunft_richtwert";
+        /**
+         * @description Art eines Stammdatensatzes. Wire == `as_str()`.
+         * @enum {string}
+         */
+        StammdatenDateiArt: "fahrzeug" | "personal" | "qualifikation";
+        StammdatenErgebnis: {
+            zaehlung: components["schemas"]["Zaehlung"];
+        };
         /** @description Herkunft der Stammdaten einer Org für die Oberfläche (design.md D9). */
         StammdatenHerkunftAnzeige: {
             /**
@@ -8569,6 +8712,40 @@ export interface components {
             vom_hub: {
                 [key: string]: string[];
             };
+        };
+        /**
+         * @description Über welche Stufe eine Zeile einen Datensatz getroffen hat.
+         * @enum {string}
+         */
+        StammdatenTrefferGrund: "kennung" | "opta" | "issi" | "funkrufname" | "personalnummer" | "name" | "bezeichnung";
+        StammdatenVorschau: {
+            /** @description Eine Zeile hat eine Kennung, aber weder Zeile noch Hochladen nennen eine Herkunft. */
+            herkunft_noetig: boolean;
+            /** @description Die zuletzt in der Org gemerkte Herkunft (normalisiert). */
+            herkunft_vorschlag?: string | null;
+            meldungen: components["schemas"]["DateiMeldung"][];
+            /** @description Spaltenköpfe, die der Vertrag nicht kennt (nie ihre Werte). */
+            nicht_uebernommen: string[];
+            qualifikationen: components["schemas"]["QualiZeile"][];
+            /** @description Keine Fehler, nichts offen, Herkunft da: das Übernehmen schreibt. */
+            uebernehmbar: boolean;
+            zaehlung: components["schemas"]["Zaehlung"];
+            zeilen: components["schemas"]["StammdatenZeile"][];
+        };
+        /** @description Eine Fahrzeug- oder Personalzeile der Datei in der Vorschau. */
+        StammdatenZeile: {
+            aenderungen: components["schemas"]["FeldAenderungDto"][];
+            anzeige: string;
+            art: components["schemas"]["StammdatenDateiArt"];
+            ergebnis: components["schemas"]["ZeilenErgebnis"];
+            grund?: components["schemas"]["StammdatenTrefferGrund"] | null;
+            /** @description Hinweise; bei `fehler` steht der Grund zuerst. */
+            hinweise: string[];
+            /** @description Getroffene Datensätze: einer bei `gefunden`/`ausser_dienst`, mehrere bei `mehrdeutig`. */
+            kandidaten: components["schemas"]["Kandidat"][];
+            wahl?: components["schemas"]["ZeilenWahl"] | null;
+            /** Format: int32 */
+            zeile: number;
         };
         /**
          * @description Eine Standmeldung im Verlauf eines Bezirks (LFH-676), zurückgenommene eingeschlossen.
@@ -10003,7 +10180,7 @@ export interface components {
             daten?: components["schemas"]["WetterAktuell"] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
-        /** @description Antwort von `GET /api/einsaetze/{id}/weather`. */
+        /** @description Antwort von `GET /api/incidents/{id}/weather`. */
         WetterAnzeige: {
             aktuell: components["schemas"]["WetterAktuellTeil"];
             ort?: components["schemas"]["WetterOrt"] | null;
@@ -10154,6 +10331,11 @@ export interface components {
             daten?: components["schemas"]["WetterWarnung"][] | null;
             zustand: components["schemas"]["WetterTeilZustand"];
         };
+        Zaehlung: {
+            fahrzeuge: components["schemas"]["ArtZaehlung"];
+            personal: components["schemas"]["ArtZaehlung"];
+            qualifikationen: components["schemas"]["ArtZaehlung"];
+        };
         /**
          * @description Wovon die ID einer abgelehnten Zeile spricht: IDs von Personal und Fahrzeugen können
          *     kollidieren (LLH-1100, D2). Beim Disponieren sind es Stamm-IDs, in einer Mengen-Anfrage im
@@ -10161,6 +10343,17 @@ export interface components {
          * @enum {string}
          */
         ZeilenArt: "personal" | "fahrzeug" | "material" | "planschicht" | "dateizeile";
+        ZeilenEntscheidung: {
+            art: components["schemas"]["StammdatenDateiArt"];
+            wahl: components["schemas"]["ZeilenWahl"];
+            /** Format: int32 */
+            zeile: number;
+        };
+        /**
+         * @description Ergebnis des Abgleichs einer Zeile. Wire == `as_str()`.
+         * @enum {string}
+         */
+        ZeilenErgebnis: "neu" | "gefunden" | "mehrdeutig" | "ausser_dienst" | "fehler" | "unveraendert";
         /**
          * @description Antwort einer an einzelnen Zeilen abgelehnten Mengen-Anfrage (422, LLH-1100): der Umschlag
          *     `{error}` und je abgelehnter Zeile ein [`ZeilenGrund`].
@@ -10179,6 +10372,25 @@ export interface components {
              * @description Die ID, wie die Anfrage sie nannte (Stamm-ID beim Disponieren, sonst die der Disposition).
              */
             id: number;
+        };
+        /**
+         * @description Was mit einer Zeile geschehen soll. Fehlt die Wahl, gilt der Vorschlag: `neu` legt an,
+         *     `gefunden` füllt nur Lücken und behält abweichende Werte; `mehrdeutig` bleibt offen.
+         */
+        ZeilenWahl: {
+            /** @enum {string} */
+            art: "auslassen";
+        } | {
+            /** @enum {string} */
+            art: "neu";
+        } | {
+            /** @enum {string} */
+            art: "kandidat";
+            /** Format: int64 */
+            id: number;
+        } | {
+            /** @enum {string} */
+            art: "datei_uebernehmen";
         };
         /**
          * @description Zeitachse einer Kraft: alle Ereignisse nach Zeit (gestrichene eingeschlossen) und die

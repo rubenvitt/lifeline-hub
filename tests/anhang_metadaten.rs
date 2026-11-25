@@ -145,7 +145,7 @@ async fn gespeichert(pool: &sqlx::SqlitePool, anhang: i64) -> (Vec<u8>, String) 
 async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> (String, i64) {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/attachments"),
+        &format!("/api/incidents/{einsatz}/attachments"),
         cookie,
         Some(("foto.jpg", &foto_mit_gps())),
         &[],
@@ -153,7 +153,7 @@ async fn chat_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> (String, i
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let aid = v[0]["id"].as_i64().unwrap();
-    (format!("/api/einsaetze/{einsatz}/attachments/{aid}"), aid)
+    (format!("/api/incidents/{einsatz}/attachments/{aid}"), aid)
 }
 
 /// Dokumentenablage; liefert (Pfad, Anhang-id).
@@ -165,7 +165,7 @@ async fn dokument_foto(
 ) -> (String, i64) {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/documents"),
+        &format!("/api/incidents/{einsatz}/documents"),
         cookie,
         Some(("lage.jpg", &foto_mit_gps())),
         &[("titel", "Lagefoto"), ("kategorie", "lagekarte_plan")],
@@ -179,7 +179,7 @@ async fn dokument_foto(
         .await
         .unwrap();
     (
-        format!("/api/einsaetze/{einsatz}/documents/{did}/file"),
+        format!("/api/incidents/{einsatz}/documents/{did}/file"),
         aid,
     )
 }
@@ -194,7 +194,7 @@ struct EtbFoto {
 async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> EtbFoto {
     let (s, v) = multipart_post(
         app,
-        &format!("/api/einsaetze/{einsatz}/etb/attachments"),
+        &format!("/api/incidents/{einsatz}/etb/attachments"),
         cookie,
         Some(("Lagefoto Süd.jpg", &foto_mit_gps())),
         &[],
@@ -205,7 +205,7 @@ async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> EtbFoto {
     let (s, e) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(&format!(
             r#"{{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Foto","anhang_ids":[{aid}]}}"#
@@ -215,7 +215,7 @@ async fn etb_foto(app: &axum::Router, cookie: &str, einsatz: i64) -> EtbFoto {
     assert_eq!(s, StatusCode::CREATED, "{e}");
     let eintrag = e["id"].as_i64().unwrap();
     EtbFoto {
-        pfad: format!("/api/einsaetze/{einsatz}/etb/{eintrag}/attachments/{aid}"),
+        pfad: format!("/api/incidents/{einsatz}/etb/{eintrag}/attachments/{aid}"),
         anhang: aid,
         lfd_nr: e["lfd_nr"].as_i64().unwrap(),
     }
@@ -273,7 +273,7 @@ async fn schaden_datei(
     .await
     .unwrap();
     (
-        format!("/api/einsaetze/{einsatz}/damages/{schaden}/attachments/{linker}/file"),
+        format!("/api/incidents/{einsatz}/damages/{schaden}/attachments/{linker}/file"),
         aid,
     )
 }
@@ -507,7 +507,7 @@ async fn chat_anhang_an_einer_nachricht_vermerkt_chat() {
     let (_, kanaele) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
         &admin,
         None,
     )
@@ -516,7 +516,7 @@ async fn chat_anhang_an_einer_nachricht_vermerkt_chat() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         &admin,
         Some(&format!(r#"{{"inhalt":"Foto","anhang_ids":[{aid}]}}"#)),
     )
@@ -624,8 +624,8 @@ async fn fremder_einsatz_und_falsche_bindung_bleiben_404() {
     let nachbar = einsatz_anlegen(&app, &admin).await;
     let etb = etb_foto(&app, &admin, einsatz).await;
     let fremd = etb.pfad.replace(
-        &format!("/api/einsaetze/{einsatz}/"),
-        &format!("/api/einsaetze/{nachbar}/"),
+        &format!("/api/incidents/{einsatz}/"),
+        &format!("/api/incidents/{nachbar}/"),
     );
     let (s, _, _) = laden(&app, &original(&fremd), &admin, None).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
@@ -633,7 +633,7 @@ async fn fremder_einsatz_und_falsche_bindung_bleiben_404() {
     let (s, _, _) = laden(
         &app,
         &original(&format!(
-            "/api/einsaetze/{einsatz}/attachments/{}",
+            "/api/incidents/{einsatz}/attachments/{}",
             etb.anhang
         )),
         &admin,
@@ -655,7 +655,7 @@ async fn vermerk_entsteht_auch_im_abgeschlossenen_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -763,7 +763,7 @@ async fn tier_und_uhs_liefern_bereinigt_und_das_original_mit_vermerk() {
         let (aid, besitzer, linker) =
             erfassungs_datei(&pool, einsatz, art, "dach.jpg", "image/jpeg", &foto).await;
         let pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
+            "/api/incidents/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
             art.segment()
         );
 
@@ -807,7 +807,7 @@ async fn tier_und_uhs_original_nur_fuer_die_einsatzleitung() {
         )
         .await;
         let pfad = format!(
-            "/api/einsaetze/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
+            "/api/incidents/{einsatz}/{}/{besitzer}/attachments/{linker}/file",
             art.segment()
         );
         let (s, _, _) = laden(&app, &original(&pfad), &frieda, None).await;
@@ -832,7 +832,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         &admin,
         Some("{}"),
     )
@@ -842,7 +842,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     let foto = foto_mit_gps();
     let (s, v) = multipart_post(
         &app,
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/attachments"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/attachments"),
         &admin,
         Some(("verletzung.jpg", &foto)),
         &[],
@@ -850,7 +850,7 @@ async fn personen_foto_ist_bereinigt_und_das_original_nur_fuer_die_leitung() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     let pfad = format!(
-        "/api/einsaetze/{einsatz}/persons/{person}/attachments/{}/file",
+        "/api/incidents/{einsatz}/persons/{person}/attachments/{}/file",
         v["id"]
     );
 

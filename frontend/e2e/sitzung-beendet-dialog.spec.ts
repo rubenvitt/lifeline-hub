@@ -14,7 +14,7 @@ import { ADMIN, ADMIN_PW } from './rollen-kern';
 /** Bis zum Dialog „Sitzung beendet“ über der halb erfassten Meldung (Ablauf oben). */
 async function sitzungEndetUeberMeldung(page: Page, baseURL: string | undefined) {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Sitzung beendet ${Date.now()}` },
   });
   expect(angelegt.ok(), `Einsatz anlegen: ${angelegt.status()}`).toBe(true);
@@ -58,7 +58,7 @@ test('die halb erfasste Meldung übersteht das Sitzungsende', async ({ page, bas
   await expect
     .poll(
       async () => {
-        const r = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
+        const r = await page.request.get(`/api/incidents/${einsatzId}/reports`);
         const liste = (await r.json()) as { inhalt: string }[];
         return liste.some((m) => m.inhalt === inhalt);
       },

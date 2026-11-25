@@ -166,25 +166,25 @@ function mitschnitt(hier: EinsatzMaterial) {
   const gesendet: { url: string; body: unknown }[] = [];
   const einheitenRouten: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json([FREI, hier])),
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/material', () => HttpResponse.json([FREI, hier])),
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([{ id: 10, name: '1. Zug', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/vehicles', () =>
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/vehicles', () =>
       HttpResponse.json([{ id: 20, funkrufname: 'Florian 1', beendet_at: null }]),
     ),
-    http.get('/api/einsaetze/1/uhs', () =>
+    http.get('/api/incidents/1/uhs', () =>
       HttpResponse.json([{ id: 3, bezeichnung: 'Turnhalle', status: 'aktiv', storniert_at: null }]),
     ),
-    http.get('/api/einsaetze/1/staging-areas', () =>
+    http.get('/api/incidents/1/staging-areas', () =>
       HttpResponse.json([{ id: 4, bezeichnung: 'BR Nord', status: 'geplant', storniert_at: null }]),
     ),
-    http.patch('/api/einsaetze/1/material/:emId', async ({ request }) => {
+    http.patch('/api/incidents/1/material/:emId', async ({ request }) => {
       gesendet.push({ url: new URL(request.url).pathname, body: await request.json() });
       return HttpResponse.json({});
     }),
-    http.all('/api/einsaetze/1/units/:eid/material/:emId', ({ request }) => {
+    http.all('/api/incidents/1/units/:eid/material/:emId', ({ request }) => {
       einheitenRouten.push(`${request.method} ${new URL(request.url).pathname}`);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -220,7 +220,7 @@ describe('Ein Schreibweg für den Ort (LLH-1225 D2, 6.5)', () => {
       await waitFor(() => expect(amOrtSelbst.gesendet).toHaveLength(1));
 
       expect(amOrtSelbst.gesendet).toEqual(liste.gesendet);
-      expect(liste.gesendet[0].url).toBe('/api/einsaetze/1/material/50');
+      expect(liste.gesendet[0].url).toBe('/api/incidents/1/material/50');
       expect([...liste.einheitenRouten, ...amOrtSelbst.einheitenRouten]).toEqual([]);
     });
 
@@ -237,7 +237,7 @@ describe('Ein Schreibweg für den Ort (LLH-1225 D2, 6.5)', () => {
       await waitFor(() => expect(amOrtSelbst.gesendet).toHaveLength(1));
 
       expect(amOrtSelbst.gesendet).toEqual(liste.gesendet);
-      expect(liste.gesendet[0].url).toBe('/api/einsaetze/1/material/40');
+      expect(liste.gesendet[0].url).toBe('/api/incidents/1/material/40');
       expect([...liste.einheitenRouten, ...amOrtSelbst.einheitenRouten]).toEqual([]);
     });
   });
@@ -261,9 +261,9 @@ async function statusInDerMaterialliste(hier: EinsatzMaterial) {
   const { gesendet, einheitenRouten } = mitschnitt(hier);
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture())),
     // Aktives und herausgenommenes Material teilen den Pfad (`?entlassene=1`).
-    http.get('/api/einsaetze/1/material', ({ request }) =>
+    http.get('/api/incidents/1/material', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : [FREI, hier]),
     ),
     http.get('/api/material', () => HttpResponse.json([])),
@@ -293,7 +293,7 @@ describe('Ein Schreibweg für den Status (LLH-1133, „Status am Ort setzen“)'
 
       expect(amOrtSelbst.gesendet).toEqual(liste.gesendet);
       expect(liste.gesendet).toEqual([
-        { url: '/api/einsaetze/1/material/40', body: { status: 'defekt' } },
+        { url: '/api/incidents/1/material/40', body: { status: 'defekt' } },
       ]);
       expect([...liste.einheitenRouten, ...amOrtSelbst.einheitenRouten]).toEqual([]);
     });

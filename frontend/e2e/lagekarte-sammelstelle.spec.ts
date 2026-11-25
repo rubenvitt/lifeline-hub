@@ -85,7 +85,7 @@ async function countEtb(page: Page, basis: string): Promise<number> {
 }
 
 async function bezirkLaden(page: Page, basis: string, id: number): Promise<Bezirk | undefined> {
-  const antwort = await page.request.get(`${basis}/evakuierung`);
+  const antwort = await page.request.get(`${basis}/evacuation`);
   const { bezirke } = (await antwort.json()) as { bezirke: Bezirk[] };
   return bezirke.find((b) => b.id === id);
 }
@@ -100,10 +100,10 @@ test('Sammelstelle: Zeichen, Sprung vom Bezirk ohne Fläche, Setzen ohne ETB', a
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Sammelstelle ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],
@@ -160,10 +160,10 @@ test('Sammelstelle: ohne Modul Evakuierung keine Ebene und kein Marker', async (
   test.setTimeout(120_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Sammelstelle gesperrt ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   await senden(page, 'patch', basis, {
     einsatzort: 'Weserufer',
     einsatzort_lat: ORT[1],

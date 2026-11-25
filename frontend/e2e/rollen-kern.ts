@@ -93,7 +93,7 @@ export async function mitgliedEintragen(
   benutzerId: number,
   einsatzRolle: 'beobachter' | 'fuehrungspersonal' | 'einsatzleitung',
 ) {
-  const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/members/${benutzerId}`, {
+  const antwort = await page.request.put(`/api/incidents/${einsatzId}/members/${benutzerId}`, {
     data: { einsatz_rolle: einsatzRolle },
   });
   expect(

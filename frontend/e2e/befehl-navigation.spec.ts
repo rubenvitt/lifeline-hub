@@ -21,12 +21,12 @@ async function vorbereiten(page: Page) {
   await page.getByRole('button', { name: 'Anlegen', exact: true }).click();
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const einsatzId = page.url().match(/\/einsaetze\/(\d+)/)![1];
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Befehl Navigation' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
   const befehlId = (await antwort.json()).id as number;
-  const api = `/api/einsaetze/${einsatzId}/orders/${befehlId}`;
+  const api = `/api/incidents/${einsatzId}/orders/${befehlId}`;
   const liste = `/einsaetze/${einsatzId}/auftraege`;
   const detail = `${liste}/befehle/${befehlId}`;
   // Der Rückweg aus einem Befehl führt auf den Reiter Befehle (LFH-972). Wählt `?befehl=` einen

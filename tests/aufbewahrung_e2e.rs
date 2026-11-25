@@ -1019,12 +1019,12 @@ async fn pruefe_skelett(
 
     // Reguläre Routen bleiben dem Admin gesperrt.
     for uri in [
-        format!("/api/einsaetze/{e}"),
-        format!("/api/einsaetze/{e}/etb"),
-        format!("/api/einsaetze/{e}/persons"),
-        format!("/api/einsaetze/{e}/animals"),
-        format!("/api/einsaetze/{e}/damages"),
-        format!("/api/einsaetze/{e}/live"),
+        format!("/api/incidents/{e}"),
+        format!("/api/incidents/{e}/etb"),
+        format!("/api/incidents/{e}/persons"),
+        format!("/api/incidents/{e}/animals"),
+        format!("/api/incidents/{e}/damages"),
+        format!("/api/incidents/{e}/live"),
     ] {
         let (s, _) = anfrage(app, "GET", &uri, admin, None).await;
         assert_eq!(s, StatusCode::FORBIDDEN, "{uri}");
@@ -1053,7 +1053,7 @@ async fn ak3_person_tier_schaden_ueber_frist_und_karenz() {
     let (app, pool) = common::setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{e}");
+    let basis = format!("/api/incidents/{e}");
 
     // 1. Dauer vor dem Abschluss (danach sind die Einstellungen eingefroren) + Kopf-PII.
     // LFH-749: eine Kategorie-Vorgabe, die erst nach der Einsatz-Frist fällig wäre — ihre

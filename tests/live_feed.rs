@@ -1,4 +1,4 @@
-//! Transportzusicherungen des Live-Feeds `GET /api/einsaetze/{id}/live` (LFH-624).
+//! Transportzusicherungen des Live-Feeds `GET /api/incidents/{id}/live` (LFH-624).
 //!
 //! Die Sichtbarkeitsregeln des Feeds (Modul-Filter, Replay) prüft `modul_override.rs`;
 //! hier steht, WANN und WIE die Verbindung ihr erstes Byte liefert, wie viele Ströme ein
@@ -36,7 +36,7 @@ async fn live_feed_sendet_sein_erstes_byte_sofort() {
     let feed = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{eid}/live"))
+                .uri(format!("/api/incidents/{eid}/live"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -136,7 +136,7 @@ async fn je_benutzer_hoechstens_n_stroeme_und_der_platz_faellt_zurueck() {
     let (app, pool, live) = setup_mit_grenzen(grenzen(2, 100)).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let feed = format!("/api/einsaetze/{eid}/live");
+    let feed = format!("/api/incidents/{eid}/live");
     let admin_id = benutzer_id(&pool, "admin").await;
 
     let erster = oeffnen(&app, &feed, &admin, None).await;
@@ -197,7 +197,7 @@ async fn strom_endet_nach_der_lebensdauer_und_der_reconnect_holt_nach() {
     .await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let feed = format!("/api/einsaetze/{eid}/live");
+    let feed = format!("/api/incidents/{eid}/live");
     let admin_id = benutzer_id(&pool, "admin").await;
 
     let strom = oeffnen(&app, &feed, &admin, None).await;
@@ -247,7 +247,7 @@ async fn nach_der_abmeldung_scheitert_der_reconnect_mit_401() {
     .await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let feed = format!("/api/einsaetze/{eid}/live");
+    let feed = format!("/api/incidents/{eid}/live");
 
     let einsatz_strom = oeffnen(&app, &feed, &admin, None).await;
     let org_strom = oeffnen(&app, "/api/live", &admin, None).await;
@@ -271,7 +271,7 @@ async fn stroeme_senden_eine_gestreute_wartezeit() {
     let eid = einsatz_anlegen(&app, &admin).await;
 
     for pfad in [
-        format!("/api/einsaetze/{eid}/live"),
+        format!("/api/incidents/{eid}/live"),
         "/api/live".to_string(),
     ] {
         let resp = oeffnen(&app, &pfad, &admin, None).await;
@@ -348,7 +348,7 @@ async fn einsatz_strom_nennt_beim_aufbau_seine_position() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
 
-    let resp = oeffnen(&app, &format!("/api/einsaetze/{eid}/live"), &admin, None).await;
+    let resp = oeffnen(&app, &format!("/api/incidents/{eid}/live"), &admin, None).await;
     let anfang = common::sse_anfang_lesen(resp.into_body(), 300).await;
     let fs = sse_frames(&anfang);
     assert!(fs.len() >= 3, "{anfang:?}");
@@ -379,7 +379,7 @@ async fn neuverbinden_mit_der_position_holt_genau_das_verpasste() {
     let (app, _pool, live) = setup_mit_grenzen(StromGrenzen::default()).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let feed = format!("/api/einsaetze/{eid}/live");
+    let feed = format!("/api/incidents/{eid}/live");
     // Ein offener Strom hält den Kanal, damit das erste Ereignis eine Nummer im Ring bekommt.
     let _halter = oeffnen(&app, &feed, &admin, None).await;
     live.publiziere_einsatz(eid, LiveEvent::Einsatz);
@@ -433,7 +433,7 @@ async fn einsatz_und_org_strom_senden_lebenszeichen_ohne_id() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
     for pfad in [
-        format!("/api/einsaetze/{eid}/live"),
+        format!("/api/incidents/{eid}/live"),
         "/api/live".to_string(),
     ] {
         let resp = oeffnen(&app, &pfad, &admin, None).await;
@@ -463,7 +463,7 @@ async fn neuverbinden_nach_lebenszeichen_liefert_nichts_nach() {
     let (app, _pool, _live) = setup_mit_grenzen(schneller_takt()).await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
-    let feed = format!("/api/einsaetze/{eid}/live");
+    let feed = format!("/api/incidents/{eid}/live");
 
     let resp = oeffnen(&app, &feed, &admin, None).await;
     let mut body = resp.into_body();
@@ -496,7 +496,7 @@ async fn takt_haelt_den_strom_nach_der_abmeldung_nicht_offen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let eid = einsatz_anlegen(&app, &admin).await;
 
-    let einsatz_strom = oeffnen(&app, &format!("/api/einsaetze/{eid}/live"), &admin, None).await;
+    let einsatz_strom = oeffnen(&app, &format!("/api/incidents/{eid}/live"), &admin, None).await;
     let org_strom = oeffnen(&app, "/api/live", &admin, None).await;
     let (status, _) = anfrage(&app, "POST", "/api/auth/logout", &admin, None).await;
     assert!(status.is_success(), "Abmeldung: {status}");

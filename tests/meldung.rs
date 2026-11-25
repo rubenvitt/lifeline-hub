@@ -43,7 +43,7 @@ async fn anlegen_erzeugt_meldung_und_etb_eintrag() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -58,7 +58,7 @@ async fn anlegen_erzeugt_meldung_und_etb_eintrag() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -79,7 +79,7 @@ async fn anlegen_ohne_absender_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -96,7 +96,7 @@ async fn anlegen_ohne_inhalt_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -113,7 +113,7 @@ async fn anlegen_ungueltiger_meldeweg_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -137,7 +137,7 @@ async fn anlegen_ungueltige_meldungsart_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -161,7 +161,7 @@ async fn anlegen_ungueltige_prioritaet_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -177,7 +177,7 @@ async fn liste_zeigt_angelegte_meldungen() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -185,7 +185,7 @@ async fn liste_zeigt_angelegte_meldungen() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         None,
     )
@@ -203,7 +203,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -219,7 +219,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &erika_c,
         None,
     )
@@ -230,7 +230,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &erika_c,
         Some(&body_funk()),
     )
@@ -241,7 +241,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/status"),
+        &format!("/api/incidents/{e}/reports/{mid}/status"),
         &erika_c,
         Some(r#"{"status":"gesichtet"}"#),
     )
@@ -252,7 +252,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &erika_c,
         Some(r#"{"bearbeiter_id":null}"#),
     )
@@ -263,7 +263,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{e}/reports/{mid}/situation-relevant"),
         &erika_c,
         Some("{}"),
     )
@@ -272,7 +272,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 
     // POST auftrag (Meldung→Auftrag, LFH-113) → 403 (gültiger Auftrags-Body, damit der Guard greift).
     let (status, _) = anfrage(
-        &app, "POST", &format!("/api/einsaetze/{e}/reports/{mid}/task"), &erika_c,
+        &app, "POST", &format!("/api/incidents/{e}/reports/{mid}/task"), &erika_c,
         Some(r#"{"auftrag_text":"X","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S3"}]}"#),
     ).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -290,7 +290,7 @@ async fn beobachter_liest_lage_meldungen() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/situation/reports"),
+        &format!("/api/incidents/{e}/situation/reports"),
         &erika_c,
         None,
     )
@@ -308,7 +308,7 @@ async fn cross_einsatz_status_ist_404() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a_einsatz}/reports"),
+        &format!("/api/incidents/{a_einsatz}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -318,7 +318,7 @@ async fn cross_einsatz_status_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b_einsatz}/reports/{mid_a}/status"),
+        &format!("/api/incidents/{b_einsatz}/reports/{mid_a}/status"),
         &admin,
         Some(r#"{"status":"gesichtet"}"#),
     )
@@ -335,7 +335,7 @@ async fn cross_einsatz_zuweisen_ist_404() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a_einsatz}/reports"),
+        &format!("/api/incidents/{a_einsatz}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -344,7 +344,7 @@ async fn cross_einsatz_zuweisen_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b_einsatz}/reports/{mid_a}/assign"),
+        &format!("/api/incidents/{b_einsatz}/reports/{mid_a}/assign"),
         &admin,
         Some(r#"{"bearbeiter_id":null}"#),
     )
@@ -361,7 +361,7 @@ async fn cross_einsatz_lagerelevant_ist_404() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a_einsatz}/reports"),
+        &format!("/api/incidents/{a_einsatz}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -370,7 +370,7 @@ async fn cross_einsatz_lagerelevant_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b_einsatz}/reports/{mid_a}/situation-relevant"),
+        &format!("/api/incidents/{b_einsatz}/reports/{mid_a}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -393,7 +393,7 @@ async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -404,7 +404,7 @@ async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/task"),
+        &format!("/api/incidents/{e}/reports/{mid}/task"),
         &admin,
         Some(&auftrag_body("Tank fordern")),
     )
@@ -420,7 +420,7 @@ async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         None,
     )
@@ -432,7 +432,7 @@ async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/task"),
+        &format!("/api/incidents/{e}/reports/{mid}/task"),
         &admin,
         Some(&auftrag_body("zweiter")),
     )
@@ -442,7 +442,7 @@ async fn meldung_auftrag_erteilen_setzt_rueckverweis_und_doppelt_ist_409() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         None,
     )
@@ -463,7 +463,7 @@ async fn cross_einsatz_auftrag_erteilen_ist_404() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a_einsatz}/reports"),
+        &format!("/api/incidents/{a_einsatz}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -472,7 +472,7 @@ async fn cross_einsatz_auftrag_erteilen_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b_einsatz}/reports/{mid_a}/task"),
+        &format!("/api/incidents/{b_einsatz}/reports/{mid_a}/task"),
         &admin,
         Some(&auftrag_body("X")),
     )
@@ -488,7 +488,7 @@ async fn status_gueltiger_uebergang_setzt_status() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -498,7 +498,7 @@ async fn status_gueltiger_uebergang_setzt_status() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/status"),
+        &format!("/api/incidents/{e}/reports/{mid}/status"),
         &admin,
         Some(r#"{"status":"in_bearbeitung"}"#),
     )
@@ -516,7 +516,7 @@ async fn status_ungueltig_ist_400() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -525,7 +525,7 @@ async fn status_ungueltig_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/status"),
+        &format!("/api/incidents/{e}/reports/{mid}/status"),
         &admin,
         Some(r#"{"status":"archiviert"}"#),
     )
@@ -541,7 +541,7 @@ async fn status_filter_trennt_offen_und_erledigt() {
     let (_, m1) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&meldung_body("Florian Nord 1", "funk", "A")),
     )
@@ -550,7 +550,7 @@ async fn status_filter_trennt_offen_und_erledigt() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&meldung_body("Florian Nord 2", "funk", "B")),
     )
@@ -560,7 +560,7 @@ async fn status_filter_trennt_offen_und_erledigt() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid1}/status"),
+        &format!("/api/incidents/{e}/reports/{mid1}/status"),
         &admin,
         Some(r#"{"status":"erledigt"}"#),
     )
@@ -570,7 +570,7 @@ async fn status_filter_trennt_offen_und_erledigt() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports?status=erledigt"),
+        &format!("/api/incidents/{e}/reports?status=erledigt"),
         &admin,
         None,
     )
@@ -583,7 +583,7 @@ async fn status_filter_trennt_offen_und_erledigt() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports?status=neu"),
+        &format!("/api/incidents/{e}/reports?status=neu"),
         &admin,
         None,
     )
@@ -602,7 +602,7 @@ async fn status_filter_ungueltig_ist_400() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports?status=unsinn"),
+        &format!("/api/incidents/{e}/reports?status=unsinn"),
         &admin,
         None,
     )
@@ -618,7 +618,7 @@ async fn zuweisen_an_mitglied_setzt_bearbeiter() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -632,7 +632,7 @@ async fn zuweisen_an_mitglied_setzt_bearbeiter() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &admin,
         Some(&format!(r#"{{"bearbeiter_id":{bea}}}"#)),
     )
@@ -650,7 +650,7 @@ async fn zuweisen_an_nichtmitglied_ist_400() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -662,7 +662,7 @@ async fn zuweisen_an_nichtmitglied_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &admin,
         Some(&format!(r#"{{"bearbeiter_id":{fremd}}}"#)),
     )
@@ -678,7 +678,7 @@ async fn zuweisen_null_gibt_frei() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -691,7 +691,7 @@ async fn zuweisen_null_gibt_frei() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &admin,
         Some(&format!(r#"{{"bearbeiter_id":{bea}}}"#)),
     )
@@ -703,7 +703,7 @@ async fn zuweisen_null_gibt_frei() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &admin,
         Some(r#"{"bearbeiter_id":null}"#),
     )
@@ -720,7 +720,7 @@ async fn statuswechsel_erhaelt_zuweisung() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -733,7 +733,7 @@ async fn statuswechsel_erhaelt_zuweisung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/assign"),
+        &format!("/api/incidents/{e}/reports/{mid}/assign"),
         &admin,
         Some(&format!(r#"{{"bearbeiter_id":{bea}}}"#)),
     )
@@ -744,7 +744,7 @@ async fn statuswechsel_erhaelt_zuweisung() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/status"),
+        &format!("/api/incidents/{e}/reports/{mid}/status"),
         &admin,
         Some(r#"{"status":"erledigt"}"#),
     )
@@ -765,7 +765,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&meldung_body("Florian Nord 1", "funk", "Brücke gesperrt")),
     )
@@ -775,7 +775,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{e}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -789,7 +789,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/situation-relevant"),
+        &format!("/api/incidents/{e}/reports/{mid}/situation-relevant"),
         &admin,
         Some("{}"),
     )
@@ -800,7 +800,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/situation/reports"),
+        &format!("/api/incidents/{e}/situation/reports"),
         &admin,
         None,
     )
@@ -819,7 +819,7 @@ async fn lagerelevant_uebernimmt_in_die_lage_und_ist_idempotent() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -862,7 +862,7 @@ async fn sofortmeldung_ist_bestaetigungspflichtig_mit_frist_und_nachfass() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -880,7 +880,7 @@ async fn sofortmeldung_ist_bestaetigungspflichtig_mit_frist_und_nachfass() {
     let (_, erinn) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         None,
     )
@@ -926,7 +926,7 @@ async fn auto_frist_erinnerung_nennt_die_meldungsart() {
         let (status, m) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             &admin,
             Some(&body),
         )
@@ -937,7 +937,7 @@ async fn auto_frist_erinnerung_nennt_die_meldungsart() {
         let (_, erinn) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{e}/reminders"),
+            &format!("/api/incidents/{e}/reminders"),
             &admin,
             None,
         )
@@ -981,7 +981,7 @@ async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
     let (status, original) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&initial),
     )
@@ -998,7 +998,7 @@ async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -1021,7 +1021,7 @@ async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
         let (status, erneut) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             &admin,
             Some(&replay),
         )
@@ -1062,7 +1062,7 @@ async fn meldungs_replay_nach_abschluss_repariert_fehlende_frist_erinnerung() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&neu),
     )
@@ -1102,7 +1102,7 @@ async fn reminder_fehler_nach_commit_verliert_sofortalarm_nicht_und_replay_dupli
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1144,7 +1144,7 @@ async fn reminder_fehler_nach_commit_verliert_sofortalarm_nicht_und_replay_dupli
     let (status, replay) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1186,7 +1186,7 @@ async fn meldung_offline_replay_mit_falschem_queue_besitzer_ist_412() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             &admin,
             Some(&body),
         )
@@ -1198,7 +1198,7 @@ async fn meldung_offline_replay_mit_falschem_queue_besitzer_ist_412() {
     let (status, _) = anfrage_mit_offline_queue_benutzer(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
         i64::MAX,
@@ -1215,7 +1215,7 @@ async fn nicht_sofort_ohne_pflicht_legt_keine_nachfass_an() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -1226,7 +1226,7 @@ async fn nicht_sofort_ohne_pflicht_legt_keine_nachfass_an() {
     let (_, erinn) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         None,
     )
@@ -1245,7 +1245,7 @@ async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -1255,7 +1255,7 @@ async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/confirm"),
+        &format!("/api/incidents/{e}/reports/{mid}/confirm"),
         &admin,
         None,
     )
@@ -1271,7 +1271,7 @@ async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
     let (_, erinn) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders?nur_offen=true"),
+        &format!("/api/incidents/{e}/reminders?nur_offen=true"),
         &admin,
         None,
     )
@@ -1289,7 +1289,7 @@ async fn bestaetigen_setzt_quittung_und_doppelt_ist_422() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/confirm"),
+        &format!("/api/incidents/{e}/reports/{mid}/confirm"),
         &admin,
         None,
     )
@@ -1305,7 +1305,7 @@ async fn bestaetigen_beobachter_ist_403() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -1319,7 +1319,7 @@ async fn bestaetigen_beobachter_ist_403() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports/{mid}/confirm"),
+        &format!("/api/incidents/{e}/reports/{mid}/confirm"),
         &erika_c,
         None,
     )
@@ -1336,7 +1336,7 @@ async fn cross_einsatz_bestaetigen_ist_404() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{a}/reports"),
+        &format!("/api/incidents/{a}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -1345,7 +1345,7 @@ async fn cross_einsatz_bestaetigen_ist_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{b}/reports/{mid_a}/confirm"),
+        &format!("/api/incidents/{b}/reports/{mid_a}/confirm"),
         &admin,
         None,
     )
@@ -1361,7 +1361,7 @@ async fn sofort_frist_default_ist_fuenf_minuten() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -1388,7 +1388,7 @@ async fn bestaetigung_frist_override_in_minuten() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1409,7 +1409,7 @@ async fn bestaetigung_frist_default_aus_einstellungen_schlaegt_konstante() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
     )
@@ -1419,7 +1419,7 @@ async fn bestaetigung_frist_default_aus_einstellungen_schlaegt_konstante() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&sofort_body()),
     )
@@ -1439,7 +1439,7 @@ async fn bestaetigung_frist_request_override_schlaegt_einstellung() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"meldung_bestaetigung_frist_min":20}"#),
     )
@@ -1455,7 +1455,7 @@ async fn bestaetigung_frist_request_override_schlaegt_einstellung() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1481,7 +1481,7 @@ async fn bestaetigung_frist_nicht_positiv_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1503,7 +1503,7 @@ async fn sofort_mit_pflicht_false_ueberstimmt_und_legt_keine_nachfass_an() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body),
     )
@@ -1517,7 +1517,7 @@ async fn sofort_mit_pflicht_false_ueberstimmt_und_legt_keine_nachfass_an() {
     let (_, erinn) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         None,
     )
@@ -1537,7 +1537,7 @@ async fn richtung_filter_trennt_intern_extern() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -1550,7 +1550,7 @@ async fn richtung_filter_trennt_intern_extern() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&extern_body),
     )
@@ -1559,7 +1559,7 @@ async fn richtung_filter_trennt_intern_extern() {
     let (status, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports?richtung=extern"),
+        &format!("/api/incidents/{e}/reports?richtung=extern"),
         &admin,
         None,
     )
@@ -1573,7 +1573,7 @@ async fn richtung_filter_trennt_intern_extern() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports?richtung=quatsch"),
+        &format!("/api/incidents/{e}/reports?richtung=quatsch"),
         &admin,
         None,
     )
@@ -1589,7 +1589,7 @@ async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -1599,7 +1599,7 @@ async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
     let (status, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body_funk()),
     )
@@ -1612,7 +1612,7 @@ async fn auto_etb_aus_unterdrueckt_etb_meldung_am_http_rand() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -1642,7 +1642,7 @@ async fn bestaetigungsfrist_ausserhalb_der_grenzen_ist_400() {
         let (status, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             &admin,
             Some(&body(frist)),
         )
@@ -1652,7 +1652,7 @@ async fn bestaetigungsfrist_ausserhalb_der_grenzen_ist_400() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&body(10_080)),
     )

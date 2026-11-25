@@ -205,11 +205,11 @@ async fn unbekannter_code_und_zu_langes_label_sind_400() {
 // ---------- Empfänger: Auftrag, Erinnerung, Führungsstelle ----------
 
 fn auftrag_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/tasks")
+    format!("/api/incidents/{einsatz}/tasks")
 }
 
 fn erinnerung_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reminders")
+    format!("/api/incidents/{einsatz}/reminders")
 }
 
 async fn auftrag_an(
@@ -271,7 +271,7 @@ async fn auftrag_an_s3_mit_snapshot_ohne_person() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &admin,
         None,
     )
@@ -572,7 +572,7 @@ async fn fuehrungsstelle_als_katalogwert() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
     rolle_setzen(&app, &admin, einsatz, frieda, "fuehrungspersonal").await;
-    let mitglied_pfad = format!("/api/einsaetze/{einsatz}/members/{frieda}");
+    let mitglied_pfad = format!("/api/incidents/{einsatz}/members/{frieda}");
 
     let (status, json) = anfrage(
         &app,
@@ -598,7 +598,7 @@ async fn fuehrungsstelle_als_katalogwert() {
     let (_, e) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &frieda_cookie,
         None,
     )
@@ -611,7 +611,7 @@ async fn fuehrungsstelle_als_katalogwert() {
     let (_, e) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &frieda_cookie,
         None,
     )
@@ -638,7 +638,7 @@ async fn fuehrungsstelle_als_katalogwert() {
     let (_, e) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &frieda_cookie,
         None,
     )
@@ -695,7 +695,7 @@ async fn mandantenlabel_in_mitgliederliste_und_kopf() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/members"),
+        &format!("/api/incidents/{einsatz}/members"),
         &admin,
         None,
     )
@@ -711,7 +711,7 @@ async fn mandantenlabel_in_mitgliederliste_und_kopf() {
     let (_, kopf) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &cookie,
         None,
     )
@@ -748,7 +748,7 @@ async fn schwaerzung_nimmt_der_aufloesung_den_namen() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -812,7 +812,7 @@ async fn mitglied_von(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) -
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/members"),
+        &format!("/api/incidents/{einsatz}/members"),
         cookie,
         None,
     )
@@ -832,7 +832,7 @@ async fn mitarbeit_und_beobachter_mit_funktion_sind_422() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let frieda = benutzer_anlegen(&app, &admin, "frieda", "keine").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/members/{frieda}");
+    let pfad = format!("/api/incidents/{einsatz}/members/{frieda}");
 
     for rolle in ["mitarbeit", "beobachter"] {
         let body = serde_json::json!({"einsatz_rolle": rolle, "fuehrungsfunktion": "s4"});
@@ -846,7 +846,7 @@ async fn mitarbeit_und_beobachter_mit_funktion_sind_422() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/members"),
+        &format!("/api/incidents/{einsatz}/members"),
         &admin,
         None,
     )
@@ -870,7 +870,7 @@ async fn mitarbeit_mit_freitext_ist_erlaubt() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{frieda}"),
+        &format!("/api/incidents/{einsatz}/members/{frieda}"),
         &admin,
         Some(r#"{"einsatz_rolle":"mitarbeit","fuehrungsstelle":"Funk ELW 2"}"#),
     )

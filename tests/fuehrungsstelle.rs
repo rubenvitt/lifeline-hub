@@ -18,7 +18,7 @@ async fn schwaerzung_entfernt_fuehrungsstelle_nur_im_betroffenen_einsatz() {
             &app,
             &admin,
             "POST",
-            "/api/einsaetze",
+            "/api/incidents",
             json!({"bezeichnung": name}),
         )
         .await;
@@ -28,7 +28,7 @@ async fn schwaerzung_entfernt_fuehrungsstelle_nur_im_betroffenen_einsatz() {
                 &app,
                 &admin,
                 "PUT",
-                &format!("/api/einsaetze/{id}/members/1"),
+                &format!("/api/incidents/{id}/members/1"),
                 json!({"einsatz_rolle": "einsatzleitung", "fuehrungsstelle": name})
             )
             .await
@@ -91,7 +91,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
         &app,
         &admin,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         json!({"bezeichnung": "A"}),
     )
     .await;
@@ -99,7 +99,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
         &app,
         &admin,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         json!({"bezeichnung": "B"}),
     )
     .await;
@@ -109,7 +109,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
     let erika = common::login_cookie(&app, "erika", "erikapw1").await;
     for (eid, stelle) in [(aid, "Florian A"), (bid, "Florian B")] {
         let (status, mitglieder) = request(&app, &admin, "PUT",
-            &format!("/api/einsaetze/{eid}/members/{erika_id}"),
+            &format!("/api/incidents/{eid}/members/{erika_id}"),
             json!({"einsatz_rolle": "fuehrungspersonal", "fuehrungsstelle": format!("  {stelle}  ")})).await;
         assert_eq!(status, StatusCode::OK);
         let mitglied = mitglieder
@@ -123,7 +123,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             &app,
             &erika,
             "GET",
-            &format!("/api/einsaetze/{eid}"),
+            &format!("/api/incidents/{eid}"),
             Value::Null,
         )
         .await;
@@ -132,7 +132,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             &app,
             &admin,
             "GET",
-            &format!("/api/einsaetze/{eid}"),
+            &format!("/api/incidents/{eid}"),
             Value::Null,
         )
         .await;
@@ -141,7 +141,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             .unwrap()
             .contains_key("meine_fuehrungsstelle"));
     }
-    let (_, liste) = request(&app, &erika, "GET", "/api/einsaetze", Value::Null).await;
+    let (_, liste) = request(&app, &erika, "GET", "/api/incidents", Value::Null).await;
     for (eid, stelle) in [(aid, "Florian A"), (bid, "Florian B")] {
         assert_eq!(
             liste
@@ -153,7 +153,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             stelle
         );
     }
-    let uri = format!("/api/einsaetze/{aid}/members/{erika_id}");
+    let uri = format!("/api/incidents/{aid}/members/{erika_id}");
     let (status, _) = request(
         &app,
         &admin,
@@ -167,7 +167,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
         &app,
         &erika,
         "GET",
-        &format!("/api/einsaetze/{aid}"),
+        &format!("/api/incidents/{aid}"),
         Value::Null,
     )
     .await;
@@ -205,7 +205,7 @@ async fn fuehrungsstelle_ist_je_mitgliedschaft_und_rollenwechsel_erhaelt_sie() {
             &app,
             &erika,
             "GET",
-            &format!("/api/einsaetze/{aid}"),
+            &format!("/api/incidents/{aid}"),
             Value::Null,
         )
         .await;
@@ -224,14 +224,14 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
         &app,
         &admin,
         "POST",
-        "/api/einsaetze",
+        "/api/incidents",
         json!({"bezeichnung": "A"}),
     )
     .await;
     let eid = e["id"].as_i64().unwrap();
     let erika_id = common::benutzer_anlegen(&app, &admin, "erika", "keine").await;
     let erika = common::login_cookie(&app, "erika", "erikapw1").await;
-    let uri = format!("/api/einsaetze/{eid}/members/{erika_id}");
+    let uri = format!("/api/incidents/{eid}/members/{erika_id}");
     let body = json!({"einsatz_rolle": "fuehrungspersonal", "fuehrungsstelle": "Florian A"});
     assert_eq!(
         request(&app, &admin, "PUT", &uri, body.clone()).await.0,
@@ -262,7 +262,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
             &app,
             &admin,
             "PUT",
-            &format!("/api/einsaetze/{eid}/members/{fremd_id}"),
+            &format!("/api/incidents/{eid}/members/{fremd_id}"),
             body.clone()
         )
         .await
@@ -273,7 +273,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
         &app,
         &erika,
         "GET",
-        &format!("/api/einsaetze/{eid}"),
+        &format!("/api/incidents/{eid}"),
         Value::Null,
     )
     .await;
@@ -286,7 +286,7 @@ async fn fuehrungsstelle_schreibschutz_validierung_und_org_grenze() {
         &app,
         &admin,
         "POST",
-        &format!("/api/einsaetze/{eid}/close"),
+        &format!("/api/incidents/{eid}/close"),
         json!({}),
     )
     .await;

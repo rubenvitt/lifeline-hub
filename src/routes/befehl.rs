@@ -61,7 +61,7 @@ async fn geraete_bereich(
     crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await
 }
 
-/// GET /api/einsaetze/{id}/orders — Liste. Nur Lesezugriff (inkl. Beobachter); ein
+/// GET /api/incidents/{id}/orders — Liste. Nur Lesezugriff (inkl. Beobachter); ein
 /// Abschnittsgerät sieht nur die geltenden Fassungen an seinen Bereich.
 pub async fn liste(
     State(state): State<AppState>,
@@ -77,7 +77,7 @@ pub async fn liste(
     }))
 }
 
-/// GET /api/einsaetze/{id}/orders/{bid} — Detail. Nur Lesezugriff; ein Befehl außerhalb des
+/// GET /api/incidents/{id}/orders/{bid} — Detail. Nur Lesezugriff; ein Befehl außerhalb des
 /// Bereichs eines Abschnittsgeräts ist für es nicht vorhanden (404).
 pub async fn detail(
     State(state): State<AppState>,
@@ -93,7 +93,7 @@ pub async fn detail(
     Ok(Json(befehl))
 }
 
-/// POST /api/einsaetze/{id}/orders — Entwurf anlegen. Schreibrecht + aktiv.
+/// POST /api/incidents/{id}/orders — Entwurf anlegen. Schreibrecht + aktiv.
 pub async fn anlegen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -103,7 +103,7 @@ pub async fn anlegen(
     kern::anlegen::<Befehl>(&state, &benutzer, einsatz_id, body).await
 }
 
-/// PATCH /api/einsaetze/{id}/orders/{bid} — nur solange Entwurf (sonst 422).
+/// PATCH /api/incidents/{id}/orders/{bid} — nur solange Entwurf (sonst 422).
 pub async fn aktualisieren(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -113,7 +113,7 @@ pub async fn aktualisieren(
     kern::aktualisieren::<Befehl>(&state, &benutzer, einsatz_id, bid, body).await
 }
 
-/// POST /api/einsaetze/{id}/orders/{bid}/release — rendert + snapshottet ins ETB.
+/// POST /api/incidents/{id}/orders/{bid}/release — rendert + snapshottet ins ETB.
 pub async fn freigeben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -122,7 +122,7 @@ pub async fn freigeben(
     kern::freigeben::<Befehl>(&state, &benutzer, einsatz_id, bid).await
 }
 
-/// POST /api/einsaetze/{id}/orders/{bid}/revise — neue Entwurfs-Version.
+/// POST /api/incidents/{id}/orders/{bid}/revise — neue Entwurfs-Version.
 pub async fn fortschreiben(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -159,7 +159,7 @@ async fn quittung(
         .map(Json)
 }
 
-/// POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/acknowledge — Empfang einer
+/// POST /api/incidents/{id}/orders/{bid}/distribution/{vid}/acknowledge — Empfang einer
 /// Verteiler-Zeile quittieren (LLH-1173). Nur die jüngste freigegebene Fassung, sonst 422.
 pub async fn quittieren(
     State(state): State<AppState>,
@@ -169,7 +169,7 @@ pub async fn quittieren(
     quittung(&state, &ctx, bid, vid, true).await
 }
 
-/// POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/undo — Quittung
+/// POST /api/incidents/{id}/orders/{bid}/distribution/{vid}/undo — Quittung
 /// zurücknehmen (LLH-1173), der Rückweg zum Rückgängig-Knopf (LFH-343).
 pub async fn quittung_zuruecknehmen(
     State(state): State<AppState>,
@@ -179,7 +179,7 @@ pub async fn quittung_zuruecknehmen(
     quittung(&state, &ctx, bid, vid, false).await
 }
 
-/// GET /api/einsaetze/{id}/orders/{bid}/enclosures — Bild-Anlagen (LFH-1028). Lesezugriff.
+/// GET /api/incidents/{id}/orders/{bid}/enclosures — Bild-Anlagen (LFH-1028). Lesezugriff.
 pub async fn anlagen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -188,7 +188,7 @@ pub async fn anlagen(
     kern::anlagen::<Befehl>(&state, &benutzer, einsatz_id, bid).await
 }
 
-/// POST /api/einsaetze/{id}/orders/{bid}/enclosures — Anlage anfügen (Multipart: `datei`,
+/// POST /api/incidents/{id}/orders/{bid}/enclosures — Anlage anfügen (Multipart: `datei`,
 /// `art`, `titel`, `stand_at`), nur im Entwurf.
 pub async fn anlage_ablegen(
     State(state): State<AppState>,
@@ -199,7 +199,7 @@ pub async fn anlage_ablegen(
     kern::anlage_ablegen::<Befehl>(&state, &benutzer, einsatz_id, bid, multipart).await
 }
 
-/// GET /api/einsaetze/{id}/orders/{bid}/enclosures/{aid}/file — Download (`?fassung=`).
+/// GET /api/incidents/{id}/orders/{bid}/enclosures/{aid}/file — Download (`?fassung=`).
 pub async fn anlage_datei(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -220,7 +220,7 @@ pub async fn anlage_datei(
     .await
 }
 
-/// DELETE /api/einsaetze/{id}/orders/{bid}/enclosures/{aid} — nur im Entwurf.
+/// DELETE /api/incidents/{id}/orders/{bid}/enclosures/{aid} — nur im Entwurf.
 pub async fn anlage_entfernen(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,

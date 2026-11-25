@@ -49,7 +49,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
         &admin,
         None,
     )
@@ -78,7 +78,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
+            &format!("/api/incidents/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": rolle, "fuehrungsfunktion": funktion }).to_string()),
         )
@@ -92,7 +92,7 @@ impl Welt {
             &self.app,
             "POST",
             &format!(
-                "/api/einsaetze/{}/chat/channels/{}/messages",
+                "/api/incidents/{}/chat/channels/{}/messages",
                 self.einsatz, self.kanal
             ),
             cookie,
@@ -147,7 +147,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/module-overrides/chat", self.einsatz),
+            &format!("/api/incidents/{}/module-overrides/chat", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
         )
@@ -314,7 +314,7 @@ async fn bearbeiten_bleibt_still() {
     let (s, v) = anfrage(
         &w.app,
         "PATCH",
-        &format!("/api/einsaetze/{}/chat/messages/{n}", w.einsatz),
+        &format!("/api/incidents/{}/chat/messages/{n}", w.einsatz),
         &w.admin,
         Some(&body.to_string()),
     )

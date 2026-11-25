@@ -56,7 +56,7 @@ import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDa
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
-import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
+import { braucheViewportBbox, ohneAbgeschaltete, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN, zoneStil, zoneTypLabel } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
 import { bezirkAuftragEntschieden, bezirkZeichnenEntwurf } from './lagekarte/bezirkZeichnen';
@@ -109,6 +109,7 @@ import type { KarteMarker } from './lagekarte/marker';
 import { erzeugeMessQuelle } from './lagekarte/messQuelle';
 import { HistorienBanner } from './lagekarte/HistorienBanner';
 import { SnapshotLeiste } from './lagekarte/SnapshotLeiste';
+import { DrohnenVideoHalter } from './lagekarte/DrohnenVideoFenster';
 import { KartenFuss, bandStil } from './lagekarte/KartenFuss';
 import KartenUeberlagerung, {
   GrundlageHinweis,
@@ -213,6 +214,8 @@ export default function LagekartePage() {
   // Dialog; die Quelle sagt, ob er das Suchfeld fokussiert.
   const werkzeugmenueId = useId();
   const [werkzeugmenueOffen, setWerkzeugmenueOffen] = useState(false);
+  // Livebild der Drohne (LLH-2107): die Quelle, deren Fenster über der Karte steht.
+  const [livebildQuelle, setLivebildQuelle] = useState<string | null>(null);
   const [zeichenWahl, setZeichenWahl] = useState<{ offen: boolean; quelle: 'maus' | 'touch' }>({
     offen: false,
     quelle: 'maus',
@@ -269,11 +272,19 @@ export default function LagekartePage() {
     speichern,
     speichertGerade,
   } = useKartenAnsicht({ einsatzId, config, aktiveAnsichtId: ansichtParam });
+  // Vom Betreiber abgeschaltete Fachebenen (LLH-2104) gelten als unsichtbar: kein Abruf, keine
+  // Zeile im Ebenenbaum. Gespeichert bleibt die Wahl der Ansicht.
+  const fachebenenAbgeschaltet = config?.fachebenen_abgeschaltet;
+  const fachebenenWirksam = useMemo(
+    () => ohneAbgeschaltete(fachebenenSichtbar, fachebenenAbgeschaltet),
+    [fachebenenSichtbar, fachebenenAbgeschaltet],
+  );
 
   // Domänen-Daten + Marker-Ableitungen. Live liegt im EinsatzLayout; eine zweite Verbindung je
   // Seite spränge das HTTP/1.1-Limit von 6.
   const {
     darfSchreiben,
+    darfDrohneSchalten,
     ladt,
     markerLaden,
     gebiete,
@@ -331,9 +342,10 @@ export default function LagekartePage() {
     fachebenenAttribution,
     zoomZuKlein,
     copernicus,
+    copernicusBilder,
     setViewportBbox,
     setKartenZoom,
-  } = useFachebenen({ fachebenenSichtbar, setFachebenenSichtbar });
+  } = useFachebenen({ einsatzId, fachebenenSichtbar: fachebenenWirksam, setFachebenenSichtbar });
 
   const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
@@ -1387,6 +1399,7 @@ export default function LagekartePage() {
             onSchliessen={() => setFachebeneAuswahl(null)}
             // Schnellweg „Als maßgeblichen Pegel festlegen"; wirkt nur an PEGELONLINE-Punkten.
             pegelBezug={{ einsatzId, darfSchreiben: !!darfSchreiben }}
+            einsatzId={einsatzId}
             abgerufen={fachebenenAbgerufen[fachebeneAuswahl.quelle]}
           />
         )}
@@ -1697,9 +1710,7 @@ export default function LagekartePage() {
         // Der Ausschnitt hängt an jeder sichtbaren bbox-Ebene — sonst bliebe „Energie an, KRITIS
         // aus" leer.
         onBboxAenderung={
-          braucheViewportBbox(fachebenenSichtbar)
-            ? (b) => setViewportBbox(rasterBbox(b))
-            : undefined
+          braucheViewportBbox(fachebenenWirksam) ? (b) => setViewportBbox(rasterBbox(b)) : undefined
         }
         onZoomAenderung={setKartenZoom}
         onFachebeneKlick={onFachebeneKlick}
@@ -1764,6 +1775,14 @@ export default function LagekartePage() {
             : undefined
         }
       />
+      {/* Das Livebild gehört zur laufenden Lage, nicht zu einem gesicherten Stand (LLH-2107). */}
+      {livebildQuelle != null && snapshotParam == null && (
+        <DrohnenVideoHalter
+          einsatzId={einsatzId}
+          adapterId={livebildQuelle}
+          onClose={() => setLivebildQuelle(null)}
+        />
+      )}
       {/* Gemeinsamer unterer Rand: Zeichnen-Steuerung, Maßstab und Zeitachse als Flow-Bänder in
           einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
           `lagekarte/KartenFuss.tsx`. */}
@@ -2038,11 +2057,19 @@ export default function LagekartePage() {
         ansichtDirty={dirty}
         ansichtSpeichert={speichertGerade}
         onAnsichtSpeichern={onAnsichtSpeichern}
-        fachebenenSichtbar={fachebenenSichtbar}
+        fachebenenSichtbar={fachebenenWirksam}
+        fachebenenAbgeschaltet={fachebenenAbgeschaltet}
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}
         copernicus={copernicus}
+        copernicusBilder={copernicusBilder}
+        // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
+        drohne={
+          snapshotParam == null
+            ? { darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }
+            : undefined
+        }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
         bilder={bilder}

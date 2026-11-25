@@ -31,7 +31,7 @@ interface Anfrage {
   body: unknown;
 }
 
-const E = '/api/einsaetze/7';
+const E = '/api/incidents/7';
 const S = `${E}/staff/comms-sketch`;
 
 function faengeAnfragen(): Anfrage[] {

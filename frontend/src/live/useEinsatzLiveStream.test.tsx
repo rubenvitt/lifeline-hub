@@ -446,7 +446,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/3/damages/:sid', ({ params }) => {
+      http.get('/api/incidents/3/damages/:sid', ({ params }) => {
         abrufe.push(String(params.sid));
         return HttpResponse.json({
           id: 9,
@@ -483,7 +483,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/3/persons/:pid/row', ({ params }) => {
+      http.get('/api/incidents/3/persons/:pid/row', ({ params }) => {
         abrufe.push(String(params.pid));
         return HttpResponse.json({
           id: 9,
@@ -791,7 +791,7 @@ describe('useEinsatzLiveStream', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 3 }, { status: 200 })),
-      http.get('/api/einsaetze/3', () => HttpResponse.json({ id: 3 }, { status: 200 })),
+      http.get('/api/incidents/3', () => HttpResponse.json({ id: 3 }, { status: 200 })),
     );
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const client = neuerQueryClient();
@@ -953,7 +953,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );
@@ -1081,7 +1081,7 @@ describe('useEinsatzLiveStream', () => {
     let einsatzProben = 0;
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ error: 'x' }, { status: 401 })),
-      http.get('/api/einsaetze/1', () => {
+      http.get('/api/incidents/1', () => {
         einsatzProben += 1;
         return HttpResponse.json({ error: 'x' }, { status: 401 });
       }),
@@ -1112,7 +1112,7 @@ describe('useEinsatzLiveStream', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ id: 1 }, { status: 200 })),
+      http.get('/api/incidents/1', () => HttpResponse.json({ id: 1 }, { status: 200 })),
     );
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
@@ -1140,7 +1140,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
       ),
     );
@@ -1183,7 +1183,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );
@@ -1224,7 +1224,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );
@@ -1257,7 +1257,7 @@ describe('useEinsatzLiveStream', () => {
     await client.fetchQuery({ queryKey: ['einsatz', 1], queryFn: () => ({ id: 1 }) });
     expect(FakeEventSource.instanzen).toHaveLength(2);
     const neue = FakeEventSource.letzte!;
-    expect(neue.url).toBe('/api/einsaetze/1/live');
+    expect(neue.url).toBe('/api/incidents/1/live');
     // Verpasste Ereignisse: der Erst-Open der neuen Verbindung gleicht voll ab.
     spy.mockClear();
     neue.emit('open');
@@ -1295,7 +1295,7 @@ describe('useEinsatzLiveStream', () => {
     vi.stubGlobal('EventSource', FakeEventSource);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );
@@ -1321,7 +1321,7 @@ describe('useEinsatzLiveStream', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 1 }, { status: 200 })),
-      http.get('/api/einsaetze/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
+      http.get('/api/incidents/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
     );
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     const client = neuerQueryClient();
@@ -1349,7 +1349,7 @@ describe('useEinsatzLiveStream', () => {
     };
 
     const zweite = await fehlerUndBackoff(erste, 1000);
-    expect(zweite.url).toBe('/api/einsaetze/4/live');
+    expect(zweite.url).toBe('/api/incidents/4/live');
     const dritte = await fehlerUndBackoff(zweite, 3000);
     spy.mockClear();
     dritte.emit('open');
@@ -1364,7 +1364,7 @@ describe('useEinsatzLiveStream', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     server.use(
       http.get('/api/auth/me', () => HttpResponse.json({ id: 4 }, { status: 200 })),
-      http.get('/api/einsaetze/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
+      http.get('/api/incidents/4', () => HttpResponse.json({ id: 4 }, { status: 200 })),
     );
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     render(

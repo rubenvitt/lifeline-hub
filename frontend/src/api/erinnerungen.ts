@@ -7,7 +7,7 @@ export const ERINNERUNGEN_SEITE = 100;
 
 /** Offene Erinnerungen; ohne Parameter liefert der Server nur offene (LFH-940). */
 export function listeOffeneErinnerungen(einsatzId: number): Promise<Erinnerung[]> {
-  return apiGet<Erinnerung[]>(`/api/einsaetze/${einsatzId}/reminders`);
+  return apiGet<Erinnerung[]>(`/api/incidents/${einsatzId}/reminders`);
 }
 
 /** Ordnungszeit wie am Server: `COALESCE(erledigt_at, quittiert_at, erstellt_at)`. */
@@ -22,7 +22,7 @@ export function listeAbgeschlosseneErinnerungen(
   limit: number = ERINNERUNGEN_SEITE,
 ): Promise<Erinnerung[]> {
   return apiGet<Erinnerung[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/reminders`, {
+    mitParametern(`/api/incidents/${einsatzId}/reminders`, {
       phase: 'abgeschlossen',
       vor_zeit: vor?.zeit,
       vor_id: vor?.id,
@@ -33,19 +33,19 @@ export function listeAbgeschlosseneErinnerungen(
 
 /** Offen und abgeschlossen über den ganzen Bestand (LFH-940). */
 export function ladeErinnerungKennzahlen(einsatzId: number): Promise<ErinnerungKennzahlen> {
-  return apiGet<ErinnerungKennzahlen>(`/api/einsaetze/${einsatzId}/reminders/metrics`);
+  return apiGet<ErinnerungKennzahlen>(`/api/incidents/${einsatzId}/reminders/metrics`);
 }
 
 export function legeErinnerungAn(einsatzId: number, daten: NeueErinnerung): Promise<Erinnerung> {
-  return apiSend<Erinnerung>(`/api/einsaetze/${einsatzId}/reminders`, 'POST', daten);
+  return apiSend<Erinnerung>(`/api/incidents/${einsatzId}/reminders`, 'POST', daten);
 }
 
 export function erledigeErinnerung(einsatzId: number, id: number): Promise<Erinnerung> {
-  return apiSend<Erinnerung>(`/api/einsaetze/${einsatzId}/reminders/${id}/complete`, 'POST');
+  return apiSend<Erinnerung>(`/api/incidents/${einsatzId}/reminders/${id}/complete`, 'POST');
 }
 
 export function quittiereErinnerung(einsatzId: number, id: number): Promise<Erinnerung> {
-  return apiSend<Erinnerung>(`/api/einsaetze/${einsatzId}/reminders/${id}/acknowledge`, 'POST');
+  return apiSend<Erinnerung>(`/api/incidents/${einsatzId}/reminders/${id}/acknowledge`, 'POST');
 }
 
 /**
@@ -53,5 +53,5 @@ export function quittiereErinnerung(einsatzId: number, id: number): Promise<Erin
  * serverseitig alle drei Achsen (Status, Vollzug, Quittung); auf eine offene Erinnerung: 422.
  */
 export function oeffneErinnerung(einsatzId: number, id: number): Promise<Erinnerung> {
-  return apiSend<Erinnerung>(`/api/einsaetze/${einsatzId}/reminders/${id}/reopen`, 'POST');
+  return apiSend<Erinnerung>(`/api/incidents/${einsatzId}/reminders/${id}/reopen`, 'POST');
 }

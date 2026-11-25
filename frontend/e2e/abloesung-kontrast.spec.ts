@@ -117,10 +117,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmelden(page);
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E 646 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     const jetzt = Date.now();
     // Ein Abschnitt, damit das Vorgaben-Paneel eine Zeile trägt statt des Leerzustands.
     const abschnitt_id = await post(page, `${basis}/sectors`, { name: 'Deichwache Kontrast' });

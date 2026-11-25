@@ -600,8 +600,7 @@ async fn fordere_geraeteroute(
     if !crate::geraet::darf_route(geraet.ansicht, parts.method.as_str(), &pfad) {
         return Err(AppError::Forbidden);
     }
-    // Neue Einsatzrouten stehen unter `/api/incidents/{id}` (ADR-0097); dieselbe Bindung.
-    if pfad.starts_with("/api/einsaetze/{id}") || pfad.starts_with("/api/incidents/{id}") {
+    if pfad.starts_with("/api/incidents/{id}") {
         use axum::extract::Path;
         use std::collections::HashMap;
         let Path(params) = Path::<HashMap<String, String>>::from_request_parts(parts, state)

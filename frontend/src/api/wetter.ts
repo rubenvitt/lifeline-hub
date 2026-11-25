@@ -9,7 +9,7 @@ import type { WetterAnzeige } from './types';
  * eigenen `zustand` (`ok` · `kein_ort` · `ausfall`), damit ein Teil den anderen nicht mitreißt.
  */
 export function ladeWetter(einsatzId: number): Promise<WetterAnzeige> {
-  return apiGet<WetterAnzeige>(`/api/einsaetze/${einsatzId}/weather`);
+  return apiGet<WetterAnzeige>(`/api/incidents/${einsatzId}/weather`);
 }
 
 /** Nachfrage alle 5 min wie die Pegel — kein Live-Ereignis (externe Quelle). */

@@ -22,10 +22,10 @@ async function senden<T = { id: number }>(
 const STELLE = 'Grundschule Am Deich';
 
 async function saeStelle(page: Page): Promise<{ einsatzId: number; stelleId: number }> {
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `Stelle Detail ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const { id: stelleId } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',

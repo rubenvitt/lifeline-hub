@@ -16,7 +16,7 @@ const GEOMETRIE_BODY_MAX: usize = 256 * 1024 + 64 * 1024;
 const ZU_GROSS: &str = "Anfrage ist zu groß.";
 
 async fn etb_anzahl(app: &axum::Router, cookie: &str, e: i64) -> usize {
-    let (s, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (s, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     assert_eq!(s, StatusCode::OK);
     etb.as_array().unwrap().len()
 }
@@ -48,7 +48,7 @@ async fn body_ueber_dem_limit_ist_413_und_der_handler_laeuft_nicht() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(&body),
     )
@@ -66,7 +66,7 @@ async fn body_ueber_dem_limit_ist_413_und_der_handler_laeuft_nicht() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(&body),
     )
@@ -86,7 +86,7 @@ async fn body_an_der_grenze_erreicht_die_feldpruefung() {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(&body),
     )
@@ -110,7 +110,7 @@ async fn zone(app: &axum::Router, cookie: &str, e: i64, body: &str) -> (StatusCo
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/zones"),
+        &format!("/api/incidents/{e}/zones"),
         cookie,
         Some(body),
     )
@@ -148,7 +148,7 @@ async fn geometrie_routen_haben_ein_eigenes_limit() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/sectors/1/area"),
+        &format!("/api/incidents/{e}/sectors/1/area"),
         &admin,
         Some(&flaeche),
     )
@@ -159,7 +159,7 @@ async fn geometrie_routen_haben_ein_eigenes_limit() {
     let (s, j) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/sectors/1/area"),
+        &format!("/api/incidents/{e}/sectors/1/area"),
         &admin,
         Some(&flaeche),
     )

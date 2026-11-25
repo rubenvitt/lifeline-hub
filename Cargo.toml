@@ -83,6 +83,11 @@ rust_xlsxwriter = { version = "0.103", default-features = false }
 # tiff), kein `-sys`-Crate, damit das Single-Binary ohne C-Bibliothek bleibt; ohne `rayon`, die
 # Last begrenzt `anhang::vorschau` selbst. HEIC dekodiert der Browser (design.md D3/D8).
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "tiff"] }
+# COG-Kacheln entpacken (LLH-2021, `src/karte/cog.rs`): Deflate und LZW. Beide liegen über
+# `osmpbf` bzw. `image`/`tiff` ohnehin im Lockfile; `flate2` baut auch die gzip-Bomben der
+# Deckel-Tests ausgehender Abrufe (LFH-923, `src/http_begrenzt.rs`).
+flate2 = "1"
+weezl = "0.1"
 # fontstack-/Pfadsegment-Encoding für den Style-/Tile-Proxy.
 percent-encoding = "2"
 rust-embed = "8"
@@ -172,14 +177,14 @@ webauthn-rs-core = "=0.6.2"
 # SSE-Body eines OFFENEN Streams frameweise lesen: `to_bytes` wartet auf ein Stream-Ende, das
 # bei einem Live-Feed nie kommt.
 http-body-util = "0.1"
-# gzip-Bomben für die Deckel-Tests ausgehender Abrufe (LFH-923, `src/http_begrenzt.rs`); liegt
-# über `osmpbf` ohnehin im Lockfile.
-flate2 = "1"
 # `all` nur für Tests: liest die Keepalive-Frist zurück (`verbindung::tests`).
 socket2 = { version = "0.6", features = ["all"] }
 # `test-util` für `#[tokio::test(start_paused = true)]`: die Fristen in `transfer::tests` laufen
 # auf einer angehaltenen Uhr und hängen nicht an der Last der Maschine.
 tokio = { version = "1", features = ["full", "test-util"] }
+# Property-Tests (LLH-2090, `src/AGENTS.md`, „Backend↔Frontend — Property-Tests“): Eigenschaften,
+# die für jede Eingabe gelten, gegen viele erzeugte Fälle. Ohne Standard-Features: kein `fork`.
+proptest = { version = "1", default-features = false, features = ["std"] }
 
 [features]
 # clamav ist Default-AN (reines Rust). Der echte Scan braucht einen erreichbaren clamd; ohne

@@ -85,7 +85,7 @@ describe('unterschreibeErklaerung (LLH-1490/1491)', () => {
   // LLH-1862: Die ID einer Akte vergibt der Server nach dem Löschen neu; die Kennung der
   // gezeigten Akte reist als Gegenprobe mit.
   it('bildet den Pfad am Einsatz oder an der Akte, dort mit der Kennung', () => {
-    expect(fuehrungPfad({ einsatzId: 7 }, 'request')).toBe('/api/einsaetze/7/command/request');
+    expect(fuehrungPfad({ einsatzId: 7 }, 'request')).toBe('/api/incidents/7/command/request');
     expect(fuehrungPfad({ akteId: 4, kennung: 'k-hub/3' }, 'request')).toBe(
       '/api/admin/instance/command/4/request?kennung=k-hub%2F3',
     );

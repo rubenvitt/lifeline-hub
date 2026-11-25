@@ -29,7 +29,7 @@ const schaden = (o: Partial<Schaden> = {}): Schaden =>
 function liefereListe(liste: Schaden[]) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/damages/:id', ({ params }) => {
+    http.get('/api/incidents/5/damages/:id', ({ params }) => {
       abrufe += 1;
       const s = liste.find((x) => x.id === Number(params.id));
       return s ? HttpResponse.json(s) : new HttpResponse(null, { status: 404 });

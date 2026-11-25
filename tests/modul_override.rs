@@ -34,7 +34,7 @@ async fn override_setzen(
             Request::builder()
                 .method("PUT")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz_id}/module-overrides/{modul_key}"
+                    "/api/incidents/{einsatz_id}/module-overrides/{modul_key}"
                 ))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
@@ -52,7 +52,7 @@ async fn overrides_laden(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}/module-overrides"))
+                .uri(format!("/api/incidents/{einsatz_id}/module-overrides"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -221,11 +221,11 @@ async fn einsatzleitung_sperrt_sich_nicht_aus_einstellungen_aus() {
 
     // GET der Einstellungen + Stammdaten bleibt für die Einsatzleitung erreichbar.
     assert_eq!(
-        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}/settings")).await,
+        get_status(&app, &lotta, &format!("/api/incidents/{eid}/settings")).await,
         StatusCode::OK
     );
     assert_eq!(
-        get_status(&app, &lotta, &format!("/api/einsaetze/{eid}")).await,
+        get_status(&app, &lotta, &format!("/api/incidents/{eid}")).await,
         StatusCode::OK
     );
 }
@@ -270,7 +270,7 @@ async fn einsatzfuehrung_ist_gueltig_und_ungueltiges_aendert_nichts() {
     let (status, v) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-overrides"),
+        &format!("/api/incidents/{eid}/module-overrides"),
         &admin,
         None,
     )
@@ -430,7 +430,7 @@ async fn verstecktes_etb_blockt_mitglied_auf_get_und_post() {
 
     // Vor dem Verstecken: Frieda darf lesen.
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::OK
     );
 
@@ -443,14 +443,14 @@ async fn verstecktes_etb_blockt_mitglied_auf_get_und_post() {
     // GET und POST des versteckten Moduls → 403. Der Live-Feed ist kein Gate mehr,
     // sondern filtert (siehe versteckte_module_werden_aus_dem_live_feed_gefiltert).
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::FORBIDDEN
     );
     assert_eq!(
         post_status(
             &app,
             &frieda,
-            &format!("/api/einsaetze/{eid}/etb"),
+            &format!("/api/incidents/{eid}/etb"),
             r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Test"}"#
         )
         .await,
@@ -466,7 +466,7 @@ async fn verstecktes_etb_laesst_admin_durch() {
 
     // Admin-Mindest-Guard: trotz versteckt 200.
     assert_eq!(
-        get_status(&app, &admin, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &admin, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::OK
     );
 }
@@ -479,7 +479,7 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
     // ETB sichtbar, aber Rolle fuehrungskraft erforderlich. Frieda hat org_rolle 'keine'.
     override_setzen(&app, &admin, eid, "etb", true, Some("fuehrungskraft")).await;
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::FORBIDDEN
     );
 
@@ -488,7 +488,7 @@ async fn etb_rollen_schranke_blockt_normales_mitglied() {
     rolle_setzen(&app, &admin, eid, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
     assert_eq!(
-        get_status(&app, &gustav, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &gustav, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::OK
     );
 }
@@ -580,7 +580,7 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
 
     // Baseline: alle Pfade für das Mitglied sichtbar → 200.
     for (key, suffix) in MODUL_GET_PFADE {
-        let st = get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/{suffix}")).await;
+        let st = get_status(&app, &frieda, &format!("/api/incidents/{eid}/{suffix}")).await;
         assert_eq!(
             st,
             StatusCode::OK,
@@ -601,7 +601,7 @@ async fn alle_modul_gruppen_gegated_get_baseline_und_versteckt() {
 
     // Mitglied → 403 auf jedem Pfad; Admin-Mindest-Guard → 200.
     for (key, suffix) in MODUL_GET_PFADE {
-        let pfad = format!("/api/einsaetze/{eid}/{suffix}");
+        let pfad = format!("/api/incidents/{eid}/{suffix}");
         assert_eq!(
             get_status(&app, &frieda, &pfad).await,
             StatusCode::FORBIDDEN,
@@ -639,7 +639,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{eid}/live"))
+                .uri(format!("/api/incidents/{eid}/live"))
                 .header(header::COOKIE, frieda.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -658,7 +658,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{eid}/persons"))
+                .uri(format!("/api/incidents/{eid}/persons"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(r#"{"name":"Muster","vorname":"Max"}"#))
@@ -673,7 +673,7 @@ async fn versteckte_module_werden_aus_dem_live_feed_gefiltert() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{eid}/etb"))
+                .uri(format!("/api/incidents/{eid}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(
@@ -718,11 +718,11 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
         StatusCode::OK
     );
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/briefing")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/briefing")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: Frieda sieht die Lagebesprechung nicht"
     );
-    let besprechungen = format!("/api/einsaetze/{eid}/briefings");
+    let besprechungen = format!("/api/incidents/{eid}/briefings");
     admin_post(
         &app,
         &admin,
@@ -763,7 +763,7 @@ async fn einsatzkopf_erreicht_auch_mitglieder_ohne_lagebesprechungs_recht() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}"),
+        &format!("/api/incidents/{eid}"),
         &admin,
         Some(r#"{"stichwort":"H 2"}"#),
     )
@@ -796,7 +796,7 @@ async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
         );
     }
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}")).await,
         StatusCode::OK,
         "Vorbedingung: den Kopf liest Frieda weiterhin"
     );
@@ -806,14 +806,14 @@ async fn einsatzkopf_erreicht_ein_mitglied_ohne_ausblendbare_module() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Nicht fuer Frieda"}"#,
     )
     .await;
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{eid}"),
+        &format!("/api/incidents/{eid}"),
         &admin,
         Some(r#"{"stichwort":"H 3"}"#),
     )
@@ -873,7 +873,7 @@ async fn live_oeffnen(
     last_event_id: Option<&str>,
 ) -> axum::http::Response<axum::body::Body> {
     let mut req = Request::builder()
-        .uri(format!("/api/einsaetze/{eid}/live"))
+        .uri(format!("/api/incidents/{eid}/live"))
         .header(header::COOKIE, cookie.to_string());
     if let Some(id) = last_event_id {
         req = req.header("last-event-id", id);
@@ -921,7 +921,7 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
     );
     // Gegenprobe: der GET-Pfad sperrt bereits.
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: Org-Default muss den GET sperren"
     );
@@ -932,14 +932,14 @@ async fn org_modul_default_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/persons"),
+        &format!("/api/incidents/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Nur fuer Fuehrungskraefte"}"#,
     )
     .await;
@@ -981,7 +981,7 @@ async fn einsatzfuehrung_filtert_den_live_feed_nach_einsatzrolle() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Fuer die Fuehrung"}"#,
     )
     .await;
@@ -1024,7 +1024,7 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/persons"),
+        &format!("/api/incidents/{eid}/persons"),
         r#"{"name":"Erste","vorname":"Person"}"#,
     )
     .await;
@@ -1036,14 +1036,14 @@ async fn reconnect_replay_wird_ebenfalls_gefiltert() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Verpasst und geheim"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/persons"),
+        &format!("/api/incidents/{eid}/persons"),
         r#"{"name":"Zweite","vorname":"Person"}"#,
     )
     .await;
@@ -1081,21 +1081,21 @@ async fn live_payloads_tragen_keinen_klartext() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"an":"ELW 1","typ":"meldung","inhalt":"ETB-Klartext-Kanarienvogel","von":"Absender-Kanarienvogel"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/channels"),
+        &format!("/api/incidents/{eid}/chat/channels"),
         r#"{"name":"Lagekanal"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/chat/channels/1/messages"),
+        &format!("/api/incidents/{eid}/chat/channels/1/messages"),
         r#"{"inhalt":"Chat-Klartext-Kanarienvogel"}"#,
     )
     .await;
@@ -1166,7 +1166,7 @@ async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
 
     // Baseline: kein Override, kein Org-Default → Frieda darf ETB lesen.
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::OK,
         "Baseline ohne Default muss 200 sein"
     );
@@ -1180,14 +1180,14 @@ async fn org_default_fuehrungskraft_blockt_normales_mitglied_via_route() {
 
     // Frieda (org_rolle='keine', kein Einsatz-Override) → 403.
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::FORBIDDEN,
         "Org-Default fuehrungskraft muss normales Mitglied blocken"
     );
 
     // Admin-Mindest-Guard: Admin kommt trotz Org-Default durch.
     assert_eq!(
-        get_status(&app, &admin, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &admin, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::OK,
         "Admin muss trotz Org-Default durchkommen"
     );
@@ -1206,7 +1206,7 @@ async fn override_ohne_eigene_sichtbarkeit_speichert_null() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{eid}/module-overrides/schaeden"),
+        &format!("/api/incidents/{eid}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":null,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -1255,7 +1255,7 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     .await;
     assert!(status.is_success(), "{status} {v:?}");
     assert_eq!(
-        get_status(&app, &frieda, &format!("/api/einsaetze/{eid}/etb")).await,
+        get_status(&app, &frieda, &format!("/api/incidents/{eid}/etb")).await,
         StatusCode::FORBIDDEN,
         "Vorbedingung: die Org-Ausblendung muss den GET sperren"
     );
@@ -1265,14 +1265,14 @@ async fn org_ausblendung_wirkt_auch_im_live_feed() {
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/persons"),
+        &format!("/api/incidents/{eid}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#,
     )
     .await;
     admin_post(
         &app,
         &admin,
-        &format!("/api/einsaetze/{eid}/etb"),
+        &format!("/api/incidents/{eid}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Ausgeblendet"}"#,
     )
     .await;
@@ -1306,7 +1306,7 @@ async fn load_modul_vorgaben(app: &axum::Router, cookie: &str, eid: i64) -> (Sta
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{eid}/module-defaults"),
+        &format!("/api/incidents/{eid}/module-defaults"),
         cookie,
         None,
     )

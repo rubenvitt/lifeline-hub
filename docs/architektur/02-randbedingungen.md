@@ -35,7 +35,7 @@ verlinkten Dateien; hier steht nur, dass es sie gibt und was sie für die Archit
 | Planung über OpenSpec (Änderungszyklus), Arbeitsdisziplin über Superpowers; eine Change nur auf der Route `entwurf` | Entscheidungen haben eine Herleitung im Archiv (`openspec/changes/archive/*/design.md`) | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Planung und Ausführung“ |
 | Aufgabenverwaltung in Zunder; alte Kennungen `LFH-<n>` bleiben gültig | Kennungen in Kommentaren, Commits und dieser Doku führen auf Aufgaben | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Zunder“ |
 | Regeln liegen in `AGENTS.md`-Dateien beim betroffenen Code; es gibt keine `CLAUDE.md` | Eine Regel steht genau einmal; diese Doku verweist darauf | Wurzel-[`AGENTS.md`](../../AGENTS.md), Abschnitt „Wo die Regeln stehen“ |
-| Lizenzauflagen der Fremddaten: Pflicht-Attribution, teils nur nicht-gewerbliche Nutzung (NINA), ODbL für OpenStreetMap | Attribution reist mit jeder Fachebene bis in die Karte | [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
+| Lizenzauflagen der Fremddaten: Pflicht-Attribution, teils nur nicht-gewerbliche Nutzung (NINA), ODbL für OpenStreetMap | Attribution reist mit jeder Fachebene bis in die Karte; ein gewerblicher Betreiber schaltet NINA mit `--nina false` ab (LLH-2104) | [`docs/fachebenen-quellen.md`](../fachebenen-quellen.md) |
 | LGPL-Bibliothek `libheif-js` im Browser mit Austauschweg und Quelltextpaket je Release | Der Betreiber darf die Bibliothek ersetzen (`--heic-decoder-verzeichnis`) | `frontend/src/heic/LIESMICH.md`; [`docs/betrieb/env-registry.md`](../betrieb/env-registry.md); [`scripts/AGENTS.md`](../../scripts/AGENTS.md) |
 
 ## 2.3 Konventionen

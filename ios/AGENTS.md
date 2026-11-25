@@ -22,7 +22,7 @@ hat eigene Regeln in `ios/Helfer/AGENTS.md`.
   `__LIFELINE_LOCATION__`). Ob gefragt wird und was geht, entscheidet `Brueckenausfuehrung`, an wen
   eine Position einer Beobachtung geht, `Standortbeobachtung` (nur an eine Seite des Servers, auf
   dem sie begann, solange er aktiv ist; Navigation, Schließen und Ende des Web-Prozesses beenden
-  sie). Gefragt wird nur „When in Use“ und erst beim ersten Befehl; die Frist zählt ab der
+  sie), was ein Fehler oder ein Wegfall der Freigabe beendet, `Ortungsablauf` (LLH-2082). Gefragt wird nur „When in Use“ und erst beim ersten Befehl; die Frist zählt ab der
   Freigabe. Unterframes sperrt `ios/App/Huelle/unterframe-standort.js` (Code 1).
 - **Wire-Format im Init-Skript:** Kennung `__LIFELINE_HUELLE__` und Befehle der Brücke stehen im
   Kopf von `ios/App/Huelle/huelle.js`. Wire-Namen sind englisch und danach fest; Vitest führt das

@@ -1,10 +1,10 @@
-//! GET /api/einsaetze/:id/place-preview?lat=&lon=&exclude=typ:id
+//! GET /api/incidents/:id/place-preview?lat=&lon=&exclude=typ:id
 //!
 //! Liefert `{peilung, ortsname}` für die Koordinaten-Plausibilitätsprüfung.
 //! Die Peilung (nächster verorteter Marker) wird bedingungslos berechnet; `ortsname`
 //! kommt aus dem Adressindex der Offline-Karten (LLH-1119, nächste Adresse ≤ 75 m), sonst
 //! via Reverse-Geocoding (org-konfigurierbarer Geocoder, Cache, Rate-Limit).
-//! Auth/Scope wie andere /api/einsaetze/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
+//! Auth/Scope wie andere /api/incidents/:id/*-Routen (Einsatz-Mitglied, Lesezugriff).
 //!
 //! GET /api/place-preview?lat=&lon= (LLH-1376, Spec `ortsfeld`, „Ortsname als Vorschlag“): derselbe
 //! Ortsname ohne Einsatz, etwa beim Anlegen ([`in_org`]). Nur wer Einsätze anlegen darf, wie die

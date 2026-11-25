@@ -22,7 +22,7 @@ async fn erfassen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(body),
     )
@@ -36,7 +36,7 @@ async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> Value {
 }
 
 async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
-    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/etb"))
+    lesen(app, cookie, &format!("/api/incidents/{einsatz}/etb"))
         .await
         .as_array()
         .unwrap()
@@ -44,7 +44,7 @@ async fn etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
 }
 
 async fn meldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Value> {
-    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/reports"))
+    lesen(app, cookie, &format!("/api/incidents/{einsatz}/reports"))
         .await
         .as_array()
         .unwrap()
@@ -55,7 +55,7 @@ async fn lagemeldungen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/situation/reports"),
+        &format!("/api/incidents/{einsatz}/situation/reports"),
     )
     .await
     .as_array()
@@ -75,7 +75,7 @@ async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -132,7 +132,7 @@ async fn meldung_aus_dem_etb_ist_sonstige_und_zaehlt_als_offen() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let zaehler = |app: axum::Router, admin: String| async move {
-        lesen(&app, &admin, &format!("/api/einsaetze/{e}/module-counts")).await["meldungen"]
+        lesen(&app, &admin, &format!("/api/incidents/{e}/module-counts")).await["meldungen"]
             ["offen"]
             .as_i64()
             .unwrap()
@@ -238,7 +238,7 @@ async fn auto_etb_aus_aendert_nichts_am_einen_eintrag() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -324,7 +324,7 @@ async fn ohne_netz_vorgemerkt_legt_beim_abspielen_die_meldung_an() {
         let (s, v) = anfrage_mit_offline_queue_benutzer(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/etb"),
+            &format!("/api/incidents/{e}/etb"),
             &frieda,
             Some(body),
             frieda_id,

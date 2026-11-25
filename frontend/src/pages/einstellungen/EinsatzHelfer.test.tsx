@@ -50,14 +50,14 @@ function stelleBereit(a: Aufbau = {}) {
         person_tracking_allowed: a.person_tracking_allowed ?? false,
       }),
     ),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([{ id: 4, name: 'Zug 1' }])),
-    http.get('/api/einsaetze/1/vehicles', () =>
+    http.get('/api/incidents/1/units', () => HttpResponse.json([{ id: 4, name: 'Zug 1' }])),
+    http.get('/api/incidents/1/vehicles', () =>
       HttpResponse.json([
         { id: 7, funkrufname: 'Rotkreuz 1/83-1', beendet_als: null },
         { id: 8, funkrufname: 'Rotkreuz 1/83-2', beendet_als: null },
       ]),
     ),
-    http.get('/api/einsaetze/1/personnel', () =>
+    http.get('/api/incidents/1/personnel', () =>
       HttpResponse.json([
         { id: 31, name: 'Anna Berg' },
         { id: 32, name: 'Kraft 2' },

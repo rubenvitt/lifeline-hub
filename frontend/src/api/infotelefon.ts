@@ -20,7 +20,7 @@ import type {
  * Seit LLH-732 ist die Liste immer geblättert, und alle Zahlen kommen aus `…/zaehler` über den
  * ganzen Bestand, nie aus den geladenen Seiten.
  */
-const pfad = (einsatzId: number) => `/api/einsaetze/${einsatzId}/staff/info-line`;
+const pfad = (einsatzId: number) => `/api/incidents/${einsatzId}/staff/info-line`;
 
 /** Seitengröße der Anrufliste; der Server klemmt auf seine Obergrenze. */
 export const ANRUFE_PAGE_SIZE = 100;

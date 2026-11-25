@@ -82,12 +82,12 @@ function ablehnen(antragId: number, grund: string) {
 }
 
 async function einsatzMitEintrag(page: Page): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Spiegel ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBe(true);
   const id = ((await antwort.json()) as { id: number }).id;
-  const eintrag = await page.request.post(`/api/einsaetze/${id}/etb`, {
+  const eintrag = await page.request.post(`/api/incidents/${id}/etb`, {
     data: { typ: 'meldung', inhalt: 'Lage vom ELW', von: 'ELW Nord', an: 'EL' },
   });
   expect(eintrag.ok(), `ETB-Eintrag: ${eintrag.status()}`).toBe(true);
@@ -133,12 +133,12 @@ test('am Spiegel: Band, Bearbeiten gesperrt, ETB-Erfassung wird beantragt', asyn
     '1 Antrag ausstehend',
   );
   // Nicht in die Daten des Spiegels geschrieben.
-  const etb = await page.request.get(`/api/einsaetze/${einsatz}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatz}/etb`);
   expect(await etb.text()).not.toContain('Sandsäcke am Deich angekommen');
 
   // Der Führer lehnt ab: das Band nennt den Grund, „Verwerfen“ räumt den Antrag.
   const antraege = (await (
-    await page.request.get(`/api/einsaetze/${einsatz}/requests`)
+    await page.request.get(`/api/incidents/${einsatz}/requests`)
   ).json()) as { id: number }[];
   expect(antraege).toHaveLength(1);
   ablehnen(antraege[0].id, 'Einsatz ist abgeschlossen.');

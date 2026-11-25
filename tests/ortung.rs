@@ -34,7 +34,7 @@ async fn fahrzeug_adhoc(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(r#"{"adhoc":{"funkrufname":"FW Extern 1","traegerorganisation":"Feuerwehr"}}"#),
     )
@@ -164,7 +164,7 @@ async fn manuelle_position_setzt_quelle_manuell() {
         ("vehicles", "einsatz_fahrzeug", ef),
         ("personnel", "einsatz_personal", ep),
     ] {
-        let uri = format!("/api/einsaetze/{einsatz}/{pfad}/{id}/position");
+        let uri = format!("/api/incidents/{einsatz}/{pfad}/{id}/position");
         let (s, json) = anfrage(
             &app,
             "PATCH",

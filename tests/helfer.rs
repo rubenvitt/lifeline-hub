@@ -342,7 +342,7 @@ async fn lage() -> Lage {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         &admin,
         Some(&json!({"adhoc": {"funkrufname": "Rotkreuz 10/83-1", "fahrzeugtyp": "RTW"}})),
     )
@@ -462,7 +462,7 @@ async fn helfer_loest_einladung_ein_und_ist_unbestaetigt() {
     let (_, v) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/einsaetze/{}/devices", l.einsatz),
+        &format!("/api/incidents/{}/devices", l.einsatz),
         &l.admin,
         None,
     )
@@ -606,10 +606,10 @@ async fn helfer_darf_keine_lage_lesen() {
     let a = redeem(&l.app, None, anmeldung(&l.code, "unit", l.einheit)).await;
     let cookie = a.cookie.unwrap();
     for pfad in [
-        format!("/api/einsaetze/{}/units", l.einsatz),
-        format!("/api/einsaetze/{}/vehicles", l.einsatz),
-        format!("/api/einsaetze/{}/persons", l.einsatz),
-        format!("/api/einsaetze/{}", l.einsatz),
+        format!("/api/incidents/{}/units", l.einsatz),
+        format!("/api/incidents/{}/vehicles", l.einsatz),
+        format!("/api/incidents/{}/persons", l.einsatz),
+        format!("/api/incidents/{}", l.einsatz),
         format!("/api/incidents/{}/helpers", l.einsatz),
         "/api/organization".to_string(),
     ] {
@@ -1439,7 +1439,7 @@ async fn einsatz_beendet_401() {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", l.einsatz),
+        &format!("/api/incidents/{}/close", l.einsatz),
         &l.admin,
         None,
     )
@@ -1665,7 +1665,7 @@ async fn einsatzabschluss_loescht_personenposition() {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", l.einsatz),
+        &format!("/api/incidents/{}/close", l.einsatz),
         &l.admin,
         None,
     )
@@ -1748,7 +1748,7 @@ async fn einheit_aufloesen_loescht_personenposition_des_helfers() {
     let (s, v) = anfrage(
         &l.app,
         "DELETE",
-        &format!("/api/einsaetze/{}/units/{}", l.einsatz, l.einheit),
+        &format!("/api/incidents/{}/units/{}", l.einsatz, l.einheit),
         &l.admin,
         None,
     )
@@ -1778,7 +1778,7 @@ async fn generische_geraetewege_kennen_keine_helfer() {
         let (s, v) = anfrage_json(
             &l.app,
             "POST",
-            &format!("/api/einsaetze/{}/devices/{gid}/{pfad}", l.einsatz),
+            &format!("/api/incidents/{}/devices/{gid}/{pfad}", l.einsatz),
             &l.admin,
             body.as_ref(),
         )
@@ -1788,7 +1788,7 @@ async fn generische_geraetewege_kennen_keine_helfer() {
     let (s, v) = anfrage(
         &l.app,
         "GET",
-        &format!("/api/einsaetze/{}/devices", l.einsatz),
+        &format!("/api/incidents/{}/devices", l.einsatz),
         &l.admin,
         None,
     )

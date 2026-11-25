@@ -7,7 +7,7 @@ import { erzeugeQueryClient } from '../api/queryClient';
 import ListenzugriffeDrawer from './ListenzugriffeDrawer';
 import type { PersonZugriff } from '../api/types';
 
-const URL = '/api/einsaetze/1/persons/list-accesses';
+const URL = '/api/incidents/1/persons/list-accesses';
 
 const eintraege: PersonZugriff[] = [
   {

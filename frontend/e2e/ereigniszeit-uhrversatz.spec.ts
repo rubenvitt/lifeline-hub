@@ -35,10 +35,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function neuerEinsatz(page: Page, name: string): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E ${name} ${Date.now()}` },
   });
-  expect(r.ok(), `POST /api/einsaetze: ${r.status()} ${await r.text()}`).toBeTruthy();
+  expect(r.ok(), `POST /api/incidents: ${r.status()} ${await r.text()}`).toBeTruthy();
   return ((await r.json()) as { id: number }).id;
 }
 
@@ -56,7 +56,7 @@ test('ETB-Eintrag eines vorgehenden Geräts trägt die Serverzeit und ist nicht 
   await feld.press('Enter');
   await expect(feld).toHaveValue('');
 
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const r = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   const eintraege = (await r.json()) as {
     inhalt: string;
     ereigniszeit: string;
@@ -88,7 +88,7 @@ test('Meldung eines vorgehenden Geräts trägt die Serverzeit', async ({ page })
   await formular.getByRole('button', { name: 'Erfassen', exact: true }).click();
 
   const meldung = async () => {
-    const r = await page.request.get(`/api/einsaetze/${einsatzId}/reports`);
+    const r = await page.request.get(`/api/incidents/${einsatzId}/reports`);
     const liste = (await r.json()) as { inhalt: string; ereigniszeit: string }[];
     return liste.find((m) => m.inhalt === inhalt);
   };

@@ -411,42 +411,43 @@ function basisHandler(
     // Pflichtfeld im generierten Schema — leere Liste = keine Region bereit.
     offline_regionen: [],
     karten_bau_verfuegbar: false,
+    fachebenen_abgeschaltet: [],
   },
 ) {
   // extra zuerst: MSW nimmt den ersten Treffer → Tests überschreiben einzelne GET-Defaults gezielt.
   server.use(
     ...extra,
-    http.get('/api/einsaetze/1', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([UHS_NICHT_VERORTET])),
-    http.get('/api/einsaetze/1/damages/marker', () => HttpResponse.json([SCHADEN_VERORTET])),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/1', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([UHS_NICHT_VERORTET])),
+    http.get('/api/incidents/1/damages/marker', () => HttpResponse.json([SCHADEN_VERORTET])),
+    http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
     // Fahrzeugstatus-Katalog für den Sprechwunsch im Paneel „Ausgewählt“ (eon26eat D2).
     http.get('/api/vehicle-statuses', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/zones', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/free-symbols', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/map/commanders', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/situation/reports', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/reports/check-ins', () =>
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/zones', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/free-symbols', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/map/commanders', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/situation/reports', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/reports/check-ins', () =>
       HttpResponse.json({ frist_min: 60, einheiten: [], abschnitte: [] }),
     ),
-    http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/hazard-areas', () => HttpResponse.json([])),
     // Ebene „Betroffene": der MSW-Default meldet jedes Modul frei (`test/server.ts`), die Query
     // läuft in jedem Test — ohne diese zwei Handler stünde „Betroffene" überall im Ausfallbanner.
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/care', () => HttpResponse.json({ stellen: [] })),
-    http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [] })),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/care', () => HttpResponse.json({ stellen: [] })),
+    http.get('/api/incidents/1/evacuation', () => HttpResponse.json({ bezirke: [] })),
     http.get('/api/organization', () =>
       HttpResponse.json({ id: 1, name: 'Org', tz_organisation: null }),
     ),
     http.get('/api/map/config', () => HttpResponse.json(config)),
-    http.get('/api/einsaetze/1/settings', () => HttpResponse.json(EINSTELLUNGEN)),
-    http.get('/api/einsaetze/1/situation-snapshots', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/map/background-images', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/settings', () => HttpResponse.json(EINSTELLUNGEN)),
+    http.get('/api/incidents/1/situation-snapshots', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/map/background-images', () => HttpResponse.json([])),
     // Standardansicht mit basemap_modus=null → useKartenAnsicht hydratisiert auf den
     // config-Verfügbarkeits-Default.
-    http.get('/api/einsaetze/1/map-views', () =>
+    http.get('/api/incidents/1/map-views', () =>
       HttpResponse.json([
         {
           id: 1,
@@ -599,7 +600,7 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
   });
 
   it('nennt die gescheiterte Quelle namentlich und trägt KEINEN Schließen-Knopf', async () => {
-    basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    basisHandler([http.get('/api/incidents/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
     renderSeite();
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
     expect(overlay).toHaveTextContent('Lagebild unvollständig: Unfallhilfsstellen');
@@ -616,17 +617,17 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
     // unlesbar; die Zahl trägt „alles", die Namen den Einstieg.
     basisHandler(
       [
-        '/api/einsaetze/1',
-        '/api/einsaetze/1/uhs',
-        '/api/einsaetze/1/damages/marker',
-        '/api/einsaetze/1/units',
-        '/api/einsaetze/1/vehicles',
-        '/api/einsaetze/1/sectors',
-        '/api/einsaetze/1/zones',
-        '/api/einsaetze/1/free-symbols',
-        '/api/einsaetze/1/hazard-areas',
-        '/api/einsaetze/1/situation/reports',
-        '/api/einsaetze/1/map/commanders',
+        '/api/incidents/1',
+        '/api/incidents/1/uhs',
+        '/api/incidents/1/damages/marker',
+        '/api/incidents/1/units',
+        '/api/incidents/1/vehicles',
+        '/api/incidents/1/sectors',
+        '/api/incidents/1/zones',
+        '/api/incidents/1/free-symbols',
+        '/api/incidents/1/hazard-areas',
+        '/api/incidents/1/situation/reports',
+        '/api/incidents/1/map/commanders',
       ].map((pfad) => http.get(pfad, () => new HttpResponse(null, { status: 500 }))),
     );
     renderSeite();
@@ -645,7 +646,7 @@ describe('LagekartePage · Warn-Overlay bei fehlender Quelle (AK6)', () => {
     // gibt es keinen Ersatzstand.
     basisHandler([
       http.get(
-        '/api/einsaetze/1/situation-snapshots/3',
+        '/api/incidents/1/situation-snapshots/3',
         () => new HttpResponse(null, { status: 500 }),
       ),
     ]);
@@ -666,7 +667,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
   it('verdrahtet den Slot der Objektliste mit denselben Lagebild-Quellen wie das Overlay', async () => {
     // Derselbe 500er wie im Overlay-Test: `Sidebar.test.tsx` reicht den Slot als Prop herein und
     // sieht nicht, ob die Seite ihn füllt.
-    basisHandler([http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
+    basisHandler([http.get('/api/incidents/1/uhs', () => new HttpResponse(null, { status: 500 }))]);
     objekteVorn();
     renderSeite();
     expect(
@@ -681,7 +682,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
   it('meldet die gescheiterte Bilder-Query in ihrer Sektion', async () => {
     basisHandler([
       http.get(
-        '/api/einsaetze/1/map/background-images',
+        '/api/incidents/1/map/background-images',
         () => new HttpResponse(null, { status: 500 }),
       ),
     ]);
@@ -695,7 +696,7 @@ describe('LagekartePage · Fehler-Slots der Sidebar', () => {
 
   it('meldet die gescheiterte Ansichts-Query in ihrer Sektion', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/map-views', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/map-views', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
     expect(
@@ -765,7 +766,7 @@ describe('LagekartePage', () => {
     let freigeben: () => void = () => {};
     const freigabe = new Promise<void>((r) => (freigeben = r));
     basisHandler([
-      http.get('/api/einsaetze/1/map-views', async () => {
+      http.get('/api/incidents/1/map-views', async () => {
         await freigabe;
         return HttpResponse.json([
           {
@@ -814,7 +815,7 @@ describe('LagekartePage', () => {
   it('platziert ein Objekt: Objekt wählen → Karten-Klick → PATCH mit lat/lon', async () => {
     let patchBody: unknown = null;
     basisHandler([
-      http.patch('/api/einsaetze/1/uhs/5', async ({ request }) => {
+      http.patch('/api/incidents/1/uhs/5', async ({ request }) => {
         patchBody = await request.json();
         return HttpResponse.json({ ...UHS_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
       }),
@@ -830,7 +831,7 @@ describe('LagekartePage', () => {
   it('verschiebt den Einsatzort: Verschieben → Karten-Klick → Teil-PATCH nur mit der Koordinate', async () => {
     let patchBody: Record<string, unknown> | null = null;
     basisHandler([
-      http.patch('/api/einsaetze/1', async ({ request }) => {
+      http.patch('/api/incidents/1', async ({ request }) => {
         patchBody = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ ...EINSATZ, einsatzort_lat: 50.1, einsatzort_lon: 8.6 });
       }),
@@ -910,7 +911,7 @@ describe('LagekartePage', () => {
 
   it('rendert freie taktische Zeichen als Marker (Datenpfad: Query → alleVerortet → sichtbar) (LFH-170)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/free-symbols', () =>
+      http.get('/api/incidents/1/free-symbols', () =>
         HttpResponse.json([
           {
             id: 42,
@@ -938,7 +939,7 @@ describe('LagekartePage', () => {
 
   it('Marker-Klick auf ein freies Zeichen öffnet den FreiesZeichenInspector (kein Fach-Modul-Link) (LFH-170)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/free-symbols', () =>
+      http.get('/api/incidents/1/free-symbols', () =>
         HttpResponse.json([
           {
             id: 42,
@@ -974,7 +975,7 @@ describe('LagekartePage', () => {
     // Platzier-Modus bleibt intakt.
     let patchBody: unknown = null;
     basisHandler([
-      http.patch('/api/einsaetze/1/uhs/5', async ({ request }) => {
+      http.patch('/api/incidents/1/uhs/5', async ({ request }) => {
         patchBody = await request.json();
         return HttpResponse.json({ ...UHS_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
       }),
@@ -992,7 +993,7 @@ describe('LagekartePage', () => {
 
   it('rendert verortete Lagemeldungen als Marker; Klick öffnet Inspector mit Backlink zur Quell-Meldung', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/situation/reports', () =>
+      http.get('/api/incidents/1/situation/reports', () =>
         HttpResponse.json([LAGEMELDUNG_VERORTET]),
       ),
     ]);
@@ -1019,6 +1020,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1045,6 +1047,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1105,6 +1108,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1126,6 +1130,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -1139,7 +1144,7 @@ describe('LagekartePage', () => {
 
   it('zeigt die taktischen Layer-Toggles und ein nicht-verortetes taktisches Objekt in der Liste', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
       http.get('/api/organization', () => HttpResponse.json(ORG_DRK)),
     ]);
     objekteVorn();
@@ -1192,7 +1197,7 @@ describe('LagekartePage', () => {
   it('LFH-776: Kontextmenü — Einträge mit Schreibrecht, aus im exklusiven Modus, Wahl wirkt', async () => {
     let angelegt: unknown = null;
     basisHandler([
-      http.post('/api/einsaetze/1/free-symbols', async ({ request }) => {
+      http.post('/api/incidents/1/free-symbols', async ({ request }) => {
         angelegt = await request.json();
         return HttpResponse.json({ id: 9 });
       }),
@@ -1235,8 +1240,8 @@ describe('LagekartePage', () => {
   it('platziert eine Einheit: wählen → Karten-Klick → PATCH /position mit lat/lon', async () => {
     let body: unknown = null;
     basisHandler([
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/units/2/position', async ({ request }) => {
+      http.get('/api/incidents/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/incidents/1/units/2/position', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json({ ...EINHEIT_NICHT_VERORTET, lat: 50.1, lon: 8.6 });
       }),
@@ -1255,8 +1260,8 @@ describe('LagekartePage', () => {
   it('zeichnet eine Abschnittsfläche: Fläche zeichnen → fertig → PATCH /flaeche mit Polygon-GeoJSON', async () => {
     let body: { flaeche_geojson?: string } | null = null;
     basisHandler([
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
-      http.patch('/api/einsaetze/1/sectors/3/area', async ({ request }) => {
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
+      http.patch('/api/incidents/1/sectors/3/area', async ({ request }) => {
         body = (await request.json()) as { flaeche_geojson?: string };
         return HttpResponse.json({
           ...ABSCHNITT_OHNE_FLAECHE,
@@ -1279,7 +1284,7 @@ describe('LagekartePage', () => {
 
   it('rendert verortetes Personal als taktische Zeichen (alle über karte/fuehrungskraefte, LFH-276)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/map/commanders', () =>
+      http.get('/api/incidents/1/map/commanders', () =>
         HttpResponse.json([FUEHRUNGSKRAFT_VERORTET]),
       ),
     ]);
@@ -1292,7 +1297,7 @@ describe('LagekartePage', () => {
   });
 
   it('Marker-Klick auf eine verortete Einheit öffnet den Inspector mit Fach-Modul-Link', async () => {
-    basisHandler([http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_VERORTET]))]);
+    basisHandler([http.get('/api/incidents/1/units', () => HttpResponse.json([EINHEIT_VERORTET]))]);
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByText('marker-einheit-1'));
@@ -1312,6 +1317,7 @@ describe('LagekartePage', () => {
       offline_attribution: null,
       offline_regionen: [],
       karten_bau_verfuegbar: false,
+      fachebenen_abgeschaltet: [],
     });
     const user = userEvent.setup();
     renderSeite();
@@ -1333,7 +1339,7 @@ describe('LagekartePage', () => {
     // den POST aus.
     let body: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
     basisHandler([
-      http.post('/api/einsaetze/1/zones', async ({ request }) => {
+      http.post('/api/incidents/1/zones', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
           id: 5,
@@ -1365,7 +1371,7 @@ describe('LagekartePage', () => {
   it('zeichnet eine Linien-Zone: Absperrgrenze → zeichnen → bestätigen → POST mit geometrie_typ LineString', async () => {
     let body: { typ?: string; geometrie_typ?: string } | null = null;
     basisHandler([
-      http.post('/api/einsaetze/1/zones', async ({ request }) => {
+      http.post('/api/incidents/1/zones', async ({ request }) => {
         body = (await request.json()) as typeof body;
         return HttpResponse.json({
           id: 6,
@@ -1409,8 +1415,8 @@ describe('LagekartePage', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_FREI])),
-      http.patch('/api/einsaetze/1/zones/7', async ({ request }) => {
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_FREI])),
+      http.patch('/api/incidents/1/zones/7', async ({ request }) => {
         patch = (await request.json()) as typeof patch;
         return HttpResponse.json({ ...ZONE_FREI, label: patch!.label });
       }),
@@ -1449,8 +1455,8 @@ describe('LagekartePage', () => {
       hoechste_warnstufe: 'keine',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_GG])),
-      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([GEBIET])),
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_GG])),
+      http.get('/api/incidents/1/hazard-areas', () => HttpResponse.json([GEBIET])),
     ]);
     renderSeite('/einsaetze/1/lagekarte?gefahrengebiet=10');
     // Der ZonenInspector der zugehörigen Zone öffnet sich (Gefahrengebiet-Gruppen-Select).
@@ -1484,8 +1490,8 @@ describe('LagekartePage', () => {
       angelegt_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_EB])),
-      http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_EB])),
+      http.get('/api/incidents/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?evakuierungsbezirk=5');
     expect(await screen.findByLabelText('Gehört zu Evakuierungsbezirk')).toBeInTheDocument();
@@ -1515,8 +1521,8 @@ describe('LagekartePage', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_NORD])),
-      http.get('/api/einsaetze/1/map-views', () =>
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_NORD])),
+      http.get('/api/incidents/1/map-views', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -1564,7 +1570,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=betreuungsstelle: ohne Modul Betreuung kein Platziermodus (LFH-673)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ betreuung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -1598,8 +1604,8 @@ describe('LagekartePage', () => {
       hoechste_warnstufe: 'keine',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_GG])),
-      http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([GEBIET])),
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_GG])),
+      http.get('/api/incidents/1/hazard-areas', () => HttpResponse.json([GEBIET])),
     ]);
     renderSeiteMitSonde('/einsaetze/1/lagekarte?gefahrengebiet=10');
     // Zone selektiert → Inspector offen (Sonde startet mit ?gefahrengebiet=10).
@@ -1642,7 +1648,7 @@ describe('LagekartePage', () => {
    */
   it('Deeplink ?zentrum= fliegt die Stelle an und räumt den Param (LFH-619)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -1707,7 +1713,7 @@ describe('LagekartePage', () => {
     setzeViewportBreite(390);
     const anfragen: string[] = [];
     basisHandler([
-      http.get('/api/einsaetze/1/map/place-search', ({ request }) => {
+      http.get('/api/incidents/1/map/place-search', ({ request }) => {
         anfragen.push(new URL(request.url).searchParams.get('q') ?? '');
         return HttpResponse.json({
           zustand: 'ok',
@@ -1734,7 +1740,7 @@ describe('LagekartePage', () => {
   it('Deeplink ?ort= mit genau einem Treffer: ein Wechsel der Ansicht fliegt nicht erneut (LFH-638)', async () => {
     let anfragen = 0;
     basisHandler([
-      http.get('/api/einsaetze/1/map/place-search', () => {
+      http.get('/api/incidents/1/map/place-search', () => {
         anfragen += 1;
         return HttpResponse.json({
           zustand: 'ok',
@@ -1774,7 +1780,7 @@ describe('LagekartePage', () => {
     // Der Modus endet in einem PATCH; ohne Schreibrecht wäre der Klick eine Einladung in einen 403.
     // Der Param wird trotzdem geräumt, damit ein Neuladen ihn nicht wieder aufgreift.
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -1797,7 +1803,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=betreuungsstelle: ein Beobachter kommt nicht in den Modus (LFH-673)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -1819,7 +1825,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=bereitstellungsraum: ohne Modul Bereitstellungsräume kein Platziermodus (LLH-1107)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ bereitstellungsraeume: { zugriff: false } })),
       ),
     ]);
@@ -1842,7 +1848,7 @@ describe('LagekartePage', () => {
 
   it('Deeplink ?platzieren=tier: ohne Modul Tiere kein Platziermodus, der Auftrag wird geräumt (LLH-1123)', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ tiere: { zugriff: false } })),
       ),
     ]);
@@ -1866,7 +1872,7 @@ describe('LagekartePage', () => {
     // Schreibrecht im Einsatz reicht nicht: der PATCH einer Person verlangt das Modul, ohne es endete
     // der Klick auf die Karte in einem 403.
     basisHandler([
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -1893,8 +1899,8 @@ describe('LagekartePage', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_FREI])),
-      http.delete('/api/einsaetze/1/zones/7', () => {
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_FREI])),
+      http.delete('/api/incidents/1/zones/7', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1933,13 +1939,13 @@ describe('LagekartePage', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/map/background-images', () => HttpResponse.json([BILD])),
+      http.get('/api/incidents/1/map/background-images', () => HttpResponse.json([BILD])),
       // Kein `new Blob(...)` als Body: jsdoms Blob hat kein `stream()`, undicis `extractBody` ruft
       // es aber beim Bau der Response. Der Handler stürbe still im MSW-Lookup, und der Test
       // scheiterte an einer leeren Anzeige, als wäre die Komponente kaputt. Den MIME-Typ trägt der
       // Header.
       http.get(
-        '/api/einsaetze/1/map/background-images/3/download',
+        '/api/incidents/1/map/background-images/3/download',
         () =>
           new HttpResponse(new TextEncoder().encode('pixeldata'), {
             status: 200,
@@ -1991,11 +1997,11 @@ describe('LagekartePage', () => {
 
     let bilderListe = [A];
     basisHandler([
-      http.get('/api/einsaetze/1/map/background-images', () => HttpResponse.json(bilderListe)),
+      http.get('/api/incidents/1/map/background-images', () => HttpResponse.json(bilderListe)),
       // Beide Downloads liefern Pixeldaten, die id steckt im Pfad. Kein `new Blob(...)` als Body
       // (siehe Smoke-Test).
       http.get(
-        '/api/einsaetze/1/map/background-images/:bildId/download',
+        '/api/incidents/1/map/background-images/:bildId/download',
         () =>
           new HttpResponse(new TextEncoder().encode('pixeldata'), {
             status: 200,
@@ -2046,7 +2052,7 @@ describe('LagekartePage', () => {
 function erstelleZonenPostSpy() {
   let anzahl = 0;
   let letzterBody: { typ?: string; geometrie_typ?: string; geometrie?: string } | null = null;
-  const handler = http.post('/api/einsaetze/1/zones', async ({ request }) => {
+  const handler = http.post('/api/incidents/1/zones', async ({ request }) => {
     anzahl += 1;
     letzterBody = (await request.json()) as typeof letzterBody;
     return HttpResponse.json({
@@ -2082,7 +2088,7 @@ describe('LagekartePage · Abschnittsflächen behalten ihre Identität (LFH-945)
         ],
       }),
     };
-    basisHandler([http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([abschnitt]))]);
+    basisHandler([http.get('/api/incidents/1/sectors', () => HttpResponse.json([abschnitt]))]);
     const ansicht = renderSeite();
     await screen.findByRole('button', { name: 'flaeche-3' });
     const vorher = flaechenProps[flaechenProps.length - 1];
@@ -2132,6 +2138,71 @@ describe('LagekartePage · bbox-Pfad für bbox-abhängige Ebenen (LFH-81)', () =
     // Gerastert wie bei KRITIS (0,05°-Gitter nach außen) — derselbe Schlüssel für benachbarte
     // Ausschnitte.
     await waitFor(() => expect(angefragt).toContain('7,51.5,7.15,51.6'));
+  });
+});
+
+describe('LagekartePage · vom Betreiber abgeschaltete Fachebene (LLH-2104)', () => {
+  const leer = (quelle: string) =>
+    HttpResponse.json({
+      quelle,
+      status: 'leer',
+      attribution: 'Quelle',
+      features: { type: 'FeatureCollection', features: [] },
+    });
+
+  // Gespeicherte Ansicht mit NINA und DWD an; DWD ist der Taktgeber, an dem der Test erkennt,
+  // dass die Fachebenen abgefragt wurden.
+  function mitAnsicht(abgeschaltet: string[], angefragt: string[]) {
+    basisHandler(
+      [
+        http.get('/api/map/overlays/nina', () => {
+          angefragt.push('nina');
+          return leer('nina');
+        }),
+        http.get('/api/map/overlays/dwd', () => {
+          angefragt.push('dwd');
+          return leer('dwd');
+        }),
+        http.get('/api/incidents/1/map-views', () =>
+          HttpResponse.json([
+            {
+              id: 1,
+              einsatz_id: 1,
+              name: 'Standard',
+              reihenfolge: 0,
+              ist_standard: true,
+              erstellt_at: '',
+              geaendert_at: '',
+              fachebenen_sichtbar: { nina: true, dwd: true },
+            },
+          ]),
+        ),
+      ],
+      {
+        online_styles: [],
+        offline_verfuegbar: false,
+        offline_tiles_url: null,
+        offline_attribution: null,
+        offline_regionen: [],
+        karten_bau_verfuegbar: false,
+        fachebenen_abgeschaltet: abgeschaltet,
+      },
+    );
+  }
+
+  it('Gegenprobe: eingeschaltet fragt die Seite NINA aus der gespeicherten Ansicht ab', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht([], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('nina'));
+  });
+
+  it('abgeschaltet fragt die Seite NINA nie ab, obwohl die Ansicht sie gespeichert hat', async () => {
+    const angefragt: string[] = [];
+    mitAnsicht(['nina'], angefragt);
+    renderSeite();
+    await waitFor(() => expect(angefragt).toContain('dwd'));
+    expect(angefragt).not.toContain('nina');
   });
 });
 
@@ -2246,7 +2317,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
   // nicht — sonst hinge sie an einer zweiten Quelle, und die Kopfzeile bräche am Handschirm um.
   it('Kopfzahl zählt den Einsatzort ohne Koordinate nicht mit', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
       ),
     ]);
@@ -2262,7 +2333,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
   // LLH-1953: ohne Punkt schweigt die Karte nicht, sie nennt den fehlenden Einsatzort im Fuß.
   it('nennt den Einsatzort ohne Koordinate im Kartenfuß, mit Platzieren und Sprung', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
       ),
     ]);
@@ -2291,10 +2362,10 @@ describe('LagekartePage · Neuentwurf S5', () => {
 
   it('lässt den Sprung weg, wenn die Einsatzdaten gesperrt sind', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null }),
       ),
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ einsatzdaten: { zugriff: false } })),
       ),
     ]);
@@ -2311,9 +2382,9 @@ describe('LagekartePage · Neuentwurf S5', () => {
   it('zeigt im gesicherten Stand kein Einsatzort-Band', async () => {
     const ohneOrt = { ...EINSATZ, einsatzort_lat: null, einsatzort_lon: null };
     basisHandler([
-      http.get('/api/einsaetze/1', () => HttpResponse.json(ohneOrt)),
-      http.get('/api/einsaetze/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
-      http.get('/api/einsaetze/1/situation-snapshots/3', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(ohneOrt)),
+      http.get('/api/incidents/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/incidents/1/situation-snapshots/3', () =>
         HttpResponse.json({ ...STAND_A, daten: { einsatz: ohneOrt } }),
       ),
     ]);
@@ -2322,9 +2393,46 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull();
   });
 
+  it('zeigt die Drohnenquellen nur live, im gesicherten Stand weder Zeile noch Abfrage (LLH-2106)', async () => {
+    const abgefragt = vi.fn();
+    const quellen = http.get('/api/incidents/1/drone/sources', () => {
+      abgefragt();
+      return HttpResponse.json([]);
+    });
+    const stand = [
+      http.get('/api/incidents/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/incidents/1/situation-snapshots/3', () =>
+        HttpResponse.json({ ...STAND_A, daten: { einsatz: EINSATZ } }),
+      ),
+    ];
+    // Die Gruppe „Fachebenen“ merkt sich ihren Zustand über die Seite hinaus: nur zugeklappt öffnen.
+    const ebenenOeffnen = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole('tab', { name: 'Ebenen' }));
+      if (!screen.queryByRole('button', { name: /^Drohne / })) {
+        await user.click(await screen.findByRole('button', { name: /^Fachebenen/ }));
+      }
+      await screen.findByRole('button', { name: /^Drohne / });
+    };
+
+    basisHandler([quellen, ...stand]);
+    const live = renderSeite();
+    await ebenenOeffnen(userEvent.setup());
+    await waitFor(() => expect(abgefragt).toHaveBeenCalled());
+    expect(document.querySelector('[data-lfh="drohnen-quellen"]')).not.toBeNull();
+    expect(screen.getByRole('switch', { name: 'Drohnenlage (Suchlage)' })).toBeInTheDocument();
+    live.unmount();
+
+    abgefragt.mockClear();
+    renderSeite('/einsaetze/1/lagekarte?snapshot=3');
+    await screen.findByText('Historischer Stand — schreibgeschützt');
+    await ebenenOeffnen(userEvent.setup());
+    expect(document.querySelector('[data-lfh="drohnen-quellen"]')).toBeNull();
+    expect(abgefragt).not.toHaveBeenCalled();
+  });
+
   it('nennt ohne Schreibrecht nur den fehlenden Einsatzort, ohne Knöpfe', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({
           ...EINSATZ,
           einsatzort: null,
@@ -2519,7 +2627,7 @@ describe('LagekartePage · Neuentwurf S5', () => {
 
   it('ohne Schreibrecht: kein Knopf „Zeichenwerkzeuge“, „Messen“ steht da', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -2533,9 +2641,9 @@ describe('LagekartePage · Neuentwurf S5', () => {
     // Ohne `pointerdown` (nur `mouseDown`/`click`): ein Druck neben das Menü schlösse es ohnehin.
     localStorage.setItem('lfh:lagekarte:zeitachse-eingeklappt', '0');
     basisHandler([
-      http.get('/api/einsaetze/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/incidents/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
       // Der Stand trägt nur den Einsatz: genug für die Zeitachse, die zurück in Live führt.
-      http.get('/api/einsaetze/1/situation-snapshots/3', () =>
+      http.get('/api/incidents/1/situation-snapshots/3', () =>
         HttpResponse.json({ ...STAND_A, daten: { einsatz: EINSATZ } }),
       ),
     ]);
@@ -2681,7 +2789,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('Bestandsansicht ohne Schalterwert: keine Personen-Marker, obwohl eine Person verortet ist', async () => {
     // Die Vorgabe „aus" (LAYER_DEFAULT.person = false) schließt Personen aus.
     basisHandler([
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     // Warten, bis die übrigen Marker stehen — sonst wäre die Negativaussage trivial.
@@ -2690,7 +2798,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   });
 
   /** Dieselbe geteilte Ansicht in jedem Fall: „Betroffene" ist eingeschaltet. */
-  const ANSICHT_BETROFFENE_AN = http.get('/api/einsaetze/1/map-views', () =>
+  const ANSICHT_BETROFFENE_AN = http.get('/api/incidents/1/map-views', () =>
     HttpResponse.json([
       {
         id: 1,
@@ -2708,7 +2816,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('mit Zugriff: die eingeschaltete Ebene zeichnet die Person — ohne Namen', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
@@ -2720,7 +2828,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('mit Zugriff und eingeschalteter Ebene: die Objektsuche führt die Person (LFH-716)', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     objekteVorn();
     renderSeite();
@@ -2732,7 +2840,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 403 })),
     ]);
     objekteVorn();
     renderSeite();
@@ -2747,7 +2855,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 403 })),
     ]);
     objekteVorn();
     renderSeite();
@@ -2763,10 +2871,10 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     let anfragen = 0;
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: false, zugriff: false } })),
       ),
-      http.get('/api/einsaetze/1/persons', () => {
+      http.get('/api/incidents/1/persons', () => {
         anfragen += 1;
         return HttpResponse.json([PERSON_VERORTET]);
       }),
@@ -2786,8 +2894,8 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 403 })),
-      http.patch('/api/einsaetze/1/map-views/1', async ({ request }) => {
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 403 })),
+      http.patch('/api/incidents/1/map-views/1', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1, einsatz_id: 1, name: 'Standard', ist_standard: true });
       }),
@@ -2808,7 +2916,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
     betroffeneOffen();
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
     const overlay = await screen.findByTestId('lagebild-unvollstaendig');
@@ -2831,7 +2939,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
 
   it('ohne eingeschaltete Ebene macht ein Ausfall der Personenliste die Suche nicht unvollständig', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 500 })),
     ]);
     renderSeite();
     const kopf = await screen.findByRole('button', { name: /^Schäden/, hidden: true });
@@ -2841,7 +2949,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('die Kopfzahl „verortet" zählt Betroffene nicht mit', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     renderSeite();
     expect(await screen.findByText('marker-person-11')).toBeInTheDocument();
@@ -2855,7 +2963,7 @@ describe('LagekartePage · Ebene „Betroffene" (LFH-648)', () => {
   it('ein Klick auf den Personen-Marker füllt „Ausgewählt" mit Registriernummer und Sichtung', async () => {
     basisHandler([
       ANSICHT_BETROFFENE_AN,
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([PERSON_VERORTET])),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -2883,10 +2991,10 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     let verortet = false;
     basisHandler([
       ...extra,
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json([verortet ? PERSON_VERORTET : PERSON_OHNE_ORT]),
       ),
-      http.patch('/api/einsaetze/1/persons/11', () => {
+      http.patch('/api/incidents/1/persons/11', () => {
         verortet = true;
         return HttpResponse.json(PERSON_VERORTET);
       }),
@@ -2959,12 +3067,12 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
     localStorage.setItem('lfh:lagekarte:leiste-offen:ab-lg', '0');
     let verortet = false;
     basisHandler([
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         verortet
           ? HttpResponse.json({ error: 'Netz weg' }, { status: 503 })
           : HttpResponse.json([PERSON_OHNE_ORT]),
       ),
-      http.patch('/api/einsaetze/1/persons/11', () => {
+      http.patch('/api/incidents/1/persons/11', () => {
         verortet = true;
         return HttpResponse.json(PERSON_VERORTET);
       }),
@@ -3024,7 +3132,7 @@ describe('LagekartePage · Verortungsauftrag mit Rückweg (LLH-1125)', () => {
 
   it('ohne Modul „Personen“ kein Modus und kein Personenmarker', async () => {
     auftragsHandler([
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ personen: { sichtbar: true, zugriff: false } })),
       ),
     ]);
@@ -3336,7 +3444,7 @@ describe('LFH-825: Zeichnen per Link', () => {
 
   it('ein Beobachter kommt nicht in den Zeichenmodus, der Param wird trotzdem geräumt', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -3358,7 +3466,7 @@ describe('LFH-825: Zeichnen per Link', () => {
       freigeben = r;
     });
     basisHandler([
-      http.get('/api/einsaetze/1', async () => {
+      http.get('/api/incidents/1', async () => {
         await einsatzDa;
         return HttpResponse.json(EINSATZ);
       }),
@@ -3429,7 +3537,7 @@ describe('LLH-1043: Kreis', () => {
   it('„Kreis hier …“ setzt die Mitte, „Übernehmen“ sendet den Kreis', async () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
-      http.post('/api/einsaetze/1/zones', async ({ request }) => {
+      http.post('/api/incidents/1/zones', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({
           id: 5,
@@ -3523,7 +3631,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     angelegt_at: '',
   };
   const mitBezirken = (bezirke: unknown[] = [UFER]) =>
-    http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke }));
+    http.get('/api/incidents/1/evacuation', () => HttpResponse.json({ bezirke }));
   const ort = () => screen.getByTestId('location-search');
   const geraeumt = () =>
     waitFor(() => {
@@ -3551,7 +3659,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
       mitBezirken(),
-      http.post('/api/einsaetze/1/zones', async ({ request }) => {
+      http.post('/api/incidents/1/zones', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 9, ...body });
       }),
@@ -3584,7 +3692,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
     let body: Record<string, unknown> | null = null;
     basisHandler([
       mitBezirken(),
-      http.post('/api/einsaetze/1/zones', async ({ request }) => {
+      http.post('/api/incidents/1/zones', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 9, ...body });
       }),
@@ -3626,10 +3734,10 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('eine noch nicht gerenderte Räumung startet den Modus nicht neu', async () => {
     let flaechen = 0;
     basisHandler([
-      http.get('/api/einsaetze/1/evacuation', () =>
+      http.get('/api/incidents/1/evacuation', () =>
         HttpResponse.json({ bezirke: [{ ...UFER, flaechen }] }),
       ),
-      http.post('/api/einsaetze/1/zones', () => {
+      http.post('/api/incidents/1/zones', () => {
         flaechen += 1;
         return HttpResponse.json({ id: 9 });
       }),
@@ -3659,7 +3767,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('„Auf der Karte bleiben“ schließt die Rückmeldung', async () => {
     basisHandler([
       mitBezirken(),
-      http.post('/api/einsaetze/1/zones', () => HttpResponse.json({ id: 9 })),
+      http.post('/api/incidents/1/zones', () => HttpResponse.json({ id: 9 })),
     ]);
     const user = userEvent.setup();
     renderMitRueckweg('/einsaetze/1/lagekarte?zeichnen=evakuierungsbezirk&bezirk=5');
@@ -3691,7 +3799,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('ohne Schreibrecht: kein Modus, Parameter geräumt', async () => {
     basisHandler([
       mitBezirken(),
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...EINSATZ, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -3704,7 +3812,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
   it('ohne Freigabe des Moduls Evakuierung: kein Modus, Parameter geräumt', async () => {
     basisHandler([
       mitBezirken(),
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ evakuierung: { sichtbar: false, zugriff: false } })),
       ),
     ]);
@@ -3722,7 +3830,7 @@ describe('LLH-1069: Gebiet eines Bezirks per Link zeichnen', () => {
       freigeben = r;
     });
     basisHandler([
-      http.get('/api/einsaetze/1/evacuation', async () => {
+      http.get('/api/incidents/1/evacuation', async () => {
         await listeDa;
         return HttpResponse.json({ bezirke: [UFER] });
       }),
@@ -3755,7 +3863,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     let versuch = 0;
     let freigeben: () => void = () => {};
     basisHandler([
-      http.post('/api/einsaetze/1/zones', async () => {
+      http.post('/api/incidents/1/zones', async () => {
         versuch += 1;
         if (versuch === 1) return ablehnen('Geometrie ungültig');
         await new Promise<void>((r) => (freigeben = r));
@@ -3785,8 +3893,8 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
 
   it('Verorten abgelehnt: Grund über der Karte, kein Toast', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/incidents/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
     objekteVorn();
@@ -3801,8 +3909,8 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
 
   it('Abschnittsfläche abgelehnt: Grund über der Karte, kein Toast', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
-      http.patch('/api/einsaetze/1/sectors/3/area', () => ablehnen('Fläche zu groß')),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([ABSCHNITT_OHNE_FLAECHE])),
+      http.patch('/api/incidents/1/sectors/3/area', () => ablehnen('Fläche zu groß')),
     ]);
     const user = userEvent.setup();
     objekteVorn();
@@ -3829,8 +3937,8 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/zones', () => HttpResponse.json([ZONE_FREI])),
-      http.delete('/api/einsaetze/1/zones/7', () => ablehnen('Zone gehört zu einem Gebiet')),
+      http.get('/api/incidents/1/zones', () => HttpResponse.json([ZONE_FREI])),
+      http.delete('/api/incidents/1/zones/7', () => ablehnen('Zone gehört zu einem Gebiet')),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -3847,7 +3955,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     let versuch = 0;
     let freigeben: () => void = () => {};
     basisHandler([
-      http.post('/api/einsaetze/1/free-symbols', async () => {
+      http.post('/api/incidents/1/free-symbols', async () => {
         versuch += 1;
         if (versuch !== 2) return ablehnen('Ansicht gelöscht');
         await new Promise<void>((r) => (freigeben = r));
@@ -3913,9 +4021,9 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/map/background-images', () => HttpResponse.json([BILD])),
+      http.get('/api/incidents/1/map/background-images', () => HttpResponse.json([BILD])),
       http.get(
-        '/api/einsaetze/1/map/background-images/3/download',
+        '/api/incidents/1/map/background-images/3/download',
         () => new HttpResponse(null, { status: 404 }),
       ),
     ]);
@@ -3929,7 +4037,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
   });
 
   it('Neue Ansicht abgelehnt: Grund im Dialog, kein Toast', async () => {
-    basisHandler([http.post('/api/einsaetze/1/map-views', () => ablehnen('Name vergeben'))]);
+    basisHandler([http.post('/api/incidents/1/map-views', () => ablehnen('Name vergeben'))]);
     const user = userEvent.setup();
     renderSeite();
     await user.click(await screen.findByLabelText('Ansichts-Aktionen'));
@@ -3950,7 +4058,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
 
   it('Als Standard abgelehnt: Grund im Paneel „Kartenansicht“, kein Toast', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/map-views', () =>
+      http.get('/api/incidents/1/map-views', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -3972,7 +4080,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
           },
         ]),
       ),
-      http.patch('/api/einsaetze/1/map-views/2', () => ablehnen('Keine Berechtigung')),
+      http.patch('/api/incidents/1/map-views/2', () => ablehnen('Keine Berechtigung')),
     ]);
     const user = userEvent.setup();
     renderSeite('/einsaetze/1/lagekarte?ansicht=2');
@@ -3993,7 +4101,7 @@ describe('LFH-1077: Speicherfehler an der Karte', () => {
     let versuch = 0;
     let freigeben: () => void = () => {};
     basisHandler([
-      http.patch('/api/einsaetze/1/map-views/1', async () => {
+      http.patch('/api/incidents/1/map-views/1', async () => {
         versuch += 1;
         if (versuch === 1) return ablehnen('Ansicht gesperrt');
         await new Promise<void>((r) => (freigeben = r));
@@ -4027,7 +4135,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   const hinweis = () => screen.queryByTestId('karten-speicherfehler');
   const paneelFehler = () => document.querySelector('[data-lfh="ansicht-fehler"]');
   const toasts = () => document.querySelectorAll('.ant-message-notice').length;
-  const ZWEI_ANSICHTEN = http.get('/api/einsaetze/1/map-views', () =>
+  const ZWEI_ANSICHTEN = http.get('/api/incidents/1/map-views', () =>
     HttpResponse.json([
       {
         id: 1,
@@ -4051,7 +4159,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   );
 
   it('ein Grund über der Karte lässt sich schließen', async () => {
-    basisHandler([http.post('/api/einsaetze/1/zones', () => ablehnen('Geometrie ungültig'))]);
+    basisHandler([http.post('/api/incidents/1/zones', () => ablehnen('Geometrie ungültig'))]);
     const user = userEvent.setup();
     objekteVorn();
     renderSeite();
@@ -4067,8 +4175,8 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
 
   it('Verorten abgelehnt, Platzieren abgebrochen: der Grund geht mit', async () => {
     basisHandler([
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
-      http.patch('/api/einsaetze/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([EINHEIT_NICHT_VERORTET])),
+      http.patch('/api/incidents/1/units/2/position', () => ablehnen('Einheit aufgelöst')),
     ]);
     const user = userEvent.setup();
     objekteVorn();
@@ -4102,16 +4210,16 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
       geaendert_at: '',
     };
     basisHandler([
-      http.get('/api/einsaetze/1/map/background-images', () => HttpResponse.json([BILD])),
+      http.get('/api/incidents/1/map/background-images', () => HttpResponse.json([BILD])),
       http.get(
-        '/api/einsaetze/1/map/background-images/3/download',
+        '/api/incidents/1/map/background-images/3/download',
         () =>
           new HttpResponse(new TextEncoder().encode('pixeldata'), {
             status: 200,
             headers: { 'Content-Type': 'image/png' },
           }),
       ),
-      http.patch('/api/einsaetze/1/map/background-images/3', () =>
+      http.patch('/api/incidents/1/map/background-images/3', () =>
         ablehnen('Keine Berechtigung', 403),
       ),
     ]);
@@ -4128,7 +4236,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   it('steht „Objekte“ vorn, wandert ein Ansichtsgrund in den Kartenhinweis — und zurück (LLH-1028)', async () => {
     basisHandler([
       ZWEI_ANSICHTEN,
-      http.patch('/api/einsaetze/1/map-views/1', () => ablehnen('Ansicht gesperrt')),
+      http.patch('/api/incidents/1/map-views/1', () => ablehnen('Ansicht gesperrt')),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -4149,7 +4257,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   it('Ansicht nicht gespeichert, dann Ansicht gewechselt: kein alter Grund', async () => {
     basisHandler([
       ZWEI_ANSICHTEN,
-      http.patch('/api/einsaetze/1/map-views/1', () => ablehnen('Ansicht gesperrt')),
+      http.patch('/api/incidents/1/map-views/1', () => ablehnen('Ansicht gesperrt')),
     ]);
     const user = userEvent.setup();
     renderSeite();
@@ -4175,7 +4283,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
   it('Als Standard abgelehnt, dann Ansicht gewechselt: der Grund geht mit, auch nicht über die Karte', async () => {
     basisHandler([
       ZWEI_ANSICHTEN,
-      http.patch('/api/einsaetze/1/map-views/2', () => ablehnen('Keine Berechtigung')),
+      http.patch('/api/incidents/1/map-views/2', () => ablehnen('Keine Berechtigung')),
     ]);
     const user = userEvent.setup();
     renderSeite('/einsaetze/1/lagekarte?ansicht=2');
@@ -4201,7 +4309,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
     let freigeben: () => void = () => {};
     basisHandler([
       ZWEI_ANSICHTEN,
-      http.patch('/api/einsaetze/1/map-views/1', async () => {
+      http.patch('/api/incidents/1/map-views/1', async () => {
         await new Promise<void>((r) => (freigeben = r));
         return ablehnen('Ansicht gesperrt');
       }),
@@ -4226,7 +4334,7 @@ describe('LFH-1077: Kartenhinweis und Ansichtsgründe', () => {
 
   it('Ansicht nicht gespeichert, Leiste ausgeblendet: der Grund steht über der Karte', async () => {
     setzeViewportBreite(768);
-    basisHandler([http.patch('/api/einsaetze/1/map-views/1', () => ablehnen('Gesperrt'))]);
+    basisHandler([http.patch('/api/incidents/1/map-views/1', () => ablehnen('Gesperrt'))]);
     const user = userEvent.setup();
     renderSeite();
     await screen.findByText('marker-schaden-9');
@@ -4261,7 +4369,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     erstellt_at: '',
     geaendert_at: '',
   };
-  const ZWEI_ANSICHTEN = http.get('/api/einsaetze/1/map-views', () =>
+  const ZWEI_ANSICHTEN = http.get('/api/incidents/1/map-views', () =>
     HttpResponse.json([
       { ...ANSICHT, id: 1, name: 'Standard', ist_standard: true },
       { ...ANSICHT, id: 2, name: 'Nord', reihenfolge: 1, ist_standard: false },
@@ -4269,14 +4377,14 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
   );
   /** Einsatz B: eigene Ansicht 9, alles übrige wie in A (über die Handler von A beantwortet). */
   const EINSATZ_B = [
-    http.get('/api/einsaetze/2', () => HttpResponse.json({ ...EINSATZ, id: 2 })),
-    http.get('/api/einsaetze/2/map-views', () =>
+    http.get('/api/incidents/2', () => HttpResponse.json({ ...EINSATZ, id: 2 })),
+    http.get('/api/incidents/2/map-views', () =>
       HttpResponse.json([
         { ...ANSICHT, einsatz_id: 2, id: 9, name: 'B-Standard', ist_standard: true },
       ]),
     ),
-    http.get('/api/einsaetze/2/*', ({ request }) =>
-      fetch(request.url.replace('/api/einsaetze/2/', '/api/einsaetze/1/')),
+    http.get('/api/incidents/2/*', ({ request }) =>
+      fetch(request.url.replace('/api/incidents/2/', '/api/incidents/1/')),
     ),
   ];
 
@@ -4329,7 +4437,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     let angefragt = false;
     basisHandler([
       ...EINSATZ_B,
-      http.post('/api/einsaetze/1/map-views', async () => {
+      http.post('/api/incidents/1/map-views', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json(
@@ -4361,7 +4469,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     basisHandler([
       ...EINSATZ_B,
       ZWEI_ANSICHTEN,
-      http.delete('/api/einsaetze/1/map-views/2', async () => {
+      http.delete('/api/incidents/1/map-views/2', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return new HttpResponse(null, { status: 204 });
@@ -4387,7 +4495,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     basisHandler([
       ...EINSATZ_B,
       ZWEI_ANSICHTEN,
-      http.patch('/api/einsaetze/1/map-views/2', async () => {
+      http.patch('/api/incidents/1/map-views/2', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json({ ...ANSICHT, id: 2, name: 'Nord', ist_standard: true });
@@ -4411,7 +4519,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     let angefragt = false;
     basisHandler([
       ...EINSATZ_B,
-      http.patch('/api/einsaetze/1/map-views/1', async () => {
+      http.patch('/api/incidents/1/map-views/1', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json({ ...ANSICHT, id: 1, name: 'Standard', ist_standard: true });
@@ -4443,7 +4551,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     const lauf = { angefragt: false, gibFrei: () => {} };
     return {
       lauf,
-      handler: http.post('/api/einsaetze/1/map-views', async () => {
+      handler: http.post('/api/incidents/1/map-views', async () => {
         lauf.angefragt = true;
         await new Promise<void>((r) => (lauf.gibFrei = r));
         return HttpResponse.json(
@@ -4483,7 +4591,7 @@ describe('LFH-1138: späte Ansichts-Antwort nach dem Einsatzwechsel', () => {
     let angefragt = false;
     basisHandler([
       ...EINSATZ_B,
-      http.patch('/api/einsaetze/1/map-views/1', async () => {
+      http.patch('/api/incidents/1/map-views/1', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json({ ...ANSICHT, id: 1, name: 'Standard', ist_standard: true });
@@ -4561,7 +4669,7 @@ describe('LLH-1154: späte Ansichts-Antwort nach Verlassen der Lagekarte', () =>
     let gibFrei: () => void = () => {};
     let angefragt = false;
     basisHandler([
-      http.post('/api/einsaetze/1/map-views', async () => {
+      http.post('/api/incidents/1/map-views', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return HttpResponse.json(
@@ -4592,13 +4700,13 @@ describe('LLH-1154: späte Ansichts-Antwort nach Verlassen der Lagekarte', () =>
     let gibFrei: () => void = () => {};
     let angefragt = false;
     basisHandler([
-      http.get('/api/einsaetze/1/map-views', () =>
+      http.get('/api/incidents/1/map-views', () =>
         HttpResponse.json([
           { ...ANSICHT, id: 1, name: 'Standard', ist_standard: true },
           { ...ANSICHT, id: 2, name: 'Nord', reihenfolge: 1, ist_standard: false },
         ]),
       ),
-      http.delete('/api/einsaetze/1/map-views/2', async () => {
+      http.delete('/api/incidents/1/map-views/2', async () => {
         angefragt = true;
         await new Promise<void>((r) => (gibFrei = r));
         return new HttpResponse(null, { status: 204 });
@@ -4654,8 +4762,8 @@ describe('LLH-1057: Abschnitt fokussieren', () => {
   };
   const handler = () =>
     basisHandler([
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([NORD, SUED])),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([GRUPPE_SUED])),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([NORD, SUED])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([GRUPPE_SUED])),
     ]);
   const band = () => document.querySelector('[data-lfh="fokus-band"]');
 
@@ -4830,10 +4938,10 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?gefahrengebiet=10',
       // Eine Zone ändert sich (Live-Ereignis): neue Zonenliste.
       handler: () => [
-        http.get('/api/einsaetze/1/zones', () =>
+        http.get('/api/incidents/1/zones', () =>
           HttpResponse.json([{ ...ZONE_GG, geaendert_at: String(runde) }]),
         ),
-        http.get('/api/einsaetze/1/hazard-areas', () => HttpResponse.json([GEBIET])),
+        http.get('/api/incidents/1/hazard-areas', () => HttpResponse.json([GEBIET])),
       ],
       gewirkt: () => screen.findByLabelText('Gehört zu Gefahrengebiet'),
       aufheben: (user) => user.keyboard('{Escape}'),
@@ -4843,10 +4951,10 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       name: 'Evakuierungsbezirk',
       route: '/einsaetze/1/lagekarte?evakuierungsbezirk=5',
       handler: () => [
-        http.get('/api/einsaetze/1/zones', () =>
+        http.get('/api/incidents/1/zones', () =>
           HttpResponse.json([{ ...ZONE_EB, geaendert_at: String(runde) }]),
         ),
-        http.get('/api/einsaetze/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
+        http.get('/api/incidents/1/evacuation', () => HttpResponse.json({ bezirke: [UFER] })),
       ],
       gewirkt: () => screen.findByLabelText('Gehört zu Evakuierungsbezirk'),
       aufheben: (user) => user.keyboard('{Escape}'),
@@ -4857,7 +4965,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?platzieren=schaden:10',
       // Die Modulfreigaben ändern sich (ein anderes Modul wird gesperrt).
       handler: () => [
-        http.get('/api/einsaetze/1/module-access', () =>
+        http.get('/api/incidents/1/module-access', () =>
           HttpResponse.json(freigabenFixture(runde > 0 ? { personen: { zugriff: false } } : {})),
         ),
       ],
@@ -4871,7 +4979,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?zeichnen=gefahrengebiet',
       // Die Bezirksliste lädt neu (der Fall aus PR #878).
       handler: () => [
-        http.get('/api/einsaetze/1/evacuation', () =>
+        http.get('/api/incidents/1/evacuation', () =>
           HttpResponse.json({ bezirke: runde > 0 ? [UFER] : [] }),
         ),
       ],
@@ -4884,7 +4992,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       route: '/einsaetze/1/lagekarte?zentrum=52.52,13.405',
       // Das Koordinatenformat des Einsatzes ändert sich (`EinsatzAnzeigeProvider`): neue Formatter.
       handler: () => [
-        http.get('/api/einsaetze/1/settings', () =>
+        http.get('/api/incidents/1/settings', () =>
           HttpResponse.json({
             ...EINSTELLUNGEN,
             koordinatenformat: runde > 0 ? 'utm' : null,
@@ -4899,7 +5007,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       name: 'Ort',
       route: '/einsaetze/1/lagekarte?ort=Rathaus',
       handler: () => [
-        http.get('/api/einsaetze/1/map/place-search', () =>
+        http.get('/api/incidents/1/map/place-search', () =>
           HttpResponse.json({
             zustand: 'ok',
             treffer: [
@@ -4922,7 +5030,7 @@ describe('LLH-1361: Link-Aufträge gelten einmal je Verlaufseintrag', () => {
       name: 'Abschnitt',
       route: '/einsaetze/1/lagekarte?abschnitt=3',
       handler: () => [
-        http.get('/api/einsaetze/1/sectors', () =>
+        http.get('/api/incidents/1/sectors', () =>
           HttpResponse.json([{ ...NORD, tz_fachaufgabe: runde > 0 ? 'Sanitätsdienst' : null }]),
         ),
       ],

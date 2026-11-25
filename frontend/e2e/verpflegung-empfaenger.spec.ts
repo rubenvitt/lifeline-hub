@@ -39,10 +39,10 @@ async function senden<T = { id: number }>(
  */
 async function saeen(page: Page) {
   await anmeldenAlsAdmin(page);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Empfänger ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   const { id: zf } = await senden(page, 'post', `${basis}/catering/time-slots`, {
     bezeichnung: 'Mittag Empfänger',
     von_at: zeit(-20),

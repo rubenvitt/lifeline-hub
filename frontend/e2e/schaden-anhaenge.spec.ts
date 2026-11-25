@@ -47,7 +47,7 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 
 /** Schaden per API (Cookie-Jar geteilt); liefert die id. */
 async function schadenAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/damages`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/damages`, {
     data: { typ: 'sachschaden', ausmass: 'gering', ort: 'Hauptstr. 1' },
   });
   expect(antwort.ok(), `Schaden: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -56,7 +56,7 @@ async function schadenAnlegen(page: Page, einsatzId: string): Promise<number> {
 
 async function seedeAnhang(page: Page, einsatzId: string, schadenId: number, name: string) {
   const antwort = await page.request.post(
-    `/api/einsaetze/${einsatzId}/damages/${schadenId}/attachments`,
+    `/api/incidents/${einsatzId}/damages/${schadenId}/attachments`,
     { multipart: { datei: { name, mimeType: 'image/jpeg', buffer: JPG } } },
   );
   expect(antwort.status(), await antwort.text()).toBe(201);
@@ -99,7 +99,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   await expect(anker).toBeVisible();
   await expect(anker).toHaveAttribute(
     'href',
-    new RegExp(`/api/einsaetze/${einsatzId}/damages/${schadenId}/attachments/\\d+/file$`),
+    new RegExp(`/api/incidents/${einsatzId}/damages/${schadenId}/attachments/\\d+/file$`),
   );
 
   // ── 2 · Download per Klick ──────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ test('legt ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und entfern
   // ── 5 · Zugehörigkeit: Liste über die Adresse eines anderen Einsatzes → 404 ──────────
   const andererEinsatz = await einsatzAnlegen(page, `E2E Nebenlage ${Date.now()}`);
   const fremd = await page.request.get(
-    `/api/einsaetze/${andererEinsatz}/damages/${schadenId}/attachments`,
+    `/api/incidents/${andererEinsatz}/damages/${schadenId}/attachments`,
   );
   expect(fremd.status()).toBe(404);
 });

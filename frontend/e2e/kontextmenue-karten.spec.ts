@@ -16,10 +16,10 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function einsatzMitMeldung(page: Page): Promise<number> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Kontextmenü Karten ${Date.now()}`,
   });
-  await post(page, `/api/einsaetze/${einsatzId}/reports`, {
+  await post(page, `/api/incidents/${einsatzId}/reports`, {
     absender: 'Abschnitt Nord',
     meldeweg: 'funk',
     inhalt: 'Deich am Pegel instabil',
@@ -85,13 +85,13 @@ test.describe('Chat am Handy (Touch)', () => {
   test('langer Druck auf eine Nachricht öffnet ihr Menü; das Abheben schließt es nicht', async ({
     page,
   }) => {
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Kontextmenü Chat ${Date.now()}`,
     });
-    const kanaele = await page.request.get(`/api/einsaetze/${einsatzId}/chat/channels`);
+    const kanaele = await page.request.get(`/api/incidents/${einsatzId}/chat/channels`);
     expect(kanaele.ok(), `Kanäle: ${kanaele.status()}`).toBe(true);
     const kanalId = ((await kanaele.json()) as { id: number }[])[0].id;
-    await post(page, `/api/einsaetze/${einsatzId}/chat/channels/${kanalId}/messages`, {
+    await post(page, `/api/incidents/${einsatzId}/chat/channels/${kanalId}/messages`, {
       inhalt: 'Bitte Lagebild aktualisieren',
     });
 

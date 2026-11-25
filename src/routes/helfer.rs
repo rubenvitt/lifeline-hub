@@ -914,7 +914,7 @@ pub async fn alle_entfernen(
 }
 
 /// POST /api/incidents/{id}/helpers/{gid}/extend — neues Ende eines bestätigten Helfers, wie
-/// `POST /api/einsaetze/{id}/devices/{gid}/extend` (höchstens 72 h ab jetzt). 404 fremd; 409,
+/// `POST /api/incidents/{id}/devices/{gid}/extend` (höchstens 72 h ab jetzt). 404 fremd; 409,
 /// wenn er nicht aktiv ist.
 pub async fn verlaengern(
     State(state): State<AppState>,

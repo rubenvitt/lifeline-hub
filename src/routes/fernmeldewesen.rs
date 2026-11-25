@@ -118,7 +118,7 @@ fn hinweis_aus(hinweis: Option<String>) -> Result<Option<String>, AppError> {
     Ok(h)
 }
 
-/// GET /api/einsaetze/{id}/staff/comms-plan — gepflegte Stellen mit Verbindungen.
+/// GET /api/incidents/{id}/staff/comms-plan — gepflegte Stellen mit Verbindungen.
 pub async fn kommunikationsplan_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Fernmeldewesen>,
@@ -136,7 +136,7 @@ pub struct StelleAnlegenParams {
     antwort: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/staff/comms-plan/positions — Stelle anlegen. Antwort: der ganze
+/// POST /api/incidents/{id}/staff/comms-plan/positions — Stelle anlegen. Antwort: der ganze
 /// Plan, mit `?antwort=stelle` nur die neue Stelle (LFH-893, Review S4).
 pub async fn kommunikationsplan_stelle_anlegen(
     State(state): State<AppState>,
@@ -219,7 +219,7 @@ pub async fn kommunikationsplan_stelle_anlegen(
     Ok((StatusCode::CREATED, Json(stelle)).into_response())
 }
 
-/// PATCH /api/einsaetze/{id}/staff/comms-plan/positions/{sid} — Bezeichnung ändern.
+/// PATCH /api/incidents/{id}/staff/comms-plan/positions/{sid} — Bezeichnung ändern.
 pub async fn kommunikationsplan_stelle_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -239,7 +239,7 @@ pub async fn kommunikationsplan_stelle_aendern(
     Ok(Json(plan))
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-plan/positions/{sid} — Stelle samt Verbindungen.
+/// DELETE /api/incidents/{id}/staff/comms-plan/positions/{sid} — Stelle samt Verbindungen.
 pub async fn kommunikationsplan_stelle_entfernen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -251,7 +251,7 @@ pub async fn kommunikationsplan_stelle_entfernen(
     Ok(Json(plan))
 }
 
-/// POST /api/einsaetze/{id}/staff/comms-plan/positions/{sid}/connections
+/// POST /api/incidents/{id}/staff/comms-plan/positions/{sid}/connections
 pub async fn kommunikationsplan_verbindung_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -276,7 +276,7 @@ pub async fn kommunikationsplan_verbindung_anlegen(
     Ok((StatusCode::CREATED, Json(plan)))
 }
 
-/// PATCH /api/einsaetze/{id}/staff/comms-plan/connections/{vid}
+/// PATCH /api/incidents/{id}/staff/comms-plan/connections/{vid}
 pub async fn kommunikationsplan_verbindung_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -309,7 +309,7 @@ pub async fn kommunikationsplan_verbindung_aendern(
     Ok(Json(plan))
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-plan/connections/{vid}
+/// DELETE /api/incidents/{id}/staff/comms-plan/connections/{vid}
 pub async fn kommunikationsplan_verbindung_entfernen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -321,7 +321,7 @@ pub async fn kommunikationsplan_verbindung_entfernen(
     Ok(Json(plan))
 }
 
-/// PUT /api/einsaetze/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg} — Kanal
+/// PUT /api/incidents/{id}/staff/comms-plan/positions/{sid}/talk-groups/{sg} — Kanal
 /// einer externen Stelle mit Status setzen (LFH-893, design.md D5/D14). Idempotent; eine
 /// Funktion ist 422, eine fremde Sprechgruppe 422 (dieselbe Prüfung wie der PATCH der
 /// Datensätze).
@@ -447,7 +447,7 @@ fn endlich(wert: f64, feld: &str) -> Result<f64, AppError> {
     Ok(wert)
 }
 
-/// GET /api/einsaetze/{id}/staff/comms-sketch — die Skizzendaten (alle mit Leserecht am Fernmeldewesen).
+/// GET /api/incidents/{id}/staff/comms-sketch — die Skizzendaten (alle mit Leserecht am Fernmeldewesen).
 pub async fn fernmeldeskizze_laden(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Fernmeldewesen>,
@@ -469,7 +469,7 @@ pub struct LageSetzen {
     version: Option<Option<i64>>,
 }
 
-/// PUT /api/einsaetze/{id}/staff/comms-sketch/layout/{element} — Element verschieben (D4).
+/// PUT /api/incidents/{id}/staff/comms-sketch/layout/{element} — Element verschieben (D4).
 /// Weicht die erwartete Version ab, antwortet der Server 409 mit dem gespeicherten Stand
 /// (`SkizzenLageKonflikt`).
 pub async fn fernmeldeskizze_lage_setzen(
@@ -523,7 +523,7 @@ pub struct LageVerwerfen {
     version: Option<i64>,
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/layout/{element} — die Lage EINES Elements
+/// DELETE /api/incidents/{id}/staff/comms-sketch/layout/{element} — die Lage EINES Elements
 /// verwerfen (Review O3, Rückgängig des ersten Verschiebens). Body `{ version }`; weicht sie ab,
 /// 409 mit dem gespeicherten Stand wie beim Verschieben. Ohne Zeile 204 ohne Ereignis.
 pub async fn fernmeldeskizze_lage_entfernen(
@@ -559,7 +559,7 @@ pub async fn fernmeldeskizze_lage_entfernen(
     }
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/layout — „Neu anordnen“: alle Lagen verwerfen.
+/// DELETE /api/incidents/{id}/staff/comms-sketch/layout — „Neu anordnen“: alle Lagen verwerfen.
 pub async fn fernmeldeskizze_lage_verwerfen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -611,7 +611,7 @@ fn tri_zeit(wert: Option<Option<String>>) -> Result<Option<Option<String>>, AppE
     }
 }
 
-/// PUT /api/einsaetze/{id}/staff/comms-sketch/title-block — Teilfelder setzen (Tri-State).
+/// PUT /api/incidents/{id}/staff/comms-sketch/title-block — Teilfelder setzen (Tri-State).
 pub async fn fernmeldeskizze_schriftfeld_setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -666,7 +666,7 @@ pub struct KomponentePatchBody {
     bezeichnung: Option<Option<String>>,
 }
 
-/// POST /api/einsaetze/{id}/staff/comms-sketch/components — Komponente anlegen.
+/// POST /api/incidents/{id}/staff/comms-sketch/components — Komponente anlegen.
 pub async fn fernmeldeskizze_komponente_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -687,7 +687,7 @@ pub async fn fernmeldeskizze_komponente_anlegen(
     Ok((StatusCode::CREATED, Json(k)))
 }
 
-/// PATCH /api/einsaetze/{id}/staff/comms-sketch/components/{kid}
+/// PATCH /api/incidents/{id}/staff/comms-sketch/components/{kid}
 pub async fn fernmeldeskizze_komponente_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -710,7 +710,7 @@ pub async fn fernmeldeskizze_komponente_aendern(
     Ok(Json(k))
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/components/{kid} — samt Kanälen, Lage und
+/// DELETE /api/incidents/{id}/staff/comms-sketch/components/{kid} — samt Kanälen, Lage und
 /// Verbindungen.
 pub async fn fernmeldeskizze_komponente_entfernen(
     State(state): State<AppState>,
@@ -723,7 +723,7 @@ pub async fn fernmeldeskizze_komponente_entfernen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/einsaetze/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}
+/// PUT /api/incidents/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}
 pub async fn fernmeldeskizze_komponente_kanal_setzen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -737,7 +737,7 @@ pub async fn fernmeldeskizze_komponente_kanal_setzen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}
+/// DELETE /api/incidents/{id}/staff/comms-sketch/components/{kid}/talk-groups/{sg}
 pub async fn fernmeldeskizze_komponente_kanal_loesen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -803,7 +803,7 @@ pub struct VerbindungPatchBody {
     hinweis: Option<Option<String>>,
 }
 
-/// POST /api/einsaetze/{id}/staff/comms-sketch/connections — Punkt-zu-Punkt-Verbindung.
+/// POST /api/incidents/{id}/staff/comms-sketch/connections — Punkt-zu-Punkt-Verbindung.
 pub async fn fernmeldeskizze_verbindung_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -837,7 +837,7 @@ pub async fn fernmeldeskizze_verbindung_anlegen(
     Ok((StatusCode::CREATED, Json(v)))
 }
 
-/// PATCH /api/einsaetze/{id}/staff/comms-sketch/connections/{vid} — ohne Endpunkte.
+/// PATCH /api/incidents/{id}/staff/comms-sketch/connections/{vid} — ohne Endpunkte.
 pub async fn fernmeldeskizze_verbindung_aendern(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -866,7 +866,7 @@ pub async fn fernmeldeskizze_verbindung_aendern(
     Ok(Json(v))
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/connections/{vid}
+/// DELETE /api/incidents/{id}/staff/comms-sketch/connections/{vid}
 pub async fn fernmeldeskizze_verbindung_entfernen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,
@@ -905,7 +905,7 @@ pub struct BereichPatchBody {
     version: i64,
 }
 
-/// POST /api/einsaetze/{id}/staff/comms-sketch/areas — Bereich anlegen (Vorgabe
+/// POST /api/incidents/{id}/staff/comms-sketch/areas — Bereich anlegen (Vorgabe
 /// „Rückwärtiger Bereich“).
 pub async fn fernmeldeskizze_bereich_anlegen(
     State(state): State<AppState>,
@@ -926,7 +926,7 @@ pub async fn fernmeldeskizze_bereich_anlegen(
     Ok((StatusCode::CREATED, Json(b)))
 }
 
-/// PATCH /api/einsaetze/{id}/staff/comms-sketch/areas/{bid} — Lage, Größe, Bezeichnung mit
+/// PATCH /api/incidents/{id}/staff/comms-sketch/areas/{bid} — Lage, Größe, Bezeichnung mit
 /// erwarteter Version (409 mit `SkizzenBereichKonflikt`).
 pub async fn fernmeldeskizze_bereich_aendern(
     State(state): State<AppState>,
@@ -966,7 +966,7 @@ pub async fn fernmeldeskizze_bereich_aendern(
     }
 }
 
-/// DELETE /api/einsaetze/{id}/staff/comms-sketch/areas/{bid}
+/// DELETE /api/incidents/{id}/staff/comms-sketch/areas/{bid}
 pub async fn fernmeldeskizze_bereich_entfernen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fernmeldewesen>,

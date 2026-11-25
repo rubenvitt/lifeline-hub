@@ -30,13 +30,13 @@ const BREITEN = [
 ];
 
 async function saeen(page: Page): Promise<string> {
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Zeilenhöhe ${Date.now()}` },
   });
   expect(neu.ok(), `Einsatz: ${neu.status()}`).toBe(true);
   const einsatzId = String(((await neu.json()) as { id: number }).id);
   for (let n = 1; n <= ANZAHL; n += 1) {
-    const a = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const a = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: {
         typ: 'meldung',
         inhalt: `Pegel Messstelle ${n} unverändert`,
@@ -147,7 +147,7 @@ test('Systemeinträge: drei stehen als eine Bündelzeile, aufgeklappt hält jede
   const einsatzId = await saeen(page);
   for (const [i, label] of ['Sektor A', 'Sektor B', 'Sektor C'].entries()) {
     const x = 10 + i / 20;
-    const zone = await page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
+    const zone = await page.request.post(`/api/incidents/${einsatzId}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',

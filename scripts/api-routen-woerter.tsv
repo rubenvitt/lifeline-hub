@@ -25,6 +25,7 @@ area	Fläche
 areas	Bereiche
 arrival	Eintreffen
 assessment	Beurteilung
+asset	-
 assign	zuweisen
 attachments	Anhänge
 attachments.zip	Anlagen
@@ -77,6 +78,7 @@ confirm	bestätigen
 confirmers	Bestätiger
 connections	Verbindungen
 contact-person	Bezugsperson
+copernicus	-
 correct	berichtigen
 count	Anzahl
 countersign	gegenzeichnen
@@ -100,6 +102,7 @@ distributions	Ausgaben
 districts	Bezirke
 documents	Dokumente
 download	-
+drone	Drohne
 emergency-takeover	Notübernahme
 enclosures	Anlagen eines Dokuments
 end	beenden
@@ -137,9 +140,11 @@ hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
 history	Verlauf
+hls	-
 household	Haushalt
 households	Haushalte
 image	Bild
+images	Bilder
 import	-
 in-service	in Dienst
 incident-templates	Einsatzvorlagen
@@ -220,6 +225,7 @@ personnel	Personal
 personnel-statuses	Personalstatus
 personnel-suggestions	Personalvorschläge
 persons	Personen
+photos	Fotos
 place-preview	Ortsvorschau
 place-search	Ortssuche
 plan	-
@@ -299,6 +305,7 @@ situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
+sources	Quellen
 split	aufteilen
 sprite	-
 sprites	-
@@ -320,6 +327,7 @@ task	Auftrag
 tasks	Aufträge
 template	Vorlage
 test	-
+thumb	Vorschaubild
 tile	-
 tilejson	-
 tiles	-
@@ -347,6 +355,7 @@ v1	-
 vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
+video	Video
 void	aufheben
 weather	Wetter
 web-push	-

@@ -16,7 +16,7 @@ async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) ->
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(body),
     )
@@ -29,7 +29,7 @@ async fn etb_eintrag(app: &axum::Router, cookie: &str, einsatz: i64, id: i64) ->
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -47,7 +47,7 @@ async fn kopf(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
     let (status, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
@@ -100,7 +100,7 @@ async fn meine_funktion_in_detail_und_liste() {
     assert_eq!(json["meine_sachgebiete"], serde_json::json!(["s2"]));
 
     // Listen-Pfad baut das Struct-Literal selbst — ein fehlendes Feld dort fiele nur hier auf.
-    let (_, liste) = anfrage(&app, "GET", "/api/einsaetze", &kraft, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/incidents", &kraft, None).await;
     let eintrag = liste
         .as_array()
         .unwrap()
@@ -112,7 +112,7 @@ async fn meine_funktion_in_detail_und_liste() {
     assert_eq!(eintrag["meine_sachgebiete"], serde_json::json!(["s2"]));
 }
 
-/// Listen-Pfad (`GET /api/einsaetze`) mit ZWEI Einsätzen, in denen derselbe Benutzer
+/// Listen-Pfad (`GET /api/incidents`) mit ZWEI Einsätzen, in denen derselbe Benutzer
 /// verschiedene Funktionen trägt. **Nur diese Hälfte** fängt einen stillen Platzhalter im
 /// Struct-Literal von `liste_fuer` (vorher in `tests/stab.rs`, LFH-46).
 #[tokio::test]
@@ -127,7 +127,7 @@ async fn meine_sachgebiete_im_listen_pfad_ueber_zwei_einsaetze() {
         erwartet.insert(einsatz, sg);
     }
     let cookie = login_cookie(&app, "kraft", "kraftpw1").await;
-    let (status, json) = anfrage(&app, "GET", "/api/einsaetze", &cookie, None).await;
+    let (status, json) = anfrage(&app, "GET", "/api/incidents", &cookie, None).await;
     assert_eq!(status, StatusCode::OK);
     let liste = json.as_array().unwrap();
     assert_eq!(liste.len(), 2, "beide Einsätze sind lesbar");
@@ -153,7 +153,7 @@ async fn fachberater_hat_kein_sachgebiet() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{id}"),
+        &format!("/api/incidents/{einsatz}/members/{id}"),
         &admin,
         Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fachberater","fuehrungsstelle":"THW"}"#),
     )
@@ -166,7 +166,7 @@ async fn fachberater_hat_kein_sachgebiet() {
     // Code und Bezeichnung für „meine Stelle“ (pkjvl5iy, design.md D1), in Detail und Liste.
     assert_eq!(json["meine_funktion_code"], "fachberater");
     assert_eq!(json["meine_funktion_bezeichnung"], "THW");
-    let (_, liste) = anfrage(&app, "GET", "/api/einsaetze", &kraft, None).await;
+    let (_, liste) = anfrage(&app, "GET", "/api/incidents", &kraft, None).await;
     let eintrag = liste
         .as_array()
         .unwrap()
@@ -311,7 +311,7 @@ async fn snapshot_auch_auf_dem_client_id_weg() {
     let (status, replay) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &kraft,
         Some(body),
     )
@@ -334,7 +334,7 @@ async fn fuehrungshilfspersonal_traegt_bezeichnung() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/members/{id}"),
+        &format!("/api/incidents/{einsatz}/members/{id}"),
         &admin,
         Some(r#"{"einsatz_rolle":"fuehrungspersonal","fuehrungsfunktion":"fuehrungshilfspersonal","fuehrungsstelle":"  Lotse  "}"#),
     )

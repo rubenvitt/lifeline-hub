@@ -19,7 +19,7 @@ export interface MaterialAdhocEingabe {
 }
 
 export function listEinsatzMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
-  return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material`);
+  return apiGet<EinsatzMaterial[]>(`/api/incidents/${einsatzId}/material`);
 }
 
 /**
@@ -59,7 +59,7 @@ export function disponiereMaterial(
   menge: number,
   optionen: DisponierEingabe = {},
 ): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
+  return apiSend<EinsatzMaterial>(`/api/incidents/${einsatzId}/material`, 'POST', {
     material_id: materialId,
     menge,
     ...optionen.ort,
@@ -75,7 +75,7 @@ export function disponiereAdhoc(
   menge: number,
   optionen: DisponierEingabe & { art?: MaterialArt } = {},
 ): Promise<EinsatzMaterial> {
-  return apiSend<EinsatzMaterial>(`/api/einsaetze/${einsatzId}/material`, 'POST', {
+  return apiSend<EinsatzMaterial>(`/api/incidents/${einsatzId}/material`, 'POST', {
     adhoc,
     menge,
     ...(optionen.art ? { art: optionen.art } : {}),
@@ -127,7 +127,7 @@ export function updateDisposition(
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'> & { erwartet?: MaterialErwartet },
 ): Promise<MaterialPatchAntwort> {
   return apiSend<MaterialPatchAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}${zuruecknahmeQuery(optionen)}`,
+    `/api/incidents/${einsatzId}/material/${emId}${zuruecknahmeQuery(optionen)}`,
     'PATCH',
     optionen?.erwartet ? { ...felder, erwartet: optionen.erwartet } : felder,
   );
@@ -156,7 +156,7 @@ export function nimmMaterialStatuswechselZurueck(
   beleg: MaterialStatusRuecknahmeBeleg,
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/status/undo`,
+    `/api/incidents/${einsatzId}/material/${emId}/status/undo`,
     'POST',
     beleg,
   );
@@ -176,7 +176,7 @@ export function teileAuf(
   ort?: MaterialOrtPatch | null,
 ): Promise<[EinsatzMaterial, EinsatzMaterial]> {
   return apiSend<[EinsatzMaterial, EinsatzMaterial]>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/split`,
+    `/api/incidents/${einsatzId}/material/${emId}/split`,
     'POST',
     { menge, ...ort },
   );
@@ -195,7 +195,7 @@ export function verknuepfeNachforderung(
   ergaenzen: boolean,
 ): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/resource-request`,
+    `/api/incidents/${einsatzId}/material/${emId}/resource-request`,
     'POST',
     { nachforderung_id: nachforderungId, ...(ergaenzen ? { ergaenzen: true } : {}) },
   );
@@ -207,7 +207,7 @@ export function verknuepfeNachforderung(
  */
 export function loeseNachforderung(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/resource-request`,
+    `/api/incidents/${einsatzId}/material/${emId}/resource-request`,
     'DELETE',
   );
 }
@@ -217,7 +217,7 @@ export function loeseNachforderung(einsatzId: number, emId: number): Promise<Ein
  * dem Draht heißt der Endzustand wie bei jeder Kraft `entlassen`.
  */
 export function listEntlassenesMaterial(einsatzId: number): Promise<EinsatzMaterial[]> {
-  return apiGet<EinsatzMaterial[]>(`/api/einsaetze/${einsatzId}/material?entlassene=1`);
+  return apiGet<EinsatzMaterial[]>(`/api/incidents/${einsatzId}/material?entlassene=1`);
 }
 
 /**
@@ -230,7 +230,7 @@ export function nimmAusDemEinsatz(
   emId: number,
 ): Promise<MaterialEntlassungAntwort> {
   return apiSend<MaterialEntlassungAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down`,
+    `/api/incidents/${einsatzId}/material/${emId}/stand-down`,
     'POST',
   );
 }
@@ -247,7 +247,7 @@ export function nimmHerausnahmeZurueck(
   vorzustand: MaterialEntlassungVorzustand,
 ): Promise<MaterialRuecknahmeAntwort> {
   return apiSend<MaterialRuecknahmeAntwort>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/stand-down/undo`,
+    `/api/incidents/${einsatzId}/material/${emId}/stand-down/undo`,
     'POST',
     vorzustand,
   );
@@ -255,13 +255,13 @@ export function nimmHerausnahmeZurueck(
 
 /** Fehldisposition stornieren (LLH-1079): nur ohne Ort (LLH-1224) in den ersten 15 Minuten. */
 export function storniereDisposition(einsatzId: number, emId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/material/${emId}/annul`, 'POST');
+  return apiSend<void>(`/api/incidents/${einsatzId}/material/${emId}/annul`, 'POST');
 }
 
 /** Herausgenommenes oder storniertes Material erneut disponieren (Block „Aus dem Einsatz genommen“). */
 export function reaktiviereDisposition(einsatzId: number, emId: number): Promise<EinsatzMaterial> {
   return apiSend<EinsatzMaterial>(
-    `/api/einsaetze/${einsatzId}/material/${emId}/reactivate`,
+    `/api/incidents/${einsatzId}/material/${emId}/reactivate`,
     'POST',
   );
 }

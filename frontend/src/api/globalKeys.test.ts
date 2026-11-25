@@ -163,7 +163,18 @@ describe('globalKeys: Byte-Pin gegen die ersetzten Literale (LFH-307)', () => {
     // Der bbox-lose Accessor ist für bbox-Quellen gesperrt, sonst entstünden zwei Fächer für
     // denselben Zustand. Die Sperre ist ein Typ, der Test hält sie über `tsc` fest.
     // @ts-expect-error — 'energie' ist aus `fachebene` ausgenommen (nur `fachebeneEnergie`)
-    expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']);
+    expect(globalKeys.fachebene('energie')).toEqual(['fachebene', 'energie']); // Copernicus-Bilder (LLH-2021): je Ausschnitt und Archiv-Schalter ein Fach, wie die Vektorebene.
+    expect(globalKeys.fachebeneCopernicusBilder('1,2,3,4', true)).toEqual([
+      'fachebene',
+      'copernicus_bilder',
+      '1,2,3,4',
+      true,
+    ]);
+    expect(globalKeys.fachebeneCopernicusBilder(null, false)).not.toEqual(
+      globalKeys.fachebeneCopernicus(null, false),
+    );
+    // @ts-expect-error — 'copernicus_bilder' ist aus `fachebene` ausgenommen
+    expect(globalKeys.fachebene('copernicus_bilder')).toEqual(['fachebene', 'copernicus_bilder']);
   });
 
   it('LEERLAUF-SCHUTZ: die Registry hat die gemessenen 53 Prefixe und keine Dubletten', () => {

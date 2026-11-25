@@ -38,7 +38,7 @@ const STAFFEL = 'Rettungsstaffel';
 
 /** Zwei Zeitfenster (eines läuft, eines steht an) und eine Ausgabe, einmal je Lauf. */
 async function zeitfensterAnlegen(page: Page, einsatz: number) {
-  const basis = `/api/einsaetze/${einsatz}/catering`;
+  const basis = `/api/incidents/${einsatz}/catering`;
   const stand = (await (await page.request.get(basis)).json()) as {
     zeitfenster: { bezeichnung: string }[];
     empfaenger: { einheiten: { id: number; eintreffen_at?: string | null }[] };
@@ -48,7 +48,7 @@ async function zeitfensterAnlegen(page: Page, einsatz: number) {
   const jetzt = Date.now();
   // Eintreffen der Demo-Einheiten (LLH-1055), nur wo es fehlt.
   for (const e of stand.empfaenger.einheiten.filter((x) => !x.eintreffen_at)) {
-    await fuelle(page, 'post', `/api/einsaetze/${einsatz}/units/${e.id}/timeline`, {
+    await fuelle(page, 'post', `/api/incidents/${einsatz}/units/${e.id}/timeline`, {
       art: 'eintreffen',
       zeitpunkt_at: eintreffenVor(new Date(jetzt), 120).toISOString(),
     });
@@ -98,7 +98,7 @@ async function verpflegungTablet(page: Page, browser: Browser) {
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/devices`,
+    `/api/incidents/${demo.id}/devices`,
     { ansicht: 'verpflegung', bezeichnung: 'Tablet Ausgabe' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.tablet });

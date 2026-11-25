@@ -30,11 +30,11 @@ beforeEach(() => {
   freigaben = freigabenFixture();
   einstellungen = {};
   server.use(
-    http.get('/api/einsaetze/:id/module-access', () => {
+    http.get('/api/incidents/:id/module-access', () => {
       zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
       return HttpResponse.json(freigaben);
     }),
-    http.get('/api/einsaetze/:id/settings', () => {
+    http.get('/api/incidents/:id/settings', () => {
       zaehler.einstellungen = (zaehler.einstellungen ?? 0) + 1;
       return HttpResponse.json(einstellungen);
     }),
@@ -117,7 +117,7 @@ describe('useKoordinatenSprung', () => {
   /** Unbekannt heißt nicht freigegeben (LFH-669): ein gescheiterter Abruf gibt nichts frei. */
   it('bietet nichts an, wenn der Abruf der Freigaben scheitert', async () => {
     server.use(
-      http.get('/api/einsaetze/:id/module-access', () => {
+      http.get('/api/incidents/:id/module-access', () => {
         zaehler.freigaben = (zaehler.freigaben ?? 0) + 1;
         return HttpResponse.json({ fehler: 'kaputt' }, { status: 500 });
       }),

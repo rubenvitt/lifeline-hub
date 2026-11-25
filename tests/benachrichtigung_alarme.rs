@@ -80,7 +80,7 @@ impl Welt {
     }
 
     fn pfad(&self, rest: &str) -> String {
-        format!("/api/einsaetze/{}/{rest}", self.einsatz)
+        format!("/api/incidents/{}/{rest}", self.einsatz)
     }
 
     /// Gibt dem Mitglied `benutzer_id` die Führungsfunktion `funktion` (Mitgliedschaft,

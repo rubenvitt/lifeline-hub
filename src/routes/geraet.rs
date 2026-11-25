@@ -70,7 +70,7 @@ pub struct KopplungMitCode {
     pub code: KopplungsCode,
 }
 
-/// GET /api/einsaetze/{id}/devices — alle Kopplungen und die Modulsperren je Ansicht. Nur die
+/// GET /api/incidents/{id}/devices — alle Kopplungen und die Modulsperren je Ansicht. Nur die
 /// Einsatzleitung; auch nach Abschluss lesbar, solange der Einsatz lesbar ist.
 pub async fn liste(
     State(state): State<AppState>,
@@ -218,7 +218,7 @@ async fn stelle_pruefen(
     }
 }
 
-/// POST /api/einsaetze/{id}/devices — Kopplung anlegen und ersten Code ausstellen. Nur die
+/// POST /api/incidents/{id}/devices — Kopplung anlegen und ersten Code ausstellen. Nur die
 /// Einsatzleitung eines aktiven Einsatzes. Schreibt einen System-Eintrag ins ETB.
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -351,7 +351,7 @@ async fn lade_geraet(
     Ok(k)
 }
 
-/// POST /api/einsaetze/{id}/devices/{gid}/code — neuen Code ausstellen (Gerät getauscht, Browser
+/// POST /api/incidents/{id}/devices/{gid}/code — neuen Code ausstellen (Gerät getauscht, Browser
 /// geleert). Der alte Code verfällt; beim Einlösen des neuen enden die alten Sitzungen.
 pub async fn code_ausstellen(
     State(state): State<AppState>,
@@ -376,7 +376,7 @@ pub struct VerlaengernBody {
     pub laeuft_ab_at: String,
 }
 
-/// POST /api/einsaetze/{id}/devices/{gid}/extend — neues Ende (höchstens 72 h ab jetzt).
+/// POST /api/incidents/{id}/devices/{gid}/extend — neues Ende (höchstens 72 h ab jetzt).
 pub async fn verlaengern(
     State(state): State<AppState>,
     ctx: EinsatzLeitungszugriff,
@@ -395,7 +395,7 @@ pub async fn verlaengern(
     ))
 }
 
-/// POST /api/einsaetze/{id}/devices/{gid}/revoke — das Gerät verliert sofort jeden Zugriff,
+/// POST /api/incidents/{id}/devices/{gid}/revoke — das Gerät verliert sofort jeden Zugriff,
 /// auch einen offenen Live-Kanal (design.md D7). Idempotent. Auch am abgeschlossenen Einsatz
 /// erlaubt wäre sinnlos: dort ist jede Kopplung schon beendet, deshalb der Leitungszugriff.
 pub async fn widerrufen(

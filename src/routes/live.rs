@@ -44,7 +44,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use std::convert::Infallible;
 use tokio_stream::{Stream, StreamExt};
 
-/// GET /api/einsaetze/{id}/live — der Live-Feed des Einsatzes.
+/// GET /api/incidents/{id}/live — der Live-Feed des Einsatzes.
 ///
 /// `EinsatzLesezugriff<OhneModul>` erzwingt Org-Floor und Lesezugriff (Org-Grenze, Soft-Delete,
 /// Retention, Nachlauffrist) und **kein** Modul-Gate: die Route gehört keinem Modul, die
@@ -347,7 +347,7 @@ mod tests {
         assert!(ist_stammdaten_pfad("/api/organization/logo"));
         assert!(!ist_stammdaten_pfad("/api/fahrzeuge-x"));
         assert!(!ist_stammdaten_pfad("/api/vehicle-suggestions"));
-        assert!(!ist_stammdaten_pfad("/api/einsaetze/{id}/talk-groups"));
+        assert!(!ist_stammdaten_pfad("/api/incidents/{id}/talk-groups"));
         assert!(!ist_stammdaten_pfad("/api/org-settings"));
     }
 }

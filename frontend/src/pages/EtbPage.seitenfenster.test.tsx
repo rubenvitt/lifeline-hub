@@ -66,7 +66,7 @@ let fehlerUnter: number | null = null;
 let waehrendKopfabruf: (() => void) | null = null;
 
 function tagebuch() {
-  return http.get('/api/einsaetze/7/etb', ({ request }) => {
+  return http.get('/api/incidents/7/etb', ({ request }) => {
     const p = new URL(request.url).searchParams;
     abrufe.push(p.toString());
     const limit = Number(p.get('limit') ?? 100);
@@ -107,7 +107,7 @@ function Springer() {
 function setup(route: string) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents/7', () =>
       HttpResponse.json({
         id: 7,
         bezeichnung: 'Hochwasser Nord',
@@ -120,11 +120,11 @@ function setup(route: string) {
       }),
     ),
     tagebuch(),
-    http.post('/api/einsaetze/7/etb', () => {
+    http.post('/api/incidents/7/etb', () => {
       gesamt += 1;
       return HttpResponse.json(eintrag(gesamt), { status: 201 });
     }),
-    http.get('/api/einsaetze/7/etb/counts', () =>
+    http.get('/api/incidents/7/etb/counts', () =>
       HttpResponse.json({
         gesamt,
         je_typ: {
@@ -138,9 +138,9 @@ function setup(route: string) {
       }),
     ),
     http.get('/api/etb-snippets', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/sectors', () => HttpResponse.json([])),
     http.get('/api/user-settings', () =>
       HttpResponse.json({
         eintraege: { [SCHLUESSEL_ETB_STANDARD_RUFNAME]: '{"von":"ELW 1","an":"ELW 1"}' },

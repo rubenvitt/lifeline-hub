@@ -108,8 +108,8 @@ async fn ohne_netz_an_allen_einstiegen_mit_netz_lokal_vorn() {
     let q = kodiert("Hauptstraße 12, Musterstadt");
 
     for pfad in [
-        format!("/api/einsaetze/{einsatz}/map/place-search?q={q}"),
-        format!("/api/einsaetze/{einsatz}/place-search?q={q}"),
+        format!("/api/incidents/{einsatz}/map/place-search?q={q}"),
+        format!("/api/incidents/{einsatz}/place-search?q={q}"),
         format!("/api/place-search?q={q}"),
     ] {
         let (status, json) = anfrage(&app, "GET", &pfad, &admin, None).await;

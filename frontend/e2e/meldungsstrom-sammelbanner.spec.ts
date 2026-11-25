@@ -52,7 +52,7 @@ const FAELLE = [
 ];
 
 async function seedeEintrag(page: Page, einsatzId: number, inhalt: string) {
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+  const r = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
     data: { typ: 'meldung', inhalt, von: 'ELW 1', an: 'Leitstelle' },
   });
   expect(r.ok(), `Seeding ETB-Eintrag: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -70,7 +70,7 @@ for (const { viewport, dichte, soll, vorher: anzahl } of FAELLE) {
     page,
   }) => {
     await anmeldenAlsAdmin(page, { startseite: false });
-    const r = await page.request.post('/api/einsaetze', {
+    const r = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Sammelbanner Meldungsstrom ${Date.now()}` },
     });
     expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();

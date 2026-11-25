@@ -28,7 +28,7 @@ async fn auftrag_erteilen(
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         cookie,
         Some(&body.to_string()),
     )
@@ -50,7 +50,7 @@ async fn aufheben(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/void"),
+        &format!("/api/incidents/{e}/tasks/{aid}/void"),
         cookie,
         Some(body),
     )
@@ -62,7 +62,7 @@ fn grund(g: &str) -> String {
 }
 
 async fn anordnungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
-    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (_, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     etb.as_array()
         .unwrap()
         .iter()
@@ -134,7 +134,7 @@ async fn aufheben_aus_in_arbeit_und_vollzogen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{in_arbeit}/execution"),
+        &format!("/api/incidents/{e}/tasks/{in_arbeit}/execution"),
         &admin,
         Some(r#"{"status":"in_arbeit"}"#),
     )
@@ -148,7 +148,7 @@ async fn aufheben_aus_in_arbeit_und_vollzogen() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{vollzogen}/execution"),
+        &format!("/api/incidents/{e}/tasks/{vollzogen}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"Säcke liegen"}"#),
     )
@@ -173,7 +173,7 @@ async fn abgenommen_oder_schon_aufgehoben_ist_422_ohne_zweiten_eintrag() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{abgenommen}/execution"),
+        &format!("/api/incidents/{e}/tasks/{abgenommen}/execution"),
         &admin,
         Some(r#"{"status":"vollzogen","vollzugsmeldung":"ok"}"#),
     )
@@ -181,7 +181,7 @@ async fn abgenommen_oder_schon_aufgehoben_ist_422_ohne_zweiten_eintrag() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{abgenommen}/accept"),
+        &format!("/api/incidents/{e}/tasks/{abgenommen}/accept"),
         &admin,
         None,
     )
@@ -257,7 +257,7 @@ async fn beobachter_403_abgeschlossener_einsatz_409_fremder_einsatz_404() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -274,7 +274,7 @@ async fn aufheben_schreibt_auch_ohne_auto_etb() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/settings"),
+        &format!("/api/incidents/{e}/settings"),
         &admin,
         Some(r#"{"auto_etb_eintraege":false}"#),
     )
@@ -300,7 +300,7 @@ async fn aufheben_schliesst_auto_erinnerung_und_laesst_manuelle_stehen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reminders"),
+        &format!("/api/incidents/{e}/reminders"),
         &admin,
         Some(
             &serde_json::json!({
@@ -339,7 +339,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
+        &format!("/api/incidents/{e}/tasks/{aid}/recipients/{empf}/acknowledge"),
         &admin,
         None,
     )
@@ -353,7 +353,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+            &format!("/api/incidents/{e}/tasks/{aid}/execution"),
             &admin,
             Some(body),
         )
@@ -363,7 +363,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks/{aid}/accept"),
+        &format!("/api/incidents/{e}/tasks/{aid}/accept"),
         &admin,
         None,
     )
@@ -373,7 +373,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (_, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )
@@ -385,7 +385,7 @@ async fn nach_dem_aufheben_nimmt_der_auftrag_nichts_mehr_an() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/module-counts"),
+        &format!("/api/incidents/{e}/module-counts"),
         &admin,
         None,
     )
@@ -409,7 +409,7 @@ async fn feldfehler_am_vollzug_bleiben_400_auch_wenn_aufgehoben() {
         let (s, _) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/tasks/{aid}/execution"),
+            &format!("/api/incidents/{e}/tasks/{aid}/execution"),
             &admin,
             Some(body),
         )
@@ -436,7 +436,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (s, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         &admin,
         Some(&meldung),
     )
@@ -450,7 +450,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
         })
         .to_string()
     };
-    let erteilen_pfad = format!("/api/einsaetze/{e}/reports/{mid}/task");
+    let erteilen_pfad = format!("/api/incidents/{e}/reports/{mid}/task");
 
     let (s, json) = anfrage(
         &app,
@@ -472,7 +472,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (s, json) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports/{mid}"),
+        &format!("/api/incidents/{e}/reports/{mid}"),
         &admin,
         None,
     )
@@ -497,7 +497,7 @@ async fn meldung_mit_aufgehobenem_auftrag_laesst_sich_erneut_erteilen() {
     let (_, alt) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{erster}"),
+        &format!("/api/incidents/{e}/tasks/{erster}"),
         &admin,
         None,
     )

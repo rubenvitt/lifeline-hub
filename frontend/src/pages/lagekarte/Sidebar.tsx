@@ -281,6 +281,11 @@ export interface SidebarProps {
   ansichtSpeichert: boolean;
   onAnsichtSpeichern: () => void;
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
+  /**
+   * Vom Betreiber abgeschaltete Fachebenen (`/api/map/config`, LLH-2104): Der Ebenenbaum zeigt
+   * sie nicht. Fehlt die Liste, gilt keine als abgeschaltet.
+   */
+  fachebenenAbgeschaltet?: readonly string[];
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
   fachebenenStatus: Partial<
@@ -291,6 +296,13 @@ export interface SidebarProps {
   >;
   /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
   copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
+  /** Copernicus-Satellitenbilder (LLH-2021): Bildliste und Deckkraft (`useFachebenen`). */
+  copernicusBilder?: Pick<
+    import('./CopernicusBilderZusatz').CopernicusBilderZusatzProps,
+    'liste' | 'deckkraft' | 'onDeckkraft'
+  >;
+  /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
+  drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */

@@ -15,7 +15,7 @@ import type {
  * als UTC `YYYY-MM-DD HH:mm:ss` auf den Draht, hin über `alsBackendZeit`, zurück über
  * `alsZeitpunkt` (`anzeige/zeitEingabe.ts`), nie über `dayjs(s)`.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/evacuation`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/evacuation`;
 
 /** Die eine Lesequelle: alle nicht stornierten Bezirke samt aktuellem Stand. */
 export function ladeEvakuierung(einsatzId: number): Promise<EvakuierungUebersicht> {

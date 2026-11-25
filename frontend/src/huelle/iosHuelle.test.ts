@@ -65,6 +65,34 @@ describe('Init-Skript der iOS-Hülle (t39ltxxi)', () => {
     expect(window.__LIFELINE_HUELLE__?.platform).toBe('ios');
   });
 
+  it('eine Antwort an das alte Dokument erfüllt keine Frage des neuen (LLH-2082)', async () => {
+    const zufall = vi.spyOn(Math, 'random').mockReturnValueOnce(0.25).mockReturnValueOnce(0.75);
+    try {
+      const alt = brueckeMit();
+      starteIosHuelle({ bruecke: alt.bruecke });
+      void window.__LIFELINE_HUELLE__!.anmeldungImBrowser!();
+      const altId = alt.nachrichten[0].id!;
+      beendeHuelle();
+
+      const neu = brueckeMit();
+      starteIosHuelle({ bruecke: neu.bruecke });
+      let fertig = false;
+      void window.__LIFELINE_HUELLE__!.anmeldungImBrowser!().then(() => {
+        fertig = true;
+      });
+      const neuId = neu.nachrichten[0].id!;
+      expect(Number.isSafeInteger(neuId)).toBe(true);
+      expect(neuId).not.toBe(altId);
+
+      // Die späte Antwort der Hülle auf das alte Dokument trifft keine offene Frage.
+      antworteIosHuelle(altId, null);
+      await Promise.resolve();
+      expect(fertig).toBe(false);
+    } finally {
+      zufall.mockRestore();
+    }
+  });
+
   it('„Im Browser anmelden“ fragt die Hülle und wartet auf ihre Antwort', async () => {
     const { bruecke, nachrichten } = brueckeMit();
     starteIosHuelle({ bruecke });

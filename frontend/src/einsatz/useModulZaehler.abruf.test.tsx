@@ -20,8 +20,8 @@ import { freigabenFixture } from '../test/fixtures';
  * aus `test/server.ts`.
  */
 
-const PFAD_EVAK = '/api/einsaetze/7/evacuation';
-const PFAD_BETREUUNG = '/api/einsaetze/7/care';
+const PFAD_EVAK = '/api/incidents/7/evacuation';
+const PFAD_BETREUUNG = '/api/incidents/7/care';
 
 const ANDERE = ['meldungen', 'auftraege', 'erinnerungen', 'chat', 'dokumente', 'abloesung'];
 
@@ -157,7 +157,7 @@ describe.each([
 );
 
 describe('useModulZaehler am Draht — Wetter & Pegel (LFH-663)', () => {
-  const WETTER = '/api/einsaetze/7/weather';
+  const WETTER = '/api/incidents/7/weather';
   const JETZT = Date.now();
   const um = (ms: number) => new Date(JETZT + ms).toISOString();
   const ALLE_ANDEREN = [...ANDERE, 'betreuung', 'evakuierung'];

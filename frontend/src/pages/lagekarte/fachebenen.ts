@@ -164,6 +164,18 @@ export interface FachebeneDef {
    * einen Kreis-Layer an; Features mit `klasse: 'gebiet'` erscheinen nur als gestrichelter Umriss.
    */
   gemischteGeometrie?: boolean;
+  /**
+   * Nur die Copernicus-Satellitenbilder (LLH-2021): Die Ebene zeichnet keine Features. Jedes Feature
+   * beschreibt ein Bild, und die Karte legt je Bild eine Rasterquelle an
+   * (`copernicusBildLayer.ts`), unter allen Fachebenen, ohne Klickebene.
+   */
+  darstellung?: 'raster';
+  /**
+   * Nur die Drohnenlage (LLH-2106): Punkte, Linien und Flächen gemischt, je Feature nach
+   * `properties.kind` (`aircraft` | `track` | `element` | `photo`) gezeichnet. Lädt über die
+   * Einsatzroute, nicht über `/api/map/overlays` (`loadDrohneFachebene`).
+   */
+  drohnenlage?: boolean;
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -265,6 +277,21 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     geltung: 'nur Bundesautobahnen',
     veraltetNachMin: 60,
   },
+  autobahn_parken: {
+    key: 'autobahn_parken',
+    label: 'Lkw-Parkplätze (BAB)',
+    geometrieTyp: 'punkt',
+    // LLH-1637: Rastanlagen sind statisch, der Server holt sie einmal am Tag (TTL 24 h). Ein Poll
+    // ohne neuen Stand kostet nur ein 304; 30 min holen einen neuen Tagesstand ohne Hast.
+    pollMs: 30 * 60_000,
+    bboxAbhaengig: false,
+    // Der erste Lauf hängt wie bei `autobahn` an keinem Request (`fetch_autobahn_parken`).
+    aufwaermPollMs: 20_000,
+    geltung: 'nur Rastanlagen an Bundesautobahnen, ohne Belegung',
+    // 1,5 × TTL wie Energie, unter dem Cache-Deckel von 48 h (`cache::MAX_ALTER_SEKUNDEN`): auf
+    // dem Deckel verschwände der Stand genau dann, wenn er als veraltet gälte.
+    veraltetNachMin: 36 * 60,
+  },
   kritis: {
     key: 'kritis',
     label: 'KRITIS / sensible Objekte',
@@ -308,7 +335,7 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
     aufwaermPollMs: 15_000,
     bboxAbhaengig: true,
     minZoom: BBOX_MIN_ZOOM,
-    geltung: 'nur wo Copernicus aktiviert wurde, ab 2023',
+    geltung: 'nur wo Copernicus aktiviert wurde; vor 2023 nur ausgewählte',
     // Alter des Abrufs, nicht des Bildes: vier verpasste Erneuerungen. Das Alter der Aufnahme
     // zeigt der Inspector.
     veraltetNachMin: 120,
@@ -316,6 +343,33 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
       legende: legendeAus(klassenVon(copernicusKlasse), copernicusDarstellung, copernicusRadius),
       faerbe: faerbeCopernicus,
     },
+  },
+  copernicus_bilder: {
+    key: 'copernicus_bilder',
+    label: 'Copernicus-Satellitenbilder',
+    geometrieTyp: 'polygon',
+    darstellung: 'raster',
+    // Gleiche TTL wie die Vektorebene (`COPERNICUS_TTL`), gleicher Takt und Aufwärmtakt: ein kalter
+    // Abruf lädt zusätzlich bis zu 20 Bildköpfe.
+    pollMs: 600_000,
+    aufwaermPollMs: 15_000,
+    bboxAbhaengig: true,
+    minZoom: BBOX_MIN_ZOOM,
+    geltung: 'nur optische Aufnahmen, nur wo Copernicus aktiviert wurde',
+    veraltetNachMin: 120,
+  },
+  drohne: {
+    key: 'drohne',
+    label: 'Drohnenlage (Suchlage)',
+    geometrieTyp: 'punkt',
+    drohnenlage: true,
+    // Kein Server-Cache: die Lage liegt im Arbeitsspeicher und erneuert sich im Takt des Adapters
+    // (`intervall_vorschlag_s` = 5 s, `src/drohne/art.rs`). Ein Poll ohne neuen Stand kostet ein
+    // 304. Wächter in `fachebenen.test.ts`.
+    pollMs: 5_000,
+    bboxAbhaengig: false,
+    // Eine Minute ohne neuen Stand ist für ein Fluggerät eine alte Position, nicht „noch frisch“.
+    veraltetNachMin: 1,
   },
 };
 
@@ -354,6 +408,11 @@ export interface CopernicusAktivierung {
   gekuerzt: boolean;
   /** Jüngste Aufnahme ihrer gezeigten Gebiete, UTC im Wire-Format; fehlt, wenn die Quelle keine nennt. */
   aufnahme?: string;
+  /**
+   * Jüngste Lieferung, nur wenn keine Aufnahme bekannt ist (Altbestand vor 2023, LLH-2022): die
+   * Vector Packages nennen keine Aufnahmezeit.
+   */
+  geliefert?: string;
 }
 
 /**
@@ -366,6 +425,7 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
     const p = f.properties;
     if (p?.klasse !== 'gebiet' || typeof p.emsr !== 'string') continue;
     const aufnahme = typeof p.aufnahme === 'string' ? p.aufnahme : undefined;
+    const geliefert = typeof p.geliefert === 'string' ? p.geliefert : undefined;
     const bisher = je.get(p.emsr) ?? {
       emsr: p.emsr,
       aufnahme: undefined,
@@ -379,11 +439,95 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
         bisher.aufnahme === undefined || (aufnahme ?? '') > bisher.aufnahme
           ? aufnahme
           : bisher.aufnahme,
+      geliefert:
+        bisher.geliefert === undefined || (geliefert ?? '') > bisher.geliefert
+          ? geliefert
+          : bisher.geliefert,
       unvollstaendig: bisher.unvollstaendig || p.unvollstaendig === true,
       gekuerzt: bisher.gekuerzt || p.gekuerzt === true,
     });
   }
-  return [...je.values()].sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+  // Zeit, die zählt: Aufnahme, ersatzweise Lieferung (ADR-0099).
+  const zeit = (a: CopernicusAktivierung) => a.aufnahme ?? a.geliefert ?? '';
+  return [...je.values()]
+    .map(({ geliefert, ...a }) =>
+      a.aufnahme === undefined && geliefert !== undefined ? { ...a, geliefert } : a,
+    )
+    .sort((a, b) => zeit(b).localeCompare(zeit(a)));
+}
+
+/** Ein Satellitenbild der Ebene `copernicus_bilder`, wie Karte und Ebenenzeile es brauchen (LLH-2021). */
+export interface CopernicusBild {
+  /** Kennung der Kachelroute: 16 Hex-Zeichen. */
+  bild: string;
+  emsr: string;
+  gebiet: string;
+  sensor?: string;
+  /** Aufnahmezeit, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`. */
+  aufnahme?: string;
+  minZoom: number;
+  maxZoom: number;
+  /** [west, sued, ost, nord] in WGS84. */
+  bounds: [number, number, number, number];
+  darstellbar: boolean;
+  /** Die Antwort wurde an der Obergrenze gekürzt: hineinzoomen zeigt mehr. */
+  gekuerzt: boolean;
+}
+
+const BILD_KENNUNG = /^[0-9a-f]{16}$/;
+
+/**
+ * Die Bilder der Antwort von `copernicus_bilder`, jüngste Aufnahme zuerst. Ein Feature mit falsch
+ * geformter Kennung, Zoomgrenze oder Umriss fällt weg: die Kennung landet in einer Kachel-URL.
+ */
+export function copernicusBilder(fc: FeatureCollection): CopernicusBild[] {
+  const bilder: CopernicusBild[] = [];
+  for (const f of fc.features) {
+    const p = f.properties ?? {};
+    const b = p.bounds;
+    if (
+      typeof p.bild !== 'string' ||
+      !BILD_KENNUNG.test(p.bild) ||
+      typeof p.min_zoom !== 'number' ||
+      typeof p.max_zoom !== 'number' ||
+      !Array.isArray(b) ||
+      b.length !== 4 ||
+      !b.every((v) => typeof v === 'number' && Number.isFinite(v))
+    )
+      continue;
+    bilder.push({
+      bild: p.bild,
+      emsr: typeof p.emsr === 'string' ? p.emsr : '',
+      gebiet: typeof p.gebiet === 'string' ? p.gebiet : '',
+      sensor: typeof p.sensor === 'string' ? p.sensor : undefined,
+      aufnahme: typeof p.aufnahme === 'string' ? p.aufnahme : undefined,
+      minZoom: p.min_zoom,
+      maxZoom: p.max_zoom,
+      bounds: b as [number, number, number, number],
+      darstellbar: p.darstellbar === true,
+      gekuerzt: p.gekuerzt === true,
+    });
+  }
+  // Wire-Format: Textvergleich ist Zeitvergleich; ohne Aufnahme ans Ende.
+  return bilder.sort((a, z) => (z.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+}
+
+/**
+ * Sichtbarkeit, wie sie wirkt: Ebenen, die der Betreiber abgeschaltet hat
+ * (`KarteConfigAntwort.fachebenen_abgeschaltet`, LLH-2104), gelten als unsichtbar und werden
+ * nie abgefragt. Die gespeicherte Wahl bleibt unberührt; ohne Abschaltung kommt dasselbe Objekt
+ * zurück, damit Memo-Abhängigkeiten stabil bleiben.
+ */
+export function ohneAbgeschaltete(
+  sichtbar: Record<FachebeneQuelle, boolean>,
+  abgeschaltet: readonly string[] | undefined,
+): Record<FachebeneQuelle, boolean> {
+  if (!abgeschaltet?.length) return sichtbar;
+  const wirksam = { ...sichtbar };
+  for (const k of fachebeneKeys()) {
+    if (abgeschaltet.includes(k)) wirksam[k] = false;
+  }
+  return wirksam;
 }
 
 /** Anzeige-Reihenfolge im Panel. */
@@ -398,7 +542,10 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'kritis',
     'energie',
     'autobahn',
+    'autobahn_parken',
     'copernicus',
+    'copernicus_bilder',
+    'drohne',
   ];
 }
 

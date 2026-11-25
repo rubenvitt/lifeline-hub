@@ -139,7 +139,7 @@ fn ansichtslisten_tragen_nur_einsatzrouten() {
         }
         if herkunft != "ALLE_GERAETE" {
             assert!(
-                pfad.starts_with("/api/einsaetze/{id}"),
+                pfad.starts_with("/api/incidents/{id}"),
                 "{herkunft}: {pfad} ist keine Einsatzroute"
             );
         }
@@ -186,7 +186,7 @@ fn lagemonitor_schreibt_nichts() {
     let mut geprueft = 0usize;
     let mut verstoesse = Vec::new();
     for (pfad, block) in alle_route_bloecke(&quelle) {
-        if !pfad.starts_with("/api/einsaetze/{id}") {
+        if !pfad.starts_with("/api/incidents/{id}") {
             continue;
         }
         for methode in ["POST", "PATCH", "PUT", "DELETE"] {
@@ -242,7 +242,7 @@ fn helfer_erreicht_nur_seine_liste() {
     // Keine Lage: aus dem Einsatz nur der Live-Kanal (Ende der Kopplung, eigener Zustand).
     for (m, p) in liste {
         assert!(
-            !p.starts_with("/api/einsaetze/{id}") || *p == "/api/einsaetze/{id}/live",
+            !p.starts_with("/api/incidents/{id}") || *p == "/api/incidents/{id}/live",
             "Helfer darf {m} {p} nicht"
         );
     }

@@ -72,7 +72,7 @@ impl Welt {
     }
 
     fn pfad(&self, rest: &str) -> String {
-        format!("/api/einsaetze/{}/{rest}", self.einsatz)
+        format!("/api/incidents/{}/{rest}", self.einsatz)
     }
 
     async fn einheit(&self, name: &str) -> i64 {
@@ -368,7 +368,7 @@ async fn eintreffen_der_geplanten_einheit_erreicht_nur_die_leser_des_moduls() {
         .unwrap();
     assert_eq!(n, 1, "keine weitere Benachrichtigung");
 
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
     let roh = common::sse_anfang_lesen(
         oeffnen(&w.app, &feed, &w.admin, Some(&pos))
             .await

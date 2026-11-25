@@ -57,14 +57,14 @@ async function schluessel(page: Page): Promise<string[]> {
 test('Lagekarte (LFH-723): ohne Netz neu aufgebaut, zeichnet sie ihre Marker', async ({ page }) => {
   test.setTimeout(120_000);
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Funkloch Karte ${Date.now()}`,
   });
-  const einheit = await post(page, `/api/einsaetze/${einsatzId}/units`, {
+  const einheit = await post(page, `/api/incidents/${einsatzId}/units`, {
     name: 'Offline-Probe Zug',
   });
   const position = await page.request.patch(
-    `/api/einsaetze/${einsatzId}/units/${einheit}/position`,
+    `/api/incidents/${einsatzId}/units/${einheit}/position`,
     { data: { lat: 53.0775, lon: 8.8 } },
   );
   expect(position.ok(), await position.text()).toBeTruthy();

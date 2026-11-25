@@ -27,7 +27,7 @@ const uhs = (o: Partial<Uhs> = {}): Uhs =>
   }) as Uhs;
 
 function liefere(liste: Uhs[]) {
-  server.use(http.get('/api/einsaetze/5/uhs', () => HttpResponse.json(liste)));
+  server.use(http.get('/api/incidents/5/uhs', () => HttpResponse.json(liste)));
 }
 
 describe('UhsVorschau (LFH-664)', () => {
@@ -83,7 +83,7 @@ describe('UhsVorschau (LFH-664)', () => {
   it('holt bei warmem Fach der Palette nicht neu', () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/5/uhs', () => {
+      http.get('/api/incidents/5/uhs', () => {
         abrufe += 1;
         return HttpResponse.json([]);
       }),

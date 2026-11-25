@@ -225,7 +225,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
+  expect(anfragen).toEqual([`POST /api/incidents/${einsatzId}/situation-reports`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
   await expect(page.getByText(TELEFON)).toHaveCount(0);
 });
@@ -247,7 +247,7 @@ test('Übernahme in den Befehl (LFH-1027): genau ein POST, danach der LADEF-Befe
   });
   await page.getByRole('button', { name: 'In Befehl übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/auftraege/befehle/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/orders`]);
+  expect(anfragen).toEqual([`POST /api/incidents/${einsatzId}/orders`]);
   await expect(page.getByText('Führung und Kommunikation').first()).toBeVisible();
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
   await expect(page.getByText(TELEFON)).toHaveCount(0);
@@ -362,7 +362,7 @@ test('Sprechgruppen am Fükw: Umschalten, Teilnehmer, kein Überhang, Lücken im
   // Bedingung statt Betriebsart (LFH-1030): lange Angaben brechen um, statt zu überhängen.
   await expect(tmo).toContainText(`TMO · ${SG_NETZ} · ${SG_SICHERHEIT}`);
   await expect(tmo).toContainText(EINHEIT_RUF);
-  // `POST …/einsaetze/{id}/talk-groups` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
+  // `POST …/incidents/{id}/talk-groups` legt einsatzlokal an; der Katalog ist Org-Stammdaten.
   await expect(tmo).toContainText('einsatzlokal');
   // TMO vor DMO, die lokale ohne Zuordnung mit „keine“.
   await expect(sprechgruppenSicht(page).locator('tr.ant-table-row').first()).toContainText(SG_LANG);
@@ -414,7 +414,7 @@ for (const art of ['Fokus', 'Zeiger'] as const) {
     else await zeile.hover();
     const vorher = await lage();
 
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/units`, {
       data: {
         name: NEUE_EINHEIT,
         funkrufname: 'Florian Musterstadt 3/10',
@@ -454,7 +454,7 @@ test('Sprechgruppen: die Führungsstelle ist Teilnehmer, ohne sie keine Vollstä
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Sprechgruppen FS ${Date.now()}`);
   await seedeSprechgruppen(page, einsatzId);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sg = await page.request.post(`${basis}/talk-groups`, {
     data: { bezeichnung: NUR_FS, betriebsart: 'DMO' },
   });

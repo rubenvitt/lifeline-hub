@@ -65,10 +65,10 @@ test('Notunterkunft mit Stelle: Ziel vorbelegt, Personenseite zeigt es, zweite B
   test.setTimeout(180_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Weserlage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   const { id: sid } = await senden(page, 'post', `${basis}/care/positions`, {
     bezeichnung: 'NU Turnhalle Nord',
     art: 'notunterkunft',
@@ -130,10 +130,10 @@ test('ohne Modul Betreuung: keine Stellenauswahl, Freitext-Ziel bleibt', async (
   test.setTimeout(120_000);
   const LAUF = Date.now();
   await anmeldenAls(page, ADMIN, PW);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Deichlage ${LAUF}`,
   });
-  const basis = `/api/einsaetze/${e}`;
+  const basis = `/api/incidents/${e}`;
   const { id: sid } = await senden(page, 'post', `${basis}/care/positions`, {
     bezeichnung: 'NU Halle Ost',
     art: 'notunterkunft',

@@ -59,7 +59,7 @@ interface Person {
 }
 
 async function einheitNamens(api: APIRequestContext, einsatzId: number, name: string) {
-  const antwort = await api.get(`/api/einsaetze/${einsatzId}/units`);
+  const antwort = await api.get(`/api/incidents/${einsatzId}/units`);
   expect(antwort.ok(), `Einheiten: ${antwort.status()}`).toBe(true);
   const einheit = ((await antwort.json()) as Einheit[]).find((e) => e.name === name);
   expect(einheit, `Einheit „${name}“ im Demo-Einsatz`).toBeDefined();
@@ -72,16 +72,16 @@ test.describe(KAPITEL, () => {
     try {
       const demo = await demoEinsatz(api);
       const rettung = await einheitNamens(api, demo.id, 'Rettungsstaffel');
-      const personal = await api.get(`/api/einsaetze/${demo.id}/personnel`);
+      const personal = await api.get(`/api/incidents/${demo.id}/personnel`);
       expect(personal.ok(), `Personal: ${personal.status()}`).toBe(true);
       const anna = ((await personal.json()) as Person[]).find((p) => p.name === 'Anna Probe');
       expect(anna, 'Anna Probe im Demo-Einsatz').toBeDefined();
-      await fuelle(api, 'patch', `/api/einsaetze/${demo.id}/units/${rettung.id}`, {
+      await fuelle(api, 'patch', `/api/incidents/${demo.id}/units/${rettung.id}`, {
         fuehrer_id: anna!.id,
       });
       // Besatzung aus den Demo-Daten: zwei auf jedem RTW; die vierte Kraft steigt aus.
       const staffel = (
-        (await (await api.get(`/api/einsaetze/${demo.id}/personnel`)).json()) as Person[]
+        (await (await api.get(`/api/incidents/${demo.id}/personnel`)).json()) as Person[]
       )
         .filter((p) => p.einheit_id === rettung.id)
         .sort((a, b) => a.id - b.id);
@@ -91,20 +91,20 @@ test.describe(KAPITEL, () => {
       await fuelle(
         api,
         'delete',
-        `/api/einsaetze/${demo.id}/vehicles/${vierte.fahrzeug_id}/crew/${vierte.id}`,
+        `/api/incidents/${demo.id}/vehicles/${vierte.fahrzeug_id}/crew/${vierte.id}`,
       );
 
-      const alt = await fuelle<Einheit>(api, 'post', `/api/einsaetze/${demo.id}/units`, {
+      const alt = await fuelle<Einheit>(api, 'post', `/api/incidents/${demo.id}/units`, {
         name: 'Erkundungstrupp',
       });
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/units/${alt.id}/timeline`, {
+      await fuelle(api, 'post', `/api/incidents/${demo.id}/units/${alt.id}/timeline`, {
         art: 'alarmierung',
         zeitpunkt_at: new Date(Date.now() - 90 * 60_000)
           .toISOString()
           .slice(0, 19)
           .replace('T', ' '),
       });
-      await fuelle(api, 'delete', `/api/einsaetze/${demo.id}/units/${alt.id}`);
+      await fuelle(api, 'delete', `/api/incidents/${demo.id}/units/${alt.id}`);
     } finally {
       await api.dispose();
     }

@@ -293,7 +293,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
     const tabelle = await zweiter.newPage();
     await anmeldenAls(tabelle, ADMIN, ADMIN_PW);
     const strom = tabelle.waitForResponse(
-      (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+      (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
     );
     await tabelle.goto(`/einsaetze/${einsatzId}/fernmeldewesen`);
     await strom;
@@ -305,7 +305,7 @@ test('Ziehen: Einheit auf die Schiene, Tabelle und Detailseite im zweiten Kontex
 
     const detail = await zweiter.newPage();
     const strom2 = detail.waitForResponse(
-      (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+      (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
     );
     await detail.goto(`/einsaetze/${einsatzId}/einheiten/${n.zug}`);
     await strom2;
@@ -806,7 +806,7 @@ test('Gleichzeitig: zwei Kontexte verschieben dieselbe Einheit — B bekommt ein
     // hängt in der Leitung, bis B selbst gespeichert hat (Latenz, kein Abschalten des Stroms).
     let halten = false;
     const wartend: Route[] = [];
-    await b.route(/\/api\/einsaetze\/\d+\/staff\/comms-sketch$/, async (route) => {
+    await b.route(/\/api\/incidents\/\d+\/staff\/comms-sketch$/, async (route) => {
       if (halten && route.request().method() === 'GET') {
         wartend.push(route);
         return;
@@ -878,7 +878,7 @@ test('Ruhige Fläche: eine aufgelöste Einheit lässt die Einheit unter dem Zeig
 
   await ziel.hover();
   // „Zug A“ wird an einem anderen Arbeitsplatz aufgelöst; im Auto-Layout rückte „Zug B“ auf.
-  const weg = await page.request.delete(`/api/einsaetze/${einsatzId}/units/${vorne}`);
+  const weg = await page.request.delete(`/api/incidents/${einsatzId}/units/${vorne}`);
   expect(weg.ok(), `Auflösen: ${weg.status()} ${await weg.text()}`).toBe(true);
   // Vorbedingung: das Ereignis ist angekommen — „Zug A“ ist aus dem Bild.
   await expect(element(page, `eh-${vorne}`)).toHaveCount(0);
@@ -946,7 +946,7 @@ test('Ruhige Fläche am Schirm (1366 × 768): eine fremde Lücke und eine fremde
   const neu = { x: lageVorher.x + 160, y: lageVorher.y + 80 };
   const abruf = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/staff/comms-sketch`) &&
+      r.url().endsWith(`/api/incidents/${einsatzId}/staff/comms-sketch`) &&
       r.request().method() === 'GET',
   );
   await a.put(`staff/comms-sketch/layout/${key}`, { ...neu, version: null });
@@ -1020,7 +1020,7 @@ test('Rechte: der Beobachter liest — kein Griff, nichts verschiebt, aber Hervo
 
   const schreibend: string[] = [];
   page.on('request', (r) => {
-    if (r.method() !== 'GET' && r.url().includes(`/api/einsaetze/${einsatzId}/`))
+    if (r.method() !== 'GET' && r.url().includes(`/api/incidents/${einsatzId}/`))
       schreibend.push(`${r.method()} ${r.url()}`);
   });
   await ea1.click();
@@ -1059,7 +1059,7 @@ test('Rechte: Schreibrecht im Fernmeldewesen ohne Einheiten — keine Einheit gr
   const einsatzId = await einsatzAnlegen(page, `E2E Skizze ohne Einheiten ${Date.now()}`);
   const n = await seedeGrund(page, einsatzId);
   // Einheiten nur für Admins (Modulsperre per Override, `e2e/AGENTS.md`); das Fernmeldewesen bleibt frei.
-  const sperre = await page.request.put(`/api/einsaetze/${einsatzId}/module-overrides/einheiten`, {
+  const sperre = await page.request.put(`/api/incidents/${einsatzId}/module-overrides/einheiten`, {
     data: { sichtbar: true, benoetigte_rolle: 'admin' },
   });
   expect(sperre.ok(), `Override: ${sperre.status()} ${await sperre.text()}`).toBeTruthy();
@@ -1080,7 +1080,7 @@ test('Rechte: Schreibrecht im Fernmeldewesen ohne Einheiten — keine Einheit gr
   await expect(paneel(page).locator('[data-lfh="skizze-rechte-grund"]')).toHaveCount(0);
 
   const direkt = await page.request.put(
-    `/api/einsaetze/${einsatzId}/units/${n.zug}/talk-groups/${n.f314}`,
+    `/api/incidents/${einsatzId}/units/${n.zug}/talk-groups/${n.f314}`,
   );
   expect(direkt.status(), 'direkter Aufruf ohne Recht auf Einheiten').toBe(403);
 });

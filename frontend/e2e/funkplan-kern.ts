@@ -37,7 +37,7 @@ export { einsatzAnlegen } from './einsatz-kern';
  * und eine nicht zugeordnete einsatzlokale Sprechgruppe: jede Lücke hat einen Treffer.
  */
 export async function seede(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const post = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(
@@ -93,7 +93,7 @@ export const SG_NETZ = 'BOS-Digitalfunk Gateway Hof Nordwest 412';
 export const SG_SICHERHEIT = 'Ende-zu-Ende-Verschlüsselung BSI-Karte';
 
 export async function seedeSprechgruppen(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const post = async (pfad: string, data: unknown) => {
     const antwort = await page.request.post(`${basis}/${pfad}`, { data });
     expect(

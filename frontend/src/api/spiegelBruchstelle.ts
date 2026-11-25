@@ -7,7 +7,7 @@ import type { BruchAlleErgebnis, BruchErfassung } from './types';
  * mit Freigabe des Moduls.
  */
 export function loadBruchstelle(einsatzId: number): Promise<BruchErfassung[]> {
-  return apiGet<BruchErfassung[]>(`/api/einsaetze/${einsatzId}/breaks`);
+  return apiGet<BruchErfassung[]>(`/api/incidents/${einsatzId}/breaks`);
 }
 
 /** Stellt eine Erfassung als Antrag an den Führer (202 mit dem Antrag). */
@@ -15,15 +15,15 @@ export function stelleBruchAntrag(
   einsatzId: number,
   bruchId: number,
 ): Promise<{ antrag: { id: number; zustand: string } }> {
-  return apiSend(`/api/einsaetze/${einsatzId}/breaks/${bruchId}/request`, 'POST', {});
+  return apiSend(`/api/incidents/${einsatzId}/breaks/${bruchId}/request`, 'POST', {});
 }
 
 /** Stellt alle nachreichbaren Erfassungen in der Reihenfolge ihrer Zeit. */
 export function stelleAlleBruchAntraege(einsatzId: number): Promise<BruchAlleErgebnis> {
-  return apiSend<BruchAlleErgebnis>(`/api/einsaetze/${einsatzId}/breaks/requests`, 'POST', {});
+  return apiSend<BruchAlleErgebnis>(`/api/incidents/${einsatzId}/breaks/requests`, 'POST', {});
 }
 
 /** Legt eine Erfassung ab (204). */
 export function verwirfBruch(einsatzId: number, bruchId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/breaks/${bruchId}/discard`, 'POST', {});
+  return apiSend<void>(`/api/incidents/${einsatzId}/breaks/${bruchId}/discard`, 'POST', {});
 }

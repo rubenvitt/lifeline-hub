@@ -33,10 +33,10 @@ async function senden<T = { id: number }>(
 const STELLE = 'Notunterkunft Turnhalle Gymnasium';
 
 async function saeStelle(page: Page): Promise<string> {
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `Stellen schmal ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const { id } = await senden(page, 'post', `${basis}/positions`, {
     bezeichnung: STELLE,
     art: 'notunterkunft',

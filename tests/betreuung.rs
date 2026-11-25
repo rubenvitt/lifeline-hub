@@ -14,19 +14,19 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/care")
+    format!("/api/incidents/{einsatz}/care")
 }
 
 /// Bezirke und Stände sind seit LLH-1034 das eigene Modul Evakuierung.
 fn pfad_evak(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/evacuation")
+    format!("/api/incidents/{einsatz}/evacuation")
 }
 
 async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -76,7 +76,7 @@ async fn etb_eintraege(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Va
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -1062,7 +1062,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -1249,7 +1249,7 @@ async fn live_ereignis_nur_an_leser_mit_modulrecht() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )
@@ -1577,7 +1577,7 @@ async fn lagekennzahlen(app: &axum::Router, cookie: &str, einsatz: i64) -> (Valu
     let (s, detail) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         None,
     )
@@ -1587,7 +1587,7 @@ async fn lagekennzahlen(app: &axum::Router, cookie: &str, einsatz: i64) -> (Valu
         detail.as_object().unwrap().contains_key("lagekennzahlen"),
         "Detail: nie absent, leer ist []: {detail:?}"
     );
-    let (s, liste) = anfrage(app, "GET", "/api/einsaetze", cookie, None).await;
+    let (s, liste) = anfrage(app, "GET", "/api/incidents", cookie, None).await;
     assert_eq!(s, StatusCode::OK, "{liste:?}");
     let zeile = liste
         .as_array()
@@ -1817,7 +1817,7 @@ async fn replay_nach_abschluss_und_schluessel_eines_anderen_bezirks() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -2464,7 +2464,7 @@ async fn abschnitt_umbenennen_und_aufloesen_meldet_stellen_und_bezirke() {
             t.sort();
             t
         };
-    let abschnitt_uri = format!("/api/einsaetze/{e}/sectors/{nord}");
+    let abschnitt_uri = format!("/api/incidents/{e}/sectors/{nord}");
 
     let mut rx = live.abonniere(e);
     let erwartet = vec![

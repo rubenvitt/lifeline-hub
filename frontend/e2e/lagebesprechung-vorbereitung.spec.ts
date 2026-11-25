@@ -27,9 +27,9 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
  *  vollzogener mit abgelaufener Frist (Quittungslücke). */
 async function seede(page: Page): Promise<string> {
   const einsatzId = String(
-    await post(page, '/api/einsaetze', { bezeichnung: `E2E Vorbereitung ${Date.now()}` }),
+    await post(page, '/api/incidents', { bezeichnung: `E2E Vorbereitung ${Date.now()}` }),
   );
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   await post(page, `${basis}/persons`, { name: 'Albers' });
   await post(page, `${basis}/persons`, { name: 'Brandt' });
   const auftrag = (text: string, frist?: string) => ({
@@ -95,7 +95,7 @@ test('dieselben Zahlen wie das Dashboard, Übernahme in EINEM Aufruf', async ({ 
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
+  expect(anfragen).toEqual([`POST /api/incidents/${einsatzId}/situation-reports`]);
   await expect(page.getByText('Quelle: Aufträge/Befehle').first()).toBeVisible();
 });
 

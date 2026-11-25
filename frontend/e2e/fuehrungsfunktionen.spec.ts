@@ -17,7 +17,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  */
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `Funktionskatalog ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -47,7 +47,7 @@ async function mitgliedMitFunktion(
     expect(konto.ok(), `Konto: ${konto.status()} ${await konto.text()}`).toBeTruthy();
     id = ((await konto.json()) as { id: number }).id;
   }
-  const antwort = await page.request.put(`/api/einsaetze/${einsatzId}/members/${id}`, {
+  const antwort = await page.request.put(`/api/incidents/${einsatzId}/members/${id}`, {
     data: { einsatz_rolle: 'fuehrungspersonal', fuehrungsfunktion: funktion },
   });
   expect(antwort.ok(), `Mitglied: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -92,7 +92,7 @@ test('Ohne Modulrecht steht die Besetzung aus den Mitgliedern da (Führungsperso
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
   await mitgliedMitFunktion(page, einsatzId, 's3', 'Müller');
-  const erteilt = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const erteilt = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Lage erkunden',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion: 's3' }],

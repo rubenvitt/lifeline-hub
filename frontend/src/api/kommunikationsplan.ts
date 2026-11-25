@@ -12,7 +12,7 @@ import type {
  * Aufrufer setzt ihn per `setQueryData` (design.md D3).
  */
 function basis(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}/staff/comms-plan`;
+  return `/api/incidents/${einsatzId}/staff/comms-plan`;
 }
 
 export function ladeKommunikationsplan(einsatzId: number): Promise<KommunikationsStelle[]> {

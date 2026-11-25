@@ -34,20 +34,20 @@ for (const modus of ['light', 'dark'] as const) {
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await anmeldenAlsAdmin(page, { startseite: false });
     const e = (
-      await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Dringlichkeit ${Date.now()}` })
+      await anlegen(page, '/api/incidents', { bezeichnung: `E2E Dringlichkeit ${Date.now()}` })
     ).id;
-    const uhs = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+    const uhs = await anlegen(page, `/api/incidents/${e}/uhs`, {
       typ: 'behandlungsplatz',
       bezeichnung: 'BHP Dringlichkeit',
     });
-    await anlegen(page, `/api/einsaetze/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
+    await anlegen(page, `/api/incidents/${e}/uhs/${uhs.id}/status`, { status: 'aktiv' });
     // Zuerst der SK III: er wartet länger und stünde nach Zeit vorn.
-    await anlegen(page, `/api/einsaetze/${e}/persons`, {
+    await anlegen(page, `/api/incidents/${e}/persons`, {
       name: 'Gruen',
       sichtung: 'sk3',
       uhs_id: uhs.id,
     });
-    await anlegen(page, `/api/einsaetze/${e}/persons`, {
+    await anlegen(page, `/api/incidents/${e}/persons`, {
       name: 'Rot',
       sichtung: 'sk1',
       uhs_id: uhs.id,

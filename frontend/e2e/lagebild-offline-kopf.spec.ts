@@ -32,12 +32,12 @@ test('Offline-Kennzeichnung (LFH-723): der Seitenkopf bleibt bei 390 px, wie er 
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await anmelden(page, { startseite: false });
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `Offline Kopf 723 ${Date.now()}` },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
   const { id } = (await antwort.json()) as { id: number };
-  const eintrag = await page.request.post(`/api/einsaetze/${id}/etb`, {
+  const eintrag = await page.request.post(`/api/incidents/${id}/etb`, {
     data: { typ: 'meldung', inhalt: 'Lage unverändert', von: 'ELW 1', an: 'Leitstelle' },
   });
   expect(eintrag.ok(), await eintrag.text()).toBeTruthy();
