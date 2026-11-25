@@ -7,19 +7,25 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import dev.rubeen.lifeline.helfer.dienste.Auftragsstand
 import dev.rubeen.lifeline.helfer.dienste.Dienste
+import dev.rubeen.lifeline.helfer.dienste.Dienstvorgabe
 import dev.rubeen.lifeline.helfer.dienste.Entscheidung
 import dev.rubeen.lifeline.helfer.dienste.Ortungsstand
 import dev.rubeen.lifeline.helfer.dienste.Rueckmeldung
 import dev.rubeen.lifeline.helfer.dienste.Serververbindung
 import dev.rubeen.lifeline.helfer.dienste.Sitzung
 import dev.rubeen.lifeline.helferkern.Antwort
+import dev.rubeen.lifeline.helferkern.Auftraege
 import dev.rubeen.lifeline.helferkern.Anmeldung
 import dev.rubeen.lifeline.helferkern.Anzeige
 import dev.rubeen.lifeline.helferkern.Einloesung
 import dev.rubeen.lifeline.helferkern.Ereignis
 import dev.rubeen.lifeline.helferkern.Grund
 import dev.rubeen.lifeline.helferkern.HelferZiel
+import dev.rubeen.lifeline.helferkern.HelperTask
+import dev.rubeen.lifeline.helferkern.HelperTaskRecipient
+import dev.rubeen.lifeline.helferkern.Ortungslage
 import dev.rubeen.lifeline.helferkern.Phase
 import dev.rubeen.lifeline.helferkern.Rolle
 import dev.rubeen.lifeline.helferkern.Ruhegrund
@@ -29,6 +35,7 @@ import dev.rubeen.lifeline.helferkern.ZielOption
 import dev.rubeen.lifeline.helferkern.Zielliste
 import dev.rubeen.lifeline.helferkern.Zustand
 import dev.rubeen.lifeline.helferkern.deuteHelferLink
+import dev.rubeen.lifeline.helferkern.empfaengt
 import dev.rubeen.lifeline.kern.ServerAdresse
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
@@ -52,11 +59,12 @@ enum class Verbindungsstand {
 
 /**
  * Das Modell der Helfer-App: hält die eine [Anmeldung] (Zustandsautomat im Kern) und führt ihre
- * Wirkungen aus: Server, Ablage, Ortung. Welche Phase gilt, entscheidet allein
- * [Anmeldung.verarbeite]; die Seiten zeigen nur [phase]. Gegenstück zu
+ * Wirkungen aus: Server, Ablage, Ortung und Empfang (ein Helfer-Dienst, ADR-0105). Welche Phase
+ * gilt, entscheidet allein [Anmeldung.verarbeite]; die Seiten zeigen nur [phase]. Gegenstück zu
  * `ios/Helfer/App/Modell/HelferModell.swift`, mit denselben Texten und Wegen.
  *
- * Ohne [dienste] (Tests und Testzustand) fragt es kein Netz, speichert nichts und ortet nicht.
+ * Ohne [dienste] (Tests und Testzustand) fragt es kein Netz, speichert nichts, ortet und empfängt
+ * nicht.
  */
 class HelferModell(private val dienste: Dienste?) : ViewModel() {
     private var anmeldung = Anmeldung()
@@ -86,8 +94,38 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     var beschaeftigt by mutableStateOf(false)
         private set
 
-    /** Ob der Ortungsdienst gerade läuft. */
+    /** Ob der Dienst gerade ortet. */
     var ortungLaeuft by mutableStateOf(false)
+        private set
+
+    /** Ob der Helfer-Dienst läuft (ortend oder nur empfangend). */
+    var dienstLaeuft by mutableStateOf(false)
+        private set
+
+    // Aufträge (ADR-0105): nur im Speicher.
+
+    /** Die eigenen Aufträge, geordnet (`Auftraege.ordnen`). */
+    var auftraege: List<HelperTask> by mutableStateOf(emptyList())
+        private set
+
+    /** Ob die Live-Verbindung des Dienstes steht. */
+    var empfangVerbunden by mutableStateOf(false)
+        private set
+
+    /** Mitteilungen sind aus: Aufträge kommen nur bei offener App an. */
+    var mitteilungenAus by mutableStateOf(false)
+        private set
+
+    /** Der Auftrag, dessen Detail die App zeigt; `null` für „Angemeldet“. */
+    var offenerAuftrag: Long? by mutableStateOf(null)
+        private set
+
+    /** Aufträge, deren Quittung nicht ankam („Bitte über Funk bestätigen“). */
+    var quittungFehlgeschlagen: Set<Long> by mutableStateOf(emptySet())
+        private set
+
+    /** Der Auftrag, dessen Quittung gerade läuft. */
+    var quittiertGerade: Long? by mutableStateOf(null)
         private set
     var ortungVerweigert by mutableStateOf(false)
         private set
@@ -133,6 +171,9 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
 
     private fun verbindeDienste(dienste: Dienste) {
         viewModelScope.launch { Ortungsstand.laeuft.collect { ortungLaeuft = it } }
+        viewModelScope.launch { Ortungsstand.dienstLaeuft.collect { dienstLaeuft = it } }
+        viewModelScope.launch { Auftragsstand.liste.collect { auftraege = it } }
+        viewModelScope.launch { Auftragsstand.verbunden.collect { empfangVerbunden = it } }
         viewModelScope.launch { Ortungsstand.letzteSendung.collect { if (it != null) letzteSendung = it } }
         viewModelScope.launch {
             Ortungsstand.naechsterVersuch.collect { zeit ->
@@ -179,6 +220,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                 delay(1_000)
             }
         }
+        mitteilungenAus = !dienste.isMitteilungErlaubt
         // Zurück aus den Einstellungen mit erteiltem Standortrecht: die Ortung startet jetzt.
         if (ortungVerweigert && dienste.isOrtungErlaubt) starteOrtung()
         if (startNachRuhe) {
@@ -188,6 +230,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         abfrage = viewModelScope.launch {
             while (isActive) {
                 aktualisiereZustand()
+                if (phase.empfaengt) ladeAuftraege()
                 delay(ABFRAGE_MS)
             }
         }
@@ -317,6 +360,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                 zustand?.let { ereignis(Ereignis.Zustand(it.state, it.reason, it.rolle)) }
                 // Ohne Rolle, die orten darf, ruht die Kopplung gleich: dann startet keine Ortung.
                 nachWechsel(vorher)
+                // Der Dienst startet beim Einlösen immer (ADR-0105), ohne Ortung nur zum Empfang.
                 starteOrtung()
             } finally {
                 beschaeftigt = false
@@ -325,25 +369,49 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     }
 
     /**
-     * Startet die Ortung, solange die Phase sie verlangt; nur aus dem Vordergrund (Einlösen,
-     * Fortsetzen oder „Ortung wieder starten“). Ohne Standortrecht bleibt sie aus, die Seite zeigt
-     * den Weg in die Einstellungen.
+     * Startet den Helfer-Dienst aus dem Vordergrund (Einlösen, Fortsetzen, „Ortung wieder
+     * starten“): er empfängt immer und ortet, solange die Phase es verlangt. Ohne Standortrecht
+     * bleibt die Ortung aus, die Seite zeigt den Weg in die Einstellungen.
      */
     fun starteOrtung() {
-        if (!phase.ortet) return
+        if (!phase.gekoppelt) return
         val dienste = dienste ?: return
-        ortungVerweigert = !dienste.isOrtungErlaubt
-        if (ortungVerweigert) return
-        if (dienste.starteOrtung(einsatzname, zielname)) {
-            ortungLaeuft = true
-        } else {
-            meldung = ORTUNG_NICHT_GESTARTET
-        }
+        ortungVerweigert = phase.ortet && !dienste.isOrtungErlaubt
+        if (!aktualisiereDienst()) meldung = ORTUNG_NICHT_GESTARTET
     }
 
-    private fun stoppeOrtung() {
-        dienste?.stoppeOrtung()
+    /**
+     * Gibt dem Dienst die Vorgabe der aktuellen Phase: orten oder nicht (Pause, Ruhe), empfangen ab
+     * `aktiv`. Aus dem Hintergrund erreicht sie nur einen laufenden Dienst; `location` nimmt er dort
+     * nur auf, wo Android es zulässt.
+     */
+    private fun aktualisiereDienst(): Boolean {
+        val dienste = dienste ?: return true
+        if (!phase.gekoppelt) return true
+        val orten = phase.ortet
+        val vorgabe = Dienstvorgabe(
+            einsatzId = zustand?.incident?.id ?: 0L,
+            einsatz = einsatzname,
+            ziel = zielname,
+            orten = orten,
+            empfangen = phase.empfaengt,
+            lage = Ortungslage.aus(phase, orten),
+            imVordergrund = imVordergrund,
+        )
+        val gestartet = dienste.starteDienst(vorgabe)
+        if (gestartet) {
+            dienstLaeuft = true
+            // Sofort sichtbar; lässt das System die Ortung doch nicht zu, setzt der Dienst es zurück.
+            ortungLaeuft = orten && dienste.isOrtungErlaubt
+        }
+        return gestartet
+    }
+
+    /** Ortung und Empfang aus (Abmelden, Ende der Kopplung). */
+    private fun beendeDienst() {
+        dienste?.stoppeDienst()
         ortungLaeuft = false
+        dienstLaeuft = false
     }
 
     // Ziel ändern (nur unbestätigt)
@@ -368,7 +436,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                     zustand = neu
                     gewaehltesZiel = option
                     // Die Benachrichtigung nennt das neue Ziel.
-                    if (ortungLaeuft) dienste?.starteOrtung(einsatzname, zielname)
+                    if (dienstLaeuft) aktualisiereDienst()
                 } else {
                     meldung = rueckmeldung.meldung
                     reagiere(rueckmeldung)
@@ -388,7 +456,9 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     fun pausieren() {
         if (phase != Phase.Aktiv) return
         ereignis(Ereignis.Pausiert)
-        stoppeOrtung()
+        // Die Ortung hört auf, der Empfang läuft weiter.
+        aktualisiereDienst()
+        ortungLaeuft = false
         val v = verbindung ?: return
         viewModelScope.launch { reagiere(io { v.pausiere(true) }) }
     }
@@ -438,7 +508,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         beschaeftigt = true
         try {
             val vorher = phase
-            stoppeOrtung()
+            beendeDienst()
             verbindung?.let { v -> io { v.abmelden() } }
             ereignis(Ereignis.Abgemeldet)
             nachWechsel(vorher)
@@ -546,7 +616,8 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         if (neu.paused && phase == Phase.Aktiv) {
             // Pausiert in der Benachrichtigung, während die App nicht lief.
             ereignis(Ereignis.Pausiert)
-            stoppeOrtung()
+            aktualisiereDienst()
+            ortungLaeuft = false
         } else if (!neu.paused && phase == Phase.Pausiert) {
             // Die Pause erreichte den Server nicht: nachholen.
             io { v.pausiere(true) }
@@ -555,29 +626,32 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     }
 
     /**
-     * Wirkungen eines Phasenwechsels: Bestätigung melden, Ruhe beginnen und beenden, am Ende alles
-     * abräumen. In der Ruhe ist der Dienst aus (Benachrichtigung weg), Kopplung und Sitzung
-     * bleiben; endet sie, startet die Ortung nur aus dem Vordergrund, sonst beim nächsten Öffnen.
+     * Wirkungen eines Phasenwechsels: Bestätigung melden, Ruhe beginnen und beenden, dem Dienst die
+     * neue Vorgabe geben, am Ende alles abräumen. In der Ruhe ortet der Dienst nicht, empfängt aber
+     * weiter (ADR-0105); endet sie im Hintergrund, nimmt er `location` nur auf, wo Android es
+     * zulässt, sonst startet die Ortung beim nächsten Öffnen.
      */
     private fun nachWechsel(vorher: Phase) {
         if (phase == vorher) return
         if (vorher == Phase.Unbestaetigt && phase == Phase.Aktiv) bestaetigungen += 1
         val ruhteVorher = vorher is Phase.Ruht
         if (phase is Phase.Ruht) {
-            stoppeOrtung()
+            ortungLaeuft = false
             if (!ruhteVorher) starteRuhePruefung()
         } else if (ruhteVorher) {
             ruhePruefung?.cancel()
             ruhePruefung = null
-            if (phase.ortet) {
-                if (imVordergrund) starteOrtung() else startNachRuhe = true
-            }
+            if (phase.ortet && !imVordergrund) startNachRuhe = true
         }
-        if (phase is Phase.Beendet) raeumeAb()
+        if (phase is Phase.Beendet) {
+            raeumeAb()
+        } else if (phase.gekoppelt && (dienstLaeuft || imVordergrund)) {
+            aktualisiereDienst()
+        }
     }
 
     private fun raeumeAb() {
-        stoppeOrtung()
+        beendeDienst()
         abfrage?.cancel()
         abfrage = null
         ruhePruefung?.cancel()
@@ -586,6 +660,75 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         dienste?.loeschen()
         verbindung = null
         Ortungsstand.vergessen()
+        Auftragsstand.vergessen()
+        auftraege = emptyList()
+        offenerAuftrag = null
+        quittungFehlgeschlagen = emptySet()
+    }
+
+    // Aufträge
+
+    /** Liste vom Server (im Vordergrund; der Dienst lädt selbst nach jedem Live-Ereignis). */
+    suspend fun ladeAuftraege() {
+        val dienste = dienste ?: return
+        val v = verbindung ?: return
+        val rueckmeldung = io { v.auftraege() }
+        val liste = if (rueckmeldung.isErfolg) Wire.auftraege(rueckmeldung.text) else null
+        if (liste != null) {
+            io { dienste.uebernimmAuftraege(liste) }
+        } else if (rueckmeldung.status == 401) {
+            // Sitzung weg; ein 403 (noch nicht bestätigt) beendet hier nichts.
+            reagiere(rueckmeldung)
+        }
+    }
+
+    /** Detail eines Auftrags zeigen (aus der Liste oder der Mitteilung) oder schließen (`null`). */
+    fun zeigeAuftrag(id: Long?) {
+        offenerAuftrag = id
+        if (id != null) dienste?.entferneMitteilung(id)
+    }
+
+    /** Die eigene Zeile, die „Übernommen“ quittiert: die erste offene, sonst die erste. */
+    fun eigeneZeile(a: HelperTask): HelperTaskRecipient? =
+        a.recipients.firstOrNull { !it.isQuittiert } ?: a.recipients.firstOrNull()
+
+    /**
+     * „Übernommen“: quittiert die eigene Zeile über denselben Weg wie die Einheitenansicht
+     * (ADR-0105). Scheitert es (ohne Netz, Serverfehler), zeigt das Detail „Bitte über Funk
+     * bestätigen“; ein aufgehobener oder fremder Auftrag (422, 404) lädt die Liste neu.
+     */
+    fun uebernehmen(a: HelperTask) {
+        val zeile = eigeneZeile(a)?.takeIf { !it.isQuittiert } ?: return
+        if (a.isAufgehoben || quittiertGerade != null) return
+        quittungFehlgeschlagen = quittungFehlgeschlagen - a.id
+        val v = verbindung
+        if (v == null) {
+            if (dienste == null) {
+                // Testzustand: angenommen, von diesem Gerät, jetzt.
+                val neu = a.copy(
+                    recipients = a.recipients.map {
+                        if (it.id == zeile.id) it.copy(acknowledgedAt = Beispiel.jetzt(), acknowledgedBy = anzeigename) else it
+                    },
+                )
+                auftraege = Auftraege.ordnen(auftraege.filter { it.id != a.id } + neu)
+            }
+            return
+        }
+        quittiertGerade = a.id
+        viewModelScope.launch {
+            try {
+                val rueckmeldung = io { v.quittiere(a.id, zeile.id) }
+                val neu = if (rueckmeldung.isErfolg) Wire.auftrag(rueckmeldung.text) else null
+                when {
+                    neu != null -> io { dienste?.ersetzeAuftrag(neu) }
+                    rueckmeldung.status == 404 || rueckmeldung.status == 422 -> ladeAuftraege()
+                    rueckmeldung.status == 401 -> reagiere(rueckmeldung)
+                    else -> quittungFehlgeschlagen = quittungFehlgeschlagen + a.id
+                }
+            } finally {
+                quittiertGerade = null
+            }
+        }
     }
 
     // Anzeige
@@ -608,11 +751,13 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
         ereignis(Ereignis.Eingeloest)
         zustand = Beispiel.zustand("unbestaetigt")
         ortungLaeuft = true
+        dienstLaeuft = true
         if (testzustand == Testzustand.WARTET) return
         ereignis(Ereignis.Bestaetigt)
         zustand = Beispiel.zustand("aktiv")
         letzteSendung = Instant.now().minusSeconds(12)
         verbindungsstand = Verbindungsstand.VERBUNDEN
+        empfangVerbunden = true
         when (testzustand) {
             Testzustand.PAUSIERT -> {
                 ereignis(Ereignis.Pausiert)
@@ -626,9 +771,27 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
             Testzustand.BEENDET -> {
                 ereignis(Ereignis.Zustand("beendet", Grund.EINSATZ_BEENDET.wire, Beispiel.zustand("aktiv").rolle))
                 ortungLaeuft = false
+                dienstLaeuft = false
+            }
+            Testzustand.AUFTRAEGE -> auftraege = Auftraege.ordnen(Beispiel.auftraege)
+            Testzustand.MITTEILUNGEN_AUS -> {
+                mitteilungenAus = true
+                auftraege = Auftraege.ordnen(Beispiel.auftraege)
+            }
+            Testzustand.AUFTRAG_OFFEN -> zeigeBeispiel(Beispiel.OFFEN)
+            Testzustand.AUFTRAG_UEBERNOMMEN -> zeigeBeispiel(Beispiel.UEBERNOMMEN)
+            Testzustand.AUFTRAG_AUFGEHOBEN -> zeigeBeispiel(Beispiel.AUFGEHOBEN)
+            Testzustand.QUITTUNG_FEHLGESCHLAGEN -> {
+                zeigeBeispiel(Beispiel.OFFEN)
+                quittungFehlgeschlagen = setOf(Beispiel.OFFEN)
             }
             else -> Unit
         }
+    }
+
+    private fun zeigeBeispiel(id: Long) {
+        auftraege = Auftraege.ordnen(Beispiel.auftraege)
+        offenerAuftrag = id
     }
 
     /** Baut das Modell für die Activity: echt, oder mit Beispieldaten im Testzustand. */
@@ -659,6 +822,50 @@ object Beispiel {
         ),
         personTrackingAllowed = true,
     )
+
+    const val OFFEN = 12L
+    const val UEBERNOMMEN = 11L
+    const val AUFGEHOBEN = 9L
+
+    /** Jetzt in der Form des Servers (UTC, `yyyy-MM-dd HH:mm:ss`). */
+    fun jetzt(minus: Long = 0): String =
+        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            .format(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).minusMinutes(minus))
+
+    /** Aufträge an San-Trupp 2: offen, von einem anderen übernommen, aufgehoben. */
+    val auftraege: List<HelperTask>
+        get() = listOf(
+            HelperTask(
+                id = OFFEN,
+                number = 12,
+                text = "Verletzte Person am Zelt 3, bitte Erstversorgung und Rückmeldung über Funk.",
+                location = "Zelt 3, Festwiese Nord",
+                locationLat = 50.1109,
+                locationLon = 8.6821,
+                priority = "dringend",
+                deadlineAt = jetzt(-15),
+                issuedAt = jetzt(2),
+                recipients = listOf(HelperTaskRecipient(120, "unit", "San-Trupp 2")),
+            ),
+            HelperTask(
+                id = UEBERNOMMEN,
+                number = 11,
+                text = "Getränke für den Abschnitt Süd an der Ausgabestelle Ost abholen.",
+                location = "Ausgabestelle Ost",
+                priority = "normal",
+                issuedAt = jetzt(18),
+                recipients = listOf(HelperTaskRecipient(110, "unit", "San-Trupp 2", jetzt(16), "Lisa K.")),
+            ),
+            HelperTask(
+                id = AUFGEHOBEN,
+                number = 9,
+                text = "Sanitätswache am Bühneneingang besetzen.",
+                priority = "normal",
+                issuedAt = jetzt(25),
+                cancelledAt = jetzt(20),
+                recipients = listOf(HelperTaskRecipient(90, "unit", "San-Trupp 2")),
+            ),
+        )
 
     fun zustand(state: String) = Zustand(
         state = state,

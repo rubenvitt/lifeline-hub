@@ -9,13 +9,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 data class Entscheidung(val antwort: Antwort, val grund: String?)
 
 /**
- * Was der [OrtungsDienst] dem Modell meldet, im Speicher des Prozesses (kein Verlauf, keine Datei).
+ * Was der [OrtungsDienst] (Helfer-Dienst) dem Modell meldet, im Speicher des Prozesses (kein Verlauf, keine Datei).
  * Der Dienst läuft auch ohne geöffnete App; öffnet sie sich wieder, liest das Modell hier, ob er
  * läuft und wann die letzte Sendung ankam.
  */
 object Ortungsstand {
     /** Ob der Dienst gerade ortet. */
     val laeuft = MutableStateFlow(false)
+
+    /** Ob der Helfer-Dienst läuft (ortend oder nur empfangend, ADR-0105). */
+    val dienstLaeuft = MutableStateFlow(false)
 
     /** Uhrzeit des Geräts, zu der die letzte Sendung angenommen wurde. */
     val letzteSendung = MutableStateFlow<Instant?>(null)
@@ -32,6 +35,7 @@ object Ortungsstand {
     /** Nach dem Ende einer Kopplung: nichts von ihr bleibt stehen. */
     fun vergessen() {
         laeuft.value = false
+        dienstLaeuft.value = false
         letzteSendung.value = null
         naechsterVersuch.value = null
     }
