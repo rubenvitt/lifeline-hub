@@ -1365,7 +1365,8 @@ export default function LagekartePage() {
   });
   const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
   // Export (Spec `lagekarte-geo-export`): nur, was die Karte gerade zeigt; ein Fehler steht im
-  // Hinweis über der Karte. Die Farben der Marker folgen dem aktiven Modus (`rollenFarbe`).
+  // Hinweis über der Karte. Die Datei trägt immer Tagesfarben; der Token sagt dem Export, in
+  // welchem Modus die Marker gebaut sind (`tagesFarbe`, LLH-2133).
   // Solange die Quellen laden, gibt es keine Eingabe (der Eintrag sagt „lädt“, nicht „Nichts
   // eingeblendet“). Der Stand ist in der Historienansicht der gezeigte gesicherte Stand, live der
   // Moment des Klicks (`stand: null`).
@@ -1381,6 +1382,7 @@ export default function LagekartePage() {
       marker: sichtbareMarker,
       flaechen: kartenFlaechen,
       zonen: zonenFeatures,
+      token,
       einsatzName: rahmenEinsatz?.bezeichnung ?? '',
       stand,
     };
@@ -1392,6 +1394,7 @@ export default function LagekartePage() {
     sichtbareMarker,
     kartenFlaechen,
     zonenFeatures,
+    token,
     rahmenEinsatz?.bezeichnung,
   ]);
   const { beginne: beginneKartenhandlung } = kartenFehler;

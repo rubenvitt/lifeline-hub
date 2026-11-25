@@ -325,3 +325,65 @@ async fn org_grenze_liste_laden_und_patch() {
         "Polizei"
     );
 }
+
+#[test]
+fn normalize_email_nimmt_eine_adresse() {
+    assert_eq!(
+        super::kanal::normalize_email(" Lage@Leitstelle-Nord.de ").unwrap(),
+        "Lage@leitstelle-nord.de"
+    );
+}
+
+#[test]
+fn normalize_email_lehnt_mehrere_und_anzeigenamen_ab() {
+    let zu_lang = format!("{}@b.de", "a".repeat(250));
+    for roh in [
+        "a@b.de, c@d.de",
+        "Nord <a@b.de>",
+        "",
+        "   ",
+        "ohne-at.de",
+        zu_lang.as_str(),
+    ] {
+        assert!(
+            super::kanal::normalize_email(roh).is_err(),
+            "{roh:?} muss abgelehnt werden"
+        );
+    }
+    assert!(super::kanal::normalize_email(&"x".repeat(255)).is_err());
+}
+
+#[test]
+fn nur_email_ist_freigeschaltet() {
+    use super::KanalArt;
+    assert!(KanalArt::Email.is_freigeschaltet());
+    for k in [KanalArt::Fax, KanalArt::Matrix, KanalArt::Threema] {
+        assert!(!k.is_freigeschaltet());
+    }
+}
+
+#[tokio::test]
+async fn kanal_check_entspricht_der_art() {
+    let pool = crate::db::test_pool().await;
+    let sql: String = sqlx::query_scalar(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'org_externe_stelle_kanal'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let start = sql
+        .find("CHECK (kanal IN (")
+        .expect("CHECK des Kanals fehlt");
+    let rest = &sql[start + "CHECK (kanal IN (".len()..];
+    let mut liste: Vec<String> = rest[..rest.find(')').unwrap()]
+        .split(',')
+        .map(|w| w.trim().trim_matches('\'').to_string())
+        .collect();
+    let mut erwartet: Vec<String> = super::KanalArt::ALLE
+        .iter()
+        .map(|a| a.as_str().to_string())
+        .collect();
+    liste.sort();
+    erwartet.sort();
+    assert_eq!(liste, erwartet);
+}

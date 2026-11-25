@@ -79,12 +79,13 @@ async fn fordere_lesen<T: DokumentRoute>(
     .await
 }
 
-/// Schreibrecht plus Modul-Freigabe, Einsatz aktiv.
-async fn fordere_schreiben<T: DokumentRoute>(
+/// Schreibrecht plus Modul-Freigabe, Einsatz aktiv. Liefert den geladenen Einsatz (der
+/// Ausgangskorb braucht seine Organisation, LLH-2093).
+pub(crate) async fn fordere_schreiben<T: DokumentRoute>(
     state: &AppState,
     benutzer: &Benutzer,
     einsatz_id: i64,
-) -> Result<(), AppError> {
+) -> Result<crate::einsatz::Einsatz, AppError> {
     let einsatz = einsatz_repo::laden(&state.pool, einsatz_id).await?;
     let rolle = einsatz_repo::rolle_von(&state.pool, einsatz_id, benutzer.id).await?;
     fordere_schreibrecht(rolle)?;
@@ -97,7 +98,8 @@ async fn fordere_schreiben<T: DokumentRoute>(
         rolle,
     )
     .await?;
-    fordere_aktiv(&einsatz)
+    fordere_aktiv(&einsatz)?;
+    Ok(einsatz)
 }
 
 pub async fn liste<T: DokumentRoute>(

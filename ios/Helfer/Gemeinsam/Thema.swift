@@ -54,6 +54,9 @@ enum Farbe {
     static let alarmText = Color(LifelineFarbe.rolleAlarmText)
     static let alarmFlaeche = Color(LifelineFarbe.rolleAlarmFlaeche)
     static let marke = Color(LifelineFarbe.rolleMarke)
+    /// Kopf-Schwarz und Linie der Bildmarke: immer dunkel, wie das App-Symbol.
+    static let rahmenGrund = Color(LifelineFarbe.rahmenGrund)
+    static let rahmenText = Color(LifelineFarbe.rahmenText)
 }
 
 /// Schriftstile der Helfer-App: die Familien der Tokens, Größen für eine App mit einer Aufgabe und

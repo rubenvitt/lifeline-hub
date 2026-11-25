@@ -564,6 +564,12 @@ pub struct Config {
     #[arg(long, env = "LIFELINE_EINWURF_ALLOW_HTTP", default_value_t = false)]
     pub einwurf_allow_http: bool,
 
+    /// Nur für die e2e-Suite (LLH-2093): der Ausgangskorb stellt Mails nicht über SMTP zu,
+    /// sondern nimmt sie mit einem aufzeichnenden Doppel an. Gilt **nur in Debug-Builds**; ein
+    /// Release-Binary weigert sich zu starten, wenn er gesetzt ist. Keine Umgebungsvariable.
+    #[arg(long, hide = true, default_value_t = false)]
+    pub ausgang_testzusteller: bool,
+
     /// Demo-Daten zur Laufzeit importieren und entfernen (LFH-690). **Default AUS.** Nur mit
     /// diesem Schalter werden die Routen unter `/api/demo-data` überhaupt registriert; ohne
     /// ihn antworten sie wie ein unbekannter Pfad (404). Sie öffnen einen harten Löschweg für
@@ -1614,6 +1620,15 @@ mod tests {
         assert_eq!(c.tls_cert.as_deref(), Some("/c.pem"));
         assert_eq!(c.tls_key.as_deref(), Some("/k.pem"));
         assert_eq!(c.tls_hostname.as_deref(), Some("elw.local"));
+    }
+
+    /// Das Test-Doppel des Ausgangs (LLH-2093) ist aus und nur per Flag zuschaltbar, nie per Umgebung.
+    #[test]
+    fn ausgang_testzusteller_vorgabe_aus_und_nur_per_flag() {
+        assert!(!parse_hermetisch(["lifeline-hub"]).ausgang_testzusteller);
+        assert!(
+            parse_hermetisch(["lifeline-hub", "--ausgang-testzusteller"]).ausgang_testzusteller
+        );
     }
 
     /// Einwurf ohne TLS (ADR-0023): Vorgabe aus, per Flag und per Umgebung an.

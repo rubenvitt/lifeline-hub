@@ -2,7 +2,7 @@
 titel: Stammdaten
 gruppen: [administration]
 reihenfolge: 620
-quellen: [frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/stammdaten/StammdatenVorschauAnsicht.tsx, src/stammdaten_eingang/repo.rs, src/stammdaten_eingang/repo/planen.rs, src/routes/stammdaten_eingang.rs, frontend/src/admin/BereitschaftUebersicht.tsx, frontend/src/admin/bereitschaft.ts, src/routes/verwaltung.rs, frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, src/auth/bootstrap.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs]
+quellen: [frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/stammdaten/StammdatenVorschauAnsicht.tsx, src/stammdaten_eingang/repo.rs, src/stammdaten_eingang/repo/planen.rs, src/routes/stammdaten_eingang.rs, frontend/src/admin/BereitschaftUebersicht.tsx, frontend/src/admin/bereitschaft.ts, src/routes/verwaltung.rs, frontend/src/stammdaten/PersonalStatusTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/stammdaten/UnterkunftRichtwerteTab.tsx, frontend/src/betreuung/unterkunft/RichtwerteListe.tsx, src/unterkunft/richtwerte_basis.json, frontend/src/components/KatalogTabelle.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/stammdaten/EinsatzVorlagenTab.tsx, frontend/src/stammdaten/EinsatzVorlageFormModal.tsx, frontend/src/stammdaten/einsatzVorlageModule.ts, frontend/src/stammdaten/StichworteTab.tsx, src/einsatz_vorlage/mod.rs, src/einsatz_vorlage/repo.rs, src/auth/bootstrap.rs, frontend/src/stammdaten/MaterialFormModal.tsx, frontend/src/stammdaten/MaterialTab.tsx, src/material/repo.rs, frontend/src/stammdaten/FahrzeugeTab.tsx, frontend/src/stammdaten/FahrzeugFormModal.tsx, frontend/src/stammdaten/dienststatus.tsx, frontend/src/stammdaten/KatalogVerwaltung.tsx, frontend/src/stammdaten/QualifikationenTab.tsx, frontend/src/kraefte/QualiSollFeld.tsx, src/personal/qualifikation_deckung.rs, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/stammdaten/FuehrungsfunktionenTab.tsx, frontend/src/stammdaten/ExterneStellenTab.tsx, frontend/src/stammdaten/ExterneStelleFormModal.tsx, frontend/src/stammdaten/EinheitVorlagenTab.tsx, frontend/src/stammdaten/EinheitVorlageFormModal.tsx, frontend/src/stammdaten/EinheitVorlageDetailPage.tsx, frontend/src/stammdaten/EinheitVorlageSections.tsx, frontend/src/stammdaten/rechteText.ts, frontend/src/components/InlineAngabe.tsx, frontend/src/components/druck/Druckkopf.tsx, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/SchichtmodelleTab.tsx, frontend/src/abloesung/SchichtmodellModal.tsx, frontend/src/api/schichtmodelle.ts, frontend/src/pages/EinsaetzePage.tsx, src/schichtmodell/repo.rs, src/einsatz/repo.rs, src/routes/organisation.rs, src/externe_stelle/repo.rs, src/einheit_vorlage/repo.rs, frontend/src/stammdaten/VerpflegungsplanTab.tsx, frontend/src/stammdaten/MahlzeitDialog.tsx, frontend/src/anzeige/uhrzeit.ts, src/verpflegung/vorlage.rs, frontend/src/stammdaten/SprechgruppenTab.tsx, src/sprechgruppe/repo.rs, frontend/src/stammdaten/ExterneStelleKanaele.tsx, src/externe_stelle/kanal.rs]
 ---
 
 ## Überblick
@@ -154,6 +154,15 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
 4. Bei der eigenen Leitstelle „Zuständige Leitstelle“ anhaken.
 5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
 6. „Anlegen“ wählen.
+
+Mailadressen einer bestehenden Stelle (für das Senden von Lageberichten, Befehlen und
+Nachforderungen):
+
+1. Die Stelle öffnen und im Abschnitt „Erreichbar per“ die Mailadresse eintragen, nach Bedarf eine
+   Beschriftung („Lagedienst“).
+2. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert; „Mailadresse ungültig“
+   erscheint, wenn sie nicht stimmt.
+3. Zum Entfernen den Eintrag der Adresse entfernen.
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
 deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
@@ -366,6 +375,11 @@ Sicherheit bleiben pflegbar.
   bisherigen die Markierung ab; Deaktivieren nimmt sie ebenfalls. Die zuständige Leitstelle steht
   in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
   [Nachforderung](nachforderung.md).
+
+Eine Stelle kann mehrere Mailadressen haben; die Adresse wird klein geschrieben gespeichert, eine
+doppelte ist nicht möglich. Eine Stelle, die vom Hub kommt, zeigt ihre Adressen nur an. Die
+Liste nennt „n Mailadressen“ an der Bezeichnung. Gesendet wird an die Adresse, wie sie beim
+Absenden stand; spätere Änderungen betreffen nur neue Versände.
 
 ### Einsatz-Vorlagen
 

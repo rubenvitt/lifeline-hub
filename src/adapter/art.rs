@@ -18,7 +18,7 @@ use super::repo::Adapter;
 use super::ziel::AbrufKontext;
 use super::zustand::AdapterFehler;
 use crate::error::AppError;
-use crate::public_api::webhook::ziel::check_url;
+use crate::public_api::webhook::ziel::{check_host, check_url};
 use crate::wire_enum::wire_enum;
 
 /// Höchstlänge eines Textfelds einer Einstellung, wenn die Art keine kleinere nennt.
@@ -40,6 +40,9 @@ wire_enum! {
         Zahl => "zahl",
         /// Eine `https`-URL; sie besteht den Zielschutz (LAN nur mit Ausnahme).
         Url => "url",
+        /// Ein Hostname ohne Schema, Pfad und Port (für Nicht-HTTP-Ziele); er besteht den
+        /// Zielschutz wie eine URL, ein Name wird erst beim Verbinden aufgelöst und geprüft.
+        Host => "host",
     }
 }
 
@@ -137,7 +140,7 @@ pub trait AdapterArt: Send + Sync + 'static {
 }
 
 /// Prüft Einstellungen gegen die Felder der Art: keine unbekannten Felder, Pflichtfelder da,
-/// Typ und Länge passen, URLs bestehen den Zielschutz. Liefert die bereinigten Einstellungen
+/// Typ und Länge passen, URLs und Hosts bestehen den Zielschutz. Liefert die bereinigten Einstellungen
 /// (Text getrimmt, leere optionale Felder entfernt) oder eine Meldung für die Verwaltung (400).
 pub fn check_einstellungen(
     art: &dyn AdapterArt,
@@ -161,7 +164,7 @@ pub fn check_einstellungen(
                     .map(Value::from)
                     .ok_or_else(|| format!("{}: muss eine ganze Zahl sein", feld.bezeichnung))?,
             ),
-            (FeldTyp::Text | FeldTyp::Url, Some(w)) => {
+            (FeldTyp::Text | FeldTyp::Url | FeldTyp::Host, Some(w)) => {
                 let text = w
                     .as_str()
                     .ok_or_else(|| format!("{}: muss Text sein", feld.bezeichnung))?
@@ -180,11 +183,19 @@ pub fn check_einstellungen(
                             feld.bezeichnung
                         ));
                     }
-                    if feld.typ == FeldTyp::Url {
-                        check_url(text, lan_erlaubt)
-                            .map_err(|f| format!("{}: {}", feld.bezeichnung, f.text()))?;
+                    match feld.typ {
+                        FeldTyp::Url => {
+                            check_url(text, lan_erlaubt)
+                                .map_err(|f| format!("{}: {}", feld.bezeichnung, f.text()))?;
+                            Some(Value::from(text))
+                        }
+                        FeldTyp::Host => {
+                            let host = check_host(text, lan_erlaubt)
+                                .map_err(|f| format!("{}: {}", feld.bezeichnung, f.text()))?;
+                            Some(Value::from(host))
+                        }
+                        _ => Some(Value::from(text)),
                     }
-                    Some(Value::from(text))
                 }
             }
         };
@@ -203,7 +214,7 @@ pub fn check_einstellungen(
 }
 
 /// Ob eine Änderung der Einstellungen ein neues Ziel einträgt: eine URL, deren Host vorher ein
-/// anderer war oder fehlte. Dann gehen die gespeicherten Geheimnisse nicht mehr mit, sie werden
+/// anderer war oder fehlte, oder ein Host-Feld mit anderem oder neuem Wert. Dann gehen die gespeicherten Geheimnisse nicht mehr mit, sie werden
 /// entfernt (Entscheidung Ruben, 21.11.2026): sonst schickte „Verbindung prüfen“ ein Geheimnis,
 /// das jemand anderes gesetzt hat, an einen frei gewählten Server.
 pub fn has_neues_ziel(
@@ -217,17 +228,26 @@ pub fn has_neues_ziel(
             .and_then(crate::public_api::webhook::ziel::host_von)
             .map(|h| h.to_ascii_lowercase())
     };
-    art.felder()
-        .iter()
-        .filter(|f| f.typ == FeldTyp::Url)
-        .any(|f| {
-            let neu = host(nachher, f.name);
-            neu.is_some() && neu != host(vorher, f.name)
-        })
+    let name = |m: &Map<String, Value>, name: &str| {
+        m.get(name)
+            .and_then(Value::as_str)
+            .map(|h| h.trim().to_ascii_lowercase())
+            .filter(|h| !h.is_empty())
+    };
+    art.felder().iter().any(|f| {
+        let ziel = |m: &Map<String, Value>| match f.typ {
+            FeldTyp::Url => host(m, f.name),
+            FeldTyp::Host => name(m, f.name),
+            _ => None,
+        };
+        let neu = ziel(nachher);
+        neu.is_some() && neu != ziel(vorher)
+    })
 }
 
-/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105) und
-/// `veranstaltungen_abruf` (LLH-2097); Tests bringen ihre eigene mit.
+/// Die Arten, die dieser Server kennt. In Produktion `suchlage` (LLH-2105),
+/// `veranstaltungen_abruf` (LLH-2097), `smtp` (LLH-2093) und `stammdaten_abruf`; Tests bringen
+/// ihre eigene mit.
 #[derive(Clone, Default)]
 pub struct Verzeichnis(Arc<[Arc<dyn AdapterArt>]>);
 
@@ -249,6 +269,7 @@ impl Verzeichnis {
         Verzeichnis::new(vec![
             Arc::new(crate::drohne::art::SuchlageArt::new(drohne)),
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
+            Arc::new(super::smtp_art::SmtpArt::produktiv()),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
@@ -329,6 +350,13 @@ mod tests {
                     typ: FeldTyp::Zahl,
                     pflicht: false,
                     max: 0,
+                },
+                Feld {
+                    name: "server",
+                    bezeichnung: "Server",
+                    typ: FeldTyp::Host,
+                    pflicht: false,
+                    max: 100,
                 },
             ]
         }
@@ -424,6 +452,70 @@ mod tests {
     }
 
     #[test]
+    fn has_neues_ziel_zaehlt_geaenderten_host() {
+        let m = |v: Value| v.as_object().unwrap().clone();
+        let alt = m(json!({ "adresse": "https://api.example.org/a", "server": "a.example" }));
+        assert!(!has_neues_ziel(&Probe, &alt, &alt));
+        // Schreibweise zählt nicht.
+        assert!(!has_neues_ziel(
+            &Probe,
+            &alt,
+            &m(json!({ "adresse": "https://api.example.org/a", "server": "A.Example" }))
+        ));
+        assert!(has_neues_ziel(
+            &Probe,
+            &alt,
+            &m(json!({ "adresse": "https://api.example.org/a", "server": "b.example" }))
+        ));
+        assert!(has_neues_ziel(
+            &Probe,
+            &m(json!({ "adresse": "https://api.example.org/a" })),
+            &alt
+        ));
+        // Ein entfernter Host schickt nichts mehr irgendwohin.
+        assert!(!has_neues_ziel(
+            &Probe,
+            &alt,
+            &m(json!({ "adresse": "https://api.example.org/a" }))
+        ));
+    }
+
+    #[test]
+    fn host_feld_besteht_den_zielschutz_und_wird_kleingeschrieben() {
+        let ok = pruefe(
+            json!({ "adresse": "https://x.example/", "server": " SMTP.Example.org " }),
+            false,
+        )
+        .unwrap();
+        assert_eq!(ok["server"], "smtp.example.org");
+        assert!(pruefe(
+            json!({ "adresse": "https://x.example/", "server": "smtp://x" }),
+            false
+        )
+        .is_err());
+        assert!(pruefe(
+            json!({ "adresse": "https://x.example/", "server": "x:25" }),
+            false
+        )
+        .is_err());
+        assert!(pruefe(
+            json!({ "adresse": "https://x.example/", "server": "10.0.0.1" }),
+            false
+        )
+        .is_err());
+        assert!(pruefe(
+            json!({ "adresse": "https://x.example/", "server": "10.0.0.1" }),
+            true
+        )
+        .is_ok());
+        assert!(pruefe(
+            json!({ "adresse": "https://x.example/", "server": "localhost" }),
+            true
+        )
+        .is_err());
+    }
+
+    #[test]
     fn verzeichnis_findet_nach_code() {
         let v = Verzeichnis::new(vec![Arc::new(Probe)]);
         assert!(v.find("probe").is_some());
@@ -431,5 +523,6 @@ mod tests {
         let produktiv = Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()));
         assert!(produktiv.find("suchlage").is_some());
         assert!(produktiv.find("stammdaten_abruf").is_some());
+        assert!(produktiv.find("smtp").is_some());
     }
 }

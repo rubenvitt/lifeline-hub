@@ -122,6 +122,16 @@ impl<'a> AbrufKontext<'a> {
         self.geheimnisse.get(name)
     }
 
+    /// Ob der Adapter die LAN-Ausnahme hat (für Arten, die ihr Ziel selbst auflösen, etwa SMTP).
+    pub fn lan_erlaubt(&self) -> bool {
+        self.lan_erlaubt
+    }
+
+    /// Alle Geheimnisse der Art, entschlüsselt. Nicht loggen, nicht in Fehler schreiben.
+    pub fn geheimnisse(&self) -> &HashMap<String, SecretString> {
+        self.geheimnisse
+    }
+
     /// Ein Textfeld der Einstellungen.
     pub fn einstellung_text(&self, name: &str) -> Option<&str> {
         self.einstellungen.get(name).and_then(Value::as_str)

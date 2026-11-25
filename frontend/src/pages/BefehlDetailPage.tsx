@@ -7,6 +7,9 @@ import { ladeEinsatz } from '../api/einsaetze';
 import { darfImEinsatzSchreiben } from '../einsatz/schreibrecht';
 import { parseRouteId, befehlDetailPfad, auftraegePfad } from '../routing/deeplinks';
 import { einsatzKeys } from '../api/queryKeys';
+import SendenAktion from '../ausgang/SendenAktion';
+import Versandliste from '../ausgang/Versandliste';
+import { abschnittVorschau, externeVerteilerNamen } from '../ausgang/empfaengerVorschlag';
 import { aktualisiereBefehl, gibBefehlFrei, ladeBefehl, schreibeBefehlFort } from '../api/befehle';
 import type { BefehlAbschnitt, BefehlAnzeige } from '../api/types';
 import { vorlage } from '../befehle/vorlagen';
@@ -303,6 +306,15 @@ function BefehlDetail() {
             Fortschreiben
           </Button>
         )}
+        {/* Nur die freigegebene Fassung geht hinaus (LLH-2093). */}
+        {!istEntwurf && (
+          <SendenAktion
+            einsatzId={einsatzId}
+            quelle={{ kind: 'befehl', id: befehlId }}
+            vorschlagNamen={externeVerteilerNamen(befehl.verteiler)}
+            vorschauText={abschnittVorschau(befehl.abschnitte)}
+          />
+        )}
         {istEntwurf && (
           <>
             {/* Der sichtbare Beleg des stillen Autosave — ohne ihn wäre „gespeichert" von
@@ -505,6 +517,16 @@ function BefehlDetail() {
               ebene={3}
             />
           </Paneel>
+        )}
+        {/* Versand (LLH-2093): nur mit mindestens einem Versand, nie im Druck. */}
+        {!istEntwurf && (
+          <div className="befehl-no-print">
+            <Versandliste
+              einsatzId={einsatzId}
+              quelle={{ kind: 'befehl', id: befehlId }}
+              darfSchreiben={darfSchreiben}
+            />
+          </div>
         )}
         {/* Bild-Anlagen (LFH-1028): am Schirm ein Paneel, auf Papier je ein Blatt hinter dem Text. */}
         <DokumentAnlagen

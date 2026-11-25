@@ -113,6 +113,13 @@ impl AdapterArt for TestArt {
                 pflicht: false,
                 max: 40,
             },
+            Feld {
+                name: "server",
+                bezeichnung: "Server",
+                typ: FeldTyp::Host,
+                pflicht: false,
+                max: 100,
+            },
         ]
     }
     fn intervall_min_s(&self) -> i64 {
@@ -176,4 +183,41 @@ pub fn rahmen_mit(art: &Arc<TestArt>, schluessel: Option<GeheimnisSchluessel>) -
         Geheimnisspeicher::new(schluessel),
         Verzeichnis::new(vec![art.clone()]),
     )
+}
+
+/// Ein SMTP-Prüfer, der ein Skript von Ergebnissen abspielt (leer heißt Erfolg) und merkt sich
+/// das Ziel (ohne Passwort), das er sah.
+#[derive(Default)]
+pub struct SmtpSkript {
+    pub skript: Mutex<VecDeque<Result<(), lifeline_hub::adapter::smtp::SmtpFehler>>>,
+    pub gesehen: Mutex<Vec<String>>,
+}
+
+impl lifeline_hub::adapter::smtp_art::SmtpPruefer for SmtpSkript {
+    fn pruefe<'a>(
+        &'a self,
+        ziel: &'a lifeline_hub::adapter::smtp::SmtpZiel<'a>,
+    ) -> BoxFuture<'a, Result<(), lifeline_hub::adapter::smtp::SmtpFehler>> {
+        Box::pin(async move {
+            self.gesehen.lock().unwrap().push(format!(
+                "{}:{} {}",
+                ziel.host,
+                ziel.port,
+                ziel.passwort.is_some()
+            ));
+            self.skript.lock().unwrap().pop_front().unwrap_or(Ok(()))
+        })
+    }
+}
+
+/// Ein Rahmen mit Schlüssel und der SMTP-Art mit Skript-Prüfer.
+pub fn rahmen_smtp() -> (Rahmen, Arc<SmtpSkript>) {
+    let pruefer = Arc::new(SmtpSkript::default());
+    let rahmen = Rahmen::new(
+        Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
+        Verzeichnis::new(vec![Arc::new(
+            lifeline_hub::adapter::smtp_art::SmtpArt::new(pruefer.clone()),
+        )]),
+    );
+    (rahmen, pruefer)
 }

@@ -3719,6 +3719,41 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("angelegt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
+    // ---------- Ausgangskorb für E-Mail (LLH-2093, `ausgang`) ----------
+    // Schnappschuss des Versands: Betreff, Text, Adresse und Name der Stelle sind Freitext der
+    // Module (Linie A, LFH-701) und werden geschwärzt; der rechtsverbindliche Wortlaut steht im
+    // ETB (G_ETB). Zustand, Fehlercode und Zeiten sind Skelett.
+    TabellenRegel {
+        tabelle: "ausgang",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("org_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("client_id", G_IDEMPOTENZ),
+            retain("quelle_art", G_ENUM),
+            retain("quelle_id", G_POLY),
+            retain("kanal", G_ENUM),
+            retain("externe_stelle_id", G_FK),
+            scrub("stelle_bezeichnung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("adresse", Strategie::Platzhalter, Z_EINSATZ),            // NOT NULL
+            scrub("betreff", Strategie::Platzhalter, Z_EINSATZ),            // NOT NULL
+            scrub("inhalt", Strategie::Platzhalter, Z_EINSATZ),             // NOT NULL
+            retain("zustand", G_ENUM),
+            retain("versuche", G_ZAEHLER),
+            retain("naechster_versuch_at", G_ZEIT),
+            retain("erster_versuch_at", G_ZEIT),
+            retain("versuch_begonnen_at", G_ZEIT),
+            retain("fehler_art", G_ENUM),
+            retain("fehler_status", G_ZAEHLER),
+            retain("erstellt_von_id", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("uebergeben_at", G_ZEIT),
+            retain("etb_eintrag_id", G_FK),
+        ],
+    },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
     // Nur Kennungen, Art und Zeitpunkt (`src/AGENTS.md`, Ausgangsereignisse für Fremdsysteme);
     // der Purge-Lauf löscht nach sieben Tagen. Mit dem Einsatz gehen die Zeilen über seinen
