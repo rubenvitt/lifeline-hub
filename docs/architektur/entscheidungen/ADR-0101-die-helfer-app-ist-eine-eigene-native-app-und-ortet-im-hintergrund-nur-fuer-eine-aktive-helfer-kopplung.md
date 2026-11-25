@@ -55,6 +55,9 @@ ADR-0093 erlaubt ihnen Standort nur im Vordergrund. Beides trägt eine dauerhaft
 
 ## Konsequenzen
 
+Ergänzt durch [ADR-0104](ADR-0104-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md): Empfang von Aufträgen (iOS über das Relais, Android über die eigene Verbindung).
+
+
 Es gibt zwei eigene native Apps mit eigener Kennung, eigenem Kern und eigener Auslieferung; die
 Hüllen bleiben unverändert. Die Hintergrundortung ist auf die Dauer einer Kopplung begrenzt, für
 die Person sichtbar und ohne gespeicherten Verlauf. Dafür fällt jede Ortung ohne Kopplung weg.

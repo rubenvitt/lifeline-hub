@@ -35,3 +35,6 @@ und reicht Pushes der Lifeline-Server an APNs weiter; Ruben betreibt ihn selbst 
 - **`senden` blockiert nie auf eine einzelne Nachricht:** nebenläufig über die HTTP/2-Verbindung,
   Frist je Anfrage an Apple und Gesamtfrist je Aufruf klar unter der Frist des Servers
   (`RELAIS_SENDEN_FRIST` in `src/ios_push/mod.rs`); die Ergebnisse in Eingabe-Reihenfolge.
+- **Thema je Nachricht** (ADR-0104): `thema` (optional) wird `apns-topic`; ohne `thema` gilt
+  `PUSH_RELAIS_BUNDLE_ID`. Erlaubt sind nur das Hauptbundle und `PUSH_RELAIS_WEITERE_BUNDLE_IDS`;
+  ein fremdes Thema weist der Aufruf mit 422 ab, ohne Apple zu fragen.
