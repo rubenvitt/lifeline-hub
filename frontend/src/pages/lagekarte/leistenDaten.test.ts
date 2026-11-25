@@ -851,7 +851,7 @@ describe('Gruppen des Ebenenbaums', () => {
       ['Warnungen', ['nina', 'dwd']],
       ['Wasser', ['pegelonline', 'hochwasser']],
       ['Umwelt', ['luftqualitaet', 'odl']],
-      ['Verkehr & Infrastruktur', ['autobahn', 'kritis', 'energie']],
+      ['Verkehr & Infrastruktur', ['autobahn', 'autobahn_parken', 'kritis', 'energie']],
       ['Satellitenauswertung', ['copernicus']],
       ['Drohne', ['drohne']],
     ]);

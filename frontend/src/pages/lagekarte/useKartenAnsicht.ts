@@ -92,6 +92,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     // Dasselbe für `energie`.
     energie: o.energie === true,
     autobahn: o.autobahn === true,
+    // Dasselbe für `autobahn_parken` (LLH-1637).
+    autobahn_parken: o.autobahn_parken === true,
     // Dasselbe für `copernicus` (LLH-1200). Der Archiv-Schalter reist bewusst nicht mit.
     copernicus: o.copernicus === true,
     // Dasselbe für `drohne` (LLH-2106).
