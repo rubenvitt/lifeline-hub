@@ -30,6 +30,7 @@ import {
 import { MELDEWEG_WORT, rueckmeldungJeEinheit } from '../../meldungen/rueckmeldung';
 import { einheitStatusAnzeige } from '../../kraefte/meldebildRaster';
 import type { KarteMarker, MarkerTyp } from './marker';
+import { positionsHinweisText } from './geortet';
 import type { BasemapModus } from './basemapStil';
 import type { LayerSichtbar } from './Sidebar';
 import { PERSONEN_SPERRGRUND, type PersonenZugriff } from './personenEbene';
@@ -611,6 +612,18 @@ export function auswahlRaster(
         { label: 'Disponiert', wert: f.disponiert_at ? zeit(f.disponiert_at) : '—' },
         { label: 'Einheit', wert: text(einheit?.name), mono: false },
       ];
+      // Quelle und Alter der Position (LLH-2091): wie der Marker und die Liste „Geortet“ (gegen
+      // den Minutentakt, im Lagestand gegen dessen Stand); eine Handposition heißt „manuell“.
+      const hinweis = positionsHinweisText(marker);
+      if (hinweis)
+        felder.push({
+          label: 'Position',
+          wert: hinweis.text,
+          rolle: hinweis.veraltet ? 'achtung' : undefined,
+          mono: false,
+        });
+      else if (f.position_quelle === 'manuell' && f.lat != null)
+        felder.push({ label: 'Position', wert: 'manuell', mono: false });
       if (f.kennzeichen) felder.push({ label: 'Kennzeichen', wert: f.kennzeichen });
       return felder;
     }

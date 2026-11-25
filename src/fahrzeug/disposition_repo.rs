@@ -16,6 +16,8 @@ const SELECT_AUFGELOEST: &str = "\
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
            ef.lat, ef.lon, ef.position_aktualisiert_at, ef.position_quelle, \
+           EXISTS(SELECT 1 FROM ortung_kopplung k WHERE k.einsatz_fahrzeug_id = ef.id) \
+               AS ortung_gekoppelt, \
            ef.tz_fachaufgabe, ef.tz_organisation, \
            ef.aktueller_br_id, ef.status_seit, \
            ef.disponiert_at, ef.disponiert_von, \
@@ -49,6 +51,7 @@ struct Row {
     lon: Option<f64>,
     position_aktualisiert_at: Option<String>,
     position_quelle: Option<String>,
+    ortung_gekoppelt: bool,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
     aktueller_br_id: Option<i64>,
@@ -122,6 +125,7 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         lon: row.lon,
         position_aktualisiert_at: row.position_aktualisiert_at,
         position_quelle: row.position_quelle,
+        ortung_gekoppelt: row.ortung_gekoppelt,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
         aktueller_br_id: row.aktueller_br_id,
@@ -770,6 +774,9 @@ pub struct Entlassen {
     pub trug_fuehrungsstelle: bool,
     /// Beladung, die ohne Ort zurückbleibt (`einsatz_material.id`, LLH-1224 D13).
     pub material: Vec<i64>,
+    /// Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091); den ETB-Eintrag
+    /// „Ortung getrennt“ schreibt der Aufrufer.
+    pub ortung: Option<crate::ortung::kopplung::Kopplung>,
 }
 
 impl Entlassen {
@@ -783,6 +790,13 @@ impl Entlassen {
             fuehrungsstelle: self.trug_fuehrungsstelle,
             besatzung: self.besatzung.clone(),
             beladung: self.material.clone(),
+            ortung: self
+                .ortung
+                .as_ref()
+                .map(|k| crate::fahrzeug::OrtungVorzustand {
+                    zugang_id: k.zugang_id.clone(),
+                    kennung: k.kennung.clone(),
+                }),
         }
     }
 }
@@ -856,12 +870,15 @@ pub async fn entlassen_tx(
         BeendetAls::Entlassen,
     )
     .await?;
+    // Die Ortung endet mit dem Fahrzeug; die letzte Position bleibt stehen (LLH-2091).
+    let ortung = crate::ortung::kopplung::delete_kopplung_tx(conn, einsatz_id, ef_id).await?;
     Ok(Entlassen {
         einheit,
         br_id,
         besatzung,
         trug_fuehrungsstelle,
         material,
+        ortung,
     })
 }
 
@@ -903,14 +920,15 @@ async fn set_beendet_tx(
 /// Bereitstellungsraum, Führungsstelle und Auftrag und höchstens
 /// [`crate::entlassung::STORNO_FRIST_MINUTEN`] nach der Disposition; sonst 422 mit dem ersten
 /// verletzten Grund als Satz. Ein Fahrzeug trägt keine eigene Zeitachse, es gibt nichts zu
-/// streichen.
+/// streichen. Eine Ortungs-Kopplung endet mit (LLH-2091) und kommt als Ergebnis zurück; den
+/// ETB-Eintrag „Ortung getrennt“ schreibt der Aufrufer.
 pub async fn stornieren_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ef_id: i64,
     benutzer_id: i64,
     jetzt: &str,
-) -> Result<(), AppError> {
+) -> Result<Option<crate::ortung::kopplung::Kopplung>, AppError> {
     require_aktiv_tx(conn, einsatz_id, ef_id).await?;
     if let Some(grund) = find_storno_hindernis_tx(conn, einsatz_id, ef_id, jetzt).await? {
         return Err(AppError::UnprocessableEntity(grund));
@@ -923,7 +941,8 @@ pub async fn stornieren_tx(
         jetzt,
         BeendetAls::Storniert,
     )
-    .await
+    .await?;
+    crate::ortung::kopplung::delete_kopplung_tx(conn, einsatz_id, ef_id).await
 }
 
 /// Der erste Grund, der den Storno eines Fahrzeugs verbietet (design.md D3), oder `None`.
@@ -1113,6 +1132,8 @@ pub struct Ruecknahme {
     pub fuehrungsstelle: bool,
     pub besatzung: Vec<i64>,
     pub beladung: Vec<i64>,
+    /// Die wiederhergestellte Ortungs-Kopplung (LLH-2091); den ETB-Eintrag schreibt der Aufrufer.
+    pub ortung: Option<crate::ortung::kopplung::Kopplung>,
     pub ausgelassen: Vec<crate::fahrzeug::RuecknahmeAusgelassen>,
 }
 
@@ -1352,7 +1373,70 @@ pub async fn zuruecknehmen_tx(
             }
         }
     }
+    if let Some(ortung) = &vorzustand.ortung {
+        restore_ortung_tx(
+            conn,
+            einsatz_id,
+            ef_id,
+            benutzer_id,
+            jetzt,
+            ortung,
+            &mut ergebnis,
+        )
+        .await?;
+    }
     Ok(ergebnis)
+}
+
+/// Stellt die Ortungs-Kopplung des Vorzustands her (LLH-2091). Der Vorzustand kommt vom Client:
+/// Org-Schalter „Ortung im Einsatz“ (ADR-0101), Zugang (Org, Scope, nicht widerrufen, nicht
+/// abgelaufen) und freie Kennung werden neu geprüft wie beim PUT. Was nicht geht, bleibt aus und
+/// steht in `ausgelassen`.
+async fn restore_ortung_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    ef_id: i64,
+    benutzer_id: i64,
+    jetzt: &str,
+    ortung: &crate::fahrzeug::OrtungVorzustand,
+    ergebnis: &mut Ruecknahme,
+) -> Result<(), AppError> {
+    let kennung_ok = !ortung.kennung.is_empty()
+        && ortung.kennung.chars().count()
+            <= crate::public_api::einwurf::ablage::POSITION_KENNUNG_MAX;
+    if !kennung_ok {
+        ergebnis.ausgelassen.push(ausgelassen(
+            "Ortung",
+            "Kopplung nicht mehr zulässig; bitte neu koppeln",
+        ));
+        return Ok(());
+    }
+    match crate::ortung::kopplung::create_kopplung_tx(
+        conn,
+        einsatz_id,
+        ef_id,
+        &ortung.zugang_id,
+        &ortung.kennung,
+        benutzer_id,
+        jetzt,
+    )
+    .await
+    {
+        Ok(k) => {
+            // Wie beim Koppeln: die vorhandene Position der Kennung gleich übernehmen.
+            crate::ortung::uebernahme::apply_position_tx(conn, &k.zugang_id, &k.kennung, jetzt)
+                .await?;
+            ergebnis.ortung = Some(k);
+        }
+        // Schalter aus, Zugang ungültig oder Kennung belegt: der Grund steht im Fehler.
+        Err(
+            e @ (AppError::Conflict(_) | AppError::UnprocessableEntity(_) | AppError::NotFound),
+        ) => ergebnis
+            .ausgelassen
+            .push(ausgelassen("Ortung", &e.to_string())),
+        Err(e) => return Err(e),
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -2546,6 +2630,7 @@ mod tests {
                 fuehrungsstelle: true,
                 besatzung: vec![ep],
                 beladung: vec![em],
+                ortung: None,
             }
         );
     }

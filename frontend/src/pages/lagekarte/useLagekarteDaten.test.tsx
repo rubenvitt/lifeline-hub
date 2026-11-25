@@ -1507,3 +1507,53 @@ describe('useLagekarteDaten freie Zeichen im Altformat (LFH-836)', () => {
     expect(baueZeichenRegistry([marker]).get(erwartet.schluessel)).toBe(erwartet.drawing);
   });
 });
+
+describe('useLagekarteDaten Alter der Einwurf-Position im Lagestand (LLH-2091)', () => {
+  function stand(aktualisiert: string) {
+    const d = dokument('akut');
+    (d.daten as unknown as { fahrzeuge: unknown[] }).fahrzeuge = [
+      {
+        id: 3,
+        funkrufname: 'Florian 1',
+        lat: 50.2,
+        lon: 8.7,
+        tz_fachaufgabe: null,
+        tz_organisation: null,
+        status_farbe: '#123456',
+        position_quelle: 'einwurf',
+        position_aktualisiert_at: aktualisiert,
+      },
+    ];
+    return d;
+  }
+  const marke = (r: {
+    current: {
+      alleVerortet: Array<{ schluessel: string; untertitel?: string; deckkraft?: number }>;
+    };
+  }) => r.current.alleVerortet.find((m) => m.schluessel === 'fahrzeug-3');
+
+  it('altert die Position gegen den Zeitpunkt des Lagestands, nicht gegen die Uhr', async () => {
+    // Stand 08:00, Messung 07:58: damals frisch, obwohl heute lange her.
+    ladeLageSnapshot.mockResolvedValue(stand('2026-07-24 07:58:00'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(marke(result)?.untertitel).toBeDefined());
+    expect(marke(result)?.untertitel).toBe('Ortung · vor 2 min');
+    expect(marke(result)?.deckkraft).toBeUndefined();
+  });
+
+  it('zeigt im Lagestand blass, wenn die Messung schon beim Sichern 5 Minuten alt war', async () => {
+    ladeLageSnapshot.mockResolvedValue(stand('2026-07-24 07:55:00'));
+    const { result } = renderHook(
+      () =>
+        useLagekarteDaten({ einsatzId: 5, zeigeZonen: true, quelle: { typ: 'snapshot', id: 9 } }),
+      { wrapper: wrapper() },
+    );
+    await waitFor(() => expect(marke(result)?.untertitel).toBeDefined());
+    expect(marke(result)?.untertitel).toBe('Ortung · vor 5 min');
+    expect(marke(result)?.deckkraft).toBe(0.5);
+  });
+});

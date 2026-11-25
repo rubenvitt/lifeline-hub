@@ -157,6 +157,7 @@ const EINHEIT_E10 = {
 const FAHRZEUG_F1 = {
   id: 30,
   einsatz_id: 1,
+  ortung_gekoppelt: false,
   fahrzeug_id: null,
   einheit_id: 20,
   ist_adhoc: false,

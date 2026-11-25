@@ -1086,3 +1086,21 @@ describe('Registrierliste und Kostformen (LLH-1612)', () => {
     }
   });
 });
+
+/**
+ * Kennungen zum Koppeln der Ortung (LLH-2091): ein Abruf beim Öffnen des Dialogs, nicht live und
+ * nicht im Lagebild ohne Netz (Kennungen fremder Geräte gehören nicht auf die Platte).
+ */
+describe('einsatzKeys.ortungKandidaten (LLH-2091)', () => {
+  it('baut den Key als [prefix, einsatzId, efId] mit handgeschriebenem Prefix', () => {
+    expect(einsatzKeys.ortungKandidaten(7, 10)).toEqual(['einsatz-ortung-kandidaten', 7, 10]);
+  });
+
+  it('ist nicht live und nicht offline: NICHT_LIVE_KEYS führt ihn, das Lagebild nimmt ihn nicht', () => {
+    expect(NICHT_LIVE_KEYS as readonly string[]).toContain('einsatz-ortung-kandidaten');
+    for (const prefixe of Object.values(EINSATZ_STREAM_EVENTS)) {
+      expect(prefixe as readonly string[]).not.toContain('einsatz-ortung-kandidaten');
+    }
+    expect(istLagebildOfflineKey(einsatzKeys.ortungKandidaten(7, 10))).toBe(false);
+  });
+});

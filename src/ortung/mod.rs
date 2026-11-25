@@ -11,6 +11,11 @@
 //!   Einsatz bricht der Schutz-Trigger es ab (`einsatz_ist_spiegel`), und das Änderungslog nimmt
 //!   die neuen Spalten über das Schema mit.
 //! - Das Live-Ereignis löst der Aufrufer nach dem Commit mit [`publiziere`] aus.
+//!
+//! Fahrzeugortung aus dem Einwurf (LLH-2091, ADR-0103, Entwurf
+//! `docs/superpowers/specs/2026-11-24-fjftaovq-fahrzeugortung-design.md`): [`kopplung`] bindet
+//! ein Einsatzfahrzeug an eine Kennung eines Einwurf-Zugangs, [`uebernahme`] schreibt deren
+//! Position über diesen Baustein mit Quelle `einwurf`.
 
 use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::SqliteConnection;
@@ -166,3 +171,6 @@ pub fn publiziere(state: &AppState, einsatz_id: i64, ziel: Ortungsziel) {
         }
     }
 }
+
+pub mod kopplung;
+pub mod uebernahme;

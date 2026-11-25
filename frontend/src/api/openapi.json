@@ -7476,6 +7476,7 @@
           "einsatz_id",
           "ist_adhoc",
           "funkrufname",
+          "ortung_gekoppelt",
           "disponiert_at",
           "ist_demo"
         ],
@@ -7593,6 +7594,10 @@
               "string",
               "null"
             ]
+          },
+          "ortung_gekoppelt": {
+            "type": "boolean",
+            "description": "Hängt das Fahrzeug an einer Ortungs-Kennung des Einwurfs? Nur der Wahrheitswert; Kennung\nund Zugang verlassen den Server hier nicht (LLH-2091)."
           },
           "position_aktualisiert_at": {
             "type": [
@@ -9187,6 +9192,17 @@
           "fuehrungsstelle": {
             "type": "boolean",
             "description": "Trug das Fahrzeug die Führungsstelle?"
+          },
+          "ortung": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrtungVorzustand",
+                "description": "Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie\nnur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -17562,6 +17578,22 @@
           }
         }
       },
+      "OrtungVorzustand": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).",
+        "required": [
+          "zugang_id",
+          "kennung"
+        ],
+        "properties": {
+          "kennung": {
+            "type": "string"
+          },
+          "zugang_id": {
+            "type": "string"
+          }
+        }
+      },
       "PaketPostenArt": {
         "type": "string",
         "description": "Art eines Postens im Paket. `fahrzeug` sucht wie `einheit` eine Einheit, auch über ihren\nFunkrufnamen. Wire == `as_str()`.",
@@ -22739,6 +22771,79 @@
             "type": "string"
           },
           "secret_base32": {
+            "type": "string"
+          }
+        }
+      },
+      "TrackingCandidate": {
+        "type": "object",
+        "description": "Eine Kennung der letzten 24 Stunden, ohne Koordinaten.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "received_at",
+          "coupled"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled": {
+            "type": "boolean",
+            "description": "Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)?"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TrackingCandidates": {
+        "type": "object",
+        "description": "Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“\n(ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu\ndürfen, und erklärt, warum Koppeln gesperrt ist.",
+        "required": [
+          "tracking_enabled",
+          "candidates"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackingCandidate"
+            }
+          },
+          "tracking_enabled": {
+            "type": "boolean",
+            "description": "Org-Schalter „Ortung im Einsatz“; aus = Koppeln antwortet 422, nichts wird übernommen."
+          }
+        }
+      },
+      "TrackingResponse": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "coupled_at"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled_at": {
+            "type": "string"
+          },
+          "device_id": {
             "type": "string"
           }
         }

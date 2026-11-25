@@ -83,6 +83,7 @@ function fahrzeug(id: number, p: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug
   return {
     id,
     einsatz_id: 1,
+    ortung_gekoppelt: false,
     funkrufname: `Florian ${id}`,
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,

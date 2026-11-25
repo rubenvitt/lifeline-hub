@@ -205,6 +205,9 @@ pub struct EinsatzFahrzeugAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<crate::ortung::Positionsquelle>)]
     pub position_quelle: Option<String>,
+    /// Hängt das Fahrzeug an einer Ortungs-Kennung des Einwurfs? Nur der Wahrheitswert; Kennung
+    /// und Zugang verlassen den Server hier nicht (LLH-2091).
+    pub ortung_gekoppelt: bool,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
     /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
@@ -252,6 +255,17 @@ pub struct EntlassungVorzustand {
     /// Beladung (`einsatz_material.id`).
     #[serde(default)]
     pub beladung: Vec<i64>,
+    /// Die Ortungs-Kopplung, die das Entlassen getrennt hat (LLH-2091). Die Rücknahme stellt sie
+    /// nur her, wenn Zugang und Kennung noch frei und gültig sind; der Server prüft alles neu.
+    #[serde(default)]
+    pub ortung: Option<OrtungVorzustand>,
+}
+
+/// Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct OrtungVorzustand {
+    pub zugang_id: String,
+    pub kennung: String,
 }
 
 /// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): mehr
@@ -369,6 +383,16 @@ mod tests {
 /// System-ETB beim Disponieren eines Fahrzeugs (Stamm oder Ad-hoc).
 pub fn etb_text_disponiert(funkrufname: &str) -> String {
     format!("Fahrzeug «{}» disponiert", funkrufname)
+}
+
+/// System-ETB beim Koppeln eines Fahrzeugs an eine Ortungs-Kennung (LLH-2091).
+pub fn etb_text_gekoppelt(funkrufname: &str, zugang_name: &str, kennung: &str) -> String {
+    format!("Ortung gekoppelt: {funkrufname} ({zugang_name} / {kennung})")
+}
+
+/// System-ETB beim Trennen der Ortung (von Hand oder automatisch, LLH-2091).
+pub fn etb_text_getrennt(funkrufname: &str) -> String {
+    format!("Ortung getrennt: {funkrufname}")
 }
 
 /// System-ETB, wenn Personen einem Fahrzeug als Besatzung zugeordnet werden (LFH-9; Sammelweg

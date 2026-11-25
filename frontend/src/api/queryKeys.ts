@@ -60,6 +60,10 @@ export const EINSATZ_KEYS = {
   // Einsätze; ein Sub-Key unter `nachforderungen` holte sie bei jedem Ereignis neu) und nicht im
   // Lagebild offline (Wortlaut anderer Einsätze gehört nicht auf die Platte).
   nachforderungArten: 'einsatz-nachforderung-arten',
+  // Kennungen der letzten 24 Stunden zum Koppeln der Ortung (LLH-2091): Abruf beim Öffnen des
+  // Dialogs, nicht live (der Einwurf einer Kennung ist kein Einsatzereignis) und nicht im
+  // Lagebild offline (Kennungen fremder Geräte gehören nicht auf die Platte).
+  ortungKandidaten: 'einsatz-ortung-kandidaten',
   meldungen: 'einsatz-meldungen',
   lagemeldungen: 'einsatz-lagemeldungen',
   br: 'einsatz-br',
@@ -660,6 +664,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.personenListenzugriffe,
   EINSATZ_KEYS.personenBestaetiger,
   EINSATZ_KEYS.nachforderungArten,
+  EINSATZ_KEYS.ortungKandidaten,
 ] as const satisfies readonly EinsatzKey[];
 
 /**
@@ -1067,6 +1072,8 @@ export const einsatzKeys = {
     [EINSATZ_KEYS.auftraege, einsatzId, 'einzeln', auftragId] as const,
   nachforderungen: (einsatzId: number) => [EINSATZ_KEYS.nachforderungen, einsatzId] as const,
   nachforderungArten: (einsatzId: number) => [EINSATZ_KEYS.nachforderungArten, einsatzId] as const,
+  ortungKandidaten: (einsatzId: number, efId: number) =>
+    [EINSATZ_KEYS.ortungKandidaten, einsatzId, efId] as const,
 
   // ETB
   etb: (einsatzId: number) => [EINSATZ_KEYS.etb, einsatzId] as const,
