@@ -898,6 +898,8 @@ describe('ORG_STREAM_EVENTS (LFH-734)', () => {
         'organisation',
         // Herkunft der Stammdaten (LLH-1493): eine Nachlieferung vom Hub ändert „vom Hub“.
         'stammdaten-herkunft',
+        // Eine Übernahme aus Datei oder Schnappschuss (LLH-2121) erledigt den Hinweis „zum Prüfen“.
+        'stammdaten-schnappschuesse',
         // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
         'einsaetze',
       ].sort(),

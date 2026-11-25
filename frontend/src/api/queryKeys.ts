@@ -1488,6 +1488,9 @@ export const ORG_STREAM_EVENTS = {
     GLOBAL_KEYS.organisation,
     // Eine übernommene Nachlieferung vom Hub (LLH-1493) ändert, was „vom Hub“ ist.
     GLOBAL_KEYS.stammdatenHerkunft,
+    // Eine Übernahme aus Datei oder Schnappschuss (LLH-2121) erledigt den Hinweis „zum Prüfen“ auf
+    // jedem Schirm. Ein neuer Schnappschuss aus dem Lauf im Hintergrund meldet weiter nichts.
+    GLOBAL_KEYS.stammdatenSchnappschuesse,
     // Die Liste zeigt den Namen der Organisation und Labels der Führungsfunktionen.
     GLOBAL_KEYS.einsaetze,
   ],
@@ -1517,9 +1520,6 @@ export const ORG_LIVE_KEYS: readonly GlobalKey[] = [
  * - `adapter`, `adapterVersuche` (LLH-2018): Verwaltung der Adapter und Verlauf ihrer Abrufe; die
  *   eigene Änderung setzt die Antwort, den Zustand aus dem Lauf im Hintergrund zeigt der nächste
  *   Abruf (30 s), kein Ereignis je Abruf. Geheimnisse stehen in keinem der beiden.
- * - `stammdatenSchnappschuesse` (LLH-1194): ein neuer Schnappschuss erscheint beim nächsten Laden
- *   der Seite, nicht live (Entwurf `personal-abruf`, „Oberfläche“); die eigene Übernahme und ein
- *   409 frischen die Liste auf. Der Lauf im Hintergrund meldet kein Ereignis.
  * - `lagebildExtern` (LLH-1496): Seite ohne Sitzung und ohne Live-Verbindung; sie fragt alle 30 s.
  * - `instanzkopplung` (LLH-1490): Verwaltung der Kopplungen; „zuletzt gesehen“ frischt ein Abruf
  *   alle 30 s auf, kein Org-Ereignis (die Meldungen einer anderen Instanz sind keine Fachdaten).
@@ -1554,7 +1554,6 @@ export const NICHT_LIVE_GLOBAL_KEYS = [
   GLOBAL_KEYS.einwurfZugaenge,
   GLOBAL_KEYS.adapter,
   GLOBAL_KEYS.adapterVersuche,
-  GLOBAL_KEYS.stammdatenSchnappschuesse,
   GLOBAL_KEYS.lagebildExtern,
   GLOBAL_KEYS.instanzkopplung,
   GLOBAL_KEYS.orgArchivSchluessel,

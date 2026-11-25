@@ -1098,6 +1098,34 @@ mod http {
         assert_eq!(anzahl(&pool, "fahrzeug").await, 0);
     }
 
+    /// LLH-2121: Nur eine erfolgreiche Übernahme meldet `stammdaten` an die Organisation, damit
+    /// andere Tabs ihre Listen neu laden; Vorschau und abgelehnte Übernahme melden nichts.
+    #[tokio::test]
+    async fn nur_die_uebernahme_meldet_stammdaten() {
+        use lifeline_hub::live::org::{OrgLiveEvent, OrgNachricht};
+        fn stammdaten(rx: &mut tokio::sync::broadcast::Receiver<OrgNachricht>) -> usize {
+            std::iter::from_fn(|| rx.try_recv().ok())
+                .filter(|m| m.event == OrgLiveEvent::Stammdaten)
+                .count()
+        }
+        let (app, _pool, live) = crate::common::setup_mit_pool_und_live().await;
+        let admin = login_cookie(&app, "admin", "startpw12").await;
+        let mut rx = live.abonniere_org();
+
+        let (s, _) = hochladen(&app, VORSCHAU, &admin, FZ, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(stammdaten(&mut rx), 0, "Vorschau");
+
+        let kaputt = "Kennung;Funkrufname\nfz-1;Florian 1\nfz-2;Florian 1\n";
+        let (s, _) = hochladen(&app, IMPORT, &admin, kaputt, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+        assert_eq!(stammdaten(&mut rx), 0, "abgelehnte Übernahme");
+
+        let (s, _) = hochladen(&app, IMPORT, &admin, FZ, &[("herkunft", "FV")]).await;
+        assert_eq!(s, StatusCode::OK);
+        assert_eq!(stammdaten(&mut rx), 1, "Übernahme");
+    }
+
     #[tokio::test]
     async fn iban_wert_nicht_in_antwort() {
         let (app, _pool, admin) = start().await;
