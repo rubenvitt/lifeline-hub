@@ -6334,6 +6334,24 @@
               "$ref": "#/components/schemas/EinheitMitgliedPerson"
             }
           },
+          "position_aktualisiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "quali_soll": {
             "type": [
               "array",
@@ -7402,6 +7420,24 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "position_aktualisiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "soll_besatzung": {
@@ -10746,6 +10782,24 @@
           },
           "name": {
             "type": "string"
+          },
+          "position_aktualisiert_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim\nBestand vor der Quelle."
+          },
+          "position_quelle": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Positionsquelle",
+                "description": "Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "tz_fachaufgabe": {
             "type": [
@@ -19069,6 +19123,15 @@
             "$ref": "#/components/schemas/Sonderkost"
           }
         }
+      },
+      "Positionsquelle": {
+        "type": "string",
+        "description": "Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration\n0373) `manuell`, `einwurf`, `helfer`.",
+        "enum": [
+          "manuell",
+          "einwurf",
+          "helfer"
+        ]
       },
       "PostenArt": {
         "type": "string",

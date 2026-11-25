@@ -185,23 +185,23 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   `pruefe_koordinate` aus den bestehenden Handlern wiederverwenden (422).
 - Frontend: `export function positionsAlter(aktualisiertAt: string | null, jetzt: Date): { minuten: number; veraltet: boolean } | null` in `frontend/src/pages/lagekarte/positionsAlter.ts`.
 
-- [ ] **Step 1: Failing tests** in `tests/ortung.rs`:
+- [x] **Step 1: Failing tests** in `tests/ortung.rs`:
   - `aeltere_position_wird_verworfen`: erst `t2` schreiben, dann `t1` → zweiter Aufruf `false`,
     `lat` bleibt bei `t2`;
   - `zukunftszeit_wird_auf_serverzeit_geklemmt`: `klemme_zeitpunkt("2026-11-24T12:05:00Z","2026-11-24T12:00:00Z") == "2026-11-24T12:00:00Z"`; bei 30 s Vorlauf unverändert;
   - `manuelle_position_setzt_quelle_manuell`: PATCH `…/units/{eid}/position` → Anzeige
     `position_quelle == "manuell"`, `position_aktualisiert_at` gesetzt.
-- [ ] **Step 2:** Run `cargo test --test ortung` → FAIL.
-- [ ] **Step 3:** `src/ortung/mod.rs` umsetzen; die drei Handler über `schreibe_position(…, Manuell)` führen. Die Feld-CAS (`erwartet`) bleibt im Handler.
-- [ ] **Step 4:** Run `cargo test --test ortung --test einsatz_einheit` → PASS, dann `scripts/check-typ-codegen.sh`.
-- [ ] **Step 5: Frontend failing test** `positionsAlter`:
+- [x] **Step 2:** Run `cargo test --test ortung` → FAIL.
+- [x] **Step 3:** `src/ortung/mod.rs` umsetzen; die drei Handler über `schreibe_position(…, Manuell)` führen. Die Feld-CAS (`erwartet`) bleibt im Handler.
+- [x] **Step 4:** Run `cargo test --test ortung --test einsatz_einheit` → PASS, dann `scripts/check-typ-codegen.sh`.
+- [x] **Step 5: Frontend failing test** `positionsAlter`:
   - `null` → `null`;
   - 4 min → `veraltet: false`;
   - 6 min → `veraltet: true`.
   - Marker-Test: Quelle `helfer` zeigt den Untertitel „Helfer-App · vor 6 min“, und das Symbol
     hat die Deckkraft 0,5.
-- [ ] **Step 6:** Umsetzen, `vitest run src/pages/lagekarte` → PASS.
-- [ ] **Step 7:** Commit `feat: Positionen mit Quelle und Zeitpunkt`.
+- [x] **Step 6:** Umsetzen, `vitest run src/pages/lagekarte` → PASS.
+- [x] **Step 7:** Commit `feat: Positionen mit Quelle und Zeitpunkt`.
 
 ### Task 4: Helfer-Einladung (Leitung)
 

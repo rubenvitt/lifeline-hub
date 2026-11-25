@@ -501,6 +501,8 @@ export interface SprechgruppeEingabe {
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type Einheit = S['EinheitAnzeige'];
+/** Quelle einer Position an Einheit, Fahrzeug oder Person (Helfer-App). */
+export type Positionsquelle = S['Positionsquelle'];
 /** Wer eine Angabe zuletzt geändert hat und wann (LLH-1834, Spec `aenderungsvermerk`). */
 export type FeldVermerk = S['FeldVermerk'];
 /** Wer gerade welche Angabe bearbeitet (LLH-1946); Daten des Live-Ereignisses `praesenz`. */

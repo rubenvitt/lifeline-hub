@@ -632,6 +632,7 @@ use utoipa::OpenApi;
         crate::fuehrung::Fuehrungsfunktion,
         crate::fuehrung::FuehrungsfunktionAnzeige,
         crate::fuehrung::FunktionsArt,
+        crate::ortung::Positionsquelle,
         crate::unterkunft::RichtwertHerkunft,
         crate::unterkunft::RichtwertEbenen,
         crate::unterkunft::UnterkunftRichtwerte,

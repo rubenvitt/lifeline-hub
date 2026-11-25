@@ -33,7 +33,7 @@ use serde::de::IgnoredAny;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Einheit hat sich geändert. Frontend filtert per Event-Name.
-pub(super) fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
+pub(crate) fn sse_einheit(state: &AppState, einsatz_id: i64, einheit_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Einheit, "einheit_id", einheit_id);

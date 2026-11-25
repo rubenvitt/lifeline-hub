@@ -2524,6 +2524,12 @@ export interface components {
             nicht_uebernommen_seit?: string | null;
             personal_mitglieder: components["schemas"]["EinheitMitgliedPerson"][];
             /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
+            /**
              * @description Wirksames Qualifikationssoll (LLH-1553, design.md D4): das eigene, sonst das des Typs;
              *     `None` = keins. Kein Urteil: „unterbesetzt“ urteilt weiter nur nach F/UF/M.
              */
@@ -2937,6 +2943,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             opta?: string | null;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             soll_besatzung?: components["schemas"]["Staerke"] | null;
             status_farbe?: string | null;
             /** Format: int64 */
@@ -4278,6 +4290,12 @@ export interface components {
             /** Format: double */
             lon?: number | null;
             name: string;
+            /**
+             * @description Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+             *     Bestand vor der Quelle.
+             */
+            position_aktualisiert_at?: string | null;
+            position_quelle?: components["schemas"]["Positionsquelle"] | null;
             tz_fachaufgabe?: string | null;
             tz_organisation?: string | null;
         };
@@ -7675,6 +7693,12 @@ export interface components {
             gesamt: number;
             sonderkost: components["schemas"]["Sonderkost"];
         };
+        /**
+         * @description Woher eine Position stammt; Wire- und Spaltenwert (`position_quelle`, CHECK in Migration
+         *     0373) `manuell`, `einwurf`, `helfer`.
+         * @enum {string}
+         */
+        Positionsquelle: "manuell" | "einwurf" | "helfer";
         /**
          * @description Art eines Postens im Plan (`einsatz_planschicht.posten_art`). Wire == `as_str()`.
          * @enum {string}

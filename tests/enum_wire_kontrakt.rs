@@ -1184,6 +1184,16 @@ fn fuehrungsfunktion_wire() {
     } in lifeline_hub::fuehrung::Fuehrungsfunktion::ALLE);
 }
 
+/// Helfer-App: Quelle einer Position; Werte = CHECK von `position_quelle` (Migration 0373).
+#[test]
+fn positionsquelle_wire() {
+    enum_wire!(lifeline_hub::ortung::Positionsquelle {
+        Manuell => "manuell",
+        Einwurf => "einwurf",
+        Helfer => "helfer",
+    } in lifeline_hub::ortung::Positionsquelle::ALLE);
+}
+
 #[test]
 fn fuehrungsfunktion_art_wire() {
     enum_wire!(lifeline_hub::fuehrung::FunktionsArt {

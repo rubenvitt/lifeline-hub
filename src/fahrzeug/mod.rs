@@ -197,6 +197,14 @@ pub struct EinsatzFahrzeugAnzeige {
     pub bemerkung: Option<String>,
     pub lat: Option<f64>,
     pub lon: Option<f64>,
+    /// Zeitpunkt der letzten Position (UTC, kanonisch, Helfer-App); fehlt ohne Position und beim
+    /// Bestand vor der Quelle.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position_aktualisiert_at: Option<String>,
+    /// Quelle der Position (`crate::ortung::Positionsquelle`); fehlt, wenn nie eine gesetzt war.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<crate::ortung::Positionsquelle>)]
+    pub position_quelle: Option<String>,
     pub tz_fachaufgabe: Option<String>,
     pub tz_organisation: Option<String>,
     /// BR‑1: aktuell bereitgestellter Bereitstellungsraum (NULL = in keinem BR).
