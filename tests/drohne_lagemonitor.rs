@@ -203,7 +203,10 @@ async fn mit_schalter_block_mit_videos_und_stand() {
     assert_eq!(v["drohne"]["stand_at"], "2025-11-24 16:00:00", "{v}");
     // Keine Seriennummer, kein Missionsname auf dem Großbild.
     let text = v.to_string();
-    assert!(!text.contains("SN-GEHEIM") && !text.contains("Waldweg"), "{text}");
+    assert!(
+        !text.contains("SN-GEHEIM") && !text.contains("Waldweg"),
+        "{text}"
+    );
 }
 
 #[tokio::test]
