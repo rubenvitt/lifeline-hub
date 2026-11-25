@@ -164,6 +164,12 @@ export interface FachebeneDef {
    * einen Kreis-Layer an; Features mit `klasse: 'gebiet'` erscheinen nur als gestrichelter Umriss.
    */
   gemischteGeometrie?: boolean;
+  /**
+   * Nur die Copernicus-Satellitenbilder (LLH-2021): Die Ebene zeichnet keine Features. Jedes Feature
+   * beschreibt ein Bild, und die Karte legt je Bild eine Rasterquelle an
+   * (`copernicusBildLayer.ts`), unter allen Fachebenen, ohne Klickebene.
+   */
+  darstellung?: 'raster';
 }
 
 export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
@@ -317,6 +323,20 @@ export const FACHEBENEN: Record<FachebeneQuelle, FachebeneDef> = {
       faerbe: faerbeCopernicus,
     },
   },
+  copernicus_bilder: {
+    key: 'copernicus_bilder',
+    label: 'Copernicus-Satellitenbilder',
+    geometrieTyp: 'polygon',
+    darstellung: 'raster',
+    // Gleiche TTL wie die Vektorebene (`COPERNICUS_TTL`), gleicher Takt und Aufwärmtakt: ein kalter
+    // Abruf lädt zusätzlich bis zu 20 Bildköpfe.
+    pollMs: 600_000,
+    aufwaermPollMs: 15_000,
+    bboxAbhaengig: true,
+    minZoom: BBOX_MIN_ZOOM,
+    geltung: 'nur optische Aufnahmen, nur wo Copernicus aktiviert wurde',
+    veraltetNachMin: 120,
+  },
 };
 
 /** Alter eines Fachebenen-Stands, wie Panel und Inspector es zeigen (LFH-591). */
@@ -386,6 +406,62 @@ export function copernicusAktivierungen(fc: FeatureCollection): CopernicusAktivi
   return [...je.values()].sort((a, b) => (b.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
 }
 
+/** Ein Satellitenbild der Ebene `copernicus_bilder`, wie Karte und Ebenenzeile es brauchen (LLH-2021). */
+export interface CopernicusBild {
+  /** Kennung der Kachelroute: 16 Hex-Zeichen. */
+  bild: string;
+  emsr: string;
+  gebiet: string;
+  sensor?: string;
+  /** Aufnahmezeit, UTC im Wire-Format `YYYY-MM-DD HH:MM:SS`. */
+  aufnahme?: string;
+  minZoom: number;
+  maxZoom: number;
+  /** [west, sued, ost, nord] in WGS84. */
+  bounds: [number, number, number, number];
+  darstellbar: boolean;
+  /** Die Antwort wurde an der Obergrenze gekürzt: hineinzoomen zeigt mehr. */
+  gekuerzt: boolean;
+}
+
+const BILD_KENNUNG = /^[0-9a-f]{16}$/;
+
+/**
+ * Die Bilder der Antwort von `copernicus_bilder`, jüngste Aufnahme zuerst. Ein Feature mit falsch
+ * geformter Kennung, Zoomgrenze oder Umriss fällt weg: die Kennung landet in einer Kachel-URL.
+ */
+export function copernicusBilder(fc: FeatureCollection): CopernicusBild[] {
+  const bilder: CopernicusBild[] = [];
+  for (const f of fc.features) {
+    const p = f.properties ?? {};
+    const b = p.bounds;
+    if (
+      typeof p.bild !== 'string' ||
+      !BILD_KENNUNG.test(p.bild) ||
+      typeof p.min_zoom !== 'number' ||
+      typeof p.max_zoom !== 'number' ||
+      !Array.isArray(b) ||
+      b.length !== 4 ||
+      !b.every((v) => typeof v === 'number' && Number.isFinite(v))
+    )
+      continue;
+    bilder.push({
+      bild: p.bild,
+      emsr: typeof p.emsr === 'string' ? p.emsr : '',
+      gebiet: typeof p.gebiet === 'string' ? p.gebiet : '',
+      sensor: typeof p.sensor === 'string' ? p.sensor : undefined,
+      aufnahme: typeof p.aufnahme === 'string' ? p.aufnahme : undefined,
+      minZoom: p.min_zoom,
+      maxZoom: p.max_zoom,
+      bounds: b as [number, number, number, number],
+      darstellbar: p.darstellbar === true,
+      gekuerzt: p.gekuerzt === true,
+    });
+  }
+  // Wire-Format: Textvergleich ist Zeitvergleich; ohne Aufnahme ans Ende.
+  return bilder.sort((a, z) => (z.aufnahme ?? '').localeCompare(a.aufnahme ?? ''));
+}
+
 /** Anzeige-Reihenfolge im Panel. */
 export function fachebeneKeys(): FachebeneQuelle[] {
   return [
@@ -399,6 +475,7 @@ export function fachebeneKeys(): FachebeneQuelle[] {
     'energie',
     'autobahn',
     'copernicus',
+    'copernicus_bilder',
   ];
 }
 

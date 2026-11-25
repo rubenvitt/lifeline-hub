@@ -20,6 +20,7 @@ import type { MarkerTyp, NichtVerortet } from './marker';
 import type { ObjektEintrag } from './objektsuche';
 import { AusgangUnbekannt, NetzFehler } from '../../api/client';
 import type { SidebarProps } from './Sidebar';
+import type { FachebeneQuelle } from '../../api/fachebenen';
 import { dichten, fachebeneFarbenHell } from '../../theme/tokens';
 import { hochwasserKlasse } from '../../theme/statusFarben';
 import { FACHEBENEN, fachebeneKeys } from './fachebenen';
@@ -85,6 +86,7 @@ const basisProps: SidebarProps = {
     energie: false,
     autobahn: false,
     copernicus: false,
+    copernicus_bilder: false,
   },
   onFachebeneToggle: vi.fn(),
   fachebenenStatus: {},
@@ -633,7 +635,11 @@ describe('Sidebar Bild-Hintergründe', () => {
   };
 
   it('keine klassenabhängige Ebene zeigt ihren Rückfallton im Panel, ein- wie ausgeschaltet (LFH-592)', () => {
-    const klassig = fachebeneKeys().filter((k) => FACHEBENEN[k].klassenfarben);
+    // Die Satellitenbilder haben keine Klassenfarben und keinen eigenen Ton (LLH-2021).
+    const klassig = fachebeneKeys().filter(
+      (k): k is Exclude<FachebeneQuelle, 'copernicus_bilder'> =>
+        k !== 'copernicus_bilder' && !!FACHEBENEN[k].klassenfarben,
+    );
     expect(klassig.length).toBeGreaterThan(0);
     for (const an of [false, true]) {
       const sichtbar = { ...basisProps.fachebenenSichtbar };

@@ -94,6 +94,8 @@ function leseFachebenen(roh: unknown): FachebenenSichtbar {
     autobahn: o.autobahn === true,
     // Dasselbe für `copernicus` (LLH-1200). Der Archiv-Schalter reist bewusst nicht mit.
     copernicus: o.copernicus === true,
+    // Dasselbe für die Satellitenbilder (LLH-2021).
+    copernicus_bilder: o.copernicus_bilder === true,
   };
 }
 

@@ -25,7 +25,9 @@ export type FachebeneQuelle =
   | 'odl'
   | 'luftqualitaet'
   | 'energie'
-  | 'copernicus';
+  | 'copernicus'
+  /** Satellitenbilder der Copernicus-Aktivierungen (LLH-2021), Route `…/copernicus/images`. */
+  | 'copernicus_bilder';
 
 /**
  * Hochwasserklasse eines LHP-Pegels (LFH-77), Feature-Property `klasse` der
@@ -118,9 +120,11 @@ export type EnergieAnlagenart =
 
 /**
  * Lädt eine Fachebene. `bbox` (west,sued,ost,nord) brauchen die bbox-abhängigen Ebenen
- * (`kritis`, `energie`, `copernicus` — siehe `istBboxAbhaengig`); das Backend lehnt sie dort ohne
- * ab. `archiv` gilt nur für `copernicus`: auch abgeschlossene Aktivierungen, die älter als 30 Tage
- * sind (LLH-1200).
+ * (`kritis`, `energie`, `copernicus`, `copernicus_bilder` — siehe `istBboxAbhaengig`); das Backend
+ * lehnt sie dort ohne ab. `archiv` gilt nur für die beiden Copernicus-Ebenen: auch abgeschlossene
+ * Aktivierungen, die älter als 30 Tage sind (LLH-1200).
+ *
+ * Die Bilderliste hat eine eigene Route unter der Vektorebene (LLH-2021).
  */
 export function ladeFachebene(
   quelle: FachebeneQuelle,
@@ -131,5 +135,6 @@ export function ladeFachebene(
   if (bbox) teile.push(`bbox=${encodeURIComponent(bbox)}`);
   if (archiv) teile.push('archiv=1');
   const q = teile.length ? `?${teile.join('&')}` : '';
-  return apiGet<FachebeneAntwort>(`/api/map/overlays/${quelle}${q}`);
+  const pfad = quelle === 'copernicus_bilder' ? 'copernicus/images' : quelle;
+  return apiGet<FachebeneAntwort>(`/api/map/overlays/${pfad}${q}`);
 }

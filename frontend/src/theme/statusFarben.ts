@@ -970,6 +970,9 @@ const FACHEBENE_TON: Record<FachebeneQuelle, FachebeneTon> = {
   kritis: 'kritis',
   energie: 'energie',
   copernicus: 'copernicus',
+  // Die Satellitenbilder zeichnen keinen Ebenenpunkt; Panel und Akzent teilen den Ton der
+  // Vektorebene derselben Quelle (LLH-2021), kein neuer Farbton.
+  copernicus_bilder: 'copernicus',
 };
 
 export function fachebeneFarbe(quelle: FachebeneQuelle, token: GlobalToken): string {

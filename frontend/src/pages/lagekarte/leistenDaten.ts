@@ -305,7 +305,11 @@ export const FACHEBENEN_GRUPPEN: readonly {
     ebenen: ['autobahn', 'kritis', 'energie'],
   },
   // LLH-1200: Auswertungen von Satellitenbildern, später auch deren Rasterbilder.
-  { kennung: 'satellit', name: 'Satellitenauswertung', ebenen: ['copernicus'] },
+  {
+    kennung: 'satellit',
+    name: 'Satellitenauswertung',
+    ebenen: ['copernicus', 'copernicus_bilder'],
+  },
 ];
 
 export interface EbenenGruppe {
