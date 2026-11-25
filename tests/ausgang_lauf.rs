@@ -1227,3 +1227,171 @@ async fn fax_status_doppel_liefert_den_geplanten_stand() {
     assert_eq!(f.status(&z, "s").await, Ok(FaxStatus::Laeuft));
     assert_eq!(f.status(&z, "s").await, Ok(FaxStatus::Gesendet));
 }
+
+impl Welt {
+    /// Ein übergebenes Fax: legt es an und lässt einen Durchgang es senden.
+    async fn uebergebenes_fax(&self, t0: DateTime<Utc>) -> String {
+        let lid = self.lagebericht_freigeben(false).await;
+        let id = self.fax_versand("lagebericht", lid, t0).await;
+        self.durchgang(t0).await;
+        assert_eq!(self.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+        id
+    }
+}
+
+#[tokio::test]
+async fn sent_wird_zugestellt_mit_etb() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    let mut rx = w.live.abonniere(w.einsatz);
+    w.fax.plane_status(Ok(FaxStatus::Gesendet));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Zugestellt);
+    assert!(z.zugestellt_at.is_some());
+    assert!(z.naechste_abfrage_at.is_none());
+    let etb = w.etb_versand().await;
+    assert_eq!(
+        etb,
+        vec![(
+            format!("Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}) zugestellt"),
+            STELLE.to_string()
+        )]
+    );
+    common::recv_until_tag(&mut rx, "ausgang", Duration::from_secs(2)).await;
+    let (_, v) = anfrage_json(
+        &w.app,
+        "GET",
+        &format!("/api/incidents/{}/deliveries", w.einsatz),
+        &w.admin,
+        None,
+    )
+    .await;
+    let eintrag = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == id.as_str())
+        .unwrap()
+        .clone();
+    assert_eq!(eintrag["state"], "zugestellt");
+    assert!(eintrag["delivered_at"].is_string(), "{eintrag}");
+}
+
+#[tokio::test]
+async fn failed_wird_nicht_zugestellt_und_laesst_sich_erneut_senden() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Gescheitert));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::NichtZugestellt));
+    assert_eq!(
+        w.etb_versand().await[0].0,
+        format!(
+            "Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}) nicht zugestellt: \
+             Gegenstelle nicht erreicht"
+        )
+    );
+    let (s, v) = anfrage_json(
+        &w.app,
+        "POST",
+        &format!("/api/incidents/{}/deliveries/{id}/retry", w.einsatz),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet);
+    assert!(z.anbieter_ref.is_none() && z.naechste_abfrage_at.is_none());
+}
+
+#[tokio::test]
+async fn laeuft_fragt_eine_minute_spaeter_erneut() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Laeuft));
+    let t1 = t0 + chrono::Duration::seconds(31);
+    w.durchgang(t1).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    let naechste =
+        lifeline_hub::zeit::parse_utc(z.naechste_abfrage_at.as_deref().unwrap()).unwrap();
+    assert!(((naechste - t1).num_seconds() - 60).abs() <= 1);
+    // Vor der nächsten Abfrage wird nicht gefragt.
+    w.durchgang(t1 + chrono::Duration::seconds(30)).await;
+    assert_eq!(w.fax.abfragen(), 1);
+    w.durchgang(t1 + chrono::Duration::seconds(61)).await;
+    assert_eq!(w.fax.abfragen(), 2);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Zugestellt);
+}
+
+#[tokio::test]
+async fn abfragefehler_fragt_spaeter_erneut() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Err(SipgateFehler::Verbindung));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    assert!(z.naechste_abfrage_at.is_some());
+    assert!(w.etb_versand().await.is_empty());
+}
+
+#[tokio::test]
+async fn ohne_endstand_nach_zwei_stunden_ungewiss() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Laeuft));
+    w.durchgang(t0 + chrono::Duration::minutes(121)).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Ungewiss));
+    assert_eq!(
+        w.etb_versand().await[0].0,
+        format!("Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}): Zustellung nicht bestätigt")
+    );
+}
+
+#[tokio::test]
+async fn vor_der_ersten_abfrage_wird_nicht_gefragt() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    w.uebergebenes_fax(t0).await;
+    w.durchgang(t0 + chrono::Duration::seconds(29)).await;
+    assert_eq!(w.fax.abfragen(), 0);
+}
+
+#[tokio::test]
+async fn neustart_mit_uebergebenem_fax_fragt_weiter_und_sendet_nicht() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    lauf::beim_start(&w.pool, &w.live).await.unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+    assert_eq!(w.fax.gesendet().len(), 1, "nicht erneut gesendet");
+    assert_eq!(w.fax.abfragen(), 1);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Zugestellt);
+}
+
+#[tokio::test]
+async fn eine_mail_auf_uebergeben_wird_nie_abgefragt() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    w.durchgang(t0).await;
+    w.durchgang(t0 + chrono::Duration::minutes(5)).await;
+    assert_eq!(w.fax.abfragen(), 0);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+}

@@ -22,10 +22,11 @@ use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinHandle;
 
 use super::nachricht::{self, AnhangFehler, Schnappschuss};
-use super::repo::{self, Ergebnis};
-use super::zustand::naechster_versuch;
+use super::repo::{self, Abfrage, Ergebnis};
+use super::zustand::{naechste_abfrage, naechster_versuch};
 pub use super::zusteller::{SmtpZusteller, Versandzugang, Zusteller, Zustellwege};
 use super::{AusgangFehler, QuelleArt, VersandZeile};
+use crate::adapter::sipgate::FaxStatus;
 use crate::adapter::sipgate::{FaxAuftrag, SipgateFehler};
 use crate::adapter::smtp::SmtpFehler;
 use crate::adapter::Rahmen;
@@ -247,8 +248,13 @@ async fn takt(
         tracing::error!("Ausgang: hängengebliebene Zustellungen nicht geprüft: {e}");
     }
     let faellige = repo::load_faellige(pool, jetzt, JE_DURCHGANG).await?;
+    let abzufragen = repo::load_abzufragende(pool, jetzt, JE_DURCHGANG).await?;
+    let auftraege = faellige
+        .into_iter()
+        .map(|z| (z, false))
+        .chain(abzufragen.into_iter().map(|z| (z, true)));
     let mut handles = Vec::new();
-    for zeile in faellige {
+    for (zeile, abfrage) in auftraege {
         if !laufend
             .lock()
             .expect("Merker nicht vergiftet")
@@ -265,7 +271,13 @@ async fn takt(
             if let Ok(_platz) = plaetze.acquire_owned().await {
                 let beginn =
                     jetzt + chrono::Duration::from_std(gestartet.elapsed()).unwrap_or_default();
-                let lauf = run_one(&pool, &rahmen, &live, &zusteller, zeile, beginn);
+                let lauf = async {
+                    if abfrage {
+                        abfragen_one(&pool, &rahmen, &live, &zusteller, zeile, beginn).await
+                    } else {
+                        run_one(&pool, &rahmen, &live, &zusteller, zeile, beginn).await
+                    }
+                };
                 let (ergebnis, l) =
                     nachlauf::klammer(&pool, AssertUnwindSafe(lauf).catch_unwind()).await;
                 luecken = l;
@@ -612,6 +624,61 @@ async fn run_one(
     Ok(())
 }
 
+/// Fragt den Stand eines übergebenen Faxes beim Anbieter ab (Spec Abschnitt 5): `SENT` →
+/// `zugestellt`, `FAILED` → `fehlgeschlagen` mit `nicht_zugestellt`, sonst später wieder, bis
+/// zur Frist von 2 h nach der Übergabe (dann `ungewiss`). Ein Endstand steht im ETB. Kein
+/// Netz mit gehaltener Datenbankverbindung.
+async fn abfragen_one(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    live: &LiveHub,
+    zusteller: &Zustellwege,
+    zeile: VersandZeile,
+    jetzt: DateTime<Utc>,
+) -> Result<(), AppError> {
+    let Some(session) = zeile.anbieter_ref.clone() else {
+        return Ok(());
+    };
+    let uebergeben = zeile
+        .uebergeben_at
+        .as_deref()
+        .and_then(zeit::parse_utc)
+        .unwrap_or(jetzt);
+    let antwort =
+        match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id, KanalArt::Fax)
+            .await?
+        {
+            Ok(zugang) => {
+                let a = zusteller.fax.status(&zugang, &session).await;
+                if let Err(SipgateFehler::Status(401 | 403)) = a {
+                    pruefung_vorziehen(pool, &zugang.adapter_id, jetzt).await;
+                }
+                a.ok()
+            }
+            // Ohne nutzbaren Zugang wird weiter gewartet; die Frist entscheidet.
+            Err(_) => None,
+        };
+    let ziel = ziel_text(&zeile);
+    let (abfrage, etb) = match antwort {
+        Some(FaxStatus::Gesendet) => (
+            Abfrage::Zugestellt { at: jetzt },
+            Some(format!("{ziel} zugestellt")),
+        ),
+        Some(FaxStatus::Gescheitert) => (
+            Abfrage::NichtZugestellt,
+            Some(etb_text_fax(&zeile, AusgangFehler::NichtZugestellt, None)),
+        ),
+        Some(FaxStatus::Laeuft) | None => match naechste_abfrage(uebergeben, jetzt) {
+            Some(naechste) => (Abfrage::Weiter { naechste }, None),
+            None => (
+                Abfrage::Ungewiss,
+                Some(format!("{ziel}: Zustellung nicht bestätigt")),
+            ),
+        },
+    };
+    abschliessen_mit(pool, live, &zeile, Abschluss::Abfrage(abfrage), etb).await
+}
+
 /// Zieht die nächste Prüfung einer Anbindung auf jetzt vor (ADR-0086).
 async fn pruefung_vorziehen(pool: &SqlitePool, adapter_id: &str, t: DateTime<Utc>) {
     if let Err(e) = crate::adapter::repo::postpone(pool, adapter_id, &zeit::formatiere_utc(t)).await
@@ -884,9 +951,49 @@ async fn abschliessen(
     ergebnis: Ergebnis,
     etb: Option<String>,
 ) -> Result<(), AppError> {
+    abschliessen_mit(
+        pool,
+        live,
+        zeile,
+        Abschluss::Versuch { begonnen, ergebnis },
+        etb,
+    )
+    .await
+}
+
+/// Was [`abschliessen_mit`] schreibt: das Ergebnis eines Zustellversuchs oder einer Abfrage.
+#[derive(Clone)]
+enum Abschluss<'a> {
+    Versuch {
+        begonnen: Option<&'a str>,
+        ergebnis: Ergebnis,
+    },
+    Abfrage(Abfrage),
+}
+
+async fn schreibe_abschluss(
+    conn: &mut sqlx::SqliteConnection,
+    id: &str,
+    a: &Abschluss<'_>,
+) -> Result<bool, AppError> {
+    match a {
+        Abschluss::Versuch { begonnen, ergebnis } => {
+            repo::save_ergebnis_tx(conn, id, *begonnen, ergebnis.clone()).await
+        }
+        Abschluss::Abfrage(abfrage) => repo::save_abfrage_tx(conn, id, *abfrage).await,
+    }
+}
+
+async fn abschliessen_mit(
+    pool: &SqlitePool,
+    live: &LiveHub,
+    zeile: &VersandZeile,
+    abschluss: Abschluss<'_>,
+    etb: Option<String>,
+) -> Result<(), AppError> {
     // `None`: nichts geändert; `Some(etb_id)`: Ergebnis geschrieben, mit oder ohne ETB.
     let mit_etb = crate::write_retry!(pool, |conn| {
-        if !repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis.clone()).await? {
+        if !schreibe_abschluss(&mut *conn, &zeile.id, &abschluss).await? {
             return Ok(None);
         }
         let Some(text) = etb.as_deref() else {
@@ -927,7 +1034,7 @@ async fn abschliessen(
         Err(e) if etb.is_some() => {
             tracing::error!(versand = %zeile.id, "Ausgang: ETB-Eintrag nicht geschrieben: {e}");
             let geaendert = crate::write_retry!(pool, |conn| {
-                repo::save_ergebnis_tx(&mut *conn, &zeile.id, begonnen, ergebnis.clone()).await
+                schreibe_abschluss(&mut *conn, &zeile.id, &abschluss).await
             })?;
             if !geaendert {
                 return Ok(());

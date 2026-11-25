@@ -283,6 +283,70 @@ pub async fn load_faellige(
     .map_err(Into::into)
 }
 
+/// Übergebene Faxe, deren nächste Abfrage beim Anbieter fällig ist (LLH-2095, Spec Abschnitt 5);
+/// nach Fälligkeit sortiert. Eine Mail hat keine `anbieter_ref` und kommt nie hierher.
+pub async fn load_abzufragende(
+    pool: &SqlitePool,
+    jetzt: DateTime<Utc>,
+    limit: i64,
+) -> Result<Vec<VersandZeile>, AppError> {
+    sqlx::query_as::<_, VersandZeile>(sqlx::AssertSqlSafe(format!(
+        "SELECT {ZEILE} FROM ausgang \
+         WHERE zustand = 'uebergeben' AND anbieter_ref IS NOT NULL \
+           AND naechste_abfrage_at <= ? \
+         ORDER BY naechste_abfrage_at, id LIMIT ?"
+    )))
+    .bind(zeit(jetzt))
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+/// Ergebnis einer Abfrage beim Fax-Anbieter, wie [`save_abfrage_tx`] es schreibt.
+#[derive(Debug, Clone, Copy)]
+pub enum Abfrage {
+    /// Der Anbieter bestätigt die Zustellung.
+    Zugestellt { at: DateTime<Utc> },
+    /// Der Anbieter meldet, dass das Fax nicht durchging.
+    NichtZugestellt,
+    /// Kein Endstand innerhalb der Frist.
+    Ungewiss,
+    /// Noch kein Endstand: wieder fragen zu `naechste`.
+    Weiter { naechste: DateTime<Utc> },
+}
+
+/// Schreibt das Ergebnis einer Abfrage, aber nur an einem Fax, das noch `uebergeben` ist.
+/// Liefert, ob eine Zeile sich änderte (sonst hat ein anderer Lauf schon abgeschlossen).
+pub async fn save_abfrage_tx(
+    conn: &mut SqliteConnection,
+    id: &str,
+    a: Abfrage,
+) -> Result<bool, AppError> {
+    const BEDINGUNG: &str = "WHERE id = ? AND zustand = 'uebergeben' AND anbieter_ref IS NOT NULL";
+    let q = match a {
+        Abfrage::Zugestellt { at } => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'zugestellt', zugestellt_at = ?, \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        )))
+        .bind(zeit(at)),
+        Abfrage::NichtZugestellt => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'fehlgeschlagen', fehler_art = 'nicht_zugestellt', \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        ))),
+        Abfrage::Ungewiss => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'fehlgeschlagen', fehler_art = 'ungewiss', \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        ))),
+        Abfrage::Weiter { naechste } => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET naechste_abfrage_at = ? {BEDINGUNG}"
+        )))
+        .bind(zeit(naechste)),
+    };
+    let n = q.bind(id).execute(&mut *conn).await?.rows_affected();
+    Ok(n == 1)
+}
+
 /// Beansprucht einen Zustellversuch vor dem Netz: setzt `versuch_begonnen_at`, zählt `versuche`
 /// hoch und hält beim ersten Versuch `erster_versuch_at` fest, aber nur, wenn der Versand noch
 /// `wartet` und kein anderer Versuch ihn hält. Liefert, ob dieser Aufruf ihn bekam; `false`
