@@ -373,6 +373,27 @@ pub fn etb_text_disponiert(funkrufname: &str) -> String {
     format!("Fahrzeug «{}» disponiert", funkrufname)
 }
 
+/// System-ETB beim Koppeln eines Fahrzeugs an eine Ortungs-Kennung (LLH-2091). Mit Zusatz, wenn
+/// die ehrenamtliche Besatzung bestätigt wurde.
+pub fn etb_text_gekoppelt(
+    funkrufname: &str,
+    zugang_name: &str,
+    kennung: &str,
+    ehrenamt: bool,
+) -> String {
+    let zusatz = if ehrenamt {
+        ", Besatzung ehrenamtlich bestätigt"
+    } else {
+        ""
+    };
+    format!("Ortung gekoppelt: {funkrufname} ({zugang_name} / {kennung}){zusatz}")
+}
+
+/// System-ETB beim Trennen der Ortung (von Hand oder automatisch, LLH-2091).
+pub fn etb_text_getrennt(funkrufname: &str) -> String {
+    format!("Ortung getrennt: {funkrufname}")
+}
+
 /// System-ETB, wenn Personen einem Fahrzeug als Besatzung zugeordnet werden (LFH-9; Sammelweg
 /// LLH-1073 D12, Wortlaut nach LLH-1100 D1): eine Person „Fahrzeug «X»: «A» als Besatzung
 /// zugeordnet“, mehrere „Fahrzeug «X»: 3 Kräfte als Besatzung zugeordnet: A, B, C“.

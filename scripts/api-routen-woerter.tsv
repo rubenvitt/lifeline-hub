@@ -47,6 +47,7 @@ bulk	-
 calculators	Rechner
 callback	-
 cancel	abbrechen
+candidates	Kandidaten
 care	Betreuung
 case-file	Einsatzakte
 catalog	Katalog
@@ -325,6 +326,7 @@ time-slots	Zeitfenster
 timeline	Zeitachse
 title-block	Schriftfeld
 totp	-
+tracking	Ortung
 transfer	Übernahme
 transport	-
 transport-means	Transportmittel

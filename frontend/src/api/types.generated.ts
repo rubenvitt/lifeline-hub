@@ -8678,6 +8678,23 @@ export interface components {
             otpauth_url: string;
             secret_base32: string;
         };
+        /** @description Eine Kennung der letzten 24 Stunden, ohne Koordinaten. */
+        TrackingCandidate: {
+            access_id: string;
+            access_name: string;
+            /** @description Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)? */
+            coupled: boolean;
+            device_id: string;
+            received_at: string;
+        };
+        /** @description Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung. */
+        TrackingResponse: {
+            access_id: string;
+            access_name: string;
+            coupled_at: string;
+            device_id: string;
+            volunteer_crew_confirmed: boolean;
+        };
         /** @description Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“. */
         TransportAnzeige: {
             art?: components["schemas"]["TransportArt"] | null;

@@ -1106,6 +1106,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/vehicles/{ef_id}/status/undo",
             post(routes::einsatz_fahrzeug::status_zuruecknehmen),
         )
+        // LLH-2091: Ortung koppeln, trennen und die Kandidaten dazu (ADR-0097: `incidents`).
+        .route(
+            "/api/incidents/{id}/vehicles/{ef_id}/tracking",
+            get(routes::ortung::load)
+                .put(routes::ortung::couple)
+                .delete(routes::ortung::decouple),
+        )
+        .route(
+            "/api/incidents/{id}/vehicles/{ef_id}/tracking/candidates",
+            get(routes::ortung::candidates),
+        )
         .route(
             "/api/einsaetze/{id}/vehicles/{ef_id}/annul",
             post(routes::einsatz_fahrzeug::stornieren),

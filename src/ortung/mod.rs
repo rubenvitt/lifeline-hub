@@ -18,4 +18,5 @@ wire_enum! {
     sqlx = |s| format!("Ungültige Positionsquelle: {s}");
 }
 
+pub mod kopplung;
 pub mod uebernahme;

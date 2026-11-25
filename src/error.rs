@@ -74,6 +74,13 @@ pub enum AppError {
     /// übrigen 409 (Lebenszyklus, doppelte Bezeichnung) trennt und nur hier „Zwischenzeitlich
     /// geändert“ fragt (`src/AGENTS.md`, Statuscode-Konvention).
     Veraltet,
+    /// 422 mit maschinenlesbarem Grund (LLH-2091): `{error, grund}`, wo der Client den Fall
+    /// unterscheiden muss (etwa „Besatzung ehrenamtlich bestätigen“) und nicht am Text raten
+    /// soll. Wie [`AppError::UnprocessableEntity`] sonst.
+    UnprocessableGrund {
+        meldung: String,
+        grund: &'static str,
+    },
 }
 
 /// Wert von `grund` im Umschlag von [`AppError::NichtInListe`]; der Client vergleicht ihn
@@ -159,6 +166,7 @@ impl std::fmt::Display for AppError {
                 "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
             ),
             AppError::UnprocessableEntity(m) => write!(f, "{m}"),
+            AppError::UnprocessableGrund { meldung, .. } => write!(f, "{meldung}"),
             AppError::Database(e) => write!(f, "Datenbankfehler: {e}"),
             AppError::Internal(m) => write!(f, "{m}"),
             AppError::NotImplemented(m) => write!(f, "{m}"),
@@ -215,7 +223,9 @@ impl AppError {
             AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::PayloadTooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             AppError::UpgradeRequired(_) => StatusCode::UPGRADE_REQUIRED,
-            AppError::Zeilen { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::Zeilen { .. } | AppError::UnprocessableGrund { .. } => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
         }
     }
 
@@ -342,6 +352,9 @@ impl IntoResponse for AppError {
                 }),
             )
                 .into_response();
+        }
+        if let AppError::UnprocessableGrund { meldung, grund } = self {
+            return (status, Json(json!({ "error": meldung, "grund": grund }))).into_response();
         }
         if let AppError::Veraltet = self {
             let message = self.public_message();

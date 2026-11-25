@@ -323,6 +323,8 @@ use utoipa::OpenApi;
         crate::externe_stelle::ExterneStelle,
         crate::externe_stelle::ExterneStelleArt,
         crate::fahrzeug::EinsatzFahrzeugAnzeige,
+        crate::routes::ortung::TrackingResponse,
+        crate::routes::ortung::TrackingCandidate,
         crate::fahrzeug::EntlassungAntwort,
         crate::fahrzeug::EntlassungRuecknahmeAntwort,
         crate::fahrzeug::StatusRuecknahmeBeleg,

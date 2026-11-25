@@ -80,6 +80,7 @@ pub mod org_einstellungen;
 pub mod organisation;
 pub mod ort_suche;
 pub mod ort_vorschau;
+pub mod ortung;
 pub mod pegel;
 pub mod person_anhang;
 pub mod person_anlass;

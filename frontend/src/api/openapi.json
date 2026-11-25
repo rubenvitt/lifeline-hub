@@ -21612,6 +21612,63 @@
           }
         }
       },
+      "TrackingCandidate": {
+        "type": "object",
+        "description": "Eine Kennung der letzten 24 Stunden, ohne Koordinaten.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "received_at",
+          "coupled"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled": {
+            "type": "boolean",
+            "description": "Hängt die Kennung schon an einem Fahrzeug (irgendeines Einsatzes)?"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "received_at": {
+            "type": "string"
+          }
+        }
+      },
+      "TrackingResponse": {
+        "type": "object",
+        "description": "Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung.",
+        "required": [
+          "access_id",
+          "access_name",
+          "device_id",
+          "coupled_at",
+          "volunteer_crew_confirmed"
+        ],
+        "properties": {
+          "access_id": {
+            "type": "string"
+          },
+          "access_name": {
+            "type": "string"
+          },
+          "coupled_at": {
+            "type": "string"
+          },
+          "device_id": {
+            "type": "string"
+          },
+          "volunteer_crew_confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
       "TransportAnzeige": {
         "type": "object",
         "description": "Ein Transportstand (1:1 zu `person_transport`). Drei leere Felder heißen „aufgehoben“.",

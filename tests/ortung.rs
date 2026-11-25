@@ -461,3 +461,363 @@ async fn aelterer_fix_stoesst_nichts_an() {
     assert_eq!(f.stand().await, vorher);
     assert!(objekt_ereignisse(&mut rx, &[("fahrzeug", "fahrzeug_id")]).is_empty());
 }
+
+// ── Koppeln, Trennen, Kandidaten (Routen) ───────────────────────────────────────────────────
+
+impl Fix {
+    fn pfad(&self) -> String {
+        format!(
+            "/api/incidents/{}/vehicles/{}/tracking",
+            self.einsatz, self.ef
+        )
+    }
+
+    /// Nimmt die Kopplung der Fixture weg, damit die Route sie neu anlegen kann.
+    async fn kopplung_loeschen(&self) {
+        sqlx::query("DELETE FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?")
+            .bind(self.ef)
+            .execute(&self.pool)
+            .await
+            .unwrap();
+    }
+
+    async fn kopplungen(&self) -> i64 {
+        sqlx::query_scalar("SELECT COUNT(*) FROM ortung_kopplung")
+            .fetch_one(&self.pool)
+            .await
+            .unwrap()
+    }
+
+    async fn ortung_etb(&self, cookie: &str) -> Vec<String> {
+        system_etb_inhalte(&self.app, cookie, self.einsatz)
+            .await
+            .into_iter()
+            .filter(|t| t.starts_with("Ortung "))
+            .collect()
+    }
+
+    async fn zugang_anlegen(&self, id: &str, org: i64, scope: &str, widerrufen: bool) {
+        sqlx::query(
+            "INSERT INTO einwurf_zugang (id, org_id, name, scope, schluessel_hash, angelegt_at, \
+             widerrufen_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(id)
+        .bind(org)
+        .bind(format!("Zugang {id}"))
+        .bind(scope)
+        .bind(format!("hash-{id}"))
+        .bind(T)
+        .bind(widerrufen.then_some(T))
+        .execute(&self.pool)
+        .await
+        .unwrap();
+    }
+}
+
+async fn vor_stunden(pool: &SqlitePool, h: i64) -> String {
+    sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT datetime('now', '-{h} hours')"
+    )))
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+fn koppel_body(f: &Fix, bestaetigt: bool) -> String {
+    format!(
+        r#"{{"access_id":"{}","device_id":"{KENNUNG}","volunteer_crew_confirmed":{bestaetigt}}}"#,
+        f.zugang
+    )
+}
+
+#[tokio::test]
+async fn koppeln_schreibt_etb_und_uebernimmt_vorhandene_position() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &admin,
+        Some(&koppel_body(&f, true)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["ortung_gekoppelt"], true);
+    assert_eq!(v["position_quelle"], "ortung");
+    assert_eq!(v["lat"], 48.1);
+    assert_eq!(
+        f.ortung_etb(&admin).await,
+        ["Ortung gekoppelt: Florian 1 (Tracker / geraet-1), Besatzung ehrenamtlich bestätigt"]
+    );
+    let (s, v) = anfrage(&f.app, "GET", &f.pfad(), &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["access_id"], f.zugang.as_str());
+    assert_eq!(v["access_name"], "Tracker");
+    assert_eq!(v["device_id"], KENNUNG);
+    assert_eq!(v["volunteer_crew_confirmed"], true);
+    assert!(v["coupled_at"].is_string());
+}
+
+#[tokio::test]
+async fn koppeln_ohne_bestaetigung_bei_ausgeschaltetem_schalter_ist_422() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &admin,
+        Some(&koppel_body(&f, false)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "volunteer_crew_required");
+    assert_eq!(f.kopplungen().await, 0);
+    assert!(f.ortung_etb(&admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn koppeln_ohne_bestaetigung_bei_eingeschaltetem_schalter_geht() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    sqlx::query(
+        "INSERT INTO org_einstellungen (org_id, ortung_hauptamt) VALUES (?, 1) \
+         ON CONFLICT(org_id) DO UPDATE SET ortung_hauptamt = 1",
+    )
+    .bind(f.org)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &admin,
+        Some(&koppel_body(&f, false)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        f.ortung_etb(&admin).await,
+        ["Ortung gekoppelt: Florian 1 (Tracker / geraet-1)"]
+    );
+}
+
+#[tokio::test]
+async fn belegte_kennung_ist_409() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        "/api/vehicles",
+        &admin,
+        Some(r#"{"funkrufname":"Florian 2"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/vehicles", f.einsatz),
+        &admin,
+        Some(&format!(r#"{{"fahrzeug_id":{}}}"#, v["id"])),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED);
+    let ef2 = v["id"].as_i64().unwrap();
+    // Die Kennung hängt aus der Fixture an `f.ef`.
+    let pfad = format!("/api/incidents/{}/vehicles/{ef2}/tracking", f.einsatz);
+    let (s, _) = anfrage(&f.app, "PUT", &pfad, &admin, Some(&koppel_body(&f, true))).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert_eq!(f.kopplungen().await, 1);
+    assert!(f.ortung_etb(&admin).await.is_empty());
+    // Ein erneutes PUT am selben Fahrzeug ersetzt dessen Kopplung.
+    let (s, _) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &admin,
+        Some(&koppel_body(&f, true)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(f.kopplungen().await, 1);
+}
+
+#[tokio::test]
+async fn koppeln_im_gespiegelten_einsatz_ist_409_ohne_etb() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    sqlx::query("UPDATE einsatz SET spiegel = 1 WHERE id = ?")
+        .bind(f.einsatz)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &admin,
+        Some(&koppel_body(&f, true)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(f.kopplungen().await, 0);
+    assert!(f.ortung_etb(&admin).await.is_empty());
+}
+
+#[tokio::test]
+async fn fremder_oder_falscher_zugang_ist_422() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    let (fremde_org, _) =
+        fremde_org_anlegen(&f.pool, "Fremd", "fremder", "fremderpw1", "keine").await;
+    f.zugang_anlegen("zugang-fremd", fremde_org, "positionen:write", false)
+        .await;
+    f.zugang_anlegen("zugang-alarm", f.org, "alarmmeldungen:write", false)
+        .await;
+    f.zugang_anlegen("zugang-widerrufen", f.org, "positionen:write", true)
+        .await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    for id in [
+        "zugang-fremd",
+        "zugang-alarm",
+        "zugang-widerrufen",
+        "gibt-es-nicht",
+    ] {
+        let body = format!(
+            r#"{{"access_id":"{id}","device_id":"{KENNUNG}","volunteer_crew_confirmed":true}}"#
+        );
+        let (s, v) = anfrage(&f.app, "PUT", &f.pfad(), &admin, Some(&body)).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{id}: {v}");
+    }
+    assert_eq!(f.kopplungen().await, 0);
+}
+
+#[tokio::test]
+async fn lesende_rolle_darf_nicht_koppeln() {
+    let f = fix().await;
+    f.kopplung_loeschen().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let erika = benutzer_anlegen(&f.app, &admin, "erika", "keine").await;
+    rolle_setzen(&f.app, &admin, f.einsatz, erika, "beobachter").await;
+    let cookie = login_cookie(&f.app, "erika", "erikapw1").await;
+    let (s, _) = anfrage(
+        &f.app,
+        "PUT",
+        &f.pfad(),
+        &cookie,
+        Some(&koppel_body(&f, true)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(&f.app, "DELETE", &f.pfad(), &cookie, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    assert_eq!(f.kopplungen().await, 0);
+}
+
+#[tokio::test]
+async fn trennen_schreibt_etb_und_laesst_die_position_stehen() {
+    let f = fix().await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, _) = anfrage(&f.app, "DELETE", &f.pfad(), &admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(f.kopplungen().await, 0);
+    let (lat, lon, quelle, _, _) = f.stand().await;
+    assert_eq!(
+        (lat, lon, quelle.as_deref()),
+        (Some(48.1), Some(11.5), Some("ortung"))
+    );
+    assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 1"]);
+    // Ohne Kopplung gibt es nichts zu trennen: 404, kein zweiter ETB-Eintrag.
+    let (s, _) = anfrage(&f.app, "DELETE", &f.pfad(), &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    assert_eq!(f.ortung_etb(&admin).await.len(), 1);
+    let (s, _) = anfrage(&f.app, "GET", &f.pfad(), &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn kandidaten_ohne_koordinaten_ohne_fremde_org_ohne_widerrufene_und_ohne_alte() {
+    let f = fix().await;
+    let jung = vor_stunden(&f.pool, 1).await;
+    let alt = vor_stunden(&f.pool, 25).await;
+    f.einwerfen(48.1, 11.5, &jung, &jung).await;
+    let (fremde_org, _) =
+        fremde_org_anlegen(&f.pool, "Fremd", "fremder", "fremderpw1", "keine").await;
+    f.zugang_anlegen("zugang-fremd", fremde_org, "positionen:write", false)
+        .await;
+    f.zugang_anlegen("zugang-alarm", f.org, "alarmmeldungen:write", false)
+        .await;
+    f.zugang_anlegen("zugang-widerrufen", f.org, "positionen:write", true)
+        .await;
+    f.zugang_anlegen("zugang-zweit", f.org, "positionen:write", false)
+        .await;
+    for (zugang, org, kennung, at) in [
+        ("zugang-fremd", fremde_org, "x1", &jung),
+        ("zugang-alarm", f.org, "x2", &jung),
+        ("zugang-widerrufen", f.org, "x3", &jung),
+        ("zugang-zweit", f.org, "alt", &alt),
+        ("zugang-zweit", f.org, "frei", &jung),
+    ] {
+        sqlx::query(
+            "INSERT INTO position_letzte (org_id, zugang_id, kennung, lat, lon, gemessen_at, \
+             empfangen_at, rohdaten) VALUES (?, ?, ?, 1.5, 2.5, ?, ?, '{}')",
+        )
+        .bind(org)
+        .bind(zugang)
+        .bind(kennung)
+        .bind(at)
+        .bind(at)
+        .execute(&f.pool)
+        .await
+        .unwrap();
+    }
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "GET",
+        &format!("{}/candidates", f.pfad()),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let liste = v.as_array().unwrap();
+    let mut gesehen: Vec<(&str, &str, bool)> = liste
+        .iter()
+        .map(|k| {
+            (
+                k["access_id"].as_str().unwrap(),
+                k["device_id"].as_str().unwrap(),
+                k["coupled"].as_bool().unwrap(),
+            )
+        })
+        .collect();
+    gesehen.sort();
+    assert_eq!(
+        gesehen,
+        [
+            ("zugang-ortung", KENNUNG, true),
+            ("zugang-zweit", "frei", false)
+        ]
+    );
+    for k in liste {
+        let schluessel: Vec<&str> = k.as_object().unwrap().keys().map(String::as_str).collect();
+        assert!(
+            !schluessel.contains(&"lat") && !schluessel.contains(&"lon"),
+            "{k}"
+        );
+        assert!(k["received_at"].is_string());
+        assert!(k["access_name"].is_string());
+    }
+}
