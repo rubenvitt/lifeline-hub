@@ -406,9 +406,13 @@ pub async fn speichern(
     } else {
         Vec::new()
     };
+    // Den Endstand noch unter der Schreibsperre lesen: nach dem Commit könnte ein zweiter Admin
+    // schon umgeschaltet haben, und die Admin-Spur würde dessen Stand mit unserem Vorher
+    // vergleichen (LLH-2120, Review).
+    let einstellungen = laden_oder_default(&mut *tx, org_id).await?;
     tx.commit().await?;
     Ok(Gespeichert {
-        einstellungen: laden_oder_default(pool, org_id).await?,
+        einstellungen,
         personen_geloescht,
         lan_vorher,
         ortung_vorher,
@@ -417,6 +421,7 @@ pub async fn speichern(
 
 /// Ergebnis von [`speichern`].
 pub struct Gespeichert {
+    /// Stand nach dem Speichern, in derselben Transaktion gelesen wie die `*_vorher`-Werte.
     pub einstellungen: OrgEinstellungen,
     /// `(einsatz_id, person_id)` der Helfer, deren Personenposition gelöscht wurde; der Aufrufer
     /// meldet sie nach dem Commit live.
