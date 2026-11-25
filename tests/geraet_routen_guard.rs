@@ -134,7 +134,7 @@ fn ansichtslisten_tragen_nur_einsatzrouten() {
     for (herkunft, _, pfad) in alle_eintraege() {
         if herkunft != "ALLE_GERAETE" {
             assert!(
-                pfad.starts_with("/api/einsaetze/{id}"),
+                pfad.starts_with("/api/einsaetze/{id}") || pfad.starts_with("/api/incidents/{id}"),
                 "{herkunft}: {pfad} ist keine Einsatzroute"
             );
         }
@@ -181,7 +181,7 @@ fn lagemonitor_schreibt_nichts() {
     let mut geprueft = 0usize;
     let mut verstoesse = Vec::new();
     for (pfad, block) in alle_route_bloecke(&quelle) {
-        if !pfad.starts_with("/api/einsaetze/{id}") {
+        if !(pfad.starts_with("/api/einsaetze/{id}") || pfad.starts_with("/api/incidents/{id}")) {
             continue;
         }
         for methode in ["POST", "PATCH", "PUT", "DELETE"] {

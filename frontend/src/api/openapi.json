@@ -6179,6 +6179,68 @@
           "sonstiges"
         ]
       },
+      "DroneSourceUpdate": {
+        "type": "object",
+        "required": [
+          "lagemonitor"
+        ],
+        "properties": {
+          "lagemonitor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DroneSourceView": {
+        "type": "object",
+        "description": "Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz.",
+        "required": [
+          "adapter_id",
+          "label",
+          "connected",
+          "lagemonitor",
+          "state",
+          "video_keys"
+        ],
+        "properties": {
+          "adapter_id": {
+            "type": "string"
+          },
+          "connected": {
+            "type": "boolean",
+            "description": "In diesem Einsatz zugeschaltet."
+          },
+          "held_by_other": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die\nPerson ihn nicht lesen darf)."
+          },
+          "label": {
+            "type": "string"
+          },
+          "lagemonitor": {
+            "type": "boolean",
+            "description": "Das Livebild geht auch an den Lagemonitor."
+          },
+          "mission_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "description": "Zustand des Adapters (`aktiv`, `angehalten`, …)."
+          },
+          "video_keys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "EinheitAnzeige": {
         "type": "object",
         "description": "Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,\nMitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →\n`None`); `ist`/`ist_kumuliert` sind immer gesetzt.",

@@ -101,6 +101,7 @@ distributions	Ausgaben
 districts	Bezirke
 documents	Dokumente
 download	-
+drone	Drohne
 emergency-takeover	Notübernahme
 enclosures	Anlagen eines Dokuments
 end	beenden
@@ -299,6 +300,7 @@ situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
+sources	Quellen
 split	aufteilen
 sprite	-
 sprites	-

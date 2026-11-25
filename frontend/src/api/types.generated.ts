@@ -2466,6 +2466,27 @@ export interface components {
          * @enum {string}
          */
         DokumentKategorie: "lagekarte_plan" | "befehl" | "formular" | "foto" | "sonstiges";
+        DroneSourceUpdate: {
+            lagemonitor: boolean;
+        };
+        /** @description Eine Drohnenquelle der Organisation, gesehen aus einem Einsatz. */
+        DroneSourceView: {
+            adapter_id: string;
+            /** @description In diesem Einsatz zugeschaltet. */
+            connected: boolean;
+            /**
+             * @description Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die
+             *     Person ihn nicht lesen darf).
+             */
+            held_by_other?: string | null;
+            label: string;
+            /** @description Das Livebild geht auch an den Lagemonitor. */
+            lagemonitor: boolean;
+            mission_name?: string | null;
+            /** @description Zustand des Adapters (`aktiv`, `angehalten`, …). */
+            state: string;
+            video_keys: string[];
+        };
         /**
          * @description Aufgelöste Einheiten-Anzeige inkl. Typ/Abschnitt-Labels, Führer-Identität,
          *     Mitgliedern und berechneter Stärke. `soll` ist optional (Override → Typ-Default →

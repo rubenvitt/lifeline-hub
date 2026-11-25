@@ -1942,6 +1942,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/map/background-images/{bildId}",
             delete(routes::karte_hintergrundbild::loeschen),
         )
+        // Drohnenquellen je Einsatz (LLH-2105), unter dem englischen Präfix (ADR-0097).
+        .route(
+            "/api/incidents/{id}/drone/sources",
+            get(routes::drohne::liste),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            put(routes::drohne::zuschalten),
+        )
+        .route(
+            "/api/incidents/{id}/drone/sources/{aid}",
+            delete(routes::drohne::abschalten),
+        )
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),

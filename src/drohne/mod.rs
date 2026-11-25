@@ -9,3 +9,9 @@ pub mod suchlage;
 pub mod vertrag;
 
 pub use store::Store;
+
+/// Ob eine Adapterart einen Drohnenvertrag hat, also Drohnenbild liefert und je Einsatz
+/// zuschaltbar ist.
+pub fn is_drohnen_art(code: &str) -> bool {
+    code == "suchlage"
+}

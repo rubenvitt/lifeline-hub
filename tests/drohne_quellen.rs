@@ -1,0 +1,232 @@
+//! Drohnenquelle je Einsatz zu- und abschalten (LLH-2105): `/api/incidents/{id}/drone/sources`.
+
+use axum::http::StatusCode;
+use serde_json::{json, Value};
+use sqlx::SqlitePool;
+
+mod common;
+use common::{
+    anfrage, benutzer_anlegen, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie, rolle_setzen,
+    system_etb_inhalte,
+};
+
+struct Umgebung {
+    app: axum::Router,
+    pool: SqlitePool,
+    org_id: i64,
+    admin: String,
+    einsatz: i64,
+}
+
+async fn umgebung() -> Umgebung {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Lage A").await;
+    let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    Umgebung {
+        app,
+        pool,
+        org_id,
+        admin,
+        einsatz,
+    }
+}
+
+impl Umgebung {
+    async fn adapter(&self, id: &str, art: &str, org_id: i64) {
+        sqlx::query(
+            "INSERT INTO adapter (id, org_id, art, name, intervall_s) VALUES (?, ?, ?, 'Drohnen Nord', 30)",
+        )
+        .bind(id)
+        .bind(org_id)
+        .bind(art)
+        .execute(&self.pool)
+        .await
+        .unwrap();
+    }
+
+    fn pfad(&self, einsatz: i64, aid: &str) -> String {
+        format!("/api/incidents/{einsatz}/drone/sources/{aid}")
+    }
+
+    async fn zuschalten(&self, einsatz: i64, aid: &str) -> (StatusCode, Value) {
+        anfrage(
+            &self.app,
+            "PUT",
+            &self.pfad(einsatz, aid),
+            &self.admin,
+            Some(&json!({"lagemonitor": true}).to_string()),
+        )
+        .await
+    }
+
+    async fn liste(&self, einsatz: i64, cookie: &str) -> (StatusCode, Value) {
+        anfrage(
+            &self.app,
+            "GET",
+            &format!("/api/incidents/{einsatz}/drone/sources"),
+            cookie,
+            None,
+        )
+        .await
+    }
+}
+
+#[tokio::test]
+async fn einsatzleitung_schaltet_zu_und_ab() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    u.adapter("a2", "test", u.org_id).await;
+
+    let (s, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(s, StatusCode::OK);
+    // Nur Quellen mit Drohnenvertrag stehen in der Liste.
+    assert_eq!(liste.as_array().unwrap().len(), 1);
+    assert_eq!(liste[0]["adapter_id"], "a1");
+    assert_eq!(liste[0]["label"], "Drohnen Nord");
+    assert_eq!(liste[0]["connected"], false);
+
+    let (s, v) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["connected"], true);
+    assert_eq!(v["lagemonitor"], true);
+    assert!(v["held_by_other"].is_null());
+    assert!(v["video_keys"].as_array().unwrap().is_empty());
+
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(liste[0]["connected"], true);
+
+    let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(liste[0]["connected"], false);
+}
+
+#[tokio::test]
+async fn beobachter_darf_lesen_aber_nicht_zuschalten() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let beob = benutzer_anlegen(&u.app, &u.admin, "beobachter", "keine").await;
+    rolle_setzen(&u.app, &u.admin, u.einsatz, beob, "beobachter").await;
+    let cookie = login_cookie(&u.app, "beobachter", "beobachterpw1").await;
+
+    let (s, liste) = u.liste(u.einsatz, &cookie).await;
+    assert_eq!(s, StatusCode::OK, "{liste:?}");
+    assert_eq!(liste.as_array().unwrap().len(), 1);
+
+    let (s, _) = anfrage(
+        &u.app,
+        "PUT",
+        &u.pfad(u.einsatz, "a1"),
+        &cookie,
+        Some(r#"{"lagemonitor":false}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &cookie, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn zweiter_einsatz_bekommt_409() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let zweiter = einsatz_anlegen_mit(&u.app, &u.admin, "Lage B").await;
+
+    let (s, _) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, body) = u.zuschalten(zweiter, "a1").await;
+    assert_eq!(s, StatusCode::CONFLICT, "{body:?}");
+
+    // Im zweiten Einsatz steht die Quelle als „gehalten“, mit dem Namen des ersten.
+    let (_, liste) = u.liste(zweiter, &u.admin).await;
+    assert_eq!(liste[0]["connected"], false);
+    assert_eq!(liste[0]["held_by_other"], "Lage A");
+
+    // Nach dem Abschalten im ersten geht es im zweiten.
+    let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    let (s, _) = u.zuschalten(zweiter, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn fremde_org_bekommt_404() {
+    let u = umgebung().await;
+    let (fremd_org, _) = fremde_org_anlegen(&u.pool, "Fremd", "fremd", "fremdpw12", "keine").await;
+    u.adapter("fremd-1", "suchlage", fremd_org).await;
+
+    let (s, _) = u.zuschalten(u.einsatz, "fremd-1").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = anfrage(
+        &u.app,
+        "DELETE",
+        &u.pfad(u.einsatz, "fremd-1"),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert!(liste.as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn adapter_anderer_art_ergibt_422() {
+    let u = umgebung().await;
+    u.adapter("a2", "test", u.org_id).await;
+    let (s, _) = u.zuschalten(u.einsatz, "a2").await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test]
+async fn zuschalten_schreibt_ins_etb() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+
+    u.zuschalten(u.einsatz, "a1").await;
+    // Erneutes Zuschalten (nur die Lagemonitor-Wahl ändert sich) schreibt nichts mehr.
+    u.zuschalten(u.einsatz, "a1").await;
+    let inhalte = system_etb_inhalte(&u.app, &u.admin, u.einsatz).await;
+    let n = inhalte
+        .iter()
+        .filter(|i| i.contains("Drohnenbild aus Suchlage zugeschaltet"))
+        .count();
+    assert_eq!(n, 1, "{inhalte:?}");
+
+    anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &u.admin, None).await;
+    let inhalte = system_etb_inhalte(&u.app, &u.admin, u.einsatz).await;
+    assert!(
+        inhalte
+            .iter()
+            .any(|i| i.contains("Drohnenbild aus Suchlage abgeschaltet")),
+        "{inhalte:?}"
+    );
+}
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_kann_nicht_zuschalten() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let (s, _) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM adapter_einsatz")
+        .fetch_one(&u.pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
