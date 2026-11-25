@@ -94,23 +94,36 @@ pub fn lies_tabelle(bytes: &[u8]) -> Result<Tabelle, AppError> {
     Ok(tabelle)
 }
 
-/// Liest alle Blätter einer XLSX mit ihrem Namen, in der Reihenfolge der Mappe; eine CSV ist ein
-/// Eintrag mit dem Namen `""`. `zeilen_max` gilt je Blatt (ohne Kopfzeile); Größen- und
-/// Zip-Grenzen wie bei [`lies_tabelle`]. Ein leeres Blatt ist eine leere [`Tabelle`], kein Fehler.
-pub fn lies_blaetter(bytes: &[u8], zeilen_max: usize) -> Result<Vec<(String, Tabelle)>, AppError> {
+/// Liest die Blätter einer XLSX mit ihrem Namen, in der Reihenfolge der Mappe; eine CSV ist ein
+/// Eintrag mit dem Namen `""` und wird immer gelesen. `lesen` entscheidet je Blattname, ob das
+/// Blatt gelesen wird; ein übergangenes Blatt steht mit `None` in der Liste, ohne dass eine
+/// seiner Zellen angefasst oder an einer Grenze gemessen wird. `zeilen_max` gilt je Blatt (ohne
+/// Kopfzeile), die Textgrenze ([`XLSX_ENTPACKT_MAX_BYTES`]) für alle gelesenen Blätter
+/// zusammen; Größen- und Zip-Grenzen wie bei [`lies_tabelle`]. Ein leeres Blatt ist eine leere
+/// [`Tabelle`], kein Fehler.
+pub fn lies_blaetter(
+    bytes: &[u8],
+    zeilen_max: usize,
+    mut lesen: impl FnMut(&str) -> bool,
+) -> Result<Vec<(String, Option<Tabelle>)>, AppError> {
     use calamine::{Reader, Xlsx};
     pruefe_eingang(bytes)?;
     if !bytes.starts_with(b"PK\x03\x04") {
         let tabelle = lies_csv(bytes)?;
         pruefe_zeilen(&tabelle, zeilen_max)?;
-        return Ok(vec![(String::new(), tabelle)]);
+        return Ok(vec![(String::new(), Some(tabelle))]);
     }
     pruefe_entpackt(bytes)?;
     let mut mappe: Xlsx<_> =
         calamine::open_workbook_from_rs(Cursor::new(bytes)).map_err(|_| unlesbar("XLSX"))?;
+    let mut text_bytes: u64 = 0;
     let mut ergebnis = Vec::new();
     for name in mappe.sheet_names() {
-        let tabelle = lies_blatt(&mut mappe, &name, zeilen_max)?;
+        let tabelle = if lesen(&name) {
+            Some(lies_blatt(&mut mappe, &name, zeilen_max, &mut text_bytes)?)
+        } else {
+            None
+        };
         ergebnis.push((name, tabelle));
     }
     Ok(ergebnis)
@@ -291,7 +304,7 @@ pub(crate) fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
         .or_else(|| namen.first())
         .cloned()
         .ok_or_else(|| unlesbar("XLSX"))?;
-    let tabelle = lies_blatt(&mut mappe, &blatt, ZEILEN_MAX)?;
+    let tabelle = lies_blatt(&mut mappe, &blatt, ZEILEN_MAX, &mut 0)?;
     if tabelle.kopf.is_empty() {
         return Err(AppError::Validation("Die Datei ist leer".into()));
     }
@@ -301,11 +314,13 @@ pub(crate) fn lies_xlsx(bytes: &[u8]) -> Result<Tabelle, AppError> {
 /// Liest ein Blatt Zelle für Zelle. `worksheet_range` legte eine dichte Tabelle bis zur letzten
 /// belegten Zelle an: eine einzelne Zelle in XFD1048576 kostete Gigabyte. Gezählt werden deshalb
 /// Spalten (höchstens [`XLSX_SPALTEN_MAX`]) und belegte Zeilen (höchstens `zeilen_max` plus
-/// Kopf), bevor etwas wächst. Ein Blatt ohne Zellen ergibt eine leere [`Tabelle`].
+/// Kopf), bevor etwas wächst. `text_bytes` zählt den gelesenen Text weiter, über Blätter hinweg
+/// (Grenze [`XLSX_ENTPACKT_MAX_BYTES`]). Ein Blatt ohne Zellen ergibt eine leere [`Tabelle`].
 fn lies_blatt<RS: std::io::Read + std::io::Seek>(
     mappe: &mut calamine::Xlsx<RS>,
     blatt: &str,
     zeilen_max: usize,
+    text_bytes: &mut u64,
 ) -> Result<Tabelle, AppError> {
     use calamine::DataRef;
     use std::collections::BTreeMap;
@@ -341,7 +356,6 @@ fn lies_blatt<RS: std::io::Read + std::io::Seek>(
     // Zeile (0-basiert) → belegte Zellen mit Spalte.
     let mut belegt: BTreeMap<u32, Vec<(u32, Zelle)>> = BTreeMap::new();
     let mut breite: u32 = 0;
-    let mut text_bytes: u64 = 0;
     {
         let mut leser = mappe
             .worksheet_cells_reader(blatt)
@@ -363,8 +377,8 @@ fn lies_blatt<RS: std::io::Read + std::io::Seek>(
             }
             // Viele Zellen auf einen langen gemeinsamen Text vervielfachten ihn im Speicher.
             if let Zelle::Text(t) = &z {
-                text_bytes = text_bytes.saturating_add(t.len() as u64);
-                if text_bytes > XLSX_ENTPACKT_MAX_BYTES {
+                *text_bytes = text_bytes.saturating_add(t.len() as u64);
+                if *text_bytes > XLSX_ENTPACKT_MAX_BYTES {
                     return Err(AppError::Validation("Die XLSX ist entpackt zu groß".into()));
                 }
             }
@@ -435,13 +449,16 @@ mod tests {
             ("Fahrzeuge", &[&["Kennzeichen", "Typ"], &["B-RK 1", "RTW"]]),
             ("Personal", &[&["Nachname", "Vorname"], &["Muster", "Max"]]),
         ]);
-        let blaetter = lies_blaetter(&bytes, 10).unwrap();
+        let blaetter = lies_blaetter(&bytes, 10, |_| true).unwrap();
         let namen: Vec<&str> = blaetter.iter().map(|(n, _)| n.as_str()).collect();
         assert_eq!(namen, ["Fahrzeuge", "Personal"]);
-        assert_eq!(blaetter[0].1.kopf, ["Kennzeichen", "Typ"]);
-        assert_eq!(blaetter[1].1.kopf, ["Nachname", "Vorname"]);
-        assert_eq!(blaetter[1].1.zeilen.len(), 1);
-        assert_eq!(blaetter[1].1.zeilen[0].0, 2);
+        assert_eq!(blaetter[0].1.as_ref().unwrap().kopf, ["Kennzeichen", "Typ"]);
+        assert_eq!(
+            blaetter[1].1.as_ref().unwrap().kopf,
+            ["Nachname", "Vorname"]
+        );
+        assert_eq!(blaetter[1].1.as_ref().unwrap().zeilen.len(), 1);
+        assert_eq!(blaetter[1].1.as_ref().unwrap().zeilen[0].0, 2);
     }
 
     #[test]
@@ -449,33 +466,53 @@ mod tests {
         let drei: &[&[&str]] = &[&["A"], &["1"], &["2"], &["3"]];
         let vier: &[&[&str]] = &[&["A"], &["1"], &["2"], &["3"], &["4"]];
         let ok = mappe(&[("Eins", drei), ("Zwei", drei)]);
-        assert_eq!(lies_blaetter(&ok, 3).unwrap().len(), 2);
+        assert_eq!(lies_blaetter(&ok, 3, |_| true).unwrap().len(), 2);
         let zu_viel = mappe(&[("Eins", drei), ("Zwei", vier)]);
         assert!(matches!(
-            lies_blaetter(&zu_viel, 3),
+            lies_blaetter(&zu_viel, 3, |_| true),
             Err(AppError::Validation(_))
         ));
     }
 
     #[test]
     fn lies_blaetter_csv_ein_eintrag() {
-        let blaetter = lies_blaetter(b"Nachname;Vorname\nMuster;Max\n", 10).unwrap();
+        let blaetter = lies_blaetter(b"Nachname;Vorname\nMuster;Max\n", 10, |_| false).unwrap();
         assert_eq!(blaetter.len(), 1);
         assert_eq!(blaetter[0].0, "");
-        assert_eq!(blaetter[0].1.kopf, ["Nachname", "Vorname"]);
-        assert_eq!(blaetter[0].1.zeilen.len(), 1);
+        assert_eq!(
+            blaetter[0].1.as_ref().unwrap().kopf,
+            ["Nachname", "Vorname"]
+        );
+        assert_eq!(blaetter[0].1.as_ref().unwrap().zeilen.len(), 1);
     }
 
     #[test]
     fn lies_blaetter_leeres_blatt_ist_leere_tabelle() {
         let bytes = mappe(&[("Leer", &[]), ("Voll", &[&["A"], &["1"]])]);
-        let blaetter = lies_blaetter(&bytes, 10).unwrap();
-        assert!(blaetter[0].1.kopf.is_empty() && blaetter[0].1.zeilen.is_empty());
-        assert_eq!(blaetter[1].1.kopf, ["A"]);
+        let blaetter = lies_blaetter(&bytes, 10, |_| true).unwrap();
+        assert!(
+            blaetter[0].1.as_ref().unwrap().kopf.is_empty()
+                && blaetter[0].1.as_ref().unwrap().zeilen.is_empty()
+        );
+        assert_eq!(blaetter[1].1.as_ref().unwrap().kopf, ["A"]);
+    }
+
+    #[test]
+    fn lies_blaetter_uebergangenes_blatt_wird_nicht_gelesen() {
+        // „Groß“ verletzt die Zeilengrenze; übergangen wird es nicht gemessen.
+        let drei: &[&[&str]] = &[&["A"], &["1"], &["2"], &["3"]];
+        let fuenf: &[&[&str]] = &[&["A"], &["1"], &["2"], &["3"], &["4"], &["5"]];
+        let bytes = mappe(&[("Eins", drei), ("Groß", fuenf)]);
+        assert!(lies_blaetter(&bytes, 3, |_| true).is_err());
+        let blaetter = lies_blaetter(&bytes, 3, |n| n == "Eins").unwrap();
+        assert_eq!(blaetter.len(), 2);
+        assert_eq!(blaetter[0].1.as_ref().unwrap().zeilen.len(), 3);
+        assert_eq!(blaetter[1].0, "Groß");
+        assert!(blaetter[1].1.is_none());
     }
 
     #[test]
     fn lies_blaetter_prueft_die_dateigroesse() {
-        assert!(lies_blaetter(&vec![b'a'; DATEI_MAX_BYTES + 1], 10).is_err());
+        assert!(lies_blaetter(&vec![b'a'; DATEI_MAX_BYTES + 1], 10, |_| true).is_err());
     }
 }

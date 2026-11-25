@@ -123,6 +123,19 @@ function gewaehlt(e: StammdatenEntscheidungen, z: StammdatenZeile): StammdatenZe
   return eintrag?.wahl ?? z.wahl ?? null;
 }
 
+/**
+ * Wert der Auswahl. Der Server meldet bei einer neuen Zeile die Vorgabe als `wahl: neu`; das ist
+ * hier der Vorschlag „Neu anlegen“, kein eigener Eintrag (sonst stünde der Rohwert im Feld).
+ */
+function auswahlWert(
+  ergebnis: StammdatenZeile['ergebnis'],
+  wert: string | null,
+  offen: boolean,
+): string | undefined {
+  if (wert == null) return offen ? undefined : VORSCHLAG;
+  return ergebnis === 'neu' && wert === 'neu' ? VORSCHLAG : wert;
+}
+
 function qualiGewaehlt(
   e: StammdatenEntscheidungen,
   q: StammdatenQualiZeile,
@@ -193,17 +206,28 @@ function zeilenOptionen(z: StammdatenZeile) {
   }
 }
 
-function qualiOptionen(q: StammdatenQualiZeile) {
+/** Eine Qualifikation der eigenen Org, zu der eine der Datei zugeordnet werden kann. */
+export interface KatalogQualifikation {
+  id: number;
+  label: string;
+}
+
+/**
+ * Wahl einer Qualifikation: die Kandidaten des Abgleichs zuerst, dann der übrige Katalog der Org.
+ * Eine mehrdeutige lässt sich nicht neu anlegen: eine gleichlautende gibt es schon.
+ */
+function qualiOptionen(q: StammdatenQualiZeile, katalog: readonly KatalogQualifikation[]) {
   const auslassen = { value: 'auslassen', label: 'Auslassen' };
-  const zuordnen = q.kandidaten.map((k) => ({
-    value: `zuordnen:${k.id}`,
-    label: `Zuordnen zu ${k.anzeige}`,
-  }));
+  const kandidaten = new Set(q.kandidaten.map((k) => k.id));
+  const zuordnen = [
+    ...q.kandidaten.map((k) => ({ id: k.id, anzeige: k.anzeige })),
+    ...katalog.filter((k) => !kandidaten.has(k.id)).map((k) => ({ id: k.id, anzeige: k.label })),
+  ].map((k) => ({ value: `zuordnen:${k.id}`, label: `Zuordnen zu ${k.anzeige}` }));
   switch (q.ergebnis) {
     case 'neu':
       return [{ value: VORSCHLAG, label: 'Neu anlegen' }, ...zuordnen, auslassen];
     case 'mehrdeutig':
-      return [...zuordnen, { value: 'neu', label: 'Neu anlegen' }, auslassen];
+      return [...zuordnen, auslassen];
     case 'gefunden':
     case 'ausser_dienst':
       return [{ value: VORSCHLAG, label: 'Mit Bestand verknüpfen' }, ...zuordnen, auslassen];
@@ -288,7 +312,7 @@ function DateiZeile({
             <Select
               aria-label={`Wahl für ${zeile.anzeige}`}
               placeholder="Bitte wählen"
-              value={wahl ? zeilenWert(wahl) : offen ? undefined : VORSCHLAG}
+              value={auswahlWert(zeile.ergebnis, wahl ? zeilenWert(wahl) : null, offen)}
               onChange={(w: string) => onWahl(zeilenWahl(w))}
               disabled={gesperrt}
               options={optionen}
@@ -323,11 +347,16 @@ function DateiZeile({
 
 function QualiBlockZeile({
   quali,
+  katalog,
+  herkunftNennen,
   e,
   gesperrt,
   onWahl,
 }: {
   quali: StammdatenQualiZeile;
+  katalog: readonly KatalogQualifikation[];
+  /** Derselbe Text steht unter einer anderen Herkunft noch einmal. */
+  herkunftNennen: boolean;
   e: StammdatenEntscheidungen;
   gesperrt: boolean;
   onWahl: (w: StammdatenQualiWahl | null) => void;
@@ -340,19 +369,22 @@ function QualiBlockZeile({
       <Flex gap={token.marginSM} align="center" wrap>
         <ZeilenKopf
           titel={quali.text}
-          nebenan={
-            quali.zeilen.length > 0 ? `Zeile ${quali.zeilen.join(', ')}` : 'aus dem Personal'
-          }
+          nebenan={[
+            ...(herkunftNennen
+              ? [quali.herkunft !== '' ? `Herkunft ${quali.herkunft}` : 'ohne Herkunft']
+              : []),
+            quali.zeilen.length > 0 ? `Zeile ${quali.zeilen.join(', ')}` : 'aus dem Personal',
+          ].join(' · ')}
           marken={[offen ? 'Offen' : quali.ergebnis === 'neu' ? 'Unbekannt' : 'Gefunden']}
         />
         <div className={FELD_KLASSE} style={{ flex: '1 1 14rem', minWidth: 0 }}>
           <Select
             aria-label={`Wahl für Qualifikation ${quali.text}`}
             placeholder="Bitte wählen"
-            value={wahl ? qualiWert(wahl) : offen ? undefined : VORSCHLAG}
+            value={auswahlWert(quali.ergebnis, wahl ? qualiWert(wahl) : null, offen)}
             onChange={(w: string) => onWahl(qualiWahl(w))}
             disabled={gesperrt}
-            options={qualiOptionen(quali)}
+            options={qualiOptionen(quali, katalog)}
           />
         </div>
       </Flex>
@@ -419,6 +451,8 @@ function qualiZuEntscheiden(q: StammdatenQualiZeile): boolean {
 
 interface StammdatenVorschauAnsichtProps {
   vorschau: StammdatenVorschau;
+  /** Qualifikationen der Org, zu denen eine der Datei zugeordnet werden kann. */
+  katalog?: readonly KatalogQualifikation[];
   entscheidungen: StammdatenEntscheidungen;
   onEntscheidungen: (neu: StammdatenEntscheidungen) => void;
   /** Während einer Abfrage oder des Übernehmens. */
@@ -428,6 +462,7 @@ interface StammdatenVorschauAnsichtProps {
 /** Die Vorschau samt Wahl je Zeile und Qualifikation. */
 export function StammdatenVorschauAnsicht({
   vorschau,
+  katalog = [],
   entscheidungen,
   onEntscheidungen,
   gesperrt = false,
@@ -440,6 +475,11 @@ export function StammdatenVorschauAnsicht({
   const qualiSortiert = [...qualis].sort(
     (a, b) => Number(qualiOffen(e, b)) - Number(qualiOffen(e, a)),
   );
+  // Derselbe Text unter mehreren Herkünften: die Herkunft unterscheidet die Zeilen.
+  const textAnzahl = new Map<string, number>();
+  for (const q of vorschau.qualifikationen) {
+    textAnzahl.set(q.text, (textAnzahl.get(q.text) ?? 0) + 1);
+  }
   const zeile = (z: StammdatenZeile) => (
     <DateiZeile
       key={`${z.art}-${z.zeile}`}
@@ -482,8 +522,10 @@ export function StammdatenVorschauAnsicht({
             <Typography.Title level={5}>Qualifikationen</Typography.Title>
             {qualiSortiert.map((q) => (
               <QualiBlockZeile
-                key={q.text}
+                key={`${q.herkunft}|${q.text}`}
                 quali={q}
+                katalog={katalog}
+                herkunftNennen={(textAnzahl.get(q.text) ?? 0) > 1}
                 e={e}
                 gesperrt={gesperrt}
                 onWahl={(w) => onEntscheidungen(mitQualiWahl(e, q, w))}

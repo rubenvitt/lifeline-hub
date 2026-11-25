@@ -15223,17 +15223,14 @@ async fn migration_0373_stammdaten_kennung() {
         .await
         .expect("Qualifikation darf mehrere Kennungen derselben Herkunft tragen");
 
-    sqlx::query("DELETE FROM fahrzeug WHERE id = ?")
+    let geloescht = sqlx::query("DELETE FROM fahrzeug WHERE id = ?")
         .bind(fz1)
         .execute(&pool)
-        .await
-        .unwrap();
-    let rest: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM stammdaten_kennung WHERE fahrzeug_id IS NOT NULL")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
-    assert_eq!(rest, 0, "Löschen des Fahrzeugs kaskadiert");
+        .await;
+    assert!(
+        geloescht.is_err(),
+        "ein Fahrzeug mit Kennung hält fest (NO ACTION, Demo-Löschweg behält es)"
+    );
 }
 
 /// LLH-1194: höchstens ein offener Schnappschuss je Adapter, nur ein offener trägt Inhalt, Löschen

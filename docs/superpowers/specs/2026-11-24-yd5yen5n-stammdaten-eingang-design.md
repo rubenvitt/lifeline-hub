@@ -154,8 +154,8 @@ CREATE TABLE stammdaten_kennung (
     org_id           INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,
     herkunft         TEXT    NOT NULL,           -- normalisiert wie herkunft_norm
     kennung          TEXT    NOT NULL,
-    fahrzeug_id      INTEGER REFERENCES fahrzeug(id)      ON DELETE CASCADE,
-    personal_id      INTEGER REFERENCES personal(id)      ON DELETE CASCADE,
+    fahrzeug_id      INTEGER REFERENCES fahrzeug(id),
+    personal_id      INTEGER REFERENCES personal(id),
     qualifikation_id INTEGER REFERENCES qualifikation(id) ON DELETE CASCADE,
     angelegt_at      TEXT    NOT NULL,
     CHECK ((fahrzeug_id IS NOT NULL) + (personal_id IS NOT NULL) + (qualifikation_id IS NOT NULL) = 1)
@@ -170,8 +170,10 @@ CREATE UNIQUE INDEX uq_stammdaten_kennung_fz_ziel ON stammdaten_kennung(herkunft
 CREATE UNIQUE INDEX uq_stammdaten_kennung_p_ziel  ON stammdaten_kennung(herkunft, personal_id)      WHERE personal_id IS NOT NULL;
 ```
 
-Drei echte Fremdschlüssel statt `art` + `ziel_id`, damit Löschen kaskadiert und keine Waise
-entsteht (Entscheidung des Entwurfs). Die Org eines Ziels muss gleich `org_id` sein; das prüft
+Drei echte Fremdschlüssel statt `art` + `ziel_id`, damit keine Waise entsteht (Entscheidung des
+Entwurfs). Fahrzeug und Personal halten fest (NO ACTION, Nachtrag 25.11.2026): Der Demo-Löschweg
+behält eine verwiesene Zeile (`demo::schema_tests::kein_fk_kaskadiert_in_stammdaten`); eine
+Qualifikation nimmt ihre Kennungen mit. Die Org eines Ziels muss gleich `org_id` sein; das prüft
 Rust beim Schreiben (Org-Isolation), ein Test riegelt es ab. Die Herkunft wird normalisiert
 gespeichert (getrimmt, Kleinschreibung) und für die Anzeige in der Vorschau aus der Datei genommen.
 Migrations-Test `db::tests::migration_NNNN_stammdaten_kennung`.

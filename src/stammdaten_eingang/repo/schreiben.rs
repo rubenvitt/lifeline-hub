@@ -129,10 +129,11 @@ pub async fn write_tx(
         };
         if let Some(id) = id {
             for k in &q.kennungen {
-                // Mehrere Kennungen je Qualifikation sind erlaubt; eine schon gemerkte (gleich
-                // geschrieben) bleibt.
+                // Mehrere Kennungen je Qualifikation sind erlaubt. Eine, die schon gemerkt oder
+                // in der Datei doppelt ist, hat `planen` ausgesondert; ein Konflikt hier ist ein
+                // Programmfehler und bricht die Transaktion ab, statt still zu verwerfen.
                 sqlx::query(
-                    "INSERT OR IGNORE INTO stammdaten_kennung \
+                    "INSERT INTO stammdaten_kennung \
                         (org_id, herkunft, kennung, qualifikation_id, angelegt_at) \
                      VALUES (?, ?, ?, ?, ?)",
                 )
