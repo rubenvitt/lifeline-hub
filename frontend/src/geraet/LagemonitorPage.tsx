@@ -928,27 +928,27 @@ export default function LagemonitorPage() {
                 >
                   {!aus.has('meldungen') && (
                     <KachelGrenze
-                  titel="Meldungen"
-                  form="gross"
-                  neuversuch={lageQuery.dataUpdatedAt}
-                  ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
-                >
-                  <MeldungenKachel
-                    offen={lage?.sofortmeldungen_offen}
-                    neu={sofortNeu}
-                    allein={ablauf.length === 0}
-                  />
-                </KachelGrenze>
+                      titel="Meldungen"
+                      form="gross"
+                      neuversuch={lageQuery.dataUpdatedAt}
+                      ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
+                    >
+                      <MeldungenKachel
+                        offen={lage?.sofortmeldungen_offen}
+                        neu={sofortNeu}
+                        allein={ablauf.length === 0}
+                      />
+                    </KachelGrenze>
                   )}
                   {ablauf.length > 0 && (
                     <KachelGrenze
-                  titel="Ablauf"
-                  form="gross"
-                  neuversuch={lageQuery.dataUpdatedAt}
-                  ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
-                >
-                  <AblaufKachel punkte={ablauf} jetzt={jetzt} />
-                </KachelGrenze>
+                      titel="Ablauf"
+                      form="gross"
+                      neuversuch={lageQuery.dataUpdatedAt}
+                      ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
+                    >
+                      <AblaufKachel punkte={ablauf} jetzt={jetzt} />
+                    </KachelGrenze>
                   )}
                 </div>
               )}
@@ -962,27 +962,27 @@ export default function LagemonitorPage() {
               <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
                 {!aus.has('meldungen') && (
                   <KachelGrenze
-                  titel="Meldungen"
-                  form="gross"
-                  neuversuch={lageQuery.dataUpdatedAt}
-                  ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
-                >
-                  <MeldungenKachel
-                    offen={lage?.sofortmeldungen_offen}
-                    neu={sofortNeu}
-                    allein={ablauf.length === 0}
-                  />
-                </KachelGrenze>
+                    titel="Meldungen"
+                    form="gross"
+                    neuversuch={lageQuery.dataUpdatedAt}
+                    ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
+                  >
+                    <MeldungenKachel
+                      offen={lage?.sofortmeldungen_offen}
+                      neu={sofortNeu}
+                      allein={ablauf.length === 0}
+                    />
+                  </KachelGrenze>
                 )}
                 {ablauf.length > 0 && (
                   <KachelGrenze
-                  titel="Ablauf"
-                  form="gross"
-                  neuversuch={lageQuery.dataUpdatedAt}
-                  ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
-                >
-                  <AblaufKachel punkte={ablauf} jetzt={jetzt} />
-                </KachelGrenze>
+                    titel="Ablauf"
+                    form="gross"
+                    neuversuch={lageQuery.dataUpdatedAt}
+                    ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
+                  >
+                    <AblaufKachel punkte={ablauf} jetzt={jetzt} />
+                  </KachelGrenze>
                 )}
               </div>
             )

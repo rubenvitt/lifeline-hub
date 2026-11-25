@@ -265,7 +265,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     for (const groesse of ablaufText) expect(groesse).toBeGreaterThanOrEqual(28);
 
     // Kein Bildlauf: alles passt in 1920 × 1080, und keine Kachel schneidet ihren Inhalt ab.
-    const passtGanz = async () => {
+    const passtGanz = async (mitLivebild = false) => {
       const masse = await monitor.evaluate(() => ({
         hoehe: document.documentElement.scrollHeight,
         breite: document.documentElement.scrollWidth,
@@ -288,6 +288,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
         'Lagekarte',
         'Meldungen',
         'Ablauf',
+        ...(mitLivebild ? ['Livebild'] : []),
       ]) {
         await expect(monitor.getByRole('region', { name: kachel })).toBeInViewport({ ratio: 1 });
       }
@@ -329,6 +330,29 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
       '2Sofortmeldungen offen',
     );
     await passtGanz();
+    await expect(monitor.getByRole('region', { name: 'Livebild' })).toHaveCount(0);
+
+    // LLH-2109: Hat die Einsatzleitung das Livebild auf den Lagemonitor gelegt, steht unter der
+    // Karte die Kachel „Livebild“ neben Meldungen über Ablauf. Ohne Suchlage im Testlauf ergänzt
+    // die Seite den Block `drohne` und der Proxy antwortet 503: die Kachel zeigt „Kein Livebild“.
+    await monitor.route(`**/api/incidents/${e}/situation-monitor`, async (route) => {
+      const antwort = await route.fetch();
+      const lage = await antwort.json();
+      await route.fulfill({
+        response: antwort,
+        json: { ...lage, drohne: { videos: ['v1'], stand_at: lage.stand_at } },
+      });
+    });
+    await monitor.route('**/drone/video/**', (route) =>
+      route.fulfill({ status: 503, body: 'Kein Livebild' }),
+    );
+    await monitor.reload();
+    await monitor.getByRole('button', { name: 'Anzeige starten' }).click();
+    const livebild = monitor.getByRole('region', { name: 'Livebild' });
+    await expect(livebild.getByText('Kein Livebild')).toBeVisible({ timeout: 30_000 });
+    await expect(livebild.locator('video')).toHaveJSProperty('muted', true);
+    await passtGanz(true);
+    await monitor.unroute(`**/api/incidents/${e}/situation-monitor`);
 
     // Übungsmarke in der Statusleiste, ≥ 28 px, ohne Band oben (LLH-1725, Spec `uebungsmarke`).
     const marke = monitor.locator('[data-lfh="monitor-statusleiste"] [data-lfh="uebung-marke"]');
