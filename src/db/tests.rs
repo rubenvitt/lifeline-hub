@@ -15046,9 +15046,12 @@ async fn migration_0370_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
             .await
             .unwrap();
     assert_eq!(neu.len(), alt.len());
+    // Das Präfix zieht erst Migration 0375 auf `/api/incidents` um (LLH-2061); verglichen wird mit
+    // dem Stand, den beide Migrationen zusammen hinterlassen.
     for (vorher, nachher) in alt.iter().zip(&neu) {
+        let spaeter = nachher.replacen("/api/einsaetze/", "/api/incidents/", 1);
         assert!(
-            BEANTRAGBAR.iter().any(|b| b.pfad == nachher.as_str()),
+            BEANTRAGBAR.iter().any(|b| b.pfad == spaeter),
             "{vorher} → {nachher} ist kein beantragbarer Pfad"
         );
     }
@@ -15134,9 +15137,9 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
 /// Führer sie nicht mehr unter den beantragbaren Erfassungen. Die Migration tauscht nur das Präfix
 /// und lässt fremde Vorlagen stehen, auch eine, die bloß mit denselben Buchstaben beginnt.
 #[tokio::test]
-async fn migration_0374_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
+async fn migration_0375_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
     // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-    const VERSION: i64 = 374;
+    const VERSION: i64 = 375;
     let pool = pool_bis(
         SqliteConnectOptions::new().filename(":memory:"),
         VERSION - 1,

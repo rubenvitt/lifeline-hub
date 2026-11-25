@@ -101,8 +101,7 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
               </span>
               {onLivebild && q.connected && q.video_keys.length > 0 && (
                 <Button
-                  size="small"
-                  style={{ alignSelf: 'flex-start', minHeight: token.controlHeight }}
+                  style={{ alignSelf: 'flex-start' }}
                   aria-describedby={beschreibung}
                   onClick={() => onLivebild(q.adapter_id)}
                 >
@@ -111,8 +110,7 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
               )}
               {darfSchalten && schaltbar && (
                 <Button
-                  size="small"
-                  style={{ alignSelf: 'flex-start', minHeight: token.controlHeight }}
+                  style={{ alignSelf: 'flex-start' }}
                   type={q.connected ? 'default' : 'primary'}
                   loading={laeuft}
                   aria-describedby={beschreibung}
