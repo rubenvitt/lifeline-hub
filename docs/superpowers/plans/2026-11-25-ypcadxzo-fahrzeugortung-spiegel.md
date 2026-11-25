@@ -1,7 +1,7 @@
 # Fahrzeugortung in gespiegelten Einsätzen: Umsetzungsplan (LLH-2119)
 
 > **Für ausführende Agenten:** PFLICHT-SKILL: superpowers:subagent-driven-development (empfohlen)
-> oder superpowers:executing-plans; Schritte als Checkboxen (`- [ ]`).
+> oder superpowers:executing-plans; Schritte als Checkboxen (`- [x]`).
 
 **Ziel:** Ein ELW, das einen Einsatz führt, koppelt Fahrzeuge an Einwurf-Kennungen seines Hubs. Die
 Positionen kommen im Spiegelabgleich ans ELW.
@@ -72,7 +72,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   `Kopplung.zugang: KopplungZugang`, über `FromRow` von Hand oder über eine Zwischenzeile.
 - Erzeugt `impl Kopplung { pub fn access_id(&self) -> &str }`, den Zugangs-Schlüssel beider Arten.
 
-- [ ] **Schritt 1: Failing Tests in `tests/ortung.rs`**
+- [x] **Schritt 1: Failing Tests in `tests/ortung.rs`**
   - `gemischte_kopplungszeile_wird_abgelehnt`: Ein INSERT mit `zugang_id` **und**
     `instanz_kopplung_id` ergibt einen Fehler mit `CHECK`.
   - `hub_kopplung_wird_mit_namen_geladen`: Eine Hub-Zeile von Hand einfügen (Instanzkopplung über
@@ -80,12 +80,12 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     Zeile und `KopplungZugang::Hub { .. }`.
   - `trennen_und_abschluss_sehen_hub_kopplungen`: `delete_kopplung_tx` liefert `Some(..)`;
     `beende_im_einsatz_tx` führt sie in `getrennt`.
-- [ ] **Schritt 2:** `cargo test --test ortung` muss mit FAIL enden (Spalte fehlt).
-- [ ] **Schritt 3: Migration 0385 schreiben**
+- [x] **Schritt 2:** `cargo test --test ortung` muss mit FAIL enden (Spalte fehlt).
+- [x] **Schritt 3: Migration 0385 schreiben**
   - Umbau nach dem Muster 0324: neue Tabelle anlegen, Bestand mit `zugang_id` kopieren, die alte
     Tabelle löschen, umbenennen, Indizes anlegen.
   - Kopfkommentar mit Verweis auf die Spec.
-- [ ] **Schritt 4: `SELECT_KOPPLUNG` umbauen**
+- [x] **Schritt 4: `SELECT_KOPPLUNG` umbauen**
   - `LEFT JOIN einwurf_zugang z ON z.id = k.zugang_id`;
   - Name `COALESCE(z.name, k.zugang_name)`;
   - die Hub-Spalten mitlesen.
@@ -94,9 +94,9 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `From<Kopplung> for TrackingResponse` nimmt `access_id()`.
   - `disposition_repo.rs:796` füllt `OrtungVorzustand` aus `access_id()` (die Hub-Felder folgen in
     Task 4).
-- [ ] **Schritt 5:** `cargo test --test ortung`, dann `cargo test ortung`: PASS, auch
+- [x] **Schritt 5:** `cargo test --test ortung`, dann `cargo test ortung`: PASS, auch
   `keine_tabelle_haelt_einen_positionsverlauf`.
-- [ ] **Schritt 6:** Commit `feat(ortung): Kopplung an Zugänge des Hubs vorbereiten (LLH-2119)`.
+- [x] **Schritt 6:** Commit `feat(ortung): Kopplung an Zugänge des Hubs vorbereiten (LLH-2119)`.
 
 ### Task 2: Hub beantwortet Ortungsanfragen im Abgleich
 
@@ -133,7 +133,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - Kandidaten über `kopplung::list_kandidaten`; `tracking_enabled` aus
     `org::einstellungen::ortung_der_org`.
 
-- [ ] **Schritt 1: Failing Tests in `tests/ortung_spiegel.rs`.** Aufbau je Test:
+- [x] **Schritt 1: Failing Tests in `tests/ortung_spiegel.rs`.** Aufbau je Test:
   - Hub und ELW gekoppelt;
   - am Hub ein Einwurf-Zugang mit `positionen:write` für die abgebildete Org;
   - am Hub ein Einwurf über die Route mit Kennung `fkw1`;
@@ -160,13 +160,13 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     ein voller Abgleich über `abgleichen(elw)`. Er gelingt, und die Felder sind leer.
   - `aelteres_paket_ohne_felder_wird_gelesen`: JSON eines `SpiegelPaket` ohne die vier Felder
     deserialisiert, und die Felder sind leer.
-- [ ] **Schritt 2:** `cargo test --test ortung_spiegel` muss mit FAIL enden (Typen fehlen).
-- [ ] **Schritt 3:** Typen, Felder und `check()` umsetzen (`tracking_requests.len() <= 200` sonst
+- [x] **Schritt 2:** `cargo test --test ortung_spiegel` muss mit FAIL enden (Typen fehlen).
+- [x] **Schritt 3:** Typen, Felder und `check()` umsetzen (`tracking_requests.len() <= 200` sonst
   kürzen, nicht abweisen: Überzählige überliest der Hub). `answer_hub` umsetzen.
   `handle_abgleich` ruft es **nach** dem `write_retry!` auf und setzt die Felder in die Antwort.
-- [ ] **Schritt 4:** `cargo test --test ortung_spiegel` und
+- [x] **Schritt 4:** `cargo test --test ortung_spiegel` und
   `cargo test --test eingabegrenzen_spiegel`: PASS.
-- [ ] **Schritt 5:** Commit `feat(spiegel): Hub liefert Positionen gekoppelter Kennungen (LLH-2119)`.
+- [x] **Schritt 5:** Commit `feat(spiegel): Hub liefert Positionen gekoppelter Kennungen (LLH-2119)`.
 
 ### Task 3: ELW fragt an und übernimmt
 
@@ -200,7 +200,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `pub fn cached_candidates(pool: &SqlitePool, instanz_kopplung_id: i64, org_id: i64) ->
     Option<(Instant, TrackingCandidates)>`.
 
-- [ ] **Schritt 1: Failing Tests.** Ende zu Ende über `abgleichen(elw)`. Das ELW führt den
+- [x] **Schritt 1: Failing Tests.** Ende zu Ende über `abgleichen(elw)`. Das ELW führt den
   Einsatz (`elw_einsatz`) mit einem disponierten Fahrzeug. Die Hub-Kopplung wird per SQL
   eingefügt, die Route folgt in Task 4.
   - `elw_bekommt_position_vom_hub`: Nach `abgleichen` gilt am ELW-Fahrzeug `lat/lon` des
@@ -212,13 +212,13 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     `SpiegelPaket::default()` auf. Nichts ändert sich, und es gibt keinen Panic.
   - `wunsch_liefert_kandidaten_in_den_puffer`: `wish_candidates`, dann `abgleichen`. Danach ist
     `cached_candidates` gesetzt und enthält `fkw1`.
-- [ ] **Schritt 2:** FAIL bestätigen.
-- [ ] **Schritt 3:** Umsetzen.
+- [x] **Schritt 2:** FAIL bestätigen.
+- [x] **Schritt 3:** Umsetzen.
   - `abgleich_einmal` setzt die Anfragefelder in der ersten Runde, nur wenn
     `runde == 0`, damit ein Paket mit mehreren Runden nicht doppelt fragt.
   - Nach dem Commit der Antwortübernahme ruft es `apply_answer` auf.
-- [ ] **Schritt 4:** `cargo test --test ortung_spiegel --test ortung`: PASS.
-- [ ] **Schritt 5:** Commit `feat(ortung): ELW übernimmt Positionen vom Hub (LLH-2119)`.
+- [x] **Schritt 4:** `cargo test --test ortung_spiegel --test ortung`: PASS.
+- [x] **Schritt 5:** Commit `feat(ortung): ELW übernimmt Positionen vom Hub (LLH-2119)`.
 
 ### Task 4: Routen und Rücknahme am ELW
 
@@ -244,7 +244,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   `#[serde(default)] zugang_name: Option<String>`. Mit gesetztem `instanz_kopplung_id` ist
   `zugang_id` der Hub-Zugang.
 
-- [ ] **Schritt 1: Failing Tests** über die Routen am ELW:
+- [x] **Schritt 1: Failing Tests** über die Routen am ELW:
   - `kandidaten_vom_hub_mit_pending`:
     - Der erste GET liefert `pending: true` und eine leere Liste.
     - Nach `abgleichen` liefert der zweite GET `pending: false`, und `fkw1` steht mit
@@ -262,8 +262,8 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `ohne_hub_bleibt_alles_lokal`: Eine Instanz ohne Hub liefert Kandidaten aus der eigenen
     Ablage mit `pending: false` und `via_hub: false`. Die bestehenden Tests in `tests/ortung.rs`
     bleiben grün.
-- [ ] **Schritt 2:** FAIL bestätigen.
-- [ ] **Schritt 3:** Umsetzen.
+- [x] **Schritt 2:** FAIL bestätigen.
+- [x] **Schritt 3:** Umsetzen.
   - **`candidates`:** Hat die Org einen Hub, wird der Puffer gelesen. Ist er älter als 10 s oder
     fehlt er, folgen `wish_candidates` und `takt::wecken()`. `coupled` kommt aus den eigenen
     Hub-Zeilen; `tracking_enabled` ist das logische UND von Hub-Wert und eigenem Schalter.
@@ -276,9 +276,9 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     - die Org ist noch zugeordnet;
     - die Kennung ist frei.
   - Danach `scripts/check-typ-codegen.sh`.
-- [ ] **Schritt 4:** `cargo test --test ortung_spiegel --test ortung` und
+- [x] **Schritt 4:** `cargo test --test ortung_spiegel --test ortung` und
   `scripts/check-typ-codegen.sh`: PASS.
-- [ ] **Schritt 5:** Commit `feat(ortung): Koppeln an Kennungen des Hubs (LLH-2119)`.
+- [x] **Schritt 5:** Commit `feat(ortung): Koppeln an Kennungen des Hubs (LLH-2119)`.
 
 ### Task 5: Führungsabgabe trennt still
 
@@ -292,7 +292,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   i64) -> Result<u64, AppError>`. Sie löscht alle Kopplungen des Einsatzes, schreibt kein ETB und
   liefert die Anzahl.
 
-- [ ] **Schritt 1: Failing Tests**
+- [x] **Schritt 1: Failing Tests**
   - `abgabe_trennt_hub_kopplung_still`:
     - Das ELW führt den Einsatz mit einer Hub-Kopplung und gibt die Führung an den Hub ab, über
       den Übergabeweg aus `tests/instanz_fuehrung.rs`.
@@ -301,11 +301,11 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     - `einsatz_spiegel.bruch_offen = 0`.
   - `abgabe_am_hub_trennt_lokale_kopplung`: Der Hub führt mit einer lokalen Kopplung und gibt an
     das ELW ab. Die Zeile ist weg.
-- [ ] **Schritt 2:** FAIL bestätigen.
-- [ ] **Schritt 3:** Aufruf in `werde_spiegel` direkt nach
+- [x] **Schritt 2:** FAIL bestätigen.
+- [x] **Schritt 3:** Aufruf in `werde_spiegel` direkt nach
   `helfer::ende::beende_alle_im_einsatz`, mit Kommentar zur Bruchstelle (Spec, „Führungswechsel“).
-- [ ] **Schritt 4:** `cargo test --test ortung_spiegel --test instanz_fuehrung`: PASS.
-- [ ] **Schritt 5:** Commit `feat(ortung): Führungsabgabe beendet Kopplungen (LLH-2119)`.
+- [x] **Schritt 4:** `cargo test --test ortung_spiegel --test instanz_fuehrung`: PASS.
+- [x] **Schritt 5:** Commit `feat(ortung): Führungsabgabe beendet Kopplungen (LLH-2119)`.
 
 ### Task 6: Oberfläche
 
@@ -317,7 +317,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 **Schnittstellen:**
 - Verbraucht `pending` und `via_hub` aus `types.generated.ts` (Task 4).
 
-- [ ] **Schritt 1: Failing Tests (Vitest)**
+- [x] **Schritt 1: Failing Tests (Vitest)**
   - `zeigt Ladezustand, solange der Hub liefert`: Bei `pending: true` steht der Text
     „Kennungen werden vom Hub geholt …“, und die Abfrage läuft erneut (`refetchInterval` 2000).
   - `zeigt Hinweis nach 15 s ohne Antwort`: Mit Fake-Timern und dauerhaft `pending` erscheint
@@ -327,15 +327,15 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
     Einsatz mit `position_quelle: 'einwurf'` und Position jünger als 5 min zeigt die Marke
     „Ortung“; bei einer älteren Position fehlt sie. Die Schwelle kommt aus der bestehenden
     Konstante für „veraltet“, keine neue.
-- [ ] **Schritt 2:** `mise exec -- pnpm -C frontend vitest run src/kraefte/OrtungKoppelnDialog
+- [x] **Schritt 2:** `mise exec -- pnpm -C frontend vitest run src/kraefte/OrtungKoppelnDialog
   src/pages/FahrzeugePage` muss mit FAIL enden.
-- [ ] **Schritt 3:** Umsetzen.
+- [x] **Schritt 3:** Umsetzen.
   - `refetchInterval` nur bei offenem Dialog und `pending`.
   - Die 15 s ab dem ersten `pending` über einen Zeitstempel im State messen.
   - Texte wie oben.
-- [ ] **Schritt 4:** Tests PASS. Prettier und Lint über `./scripts/check-all.sh --geaendert
+- [x] **Schritt 4:** Tests PASS. Prettier und Lint über `./scripts/check-all.sh --geaendert
   --ohne-e2e` erst in Task 8.
-- [ ] **Schritt 5:** Commit `feat(fahrzeuge): Ortung über den Hub im Koppeldialog (LLH-2119)`.
+- [x] **Schritt 5:** Commit `feat(fahrzeuge): Ortung über den Hub im Koppeldialog (LLH-2119)`.
 
 ### Task 7: ADR-0105 und Doku
 
@@ -347,7 +347,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `docs/anwender/…/fahrzeuge.md` und `anbindungen.md` (DSFA-Empfänger „führendes ELW“);
   - Spec LLH-2091, Abschnitt „Offen für später“: Verweis ergänzen.
 
-- [ ] **Schritt 1: ADR schreiben** nach `VORLAGE.md`.
+- [x] **Schritt 1: ADR schreiben** nach `VORLAGE.md`.
   - `gilt_fuer`: `src/ortung/fern.rs`, `src/ortung/kopplung.rs`,
     `src/instanz/spiegel/fuehrung.rs`, `src/instanz/spiegel/paket.rs`.
   - Regeln wie in der Spec, „Doku“, einschließlich der Ausnahme „kein Nachlauf auf dem Hub-Weg“.
@@ -359,11 +359,11 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
       `SammelzeileJe`, ohne Kennung; das Muster danach ausrichten.
     - `verbiete '\b(lat|lon)\b'` im Typ `TrackingCandidate` (über einen eigenen Abschnitt oder
       einen Test).
-- [ ] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0105 und ADR-0103;
+- [x] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0105 und ADR-0103;
   `scripts/check-adr-nummern.sh` ist grün.
-- [ ] **Schritt 3:** Architektur- und Anwendertexte. Bilder nach `docs/anwender/AGENTS.md`
+- [x] **Schritt 3:** Architektur- und Anwendertexte. Bilder nach `docs/anwender/AGENTS.md`
   (Bildlauf), soweit der Dialog betroffen ist.
-- [ ] **Schritt 4:** Commit `docs: ADR-0105 und Doku zur Ortung über den Hub (LLH-2119)`.
+- [x] **Schritt 4:** Commit `docs: ADR-0105 und Doku zur Ortung über den Hub (LLH-2119)`.
 
 ### Task 8: Gates, Bilder, Abschluss
 
