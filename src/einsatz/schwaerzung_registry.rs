@@ -3771,6 +3771,26 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("occurred_at", G_ZEIT),
         ],
     },
+    // ---------- Fahrzeugortung aus dem Einwurf (LLH-2091, migrations/0381, ADR-0103) ----------
+    // Ganze Zeile löschen: die Kopplung ist eine lokale Betriebsangabe ohne Skelettwert (die
+    // Spur steht im ETB), und der Abschluss löscht sie ohnehin. `kennung` ist die Absender-
+    // Kennung eines Ortungsgeräts; sie kann ein Gerät der Besatzung benennen und darf nicht
+    // bleiben. Ein Platzhalter verletzte zudem `UNIQUE (zugang_id, kennung)` ab der zweiten Zeile.
+    TabellenRegel {
+        tabelle: "ortung_kopplung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("einsatz_fahrzeug_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("kennung", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("gekoppelt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("gekoppelt_von", Strategie::ZeileLoeschen, Z_EINSATZ),
+        ],
+    },
     TabellenRegel {
         tabelle: "spiegel_ziel",
         scoping: Scoping::EinsatzId,

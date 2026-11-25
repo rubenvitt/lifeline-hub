@@ -200,6 +200,8 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   `engines.node` (Wurzel, `frontend/`, `website/`), `website/.node-version` (Cloudflare Pages) und
   der Devcontainer spiegeln die Zahl; `scripts/check-toolversionen.sh`
   prüft das und bricht an jedem harten `node@…`/`pnpm@…` in `scripts/`, `.github/`, README, Skills.
+  Vitest bricht unter einer anderen Node-Hauptversion als `engines.node` vor dem ersten Test ab
+  (`frontend/src/test/suitenNode.ts`, LLH-2134).
 - Env-Hygiene über `scripts/lib/dev-env.sh`, keine handgepflegte `env -u`-Liste; Isolation wo
   möglich im Test (`config::tests::parse_hermetisch`).
 - **Jeder Checkout baut in sein eigenes `target/`** (LFH-520, `.cargo/config.toml`, schlägt
