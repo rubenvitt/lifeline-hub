@@ -12,7 +12,7 @@ import { useWasBrennt, ZAEHLER_TAKT_MS } from './useWasBrennt';
 
 dayjs.extend(utc);
 
-const BASIS = '/api/einsaetze/1';
+const BASIS = '/api/incidents/1';
 const JETZT = dayjs.utc('2026-11-16 14:00:00');
 
 const zaehler = {

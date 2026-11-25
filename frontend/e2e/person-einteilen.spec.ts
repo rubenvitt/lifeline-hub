@@ -28,18 +28,18 @@ async function seed(page: Page): Promise<Saat> {
     return ((await antwort.json()) as { id: number }).id;
   };
   const einsatzId = String(
-    await post('/api/einsaetze', { bezeichnung: `E2E Einteilen ${Date.now()}` }),
+    await post('/api/incidents', { bezeichnung: `E2E Einteilen ${Date.now()}` }),
   );
-  const einheitId = await post(`/api/einsaetze/${einsatzId}/units`, { name: EINHEIT });
-  const fahrzeugId = await post(`/api/einsaetze/${einsatzId}/vehicles`, {
+  const einheitId = await post(`/api/incidents/${einsatzId}/units`, { name: EINHEIT });
+  const fahrzeugId = await post(`/api/incidents/${einsatzId}/vehicles`, {
     adhoc: { funkrufname: FAHRZEUG },
   });
   // Das Fahrzeug gehört der Einheit: dann steht die Person im Meldebild unter ihm.
   const fz = await page.request.put(
-    `/api/einsaetze/${einsatzId}/units/${einheitId}/vehicles/${fahrzeugId}`,
+    `/api/incidents/${einsatzId}/units/${einheitId}/vehicles/${fahrzeugId}`,
   );
   expect(fz.ok(), await fz.text()).toBe(true);
-  const epId = await post(`/api/einsaetze/${einsatzId}/personnel`, {
+  const epId = await post(`/api/incidents/${einsatzId}/personnel`, {
     adhoc: { name: NAME, funktion: 'Sanitäter' },
   });
   return { einsatzId, einheitId, fahrzeugId, epId };

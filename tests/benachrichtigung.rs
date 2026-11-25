@@ -86,7 +86,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/personnel", self.einsatz),
+            &format!("/api/incidents/{}/personnel", self.einsatz),
             &self.admin,
             Some(&json!({ "personal_id": v["id"] }).to_string()),
         )
@@ -104,7 +104,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/members/{benutzer_id}", self.einsatz),
+            &format!("/api/incidents/{}/members/{benutzer_id}", self.einsatz),
             &self.admin,
             Some(&json!({ "einsatz_rolle": rolle, "fuehrungsfunktion": funktion }).to_string()),
         )
@@ -116,7 +116,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "PUT",
-            &format!("/api/einsaetze/{}/module-overrides/{modul}", self.einsatz),
+            &format!("/api/incidents/{}/module-overrides/{modul}", self.einsatz),
             &self.admin,
             Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
         )
@@ -147,7 +147,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/tasks", self.einsatz),
+            &format!("/api/incidents/{}/tasks", self.einsatz),
             &self.admin,
             Some(&body.to_string()),
         )
@@ -413,7 +413,7 @@ async fn geraetekonto_bleibt_still() {
     let (s, v) = anfrage(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/devices", w.einsatz),
+        &format!("/api/incidents/{}/devices", w.einsatz),
         &w.admin,
         Some(r#"{"ansicht":"lagemonitor","bezeichnung":"Monitor"}"#),
     )
@@ -634,7 +634,7 @@ async fn einsatz_strom_stellt_nur_dem_empfaenger_zu_live_und_im_replay() {
     let w = welt().await;
     let anna = w.cookie("annika").await;
     let bert = w.cookie("bertram").await;
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
 
     let anna_live = oeffnen(&w.app, &feed, &anna, None).await;
     let bert_live = oeffnen(&w.app, &feed, &bert, None).await;
@@ -687,7 +687,7 @@ async fn ein_melden_belegt_einen_ringplatz_und_jeder_bekommt_seine_eigene_id() {
     let w = welt().await;
     let anna = w.cookie("annika").await;
     let bert = w.cookie("bertram").await;
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
     let anna_live = oeffnen(&w.app, &feed, &anna, None).await;
     let bert_live = oeffnen(&w.app, &feed, &bert, None).await;
     let admin_live = oeffnen(&w.app, &feed, &w.admin, None).await;
@@ -759,7 +759,7 @@ async fn org_art_geht_ueber_den_org_kanal_nur_an_den_empfaenger() {
     let admin_org = oeffnen(&w.app, "/api/live", &w.admin, None).await;
     let anna_einsatz = oeffnen(
         &w.app,
-        &format!("/api/einsaetze/{}/live", w.einsatz),
+        &format!("/api/incidents/{}/live", w.einsatz),
         &anna,
         None,
     )
@@ -865,7 +865,7 @@ async fn lesen_liste_und_quittieren() {
     let (_, v) = anfrage(&w.app, "GET", &pfad, &anna, None).await;
     assert!(v.get("quittiert_at").is_none(), "{v}");
 
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
     let zweiter_tab = oeffnen(&w.app, &feed, &anna, None).await;
     // Der Abgleich sendet den eigenen Benutzer mit (LLH-1477).
     let (s, _) = anfrage_mit_offline_queue_benutzer(
@@ -978,7 +978,7 @@ impl Welt {
         anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/notifications", self.einsatz),
+            &format!("/api/incidents/{}/notifications", self.einsatz),
             cookie,
             None,
         )
@@ -989,7 +989,7 @@ impl Welt {
         anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/notifications/read", self.einsatz),
+            &format!("/api/incidents/{}/notifications/read", self.einsatz),
             cookie,
             Some(body),
         )
@@ -1024,7 +1024,7 @@ async fn abgeschaltete_art_steht_still_im_verlauf_und_zaehlt_nicht() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
     let anna_live = oeffnen(&w.app, &feed, &anna, None).await;
     let (auftrag, _) = w.auftrag().await;
 
@@ -1154,7 +1154,7 @@ async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
     let (s, _) = anfrage_mit_offline_queue_benutzer(
         &w.app,
         "POST",
-        &format!("/api/einsaetze/{}/notifications/read", w.einsatz),
+        &format!("/api/incidents/{}/notifications/read", w.einsatz),
         &anna,
         Some(&json!({ "bis_id": bis }).to_string()),
         w.bert,
@@ -1163,7 +1163,7 @@ async fn alle_gelesen_quittiert_eingaenge_nicht_alarme_und_meldet_einmal() {
     assert_eq!(s, StatusCode::PRECONDITION_FAILED, "fremder Queue-Benutzer");
     assert!(w.zeilen_von(w.anna).await.iter().all(|(_, q)| !q));
 
-    let feed = format!("/api/einsaetze/{}/live", w.einsatz);
+    let feed = format!("/api/incidents/{}/live", w.einsatz);
     let zweiter_tab = oeffnen(&w.app, &feed, &anna, None).await;
     let (s, v) = w
         .gelesen(&anna, &json!({ "bis_id": bis }).to_string())

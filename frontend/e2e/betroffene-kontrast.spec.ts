@@ -53,9 +53,14 @@ async function pruefeSchraffiert(ziel: Locator, minimum: number, name: string) {
   expect(Math.min(...werte), `${name}: ${JSON.stringify(m)}`).toBeGreaterThanOrEqual(minimum);
 }
 
+/**
+ * `pfad` ist der Seitenpfad (`/einsaetze/<id>/…`, wie `vorbereiten` ihn liefert); die API liegt
+ * seit LLH-2061 unter `/api/incidents/<id>/…`.
+ */
 async function post(page: Page, pfad: string, data: unknown) {
-  const response = await page.request.post(`/api${pfad}`, { data });
-  expect(response.ok(), `${pfad}: ${response.status()} ${await response.text()}`).toBeTruthy();
+  const apiPfad = pfad.replace(/^\/einsaetze\//, '/incidents/');
+  const response = await page.request.post(`/api${apiPfad}`, { data });
+  expect(response.ok(), `${apiPfad}: ${response.status()} ${await response.text()}`).toBeTruthy();
   return response.json();
 }
 
@@ -327,7 +332,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Fehler an der Zeile: der PATCH scheitert, die Zelle trägt Marke und Satz.
-    await page.route('**/api/einsaetze/*/persons/*', (r) =>
+    await page.route('**/api/incidents/*/persons/*', (r) =>
       r.request().method() === 'PATCH'
         ? r.fulfill({ status: 500, json: { error: 'Speicher nicht erreichbar' } })
         : r.continue(),
@@ -526,20 +531,20 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     const basis = await vorbereiten(page, modus);
     const einsatzId = basis.split('/').pop()!;
-    const person = (await post(page, `/einsaetze/${einsatzId}/persons`, {
+    const person = (await post(page, `/incidents/${einsatzId}/persons`, {
       name: 'Kontrast',
       status: 'betroffen',
       sichtung: 'sk2',
     })) as { id: number };
     // Eine Verletzung auf der Silhouette, eine am Mittelpunkt der Hand.
-    await post(page, `/einsaetze/${einsatzId}/persons/${person.id}/injuries`, {
+    await post(page, `/incidents/${einsatzId}/persons/${person.id}/injuries`, {
       ansicht: 'vorn',
       region: 'thorax',
       art: 'prellung_schwellung',
       x: 0.5,
       y: 0.3,
     });
-    await post(page, `/einsaetze/${einsatzId}/persons/${person.id}/injuries`, {
+    await post(page, `/incidents/${einsatzId}/persons/${person.id}/injuries`, {
       ansicht: 'vorn',
       region: 'hand_l',
       art: 'verbrennung',

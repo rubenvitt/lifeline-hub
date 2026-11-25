@@ -24,7 +24,7 @@ export function listeBr(
   abschnittId?: number,
 ): Promise<BrListenEintrag[]> {
   return apiGet<BrListenEintrag[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/staging-areas`, {
+    mitParametern(`/api/incidents/${einsatzId}/staging-areas`, {
       status,
       abschnitt_id: abschnittId,
     }),
@@ -32,12 +32,12 @@ export function listeBr(
 }
 
 export function ladeBr(einsatzId: number, brId: number): Promise<BrDetail> {
-  return apiGet<BrDetail>(`/api/einsaetze/${einsatzId}/staging-areas/${brId}`);
+  return apiGet<BrDetail>(`/api/incidents/${einsatzId}/staging-areas/${brId}`);
 }
 
 /** Belegungsreihe eines Raums, ungeblättert, neueste zuerst (LLH-1095). */
 export function loadBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlaufEintrag[]> {
-  return apiGet<BrVerlaufEintrag[]>(`/api/einsaetze/${einsatzId}/staging-areas/${brId}/history`);
+  return apiGet<BrVerlaufEintrag[]>(`/api/incidents/${einsatzId}/staging-areas/${brId}/history`);
 }
 
 /**
@@ -45,7 +45,7 @@ export function loadBrVerlauf(einsatzId: number, brId: number): Promise<BrVerlau
  * offene Rufnamen und erwartetes Eintreffen. Ohne Freigabe Nachforderungen 403.
  */
 export function loadBrErwartet(einsatzId: number, brId: number): Promise<ErwarteteKraft[]> {
-  return apiGet<ErwarteteKraft[]>(`/api/einsaetze/${einsatzId}/staging-areas/${brId}/expected`);
+  return apiGet<ErwarteteKraft[]>(`/api/incidents/${einsatzId}/staging-areas/${brId}/expected`);
 }
 
 /**
@@ -59,7 +59,7 @@ export function loadBrStammTreffer(
   suche: string,
 ): Promise<StammTreffer[]> {
   return apiGet<StammTreffer[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/staging-areas/${brId}/master-data-matches`, {
+    mitParametern(`/api/incidents/${einsatzId}/staging-areas/${brId}/master-data-matches`, {
       suche,
     }),
   );
@@ -76,7 +76,7 @@ export interface BrEingabe {
 }
 
 export function legeBrAn(einsatzId: number, daten: BrEingabe): Promise<Bereitstellungsraum> {
-  return apiSend<Bereitstellungsraum>(`/api/einsaetze/${einsatzId}/staging-areas`, 'POST', daten);
+  return apiSend<Bereitstellungsraum>(`/api/incidents/${einsatzId}/staging-areas`, 'POST', daten);
 }
 
 /** Teil-Patch der Raumdaten: fehlender Key = unverändert, `null` = leeren (`patchTriState.ts`). */
@@ -101,7 +101,7 @@ export function aktualisiereBr(
   daten: BrPatch,
 ): Promise<Bereitstellungsraum> {
   return apiSend<Bereitstellungsraum>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}`,
     'PATCH',
     daten,
   );
@@ -113,14 +113,14 @@ export function setzeBrStatus(
   status: BrStatus,
 ): Promise<Bereitstellungsraum> {
   return apiSend<Bereitstellungsraum>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/status`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/status`,
     'POST',
     { status },
   );
 }
 
 export function storniereBr(einsatzId: number, brId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/staging-areas/${brId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/staging-areas/${brId}`, 'DELETE');
 }
 
 /** Eintritt, Wechsel und Austritt; Abruf und Rücknahme haben eigene Routen (LLH-1085). */
@@ -142,7 +142,7 @@ export function belegeBr(
   daten: BrBelegungEingabe,
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/occupancy`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/occupancy`,
     'POST',
     daten,
   );
@@ -159,7 +159,7 @@ export function nimmBrAustrittZurueck(
   belegungId: number,
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/occupancy/${belegungId}/undo`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/occupancy/${belegungId}/undo`,
     'POST',
   );
 }
@@ -176,7 +176,7 @@ export function bucheEintreffen(
   optionen?: ApiSendOptionen,
 ): Promise<EintreffenErgebnis> {
   return apiSend<EintreffenErgebnis>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/arrival`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/arrival`,
     'POST',
     daten,
     optionen,
@@ -202,7 +202,7 @@ export function ruftAbAusBr(
   daten: BrAbrufEingabe,
 ): Promise<BrAbrufErgebnis> {
   return apiSend<BrAbrufErgebnis>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/dispatch`,
     'POST',
     daten,
   );
@@ -221,7 +221,7 @@ export function hebtBrAbrufAuf(
   daten: BrAbrufAufhebenEingabe,
 ): Promise<BrBelegung> {
   return apiSend<BrBelegung>(
-    `/api/einsaetze/${einsatzId}/staging-areas/${brId}/dispatch/void`,
+    `/api/incidents/${einsatzId}/staging-areas/${brId}/dispatch/void`,
     'POST',
     daten,
   );

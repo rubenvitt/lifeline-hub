@@ -9,6 +9,7 @@
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
 use crate::app::AppState;
+use crate::auth::admin_audit::{schreibe, AdminAktion, AdminEintrag, Ziel};
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
     ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
@@ -19,8 +20,8 @@ use crate::einsatz::modul::{
     ist_ausblendbar, ist_gueltige_benoetigte_rolle, ist_gueltiger_modul_key, BENOETIGTE_ROLLEN,
 };
 use crate::error::AppError;
-use crate::extract::JsonBody;
 use crate::extract::PfadParam;
+use crate::extract::{JsonBody, PeerIp};
 use crate::org::aufbewahrung_kategorie::{self, KategorieVorgabeEingabe};
 use crate::org::einstellungen::{self, OrgEinstellungenAnzeige, OrgEinstellungenDaten};
 use crate::org::modul_einstellung::{self, OrgModulEinstellung};
@@ -65,6 +66,17 @@ pub struct OrgEinstellungenUpdate {
     pub auto_etb_eintraege: Option<bool>,
     /// Geocoder-Basis-URL (nur http/https) für die Ort-Vorschau.
     pub geocoder_url: Option<String>,
+    /// Fremdebenen der Lagekarte dürfen Ziele im eigenen Netz abrufen (LLH-2099). Anders als die
+    /// übrigen Felder kein Vollersatz: fehlt das Feld, bleibt der Wert, damit ein älterer Client
+    /// die Erlaubnis nicht still entzieht. Eine Änderung steht in der Admin-Spur.
+    pub fremdebenen_lan_erlaubt: Option<bool>,
+    /// „Ortung im Einsatz“ (Helfer-App). Fehlt das Feld, bleibt der Schalter, wie er ist: ein
+    /// älterer Client schaltet die Ortung nicht still ab. Der Wechsel von aus auf an gilt als
+    /// Bestätigung von Einwilligung bzw. Betriebsvereinbarung (der Dialog im Client).
+    pub ortung_im_einsatz: Option<bool>,
+    /// „Auch Personen orten“; nur zusammen mit `ortung_im_einsatz` (sonst 422). Fehlt das Feld,
+    /// bleibt der Wert, außer die Ortung geht aus: dann geht er mit aus.
+    pub ortung_personen: Option<bool>,
 }
 
 /// GET /api/org-settings — Org-weite Einstellungen lesen.
@@ -86,6 +98,7 @@ pub async fn lesen(
 pub async fn setzen(
     State(state): State<AppState>,
     AdminUser(benutzer): AdminUser,
+    PeerIp(peer_ip): PeerIp,
     JsonBody(req): JsonBody<OrgEinstellungenUpdate>,
 ) -> Result<Json<OrgEinstellungenAnzeige>, AppError> {
     // Anzeige-Konventionen: bereinigen + Whitelist (400 bei Fehler).
@@ -207,6 +220,28 @@ pub async fn setzen(
         }
     }
 
+    // Ortung (Helfer-App): „Personen orten“ ohne „Ortung im Einsatz“ ist ein Zusammenhang,
+    // kein kaputtes Feld (422, `src/AGENTS.md`, Statuscode-Konvention).
+    let (ortung_im_einsatz, ortung_personen) =
+        if req.ortung_im_einsatz.is_some() || req.ortung_personen.is_some() {
+            let alt = einstellungen::ortung_der_org(&state.pool, benutzer.org_id).await?;
+            let im = req.ortung_im_einsatz.unwrap_or(alt.im_einsatz);
+            let personen = match req.ortung_personen {
+                Some(true) if !im => {
+                    return Err(AppError::UnprocessableEntity(
+                        "„Auch Personen orten“ geht nur mit „Ortung im Einsatz“".into(),
+                    ));
+                }
+                Some(p) => p,
+                None => im && alt.personen,
+            };
+            (Some(im), Some(personen))
+        } else {
+            (None, None)
+        };
+
+    // Fremdebenen im eigenen Netz: fehlendes Feld = unverändert. Der alte Wert kommt aus der
+    // Speicher-Transaktion (`Gespeichert::lan_vorher`), damit die Admin-Spur zum Endzustand passt.
     let gespeichert = einstellungen::speichern(
         &state.pool,
         benutzer.org_id,
@@ -229,12 +264,40 @@ pub async fn setzen(
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
+            fremdebenen_lan_erlaubt: req.fremdebenen_lan_erlaubt,
+            ortung_im_einsatz,
+            ortung_personen,
             aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
+    let lan_neu = gespeichert.einstellungen.fremdebenen_lan_erlaubt != 0;
+    if lan_neu != gespeichert.lan_vorher {
+        schreibe(
+            &state.pool,
+            AdminEintrag {
+                aktion: if lan_neu {
+                    AdminAktion::FremdebenenLanErlaubt
+                } else {
+                    AdminAktion::FremdebenenLanEntzogen
+                },
+                akteur: &benutzer,
+                ziel: Ziel::Org("fremdebenen_lan"),
+                angaben: None,
+                peer_ip,
+            },
+        )
+        .await;
+    }
+    for (einsatz_id, person_id) in gespeichert.personen_geloescht {
+        crate::ortung::publiziere(
+            &state,
+            einsatz_id,
+            crate::ortung::Ortungsziel::Person(person_id),
+        );
+    }
     let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
-    Ok(Json(gespeichert.anzeige(kategorien)))
+    Ok(Json(gespeichert.einstellungen.anzeige(kategorien)))
 }
 
 /// Trimmt und filtert leere Strings (None bei leerem Wert).

@@ -295,17 +295,17 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
   const json = (x: object) => () => HttpResponse.json(x);
   server.use(
     ...ueberschreiben,
-    http.get('/api/einsaetze/1', json(einsatz)),
-    http.get('/api/einsaetze/1/persons', json(d.personen)),
-    http.get('/api/einsaetze/1/personnel', json(d.personal)),
-    http.get('/api/einsaetze/1/vehicles', json(d.fahrzeuge)),
-    http.get('/api/einsaetze/1/material', json(d.material)),
-    http.get('/api/einsaetze/1/units', json(d.einheiten)),
-    http.get('/api/einsaetze/1/sectors', json(d.abschnitte)),
-    http.get('/api/einsaetze/1/hazard-areas', json(d.gefahren)),
-    http.get('/api/einsaetze/1/tasks', json(d.auftraege)),
+    http.get('/api/incidents/1', json(einsatz)),
+    http.get('/api/incidents/1/persons', json(d.personen)),
+    http.get('/api/incidents/1/personnel', json(d.personal)),
+    http.get('/api/incidents/1/vehicles', json(d.fahrzeuge)),
+    http.get('/api/incidents/1/material', json(d.material)),
+    http.get('/api/incidents/1/units', json(d.einheiten)),
+    http.get('/api/incidents/1/sectors', json(d.abschnitte)),
+    http.get('/api/incidents/1/hazard-areas', json(d.gefahren)),
+    http.get('/api/incidents/1/tasks', json(d.auftraege)),
     http.get(
-      '/api/einsaetze/1/module-counts',
+      '/api/incidents/1/module-counts',
       json(
         d.zaehler ?? {
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
@@ -322,17 +322,17 @@ function stelleBereit(d: Daten, ueberschreiben: Parameters<typeof server.use> = 
         },
       ),
     ),
-    http.get('/api/einsaetze/1/resource-requests', json(d.nachforderungen ?? [])),
-    http.get('/api/einsaetze/1/reports', json(d.meldungen ?? [])),
-    http.get('/api/einsaetze/1/reminders', json(d.erinnerungen)),
-    http.get('/api/einsaetze/1/reports/check-ins', json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN)),
-    http.get('/api/einsaetze/1/gauges', json(d.pegel ?? [])),
+    http.get('/api/incidents/1/resource-requests', json(d.nachforderungen ?? [])),
+    http.get('/api/incidents/1/reports', json(d.meldungen ?? [])),
+    http.get('/api/incidents/1/reminders', json(d.erinnerungen)),
+    http.get('/api/incidents/1/reports/check-ins', json(d.rueckmeldungen ?? KEINE_RUECKMELDUNGEN)),
+    http.get('/api/incidents/1/gauges', json(d.pegel ?? [])),
     // Laufende Schichten; die Modul-Freigaben (Sichtbarkeit der Ablösung) liefert der
     // MSW-Default: alles frei.
-    http.get('/api/einsaetze/1/reliefs', json([])),
+    http.get('/api/incidents/1/reliefs', json([])),
     // Perioden der Einheiten für „n ohne Schicht ↗“ (LLH-1312): ohne offene Periode keine.
-    http.get('/api/einsaetze/1/units/timeline', json([])),
-    http.get('/api/einsaetze/1/etb', ({ request }) => {
+    http.get('/api/incidents/1/units/timeline', json([])),
+    http.get('/api/incidents/1/etb', ({ request }) => {
       const url = new URL(request.url);
       // Die Seite fragt NUR Entscheidungen und (Startliste, LLH-1815) die jüngste Lage ab — ein
       // Abruf ohne Filter wäre ein Fehler.
@@ -547,7 +547,7 @@ describe('UeberblickPage', () => {
     erster.unmount();
 
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/gauges', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/gauges', () => new HttpResponse(null, { status: 500 })),
     ]);
     rendern();
     await waitFor(() =>
@@ -561,7 +561,7 @@ describe('UeberblickPage', () => {
 
   // LLH-2085: kam die Notiz als erste Lage-Angabe, brach der Kopf mit langem Einsatznamen bei
   // 1024 px um (CLS 0,40). Der Einsatz sagt vorher, ob ein Pegel festgelegt ist.
-  const pegelHaengt = http.get('/api/einsaetze/1/gauges', async () => {
+  const pegelHaengt = http.get('/api/incidents/1/gauges', async () => {
     await delay('infinite');
     return HttpResponse.json([]);
   });
@@ -570,7 +570,7 @@ describe('UeberblickPage', () => {
 
   it('Pegel lädt: unsichtbarer Platzhalter „Pegel 0,00 m steigend“ hält die Stelle der Notiz (LLH-2085)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz, lagekennzahlen: ['pegel'] }),
       ),
       pegelHaengt,
@@ -586,7 +586,7 @@ describe('UeberblickPage', () => {
 
   it('Einsatz ohne Pegel: kein Platzhalter im Kopf, auch während der Pegel-Abruf lädt (LLH-2085)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, lagekennzahlen: [] })),
+      http.get('/api/incidents/1', () => HttpResponse.json({ ...einsatz, lagekennzahlen: [] })),
       pegelHaengt,
     ]);
     rendern();
@@ -721,7 +721,7 @@ describe('UeberblickPage', () => {
 
   it('Abschnittszeile: ohne geladene Rückmeldungen kein Rückmeldungs-Etikett (LLH-1739)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/reports/check-ins', () =>
+      http.get('/api/incidents/1/reports/check-ins', () =>
         HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 }),
       ),
     ]);
@@ -743,7 +743,7 @@ describe('UeberblickPage', () => {
   it('Abschnittszeile: ohne Leserecht auf Meldungen (403) nichts erfunden, Paneel bleibt', async () => {
     let abgerufen = false;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/reports/check-ins', () => {
+      http.get('/api/incidents/1/reports/check-ins', () => {
         abgerufen = true;
         return HttpResponse.json({ error: 'kein Zugriff' }, { status: 403 });
       }),
@@ -1064,7 +1064,7 @@ describe('UeberblickPage', () => {
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/reliefs', () =>
+      http.get('/api/incidents/1/reliefs', () =>
         HttpResponse.json([schicht(1, vor(10)), schicht(2, nach(20)), schicht(3, nach(120))]),
       ),
     ]);
@@ -1093,7 +1093,7 @@ describe('UeberblickPage', () => {
 
   it('Offene Vorgänge · Ablösungen: „1 ohne Schicht ↗“ springt auf die Ansicht, die Zahl bleibt die der fälligen (LLH-1312)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/units/timeline', () =>
+      http.get('/api/incidents/1/units/timeline', () =>
         HttpResponse.json([
           {
             einheit_id: 10,
@@ -1112,7 +1112,7 @@ describe('UeberblickPage', () => {
 
   it('„n ohne Schicht“ verschwindet, wenn ein Neuabruf scheitert, statt die alte Zahl zu nennen', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/units/timeline', () =>
+      http.get('/api/incidents/1/units/timeline', () =>
         HttpResponse.json([
           {
             einheit_id: 10,
@@ -1125,7 +1125,7 @@ describe('UeberblickPage', () => {
     await waitFor(() => vorgaenge());
     await within(abschnitt('Ablösungen')).findByRole('link', { name: '1 ohne Schicht' });
     server.use(
-      http.get('/api/einsaetze/1/units/timeline', () =>
+      http.get('/api/incidents/1/units/timeline', () =>
         HttpResponse.json({ fehler: 'kaputt' }, { status: 500 }),
       ),
     );
@@ -1140,14 +1140,14 @@ describe('UeberblickPage', () => {
     const fuerStelle = (code: 's2' | 's7') => {
       server.use(meHandler(benutzerFixture({ id: 9 }) as never));
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1', () =>
+        http.get('/api/incidents/1', () =>
           HttpResponse.json({
             ...einsatz,
             meine_sachgebiete: code === 's2' ? ['s2'] : [],
             meine_funktion_code: code,
           }),
         ),
-        http.get('/api/einsaetze/1/tasks', () =>
+        http.get('/api/incidents/1/tasks', () =>
           HttpResponse.json([
             ...volleDaten.auftraege,
             auftrag({
@@ -1308,7 +1308,7 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: Programmpunkt neutral, führt in die Einsatzdaten (LLH-1570)', async () => {
     stelleBereit(volleDaten);
     server.use(
-      http.get('/api/einsaetze/1/agenda-items', () =>
+      http.get('/api/incidents/1/agenda-items', () =>
         HttpResponse.json([
           { id: 5, bezeichnung: 'Feuerwerk', zeitpunkt_at: nach(15) },
           { id: 6, bezeichnung: 'Einlass', zeitpunkt_at: vor(30) },
@@ -1367,7 +1367,7 @@ describe('UeberblickPage', () => {
       // Vor der Freigaben-Antwort gilt ohnehin die Pflege; die Aussage trägt erst NACH ihr.
       let freigabenGeliefert = 0;
       stelleBereit(daten(), [
-        http.get('/api/einsaetze/1/module-access', () => {
+        http.get('/api/incidents/1/module-access', () => {
           freigabenGeliefert += 1;
           return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
@@ -1407,7 +1407,7 @@ describe('UeberblickPage', () => {
 
     it('Modul frei → Marke „Unwetterwarnung: Orkanböen" mit Weg zur Modulseite', async () => {
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/weather', () => HttpResponse.json(wetter())),
+        http.get('/api/incidents/1/weather', () => HttpResponse.json(wetter())),
       ]);
       rendern();
       const p = await waitFor(() => paneel('Nächste Marken'));
@@ -1420,11 +1420,11 @@ describe('UeberblickPage', () => {
       let wetterAbrufe = 0;
       let freigabenGeliefert = 0;
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/weather', () => {
+        http.get('/api/incidents/1/weather', () => {
           wetterAbrufe += 1;
           return HttpResponse.json(wetter());
         }),
-        http.get('/api/einsaetze/1/module-access', () => {
+        http.get('/api/incidents/1/module-access', () => {
           freigabenGeliefert += 1;
           return HttpResponse.json(freigabenFixture({ 'wetter-pegel': { sichtbar: false } }));
         }),
@@ -1461,9 +1461,9 @@ describe('UeberblickPage', () => {
       angelegt_at: vor(300),
     });
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/reliefs', () => HttpResponse.json([schicht(1), schicht(2)])),
+      http.get('/api/incidents/1/reliefs', () => HttpResponse.json([schicht(1), schicht(2)])),
       // Die Auto-Frist derselben Ablösung in den Erinnerungen darf keine zweite Marke werden.
-      http.get('/api/einsaetze/1/reminders', () =>
+      http.get('/api/incidents/1/reminders', () =>
         HttpResponse.json([
           ...volleDaten.erinnerungen,
           {
@@ -1487,10 +1487,10 @@ describe('UeberblickPage', () => {
   it('Nächste Marken: ohne sichtbares Modul Ablösung keine Anfrage und keine Marke (LFH-635)', async () => {
     let abgefragt = 0;
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ abloesung: { sichtbar: false } })),
       ),
-      http.get('/api/einsaetze/1/reliefs', () => {
+      http.get('/api/incidents/1/reliefs', () => {
         abgefragt += 1;
         return HttpResponse.json([]);
       }),
@@ -1515,7 +1515,7 @@ describe('UeberblickPage', () => {
       etb: [],
     } as unknown as Daten);
     server.use(
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: null }),
       ),
     );
@@ -1574,7 +1574,7 @@ describe('UeberblickPage', () => {
 
   it('ohne Schreibrecht: „Eintrag" gesperrt mit Grund, Leer-Aktionen zum Schreiben fehlen', async () => {
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -1595,7 +1595,7 @@ describe('UeberblickPage', () => {
 
   it('abgeschlossener Einsatz: der Grund nennt den Abschluss, nicht die Rolle', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz, status: 'abgeschlossen' }),
       ),
     ]);
@@ -1607,10 +1607,10 @@ describe('UeberblickPage', () => {
   it('Fehler ist nicht leer: ausgefallene Aufträge zeigen „Stand unbekannt", der Rest bleibt', async () => {
     // Liste und Zähler fallen aus: das Paneel und die Kennzahl sagen es je für sich.
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/tasks', () =>
+      http.get('/api/incidents/1/tasks', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
-      http.get('/api/einsaetze/1/module-counts', () =>
+      http.get('/api/incidents/1/module-counts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -1637,7 +1637,7 @@ describe('UeberblickPage', () => {
 
   it('Abschnitte: fehlen die Aufträge, sagt es der Fuß, die Stärke bleibt (LFH-962)', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/tasks', () =>
+      http.get('/api/incidents/1/tasks', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -1656,8 +1656,8 @@ describe('UeberblickPage', () => {
     };
     // Die Meldungsliste hält die Reihen nicht auf (anders als die Quellen der Marken, LLH-1748).
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/persons', haengt),
-      http.get('/api/einsaetze/1/reports', haengt),
+      http.get('/api/incidents/1/persons', haengt),
+      http.get('/api/incidents/1/reports', haengt),
     ]);
     rendern();
     await koerperDa();
@@ -1687,7 +1687,7 @@ describe('UeberblickPage', () => {
       await delay('infinite');
       return HttpResponse.json([]);
     };
-    stelleBereit(leereDaten, [http.get('/api/einsaetze/1/resource-requests', haengt)]);
+    stelleBereit(leereDaten, [http.get('/api/incidents/1/resource-requests', haengt)]);
     rendern();
     await koerperDa();
     // Ein Abschnitt der „Offenen Vorgänge" trägt leer keine Aktion, also kein Platz.
@@ -1743,7 +1743,7 @@ describe('UeberblickPage', () => {
         const daten = volleDaten[quelle as keyof typeof volleDaten];
         stelleBereit(volleDaten, [
           // Die Quelle `abschnitte` liest `/sectors` (LLH-2059, ADR-0085).
-          http.get(`/api/einsaetze/1/${route(quelle)}`, async () => {
+          http.get(`/api/incidents/1/${route(quelle)}`, async () => {
             await tor;
             return HttpResponse.json(daten as object);
           }),
@@ -1764,7 +1764,7 @@ describe('UeberblickPage', () => {
 
     it('scheitert eine Quelle, stehen die Paneele mit „Stand unbekannt“', async () => {
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/units', () =>
+        http.get('/api/incidents/1/units', () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       ]);
@@ -1788,7 +1788,7 @@ describe('UeberblickPage', () => {
         const tor = new Promise<void>((f) => (loslassen = f));
         const abrufe = { n: 0 };
         stelleBereit(volleDaten, [
-          http.get('/api/einsaetze/1/module-access', () =>
+          http.get('/api/incidents/1/module-access', () =>
             HttpResponse.json(freigabenFixture({ [modul]: { zugriff: false } })),
           ),
         ]);
@@ -1800,8 +1800,8 @@ describe('UeberblickPage', () => {
         expect(reihe2).not.toBeNull();
 
         server.use(
-          http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-          http.get(`/api/einsaetze/1/${route(modul)}`, async () => {
+          http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigabenFixture())),
+          http.get(`/api/incidents/1/${route(modul)}`, async () => {
             abrufe.n += 1;
             await tor;
             return HttpResponse.json(volleDaten[modul] as object);
@@ -1833,11 +1833,11 @@ describe('UeberblickPage', () => {
       const abschnitteTor = new Promise<void>((f) => (abschnitteLos = f));
       const abrufe = { n: 0 };
       stelleBereit(volleDaten, [
-        http.get('/api/einsaetze/1/module-access', async () => {
+        http.get('/api/incidents/1/module-access', async () => {
           await freigabenTor;
           return HttpResponse.json(freigabenFixture());
         }),
-        http.get('/api/einsaetze/1/sectors', async () => {
+        http.get('/api/incidents/1/sectors', async () => {
           abrufe.n += 1;
           await abschnitteTor;
           return HttpResponse.json(volleDaten.abschnitte);
@@ -1900,8 +1900,8 @@ describe('UeberblickPage', () => {
           },
         },
         [
-          http.get('/api/einsaetze/1/reports', haengt),
-          http.get('/api/einsaetze/1/resource-requests', haengt),
+          http.get('/api/incidents/1/reports', haengt),
+          http.get('/api/incidents/1/resource-requests', haengt),
         ],
       );
     const platzhalter = (name: string) =>
@@ -1940,7 +1940,7 @@ describe('UeberblickPage', () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((f) => (freigeben = f));
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1', async () => {
+      http.get('/api/incidents/1', async () => {
         await tor;
         return HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' });
       }),
@@ -1963,7 +1963,7 @@ describe('UeberblickPage', () => {
     let freigeben!: () => void;
     const tor = new Promise<void>((f) => (freigeben = f));
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/module-counts', async () => {
+      http.get('/api/incidents/1/module-counts', async () => {
         await tor;
         return HttpResponse.json({
           auftraege: { offen: 0, in_arbeit: 0, ueberfaellig: 0 },
@@ -1992,7 +1992,7 @@ describe('UeberblickPage', () => {
 
   it('ein gescheiterter Modulzähler hält den Körper nicht auf', async () => {
     stelleBereit(leereDaten, [
-      http.get('/api/einsaetze/1/module-counts', () =>
+      http.get('/api/incidents/1/module-counts', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2109,20 +2109,20 @@ describe('UeberblickPage', () => {
  */
 describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   const GEBUNDEN = [
-    '/api/einsaetze/1/persons',
-    '/api/einsaetze/1/personnel',
-    '/api/einsaetze/1/vehicles',
-    '/api/einsaetze/1/material',
-    '/api/einsaetze/1/units',
-    '/api/einsaetze/1/units/timeline',
-    '/api/einsaetze/1/sectors',
-    '/api/einsaetze/1/hazard-areas',
-    '/api/einsaetze/1/tasks',
-    '/api/einsaetze/1/resource-requests',
-    '/api/einsaetze/1/reports',
-    '/api/einsaetze/1/reminders',
-    '/api/einsaetze/1/etb',
-    '/api/einsaetze/1/reports/check-ins',
+    '/api/incidents/1/persons',
+    '/api/incidents/1/personnel',
+    '/api/incidents/1/vehicles',
+    '/api/incidents/1/material',
+    '/api/incidents/1/units',
+    '/api/incidents/1/units/timeline',
+    '/api/incidents/1/sectors',
+    '/api/incidents/1/hazard-areas',
+    '/api/incidents/1/tasks',
+    '/api/incidents/1/resource-requests',
+    '/api/incidents/1/reports',
+    '/api/incidents/1/reminders',
+    '/api/incidents/1/etb',
+    '/api/incidents/1/reports/check-ins',
   ];
 
   /**
@@ -2141,7 +2141,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
           aufrufe[pfad] = (aufrufe[pfad] ?? 0) + 1;
         }),
       ),
-      http.get('/api/einsaetze/1/module-access', async () => {
+      http.get('/api/incidents/1/module-access', async () => {
         if (freigaben === 'fehler') return new HttpResponse(null, { status: 500 });
         if (freigaben === 'haengt') {
           await delay('infinite');
@@ -2163,9 +2163,9 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   it('Modul Einheiten gesperrt: keine Anfrage an die Zeitachse, kein Sprung „ohne Schicht“ (LLH-1312)', async () => {
     const aufrufe = mitFreigaben({ einheiten: { zugriff: false } });
     rendern();
-    await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
+    await waitFor(() => expect(aufrufe['/api/incidents/1/hazard-areas']).toBe(1));
     await waitFor(() => vorgaenge());
-    expect(aufrufe['/api/einsaetze/1/units/timeline']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/units/timeline']).toBeUndefined();
     expect(document.querySelector('[data-lfh="vorgang-ohne-schicht"]')).toBeNull();
   });
 
@@ -2180,12 +2180,12 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     rendern();
     // Vorbedingung: die freien Quellen liefen — sonst wäre „keine Anfrage" trivial.
     await nordDa();
-    await waitFor(() => expect(aufrufe['/api/einsaetze/1/hazard-areas']).toBe(1));
-    expect(aufrufe['/api/einsaetze/1/persons']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/resource-requests']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/etb']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/reports/check-ins']).toBeUndefined();
+    await waitFor(() => expect(aufrufe['/api/incidents/1/hazard-areas']).toBe(1));
+    expect(aufrufe['/api/incidents/1/persons']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/tasks']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/resource-requests']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/etb']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/reports/check-ins']).toBeUndefined();
 
     // Alarmzeile: gesperrte Quellen fehlen still, kein „Stand unvollständig“ (Spec
     // `lage-alarmzeile`, „Ruhe nur bei vollständigen Quellen“).
@@ -2204,7 +2204,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       expect(within(a).queryByRole('link')).toBeNull();
       expect(abschnittZahl(name)).toHaveTextContent(/^—$/);
     }
-    expect(aufrufe['/api/einsaetze/1/reports']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/reports']).toBeUndefined();
     const entscheidungen = paneel(/Entscheidungen/);
     expect(within(entscheidungen).getByText('Modul nicht freigegeben.')).toBeInTheDocument();
     expect(within(entscheidungen).queryByText(/Noch keine Entscheidung/)).toBeNull();
@@ -2290,7 +2290,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   it('„Erneut abrufen" nach gescheiterten Freigaben fragt sie neu an, nicht die gesperrten Listen', async () => {
     let freigabenAbrufe = 0;
     const aufrufe = mitFreigaben({}, [
-      http.get('/api/einsaetze/1/module-access', () => {
+      http.get('/api/incidents/1/module-access', () => {
         freigabenAbrufe += 1;
         return freigabenAbrufe === 1
           ? new HttpResponse(null, { status: 500 })
@@ -2301,12 +2301,12 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
     const p = await waitFor(() => vorgaenge());
     await userEvent.click(await within(p).findByRole('button', { name: 'Erneut abrufen' }));
     expect(await within(abschnitt('Aufträge')).findByText('nicht freigegeben')).toBeInTheDocument();
-    expect(aufrufe['/api/einsaetze/1/tasks']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/tasks']).toBeUndefined();
   });
 
   it('freies Modul mit echtem Ausfall bleibt ein Ausfall', async () => {
     mitFreigaben({}, [
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2318,7 +2318,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
   });
 
   /** Der Einsatz ohne Lagebesprechung: dann trägt nur noch eine gebundene Quelle Fristen. */
-  const ohneLagebesprechung = http.get('/api/einsaetze/1', () =>
+  const ohneLagebesprechung = http.get('/api/incidents/1', () =>
     HttpResponse.json({ ...einsatz, naechste_lagebesprechung_at: null }),
   );
 
@@ -2369,16 +2369,16 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
       },
     );
     expect(zeile).toHaveTextContent('1/0/1//2');
-    expect(aufrufe['/api/einsaetze/1/vehicles']).toBeUndefined();
-    expect(aufrufe['/api/einsaetze/1/material']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/vehicles']).toBeUndefined();
+    expect(aufrufe['/api/incidents/1/material']).toBeUndefined();
   });
 
   it('Abschnittspaneel (LFH-887): leer bei gesperrten Fahrzeugen behauptet nicht „keine Kräfte"', async () => {
     mitFreigaben({ fahrzeuge: { zugriff: false } }, [
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/material', () => HttpResponse.json([])),
     ]);
     rendern();
     const p = await waitFor(() => paneel('Einsatzabschnitte'));
@@ -2407,7 +2407,7 @@ describe('UeberblickPage Modulgrenze der Quellen (LFH-669)', () => {
 describe('UeberblickPage Sprungziele (LFH-888)', () => {
   function mitFreigaben(freigaben: Record<string, Partial<ModulFreigabe>> | 'haengt') {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1/module-access', async () => {
+      http.get('/api/incidents/1/module-access', async () => {
         if (freigaben === 'haengt') await delay('infinite');
         return HttpResponse.json(freigabenFixture(freigaben === 'haengt' ? {} : freigaben));
       }),
@@ -2535,7 +2535,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   function lageAbrufe() {
     const zaehler = { n: 0 };
     server.use(
-      http.get('/api/einsaetze/1/etb', ({ request }) => {
+      http.get('/api/incidents/1/etb', ({ request }) => {
         if (new URL(request.url).searchParams.get('typ') === 'lage') zaehler.n += 1;
       }),
     );
@@ -2607,7 +2607,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('erledigte Punkte tragen Haken und Wert, ohne Sprung; der Ort ohne Koordinate „nicht verortet“', async () => {
     stelleBereit({ ...volleDaten }, [
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...fertigerKopf, einsatzort_lat: null, einsatzort_lon: null }),
       ),
     ]);
@@ -2641,7 +2641,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('alles erledigt: kein Paneel und keine Reihe', async () => {
     stelleBereit({ ...volleDaten, lage: eineLage }, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/incidents/1', () => HttpResponse.json(fertigerKopf)),
     ]);
     rendern();
     await waitFor(() => paneel('Einsatzabschnitte'));
@@ -2651,7 +2651,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('Übung: dieselben fünf Punkte', async () => {
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
+      http.get('/api/incidents/1', () => HttpResponse.json({ ...einsatz, einsatzart: 'uebung' })),
     ]);
     rendern();
     const p = await screen.findByRole('region', { name: 'Einsatz starten' });
@@ -2676,7 +2676,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     ],
   ] as const) {
     it(`${fall}: kein Paneel und keine Abfrage der Lagefeststellung`, async () => {
-      stelleBereit(leer, [http.get('/api/einsaetze/1', () => HttpResponse.json(kopf))]);
+      stelleBereit(leer, [http.get('/api/incidents/1', () => HttpResponse.json(kopf))]);
       const abrufe = lageAbrufe();
       rendern();
       await waitFor(() => paneel('Einsatzabschnitte'));
@@ -2690,7 +2690,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('ETB gesperrt: der Punkt steht „—“ mit Grund, ohne Sprung und ohne Abfrage', async () => {
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     ]);
@@ -2706,8 +2706,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('ETB gesperrt, alles andere erledigt: kein Paneel', async () => {
     stelleBereit(volleDaten, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ etb: { zugriff: false } })),
       ),
     ]);
@@ -2718,8 +2718,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
 
   it('Quelle ausgefallen: Einsatzabschnitte „nicht geladen“, das Paneel bleibt', async () => {
     stelleBereit({ ...volleDaten, lage: eineLage }, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/sectors', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/incidents/1/sectors', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2738,16 +2738,16 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   it('alles erledigt, dann scheitert ein Neuabruf: die Startliste bleibt weg', async () => {
     // Kräfte nur über eine Einheit: fällt die Einheitenliste aus, trägt das Personal nichts.
     stelleBereit({ ...volleDaten, personal: [], lage: eineLage }, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/incidents/1', () => HttpResponse.json(fertigerKopf)),
     ]);
     const { client } = rendern();
     await waitFor(() => paneel('Einsatzabschnitte'));
     expect(startliste()).toBeNull();
     const kaputt = () => HttpResponse.json({ error: 'kaputt' }, { status: 502 });
     server.use(
-      http.get('/api/einsaetze/1/sectors', kaputt),
-      http.get('/api/einsaetze/1/units', kaputt),
-      http.get('/api/einsaetze/1/etb', ({ request }) =>
+      http.get('/api/incidents/1/sectors', kaputt),
+      http.get('/api/incidents/1/units', kaputt),
+      http.get('/api/incidents/1/etb', ({ request }) =>
         new URL(request.url).searchParams.get('typ') === 'lage' ? kaputt() : undefined,
       ),
     );
@@ -2763,8 +2763,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
   // Review LLH-1815 (Befund 7): ein Punkt „nicht geladen“ hat einen sichtbaren Weg zum Neuladen.
   it('Quelle ausgefallen: „Erneut abrufen“ am Punkt lädt die Quelle neu', async () => {
     stelleBereit({ ...volleDaten, lage: eineLage }, [
-      http.get('/api/einsaetze/1', () => HttpResponse.json(fertigerKopf)),
-      http.get('/api/einsaetze/1/sectors', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(fertigerKopf)),
+      http.get('/api/incidents/1/sectors', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
     ]);
@@ -2777,7 +2777,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
       expect(within(punkt(s)).queryByRole('button'), s).toBeNull();
     }
     server.use(
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(volleDaten.abschnitte)),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json(volleDaten.abschnitte)),
     );
     await userEvent.click(knopf);
     // Der letzte unbekannte Punkt ist erledigt: die Reihe fällt nach der Handlung weg.
@@ -2794,7 +2794,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     const tor = new Promise<void>((f) => (loslassen = f));
     const lage = { n: 0 };
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1', () =>
+      http.get('/api/incidents/1', () =>
         HttpResponse.json({ ...einsatz, meine_rolle: 'beobachter' }),
       ),
     ]);
@@ -2807,8 +2807,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(startliste()).toBeNull();
 
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/1/etb', async ({ request }) => {
         if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
         lage.n += 1;
         await tor;
@@ -2840,10 +2840,10 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     const auftraegeTor = new Promise<void>((f) => (auftraegeLos = f));
     const abrufe = { lage: 0, auftraege: 0 };
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1/module-access', () =>
+      http.get('/api/incidents/1/module-access', () =>
         HttpResponse.json(freigabenFixture({ auftraege: { zugriff: false } })),
       ),
-      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+      http.get('/api/incidents/1/etb', async ({ request }) => {
         if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
         abrufe.lage += 1;
         await lageTor;
@@ -2856,8 +2856,8 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     expect(document.querySelector('[data-lfh="ueberblick-paneele"]')).toBeNull();
 
     server.use(
-      http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
-      http.get('/api/einsaetze/1/tasks', async () => {
+      http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigabenFixture())),
+      http.get('/api/incidents/1/tasks', async () => {
         abrufe.auftraege += 1;
         await auftraegeTor;
         return HttpResponse.json(leer.auftraege);
@@ -2879,7 +2879,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     const urls: string[] = [];
     stelleBereit(leer);
     server.use(
-      http.get('/api/einsaetze/1/etb', ({ request }) => {
+      http.get('/api/incidents/1/etb', ({ request }) => {
         urls.push(new URL(request.url).search);
       }),
     );
@@ -2897,7 +2897,7 @@ describe('UeberblickPage Startliste „Einsatz starten“ (LLH-1815)', () => {
     let loslassen!: () => void;
     const tor = new Promise<void>((f) => (loslassen = f));
     stelleBereit(leer, [
-      http.get('/api/einsaetze/1/etb', async ({ request }) => {
+      http.get('/api/incidents/1/etb', async ({ request }) => {
         if (new URL(request.url).searchParams.get('typ') !== 'lage') return;
         await tor;
         return HttpResponse.json([]);

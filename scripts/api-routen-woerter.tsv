@@ -78,12 +78,14 @@ confirm	bestätigen
 confirmers	Bestätiger
 connections	Verbindungen
 contact-person	Bezugsperson
+copernicus	-
 correct	berichtigen
 count	Anzahl
 countersign	gegenzeichnen
 counts	Zähler
 crew	Besatzung
 damages	Schäden
+data	Daten
 deactivate	deaktivieren
 decision	Entscheidung
 decline	ablehnen
@@ -125,6 +127,7 @@ follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 forecast	Prognose
+foreign-layers	Fremdebenen
 free-symbols	freie Zeichen
 from-attachment	aus Anhang
 from-resource-request	aus Nachforderung
@@ -143,6 +146,7 @@ hls	-
 household	Haushalt
 households	Haushalte
 image	Bild
+images	Bilder
 import	-
 in-service	in Dienst
 incident-templates	Einsatzvorlagen
@@ -155,6 +159,7 @@ intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 interventions	Maßnahmen
 inventory	Bestand
+invitations	Einladungen
 ios-push	-
 jwks.json	-
 key	Schlüssel
@@ -321,6 +326,7 @@ subscription	Abo
 system	-
 take-over	übernehmen
 talk-groups	Sprechgruppen
+targets	Ziele
 task	Auftrag
 tasks	Aufträge
 template	Vorlage

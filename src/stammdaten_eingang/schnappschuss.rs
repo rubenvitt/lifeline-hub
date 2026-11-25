@@ -1,4 +1,4 @@
-//! Schnappschüsse des Adapters „Stammdaten-Abruf“ (LLH-1194, Migration 0375).
+//! Schnappschüsse des Adapters „Stammdaten-Abruf“ (LLH-1194, Migration 0380).
 //!
 //! Ein Abruf übernimmt nie selbst (G1): er legt den Körper ab ([`ablegen`]), und ein Admin rechnet
 //! Vorschau und Übernahme auf genau diesem Stand ([`vorschau`], [`uebernehmen`]). So bleibt die

@@ -1073,7 +1073,8 @@ pub async fn liste_fuehrungskraefte(
 ) -> Result<Vec<FuehrungskraftKarte>, AppError> {
     let rows = sqlx::query_as::<_, FuehrungskraftKarte>(
         "SELECT ep.id, ep.einsatz_id, ep.snap_name AS name, \
-                ep.lat, ep.lon, ep.tz_fachaufgabe, ep.tz_organisation, \
+                ep.lat, ep.lon, ep.position_aktualisiert_at, ep.position_quelle, \
+                ep.tz_fachaufgabe, ep.tz_organisation, \
                 ep.snap_funktion AS funktion, ep.einsatzfunktion, \
                 EXISTS(SELECT 1 FROM einsatz_einheit e \
                        WHERE e.einsatz_id = ep.einsatz_id AND e.fuehrer_id = ep.id \
@@ -1112,9 +1113,13 @@ pub async fn update_position(
             lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
             lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
             tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END, \
+            position_quelle = CASE WHEN ?1 OR ?3 THEN 'manuell' ELSE position_quelle END, \
+            position_aktualisiert_at = CASE WHEN ?1 OR ?3 THEN \
+                (CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL THEN NULL ELSE ?11 END) \
+                ELSE position_aktualisiert_at END \
          WHERE id = ?9 AND einsatz_id = ?10{}",
-        erwartet.sql_suffix(11)
+        erwartet.sql_suffix(12)
     );
     let q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.lat.is_some())
@@ -1126,7 +1131,8 @@ pub async fn update_position(
         .bind(daten.tz_organisation.is_some())
         .bind(daten.tz_organisation.flatten())
         .bind(ep_id)
-        .bind(einsatz_id);
+        .bind(einsatz_id)
+        .bind(crate::zeit::jetzt());
     let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
         return Err(crate::feld_cas::ohne_treffer(

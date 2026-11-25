@@ -15,6 +15,10 @@ interface Props {
   name?: string;
   /** Meldet eine neue Dateiwahl — nicht das Entfernen (Titel-Übernahme der Ablage). */
   onDateiWahl?: (datei: UploadFile) => void;
+  /** Größengrenze in Bytes, Vorgabe {@link UPLOAD_MAX_GROESSE}; der Server prüft mit `>`. */
+  maxBytes?: number;
+  /** Absage bei Überschreiten, Vorgabe der Wortlaut des Anhang-Servers. */
+  zuGrossText?: string;
 }
 
 /**
@@ -28,7 +32,13 @@ interface Props {
  * `<input type="file">` mit `display: none` wäre (im Browser nicht fokussierbar, jsdom merkt das
  * nicht; e2e-Beleg in `e2e/schaden-anhaenge.spec.ts`).
  */
-export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props) {
+export default function DateiFeld({
+  accept,
+  name = 'datei',
+  onDateiWahl,
+  maxBytes = UPLOAD_MAX_GROESSE,
+  zuGrossText = ZU_GROSS,
+}: Props) {
   return (
     <Feld
       breite="voll"
@@ -44,9 +54,7 @@ export default function DateiFeld({ accept, name = 'datei', onDateiWahl }: Props
           // Vorab statt nach 25 MiB Upload: der Server lehnt dieselbe Grenze mit `>` ab.
           validator: (_, liste?: UploadFile[]) => {
             const groesse = liste?.[0]?.originFileObj?.size ?? liste?.[0]?.size ?? 0;
-            return groesse > UPLOAD_MAX_GROESSE
-              ? Promise.reject(new Error(ZU_GROSS))
-              : Promise.resolve();
+            return groesse > maxBytes ? Promise.reject(new Error(zuGrossText)) : Promise.resolve();
           },
         },
       ]}

@@ -99,7 +99,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
   it('LFH-463: übernimmt genau den bekannten UTC-Termin einschließlich Sekunden', async () => {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
+      http.post('/api/incidents/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -152,7 +152,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
   it('sendet mit Enter ab — der Absende-Knopf liegt im Formular', async () => {
     let gesendet: Record<string, unknown> | null = null;
     server.use(
-      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
+      http.post('/api/incidents/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -181,7 +181,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
 
   it('lässt die Eingaben stehen, wenn der Server ablehnt', async () => {
     server.use(
-      http.post('/api/einsaetze/7/reminders', () =>
+      http.post('/api/incidents/7/reminders', () =>
         HttpResponse.json({ error: 'Titel ist erforderlich' }, { status: 422 }),
       ),
     );
@@ -204,7 +204,7 @@ describe('WiedervorlageModal (LFH-342 · C7, Befund N22)', () => {
  * „Rückwege und Fehler“). Der Dialog wartet auf die Antwort.
  */
 describe('WiedervorlageModal — Ablehnung im Dialog (LFH-1077)', () => {
-  const URL = '/api/einsaetze/7/reminders';
+  const URL = '/api/incidents/7/reminders';
 
   /** Erste Antwort lehnt ab, jede weitere bleibt aus, bis `freigeben` sie beantwortet. */
   function ablehnenDannHalten() {
@@ -333,7 +333,7 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
   it('der Lagebesprechungstermin erscheint in Berlin und geht exakt als UTC hinaus', async () => {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
+      http.post('/api/incidents/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -349,7 +349,7 @@ describe('WiedervorlageModal — Anzeigezone (LFH-692)', () => {
   it('LLH-1077: „1430“ + Enter im Fälligkeitsfeld übernimmt die Frist und sendet ab', async () => {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
+      http.post('/api/incidents/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),
@@ -369,7 +369,7 @@ describe('WiedervorlageModal — Gerät mit 5 min Vorlauf (LFH-1031)', () => {
   function sendetNach(): () => Record<string, unknown> | undefined {
     let gesendet: Record<string, unknown> | undefined;
     server.use(
-      http.post('/api/einsaetze/7/reminders', async ({ request }) => {
+      http.post('/api/incidents/7/reminders', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json({ id: 1 });
       }),

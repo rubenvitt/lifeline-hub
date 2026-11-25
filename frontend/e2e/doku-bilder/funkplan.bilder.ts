@@ -46,14 +46,14 @@ async function sprechgruppe(
   bezeichnung: string,
   betriebsart: 'TMO' | 'DMO',
 ): Promise<Sprechgruppe> {
-  const liste = await api.get(`/api/einsaetze/${einsatzId}/talk-groups`);
+  const liste = await api.get(`/api/incidents/${einsatzId}/talk-groups`);
   expect(liste.ok(), `Sprechgruppen: ${liste.status()}`).toBe(true);
   const vorhanden = ((await liste.json()) as Sprechgruppe[]).find(
     (s) => s.bezeichnung === bezeichnung,
   );
   return (
     vorhanden ??
-    fuelle<Sprechgruppe>(api, 'post', `/api/einsaetze/${einsatzId}/talk-groups`, {
+    fuelle<Sprechgruppe>(api, 'post', `/api/incidents/${einsatzId}/talk-groups`, {
       bezeichnung,
       betriebsart,
     })
@@ -73,7 +73,7 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     const demo = await demoEinsatz(api);
     const { id } = demo;
-    const e = `/api/einsaetze/${id}`;
+    const e = `/api/incidents/${id}`;
     const el = await sprechgruppe(api, id, 'TMO 311_F_EL', 'TMO');
     const san = await sprechgruppe(api, id, 'TMO 311_F_SAN', 'TMO');
     const dmo = await sprechgruppe(api, id, 'DMO 505', 'DMO');

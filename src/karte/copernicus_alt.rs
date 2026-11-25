@@ -105,6 +105,8 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
         // Die ZIPs nennen keine Aufnahmezeit maschinenlesbar; es zählt die Lieferung.
         aufnahme: None,
         sensor: None,
+        // Die Vector Packages enthalten keine Rasterbilder (LLH-2021).
+        bilder: Vec::new(),
         geliefert: p
             .get("geliefert")
             .and_then(Value::as_str)

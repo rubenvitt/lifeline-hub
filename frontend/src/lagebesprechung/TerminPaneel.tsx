@@ -1,13 +1,15 @@
-import { Button, Flex, theme } from 'antd';
+import { useId } from 'react';
+import { Button, Flex, Typography, theme } from 'antd';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { useUhr } from '../abloesung/useUhr';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { ZeitpunktEingabe } from '../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../anzeige/zeitEingabe';
-import { setLagebesprechungTermin } from '../api/lagebesprechung';
+import { fetchLagebesprechungIcs, setLagebesprechungTermin } from '../api/lagebesprechung';
 import { einsatzKeys } from '../api/queryKeys';
 import type { LagebesprechungStand } from '../api/types';
+import { exportDateiname, speichereDatei } from '../components/dateiSpeichern';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import {
   Kennzahl,
@@ -48,6 +50,7 @@ export default function TerminPaneel({
   darfSchreiben,
 }: TerminPaneelProps) {
   const { token } = theme.useToken();
+  const kalenderGrundId = useId();
   const qc = useQueryClient();
   const jetzt = useUhr(30_000);
   const termin = stand?.naechste_lagebesprechung_at;
@@ -62,7 +65,23 @@ export default function TerminPaneel({
       void qc.invalidateQueries({ queryKey: einsatzKeys.einsatz(einsatzId) });
     },
   });
+  // Nur Lesen: der Export schreibt nichts, deshalb weder `darfSchreiben` noch `isGesperrt`.
+  // `networkMode: 'always'` wie `useCsvExport`: ohne Netz scheitert er sofort sichtbar, statt zu
+  // pausieren und später ungefragt nachzulaufen.
+  // Der Einsatz reist in den `variables` mit: ein Fehler gilt nur am Einsatz, für den er entstand
+  // (`frontend/AGENTS.md`, „Ein Wechsel von Einsatz … räumt die Gründe“). Der Dateiname trägt die
+  // Terminzeit (lokal), nicht die Uhrzeit des Klicks: zwei Termine ergeben zwei Dateien.
+  const kalender = useMutation({
+    networkMode: 'always',
+    mutationFn: async ({ einsatz, terminZeit }: { einsatz: number; terminZeit: Date }) => {
+      const datei = await fetchLagebesprechungIcs(einsatz);
+      speichereDatei(datei, exportDateiname('lagebesprechung', einsatz, 'ics', terminZeit));
+    },
+  });
+  const kalenderHier = kalender.variables?.einsatz === einsatzId;
+  const terminZeit = terminZeitpunkt(termin)?.toDate() ?? null;
   const isGesperrt = !darfSchreiben || stand == null || mutation.isPending;
+  const keinTermin = stand != null && !termin;
   const setTermin = (zeitpunkt: Dayjs | null) =>
     mutation.mutate(zeitpunkt ? alsBackendZeit(zeitpunkt) : null);
 
@@ -115,7 +134,30 @@ export default function TerminPaneel({
             }}
           />
         </Flex>
+        <Flex align="center" gap={token.marginXS} wrap>
+          <Button
+            disabled={terminZeit == null || (kalenderHier && kalender.isPending)}
+            loading={kalenderHier && kalender.isPending}
+            aria-describedby={keinTermin ? kalenderGrundId : undefined}
+            onClick={() => {
+              if (terminZeit) kalender.mutate({ einsatz: einsatzId, terminZeit });
+            }}
+          >
+            In Kalender übernehmen
+          </Button>
+          {/* Der Grund erst mit geladenem Stand: solange er lädt, stimmt „Kein Termin“ nicht. */}
+          {keinTermin && (
+            <Typography.Text id={kalenderGrundId} type="secondary">
+              Kein Termin
+            </Typography.Text>
+          )}
+        </Flex>
         <SpeicherFehler fehler={mutation.error} titel="Termin nicht gesetzt" />
+        <SpeicherFehler
+          fehler={kalenderHier ? kalender.error : null}
+          titel="Nicht übernommen"
+          fallback="Keine Verbindung zum Server"
+        />
       </Stapel>
     </Paneel>
   );

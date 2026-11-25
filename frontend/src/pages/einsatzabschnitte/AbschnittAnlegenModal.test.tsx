@@ -16,7 +16,7 @@ const abschnitte = [
 function recordPosts(antwort: () => Response = () => HttpResponse.json({ id: 9, name: 'x' })) {
   const bodies: unknown[] = [];
   server.use(
-    http.post('/api/einsaetze/1/sectors', async ({ request }) => {
+    http.post('/api/incidents/1/sectors', async ({ request }) => {
       bodies.push(await request.json());
       return antwort();
     }),

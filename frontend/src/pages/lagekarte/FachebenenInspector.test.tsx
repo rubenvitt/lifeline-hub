@@ -861,6 +861,78 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
   });
 
+  it('Autobahn/Verkehrsmeldung: Art und Reisezeitverlust stehen oben', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | Hamburg-Südost - Norderelbbrücke',
+          kategorie: 'verkehrsmeldung',
+          art: 'stau',
+          verzoegerung_min: 17,
+          richtung: 'Lübeck -> Hamburg',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.getByText('Stau · +17 min Reisezeitverlust')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A7 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: null }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.queryByText(/Reisezeitverlust|Stau/)).not.toBeInTheDocument();
+  });
+
+  it('Autobahn/Verkehrsmeldung: Reisezeitverlust ab einer Stunde in der Form der Dauer', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A1 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: 65 }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('+1 h 05 min Reisezeitverlust')).toBeInTheDocument();
+  });
+
+  it('Lkw-Parken: Name, Autobahn, Abschnitt, Stellplätze und Ausstattung', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{
+          titel: 'Krummhörens Kuhlen',
+          kategorie: 'rastanlage',
+          strasse: 'A1',
+          abschnitt: 'Puttgarden',
+          pkw_stellplaetze: 18,
+          lkw_stellplaetze: 4,
+          ausstattung: ['Toilette vorhanden', 'Picknickmöglichkeiten'],
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Rastanlage')).toBeInTheDocument();
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByText('Puttgarden')).toBeInTheDocument();
+    expect(screen.getByText('Pkw 18 · Lkw 4')).toBeInTheDocument();
+    expect(screen.getByText('Toilette vorhanden')).toBeInTheDocument();
+    expect(screen.getByText('Picknickmöglichkeiten')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{ titel: 'Rastanlage', kategorie: 'rastanlage', strasse: 'A7' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Pkw k. A. · Lkw k. A.')).toBeInTheDocument();
+  });
+
   it('Punkt-/keine Geometrie zeigt keine Fläche', () => {
     render(
       <FachebenenInspector
@@ -1089,8 +1161,8 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
     const posts: unknown[] = [];
     let stand = liste;
     server.use(
-      http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(stand)),
-      http.post('/api/einsaetze/1/gauges', async ({ request }) => {
+      http.get('/api/incidents/1/gauges', () => HttpResponse.json(stand)),
+      http.post('/api/incidents/1/gauges', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         posts.push(body);
         stand = [...stand, { id: 99, reihenfolge: stand.length, ...body }];
@@ -1181,7 +1253,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('ein abgelehnter POST (volle Liste, 422) steht als Fehler im Panel, ohne Erfolgsmeldung', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'höchstens 5 Pegel je Einsatz' }, { status: 422 }),
       ),
     );
@@ -1197,7 +1269,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('Fehler und Ladezustand gehören zur Station: ein anderer Punkt zeigt sie nicht', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );

@@ -120,7 +120,7 @@ let personenAnfragen: URL[];
 function renderPage(pfad = '/einsaetze/1/betreuung/8') {
   server.use(
     meHandler(benutzerFixture({ id: 1, anzeigename: 'Leitung' })),
-    http.get('/api/einsaetze/1/persons', ({ request }) => {
+    http.get('/api/incidents/1/persons', ({ request }) => {
       personenAnfragen.push(new URL(request.url));
       return HttpResponse.json([BEWOHNER]);
     }),
@@ -366,7 +366,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
   /** Standort über das Ortsfeld (LLH-1121, design.md D3/D6). */
   it('Bearbeiten: ein gewählter Standort verortet die Stelle, Text und Paar gehen hinaus', async () => {
     server.use(
-      http.get('/api/einsaetze/1/place-search', () =>
+      http.get('/api/incidents/1/place-search', () =>
         HttpResponse.json({
           zustand: 'ok',
           treffer: [
@@ -379,7 +379,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
           ],
         }),
       ),
-      http.get('/api/einsaetze/1/place-preview', () =>
+      http.get('/api/incidents/1/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
     );
@@ -405,7 +405,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
 
   it('Bearbeiten: eine Textkorrektur am verorteten Standort behält den Punkt', async () => {
     server.use(
-      http.get('/api/einsaetze/1/place-preview', () =>
+      http.get('/api/incidents/1/place-preview', () =>
         HttpResponse.json({ ortsname: null, peilung: null }),
       ),
     );
@@ -618,7 +618,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
 
   it('LLH-1612: Abschnitt „Registrierung“ mit Liste der Stelle; „Registrieren“ öffnet die Maske', async () => {
     server.use(
-      http.get('/api/einsaetze/1/care/positions/8/registrations', () =>
+      http.get('/api/incidents/1/care/positions/8/registrations', () =>
         HttpResponse.json({
           stelle_id: 8,
           haushalte: [
@@ -695,7 +695,7 @@ describe('BetreuungsstelleDetailPage (LLH-1044)', () => {
   it('Bedarf (LLH-1082): offene Nachforderungen der Stelle, „Bedarf anfordern“ führt in die Erfassung mit Bezug', async () => {
     freigaben.wert = freigabenFixture();
     server.use(
-      http.get('/api/einsaetze/1/resource-requests', () =>
+      http.get('/api/incidents/1/resource-requests', () =>
         HttpResponse.json([
           {
             id: 21,

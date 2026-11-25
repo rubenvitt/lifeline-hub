@@ -42,7 +42,7 @@ export async function seedKraefteGesperrt(
   const { pfad } = await einheitMitZuordnungen(page);
   const einsatzId = pfad.split('/')[2];
   const einheitId = Number(pfad.split('/')[4]);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const post = async (ziel: string, data: unknown): Promise<number> => {
     const antwort = await page.request.post(`${basis}/${ziel}`, { data });
     expect(antwort.ok(), `${ziel}: ${antwort.status()} ${await antwort.text()}`).toBe(true);

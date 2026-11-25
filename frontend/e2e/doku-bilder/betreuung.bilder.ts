@@ -30,7 +30,7 @@ interface Uebersicht {
 
 /** Ergänzt die Demo-Lage einmal je Lauf (die Datenbank gilt für alle Tests eines Laufs). */
 async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
   if (!lage.stellen.some((s) => s.bezeichnung === 'Sporthalle Nord')) {
     const stelle = await fuelle<{ id: number }>(page, 'post', `${basis}/positions`, {
@@ -62,7 +62,7 @@ async function lageErgaenzen(page: Page, einsatzId: number): Promise<number> {
 
 /** Namentlich geführte Notunterkunft mit zwei Haushalten (LLH-1612), einmal je Lauf. */
 async function registrierstelle(page: Page, einsatzId: number): Promise<number> {
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const lage = (await (await page.request.get(basis)).json()) as Uebersicht;
   const da = lage.stellen.find((s) => s.bezeichnung === 'Turnhalle Ost');
   if (da) return da.id;

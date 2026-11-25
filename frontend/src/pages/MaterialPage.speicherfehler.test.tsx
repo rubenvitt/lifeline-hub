@@ -63,18 +63,18 @@ function tor() {
 function render(liste = [em, zweites]) {
   server.use(
     meHandler(adminFixture()),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture())),
-    http.get('/api/einsaetze/1/material', ({ request }) =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture())),
+    http.get('/api/incidents/1/material', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('entlassene') ? [] : liste),
     ),
     http.get('/api/material', () => HttpResponse.json(pool)),
     // Orte für die Spalte „Ort“ (LLH-1225).
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([{ id: 1, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null }]),
     ),
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -93,7 +93,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     const zweiterVersuch = tor();
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/material', async () => {
+      http.post('/api/incidents/1/material', async () => {
         versuche += 1;
         if (versuche === 1) {
           return HttpResponse.json({ error: 'Material nicht im Dienst' }, { status: 409 });
@@ -132,7 +132,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Ad-hoc: der Grund steht im Dialog, der Wortlaut bleibt, kein Toast', async () => {
     server.use(
-      http.post('/api/einsaetze/1/material', () =>
+      http.post('/api/incidents/1/material', () =>
         HttpResponse.json({ error: 'Bezeichnung zu lang' }, { status: 422 }),
       ),
     );
@@ -151,14 +151,14 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Herausnehmen an zwei Zeilen nebenläufig: die späte Ablehnung landet an ihrer Zeile', async () => {
     const ersteAntwort = tor();
     server.use(
-      http.post('/api/einsaetze/1/material/10/stand-down', async () => {
+      http.post('/api/incidents/1/material/10/stand-down', async () => {
         await ersteAntwort.offen;
         return HttpResponse.json(
           { error: 'Das Material ist bereits aus dem Einsatz genommen' },
           { status: 409 },
         );
       }),
-      http.post('/api/einsaetze/1/material/11/stand-down', () =>
+      http.post('/api/incidents/1/material/11/stand-down', () =>
         HttpResponse.json({
           material: { ...zweites, beendet_als: 'entlassen' },
           vorzustand: { entlassen_at: '2026-11-17 10:00:00' },
@@ -193,7 +193,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Ort: der Grund steht an der Zeile, Verlassen sendet nie, „Speichern“ wiederholt', async () => {
     const gesendet: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async ({ request }) => {
+      http.patch('/api/incidents/1/material/10', async ({ request }) => {
         gesendet.push(await request.json());
         return HttpResponse.json({ error: 'Einheit ist aufgelöst' }, { status: 422 });
       }),
@@ -245,7 +245,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Menge ändern: der Grund steht im Dialog, kein Toast', async () => {
     server.use(
-      http.patch('/api/einsaetze/1/material/10', () =>
+      http.patch('/api/incidents/1/material/10', () =>
         HttpResponse.json({ error: 'Menge kleiner als die Ausgabe' }, { status: 422 }),
       ),
     );
@@ -266,7 +266,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
 
   it('Bemerkung: das Feld wartet, bleibt bei Ablehnung mit dem Wortlaut offen, der Grund steht an der Zeile', async () => {
     server.use(
-      http.patch('/api/einsaetze/1/material/10', () =>
+      http.patch('/api/incidents/1/material/10', () =>
         HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
@@ -294,7 +294,7 @@ describe('MaterialPage · Speicherfehler am Ort (LFH-1077)', () => {
     const zweiterVersuch = tor();
     let versuche = 0;
     server.use(
-      http.patch('/api/einsaetze/1/material/10', async () => {
+      http.patch('/api/incidents/1/material/10', async () => {
         versuche += 1;
         if (versuche > 1) await zweiterVersuch.offen;
         return HttpResponse.json({ error: 'Status abgelehnt' }, { status: 409 });

@@ -120,7 +120,7 @@ test('DWD: abgelaufen fehlt, angekündigt gestrichelt, Inspector nennt „angek�
   await dwdBeantworten(page);
 
   await anmeldenPerApi(page, 'admin', PW, { startseite: false });
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E 662 DWD ${Date.now()}` },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();

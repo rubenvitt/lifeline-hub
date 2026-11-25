@@ -109,18 +109,18 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
   await page.setViewportSize(FUEKW);
   await verschiebungenAufzeichnen(page);
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E Layout ${Date.now()}` });
+  const einsatzId = await post(page, '/api/incidents', { bezeichnung: `E2E Layout ${Date.now()}` });
   const werte: string[] = [];
 
   for (const dichte of ['kompakt', 'komfortabel', 'handschuh'] as const) {
     // Je Stufe drei frische Personen. Die Liste sortiert nach Registriernummer ABSTEIGEND: der
     // Anker wird ZUERST angelegt und steht damit direkt unter der ersten, sonst liefe die
     // Folgezeilen-Prüfung leer.
-    await post(page, `/api/einsaetze/${einsatzId}/persons`, { name: `Anker ${dichte}` });
-    const erste = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+    await post(page, `/api/incidents/${einsatzId}/persons`, { name: `Anker ${dichte}` });
+    const erste = await post(page, `/api/incidents/${einsatzId}/persons`, {
       name: `Zustand ${dichte}`,
     });
-    const zweite = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+    const zweite = await post(page, `/api/incidents/${einsatzId}/persons`, {
       name: `Fundort ${dichte}`,
       antreff_ort: 'Deich am Pumpwerk',
     });
@@ -159,7 +159,7 @@ test('Liste: Zustand speichern ändert die Zeilenhöhe in KEINER Stufe, eine liv
     await wartenBisRuhig(page);
     const hoeheVorher = (await kasten(zeile(zweite))).height;
     const m = await marke(page);
-    await patch(page, `/api/einsaetze/${einsatzId}/persons/${zweite}`, {
+    await patch(page, `/api/incidents/${einsatzId}/persons/${zweite}`, {
       antreff_lat: 52.2691,
       antreff_lon: 9.1342,
     });
@@ -193,10 +193,10 @@ test('Liste: Nachsichtung aus der Zeile in drei Tipps, die Zeile zeigt SK I, die
 }) => {
   await page.setViewportSize(FUEKW);
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Nachsichtung ${Date.now()}`,
   });
-  const id = await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+  const id = await post(page, `/api/incidents/${einsatzId}/persons`, {
     name: 'Nachsicht',
     sichtung: 'sk2',
   });
@@ -230,8 +230,8 @@ test('Schnellerfassung bei 390 px: die Hinweiszeile beim Tippen von „Name sk2 
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', { bezeichnung: `E2E Zeile ${Date.now()}` });
-  await post(page, `/api/einsaetze/${einsatzId}/persons`, { name: 'Anker' });
+  const einsatzId = await post(page, '/api/incidents', { bezeichnung: `E2E Zeile ${Date.now()}` });
+  await post(page, `/api/incidents/${einsatzId}/persons`, { name: 'Anker' });
   await page.goto(`/einsaetze/${einsatzId}/personen`);
   const feld = page.getByRole('textbox', { name: 'Kurzeingabe Person' });
   await expect(feld).toBeVisible();
@@ -268,15 +268,15 @@ test('Karte: die Hinweiszeile springt nicht, wenn die letzte Lücke live geschlo
   await page.setViewportSize(FUEKW);
   await verschiebungenAufzeichnen(page);
   await anmelden(page, { startseite: false });
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Hinweis ${Date.now()}`,
   });
-  await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+  await post(page, `/api/incidents/${einsatzId}/persons`, {
     name: 'Verortet',
     antreff_lat: 53.0,
     antreff_lon: 8.8,
   });
-  const luecke = await post(page, `/api/einsaetze/${einsatzId}/persons`, { name: 'Lücke' });
+  const luecke = await post(page, `/api/incidents/${einsatzId}/persons`, { name: 'Lücke' });
   await page.goto(`/einsaetze/${einsatzId}/personen?ansicht=karte`);
   await page.waitForFunction(
     () => Boolean((window as unknown as { __lfhKarte?: KartenHaken }).__lfhKarte?.loaded()),
@@ -292,7 +292,7 @@ test('Karte: die Hinweiszeile springt nicht, wenn die letzte Lücke live geschlo
   await wartenBisRuhig(page);
   const vorher = await kasten(karte);
   const m = await marke(page);
-  await patch(page, `/api/einsaetze/${einsatzId}/persons/${luecke}`, {
+  await patch(page, `/api/incidents/${einsatzId}/persons/${luecke}`, {
     antreff_lat: 53.1,
     antreff_lon: 8.9,
   });
@@ -323,10 +323,10 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
   for (const breite of [1366, 1024, 390]) {
     // Je Breite ein FRISCHER Einsatz mit nur einer gesichteten Person — sonst wäre der
     // „Wechsel 0 → 1" ab der zweiten Breite keiner.
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Fuss ${breite} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+    await post(page, `/api/incidents/${einsatzId}/persons`, {
       name: 'Gesichtet',
       sichtung: 'sk2',
     });
@@ -335,7 +335,7 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
     let loslassen!: () => void;
     const tor = new Promise<void>((f) => (loslassen = f));
     await page.unrouteAll({ behavior: 'ignoreErrors' });
-    await page.route(`**/api/einsaetze/${einsatzId}/persons`, async (r) => {
+    await page.route(`**/api/incidents/${einsatzId}/persons`, async (r) => {
       if (r.request().method() !== 'GET') return r.continue();
       await tor;
       await r.continue();
@@ -355,7 +355,7 @@ test('Lage-Dashboard: Sichtungspaneel beim ersten Laden und beim Wechsel „Ohne
     await page.mouse.move(0, 0);
     const transportVorher = await kasten(page.locator('[data-lfh="transport-bilanz"]'));
     const m2 = await marke(page);
-    await post(page, `/api/einsaetze/${einsatzId}/persons`, { name: `Neu ${breite}` });
+    await post(page, `/api/incidents/${einsatzId}/persons`, { name: `Neu ${breite}` });
     await expect(page.locator('[data-lfh="ohne-sichtung"]')).not.toHaveText(/Ohne Sichtung0$/, {
       timeout: 15_000,
     });

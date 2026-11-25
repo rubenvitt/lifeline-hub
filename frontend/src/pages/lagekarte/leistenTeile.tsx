@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { useRollen } from '../../components/instrument';
 import { SeitenFehler } from '../../components/SeitenZustand';
 
 /**
@@ -85,4 +86,30 @@ export function namensteilStil(token: { controlHeight: number; marginXS: number 
     flex: '1 1 0',
     minWidth: `calc(6em + ${token.controlHeight}px)`,
   } as const;
+}
+
+/** Kantenlänge des Farbfelds einer Ebenen-Zeile (Neuentwurf S5). */
+export const FARBFELD = 14;
+
+/**
+ * Das Farbfeld einer Ebenen-Zeile (`Ebenenbaum.tsx`, `FremdebenenZeilen.tsx`): gefüllt an, leer
+ * aus — der zweite Kanal neben `aria-checked`.
+ */
+export function Farbfeld({ an, farbe }: { an: boolean; farbe: string }) {
+  const { rollen } = useRollen();
+  return (
+    <span
+      aria-hidden="true"
+      data-lfh="ebenen-farbfeld"
+      style={{
+        width: FARBFELD,
+        height: FARBFELD,
+        flex: `0 0 ${FARBFELD}px`,
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: an ? farbe : rollen.steuerRahmen,
+        background: an ? `color-mix(in srgb, ${farbe} 55%, transparent)` : 'transparent',
+      }}
+    />
+  );
 }

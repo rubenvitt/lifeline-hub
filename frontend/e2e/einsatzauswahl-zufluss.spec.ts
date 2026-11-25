@@ -15,7 +15,7 @@ import { anmeldenPerApi } from './anmelde-kern';
  * Seite eine Liste MIT dem Störer abgeholt und gezeichnet hat; sonst wäre „nichts hat sich bewegt"
  * auch grün, wenn der Neuabruf nie kam.
  *
- * Interzipiert wird nur `GET /api/einsaetze`, und nur, um die Einsätze paralleler Tests
+ * Interzipiert wird nur `GET /api/incidents`, und nur, um die Einsätze paralleler Tests
  * wegzufiltern (Präfix je Test); die Antwort bleibt die echte des Servers.
  */
 
@@ -26,7 +26,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatz(page: Page, bezeichnung: string, begonnen_at?: string): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung, begonnen_at } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung, begonnen_at } });
   expect(r.ok(), `Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   return (await r.json()).id;
 }
@@ -39,7 +39,7 @@ const vor = (stunden: number) => new Date(Date.now() - stunden * 3_600_000).toIS
  * die Seite abgeholt hat, damit die Störprobe auf den Neuabruf warten kann.
  */
 async function nurDieseEinsaetze(page: Page, praefix: string, gelesen: Set<number>) {
-  await page.route(/\/api\/einsaetze(\?.*)?$/, async (route) => {
+  await page.route(/\/api\/incidents(\?.*)?$/, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const antwort = await route.fetch();
     const liste = (await antwort.json()) as { id: number; bezeichnung: string }[];

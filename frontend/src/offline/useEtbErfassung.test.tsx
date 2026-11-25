@@ -33,7 +33,7 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
     const gesehen: NeuerEintrag[] = [];
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+      http.post('/api/incidents/9/etb', async ({ request }) => {
         gesehen.push((await request.json()) as NeuerEintrag);
         versuch += 1;
         return versuch === 1
@@ -65,7 +65,7 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
       const gesehen: NeuerEintrag[] = [];
       let versuch = 0;
       server.use(
-        http.post('/api/einsaetze/9/etb', async ({ request }) => {
+        http.post('/api/incidents/9/etb', async ({ request }) => {
           gesehen.push((await request.json()) as NeuerEintrag);
           versuch += 1;
           return versuch === 1
@@ -94,7 +94,7 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
   it('sendet eine Queue-Zeile ohne anhang_ids (Altbestand) weiter', async () => {
     const gesehen: NeuerEintrag[] = [];
     server.use(
-      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+      http.post('/api/incidents/9/etb', async ({ request }) => {
         gesehen.push((await request.json()) as NeuerEintrag);
         return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
       }),
@@ -111,7 +111,7 @@ describe('useEtbErfassung – Anhänge (LFH-117)', () => {
 
   it('legt einen beim Flush mit 400 abgelehnten Eintrag mit dem Server-Wortlaut ab', async () => {
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Anhang unbekannt oder nicht mehr vorhanden' }, { status: 400 }),
       ),
     );
@@ -132,7 +132,7 @@ describe('useEtbErfassung – Antwort an den Aufrufer (LLH-1071)', () => {
   it('liefert den angenommenen Eintrag, eingereiht dagegen null', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', () => {
+      http.post('/api/incidents/9/etb', () => {
         versuch += 1;
         return versuch === 1
           ? HttpResponse.json({ id: 7, lfd_nr: 135, typ: 'anordnung' }, { status: 201 })
@@ -164,7 +164,7 @@ describe('useEtbErfassung – client_ids dieses Geräts (LLH-1833)', () => {
     await queueEinreihen(11, 9, { ...eintrag, client_id: 'anderer-tab' });
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', () => {
+      http.post('/api/incidents/9/etb', () => {
         versuch += 1;
         return versuch === 1
           ? HttpResponse.json({ id: 7, lfd_nr: 1 }, { status: 201 })
@@ -185,7 +185,7 @@ describe('useEtbErfassung – client_ids dieses Geräts (LLH-1833)', () => {
 
     // Gesendet und aus der Warteschlange genommen: die Kennung bleibt bekannt.
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ id: 8, lfd_nr: 2 }, { status: 201 }),
       ),
     );
@@ -205,7 +205,7 @@ describe('useEtbErfassung', () => {
   it('reiht bei Netzwerkfehler ein und sendet beim Flush nach', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', () => {
+      http.post('/api/incidents/9/etb', () => {
         versuch += 1;
         return versuch === 1
           ? HttpResponse.error()
@@ -229,7 +229,7 @@ describe('useEtbErfassung', () => {
 
   it('reicht fachliche Ablehnung (ApiError) an den Aufrufer durch', async () => {
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
       ),
     );
@@ -239,7 +239,7 @@ describe('useEtbErfassung', () => {
   });
 
   it('verwirft beim Flush abgelehnte Einträge nicht still, sondern meldet sie', async () => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
 
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
 
@@ -249,7 +249,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
       ),
     );
@@ -271,7 +271,7 @@ describe('useEtbErfassung', () => {
     const queueEigentuemer: (string | null)[] = [];
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', async ({ request }) => {
+      http.post('/api/incidents/9/etb', async ({ request }) => {
         const body = (await request.json()) as NeuerEintrag;
         gesehen.push(body.client_id);
         queueEigentuemer.push(request.headers.get(OFFLINE_QUEUE_BENUTZER_HEADER));
@@ -299,7 +299,7 @@ describe('useEtbErfassung', () => {
   });
 
   it('behält 401-Einträge in der Queue und signalisiert Re-Login (F03)', async () => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -307,7 +307,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Session abgelaufen' }, { status: 401 }),
       ),
     );
@@ -327,7 +327,7 @@ describe('useEtbErfassung', () => {
   });
 
   it('behält 5xx-Einträge in der Queue (Serverfehler ist transient, F03)', async () => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -335,7 +335,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'DB busy' }, { status: 503 }),
       ),
     );
@@ -348,7 +348,7 @@ describe('useEtbErfassung', () => {
   });
 
   it('verschiebt 422-Ablehnungen persistent nach abgelehnt (überlebt Remount, F03)', async () => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result, unmount } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -356,7 +356,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Ungültig' }, { status: 422 }),
       ),
     );
@@ -377,7 +377,7 @@ describe('useEtbErfassung', () => {
   });
 
   it('verwirft einen abgelehnten Eintrag dauerhaft (Dismiss, F03)', async () => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -385,7 +385,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Ungültig' }, { status: 422 }),
       ),
     );
@@ -413,7 +413,7 @@ describe('useEtbErfassung', () => {
     try {
       let posts = 0;
       server.use(
-        http.post('/api/einsaetze/9/etb', () => {
+        http.post('/api/incidents/9/etb', () => {
           posts += 1;
           return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
         }),
@@ -452,7 +452,7 @@ describe('useEtbErfassung', () => {
     try {
       let posts = 0;
       server.use(
-        http.post('/api/einsaetze/9/etb', () => {
+        http.post('/api/incidents/9/etb', () => {
           posts += 1;
           return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
         }),
@@ -497,7 +497,7 @@ describe('useEtbErfassung', () => {
     try {
       let posts = 0;
       server.use(
-        http.post('/api/einsaetze/9/etb', () => {
+        http.post('/api/incidents/9/etb', () => {
           posts += 1;
           return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
         }),
@@ -529,7 +529,7 @@ describe('useEtbErfassung', () => {
   it('plant nach transientem Fehler einen Backoff-Retry (F03)', async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
     try {
-      server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+      server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
       const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
       await act(async () => {
         await result.current.erfassen(eintrag);
@@ -538,7 +538,7 @@ describe('useEtbErfassung', () => {
 
       setTimeoutSpy.mockClear();
       server.use(
-        http.post('/api/einsaetze/9/etb', () =>
+        http.post('/api/incidents/9/etb', () =>
           HttpResponse.json({ error: 'busy' }, { status: 503 }),
         ),
       );
@@ -555,7 +555,7 @@ describe('useEtbErfassung', () => {
   });
 
   it.each([408, 429])('behält %i-Einträge in der Queue (transient, F03)', async (code) => {
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -563,7 +563,7 @@ describe('useEtbErfassung', () => {
     await waitFor(() => expect(result.current.ausstehend).toHaveLength(1));
 
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'transient' }, { status: code }),
       ),
     );
@@ -581,7 +581,7 @@ describe('useEtbErfassung', () => {
       // Antwort-Umschalter: 999 = Netzfehler (enqueue ohne Backoff), 503 = transient, 201 = ok.
       let code = 999;
       server.use(
-        http.post('/api/einsaetze/9/etb', () => {
+        http.post('/api/incidents/9/etb', () => {
           if (code === 999) return HttpResponse.error();
           if (code === 201) return HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 });
           return HttpResponse.json({ error: 'busy' }, { status: code });
@@ -645,7 +645,7 @@ afterEach(() => {
 describe('useEtbErfassung – Neuladen nur nach Versand (LFH-947)', () => {
   it('eine leere Queue lädt das Seitenfenster nicht neu, ein gesendeter Eintrag schon', async () => {
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ id: 1, lfd_nr: 1 }, { status: 201 }),
       ),
     );
@@ -685,7 +685,7 @@ describe('useEtbErfassung – Haptik in der Hülle', () => {
   it('meldet `success`, wenn der Server den Eintrag annimmt', async () => {
     const haptik = mitIosHuelle();
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ id: 7, lfd_nr: 135 }, { status: 201 }),
       ),
     );
@@ -698,7 +698,7 @@ describe('useEtbErfassung – Haptik in der Hülle', () => {
 
   it('meldet `tap`, nicht `success`, wenn der Eintrag ohne Netz vorgemerkt wird', async () => {
     const haptik = mitIosHuelle();
-    server.use(http.post('/api/einsaetze/9/etb', () => HttpResponse.error()));
+    server.use(http.post('/api/incidents/9/etb', () => HttpResponse.error()));
     const { result } = renderHook(() => useEtbErfassung(9, 11), { wrapper });
     await act(async () => {
       await result.current.erfassen(eintrag);
@@ -710,7 +710,7 @@ describe('useEtbErfassung – Haptik in der Hülle', () => {
   it('meldet `error`, wenn der Server den Eintrag ablehnt', async () => {
     const haptik = mitIosHuelle();
     server.use(
-      http.post('/api/einsaetze/9/etb', () =>
+      http.post('/api/incidents/9/etb', () =>
         HttpResponse.json({ error: 'Einsatz abgeschlossen' }, { status: 409 }),
       ),
     );
@@ -722,7 +722,7 @@ describe('useEtbErfassung – Haptik in der Hülle', () => {
   it('meldet beim Nachsenden der Queue nichts', async () => {
     let versuch = 0;
     server.use(
-      http.post('/api/einsaetze/9/etb', () => {
+      http.post('/api/incidents/9/etb', () => {
         versuch += 1;
         return versuch === 1
           ? HttpResponse.error()

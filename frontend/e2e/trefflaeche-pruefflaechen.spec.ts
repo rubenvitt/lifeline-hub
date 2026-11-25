@@ -373,7 +373,7 @@ test('C7 · ETB (Beobachter): die Schnellerfassung fehlt, der Typfilter hält 72
 // ── C8 · Kommunikation (LFH-343) ───────────────────────────────────────────────────────
 
 async function kommunikationSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   await seed(page, `${E}/reports`, {
     absender: 'Florian Nord 1',
     meldeweg: 'funk',
@@ -665,7 +665,7 @@ test('C8 · Aufträge auf dem Handschirm: Auswahlziel und Detailknöpfe halten 7
 }) => {
   await page.setViewportSize(HANDSCHIRM);
   const einsatzId = await einsatzAnlegen(page, `E2E oxgob5gk Handschirm ${Date.now()}`);
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   for (const auftrag_text of ['Erkundung Brücke Nord', 'Absperrung Brücke Süd']) {
     await seed(page, `${E}/tasks`, {
       auftrag_text,
@@ -981,7 +981,7 @@ test('C11 · Einsatz-Vorgaben (Führungskraft): Speichern ist gesperrt, Modulzei
 // ── C12 · Einsatzabschnitte und Bereitstellungsraum (LFH-347) ─────────────────────────
 
 async function gliederungSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   const nord = await seed(page, `${E}/sectors`, { name: 'Abschnitt Nord' });
   await seed(page, `${E}/sectors`, { name: 'UA Nord 1', ueber_abschnitt_id: nord.id });
   await seed(page, `${E}/units`, { name: 'Zug 1', abschnitt_id: nord.id });
@@ -1110,7 +1110,7 @@ test('C12 · Gliederung und Bereitstellungsraum (Beobachter): Schreibaktionen fe
 // ── C13 · Lagebericht und Lagemeldungen (LFH-348) ─────────────────────────────────────
 
 async function lageSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   const bericht = await seed(page, `${E}/situation-reports`, {
     vorlage: 'lagebeurteilung',
     titel: 'Lagevortrag zur Entscheidung 1000',
@@ -1289,7 +1289,7 @@ test('C13 · Lagebericht und Berichtsliste (Beobachter): Schreibaktionen fehlen 
 // (Prüfliste Einsatztauglichkeit, Kriterium 2). Die Liste steht ab `md` als Tabelle.
 
 async function materialSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   const einheit = await seed(page, `${E}/units`, { name: 'Staffel Ost' });
   const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
   const verortet = await seed(page, `${E}/material`, {
@@ -1379,7 +1379,7 @@ test('C14 · Materialliste (Beobachter): Schreibaktionen fehlen, die Ort-Links h
 // Einsatztauglichkeit der Orte, Kriterium 2).
 
 async function materialAmOrtSaeen(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   const einheit = await seed(page, `${E}/units`, { name: 'Staffel West' });
   const fahrzeug = await seed(page, `${E}/vehicles`, { adhoc: { funkrufname: 'Florian 15' } });
   const uhs = await seed(page, `${E}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
@@ -1495,7 +1495,7 @@ async function schaedenSaeen(page: Page, einsatzId: string) {
     ['gross', 'Deichweg 2'],
     ['gering', 'Bachstraße 1'],
   ]) {
-    await seed(page, `/api/einsaetze/${einsatzId}/damages`, { typ: 'sachschaden', ausmass, ort });
+    await seed(page, `/api/incidents/${einsatzId}/damages`, { typ: 'sachschaden', ausmass, ort });
   }
 }
 
@@ -1561,7 +1561,7 @@ test('C16 · Kopffilter und Filterchips (Beobachter): Erfassen fehlt, die Filter
 const TABLET_QUER = { width: 1024, height: 768 };
 
 async function eingetroffeneNachforderung(page: Page, einsatzId: string) {
-  const E = `/api/einsaetze/${einsatzId}`;
+  const E = `/api/incidents/${einsatzId}`;
   const nf = await seed(page, `${E}/resource-requests`, {
     art: 'Tauchpumpe',
     bezeichnung: '3 Tauchpumpen für Keller Hauptstraße',
@@ -1769,12 +1769,12 @@ test('Körperschema: jede Region und jedes Sternchen hält die Stufe, Hand, Fuß
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   const einsatzId = await einsatzAnlegen(page, `Körperschema ${Date.now()}`);
-  const r = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
+  const r = await page.request.post(`/api/incidents/${einsatzId}/persons`, {
     data: { name: 'Treffer', status: 'betroffen', sichtung: 'sk3' },
   });
   expect(r.ok(), `Person: ${r.status()}`).toBe(true);
   const pid = ((await r.json()) as { id: number }).id;
-  const v = await page.request.post(`/api/einsaetze/${einsatzId}/persons/${pid}/injuries`, {
+  const v = await page.request.post(`/api/incidents/${einsatzId}/persons/${pid}/injuries`, {
     data: { ansicht: 'vorn', region: 'thorax', art: 'prellung_schwellung' },
   });
   expect(v.ok(), `Verletzung: ${v.status()}`).toBe(true);

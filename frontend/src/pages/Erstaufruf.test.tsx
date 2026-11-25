@@ -252,8 +252,8 @@ describe('Erstaufruf mit langsamem Server (LLH-2005)', () => {
       const nieAntworten = () => new Promise<never>(() => {});
       server.use(
         meHandler(benutzerFixture()),
-        http.get('/api/einsaetze/:id', nieAntworten),
-        http.get('/api/einsaetze/:id/*', nieAntworten),
+        http.get('/api/incidents/:id', nieAntworten),
+        http.get('/api/incidents/:id/*', nieAntworten),
       );
       renderMitProviders(
         <Routes>

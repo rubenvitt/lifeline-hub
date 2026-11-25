@@ -265,6 +265,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   idempotent in den Vertrag der Art.
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
   vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
+  Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
   (`adapter::live::live_kontext`, LLH-2107,
@@ -296,6 +297,12 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   (Fortsetzen, Anhalten, Geheimnis, wirksame Änderung), räumt mit `repo::clear_gemeldet` und
   `benachrichtigung::erledigen_adapter` ab; Löschen quittiert in seiner Transaktion
   (`repo::quittieren_fuer_adapter_in`, Ereignis nach dem Commit).
+- **Ablage einer Art** (LLH-2097, `veranstaltung_extern`): eine Art, die nicht flüchtig ist, legt
+  in eine eigene Tabelle mit FK auf `adapter` (`ON DELETE CASCADE`) ab, je Adapter eine Zeile je
+  Fremdkennung. `uebernehmen` vergleicht einen Fingerabdruck und schreibt bei Gleichstand nichts;
+  eine Lieferung gilt ganz oder gar nicht (eine ungültige Zeile ist `antwort_ungueltig`). Keine
+  Admin-Spur je Zeile: der Lauf ist kein Admin. Kein Name einer liefernden Anwendung im Code
+  (Guard `veranstaltung_extern::tests::code_nennt_keine_liefernde_anwendung`).
 - **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
   in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
   `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er
@@ -811,7 +818,7 @@ Entwurf `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitgli
 - **Die anlegende Person ist immer Einsatzleitung** und steht nicht in der Liste (sonst 400).
 - **Dieselbe Menge wie unter „Zugriff“:** aufnehmbar ist, was `einsatz::repo::auswahl_sql` liefert
   (aktiv, eigene Org, ohne Geräte-, Stellvertreter- und Archivkonten). Die Auswahl beim Anlegen
-  (`GET /api/einsaetze/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
+  (`GET /api/incidents/member-selection`, Tür `darf_einsatz_anlegen`) und der Schreibweg teilen sie.
   Eine fremde oder unbekannte Person nennt die Meldung nur mit Kennung.
 - **Jede aufgenommene Person bekommt nach dem Commit den Hinweis `einsatz_aufnahme`** wie bei
   `mitglied_setzen`; die anlegende Person nicht.
@@ -934,7 +941,7 @@ Spec `benachrichtigungen`, Herleitung `openspec/changes/archive/2026-10-15-kcjec
   stellt (EL als Einsatzleiter der Führungsstelle ∪ Funktion der Mitgliedschaft, leer = `ohne`);
   lauter gewinnt. Ohne Zeile gilt `BenachrichtigungArt::vorgabe_still()`, einstellbar ist nur
   `vorgabe_einstellbar()`. Lesen und Schreiben nur über `benachrichtigung::vorgabe`.
-  Verlauf `GET …/einsaetze/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
+  Verlauf `GET …/incidents/{id}/notifications` (≤ 200, `ungelesen` = unquittierte Eingänge
   nach der Rechteprüfung), „alle gelesen“ `POST …/notifications/read` nur über
   `benachrichtigung::gelesen_bis`: nie Alarme, EIN Quittier-Ereignis mit `gelesen_bis`, nie eines
   je Zeile.
@@ -999,7 +1006,7 @@ Entscheidung [ADR-0090](../docs/architektur/entscheidungen/ADR-0090-ios-push-lae
   `/admin/einstellungen/anbindungen` (`inhalt::rueckfall_pfad` ↔ `alarm-sw.js`). Absender und Wortlaut nur mit
   „Mit Absender und Wortlaut“ (`inhalt`), nur für die Arten, zu denen der Service Worker sie holt
   (`inhalt::hat_inhalt` ↔ `pushInhalt` in `frontend/public/alarm-sw.js`, beide ziehen zusammen
-  mit), und nur, wenn der Empfänger die Meldung über `GET /api/einsaetze/{e}/reports/{mid}` lesen
+  mit), und nur, wenn der Empfänger die Meldung über `GET /api/incidents/{e}/reports/{mid}` lesen
   dürfte (dieselbe Prüfung, je Empfänger auf dem Server).
 - **Größe:** der Umschlag an das Relais ist höchstens `UMSCHLAG_MAX` (3072 Zeichen; APNs nimmt
   4096 Byte für den ganzen Push, das Relais weist einen größeren Push mit 400 ab). Zu langes kürzt
@@ -1162,6 +1169,10 @@ Specs `bereitstellungsraum-belegung` und `bereitstellungsraum-lagekarte`;
 ## Backend — Aufbewahrung (LFH-23)
 
 Herleitung: `openspec/changes/archive/2026-09-29-lfh-23-retention-rest/design.md`.
+- **Abgerufene Veranstaltungen** (LLH-2097): `veranstaltung_extern` geht 14 Tage nach `ende_at`
+  (`veranstaltung_extern::repo::AUFBEWAHRUNG_TAGE`, Phase C des Purge-Laufs) oder mit dem Adapter.
+  Was die Quelle planmäßig nicht mehr liefert (Ende mehr als `FENSTER_TAGE` zurück), wird nicht
+  `entfernt`; eine Frist, die kürzer ist als das Fenster, holte eine Veranstaltung als neu zurück.
 - **Totalsperre bleibt** (`einsatz::berechtigung::darf_lesen`, auch für den System-Admin); das
   Archiv liest nur `/api/retention` (`routes/aufbewahrung.rs`), Guard
   `archiv_namensraum_nur_lesend_und_admin` (`tests/aufbewahrung.rs`) — neue Routen dort

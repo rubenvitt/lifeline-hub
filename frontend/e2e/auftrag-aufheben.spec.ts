@@ -12,12 +12,12 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
 const detail = (page: Page) => page.locator('[data-lfh="liste-detail-detail"]');
 
 async function einsatzMitAuftrag(page: Page): Promise<{ einsatzId: string; nr: number }> {
-  const e = await page.request.post('/api/einsaetze', {
+  const e = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Auftragsrücknahme ${Date.now()}` },
   });
-  expect(e.ok(), `POST /api/einsaetze: ${e.status()} ${await e.text()}`).toBe(true);
+  expect(e.ok(), `POST /api/incidents: ${e.status()} ${await e.text()}`).toBe(true);
   const einsatzId = String(((await e.json()) as { id: number }).id);
-  const a = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const a = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Sandsäcke zum Deich bringen',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
@@ -60,7 +60,7 @@ test.describe('Auftrag aufheben und berichtigen', () => {
     await expect(dialog).toHaveCount(0);
     await expect(detail(page).getByText('Sandsäcke zum Deich Nord bringen')).toBeVisible();
 
-    const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+    const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
     const inhalte = ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
     expect(inhalte).toContain(
       `Auftrag #${nr} geändert: Auftragstext „Sandsäcke zum Deich Nord bringen“.`,

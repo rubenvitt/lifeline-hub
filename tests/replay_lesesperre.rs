@@ -36,7 +36,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, e: i64) {
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         cookie,
         None,
     )
@@ -85,7 +85,7 @@ async fn angelegt(app: &axum::Router, cookie: &str, url: &str, body: &str, was: 
 /// Legt an Einsatz `e` je Route einen Datensatz mit `client_id` an (als `cookie`) und liefert
 /// die Fälle für den Replay.
 async fn faelle_anlegen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Fall> {
-    let basis = format!("/api/einsaetze/{e}");
+    let basis = format!("/api/incidents/{e}");
     let mut faelle = Vec::new();
 
     let url = format!("{basis}/etb");
@@ -339,7 +339,7 @@ async fn replay_nach_nachlauffrist_fuer_fuehrungspersonal_gesperrt() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &fuehr_cookie,
         None,
     )

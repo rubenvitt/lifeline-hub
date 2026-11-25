@@ -29,9 +29,9 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
  */
 async function seed(page: Page): Promise<string> {
   const einsatzId = String(
-    await post(page, '/api/einsaetze', { bezeichnung: `E2E Großbild ${Date.now()}` }),
+    await post(page, '/api/incidents', { bezeichnung: `E2E Großbild ${Date.now()}` }),
   );
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   for (const name of ['Albers', 'Brandt']) await post(page, `${basis}/persons`, { name });
   await post(page, `${basis}/persons`, { name: 'Claasen', status: 'vermisst' });
   await post(page, `${basis}/tasks`, {

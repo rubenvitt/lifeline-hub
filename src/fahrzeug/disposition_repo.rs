@@ -15,7 +15,8 @@ const SELECT_AUFGELOEST: &str = "\
     SELECT ef.id, ef.einsatz_id, ef.fahrzeug_id, ef.einheit_id, ef.status_id, \
            ef.snap_funkrufname, ef.snap_kennzeichen, ef.snap_fahrzeugtyp, ef.snap_opta, \
            ef.snap_traegerorganisation, ef.bemerkung, \
-           ef.lat, ef.lon, ef.tz_fachaufgabe, ef.tz_organisation, \
+           ef.lat, ef.lon, ef.position_aktualisiert_at, ef.position_quelle, \
+           ef.tz_fachaufgabe, ef.tz_organisation, \
            ef.aktueller_br_id, ef.status_seit, \
            ef.disponiert_at, ef.disponiert_von, \
            ef.beendet_at, ef.beendet_von, ef.beendet_als, \
@@ -46,6 +47,8 @@ struct Row {
     bemerkung: Option<String>,
     lat: Option<f64>,
     lon: Option<f64>,
+    position_aktualisiert_at: Option<String>,
+    position_quelle: Option<String>,
     tz_fachaufgabe: Option<String>,
     tz_organisation: Option<String>,
     aktueller_br_id: Option<i64>,
@@ -117,6 +120,8 @@ fn zu_anzeige(row: Row, einsatz_aktiv: bool) -> EinsatzFahrzeugAnzeige {
         bemerkung: row.bemerkung,
         lat: row.lat,
         lon: row.lon,
+        position_aktualisiert_at: row.position_aktualisiert_at,
+        position_quelle: row.position_quelle,
         tz_fachaufgabe: row.tz_fachaufgabe,
         tz_organisation: row.tz_organisation,
         aktueller_br_id: row.aktueller_br_id,
@@ -611,9 +616,13 @@ pub async fn update_position(
             lat = CASE WHEN ?1 THEN ?2 ELSE lat END, \
             lon = CASE WHEN ?3 THEN ?4 ELSE lon END, \
             tz_fachaufgabe  = CASE WHEN ?5 THEN ?6 ELSE tz_fachaufgabe END, \
-            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END \
+            tz_organisation = CASE WHEN ?7 THEN ?8 ELSE tz_organisation END, \
+            position_quelle = CASE WHEN ?1 OR ?3 THEN 'manuell' ELSE position_quelle END, \
+            position_aktualisiert_at = CASE WHEN ?1 OR ?3 THEN \
+                (CASE WHEN (CASE WHEN ?1 THEN ?2 ELSE lat END) IS NULL THEN NULL ELSE ?11 END) \
+                ELSE position_aktualisiert_at END \
          WHERE id = ?9 AND einsatz_id = ?10{}",
-        erwartet.sql_suffix(11)
+        erwartet.sql_suffix(12)
     );
     let q = sqlx::query(sqlx::AssertSqlSafe(sql))
         .bind(daten.lat.is_some())
@@ -625,7 +634,8 @@ pub async fn update_position(
         .bind(daten.tz_organisation.is_some())
         .bind(daten.tz_organisation.flatten())
         .bind(ef_id)
-        .bind(einsatz_id);
+        .bind(einsatz_id)
+        .bind(crate::zeit::jetzt());
     let betroffen = erwartet.bind_all(q).execute(pool).await?.rows_affected();
     if betroffen == 0 {
         return Err(crate::feld_cas::ohne_treffer(

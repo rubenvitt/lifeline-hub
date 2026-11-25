@@ -28,25 +28,25 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 
 /** Ein Einsatz mit Inhalt, damit Tabelle, Zeitachse und Liste ihre echte Höhe haben. */
 async function createEinsatzMitDaten(page: Page): Promise<number> {
-  const id = await post(page, '/api/einsaetze', { bezeichnung: `E2E Erstaufruf ${Date.now()}` });
+  const id = await post(page, '/api/incidents', { bezeichnung: `E2E Erstaufruf ${Date.now()}` });
   for (const inhalt of ['Pegel steigt', 'Deich sichern', 'Sandsäcke angefordert']) {
-    await post(page, `/api/einsaetze/${id}/etb`, {
+    await post(page, `/api/incidents/${id}/etb`, {
       typ: 'meldung',
       inhalt,
       von: 'ELW 1',
       an: 'Leitstelle',
     });
   }
-  await post(page, `/api/einsaetze/${id}/persons`, { name: 'Erstaufruf Eins' });
-  await post(page, `/api/einsaetze/${id}/persons`, { name: 'Erstaufruf Zwei' });
-  await post(page, `/api/einsaetze/${id}/personnel`, { adhoc: { name: 'Kraft Erstaufruf' } });
+  await post(page, `/api/incidents/${id}/persons`, { name: 'Erstaufruf Eins' });
+  await post(page, `/api/incidents/${id}/persons`, { name: 'Erstaufruf Zwei' });
+  await post(page, `/api/incidents/${id}/personnel`, { adhoc: { name: 'Kraft Erstaufruf' } });
   return id;
 }
 
 /** Verzögert jede Antwort zum Einsatz; der Einsatz selbst kommt vor seinen Daten. */
 async function verzoegere(page: Page, einsatzId: number) {
-  await page.route(new RegExp(`/api/einsaetze/${einsatzId}(/.*)?(\\?.*)?$`), async (route) => {
-    const nurEinsatz = new RegExp(`/api/einsaetze/${einsatzId}(\\?.*)?$`).test(
+  await page.route(new RegExp(`/api/incidents/${einsatzId}(/.*)?(\\?.*)?$`), async (route) => {
+    const nurEinsatz = new RegExp(`/api/incidents/${einsatzId}(\\?.*)?$`).test(
       route.request().url(),
     );
     await new Promise((r) => setTimeout(r, nurEinsatz ? EINSATZ_VERZUG : DATEN_VERZUG));

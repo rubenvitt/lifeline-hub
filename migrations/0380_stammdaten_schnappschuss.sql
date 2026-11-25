@@ -5,7 +5,7 @@
 --
 -- Datensparsamkeit: nur ein offener Schnappschuss trägt Namen (`inhalt`, der Körper des Abrufs);
 -- beim Übernehmen oder Ersetzen wird `inhalt` NULL. Es bleiben Fingerabdruck, Zählung und Zeiten.
--- Nicht verteilt an gekoppelte ELW. Abgesichert von db::tests::migration_0375_stammdaten_schnappschuss.
+-- Nicht verteilt an gekoppelte ELW. Abgesichert von db::tests::migration_0380_stammdaten_schnappschuss.
 CREATE TABLE stammdaten_schnappschuss (
     id             TEXT    PRIMARY KEY,
     org_id         INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,

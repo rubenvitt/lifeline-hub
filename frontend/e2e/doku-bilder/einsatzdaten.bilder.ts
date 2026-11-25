@@ -56,7 +56,7 @@ async function kartengrundlage(page: Page) {
 
 /** Treffer der Ortssuche, ohne Geocoder. */
 async function ortssuche(page: Page) {
-  await page.route(/\/api\/einsaetze\/\d+\/place-search\?/, (route) =>
+  await page.route(/\/api\/incidents\/\d+\/place-search\?/, (route) =>
     route.fulfill({
       json: {
         zustand: 'ok',
@@ -92,14 +92,14 @@ async function sprechgruppe(
   bezeichnung: string,
   betriebsart: 'TMO' | 'DMO',
 ): Promise<Sprechgruppe> {
-  const liste = await api.get(`/api/einsaetze/${einsatzId}/talk-groups`);
+  const liste = await api.get(`/api/incidents/${einsatzId}/talk-groups`);
   expect(liste.ok(), `Sprechgruppen: ${liste.status()}`).toBe(true);
   const vorhanden = ((await liste.json()) as Sprechgruppe[]).find(
     (s) => s.bezeichnung === bezeichnung,
   );
   return (
     vorhanden ??
-    fuelle<Sprechgruppe>(api, 'post', `/api/einsaetze/${einsatzId}/talk-groups`, {
+    fuelle<Sprechgruppe>(api, 'post', `/api/incidents/${einsatzId}/talk-groups`, {
       bezeichnung,
       betriebsart,
     })
@@ -111,9 +111,9 @@ test.describe(KAPITEL, () => {
     const api = await apiAlsAdmin();
     const demo = await demoEinsatz(api);
     const id = demo.id;
-    const einsatz = await (await api.get(`/api/einsaetze/${id}`)).json();
+    const einsatz = await (await api.get(`/api/incidents/${id}`)).json();
     if (!einsatz.einsatzort) {
-      await fuelle(api, 'patch', `/api/einsaetze/${id}`, {
+      await fuelle(api, 'patch', `/api/incidents/${id}`, {
         einsatzort: 'Musterstadt, Mühlbachstraße 12',
         einsatzort_lat: 50.9525,
         einsatzort_lon: 10.2465,
@@ -126,14 +126,14 @@ test.describe(KAPITEL, () => {
     }
     const sg1 = await sprechgruppe(api, id, 'TMO 311_F_EL', 'TMO');
     const sg2 = await sprechgruppe(api, id, 'DMO 505', 'DMO');
-    const fs = await (await api.get(`/api/einsaetze/${id}/command-post`)).json();
+    const fs = await (await api.get(`/api/incidents/${id}/command-post`)).json();
     if (!fs.rufname) {
-      const fahrzeuge = (await (await api.get(`/api/einsaetze/${id}/vehicles`)).json()) as {
+      const fahrzeuge = (await (await api.get(`/api/incidents/${id}/vehicles`)).json()) as {
         id: number;
         funkrufname: string;
       }[];
       const elw = fahrzeuge.find((f) => f.funkrufname === 'Musterstadt 11-1') ?? fahrzeuge[0];
-      await fuelle(api, 'patch', `/api/einsaetze/${id}/command-post`, {
+      await fuelle(api, 'patch', `/api/incidents/${id}/command-post`, {
         rufname: 'Florian Musterstadt 11-1',
         verbindungen: [{ mittel: 'festnetz', wert: '0561 123 4567' }],
         sprechgruppe_ids: [sg1.id, sg2.id],

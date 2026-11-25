@@ -198,7 +198,7 @@ describe('apiSend', () => {
 describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
   it('meldet eine 202 mit Antrag als Fensterereignis mit der Einsatz-Kennung', async () => {
     server.use(
-      http.post('/api/einsaetze/7/etb', () =>
+      http.post('/api/incidents/7/etb', () =>
         HttpResponse.json({ antrag: { id: 3, zustand: 'ausstehend' } }, { status: 202 }),
       ),
     );
@@ -206,7 +206,7 @@ describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
     const hoerer = (e: Event) => gemeldet.push((e as CustomEvent).detail);
     window.addEventListener(ANTRAG_EREIGNIS, hoerer);
     try {
-      await expect(apiSend('/api/einsaetze/7/etb', 'POST', {})).resolves.toEqual({
+      await expect(apiSend('/api/incidents/7/etb', 'POST', {})).resolves.toEqual({
         antrag: { id: 3, zustand: 'ausstehend' },
       });
     } finally {
@@ -217,16 +217,16 @@ describe('apiSend — Antrag am Spiegel (LLH-1492)', () => {
 
   it('meldet keine andere 202 und keine 201', async () => {
     server.use(
-      http.post('/api/einsaetze/7/map', () => HttpResponse.json({ id: 1 }, { status: 202 })),
-      http.post('/api/einsaetze/7/etb', () =>
+      http.post('/api/incidents/7/map', () => HttpResponse.json({ id: 1 }, { status: 202 })),
+      http.post('/api/incidents/7/etb', () =>
         HttpResponse.json({ antrag: { id: 3, zustand: 'x' } }, { status: 201 }),
       ),
     );
     const hoerer = vi.fn();
     window.addEventListener(ANTRAG_EREIGNIS, hoerer);
     try {
-      await apiSend('/api/einsaetze/7/map', 'POST', {});
-      await apiSend('/api/einsaetze/7/etb', 'POST', {});
+      await apiSend('/api/incidents/7/map', 'POST', {});
+      await apiSend('/api/incidents/7/etb', 'POST', {});
     } finally {
       window.removeEventListener(ANTRAG_EREIGNIS, hoerer);
     }
@@ -535,6 +535,20 @@ describe('ApiError.grund', () => {
     expect(zeile.grund).toBe(GRUND_NICHT_IN_LISTE);
     const unbekannt = (await apiGet('/api/unbekannt').catch((x: unknown) => x)) as ApiError;
     expect(unbekannt.grund).toBeNull();
+  });
+
+  it('liest den englischen `reason` neuer Routen als Grund und hält die übrigen Felder (Helfer-App)', async () => {
+    server.use(
+      http.post('/api/belegt', () =>
+        HttpResponse.json(
+          { error: 'Belegt', reason: 'tracker_taken', holder: 12 },
+          { status: 409 },
+        ),
+      ),
+    );
+    const e = (await apiSend('/api/belegt', 'POST', {}).catch((x: unknown) => x)) as ApiError;
+    expect(e.grund).toBe('tracker_taken');
+    expect(e.details.holder).toBe(12);
   });
 });
 

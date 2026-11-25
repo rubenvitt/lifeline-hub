@@ -11,6 +11,9 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 use age::secrecy::SecretString;
+use reqwest::header::{
+    HeaderMap, HeaderValue, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
+};
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 
@@ -18,7 +21,8 @@ use super::art::Fehlschlag;
 use super::zustand::AdapterFehler;
 use crate::ausgehend::{client_builder, Zweck};
 use crate::http_begrenzt::{self, LeseFehler};
-use crate::public_api::webhook::ziel::{check_url, fehler_art, WebhookResolver};
+use crate::karte_fremdebene::FremdebeneFehler;
+use crate::public_api::webhook::ziel::{check_url, fehler_art, WebhookResolver, ZielFehler};
 use crate::public_api::webhook::WebhookFehler;
 
 /// Zeit für den Verbindungsaufbau.
@@ -200,6 +204,112 @@ impl<'a> AbrufKontext<'a> {
     }
 }
 
+/// Antwort eines bedingten Abrufs ([`fetch_bedingt`]): 200 mit Rumpf oder 304 ohne.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BedingteAntwort {
+    pub status: u16,
+    pub etag: Option<String>,
+    pub last_modified: Option<String>,
+    /// `None` bei 304.
+    pub body: Option<Vec<u8>>,
+}
+
+/// Ordnet den Status eines bedingten Abrufs ein: `None` bei 2xx und 304.
+pub fn fremdebene_fehler_aus_status(status: u16) -> Option<FremdebeneFehler> {
+    match status {
+        200..=299 | 304 => None,
+        300..=399 => Some(FremdebeneFehler::Weiterleitung),
+        401 | 403 => Some(FremdebeneFehler::Abgelehnt),
+        _ => Some(FremdebeneFehler::Status),
+    }
+}
+
+/// Ordnet eine abgelehnte Ziel-URL ein: ein internes Ziel ist `ziel_intern`, jede andere (etwa
+/// `http://`) `abgelehnt`.
+pub fn fremdebene_fehler_aus_ziel(f: ZielFehler) -> FremdebeneFehler {
+    match f {
+        ZielFehler::Intern | ZielFehler::Localhost => FremdebeneFehler::ZielIntern,
+        _ => FremdebeneFehler::Abgelehnt,
+    }
+}
+
+fn fremdebene_fehler_aus_webhook(f: WebhookFehler) -> FremdebeneFehler {
+    match f {
+        WebhookFehler::Zeitueberschreitung => FremdebeneFehler::Zeitlimit,
+        WebhookFehler::ZielIntern => FremdebeneFehler::ZielIntern,
+        WebhookFehler::Weiterleitung => FremdebeneFehler::Weiterleitung,
+        WebhookFehler::Status => FremdebeneFehler::Status,
+        WebhookFehler::ZielUngueltig => FremdebeneFehler::Abgelehnt,
+        WebhookFehler::Verbindung | WebhookFehler::Tls | WebhookFehler::Dns => {
+            FremdebeneFehler::NichtErreichbar
+        }
+    }
+}
+
+/// Die Köpfe eines bedingten Abrufs aus den Validatoren der letzten Antwort. Ein Wert, der kein
+/// gültiger Kopf ist, fällt weg (dann kommt eben 200).
+pub fn bedingte_koepfe(etag: Option<&str>, last_modified: Option<&str>) -> HeaderMap {
+    let mut koepfe = HeaderMap::new();
+    if let Some(wert) = etag.and_then(|e| HeaderValue::from_str(e).ok()) {
+        koepfe.insert(IF_NONE_MATCH, wert);
+    }
+    if let Some(wert) = last_modified.and_then(|l| HeaderValue::from_str(l).ok()) {
+        koepfe.insert(IF_MODIFIED_SINCE, wert);
+    }
+    koepfe
+}
+
+fn kopf_text(antwort: &reqwest::Response, name: reqwest::header::HeaderName) -> Option<String> {
+    antwort
+        .headers()
+        .get(name)
+        .and_then(|w| w.to_str().ok())
+        .map(str::to_string)
+}
+
+/// Bedingter Abruf einer Fremdebene (LLH-2100) über denselben Weg wie die Adapter: Zielschutz
+/// (`check_url`), der Client ohne Proxy und Weiterleitung, nur `https`, pinnender Resolver, Rumpf
+/// gedeckelt (`deckel`). Fehler tragen nur den Code, nie die URL.
+pub async fn fetch_bedingt(
+    url: &str,
+    lan_erlaubt: bool,
+    deckel: usize,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<BedingteAntwort, FremdebeneFehler> {
+    let ziel = check_url(url, lan_erlaubt).map_err(fremdebene_fehler_aus_ziel)?;
+    let antwort = client(lan_erlaubt)
+        .get(ziel)
+        .headers(bedingte_koepfe(etag, last_modified))
+        .send()
+        .await
+        .map_err(|e| fremdebene_fehler_aus_webhook(fehler_art(&e)))?;
+    let status = antwort.status().as_u16();
+    if let Some(f) = fremdebene_fehler_aus_status(status) {
+        return Err(f);
+    }
+    let etag = kopf_text(&antwort, ETAG);
+    let last_modified = kopf_text(&antwort, LAST_MODIFIED);
+    let body = if status == 304 {
+        None
+    } else {
+        Some(
+            http_begrenzt::lies_begrenzt(antwort, deckel)
+                .await
+                .map_err(|f| match f {
+                    LeseFehler::ZuGross { .. } => FremdebeneFehler::ZuGross,
+                    LeseFehler::Json(_) | LeseFehler::Http(_) => FremdebeneFehler::NichtErreichbar,
+                })?,
+        )
+    };
+    Ok(BedingteAntwort {
+        status,
+        etag,
+        last_modified,
+        body,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,6 +352,121 @@ mod tests {
         assert_eq!(
             mit_lan.get("https://127.0.0.1/x").unwrap_err().art,
             AdapterFehler::ZielIntern
+        );
+    }
+
+    #[test]
+    fn fremdebene_status_wird_eingeordnet() {
+        assert_eq!(fremdebene_fehler_aus_status(200), None);
+        assert_eq!(fremdebene_fehler_aus_status(304), None);
+        assert_eq!(
+            fremdebene_fehler_aus_status(302),
+            Some(FremdebeneFehler::Weiterleitung)
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_status(301),
+            Some(FremdebeneFehler::Weiterleitung)
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_status(403),
+            Some(FremdebeneFehler::Abgelehnt)
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_status(404),
+            Some(FremdebeneFehler::Status)
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_status(500),
+            Some(FremdebeneFehler::Status)
+        );
+    }
+
+    #[test]
+    fn bedingte_koepfe_aus_den_validatoren() {
+        let k = bedingte_koepfe(Some("\"v1\""), Some("Wed, 21 Oct 2026 07:28:00 GMT"));
+        assert_eq!(k.get(IF_NONE_MATCH).unwrap(), "\"v1\"");
+        assert_eq!(
+            k.get(IF_MODIFIED_SINCE).unwrap(),
+            "Wed, 21 Oct 2026 07:28:00 GMT"
+        );
+        assert!(bedingte_koepfe(None, None).is_empty());
+        // Ein Wert, der kein Kopf sein kann, fällt weg.
+        assert!(bedingte_koepfe(Some("a\nb"), None).is_empty());
+    }
+
+    /// Der Zielschutz greift vor jeder Anfrage: weder `http` noch ein internes IP-Literal
+    /// bekommen eine Verbindung (der Lauscher sieht keine).
+    #[tokio::test]
+    async fn fetch_bedingt_prueft_das_ziel_vorher() {
+        let lauscher = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = lauscher.local_addr().unwrap().port();
+        let deckel = 1024;
+        let faelle = [
+            (
+                format!("http://127.0.0.1:{port}/x"),
+                true,
+                FremdebeneFehler::Abgelehnt,
+            ),
+            (
+                "http://geo.example.org/x".to_string(),
+                false,
+                FremdebeneFehler::Abgelehnt,
+            ),
+            (
+                format!("https://127.0.0.1:{port}/x"),
+                true,
+                FremdebeneFehler::ZielIntern,
+            ),
+            (
+                format!("https://localhost:{port}/x"),
+                true,
+                FremdebeneFehler::ZielIntern,
+            ),
+            (
+                "https://10.0.0.1/x".to_string(),
+                false,
+                FremdebeneFehler::ZielIntern,
+            ),
+            (
+                "https://192.168.1.5/x".to_string(),
+                false,
+                FremdebeneFehler::ZielIntern,
+            ),
+            ("kein url".to_string(), false, FremdebeneFehler::Abgelehnt),
+        ];
+        for (url, lan, erwartet) in faelle {
+            assert_eq!(
+                fetch_bedingt(&url, lan, deckel, Some("\"v1\""), None).await,
+                Err(erwartet),
+                "{url}"
+            );
+        }
+        let angenommen =
+            tokio::time::timeout(std::time::Duration::from_millis(200), lauscher.accept()).await;
+        assert!(angenommen.is_err(), "keine Verbindung erwartet");
+    }
+
+    #[test]
+    fn fremdebene_zielfehler_und_netzfehler() {
+        assert_eq!(
+            fremdebene_fehler_aus_ziel(ZielFehler::NichtHttps),
+            FremdebeneFehler::Abgelehnt
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_ziel(ZielFehler::Localhost),
+            FremdebeneFehler::ZielIntern
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_webhook(WebhookFehler::Zeitueberschreitung),
+            FremdebeneFehler::Zeitlimit
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_webhook(WebhookFehler::Dns),
+            FremdebeneFehler::NichtErreichbar
+        );
+        assert_eq!(
+            fremdebene_fehler_aus_webhook(WebhookFehler::ZielIntern),
+            FremdebeneFehler::ZielIntern
         );
     }
 }

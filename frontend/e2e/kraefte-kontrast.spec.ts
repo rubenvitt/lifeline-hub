@@ -151,10 +151,10 @@ for (const modus of ['light', 'dark']) {
     test.setTimeout(120_000);
     await anmelden(page);
     const lauf = Date.now();
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E 446 Kontrast ${lauf}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     const faelle: {
       modul: string;
       kennung: string;
@@ -325,10 +325,10 @@ for (const modus of ['light', 'dark'] as const) {
   test(`Meldebild: Statusband und Verdichtungszeile im Modus ${modus}`, async ({ page }) => {
     test.setTimeout(90_000);
     await anmelden(page);
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E 515 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     // Ohne Daten rendert die Verdichtungszeile `null` und das Band einen Leerzustand.
     await post(page, `${basis}/personnel`, { adhoc: { name: 'Messkraft 515' } });
 

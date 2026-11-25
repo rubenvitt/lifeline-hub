@@ -19,11 +19,11 @@ const einsatz = (meine_rolle: string | null, status = 'aktiv', spiegel: unknown 
 
 function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = null) {
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz(rolle, status, spiegel))),
-    http.get('/api/einsaetze/1/settings', () =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatz(rolle, status, spiegel))),
+    http.get('/api/incidents/1/settings', () =>
       HttpResponse.json({ einsatz_id: 1, org_defaults: { org_id: 1 } }),
     ),
-    http.get('/api/einsaetze/1/members', () =>
+    http.get('/api/incidents/1/members', () =>
       HttpResponse.json([
         {
           benutzer_id: 2,
@@ -34,7 +34,7 @@ function setupServer(rolle: string | null, status = 'aktiv', spiegel: unknown = 
         },
       ]),
     ),
-    http.get('/api/einsaetze/1/members/selection', () =>
+    http.get('/api/incidents/1/members/selection', () =>
       HttpResponse.json([{ benutzer_id: 9, anzeigename: 'Paul Probe' }]),
     ),
   );

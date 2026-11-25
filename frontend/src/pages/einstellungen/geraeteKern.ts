@@ -22,6 +22,7 @@ export const ANSICHT_LABEL: Record<Funktionsansicht, string> = {
   einsatzabschnitt: 'Einsatzabschnitt',
   verpflegung: 'Verpflegung',
   einheit: 'Einheit',
+  helfer: 'Helfer',
 };
 
 /** Was eine Ansicht kann, in wenigen Fachwörtern für die Auswahl (kein Satz, LFH-1078). */
@@ -34,6 +35,8 @@ export const ANSICHT_ZWECK: Record<Funktionsansicht, string> = {
   einsatzabschnitt: 'Kräfte, Aufträge, Meldungen eines Abschnitts',
   verpflegung: 'Portionen je Zeitfenster ausgeben, Fehlmenge melden',
   einheit: 'Aufträge, Status, Meldungen einer Einheit',
+  // Nur über die Helfer-Einladung, nie in der Kopplungsmaske (Spec Helfer-App).
+  helfer: 'Position der eigenen Einheit oder des Fahrzeugs',
 };
 
 /** Feld der Kopplungsmaske je Stellenart: Beschriftung, Platzhalter, leere Auswahl. */

@@ -346,14 +346,14 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   await seedeKraefte(page, einsatzId, KRAEFTE_LESBAR);
   // Eine Einheit mit langem Auftrag: der Auftrag wirbt um Breite, die Einheitenspalte muss ihren
   // Anteil trotzdem halten (ohne ihn verteilte die Tabelle allein nach Inhalt).
-  const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+  const einheit = await page.request.post(`/api/incidents/${einsatzId}/units`, {
     data: { name: EINHEIT_LESBAR },
   });
   expect(einheit.ok(), `Seeding Einheit: ${einheit.status()}`).toBeTruthy();
   const einheitId = ((await einheit.json()) as { id: number }).id;
   // Ein Materialposten der Einheit: sein Kürzel „Mtl.“ ist das Einzelwort, das (b) prüft. Die
   // Bezeichnung ist lang (Druck auf die Zelle) und trifft das Namensmuster von (b) nicht.
-  const material = await page.request.post(`/api/einsaetze/${einsatzId}/material`, {
+  const material = await page.request.post(`/api/incidents/${einsatzId}/material`, {
     data: {
       adhoc: { bezeichnung: 'Tauchpumpe Hochwasser-Schlauchpaket, Löschzug Nordwest 1' },
       menge: 1,
@@ -361,11 +361,11 @@ async function pruefeLesbarkeit(page: Page, browserName: string, zusatz: boolean
   });
   expect(material.ok(), `Seeding Material: ${material.status()}`).toBeTruthy();
   const materialId = ((await material.json()) as { id: number }).id;
-  const zuordnung = await page.request.patch(`/api/einsaetze/${einsatzId}/material/${materialId}`, {
+  const zuordnung = await page.request.patch(`/api/incidents/${einsatzId}/material/${materialId}`, {
     data: { einheit_id: einheitId },
   });
   expect(zuordnung.ok(), `Material zuordnen: ${zuordnung.status()}`).toBeTruthy();
-  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const auftrag = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: {
       auftrag_text:
         'Verletztenablage am Deich Süd einrichten und Betroffene aus dem Pegelbereich Altstadt ' +

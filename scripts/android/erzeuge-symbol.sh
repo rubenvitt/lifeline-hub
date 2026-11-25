@@ -16,12 +16,14 @@
 # `convert`), damit ein neuer Lauf bei gleicher Quelle dieselbe Datei ergibt. Ergebnisse und
 # Stempel werden eingecheckt; frontend/src/marke/marke.guard.test.ts prüft Größe, Transparenz,
 # den sicheren Kreis, die Hintergrundfarbe und den Stempel `scripts/android/symbol.sha256`.
-# `scripts/marke/erzeuge-symbole.sh` ruft dieses Skript am Ende auf.
+# `scripts/marke/erzeuge-symbole.sh` ruft dieses Skript am Ende auf. Die Helfer-App
+# (`android/helfer`, ADR-0101) trägt dasselbe Symbol; das Skript schreibt in beide Module.
 set -euo pipefail
 
 wurzel="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 quelle="$wurzel/scripts/marke/symbol.svg"
-res="$wurzel/android/app/src/main/res"
+# Lifeline-App und Helfer-App bekommen dasselbe Symbol.
+ziele=("$wurzel/android/app/src/main/res" "$wurzel/android/helfer/src/main/res")
 KOPF_SCHWARZ="#0c0e11"
 # Die Ecken des Rahmens um die Marke (±198, ±189 um die Mitte, MARKE_RAHMEN) liegen bei 0,56 auf
 # 153 von 156,4 Einheiten Radius (66/108 der halben Kante 256): ganz im sicheren Kreis.
@@ -58,10 +60,11 @@ fi
 rsvg-convert --width "$KANTE" --height "$KANTE" --output "$arbeit/roh.png" "$arbeit/vordergrund.svg"
 "${im[@]}" "$arbeit/roh.png" -strip -define png:exclude-chunks=date,time,tIME \
   "PNG32:$arbeit/vordergrund.png"
-mkdir -p "$res/mipmap-xxxhdpi" "$res/mipmap-anydpi-v26"
-cp "$arbeit/vordergrund.png" "$res/mipmap-xxxhdpi/ic_launcher_vordergrund.png"
+for res in "${ziele[@]}"; do
+  mkdir -p "$res/mipmap-xxxhdpi" "$res/mipmap-anydpi-v26"
+  cp "$arbeit/vordergrund.png" "$res/mipmap-xxxhdpi/ic_launcher_vordergrund.png"
 
-cat > "$res/mipmap-anydpi-v26/ic_launcher.xml" << 'XML'
+  cat > "$res/mipmap-anydpi-v26/ic_launcher.xml" << 'XML'
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Erzeugt von scripts/android/erzeuge-symbol.sh aus der Bildmarke — nicht von Hand ändern. -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
@@ -69,7 +72,8 @@ cat > "$res/mipmap-anydpi-v26/ic_launcher.xml" << 'XML'
     <foreground android:drawable="@mipmap/ic_launcher_vordergrund" />
 </adaptive-icon>
 XML
+done
 
 (cd "$wurzel/scripts/marke" && shasum -a 256 symbol.svg 2> /dev/null || sha256sum symbol.svg) \
   > "$wurzel/scripts/android/symbol.sha256"
-echo "Android-Symbol erzeugt: $res/mipmap-anydpi-v26/ic_launcher.xml"
+echo "Android-Symbol erzeugt: ${ziele[*]/%//mipmap-anydpi-v26/ic_launcher.xml}"

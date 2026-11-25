@@ -29,7 +29,7 @@ function zaehleAnlegen(page: Page, einsatzId: string): { anzahl: number; bodies:
   page.on('request', (r) => {
     if (
       r.method() === 'POST' &&
-      new URL(r.url()).pathname === `/api/einsaetze/${einsatzId}/situation-reports`
+      new URL(r.url()).pathname === `/api/incidents/${einsatzId}/situation-reports`
     ) {
       zaehler.anzahl += 1;
       zaehler.bodies.push(r.postDataJSON() as AnlegenBody);
@@ -147,7 +147,7 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
   // App-Route deutsch, API englisch (ADR-0085): `/einsaetze/1/lageberichte/5` → `…/situation-reports/5`.
   const berichtPfad = new URL(page.url()).pathname
-    .replace(/^\/einsaetze/, '/api/einsaetze')
+    .replace(/^\/einsaetze/, '/api/incidents')
     .replace('/lageberichte/', '/situation-reports/');
 
   const patches: PatchBody[] = [];
@@ -167,7 +167,7 @@ test('von Hand gefüllte Lageentwicklung übersteht die Sammelfüllung und wird 
   const fuellung = new Promise<void>((r) => (fuellungDa = r));
   let reihenfolgeFest = false;
   await page.route(
-    (u) => u.pathname.startsWith(`/api/einsaetze/${einsatzId}/`),
+    (u) => u.pathname.startsWith(`/api/incidents/${einsatzId}/`),
     async (route) => {
       const anfrage = route.request();
       const pfad = new URL(anfrage.url()).pathname;
@@ -246,7 +246,7 @@ test('die Übersicht zeigt die jüngste Freigabe vorn, Fortschreiben öffnet die
 }) => {
   await anmelden(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Lagevortrag Stand ${Date.now()}`);
-  const E = `/api/einsaetze/${einsatzId}/situation-reports`;
+  const E = `/api/incidents/${einsatzId}/situation-reports`;
   const angelegt = await page.request.post(E, {
     data: {
       vorlage: 'lagebericht',

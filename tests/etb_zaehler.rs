@@ -18,7 +18,7 @@ async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) {
     let (status, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(body),
     )
@@ -45,7 +45,7 @@ async fn zaehler(
     anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb/counts{query}"),
+        &format!("/api/incidents/{einsatz}/etb/counts{query}"),
         cookie,
         None,
     )
@@ -72,7 +72,7 @@ async fn liste_vollstaendig(app: &axum::Router, cookie: &str, einsatz: i64, quer
         let (status, v) = anfrage(
             app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/etb{seite}"),
+            &format!("/api/incidents/{einsatz}/etb{seite}"),
             cookie,
             None,
         )
@@ -249,7 +249,7 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
         let (status, v) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/units"),
+            &format!("/api/incidents/{einsatz}/units"),
             &admin,
             Some(&format!(r#"{{"name":"{name}"}}"#)),
         )
@@ -261,7 +261,7 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
     let (status, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/tasks"),
+        &format!("/api/incidents/{einsatz}/tasks"),
         &admin,
         Some(&format!(
             r#"{{"auftrag_text":"Deich sichern","empfaenger":[{{"empfaenger_typ":"einheit","einheit_id":{zug}}}]}}"#
@@ -290,7 +290,7 @@ async fn einheitenfilter_zaehlt_wie_die_liste() {
         let (status, a) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/etb/count{query}"),
+            &format!("/api/incidents/{einsatz}/etb/count{query}"),
             &admin,
             None,
         )
@@ -333,7 +333,7 @@ async fn ausgeblendetes_etb_modul_ist_403() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/etb"),
+        &format!("/api/incidents/{einsatz}/module-overrides/etb"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -367,7 +367,7 @@ async fn cursor_nach_oben_liefert_die_seite_ueber_dem_cursor() {
     let (status, alle) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb?limit=500"),
+        &format!("/api/incidents/{einsatz}/etb?limit=500"),
         &admin,
         None,
     )
@@ -384,7 +384,7 @@ async fn cursor_nach_oben_liefert_die_seite_ueber_dem_cursor() {
     let (status, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb?limit=2&after_lfd_nr={cursor}"),
+        &format!("/api/incidents/{einsatz}/etb?limit=2&after_lfd_nr={cursor}"),
         &admin,
         None,
     )
@@ -405,7 +405,7 @@ async fn cursor_nach_oben_liefert_die_seite_ueber_dem_cursor() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb?before_lfd_nr={cursor}&after_lfd_nr=1"),
+        &format!("/api/incidents/{einsatz}/etb?before_lfd_nr={cursor}&after_lfd_nr=1"),
         &admin,
         None,
     )
@@ -454,7 +454,7 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
         let (status, a) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/etb/count{query}"),
+            &format!("/api/incidents/{einsatz}/etb/count{query}"),
             &admin,
             None,
         )
@@ -472,7 +472,7 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
     let (status, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb?ohne_system=true"),
+        &format!("/api/incidents/{einsatz}/etb?ohne_system=true"),
         &admin,
         None,
     )
@@ -487,7 +487,7 @@ async fn ohne_system_schliesst_systemeintraege_aus_wie_die_liste() {
         let (status, v) = anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/{pfad}?typ=system&ohne_system=true"),
+            &format!("/api/incidents/{einsatz}/{pfad}?typ=system&ohne_system=true"),
             &admin,
             None,
         )

@@ -259,7 +259,7 @@ describe('Spaltenzeile in kompakter Dichte', () => {
       .find((i) => i.getAttribute('src')?.includes('fassung=grossansicht'));
     expect(gross).toHaveAttribute(
       'src',
-      '/api/einsaetze/1/etb/1/attachments/9?fassung=grossansicht',
+      '/api/incidents/1/etb/1/attachments/9?fassung=grossansicht',
     );
   });
 
@@ -301,7 +301,7 @@ describe('Spaltenzeile in kompakter Dichte', () => {
         .map((i) => i.getAttribute('src') ?? '');
       // `gross` ist die zweite Object-URL (klein, dann gross).
       expect(quellen).toContain('blob:heic-2');
-      expect(heic.dekodiere).toHaveBeenCalledWith('/api/einsaetze/1/etb/1/attachments/9');
+      expect(heic.dekodiere).toHaveBeenCalledWith('/api/incidents/1/etb/1/attachments/9');
       expect([...quellen, ...heic.dekodiere.mock.calls.flat()].join()).not.toContain(
         'fassung=original',
       );
@@ -485,7 +485,7 @@ describe('Vermerke in eigener Spalte', () => {
       within(spalte).getByRole('link', {
         name: /^Lagefoto\.jpg, .+, Anhang zu Nr\. 7 herunterladen$/,
       }),
-    ).toHaveAttribute('href', '/api/einsaetze/1/etb/3/attachments/11');
+    ).toHaveAttribute('href', '/api/incidents/1/etb/3/attachments/11');
   });
 
   describe('Überlauf', () => {

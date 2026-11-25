@@ -508,7 +508,7 @@ test.describe('LFH-1126 Kopfhöhe über das Laden', () => {
     let loslassen!: () => void;
     const tor = new Promise<void>((f) => (loslassen = f));
     let gehalten = 0;
-    await page.route(`**/api/einsaetze/${einsatzId}`, async (route) => {
+    await page.route(`**/api/incidents/${einsatzId}`, async (route) => {
       if (route.request().method() === 'GET') {
         gehalten += 1;
         await tor;

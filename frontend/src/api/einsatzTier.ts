@@ -64,7 +64,7 @@ interface TiereFilter {
 
 export function listeTiere(einsatzId: number, filter: TiereFilter = {}): Promise<Tier[]> {
   return apiGet<Tier[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/animals`, {
+    mitParametern(`/api/incidents/${einsatzId}/animals`, {
       status: filter.status,
       spezies: filter.spezies,
       halter_person_id: filter.halterPersonId,
@@ -74,15 +74,15 @@ export function listeTiere(einsatzId: number, filter: TiereFilter = {}): Promise
 
 /** CSV aller nicht stornierten Tiere des Einsatzes (`routes/einsatz_tier.rs`, `export`). */
 export function ladeTiereExport(einsatzId: number): Promise<Blob> {
-  return apiDatei(`/api/einsaetze/${einsatzId}/animals/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
+  return apiDatei(`/api/incidents/${einsatzId}/animals/export`, { timeoutMs: EXPORT_TIMEOUT_MS });
 }
 
 export function ladeTier(einsatzId: number, tierId: number): Promise<Tier> {
-  return apiGet<Tier>(`/api/einsaetze/${einsatzId}/animals/${tierId}`);
+  return apiGet<Tier>(`/api/incidents/${einsatzId}/animals/${tierId}`);
 }
 
 export function legeTierAn(einsatzId: number, daten: TierEingabe): Promise<Tier> {
-  return apiSend<Tier>(`/api/einsaetze/${einsatzId}/animals`, 'POST', daten);
+  return apiSend<Tier>(`/api/incidents/${einsatzId}/animals`, 'POST', daten);
 }
 
 /**
@@ -102,7 +102,7 @@ export function aktualisiereTier(
   basisGeaendertAt?: string,
 ): Promise<Tier> {
   const body = patchBody(daten, basisGeaendertAt);
-  return apiSend<Tier>(`/api/einsaetze/${einsatzId}/animals/${tierId}`, 'PATCH', body);
+  return apiSend<Tier>(`/api/incidents/${einsatzId}/animals/${tierId}`, 'PATCH', body);
 }
 
 export function setzeTierStatus(
@@ -110,11 +110,11 @@ export function setzeTierStatus(
   tierId: number,
   daten: TierStatusEingabe,
 ): Promise<Tier> {
-  return apiSend<Tier>(`/api/einsaetze/${einsatzId}/animals/${tierId}/status`, 'POST', daten);
+  return apiSend<Tier>(`/api/incidents/${einsatzId}/animals/${tierId}/status`, 'POST', daten);
 }
 
 export function storniereTier(einsatzId: number, tierId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/animals/${tierId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/animals/${tierId}`, 'DELETE');
 }
 
 /** Registriernummer-Anzeige wie im Backend (T-042). */
@@ -125,7 +125,7 @@ export function tierRegistrierAnzeige(nr: number): string {
 // ---------- Fotos und Dateien (LFH-758) ----------
 
 const anhangBasis = (einsatzId: number, tierId: number) =>
-  `/api/einsaetze/${einsatzId}/animals/${tierId}/attachments`;
+  `/api/incidents/${einsatzId}/animals/${tierId}/attachments`;
 
 /** Lebende Anhänge eines Tieres, neueste zuerst. */
 export function listeTierAnhaenge(einsatzId: number, tierId: number): Promise<TierAnhang[]> {

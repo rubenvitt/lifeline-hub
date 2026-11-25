@@ -32,8 +32,8 @@ beforeEach(async () => {
   localStorage.clear();
   server.use(
     meHandler(ich),
-    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/units', () => HttpResponse.json([])),
   );
 });
 
@@ -485,7 +485,7 @@ describe('EtbEntwurfsTabs', () => {
     };
     server.use(
       http.post(
-        '/api/einsaetze/7/etb/attachments',
+        '/api/incidents/7/etb/attachments',
         () =>
           new Promise<Response>((r) => {
             s.freigeben = () =>
@@ -680,7 +680,7 @@ describe('EtbEntwurfsTabs', () => {
       .mockRejectedValueOnce(new ApiError(409, konflikt))
       .mockResolvedValue(undefined);
     server.use(
-      http.post('/api/einsaetze/7/etb/attachments', () =>
+      http.post('/api/incidents/7/etb/attachments', () =>
         HttpResponse.json(
           [
             {

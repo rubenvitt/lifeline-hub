@@ -74,6 +74,10 @@ calamine = { version = "0.38", default-features = false }
 # Vor dem Lesen die entpackte Größe der XLSX-Teile prüfen (Zip-Bombe): dieselbe Version, die
 # calamine mitbringt, nur mit `deflate`.
 zip = { version = "9", default-features = false, features = ["deflate"] }
+# Fremdebenen aus KML und KMZ einlesen (LLH-2099, `src/karte_fremdebene/einlesen/kml.rs`):
+# Ereignisleser, dieselbe Version, die calamine mitbringt, ohne Vorgabe-Features; eine DTD lehnt
+# der Leser ab, Entities löst er nie auf.
+quick-xml = { version = "0.42", default-features = false }
 # Schichtplan als Excel-Mappe (LLH-1557, `src/abloesung/schichtplan/ausgabe/mappe.rs`): schreibt
 # XLSX, reines Rust (MIT oder Apache-2.0), ohne Vorgabe-Features; Zeiten stehen als Text, darum
 # ohne `chrono`.
@@ -83,6 +87,12 @@ rust_xlsxwriter = { version = "0.103", default-features = false }
 # tiff), kein `-sys`-Crate, damit das Single-Binary ohne C-Bibliothek bleibt; ohne `rayon`, die
 # Last begrenzt `anhang::vorschau` selbst. HEIC dekodiert der Browser (design.md D3/D8).
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "tiff"] }
+# COG-Kacheln entpacken (LLH-2021, `src/karte/cog.rs`): Deflate und LZW. Beide liegen über
+# `osmpbf` bzw. `image`/`tiff` ohnehin im Lockfile; `flate2` baut auch die gzip-Bomben der
+# Deckel-Tests ausgehender Abrufe (LFH-923, `src/http_begrenzt.rs`); entpackt auch die KML einer
+# KMZ (`src/karte_fremdebene/einlesen/kmz.rs`), gedeckelt beim Lesen.
+flate2 = "1"
+weezl = "0.1"
 # fontstack-/Pfadsegment-Encoding für den Style-/Tile-Proxy.
 percent-encoding = "2"
 rust-embed = "8"
@@ -172,9 +182,6 @@ webauthn-rs-core = "=0.6.2"
 # SSE-Body eines OFFENEN Streams frameweise lesen: `to_bytes` wartet auf ein Stream-Ende, das
 # bei einem Live-Feed nie kommt.
 http-body-util = "0.1"
-# gzip-Bomben für die Deckel-Tests ausgehender Abrufe (LFH-923, `src/http_begrenzt.rs`); liegt
-# über `osmpbf` ohnehin im Lockfile.
-flate2 = "1"
 # `all` nur für Tests: liest die Keepalive-Frist zurück (`verbindung::tests`).
 socket2 = { version = "0.6", features = ["all"] }
 # `test-util` für `#[tokio::test(start_paused = true)]`: die Fristen in `transfer::tests` laufen

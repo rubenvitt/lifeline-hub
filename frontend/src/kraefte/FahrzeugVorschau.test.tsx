@@ -9,7 +9,7 @@ import { datensatzAbfrage } from '../command-palette/datensatzAbfrage';
 import type { EinsatzFahrzeug } from '../api/types';
 import FahrzeugVorschau from './FahrzeugVorschau';
 
-const URL = '/api/einsaetze/5/vehicles';
+const URL = '/api/incidents/5/vehicles';
 
 const fahrzeug = (o: Partial<EinsatzFahrzeug> = {}): EinsatzFahrzeug =>
   ({

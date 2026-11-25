@@ -53,6 +53,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     g("gefahr_bewertung", K::Lage),
     g("freies_zeichen", K::Lage),
     g("karte_hintergrundbild", K::Lage),
+    g("karte_fremdebene", K::Lage),
     g("karten_ansicht", K::Lage),
     g("lage_snapshot", K::Lage),
     g("einsatz_pegel", K::Lage),
@@ -136,6 +137,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     // Anhänge und ihre Verknüpfungen
     g("anhang", K::Anhaenge),
     g("karte_hintergrundbild_daten", K::Anhaenge),
+    g("karte_fremdebene_daten", K::Anhaenge),
     g("uhs_plan", K::Anhaenge),
     g("einsatz_dokument", K::Anhaenge),
     g("einsatz_schaden_anhang", K::Anhaenge),
@@ -187,9 +189,17 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "maschine_ereignis",
         "Ausgang an Fremdsysteme gilt an der Instanz, die ihn ausgibt (LLH-1655)",
     ),
+    (
+        "adapter_einsatz",
+        "Adapter samt Zugangsdaten hängen an einer Instanz; ihre Zuschaltung ebenso (LLH-2105)",
+    ),
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),
+    (
+        "helfer_einladung",
+        "Helfer koppeln sich an der Instanz, die einlädt",
+    ),
     ("session", "Sitzungen hängen an einer Instanz"),
     (
         "web_push_abo",

@@ -565,6 +565,8 @@ export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
   // Nur die Fotos der Drohnenlage sind ein Ziel (LLH-2108), über ihre Trefferzone; Fluggerät, Spur
   // und Element haben keinen Inspector.
   if (def.drohnenlage) return [`fachebene-${def.key}-treffer`];
+  // Rasterebenen zeichnen keine Features (LLH-2021, `copernicusBildLayer.ts`).
+  if (def.darstellung === 'raster') return [];
   if (def.gemischteGeometrie) {
     return ['fill', 'linie', 'circle', 'treffer'].map((t) => `fachebene-${def.key}-${t}`);
   }
@@ -613,6 +615,8 @@ const KATEGORIE_LABEL: Record<string, string> = {
   webcam: 'Webcam',
   baustelle: 'Baustelle',
   sperrung: 'Sperrung',
+  verkehrsmeldung: 'Verkehrsmeldung',
+  rastanlage: 'Rastanlage',
   luftmessstation: 'Luftmessstation',
 };
 

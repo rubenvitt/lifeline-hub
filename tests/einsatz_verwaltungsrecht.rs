@@ -46,7 +46,7 @@ async fn sprechgruppe(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (status, json) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         cookie,
         Some(&json!({"bezeichnung": "311", "betriebsart": "TMO"})),
     )
@@ -62,7 +62,7 @@ async fn alle_schreibwege(
     einsatz: i64,
     sg: i64,
 ) -> Vec<StatusCode> {
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let mut s = Vec::new();
     for (methode, pfad, body) in [
         (
@@ -101,7 +101,7 @@ async fn alle_schreibwege(
 }
 
 async fn stand(app: &axum::Router, cookie: &str, einsatz: i64) -> (Value, Value, Value) {
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let (s1, kopf) = anfrage(app, "GET", &basis, cookie, None).await;
     let (s2, einst) = anfrage(app, "GET", &format!("{basis}/settings"), cookie, None).await;
     let (s3, fs) = anfrage(app, "GET", &format!("{basis}/command-post"), cookie, None).await;
@@ -126,7 +126,7 @@ async fn admin_einer_fremden_org_schreibt_an_keiner_verwaltungsroute() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/command-post/talk-groups/{sg}"),
         &fk,
         None,
     )
@@ -162,7 +162,7 @@ async fn admin_einer_fremden_org_bekommt_am_abgeschlossenen_einsatz_403() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &fremd,
         Some(&json!({"leitstellen_nr": "ILS-1"})),
     )
@@ -171,7 +171,7 @@ async fn admin_einer_fremden_org_bekommt_am_abgeschlossenen_einsatz_403() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &admin,
         Some(&json!({"leitstellen_nr": "ILS-1"})),
     )

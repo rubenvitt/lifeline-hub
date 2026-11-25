@@ -16,8 +16,10 @@ import type { FachebeneQuelle } from '../../api/fachebenen';
 import AnsichtSwitcher from './AnsichtSwitcher';
 import BildHintergruende, { loeschDialogBild } from './BildHintergruende';
 import CopernicusZusatz from './CopernicusZusatz';
+import CopernicusBilderZusatz from './CopernicusBilderZusatz';
 import DrohnenQuelle from './DrohnenQuelle';
 import FachebeneStand from './FachebeneStand';
+import FremdebenenZeilen from './FremdebenenZeilen';
 import { FACHEBENEN, fachebeneKeys, istBboxAbhaengig } from './fachebenen';
 import Klassenlegende from './Klassenlegende';
 import { KlappPaneel, LeistenAbschnitt } from './KlappPaneel';
@@ -33,14 +35,11 @@ import {
   type EbenenZeile,
   type GruppenZustand,
 } from './leistenDaten';
-import { FehlerSlot, ebenenZeileStil } from './leistenTeile';
+import { FARBFELD, Farbfeld, FehlerSlot, ebenenZeileStil } from './leistenTeile';
 import { useBaumKlapp } from './leistenWahl';
 import Sichtungslegende from './Sichtungslegende';
 import type { KartenThemeWahl } from './basemapStil';
 import type { SidebarProps } from './Sidebar';
-
-/** Kantenlänge des Farbfelds einer Ebenen-Zeile (Neuentwurf S5). */
-const FARBFELD = 14;
 
 /**
  * Eine Zeile einer eigenen Ebene: Farbfeld · Name · Anzahl; Klick schaltet die Ebene.
@@ -91,26 +90,6 @@ function EbenenZeilenKnopf({
       {/* `text2` aus demselben Grund; `gedaempft` hielte am Tag auf `flaeche3` nur 6,6 : 1. */}
       <span style={{ ...monoStil('monoFein'), color: rollen.text2 }}>{zeile.anzahl}</span>
     </button>
-  );
-}
-
-/** Das Farbfeld einer Zeile: gefüllt an, leer aus — der zweite Kanal neben `aria-checked`. */
-function Farbfeld({ an, farbe }: { an: boolean; farbe: string }) {
-  const { rollen } = useRollen();
-  return (
-    <span
-      aria-hidden="true"
-      data-lfh="ebenen-farbfeld"
-      style={{
-        width: FARBFELD,
-        height: FARBFELD,
-        flex: `0 0 ${FARBFELD}px`,
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: an ? farbe : rollen.steuerRahmen,
-        background: an ? `color-mix(in srgb, ${farbe} 55%, transparent)` : 'transparent',
-      }}
-    />
   );
 }
 
@@ -263,6 +242,17 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
       {sichtbar && quelle === 'copernicus' && props.copernicus && (
         <CopernicusZusatz status={status} {...props.copernicus} />
       )}
+      {sichtbar && quelle === 'copernicus_bilder' && props.copernicusBilder && (
+        <CopernicusBilderZusatz
+          status={status}
+          {...props.copernicusBilder}
+          archiv={props.copernicus?.archiv ?? false}
+          onArchiv={props.copernicus?.onArchiv ?? (() => {})}
+          // Der Archiv-Schalter steht an der Vektorebene; ist sie aus, hier (ein Zustand, ein
+          // Schalter).
+          archivHier={!props.fachebenenSichtbar.copernicus && !!props.copernicus}
+        />
+      )}
       {/* Immer, auch bei ausgeschalteter Ebene: ohne Zuschaltung gibt es nichts zu zeigen. */}
       {quelle === 'drohne' && props.drohne && (
         <DrohnenQuelle
@@ -389,20 +379,25 @@ export default function Ebenenbaum(props: SidebarProps) {
   const zeigeSichtungslegende =
     (props.layer.person || props.eingeblendet === 'person') && props.personen?.zugriff === 'frei';
 
-  const fachAn = fachebeneKeys().filter((k) => props.fachebenenSichtbar[k]).length;
+  const abgeschaltet = props.fachebenenAbgeschaltet ?? [];
+  const fachAn = fachebeneKeys().filter(
+    (k) => props.fachebenenSichtbar[k] && !abgeschaltet.includes(k),
+  ).length;
   const fach = FACHEBENEN_GRUPPEN.map((g) => {
-    const z = g.ebenen.map((key) => ({
-      key,
-      name: FACHEBENEN[key].label,
-      sichtbar: props.fachebenenSichtbar[key],
-    }));
+    const z = g.ebenen
+      .filter((key) => !abgeschaltet.includes(key))
+      .map((key) => ({
+        key,
+        name: FACHEBENEN[key].label,
+        sichtbar: props.fachebenenSichtbar[key],
+      }));
     return {
       ...g,
       zeilen: z,
       an: z.filter((x) => x.sichtbar).length,
       treffer: filtereGruppe(suche, ['Fachebenen', g.name], z),
     };
-  });
+  }).filter((g) => g.zeilen.length > 0);
   const fachTreffer = fach.some((g) => g.treffer.length > 0);
 
   const grundlageInhalt =
@@ -420,10 +415,21 @@ export default function Ebenenbaum(props: SidebarProps) {
   const bilderFehler = sektionFehler.bilder != null;
   const hintergrundTreffer = grundlageTreffer || bilderTreffer;
 
+  // Fremdebenen (LLH-2099): eine eigene Gruppe neben dem Hintergrund, nur wenn es welche gibt
+  // (hinzugefügt wird über „Weitere Aktionen zur Lagekarte“). Ein Fehler-Slot steht offen.
+  const fremd = props.fremdebenen;
+  // Auch ein Ladefehler der Daten einer Ebene hält die Gruppe offen: zugeklappt stünde er nirgends.
+  const fremdFehler =
+    sektionFehler.fremdebenen != null ||
+    [...(fremd?.datenZustand?.values() ?? [])].some((z) => z.art === 'fehler');
+  const fremdListe = fremd ? filtereGruppe(suche, ['Fremdebenen'], fremd.ebenen) : [];
+  const fremdTreffer = fremd != null && (fremdListe.length > 0 || (fremdFehler && !suche));
+
   const keinTreffer =
     suche !== '' &&
     !eigene.some((g) => g.treffer.length > 0) &&
     !fachTreffer &&
+    !fremdTreffer &&
     !hintergrundTreffer;
 
   const schalteGruppe = (
@@ -591,6 +597,22 @@ export default function Ebenenbaum(props: SidebarProps) {
               </KlappPaneel>
             ),
           )}
+        </KlappPaneel>
+      )}
+
+      {fremd && fremdTreffer && (
+        <KlappPaneel
+          titel="Fremdebenen"
+          kennung="fremdebenen"
+          meta={fremd.sichtbar.size > 0 ? `${fremd.sichtbar.size} an` : undefined}
+          offen={istOffen('fremdebenen') || fremdFehler}
+          onUmschalten={umschalten('fremdebenen')}
+          polster={false}
+        >
+          <FehlerSlot fehler={sektionFehler.fremdebenen} />
+          <div role="group" aria-label="Fremdebenen">
+            <FremdebenenZeilen {...fremd} ebenen={fremdListe} darfSchreiben={darfSchreiben} />
+          </div>
         </KlappPaneel>
       )}
 

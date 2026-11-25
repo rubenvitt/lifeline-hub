@@ -68,7 +68,7 @@ async fn welt() -> Welt {
     let (s, v) = anfrage(
         &w.app,
         "PUT",
-        &format!("/api/einsaetze/{}/module-overrides/personen", w.einsatz),
+        &format!("/api/incidents/{}/module-overrides/personen", w.einsatz),
         &w.admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -87,7 +87,7 @@ impl Welt {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/persons", self.einsatz),
+            &format!("/api/incidents/{}/persons", self.einsatz),
             cookie,
             Some(&body.to_string()),
         )
@@ -101,7 +101,7 @@ impl Welt {
         let (s, _) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/persons/{person}/status", self.einsatz),
+            &format!("/api/incidents/{}/persons/{person}/status", self.einsatz),
             cookie,
             Some(&json!({ "status": status }).to_string()),
         )

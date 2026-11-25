@@ -429,7 +429,7 @@ test.describe('LFH-1170 Zugriff am Handy', () => {
 
   /** Über die API: der Anlege-Dialog ist hier nicht Gegenstand, und 390 px ändern seinen Weg. */
   async function createEinsatzPerApi(page: Page, name: string): Promise<string> {
-    const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+    const r = await page.request.post('/api/incidents', { data: { bezeichnung: name } });
     expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
     return String(((await r.json()) as { id: number }).id);
   }

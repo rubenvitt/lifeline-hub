@@ -70,10 +70,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1366, height: 900 });
     await anmeldenAlsAdmin(page);
-    const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+    const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
       bezeichnung: `E2E 1525 Kontrast ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     // Kapazität 50 = 200 m² zu 4 m²: „Kapazität übernehmen“ steht gesperrt mit Grund.
     const { id: stelleId } = await senden(page, 'post', `${basis}/care/positions`, {
       bezeichnung: STELLE,

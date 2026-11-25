@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -14,7 +14,7 @@ Fähigkeits-Specs unter `openspec/specs/` (eingefroren, ADR-0069), die Design-Do
 Jeder Datensatz mit Fachbezug hängt über `org_id` an einer Organisation; die Organisation ist
 die Mandantengrenze (`Benutzer.org_id` in `src/auth/mod.rs`). Der Org-Floor läuft in jedem
 einsatzgebundenen Handler im Extractor `EinsatzKontext` (`src/einsatz/kontext.rs`, Prüfung
-`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/einsaetze/{id}/…` ihn
+`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/incidents/{id}/…` ihn
 zieht, erzwingt `tests/einsatz_kontext_guard.rs`; die Grenze gegen eine echte zweite Organisation
 prüft `tests/cross_org.rs`. Wie ein System-Admin über die Org-Grenze liest und schreibt, regelt
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Admin-Schreibwege am Einsatz“.
@@ -210,6 +210,10 @@ in `src/db.rs`, `src/db/physisch.rs`). Regeln: [`src/AGENTS.md`](../../src/AGENT
 [`aufbewahrung-loeschersuchen`](../../openspec/specs/aufbewahrung-loeschersuchen/spec.md). Was das
 Gerät danach räumt: [`frontend/src/offline/AGENTS.md`](../../frontend/src/offline/AGENTS.md),
 Abschnitt „Räumen nach einer Schwärzung“.
+
+Daten ohne Einsatz löscht derselbe Lauf nach eigener Frist (Phase C), darunter die abgerufenen
+Veranstaltungen 14 Tage nach ihrem Ende (`veranstaltung_extern::repo::purge`,
+`AUFBEWAHRUNG_TAGE` in `src/veranstaltung_extern/repo.rs`).
 
 ## 8.15 Audit und Zugangsprotokoll
 
@@ -497,5 +501,9 @@ Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs
   Konzepts [`2026-11-10-schnittstellen-ausbau.md`](../konzepte/2026-11-10-schnittstellen-ausbau.md)).
 - **Gekoppelter ELW:** Eingehendes kommt am Hub an; meldet sich eine Org bei einem Hub, läuft hier
   kein Adapter, und die Verwaltung ist gesperrt.
+- **Ablage einer Art:** eine Art, die nicht flüchtig ist, schreibt in eine eigene Tabelle, idempotent
+  in der Übernahme. Vorbild `src/veranstaltung_extern/` (LLH-2097): je Adapter eine Zeile je
+  Veranstaltung, Fingerabdruck statt Versionen, ein unveränderter Abruf schreibt nichts; der
+  Vertrag ist neutral ([`docs/schnittstellen/veranstaltungen-abruf.md`](../schnittstellen/veranstaltungen-abruf.md)).
 
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.

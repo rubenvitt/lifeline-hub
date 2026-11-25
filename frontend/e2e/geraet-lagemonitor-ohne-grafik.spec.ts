@@ -30,24 +30,24 @@ test('ohne WebGL2: Kachel Lagekarte zeigt den Zustand, die übrigen Kacheln blei
   browser,
 }) => {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
-  const { id: e } = await anlegen(page, '/api/einsaetze', {
+  const { id: e } = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Monitor ohne Grafik ${Date.now()}`,
   });
   // Ein verorteter Einsatzort: ohne Punkt baute der Monitor gar keine Karte („Kein Einsatzort
   // verortet“), und der Fall prüfte nichts.
-  const ort = await page.request.patch(`/api/einsaetze/${e}`, {
+  const ort = await page.request.patch(`/api/incidents/${e}`, {
     data: { einsatzort: 'Bahnhofstraße 1', einsatzort_lat: ORT.lat, einsatzort_lon: ORT.lon },
   });
   expect(ort.ok(), `Einsatzort: ${ort.status()}`).toBe(true);
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
-    await anlegen(page, `/api/einsaetze/${e}/persons`, { name, uhs_id: nord.id });
+    await anlegen(page, `/api/incidents/${e}/persons`, { name, uhs_id: nord.id });
   }
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'lagemonitor',
     bezeichnung: 'Monitor ohne Grafik',
   });

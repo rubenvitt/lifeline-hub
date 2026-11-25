@@ -45,7 +45,7 @@ async function mitWiederholung(anfrage: () => Promise<APIResponse>): Promise<API
 
 async function erfasse(page: Page, einsatzId: string, daten: Record<string, unknown>) {
   const antwort = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/etb`, { data: daten }),
+    page.request.post(`/api/incidents/${einsatzId}/etb`, { data: daten }),
   );
   expect(antwort.ok(), `Seeding ETB: ${antwort.status()} ${await antwort.text()}`).toBe(true);
   return (await antwort.json()) as { id: number; lfd_nr: number };
@@ -119,7 +119,7 @@ test('ETB-Druck: Vollabruf über mehr als eine Serverseite, Ordnung, Nachtrag, B
   const saat = await saeen(page, einsatzId);
 
   // Serverwahrheit zum Vergleich: dieselbe Zählung, die auch der ETB-Kopf nimmt.
-  const zaehler = await (await page.request.get(`/api/einsaetze/${einsatzId}/etb/counts`)).json();
+  const zaehler = await (await page.request.get(`/api/incidents/${einsatzId}/etb/counts`)).json();
   const gesamt = zaehler.gesamt as number;
   expect(gesamt, 'Vorbedingung: mehr als eine Serverseite (500)').toBeGreaterThan(500);
 
@@ -313,7 +313,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
       .filter(Boolean)
       .join('\n\n');
   const neu = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
+    page.request.post(`/api/incidents/${einsatzId}/situation-reports`, {
       data: { vorlage: 'lagebericht', titel: 'Lagebericht überlang' },
     }),
   );
@@ -331,7 +331,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
     'zusammenfassung',
   ];
   const patch = await mitWiederholung(() =>
-    page.request.patch(`/api/einsaetze/${einsatzId}/situation-reports/${lbId}`, {
+    page.request.patch(`/api/incidents/${einsatzId}/situation-reports/${lbId}`, {
       data: {
         abschnitte: abschnitte.map((schluessel, i) => ({
           schluessel,
@@ -342,7 +342,7 @@ test('ETB-Druck: überlanger Eintrag Nr. 1 beginnt auf Seite 1', async ({ page, 
   );
   expect(patch.ok(), await patch.text()).toBe(true);
   const frei = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/situation-reports/${lbId}/release`),
+    page.request.post(`/api/incidents/${einsatzId}/situation-reports/${lbId}/release`),
   );
   expect(frei.ok(), await frei.text()).toBe(true);
   const kurz = await erfasse(page, einsatzId, {
@@ -401,7 +401,7 @@ test('ETB-Druck einer Übung: „ÜBUNG“ im Druckkopf, in Chromium auf jeder S
   browserName,
 }) => {
   await anmelden(page, { startseite: false });
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E ETB-Druck Übung ${Date.now()}`, einsatzart: 'uebung' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
@@ -442,7 +442,7 @@ test('ETB-Druck einer Übung: „ÜBUNG“ im Druckkopf, in Chromium auf jeder S
 async function gefahrengebiet(page: Page, einsatzId: string, i: number) {
   const x = 10 + i / 200;
   const antwort = await mitWiederholung(() =>
-    page.request.post(`/api/einsaetze/${einsatzId}/zones`, {
+    page.request.post(`/api/incidents/${einsatzId}/zones`, {
       data: {
         typ: 'gefahrengebiet',
         geometrie_typ: 'Polygon',

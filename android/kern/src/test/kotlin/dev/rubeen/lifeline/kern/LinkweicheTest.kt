@@ -31,10 +31,10 @@ class LinkweicheTest {
 
     @Test
     fun `Dateirouten werden heruntergeladen`() {
-        assertEquals(Linkweiche.Entscheidung.Download, navigation("https://elw.local:8443/api/einsaetze/1/export.csv"))
+        assertEquals(Linkweiche.Entscheidung.Download, navigation("https://elw.local:8443/api/incidents/1/export.csv"))
         assertEquals(
             Linkweiche.Entscheidung.Download,
-            navigation("https://elw.local:8443/api/einsaetze/1/export.csv", neuesFenster = true),
+            navigation("https://elw.local:8443/api/incidents/1/export.csv", neuesFenster = true),
         )
     }
 
@@ -101,5 +101,14 @@ class LinkweicheTest {
         val komisch = Downloadablage.dateiname("a." + "b".repeat(300))
         assertEquals(Downloadablage.MAX_NAME_BYTES, komisch.toByteArray(Charsets.UTF_8).size)
         assertEquals("kurz.pdf", Downloadablage.dateiname("kurz.pdf"))
+    }
+
+    /** Google Kalender nimmt `text/calendar` nur über `ACTION_VIEW`; alles andere geht ins Teilen-Blatt. */
+    @Test
+    fun `kalenderdatei wird angezeigt sonst geteilt`() {
+        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("text/calendar", "ics"))
+        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("application/octet-stream", "ICS"))
+        assertEquals(Oeffnen.ANZEIGEN, Downloadablage.oeffnenAls("TEXT/Calendar", ""))
+        assertEquals(Oeffnen.TEILEN, Downloadablage.oeffnenAls("text/csv", "csv"))
     }
 }

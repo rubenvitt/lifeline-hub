@@ -14,7 +14,7 @@ import type { ModulFreigaben } from '../api/types';
  * Navigation. `datensaetze.test.ts` (Kern) und `useDatensaetze.test.tsx` (Beschaffung) könnten
  * beide grün sein, während die Hälften nicht verbunden sind.
  *
- * `useBefehle` ist gestubbt: das echte fordert `/api/einsaetze` an und brächte mit
+ * `useBefehle` ist gestubbt: das echte fordert `/api/incidents` an und brächte mit
  * `onUnhandledFrame: 'error'` den Lauf zu Fall. Der Datensatz-Weg läuft ECHT (MSW, react-query,
  * echte Entprellung).
  */
@@ -47,16 +47,16 @@ beforeEach(() => {
   freigaben = freigabenFixture();
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/:id/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/:id/persons/selection', () => HttpResponse.json([PERSON])),
-    http.get('/api/einsaetze/:id/damages/selection', () => HttpResponse.json([SCHADEN])),
-    http.get('/api/einsaetze/:id/uhs', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/reports', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/tasks', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/vehicles', () => HttpResponse.json([FAHRZEUG])),
-    http.get('/api/einsaetze/:id/personnel', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/:id/etb', () => HttpResponse.json([ETB])),
+    http.get('/api/incidents/:id/module-access', () => HttpResponse.json(freigaben)),
+    http.get('/api/incidents/:id/persons/selection', () => HttpResponse.json([PERSON])),
+    http.get('/api/incidents/:id/damages/selection', () => HttpResponse.json([SCHADEN])),
+    http.get('/api/incidents/:id/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/reports', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/tasks', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/vehicles', () => HttpResponse.json([FAHRZEUG])),
+    http.get('/api/incidents/:id/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/:id/etb', () => HttpResponse.json([ETB])),
   );
 });
 
@@ -175,7 +175,7 @@ describe('Kommandopalette · Datensätze und die Leseachse (LFH-391 · C3)', () 
     freigaben = freigabenFixture({ schaeden: { zugriff: false } });
     let schadenAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/:id/damages/selection', () => {
+      http.get('/api/incidents/:id/damages/selection', () => {
         schadenAbrufe += 1;
         return HttpResponse.json([SCHADEN]);
       }),
@@ -212,7 +212,7 @@ describe('Kommandopalette · Rangvorteil des Moduls, in dem man steht (LFH-391 �
    */
   async function florianZeilen(route: string): Promise<string[]> {
     const u = userEvent.setup();
-    server.use(http.get('/api/einsaetze/:id/personnel', () => HttpResponse.json([KRAFT])));
+    server.use(http.get('/api/incidents/:id/personnel', () => HttpResponse.json([KRAFT])));
     zeigePalette(route);
 
     await suche(u, 'florian');

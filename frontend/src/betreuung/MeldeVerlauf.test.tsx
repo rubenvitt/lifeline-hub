@@ -29,9 +29,9 @@ vi.mock('../anzeige/AnzeigeKonventionenContext', async () => {
   };
 });
 
-const B = '/api/einsaetze/7/care';
+const B = '/api/incidents/7/care';
 /** Bezirke und Stände gehören seit LLH-1034 zum Modul Evakuierung. */
-const E = '/api/einsaetze/7/evacuation';
+const E = '/api/incidents/7/evacuation';
 const basis = (pfad: string) => (/^\/(districts|progress)\//.test(pfad) ? E : B);
 
 const STAENDE: StandVerlaufEintrag[] = [

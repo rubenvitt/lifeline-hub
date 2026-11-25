@@ -178,18 +178,18 @@ test('Statusband des Meldebilds bricht um statt waagerecht zu scrollen', async (
   const einsatzId = await einsatzAnlegen(page, `LFH-338 Kopf ${Date.now()}`);
   await seedeKraefte(page, einsatzId, 4);
   for (let i = 0; i < 4; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/vehicles`, {
       data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
     });
     expect(antwort.ok(), `Seeding Fahrzeug ${i}: ${antwort.status()}`).toBeTruthy();
     // Das Band zählt Einheiten — das Fahrzeug trägt den Status seiner Einheit.
     const ef = ((await antwort.json()) as { id: number }).id;
-    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+    const einheit = await page.request.post(`/api/incidents/${einsatzId}/units`, {
       data: { name: `Einsatzeinheit Musterstadt-Nordwest ${i}` },
     });
     expect(einheit.ok(), `Seeding Einheit ${i}: ${einheit.status()}`).toBeTruthy();
     const eid = ((await einheit.json()) as { id: number }).id;
-    const zu = await page.request.put(`/api/einsaetze/${einsatzId}/units/${eid}/vehicles/${ef}`);
+    const zu = await page.request.put(`/api/incidents/${einsatzId}/units/${eid}/vehicles/${ef}`);
     expect(zu.ok(), `Zuordnung ${i}: ${zu.status()}`).toBeTruthy();
   }
   await page.goto(`/einsaetze/${einsatzId}/kraefteuebersicht`);
@@ -263,17 +263,17 @@ test('Meldebild bei 1440 px: Rückmeldung und Auftrag ohne Querscrollen im Bild,
   await seedeKraefte(page, einsatzId, 2);
   // Lange Einheitennamen: die Einheit ist die Fließspalte und darf die Tabelle nicht aufweiten.
   for (let i = 0; i < 3; i += 1) {
-    const fahrzeug = await page.request.post(`/api/einsaetze/${einsatzId}/vehicles`, {
+    const fahrzeug = await page.request.post(`/api/incidents/${einsatzId}/vehicles`, {
       data: { adhoc: { funkrufname: `Florian Musterstadt-Nordwest 3/44-${i}` } },
     });
     expect(fahrzeug.ok(), `Seeding Fahrzeug ${i}: ${fahrzeug.status()}`).toBeTruthy();
     const ef = ((await fahrzeug.json()) as { id: number }).id;
-    const einheit = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+    const einheit = await page.request.post(`/api/incidents/${einsatzId}/units`, {
       data: { name: `Sanitätsgruppe Musterstadt-Nordwest ${i}` },
     });
     expect(einheit.ok(), `Seeding Einheit ${i}: ${einheit.status()}`).toBeTruthy();
     const eid = ((await einheit.json()) as { id: number }).id;
-    const zu = await page.request.put(`/api/einsaetze/${einsatzId}/units/${eid}/vehicles/${ef}`);
+    const zu = await page.request.put(`/api/incidents/${einsatzId}/units/${eid}/vehicles/${ef}`);
     expect(zu.ok(), `Zuordnung ${i}: ${zu.status()}`).toBeTruthy();
   }
 

@@ -20,8 +20,8 @@ async function seede(page: Page, funkrufname: string) {
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const einsatzId = await post('/api/einsaetze', { bezeichnung: `E2E Fahrzeuge ${Date.now()}` });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const einsatzId = await post('/api/incidents', { bezeichnung: `E2E Fahrzeuge ${Date.now()}` });
+  const basis = `/api/incidents/${einsatzId}`;
   const abschnitt = await post(`${basis}/sectors`, { name: 'Sanitätsdienst' });
   const zug = await post(`${basis}/units`, { name: 'Zug 1', abschnitt_id: abschnitt });
   const staffel = await post(`${basis}/units`, { name: 'Staffel A', ueber_einheit_id: zug });

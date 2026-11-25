@@ -19,7 +19,7 @@ async fn einsatz_anlegen(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body))
@@ -79,7 +79,7 @@ async fn liste_zeigt_einsatz_mit_meiner_rolle() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -109,7 +109,7 @@ async fn liste_blendet_einsatz_fuer_nicht_mitglied_aus() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -124,7 +124,7 @@ async fn liste_blendet_einsatz_fuer_nicht_mitglied_aus() {
 
 #[tokio::test]
 async fn liste_blendet_fremde_org_fuer_fuehrungskraft_aus() {
-    // LFH-115: Eine Org-Führungskraft sieht in GET /api/einsaetze NUR Einsätze der
+    // LFH-115: Eine Org-Führungskraft sieht in GET /api/incidents NUR Einsätze der
     // eigenen Org (auch ohne Mitgliedschaft) — fremde-Org-Einsätze werden über
     // liste_fuer → darf_lesen(r.org_id) → darf_fremdeinsatz_lesen ausgeblendet.
     let (app, pool) = setup_mit_pool().await;
@@ -154,7 +154,7 @@ async fn liste_blendet_fremde_org_fuer_fuehrungskraft_aus() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, frieda)
                 .body(Body::empty())
                 .unwrap(),
@@ -186,7 +186,7 @@ async fn detail_fuer_nicht_mitglied_ist_403() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -210,7 +210,7 @@ async fn detail_ohne_session_ist_401() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -227,7 +227,7 @@ async fn unbekannter_einsatz_detail_ist_404() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze/999")
+                .uri("/api/incidents/999")
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -249,7 +249,7 @@ async fn nur_einsatzleitung_kann_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -266,7 +266,7 @@ async fn nur_einsatzleitung_kann_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -290,7 +290,7 @@ async fn nicht_leitung_kann_nicht_abschliessen() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -313,7 +313,7 @@ async fn mitglied_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/members/{ziel_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}/members/{ziel_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body))
@@ -339,7 +339,7 @@ async fn einsatzleitung_fuegt_mitglied_hinzu() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -411,7 +411,7 @@ async fn letzte_einsatzleitung_kann_nicht_entfernt_werden() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/einsaetze/{einsatz_id}/members/1"))
+                .uri(format!("/api/incidents/{einsatz_id}/members/1"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -438,7 +438,7 @@ async fn einsatzleitung_entfernt_mitglied() {
         .oneshot(
             Request::builder()
                 .method("DELETE")
-                .uri(format!("/api/einsaetze/{einsatz_id}/members/{erika_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}/members/{erika_id}"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -451,7 +451,7 @@ async fn einsatzleitung_entfernt_mitglied() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -473,7 +473,7 @@ async fn mitgliederliste_nur_fuer_mitglieder() {
     let resp = app
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}/members"))
+                .uri(format!("/api/incidents/{einsatz_id}/members"))
                 .header(header::COOKIE, erika)
                 .body(Body::empty())
                 .unwrap(),
@@ -496,7 +496,7 @@ async fn abgeschlossener_einsatz_blockt_mitgliederaenderung() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -542,7 +542,7 @@ async fn detail_status(app: &axum::Router, cookie: &str, einsatz_id: i64) -> Sta
     app.clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -558,7 +558,7 @@ async fn einsatz_detail(app: &axum::Router, cookie: &str, einsatz_id: i64) -> (S
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -579,7 +579,7 @@ async fn listen_groesse(app: &axum::Router, cookie: &str) -> usize {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -609,7 +609,7 @@ async fn admin_nicht_mitglied_darf_fremden_einsatz_detail_lesen() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::COOKIE, admin)
                 .body(Body::empty())
                 .unwrap(),
@@ -646,7 +646,7 @@ async fn abgeschlossener_einsatz_nach_frist_nur_fuer_einsatzleitung() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -708,7 +708,7 @@ async fn patch_kopf(
         .oneshot(
             Request::builder()
                 .method("PATCH")
-                .uri(format!("/api/einsaetze/{einsatz_id}"))
+                .uri(format!("/api/incidents/{einsatz_id}"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -742,7 +742,7 @@ async fn lagebesprechungstermin_steht_im_kopf_und_in_der_liste() {
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{id}/briefing/schedule"))
+                .uri(format!("/api/incidents/{id}/briefing/schedule"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::from(
@@ -765,7 +765,7 @@ async fn lagebesprechungstermin_steht_im_kopf_und_in_der_liste() {
         .clone()
         .oneshot(
             Request::builder()
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -825,7 +825,7 @@ async fn admin_ohne_mitgliedschaft_darf_patchen_aber_kein_etb() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/etb"))
+                .uri(format!("/api/incidents/{id}/etb"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, admin)
                 .body(Body::from(
@@ -880,7 +880,7 @@ async fn patch_auf_abgeschlossenen_einsatz_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/close"))
+                .uri(format!("/api/incidents/{id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -1078,7 +1078,7 @@ async fn anlegen_vergibt_einsatznummer_im_format() {
     assert_eq!(b["einsatznummer_intern"], format!("E-{jahr}-0002"));
 }
 
-/// PUT /api/einsaetze/{id}/retention-period mit Cookie + JSON-Body.
+/// PUT /api/incidents/{id}/retention-period mit Cookie + JSON-Body.
 async fn frist_setzen(
     app: &axum::Router,
     cookie: &str,
@@ -1090,7 +1090,7 @@ async fn frist_setzen(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{einsatz_id}/retention-period"))
+                .uri(format!("/api/incidents/{einsatz_id}/retention-period"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -1109,7 +1109,7 @@ async fn abschliessen(app: &axum::Router, cookie: &str, einsatz_id: i64) -> Stat
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{einsatz_id}/close"))
+                .uri(format!("/api/incidents/{einsatz_id}/close"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -1317,7 +1317,7 @@ async fn abgelaufene_frist_sperrt_auch_personen_export() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{id}/persons/export"))
+                .uri(format!("/api/incidents/{id}/persons/export"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -1373,7 +1373,7 @@ async fn einstellungen_get(app: &axum::Router, cookie: &str, id: i64) -> (Status
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{id}/settings"))
+                .uri(format!("/api/incidents/{id}/settings"))
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -1400,7 +1400,7 @@ async fn einstellungen_put(
         .oneshot(
             Request::builder()
                 .method("PUT")
-                .uri(format!("/api/einsaetze/{id}/settings"))
+                .uri(format!("/api/incidents/{id}/settings"))
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -1524,7 +1524,7 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{id}"))
+                .uri(format!("/api/incidents/{id}"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -1541,9 +1541,9 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
         .unwrap();
 
     for uri in [
-        format!("/api/einsaetze/{id}"),
-        format!("/api/einsaetze/{id}/persons/export"),
-        format!("/api/einsaetze/{id}/live"),
+        format!("/api/incidents/{id}"),
+        format!("/api/incidents/{id}/persons/export"),
+        format!("/api/incidents/{id}/live"),
     ] {
         let resp = app
             .clone()
@@ -1562,7 +1562,7 @@ async fn geloescht_at_tombstone_sperrt_detail_export_stream_403() {
             StatusCode::FORBIDDEN,
             "Tombstone muss {uri} sperren (auch für Admin)"
         );
-        if uri == format!("/api/einsaetze/{id}") {
+        if uri == format!("/api/incidents/{id}") {
             // LLH-1819: wer den Einsatz grundsätzlich sehen dürfte, erfährt den Grund.
             let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
             let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -1616,7 +1616,7 @@ async fn einstellungen_put_auf_abgeschlossenem_ist_409() {
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/close"))
+                .uri(format!("/api/incidents/{id}/close"))
                 .header(header::COOKIE, admin.clone())
                 .body(Body::empty())
                 .unwrap(),
@@ -2053,7 +2053,7 @@ async fn einsatz_anlegen_roh(app: &axum::Router, cookie: &str, body: Value) -> (
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -2154,7 +2154,7 @@ async fn abgeschlossen_mit(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(format!("/api/einsaetze/{id}/close"))
+                .uri(format!("/api/incidents/{id}/close"))
                 .header(header::COOKIE, admin.to_string())
                 .body(Body::empty())
                 .unwrap(),
@@ -2194,11 +2194,11 @@ async fn abgelaufene_frist_ohne_tombstone_sperrt_admin_ueberall_403() {
         .unwrap();
     assert_eq!(g, None, "Vorbedingung: kein Tombstone");
     for uri in [
-        format!("/api/einsaetze/{id}"),
-        format!("/api/einsaetze/{id}/etb"),
-        format!("/api/einsaetze/{id}/persons"),
-        format!("/api/einsaetze/{id}/attachments/{aid}"),
-        format!("/api/einsaetze/{id}/live"),
+        format!("/api/incidents/{id}"),
+        format!("/api/incidents/{id}/etb"),
+        format!("/api/incidents/{id}/persons"),
+        format!("/api/incidents/{id}/attachments/{aid}"),
+        format!("/api/incidents/{id}/live"),
     ] {
         let resp = app
             .clone()
@@ -2415,7 +2415,7 @@ async fn einsatz_anlegen_json(
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri("/api/einsaetze")
+                .uri("/api/incidents")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::COOKIE, cookie.to_string())
                 .body(Body::from(body.to_string()))
@@ -2558,7 +2558,7 @@ async fn anlegen_prueft_die_koordinate() {
             .clone()
             .oneshot(
                 Request::builder()
-                    .uri("/api/einsaetze")
+                    .uri("/api/incidents")
                     .header(header::COOKIE, admin.clone())
                     .body(Body::empty())
                     .unwrap(),

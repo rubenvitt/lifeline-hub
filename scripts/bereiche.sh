@@ -67,8 +67,9 @@ bereiche_von() {
     # Deckungsregel für Qualifikationen (qualiDeckung.test.ts, LLH-1553), dazu die Frist des
     # Wiederöffnens (`NACHLAUF_STUNDEN`, schreibrecht.test.ts, LLH-1814), dazu TTL und
     # Wire-Wörter der Copernicus-Ebene (fachebenen.test.ts, LLH-1200), dazu der Abruftakt der
-    # Drohnenquelle (`intervall_vorschlag_s`, fachebenen.test.ts, LLH-2106).
-    src/karte/quellen.rs | src/karte/copernicus.rs | src/drohne/art.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
+    # Drohnenquelle (`intervall_vorschlag_s`, fachebenen.test.ts, LLH-2106), dazu der
+    # Mindest-Zoom der Copernicus-Bilder (`MIN_ZOOM_BACKEND`, fachebenen.test.ts, LLH-2021).
+    src/karte/quellen.rs | src/karte/copernicus.rs | src/drohne/art.rs | src/karte/cog.rs | tests/fixtures/verdichtung/* | src/freies_zeichen/zeichen_werte.json \
       | tests/fixtures/unterkunft/* | src/unterkunft/richtwerte_basis.json \
       | tests/fixtures/quali_deckung_faelle.json | src/einsatz/berechtigung.rs)
       echo "rust frontend e2e" ;;
@@ -80,6 +81,14 @@ bereiche_von() {
     # Vitest und e2e lesen die Kapitel. Steht vor der Doku-Regel, die Markdown sonst ausnimmt.
     docs/anwender/*)
       echo "frontend e2e" ;;
+    # Die Helfer-Apps erzeugen ihre Tokens aus tokens.json (`scripts/design/tokens-nativ.mjs`, Schritt
+    # 21 im Bündel `schnell`); Swift- und Kotlin-Kern übersetzen die erzeugten Dateien. Vor der
+    # Regel für das ganze Design System unten.
+    docs/design/design-system/project/tokens.json)
+      echo "frontend ios android" ;;
+    # Der Erzeuger und sein Wächter: die Ausgabe ist Quelltext beider Helfer-Kerne.
+    scripts/design/tokens-nativ.mjs | scripts/check-design-tokens-nativ.sh)
+      echo "ios android" ;;
     # Vitest erzeugt das Design System aus dem Code und vergleicht es mit der Ausgabe im Repo
     # (designSystem.guard.test.ts); die README schneidet es aus den Frontend-Regeln.
     docs/design/design-system/project/* | frontend/AGENTS.md)
@@ -88,6 +97,10 @@ bereiche_von() {
     # (websiteModule.guard.test.ts, LLH-1378). Steht vor der Website-Regel unten.
     website/src/daten/module.json)
       echo "frontend" ;;
+    # Gemeinsame Fälle der Helfer-App: nur ihre beiden Kerne lesen sie (ios/HelferKern,
+    # android/helferkern); die Desktop-Hülle hat keine Helfer-App (ADR-0101). Vor der Regel unten.
+    src-tauri/faelle/helfer.json)
+      echo "ios android" ;;
     # Gemeinsame Fälle der Hüllen (LLH-1978, `src-tauri/AGENTS.md`, „Gemeinsame Fälle“): die
     # Rust-Tests der Desktop-Hülle, der Swift-Kern der iOS-Hülle und der Kotlin-Kern der
     # Android-Hülle (LLH-1989) lesen sie. Vor `src-tauri/*`.
@@ -97,8 +110,8 @@ bereiche_von() {
     android/app/src/main/assets/huelle.js)
       echo "frontend android" ;;
     # Der Marken-Wächter (marke.guard.test.ts) prüft App-Symbol, Farbe Kopf-Schwarz und Thema der
-    # Android-App in ihren Ressourcen (LLH-1989).
-    android/app/src/main/res/*)
+    # Android-App in ihren Ressourcen (LLH-1989), dazu das gleiche Symbol der Helfer-App (ADR-0101).
+    android/app/src/main/res/* | android/helfer/src/main/res/*)
       echo "frontend android" ;;
     # Vitest führt das Init-Skript der iOS-Hülle aus wie die Tauri-Skripte (src/test/huelle.ts)
     # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).

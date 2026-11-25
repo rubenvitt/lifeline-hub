@@ -29,12 +29,12 @@ async function saeen(page: Page): Promise<string> {
     ['Lagemeldung: Pegel steigt, Keller in der Hauptstraße überflutet', 'Florian Musterstadt 1'],
     ['Pumpe am Einsatzort in Betrieb genommen', 'ELW 1'],
   ] as const) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const r = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: { typ: 'meldung', inhalt, von, an: 'Einsatzleitung' },
     });
     expect(r.ok(), `Seeding ETB: ${r.status()} ${await r.text()}`).toBeTruthy();
   }
-  const person = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
+  const person = await page.request.post(`/api/incidents/${einsatzId}/persons`, {
     data: { name: 'Mustermann', vorname: 'Erika' },
   });
   expect(person.ok(), `Seeding Person: ${person.status()} ${await person.text()}`).toBeTruthy();

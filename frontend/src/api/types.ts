@@ -31,6 +31,12 @@ export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
 export type KopplungsCode = S['KopplungsCode'];
 export type GeraeteUebersicht = S['GeraeteUebersicht'];
+export type HelferAnzeige = S['HelferAnzeige'];
+export type HelferEinladungAnzeige = S['HelferEinladungAnzeige'];
+export type HelferStatus = S['HelferStatus'];
+export type HelferUebersicht = S['HelferUebersicht'];
+export type HelferZiel = S['HelferZiel'];
+export type HelferZielArt = S['HelferZielArt'];
 // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652)
 export type AnbindungenListe = S['AnbindungenListe'];
 export type AnbindungAnzeige = S['AnbindungAnzeige'];
@@ -240,9 +246,17 @@ export interface OrgEinstellungenUpdate {
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
   geocoder_url: string | null;
+  /** Fremdebenen dürfen Ziele im eigenen Netz abrufen (LLH-2099). Kein Vollersatz: fehlt das Feld,
+   *  bleibt der Wert am Server; nur die Sektion „Anzeige“ schickt es mit. */
+  fremdebenen_lan_erlaubt?: boolean;
   /** Kategorie-Vorgaben (LFH-749). Fehlt das Feld, bleiben sie am Server unverändert — nur die
    *  Sektion „Einsatz-Defaults“ schickt es mit. */
   aufbewahrung_kategorien?: KategorieVorgabe[];
+  /** „Ortung im Einsatz“ (Helfer-App). Fehlt das Feld, bleibt der Schalter am Server, wie er ist;
+   *  nur die Sektion „Einsatz-Vorgaben“ schickt es mit. Einschalten bestätigt die Einwilligung. */
+  ortung_im_einsatz?: boolean;
+  /** „Auch Personen orten“; nur zusammen mit `ortung_im_einsatz` (sonst 422). */
+  ortung_personen?: boolean;
 }
 
 /** Benötigte Rolle eines Moduls (Spec `modul-freigabe`, LFH-1150); `null` = frei. Der Server
@@ -301,7 +315,7 @@ export type ModulOverrides = Record<string, ModulOverride>;
 /** Effektive Freigabe eines Moduls für den angemeldeten Benutzer (LFH-669). */
 export type ModulFreigabe = S['ModulFreigabe'];
 
-/** Antwort von `GET /api/einsaetze/{id}/module-access`: ein Eintrag je Modul-Key der Registry.
+/** Antwort von `GET /api/incidents/{id}/module-access`: ein Eintrag je Modul-Key der Registry.
  *  Die Map selbst ist kein Backend-Schema, FE-lokal. */
 export type ModulFreigaben = Record<string, ModulFreigabe>;
 
@@ -496,6 +510,8 @@ export interface SprechgruppeEingabe {
 export type Einsatzabschnitt = S['EinsatzabschnittAnzeige'];
 export type AbschnittLagezustand = S['AbschnittLagezustand'];
 export type Einheit = S['EinheitAnzeige'];
+/** Quelle einer Position an Einheit, Fahrzeug oder Person (Helfer-App). */
+export type Positionsquelle = S['Positionsquelle'];
 /** Wer eine Angabe zuletzt geändert hat und wann (LLH-1834, Spec `aenderungsvermerk`). */
 export type FeldVermerk = S['FeldVermerk'];
 /** Wer gerade welche Angabe bearbeitet (LLH-1946); Daten des Live-Ereignisses `praesenz`. */
@@ -2002,14 +2018,14 @@ export interface WiederherstellenBody {
   retention_bis: string | null;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/retention-period`. `null` hebt die Frist auf; eine
+/** Body von `PUT /api/incidents/{id}/retention-period`. `null` hebt die Frist auf; eine
  *  Verkürzung braucht `bestaetigt: true`, sonst 409. Kein Backend-Schema, FE-lokal. */
 export interface FristSetzenBody {
   retention_bis: string | null;
   bestaetigt?: boolean;
 }
 
-/** Body von `PUT /api/einsaetze/{id}/follow-up` (LLH-1494). `null` hebt die Frist auf.
+/** Body von `PUT /api/incidents/{id}/follow-up` (LLH-1494). `null` hebt die Frist auf.
  *  Kein Backend-Schema, FE-lokal. */
 export interface NachbereitungSetzenBody {
   nachbereitung_bis: string | null;
@@ -2044,7 +2060,7 @@ export type KategorieVorgabe = S['KategorieVorgabe'];
 /** Aufbewahrung einer Kategorie am Einsatz bzw. in der Archivakte (Frist, Zustand, Rechtsgrundlage). */
 export type KategorieAufbewahrung = S['KategorieAufbewahrungAnzeige'];
 
-/** Body von `PUT /api/einsaetze/{id}/retention-period/{kategorie}`. `null` hebt die Frist auf
+/** Body von `PUT /api/incidents/{id}/retention-period/{kategorie}`. `null` hebt die Frist auf
  *  (die Kategorie folgt der Einsatz-Frist); eine Verkürzung braucht `bestaetigt: true`, sonst 409;
  *  die erste Frist einer Kategorie braucht eine Rechtsgrundlage, sonst 422. Kein Backend-Schema,
  *  FE-lokal. */

@@ -20,7 +20,7 @@ async fn melden(app: &axum::Router, cookie: &str, einsatz: i64, art: &str) -> Va
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/reports"),
+        &format!("/api/incidents/{einsatz}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -41,7 +41,7 @@ async fn berichtigen(app: &axum::Router, cookie: &str, einsatz: i64, grund: i64)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         Some(&body.to_string()),
     )
@@ -57,7 +57,7 @@ async fn lesen(app: &axum::Router, cookie: &str, pfad: &str) -> Vec<Value> {
 }
 
 async fn meldung(app: &axum::Router, cookie: &str, einsatz: i64, mid: i64) -> Value {
-    lesen(app, cookie, &format!("/api/einsaetze/{einsatz}/reports"))
+    lesen(app, cookie, &format!("/api/incidents/{einsatz}/reports"))
         .await
         .into_iter()
         .find(|m| m["id"] == mid)
@@ -68,7 +68,7 @@ async fn lagemeldung(app: &axum::Router, cookie: &str, einsatz: i64, mid: i64) -
     lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/situation/reports"),
+        &format!("/api/incidents/{einsatz}/situation/reports"),
     )
     .await
     .into_iter()
@@ -184,7 +184,7 @@ async fn berichtigung_eines_anderen_eintrags_meldet_keine_meldung() {
     let (s, eintrag) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         Some(r#"{"typ":"anordnung","inhalt":"Halle räumen","von":"ELW 1","an":"Florian 3"}"#),
     )

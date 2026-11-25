@@ -318,6 +318,13 @@ export const GERAETESPEICHER: readonly GeraeteSpeicherort[] = [
       'Geräte-Einstellung der Lagekarte (Leiste offen, zuletzt gewählte Ansicht, Gruppen des Ebenenbaums und der Objektliste offen/zu), ohne Personenbezug.',
   },
   {
+    ort: 'localStorage lfh:lagekarte:fremdebenen-aus:<einsatz_id>',
+    datei: 'pages/lagekarte/useFremdebenen.ts',
+    entscheidung: 'bleibt',
+    grund:
+      'Geräte-Einstellung der Lagekarte: welche Fremdebenen dieser Arbeitsplatz ausgeblendet hat, nur deren Nummern je Einsatz, ohne Inhalt und ohne Personenbezug (LLH-2099).',
+  },
+  {
     ort: 'localStorage lfh:lagekarte:zeichen-zuletzt-v2; lfh:lagekarte:zeichen-zuletzt (Altschlüssel)',
     datei: 'pages/lagekarte/zuletztVerwendet.ts',
     entscheidung: 'bleibt',

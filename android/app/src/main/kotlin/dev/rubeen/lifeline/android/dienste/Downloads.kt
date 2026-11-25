@@ -1,6 +1,7 @@
 package dev.rubeen.lifeline.android.dienste
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
@@ -13,6 +14,7 @@ import androidx.core.content.FileProvider
 import dev.rubeen.lifeline.android.web.uri
 import dev.rubeen.lifeline.kern.Downloadablage
 import dev.rubeen.lifeline.kern.Linkregeln
+import dev.rubeen.lifeline.kern.Oeffnen
 import dev.rubeen.lifeline.kern.ServerAdresse
 import java.io.File
 import java.io.IOException
@@ -136,6 +138,20 @@ class Downloads internal constructor(
         val typ = mimetype?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() }
             ?: MimeTypeMap.getSingleton().getMimeTypeFromExtension(datei.extension.lowercase())
             ?: "application/octet-stream"
+        if (Downloadablage.oeffnenAls(typ, datei.extension) == Oeffnen.ANZEIGEN) {
+            val anzeigen = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(adresse, "text/calendar")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            if (context !is Activity) anzeigen.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            anzeigen.clipData = ClipData.newRawUri(datei.name, adresse)
+            try {
+                // Direkt, nicht im Chooser: ein Chooser wirft nie, der Rückfall bräuchte die Ausnahme.
+                context.startActivity(anzeigen)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Keine Kalender-App: wie jede andere Datei im Teilen-Blatt anbieten.
+            }
+        }
         val senden = Intent(Intent.ACTION_SEND)
             .setType(typ)
             .putExtra(Intent.EXTRA_STREAM, adresse)

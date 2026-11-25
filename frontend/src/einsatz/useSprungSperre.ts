@@ -30,7 +30,7 @@ export function useModulFreigabenStand(einsatzId: number): {
     queryKey: einsatzKeys.modulFreigaben(einsatzId),
     queryFn: () => ladeModulFreigaben(einsatzId),
     // Eine verbogene Routen-ID (LFH-438) fragt nichts ab: die Seite leitet ohnehin um, und ein
-    // Abruf gegen `/api/einsaetze/NaN/…` wäre Rauschen.
+    // Abruf gegen `/api/incidents/NaN/…` wäre Rauschen.
     enabled: Number.isInteger(einsatzId) && einsatzId > 0,
   });
   const { refetch } = query;

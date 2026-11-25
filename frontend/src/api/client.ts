@@ -97,6 +97,11 @@ export class ApiError extends Error {
    * Zeilen-Route vom 404 einer unbekannten Route.
    */
   grund: string | null;
+  /**
+   * Weitere Felder des `{error}`-Umschlags, roh (Helfer-App: `holder` beim 409 `tracker_taken`).
+   * Leer ohne Umschlag. Wer ein Feld liest, prüft seinen Typ selbst.
+   */
+  details: Readonly<Record<string, unknown>>;
   constructor(
     status: number,
     message: string,
@@ -105,11 +110,13 @@ export class ApiError extends Error {
       zeilen = [] as ZeilenGrund[],
       ohneSitzung = false,
       grund = null as string | null,
+      details = {} as Readonly<Record<string, unknown>>,
     }: {
       vomAnwendungsserver?: boolean;
       zeilen?: ZeilenGrund[];
       ohneSitzung?: boolean;
       grund?: string | null;
+      details?: Readonly<Record<string, unknown>>;
     } = {},
   ) {
     super(message);
@@ -119,6 +126,7 @@ export class ApiError extends Error {
     this.zeilen = zeilen;
     this.ohneSitzung = ohneSitzung;
     this.grund = grund;
+    this.details = details;
   }
 }
 
@@ -265,18 +273,27 @@ async function fehlerWerfen(res: Response, lese403: boolean): Promise<never> {
   let vomAnwendungsserver = false;
   let zeilen: ZeilenGrund[] = [];
   let grund: string | null = null;
+  let details: Record<string, unknown> = {};
   try {
-    const body = (await res.json()) as { error?: unknown; zeilen?: unknown; grund?: unknown };
+    const body = (await res.json()) as {
+      error?: unknown;
+      zeilen?: unknown;
+      grund?: unknown;
+      reason?: unknown;
+    };
     if (typeof body.error === 'string') {
       message = body.error;
       vomAnwendungsserver = true;
       zeilen = leseZeilen(body.zeilen);
+      // Neue Routen nennen den Grund englisch (`reason`, ADR-0097: neue Wire-Felder englisch).
       if (typeof body.grund === 'string') grund = body.grund;
+      else if (typeof body.reason === 'string') grund = body.reason;
+      details = body;
     }
   } catch {
     // keine JSON-Antwort — generische Meldung beibehalten
   }
-  throw new ApiError(res.status, message, { vomAnwendungsserver, zeilen, grund });
+  throw new ApiError(res.status, message, { vomAnwendungsserver, zeilen, grund, details });
 }
 
 /** Fetch wirft bei einem Leitungsfehler `TypeError`, bei Abbruch je nach Browser

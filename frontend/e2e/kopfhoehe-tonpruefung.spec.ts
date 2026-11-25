@@ -194,7 +194,7 @@ async function stromNachVerbindeFreigeben(page: Page, einsatzId: string) {
         },
       });
     },
-    { pfad: `/api/einsaetze/${einsatzId}/live`, haltenMs: STROM_HALTEN_MS },
+    { pfad: `/api/incidents/${einsatzId}/live`, haltenMs: STROM_HALTEN_MS },
   );
 }
 

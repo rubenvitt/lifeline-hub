@@ -94,20 +94,20 @@ function bereit() {
   aufnahmeBody = null;
   server.use(
     meHandler({ ...benutzerFixture({ id: 51, anzeigename: 'NU Nord · Tablet NU' }), geraet }),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/persons', () => HttpResponse.json([hier, weiter])),
-    http.get('/api/einsaetze/7/care', () =>
+    http.get('/api/incidents/7/persons', () => HttpResponse.json([hier, weiter])),
+    http.get('/api/incidents/7/care', () =>
       HttpResponse.json({
         bezirke: [],
         stellen: [stelle],
         namentlich: [{ stelle_id: 3, anzahl: 2 }],
       } as BetreuungUebersicht),
     ),
-    http.get('/api/einsaetze/7/care/positions/3/occupancies', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/7/persons/10', () =>
+    http.get('/api/incidents/7/care/positions/3/occupancies', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/reports', () => HttpResponse.json([])),
+    http.get('/api/incidents/7/persons/10', () =>
       HttpResponse.json({
         ...hier,
         sichtungen: [],
@@ -120,7 +120,7 @@ function bereit() {
         anlaesse: [],
       } as PersonDetail),
     ),
-    http.post('/api/einsaetze/7/persons', async ({ request }) => {
+    http.post('/api/incidents/7/persons', async ({ request }) => {
       aufnahmeBody = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json(person({ id: 12, registrier_nr: 3 }), { status: 201 });
     }),
@@ -233,7 +233,7 @@ describe('Betreuungsstelle — Aufnahme und Person', () => {
     bereit();
     let freigabeAbrufe = 0;
     server.use(
-      http.get('/api/einsaetze/7/module-access', () => {
+      http.get('/api/incidents/7/module-access', () => {
         freigabeAbrufe += 1;
         return HttpResponse.json(freigabenFixture());
       }),
@@ -277,13 +277,13 @@ describe('Betreuungsstelle — Registrierung (LLH-1612)', () => {
     bereit();
     let gelesen = 0;
     server.use(
-      http.get('/api/einsaetze/7/care', () =>
+      http.get('/api/incidents/7/care', () =>
         HttpResponse.json({
           stellen: [{ ...stelle, belegungsart: 'namentlich' }],
           namentlich: [{ stelle_id: 3, anzahl: 2 }],
         } as BetreuungUebersicht),
       ),
-      http.get('/api/einsaetze/7/care/positions/3/registrations', () => {
+      http.get('/api/incidents/7/care/positions/3/registrations', () => {
         gelesen += 1;
         return HttpResponse.json({
           stelle_id: 3,
@@ -327,10 +327,10 @@ describe('Betreuungsstelle — Registrierliste – Druckansicht (LLH-1616)', () 
     bereit();
     const abrufe: string[] = [];
     server.use(
-      http.get('/api/einsaetze/7/care/positions/3/registrations', () =>
+      http.get('/api/incidents/7/care/positions/3/registrations', () =>
         HttpResponse.json({ stelle_id: 3, haushalte: [], ohne_haushalt: [] }),
       ),
-      http.get('/api/einsaetze/7/care/positions/3/registrations/print', ({ request }) => {
+      http.get('/api/incidents/7/care/positions/3/registrations/print', ({ request }) => {
         abrufe.push(new URL(request.url).pathname);
         return HttpResponse.json({
           stelle_id: 3,
@@ -357,13 +357,13 @@ describe('Betreuungsstelle — Registrierliste – Druckansicht (LLH-1616)', () 
     expect(await screen.findByRole('table', { name: 'Registrierte Personen' })).toHaveTextContent(
       'Muster, Max',
     );
-    expect(abrufe).toEqual(['/api/einsaetze/7/care/positions/3/registrations/print']);
+    expect(abrufe).toEqual(['/api/incidents/7/care/positions/3/registrations/print']);
   });
 
   it('gibt es die Stelle nicht (mehr) (404), steht das Muster mit dem Rückweg zur Betreuung', async () => {
     bereit();
     server.use(
-      http.get('/api/einsaetze/7/care/positions/3/registrations/print', () =>
+      http.get('/api/incidents/7/care/positions/3/registrations/print', () =>
         HttpResponse.json(NICHT_GEFUNDEN_BODY, { status: 404 }),
       ),
     );

@@ -389,7 +389,7 @@ async fn netz_und_sicherheit_ueber_40_zeichen_sind_400() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         &admin,
         Some(&format!(
             r#"{{"bezeichnung":"9","betriebsart":"DMO","netz":"{lang}"}}"#
@@ -407,7 +407,7 @@ async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"  "}"#),
     )
@@ -422,7 +422,7 @@ async fn einsatzlokale_sprechgruppe_traegt_netz_und_sicherheit() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         &admin,
         None,
     )
@@ -447,7 +447,7 @@ async fn schwaerzung_behaelt_netz_und_sicherheit_und_nimmt_den_hinweis() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"999","betriebsart":"DMO","netz":"Repeater","sicherheit":"E2E","hinweis":"Hof Müller"}"#),
     )

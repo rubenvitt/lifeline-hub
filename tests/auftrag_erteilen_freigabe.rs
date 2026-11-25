@@ -10,7 +10,7 @@ use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_set
 
 const AUFTRAG_BODY: &str = r#"{"auftrag_text":"Sandsäcke","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S4"}]}"#;
 
-/// Die beiden Wege: Pfadsegment unter `/api/einsaetze/{id}/` des Quellmoduls.
+/// Die beiden Wege: Pfadsegment unter `/api/incidents/{id}/` des Quellmoduls.
 #[derive(Clone, Copy, Debug)]
 enum Quelle {
     Etb,
@@ -36,7 +36,7 @@ impl Quelle {
         let (s, v) = anfrage(
             app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/{}", self.segment()),
+            &format!("/api/incidents/{einsatz}/{}", self.segment()),
             cookie,
             Some(body),
         )
@@ -46,7 +46,7 @@ impl Quelle {
     }
 
     fn erteilen_pfad(self, einsatz: i64, id: i64) -> String {
-        format!("/api/einsaetze/{einsatz}/{}/{id}/task", self.segment())
+        format!("/api/incidents/{einsatz}/{}/{id}/task", self.segment())
     }
 }
 
@@ -61,7 +61,7 @@ async fn nur_fuer_admins(app: &axum::Router, admin: &str, einsatz: i64, modul: &
     let (s, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -73,7 +73,7 @@ async fn auftraege(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/tasks"),
+        &format!("/api/incidents/{einsatz}/tasks"),
         admin,
         None,
     )
@@ -85,7 +85,7 @@ async fn anordnungen(app: &axum::Router, einsatz: i64, admin: &str) -> usize {
     let (_, etb) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         admin,
         None,
     )
@@ -128,7 +128,7 @@ async fn auftrag_erteilen_ohne_auftrags_freigabe_ist_403() {
             let (_, m) = anfrage(
                 &app,
                 "GET",
-                &format!("/api/einsaetze/{einsatz}/reports/{id}"),
+                &format!("/api/incidents/{einsatz}/reports/{id}"),
                 &admin,
                 None,
             )
