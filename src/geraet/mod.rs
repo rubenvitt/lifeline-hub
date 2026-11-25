@@ -101,6 +101,7 @@ pub const ALLE_GERAETE: &[(&str, &str)] = &[
         "GET",
         "/api/map/proxy/{id}/glyphs/{slot}/{fontstack}/{range}",
     ),
+    ("GET", "/api/map/proxy/{id}/asset/{slot}"),
 ];
 
 /// Einsatzrouten, die jede Ansicht liest: Einsatzkopf, Modulfreigaben, Modulzähler und der

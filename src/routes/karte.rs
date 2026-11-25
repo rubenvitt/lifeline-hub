@@ -2466,6 +2466,19 @@ pub async fn proxy_glyphs(
     proxy_asset(&state, u).await
 }
 
+/// GET /api/map/proxy/{id}/asset/{slot} — statisches Asset aus einem Style-Slot, etwa die
+/// `data`-URL einer GeoJSON-Quelle (LLH-2079).
+pub async fn proxy_asset_slot(
+    _zugriff: KartenZugriff,
+    State(state): State<AppState>,
+    PfadParam((id, slot)): PfadParam<(i64, i64)>,
+) -> Result<Response, AppError> {
+    aktive_proxy_quelle(&state, id).await?;
+    let upstream = slot_oder_nf(&state, id, slot, proxy::SlotArt::Static).await?;
+    let u = ssrf_geprueft(&upstream)?;
+    proxy_asset(&state, u).await
+}
+
 #[cfg(test)]
 mod proxy_antwort_tests {
     use super::*;
