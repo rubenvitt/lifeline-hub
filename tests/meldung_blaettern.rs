@@ -25,7 +25,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, n: usize, richtung: &
         let (s, v) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/reports"),
+            &format!("/api/incidents/{e}/reports"),
             cookie,
             Some(&meldung(&format!("Meldung {i}"), richtung)),
         )
@@ -68,7 +68,7 @@ async fn phase_trennt_offen_und_abgeschlossen_ohne_phase_bleibt_alles() {
     let alle = anlegen(&app, &admin, e, 5, "intern").await;
     erledigen(&pool, &alle[..3], |i| format!("2026-10-01 10:0{i}:00")).await;
 
-    let basis = format!("/api/einsaetze/{e}/reports");
+    let basis = format!("/api/incidents/{e}/reports");
     let (s, v) = get(&app, &admin, &format!("{basis}?phase=offen")).await;
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(
@@ -92,7 +92,7 @@ async fn unbekannte_phase_ist_400_und_cursor_ohne_abgeschlossen_ist_422() {
     let (app, _pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{e}/reports");
+    let basis = format!("/api/incidents/{e}/reports");
 
     let (s, _) = get(&app, &admin, &format!("{basis}?phase=alle")).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
@@ -124,7 +124,7 @@ async fn erste_seite_hat_die_vorgabe_und_die_klemme_greift() {
         format!("2026-10-01 {:02}:{:02}:00", 10 + i / 60, i % 60)
     })
     .await;
-    let basis = format!("/api/einsaetze/{e}/reports?phase=abgeschlossen");
+    let basis = format!("/api/incidents/{e}/reports?phase=abgeschlossen");
 
     let (_, v) = get(&app, &admin, &basis).await;
     let seite = ids(&v);
@@ -152,7 +152,7 @@ async fn folgeseiten_ohne_duplikat_und_luecke_auch_bei_gleichstand() {
         .await
         .unwrap();
 
-    let basis = format!("/api/einsaetze/{e}/reports?phase=abgeschlossen&limit=5");
+    let basis = format!("/api/incidents/{e}/reports?phase=abgeschlossen&limit=5");
     let mut gesehen = Vec::new();
     let mut pfad = basis.clone();
     for _ in 0..10 {
@@ -190,7 +190,7 @@ async fn richtung_gilt_in_jeder_phase() {
     })
     .await;
 
-    let basis = format!("/api/einsaetze/{e}/reports");
+    let basis = format!("/api/incidents/{e}/reports");
     let (_, v) = get(
         &app,
         &admin,
@@ -236,7 +236,7 @@ async fn kennzahlen_gleichen_der_auszaehlung_der_liste() {
     let e = einsatz_anlegen(&app, &admin).await;
     let intern = anlegen(&app, &admin, e, 4, "intern").await;
     let extern_ = anlegen(&app, &admin, e, 3, "extern").await;
-    let basis = format!("/api/einsaetze/{e}/reports");
+    let basis = format!("/api/incidents/{e}/reports");
     let (s, _) = anfrage(
         &app,
         "POST",
@@ -297,7 +297,7 @@ async fn einzelabruf_liefert_die_meldung_und_einsatzfremd_404() {
     let (s, v) = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/reports/{eigene}"),
+        &format!("/api/incidents/{e}/reports/{eigene}"),
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -307,11 +307,11 @@ async fn einzelabruf_liefert_die_meldung_und_einsatzfremd_404() {
     let (s, _) = get(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/reports/{fremde}"),
+        &format!("/api/incidents/{e}/reports/{fremde}"),
     )
     .await;
     assert_eq!(s, StatusCode::NOT_FOUND);
-    let (s, _) = get(&app, &admin, &format!("/api/einsaetze/{e}/reports/999999")).await;
+    let (s, _) = get(&app, &admin, &format!("/api/incidents/{e}/reports/999999")).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 }
 
@@ -323,7 +323,7 @@ async fn modulzaehler_zaehlt_weiter_den_gesamtbestand() {
     let alle = anlegen(&app, &admin, e, 105, "intern").await;
     erledigen(&pool, &alle[..2], |i| format!("2026-10-01 10:0{i}:00")).await;
 
-    let (s, z) = get(&app, &admin, &format!("/api/einsaetze/{e}/module-counts")).await;
+    let (s, z) = get(&app, &admin, &format!("/api/incidents/{e}/module-counts")).await;
     assert_eq!(s, StatusCode::OK, "{z}");
     assert_eq!(z["meldungen"]["offen"], 103, "{z}");
 }

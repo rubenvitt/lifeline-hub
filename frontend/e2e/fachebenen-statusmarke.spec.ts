@@ -35,7 +35,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatz(page: Page, bezeichnung: string): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(antwort.ok(), `Seeding Einsatz: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
   return ((await antwort.json()) as { id: number }).id;
 }

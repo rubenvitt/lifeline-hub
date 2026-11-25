@@ -15,7 +15,7 @@ import { FakeEventSource } from '../test/eventSource';
  * „Neue Zeile" der Seite Lagebesprechung (seit LLH-1111, vorher Stab-Seite) mit demselben
  * Rechte-Riegel wie die Kopfaktion. Eigene Datei aus
  * denselben Gründen wie `SchaedenPage.palette.test.tsx`: `vi.mock` hoistet dateiweit, und das echte
- * `useBefehle` fordert `/api/einsaetze` an.
+ * `useBefehle` fordert `/api/incidents` an.
  */
 vi.mock('../command-palette/useBefehle', () => ({
   useBefehle: (aktionen: TastaturAktionen = {}) =>
@@ -53,10 +53,10 @@ function render(
 ) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/briefing', stand),
-    http.get('/api/einsaetze/1/briefings', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigabenFixture())),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1/briefing', stand),
+    http.get('/api/incidents/1/briefings', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigabenFixture())),
     // Quellen der Vorbereitung (LFH-550) — leer; diese Tests prüfen die Palette.
     ...[
       'personen',
@@ -69,8 +69,8 @@ function render(
       'vehicles',
       'material',
       'abschnitte',
-    ].map((l) => http.get(`/api/einsaetze/1/${l}`, () => HttpResponse.json([]))),
-    http.get('/api/einsaetze/1/module-counts', () => HttpResponse.json({})),
+    ].map((l) => http.get(`/api/incidents/1/${l}`, () => HttpResponse.json([]))),
+    http.get('/api/incidents/1/module-counts', () => HttpResponse.json({})),
   );
   return renderMitProviders(
     <CommandPaletteProvider>

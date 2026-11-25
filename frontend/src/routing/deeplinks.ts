@@ -307,7 +307,7 @@ export function einsatzaktePfad(einsatzId: number): string {
 
 /** Pfad des ZIP mit Anhängen und Tabellen der Einsatzakte (LLH-1835, `src/routes/einsatzakte.rs`). */
 export function einsatzakteZipPfad(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}/case-file/attachments.zip`;
+  return `/api/incidents/${einsatzId}/case-file/attachments.zip`;
 }
 
 /** Umkehr von {@link einsatzberichtPfad}: unbekannte Schlüssel fallen weg, leer = Standardumfang. */
@@ -1677,6 +1677,33 @@ export function koppelnAdresse(origin: string, code: string): string {
   return `${origin}${KOPPELN_PFAD}#${encodeURIComponent(code)}`;
 }
 
+/** Weiche der Helfer-App im Browser (Helfer-App): ohne Sitzung, der Code steht im Fragment. */
+export const HELFER_PFAD = '/helfer';
+
+/**
+ * Adresse im QR-Code einer Helfer-Einladung: `https://<server>/helfer#<CODE>`. Der Code steht im
+ * Fragment, das der Browser nie an den Server schickt (wie {@link koppelnAdresse}); die Kamera
+ * öffnet damit die Weiche, die App liest dieselbe Adresse direkt.
+ */
+export function helferAdresse(origin: string, code: string): string {
+  return `${origin}${HELFER_PFAD}#${encodeURIComponent(code)}`;
+}
+
+/**
+ * Deeplink in die App „Lifeline Helfer“: `lifeline-helfer://anmelden?server=<origin>#<CODE>`. Der
+ * Server steht als Abfrage, der Code wieder nur im Fragment. Ein Origin trägt weder `?` noch `#`
+ * noch `&`, `:` und `/` sind in der Abfrage erlaubt (RFC 3986): er steht unkodiert, so wie die
+ * App ihn als Serveradresse prüft.
+ */
+export function helferAppLink(origin: string, code: string): string {
+  return `lifeline-helfer://anmelden?server=${origin}#${encodeURIComponent(code)}`;
+}
+
+/** Bereich „Helfer“ der Geräte-Sektion (Ziel des Hinweises im Einsatzkopf). */
+export function einsatzHelferPfad(einsatzId: number): string {
+  return `${einsatzEinstellungenPfad(einsatzId, 'geraete')}#helfer`;
+}
+
 /** Seite des Lagebilds für Externe (LLH-1496), ohne Sitzung. */
 export const EXTERN_PFAD = '/extern';
 
@@ -1845,6 +1872,8 @@ export interface ListenZustandAdresse {
 const SORT_PARAM = 'sort';
 const SUCHE_PARAM = 'q';
 const FILTER_PRAEFIX = 'f.';
+/** Kein Filtername: als Schlüssel eines Objektliterals verbiegt er den Prototyp (LLH-2090). */
+const PROTO = '__proto__';
 const SORT_AUS = 'aus';
 
 function istListenParam(name: string): boolean {
@@ -1879,7 +1908,7 @@ export function listenZustandParams(
   if (sortierung === null) neu.set(SORT_PARAM, SORT_AUS);
   else if (sortierung) neu.set(SORT_PARAM, `${sortierung.spalte}:${sortierung.richtung}`);
   for (const [spalte, werte] of Object.entries(zustand.filter)) {
-    if (werte.length === 0) continue;
+    if (werte.length === 0 || spalte === PROTO) continue;
     neu.set(`${FILTER_PRAEFIX}${spalte}`, werte.map(encodeURIComponent).join(','));
   }
   const suche = zustand.suche.trim();
@@ -1906,7 +1935,9 @@ export function parseListenZustand(params: URLSearchParams): ListenZustandAdress
   for (const [name, wert] of params) {
     if (!name.startsWith(FILTER_PRAEFIX) || wert === '') continue;
     const spalte = name.slice(FILTER_PRAEFIX.length);
-    if (spalte === '') continue;
+    // `filter['__proto__'] = …` setzte den Prototyp statt eines Schlüssels (LLH-2090); eine
+    // Spalte dieses Namens gibt es nicht.
+    if (spalte === '' || spalte === PROTO) continue;
     try {
       filter[spalte] = wert.split(',').map(decodeURIComponent);
     } catch {

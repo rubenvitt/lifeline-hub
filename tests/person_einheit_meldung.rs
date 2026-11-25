@@ -11,7 +11,7 @@ async fn person_post(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -28,7 +28,7 @@ async fn person_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -39,7 +39,7 @@ async fn abschnitt_anlegen(app: &axum::Router, cookie: &str, e: i64, name: &str)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/sectors"),
+        &format!("/api/incidents/{e}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )
@@ -61,7 +61,7 @@ async fn meldung_anlegen(app: &axum::Router, cookie: &str, e: i64, extra: Value)
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         cookie,
         Some(&body.to_string()),
     )
@@ -74,7 +74,7 @@ async fn meldungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<Value> {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports"),
+        &format!("/api/incidents/{e}/reports"),
         cookie,
         None,
     )
@@ -93,7 +93,7 @@ async fn einheit_beim_anlegen_mit_name_und_abschnitt_aus_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/units/{streife}"),
+        &format!("/api/incidents/{e}/units/{streife}"),
         &admin,
         Some(&json!({ "abschnitt_id": abschnitt }).to_string()),
     )
@@ -293,7 +293,7 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let (s, v) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/units/{streife}"),
+        &format!("/api/incidents/{e}/units/{streife}"),
         &admin,
         None,
     )
@@ -321,7 +321,7 @@ async fn fremde_und_aufgeloeste_einheit_sind_422() {
     let (_, detail) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/{}", p["id"]),
+        &format!("/api/incidents/{e}/persons/{}", p["id"]),
         &admin,
         None,
     )
@@ -346,7 +346,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{streife}/annul"),
+        &format!("/api/incidents/{e}/units/{streife}/annul"),
         &admin,
         None,
     )
@@ -364,7 +364,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{pid}"),
+        &format!("/api/incidents/{e}/persons/{pid}"),
         &admin,
         None,
     )
@@ -373,7 +373,7 @@ async fn versorgter_patient_ist_eine_spur_der_einheit() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{leer}/annul"),
+        &format!("/api/incidents/{e}/units/{leer}/annul"),
         &admin,
         None,
     )
@@ -398,7 +398,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/units/{a}"),
+        &format!("/api/incidents/{e}/units/{a}"),
         &admin,
         Some(&json!({ "abschnitt_id": abschnitt }).to_string()),
     )
@@ -407,7 +407,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/units/{weg}"),
+        &format!("/api/incidents/{e}/units/{weg}"),
         &admin,
         None,
     )
@@ -416,7 +416,7 @@ async fn einheitenwahl_am_modul_personen_ohne_aufgeloeste() {
     let (s, v) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/units"),
+        &format!("/api/incidents/{e}/persons/units"),
         &admin,
         None,
     )
@@ -455,7 +455,7 @@ async fn patient_aus_meldung_in_beide_richtungen_sichtbar() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{}", storniert["id"]),
+        &format!("/api/incidents/{e}/persons/{}", storniert["id"]),
         &admin,
         None,
     )
@@ -508,7 +508,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs"),
+        &format!("/api/incidents/{e}/uhs"),
         admin,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": "UHS Nord"}).to_string()),
     )
@@ -518,7 +518,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{e}/uhs/{uhs}/status"),
         admin,
         Some(&json!({"status": "aktiv"}).to_string()),
     )
@@ -527,7 +527,7 @@ async fn uhs_geraet(app: &axum::Router, admin: &str, e: i64, ansicht: &str) -> S
     let (s, v) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/devices"),
+        &format!("/api/incidents/{e}/devices"),
         admin,
         Some(&json!({"ansicht": ansicht, "uhs_id": uhs, "bezeichnung": "Gerät 1"}).to_string()),
     )

@@ -37,7 +37,7 @@ function LocationProbe() {
 
 function renderSwitcher() {
   server.use(
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([uhs(3, 'aktiv'), uhs(9, 'geplant')])),
   );
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   render(

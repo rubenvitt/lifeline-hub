@@ -16,7 +16,9 @@ Regeln dazu:
   Staffel): `titel` als `h1` (Paneele ab `h2`), `meta` in Textschrift mit gleich breiten Ziffern, `aktionen` rechts (Primär blau
   gefüllt, sekundär umrandet); Meta + Datenstand unter `md` eigene Zeile, Datenstand hält vorab
   seine Breite. Kommt die Meta erst mit den Daten, hält `metaPlatzhalter` (ihre Form, Zahlen als
-  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um. Wechselt eine Kopfaktion
+  `0`) ihre Breite, sonst brechen die Aktionen nachträglich um. Wächst die Meta aus
+  mehreren Abrufen zusammen, hält die Seite den Platz ihrer späten Teile selbst, sobald sie weiß,
+  dass sie kommen (Überblick: Pegel-Notiz bei Lagekennzahl `pegel`). Wechselt eine Kopfaktion
   ihren Wortlaut mit den Daten (früher „Auflösen (noch 2 Personen)“, jetzt im ⋮), hält
   `components/BreiteHalten.tsx` die Breite der breitesten Form. `breite` Vorgabe `'voll'`, `'schmal'` nur für reine Formularseiten,
   `flaeche.seiteBreit` fällt beim Umbau.

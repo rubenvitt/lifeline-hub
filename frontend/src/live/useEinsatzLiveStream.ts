@@ -134,7 +134,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
     // `raeumeNachRechteentzug`).
     const einsatzUnerreichbar = async (): Promise<boolean> => {
       try {
-        const res = await fetch(`/api/einsaetze/${einsatzId}`, {
+        const res = await fetch(`/api/incidents/${einsatzId}`, {
           credentials: 'same-origin',
           signal: AbortSignal.timeout(15_000),
         });
@@ -190,7 +190,7 @@ export function useEinsatzLiveStream(einsatzId: number): void {
       };
     const verbinde = (beimErstenOpen: (nachFehlversuch: boolean) => void) => {
       schliessen = oeffneLiveVerbindung({
-        url: `/api/einsaetze/${einsatzId}/live`,
+        url: `/api/incidents/${einsatzId}/live`,
         listeners,
         beiWiederaufbau: mitPraesenz(vollabgleich),
         beiNachlieferung: mitPraesenz(orgAbgleich),

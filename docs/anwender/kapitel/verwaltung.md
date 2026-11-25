@@ -2,7 +2,7 @@
 titel: Verwaltung
 gruppen: [administration]
 reihenfolge: 630
-quellen: [frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, frontend/src/pages/einstellungen/AnzeigeEinstellungen.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/Anmeldeverfahren.tsx, frontend/src/einsatz/schreibrecht.ts, src/einsatz/effektiv.rs, src/einsatz/berechtigung.rs, src/org/modul_einstellung.rs, src/auth/provider/registry.rs, src/routes/ort_vorschau.rs]
+quellen: [frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, frontend/src/pages/einstellungen/AnzeigeEinstellungen.tsx, frontend/src/pages/einstellungen/EinsatzDefaults.tsx, frontend/src/pages/einstellungen/ModulEinstellungsListe.tsx, frontend/src/pages/einstellungen/Anmeldeverfahren.tsx, frontend/src/einsatz/schreibrecht.ts, src/einsatz/effektiv.rs, src/einsatz/berechtigung.rs, src/org/modul_einstellung.rs, src/auth/provider/registry.rs, src/routes/ort_vorschau.rs, src/org/einstellungen.rs, src/karte_fremdebene/abruf.rs]
 ---
 
 ## Überblick
@@ -30,7 +30,8 @@ Nachschlagen.
 
    ![Seite „Anzeige-Konventionen“ mit Darstellung und Ort-Vorschau, alle Felder auf der Vorgabe](../bilder/verwaltung/anzeige.png)
 
-4. „Speichern“ wählen. Die App meldet „Einstellungen gespeichert“.
+4. Unter „Fremdebenen“ bei Bedarf „Fremdebenen dürfen das eigene Netz abrufen“ einschalten.
+5. „Speichern“ wählen. Die App meldet „Einstellungen gespeichert“.
 
 ### Nummern, Fristen und automatische ETB-Einträge vorgeben
 
@@ -101,6 +102,19 @@ Die Ort-Vorschau nennt zu einer eingegebenen Koordinate den nächsten Ortsnamen,
 Zahlendreher auffallen. Dafür schickt der Server die Koordinate an den Dienst unter
 „Geocoder-URL“, ohne eigenen Eintrag an `https://nominatim.openstreetmap.org`. Wer keine
 Koordinaten an einen fremden Dienst geben will, trägt einen eigenen ein.
+
+### Fremdebenen im eigenen Netz
+
+Eine Fremdebene der Lagekarte kann aus einer https-Adresse stammen, die der Server selbst abruft
+(Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Ohne den Schalter „Fremdebenen dürfen
+das eigene Netz abrufen“ erreicht der Server nur öffentliche Ziele. Mit ihm darf er auch einen
+Server im lokalen Netz abrufen, etwa den der Wache; der Server selbst (localhost) und
+Link-Local-Adressen bleiben gesperrt. Der Schalter gilt für die ganze Organisation und wird bei
+jedem Abruf neu gelesen, ein Entzug wirkt also beim nächsten Abruf. Wer ihn einschaltet, erlaubt
+jedem Schreibenden im Einsatz, den Server eine Adresse im lokalen Netz ansprechen zu lassen. Beide
+Änderungen stehen im [Zugangsprotokoll](zugangsprotokoll.md). Auf einer Instanz, deren
+Organisations-Einstellungen ein Hub liefert, sperrt die Seite das Formular und damit auch diesen
+Schalter.
 
 ### Anmeldeverfahren
 

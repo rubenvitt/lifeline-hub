@@ -44,7 +44,7 @@ async fn disponieren_stamm_mit_menge_schreibt_etb() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
     )
@@ -73,7 +73,7 @@ async fn dasselbe_material_mehrfach_disponierbar() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/material"),
+            &format!("/api/incidents/{einsatz}/material"),
             &admin,
             Some(&body)
         )
@@ -85,7 +85,7 @@ async fn dasselbe_material_mehrfach_disponierbar() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/material"),
+            &format!("/api/incidents/{einsatz}/material"),
             &admin,
             Some(&body)
         )
@@ -97,7 +97,7 @@ async fn dasselbe_material_mehrfach_disponierbar() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -114,7 +114,7 @@ async fn adhoc_ohne_stamm_mit_pflicht_bezeichnung() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(
             r#"{"adhoc":{"bezeichnung":"Spende-Decken","traegerorganisation":"THW"},"menge":100}"#,
@@ -136,7 +136,7 @@ async fn menge_unter_eins_ist_400() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":0}}"#)),
     )
@@ -157,7 +157,7 @@ async fn beobachter_liest_nicht_disponiert_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/material"),
+            &format!("/api/incidents/{einsatz}/material"),
             &erika,
             None
         )
@@ -169,7 +169,7 @@ async fn beobachter_liest_nicht_disponiert_nicht() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &erika,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -187,7 +187,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/close"),
+            &format!("/api/incidents/{einsatz}/close"),
             &admin,
             None
         )
@@ -198,7 +198,7 @@ async fn disponieren_auf_abgeschlossenem_einsatz_ist_409() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -215,7 +215,7 @@ async fn menge_und_status_aenderung_schreiben_je_einen_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
     )
@@ -226,7 +226,7 @@ async fn menge_und_status_aenderung_schreiben_je_einen_etb() {
     let (status, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"menge":30,"status":"defekt"}"#),
     )
@@ -248,7 +248,7 @@ async fn ungueltiger_status_ist_400() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -257,7 +257,7 @@ async fn ungueltiger_status_ist_400() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"status":"kaputtnochmal"}"#),
     )
@@ -274,7 +274,7 @@ async fn reine_bemerkung_schreibt_keinen_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -284,7 +284,7 @@ async fn reine_bemerkung_schreibt_keinen_etb() {
     let (_, gesetzt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
     )
@@ -306,7 +306,7 @@ async fn entfernen_schreibt_etb() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -315,7 +315,7 @@ async fn entfernen_schreibt_etb() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down"),
+        &format!("/api/incidents/{einsatz}/material/{em}/stand-down"),
         &admin,
         None,
     )
@@ -348,7 +348,7 @@ async fn stamm_material_ausser_dienst_ist_422() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mid},"menge":1}}"#)),
     )
@@ -369,7 +369,7 @@ async fn org_isolation_fremdes_material_nicht_disponierbar() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(r#"{"material_id":999999}"#),
     )
@@ -385,7 +385,7 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/999999"),
+        &format!("/api/incidents/{einsatz}/material/999999"),
         &admin,
         Some(r#"{"menge":5}"#),
     )
@@ -394,7 +394,7 @@ async fn patch_und_delete_unbekannte_em_id_sind_404() {
     let (status, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/999999/stand-down"),
+        &format!("/api/incidents/{einsatz}/material/999999/stand-down"),
         &admin,
         None,
     )
@@ -411,7 +411,7 @@ async fn patch_menge_unter_eins_ist_400() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -420,7 +420,7 @@ async fn patch_menge_unter_eins_ist_400() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"menge":0}"#),
     )
@@ -437,7 +437,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat},"menge":50}}"#)),
     )
@@ -452,7 +452,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -463,7 +463,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         None,
     )
@@ -482,7 +482,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, liste_frei) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -500,7 +500,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/units/{eid}"),
+            &format!("/api/incidents/{einsatz}/units/{eid}"),
             &admin,
             None
         )
@@ -511,7 +511,7 @@ async fn material_einheit_zuordnen_freigeben_und_aufloesen() {
     let (_, liste2) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -534,7 +534,7 @@ async fn reine_bemerkung_publiziert_material_event() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -546,7 +546,7 @@ async fn reine_bemerkung_publiziert_material_event() {
     let (status, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
     )
@@ -574,7 +574,7 @@ async fn material_an_einheit_zuordnen_publiziert_material_event() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -620,7 +620,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -630,7 +630,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, gesetzt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"menge":7,"bemerkung":"Lagerhalle 2"}"#),
     )
@@ -641,7 +641,7 @@ async fn patch_null_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":null}"#),
     )
@@ -665,7 +665,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -675,7 +675,7 @@ async fn patch_leerstring_leert_bemerkung() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
     )
@@ -683,7 +683,7 @@ async fn patch_leerstring_leert_bemerkung() {
     let (_, geleert) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":"   "}"#),
     )
@@ -703,7 +703,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -713,7 +713,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"bemerkung":"Lagerhalle 2"}"#),
     )
@@ -721,7 +721,7 @@ async fn patch_ohne_bemerkung_laesst_sie_stehen() {
     let (_, unberuehrt) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         &admin,
         Some(r#"{"menge":3}"#),
     )
@@ -746,7 +746,7 @@ async fn material_disponieren(app: &axum::Router, admin: &str, einsatz: i64, bez
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         admin,
         Some(&format!(r#"{{"material_id":{mat}}}"#)),
     )
@@ -759,7 +759,7 @@ async fn create_uhs(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&format!(
             r#"{{"typ":"behandlungsplatz","bezeichnung":"{bez}"}}"#
@@ -800,7 +800,7 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
     let (s, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{an_uhs}"),
+        &format!("/api/incidents/{einsatz}/material/{an_uhs}"),
         &admin,
         Some(&format!(r#"{{"uhs_id":{uhs}}}"#)),
     )
@@ -814,7 +814,7 @@ async fn entfernen_feuert_einheit_und_uhs_nur_bei_betroffenem_material() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down"),
+                &format!("/api/incidents/{einsatz}/material/{em}/stand-down"),
                 &admin,
                 None,
             )
@@ -861,7 +861,7 @@ async fn aendern_feuert_einheit_und_uhs_nur_wenn_deren_ansicht_sich_aendert() {
             anfrage(
                 &app,
                 "PATCH",
-                &format!("/api/einsaetze/{einsatz}/material/{em}"),
+                &format!("/api/incidents/{einsatz}/material/{em}"),
                 &admin,
                 Some(&body),
             )
@@ -957,7 +957,7 @@ async fn wechsel_von_der_einheit_an_die_uhs_loest_die_einheit() {
     let em = material_disponieren(&app, &admin, einsatz, "Trage").await;
     let einheit = in_einheit(&app, &admin, einsatz, em).await;
     let uhs = create_uhs(&app, &admin, einsatz, "UHS 1").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/material/{em}");
+    let pfad = format!("/api/incidents/{einsatz}/material/{em}");
 
     let mut rx = live.abonniere(einsatz);
     let (s, json) = anfrage(
@@ -1007,7 +1007,7 @@ async fn aktion(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/{was}"),
+        &format!("/api/incidents/{einsatz}/material/{em}/{was}"),
         cookie,
         None,
     )
@@ -1018,7 +1018,7 @@ async fn bezeichnungen(app: &axum::Router, cookie: &str, einsatz: i64, query: &s
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material{query}"),
+        &format!("/api/incidents/{einsatz}/material{query}"),
         cookie,
         None,
     )
@@ -1129,7 +1129,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
+        &format!("/api/incidents/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1160,7 +1160,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
+        &format!("/api/incidents/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&vorzustand.to_string()),
     )
@@ -1171,7 +1171,7 @@ async fn herausnehmen_und_rueckgaengig_bringt_den_posten_an_seinen_ort() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
+        &format!("/api/incidents/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&zwei_orte.to_string()),
     )
@@ -1210,7 +1210,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
             anfrage(
                 &app,
                 "POST",
-                &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
+                &format!("/api/incidents/{einsatz}/material/{em}/stand-down/undo"),
                 &cookie,
                 Some(&vorzustand),
             )
@@ -1222,7 +1222,7 @@ async fn rueckgaengig_ohne_entlassenes_fahrzeug_und_nur_fuer_die_person() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles/{ef}/stand-down"),
+        &format!("/api/incidents/{einsatz}/vehicles/{ef}/stand-down"),
         &admin,
         None,
     )
@@ -1261,7 +1261,7 @@ async fn adhoc_disponieren(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         cookie,
         Some(&format!(
             r#"{{"adhoc":{{"bezeichnung":"{bezeichnung}"}},"menge":{menge}}}"#
@@ -1282,7 +1282,7 @@ async fn material_patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/material/{em}"),
         cookie,
         Some(body),
     )
@@ -1293,7 +1293,7 @@ async fn material_zeile(app: &axum::Router, cookie: &str, einsatz: i64, em: i64)
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         cookie,
         None,
     )
@@ -1329,7 +1329,7 @@ async fn adhoc_texte_ueber_der_grenze_sind_400_und_legen_nichts_an() {
         let (s, json) = anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/material"),
+            &format!("/api/incidents/{einsatz}/material"),
             &admin,
             Some(&format!(r#"{{"adhoc":{adhoc}}}"#)),
         )
@@ -1618,7 +1618,7 @@ async fn uhs_status(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64, st
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -1641,7 +1641,7 @@ async fn uhs_verortung_prueft_das_ziel() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{storniert}"),
+        &format!("/api/incidents/{einsatz}/uhs/{storniert}"),
         &admin,
         None,
     )
@@ -1730,7 +1730,7 @@ async fn aufteilen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/split"),
+        &format!("/api/incidents/{einsatz}/material/{em}/split"),
         cookie,
         Some(body),
     )
@@ -1994,7 +1994,7 @@ async fn disponieren_roh(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         cookie,
         Some(body),
     )
@@ -2275,7 +2275,7 @@ async fn br_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) -
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         cookie,
         Some(&format!(r#"{{"bezeichnung":"{bez}"}}"#)),
     )
@@ -2288,7 +2288,7 @@ async fn br_status(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, stat
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -2300,7 +2300,7 @@ async fn adhoc_fahrzeug(app: &axum::Router, cookie: &str, einsatz: i64, funkrufn
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/vehicles"),
+        &format!("/api/incidents/{einsatz}/vehicles"),
         cookie,
         Some(&format!(r#"{{"adhoc":{{"funkrufname":"{funkrufname}"}}}}"#)),
     )
@@ -2491,7 +2491,7 @@ async fn nachforderung_bis(
     let (s, n) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         Some(
             &serde_json::json!({
@@ -2524,7 +2524,7 @@ async fn nachforderung_status(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/resource-requests/{id}/status"),
+        &format!("/api/incidents/{einsatz}/resource-requests/{id}/status"),
         cookie,
         Some(&format!(r#"{{"status":"{status}"}}"#)),
     )
@@ -2536,7 +2536,7 @@ async fn load_nachforderung(app: &axum::Router, cookie: &str, einsatz: i64, id: 
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/resource-requests"),
+        &format!("/api/incidents/{einsatz}/resource-requests"),
         cookie,
         None,
     )
@@ -2567,7 +2567,7 @@ async fn posten_count(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
         let (s, json) = anfrage(
             app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/material{query}"),
+            &format!("/api/incidents/{einsatz}/material{query}"),
             cookie,
             None,
         )
@@ -2583,7 +2583,7 @@ async fn etb_count(app: &axum::Router, cookie: &str, einsatz: i64) -> usize {
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -2686,7 +2686,7 @@ async fn uebernahme_prueft_bezug_freigabe_und_zustand() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -2807,7 +2807,7 @@ async fn uebernahme_legt_einen_posten_mit_bezug_ort_und_etb_an() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/units/{aufgeloest}"),
+        &format!("/api/incidents/{einsatz}/units/{aufgeloest}"),
         &admin,
         None,
     )
@@ -3296,7 +3296,7 @@ async fn stamm_geraet_mit_bestandsnummer_nur_einmal_aktiv() {
     .await;
     assert_eq!(s, StatusCode::CREATED, "{json}");
     let stueck = json["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{einsatz}/material");
+    let pfad = format!("/api/incidents/{einsatz}/material");
     let body = format!(r#"{{"material_id":{stueck}}}"#);
 
     let (s, json) = anfrage(&app, "POST", &pfad, &admin, Some(&body)).await;
@@ -3361,7 +3361,7 @@ async fn stamm_geraet_mit_bestandsnummer_bleibt_geraet() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         Some(&format!(r#"{{"material_id":{stueck}}}"#)),
     )
@@ -3397,7 +3397,7 @@ async fn stamm_geraet_mit_bestandsnummer_bleibt_geraet() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &admin,
         None,
     )
@@ -3418,7 +3418,7 @@ async fn verknuepfen_roh(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/resource-request"),
+        &format!("/api/incidents/{einsatz}/material/{em}/resource-request"),
         cookie,
         Some(body),
     )
@@ -3533,7 +3533,7 @@ async fn verknuepfen_ohne_freigabe_der_nachforderungen_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -3740,7 +3740,7 @@ async fn loesen(app: &axum::Router, cookie: &str, einsatz: i64, em: i64) -> (Sta
     anfrage(
         app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/resource-request"),
+        &format!("/api/incidents/{einsatz}/material/{em}/resource-request"),
         cookie,
         None,
     )
@@ -3821,7 +3821,7 @@ async fn loesen_ohne_freigabe_der_nachforderungen_ist_403() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/nachforderungen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/nachforderungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -3911,7 +3911,7 @@ async fn loesen_prueft_den_posten() {
     let (_, entlassene) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/material?entlassene=1"),
+        &format!("/api/incidents/{einsatz}/material?entlassene=1"),
         &admin,
         None,
     )
@@ -3989,7 +3989,7 @@ async fn fruehere_einheiten_materialroute_ist_404_und_schreibt_nichts() {
         let (s, _) = anfrage(
             &app,
             methode,
-            &format!("/api/einsaetze/{einsatz}/units/{a}/material/{em}"),
+            &format!("/api/incidents/{einsatz}/units/{a}/material/{em}"),
             &admin,
             None,
         )
@@ -4020,7 +4020,7 @@ async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
     let (s, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/material"),
+        &format!("/api/incidents/{einsatz}/module-overrides/material"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -4039,7 +4039,7 @@ async fn ohne_freigabe_material_setzt_kein_weg_den_ort() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{a}/material/{em}"),
+        &format!("/api/incidents/{einsatz}/units/{a}/material/{em}"),
         &frieda,
         None,
     )
@@ -4060,7 +4060,7 @@ async fn ort_zuruecknehmen_nur_wenn_frei() {
     let turnhalle = create_uhs(&app, &admin, einsatz, "Turnhalle").await;
     let zelt = create_uhs(&app, &admin, einsatz, "Zelt Nord").await;
     let em = adhoc_disponieren(&app, &admin, einsatz, "Trage", 1).await;
-    let pfad = |q: &str| format!("/api/einsaetze/{einsatz}/material/{em}{q}");
+    let pfad = |q: &str| format!("/api/incidents/{einsatz}/material/{em}{q}");
     let an = |uhs: i64| format!(r#"{{"uhs_id":{uhs}}}"#);
 
     // Ohne Ort: das Rückgängig gelingt.
@@ -4277,7 +4277,7 @@ async fn material_etb_eintraege_gehen_live_hinaus() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material/{em}/stand-down/undo"),
+        &format!("/api/incidents/{einsatz}/material/{em}/stand-down/undo"),
         &admin,
         Some(&json["vorzustand"].to_string()),
     )

@@ -15,7 +15,7 @@ async fn setup() -> (axum::Router, sqlx::SqlitePool, LiveHub, String, i64, i64) 
     let (s, uhs) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs"),
+        &format!("/api/incidents/{e}/uhs"),
         &admin,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"BHP Mitte"}"#),
     )
@@ -25,7 +25,7 @@ async fn setup() -> (axum::Router, sqlx::SqlitePool, LiveHub, String, i64, i64) 
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{u}/status"),
+        &format!("/api/incidents/{e}/uhs/{u}/status"),
         &admin,
         Some(r#"{"status":"aktiv"}"#),
     )
@@ -38,7 +38,7 @@ async fn aufnehmen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (St
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -85,7 +85,7 @@ async fn aufnahme_antwort_verlauf_audit_und_live_sind_nach_commit_vollstaendig()
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -235,7 +235,7 @@ async fn aufnahme_braucht_uhs_modulzugriff_auch_beim_replay() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/unfallhilfsstellen"),
+        &format!("/api/incidents/{e}/module-overrides/unfallhilfsstellen"),
         &admin,
         Some(r#"{"sichtbar":false}"#),
     )
@@ -269,7 +269,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
             let (s, d) = anfrage(
                 &app,
                 "GET",
-                &format!("/api/einsaetze/{e}/persons/{p}"),
+                &format!("/api/incidents/{e}/persons/{p}"),
                 &admin,
                 None,
             )
@@ -299,7 +299,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, platz) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{u}/seats"),
+        &format!("/api/incidents/{e}/uhs/{u}/seats"),
         &admin,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"Platz 2"}"#),
     )
@@ -317,7 +317,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons/{p}/uhs-occupancy"),
+        &format!("/api/incidents/{e}/persons/{p}/uhs-occupancy"),
         &admin,
         Some(&json!({ "art": "wechsel", "uhs_id": u, "platz_id": platz_id }).to_string()),
     )
@@ -332,7 +332,7 @@ async fn detail_nennt_aufenthalt_mit_uhs_platz_und_seit() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons/{p}/uhs-occupancy"),
+        &format!("/api/incidents/{e}/persons/{p}/uhs-occupancy"),
         &admin,
         Some(r#"{"art":"austritt"}"#),
     )

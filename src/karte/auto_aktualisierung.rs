@@ -716,6 +716,8 @@ mod tests {
             backup_empfaenger: Default::default(),
             datentraeger: Default::default(),
             adapter: Default::default(),
+            fremdebene_abrufer: Default::default(),
+            drohne: Default::default(),
         }
     }
 

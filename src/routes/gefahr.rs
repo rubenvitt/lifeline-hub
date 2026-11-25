@@ -25,7 +25,7 @@ fn sse_gefahr(state: &AppState, einsatz_id: i64, gefahrengebiet_id: i64) {
     );
 }
 
-/// GET /api/einsaetze/{id}/hazard-areas — alle Gefahrengebiete (Übersicht/Karten-Styling).
+/// GET /api/incidents/{id}/hazard-areas — alle Gefahrengebiete (Übersicht/Karten-Styling).
 pub async fn gebiete(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Gefahrenzonen>,
@@ -36,7 +36,7 @@ pub async fn gebiete(
     ))
 }
 
-/// GET /api/einsaetze/{id}/hazard-areas/{gid}/matrix — gesetzte Zellen eines Gebiets.
+/// GET /api/incidents/{id}/hazard-areas/{gid}/matrix — gesetzte Zellen eines Gebiets.
 pub async fn matrix(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Gefahrenzonen>,
@@ -57,7 +57,7 @@ pub struct BewertungBody {
     pub gemeldet_von: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/hazard-areas/{gid}/matrix/rating — Zelle setzen (UPSERT).
+/// PUT /api/incidents/{id}/hazard-areas/{gid}/matrix/rating — Zelle setzen (UPSERT).
 pub async fn bewerten(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Gefahrenzonen>,
@@ -143,7 +143,7 @@ pub async fn bewerten(
     Ok(Json(z))
 }
 
-/// POST /api/einsaetze/{id}/hazard-areas/{gid}/assessment — Beurteilung der Matrix
+/// POST /api/incidents/{id}/hazard-areas/{gid}/assessment — Beurteilung der Matrix
 /// bestätigen (LLH-1090). Ohne Body: setzt Zeit und Person am Gebiet und schreibt atomar einen
 /// System-ETB-Eintrag; jede Bestätigung ist ein eigener Akt. Live danach `gefahr` und der Eintrag.
 pub async fn beurteilen(
@@ -186,7 +186,7 @@ pub struct UmbenennenErwartet {
     pub label: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/hazard-areas/{gid} — Label des Gefahrengebiets ändern.
+/// PATCH /api/incidents/{id}/hazard-areas/{gid} — Label des Gefahrengebiets ändern.
 pub async fn umbenennen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Gefahrenzonen>,

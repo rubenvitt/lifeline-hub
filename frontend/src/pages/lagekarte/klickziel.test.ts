@@ -363,6 +363,14 @@ describe('ordneKlickebene', () => {
     // Linie der Copernicus-Ebene (LLH-1200): ein schmales Ziel wie ein Punkt.
     expect(ordneKlickebene('fachebene-copernicus-linie')).toBe('fachebene');
     expect(ordneKlickebene('fachebene-copernicus-gebiet')).toBeNull();
+    // Fremdebenen (LLH-2099): Punkt und Linie sind schmale Ziele, die Fläche wählt das Menü.
+    expect(ordneKlickebene('fremdebene-7-punkt')).toBe('fachebene');
+    expect(ordneKlickebene('fremdebene-7-linie')).toBe('fachebene');
+    expect(ordneKlickebene('fremdebene-7-flaeche')).toBe('fachebeneFlaeche');
+    expect(ordneKlickebene('fremdebene-7-text')).toBeNull();
+    // Der Umriss einer fremden Fläche ist Kontur, kein Punktziel: er gewönne sonst in der
+    // Trefferzone eines eigenen Markers.
+    expect(ordneKlickebene('fremdebene-7-umriss')).toBeNull();
     // Die Doppelkante (LFH-600) ist Kontur, kein Ziel — die Trefferzone deckt sie ab.
     expect(ordneKlickebene('fachebene-pegelonline-kante')).toBeNull();
     expect(ordneKlickebene('fachebene-kritis-buendel-kante')).toBeNull();
@@ -391,7 +399,8 @@ describe('Klickebenen-Guard (LFH-764)', () => {
     // Die Fachebenen tragen Punkte UND Flächen — sonst prüfte der Guard nur eine Sorte.
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebene')).toBe(true);
     expect(ebenen.some((id) => ordneKlickebene(id) === 'fachebeneFlaeche')).toBe(true);
-    // Jede Punkt-Fachebene hängt ihren Klick-Hörer auch an die Trefferzone (LFH-600).
+    // Jede Punkt-Fachebene hängt ihren Klick-Hörer auch an die Trefferzone (LFH-600); die
+    // Drohnenlage tut es für ihre Fotos (LLH-2108).
     for (const def of Object.values(FACHEBENEN).filter((d) => d.geometrieTyp === 'punkt')) {
       expect(fachebeneClickLayerIds(def), def.key).toContain(`fachebene-${def.key}-treffer`);
     }

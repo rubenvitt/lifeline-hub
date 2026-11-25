@@ -55,8 +55,8 @@ function mitIosHuelleOhneServiceWorker({ push = false }: { push?: boolean } = {}
   const berichte: unknown[] = [];
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     http.post(CLIENT_FEHLER_PFAD, async ({ request }) => {
       berichte.push(await request.json());
       return new HttpResponse(null, { status: 204 });

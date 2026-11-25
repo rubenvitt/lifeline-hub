@@ -3,7 +3,7 @@ import { act, render, screen, fireEvent, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
 import { fachebeneFarbenHell } from '../../theme/tokens';
 import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
@@ -163,6 +163,84 @@ describe('FachebenenInspector', () => {
         />,
       );
       expect(screen.queryByText(/angekündigt/)).toBeNull();
+    });
+  });
+
+  describe('Vollmeldung bei warnung.bund.de (LLH-2103)', () => {
+    const vollmeldung = () =>
+      screen.queryByRole('link', { name: /Vollmeldung bei warnung\.bund\.de/ });
+
+    it('NINA-Warnung verlinkt die Vollmeldung über ihre id in neuem Tab', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Gefahrstoffaustritt', id: 'mow.DE-SL-SLS-W038-20260904-000' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const link = vollmeldung();
+      expect(link).toHaveAttribute(
+        'href',
+        'https://warnung.bund.de/meldungen/mow.DE-SL-SLS-W038-20260904-000/',
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    });
+
+    it('die id wird als Pfadsegment kodiert', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test', id: 'a/b?c' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(vollmeldung()).toHaveAttribute('href', 'https://warnung.bund.de/meldungen/a%2Fb%3Fc/');
+    });
+
+    it('ohne id kein Link', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(vollmeldung()).toBeNull();
+      expect(screen.queryByText(/Vollmeldung/)).toBeNull();
+    });
+
+    it('DWD-Warnung bekommt keinen warnung.bund.de-Link', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'FROST', id: 'x' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/Vollmeldung/)).toBeNull();
+    });
+
+    it('ohne Netz ist der Knopf gesperrt und nennt den Grund', () => {
+      setzeOnline(false);
+      try {
+        render(
+          <FachebenenInspector
+            quelle="nina"
+            properties={{ titel: 'Test', id: 'mow.X' }}
+            onSchliessen={() => {}}
+          />,
+        );
+        expect(vollmeldung()).toBeNull();
+        const knopf = screen.getByRole('button', { name: /Vollmeldung bei warnung\.bund\.de/ });
+        expect(knopf).toBeDisabled();
+        expect(screen.getByText('Ohne Netz nicht abrufbar')).toBeInTheDocument();
+        act(() => setzeOnline(true));
+        expect(vollmeldung()).not.toBeNull();
+        expect(screen.queryByText('Ohne Netz nicht abrufbar')).toBeNull();
+      } finally {
+        setzeOnline(true);
+      }
     });
   });
 
@@ -783,6 +861,78 @@ describe('FachebenenInspector — Fläche (LFH-146)', () => {
     expect(screen.queryByRole('img', { name: /Webcam-Standbild/ })).not.toBeInTheDocument();
   });
 
+  it('Autobahn/Verkehrsmeldung: Art und Reisezeitverlust stehen oben', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{
+          titel: 'A1 | Hamburg-Südost - Norderelbbrücke',
+          kategorie: 'verkehrsmeldung',
+          art: 'stau',
+          verzoegerung_min: 17,
+          richtung: 'Lübeck -> Hamburg',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.getByText('Stau · +17 min Reisezeitverlust')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A7 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: null }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Verkehrsmeldung')).toBeInTheDocument();
+    expect(screen.queryByText(/Reisezeitverlust|Stau/)).not.toBeInTheDocument();
+  });
+
+  it('Autobahn/Verkehrsmeldung: Reisezeitverlust ab einer Stunde in der Form der Dauer', () => {
+    render(
+      <FachebenenInspector
+        quelle="autobahn"
+        properties={{ titel: 'A1 | X', kategorie: 'verkehrsmeldung', verzoegerung_min: 65 }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('+1 h 05 min Reisezeitverlust')).toBeInTheDocument();
+  });
+
+  it('Lkw-Parken: Name, Autobahn, Abschnitt, Stellplätze und Ausstattung', () => {
+    const { unmount } = render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{
+          titel: 'Krummhörens Kuhlen',
+          kategorie: 'rastanlage',
+          strasse: 'A1',
+          abschnitt: 'Puttgarden',
+          pkw_stellplaetze: 18,
+          lkw_stellplaetze: 4,
+          ausstattung: ['Toilette vorhanden', 'Picknickmöglichkeiten'],
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Rastanlage')).toBeInTheDocument();
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByText('Puttgarden')).toBeInTheDocument();
+    expect(screen.getByText('Pkw 18 · Lkw 4')).toBeInTheDocument();
+    expect(screen.getByText('Toilette vorhanden')).toBeInTheDocument();
+    expect(screen.getByText('Picknickmöglichkeiten')).toBeInTheDocument();
+    unmount();
+    render(
+      <FachebenenInspector
+        quelle="autobahn_parken"
+        properties={{ titel: 'Rastanlage', kategorie: 'rastanlage', strasse: 'A7' }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText('Pkw k. A. · Lkw k. A.')).toBeInTheDocument();
+  });
+
   it('Punkt-/keine Geometrie zeigt keine Fläche', () => {
     render(
       <FachebenenInspector
@@ -1011,8 +1161,8 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
     const posts: unknown[] = [];
     let stand = liste;
     server.use(
-      http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(stand)),
-      http.post('/api/einsaetze/1/gauges', async ({ request }) => {
+      http.get('/api/incidents/1/gauges', () => HttpResponse.json(stand)),
+      http.post('/api/incidents/1/gauges', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         posts.push(body);
         stand = [...stand, { id: 99, reihenfolge: stand.length, ...body }];
@@ -1103,7 +1253,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('ein abgelehnter POST (volle Liste, 422) steht als Fehler im Panel, ohne Erfolgsmeldung', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'höchstens 5 Pegel je Einsatz' }, { status: 422 }),
       ),
     );
@@ -1119,7 +1269,7 @@ describe('FachebenenInspector — Pegel festlegen (LFH-606)', () => {
   it('Fehler und Ladezustand gehören zur Station: ein anderer Punkt zeigt sie nicht', async () => {
     stelleBereit([eintrag('00000000-0000-4000-8000-000000000001', 0)]);
     server.use(
-      http.post('/api/einsaetze/1/gauges', () =>
+      http.post('/api/incidents/1/gauges', () =>
         HttpResponse.json({ error: 'abgelehnt' }, { status: 422 }),
       ),
     );
@@ -1214,6 +1364,24 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
     expect(screen.getByText(/Aufnahme älter als 24 h/)).toBeInTheDocument();
   });
 
+  it('warnt ohne Aufnahme vor einer alten Lieferung (Altbestand, LLH-2022)', () => {
+    render(
+      <FachebenenInspector
+        quelle="copernicus"
+        properties={{
+          ...tiefe,
+          aufnahme: undefined,
+          sensor: undefined,
+          emsr: 'EMSR517',
+          geliefert: '2021-08-11 12:48:47',
+        }}
+        onSchliessen={() => {}}
+      />,
+    );
+    expect(screen.getByText(/Lieferung älter als 24 h/)).toBeInTheDocument();
+    expect(screen.queryByText(/Aufnahme älter/)).not.toBeInTheDocument();
+  });
+
   it('titelt ein Gebiet mit seinem Namen', () => {
     render(
       <FachebenenInspector
@@ -1223,5 +1391,58 @@ describe('FachebenenInspector — Copernicus (LLH-1200)', () => {
       />,
     );
     expect(screen.getByText('Auswertungsgebiet Stuttgart')).toBeInTheDocument();
+  });
+});
+
+describe('FachebenenInspector: Drohnenfoto (LLH-2108)', () => {
+  const AUFNAHME_MS = Date.parse('2026-11-24T10:15:00Z');
+  const foto = (extra: Record<string, unknown> = {}) => ({
+    quelle: 'drohne' as const,
+    einsatzId: 7,
+    properties: {
+      kind: 'photo',
+      key: 'DJI_0001 (1).JPG',
+      taken_at_ms: AUFNAHME_MS,
+      lens: 'thermal',
+      heading_deg: 90,
+      ...extra,
+    },
+    onSchliessen: () => {},
+  });
+
+  it('zeigt die vorschau über die Einsatzroute mit Linse, Aufnahmezeit und Blickrichtung', () => {
+    render(<FachebenenInspector {...foto()} />);
+    const bild = screen.getByRole('img', { name: /Drohnenfoto/ });
+    expect(bild).toHaveAttribute('src', '/api/incidents/7/drone/photos/DJI_0001%20(1).JPG/thumb');
+    expect(screen.getByText('Wärmebild')).toBeInTheDocument();
+    expect(
+      screen.getByText(zeitpunkt(new Date(AUFNAHME_MS).toISOString(), DEFAULT_KONVENTIONEN)),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Blickrichtung')).toBeInTheDocument();
+    expect(screen.getByText('90°')).toBeInTheDocument();
+  });
+
+  it('benennt die übrigen Linsen und lässt eine fehlende Blickrichtung weg', () => {
+    const { rerender } = render(<FachebenenInspector {...foto({ lens: 'wide' })} />);
+    expect(screen.getByText('Weitwinkel')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'zoom' })} />);
+    expect(screen.getByText('Zoom')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'visible' })} />);
+    expect(screen.getByText('Sichtbild')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ lens: 'unknown', heading_deg: null })} />);
+    expect(screen.getByText('unbekannte Linse')).toBeInTheDocument();
+    expect(screen.queryByText('Blickrichtung')).not.toBeInTheDocument();
+  });
+
+  it('zeigt bei einem Ladefehler den Grund, und ein anderes Foto beginnt frisch', () => {
+    const { rerender } = render(<FachebenenInspector {...foto()} />);
+    fireEvent.error(screen.getByRole('img', { name: /Drohnenfoto/ }));
+    expect(screen.queryByRole('img', { name: /Drohnenfoto/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Vorschau nicht abrufbar')).toBeInTheDocument();
+    rerender(<FachebenenInspector {...foto({ key: 'B.JPG' })} />);
+    expect(screen.getByRole('img', { name: /Drohnenfoto/ })).toHaveAttribute(
+      'src',
+      '/api/incidents/7/drone/photos/B.JPG/thumb',
+    );
   });
 });

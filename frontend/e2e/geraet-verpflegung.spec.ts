@@ -32,13 +32,13 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
   browser,
 }) => {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Verpflegung ${Date.now()}`,
   });
   const e = einsatz.id;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  await anlegen(page, `/api/einsaetze/${e}/catering/time-slots`, {
+  await anlegen(page, `/api/incidents/${e}/catering/time-slots`, {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(-30),
     bis_at: zeit(90),
@@ -47,7 +47,7 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'verpflegung', bezeichnung: 'Ausgabe Deich' },
   );
 
@@ -133,19 +133,19 @@ test('LFH-1044: Verpflegungsgerät bucht Portionen und meldet die Fehlmenge', as
 
     // Die Einsatzleitung sieht die Ausgabe in der Deckung und die Meldung mit dem Gerät als
     // Absender.
-    const verpflegung = await page.request.get(`/api/einsaetze/${e}/catering`);
+    const verpflegung = await page.request.get(`/api/incidents/${e}/catering`);
     const zf = ((await verpflegung.json()) as { zeitfenster: { ausgegeben: { gesamt: number } }[] })
       .zeitfenster[0];
     // 20 gezählt und zurückgenommen, 50 nachgetragen.
     expect(zf.ausgegeben.gesamt).toBe(50);
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
+    const meldungen = await page.request.get(`/api/incidents/${e}/reports`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(liste.find((m) => m.inhalt.startsWith('Fehlmenge Verpflegung'))?.absender).toBe(
       'Verpflegung · Ausgabe Deich',
     );
 
     // Widerruf durch die Einsatzleitung: das Gerät endet von selbst, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
+    await anlegen(page, `/api/incidents/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(tablet).toHaveURL(/\/kopplung-beendet$/);
     await expect(tablet.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
   } finally {
@@ -163,10 +163,10 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
   browser,
 }) => {
   await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
-  const { id: e } = await anlegen(page, '/api/einsaetze', {
+  const { id: e } = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Verpflegung Stellen ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/catering`;
+  const basis = `/api/incidents/${e}/catering`;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   const stelle = async (bezeichnung: string, art: string) => {
@@ -187,7 +187,7 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
     data: { stelle_ids: [feldkueche] },
   });
   expect(zuordnung.ok(), `Zuordnung: ${zuordnung.status()}`).toBeTruthy();
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'verpflegung',
     bezeichnung: 'Ausgabe Turnhalle',
   });
@@ -228,7 +228,7 @@ test('LLH-1040: Verpflegungsgerät sieht Stellen ohne Aktionen und bucht an eine
     await expect(tablet.getByText('Gebucht: 5 EP zu ‚Mittag Deich‘')).toBeVisible();
     await expect(wahl.locator('[data-lfh="ausgabe-stelle-ist"]')).toHaveText('an der Stelle 5 EP');
 
-    const antwort = await page.request.get(`/api/einsaetze/${e}/catering`);
+    const antwort = await page.request.get(`/api/incidents/${e}/catering`);
     const stand = (await antwort.json()) as {
       zeitfenster: {
         ausgaben: { menge: number; verpflegungsstelle_id: number | null }[];
@@ -267,10 +267,10 @@ test('LLH-1048: Gerät an der Feldküche sieht die Turnhalle nicht und bucht an 
   test.setTimeout(60_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenAlsAdmin(page, { startseite: false });
-  const { id: e } = await anlegen(page, '/api/einsaetze', {
+  const { id: e } = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Verpflegung an Stelle ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/catering`;
+  const basis = `/api/incidents/${e}/catering`;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
   const stelle = async (bezeichnung: string, art: string) => {

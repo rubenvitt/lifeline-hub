@@ -116,13 +116,13 @@ function antworten({
   wetter = wetterOk() as WetterAnzeige,
 } = {}) {
   server.use(
-    http.get('/api/einsaetze/1/gauges', () => HttpResponse.json(liste)),
-    http.get('/api/einsaetze/1/gauges/history', () =>
+    http.get('/api/incidents/1/gauges', () => HttpResponse.json(liste)),
+    http.get('/api/incidents/1/gauges/history', () =>
       reihen === 'fehler'
         ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
         : HttpResponse.json(reihen),
     ),
-    http.get('/api/einsaetze/1/weather', () => HttpResponse.json(wetter)),
+    http.get('/api/incidents/1/weather', () => HttpResponse.json(wetter)),
   );
 }
 

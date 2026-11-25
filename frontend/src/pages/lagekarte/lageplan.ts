@@ -139,6 +139,8 @@ export interface LageplanLegende {
   zonen: LegendenZone[];
   fachebenen: LegendenFachebene[];
   bilder: LegendenZeile[];
+  /** Gezeichnete Fremdebenen (LLH-2099) mit Ebenenfarbe, als Feld wie eine Zone. */
+  fremdebenen: LegendenZone[];
   /** Fachebenen jenseits ihrer Schwelle (LFH-591), für den Hinweis über der Legende. */
   veraltet: string[];
 }
@@ -153,6 +155,8 @@ export interface LegendenQuellen {
   abgerufen: Readonly<Partial<Record<string, string>>>;
   /** Namen der sichtbaren Bild-Hintergründe. */
   bilder: readonly { id: number; name: string }[];
+  /** Gezeichnete Fremdebenen (LLH-2099): Name und die Farbe, in der sie auf dem Bild stehen. */
+  fremdebenen: readonly { id: number; name: string; farbe: string }[];
   jetztMs: number;
   /** Uhrzeit wie im Panel der Fachebenen („1430“, am Vortag „291430“). */
   zeitKurz: (iso: string) => string;
@@ -193,7 +197,16 @@ export function lageplanLegende(q: LegendenQuellen): LageplanLegende {
     };
   });
   const bilder = q.bilder.map((b) => ({ schluessel: `bild-${b.id}`, text: b.name }));
-  return { ebenen, zonen, fachebenen, bilder, veraltet };
+  // Deckung wie die Fläche auf der Karte (`fremdebenenLayer.ts`), Umriss in derselben Farbe.
+  const fremdebenen = q.fremdebenen.map((f) => ({
+    schluessel: `fremdebene-${f.id}`,
+    text: f.name,
+    fuellung: f.farbe,
+    fuellDeckung: 0.25,
+    linie: f.farbe,
+    gestrichelt: false,
+  }));
+  return { ebenen, zonen, fachebenen, bilder, fremdebenen, veraltet };
 }
 
 /** Hinweis über der Legende, wenn eine Fachebene veraltet ist; sonst `null`. */
@@ -202,6 +215,9 @@ export function veraltetHinweis(legende: Pick<LageplanLegende, 'veraltet'>): str
   return `${legende.veraltet.length === 1 ? 'Veraltete Fachebene' : 'Veraltete Fachebenen'}: ${legende.veraltet.join(', ')}`;
 }
 
+/** Kennwort einer Fremdebene in Legende und Detailkarte: die Daten stammen nicht aus dem Einsatz. */
+export const FREMDE_DATEN = 'Fremde Daten';
+
 /** Alle Legendenzeilen als Text, in der Folge des Blatts (für das Bild der Anlage). */
 export function legendenTexte(legende: LageplanLegende): string[] {
   return [
@@ -209,5 +225,6 @@ export function legendenTexte(legende: LageplanLegende): string[] {
     ...legende.zonen.map((z) => z.text),
     ...legende.fachebenen.map((z) => z.text),
     ...legende.bilder.map((z) => `Bild: ${z.text}`),
+    ...legende.fremdebenen.map((z) => `${FREMDE_DATEN}: ${z.text}`),
   ];
 }

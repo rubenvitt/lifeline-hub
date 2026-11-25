@@ -33,7 +33,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
   const aufrufe = new Map<string, number>();
   const zaehle = (pfad: string) => aufrufe.set(pfad, (aufrufe.get(pfad) ?? 0) + 1);
   const json = (pfad: string, k: keyof EinsatzberichtRoh['quellen']) =>
-    http.get(`/api/einsaetze/${E}${pfad}`, () => {
+    http.get(`/api/incidents/${E}${pfad}`, () => {
       zaehle(pfad);
       return HttpResponse.json(wert(roh, k));
     });
@@ -45,7 +45,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     param: string,
     kBeendet: keyof EinsatzberichtRoh['quellen'],
   ) =>
-    http.get(`/api/einsaetze/${E}${pfad}`, ({ request }) => {
+    http.get(`/api/incidents/${E}${pfad}`, ({ request }) => {
       const beendet = new URL(request.url).searchParams.has(param);
       zaehle(beendet ? `${pfad}?${param}=1` : pfad);
       return HttpResponse.json(wert(roh, beendet ? kBeendet : k));
@@ -63,11 +63,11 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/personnel/timeline', 'personalPerioden'),
     json('/vehicles', 'fahrzeuge'),
     // LFH-931: die Liste trägt nur Köpfe, den Text des letzten freigegebenen Berichts das Detail.
-    http.get(`/api/einsaetze/${E}/situation-reports`, () => {
+    http.get(`/api/incidents/${E}/situation-reports`, () => {
       zaehle('/lageberichte');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').liste);
     }),
-    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, () => {
+    http.get(`/api/incidents/${E}/situation-reports/:lid`, () => {
       zaehle('/lageberichte/:lid');
       return HttpResponse.json(wert<LageberichtQuelle>(roh, 'lageberichte').letzter);
     }),
@@ -79,12 +79,12 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
     json('/care', 'betreuung'),
     json('/catering', 'verpflegung'),
     json('/etb/counts', 'etbZaehler'),
-    http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
+    http.get(`/api/incidents/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
       return HttpResponse.json(typ === 'entscheidung' ? etb.eintraege : []);
     }),
-    http.get(`/api/einsaetze/${E}/module-access`, () => HttpResponse.json(freigabenFixture())),
+    http.get(`/api/incidents/${E}/module-access`, () => HttpResponse.json(freigabenFixture())),
   );
   return aufrufe;
 }
@@ -92,7 +92,7 @@ function quellen(roh: EinsatzberichtRoh = rohBericht()) {
 /** Modulfreigaben, wie der Server sie für den Benutzer ausrechnet (LFH-669). */
 function freigaben(abweichend: Parameters<typeof freigabenFixture>[0]) {
   server.use(
-    http.get(`/api/einsaetze/${E}/module-access`, () =>
+    http.get(`/api/incidents/${E}/module-access`, () =>
       HttpResponse.json(freigabenFixture(abweichend)),
     ),
   );
@@ -217,7 +217,7 @@ describe('EinsatzberichtDruckPage', () => {
     quellen();
     let versuche = 0;
     server.use(
-      http.get(`/api/einsaetze/${E}/situation-reports`, () => {
+      http.get(`/api/incidents/${E}/situation-reports`, () => {
         versuche += 1;
         return versuche === 1
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
@@ -237,7 +237,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('ein 403 trotz Freigabe: kein Zugriff, kein Drucken', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/damages`, () =>
+      http.get(`/api/incidents/${E}/damages`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );
@@ -251,7 +251,7 @@ describe('EinsatzberichtDruckPage', () => {
     quellen();
     // So antwortet der Server nach Ablauf der Frist (`berechtigung.rs`, `darf_lesen`).
     server.use(
-      http.get(`/api/einsaetze/${E}`, () =>
+      http.get(`/api/incidents/${E}`, () =>
         HttpResponse.json({ error: 'verboten' }, { status: 403 }),
       ),
     );
@@ -278,10 +278,10 @@ describe('EinsatzberichtDruckPage', () => {
     // Der Server hat Neues; die Live-Ereignisse invalidieren Einsatzkopf und ETB.
     const roh = rohBericht();
     server.use(
-      http.get(`/api/einsaetze/${E}`, () =>
+      http.get(`/api/incidents/${E}`, () =>
         HttpResponse.json({ ...wert<object>(roh, 'einsatz'), bezeichnung: 'Umbenannt' }),
       ),
-      http.get(`/api/einsaetze/${E}/etb/counts`, () =>
+      http.get(`/api/incidents/${E}/etb/counts`, () =>
         HttpResponse.json({
           gesamt: 4,
           je_typ: {
@@ -309,7 +309,7 @@ describe('EinsatzberichtDruckPage', () => {
   it('sperrt das Drucken, solange geladen wird', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/catering`, async () => {
+      http.get(`/api/incidents/${E}/catering`, async () => {
         await delay(200);
         return HttpResponse.json({
           zeitfenster: [],

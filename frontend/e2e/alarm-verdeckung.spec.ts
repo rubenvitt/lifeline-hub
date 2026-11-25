@@ -219,7 +219,7 @@ test.describe('Alarmzone verdeckt nichts', () => {
         data: { benutzername: konto.benutzername, passwort: konto.passwort },
       });
       expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
-      const meldung = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
+      const meldung = await zweiter.post(`/api/incidents/${einsatzId}/reports`, {
         data: {
           absender: 'Abschnitt Nord',
           meldeweg: 'funk',

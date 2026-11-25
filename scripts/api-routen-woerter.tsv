@@ -25,6 +25,7 @@ area	Fläche
 areas	Bereiche
 arrival	Eintreffen
 assessment	Beurteilung
+asset	-
 assign	zuweisen
 attachments	Anhänge
 attachments.zip	Anlagen
@@ -77,12 +78,14 @@ confirm	bestätigen
 confirmers	Bestätiger
 connections	Verbindungen
 contact-person	Bezugsperson
+copernicus	-
 correct	berichtigen
 count	Anzahl
 countersign	gegenzeichnen
 counts	Zähler
 crew	Besatzung
 damages	Schäden
+data	Daten
 deactivate	deaktivieren
 decision	Entscheidung
 decline	ablehnen
@@ -100,6 +103,7 @@ distributions	Ausgaben
 districts	Bezirke
 documents	Dokumente
 download	-
+drone	Drohne
 emergency-takeover	Notübernahme
 enclosures	Anlagen eines Dokuments
 end	beenden
@@ -123,6 +127,7 @@ follow-up	Nachbereitung
 fonts	-
 forces	Kräfte
 forecast	Prognose
+foreign-layers	Fremdebenen
 free-symbols	freie Zeichen
 from-attachment	aus Anhang
 from-resource-request	aus Nachforderung
@@ -137,9 +142,11 @@ hazard-areas	Gefahrengebiete
 health	-
 helpers	Helfer
 history	Verlauf
+hls	-
 household	Haushalt
 households	Haushalte
 image	Bild
+images	Bilder
 import	-
 in-service	in Dienst
 incident-templates	Einsatzvorlagen
@@ -152,6 +159,7 @@ intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 interventions	Maßnahmen
 inventory	Bestand
+invitations	Einladungen
 ios-push	-
 jwks.json	-
 key	Schlüssel
@@ -219,6 +227,7 @@ personnel	Personal
 personnel-statuses	Personalstatus
 personnel-suggestions	Personalvorschläge
 persons	Personen
+photos	Fotos
 place-preview	Ortsvorschau
 place-search	Ortssuche
 plan	-
@@ -298,6 +307,7 @@ situation-relevant	lagerelevant
 situation-reports	Lageberichte
 situation-seen	Lage gesehen
 situation-snapshots	Lage-Snapshots
+sources	Quellen
 split	aufteilen
 sprite	-
 sprites	-
@@ -314,10 +324,12 @@ subscription	Abo
 system	-
 take-over	übernehmen
 talk-groups	Sprechgruppen
+targets	Ziele
 task	Auftrag
 tasks	Aufträge
 template	Vorlage
 test	-
+thumb	Vorschaubild
 tile	-
 tilejson	-
 tiles	-
@@ -345,6 +357,7 @@ v1	-
 vehicle-statuses	Fahrzeugstatus
 vehicle-suggestions	Fahrzeugvorschläge
 vehicles	Fahrzeuge
+video	Video
 void	aufheben
 weather	Wetter
 web-push	-

@@ -13,7 +13,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) 
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         cookie,
         Some(&json!({"typ": "behandlungsplatz", "bezeichnung": bez})),
     )
@@ -23,7 +23,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, bez: &str) 
     let (s, _) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/status"),
         cookie,
         Some(&json!({"status": "aktiv"})),
     )
@@ -37,7 +37,7 @@ async fn kraft(app: &axum::Router, cookie: &str, einsatz: i64, name: &str, posit
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&json!({"adhoc": {"name": name, "funktion": "Sanitäter", "staerke_position": position}})),
     )
@@ -50,7 +50,7 @@ async fn zuordnen(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64, ep: 
     anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces/{ep}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}/forces/{ep}"),
         cookie,
         None,
     )
@@ -62,7 +62,7 @@ async fn detail(app: &axum::Router, cookie: &str, einsatz: i64, uhs: i64) -> Val
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{uhs}"),
+        &format!("/api/incidents/{einsatz}/uhs/{uhs}"),
         cookie,
         None,
     )
@@ -79,7 +79,7 @@ async fn personal(app: &axum::Router, cookie: &str, einsatz: i64, ep: i64) -> Va
     let (_, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         None,
     )
@@ -104,7 +104,7 @@ async fn kraft_einer_einheit_zaehlt_an_der_uhs_und_bleibt_in_ihrer_einheit() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/units/{seg}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/units/{seg}/personnel/{ep}"),
         &admin,
         None,
     )
@@ -129,7 +129,7 @@ async fn kraft_einer_einheit_zaehlt_an_der_uhs_und_bleibt_in_ihrer_einheit() {
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         None,
     )
@@ -170,7 +170,7 @@ async fn kraft_ohne_position_zaehlt_an_der_uhs_als_mannschaft() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         &admin,
         Some(&json!({"adhoc": {"name": "Ohne", "funktion": "Helfer"}})),
     )
@@ -207,7 +207,7 @@ async fn position_und_wechsel_aendern_die_staerke_ohne_pflege() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/personnel/{ep}"),
+        &format!("/api/incidents/{einsatz}/personnel/{ep}"),
         &admin,
         Some(&json!({"staerke_position": "unterfuehrer"})),
     )
@@ -226,7 +226,7 @@ async fn position_und_wechsel_aendern_die_staerke_ohne_pflege() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &admin,
         None,
     )
@@ -255,7 +255,7 @@ async fn loesen_laesst_die_kraft_im_einsatz() {
         zuordnen(&app, &admin, einsatz, nord, ep).await,
         StatusCode::OK
     );
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/{ep}");
+    let pfad = format!("/api/incidents/{einsatz}/uhs/{nord}/forces/{ep}");
 
     let (s, _) = anfrage(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
@@ -267,7 +267,7 @@ async fn loesen_laesst_die_kraft_im_einsatz() {
     let (_, frei) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/available"),
+        &format!("/api/incidents/{einsatz}/uhs/{nord}/forces/available"),
         &admin,
         None,
     )
@@ -291,7 +291,7 @@ async fn adhoc_kraft_wird_disponiert_und_zugeordnet() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let nord = uhs_anlegen(&app, &admin, einsatz, "Nord").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces");
+    let pfad = format!("/api/incidents/{einsatz}/uhs/{nord}/forces");
 
     let (s, v) = anfrage_json(
         &app,
@@ -342,7 +342,7 @@ async fn aufloesen_und_stornieren_loesen_die_kraefte() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/status"),
+        &format!("/api/incidents/{einsatz}/uhs/{nord}/status"),
         &admin,
         Some(&json!({"status": "aufgeloest"})),
     )
@@ -367,7 +367,7 @@ async fn aufloesen_und_stornieren_loesen_die_kraefte() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &admin,
         Some(&json!({"typ": "patientenablage", "bezeichnung": "Süd"})),
     )
@@ -381,7 +381,7 @@ async fn aufloesen_und_stornieren_loesen_die_kraefte() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/uhs/{sued}"),
+        &format!("/api/incidents/{einsatz}/uhs/{sued}"),
         &admin,
         None,
     )
@@ -409,7 +409,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
         let (s, _) = anfrage(
             &app,
             "PUT",
-            &format!("/api/einsaetze/{einsatz}/units/{seg}/personnel/{ep}"),
+            &format!("/api/incidents/{einsatz}/units/{seg}/personnel/{ep}"),
             &admin,
             None,
         )
@@ -421,7 +421,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
         zuordnen(&app, &admin, einsatz, sued, eps[0]).await,
         StatusCode::OK
     );
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/unit/{seg}");
+    let pfad = format!("/api/incidents/{einsatz}/uhs/{nord}/forces/unit/{seg}");
 
     let (s, v) = anfrage(&app, "PUT", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -450,7 +450,7 @@ async fn ganze_einheit_zuordnen_nimmt_nur_kraefte_ohne_uhs() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/uhs/{nord}/forces/unit/999999"),
+        &format!("/api/incidents/{einsatz}/uhs/{nord}/forces/unit/999999"),
         &admin,
         None,
     )
@@ -470,7 +470,7 @@ async fn abziehen_zuruecknehmen_nur_wenn_frei() {
     let turnhalle = uhs_anlegen(&app, &admin, einsatz, "Turnhalle").await;
     let zelt = uhs_anlegen(&app, &admin, einsatz, "Zelt Nord").await;
     let ep = kraft(&app, &admin, einsatz, "Ben", "mannschaft").await;
-    let pfad = |uhs: i64, q: &str| format!("/api/einsaetze/{einsatz}/uhs/{uhs}/forces/{ep}{q}");
+    let pfad = |uhs: i64, q: &str| format!("/api/incidents/{einsatz}/uhs/{uhs}/forces/{ep}{q}");
 
     // Frei: das Rückgängig gelingt, an derselben UHS noch einmal auch.
     let (s, j) = anfrage(

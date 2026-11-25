@@ -38,8 +38,8 @@ const ZEILE: PassZeile = {
 function server_mit(status = 200) {
   const abrufe = { pass: 0 };
   server.use(
-    http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/7/persons/print', ({ request }) => {
+    http.get('/api/incidents/7', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/7/persons/print', ({ request }) => {
       if (new URL(request.url).searchParams.get('profile') !== 'pass') {
         return HttpResponse.json({ error: 'falscher Abruf' }, { status: 418 });
       }

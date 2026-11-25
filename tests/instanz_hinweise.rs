@@ -434,7 +434,7 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "GET",
-        &format!("/api/einsaetze/{}", w.einsatz),
+        &format!("/api/incidents/{}", w.einsatz),
         &elw.admin,
         None,
     )
@@ -442,7 +442,7 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["ios_push_hub_gesperrt"], erwartet, "Detail");
     let (_, liste) =
-        common::anfrage_json(&elw.app, "GET", "/api/einsaetze", &elw.admin, None).await;
+        common::anfrage_json(&elw.app, "GET", "/api/incidents", &elw.admin, None).await;
     let eintrag = liste
         .as_array()
         .unwrap()
@@ -461,7 +461,7 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     let (_, spiegel) = common::anfrage_json(
         &hub.app,
         "GET",
-        &format!("/api/einsaetze/{}", w.spiegel),
+        &format!("/api/incidents/{}", w.spiegel),
         &hub.admin,
         None,
     )
@@ -475,7 +475,7 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     let (_, v) = common::anfrage_json(
         &elw.app,
         "GET",
-        &format!("/api/einsaetze/{}", w.einsatz),
+        &format!("/api/incidents/{}", w.einsatz),
         &elw.admin,
         None,
     )
@@ -853,7 +853,7 @@ async fn die_kenntnisnahme_reist_nur_mit_gesehenen_meldungen_des_einsatzes() {
     let (s, lm) = common::anfrage_json(
         &w.elw.i.app,
         "POST",
-        &format!("/api/einsaetze/{}/reports", w.einsatz),
+        &format!("/api/incidents/{}/reports", w.einsatz),
         &w.elw.i.admin,
         Some(&json!({
             "absender": "Florian Nord 1", "meldeweg": "funk", "meldungsart": "lagemeldung",
@@ -869,7 +869,7 @@ async fn die_kenntnisnahme_reist_nur_mit_gesehenen_meldungen_des_einsatzes() {
     let (s, v) = common::anfrage_json(
         &w.elw.i.app,
         "POST",
-        &format!("/api/einsaetze/{}/situation/seen", w.einsatz),
+        &format!("/api/incidents/{}/situation/seen", w.einsatz),
         &w.elw.i.admin,
         Some(&json!({ "meldung_ids": [mid, 99_999] })),
     )

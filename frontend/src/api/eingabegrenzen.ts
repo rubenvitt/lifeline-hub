@@ -214,6 +214,8 @@ export const SCHICHTPLAN_ERZEUGEN_MAX = 100;
 export const SCHICHTPLAN_NOTIZ_MAX = 500;
 /** Größte Schichtplan-Datei zum Einlesen in Bytes, 2 MiB (LLH-1556). */
 export const SCHICHTPLAN_DATEI_MAX_BYTES = 2_097_152;
+/** Größte Stammdaten-Datei zum Einlesen in Bytes, 2 MiB (LLH-1633). */
+export const STAMMDATEN_DATEI_MAX_BYTES = 2_097_152;
 /** Name und Organisation eines Helfers des Schichtplans (LLH-1552). */
 export const SCHICHTPLAN_HELFER_TEXT_MAX = 200;
 /** Telefon eines Helfers des Schichtplans (LLH-1552). */
@@ -283,3 +285,5 @@ export const ARCHIV_BLOCK_MAX_BYTES = 268_435_456;
 export const ARCHIV_PRIVATSCHLUESSEL_MAX = 65_536;
 /** Passphrase einer geschützten Schlüsseldatei in Bytes (LLH-1711). */
 export const ARCHIV_PASSPHRASE_MAX = 1_024;
+/** Name einer Fremdebene der Lagekarte (LLH-2099), `karte_fremdebene::NAME_MAX`. */
+export const FREMDEBENE_NAME_MAX = 120;

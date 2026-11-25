@@ -33,7 +33,7 @@ async fn lokal(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         cookie,
         Some(&format!(
             r#"{{"bezeichnung":"{bezeichnung}","betriebsart":"{betriebsart}"}}"#
@@ -58,7 +58,7 @@ async fn fuehrungsstelle_zuordnen(app: &axum::Router, cookie: &str, einsatz: i64
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/command-post/talk-groups/{sg}"),
         cookie,
         None,
     )
@@ -70,7 +70,7 @@ async fn abschliessen(app: &axum::Router, admin: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         admin,
         None,
     )
@@ -289,7 +289,7 @@ async fn altbestand_wird_erkannt_und_nur_fuer_admins_gezeigt() {
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/command-post/talk-groups/{sg}"),
         &admin,
         None,
     )
@@ -318,7 +318,7 @@ async fn deaktivierte_katalog_sprechgruppe_neben_gleichnamiger_lokaler_ist_nicht
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/command-post/talk-groups/{sg}"),
+        &format!("/api/incidents/{einsatz}/command-post/talk-groups/{sg}"),
         &admin,
         None,
     )
@@ -344,7 +344,7 @@ async fn erste_skizzenlage_einer_katalog_sprechgruppe_neben_gleichnamiger_lokale
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/staff/comms-sketch/layout/sg-{sg}"),
+        &format!("/api/incidents/{einsatz}/staff/comms-sketch/layout/sg-{sg}"),
         &admin,
         Some(lage),
     )
@@ -365,7 +365,7 @@ async fn erste_skizzenlage_einer_katalog_sprechgruppe_neben_gleichnamiger_lokale
     let (status, json) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{alt}/staff/comms-sketch/layout/sg-{sg}"),
+        &format!("/api/incidents/{alt}/staff/comms-sketch/layout/sg-{sg}"),
         &admin,
         Some(lage),
     )

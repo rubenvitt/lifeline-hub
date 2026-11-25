@@ -55,7 +55,7 @@ pub struct ListeParams {
     pub status: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/resource-requests — listen (Lesezugriff, auch Beobachter).
+/// GET /api/incidents/{id}/resource-requests — listen (Lesezugriff, auch Beobachter).
 pub async fn liste(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Nachforderungen>,
@@ -75,7 +75,7 @@ pub async fn liste(
     Ok(Json(repo::list(&state.pool, einsatz_id, status).await?))
 }
 
-/// GET /api/einsaetze/{id}/resource-requests/types — übliche Arten der Organisation für
+/// GET /api/incidents/{id}/resource-requests/types — übliche Arten der Organisation für
 /// Schnellwahl und Vorschläge (LLH-1379, design.md D1–D6). Dieselbe Tür wie die Liste; gezählt
 /// wird nur über andere Einsätze der Einsatz-Org, deren Nachforderungen der Benutzer selbst lesen
 /// darf. Keine Geräteroute (D3).
@@ -207,7 +207,7 @@ async fn pruefe_betreuungsstelle(
     Ok(())
 }
 
-/// POST /api/einsaetze/{id}/resource-requests — Nachforderung absetzen (Schreibrecht + aktiv).
+/// POST /api/incidents/{id}/resource-requests — Nachforderung absetzen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Nachforderungen>,
@@ -363,7 +363,7 @@ pub struct StatusReq {
     pub status: String,
 }
 
-/// POST /api/einsaetze/{id}/resource-requests/{nid}/status — Bedarfs-Status weiterschalten.
+/// POST /api/incidents/{id}/resource-requests/{nid}/status — Bedarfs-Status weiterschalten.
 pub async fn status(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Nachforderungen>,
@@ -450,7 +450,7 @@ pub struct AblehnenReq {
     pub grund: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/resource-requests/{nid}/decline — Abzweig „abgelehnt".
+/// POST /api/incidents/{id}/resource-requests/{nid}/decline — Abzweig „abgelehnt".
 pub async fn ablehnen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Nachforderungen>,
@@ -539,7 +539,7 @@ pub struct ZusageReq {
     pub leitstelle_einsatznummer: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/resource-requests/{nid}/commitment — Zusage mit Menge, Rufnamen und
+/// POST /api/incidents/{id}/resource-requests/{nid}/commitment — Zusage mit Menge, Rufnamen und
 /// voraussichtlichem Eintreffen erfassen; eine Teilzusage teilt den Rest ab (LLH-1097 D1–D5).
 pub async fn zusage(
     State(state): State<AppState>,
@@ -596,7 +596,7 @@ pub struct ZurueckziehenReq {
     pub grund: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/resource-requests/{nid}/withdraw — die eigene Führung zieht eine
+/// POST /api/incidents/{id}/resource-requests/{nid}/withdraw — die eigene Führung zieht eine
 /// offene Nachforderung zurück (terminal, LLH-1097 D8). Keine Benachrichtigung.
 pub async fn zurueckziehen(
     State(state): State<AppState>,
@@ -668,7 +668,7 @@ pub struct PatchNachforderung {
     pub leitstelle_einsatznummer: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/resource-requests/{nid} — eine offene Nachforderung bearbeiten:
+/// PATCH /api/incidents/{id}/resource-requests/{nid} — eine offene Nachforderung bearbeiten:
 /// Anzahl, Ziel, Priorität, Details; in zugesagt/unterwegs auch Wer und Eintreffen (D9). Die Art
 /// bleibt. Ohne wirksame Änderung 200 mit dem Stand, ohne ETB.
 pub async fn bearbeiten(

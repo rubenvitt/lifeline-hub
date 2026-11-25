@@ -21,7 +21,7 @@ import type {
  * Soll und Prüfbefunden. Der Plan ist Soll, er ändert weder Zuordnung noch Fälligkeit. Jeder
  * Schreibweg eines Blocks liefert den ganzen Plan, weil sich Befunde anderer Blöcke mitändern.
  */
-const basis = (einsatzId: number) => `/api/einsaetze/${einsatzId}/reliefs/shift-plan`;
+const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/reliefs/shift-plan`;
 
 /** Ohne Freigabe des Moduls Personal sind `personen` und `helfer` `null`. */
 export function fetchSchichtplan(einsatzId: number): Promise<Schichtplan> {

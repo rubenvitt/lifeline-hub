@@ -124,30 +124,30 @@ function stelleBereit({
   const stand = { auftraege };
   server.use(
     meHandler({ ...benutzerFixture({ id: 60, anzeigename: '2. Zug · Handy' }), geraet: g }),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents/7', () =>
       HttpResponse.json(einsatzFixture({ id: 7, meine_rolle: 'fuehrungspersonal' })),
     ),
-    http.get('/api/einsaetze/7/units', () => HttpResponse.json([e])),
-    http.get('/api/einsaetze/7/sectors', () => {
+    http.get('/api/incidents/7/units', () => HttpResponse.json([e])),
+    http.get('/api/incidents/7/sectors', () => {
       abgerufen.push('abschnitte');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),
-    http.get('/api/einsaetze/7/orders', () => {
+    http.get('/api/incidents/7/orders', () => {
       abgerufen.push('befehle');
       return HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 });
     }),
     http.get('/api/vehicle-statuses', () => HttpResponse.json(KATALOG)),
-    http.get('/api/einsaetze/7/tasks', () => HttpResponse.json(stand.auftraege)),
-    http.post('/api/einsaetze/7/tasks/:aid/recipients/:eid/acknowledge', ({ params }) => {
+    http.get('/api/incidents/7/tasks', () => HttpResponse.json(stand.auftraege)),
+    http.post('/api/incidents/7/tasks/:aid/recipients/:eid/acknowledge', ({ params }) => {
       quittiert.push(`${params.aid}/${params.eid}`);
       return HttpResponse.json(stand.auftraege[0]);
     }),
-    http.put('/api/einsaetze/7/units/5/status', async ({ request }) => {
+    http.put('/api/incidents/7/units/5/status', async ({ request }) => {
       status.push(await request.json());
       return HttpResponse.json(e);
     }),
-    http.get('/api/einsaetze/7/reports', () => HttpResponse.json([])),
-    http.post('/api/einsaetze/7/reports', async ({ request }) => {
+    http.get('/api/incidents/7/reports', () => HttpResponse.json([])),
+    http.post('/api/incidents/7/reports', async ({ request }) => {
       gesendet.push(await request.json());
       return HttpResponse.json({ id: 41, lfd_nr: 5 }, { status: 201 });
     }),
@@ -247,7 +247,7 @@ describe('Einheitengerät — Vibration (Spec `benachrichtigungen`)', () => {
     renderApp('/geraet/7/status');
     expect(await screen.findByRole('heading', { level: 1, name: 'Status' })).toBeVisible();
     const strom = FakeEventSource.instanzen.find(
-      (q) => q.url === '/api/einsaetze/7/live' && !q.closed,
+      (q) => q.url === '/api/incidents/7/live' && !q.closed,
     );
     expect(strom, 'der Einsatzstrom des Geräts ist offen').toBeDefined();
     // Der Startstand ist abgerufen, bevor der neue Auftrag kommt.
@@ -409,7 +409,7 @@ describe('Einheitengerät — Melden', () => {
 
   it('meldet auch, wenn die Einheitenliste nicht kommt', async () => {
     const { gesendet } = stelleBereit();
-    server.use(http.get('/api/einsaetze/7/units', () => HttpResponse.json(null, { status: 500 })));
+    server.use(http.get('/api/incidents/7/units', () => HttpResponse.json(null, { status: 500 })));
     renderApp('/geraet/7/melden');
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Inhalt'), 'Lage ruhig');

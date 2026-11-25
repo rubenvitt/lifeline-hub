@@ -84,6 +84,8 @@ function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellun
   return {
     org_id: 1,
     aufbewahrung_kategorien: [],
+    ortung_im_einsatz: false,
+    ortung_personen: false,
     zeitzone: null,
     zeitdarstellung: null,
     einheiten: null,
@@ -96,6 +98,7 @@ function orgDefaultsMock(partial: Partial<OrgEinstellungen> = {}): OrgEinstellun
     auftrag_quittierung_frist_min: null,
     auto_etb_eintraege: null,
     geocoder_url: null,
+    fremdebenen_lan_erlaubt: false,
     geaendert_at: null,
     geaendert_von: null,
     ...partial,

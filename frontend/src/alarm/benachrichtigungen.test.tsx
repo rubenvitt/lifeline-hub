@@ -103,7 +103,7 @@ function serverMit(
   const offeneAbrufe = { anzahl: 0 };
   server.use(
     // Absender und Wortlaut einer Sofortmeldung holt die Zentrale über die Meldung (LLH-1052).
-    http.get('/api/einsaetze/:einsatzId/reports/:id', ({ params }) => {
+    http.get('/api/incidents/:einsatzId/reports/:id', ({ params }) => {
       const m = meldungen[Number(params.id)];
       return m
         ? HttpResponse.json({ id: Number(params.id), ...m })
@@ -266,7 +266,7 @@ describe('Benachrichtigungszentrale: Text, Ton und Toast (tasks.md 2.1)', () => 
     const ueberfaellig = benachrichtigung(42, 'auftrag_ueberfaellig', 'auftrag', 7);
     serverMit([ueberfaellig]);
     server.use(
-      http.get('/api/einsaetze/:id/tasks/:aid', () =>
+      http.get('/api/incidents/:id/tasks/:aid', () =>
         HttpResponse.json({
           id: 7,
           lfd_nr: 7,

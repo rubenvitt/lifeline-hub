@@ -89,7 +89,7 @@ beforeEach(async () => {
   Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
   // Die Seite lädt die Unfallhilfsstellen für `@UHS` und die Verbleib-Spalte; ohne eigene Angabe
   // gibt es keine.
-  server.use(http.get('/api/einsaetze/:einsatzId/uhs', () => HttpResponse.json([])));
+  server.use(http.get('/api/incidents/:einsatzId/uhs', () => HttpResponse.json([])));
   await queueLeerenFuerTests();
 });
 afterEach(() => {
@@ -156,10 +156,10 @@ function render(
 ) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
-    http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json(personen)),
+    http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -216,7 +216,7 @@ describe('PersonenPage', () => {
   it('LLH-1830: zeigt, solange der Einsatz lädt, schon den Seitenkopf mit Modulnamen', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => new Promise<never>(() => {})),
+      http.get('/api/incidents/1', () => new Promise<never>(() => {})),
     );
     renderMitProviders(
       <Routes>
@@ -347,7 +347,7 @@ describe('PersonenPage', () => {
   it('die Maske nennt den Folgestatus und legt mit Status „erfasst" an', async () => {
     let gesendet: { status?: string } = {};
     server.use(
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         gesendet = (await request.json()) as { status?: string };
         return HttpResponse.json({ ...person, id: 50, registrier_nr: 50 }, { status: 201 });
       }),
@@ -365,7 +365,7 @@ describe('PersonenPage', () => {
   it('„Versorgt und entlassen“ legt in drei Griffen betroffen und entlassen an', async () => {
     let gesendet: Record<string, unknown> = {};
     server.use(
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         gesendet = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(
           {
@@ -423,7 +423,7 @@ describe('PersonenPage', () => {
       name: 'Neu',
     };
     server.use(
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         const body = (await request.json()) as { status?: string; client_id?: string };
         expect(body.status).toBe('vermisst');
         expect(body.client_id).toBeTruthy();
@@ -464,7 +464,7 @@ describe('PersonenPage', () => {
     };
     let gesendet: { sichtung?: string } = {};
     server.use(
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         gesendet = (await request.json()) as { sichtung?: string };
         return HttpResponse.json(gesichtet, { status: 201 });
       }),
@@ -487,7 +487,7 @@ describe('PersonenPage', () => {
     // Die Gegenhälfte: ohne sie wäre der Fall oben auch grün, wenn dort immer ein Zusatz stünde —
     // etwa ein „undefined" aus einem fehlenden Nachschlag.
     server.use(
-      http.post('/api/einsaetze/1/persons', () =>
+      http.post('/api/incidents/1/persons', () =>
         HttpResponse.json({ ...person, id: 49, registrier_nr: 49 }, { status: 201 }),
       ),
     );
@@ -534,8 +534,8 @@ describe('PersonenPage', () => {
     let abrufe = 0;
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', async () => {
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', async () => {
         abrufe += 1;
         if (abrufe === 1) {
           ersterAbrufGestartet();
@@ -546,7 +546,7 @@ describe('PersonenPage', () => {
         await zweiterGate;
         return HttpResponse.json([alt, neu]);
       }),
-      http.post('/api/einsaetze/1/persons', () => HttpResponse.json(neu, { status: 201 })),
+      http.post('/api/incidents/1/persons', () => HttpResponse.json(neu, { status: 201 })),
     );
     const { client } = renderMitProviders(
       <Routes>
@@ -606,14 +606,14 @@ describe('PersonenPage', () => {
     });
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+      http.get('/api/incidents/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/persons', ({ params }) =>
+      http.get('/api/incidents/:einsatzId/persons', ({ params }) =>
         HttpResponse.json(params.einsatzId === '2' ? [personB] : []),
       ),
-      http.post('/api/einsaetze/1/persons', async () => {
+      http.post('/api/incidents/1/persons', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(personA, { status: 201 });
@@ -695,7 +695,7 @@ describe('PersonenPage', () => {
     };
     const post = vi.fn();
     server.use(
-      http.post('/api/einsaetze/1/persons', async ({ request }) => {
+      http.post('/api/incidents/1/persons', async ({ request }) => {
         const body = (await request.json()) as { client_id?: string; status?: string };
         post(body);
         return HttpResponse.json(vermisst, { status: 201 });
@@ -799,7 +799,7 @@ describe('PersonenPage', () => {
     ).not.toBeNull();
     // Der andere Tab hat die Person auf den Server gebracht; dieser Tab kennt sie noch nicht.
     // Die Quittung trägt nur Kennungen (LFH-941): erst das Nachladen der Liste zeigt die Zeile.
-    server.use(http.get('/api/einsaetze/1/persons', () => HttpResponse.json([crossTabPerson])));
+    server.use(http.get('/api/incidents/1/persons', () => HttpResponse.json([crossTabPerson])));
 
     const kanal = FakeBroadcastChannel.instanzen[0];
     await act(async () => {
@@ -909,11 +909,11 @@ describe('PersonenPage', () => {
     };
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+      http.get('/api/incidents/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Einsatz ${id}` });
       }),
-      http.get('/api/einsaetze/:einsatzId/persons', ({ params }) =>
+      http.get('/api/incidents/:einsatzId/persons', ({ params }) =>
         HttpResponse.json(params.einsatzId === '2' ? [personB] : []),
       ),
     );
@@ -970,7 +970,7 @@ describe('PersonenPage', () => {
   });
 
   it('leitet den Alt-Deep-Link ?person=<id> auf die Detailseite um', async () => {
-    server.use(http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)));
+    server.use(http.get('/api/incidents/1/persons/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person], '/einsaetze/1/personen?person=10');
     // Redirect → Detailseite rendert die Überschrift:
     expect(await screen.findByRole('heading', { name: /R-001/ })).toBeInTheDocument();
@@ -1020,7 +1020,7 @@ describe('PersonenPage', () => {
       antreff_ort: null,
     };
     server.use(
-      http.get('/api/einsaetze/:einsatzId/uhs', () =>
+      http.get('/api/incidents/:einsatzId/uhs', () =>
         HttpResponse.json([
           { id: 7, einsatz_id: 1, bezeichnung: 'Weserstadion', typ: 'uhs', status: 'aktiv' },
         ]),
@@ -1279,7 +1279,7 @@ describe('PersonenPage', () => {
   });
 
   it('navigiert beim Klick auf eine Zeile zur Detailseite', async () => {
-    server.use(http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(person)));
+    server.use(http.get('/api/incidents/1/persons/10', () => HttpResponse.json(person)));
     render(einsatzAktiv, [person]);
     await userEvent.click((await screen.findAllByText('Mustermann, Max'))[0]);
     // Die Detailseite zeigt den Personen-Titel als Überschrift:
@@ -1305,8 +1305,8 @@ describe('PersonenPage', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT die Leertexte', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 500 })),
     );
     renderMitProviders(
       <Routes>
@@ -1347,7 +1347,7 @@ describe('PersonenPage', () => {
     const { client } = render(einsatzAktiv, [person]);
     await screen.findByText('R-001');
 
-    server.use(http.get('/api/einsaetze/1/persons', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/persons', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.personen(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
@@ -1363,7 +1363,7 @@ describe('PersonenPage', () => {
     await screen.findByText('R-001');
 
     server.use(
-      http.get('/api/einsaetze/1/persons', () =>
+      http.get('/api/incidents/1/persons', () =>
         HttpResponse.json({ error: 'Kein Zugriff' }, { status: 403 }),
       ),
     );
@@ -1404,7 +1404,7 @@ describe('PersonenPage', () => {
         },
       ];
       server.use(
-        http.post('/api/einsaetze/1/persons', async ({ request }) => {
+        http.post('/api/incidents/1/persons', async ({ request }) => {
           koerper.push((await request.json()) as Record<string, unknown>);
           return HttpResponse.json(antworten[koerper.length - 1], { status: 201 });
         }),
@@ -1462,12 +1462,12 @@ describe('PersonenPage', () => {
     it('löst „@" auf eine UHS auf und schickt uhs_id im SELBEN POST', async () => {
       let koerper: Record<string, unknown> | undefined;
       server.use(
-        http.get('/api/einsaetze/:einsatzId/uhs', () =>
+        http.get('/api/incidents/:einsatzId/uhs', () =>
           HttpResponse.json([
             { id: 7, einsatz_id: 1, bezeichnung: 'Weserstadion', typ: 'uhs', status: 'aktiv' },
           ]),
         ),
-        http.post('/api/einsaetze/1/persons', async ({ request }) => {
+        http.post('/api/incidents/1/persons', async ({ request }) => {
           koerper = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(
             { ...person, id: 62, registrier_nr: 62, aktuelle_uhs_id: 7 },
@@ -1494,7 +1494,7 @@ describe('PersonenPage', () => {
     it('sendet bei unerkanntem Kürzel NICHT und sagt warum; der Wortlaut bleibt stehen', async () => {
       const post = vi.fn();
       server.use(
-        http.post('/api/einsaetze/1/persons', () => {
+        http.post('/api/incidents/1/persons', () => {
           post();
           return HttpResponse.json(person, { status: 201 });
         }),
@@ -1537,7 +1537,7 @@ describe('PersonenPage', () => {
     it('schickt die Koordinate aus „#lat/lon“ im SELBEN POST (LFH-613, Spec-Szenario)', async () => {
       let koerper: Record<string, unknown> | undefined;
       server.use(
-        http.post('/api/einsaetze/1/persons', async ({ request }) => {
+        http.post('/api/incidents/1/persons', async ({ request }) => {
           koerper = (await request.json()) as Record<string, unknown>;
           return HttpResponse.json(
             {
@@ -1579,7 +1579,7 @@ describe('PersonenPage', () => {
 
     it('tut bei leerer Eingabe nichts — kein POST, keine Meldung', async () => {
       const post = vi.fn();
-      server.use(http.post('/api/einsaetze/1/persons', () => (post(), HttpResponse.json(person))));
+      server.use(http.post('/api/incidents/1/persons', () => (post(), HttpResponse.json(person))));
       render(einsatzAktiv, []);
       await userEvent.type(
         await screen.findByRole('textbox', { name: 'Kurzeingabe Person' }),
@@ -1591,7 +1591,7 @@ describe('PersonenPage', () => {
 
     it('zeigt 422 mit dem Wortlaut des Servers an der Zeile und behält die Eingabe', async () => {
       server.use(
-        http.post('/api/einsaetze/1/persons', () =>
+        http.post('/api/incidents/1/persons', () =>
           HttpResponse.json({ error: 'Sichtung passt nicht zum Status' }, { status: 422 }),
         ),
       );
@@ -1643,7 +1643,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/persons/export', () => {
+      http.get('/api/incidents/1/persons/export', () => {
         abrufe += 1;
         return new HttpResponse('registrier_nr;status\nR-001;"erfasst"\n');
       }),
@@ -1674,7 +1674,7 @@ describe('PersonenPage — CSV-Export (LFH-728)', () => {
   it('zeigt den Fehler an der Seite neben dem Abschluss-Hinweis, nicht im Toast', async () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     server.use(
-      http.get('/api/einsaetze/1/persons/export', () =>
+      http.get('/api/incidents/1/persons/export', () =>
         HttpResponse.json({ error: 'Kein Zugriff auf das Modul Personen' }, { status: 403 }),
       ),
     );
@@ -1719,10 +1719,10 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
   function renderMitSuche(route: string) {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <Routes>
@@ -1761,7 +1761,7 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
   it('?ansicht=karte öffnet die Kartenansicht und lässt den Parameter stehen', async () => {
     server.use(
       http.get('/api/map/config', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/map-views', () => HttpResponse.json([])),
     );
     renderMitSuche('/einsaetze/1/personen?ansicht=karte');
     // Keine Person trägt eine Koordinate, der Einsatz keinen Ort: Leerzustand, und die Lücke ist
@@ -1806,10 +1806,10 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
     }
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -1847,10 +1847,10 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
     }
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([person, unbekannt])),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([person, unbekannt])),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     const client = neuerQueryClient();
     client.setQueryData(einsatzKeys.einsatz(1), einsatzAktiv);
@@ -1886,10 +1886,10 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
     let einsatz = einsatzAktiv;
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -1915,10 +1915,10 @@ describe('PersonenPage — Sicht in der Adresse (LFH-620, LLH-1826)', () => {
   it('ein neuer Link ?neu=1 öffnet die Maske wieder (LLH-1558)', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -1954,12 +1954,12 @@ describe('PersonenPage — Kartenansicht (LFH-613)', () => {
   function renderKarte(personen: unknown[], einsatzObj: EinsatzAnzeige = einsatzAktiv) {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json(personen)),
-      http.get('/api/einsaetze/1/animals', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/damages', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json(personen)),
+      http.get('/api/incidents/1/animals', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/damages', () => HttpResponse.json([])),
       http.get('/api/map/config', () => HttpResponse.json({})),
-      http.get('/api/einsaetze/1/map-views', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/map-views', () => HttpResponse.json([])),
     );
     return renderMitProviders(
       <>
@@ -2159,7 +2159,7 @@ describe('PersonenPage — Listenzugriffe (LFH-916)', () => {
   it('öffnet für die Einsatzleitung die Listenzugriffe erst auf Klick', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1/persons/list-accesses', () => {
+      http.get('/api/incidents/1/persons/list-accesses', () => {
         abrufe += 1;
         return HttpResponse.json([
           {
@@ -2326,10 +2326,10 @@ describe('PersonenPage · Sortieren und Filtern (LLH-1096)', () => {
   function rendereMitOrt(route = '/einsaetze/1/personen') {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([rot, gruen])),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([uhs])),
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([{ id: 30, name: 'EA Nord' }])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([rot, gruen])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([uhs])),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([{ id: 30, name: 'EA Nord' }])),
     );
     return renderMitProviders(
       <Routes>
@@ -2429,7 +2429,7 @@ describe('PersonenPage — PASS-Liste (LLH-1198)', () => {
   function zaehlePassAbrufe() {
     const abrufe = { pass: 0 };
     server.use(
-      http.get('/api/einsaetze/1/persons/export', ({ request }) => {
+      http.get('/api/incidents/1/persons/export', ({ request }) => {
         if (new URL(request.url).searchParams.get('profile') === 'pass') abrufe.pass += 1;
         return new HttpResponse('\uFEFFKennung;Name\r\n"R-001";"Muster"\r\n');
       }),
@@ -2494,7 +2494,7 @@ describe('PersonenPage — PASS-Liste (LLH-1198)', () => {
   it('ein Fehler des PASS-Exports steht an der Seite', async () => {
     vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     server.use(
-      http.get('/api/einsaetze/1/persons/export', () =>
+      http.get('/api/incidents/1/persons/export', () =>
         HttpResponse.json({ error: 'Nur für die Einsatzleitung' }, { status: 403 }),
       ),
     );

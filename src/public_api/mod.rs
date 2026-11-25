@@ -329,7 +329,7 @@ mod tests {
         assert!(is_v1("/api/v1/openapi.json"));
         assert!(!is_v1("/api/v10/x"));
         assert!(!is_v1("/api/v1x"));
-        assert!(!is_v1("/api/einsaetze"));
+        assert!(!is_v1("/api/incidents"));
     }
 
     /// Die Code-Tabelle der Beschreibung nennt genau die Werte von [`ErrorCode`], jeden mit dem

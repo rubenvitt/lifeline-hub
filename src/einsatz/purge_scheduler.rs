@@ -25,7 +25,8 @@
 //!   (`schwaerzung_nachlauf::entferne_vorgesehene`); der Tick holt Reste nach.
 //! - **Phase C**: abgelaufene Einträge des Auth-Audits und der Admin-Spur (LFH-1005), je mit
 //!   eigener Frist, an keinem Einsatz. Ebenso die Ausgangsereignisse für Fremdsysteme nach sieben
-//!   Tagen (`public_api::events::purge`, LLH-1655).
+//!   Tagen (`public_api::events::purge`, LLH-1655), und abgerufene Veranstaltungen 14 Tage nach
+//!   ihrem Ende (`veranstaltung_extern::repo::purge`, LLH-2097).
 //! - **Phase C2** (LFH-928): abgelaufene Sitzungen (`auth::session::purge_abgelaufene`), aus
 //!   demselben Grund wie Phase C.
 //! - **Phase C3** (LLH-1585): Planungen 90 Tage nach dem Ende ihres Zeitraums
@@ -362,6 +363,13 @@ async fn tick_rumpf(
     // Stunden.
     if let Err(e) = crate::public_api::einwurf::purge(pool, &crate::zeit::jetzt()).await {
         tracing::error!("Purge Einwurf-Ablage fehlgeschlagen: {e}");
+    }
+
+    // Abgerufene Veranstaltungen (LLH-2097): 14 Tage nach ihrem Ende.
+    match crate::veranstaltung_extern::repo::purge(pool, &jetzt_s).await {
+        Ok(0) => {}
+        Ok(n) => tracing::info!("Purge Phase C: {n} abgerufene Veranstaltung(en) entfernt"),
+        Err(e) => tracing::error!("Purge abgerufene Veranstaltungen fehlgeschlagen: {e}"),
     }
 
     // Admin-Spur (LFH-1005): dieselbe Lage wie das Auth-Audit, eigene, längere Frist.

@@ -64,7 +64,7 @@ fn bereinige(feld: Option<String>) -> Option<String> {
     feld.map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
 }
 
-/// POST /api/einsaetze/{id}/etb — neuen ETB-Eintrag erfassen.
+/// POST /api/incidents/{id}/etb — neuen ETB-Eintrag erfassen.
 /// Nur Erfassungsberechtigte (Einsatzleitung/Führungspersonal; die Mitarbeit nur Meldung, Lage
 /// und eigene Berichtigungen, LLH-1817), nur bei aktivem Einsatz. Der Server vergibt `lfd_nr`
 /// und `received_at` und broadcastet den fertigen Eintrag an alle SSE-Abonnenten.
@@ -311,7 +311,7 @@ async fn meldung_publizieren(
     crate::meldung::live_publikation_sicherstellen(state, &meldung).await
 }
 
-/// POST /api/einsaetze/{id}/etb/attachments — Datei für einen ETB-Eintrag hochladen (LFH-117).
+/// POST /api/incidents/{id}/etb/attachments — Datei für einen ETB-Eintrag hochladen (LFH-117).
 ///
 /// Dieselben Gates wie [`erfassen`]: Erfassungsrecht, Modul „etb", aktiver Einsatz. Die Datei
 /// ist danach ungebunden, bis ein Erfassen sie mit `anhang_ids` nennt; bleibt das aus, nimmt
@@ -336,7 +336,7 @@ pub async fn anhang_hochladen(
     Ok((StatusCode::CREATED, Json(angelegt)))
 }
 
-/// GET /api/einsaetze/{id}/etb/{eintrag_id}/attachments/{aid} — Anhang eines Eintrags laden
+/// GET /api/incidents/{id}/etb/{eintrag_id}/attachments/{aid} — Anhang eines Eintrags laden
 /// (LFH-117, design.md D6).
 ///
 /// Gates wie die Leserouten (`EinsatzLesezugriff<Etb>`: Lesezugriff inklusive Beobachter, Modul
@@ -363,7 +363,7 @@ pub async fn anhang_herunterladen(
     anhang_antwort(&state.pool, anhang_id, &req_headers, fassung).await
 }
 
-/// POST /api/einsaetze/{id}/etb/{eintrag_id}/task — aus einem ETB-Eintrag direkt einen
+/// POST /api/incidents/{id}/etb/{eintrag_id}/task — aus einem ETB-Eintrag direkt einen
 /// Auftrag/Befehl erteilen (ETB→Auftrag, LFH-112). Erzeugt einen formalen Auftrag (inkl.
 /// eigener ETB-Anordnung, Pattern B) und setzt am erzeugten Auftrag den Quellbezug
 /// `auftrag.quell_etb_eintrag_id` auf den auslösenden Eintrag. Die Auftragsfelder durchlaufen
@@ -449,7 +449,7 @@ pub struct EtbAbfrageParams {
     pub limit: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/etb — ETB-Einträge eines Einsatzes (gefiltert,
+/// GET /api/incidents/{id}/etb — ETB-Einträge eines Einsatzes (gefiltert,
 /// volltextdurchsucht, paginiert). Nur für Mitglieder (auch Beobachter).
 /// Sortierung: lfd_nr DESC (neueste zuerst); Cursor über before_lfd_nr bzw. nach oben über
 /// after_lfd_nr (beide zugleich: 422).
@@ -488,14 +488,14 @@ pub async fn liste(
     Ok(Json(repo::abfrage(&state.pool, einsatz_id, &filter).await?))
 }
 
-/// Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).
+/// Trefferzahl eines ETB-Filters (`GET /api/incidents/{id}/etb/count`).
 #[derive(Debug, serde::Serialize, utoipa::ToSchema)]
 pub struct EtbAnzahlAnzeige {
     /// Zahl der Einträge, auf die der Filter passt — ohne Seitendeckel.
     pub anzahl: i64,
 }
 
-/// GET /api/einsaetze/{id}/etb/count — wie viele Einträge der Filter von [`liste`] trifft
+/// GET /api/incidents/{id}/etb/count — wie viele Einträge der Filter von [`liste`] trifft
 /// (LFH-619, Sammeltreffer der Sprungpalette „ETB · Einträge zu … — 31 Treffer“).
 ///
 /// DIESELBEN Gates und DIESELBEN Filtermerkmale wie die Liste (`EinsatzLesezugriff<Etb>`,
@@ -513,7 +513,7 @@ pub async fn anzahl(
     Ok(Json(EtbAnzahlAnzeige { anzahl }))
 }
 
-/// GET /api/einsaetze/{id}/etb/counts — Zahl der Einträge gesamt und je Typ (LFH-612).
+/// GET /api/incidents/{id}/etb/counts — Zahl der Einträge gesamt und je Typ (LFH-612).
 ///
 /// Nimmt dieselben Filter wie [`liste`] und zählt über dieselbe Bedingung; `before_lfd_nr`
 /// und `limit` werden ignoriert (sie sind Seiten-, keine Filtermerkmale). Gates wie die
@@ -581,7 +581,7 @@ pub struct LesemarkeParams {
     pub ohne_system: bool,
 }
 
-/// GET /api/einsaetze/{id}/etb/read-marker — der eigene Lesestand (LFH-611): Marke,
+/// GET /api/incidents/{id}/etb/read-marker — der eigene Lesestand (LFH-611): Marke,
 /// Zeitpunkt der letzten Sichtung und die Zahl fremder Einträge darüber; mit
 /// `ohne_system=true` ohne Systemeinträge, wie die Vorgabe der Seite.
 pub async fn lesemarke(
@@ -595,7 +595,7 @@ pub async fn lesemarke(
     ))
 }
 
-/// POST /api/einsaetze/{id}/etb/read-marker — „alle als gesichtet markieren" (LFH-611).
+/// POST /api/incidents/{id}/etb/read-marker — „alle als gesichtet markieren" (LFH-611).
 /// Nur vorwärts; kein Live-Ereignis, die Marke gehört einer Person.
 ///
 /// 400: `bis_lfd_nr` fehlt oder ist < 1 (das Feld für sich). 422: `bis_lfd_nr` liegt über

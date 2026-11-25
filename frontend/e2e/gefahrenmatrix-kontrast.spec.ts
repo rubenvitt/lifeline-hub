@@ -29,10 +29,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 1090 ${modus} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/zones`, {
+    await post(page, `/api/incidents/${einsatzId}/zones`, {
       typ: 'gefahrengebiet',
       geometrie_typ: 'Polygon',
       geometrie: JSON.stringify({

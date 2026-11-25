@@ -35,6 +35,12 @@ describe('flaechenKennung (LFH-812)', () => {
     expect(flaechenKennung(ziel('zone', 'zonen-fill', { id: 3, label: 'X' })).text).toBe('Zone: X');
   });
 
+  it('Fremdebene (LLH-2099): „Fremde Daten“ und der Objektname', () => {
+    expect(
+      flaechenKennung(ziel('fachebene', 'fremdebene-4-flaeche', { name: 'Sperrgebiet' })),
+    ).toEqual({ art: 'Fremde Daten', titel: 'Sperrgebiet', text: 'Fremde Daten: Sperrgebiet' });
+  });
+
   it('Abschnitt', () => {
     expect(
       flaechenKennung(ziel('abschnitt', 'abschnitte-fill', { id: 9, label: 'EA 2 Süd' })),

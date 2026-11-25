@@ -17,7 +17,7 @@ async fn sprechgruppen(app: &axum::Router, cookie: &str, e: i64, n: usize) -> Ve
         let (s, j) = anfrage_json(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/talk-groups"),
+            &format!("/api/incidents/{e}/talk-groups"),
             cookie,
             Some(&json!({ "bezeichnung": format!("SG {i}"), "betriebsart": "DMO" })),
         )
@@ -32,7 +32,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, j) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/sectors"),
+        &format!("/api/incidents/{e}/sectors"),
         cookie,
         Some(&json!({ "name": "Nord" })),
     )
@@ -68,7 +68,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/sectors/{aid}"),
+        &format!("/api/incidents/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -82,7 +82,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/units/{eid}"),
+        &format!("/api/incidents/{e}/units/{eid}"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -95,7 +95,7 @@ async fn dubletten_werden_an_jedem_ziel_zu_einer_zuordnung() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/command-post"),
+        &format!("/api/incidents/{e}/command-post"),
         json!({ "sprechgruppe_ids": liste }),
     )
     .await;
@@ -123,7 +123,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, j) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/sectors"),
+        &format!("/api/incidents/{e}/sectors"),
         &admin,
         Some(&json!({ "name": "Voll", "sprechgruppe_ids": &sg[..32] })),
     )
@@ -139,7 +139,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/sectors/{aid}"),
+        &format!("/api/incidents/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": [sg[5], sg[32]] }),
     )
     .await;
@@ -153,7 +153,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, j) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/sectors"),
+        &format!("/api/incidents/{e}/sectors"),
         &admin,
         Some(&json!({ "name": "Zu viel", "sprechgruppe_ids": sg })),
     )
@@ -163,7 +163,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         &admin,
         Some(&json!({ "name": "Zug 9", "sprechgruppe_ids": sg })),
     )
@@ -173,7 +173,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/units/{eid}"),
+        &format!("/api/incidents/{e}/units/{eid}"),
         json!({ "sprechgruppe_ids": sg }),
     )
     .await;
@@ -181,7 +181,7 @@ async fn zweiunddreissig_gehen_dreiunddreissig_sind_400() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/command-post"),
+        &format!("/api/incidents/{e}/command-post"),
         json!({ "sprechgruppe_ids": sg }),
     )
     .await;
@@ -200,7 +200,7 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
     let (_, etb_vorher) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -209,7 +209,7 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
     let (s, _) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/sectors/{aid}"),
+        &format!("/api/incidents/{e}/sectors/{aid}"),
         json!({ "lagezustand": "kritisch", "sprechgruppe_ids": sg }),
     )
     .await;
@@ -224,7 +224,7 @@ async fn zu_lange_liste_verhindert_auch_den_lagewechsel() {
     let (_, etb) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &admin,
         None,
     )
@@ -255,7 +255,7 @@ async fn fremde_sprechgruppe_bleibt_422_mit_der_id() {
     let (s, j) = patch(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/sectors/{aid}"),
+        &format!("/api/incidents/{e}/sectors/{aid}"),
         json!({ "sprechgruppe_ids": [eigen, fremd, fremd] }),
     )
     .await;

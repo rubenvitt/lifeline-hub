@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 23.11.2026 (Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -16,6 +16,7 @@ stehen in den genannten Dateien und Bereichs-`AGENTS.md` und werden hier nicht w
 | 6.6 | Gerät koppeln und Funktionsansicht | `src/geraet`, `frontend/src/geraet` |
 | 6.6a | Instanzen koppeln und melden | `src/instanz`, `src/routes` |
 | 6.6b | Einsatz spiegeln und am Spiegel beantragen | `src/instanz` (`spiegel`), `src/auth`, `src/live` |
+| 6.6h | Fremdebene aus URL beim Lesen nachholen | `src/karte_fremdebene`, `src/adapter` (`ziel.rs`), `frontend/src/pages/lagekarte` |
 | 6.7 | Kartenkacheln über Proxy, Cache und Offline-Karte | `src/karte`, `karten-service` |
 | 6.8 | Benachrichtigung, Web Push und iOS-Push | `src/benachrichtigung`, `src/web_push`, `src/ios_push`, `push-relais`, `ios`, `frontend/src/alarm` |
 
@@ -114,15 +115,15 @@ sequenceDiagram
   participant DB as SQLite
   participant Hub as LiveHub (src/live)
   participant B as frontend Tab B (useEinsatzLiveStream)
-  B->>BE: GET /api/einsaetze/{id}/live (SSE, Last-Event-ID)
+  B->>BE: GET /api/incidents/{id}/live (SSE, Last-Event-ID)
   BE->>Hub: abonniere_mit_position
-  A->>BE: POST /api/einsaetze/{id}/etb {client_id, …}
+  A->>BE: POST /api/incidents/{id}/etb {client_id, …}
   BE->>DB: laden_nach_client_id, anlegen_idempotent_mit_meldung
   BE->>Hub: publiziere(einsatz_id, etb_id), nur wenn neu
   BE-->>A: 201 Created
   Hub-->>B: event: etb (nur Kennung), gefiltert nach Modulrecht
   B->>B: Sammler 300 ms, invalidateQueries([etb, id])
-  B->>BE: GET /api/einsaetze/{id}/etb
+  B->>BE: GET /api/incidents/{id}/etb
 ```
 
 - `erfassen` (`src/routes/etb.rs`) prüft Schreibfreigabe, Offline-Queue-Besitzer und
@@ -130,6 +131,10 @@ sequenceDiagram
   anderer Wortlaut darunter 409 (`CLIENT_ID_KONFLIKT`).
 - Über den Kanal geht nur die Kennung; der Client lädt mit seinen eigenen Rechten nach. Welches
   Ereignis welchem Modul gehört, legt `LiveEvent::modul_keys` fest (`src/live/mod.rs`).
+  Ergänzung zu ADR-0003 (Helfer-App, ADR-0101): `LiveEvent::Helfer` trägt kein Modul, sondern
+  ist über `LiveEvent::nur_leitung` an die Einsatzleitung gebunden. Ohne dieses Kennzeichen der
+  Verbindung erreicht es niemanden (fail-closed, `LiveNachricht::fuer_verbindung`,
+  `src/live/mod.rs`); die Variante steht im Enum-Wire-Kontrakt wie jede andere.
 - Puffer `KANAL_KAPAZITAET` und `REPLAY_KAPAZITAET` je 256, `REPLAY_KARENZ` 10 min
   (`src/live/mod.rs`). Nach einem Abriss liefert `Last-Event-ID` das Verpasste nach; nach einem
   Überlauf kommt `lagged`, und der Client gleicht alle Keys ab. Je Benutzer höchstens 16 Ströme,
@@ -150,10 +155,10 @@ sequenceDiagram
   participant BE as lifeline-hub (src/routes/praesenz.rs)
   participant Hub as LiveHub (src/live)
   participant B as frontend Tab B (useEinsatzLiveStream)
-  B->>BE: GET /api/einsaetze/{id}/live
+  B->>BE: GET /api/incidents/{id}/live
   B->>B: onopen leert den Präsenzstand
   BE-->>B: event: praesenz (Stand beim Verbinden, ohne id, nur wenn nicht leer)
-  A->>BE: PUT /api/einsaetze/{id}/presence beim Öffnen, dann alle 15 s
+  A->>BE: PUT /api/incidents/{id}/presence beim Öffnen, dann alle 15 s
   BE->>Hub: praesenz_setzen, verteilt nur bei Änderung
   Hub-->>B: event: praesenz (ganzer Stand, je Eintrag gefiltert)
   A->>BE: DELETE …/presence beim Schließen (pagehide mit keepalive)
@@ -259,14 +264,14 @@ sequenceDiagram
   participant DB as SQLite
   participant G as frontend Gerät (frontend/src/geraet)
   participant Hub as LiveHub
-  EL->>BE: POST /api/einsaetze/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
+  EL->>BE: POST /api/incidents/{id}/devices {ansicht, stelle_id, bezeichnung, laeuft_ab_at}
   BE->>DB: Gerätekonto, geraet_kopplung, Code (10 min), ETB-Systemeintrag
   BE-->>EL: 201 KopplungMitCode
   EL->>G: QR mit /koppeln#CODE
   G->>BE: POST /api/devices/pair {code}
   BE->>DB: session::anlegen_geraet (mit kopplung_id)
   BE-->>G: Cookie lifeline_sid, Neuladen auf GERAET_START_PFAD
-  G->>BE: GET /api/einsaetze/{id}/live, dann Anfragen der Ansicht
+  G->>BE: GET /api/incidents/{id}/live, dann Anfragen der Ansicht
   BE->>BE: CurrentUser: fordere_geraeteroute gegen die Routenliste
   EL->>BE: POST …/devices/{gid}/revoke
   BE->>Hub: melde_kopplung_ende
@@ -363,7 +368,7 @@ sequenceDiagram
   participant H as Hub, erreicht (src/instanz/spiegel/abgleich.rs)
   participant E as ELW, meldet sich und führt (src/instanz/spiegel/takt.rs)
   participant ER as ELW, eigener Router (src/app.rs)
-  SB->>H: POST /api/einsaetze/{id}/etb
+  SB->>H: POST /api/incidents/{id}/etb
   H->>H: antrag::schicht: Spiegel, BEANTRAGBAR, Verweise lokal → fremd
   H-->>SB: 202 {antrag: ausstehend}
   loop Tick 1 s; je Kopplung 5 s bei Aktivität, sonst Takt der Meldung
@@ -657,6 +662,49 @@ sequenceDiagram
   wieder fällig.
 - „Verbindung prüfen“ (`POST …/check`) ruft einmal ab, übernimmt nichts und lässt den Zustand;
   der Versuch steht im Verlauf (`lauf::probe`).
+
+## 6.6h Fremdebene aus URL beim Lesen nachholen
+
+Eine Fremdebene aus einer https-Adresse hat keinen Hintergrundlauf: der Server holt sie nach,
+wenn jemand ihre Daten liest (LLH-2099,
+[ADR-0102](entscheidungen/ADR-0102-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Lagekarte (useFremdebenen)
+  participant Hub as lifeline-hub (src/routes/karte_fremdebene.rs, src/karte_fremdebene/abruf.rs)
+  participant DB as SQLite (karte_fremdebene, karte_fremdebene_daten)
+  participant Q as Quelle (fremde https-Adresse)
+  loop alle 60 s, nur sichtbare URL-Ebene und sichtbarer Tab
+    FE->>Hub: GET …/map/foreign-layers/{ebeneId}/data (If-None-Match)
+    Hub->>DB: Abrufstand lesen (versucht_at, ETag, Last-Modified)
+    alt über 60 s seit dem letzten Versuch, führende Seite, Einsatz aktiv
+      Hub->>Hub: Sperre je Ebene (Single-Flight), versucht_at neu prüfen
+      Hub->>Q: bedingter Abruf über adapter::ziel (check_url, keine Weiterleitung, Deckel)
+      Q-->>Hub: 200 mit Inhalt oder 304
+      Hub->>DB: 200: normiertes GeoJSON ersetzen; immer: Abrufstand und Fehler setzen
+    end
+    Hub-->>FE: 200 mit ETag des gespeicherten Inhalts oder 304
+  end
+```
+
+- Abgerufen wird nur auf der führenden Seite eines aktiven Einsatzes: nicht am Spiegel, nicht auf der Instanz,
+  die die Führung einer anderen überlassen hat, nicht nach dem Abschluss
+  (`is_hier_abzurufen` in `src/karte_fremdebene/abruf.rs`). Dort liest ein Spiegel nur, was
+  gespeichert ist.
+- Zwischen zwei Versuchen liegen mindestens 60 s (`FRISCH_SEKUNDEN`); gleichzeitige Leser teilen
+  sich einen Abruf, weil je Ebene eine Sperre gilt und der Zeitpunkt des letzten Versuchs nach
+  dem Warten neu geprüft wird.
+- Die Antwort auf den Abruf ist bedingt (`If-None-Match`, `If-Modified-Since`): bei 304 ändert
+  sich nur der Zeitpunkt des Abrufs, bei 200 ersetzt das neu normierte GeoJSON den Inhalt und ein
+  Live-Ereignis `karte_fremdebene` geht an die Arbeitsplätze.
+- Ein gestörter Abruf setzt nur den Fehlercode an der Ebene; der letzte gute Inhalt bleibt
+  (ADR-0102). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
+  Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`), nicht aus der Ebene.
+- Den Abruf stellt der Trait `FremdebeneAbrufer` bereit, Tests setzen einen zählenden ein; die
+  URL steht nie in Log oder Fehlertext, nur `ebene_id` und der Fehlercode.
+- Beim Anlegen aus einer URL holt der Server einmal synchron (Antwort 400 mit `grund` bei Fehler,
+  ohne die URL zu nennen); eine Datei läuft durch den Virenscan (`src/anhang`) und denselben Parser.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

@@ -26,10 +26,10 @@ async function seedEinsatz(page: Page): Promise<Saat> {
     expect(antwort.ok(), `${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
     return ((await antwort.json()) as { id: number }).id;
   };
-  const einsatzId = await post('/api/einsaetze', {
+  const einsatzId = await post('/api/incidents', {
     bezeichnung: `E2E Eigene Einheit ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   return {
     einsatzId,
     post: (pfad, data) => post(`${basis}/${pfad}`, data),
@@ -74,7 +74,7 @@ test('Fahrzeug als eigene Einheit führen: die Besatzung kommt mit, das Meldebil
     region.getByRole('button', { name: `Einheit zu ${funkrufname} bearbeiten` }),
   ).toHaveText(funkrufname);
 
-  const liste = await page.request.get(`/api/einsaetze/${einsatzId}/units`);
+  const liste = await page.request.get(`/api/incidents/${einsatzId}/units`);
   expect(liste.ok()).toBeTruthy();
   const einheit = ((await liste.json()) as { id: number; name: string }[]).find(
     (e) => e.name === funkrufname,

@@ -68,23 +68,23 @@ function handlers(
   sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe],
 ) {
   return [
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
     // `?aufgeloeste=1` (LLH-1079) liefert getrennt; ohne eigenen Fall gibt es keine aufgelöste.
-    http.get('/api/einsaetze/1/units', ({ request }) =>
+    http.get('/api/incidents/1/units', ({ request }) =>
       HttpResponse.json(new URL(request.url).searchParams.has('aufgeloeste') ? [] : einheiten),
     ),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
     http.get('/api/unit-types', () =>
       HttpResponse.json([
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
       ]),
     ),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/material', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
     // Ohne aktive Vorlagen zeigt der Dialog „Einheit bilden“ kein Feld „Vorlage“ (LLH-1049).
     http.get('/api/unit-templates', () => HttpResponse.json([])),
   ];
@@ -106,7 +106,7 @@ describe('EinheitenPage · Einheit bilden (LFH-339 · C4, Befund M27)', () => {
     const angelegt: unknown[] = [];
     return {
       angelegt,
-      handler: http.post('/api/einsaetze/1/units', async ({ request }) => {
+      handler: http.post('/api/incidents/1/units', async ({ request }) => {
         const body = await request.json();
         angelegt.push(body);
         return HttpResponse.json({
@@ -243,7 +243,7 @@ describe('EinheitenPage · Einheit bilden abgelehnt (LFH-1077)', () => {
     return dialog;
   }
   const ablehnen = () =>
-    http.post('/api/einsaetze/1/units', () =>
+    http.post('/api/incidents/1/units', () =>
       HttpResponse.json({ error: 'Name bereits vergeben' }, { status: 409 }),
     );
 
@@ -262,7 +262,7 @@ describe('EinheitenPage · Einheit bilden abgelehnt (LFH-1077)', () => {
     let erster = true;
     server.use(
       ...handlers(),
-      http.post('/api/einsaetze/1/units', async () => {
+      http.post('/api/incidents/1/units', async () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Name bereits vergeben' }, { status: 409 });
@@ -340,7 +340,7 @@ describe('EinheitenPage', () => {
    */
   it('zeigt aufgelöste Einheiten eingeklappt unter der Gliederung', async () => {
     server.use(
-      http.get('/api/einsaetze/1/units', ({ request }) =>
+      http.get('/api/incidents/1/units', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('aufgeloeste')
             ? [
@@ -411,8 +411,8 @@ describe('EinheitenPage', () => {
     function zeige(...abweichungen: ReturnType<typeof http.get>[]) {
       server.use(
         ...abweichungen,
-        http.get('/api/einsaetze/1/units', () => HttpResponse.json([gruppe, zug])),
-        http.get('/api/einsaetze/1/sectors', () =>
+        http.get('/api/incidents/1/units', () => HttpResponse.json([gruppe, zug])),
+        http.get('/api/incidents/1/sectors', () =>
           HttpResponse.json([
             { id: 5, einsatz_id: 1, name: 'Nord', ueber_abschnitt_id: null, sortier: 0 },
           ]),
@@ -474,7 +474,7 @@ describe('EinheitenPage', () => {
     it('wartet auf die Abschnitte, statt die Folge nach dem Laden umzustellen', async () => {
       // Die Folge hängt am Abschnittsrang: eine Tabelle vorab in Serverfolge spränge danach um.
       zeige(
-        http.get('/api/einsaetze/1/sectors', async () => {
+        http.get('/api/incidents/1/sectors', async () => {
           await delay(300);
           return HttpResponse.json([]);
         }),
@@ -485,7 +485,7 @@ describe('EinheitenPage', () => {
     });
 
     it('scheitern die Abschnitte, steht die Gliederung trotzdem, mit Abschnitt aus der Einheit', async () => {
-      zeige(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 403 })));
+      zeige(http.get('/api/incidents/1/sectors', () => new HttpResponse(null, { status: 403 })));
       const unten = await zeileVon('Gruppe Deich');
       expect(within(unten).getByText('Nord')).toBeInTheDocument();
     });
@@ -614,7 +614,7 @@ describe('EinheitenPage', () => {
   it('eine Kennung in ?einheit= bei gescheiterter Liste der aufgelösten zeigt keinen Hinweis', async () => {
     server.use(...handlers());
     server.use(
-      http.get('/api/einsaetze/1/units', ({ request }) =>
+      http.get('/api/incidents/1/units', ({ request }) =>
         new URL(request.url).searchParams.has('aufgeloeste')
           ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
           : HttpResponse.json(einheiten),
@@ -697,19 +697,19 @@ describe('EinheitenPage · Datenzustände', () => {
   }
 
   it('gescheiterter Einsatz: der Seitenrahmen bietet den erneuten Abruf an', async () => {
-    zeige(http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/1', () => new HttpResponse(null, { status: 500 })));
     expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
   });
 
   it('gescheiterte Gliederung: Fehler statt „Noch keine Einheiten"', async () => {
-    zeige(http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })));
+    zeige(http.get('/api/incidents/1/units', () => new HttpResponse(null, { status: 500 })));
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
     expect(screen.queryByText('Noch keine Einheiten')).not.toBeInTheDocument();
   });
 
   it('leere Gliederung: Leertext mit genau EINER Primäraktion und KEINEM Fehler', async () => {
-    zeige(http.get('/api/einsaetze/1/units', () => HttpResponse.json([])));
+    zeige(http.get('/api/incidents/1/units', () => HttpResponse.json([])));
     expect(await screen.findByText('Noch keine Einheiten')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
     // Der Knopf zeigt den Weg; kein Satz, wie die Gliederung entsteht (LFH-1078).
@@ -735,7 +735,7 @@ describe('EinheitenPage · Datenzustände', () => {
     const { client } = zeige();
     await screen.findByText('1. Zug');
 
-    server.use(http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/units', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.einheiten(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
@@ -751,7 +751,7 @@ describe('EinheitenPage · Datenzustände', () => {
    */
   it('WÄHREND des Ladens behauptet nichts, dass keine Einheiten da sind', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units', async () => {
+      http.get('/api/incidents/1/units', async () => {
         await delay(300);
         return HttpResponse.json([]);
       }),
@@ -797,7 +797,7 @@ describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
     server.use(
       http.get('/api/unit-templates', () => HttpResponse.json(vorlagen)),
       ...handlers(),
-      http.post('/api/einsaetze/1/units', async ({ request }) => {
+      http.post('/api/incidents/1/units', async ({ request }) => {
         angelegt.push(await request.json());
         return HttpResponse.json({ ...einheiten[0], id: 99 });
       }),
@@ -880,7 +880,7 @@ describe('EinheitenPage · Einheit bilden aus Vorlage (LLH-1049)', () => {
 describe('EinheitenPage · Kennzeichen „nicht übernommen“ (LLH-1075, design.md D14)', () => {
   it('steht an der unangemeldeten Einheit, nicht an einer übernommenen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/units', ({ request }) =>
+      http.get('/api/incidents/1/units', ({ request }) =>
         HttpResponse.json(
           new URL(request.url).searchParams.has('aufgeloeste')
             ? []

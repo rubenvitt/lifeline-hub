@@ -53,11 +53,11 @@ export interface ZonePatch {
 }
 
 export function listeZonen(einsatzId: number): Promise<LageZone[]> {
-  return apiGet<LageZone[]>(`/api/einsaetze/${einsatzId}/zones`);
+  return apiGet<LageZone[]>(`/api/incidents/${einsatzId}/zones`);
 }
 
 export function legeZoneAn(einsatzId: number, daten: ZoneNeu): Promise<LageZone> {
-  return apiSend<LageZone>(`/api/einsaetze/${einsatzId}/zones`, 'POST', daten);
+  return apiSend<LageZone>(`/api/incidents/${einsatzId}/zones`, 'POST', daten);
 }
 
 export function aktualisiereZone(
@@ -65,9 +65,9 @@ export function aktualisiereZone(
   zid: number,
   daten: ZonePatch,
 ): Promise<LageZone> {
-  return apiSend<LageZone>(`/api/einsaetze/${einsatzId}/zones/${zid}`, 'PATCH', daten);
+  return apiSend<LageZone>(`/api/incidents/${einsatzId}/zones/${zid}`, 'PATCH', daten);
 }
 
 export function loescheZone(einsatzId: number, zid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/zones/${zid}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/zones/${zid}`, 'DELETE');
 }

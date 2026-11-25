@@ -199,7 +199,7 @@ pub struct ListeParams {
     pub betreuungsstelle_id: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/persons — Liste (optional `?status=`, `?betreuungsstelle_id=`).
+/// GET /api/incidents/{id}/persons — Liste (optional `?status=`, `?betreuungsstelle_id=`).
 /// NICHT auditiert, auch gefiltert nicht: auditiert ist das Detail, auf das die Liste führt.
 pub async fn liste(
     State(state): State<AppState>,
@@ -231,7 +231,7 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
-/// GET /api/einsaetze/{id}/persons/{pid}/state — Storno-Stand der Person für ihre offene
+/// GET /api/incidents/{id}/persons/{pid}/state — Storno-Stand der Person für ihre offene
 /// Detailseite (LLH-1832, Spec `storno-sperre`). NICHT auditiert: die Detailseite ruft ihn bei
 /// jedem `person`-Ereignis ab, das Detail selbst bleibt protokolliert und nicht live. Dieselben
 /// Schranken wie das Detail (Stellenbindung, fremder Einsatz 404); eine stornierte Person ist
@@ -247,7 +247,7 @@ pub async fn stand(
     ))
 }
 
-/// GET /api/einsaetze/{id}/persons/{pid}/row — genau die Zeile, die die Liste dieser Sitzung
+/// GET /api/incidents/{id}/persons/{pid}/row — genau die Zeile, die die Liste dieser Sitzung
 /// zeigen würde, für den Zeilenabgleich des Live-Feeds (LLH-1682, Spec `live-abgleich`). NICHT
 /// auditiert wie die Liste: jeder Tab ruft sie bei jedem `person`-Ereignis ab, das Detail
 /// schriebe dabei je Abruf eine Protokollzeile. Dieselben Schranken wie die Liste: stornierte
@@ -308,7 +308,7 @@ async fn rtw_meldung_sicherstellen(
     .await
 }
 
-/// GET /api/einsaetze/{id}/persons/uhs — die aktiven UHS als Ziel „Zur UHS“ am Einheitengerät
+/// GET /api/incidents/{id}/persons/uhs — die aktiven UHS als Ziel „Zur UHS“ am Einheitengerät
 /// (LLH-1580, Entwurf K3): nur Kennung und Bezeichnung. Am Modul Personen wie `einheiten`; nicht
 /// auditiert (kein Personenbezug).
 pub async fn uhs_ziele(
@@ -318,7 +318,7 @@ pub async fn uhs_ziele(
     Ok(Json(repo::uhs_ziele(&state.pool, ctx.einsatz.id).await?))
 }
 
-/// GET /api/einsaetze/{id}/persons/selection — Personenauswahl ohne Freitexte (LFH-940). NICHT
+/// GET /api/incidents/{id}/persons/selection — Personenauswahl ohne Freitexte (LFH-940). NICHT
 /// auditiert, wie die Liste. Geräte erreichen die Route nicht (`geraet::ALLE_GERAETE`); bekäme
 /// eines sie, gälte die Stellenbindung der Liste.
 pub async fn auswahl(
@@ -332,7 +332,7 @@ pub async fn auswahl(
     Ok(Json(liste))
 }
 
-/// GET /api/einsaetze/{id}/persons/transport-means — Vorschläge zum Rettungsmittel der
+/// GET /api/incidents/{id}/persons/transport-means — Vorschläge zum Rettungsmittel der
 /// Verbleib-Maske (LLH-1332, design.md D4). Am Modul Personen, damit auch das UHS-Gerät ohne
 /// Lesezugriff auf das Modul Fahrzeuge die Fahrzeuge im Einsatz sieht; NICHT auditiert (kein
 /// Personenbezug).
@@ -353,7 +353,7 @@ pub async fn transportmittel(
     ))
 }
 
-/// GET /api/einsaetze/{id}/persons/whereabouts-details — Angaben des maßgeblichen Verbleibs je
+/// GET /api/incidents/{id}/persons/whereabouts-details — Angaben des maßgeblichen Verbleibs je
 /// Person für den Einsatzbericht (LLH-1575, design.md D3): Rettungsmittel, „Entlassen an“, „gegen
 /// Rat“, Unterschrift. Am Modul Personen wie die Liste und wie sie NICHT auditiert (sie trägt
 /// weniger als die Liste). Geräte erreichen die Route nicht; bekäme eines sie, gälte die
@@ -369,7 +369,7 @@ pub async fn verbleib_angaben(
     Ok(Json(angaben))
 }
 
-/// GET /api/einsaetze/{id}/persons/units — Wahl der versorgenden Einheit (LLH-1567,
+/// GET /api/incidents/{id}/persons/units — Wahl der versorgenden Einheit (LLH-1567,
 /// design.md D4). Am Modul Personen wie `transportmittel`; nicht auditiert (kein Personenbezug).
 /// Nicht am gekoppelten Gerät: dort wird die Einheit nicht gesetzt.
 pub async fn einheiten(
@@ -464,7 +464,7 @@ pub struct AnlegenBody {
     pub unvertraeglichkeiten: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/persons — Person anlegen (initial erfasst/vermisst/betroffen).
+/// POST /api/incidents/{id}/persons — Person anlegen (initial erfasst/vermisst/betroffen).
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonymen ETB-Eintrag + SSE.
 ///
 /// Ohne Netz vormerkbar mit Erfassungszeit (LLH-1330): Anlage (`erfasst_at`), Erst-Sichtung,
@@ -1234,7 +1234,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(person)))
 }
 
-/// GET /api/einsaetze/{id}/persons/{pid} — Detail inkl. medizinischem Verlauf.
+/// GET /api/incidents/{id}/persons/{pid} — Detail inkl. medizinischem Verlauf.
 /// **Schreibt EINEN `detail`-Audit-Eintrag VOR der Verlauf-Anreicherung**
 /// (auch wenn der Client abbricht). Die Verlauf-Listen sind eigene Reads ohne
 /// zusätzliches Audit — der eine Audit-Eintrag steht für die gesamte Öffnung.
@@ -1246,7 +1246,7 @@ pub async fn detail(
     detail_mit_audit(&state, &ctx, person_id, "detail").await
 }
 
-/// GET /api/einsaetze/{id}/persons/{pid}/print — die Druckansicht einer Person (LLH-1120, Spec
+/// GET /api/incidents/{id}/persons/{pid}/print — die Druckansicht einer Person (LLH-1120, Spec
 /// `druck-dokumente`, „Druckansicht einer Person“): dasselbe Detail, aber im Zugriffsprotokoll
 /// als `druck` mit `person_id` (die CHECK-Liste aus 0141 erlaubt die Art). Muster wie
 /// `…/personen/druck` neben der Liste: ein eigener Pfad statt eines Query-Parameters, damit
@@ -1551,7 +1551,7 @@ pub(crate) fn pruefe_geburtsdatum(roh: &str, heute: chrono::NaiveDate) -> Result
     Ok(roh.to_owned())
 }
 
-/// PATCH /api/einsaetze/{id}/persons/{pid} — Identitäts-/Kontextfelder bearbeiten.
+/// PATCH /api/incidents/{id}/persons/{pid} — Identitäts-/Kontextfelder bearbeiten.
 /// Schreibberechtigt + aktiver Einsatz. Kein ETB-Eintrag (E‑1-Felder sind keine
 /// besondere Kategorie; aktueller Datensatz genügt).
 pub async fn aktualisieren(
@@ -1728,7 +1728,7 @@ pub struct StatusBody {
     pub status: String,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/status — validierter Status-Wechsel.
+/// POST /api/incidents/{id}/persons/{pid}/status — validierter Status-Wechsel.
 /// Unbekannter Zielstatus → 400; nicht erlaubter Übergang → 422; inzwischen von anderer Seite
 /// geändert → 409. Schreibt pseudonyme ETB-Spur + SSE; der Wechsel auf vermisst alarmiert
 /// (`vermisstenmeldung`, LLH-1425).
@@ -1795,7 +1795,7 @@ pub async fn status_wechsel(
     Ok(Json(repo::laden(&state.pool, einsatz_id, person_id).await?))
 }
 
-/// DELETE /api/einsaetze/{id}/persons/{pid} — Stornieren (Soft-Delete).
+/// DELETE /api/incidents/{id}/persons/{pid} — Stornieren (Soft-Delete).
 /// Schreibberechtigt + aktiver Einsatz. Schreibt pseudonyme ETB-Spur + SSE.
 pub async fn stornieren(
     State(state): State<AppState>,
@@ -1898,7 +1898,7 @@ pub struct SichtungBody {
     pub client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/triage — Sichtung erfassen.
+/// POST /api/incidents/{id}/persons/{pid}/triage — Sichtung erfassen.
 /// Schreibberechtigt + aktiv. Hebt `erfasst→betroffen` (Annahme 5); bei
 /// `vermisst`/`abgemeldet` → 422; bei storniert → 409. Sichtung=`tot` ändert
 /// den Admin-Status NICHT (Annahme 4). Pseudonyme ETB-Spur + SSE.
@@ -2089,7 +2089,7 @@ pub(crate) fn replay_an_person<T>(
     }
 }
 
-/// GET /api/einsaetze/{id}/persons/confirmers — Auswahl „Bestätigt von“ am Gerät (LFH-1046,
+/// GET /api/incidents/{id}/persons/confirmers — Auswahl „Bestätigt von“ am Gerät (LFH-1046,
 /// Spec `geraete-kopplung`): das Personal des Einsatzes mit Name und Funktion. Nur für
 /// UHS-Geräte (Routenliste in `src/geraet/mod.rs`); eine Person bestätigt durch ihre eigene
 /// Anmeldung und bekommt 403.
@@ -2105,7 +2105,7 @@ pub async fn bestaetiger(
     ))
 }
 
-/// GET /api/einsaetze/{id}/persons/{pid}/audit — Lese-Audit der Person, samt den Listenzugriffen
+/// GET /api/incidents/{id}/persons/{pid}/audit — Lese-Audit der Person, samt den Listenzugriffen
 /// aus ihrem Erfassungsfenster (LFH-916, design.md D3). Nur Einsatzleitung. Selbst NICHT
 /// auditiert (kein detail-Eintrag).
 pub async fn audit(
@@ -2122,7 +2122,7 @@ pub async fn audit(
     ))
 }
 
-/// GET /api/einsaetze/{id}/persons/list-accesses — Zugriffe auf die ganze Personenliste
+/// GET /api/incidents/{id}/persons/list-accesses — Zugriffe auf die ganze Personenliste
 /// (Export, Druck), neueste zuerst (LFH-916, Spec `personen-zugriffsprotokoll`). Gate wie
 /// `audit`: nur Einsatzleitung, selbst NICHT auditiert.
 pub async fn listenzugriffe(
@@ -2178,7 +2178,7 @@ fn is_pass_profile(params: &ExportParams) -> Result<bool, AppError> {
     }
 }
 
-/// GET /api/einsaetze/{id}/persons/export — CSV aller (nicht-stornierten)
+/// GET /api/incidents/{id}/persons/export — CSV aller (nicht-stornierten)
 /// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
 ///
 /// Mit `?profile=pass` (LLH-1198, Entwurf `2026-11-24-sco62ku3-pass-liste`): die PASS-Liste als
@@ -2220,7 +2220,7 @@ pub async fn export(
         .into_response())
 }
 
-/// GET /api/einsaetze/{id}/persons/print — Personenliste für die Druckansicht (LFH-727,
+/// GET /api/incidents/{id}/persons/print — Personenliste für die Druckansicht (LFH-727,
 /// `openspec/changes/archive/2026-10-01-lfh-727-druck-modul-listen/design.md` D1). Dieselbe Menge und dasselbe Gate
 /// wie die Liste, aber **protokolliert**: erst der `druck`-Eintrag (person_id = NULL), dann die
 /// Daten. Scheitert der Eintrag, verlässt keine Person den Server; ein Fehler danach hinterlässt
@@ -2284,7 +2284,7 @@ pub struct VerbleibBody {
     pub unterschrift: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/whereabouts — Verbleib-Ereignis erfassen.
+/// POST /api/incidents/{id}/persons/{pid}/whereabouts — Verbleib-Ereignis erfassen.
 /// Schreibberechtigt + aktiv. Cache-Kurzform via `VerbleibArt::kurzform`. Pseudonyme ETB-Spur + SSE.
 ///
 /// LFH-674 (design.md D2): ein Verweis auf eine Betreuungsstelle wird in fester Reihenfolge
@@ -2697,7 +2697,7 @@ pub struct NotizBody {
     pub client_id: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/notes — append-only Befundnotiz.
+/// POST /api/incidents/{id}/persons/{pid}/notes — append-only Befundnotiz.
 /// Schreibberechtigt + aktiv. **KEIN ETB-Eintrag** (besondere Kategorie). SSE.
 ///
 /// Ohne Netz vormerkbar (LLH-1138, Spec `personen-verlauf`): Replay derselben `client_id` vor
@@ -2761,7 +2761,7 @@ pub struct AbgleichBody {
     pub gefunden_person_id: i64,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/matches — Verdachts-Link anlegen.
+/// POST /api/incidents/{id}/persons/{pid}/matches — Verdachts-Link anlegen.
 /// `pid` = vermisste Person. Schreibberechtigt + aktiver Einsatz. KEIN ETB; SSE für beide Personen.
 pub async fn abgleich_anlegen(
     State(state): State<AppState>,
@@ -2809,7 +2809,7 @@ pub struct EntscheidungBody {
     pub entscheidung: String,
 }
 
-/// POST /api/einsaetze/{id}/persons/{pid}/matches/{aid}/decision — bestätigen
+/// POST /api/incidents/{id}/persons/{pid}/matches/{aid}/decision — bestätigen
 /// oder verwerfen. **Nur Einsatzleitung** (Annahme 8). Routing-Invariante:
 /// `abgleich.vermisst_person_id == pid`, sonst `404`. Nur aus `verdacht` heraus
 /// (sonst `409`). Bei `bestaetigt`: Vermisstmeldung → `abgemeldet` + pseudonyme

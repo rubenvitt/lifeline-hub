@@ -37,7 +37,7 @@ pub struct ListeParams {
     pub limit: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/reminders — Erinnerungen listen (Lesezugriff). Ohne Parameter nur
+/// GET /api/incidents/{id}/reminders — Erinnerungen listen (Lesezugriff). Ohne Parameter nur
 /// offene; `phase=abgeschlossen` seitenweise (Spec `meldungen-blaettern`).
 pub async fn liste(
     State(state): State<AppState>,
@@ -74,7 +74,7 @@ pub async fn liste(
     Ok(Json(liste))
 }
 
-/// GET /api/einsaetze/{id}/reminders/metrics — offen und abgeschlossen (LFH-940).
+/// GET /api/incidents/{id}/reminders/metrics — offen und abgeschlossen (LFH-940).
 pub async fn kennzahlen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Erinnerungen>,
@@ -109,7 +109,7 @@ fn parse_faellig(roh: &str) -> Result<String, AppError> {
     crate::zeit::im_jahresbereich(normal, "Fälligkeit")
 }
 
-/// POST /api/einsaetze/{id}/reminders — Erinnerung anlegen (Schreibrecht + aktiv).
+/// POST /api/incidents/{id}/reminders — Erinnerung anlegen (Schreibrecht + aktiv).
 pub async fn anlegen(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
@@ -223,7 +223,7 @@ async fn fordere_bearbeitbar(
     Ok(())
 }
 
-/// POST /api/einsaetze/{id}/reminders/{eid}/complete — Status → erledigt.
+/// POST /api/incidents/{id}/reminders/{eid}/complete — Status → erledigt.
 pub async fn erledigen(
     state: State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
@@ -232,7 +232,7 @@ pub async fn erledigen(
     abschliessen(state, ctx, pfad, STATUS_ERLEDIGT).await
 }
 
-/// POST /api/einsaetze/{id}/reminders/{eid}/acknowledge — Status → quittiert.
+/// POST /api/incidents/{id}/reminders/{eid}/acknowledge — Status → quittiert.
 pub async fn quittieren(
     state: State<AppState>,
     ctx: EinsatzSchreibzugriff<Erinnerungen>,
@@ -273,7 +273,7 @@ async fn abschliessen(
     Ok(Json(r))
 }
 
-/// POST /api/einsaetze/{id}/reminders/{eid}/reopen — Rücknahme von
+/// POST /api/incidents/{id}/reminders/{eid}/reopen — Rücknahme von
 /// Erledigt/Quittiert (LFH-343 · C8, Befund H50).
 ///
 /// Der Gegenweg zur Direktaktion ohne Rückfrage: beide Knöpfe schalten seither mit

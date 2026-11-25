@@ -36,8 +36,8 @@ interface Anfrage {
   body: unknown;
 }
 
-const B = '/api/einsaetze/7/care';
-const E = '/api/einsaetze/7/evacuation';
+const B = '/api/incidents/7/care';
+const E = '/api/incidents/7/evacuation';
 
 /** Fängt jede Anfrage unter beiden Modulpfaden und antwortet mit `{ ok: true }`. */
 function faengeAnfragen(): Anfrage[] {

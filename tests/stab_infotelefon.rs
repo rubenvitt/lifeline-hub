@@ -1,5 +1,5 @@
 //! Integrationstests des Informationstelefons (LFH-554) unter
-//! `/api/einsaetze/{id}/staff/info-line`: Statuscodes, Rechte, Lebenszyklus, Live. Seit
+//! `/api/incidents/{id}/staff/info-line`: Statuscodes, Rechte, Lebenszyklus, Live. Seit
 //! i6k6mzed (design.md D3) ist es das eigene Modul `infotelefon`; der Pfad bleibt. Die
 //! Fachlogik prüft `src/infotelefon/repo/tests.rs`.
 
@@ -11,7 +11,7 @@ mod common;
 use common::*;
 
 fn pfad(e: i64) -> String {
-    format!("/api/einsaetze/{e}/staff/info-line")
+    format!("/api/incidents/{e}/staff/info-line")
 }
 
 const RUECKRUF: &str = r#"{"anliegen":"vermisstensuche","notiz":"sucht Vater","anrufer_name":"K. Meyer","rueckruf":"0171 000000","rueckruf_noetig":true}"#;
@@ -168,7 +168,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )
@@ -266,7 +266,7 @@ async fn override_setzen(
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         cookie,
         Some(&format!(
             r#"{{"sichtbar":{sichtbar},"benoetigte_rolle":{rolle}}}"#
@@ -330,7 +330,7 @@ async fn ohne_stab_bleibt_das_infotelefon_nutzbar() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/staff"),
+        &format!("/api/incidents/{e}/staff"),
         &frieda,
         None,
     )
@@ -379,7 +379,7 @@ async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         &frieda,
         None,
     )
@@ -397,7 +397,7 @@ async fn live_ereignis_nur_an_leser_mit_recht_infotelefon() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(r#"{"name":"Muster","vorname":"Max"}"#),
     )

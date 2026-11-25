@@ -13,6 +13,7 @@ import { SeitenSkeleton } from './components/SeitenZustand';
 import LoginPage from './pages/LoginPage';
 import AppAnmeldungPage from './pages/AppAnmeldungPage';
 import KoppelnPage from './geraet/KoppelnPage';
+import HelferWeichePage from './geraet/HelferWeichePage';
 import KopplungBeendetPage from './geraet/KopplungBeendetPage';
 import GeraeteLayout, {
   GeraetAbschnittRahmen,
@@ -153,6 +154,7 @@ import {
   BENACHRICHTIGUNGEN_PFAD,
   HILFE_PFAD,
   KOPPELN_PFAD,
+  HELFER_PFAD,
   EXTERN_PFAD,
   KOPPLUNG_BEENDET_PFAD,
 } from './routing/deeplinks';
@@ -332,6 +334,8 @@ export const appRouten = createRoutesFromElements(
     {/* Gerätekopplung (LFH-892): Einlösen und Ende ohne Sitzung, ohne Anmeldung für Personen. */}
     <Route path={KOPPELN_PFAD} element={<KoppelnPage />} />
     <Route path={KOPPLUNG_BEENDET_PFAD} element={<KopplungBeendetPage />} />
+    {/* Weiche der Helfer-App: ohne Sitzung, ohne Abruf, der Code steht im Fragment. */}
+    <Route path={HELFER_PFAD} element={<HelferWeichePage />} />
     {/* Lagebild für Externe (LLH-1496): ohne Sitzung, der Schlüssel steht im Fragment. */}
     <Route
       path={EXTERN_PFAD}

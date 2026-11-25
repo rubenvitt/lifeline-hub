@@ -36,13 +36,13 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 891 ${modus} ${Date.now()}`,
     });
-    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
+    const kraft = await post(page, `/api/incidents/${einsatzId}/personnel`, {
       adhoc: { name: 'Albers, Anna', funktion: 'Truppführung', traegerorganisation: 'FF Muster' },
     });
-    const fahrzeug = await post(page, `/api/einsaetze/${einsatzId}/vehicles`, {
+    const fahrzeug = await post(page, `/api/incidents/${einsatzId}/vehicles`, {
       adhoc: { funkrufname: 'Florian Muster 1', fahrzeugtyp: 'LF 20' },
     });
 
@@ -70,10 +70,10 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 1022 ${modus} ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/persons`;
+    const basis = `/api/incidents/${einsatzId}/persons`;
     const gefunden = await post(page, basis, { name: 'Gefunden, Greta', sichtung: 'sk1' });
     const vermisst = await post(page, basis, { name: 'Vermisst, Volker', status: 'vermisst' });
     await post(page, `${basis}/${vermisst.id}/matches`, { gefunden_person_id: gefunden.id });

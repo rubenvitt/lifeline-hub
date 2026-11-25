@@ -735,13 +735,31 @@ describe('naechstesMerkmal (Review LFH-650)', () => {
   });
 });
 
+describe('Veraltete automatische Position (Helfer-App)', () => {
+  it('trägt Deckkraft und Untertitel an das Feature, die Plakette bekommt eine zweite Zeile', () => {
+    const fc = baueMarkerFc([
+      mk({
+        schluessel: 'fahrzeug-1',
+        typ: 'fahrzeug',
+        label: 'Florian 1',
+        untertitel: 'Helfer-App · vor 6 min',
+        deckkraft: 0.5,
+      }),
+      mk({ schluessel: 'fahrzeug-2', typ: 'fahrzeug', label: 'Florian 2' }),
+    ]);
+    expect(fc.features[0].properties.deckkraft).toBe(0.5);
+    expect(fc.features[0].properties.beschriftung).toBe('Florian 1\nHelfer-App · vor 6 min');
+    expect('deckkraft' in fc.features[1].properties).toBe(false);
+    expect(fc.features[1].properties.beschriftung).toBe('Florian 2');
+  });
+});
+
 describe('Gedämpfte Kräfte im Fokus auf einen Abschnitt (LLH-1057)', () => {
   /** Deckkraft-Ausdruck: gedämpft der Bruchteil, sonst der volle Wert. */
   const deckkraft = (voll: number) => [
-    'case',
-    ['==', ['get', 'gedaempft'], true],
-    voll * GEDAEMPFT_DECKKRAFT,
-    voll,
+    '*',
+    ['case', ['==', ['get', 'gedaempft'], true], voll * GEDAEMPFT_DECKKRAFT, voll],
+    ['coalesce', ['get', 'deckkraft'], 1],
   ];
 
   it('trägt `gedaempft` nur an gedämpften Markern als Feature-Property', () => {

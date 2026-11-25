@@ -22,7 +22,7 @@ const CSV: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stad
 const XLSX: &[u8] = include_bytes!("../frontend/public/beispiele/schichtplan-stadtfest.xlsx");
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs/shift-plan")
+    format!("/api/incidents/{einsatz}/reliefs/shift-plan")
 }
 
 /// Demo-Lage Stadtfest importieren; liefert den Einsatz.
@@ -161,7 +161,7 @@ async fn beispieldatei_stadtfest_mit_vorschau_und_zweiter_lauf_ohne_aenderung() 
     let (_, einheiten) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         &admin,
         None,
     )
@@ -371,7 +371,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
             let (s, _) = anfrage(
                 &app,
                 "PUT",
-                &format!("/api/einsaetze/{e}/module-overrides/{modul}"),
+                &format!("/api/incidents/{e}/module-overrides/{modul}"),
                 &admin,
                 Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
             )
@@ -399,7 +399,7 @@ async fn rechte_und_abgeschlossener_einsatz() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         None,
     )

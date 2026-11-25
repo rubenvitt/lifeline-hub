@@ -39,16 +39,16 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
 }) => {
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR ${Date.now()}` });
+  const einsatz = await anlegen(page, '/api/incidents', { bezeichnung: `E2E BR ${Date.now()}` });
   const e = einsatz.id;
-  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const sportplatz = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/staging-areas`, { bezeichnung: 'BR Schule' });
-  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'LF Nord' });
+  await anlegen(page, `/api/incidents/${e}/staging-areas`, { bezeichnung: 'BR Schule' });
+  await anlegen(page, `/api/incidents/${e}/units`, { name: 'LF Nord' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: sportplatz.id, bezeichnung: 'Tablet BR' },
   );
 
@@ -115,9 +115,9 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     await expect(tablet.getByText('Raum voll, weitere Kräfte zum BR Schule')).toBeVisible();
 
     // Die Einsatzleitung sieht den Raum als Status „aktiv“ und die Meldung mit dem Raum als Absender.
-    const raum = await page.request.get(`/api/einsaetze/${e}/staging-areas/${sportplatz.id}`);
+    const raum = await page.request.get(`/api/incidents/${e}/staging-areas/${sportplatz.id}`);
     expect(((await raum.json()) as { status: string }).status).toBe('aktiv');
-    const meldungen = await page.request.get(`/api/einsaetze/${e}/reports`);
+    const meldungen = await page.request.get(`/api/incidents/${e}/reports`);
     const liste = (await meldungen.json()) as { inhalt: string; absender: string }[];
     expect(
       liste.find((m) => m.inhalt === 'Raum voll, weitere Kräfte zum BR Schule')?.absender,
@@ -128,7 +128,7 @@ test('LFH-1042: BR-Tablet nimmt den Raum in Betrieb, meldet Kräfte an und ab un
     const kopf = tablet.locator('[data-lfh="kopf-stelle"]');
     await expect(kopf).toContainText('BR Sportplatz');
     const umbenannt = await page.request.patch(
-      `/api/einsaetze/${e}/staging-areas/${sportplatz.id}`,
+      `/api/incidents/${e}/staging-areas/${sportplatz.id}`,
       { data: { bezeichnung: 'BR Festwiese' } },
     );
     expect(umbenannt.ok(), `${umbenannt.status()} ${await umbenannt.text()}`).toBeTruthy();
@@ -158,26 +158,26 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
   test.setTimeout(120_000);
   await anmeldenAlsAdmin(page);
   const e = (
-    await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E BR Material ${Date.now()}` })
+    await anlegen(page, '/api/incidents', { bezeichnung: `E2E BR Material ${Date.now()}` })
   ).id;
-  const sportplatz = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const sportplatz = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  const schule = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const schule = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Schule',
   });
-  await anlegen(page, `/api/einsaetze/${e}/material`, {
+  await anlegen(page, `/api/incidents/${e}/material`, {
     adhoc: { bezeichnung: 'Rettungsdecke' },
     art: 'verbrauchsgut',
     menge: 10,
     br_id: sportplatz.id,
   });
-  await anlegen(page, `/api/einsaetze/${e}/material`, {
+  await anlegen(page, `/api/incidents/${e}/material`, {
     adhoc: { bezeichnung: 'Trage' },
     br_id: schule.id,
   });
-  await anlegen(page, `/api/einsaetze/${e}/material`, { adhoc: { bezeichnung: 'Stromerzeuger' } });
-  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/einsaetze/${e}/devices`, {
+  await anlegen(page, `/api/incidents/${e}/material`, { adhoc: { bezeichnung: 'Stromerzeuger' } });
+  const kopplung = await anlegen<{ code: { code: string } }>(page, `/api/incidents/${e}/devices`, {
     ansicht: 'bereitstellungsraum',
     stelle_id: sportplatz.id,
     bezeichnung: 'Tablet BR',
@@ -201,12 +201,12 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
     await expect(sektion.getByRole('button')).toHaveCount(0);
 
     // Ordnet die Führung einen Posten zu, steht er live am Tablet.
-    const strom = (await (await page.request.get(`/api/einsaetze/${e}/material`)).json()) as {
+    const strom = (await (await page.request.get(`/api/incidents/${e}/material`)).json()) as {
       id: number;
       bezeichnung: string;
     }[];
     const id = strom.find((m) => m.bezeichnung === 'Stromerzeuger')!.id;
-    const zugeordnet = await page.request.patch(`/api/einsaetze/${e}/material/${id}`, {
+    const zugeordnet = await page.request.patch(`/api/incidents/${e}/material/${id}`, {
       data: { br_id: sportplatz.id },
     });
     expect(zugeordnet.ok(), `${zugeordnet.status()} ${await zugeordnet.text()}`).toBeTruthy();
@@ -231,21 +231,21 @@ test('LLH-1252: BR-Tablet zeigt das Material seines Raums nur lesend', async ({
 test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ page, browser }) => {
   test.setTimeout(180_000);
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E BR Tor ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const raum = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
+  await anlegen(page, `/api/incidents/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Nord' });
-  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Musterstadt' });
+  await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Nord' });
+  await anlegen(page, `/api/incidents/${e}/units`, { name: 'HLF Musterstadt' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
 
@@ -290,7 +290,7 @@ test('LLH-1075: Eintreffen am Tablet, Übernahme durch die Führung', async ({ p
   }
 
   // Die Führung am Desktop.
-  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as {
+  const einheiten = (await (await page.request.get(`/api/incidents/${e}/units`)).json()) as {
     id: number;
     name: string;
   }[];
@@ -335,25 +335,25 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
 }) => {
   test.setTimeout(180_000);
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E BR offline ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const raum = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
+  await anlegen(page, `/api/incidents/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'LF Nachbarort' });
+  await anlegen(page, `/api/incidents/${e}/units`, { name: 'LF Nachbarort' });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
   const einheitenNamens = async (name: string) =>
     (
-      (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as { name: string }[]
+      (await (await page.request.get(`/api/incidents/${e}/units`)).json()) as { name: string }[]
     ).filter((x) => x.name === name).length;
 
   const kontext = await browser.newContext({ viewport: { width: 1024, height: 768 } });
@@ -382,14 +382,14 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     await expect(belegung.getByText('LF Nachbarort', { exact: true })).toBeVisible();
 
     // Abgerissene Antwort: der Server bucht, die Antwort erreicht das Tablet nicht.
-    const pfad = `/api/einsaetze/${e}/staging-areas/${raum.id}/arrival`;
+    const pfad = `/api/incidents/${e}/staging-areas/${raum.id}/arrival`;
     const angekommen: number[] = [];
     tablet.on('response', (r) => {
       if (new URL(r.url()).pathname === pfad) angekommen.push(r.status());
     });
     let ersterStatus = 0;
     await tablet.route(
-      `**/api/einsaetze/${e}/staging-areas/${raum.id}/arrival`,
+      `**/api/incidents/${e}/staging-areas/${raum.id}/arrival`,
       async (route) => {
         ersterStatus = (await route.fetch()).status();
         await route.abort('connectionreset');
@@ -417,7 +417,7 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
   }
 
   expect(await einheitenNamens('Florian Nachbar 7'), 'genau eine Einheit').toBe(1);
-  const meldungen = (await (await page.request.get(`/api/einsaetze/${e}/reports`)).json()) as {
+  const meldungen = (await (await page.request.get(`/api/incidents/${e}/reports`)).json()) as {
     inhalt: string;
   }[];
   expect(
@@ -425,7 +425,7 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
     'genau eine Meldung an die Einsatzleitung',
   ).toHaveLength(1);
   const detail = (await (
-    await page.request.get(`/api/einsaetze/${e}/staging-areas/${raum.id}`)
+    await page.request.get(`/api/incidents/${e}/staging-areas/${raum.id}`)
   ).json()) as { einheiten: { name: string }[] };
   expect(detail.einheiten.map((x) => x.name).sort()).toEqual([
     'Florian Nachbar 7',
@@ -447,26 +447,26 @@ test('LLH-1075 Teil III: Eintreffen ohne Netz, nach abgerissener Antwort genau e
 test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ page, browser }) => {
   test.setTimeout(180_000);
   await anmeldenAlsAdmin(page);
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E BR Abruf ${Date.now()}`,
   });
   const e = einsatz.id;
-  const raum = await anlegen(page, `/api/einsaetze/${e}/staging-areas`, {
+  const raum = await anlegen(page, `/api/incidents/${e}/staging-areas`, {
     bezeichnung: 'BR Sportplatz',
   });
-  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/status`, {
+  await anlegen(page, `/api/incidents/${e}/staging-areas/${raum.id}/status`, {
     status: 'aktiv',
   });
-  const deich = await anlegen(page, `/api/einsaetze/${e}/sectors`, { name: 'EA Deich' });
-  const hlf = await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'HLF Deich' });
-  await anlegen(page, `/api/einsaetze/${e}/staging-areas/${raum.id}/occupancy`, {
+  const deich = await anlegen(page, `/api/incidents/${e}/sectors`, { name: 'EA Deich' });
+  const hlf = await anlegen(page, `/api/incidents/${e}/units`, { name: 'HLF Deich' });
+  await anlegen(page, `/api/incidents/${e}/staging-areas/${raum.id}/occupancy`, {
     objekt_typ: 'einheit',
     objekt_id: hlf.id,
     art: 'eintritt',
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'bereitstellungsraum', stelle_id: raum.id, bezeichnung: 'Tablet Tor' },
   );
 
@@ -524,7 +524,7 @@ test('LLH-1085: Führung ruft ab, das Tablet bucht das Ausrücken', async ({ pag
   }
 
   // Unterstellt und in keinem Raum mehr.
-  const einheiten = (await (await page.request.get(`/api/einsaetze/${e}/units`)).json()) as {
+  const einheiten = (await (await page.request.get(`/api/incidents/${e}/units`)).json()) as {
     id: number;
     abschnitt_id: number | null;
     aktueller_br_id: number | null;

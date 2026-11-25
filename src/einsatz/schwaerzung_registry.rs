@@ -695,6 +695,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0377): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("fahrzeug_id", G_FK),
@@ -748,6 +751,55 @@ pub const TABELLEN: &[TabellenRegel] = &[
         spalten: &[
             scrub("bild_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
             scrub("daten", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
+        // Fremdebene der Lagekarte (LLH-2099/LLH-2100, Migration 0373): Freitext sind der Name und
+        // die Adresse der URL-Ebene (sie kann ein Geheimnis im Query tragen). `url` ist nullbar,
+        // aber ein CHECK verlangt sie bei `quelle = 'url'` → `PlatzhalterWennGesetzt`. Der Rest
+        // ist Struktur und Abrufstand; `fehler` ist ein Code, nie der Text des Ziels.
+        tabelle: "karte_fremdebene",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            scrub("name", Strategie::Platzhalter, Z_EINSATZ),
+            retain("quelle", G_ENUM),
+            scrub("url", Strategie::PlatzhalterWennGesetzt, Z_EINSATZ),
+            retain("farbe", G_ENUM),
+            retain("angelegt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("geaendert_at", G_ZEIT),
+            retain(
+                "quelle_etag",
+                "Validator der Quelle für den bedingten Abruf (technisch, kein Personenbezug)",
+            ),
+            retain("quelle_last_modified", G_ZEIT),
+            retain("abgerufen_at", G_ZEIT),
+            retain("versucht_at", G_ZEIT),
+            retain("fehler", G_ENUM),
+        ],
+    },
+    TabellenRegel {
+        // Inhalt einer Fremdebene: fremde Objekte mit Name und Beschreibung, die Personen nennen
+        // können („Sammelstelle Fam. Müller“). Ganze Zeile löschen, kein Skelett; die Ebene
+        // selbst bleibt mit geschwärztem Namen stehen. Im atomaren Vorgang, nicht im Nachlauf:
+        // höchstens 8 MiB je Ebene statt der 25 MiB eines Bilds.
+        tabelle: "karte_fremdebene_daten",
+        scoping: Scoping::UeberParent {
+            fk: "ebene_id",
+            parent: "karte_fremdebene",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("ebene_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("geojson", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("sha256", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("objekte", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("verworfen", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
     TabellenRegel {
@@ -1162,6 +1214,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_von", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
@@ -1238,6 +1293,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
@@ -3111,6 +3169,21 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("freigegeben_at", G_ZEIT),
         ],
     },
+    // ---------- Zuschaltung einer Drohnenquelle (LLH-2105, migrations/0373_adapter_einsatz.sql) ----------
+    // Ohne Personenbezug: welcher Adapter einem Einsatz zugeschaltet ist, seit wann und ob der
+    // Lagemonitor ihn zeigt. Aus der Drohnenlage selbst wird nichts gespeichert.
+    TabellenRegel {
+        tabelle: "adapter_einsatz",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("adapter_id", G_FK),
+            retain("einsatz_id", G_SCOPE),
+            retain("zugeschaltet_at", G_ZEIT),
+            retain("lagemonitor", G_KONFIG),
+        ],
+    },
     // ---------- Lagebild für Externe (LLH-1496, migrations/0319) ----------
     TabellenRegel {
         tabelle: "lagebild_freigabe",
@@ -3169,7 +3242,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("uhs_id", G_FK),
             retain(
                 "bezeichnung",
-                "Gerätename (operatives Label wie „Tablet 1“, kein Personenbezug)",
+                "Gerätename (operatives Label wie „Tablet 1“, kein Personenbezug); bei der \
+                 Helfer-Kopplung fest „Helfer“, ihr Name steht in `anzeigename`",
             ),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
@@ -3183,6 +3257,38 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abschnitt_id", G_FK),
             retain("verpflegungsstelle_id", G_FK),
             retain("einheit_id", G_FK),
+            // Helfer-App (0373): Zustand, Ziel und Person der Helfer-Kopplung.
+            retain("helfer_zustand", G_ENUM),
+            retain("einladung_id", G_FK),
+            // Den Namen gibt die Kraft selbst ein: er geht mit dem Einsatz.
+            scrub("anzeigename", Strategie::NullSetzen, Z_EINSATZ),
+            retain("fahrzeug_id", G_FK),
+            retain("person_id", G_FK),
+            retain("person_gewuenscht", G_KONFIG),
+            retain("ortungsgeraet", G_KONFIG),
+            retain("pausiert_at", G_ZEIT),
+            retain("bestaetigt_at", G_ZEIT),
+            retain("bestaetigt_von", G_FK),
+        ],
+    },
+    // Helfer-Einladung (Helfer-App, 0373): QR-Code eines Einsatzes, nur sein SHA-256.
+    TabellenRegel {
+        tabelle: "helfer_einladung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain(
+                "code_hash",
+                "SHA-256 eines Einladungscodes (technisch, kein Personenbezug)",
+            ),
+            retain("laeuft_ab_at", G_ZEIT),
+            retain("widerrufen_at", G_ZEIT),
+            retain("erstellt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("einloesungen", G_ZAEHLER),
         ],
     },
     TabellenRegel {

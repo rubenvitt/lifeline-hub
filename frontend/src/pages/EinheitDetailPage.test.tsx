@@ -72,11 +72,11 @@ const einheiten = [
 
 function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
   return [
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
-    http.get('/api/einsaetze/1/sectors', () =>
+    http.get('/api/incidents/1/units', () => HttpResponse.json(einheiten)),
+    http.get('/api/incidents/1/sectors', () =>
       HttpResponse.json([
         { id: 3, name: 'EA Nord' },
         { id: 4, name: 'EA Süd' },
@@ -87,15 +87,15 @@ function handlers(rolle = 'einsatzleitung', status = 'aktiv') {
         { id: 1, label: 'Zug', soll: { fuehrer: 1, unterfuehrer: 3, mannschaft: 18 }, sortier: 40 },
       ]),
     ),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/material', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/vehicles', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/material', () => HttpResponse.json([])),
     // Namen der Orte im Angebot von „Material zuordnen …“ (LLH-1225 D8).
-    http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     // Stamm im Dienst (Gruppe „Aus dem Stamm“, LLH-1036 Teil II): leer.
     http.get('/api/personnel', () => HttpResponse.json([])),
     http.get('/api/vehicles', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/talk-groups', () =>
+    http.get('/api/incidents/1/talk-groups', () =>
       HttpResponse.json([tmoSprechgruppe, dmoSprechgruppe]),
     ),
     http.get('/api/vehicle-statuses', () =>
@@ -158,7 +158,7 @@ function zeichneAuf(
     geladen = aktuell;
     return HttpResponse.json(aktuell);
   });
-  const liste = http.get('/api/einsaetze/1/units', () => HttpResponse.json([geladen]));
+  const liste = http.get('/api/incidents/1/units', () => HttpResponse.json([geladen]));
   return { bodies, handler, liste };
 }
 
@@ -236,8 +236,8 @@ function mitMitgliedern(
   return {
     einheit,
     handler: [
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([einheit])),
-      http.get('/api/einsaetze/1/personnel', () =>
+      http.get('/api/incidents/1/units', () => HttpResponse.json([einheit])),
+      http.get('/api/incidents/1/personnel', () =>
         HttpResponse.json(
           personen.map((p) => ({
             id: p.ep_id,
@@ -248,7 +248,7 @@ function mitMitgliedern(
           })),
         ),
       ),
-      http.get('/api/einsaetze/1/vehicles', () =>
+      http.get('/api/incidents/1/vehicles', () =>
         HttpResponse.json(
           fahrzeuge.map((f) => ({
             id: f.ef_id,
@@ -467,7 +467,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
   /** Liefert unter `?aufgeloeste=1` die aufgelösten und zählt die Abrufe. */
   function mitAufgeloesten(liste: unknown[]) {
     const abrufe = { anzahl: 0 };
-    const handler = http.get('/api/einsaetze/1/units', ({ request }) => {
+    const handler = http.get('/api/incidents/1/units', ({ request }) => {
       if (new URL(request.url).searchParams.get('aufgeloeste') !== '1') return undefined;
       abrufe.anzahl += 1;
       return HttpResponse.json(liste);
@@ -507,7 +507,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     const { handler } = mitAufgeloesten([aufgeloest]);
     server.use(
       handler,
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(
           freigabenFixture({ personal: { zugriff: false }, fahrzeuge: { zugriff: false } }),
         ),
@@ -528,7 +528,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     client.setQueryData(einsatzKeys.einheitenAufgeloeste(1), []);
     let aktivGeladen = false;
     server.use(
-      http.get('/api/einsaetze/1/units', async ({ request }) => {
+      http.get('/api/incidents/1/units', async ({ request }) => {
         if (new URL(request.url).searchParams.get('aufgeloeste') !== '1') {
           aktivGeladen = true;
           return HttpResponse.json(einheiten);
@@ -557,7 +557,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     await screen.findByRole('heading', { name: 'Florian 1', level: 1 });
 
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/incidents/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     );
     await act(() => client.refetchQueries({ queryKey: einsatzKeys.einsatz(1) }));
 
@@ -573,7 +573,7 @@ describe('EinheitDetailPage · aufgelöste Einheit lesend (LLH-1266)', () => {
     client.setQueryDefaults(einsatzKeys.einheiten(1), { gcTime: Infinity });
     client.setQueryData(einsatzKeys.einheiten(1), einheiten);
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
       ),
       ...handlers(),
@@ -610,7 +610,7 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
   it('Name: der PATCH trägt genau `name`, die Zeile zeigt den neuen Wert, Toast nennt die Angabe', async () => {
     const { bodies, handler, liste } = zeichneAuf(
       'patch',
-      '/api/einsaetze/1/units/10',
+      '/api/incidents/1/units/10',
       einheiten[0],
     );
     zeige(liste, handler);
@@ -629,9 +629,9 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
 
   it('Funkrufname geleert: der PATCH trägt genau `funkrufname: null`', async () => {
     const mitRufname = { ...einheiten[0], funkrufname: 'Heros 3/1' };
-    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/units/10', mitRufname);
+    const { bodies, handler } = zeichneAuf('patch', '/api/incidents/1/units/10', mitRufname);
     zeige(
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([mitRufname])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([mitRufname])),
       handler,
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Funkrufname bearbeiten' }));
@@ -649,7 +649,7 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
   it('zwei Zeilen nacheinander aus altem Stand: der fremd geänderte Abschnitt bleibt', async () => {
     const { bodies, handler, liste } = zeichneAuf(
       'patch',
-      '/api/einsaetze/1/units/10',
+      '/api/incidents/1/units/10',
       { ...einheiten[0], abschnitt_id: 4, abschnitt_name: 'EA Süd' },
       einheiten[0],
     );
@@ -675,7 +675,7 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
     const { einheit, handler: mitglieder } = mitMitgliedern([
       { ep_id: 1, name: 'Max Mustermann', staerke_position: 'fuehrer', ist_fuehrer: false },
     ]);
-    const { bodies, handler } = zeichneAuf('patch', '/api/einsaetze/1/units/10', einheit);
+    const { bodies, handler } = zeichneAuf('patch', '/api/incidents/1/units/10', einheit);
     zeige(...mitglieder, handler);
     await screen.findByText('Max Mustermann');
     await waehleImMenue('Max Mustermann', 'Als Einheitsführer');
@@ -701,8 +701,8 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
       aufrufe,
       patches,
       handler: [
-        http.get('/api/einsaetze/1/units', () => HttpResponse.json([stand()])),
-        http.put('/api/einsaetze/1/units/10/talk-groups/:sg', ({ params }) => {
+        http.get('/api/incidents/1/units', () => HttpResponse.json([stand()])),
+        http.put('/api/incidents/1/units/10/talk-groups/:sg', ({ params }) => {
           const sg = Number(params.sg);
           aufrufe.push(`PUT ${sg}`);
           if (sg === ablehnen) {
@@ -711,13 +711,13 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
           if (!ids.includes(sg)) ids = [...ids, sg];
           return new HttpResponse(null, { status: 204 });
         }),
-        http.delete('/api/einsaetze/1/units/10/talk-groups/:sg', ({ params }) => {
+        http.delete('/api/incidents/1/units/10/talk-groups/:sg', ({ params }) => {
           const sg = Number(params.sg);
           aufrufe.push(`DELETE ${sg}`);
           ids = ids.filter((id) => id !== sg);
           return new HttpResponse(null, { status: 204 });
         }),
-        http.patch('/api/einsaetze/1/units/10', async ({ request }) => {
+        http.patch('/api/incidents/1/units/10', async ({ request }) => {
           patches.push(await request.json());
           return HttpResponse.json(stand());
         }),
@@ -799,8 +799,8 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
   });
 
   it('Zeichen: genau `tz_organisation` an den Lageweg, keine Koordinate', async () => {
-    const zeichen = zeichneAuf('patch', '/api/einsaetze/1/units/10/position', einheiten[0]);
-    const angaben = zeichneAuf('patch', '/api/einsaetze/1/units/10', einheiten[0]);
+    const zeichen = zeichneAuf('patch', '/api/incidents/1/units/10/position', einheiten[0]);
+    const angaben = zeichneAuf('patch', '/api/incidents/1/units/10', einheiten[0]);
     zeige(zeichen.liste, zeichen.handler, angaben.handler);
     await userEvent.click(await screen.findByRole('button', { name: 'Organisation eintragen' }));
     await userEvent.click(screen.getByRole('combobox', { name: 'Organisation' }));
@@ -833,9 +833,9 @@ describe('EinheitDetailPage · eine Zeile, ein Feld (D1)', () => {
         verteilung: [],
       },
     };
-    const { bodies, handler } = zeichneAuf('put', '/api/einsaetze/1/units/10/status', mitHand);
+    const { bodies, handler } = zeichneAuf('put', '/api/incidents/1/units/10/status', mitHand);
     zeige(
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json([mitHand])),
+      http.get('/api/incidents/1/units', () => HttpResponse.json([mitHand])),
       handler,
     );
     await userEvent.click(await screen.findByRole('button', { name: 'Status von 1. Zug ändern' }));
@@ -849,13 +849,13 @@ describe('EinheitDetailPage · Datenzustände', () => {
   // LLH-1975: React Query setzt `error` auch, wenn nur ein Neuabruf scheitert und die Daten noch
   // im Zwischenspeicher liegen. Dann bleibt die Seite stehen, der Hinweis sagt es.
   it.each(['', '/units'] as const)(
-    'gescheiterter Neuabruf (/api/einsaetze/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
+    'gescheiterter Neuabruf (/api/incidents/1%s): Seite bleibt, Hinweis zeigt den alten Stand',
     async (unterpfad) => {
       const { client } = zeige();
       await screen.findByRole('heading', { name: '1. Zug', level: 1 });
 
       server.use(
-        http.get(`/api/einsaetze/1${unterpfad}`, () =>
+        http.get(`/api/incidents/1${unterpfad}`, () =>
           HttpResponse.json({ error: 'kaputt' }, { status: 500 }),
         ),
       );
@@ -872,7 +872,7 @@ describe('EinheitDetailPage · Datenzustände', () => {
 
   it('gescheiterter Erstabruf des Einsatzes zeigt weiter die Fehlerseite', async () => {
     zeige(
-      http.get('/api/einsaetze/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
+      http.get('/api/incidents/1', () => HttpResponse.json({ error: 'kaputt' }, { status: 500 })),
     );
     expect(await screen.findByText('Einsatz nicht gefunden oder kein Zugriff')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
@@ -903,7 +903,7 @@ describe('EinheitDetailPage · Datenzustände', () => {
      * behauptete „Keine freien Personen" — eine ungeprüfte Aussage über den Bestand.
      */
     const { container } = zeige(
-      http.get('/api/einsaetze/1/personnel', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/personnel', () => new HttpResponse(null, { status: 500 })),
     );
     await screen.findByRole('heading', { name: '1. Zug', level: 1 });
     await oeffneAuswahl(container, 'Person zuordnen …');
@@ -963,7 +963,7 @@ describe('EinheitDetailPage · ohne Schreibrecht nur die Ansicht (D14)', () => {
 
   it('Modul Einheiten gesperrt: auch mit Schreibrecht keine Stifte und kein Auflösen (D6)', async () => {
     zeige(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ einheiten: { zugriff: false } })),
       ),
     );
@@ -982,12 +982,12 @@ describe('EinheitDetailPage · Listen nur mit Freigabe (D5)', () => {
     // Gezählt wird der Modulschlüssel, abgefragt der englische Pfad (ADR-0085).
     const segment: Record<string, string> = { personal: 'personnel', fahrzeuge: 'vehicles' };
     const liste = (pfad: string) =>
-      http.get(`/api/einsaetze/1/${segment[pfad] ?? pfad}`, () => {
+      http.get(`/api/incidents/1/${segment[pfad] ?? pfad}`, () => {
         abrufe.push(pfad);
         return HttpResponse.json([]);
       });
     zeige(
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(
           freigabenFixture(Object.fromEntries(gesperrt.map((k) => [k, { zugriff: false }]))),
         ),
@@ -1033,7 +1033,7 @@ describe('EinheitDetailPage · Auflösen (D12)', () => {
     // Leerzustand als Ergebnis einer erfolgreichen Handlung zu zeigen.
     let geloest = false;
     zeige(
-      http.delete('/api/einsaetze/1/units/10', () => {
+      http.delete('/api/incidents/1/units/10', () => {
         geloest = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1051,7 +1051,7 @@ describe('EinheitDetailPage · Auflösen (D12)', () => {
 
   it('abgelehnt: der Grund steht im Paneel „Einheit auflösen oder stornieren“, kein Toast', async () => {
     zeige(
-      http.delete('/api/einsaetze/1/units/10', () =>
+      http.delete('/api/incidents/1/units/10', () =>
         HttpResponse.json({ error: 'Einheit ist disponiert' }, { status: 409 }),
       ),
     );
@@ -1082,11 +1082,11 @@ describe('EinheitDetailPage · Stornieren (LLH-1881)', () => {
     let storniert = false;
     let geloescht = false;
     zeige(
-      http.post('/api/einsaetze/1/units/10/annul', () => {
+      http.post('/api/incidents/1/units/10/annul', () => {
         storniert = true;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.delete('/api/einsaetze/1/units/10', () => {
+      http.delete('/api/incidents/1/units/10', () => {
         geloescht = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1101,7 +1101,7 @@ describe('EinheitDetailPage · Stornieren (LLH-1881)', () => {
   it('abgelehnt: der Grund des Servers steht im Paneel, die Seite bleibt, kein Toast', async () => {
     const grund = 'Der Einheit gehört Personal an; die Einheit lässt sich nur auflösen';
     zeige(
-      http.post('/api/einsaetze/1/units/10/annul', () =>
+      http.post('/api/incidents/1/units/10/annul', () =>
         HttpResponse.json({ error: grund }, { status: 422 }),
       ),
     );
@@ -1148,7 +1148,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
   }
 
   it('Kopfzeile abgelehnt: der Grund steht an der Zeile, die Eingabe bleibt, kein Toast', async () => {
-    zeige(http.patch('/api/einsaetze/1/units/10', abgelehnt('Name bereits vergeben', 422)));
+    zeige(http.patch('/api/incidents/1/units/10', abgelehnt('Name bereits vergeben', 422)));
     await userEvent.click(await screen.findByRole('button', { name: 'Name bearbeiten' }));
     const feld = screen.getByRole('textbox', { name: 'Name' });
     await userEvent.clear(feld);
@@ -1163,14 +1163,14 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
 
   it('Zuordnen: der Grund steht am Paneel der Zuordnung, die nächste Auswahl räumt ihn', async () => {
     const { container } = zeige(
-      http.get('/api/einsaetze/1/personnel', () =>
+      http.get('/api/incidents/1/personnel', () =>
         HttpResponse.json([
           { id: 5, name: 'Erika Frei', einheit_id: null },
           { id: 6, name: 'Otto Frei', einheit_id: null },
         ]),
       ),
       http.put(
-        '/api/einsaetze/1/units/10/personnel/:epId',
+        '/api/incidents/1/units/10/personnel/:epId',
         erstAblehnenDannWarten('Person ist einer anderen Einheit zugeordnet'),
       ),
     );
@@ -1195,13 +1195,13 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     const { container } = zeige(
-      http.get('/api/einsaetze/1/personnel', () =>
+      http.get('/api/incidents/1/personnel', () =>
         HttpResponse.json([
           { id: 5, name: 'Erika Frei', einheit_id: null },
           { id: 6, name: 'Otto Frei', einheit_id: null },
         ]),
       ),
-      http.put('/api/einsaetze/1/units/10/personnel/:epId', async ({ params }) => {
+      http.put('/api/incidents/1/units/10/personnel/:epId', async ({ params }) => {
         if (params.epId === '5') {
           await ersteAblehnung;
           return HttpResponse.json(
@@ -1238,14 +1238,14 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
       );
     }
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([...einheiten, { ...einheiten[0], id: 11, name: '2. Zug' }]),
       ),
-      http.get('/api/einsaetze/1/personnel', () =>
+      http.get('/api/incidents/1/personnel', () =>
         HttpResponse.json([{ id: 5, name: 'Erika Frei', einheit_id: null }]),
       ),
-      http.patch('/api/einsaetze/1/units/10', abgelehnt('Rufname bereits vergeben', 422)),
-      http.put('/api/einsaetze/1/units/10/personnel/:epId', abgelehnt('Person ist gebunden')),
+      http.patch('/api/incidents/1/units/10', abgelehnt('Rufname bereits vergeben', 422)),
+      http.put('/api/incidents/1/units/10/personnel/:epId', abgelehnt('Person ist gebunden')),
       ...handlers(),
     );
     const { container } = renderMitProviders(
@@ -1280,7 +1280,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     zeige(
       ...mitglieder(),
-      http.delete('/api/einsaetze/1/units/10/personnel/:epId', async ({ params }) => {
+      http.delete('/api/incidents/1/units/10/personnel/:epId', async ({ params }) => {
         if (params.epId === '1') {
           await ersteAblehnung;
           return HttpResponse.json({ error: 'Person führt die Einheit' }, { status: 409 });
@@ -1306,7 +1306,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     zeige(
       ...mitglieder(),
       http.patch(
-        '/api/einsaetze/1/units/10',
+        '/api/incidents/1/units/10',
         erstAblehnenDannWarten('Person ist nicht disponiert'),
       ),
     );
@@ -1330,11 +1330,11 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
     zeige(
       ...mitglieder(),
       http.delete(
-        '/api/einsaetze/1/units/10/vehicles/30',
+        '/api/incidents/1/units/10/vehicles/30',
         abgelehnt('Fahrzeug ist im Einsatz gebunden'),
       ),
       // Material löst der eine Schreibweg des Materials (LLH-1225 D2), nicht die Einheiten-Route.
-      http.patch('/api/einsaetze/1/material/40', abgelehnt('Material ist verliehen')),
+      http.patch('/api/incidents/1/material/40', abgelehnt('Material ist verliehen')),
     );
     await screen.findByText('FW 1/44-1');
     await waehleImFahrzeugMenue('FW 1/44-1', 'Aus Einheit lösen');
@@ -1361,8 +1361,8 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
   it('Grund an einer live entfernten Zeile: steht als Seitenhinweis, schließbar', async () => {
     const { client } = zeige(
       ...mitglieder(),
-      http.delete('/api/einsaetze/1/units/10/personnel/1', abgelehnt('Person ist schon gelöst')),
-      http.delete('/api/einsaetze/1/units/10/vehicles/30', abgelehnt('Fahrzeug ist schon gelöst')),
+      http.delete('/api/incidents/1/units/10/personnel/1', abgelehnt('Person ist schon gelöst')),
+      http.delete('/api/incidents/1/units/10/vehicles/30', abgelehnt('Fahrzeug ist schon gelöst')),
     );
     await screen.findByText('FW 1/44-1');
     await waehleImFahrzeugMenue('FW 1/44-1', 'Aus Einheit lösen');
@@ -1397,7 +1397,7 @@ describe('EinheitDetailPage · Fehler am Ort (D13)', () => {
 describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {
   it('Schreibrolle: Paneel „Zeitachse" mit Dauer, Ereignis und offenem Nachtrag', async () => {
     zeige(
-      http.get('/api/einsaetze/1/units/10/timeline', () =>
+      http.get('/api/incidents/1/units/10/timeline', () =>
         HttpResponse.json({
           ereignisse: [
             {
@@ -1438,7 +1438,7 @@ describe('EinheitDetailPage — Zeitachse (LFH-552)', () => {
 
 describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075, D14)', () => {
   const offen = () =>
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([
         { ...einheiten[0], unangemeldet: true, nicht_uebernommen_seit: '2026-10-16T12:00:00Z' },
       ]),
@@ -1463,7 +1463,7 @@ describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075
   it('ohne Freigabe Fahrzeuge kein „Abweisen“', async () => {
     zeige(
       offen(),
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ fahrzeuge: { zugriff: false } })),
       ),
     );
@@ -1478,7 +1478,7 @@ describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075
     let abgewiesen = false;
     zeige(
       offen(),
-      http.post('/api/einsaetze/1/units/10/reject', () => {
+      http.post('/api/incidents/1/units/10/reject', () => {
         abgewiesen = true;
         return new HttpResponse(null, { status: 204 });
       }),
@@ -1501,7 +1501,7 @@ describe('EinheitDetailPage · Übernahme einer unangemeldeten Einheit (LLH-1075
 /** Storno einer Fehlübernahme aus einer Nachforderung (LLH-1388, design.md D7). */
 describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
   const aus = (nachforderungId: number | null) =>
-    http.get('/api/einsaetze/1/units', () =>
+    http.get('/api/incidents/1/units', () =>
       HttpResponse.json([{ ...einheiten[0], nachforderung_id: nachforderungId ?? undefined }]),
     );
 
@@ -1519,7 +1519,7 @@ describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
     let storniert = false;
     server.use(
       aus(4),
-      http.post('/api/einsaetze/1/units/10/annul-takeover', () => {
+      http.post('/api/incidents/1/units/10/annul-takeover', () => {
         storniert = true;
         return HttpResponse.json({ id: 4, einheit_ids: [] });
       }),
@@ -1543,7 +1543,7 @@ describe('EinheitDetailPage · Übernahme stornieren (LLH-1388)', () => {
   it('ohne Freigabe Nachforderungen kein Paneel', async () => {
     zeige(
       aus(4),
-      http.get('/api/einsaetze/:einsatzId/module-access', () =>
+      http.get('/api/incidents/:einsatzId/module-access', () =>
         HttpResponse.json(freigabenFixture({ nachforderungen: { zugriff: false } })),
       ),
     );
@@ -1570,7 +1570,7 @@ function BoardMitKarte() {
  * `nvhnqynd-konflikt-und-aenderungsvermerk`).
  */
 describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () => {
-  function casServer(geladen: Record<string, unknown>, pfad = '/api/einsaetze/1/units/10') {
+  function casServer(geladen: Record<string, unknown>, pfad = '/api/incidents/1/units/10') {
     const anfragen: Record<string, unknown>[] = [];
     let stand = { ...geladen };
     const handler = http.patch(pfad, async ({ request }) => {
@@ -1585,7 +1585,7 @@ describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () =>
       stand = { ...stand, ...rest };
       return HttpResponse.json(stand);
     });
-    const liste = http.get('/api/einsaetze/1/units', () => HttpResponse.json([stand]));
+    const liste = http.get('/api/incidents/1/units', () => HttpResponse.json([stand]));
     return {
       anfragen,
       handler,
@@ -1619,7 +1619,7 @@ describe('EinheitDetailPage · Feld-CAS und Vermerk (LLH-1831, LLH-1834)', () =>
   it('Zeichen (LLH-1945): Altwert beim Öffnen geht mit; verworfen bleibt das fremde Zeichen', async () => {
     const cas = casServer(
       { ...einheiten[0], tz_organisation: null },
-      '/api/einsaetze/1/units/10/position',
+      '/api/incidents/1/units/10/position',
     );
     zeige(cas.liste, cas.handler);
     await userEvent.click(await screen.findByRole('button', { name: 'Organisation eintragen' }));

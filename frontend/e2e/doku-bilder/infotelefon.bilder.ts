@@ -29,7 +29,7 @@ test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
     const { id } = await demoEinsatz(api);
-    const pfad = `/api/einsaetze/${id}/staff/info-line`;
+    const pfad = `/api/incidents/${id}/staff/info-line`;
 
     const anrufe = (await (await api.get(pfad)).json()) as unknown[];
     if (anrufe.length === 0) {

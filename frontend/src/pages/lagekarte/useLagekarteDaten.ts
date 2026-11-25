@@ -17,7 +17,7 @@ import { listeTiere } from '../../api/einsatzTier';
 import { istKeyFreigegeben, modulRegistry } from '../../einsatz/modulRegistry';
 import { personenMarker } from '../../personen/personenKarte';
 import { ohneAbgeschlossene } from '../../personen/personenBilanz';
-import { darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
+import { darfEinsatzLeiten, darfImEinsatzSchreiben } from '../../einsatz/schreibrecht';
 import { listeUhs } from '../../api/einsatzUhs';
 import { listeSchadenMarker } from '../../api/einsatzSchaden';
 import { ladeKarteConfig } from '../../api/karte';
@@ -59,6 +59,8 @@ import { personenZugriffVon } from './personenEbene';
 import { betreuungZugriffVon } from './betreuungEbene';
 import { checkBrZugriff } from './brEbene';
 import { checkTierZugriff } from './tierEbene';
+import { parseZeitpunkt } from './positionsAlter';
+import { useMinutenTakt } from '../../components/useMinutenTakt';
 import { buildTierMarker } from './tierMarker';
 import { buildSammelstelleMarker } from './sammelstelleMarker';
 import { gemeinsamerDatenstand } from '../../components/Datenstand';
@@ -397,6 +399,9 @@ export function useLagekarteDaten({
 
   // Schreibsperre im Historien-Modus: hart `false` → alle UI-Schreibpfade (prop-gegatet) fallen weg.
   const darfSchreiben = istSnapshot ? false : darfImEinsatzSchreiben(einsatz);
+  // Die Drohnenquelle zuschalten (LLH-2106): Leitungsaktion wie am Server (`EinsatzLeitungszugriff`),
+  // im Stand-Modus nie.
+  const darfDrohneSchalten = istSnapshot ? false : darfEinsatzLeiten(einsatz);
 
   // Ansichts-Filter (client-seitig): Objekte der aktiven Ansicht plus die ansichtslosen. `== null`
   // fängt `null` und das per skip_serializing_if weggelassene Feld.
@@ -470,6 +475,10 @@ export function useLagekarteDaten({
     ],
   );
 
+  // Alter automatischer Positionen (Helfer-App): live im Minutentakt, damit ein Ziel ohne neue
+  // Daten blass wird; im Rückblick gegen den Stand des Snapshots, nicht gegen heute.
+  const takt = useMinutenTakt();
+  const positionsJetzt = istSnapshot ? (parseZeitpunkt(snap?.stand_at) ?? takt) : takt;
   const taktisch = useMemo(
     () =>
       buildTaktischeMarker(
@@ -480,8 +489,9 @@ export function useLagekarteDaten({
           orgDefault,
         },
         token,
+        new Date(positionsJetzt),
       ),
-    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token],
+    [einheitenRoh, fahrzeugeRoh, fkRoh, orgDefault, token, positionsJetzt],
   );
 
   const flaechen = useMemo(
@@ -554,6 +564,9 @@ export function useLagekarteDaten({
             id: z.id,
             geometrie: g,
             label: beschriftung,
+            rohLabel: z.label,
+            ...(gebietId != null ? { warnstufe: warnstufe ?? 'unbekannt' } : {}),
+            ...(kreis ? { kreis } : {}),
             typ: z.typ,
             stil,
             // Gefahrenzonen gestrichelt — reine Darstellung am Zonentyp.
@@ -728,6 +741,7 @@ export function useLagekarteDaten({
     // Rohdaten-/Status-Durchreichungen (für Ladegate, Basemap/Fachebenen-Hooks, Panels).
     einsatz,
     darfSchreiben,
+    darfDrohneSchalten,
     // Ladegate spiegelt die aktive Quelle: im Snapshot-Modus die Dokument-Query (eine abgeschaltete
     // Live-Query meldet isLoading=false → sonst „fertig" bei leerem Dokument, Marker-Pop-in).
     ladt: istSnapshot ? snapQuery.isLoading : einsatzQuery.isLoading || configQuery.isLoading,

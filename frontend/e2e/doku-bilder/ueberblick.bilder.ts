@@ -21,11 +21,11 @@ const KAPITEL = 'ueberblick';
  * Überblick ohne sie, die Startliste hat ihr eigenes Bild. Nur, wenn er fehlt.
  */
 async function demoEinsatzortFuellen(page: Page, einsatzId: number): Promise<void> {
-  const kopf = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as {
+  const kopf = (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as {
     einsatzort?: string | null;
   };
   if (kopf.einsatzort) return;
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatzId}`, {
+  await fuelle(page, 'patch', `/api/incidents/${einsatzId}`, {
     einsatzort: 'Musterstadt, Mühlbachweg',
     einsatzort_lat: 50.9512,
     einsatzort_lon: 10.2489,
@@ -107,11 +107,11 @@ test.describe(KAPITEL, () => {
   // Einsatzort ohne Koordinate und erfasstem Einsatzleiter, sonst nichts.
   test('Startliste „Einsatz starten“', async ({ page }) => {
     await anmelden(page);
-    const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/einsaetze', {
+    const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/incidents', {
       bezeichnung: 'Sturmschaden Waldweg',
     });
-    await fuelle(page, 'patch', `/api/einsaetze/${einsatz.id}`, { einsatzort: 'Deich West' });
-    await fuelle(page, 'patch', `/api/einsaetze/${einsatz.id}/command-post`, {
+    await fuelle(page, 'patch', `/api/incidents/${einsatz.id}`, { einsatzort: 'Deich West' });
+    await fuelle(page, 'patch', `/api/incidents/${einsatz.id}/command-post`, {
       einsatzleiter: { art: 'extern', name: 'KBM Weber' },
     });
     await uhrAnhalten(page);

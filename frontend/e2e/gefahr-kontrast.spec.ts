@@ -45,12 +45,12 @@ for (const modus of ['light', 'dark'] as const) {
     await anmelden(page, { startseite: false });
 
     // Ein Zeitfenster ohne Ausgabe: Erfassen + Bearbeiten + Löschen bündeln sich zum Menü.
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 693 Gefahrrot ${Date.now()}`,
     });
     const jetzt = Date.now();
     const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-    await post(page, `/api/einsaetze/${einsatzId}/catering/time-slots`, {
+    await post(page, `/api/incidents/${einsatzId}/catering/time-slots`, {
       bezeichnung: 'Abendessen Gefahr',
       von_at: zeit(180),
       bis_at: zeit(240),
@@ -102,7 +102,7 @@ for (const modus of ['light', 'dark'] as const) {
     );
 
     // Gefahrknopf ohne Rahmen (LFH-897): der Papierkorb einer Dokumentenzeile.
-    const ablage = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
+    const ablage = await page.request.post(`/api/incidents/${einsatzId}/documents`, {
       multipart: {
         datei: {
           name: 'Plan Gefahr.pdf',

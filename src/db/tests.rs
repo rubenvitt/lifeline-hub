@@ -15102,9 +15102,12 @@ async fn migration_0370_schreibt_beantragte_pfade_auf_die_englischen_routen_um()
             .await
             .unwrap();
     assert_eq!(neu.len(), alt.len());
+    // Das Präfix zieht erst Migration 0375 auf `/api/incidents` um (LLH-2061); verglichen wird mit
+    // dem Stand, den beide Migrationen zusammen hinterlassen.
     for (vorher, nachher) in alt.iter().zip(&neu) {
+        let spaeter = nachher.replacen("/api/einsaetze/", "/api/incidents/", 1);
         assert!(
-            BEANTRAGBAR.iter().any(|b| b.pfad == nachher.as_str()),
+            BEANTRAGBAR.iter().any(|b| b.pfad == spaeter),
             "{vorher} → {nachher} ist kein beantragbarer Pfad"
         );
     }
@@ -15182,5 +15185,496 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
             "/api/einsaetze/{id}/etb",
             "/api/einsaetze/{id}/reports",
         ]
+    );
+}
+
+/// Helfer-App (0377): Der Umbau von `geraet_kopplung` und `geraet_kopplung_ereignis` hält
+/// Kopplungen, Codes, Ereignisse und Gerätesitzungen 1:1 samt Einheitsbindung; der Bestand mit
+/// Position bekommt `manuell`, auch am Spiegel (dessen Schutz-Trigger sonst abbräche); die neuen
+/// CHECKs und Teilindizes greifen.
+#[tokio::test]
+async fn migration_0377_baut_kopplung_um_und_setzt_positionsquelle() {
+    let pool = pool_bis(SqliteConnectOptions::new().filename(":memory:"), 376).await;
+    let (e, b) = bild_grundlage(&pool).await;
+    let konto = |name: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash) \
+                     VALUES (1, ?, ?, 'h') RETURNING id",
+            )
+            .bind(name)
+            .bind(name)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let einheit: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name, lat, lon) VALUES (?, 'Trupp', 51.0, 7.0) \
+         RETURNING id",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let ohne_position: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name) VALUES (?, 'Staffel') RETURNING id",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let fahrzeug: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_fahrzeug (einsatz_id, snap_funkrufname, lat, lon) \
+         VALUES (?, 'RTW 1', 51.0, 7.0) RETURNING id",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let person: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_personal (einsatz_id, snap_name, lat, lon) \
+         VALUES (?, 'Dora', 51.0, 7.0) RETURNING id",
+    )
+    .bind(e)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    // Ein Spiegel-Einsatz mit Position: sein Schutz-Trigger sperrt jedes UPDATE ohne Merker.
+    let spiegel: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'Spiegel') RETURNING id",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    let spiegel_einheit: i64 = sqlx::query_scalar(
+        "INSERT INTO einsatz_einheit (einsatz_id, name, lat, lon) VALUES (?, 'Fremd', 50.0, 6.0) \
+         RETURNING id",
+    )
+    .bind(spiegel)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
+
+    let handy: i64 = sqlx::query_scalar(
+        "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, einheit_id, bezeichnung, \
+                erstellt_von, laeuft_ab_at, gekoppelt_at) \
+             VALUES (?, ?, 'einheit', ?, 'Handy', ?, '2099-01-01 00:00:00', \
+                '2026-11-06 08:00:00') RETURNING id",
+    )
+    .bind(e)
+    .bind(konto("geraet-1").await)
+    .bind(einheit)
+    .bind(b)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO geraet_kopplungscode (kopplung_id, code_hash, laeuft_ab_at) \
+             VALUES (?, 'hash', '2099-01-01 00:00:00')",
+    )
+    .bind(handy)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO geraet_kopplung_ereignis (kopplung_id, ereignis, von, peer_ip, zeitpunkt) \
+             VALUES (?, 'eingeloest', NULL, '10.0.0.1', '2026-11-06 08:00:00')",
+    )
+    .bind(handy)
+    .execute(&pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO session (token_hash, benutzer_id, expires_at, kopplung_id) \
+             SELECT 's' || id, benutzer_id, '2099-01-01 00:00:00', id FROM geraet_kopplung",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    type Kopplung = (i64, String, Option<i64>, String, Option<String>);
+    let kopplungen = || {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_as::<_, Kopplung>(
+                "SELECT id, ansicht, einheit_id, bezeichnung, gekoppelt_at FROM geraet_kopplung \
+                 ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    type Ereignis = (i64, i64, String, Option<String>, String);
+    let ereignisse = || {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_as::<_, Ereignis>(
+                "SELECT id, kopplung_id, ereignis, peer_ip, zeitpunkt FROM geraet_kopplung_ereignis \
+                 ORDER BY id",
+            )
+            .fetch_all(&pool)
+            .await
+            .unwrap()
+        }
+    };
+    let vorher = (kopplungen().await, ereignisse().await);
+
+    migriere_bis(&pool, 377).await;
+
+    assert_eq!(
+        (kopplungen().await, ereignisse().await),
+        vorher,
+        "Bestand 1:1 samt Einheitsbindung"
+    );
+    for t in ["geraet_kopplungscode", "session"] {
+        let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT COUNT(*) FROM {t}")))
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(n, 1, "{t} überlebt den Umbau");
+    }
+    let fk_verletzungen: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM pragma_foreign_key_check")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(fk_verletzungen, 0, "foreign_key_check ist leer");
+    for index in [
+        "idx_geraet_kopplung_einsatz",
+        "idx_geraet_kopplung_abschnitt",
+        "idx_geraet_kopplung_einheit",
+        "idx_geraet_kopplung_fahrzeug",
+        "ux_helfer_ortung_einheit",
+        "ux_helfer_ortung_fahrzeug",
+        "idx_geraet_kopplung_ereignis",
+        "idx_helfer_einladung_einsatz",
+    ] {
+        let da: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?",
+        )
+        .bind(index)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(da, 1, "{index} steht");
+    }
+
+    // Positionsquelle: Bestand mit Position `manuell`, ohne Zeitpunkt; ohne Position bleibt leer.
+    for (tabelle, id, erwartet) in [
+        ("einsatz_einheit", einheit, Some("manuell")),
+        ("einsatz_einheit", ohne_position, None),
+        ("einsatz_einheit", spiegel_einheit, Some("manuell")),
+        ("einsatz_fahrzeug", fahrzeug, Some("manuell")),
+        ("einsatz_personal", person, Some("manuell")),
+    ] {
+        let (quelle, zeitpunkt): (Option<String>, Option<String>) =
+            sqlx::query_as(sqlx::AssertSqlSafe(format!(
+                "SELECT position_quelle, position_aktualisiert_at FROM {tabelle} WHERE id = ?"
+            )))
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(quelle.as_deref(), erwartet, "{tabelle} {id}");
+        assert_eq!(zeitpunkt, None, "{tabelle} {id}: kein Zeitpunkt");
+    }
+    let merker: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM spiegel_uebernahme")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(merker, 0, "der Merker ist wieder weg");
+    assert!(
+        sqlx::query("UPDATE einsatz_einheit SET position_quelle = 'gps' WHERE id = ?")
+            .bind(einheit)
+            .execute(&pool)
+            .await
+            .is_err(),
+        "die Quelle bleibt im CHECK"
+    );
+
+    // Org-Schalter: Vorgabe aus.
+    sqlx::query("INSERT INTO org_einstellungen (org_id) VALUES (1)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let schalter: (i64, i64) = sqlx::query_as(
+        "SELECT ortung_im_einsatz, ortung_personen FROM org_einstellungen WHERE org_id = 1",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(schalter, (0, 0));
+
+    // Helfer-Kopplung: Zustand genau bei `helfer`, höchstens ein Ziel, ein Ortungsgerät je Ziel.
+    let helfer = |name: &'static str,
+                  ansicht: &'static str,
+                  zustand: Option<&'static str>,
+                  einheit_id: Option<i64>,
+                  fahrzeug_id: Option<i64>,
+                  ortungsgeraet: i64| {
+        let pool = pool.clone();
+        let konto = konto(name);
+        async move {
+            let g = konto.await;
+            sqlx::query_scalar::<_, i64>(
+                "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, helfer_zustand, \
+                        einheit_id, fahrzeug_id, ortungsgeraet, anzeigename, bezeichnung, \
+                        erstellt_von, laeuft_ab_at) \
+                     VALUES (?, ?, ?, ?, ?, ?, ?, 'Max', 'Helfer', ?, '2099-01-01 00:00:00') \
+                     RETURNING id",
+            )
+            .bind(e)
+            .bind(g)
+            .bind(ansicht)
+            .bind(zustand)
+            .bind(einheit_id)
+            .bind(fahrzeug_id)
+            .bind(ortungsgeraet)
+            .bind(b)
+            .fetch_one(&pool)
+            .await
+        }
+    };
+    let erster = helfer("h-1", "helfer", Some("aktiv"), Some(einheit), None, 1)
+        .await
+        .expect("Helfer als Ortungsgerät der Einheit");
+    assert!(
+        helfer("h-2", "helfer", None, Some(einheit), None, 0)
+            .await
+            .is_err(),
+        "helfer ohne Zustand"
+    );
+    assert!(
+        helfer("h-3", "einheit", Some("aktiv"), Some(einheit), None, 0)
+            .await
+            .is_err(),
+        "Zustand nur bei helfer"
+    );
+    assert!(
+        helfer("h-4", "helfer", Some("wartet"), Some(einheit), None, 0)
+            .await
+            .is_err(),
+        "Zustand im CHECK"
+    );
+    assert!(
+        helfer(
+            "h-5",
+            "helfer",
+            Some("aktiv"),
+            Some(einheit),
+            Some(fahrzeug),
+            0
+        )
+        .await
+        .is_err(),
+        "Einheit und Fahrzeug zugleich"
+    );
+    assert!(
+        helfer("h-6", "helfer", Some("aktiv"), Some(einheit), None, 1)
+            .await
+            .is_err(),
+        "zweites Ortungsgerät derselben Einheit"
+    );
+    helfer("h-7", "helfer", Some("aktiv"), Some(einheit), None, 0)
+        .await
+        .expect("weitere Helfer ohne Ortungsgerät");
+    helfer("h-8", "helfer", Some("aktiv"), None, Some(fahrzeug), 1)
+        .await
+        .expect("Ortungsgerät des Fahrzeugs");
+    assert!(
+        helfer("h-9", "helfer", Some("aktiv"), None, Some(fahrzeug), 1)
+            .await
+            .is_err(),
+        "zweites Ortungsgerät desselben Fahrzeugs"
+    );
+    sqlx::query("UPDATE geraet_kopplung SET widerrufen_at = datetime('now') WHERE id = ?")
+        .bind(erster)
+        .execute(&pool)
+        .await
+        .unwrap();
+    helfer("h-10", "helfer", Some("aktiv"), Some(einheit), None, 1)
+        .await
+        .expect("nach dem Widerruf ist das Ziel frei");
+
+    // Neue Ereignisse stehen im CHECK, Unbekanntes nicht.
+    for (ereignis, ok) in [
+        ("bestaetigt", true),
+        ("abgelehnt", true),
+        ("abgemeldet", true),
+        ("gesperrt", false),
+    ] {
+        let r = sqlx::query(
+            "INSERT INTO geraet_kopplung_ereignis (kopplung_id, ereignis) VALUES (?, ?)",
+        )
+        .bind(handy)
+        .bind(ereignis)
+        .execute(&pool)
+        .await;
+        assert_eq!(r.is_ok(), ok, "{ereignis}");
+    }
+
+    // Kaskaden wirken weiter.
+    sqlx::query("DELETE FROM geraet_kopplung WHERE id = ?")
+        .bind(handy)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let rest: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM geraet_kopplungscode) + \
+                (SELECT COUNT(*) FROM geraet_kopplung_ereignis) + (SELECT COUNT(*) FROM session)",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(rest, 0, "Kaskade Kopplung → Code, Ereignis, Sitzung");
+}
+
+/// LLH-2061 (Paket 15 von LLH-1979): Das Präfix `/api/einsaetze` heißt jetzt `/api/incidents`.
+/// Ein offener Antrag eines Spiegels trägt die Vorlage seines Pfads; ohne Umschreiben fände der
+/// Führer sie nicht mehr unter den beantragbaren Erfassungen. Die Migration tauscht nur das Präfix
+/// und lässt fremde Vorlagen stehen, auch eine, die bloß mit denselben Buchstaben beginnt.
+#[tokio::test]
+async fn migration_0375_zieht_das_praefix_der_pfadvorlagen_auf_incidents_um() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 375;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    for sql in [
+        "INSERT INTO organisation (id, name) VALUES (1, 'Org')",
+        "INSERT INTO einsatz (id, org_id, bezeichnung) VALUES (1, 1, 'Lage')",
+        "INSERT INTO benutzer (id, org_id, anzeigename, benutzername, passwort_hash) \
+         VALUES (1, 1, 'Erika', 'erika', 'hash')",
+        "INSERT INTO spiegel_antrag (id, einsatz_id, art, methode, pfad_vorlage, daten, \
+         benutzer_id, erfasst_at, geaendert_at) VALUES \
+         (1, 1, 'eintreffen', 'POST', '/api/einsaetze/{id}/staging-areas/{bid}/arrival', '{}', 1, 'x', 'x'), \
+         (2, 1, 'etb', 'POST', '/api/einsaetze/{id}/etb', '{}', 1, 'x', 'x'), \
+         (3, 1, 'x', 'POST', '/api/einsaetze-alt/{id}', '{}', 1, 'x', 'x'), \
+         (4, 1, 'x', 'POST', '/api/fremd/einsaetze/{id}', '{}', 1, 'x', 'x')",
+    ] {
+        sqlx::query(sql).execute(&pool).await.unwrap();
+    }
+    migriere_bis(&pool, VERSION).await;
+    let vorlagen: Vec<String> =
+        sqlx::query_scalar("SELECT pfad_vorlage FROM spiegel_antrag ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        vorlagen,
+        [
+            "/api/incidents/{id}/staging-areas/{bid}/arrival",
+            "/api/incidents/{id}/etb",
+            "/api/einsaetze-alt/{id}",
+            "/api/fremd/einsaetze/{id}",
+        ]
+    );
+}
+
+/// LLH-1633: Zuordnungstabelle Kennung + Herkunft für Fahrzeuge, Personal und Qualifikationen.
+/// Genau ein Ziel, je Art/Org/Herkunft/Kennung höchstens ein Ziel, je Fahrzeug bzw. Person nur eine
+/// Kennung je Herkunft (Qualifikationen dürfen Aliasse tragen), Löschen des Ziels kaskadiert.
+#[tokio::test]
+async fn migration_0374_stammdaten_kennung() {
+    // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
+    const VERSION: i64 = 374;
+    let pool = pool_bis(
+        SqliteConnectOptions::new().filename(":memory:"),
+        VERSION - 1,
+    )
+    .await;
+    sqlx::query("INSERT INTO organisation (id, name) VALUES (1, 'Org')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    migriere_bis(&pool, VERSION).await;
+
+    async fn id(pool: &SqlitePool, sql: &'static str) -> i64 {
+        sqlx::query_scalar(sql).fetch_one(pool).await.unwrap()
+    }
+    let fz1 = id(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 1') RETURNING id",
+    )
+    .await;
+    let fz2 = id(
+        &pool,
+        "INSERT INTO fahrzeug (org_id, funkrufname) VALUES (1, 'Florian 2') RETURNING id",
+    )
+    .await;
+    let p1 = id(
+        &pool,
+        "INSERT INTO personal (org_id, name) VALUES (1, 'Anna') RETURNING id",
+    )
+    .await;
+    let q1 = id(
+        &pool,
+        "INSERT INTO qualifikation (org_id, label) VALUES (1, 'Sanitäter') RETURNING id",
+    )
+    .await;
+
+    let einfuegen = |kennung: &'static str,
+                     herkunft: &'static str,
+                     fz: Option<i64>,
+                     p: Option<i64>,
+                     q: Option<i64>| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query(
+                "INSERT INTO stammdaten_kennung \
+                 (org_id, herkunft, kennung, fahrzeug_id, personal_id, qualifikation_id, angelegt_at) \
+                 VALUES (1, ?, ?, ?, ?, ?, '2026-11-24T00:00:00Z')",
+            )
+            .bind(herkunft)
+            .bind(kennung)
+            .bind(fz)
+            .bind(p)
+            .bind(q)
+            .execute(&pool)
+            .await
+        }
+    };
+
+    einfuegen("1", "quelle", Some(fz1), Some(p1), None)
+        .await
+        .expect_err("zwei Ziele verletzen die CHECK-Bedingung");
+    einfuegen("1", "quelle", None, None, None)
+        .await
+        .expect_err("kein Ziel verletzt die CHECK-Bedingung");
+
+    einfuegen("4711", "quelle", Some(fz1), None, None)
+        .await
+        .unwrap();
+    einfuegen("4711", "quelle", Some(fz2), None, None)
+        .await
+        .expect_err("Kennung je Org, Art und Herkunft nur einmal");
+    einfuegen("4711", "quelle", None, Some(p1), None)
+        .await
+        .expect("gleiche Kennung für Personal ist eine andere Art");
+    einfuegen("4711", "quelle", None, None, Some(q1))
+        .await
+        .expect("gleiche Kennung für Qualifikation ist eine andere Art");
+
+    einfuegen("4712", "quelle", Some(fz1), None, None)
+        .await
+        .expect_err("je Fahrzeug und Herkunft nur eine Kennung");
+    einfuegen("4712", "andere", Some(fz1), None, None)
+        .await
+        .expect("andere Herkunft am selben Fahrzeug");
+    einfuegen("4712", "quelle", None, None, Some(q1))
+        .await
+        .expect("Qualifikation darf mehrere Kennungen derselben Herkunft tragen");
+
+    let geloescht = sqlx::query("DELETE FROM fahrzeug WHERE id = ?")
+        .bind(fz1)
+        .execute(&pool)
+        .await;
+    assert!(
+        geloescht.is_err(),
+        "ein Fahrzeug mit Kennung hält fest (NO ACTION, Demo-Löschweg behält es)"
     );
 }

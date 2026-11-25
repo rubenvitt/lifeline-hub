@@ -21,7 +21,7 @@ async fn erteilen(app: &axum::Router, cookie: &str, e: i64, extra: Value) -> (St
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         cookie,
         Some(&body.to_string()),
     )
@@ -38,7 +38,7 @@ async fn patch(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -46,7 +46,7 @@ async fn patch(
 }
 
 async fn anordnungen(app: &axum::Router, cookie: &str, e: i64) -> Vec<String> {
-    let (_, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (_, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     etb.as_array()
         .unwrap()
         .iter()
@@ -82,7 +82,7 @@ async fn erteilen_speichert_ziel_mit_koordinate_ohne_bleibt_sie_weg() {
     let (s, d) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/tasks/{aid}"),
+        &format!("/api/incidents/{e}/tasks/{aid}"),
         &admin,
         None,
     )

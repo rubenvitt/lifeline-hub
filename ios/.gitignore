@@ -3,3 +3,6 @@
 /App/Info.plist
 /App/Version.xcconfig
 /Benachrichtigungsdienst/Info.plist
+/Helfer/App/Info.plist
+/Helfer/App/Version.xcconfig
+/Helfer/Aktivitaet/Info.plist

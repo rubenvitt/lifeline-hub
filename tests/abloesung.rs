@@ -10,14 +10,14 @@ mod common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs")
+    format!("/api/incidents/{einsatz}/reliefs")
 }
 
 async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(r#"{{"name":"{name}"}}"#)),
     )
@@ -40,7 +40,7 @@ async fn einheit(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         cookie,
         Some(&body),
     )
@@ -53,7 +53,7 @@ async fn etb_eintraege(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<se
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -361,7 +361,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
 const MODELLE: &str = "/api/shift-models";
 
 fn vorgabe_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/reliefs/shift-model")
+    format!("/api/incidents/{einsatz}/reliefs/shift-model")
 }
 
 async fn modell(app: &axum::Router, cookie: &str, body: &str) -> (StatusCode, serde_json::Value) {
@@ -999,7 +999,7 @@ async fn handstatus(app: &axum::Router, admin: &str, e: i64, einheit: i64, statu
     let (s, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{e}/units/{einheit}/status"),
+        &format!("/api/incidents/{e}/units/{einheit}/status"),
         admin,
         Some(&format!(r#"{{"status_id":{status}}}"#)),
     )
@@ -1065,7 +1065,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units/{f1}/timeline"),
+        &format!("/api/incidents/{e}/units/{f1}/timeline"),
         &admin,
         None,
     )
@@ -1124,7 +1124,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units/{f1}/timeline"),
+        &format!("/api/incidents/{e}/units/{f1}/timeline"),
         &admin,
         None,
     )
@@ -1141,7 +1141,7 @@ async fn schicht_beginnt_mit_dem_eintreffen_und_endet_mit_der_entlassung() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units/{f1}/timeline/{entlassung}/strike"),
+        &format!("/api/incidents/{e}/units/{f1}/timeline/{entlassung}/strike"),
         &admin,
         Some(r#"{"grund":"falscher Knopf"}"#),
     )
@@ -1190,7 +1190,7 @@ async fn ohne_vorgabe_oder_bei_fehler_bleibt_es_beim_statuswechsel() {
     let (_, z) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/units/{f2}/timeline"),
+        &format!("/api/incidents/{e}/units/{f2}/timeline"),
         &admin,
         None,
     )
@@ -1220,7 +1220,7 @@ async fn untereinheit_erbt_die_schicht_des_verbands() {
     let (s, gruppe) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         &admin,
         Some(&format!(
             r#"{{"name":"Gruppe 1","ueber_einheit_id":{zug}}}"#
@@ -1252,7 +1252,7 @@ async fn abschnitt_von(
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         cookie,
         None,
     )
@@ -1372,7 +1372,7 @@ async fn vollzug_mit_liste_und_abschnittsuebergabe() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
+        &format!("/api/incidents/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1445,7 +1445,7 @@ async fn vollzug_uebergabe_ohne_wirkung_braucht_keine_freigabe_einheiten() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
+        &format!("/api/incidents/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1525,7 +1525,7 @@ async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: O
     let (s, p) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/personnel"),
+        &format!("/api/incidents/{e}/personnel"),
         cookie,
         Some(&format!(r#"{{"adhoc":{{"name":"{name}"}}}}"#)),
     )
@@ -1536,7 +1536,7 @@ async fn person(app: &axum::Router, cookie: &str, e: i64, name: &str, einheit: O
         let (s, j) = anfrage(
             app,
             "PUT",
-            &format!("/api/einsaetze/{e}/units/{einheit}/personnel/{id}"),
+            &format!("/api/incidents/{e}/units/{einheit}/personnel/{id}"),
             cookie,
             None,
         )
@@ -1551,7 +1551,7 @@ async fn mitglieder(app: &axum::Router, cookie: &str, e: i64, einheit: i64) -> V
     let (s, liste) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/units"),
+        &format!("/api/incidents/{e}/units"),
         cookie,
         None,
     )
@@ -1646,7 +1646,7 @@ async fn besatzungswechsel_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
+        &format!("/api/incidents/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1658,7 +1658,7 @@ async fn besatzungswechsel_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/einheiten"),
+        &format!("/api/incidents/{e}/module-overrides/einheiten"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":null}"#),
     )
@@ -1712,7 +1712,7 @@ async fn besatzungswechsel_ueber_die_route() {
 
 /// LLH-1308: Bereitstellungsraum anlegen und aktivieren.
 async fn raum(app: &axum::Router, cookie: &str, e: i64, bez: &str) -> i64 {
-    let basis = format!("/api/einsaetze/{e}/staging-areas");
+    let basis = format!("/api/incidents/{e}/staging-areas");
     let (s, j) = anfrage(
         app,
         "POST",
@@ -1797,7 +1797,7 @@ async fn vollzug_mit_verbleib_ueber_die_route() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/bereitstellungsraeume"),
+        &format!("/api/incidents/{e}/module-overrides/bereitstellungsraeume"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -1864,7 +1864,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, p) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Muster","versorgende_einheit_id":{f1}}}"#
@@ -1877,7 +1877,7 @@ async fn abschnittsuebergabe_und_ruecknahme_melden_versorgte_personen() {
     let (s, q) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         &admin,
         Some(&format!(
             r#"{{"name":"Ablöser","versorgende_einheit_id":{f2}}}"#

@@ -135,4 +135,71 @@ mod tests {
             assert!(err.to_string().starts_with("Frist"), "{s}: {err}");
         }
     }
+
+    /// Property-Tests (LLH-2090): das Format trägt die Textsortierung der Zeitspalten, also muss
+    /// es für jeden Zeitpunkt mit vierstelligem Jahr verlustfrei und ordnungstreu sein.
+    mod eigenschaften {
+        use super::*;
+        use chrono::NaiveDate;
+        use proptest::prelude::*;
+
+        /// Sekundengenaue Zeitpunkte mit vierstelligem Jahr.
+        fn zeitpunkt() -> impl Strategy<Value = NaiveDateTime> {
+            (
+                0i32..=9999,
+                1u32..=12,
+                1u32..=31,
+                0u32..24,
+                0u32..60,
+                0u32..60,
+            )
+                .prop_filter_map("kein gültiges Datum", |(j, mo, t, h, mi, s)| {
+                    NaiveDate::from_ymd_opt(j, mo, t)?.and_hms_opt(h, mi, s)
+                })
+        }
+
+        proptest! {
+            #[test]
+            fn formatieren_und_streng_lesen_ergibt_denselben_zeitpunkt(t in zeitpunkt()) {
+                prop_assert_eq!(parse_streng(&formatiere(t)), Some(t));
+            }
+
+            #[test]
+            fn textsortierung_entspricht_der_zeitfolge(a in zeitpunkt(), b in zeitpunkt()) {
+                prop_assert_eq!(formatiere(a).cmp(&formatiere(b)), a.cmp(&b));
+            }
+
+            #[test]
+            fn normalisierte_eingabe_ist_kanonisch_und_bleibt_beim_zweiten_mal_gleich(
+                t in zeitpunkt(),
+                trenner in prop::sample::select(vec!["T", " "]),
+                mit_sekunden in any::<bool>(),
+                rand in "[ \t]{0,2}",
+            ) {
+                let fmt = if mit_sekunden { "%Y-%m-%d{T}%H:%M:%S" } else { "%Y-%m-%d{T}%H:%M" };
+                let roh = format!("{rand}{}{rand}", t.format(&fmt.replace("{T}", trenner)));
+                let normal = normalisiere_eingabe(&roh).expect("gültige Eingabe");
+                prop_assert!(parse_streng(&normal).is_some(), "{normal} ist nicht kanonisch");
+                prop_assert_eq!(normalisiere_eingabe(&normal), Some(normal));
+            }
+
+            #[test]
+            fn normalisieren_beliebiger_eingaben_panict_nie_und_bleibt_idempotent(roh in any::<String>()) {
+                if let Some(normal) = normalisiere_eingabe(&roh) {
+                    prop_assert_eq!(normalisiere_eingabe(&normal), Some(normal));
+                }
+            }
+
+            #[test]
+            fn minuten_addieren_panict_nie_und_laesst_sich_zuruecknehmen(
+                t in zeitpunkt(),
+                minuten in prop_oneof![any::<i64>(), -10_000_000i64..10_000_000],
+            ) {
+                let s = formatiere(t);
+                if let Some(spaeter) = plus_minuten(&s, minuten) {
+                    prop_assert_eq!(plus_minuten(&spaeter, -minuten), Some(s));
+                }
+            }
+        }
+    }
 }

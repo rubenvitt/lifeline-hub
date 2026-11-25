@@ -8,7 +8,7 @@ import { anmeldenAlsAdmin, wechsleZuRolle } from './rollen-kern';
  */
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Rufname ${Date.now()}` },
   });
   expect(antwort.ok(), `Einsatz anlegen: ${antwort.status()}`).toBe(true);
@@ -39,7 +39,7 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   // Die Pflicht: ohne Rufnamen geht nichts an den Server, der Text bleibt stehen.
   const gesendet: string[] = [];
   page.on('request', (r) => {
-    if (r.method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/etb`)) {
+    if (r.method() === 'POST' && r.url().endsWith(`/api/incidents/${einsatzId}/etb`)) {
       gesendet.push(r.url());
     }
   });
@@ -68,7 +68,7 @@ test('ohne Standard fragt das ETB, hält den Eintrag auf und sendet danach mit d
   await expect(page.getByRole('combobox', { name: 'An', exact: true })).toHaveValue('Florian 4/1');
 
   const antwort = page.waitForResponse(
-    (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/einsaetze/${einsatzId}/etb`),
+    (r) => r.request().method() === 'POST' && r.url().endsWith(`/api/incidents/${einsatzId}/etb`),
   );
   await page.getByRole('button', { name: 'Erfassen', exact: true }).click();
   const eintrag = await antwort;
@@ -95,7 +95,7 @@ test('Abfrage: Tab nimmt den obersten Vorschlag und springt weiter, Enter nimmt 
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page);
   for (const name of ['Sanitätsgruppe UHS', 'Sanitätszug Musterstadt']) {
-    const r = await page.request.post(`/api/einsaetze/${einsatzId}/units`, { data: { name } });
+    const r = await page.request.post(`/api/incidents/${einsatzId}/units`, { data: { name } });
     expect(r.ok(), `Einheit ${name}: ${r.status()}`).toBe(true);
   }
   await wechsleZuRolle(page, 'fuehrungspersonal', einsatzId);

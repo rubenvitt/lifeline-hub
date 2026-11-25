@@ -7,17 +7,24 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 `./scripts/check-all.sh` (voller Lauf; vor dem PR genügt `--geaendert --ohne-e2e`, s. „Leichte PR-Prüfung“): `check-fmt.sh` (rustfmt + Prettier) → `pnpm lint` →
 `check-typ-codegen.sh` + `check-api-clients.sh` → `cargo test` (Workspace, Hülle getrennt) → Vitest → `check-deps.sh` + `check-karenzzeit.sh` → `pnpm e2e` →
 `release-ruhefenster.test.sh` + `ki-notizen.test.mjs` + `desktop-manifest.test.mjs` + `desktop-kanal.test.mjs` + `android-kanal.test.mjs` + `kanal-nachziehen.test.sh` + `abbild-kanal.test.mjs` + `pr-kommentare.test.mjs` + `drittanbieter-quellen.test.sh` + `rueckmeldung/einwurf.test.mjs` + `ios/version.test.sh` + `ios/xcodegen-installieren.test.sh` + `ios/testflight.test.sh` + `ios/testflight-verteilen.test.mjs` + `ios/bilder-ablegen.test.sh` + `ios/fehlgruende.test.sh` + `android/version.test.sh` + `android/sdk-version.test.sh` + `android/release-apk.test.sh` + `android/apk-ablegen.test.sh` → `check-deps.test.sh` + `check-karenzzeit.test.sh` →
-`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` → `check-toolversionen.sh` →
+`check-migrationen.sh` + `migrationen-autofix.test.sh` + `stau-waechter.test.sh` → `check-all.test.sh` + `bauziel.test.sh` + `wiederholen.test.sh` + `bereiche.test.sh` + `ci-stufen.test.sh` + `ruleset-pruefen.test.sh` + `ci-messung.test.sh` + `e2e-anteile.test.mjs` + `e2e-wackler.test.mjs` + `gate-dateien.test.sh` → `check-toolversionen.sh` →
 `check-openspec-eingefroren.sh` → `check-schreibweisen.sh` + `check-api-routen.sh` → `cargo test` mit `dev-seeds` (Dev-Seed) →
-`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) →
-`swift test` in `ios/LifelineKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
+`check-architektur.sh` + `check-adr-nummern.sh` (Architekturdoku, Regeln in `docs/architektur/AGENTS.md`) und `check-design-tokens-nativ.sh` (Schritt 21, Bündel `schnell`) →
+`swift test` in `ios/LifelineKern` und `ios/HelferKern` (Schritt 18, Bündel `ios`, LLH-1978; ohne Swift im PATH eine
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
 `cargo build --bin lifeline-hub` + `cargo check -p karten-service` (Schritt 19, Bündel `rust` und
 allein `binaer`, LLH-2033/LLH-2038) →
-`gradlew -p android/kern test` (Schritt 20, Bündel `android`, LLH-1989; ohne Java 17+ eine
+`gradlew -p android/kern test` und `gradlew -p android/helferkern test` (Schritt 20, Bündel `android`, LLH-1989; ohne Java 17+ eine
 Lücke, mit `ANDROID_KERN_PFLICHT=1` rot).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
 Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
+- **Native Design-Tokens** (Helfer-Apps, Schritt 21, Bündel `schnell`): `Tokens.swift`
+  (`ios/HelferKern`) und `Tokens.kt` (`android/helferkern`) entstehen aus
+  `docs/design/design-system/project/tokens.json` mit `mise exec -- node scripts/design/tokens-nativ.mjs`
+  und werden mitcommittet; `scripts/check-design-tokens-nativ.sh` erzeugt sie neu und vergleicht
+  Byte für Byte (rot bei Abweichung oder fehlender Datei). Nie von Hand ändern, nie einen Wert
+  nativ erfinden: ein neuer Token kommt in `tokens.json`. `bereiche.sh` ordnet `tokens.json`, den
+  Erzeuger und den Wächter dem Frontend (nur `tokens.json`), iOS und Android zu.
 - **Server-Binary ohne Dev-Abhängigkeiten** (LLH-2033): Jeder Rust-Schritt mit Testzielen, auch
   `--nur baut` (`--all-targets`), übersetzt mit den Features der Dev-Abhängigkeiten
   (`webauthn-rs/danger-credential-internals`, `tokio/test-util`, …). Was ein Feature nur über sie
@@ -87,6 +94,16 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
     Archiv, Signierung und Upload stehen in `scripts/ios/testflight.sh`, das Alpha-Tags und eine
     vom Tag abweichende Workspace-Version selbst abweist (Selbsttest in Schritt 8). Betrieb und
     Secrets: `docs/betrieb/ios-app.md`.
+  - **TestFlight der Helfer-App** (ADR-0101): `ios-helfer.yml` lädt das Schema `LifelineHelfer`
+    hoch, nur an PRs mit dem Label `testflight-helfer` (beim Setzen und bei jedem Push danach)
+    oder per Handstart; dasselbe Skript mit `--app helfer --build <Laufnummer + 1000>`, die
+    Version steht nur in `scripts/ios/helfer-version.sh`. Kein Verteilschritt: die Gruppe
+    „Intern“ bekommt jeden Build automatisch. `ios-pruefung.yml` testet die Helfer-App mit.
+  - **APK der Helfer-App** (ADR-0101): `android-helfer.yml` baut `:helfer:assembleRelease` mit
+    demselben Schlüssel wie die Lifeline-App (`ANDROID_KEY*`, fehlt eins: rot), prüft Signatur
+    und Paket und legt die APK als Artefakt `android-helfer-apk` ab; nur an PRs mit dem Label
+    `apk-helfer` oder per Handstart, `versionCode` = Laufnummer + 1000. Noch kein Kanal.
+    `android-pruefung.yml` testet die Helfer-App mit (Bilder als `android-helfer-bilder`).
   - **Android-Prüfung** (LLH-1989): `android-pruefung.yml` fährt an PRs und nach Pushes auf
     `alpha`, die `android/`, `scripts/android/` oder `src-tauri/faelle/` ändern, die App-Tests
     (Robolectric, Bilder als Artefakt `android-bilder`), die Release-APK ohne Signatur und den
@@ -112,6 +129,15 @@ Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.
   - Folge: Testbrüche landen auf `alpha` und gehen über „alpha rot“ (Stau-Wächter, unten).
   - Herleitung: `openspec/changes/archive/2026-11-14-p4avye3q-pr-checks-leicht/design.md`,
     `openspec/changes/archive/2026-11-15-czjhc4qq-ci-pr-schlank/design.md`.
+- **Gate-Dateien** (LLH-2090, `scripts/gate-dateien.sh`): Eine Änderung darf die Prüfung, die
+  sie bewertet, nicht unbemerkt lockern. Ändert ein PR ein Gate-Skript, einen Selbsttest, einen
+  Lint-Riegel, eine Playwright- oder Vitest-Config, einen Workflow, die PR-Vorlage, die
+  Review-Prüfliste oder den Skill `verify` (Liste im Skript), steht je Datei eine Warnung am PR
+  und ein Abschnitt in der Zusammenfassung des Laufs „Migrationsnummern“. Das Skript kommt dort
+  vom **Ziel-Branch** wie `check-migrationen.sh`, damit ein PR die Liste nicht für sich selbst
+  kürzt. Es beobachtet und sperrt nicht (kein Status, kein Pflicht-Check): erst zeigen, wie oft
+  es anschlägt, dann entscheiden. Im PR steht unter „Geprüft“, ob die Prüfung strenger oder
+  lockerer wird und warum. Eine neue Prüfung kommt in die Liste in `ist_gate_datei`.
 - **Stau-Wächter** (LLH-1660, `scripts/stau-waechter.sh`, `.github/workflows/stau-waechter.yml`:
   Push auf einen Ziel-Branch, stündlich, von Hand): bewertet jeden offenen PR, der kein Entwurf
   ist. Was er tut und warum, steht im Skriptkopf; die Grenzen belegt `stau-waechter.test.sh`.

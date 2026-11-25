@@ -31,7 +31,7 @@ use axum::Json;
 use serde::Deserialize;
 
 /// SSE-Notify (Lage-Karte): Fahrzeug-Disposition hat sich geändert.
-pub(super) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
+pub(crate) fn sse_fahrzeug(state: &AppState, einsatz_id: i64, ef_id: i64) {
     state
         .live
         .publiziere_objekt(einsatz_id, LiveEvent::Fahrzeug, "fahrzeug_id", ef_id);
@@ -65,7 +65,7 @@ pub struct ListeParams {
     entlassene: Option<String>,
 }
 
-/// GET /api/einsaetze/{id}/vehicles — aktive Fahrzeuge (aufgelöst), mit `?entlassene=1` die
+/// GET /api/incidents/{id}/vehicles — aktive Fahrzeuge (aufgelöst), mit `?entlassene=1` die
 /// entlassenen (Spec `kraefte-entlassung`). Stornierte liefert keine der beiden. Nur
 /// Mitglieder/höhere Berechtigung.
 pub async fn liste(
@@ -99,7 +99,7 @@ pub struct DisponierenBody {
     pub adhoc: Option<AdhocBody>,
 }
 
-/// POST /api/einsaetze/{id}/vehicles — Stamm-Fahrzeug disponieren ODER Ad-hoc anlegen.
+/// POST /api/incidents/{id}/vehicles — Stamm-Fahrzeug disponieren ODER Ad-hoc anlegen.
 /// Schreibberechtigt + aktiver Einsatz. Schreibt ETB-Eintrag.
 pub async fn disponieren(
     State(state): State<AppState>,
@@ -217,7 +217,7 @@ pub struct SammelBody {
     pub einheit_id: Option<i64>,
 }
 
-/// POST /api/einsaetze/{id}/vehicles/bulk — mehrere Stamm-Fahrzeuge in einem Schritt
+/// POST /api/incidents/{id}/vehicles/bulk — mehrere Stamm-Fahrzeuge in einem Schritt
 /// disponieren und optional einer Einheit zuordnen (LLH-1100, Spec `kraefte-disposition`). Alles
 /// oder nichts wie beim Personal (422 mit Gründen je Zeile); mit Einheit gilt auch das Recht am
 /// Modul Einheiten. Keine Zeitachse (D6). Ein ETB-Sammeleintrag in der Transaktion, Ereignisse
@@ -316,7 +316,7 @@ pub struct DispoErwartet {
     pub opta: Option<Option<String>>,
 }
 
-/// PATCH /api/einsaetze/{id}/vehicles/{ef_id} — Status, Bemerkung und bei Ad-hoc-Fahrzeugen
+/// PATCH /api/incidents/{id}/vehicles/{ef_id} — Status, Bemerkung und bei Ad-hoc-Fahrzeugen
 /// Funkrufname, Typ, Kennzeichen, Träger und OPTA (LLH-1073). Ein Statuswechsel schreibt einen
 /// ETB-Eintrag, geänderte Angaben zusammen einen weiteren; die Bemerkung keinen. Reihenfolge:
 /// 400 (Feld) → 404 (Zeile) → 409 (beendet) → 422 (Angaben an einem Stamm-Fahrzeug).
@@ -559,7 +559,7 @@ pub async fn update(
     }))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/status/undo — „Rückgängig“ nach einem
+/// POST /api/incidents/{id}/vehicles/{ef_id}/status/undo — „Rückgängig“ nach einem
 /// Statuswechsel (LLH-1781, Spec `fahrzeugstatus-quittung`, Change
 /// `eon26eat-status-und-bedienung`, design.md D8). Body ist der Beleg aus der Antwort des
 /// Status-PATCH. Status inzwischen anders → 409 `veraltet`; andere Person, abgelaufene Frist oder
@@ -618,7 +618,7 @@ pub async fn status_zuruecknehmen(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
+/// POST /api/incidents/{id}/vehicles/{ef_id}/stand-down — aus dem Einsatz entlassen (LLH-1079,
 /// Spec `kraefte-entlassung`): die Zeile bleibt, Besatzung, Einheit, Bereitstellungsraum und
 /// Führungsstelle gehen, Auftragsempfänger bleiben. Ohne Rückfrage; der Rückweg „Rückgängig“ ist
 /// `…/stand-down/undo` mit dem gelieferten Vorzustand (LLH-1722), der Block „Entlassen“
@@ -691,7 +691,7 @@ pub async fn entlassen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/stand-down/undo — „Rückgängig“ nach dem
+/// POST /api/incidents/{id}/vehicles/{ef_id}/stand-down/undo — „Rückgängig“ nach dem
 /// Entlassen (LLH-1722, Spec `kraefte-entlassung`, design.md D5): Body ist der Vorzustand aus der
 /// Antwort von `…/stand-down`. Nur die entlassende Person, nur dieses Entlassen, höchstens
 /// [`crate::entlassung::RUECKNAHME_FRIST_MINUTEN`] danach, sonst 409. Was inzwischen anders
@@ -781,7 +781,7 @@ pub async fn zuruecknehmen(
     }))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/annul — Fehldisposition stornieren (LLH-1079,
+/// POST /api/incidents/{id}/vehicles/{ef_id}/annul — Fehldisposition stornieren (LLH-1079,
 /// design.md D3): nur mit unverändertem Status, ohne Bindung und Spur und in den ersten
 /// 15 Minuten, sonst 422 mit dem Grund; ein beendetes Fahrzeug → 409. ETB-Eintrag.
 pub async fn stornieren(
@@ -810,7 +810,7 @@ pub async fn stornieren(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/reactivate — ein entlassenes oder storniertes
+/// POST /api/incidents/{id}/vehicles/{ef_id}/reactivate — ein entlassenes oder storniertes
 /// Fahrzeug erneut disponieren (LLH-1079, design.md D7): Block „Entlassen“ (auch für Ad-hoc) und
 /// Rückgängig nach dem Entlassen. Initialstatus neu. Aktiv → 409. ETB-Eintrag.
 pub async fn reaktivieren(
@@ -852,7 +852,7 @@ pub struct BesatzungZuruecknahmeParams {
     nur_wenn_frei: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id} — Kraft als Besatzung
+/// PUT /api/incidents/{id}/vehicles/{ef_id}/crew/{ep_id} — Kraft als Besatzung
 /// zuordnen (LFH-9, exklusiv: Wechsel überschreibt; mit `nur_wenn_frei=1` nicht, LLH-1924).
 /// Append-only System-ETB + SSE.
 pub async fn besatzung_zuordnen(
@@ -927,7 +927,7 @@ fn check_ep_ids(ids: &[i64]) -> Result<Vec<i64>, AppError> {
     Ok(crate::kraefte_disposition::dedupe(ids, |id| *id))
 }
 
-/// POST /api/einsaetze/{id}/vehicles/{ef_id}/crew — mehrere Personen in einem Schritt als
+/// POST /api/incidents/{id}/vehicles/{ef_id}/crew — mehrere Personen in einem Schritt als
 /// Besatzung zuordnen („Personal der Einheit übernehmen“, LLH-1073, design.md D12). Alles oder
 /// nichts: Fahrzeug beendet → 409, unbekannt → 404; Vorprüfung der Personen in einer Abfrage
 /// (unbekannt oder fremd, beendet → 422 mit Grund je Person), dann ein UPDATE. Additiv und
@@ -983,7 +983,7 @@ pub async fn besatzung_uebernehmen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/vehicles/{ef_id}/crew/{ep_id} — Kraft aus der
+/// DELETE /api/incidents/{id}/vehicles/{ef_id}/crew/{ep_id} — Kraft aus der
 /// Fahrzeug-Besatzung freigeben (LFH-9). Append-only System-ETB + SSE.
 pub async fn besatzung_freigeben(
     State(state): State<AppState>,
@@ -1031,7 +1031,7 @@ pub struct PositionBody {
     pub erwartet: Option<crate::routes::support::LageErwartet>,
 }
 
-/// PATCH /api/einsaetze/{id}/vehicles/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
+/// PATCH /api/incidents/{id}/vehicles/{ef_id}/position — reine Lage-Pflege, KEIN ETB.
 pub async fn position(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Fahrzeuge>,

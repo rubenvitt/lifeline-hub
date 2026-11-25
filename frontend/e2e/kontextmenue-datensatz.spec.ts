@@ -16,10 +16,10 @@ async function post(page: Page, pfad: string, data: unknown): Promise<number> {
 }
 
 async function einsatzMitMaterial(page: Page): Promise<number> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Kontextmenü ${Date.now()}`,
   });
-  await post(page, `/api/einsaetze/${einsatzId}/material`, {
+  await post(page, `/api/incidents/${einsatzId}/material`, {
     adhoc: { bezeichnung: 'Stromerzeuger' },
     menge: 4,
   });
@@ -86,10 +86,10 @@ test.describe('Titel-Link und Tastatur (Personen, Tabelle)', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
   async function einsatzMitPerson(page: Page): Promise<number> {
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Kontextmenü Personen ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/persons`, {
+    await post(page, `/api/incidents/${einsatzId}/persons`, {
       name: 'Kontext',
       vorname: 'Karla',
       antreff_ort: 'Sammelstelle Nord',

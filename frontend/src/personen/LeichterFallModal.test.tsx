@@ -167,7 +167,7 @@ describe('LeichterFallModal', () => {
   beforeEach(() => {
     sessionStorage.clear();
     server.use(
-      http.get('/api/einsaetze/1/persons/units', () =>
+      http.get('/api/incidents/1/persons/units', () =>
         HttpResponse.json([
           { id: 7, name: 'RTW 1', abschnitt_id: 2, abschnitt_name: 'Abschnitt Nord' },
         ]),
@@ -243,7 +243,7 @@ describe('LeichterFallModal', () => {
     let freigeben: () => void = () => {};
     const geladen = new Promise<void>((r) => (freigeben = r));
     server.use(
-      http.get('/api/einsaetze/1/persons/units', async () => {
+      http.get('/api/incidents/1/persons/units', async () => {
         await geladen;
         await delay(0);
         return HttpResponse.json([

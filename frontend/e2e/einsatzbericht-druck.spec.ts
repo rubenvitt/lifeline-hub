@@ -70,7 +70,7 @@ function vorEinerStunde(): string {
 }
 
 async function saeen(page: Page, einsatzId: string) {
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const bericht = await sende(page, 'POST', `${basis}/situation-reports`, {
     vorlage: 'lagebericht',
     titel: 'Erstlage Halle 3',
@@ -264,7 +264,7 @@ test('Einsatzbericht als Beobachter: alle Module ausgeblendet druckbar, Rollensp
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Einsatzbericht Rollen ${Date.now()}`);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   for (const modul of BERICHT_MODULE) {
     await sende(page, 'PUT', `${basis}/module-overrides/${modul}`, {
       sichtbar: false,
@@ -305,7 +305,7 @@ test('Einsatzbericht: Blöcke abwählen, Anlage Personal je Kopf, Auswahl in der
 }) => {
   await anmelden(page, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Einsatzbericht Auswahl ${Date.now()}`);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   // Die Disposition setzt die Alarmierung selbst: die Kraft hat damit eine offene Periode.
   await sende(page, 'POST', `${basis}/personnel`, { adhoc: { name: 'Hanna Helferin' } });
 

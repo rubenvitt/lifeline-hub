@@ -25,7 +25,7 @@ import { anmeldenPerApi } from './anmelde-kern';
  * ist strenger als die Metrik.
  *
  * `page.route` STATT SEEDING: der Shift hängt an der Zahl der Kacheln, und die Suite legt in
- * derselben Datenbank parallel Einsätze an. Interzipiert wird nur `GET /api/einsaetze`; die
+ * derselben Datenbank parallel Einsätze an. Interzipiert wird nur `GET /api/incidents`; die
  * Vorlage der Antwort kommt aus einem echten `POST` (Feldform aus dem Backend).
  *
  * Bleibt die Seite lange offen, lädt der Vite-Dev-Server sie irgendwann neu; eine Messung
@@ -101,7 +101,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
  * getippte Pflichtfelder veralteten beim nächsten Backend-Feld still.
  */
 async function vorlageHolen(page: Page, bezeichnung: string): Promise<EinsatzAnzeige> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(
     antwort.ok(),
     `Vorlage-Einsatz „${bezeichnung}": ${antwort.status()} ${await antwort.text()}`,
@@ -142,7 +142,7 @@ function baueListe(
 }
 
 /**
- * Interzipiert `GET /api/einsaetze` mit einer festen Antwort und zählt die Abrufe — ohne
+ * Interzipiert `GET /api/incidents` mit einer festen Antwort und zählt die Abrufe — ohne
  * Zähler wäre „ein Refetch erzeugt keinen Shift" auch grün, wenn kein Refetch stattfand.
  * `POST` trifft dieselbe URL und wird durchgereicht.
  */
@@ -153,7 +153,7 @@ async function stelleListe(
 ): Promise<{ abrufe: number; zeiten: number[] }> {
   const start = Date.now();
   const zaehler: { abrufe: number; zeiten: number[] } = { abrufe: 0, zeiten: [] };
-  await page.route(/\/api\/einsaetze(\?.*)?$/, async (route: Route) => {
+  await page.route(/\/api\/incidents(\?.*)?$/, async (route: Route) => {
     if (route.request().method() !== 'GET') {
       await route.continue();
       return;

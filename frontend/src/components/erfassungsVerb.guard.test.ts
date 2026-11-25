@@ -54,6 +54,8 @@ const ERLAUBT: readonly string[] = [
   'Eintragen',
   'Einrichten',
   'Ausgeben',
+  // Helfer-App: gibt einen Einladungscode aus, wie „Koppeln“ beim Gerät.
+  'Einladen',
   'Sichern',
   'Nachtragen',
   'Schichten erzeugen',

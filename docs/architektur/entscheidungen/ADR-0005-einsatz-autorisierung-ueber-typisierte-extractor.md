@@ -19,7 +19,7 @@ herleitung:
 
 ## Regeln
 
-- MUST: Jeder Handler einer Route unter `/api/einsaetze/{id}/…` zieht genau einen
+- MUST: Jeder Handler einer Route unter `/api/incidents/{id}/…` zieht genau einen
   sanktionierten Gate-Typ aus `src/einsatz/kontext.rs` (`EinsatzLesezugriff`,
   `EinsatzSchreibzugriff`, `EinsatzSchreibfreigabe`, `EinsatzLeitungszugriff`,
   `EinsatzVerwaltungszugriff`), mit dem Modul-Marker, der zum Pfad passt. Ausnahmen gibt es nur

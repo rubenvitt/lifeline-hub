@@ -24,7 +24,7 @@ const HINWEIS = '[data-lfh="eingangsband"]';
 
 async function oeffnenMitStrom(page: Page, pfad: string, einsatzId: number) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await page.goto(pfad);
   await strom;
@@ -35,10 +35,10 @@ test('Lagemeldung von einem zweiten Schirm: Eingangshinweis in zwei Tabs, „Sic
 }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Eingang ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
@@ -56,7 +56,7 @@ test('Lagemeldung von einem zweiten Schirm: Eingangshinweis in zwei Tabs, „Sic
       data: { benutzername: konto.benutzername, passwort: konto.passwort },
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
-    const lage = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
+    const lage = await zweiter.post(`/api/incidents/${einsatzId}/reports`, {
       data: {
         absender: ABSENDER,
         meldeweg: 'funk',
@@ -93,10 +93,10 @@ test('Lagemeldung von einem zweiten Schirm: Eingangshinweis in zwei Tabs, „Sic
 test('„Alle gelesen“ im ersten Tab räumt Band und Zahl im zweiten (LLH-1143)', async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Alle gelesen ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
@@ -115,7 +115,7 @@ test('„Alle gelesen“ im ersten Tab räumt Band und Zahl im zweiten (LLH-1143
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
     for (const n of [1, 2]) {
-      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
+      const r = await zweiter.post(`/api/incidents/${einsatzId}/reports`, {
         data: {
           absender: `${ABSENDER} ${n}`,
           meldeweg: 'funk',
@@ -139,7 +139,7 @@ test('„Alle gelesen“ im ersten Tab räumt Band und Zahl im zweiten (LLH-1143
   const verlauf = page.getByRole('region', { name: 'Eingänge' });
   await expect(verlauf.getByRole('list', { name: 'Neu' }).getByRole('listitem')).toHaveCount(2);
   const gelesen = page.waitForResponse((r) =>
-    r.url().endsWith(`/api/einsaetze/${einsatzId}/notifications/read`),
+    r.url().endsWith(`/api/incidents/${einsatzId}/notifications/read`),
   );
   await verlauf.getByRole('button', { name: 'Alle gelesen' }).click();
   expect((await gelesen).status()).toBe(204);

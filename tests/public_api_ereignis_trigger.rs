@@ -104,7 +104,7 @@ async fn kopf_patch(l: &Lage, einsatz: i64, body: serde_json::Value) {
     let (s, v) = anfrage_json(
         &l.app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         &l.admin,
         Some(&body),
     )
@@ -116,7 +116,7 @@ async fn abschliessen(l: &Lage, einsatz: i64) {
     let (s, v) = anfrage(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &l.admin,
         None,
     )
@@ -605,7 +605,7 @@ async fn ein_eintrag_im_einsatztagebuch_aendert_die_lage_nicht() {
     let (s, v) = anfrage_json(
         &l.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         &l.admin,
         Some(&json!({ "typ": "meldung", "inhalt": "Lage ruhig", "von": "ELW", "an": "EL" })),
     )
@@ -824,7 +824,7 @@ async fn aenderungen_ueber_den_spiegel_melden_dem_fremdsystem_am_hub() {
     let (s, v) = anfrage_json(
         &elw.app,
         "PATCH",
-        &format!("/api/einsaetze/{e_elw}"),
+        &format!("/api/incidents/{e_elw}"),
         &elw.admin,
         Some(&json!({ "leitstellen_nr": "L-77" })),
     )
@@ -851,7 +851,7 @@ async fn aenderungen_ueber_den_spiegel_melden_dem_fremdsystem_am_hub() {
     let (s, v) = anfrage(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{e_elw}/close"),
+        &format!("/api/incidents/{e_elw}/close"),
         &elw.admin,
         None,
     )

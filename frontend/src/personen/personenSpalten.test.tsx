@@ -298,7 +298,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
   it('bearbeitet den leeren Zustand in der Zeile: PATCH mit NUR dem Zustand (Spec-Szenario)', async () => {
     const koerper: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
+      http.patch('/api/incidents/1/persons/10', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json({ ...basis, zustand: 'gehfähig, unterkühlt' });
       }),
@@ -326,7 +326,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
     const koerper: Record<string, unknown>[] = [];
     let stand: Person = { ...basis, zustand: 'gehfähig' };
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
+      http.patch('/api/incidents/1/persons/10', async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
         koerper.push(body);
         const erwartet = body.erwartet as { zustand: string | null } | undefined;
@@ -336,7 +336,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
         stand = { ...stand, zustand: body.zustand as string };
         return HttpResponse.json(stand);
       }),
-      http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(stand)),
+      http.get('/api/incidents/1/persons/10', () => HttpResponse.json(stand)),
     );
     renderMitProviders(<>{zelle(mitSchreibrecht, stand)}</>);
     await userEvent.click(
@@ -364,7 +364,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
     let freigeben!: () => void;
     const gehalten = new Promise<void>((r) => (freigeben = r));
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', async () => {
+      http.patch('/api/incidents/1/persons/10', async () => {
         await gehalten;
         return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
       }),
@@ -402,7 +402,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
      */
     const koerper: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
+      http.patch('/api/incidents/1/persons/10', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
       }),
@@ -439,14 +439,14 @@ describe('Zustand-Spalte (LFH-613)', () => {
      */
     let scheitern = true;
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', () =>
+      http.patch('/api/incidents/1/persons/10', () =>
         scheitern
           ? HttpResponse.json({ error: 'Datenbank gesperrt' }, { status: 409 })
           : HttpResponse.json({ ...basis, zustand: 'gehfähig' }),
       ),
       // Der 409 lädt die Person frisch: der Zustand steht noch wie beim Öffnen, also kein
       // Feldkonflikt — der Grund steht an der Zelle.
-      http.get('/api/einsaetze/1/persons/10', () => HttpResponse.json(basis)),
+      http.get('/api/incidents/1/persons/10', () => HttpResponse.json(basis)),
     );
     const { container } = renderMitProviders(<>{zelle(mitSchreibrecht, basis)}</>);
     await userEvent.click(
@@ -484,7 +484,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
   it('schickt nichts, wenn der Wert unverändert bleibt (Wertgleichheits-Riegel)', async () => {
     const patch = vi.fn();
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', () => {
+      http.patch('/api/incidents/1/persons/10', () => {
         patch();
         return HttpResponse.json(basis);
       }),
@@ -520,7 +520,7 @@ describe('Zustand-Spalte (LFH-613)', () => {
   it('ohne Netz bleibt ein getippter Entwurf stehen und geht nicht nachträglich hinaus', async () => {
     const koerper: unknown[] = [];
     server.use(
-      http.patch('/api/einsaetze/1/persons/10', async ({ request }) => {
+      http.patch('/api/incidents/1/persons/10', async ({ request }) => {
         koerper.push(await request.json());
         return HttpResponse.json({ ...basis, zustand: 'gehfähig' });
       }),

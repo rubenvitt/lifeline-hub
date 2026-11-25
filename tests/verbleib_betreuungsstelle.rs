@@ -12,7 +12,7 @@ mod common;
 use common::*;
 
 fn betreuung(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/care")
+    format!("/api/incidents/{einsatz}/care")
 }
 
 async fn stelle(app: &axum::Router, cookie: &str, einsatz: i64, bezeichnung: &str) -> i64 {
@@ -34,7 +34,7 @@ async fn person(app: &axum::Router, cookie: &str, einsatz: i64) -> i64 {
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         cookie,
         Some("{}"),
     )
@@ -53,7 +53,7 @@ async fn verbleib(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}/whereabouts"),
+        &format!("/api/incidents/{einsatz}/persons/{person}/whereabouts"),
         cookie,
         Some(body),
     )
@@ -64,7 +64,7 @@ async fn person_detail(app: &axum::Router, cookie: &str, einsatz: i64, person: i
     let (s, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/persons/{person}"),
+        &format!("/api/incidents/{einsatz}/persons/{person}"),
         cookie,
         None,
     )
@@ -84,7 +84,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -103,7 +103,7 @@ async fn system_etb(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<Strin
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -436,7 +436,7 @@ async fn gesicherter_lagestand_enthaelt_keine_namentliche_zahl() {
     let (s, dok) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/situation-snapshots"),
+        &format!("/api/incidents/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )
@@ -468,7 +468,7 @@ async fn personenliste_filtert_nach_betreuungsstelle() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let (e, sid) = lage_mit_zwei_namentlichen(&app, &admin).await;
-    let personen = format!("/api/einsaetze/{e}/persons");
+    let personen = format!("/api/incidents/{e}/persons");
     let hier = personen_ids(&app, &admin, &personen).await;
     assert_eq!(hier.len(), 2, "Vorbedingung: zwei Personen an der Stelle");
 
@@ -588,7 +588,7 @@ async fn filter_nach_stelle_ohne_personenrecht_ist_403() {
     let (s, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons?betreuungsstelle_id={sid}"),
+        &format!("/api/incidents/{e}/persons?betreuungsstelle_id={sid}"),
         &bernd,
         None,
     )
@@ -615,7 +615,7 @@ async fn gesicherter_lagestand_enthaelt_keine_leitung_und_keinen_kontaktweg() {
     let (s, dok) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/situation-snapshots"),
+        &format!("/api/incidents/{e}/situation-snapshots"),
         &admin,
         Some(r#"{"bezeichnung":"Stand 1"}"#),
     )

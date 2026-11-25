@@ -51,16 +51,20 @@ Zeitpunkt als volle DTG („Ebene abgerufen …“) neben den Zeitangaben der Qu
 | DWD | 300 s | 60 s | 30 min | Warnungen wie NINA, gröberer Takt |
 | PEGELONLINE | 300 s | 100 s | 60 min | Messwerte ~15 min, vier verpasst |
 | Hochwasser | 300 s | 60 s | 60 min | Amtliche Meldeklasse, Anlass von LFH-591 |
-| Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst |
+| Autobahn | 600 s | 120 s | 60 min | Sechs Läufe verpasst; gilt auch für Verkehrsmeldungen (LLH-1637), ein Stau verschwindet aus der Antwort, sobald die Quelle ihn beendet |
+| Lkw-Parkplätze (BAB) | 24 h | 30 min | 36 h | 1,5 × TTL wie Energie, unter dem Cache-Deckel von 48 h; Rastanlagen ändern sich selten |
 | ODL | 600 s | 300 s | 3 h | Stundenwerte: zwei verpasst, plus Verzug der Quelle |
 | Luftqualität | 900 s | 300 s | 4 h | Stundenwerte mit ~2 h Verzug; der Verzug zählt nicht als Veraltung |
 | Energie | 24 h | — | 36 h | 1,5 × TTL, unter dem Cache-Deckel von 48 h |
 | KRITIS | Import 168 h | — | 14 Tage | Zwei Importläufe im Vorgabe-Intervall verpasst |
 | Copernicus | 1 800 s | 600 s | 120 min | Vier verpasste Erneuerungen; das Alter des Bildes zeigt die Aufnahmezeit, nicht diese Marke |
+| Copernicus-Satellitenbilder | 1 800 s | 600 s | 120 min | Wie die Auswertung; das Alter jedes Bildes steht in der Ebenenzeile |
+| Drohne (LLH-2106) | — (Arbeitsspeicher) | 5 s | 1 min | Der Adapter erneuert den Stand alle 5 s (`intervall_vorschlag_s`); eine Minute ohne neuen Stand ist ein altes Fluggerät. Einsatzroute `/api/incidents/{id}/map/drone`, ein Poll ohne Änderung kostet ein 304 |
 
 Genau auf der Schwelle gilt ein Stand noch nicht als veraltet. Die Schwellen stehen als
-`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen alle bei
-mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser; ein
+`veraltetNachMin` in `frontend/src/pages/lagekarte/fachebenen.ts`. Sie liegen bis auf die Drohnenlage bei
+mindestens 15 min und damit über jedem üblichen Uhrenversatz zwischen Server und Browser (die
+Drohnenlage mit 1 min setzt Uhren voraus, die auf wenige Sekunden gehen); ein
 Zeitpunkt in der Zukunft zählt als Alter 0. **KRITIS:** Das Import-Intervall ist konfigurierbar
 (`--kritis-extrakt-intervall-stunden`), die Schwelle nicht. Wer das Intervall über 14 Tage
 hebt, sieht KRITIS schon vor dem nächsten Lauf als veraltet.
@@ -88,6 +92,11 @@ Messung am 03.10.2026 gegen die echten Quellen (Dev-Server, `curl` mit Cookie, `
 | Luftqualität | 381 Stationen | 173 302 B | 194 B | 1,6 ms |
 | Autobahn | 2 217 Meldungen | 1 704 054 B | 194 B | 8,9 ms |
 
+Nachtrag 24.11.2026 (LLH-1637), gemessen als `curl`-Fächer mit 8 gleichzeitigen Abrufen gegen die
+Quelle, nicht über den Dev-Server: Lage-Lauf mit vier Diensten 26 s (2 178 Baustellen, 316
+Sperrungen, 9 Meldungen nachts, 0 Webcams; 7,3 MB roh). Parken-Lauf 7 s (1 800 Rastanlagen,
+1,5 MB roh, normalisiert ≈ 0,78 MB).
+
 Der Server komprimiert nicht, der Rumpf geht also roh über die Leitung. Ein 200 trägt 240 B
 Kopf. „Server je Poll" heißt: Cache-JSON parsen, wieder serialisieren, SHA-256 bilden, im
 Release-Build und ohne das Lesen aus SQLite. Das Hashen allein kostet davon unter 1,3 ms. Der
@@ -104,16 +113,17 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
 
 | Quelle (`quelle`) | Endpoint | Format / Geometrie | Lizenz | Pflicht-Attribution | Cache-TTL / Aktualisierung | Offline |
 |---|---|---|---|---|---|---|
-| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Restriktiv: „nur nicht zu gewerblichen Zwecken".** Nutzung hier als nicht-gewerbliches behördliches/BOS-Lagetool; Quellennennung Pflicht. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
-| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **GeoNutzV — offen, auch kommerziell**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
+| **NINA / MoWaS** (`nina`) | `https://warnung.bund.de/api31/mowas/mapData.json` + je Warnung `…/warnings/{id}.geojson` | CAP-JSON-Liste + GeoJSON-Polygone (N+1, im Backend kombiniert) | **Auflage des BBK je Meldung: „nur inhaltlich unverändert und nicht zu gewerblichen Zwecken“**, keine Lizenz im engeren Sinn. Geprüft am 24.11.2026 (LLH-1203): **unbedenklich**, Begründung unter „Lizenz NINA / MoWaS“. Quellennennung Pflicht. **Vorgabe an; ein gewerblicher Betreiber schaltet die Ebene mit `--nina false` ab** (s. u., LLH-2104). Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Quelle: Bundesamt für Bevölkerungsschutz und Katastrophenhilfe (BBK) / MoWaS` | 90 s; Obergrenze 6 h | leer + ausgegraut |
+| **DWD** (`dwd`) | `https://maps.dwd.de/geoserver/dwd/ows` (WFS, `dwd:Warnungen_Gemeinden_vereinigt`, `outputFormat=application/json`, `EPSG:4326`) | GeoJSON-Polygone direkt | **CC BY 4.0 — offen, auch kommerziell und verändert**, Quellenvermerk Pflicht (bei veränderter Darstellung Zusatz „Datenbasis…"). Laut den rechtlichen Hinweisen des DWD gilt CC BY 4.0 für alle frei zugänglichen Geodaten und Geodatendienste (geprüft 24.11.2026, LLH-1203; vorher GeoNutzV). | `Datenbasis: Deutscher Wetterdienst` | 300 s; abgelaufene Warnungen (`EXPIRES ≤ jetzt`) entfernt der Server bei jeder Auslieferung, der Cache hält den Rohstand; Obergrenze 6 h | leer + ausgegraut |
 | **PEGELONLINE** (`pegelonline`) | `https://www.pegelonline.wsv.de/webservices/rest-api/v2/stations.json?includeCurrentMeasurement=true` | JSON → GeoJSON-Punkte (~640 Pegel, Wasserstand) | **DL-DE→Zero 2.0** (keine Attributionspflicht, Quellenangabe empfohlen). | `PEGELONLINE / WSV` | 300 s (Messwerte ~15 min) | leer + ausgegraut |
 | **Hochwasser-Meldeklassen / LHP** (`hochwasser`) | `https://www.hochwasserzentralen.de/` (Startseite, nur für den `ki`-Token) + `POST …/webservices/get_lagepegel.php` (`ki=<token>&pegelname=1`) | JSON-Struct-of-Arrays (`PGNAME`/`PGNR`/`HW`/`UNK`/`LAT`/`LON`, ~2070 Pegel) → GeoJSON-Punkte mit Meldeklasse | **Urheberrecht bei den jeweils zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder**; Portal betrieben von LfU Bayern / LUBW Baden-Württemberg. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Länderübergreifendes Hochwasserportal (LHP) — Urheberrecht bei den zuständigen Hochwasserzentralen bzw. Pegelbetreibern der Länder` | 300 s | leer + ausgegraut |
 | **Strahlung / ODL (BfS)** (`odl`) | `https://www.imis.bfs.de/ogc/opendata/ows` (WFS 1.1.0, `opendata:odlinfo_odl_1h_latest`, `outputFormat=application/json`) | GeoJSON-Punkte direkt (~1 676 ortsfeste Sonden, EPSG:4326, Gamma-ODL-Stundenwert in µSv/h) → auf die gelesenen Felder normalisiert, mit Bewertungsstufe | **GeoNutzV bzw. Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0)**, auch kommerziell; Auflage laut BfS-Nutzungsbedingungen: Daten „in sachlicher Art und Weise darzustellen". Kein Schlüssel, keine dokumentierte Abrufgrenze. | `Bundesamt für Strahlenschutz (BfS), dl-de/by-2-0` | 600 s (Quelle im Stundentakt) | leer + ausgegraut |
-| **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure}` | JSON → GeoJSON-**Punkte** (rund 110 Strecken × 3 Dienste, im Backend aggregiert) | **Kein Lizenzvermerk in API oder OpenAPI-Spec.** Gängige Einordnung (bundesAPI): Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0), also auch kommerziell und verändert nutzbar bei Quellennennung. Kein Schlüssel, keine Registrierung. Siehe Lizenz-Vorbehalt unten. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
+| **Autobahn-Lage / BAB** (`autobahn`) | `https://verkehr.autobahn.de/o/autobahn/` (Streckenliste) + je Strecke `…/services/{webcam,roadworks,closure,warning}` | JSON → GeoJSON-**Punkte** (rund 113 Strecken × 4 Dienste, im Backend aggregiert); Verkehrsmeldungen seit LLH-1637 | **Nicht belegt** (Befund 24.11.2026, s. Lizenz-Vorbehalt unten). Kein Schlüssel, keine Registrierung. | `Autobahn GmbH des Bundes` | 600 s (Erstbefüllung im Hintergrund, s. u.) | leer + ausgegraut |
+| **Lkw-Parkplätze / BAB** (`autobahn_parken`, LLH-1637) | wie oben, je Strecke `…/services/parking_lorry` | JSON → GeoJSON-**Punkte** (~1 800 Rastanlagen mit Pkw-/Lkw-Stellplätzen und Ausstattung, keine Belegung) | **Nicht belegt**, wie `autobahn` | `Autobahn GmbH des Bundes` | 24 h (Erstbefüllung im Hintergrund, teilt die Einzelspur mit `autobahn`; ein Lauf zählt erst ab 90 % beantworteter Strecken) | leer + ausgegraut |
 | **Luftqualität / UBA** (`luftqualitaet`) | `https://luftdaten.umweltbundesamt.de/api/air-data/v2/stations/json` + `…/airquality/json` (Acht-Stunden-Fenster, beide mit `lang=de&index=id`) | Zeilen-Arrays mit Spaltenliste in `indices` → GeoJSON-**Punkte** (~390 Messstationen mit Index) | **Lizenz-Vorbehalt, s. u.** — gängige Einordnung: Datenlizenz Deutschland – Namensnennung – 2.0 (dl-de/by-2-0). Kein Schlüssel, keine Registrierung. Inoffizielle API (bund.dev), keine Stabilitätszusage. | `Umweltbundesamt` | 900 s (Stundenwerte mit ~2 h Verzug) | leer + ausgegraut |
 | **KRITIS / sensible Objekte** (`kritis`) | Deutschland-Extrakt `https://download.geofabrik.de/europe/germany-latest.osm.pbf` (Geofabrik, konfigurierbar), **kein Abruf je Anfrage** | OSM-PBF → eigener Bestand in `nachschlage-cache.db` (Nodes als Punkt, Ways/Relations als Bounding-Box-Mitte); Route liefert GeoJSON-Punkte je `bbox`, ab 5 000 Objekten Sammelpunkte | **ODbL** (OpenStreetMap), Attribution **zwingend**. | `© OpenStreetMap-Beitragende (ODbL)` | Import alle 168 h (`--kritis-extrakt-intervall-stunden`), Stand = `Last-Modified` des Extrakts | ohne Bestand leer + ausgegraut; ein vorhandener Bestand bleibt auch ohne Netz unbegrenzt gültig |
 | **Energieanlagen** (`energie`, LFH-81) | OSM: `https://overpass-api.de/api/interpreter` (Mirror `overpass.kumi.systems`), `nwr[power=plant](bbox);out center tags;` · MaStR: `https://www.marktstammdatenregister.de/MaStR/Einheit/EinheitJson/GetErweiterteOeffentlicheEinheitStromerzeugung` (Filter: Nettonennleistung > 10 000 kW, Koordinate vorhanden, Status 35/37, `pageSize=2000`) | OSM-JSON + MaStR-JSON → GeoJSON-**Punkte**, je Anfrage über einen erweiterten Rand zusammengeführt und auf die `bbox` beschränkt | **ODbL** (OSM) · **Datenlizenz Deutschland – Namensnennung – 2.0** ([dl-de/by-2-0](https://www.govdata.de/dl-de/by-2-0)) für das [Marktstammdatenregister](https://www.marktstammdatenregister.de/MaStR) der Bundesnetzagentur | nur die beitragenden Teile, getrennt durch „ · “: `© OpenStreetMap-Beitragende (ODbL)` · `Marktstammdatenregister, Bundesnetzagentur – dl-de/by-2-0` | 24 h je Teil (OSM je gerundeter bbox, MaStR bundesweit ein Eintrag); kalter Abruf von der Anfrage gelöst, Wartefrist 10 s für beide Teile zusammen; `stand` = Zeitpunkt des MaStR-Abzugs | ein Teil fällt aus → der andere wird gezeigt; beide aus → leer + ausgegraut |
-| **Copernicus EMS Rapid Mapping** (`copernicus`, LLH-1200) | Liste `https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500` · Details `…/dashboard-api/public-activations/?code=EMSRnnn` · Ebenen als GeoJSON unter `https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/…` | WKT (Gebiete) + GeoJSON in CRS84 (Flächen, Linien, Punkte) → einheitliche Features mit `art`, `klasse`, Herkunft und Aufnahmezeit, je Ausschnitt | **Frei mit Quellenangabe** (Copernicus-Datenpolitik der EU). Kein Schlüssel. Die Detail-Schnittstelle ist ein Pfad des Dashboard-Backends ohne Stabilitätszusage; öffentlich erst ab EMSR656 (März 2023). | `© European Union, Copernicus Emergency Management Service` | Antwort, Liste und laufende Aktivierungen 1 800 s, abgeschlossene Aktivierungen und Ebenen-Dateien 24 h; kalter Abruf von der Anfrage gelöst, Wartefrist 10 s (der Client bricht nach 15 s ab); eine unvollständige Antwort geht hinaus, wird aber nicht gespeichert; `stand` = jüngste Aufnahme | ohne Liste oder ohne jede Details leer + ausgegraut; einzelne fehlende Ebene → Gebiet „unvollständig“, in der Ebenenzeile genannt |
+| **Copernicus EMS Rapid Mapping** (`copernicus`, LLH-1200) | Liste `https://rapidmapping.emergency.copernicus.eu/backend/dashboard-api/public-activations-info/?limit=500` · Details `…/dashboard-api/public-activations/?code=EMSRnnn` · Ebenen als GeoJSON unter `https://rapidmapping-viewer.s3.eu-west-1.amazonaws.com/…` · Altbestand vor 2023 (LLH-2022): Katalog `src/karte/copernicus_altbestand.json`, Vector Packages (ZIP) unter `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/…` | WKT (Gebiete) + GeoJSON in CRS84 (Flächen, Linien, Punkte) → einheitliche Features mit `art`, `klasse`, Herkunft und Aufnahmezeit, je Ausschnitt | **Frei mit Quellenangabe** (Copernicus-Datenpolitik der EU). Kein Schlüssel. Die Detail-Schnittstelle ist ein Pfad des Dashboard-Backends ohne Stabilitätszusage; öffentlich erst ab EMSR656 (März 2023); davor nur, was der Katalog führt. | `© European Union, Copernicus Emergency Management Service` | Antwort, Liste und laufende Aktivierungen 1 800 s, abgeschlossene Aktivierungen und Ebenen-Dateien und Vector Packages 24 h; kalter Abruf von der Anfrage gelöst, Wartefrist 10 s (der Client bricht nach 15 s ab); eine unvollständige Antwort geht hinaus, wird aber nicht gespeichert; `stand` = jüngste Aufnahme, ersatzweise Lieferung | ohne Liste oder ohne jede Details leer + ausgegraut; einzelne fehlende Ebene oder fehlendes Vector Package → Gebiet „unvollständig“, in der Ebenenzeile genannt |
 
 ## Hinweise zur Anbindung
 
@@ -125,6 +135,15 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
   Leitung, jeder Abruf risse die 8-s-Schranke des Clients, und der Cache füllte sich nie.
   Gilt für alle Ebenen über `liefere_mit_swr` (DWD, NINA, PEGELONLINE, ODL, Hochwasser,
   Luftqualität); Energie und Autobahn hatten den Riegel schon.
+- **NINA abschalten (LLH-2104).** Die Auflage des BBK erlaubt MoWaS-Meldungen nur inhaltlich
+  unverändert und nicht zu gewerblichen Zwecken. Hilfsorganisationen, Behörden und BOS betrifft
+  das nicht; ein gewerblicher Betreiber (etwa ein privater Sanitätsdienst) startet den Server mit
+  `--nina false` bzw. `LIFELINE_NINA=false`. **Vorgabe: an.** Abgeschaltet ruft die Instanz
+  warnung.bund.de nie ab: `GET /api/map/overlays/nina` antwortet 404, bevor Cache oder Quelle
+  gefragt werden, `GET /api/map/config` meldet `fachebenen_abgeschaltet: ["nina"]`, und die
+  Lagekarte zeigt die Ebene gar nicht (nicht als offline). Eine gespeicherte Sichtbarkeit bleibt
+  stehen und gilt wieder, sobald die Ebene eingeschaltet ist. Belegt durch
+  `abgeschaltete_nina_ist_404_ohne_abruf` in `tests/karte.rs` (Attrappe zählt 0 Anfragen).
 - **NINA** ist die einzige Quelle mit einem zweistufigen Abruf (Übersichtsliste ohne
   Geometrie → Einzel-Geometrie je Warnung). Der Aggregator lädt die Geometrien parallel und
   toleriert einzelne fehlschlagende Geometrie-Abrufe (geloggt, übrige Warnungen bleiben).
@@ -369,11 +388,57 @@ Die Pflicht-Attribution aktiver, nicht-offline Fachebenen wird in der Karten-Att
     die URL, nicht das Bild) — anders als alle übrigen Fachebenen-Daten läuft es also NICHT
     über den Backend-Proxy. Ohne Internet am Gerät lädt es nicht; das Detailpanel blendet
     das Bild dann aus und nennt den Grund, statt ein kaputtes Bildsymbol stehen zu lassen.
-- **Lizenz-Vorbehalt Autobahn:** weder die API noch die OpenAPI-Spec (bundesAPI) nennen eine
-  Lizenz; die GovData-Eintragung „Die Autobahn App" zeigt im Suchergebnis keinen Lizenzwert.
-  Die Pflicht-Attribution `Autobahn GmbH des Bundes` wird unabhängig davon immer mitgeführt
-  und genügt damit auch der strengsten der in Frage kommenden Bedingungen. Vor einer
-  kommerziellen Weiterverwertung ist die Lizenzlage direkt bei der Autobahn GmbH zu klären.
+- **Lizenz NINA / MoWaS (LLH-1203, geprüft 24.11.2026 an den Primärquellen):**
+  * **Wortlaut.** Unter jeder MoWaS-Meldung im RSS-Feed (`/api31/mowas/rss/{ARS}.rss`) steht:
+    „Diese Warnmeldung stammt aus dem Modularen Warnsystem (MoWaS) des Bundesamtes für
+    Bevölkerungsschutz und Katastrophenhilfe. Sie darf nur inhaltlich unverändert und nicht zu
+    gewerblichen Zwecken verwendet werden. Um die Authentizität der Warnmeldung zu überprüfen
+    gehen Sie auf https://warnung.bund.de.“ Die JSON-Endpunkte, die der Adapter abruft
+    (`mapData.json`, `warnings/{id}.geojson`), tragen den Satz nicht. Es sind dieselben
+    Meldungen, deshalb gilt die Auflage auch für sie. Eine Lizenz im engeren Sinn gibt es nicht:
+    Die OpenAPI-Beschreibung (bundesAPI) hat weder `license` noch `termsOfService` und führt den
+    Satz nur im RSS-Beispiel. Das Impressum des BBK regelt die Texte seiner Website, nicht die
+    Warnmeldungen.
+  * **Geltung.** Die Auflage nennt ausdrücklich MoWaS. Die übrigen Quellen in NINA (DWD, LHP,
+    Polizei) betrifft sie nicht, und der Adapter holt sie auch nicht über NINA: DWD und LHP
+    kommen direkt vom Anbieter (eigene Zeilen oben), Polizeimeldungen werden nicht genutzt.
+  * **„Inhaltlich unverändert“: erfüllt.** Die Umrechnung in GeoJSON ändert nur das Format.
+    Titel, Schwere, Dringlichkeit, Meldungstyp, Beginn und Warnpolygon gehen wörtlich durch.
+    Nichts wird umformuliert, zusammengefasst oder neu bewertet. Dass Beschreibung und
+    Handlungsanweisung fehlen, macht die Ebene zu einem Auszug, nicht zu einer veränderten
+    Meldung.
+  * **„Nicht zu gewerblichen Zwecken“: erfüllt.** Die Daten ruft die betreibende Stelle ab
+    (Hilfsorganisation, Behörde, BOS) und nutzt sie für die Gefahrenabwehr im Einsatz, also
+    nicht gewerblich. Lifeline Hub selbst gibt die Meldungen nicht weiter: Jede Instanz holt sie
+    selbst bei warnung.bund.de, und die Software enthält keine Meldungen.
+  * **Folgeaufgaben:** Link zur Vollmeldung auf warnung.bund.de im Inspector (LLH-2103:
+    Authentizität, Handlungsanweisung). Die Abschaltung je Instanz für einen gewerblichen
+    Betreiber steht seit LLH-2104 bereit (`--nina false`, Abschnitt „NINA abschalten“ oben).
+- **Lizenz-Vorbehalt Autobahn: nicht belegt** (Befund 24.11.2026, LLH-1637). Die frühere
+  Einordnung als dl-de/by-2-0 hatte keine Quelle und ist gestrichen.
+  * Die API-Antwort trägt keinen Lizenz- oder Copyright-Kopf.
+  * bundesAPI (`github.com/bundesAPI/autobahn-api`): kein Lizenzvermerk im README, keine
+    LICENSE-Datei, `openapi.yaml` 1.0.1 ohne `license`; Kontakt ist die Autobahn GmbH.
+  * autobahn.de: das Impressum nennt den Herausgeber, aber weder Nutzungsbedingungen noch Lizenz;
+    `/nutzungsbedingungen` und `/open-data` antworten mit 404.
+  * Mobilithek: das einzige Angebot der Autobahn GmbH (Arbeitsstellen längerer Dauer) steht unter
+    einer eingeschränkten Lizenz für Stellen mit berechtigtem Interesse. Das gilt nicht für die
+    App-API, zeigt aber, dass die GmbH ihre Daten nicht pauschal offen lizenziert.
+  * Ein Teil der Verkehrsmeldungen stammt von **INRIX**, einem kommerziellen Datenanbieter
+    (`source: inrix`, am 24.11. 3 von 8). Das Feld wird nicht übernommen. Webcam-Bilder liegen bei
+    Drittbetreibern und werden nur verlinkt, nie zwischengespeichert.
+  * Eine schriftliche Anfrage an die Autobahn GmbH (kontakt@autobahn.de) ist vorbereitet
+    (Entwurf im Anhang des Design-Docs zu LLH-1637): Lizenz, Vermerk für INRIX, Einsatz in einer
+    entgeltlichen Anwendung, Abrufgrenze. Bis zur Antwort wird die Attribution
+    `Autobahn GmbH des Bundes` an beiden Ebenen immer mitgeführt.
+- **Autobahn — Verkehrsmeldungen** (`warning`, LLH-1637): `abnormalTrafficType` fehlte am
+  24.11.2026 bei 5 von 8 Meldungen; bekannt sind `QUEUING_TRAFFIC` (Stau), `SLOW_TRAFFIC`
+  (zähfließend), `STATIONARY_TRAFFIC` (Stillstand), andere Werte fallen weg, der Titel trägt
+  die Meldung dann allein. `delayTimeValue` kommt als String in Minuten; `0` wird nicht gezeigt.
+- **Lkw-Parkplätze** (`parking_lorry`, LLH-1637): die Stellplätze stehen nur als Text in
+  `description` (`PKW Stellplätze: 18`), die Ausstattung in `lorryParkingFeatureIcons`. Eine
+  Belegung liefert die Quelle nicht; die Geltungszeile sagt das sichtbar. Ladesäulen
+  (`electric_charging_station`) sind bewusst nicht angebunden.
 - **Luftqualität (UBA)** zeigt **Messpunkte, keine Fläche.** Die Ebene sagt, was an den
   Stationen des Luftmessnetzes gemessen wurde — nicht, wie die Luft zwischen ihnen oder am
   Einsatzort ist. Das steht als sichtbare Geltungszeile unter dem Ebenen-Label; eine
@@ -550,8 +615,53 @@ Gebäude und Verkehrswege, eine erste Abschätzung (FEP). Die Ebene zeigt sie je
   Funkverbindung vor dem Abbruch des Clients an. Jede Datei liest `http_begrenzt` mit
   `DECKEL_FACHEBENE`, und nur vom S3-Host der Quelle. WKT wird höchstens drei Ebenen tief
   gelesen.
+- **Ausschnitt:** Jedes Feature, dessen Rechteck den Ausschnitt nicht schneidet, fällt weg
+  (`filter_ausschnitt`: der auf 2 Stellen gerundete Ausschnitt des Cache-Schlüssels, um 0,005°
+  nach außen). Der Gebietsumriss kommt immer mit.
 - **Archiv:** Der Schalter „Ältere Aktivierungen“ in der Ebenenzeile gilt nur bis zum Neuladen;
   er reist weder in gespeicherte Kartenansichten noch in den Browserspeicher.
-- **Nicht angebunden:** Aktivierungen vor März 2023 (die Detail-Schnittstelle verlangt dort eine
-  Anmeldung; die Produkt-ZIPs mit Shapefiles liest Lifeline Hub nicht) und die Rasterbilder
-  (COG). EFAS-Echtzeitdaten gibt es nur für Partner.
+- **Altbestand vor 2023 (LLH-2022, ADR-0099):** Die Detail-Schnittstelle verlangt dort eine
+  Anmeldung. Ausgewählte Aktivierungen stehen deshalb im Katalog
+  `src/karte/copernicus_altbestand.json`, heute EMSR517 (Hochwasser Westdeutschland 2021, 17
+  Gebiete, 23 Produkte). Mit „Ältere Aktivierungen“ lädt der Server das Vector Package je
+  gezeigtem Produkt (höchstens 6 je Antwort und 2 gleichzeitig, Download höchstens 48 MiB, nur
+  vom Präfix `https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/`;
+  ein eigener Client verfolgt Weiterleitungen nur innerhalb dieses Präfixes) und liest daraus nur die GeoJSON-Dateien des Umrisses und der bekannten Ebenen
+  (höchstens 200 Einträge, 16 MiB je Eintrag, 32 MiB zusammen). Gebäude und Straßen nur aus
+  `GRA`; in `DEL` sind sie Referenzdaten. Die Pakete nennen keine Aufnahmezeit: Es zählt die
+  Lieferzeit, und Liste wie Inspector sagen „Lieferung“. Fehlt ein Paket, zeigt das Gebiet sein
+  Rechteck und trägt „unvollständig“.
+- **Einen Eintrag pflegen:** Auf `https://mapping.emergency.copernicus.eu/activations/EMSRnnn/`
+  stehen je Produkt Lieferzeit und Link „Vector Package (.zip)“. Je Gebiet kommen Nummer, Name
+  (`locality` aus `…_areaOfInterestA_…json` im ZIP) und das Rechteck um diesen Umriss
+  (`[west, süd, ost, nord]`, nach außen gerundet) in den Katalog, je Produkt Typ (`DEL`, `GRA`),
+  Monitoring-Nummer (0 für `PRODUCT`), Version, Lieferzeit (UTC) und ZIP-Adresse. Die Tests in
+  `copernicus_alt.rs` prüfen Format, Präfix und doppelte Codes.
+- **Nicht angebunden:** Aktivierungen vor März 2023 außerhalb des Katalogs, und für den
+  Altbestand die Rasterbilder (COG): Die Vector Packages enthalten keine. EFAS-Echtzeitdaten gibt
+  es nur für Partner.
+
+## Copernicus-Satellitenbilder (LLH-2021)
+
+Zu optischen Produkten liefert Copernicus das Orthobild als Cloud Optimized GeoTIFF unter dem
+S3-Host der Ebenen (`layers[]` mit `format: "cog"`, Sensor und Aufnahme aus `images[]` über den
+Dateinamen). Die Ebene `copernicus_bilder` zeigt sie als Kacheln des eigenen Servers
+(`karte::cog`, `karte::copernicus_bilder`, ADR-0100, Entwurf
+`docs/superpowers/specs/2026-11-24-h11vkn1p-copernicus-cog-rasterbilder-design.md`).
+
+- **Auswahl:** dieselbe Kette wie die Auswertung (`select_im_ausschnitt`); Bilder nur der dort
+  gewählten Produkte. Ein Gebiet, dessen gezeigtes Produkt Radar ist, hat kein Bild, auch wenn ein
+  jüngeres Monitoring ohne Flächen eines hätte (EMSR728 Stuttgart).
+- **Liste:** `GET /api/map/overlays/copernicus/images?bbox=…[&archiv=1]`, Umschlag wie jede
+  Fachebene; je Bild Umriss, Kennung (16 Hex-Zeichen von SHA-256 über den Pfad), Zoomgrenzen und
+  `darstellbar`. Höchstens 20 Bilder (`MAX_BILDER`), darüber `gekuerzt`.
+- **Kacheln:** `GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y}`, PNG 256 px,
+  nur mit Sitzung (`KartenZugriff`), `Cache-Control: private, max-age=86400, immutable`. Der Server liest per HTTP-Range erst 16 KiB
+  Kopf (höchstens 1 MiB in bis zu 8 Runden), dann je Zielkachel höchstens 4 Quellkacheln der
+  passenden Übersicht (je höchstens 2 MiB komprimiert, entpackt nie mehr als eine Kachel; höchstens
+  4 Render-Läufe gleichzeitig). Kopf und Kacheln liegen im Kachel-Cache (256 MiB, LRU); jede
+  Listenantwort legt verdrängte Köpfe neu an.
+- **Nur EPSG:3857:** Gelesen werden gekachelte 8-Bit-Bilder mit höchstens 512 px Kachelkante mit 1, 3 oder 4 Kanälen, Deflate, LZW,
+  JPEG oder unkomprimiert, Prädiktor 1 oder 2. Anderes heißt „nicht darstellbar“, nie umprojiziert.
+- **Fehler:** unbekannte Kennung 404, falsche Kachel 400, außerhalb des Bildes oder unter dem
+  Mindest-Zoom 204, Quelle weg und Kachel nicht im Cache 502.

@@ -19,10 +19,12 @@ import type { KarteMarker, MarkerTyp, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
+import GeortetListe from './GeortetListe';
 import EscKappe from './EscKappe';
 import { zielSchluessel, type ObjektEintrag } from './objektsuche';
 import type { LatLon } from '../../anzeige/koordinaten';
 import type { Hintergrundbild } from '../../api/kartenbilder';
+import type { FremdebenenZeilenProps } from './FremdebenenZeilen';
 import type { UploadFortschritt } from '../../api/client';
 import type { KartenAnsicht } from '../../api/types';
 import type { KartenGrund } from './useKartenFehler';
@@ -160,6 +162,8 @@ export interface SidebarSektionFehler {
   nichtVerortet?: SektionFehler;
   /** Eigene Query: `useKartenbilder`. */
   bilder?: SektionFehler;
+  /** Eigene Query: `useFremdebenen` (LLH-2099). */
+  fremdebenen?: SektionFehler;
   /** Eigene Query: `useKartenAnsicht`. Ohne diesen Slot rendert der Switcher bei Fehler nichts. */
   ansichten?: SektionFehler;
 }
@@ -280,6 +284,11 @@ export interface SidebarProps {
   ansichtSpeichert: boolean;
   onAnsichtSpeichern: () => void;
   fachebenenSichtbar: import('./fachebenenAuswahl').FachebenenSichtbar;
+  /**
+   * Vom Betreiber abgeschaltete Fachebenen (`/api/map/config`, LLH-2104): Der Ebenenbaum zeigt
+   * sie nicht. Fehlt die Liste, gilt keine als abgeschaltet.
+   */
+  fachebenenAbgeschaltet?: readonly string[];
   onFachebeneToggle: (key: import('../../api/fachebenen').FachebeneQuelle, an: boolean) => void;
   /** Status je Fachebene für Ausgrau-/Offline-Hinweis. */
   fachebenenStatus: Partial<
@@ -290,6 +299,13 @@ export interface SidebarProps {
   >;
   /** Copernicus (LLH-1200): Archiv-Schalter und EMSR-Nummern im Ausschnitt (`useFachebenen`). */
   copernicus?: Omit<import('./CopernicusZusatz').CopernicusZusatzProps, 'status'>;
+  /** Copernicus-Satellitenbilder (LLH-2021): Bildliste und Deckkraft (`useFachebenen`). */
+  copernicusBilder?: Pick<
+    import('./CopernicusBilderZusatz').CopernicusBilderZusatzProps,
+    'liste' | 'deckkraft' | 'onDeckkraft'
+  >;
+  /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
+  drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */
@@ -299,6 +315,11 @@ export interface SidebarProps {
    * die Karte gehaltene Daten zeichnet (`useFachebenen`).
    */
   fachebenenAbgerufen?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, string>>;
+  /**
+   * Fremdebenen (LLH-2099) aus `useFremdebenen`: Liste, Sichtbarkeit je Arbeitsplatz und die
+   * Schreibwege des ⋮. Ohne Angabe (gesicherter Stand) keine Gruppe.
+   */
+  fremdebenen?: Omit<FremdebenenZeilenProps, 'darfSchreiben'>;
   /** Bild-Hintergründe */
   bilder: Hintergrundbild[];
   onBildUpload: (datei: File) => void;
@@ -407,6 +428,7 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
   return (
     <div role="tabpanel" id={props.id} aria-label="Objekte" hidden={props.hidden}>
       <div data-paneel="objekte">
+        <GeortetListe verortet={props.verortet} onMarkerWaehlen={props.onMarkerWaehlen} />
         <MarkerSuche
           eintraege={props.objekte}
           onMarkerWaehlen={props.onMarkerWaehlen}

@@ -590,15 +590,15 @@ pub(crate) mod tests {
         }
         // Ein Prozentzeichen ohne Schlüssel maskiert nichts.
         assert_eq!(
-            maskiere_pfad("/api/einsaetze/a%20b"),
-            "/api/einsaetze/a%20b"
+            maskiere_pfad("/api/incidents/a%20b"),
+            "/api/incidents/a%20b"
         );
         assert_eq!(maskiere_pfad("/x/100%/y%zz"), "/x/100%/y%zz");
     }
 
     #[test]
     fn fremder_pfad_bleibt_unveraendert() {
-        for pfad in ["/api/v1/me", "/api/einsaetze/7", "/", "", "/api/v1/intake"] {
+        for pfad in ["/api/v1/me", "/api/incidents/7", "/", "", "/api/v1/intake"] {
             assert!(matches!(maskiere_pfad(pfad), Cow::Borrowed(p) if p == pfad));
         }
     }

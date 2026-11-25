@@ -5,7 +5,8 @@ import LifelineKern
 /// Standort für die Oberfläche (LLH-2071; Regel `ios/AGENTS.md`, „Standort“): ein
 /// `CLLocationManager`, nur „When in Use“, gefragt erst beim ersten Befehl der Seite. Was die Seite
 /// bekommt und wann, entscheiden `Brueckenausfuehrung` und `Standortbeobachtung` im Kern; diese
-/// Klasse holt nur Positionen.
+/// Klasse holt nur Positionen; was bei Fehlern und Wechseln der Freigabe endet, entscheidet
+/// `Ortungsablauf` (LLH-2082).
 @MainActor
 final class Standortdienst: NSObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
@@ -23,6 +24,9 @@ final class Standortdienst: NSObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         manager.delegate = self
+        // Eine Beobachtung der Seite soll nicht still pausieren, weil sich das Gerät nicht bewegt:
+        // danach käme weder eine Position noch ein Fehler (LLH-2082).
+        manager.pausesLocationUpdatesAutomatically = false
     }
 
     // MARK: Freigabe
@@ -57,10 +61,13 @@ final class Standortdienst: NSObject, CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
         MainActor.assumeIsolated {
+            let erlaubt = isErlaubt
+            // „Einmal erlauben“ läuft ab, indem der Status wieder `.notDetermined` wird.
+            melde(Ortungsablauf.freigabe(
+                erlaubt: erlaubt, beobachtet: beobachtetGenau != nil, einmalWartend: !einmalWartende.isEmpty))
             guard status != .notDetermined else { return }
             let wartend = freigabeWartende
             freigabeWartende = []
-            let erlaubt = isErlaubt
             wartend.forEach { $0.resume(returning: erlaubt) }
         }
     }
@@ -95,6 +102,10 @@ final class Standortdienst: NSObject, CLLocationManagerDelegate {
         beobachtetGenau = nil
         manager.stopUpdatingLocation()
         passeGenauigkeitAn()
+        // Eine Einzelabfrage wartete auf die nächste Position der Ortung, die es nicht mehr gibt.
+        if Ortungsablauf.isRequestNachStopp(einmalWartend: !einmalWartende.isEmpty) {
+            manager.requestLocation()
+        }
     }
 
     private func passeGenauigkeitAn() {
@@ -122,14 +133,21 @@ final class Standortdienst: NSObject, CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
-        let code = (error as? CLError)?.code
+        let fehler: Ortungsfehler =
+            switch (error as? CLError)?.code {
+            case .denied?: .denied
+            case .locationUnknown?: .locationUnknown
+            default: .andere
+            }
         MainActor.assumeIsolated {
-            let fehler: Standortfehler = code == .denied ? .denied : .unavailable
-            beendeAlleEinmal(mit: .failure(fehler))
-            // „Noch kein Standort“ ist für eine laufende Ortung kein Ende; sie versucht weiter.
-            guard beobachtetGenau != nil, code != .locationUnknown else { return }
-            beiFehler?(fehler)
+            melde(Ortungsablauf.fehler(
+                fehler, beobachtet: beobachtetGenau != nil, einmalWartend: !einmalWartende.isEmpty))
         }
+    }
+
+    private func melde(_ folge: Ortungsfolge) {
+        if let fehler = folge.einmal { beendeAlleEinmal(mit: .failure(fehler)) }
+        if let fehler = folge.beobachtung { beiFehler?(fehler) }
     }
 
     /// Eine Position im Wire-Format; ungültige Werte (negativ) sind `nil`.

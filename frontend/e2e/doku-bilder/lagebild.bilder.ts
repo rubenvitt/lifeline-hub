@@ -22,7 +22,7 @@ const KAPITEL = 'lagebild';
  */
 async function stelleWetter(page: Page, einsatzId: number, jetzt: Date) {
   const um = (ms: number) => new Date(jetzt.getTime() + ms).toISOString();
-  await page.route(`**/api/einsaetze/${einsatzId}/weather`, (route) =>
+  await page.route(`**/api/incidents/${einsatzId}/weather`, (route) =>
     route.fulfill({
       json: {
         ort: { name: 'Musterstadt', kreis: 'Landkreis Musterland', land: 'Niedersachsen' },
@@ -86,7 +86,7 @@ test.describe(KAPITEL, () => {
       'Pegel Mühlbach: Wasserstand stagniert seit 30 Minuten.',
       'UHS Turnhalle meldet freie Kapazität für vier Patienten.',
     ]) {
-      await fuelle(page, 'post', `/api/einsaetze/${demo.id}/etb`, {
+      await fuelle(page, 'post', `/api/incidents/${demo.id}/etb`, {
         typ: 'meldung',
         inhalt,
         von: 'Abschnitt Sanitätsdienst',

@@ -92,8 +92,8 @@ function renderApp(route: string) {
   berichte = liste;
   server.use(
     meHandler(admin),
-    http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-    http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+    http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     http.post(CLIENT_FEHLER_PFAD, async ({ request }) => {
       liste.push((await request.json()) as { route: string; meldung: string });
       return new HttpResponse(null, { status: 204 });

@@ -44,11 +44,11 @@ async function saeen(
   // (Einsatzliste), lokal 3,5 bis 8 s (LLH-1533); wer nur die Ausgabe misst, braucht das nicht.
   if (ohneStartseite) await anmeldenOhneStartseite(page, ADMIN, ADMIN_PW);
   else await anmeldenAlsAdmin(page);
-  const e = (await anlegen(page, '/api/einsaetze', { bezeichnung: `E2E Ausgabe ${Date.now()}` }))
+  const e = (await anlegen(page, '/api/incidents', { bezeichnung: `E2E Ausgabe ${Date.now()}` }))
     .id;
   const jetzt = Date.now();
   const zeit = (minuten: number) => new Date(jetzt + minuten * 60_000).toISOString();
-  const zf = await anlegen(page, `/api/einsaetze/${e}/catering/time-slots`, {
+  const zf = await anlegen(page, `/api/incidents/${e}/catering/time-slots`, {
     bezeichnung: 'Mittag Deich',
     von_at: zeit(minutenVon),
     bis_at: zeit(minutenBis),
@@ -60,7 +60,7 @@ async function saeen(
 }
 
 async function zeitfenster(page: Page, e: number): Promise<Zeitfenster> {
-  const r = await page.request.get(`/api/einsaetze/${e}/catering`);
+  const r = await page.request.get(`/api/incidents/${e}/catering`);
   return ((await r.json()) as { zeitfenster: Zeitfenster[] }).zeitfenster[0];
 }
 
@@ -251,7 +251,7 @@ for (const { breite, hoehe, dichte } of [
 
     // Die Ausgabe ist schon anderswo zurückgenommen: „Rückgängig“ wird abgelehnt.
     const [ausgabe] = (await zeitfenster(page, e)).ausgaben;
-    await anlegen(page, `/api/einsaetze/${e}/catering/distributions/${ausgabe.id}/undo`, {});
+    await anlegen(page, `/api/incidents/${e}/catering/distributions/${ausgabe.id}/undo`, {});
     await page.getByRole('button', { name: 'Rückgängig' }).click();
     await expect(page.locator('[data-lfh="ausgabe-ablehnung"]')).toContainText(
       'Nicht zurückgenommen',
@@ -398,7 +398,7 @@ for (const flaeche of [
     const { e, zf } = await saeen(page, -10, 110, { kraefte: 1830 });
     const kopplung = await anlegen<{ code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/devices`,
+      `/api/incidents/${e}/devices`,
       {
         ansicht: 'verpflegung',
         bezeichnung: 'Ausgabe Deich',
@@ -615,7 +615,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
       kraefte: 1830,
     });
     for (let n = 1; n <= 10; n += 1) {
-      await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
+      await anlegen(page, `/api/incidents/${e}/catering/time-slots/${zf}/distributions`, {
         menge: n,
       });
     }
@@ -653,7 +653,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
         }),
       );
     const vorher = await lagen();
-    await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
+    await anlegen(page, `/api/incidents/${e}/catering/time-slots/${zf}/distributions`, {
       menge: 100,
       sonderkost: { ohne_schwein: 100 },
     });
@@ -666,7 +666,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     );
     // Ausgegeben über dem Soll (4 → 10/4) wächst um eine Stelle und bleibt im festen Platz
     // (Mutationsprobe: Platz nur nach den Stellen des Solls → rot).
-    await anlegen(page, `/api/einsaetze/${e}/catering/time-slots/${zf}/distributions`, {
+    await anlegen(page, `/api/incidents/${e}/catering/time-slots/${zf}/distributions`, {
       menge: 10,
       sonderkost: { vegetarisch: 10 },
     });
@@ -687,7 +687,7 @@ test.describe('Handy mit Touch, komfortabel (390×700)', () => {
     // Die Kopplung endet in 45 min: „Kopplung noch 45 min“ ist die breiteste Restzeit (LLH-1734).
     const kopplung = await anlegen<{ code: { code: string } }>(
       page,
-      `/api/einsaetze/${e}/devices`,
+      `/api/incidents/${e}/devices`,
       {
         ansicht: 'verpflegung',
         bezeichnung: 'Ausgabe Deich',

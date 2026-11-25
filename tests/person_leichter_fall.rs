@@ -12,7 +12,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (Stat
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/persons"),
+        &format!("/api/incidents/{e}/persons"),
         cookie,
         Some(&body.to_string()),
     )
@@ -23,7 +23,7 @@ async fn detail(app: &axum::Router, cookie: &str, e: i64, p: i64) -> Value {
     let (s, v) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         cookie,
         None,
     )
@@ -37,7 +37,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, uhs) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs"),
+        &format!("/api/incidents/{e}/uhs"),
         cookie,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"UHS Bühne"}"#),
     )
@@ -47,7 +47,7 @@ async fn uhs_anlegen(app: &axum::Router, cookie: &str, e: i64) -> i64 {
     let (s, _) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{u}/status"),
+        &format!("/api/incidents/{e}/uhs/{u}/status"),
         cookie,
         Some(r#"{"status":"aktiv"}"#),
     )

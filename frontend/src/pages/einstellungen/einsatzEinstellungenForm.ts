@@ -13,7 +13,7 @@ import type {
  * Geteilte Form-Logik der vier Einsatz-Einstellungs-Sektionen — Gegenstück zu
  * `orgEinstellungenForm.ts`.
  *
- * KRITISCH: `PUT /api/einsaetze/{id}/settings` ist Vollersatz. Jede Sektion speichert `{
+ * KRITISCH: `PUT /api/incidents/{id}/settings` ist Vollersatz. Jede Sektion speichert `{
  * ...zuUpdate(geladeneDaten), ...normalisiere<Sektion>(form) }`, sonst nullte ein Speichern in
  * „Aufbewahrung" die Nummernkreise. Der Fehlerfall ist stumm — kein roter Test, kein Fehlerbild —,
  * deshalb liegt die Logik an einer prüfbaren Stelle.

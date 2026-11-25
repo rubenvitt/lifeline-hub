@@ -28,14 +28,14 @@ const WORTLAUT = 'Pegel am Deichtor 2,40 m, steigend; Sandsackverbau an der Nord
 
 async function oeffnenMitStrom(page: Page, pfad: string, einsatzId: number) {
   const strom = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/einsaetze/${einsatzId}/live`) && r.status() === 200,
+    (r) => r.url().endsWith(`/api/incidents/${einsatzId}/live`) && r.status() === 200,
   );
   await page.goto(pfad);
   await strom;
 }
 
 async function ungeleseneAmServer(page: Page, einsatzId: number): Promise<number> {
-  const r = await page.request.get(`/api/einsaetze/${einsatzId}/notifications`);
+  const r = await page.request.get(`/api/incidents/${einsatzId}/notifications`);
   expect(r.ok(), `GET Verlauf: ${r.status()}`).toBe(true);
   return ((await r.json()) as { ungelesen: number }).ungelesen;
 }
@@ -44,10 +44,10 @@ async function ungeleseneAmServer(page: Page, einsatzId: number): Promise<number
 async function zweiEingaenge(page: Page, seite: string): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 900 });
   await anmeldenAlsAdmin(page);
-  const angelegt = await page.request.post('/api/einsaetze', {
+  const angelegt = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Eingänge offline ${Date.now()}` },
   });
-  expect(angelegt.ok(), `POST /api/einsaetze: ${angelegt.status()}`).toBe(true);
+  expect(angelegt.ok(), `POST /api/incidents: ${angelegt.status()}`).toBe(true);
   const einsatzId = ((await angelegt.json()) as { id: number }).id;
 
   const konto = await benutzerAnlegen(page, 'fuehrungspersonal', 'E2E Zweiter Schirm');
@@ -61,7 +61,7 @@ async function zweiEingaenge(page: Page, seite: string): Promise<number> {
     });
     expect(login.ok(), `Anmelden zweiter Schirm: ${login.status()}`).toBe(true);
     for (const n of [1, 2]) {
-      const r = await zweiter.post(`/api/einsaetze/${einsatzId}/reports`, {
+      const r = await zweiter.post(`/api/incidents/${einsatzId}/reports`, {
         data: {
           absender: `Abschnitt Deich Ost ${n}`,
           meldeweg: 'funk',
@@ -102,7 +102,7 @@ test('„Alle gelesen“ ohne Netz wird vorgemerkt und nach der Rückkehr gesend
     expect(await ungeleseneAmServer(page, einsatzId)).toBe(2);
 
     const gelesen = page.waitForResponse((r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/notifications/read`),
+      r.url().endsWith(`/api/incidents/${einsatzId}/notifications/read`),
     );
     await page.context().setOffline(false);
     expect((await gelesen).status()).toBe(204);
