@@ -310,12 +310,14 @@ fn is_dateiname(file: &str) -> bool {
 }
 
 /// Holt eine HLS-Datei der Quelle. Der `LiveKontext` entsteht hier, im Abruf, und fällt mit ihm
-/// (`src/AGENTS.md`, „Adapter“): er geht nie ins Bündel.
+/// (`src/AGENTS.md`, „Adapter“): er geht nie ins Bündel. `art` ist die Drohnenart des Adapters
+/// (`drohne::ARTEN`); `upstream` der Pfadteil der Quelle (bei Suchlage die Seriennummer).
 async fn hls_abrufen(
     state: AppState,
     org_id: i64,
     adapter_id: String,
-    gateway_sn: String,
+    art: &'static str,
+    upstream: String,
     file: String,
 ) -> Result<axum::body::Bytes, VideoFehler> {
     use crate::adapter::live::{live_kontext, LiveVerweigert};
@@ -327,34 +329,54 @@ async fn hls_abrufen(
         &state.adapter.arten,
         org_id,
         &adapter_id,
-        crate::drohne::SUCHLAGE,
+        art,
     )
     .await
     .map_err(|v| match v {
         LiveVerweigert::Intern => VideoFehler::Intern,
         _ => VideoFehler::Verweigert,
     })?;
-    let basis = kontext
-        .einstellung_text("basis_url")
-        .ok_or(VideoFehler::Verweigert)?;
-    let token = kontext.geheimnis("token").ok_or(VideoFehler::Verweigert)?;
     // Tiefenverteidigung: auch was aus dem Speicher kommt, geht nur als sicheres Segment in den Pfad.
-    if !crate::drohne::is_safe_segment(&gateway_sn) || !crate::drohne::is_safe_segment(&file) {
+    if !crate::drohne::is_safe_segment(&file) {
         return Err(VideoFehler::Upstream);
     }
-    let url = format!(
-        "{}/api/lagemonitor/v1/video/{gateway_sn}/hls/{file}",
-        basis.trim_end_matches('/')
-    );
     let fehl = |f: crate::adapter::art::Fehlschlag| {
         // Nur Code und Status, nie URL oder Seriennummer.
         tracing::warn!("Livebild-Abruf gescheitert: {:?}", f);
         VideoFehler::Upstream
     };
-    let anfrage = kontext
-        .get(&url)
-        .map_err(fehl)?
-        .bearer_auth(token.expose_secret());
+    let (url, anfrage, http_im_lan) = if art == crate::drohne::HLS_ADRESSE {
+        let playlist = kontext
+            .einstellung_text("playlist_url")
+            .ok_or(VideoFehler::Verweigert)?;
+        let url = reqwest::Url::parse(playlist)
+            .and_then(|p| p.join(&file))
+            .map_err(|_| VideoFehler::Upstream)?;
+        let anfrage = crate::drohne::hls::apply_auth(
+            kontext.get(url.as_str()).map_err(fehl)?,
+            kontext.einstellung_text("benutzer"),
+            kontext.geheimnis("passwort"),
+        );
+        (url, anfrage, true)
+    } else {
+        let basis = kontext
+            .einstellung_text("basis_url")
+            .ok_or(VideoFehler::Verweigert)?;
+        let token = kontext.geheimnis("token").ok_or(VideoFehler::Verweigert)?;
+        if !crate::drohne::is_safe_segment(&upstream) {
+            return Err(VideoFehler::Upstream);
+        }
+        let url = reqwest::Url::parse(&format!(
+            "{}/api/lagemonitor/v1/video/{upstream}/hls/{file}",
+            basis.trim_end_matches('/')
+        ))
+        .map_err(|_| VideoFehler::Upstream)?;
+        let anfrage = kontext
+            .get(url.as_str())
+            .map_err(fehl)?
+            .bearer_auth(token.expose_secret());
+        (url, anfrage, false)
+    };
     let antwort = kontext.send(anfrage).await.map_err(fehl)?;
     let is_playlist = crate::drohne::video::is_playlist(&file);
     let deckel = if is_playlist {
@@ -364,8 +386,7 @@ async fn hls_abrufen(
     };
     let bytes = kontext.read_bytes(antwort, deckel).await.map_err(fehl)?;
     if is_playlist {
-        let playlist_url = reqwest::Url::parse(&url).map_err(|_| VideoFehler::Upstream)?;
-        return rewrite_playlist(&bytes, &playlist_url, kontext.lan_erlaubt(), false);
+        return rewrite_playlist(&bytes, &url, kontext.lan_erlaubt(), http_im_lan);
     }
     Ok(bytes)
 }
@@ -387,23 +408,28 @@ pub async fn video(
     let (Some(ttl), Some(content_type)) = (ttl_for(&file), content_type_for(&file)) else {
         return Err(AppError::NotFound);
     };
-    let (adapter_id, gateway_sn) = state.drohne.find_video(&key).ok_or(AppError::NotFound)?;
-    let zugeschaltet = {
+    let (adapter_id, upstream) = state.drohne.find_video(&key).ok_or(AppError::NotFound)?;
+    let art = {
         let mut conn = state.pool.acquire().await?;
-        repo::load_for_einsatz(&mut conn, ctx.einsatz.id)
+        let zugeschaltet = repo::load_for_einsatz(&mut conn, ctx.einsatz.id)
             .await?
             .iter()
-            .any(|z| z.adapter_id == adapter_id)
+            .any(|z| z.adapter_id == adapter_id);
+        if !zugeschaltet {
+            return Err(AppError::NotFound);
+        }
+        // Die Datenbank sagt, welche Art der Adapter hat; der Live-Abruf verlangt genau sie.
+        adapter_repo::load_in_org(&mut conn, ctx.einsatz.org_id, &adapter_id)
+            .await?
+            .and_then(|a| crate::drohne::drohnen_art(&a.art))
+            .ok_or(AppError::NotFound)?
     };
-    if !zugeschaltet {
-        return Err(AppError::NotFound);
-    }
     let org_id = ctx.einsatz.org_id;
     let is_playlist = crate::drohne::video::is_playlist(&file);
     let schluessel = (adapter_id.clone(), key, file.clone());
     let bytes = buendel()
         .get_or_fetch(schluessel, ttl, move || {
-            hls_abrufen(state, org_id, adapter_id, gateway_sn, file)
+            hls_abrufen(state, org_id, adapter_id, art, upstream, file)
         })
         .await
         .map_err(|f| match f {
