@@ -192,5 +192,5 @@ ohne diese Anzeige.
 ## Grundlagen und Quellen
 
 - Architekturentscheidung zur Ortung der Helfer-App: ADR-0101 (`docs/architektur/entscheidungen/`).
-- Architekturentscheidung zu Aufträgen an die Helfer-App: ADR-0105.
+- Architekturentscheidung zu Aufträgen an die Helfer-App: ADR-0106.
 - Datenschutz: `docs/datenschutz/dsfa-vorlage-ortung.md`.

@@ -17,7 +17,7 @@ enum Verbindungsstand: Equatable, Sendable {
 /// Bildschirmbilder in ios/HelferUITests.
 enum Testzustand: String, CaseIterable, Sendable {
     case start, anmelden, wartet, angemeldet, pausiert, ruht, beendet
-    // Aufträge (Stufe 2, ADR-0105): „Angemeldet“ mit Aufträgen und mit abgelehnten Mitteilungen,
+    // Aufträge (Stufe 2, ADR-0106): „Angemeldet“ mit Aufträgen und mit abgelehnten Mitteilungen,
     // der Auftrag offen, von einem anderen übernommen, aufgehoben und mit gescheiterter Quittung.
     case auftraege
     case mitteilungenAus = "mitteilungen-aus"
@@ -72,7 +72,7 @@ final class HelferModell {
     private(set) var bestaetigungen = 0
 
     /// Aufträge der Kopplung, geordnet (`Auftraege.ordnen`); nur im Speicher, nie auf der Platte
-    /// (ADR-0105).
+    /// (ADR-0106).
     private(set) var auftraege: [HelferAuftrag] = []
     /// Empfängerzeilen, deren Quittung gerade läuft.
     private(set) var quittungLaeuft: Set<Int64> = []
@@ -186,7 +186,7 @@ final class HelferModell {
             startNachRuhe = false
             starteOrtung()
         }
-        // Ohne eigene Live-Verbindung (ADR-0105): die Aufträge kommen beim Öffnen, bei jedem Push
+        // Ohne eigene Live-Verbindung (ADR-0106): die Aufträge kommen beim Öffnen, bei jedem Push
         // (`pushEmpfangen`) und mit dieser Abfrage, auch wenn Mitteilungen aus sind.
         abfrage = Task { [weak self] in
             while !Task.isCancelled {
@@ -320,7 +320,7 @@ final class HelferModell {
                 .zustand(zustand.state, grund: zustand.reason, rolle: zustand.rolle))
         }
         starteOrtung()
-        // Nach dem Einlösen fragt die App nach Mitteilungen und meldet Push an (ADR-0105).
+        // Nach dem Einlösen fragt die App nach Mitteilungen und meldet Push an (ADR-0106).
         await meldePushAn()
     }
 
@@ -445,7 +445,7 @@ final class HelferModell {
         vergissAuftraege()
     }
 
-    // MARK: Aufträge (Stufe 2, ADR-0105)
+    // MARK: Aufträge (Stufe 2, ADR-0106)
 
     /// Lädt die eigenen Aufträge, solange die Kopplung bestätigt ist. Eine abgewiesene Sitzung
     /// (401) beendet die Kopplung; alles andere lässt die Liste stehen.

@@ -15,7 +15,7 @@ import dev.rubeen.lifeline.helferkern.Auftraege
 import dev.rubeen.lifeline.helferkern.HelperTask
 
 /**
- * Mitteilungen zu Aufträgen (ADR-0105, Entwurf „Empfang“): Kanal „Aufträge“ mit hoher Wichtigkeit,
+ * Mitteilungen zu Aufträgen (ADR-0106, Entwurf „Empfang“): Kanal „Aufträge“ mit hoher Wichtigkeit,
  * Ton und Vibration. Auf dem Sperrbildschirm nur „Neuer Auftrag“ (`VISIBILITY_PRIVATE` mit
  * öffentlicher Fassung); Tippen öffnet das Detail. Ob eine Mitteilung kommt, entscheidet
  * `Auftraege.sollMitteilen` im Kern.

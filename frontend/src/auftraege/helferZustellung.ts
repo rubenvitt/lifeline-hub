@@ -1,5 +1,5 @@
 /**
- * Hinweis an der Empfängerzeile eines Auftrags zur Helfer-App (Stufe 2, ADR-0105): an wie viele
+ * Hinweis an der Empfängerzeile eines Auftrags zur Helfer-App (Stufe 2, ADR-0106): an wie viele
  * Helfer-Apps die Zeile ging, oder welcher Helfer quittiert hat. `null`, wenn keine Helfer-App
  * beteiligt ist.
  */

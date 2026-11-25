@@ -1202,7 +1202,7 @@ export interface components {
             funktion_text?: string | null;
             /**
              * Format: int64
-             * @description An wie viele Helfer-Apps die Zeile ging (ADR-0105); fehlt vor der Zustellung und bei
+             * @description An wie viele Helfer-Apps die Zeile ging (ADR-0106); fehlt vor der Zustellung und bei
              *     Typen, die kein Helfer empfängt.
              */
             helfer_gesendet?: number | null;
@@ -1211,7 +1211,7 @@ export interface components {
             /** Format: int64 */
             person_id?: number | null;
             quittiert_at?: string | null;
-            /** @description Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0105). */
+            /** @description Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0106). */
             quittiert_von_helfer?: string | null;
             /** Format: int64 */
             quittiert_von_id?: number | null;

@@ -1,6 +1,6 @@
 //! Quittung einer Empfängerzeile (Achse 1), gemeinsam für die Leitung, gekoppelte Geräte
 //! (`routes::auftrag::quittieren`) und die Helfer-App (`routes::helfer::auftrag_quittieren`,
-//! ADR-0105: kein eigener Quittungsweg). Die Prüfung, ob die Zeile dem Aufrufer gehört, bleibt beim
+//! ADR-0106: kein eigener Quittungsweg). Die Prüfung, ob die Zeile dem Aufrufer gehört, bleibt beim
 //! Handler.
 
 use crate::app::AppState;

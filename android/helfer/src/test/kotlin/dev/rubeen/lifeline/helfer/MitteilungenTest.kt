@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Mitteilung eines neuen Auftrags (ADR-0105): Kanal „Aufträge“ mit hoher Wichtigkeit und
+ * Mitteilung eines neuen Auftrags (ADR-0106): Kanal „Aufträge“ mit hoher Wichtigkeit und
  * Vibration, auf dem Sperrbildschirm nur „Neuer Auftrag“.
  */
 @RunWith(RobolectricTestRunner::class)

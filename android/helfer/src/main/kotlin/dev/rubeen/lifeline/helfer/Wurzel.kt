@@ -109,7 +109,7 @@ fun Wurzel(modell: HelferModell, onEinstellungen: () -> Unit) {
                 is Phase.Anmelden -> AnmeldenSeite(modell, onAnmelden = { mitRechten(NACH_ANMELDEN) })
                 Phase.Unbestaetigt -> WartetSeite(modell, onOrtungStarten = { mitRechten(NACH_STARTEN) }, onEinstellungen = onEinstellungen)
                 Phase.Aktiv, Phase.Pausiert, is Phase.Ruht -> {
-                    // Detail eines Auftrags (aus der Liste oder einer Mitteilung, ADR-0105).
+                    // Detail eines Auftrags (aus der Liste oder einer Mitteilung, ADR-0106).
                     val auftrag = modell.offenerAuftrag?.let { id -> modell.auftraege.firstOrNull { it.id == id } }
                     if (auftrag != null) {
                         AuftragSeite(modell, auftrag)

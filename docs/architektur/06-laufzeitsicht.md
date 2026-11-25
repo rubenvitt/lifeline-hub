@@ -975,7 +975,7 @@ sequenceDiagram
 ### 6.8c Auftrag an die Helfer-App: zustellen und übernehmen
 
 Ein Auftrag an Einheit, Fahrzeug oder zugeordnete Person erreicht die bestätigten Helfer-Apps
-(LLH-2111, [ADR-0105](entscheidungen/ADR-0105-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md)).
+(LLH-2111, [ADR-0106](entscheidungen/ADR-0106-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md)).
 
 ```mermaid
 sequenceDiagram
@@ -1009,6 +1009,6 @@ sequenceDiagram
 - Das SSE-Ereignis `helfer_auftrag` ist kein `LiveEvent`: es läuft über einen eigenen Broadcast am
   Ring vorbei und nur im Strom der genannten Helfer-Kopplung (`helfer_auftraege` in
   `src/routes/live.rs`); `lese_module(Helfer)` bleibt leer.
-- Die Push-Anmeldung (`helfer_push_anmeldung`, Migration 0385) endet mit der Kopplung:
+- Die Push-Anmeldung (`helfer_push_anmeldung`, Migration 0386) endet mit der Kopplung:
   `geraet::repo::beenden`, Ablauf-Takt (`geraet::ablauf::raeume_helfer`) und Einsatzabschluss
   (`einsatz::repo::abschliessen`) löschen sie; `resolve` prüft trotzdem bei jeder Zustellung frisch.

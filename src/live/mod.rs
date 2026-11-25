@@ -75,7 +75,7 @@ wire_enum! {
         /// [`LiveHub::publiziere_helfer_position`]). Nur an die Einsatzleitung
         /// ([`LiveEvent::nur_leitung`]); Nutzlast nur Kennungen.
         Helfer => "helfer",
-        /// Ein Auftrag an die eigene Helfer-Kopplung (Stufe 2, ADR-0105): nur im Strom der
+        /// Ein Auftrag an die eigene Helfer-Kopplung (Stufe 2, ADR-0106): nur im Strom der
         /// genannten Kopplung, am Ring vorbei über einen eigenen Broadcast
         /// ([`LiveHub::melde_helfer_auftrag`], `routes::live`); Nutzlast nur `task_id`. Die Seite
         /// im Browser empfängt es nie, nur die Android-Helfer-App.
@@ -247,7 +247,7 @@ impl LiveEvent {
             // `EinsatzLeitungszugriff`, keinem Modul; das Ereignis erreicht nur Verbindungen der
             // Einsatzleitung ([`LiveEvent::nur_leitung`], `LiveNachricht::fuer_verbindung`).
             LiveEvent::Helfer => &[],
-            // Helfer-Auftrag (ADR-0105): Gate ist die Kopplung selbst; läuft nie durch den Ring.
+            // Helfer-Auftrag (ADR-0106): Gate ist die Kopplung selbst; läuft nie durch den Ring.
             LiveEvent::HelferAuftrag => &[],
             // Kontroll-Event ohne Fachbezug: muss JEDEN Abonnenten erreichen, sonst
             // hängt der Resync nach Ring-Overflow/Neustart.
@@ -452,7 +452,7 @@ pub struct LiveHub {
     /// Beendete Gerätekopplungen (LFH-892, design.md D7): Widerruf, neuer Code, Einsatzabschluss.
     /// Ein Live-Strom einer Gerätesitzung endet, sobald seine Kopplung hier erscheint.
     kopplung_ende: broadcast::Sender<i64>,
-    /// Aufträge an Helfer-Apps (ADR-0105): `(Kopplungen, Auftrag)`. Nur der Live-Strom einer
+    /// Aufträge an Helfer-Apps (ADR-0106): `(Kopplungen, Auftrag)`. Nur der Live-Strom einer
     /// genannten Helfer-Kopplung reicht es weiter (SSE `helfer_auftrag`); kein [`LiveEvent`].
     helfer_auftrag: broadcast::Sender<(Vec<i64>, i64)>,
     /// Beendete Sitzungen, als öffentliche Kennung (LFH-1092, design.md D6): Beenden über die
@@ -633,7 +633,7 @@ impl LiveHub {
         let _ = self.kopplung_ende.send(kopplung_id);
     }
 
-    /// Meldet den Helfer-Kopplungen `kopplung_ids` einen neuen oder geänderten Auftrag (ADR-0105).
+    /// Meldet den Helfer-Kopplungen `kopplung_ids` einen neuen oder geänderten Auftrag (ADR-0106).
     pub fn melde_helfer_auftrag(&self, kopplung_ids: Vec<i64>, auftrag_id: i64) {
         if kopplung_ids.is_empty() {
             return;
@@ -1190,7 +1190,7 @@ mod tests {
             .filter(|ev| ev.braucht_empfaenger())
             .map(|ev| ev.as_str())
             .collect();
-        // `helfer_auftrag` (ADR-0105) läuft am Ring vorbei; die Empfängerpflicht hält es dort
+        // `helfer_auftrag` (ADR-0106) läuft am Ring vorbei; die Empfängerpflicht hält es dort
         // fail-closed.
         assert_eq!(
             mit_empfaengern,
@@ -1341,7 +1341,7 @@ mod tests {
             (LiveEvent::Praesenz, &[]),
             // Gate ist die Einsatzleitung (Helfer-App, Begründung an der Variante).
             (LiveEvent::Helfer, &[]),
-            // Nur im Strom der eigenen Helfer-Kopplung (ADR-0105, Begründung an der Variante).
+            // Nur im Strom der eigenen Helfer-Kopplung (ADR-0106, Begründung an der Variante).
             (LiveEvent::HelferAuftrag, &[]),
             (LiveEvent::Lagged, &[]),
         ];

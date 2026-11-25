@@ -44,7 +44,7 @@ und der Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026
   :helfer:assembleDebug`; der Kern allein ohne SDK: `LC_ALL=C.UTF-8 android/gradlew -p
   android/helferkern test`.
 
-## Aufträge (Stufe 2, ADR-0105)
+## Aufträge (Stufe 2, ADR-0106)
 
 - **Ein Dienst für Ortung und Empfang** mit einer Benachrichtigung, Typen
   `location|remoteMessaging`. Er startet beim Einlösen immer aus dem Vordergrund, ohne Ortung nur

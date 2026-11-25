@@ -33,11 +33,11 @@
 
 ---
 
-### Task 1: ADR-0105, Regeln und Prüfungen
+### Task 1: ADR-0106, Regeln und Prüfungen
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0105-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md` (nach `VORLAGE.md`)
-- Modify: `docs/architektur/entscheidungen/ADR-0101-…md` (Verweis „ergänzt durch ADR-0105“), `ios/Helfer/AGENTS.md`, `android/helfer/AGENTS.md`, `push-relais/AGENTS.md`, `docs/architektur/AGENTS.md`-Index falls dort gelistet
+- Create: `docs/architektur/entscheidungen/ADR-0106-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md` (nach `VORLAGE.md`)
+- Modify: `docs/architektur/entscheidungen/ADR-0101-…md` (Verweis „ergänzt durch ADR-0106“), `ios/Helfer/AGENTS.md`, `android/helfer/AGENTS.md`, `push-relais/AGENTS.md`, `docs/architektur/AGENTS.md`-Index falls dort gelistet
 
 - [x] **Step 1:** ADR mit den MUST/MUST NOT aus dem Entwurf („ADR (neu, ergänzt ADR-0101)“) schreiben, Prüfblock:
   `verlange 'aps-environment' 'ios/Helfer/App/LifelineHelfer.entitlements'`,
@@ -45,8 +45,8 @@
   `verbiete 'firebase|com\.google\.firebase' 'android/helfer/**/*.kts' 'android/helfer/**/*.kt'`,
   `verbiete 'remote-notification' 'ios/project.yml'` nur für das Ziel `LifelineHelfer` (wenn `verbiete` nicht zielgenau geht: weglassen und im ADR begründen).
 - [x] **Step 2:** `./scripts/check-all.sh --nur adr` (oder der ADR-Schritt laut `scripts/AGENTS.md`) — Erwartet: die beiden `verlange` schlagen fehl (noch nicht gebaut). Prüfblock bis Task 11/13 auskommentiert committen, dort scharf schalten (Regel: rot geborenes Gate abschalten).
-- [x] **Step 3:** AGENTS.md-Ergänzungen: Helfer-Ordner je ein Abschnitt „Aufträge (Stufe 2, ADR-0105)“ (Kernlogik, Dienst-Typen, Mitteilungsrecht-Hinweis); `push-relais/AGENTS.md` „Thema je Nachricht“.
-- [x] **Step 4:** Commit `docs(helfer): ADR-0105 Aufträge an die Helfer-App`.
+- [x] **Step 3:** AGENTS.md-Ergänzungen: Helfer-Ordner je ein Abschnitt „Aufträge (Stufe 2, ADR-0106)“ (Kernlogik, Dienst-Typen, Mitteilungsrecht-Hinweis); `push-relais/AGENTS.md` „Thema je Nachricht“.
+- [x] **Step 4:** Commit `docs(helfer): ADR-0106 Aufträge an die Helfer-App`.
 
 ### Task 2: Relais — `thema` und erlaubte Bundle-IDs
 
@@ -263,7 +263,7 @@
 ### Task 13: Doku
 
 **Files:**
-- Modify: Anwenderkapitel „Helfer anmelden“ (Abschnitt „Aufträge empfangen“) und Leitungskapitel Aufträge („Aufträge an Helfer“) nach `docs/anwender/AGENTS.md`; DSFA-Vorlage aus Stufe 1 (Absatz Aufträge auf Privatgeräten, Sperrbildschirm); arc42 nach `docs/architektur/AGENTS.md` (Bausteinsicht Helfer, Laufzeitsicht Zustellung, ADR-0105).
+- Modify: Anwenderkapitel „Helfer anmelden“ (Abschnitt „Aufträge empfangen“) und Leitungskapitel Aufträge („Aufträge an Helfer“) nach `docs/anwender/AGENTS.md`; DSFA-Vorlage aus Stufe 1 (Absatz Aufträge auf Privatgeräten, Sperrbildschirm); arc42 nach `docs/architektur/AGENTS.md` (Bausteinsicht Helfer, Laufzeitsicht Zustellung, ADR-0106).
 
 - [x] **Step 1:** Schreiben; Wächter laut `docs/anwender/AGENTS.md` laufen lassen.
 - [x] **Step 2:** Commit `docs(helfer): Aufträge an die Helfer-App`.

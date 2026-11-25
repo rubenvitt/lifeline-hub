@@ -59,7 +59,7 @@ enum class Verbindungsstand {
 
 /**
  * Das Modell der Helfer-App: hält die eine [Anmeldung] (Zustandsautomat im Kern) und führt ihre
- * Wirkungen aus: Server, Ablage, Ortung und Empfang (ein Helfer-Dienst, ADR-0105). Welche Phase
+ * Wirkungen aus: Server, Ablage, Ortung und Empfang (ein Helfer-Dienst, ADR-0106). Welche Phase
  * gilt, entscheidet allein [Anmeldung.verarbeite]; die Seiten zeigen nur [phase]. Gegenstück zu
  * `ios/Helfer/App/Modell/HelferModell.swift`, mit denselben Texten und Wegen.
  *
@@ -102,7 +102,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     var dienstLaeuft by mutableStateOf(false)
         private set
 
-    // Aufträge (ADR-0105): nur im Speicher.
+    // Aufträge (ADR-0106): nur im Speicher.
 
     /** Die eigenen Aufträge, geordnet (`Auftraege.ordnen`). */
     var auftraege: List<HelperTask> by mutableStateOf(emptyList())
@@ -360,7 +360,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
                 zustand?.let { ereignis(Ereignis.Zustand(it.state, it.reason, it.rolle)) }
                 // Ohne Rolle, die orten darf, ruht die Kopplung gleich: dann startet keine Ortung.
                 nachWechsel(vorher)
-                // Der Dienst startet beim Einlösen immer (ADR-0105), ohne Ortung nur zum Empfang.
+                // Der Dienst startet beim Einlösen immer (ADR-0106), ohne Ortung nur zum Empfang.
                 starteOrtung()
             } finally {
                 beschaeftigt = false
@@ -628,7 +628,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
     /**
      * Wirkungen eines Phasenwechsels: Bestätigung melden, Ruhe beginnen und beenden, dem Dienst die
      * neue Vorgabe geben, am Ende alles abräumen. In der Ruhe ortet der Dienst nicht, empfängt aber
-     * weiter (ADR-0105); endet sie im Hintergrund, nimmt er `location` nur auf, wo Android es
+     * weiter (ADR-0106); endet sie im Hintergrund, nimmt er `location` nur auf, wo Android es
      * zulässt, sonst startet die Ortung beim nächsten Öffnen.
      */
     private fun nachWechsel(vorher: Phase) {
@@ -694,7 +694,7 @@ class HelferModell(private val dienste: Dienste?) : ViewModel() {
 
     /**
      * „Übernommen“ an einer eigenen Zeile ([zeile]; je offene Zeile ein Knopf wie in der iOS-App):
-     * quittiert sie über denselben Weg wie die Einheitenansicht (ADR-0105). Scheitert es (ohne
+     * quittiert sie über denselben Weg wie die Einheitenansicht (ADR-0106). Scheitert es (ohne
      * Netz, Serverfehler), zeigt die Zeile „Bitte über Funk bestätigen“; ein aufgehobener oder
      * fremder Auftrag (422, 404) lädt die Liste neu.
      */

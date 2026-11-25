@@ -54,7 +54,7 @@ Verwaltung, dass diese Grundlage vorliegt; der Server hält fest, wer es wann be
 | Zielzuordnung (Einheit oder Fahrzeug) | bei der Anmeldung, von der Leitung bestätigt | |
 | Zuordnung zu einer Person des Einsatzes | nur mit Freigabe „Auch Personen orten“ und Bestätigung der Leitung | |
 | Quelle der Position („Helfer-App“) | mit jeder Position | für die Anzeige auf der Lagekarte |
-| Aufträge an Einheit, Fahrzeug oder Person (Text, Ort, Frist) und ihre Quittung | im laufenden Einsatz, nur bestätigte Kopplungen (ADR-0105) | kann Personendaten Dritter tragen, etwa Angaben zu Verletzten |
+| Aufträge an Einheit, Fahrzeug oder Person (Text, Ort, Frist) und ihre Quittung | im laufenden Einsatz, nur bestätigte Kopplungen (ADR-0106) | kann Personendaten Dritter tragen, etwa Angaben zu Verletzten |
 | Push-Anmeldung der iOS-App (Gerätetoken, Schlüssel) | solange die Kopplung besteht | mit der Kopplung gelöscht, nicht in Sicherungen |
 
 Keine Bewegungsprofile, keine Geschwindigkeits- oder Routendaten, keine Weitergabe an Dritte. Die

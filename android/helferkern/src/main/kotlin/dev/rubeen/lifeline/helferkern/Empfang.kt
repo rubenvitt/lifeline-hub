@@ -1,7 +1,7 @@
 package dev.rubeen.lifeline.helferkern
 
 /**
- * Wann der Helfer-Dienst den Live-Strom neu verbindet (ADR-0105, Entwurf „Empfang“): mit wachsendem
+ * Wann der Helfer-Dienst den Live-Strom neu verbindet (ADR-0106, Entwurf „Empfang“): mit wachsendem
  * Abstand wie die Sendung, höchstens jede Minute; 401, 403 und 404 beenden die Kopplung wie bei der
  * Ortung.
  */
@@ -46,7 +46,7 @@ object Empfang {
 }
 
 /**
- * Abbrüche des Live-Stroms in Folge (ADR-0105): erst Daten, also die erste Zeile, setzen die Zählung
+ * Abbrüche des Live-Stroms in Folge (ADR-0106): erst Daten, also die erste Zeile, setzen die Zählung
  * zurück, nicht schon der Verbindungsaufbau. Sonst wartete ein Server, der annimmt und sofort
  * schließt, nie länger als [Empfang.ANFANG_MS]. Nur aus einem Faden nutzen (die Schleife des
  * Empfangs).
@@ -93,7 +93,7 @@ enum class Ortungslage(val text: String) {
 }
 
 /**
- * Typen des Helfer-Dienstes (ADR-0105): er startet beim Einlösen immer, mit `location` nur, wenn
+ * Typen des Helfer-Dienstes (ADR-0106): er startet beim Einlösen immer, mit `location` nur, wenn
  * die Phase orten lässt und das Standortrecht da ist; sonst allein mit `remoteMessaging`.
  */
 enum class Dienstumfang {

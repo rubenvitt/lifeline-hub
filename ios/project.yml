@@ -17,7 +17,7 @@
 # XcodeGen braucht beide xcconfig für jedes Schema: vor `xcodegen generate` laufen immer
 # scripts/ios/version.sh und scripts/ios/helfer-version.sh (testflight.sh, simulator-pruefung.sh).
 #
-# Aufträge an die Helfer-App (Stufe 2, ADR-0105): `LifelineHelfer` trägt Push und Time Sensitive;
+# Aufträge an die Helfer-App (Stufe 2, ADR-0106): `LifelineHelfer` trägt Push und Time Sensitive;
 # der Mitteilungsdienst `HelferDienst` entschlüsselt die Nutzlast mit `Gemeinsam/Entschluesseler.swift`
 # und liest den Schlüssel mit `Gemeinsam/Schluesselbund.swift`, beides wie in der Hülle. Als
 # Schlüsselbund-Gruppe dient die App Group der Helfer-App (keine `keychain-access-groups`: das
@@ -220,7 +220,7 @@ targets:
           - "Version.xcconfig"
       # Live-Aktivität (Attribute, Pausieren) und Thema, gemeinsam mit der Erweiterung.
       - path: Helfer/Gemeinsam
-      # Schlüssel der Push-Nutzlast anlegen und ablegen, wie die Hülle (ADR-0105).
+      # Schlüssel der Push-Nutzlast anlegen und ablegen, wie die Hülle (ADR-0106).
       - path: Gemeinsam/Entschluesseler.swift
       - path: Gemeinsam/Schluesselbund.swift
       - path: Helfer/App/PrivacyInfo.xcprivacy
@@ -313,7 +313,7 @@ targets:
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
 
-  # Mitteilungsdienst der Helfer-App (Notification Service Extension, ADR-0105): öffnet die
+  # Mitteilungsdienst der Helfer-App (Notification Service Extension, ADR-0106): öffnet die
   # verschlüsselte Nutzlast eines Auftrags, bevor iOS die Mitteilung zeigt.
   HelferDienst:
     type: app-extension

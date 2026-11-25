@@ -351,7 +351,7 @@ Relais ohne Inhalt, Android über die eigene Verbindung zum Server“.
 - Ergänzt die ADR-0101-Regel „sendet nur an den Server ihrer Kopplung“ um die Ausnahme APNs/Relais
   für iOS; die Prüfungen aus ADR-0101 (`verbiete`/`verlange`) bekommen `aps-environment` für
   `LifelineHelfer` und `FOREGROUND_SERVICE_REMOTE_MESSAGING` für das Android-Manifest als erlaubt.
-- Nummer nach `docs/architektur/AGENTS.md` (derzeit wäre es ADR-0105).
+- Nummer nach `docs/architektur/AGENTS.md` (derzeit wäre es ADR-0106).
 
 ### Datenschutz
 

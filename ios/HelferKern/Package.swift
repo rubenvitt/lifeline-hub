@@ -4,7 +4,7 @@
 // `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, „Logik im Kern“): Deutung
 // von QR-Code und Deeplink, Zustandsautomat der Anmeldung, Antwortentscheidung je Status und
 // Grund, Takt, Puffer der letzten Position, Sendeplan des Ortungsdienstes, Texte der Gründe und
-// Meldungen, die erzeugten Design-Tokens und die Aufträge (Stufe 2, ADR-0105: Ordnung,
+// Meldungen, die erzeugten Design-Tokens und die Aufträge (Stufe 2, ADR-0106: Ordnung,
 // Quittungsstand, Mitteilung ja/nein, Nutzlast ohne Entschlüsselung). Läuft auch unter
 // Linux (`swift test`, Schritt 18 von scripts/check-all.sh); die App (`ios/Helfer`) bindet das
 // Paket ein. Adressprüfung kommt aus `LifelineKern`. Die gemeinsamen Fälle liest die Suite aus

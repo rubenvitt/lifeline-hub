@@ -25,7 +25,7 @@ const NICHT_REGISTRY = [
   'lagged',
   BENACHRICHTIGUNG_EREIGNIS,
   'praesenz',
-  // Nur im Strom einer Helfer-Kopplung (Android-Helfer-App, ADR-0105); die Seite sieht es nie.
+  // Nur im Strom einer Helfer-Kopplung (Android-Helfer-App, ADR-0106); die Seite sieht es nie.
   'helfer_auftrag',
 ] as const;
 

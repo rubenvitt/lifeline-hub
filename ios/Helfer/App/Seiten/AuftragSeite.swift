@@ -1,7 +1,7 @@
 import HelferKern
 import SwiftUI
 
-/// Bereich „Aufträge“ auf „Angemeldet“ (auch pausiert und in der Ruhe, ADR-0105): Zahl der
+/// Bereich „Aufträge“ auf „Angemeldet“ (auch pausiert und in der Ruhe, ADR-0106): Zahl der
 /// offenen, die Liste in der Ordnung des Kerns, leer der feste Text; darunter der Hinweis, wenn
 /// Mitteilungen abgelehnt sind. Tippen öffnet den Auftrag.
 struct AuftraegeBereich: View {

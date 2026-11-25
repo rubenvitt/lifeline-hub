@@ -1,5 +1,5 @@
 //! Zustellung von Aufträgen an die Helfer-App (Stufe 2, Spec
-//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0105).
+//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0106).
 //!
 //! - [`resolve`] bestimmt die Pager-Empfänger eines Auftrags frisch: bestätigte, nicht beendete
 //!   Helfer-Kopplungen des aktiven Einsatzes mit einer eigenen Empfängerzeile
