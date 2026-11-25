@@ -79,6 +79,38 @@ async fn test_pool_datei_setzt_secure_delete() {
     assert_eq!(wert, 1);
 }
 
+/// Die zwischen Testprozessen geteilte Vorlage (`vorlagen_datei`) ist dieselbe wie eine frische
+/// Migration: gleiches Schema, gleiche Buchungen in `_sqlx_migrations`. Läuft der Test als
+/// zweiter Prozess, liest `test_pool` die abgelegte Datei, und genau die wird hier verglichen.
+#[tokio::test]
+async fn test_pool_aus_der_vorlage_gleicht_einer_frischen_migration() {
+    async fn stand(
+        pool: &SqlitePool,
+    ) -> (Vec<(String, String, Option<String>)>, Vec<(i64, Vec<u8>)>) {
+        let schema = sqlx::query_as(
+            "SELECT type, name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' \
+             ORDER BY type, name",
+        )
+        .fetch_all(pool)
+        .await
+        .unwrap();
+        let buchungen =
+            sqlx::query_as("SELECT version, checksum FROM _sqlx_migrations ORDER BY version")
+                .fetch_all(pool)
+                .await
+                .unwrap();
+        (schema, buchungen)
+    }
+    let frisch = leerer_test_pool().await;
+    migrate(&frisch).await.unwrap();
+    let vorlage = test_pool().await;
+    assert!(
+        vorlagen_datei().exists(),
+        "test_pool legt seine Vorlage für die folgenden Testprozesse ab"
+    );
+    assert_eq!(stand(&vorlage).await, stand(&frisch).await);
+}
+
 #[tokio::test]
 async fn connect_setzt_acquire_timeout() {
     // Regressionsschutz für `acquire_timeout`, über den PoolOptions-Getter statt durch
