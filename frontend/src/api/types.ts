@@ -2120,3 +2120,6 @@ export type StammdatenEntscheidungen = S['Entscheidungen'];
 export type StammdatenArtZaehlung = S['ArtZaehlung'];
 export type StammdatenZaehlung = S['Zaehlung'];
 export type StammdatenDateiMeldung = S['DateiMeldung'];
+// LLH-1194: offene Schnappschüsse des Stammdaten-Abrufs.
+export type StammdatenSchnappschuss = S['SchnappschussInfo'];
+export type StammdatenSchnappschussListe = S['SchnappschussListe'];
