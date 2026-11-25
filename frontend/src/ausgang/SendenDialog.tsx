@@ -5,6 +5,7 @@ import { adminSektionPfad, anbindungenPfad } from '../admin/adminPfade';
 import { ApiError } from '../api/client';
 import { useKanaeleSammlung } from '../api/externeStellen';
 import { useSendeVersaende, versandFehler, type QuelleFilter } from '../api/ausgang';
+import { zahlText } from '../anzeige/zahl';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
 import { Feld, schriftStil } from '../components/instrument';
@@ -23,7 +24,7 @@ const VORSCHAU_ZEILEN = 3;
 
 function groesse(bytes: number): string {
   return bytes >= 1024 * 1024
-    ? `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`
+    ? `${zahlText(bytes / (1024 * 1024), { stellen: 1 })} MB`
     : `${Math.max(1, Math.round(bytes / 1024))} kB`;
 }
 
