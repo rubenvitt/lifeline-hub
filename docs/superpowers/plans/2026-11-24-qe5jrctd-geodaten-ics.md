@@ -507,15 +507,15 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 **Interfaces:**
 - Consumes: `legeFremdebeneAn`, `FREMDEBENE_GRENZEN`, `FREMDEBENE_FEHLERTEXT`, `DateiFeld`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Die Wahl „Datei“ bzw. „Adresse“ schaltet das Feld um.
   - Der Name wird aus dem Dateinamen ohne Endung vorbelegt.
   - Eine Datei über 10 MB wird vor dem Senden abgelehnt.
   - Eine Adresse ohne `https://` ist ungültig.
   - Ein Serverfehler `dtd` zeigt den Text im Dialog, und der Dialog bleibt offen.
   - Erfolg schließt den Dialog und macht die Liste ungültig.
-- [ ] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest → PASS.
-- [ ] **Step 5:** Commit `feat: Fremdebene hinzufügen` (Zunder B).
+- [x] **Step 2:** vitest → FAIL. **Step 3:** umsetzen. **Step 4:** vitest → PASS.
+- [x] **Step 5:** Commit `feat: Fremdebene hinzufügen` (Zunder B).
 
 ## Abschluss
 

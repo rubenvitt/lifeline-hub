@@ -19,6 +19,7 @@ import { useDruckNebenwege } from '../components/druck/useDruckNebenwege';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { useLageplan } from './lagekarte/useLageplan';
 import LageplanDruck from './lagekarte/LageplanDruck';
+import FremdebeneDialog, { fremdebeneNebenweg } from './lagekarte/FremdebeneDialog';
 import LageplanAnlageDialog, {
   ALS_ANLAGE,
   anlageSperrGrund,
@@ -1362,6 +1363,7 @@ export default function LagekartePage() {
   const befehleFreigabe = useModulFreigabe(einsatzId, 'auftraege');
   const ohneVerbindung = useOhneVerbindung();
   const [anlageOffen, setAnlageOffen] = useState(false);
+  const [fremdebeneOffen, setFremdebeneOffen] = useState(false);
   /**
    * Abschnittsfokus per Link: `?abschnitt=<id>` (LLH-1057) — fokussieren, dann räumen; der Fokus
    * wird nie gespeichert. Erst mit geladener Seite und entschiedener Startansicht: vorher fehlt die
@@ -1545,6 +1547,13 @@ export default function LagekartePage() {
   const nebenwege: Nebenweg[] = [
     ...druckNebenwege,
     ...exportNebenwege,
+    ...[
+      fremdebeneNebenweg({
+        darfSchreiben: !!darfSchreiben && quelle.typ === 'live',
+        ohneVerbindung,
+        onWahl: () => setFremdebeneOffen(true),
+      }),
+    ].filter((weg) => weg != null),
     ...(rahmenEinsatz
       ? [
           {
@@ -2272,6 +2281,11 @@ export default function LagekartePage() {
           befehleFrei={befehleFreigabe.zustand === 'frei'}
           erstelleAnlage={lageplan.erstelleAnlage}
           onSchliessen={() => setAnlageOffen(false)}
+        />
+        <FremdebeneDialog
+          offen={fremdebeneOffen}
+          einsatzId={einsatzId}
+          onSchliessen={() => setFremdebeneOffen(false)}
         />
       </div>
       {/* Das Druckblatt hängt nur vom Knopf bis `afterprint` (LLH-1051). */}
