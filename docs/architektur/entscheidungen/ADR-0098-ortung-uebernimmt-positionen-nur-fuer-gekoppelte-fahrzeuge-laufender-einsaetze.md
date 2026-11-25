@@ -61,7 +61,9 @@ nur während des Einsatzes laufen. Entschieden am 24.11.2026 (LLH-2091).
 
 ## Konsequenzen
 
-Die Einsatzakte hält nach dem Abschluss keine GPS-Orte, und ohne Kopplung ändert ein Einwurf
+Die Einsatzakte hält nach dem Abschluss keine GPS-Orte; ausgenommen sind eingefrorene Lagestände
+(`lage_snapshot`), die ihre Positionen als Momentaufnahme bis zur Löschung des Einsatzes behalten
+(Entscheidung 25.11.2026). Ohne Kopplung ändert ein Einwurf
 nichts am Einsatz. Wer Fahrzeuge ortet, koppelt sie im Einsatz und trennt sie dort wieder oder
 lässt sie mit Entlassen, Stornieren oder Abschluss enden. Ein Verlauf ist ausgeschlossen und
 bräuchte eine neue ADR samt Datenschutzprüfung.
