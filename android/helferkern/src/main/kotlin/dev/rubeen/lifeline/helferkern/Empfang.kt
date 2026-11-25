@@ -1,7 +1,7 @@
 package dev.rubeen.lifeline.helferkern
 
 /**
- * Wann der Helfer-Dienst den Live-Strom neu verbindet (ADR-0104, Entwurf „Empfang“): mit wachsendem
+ * Wann der Helfer-Dienst den Live-Strom neu verbindet (ADR-0105, Entwurf „Empfang“): mit wachsendem
  * Abstand wie die Sendung, höchstens jede Minute; 401, 403 und 404 beenden die Kopplung wie bei der
  * Ortung.
  */
@@ -55,7 +55,40 @@ enum class Ortungslage(val text: String) {
 
     /** Kein Standortrecht oder keine Rolle, die ortet: nur Empfang. */
     AUS("Ortung aus"),
+    ;
+
+    companion object {
+        /** Lage nach der [phase] und danach, ob der Dienst gerade wirklich ortet ([ortet]). */
+        fun aus(phase: Phase, ortet: Boolean): Ortungslage = when {
+            phase == Phase.Pausiert -> PAUSIERT
+            phase is Phase.Ruht -> RUHT
+            phase.ortet && ortet -> AN
+            else -> AUS
+        }
+    }
 }
+
+/**
+ * Typen des Helfer-Dienstes (ADR-0105): er startet beim Einlösen immer, mit `location` nur, wenn
+ * die Phase orten lässt und das Standortrecht da ist; sonst allein mit `remoteMessaging`.
+ */
+enum class Dienstumfang {
+    ORTUNG_UND_EMPFANG,
+    NUR_EMPFANG,
+    ;
+
+    companion object {
+        fun fuer(orten: Boolean, standortrecht: Boolean): Dienstumfang =
+            if (orten && standortrecht) ORTUNG_UND_EMPFANG else NUR_EMPFANG
+    }
+}
+
+/**
+ * Ob der Dienst Aufträge empfängt: ab der Bestätigung (`aktiv`), solange die Kopplung besteht,
+ * auch pausiert und ruhend (Pager-Empfänger im Entwurf).
+ */
+val Phase.empfaengt: Boolean
+    get() = this == Phase.Aktiv || this == Phase.Pausiert || this is Phase.Ruht
 
 /**
  * Text der einen Benachrichtigung des Helfer-Dienstes (Entwurf „Benachrichtigung des Dienstes“):
@@ -65,6 +98,15 @@ object Dienstanzeige {
     const val EMPFAENGT = "empfängt Aufträge"
     const val GETRENNT = "getrennt — verbinde neu"
 
-    fun zeile(ortung: Ortungslage, verbunden: Boolean): String =
-        "${ortung.text} · ${if (verbunden) EMPFAENGT else GETRENNT}"
+    const val UNBESTAETIGT = "wartet auf Bestätigung"
+
+    /** [bestaetigt] `false`: die Leitung hat noch nicht bestätigt, es gibt noch nichts zu empfangen. */
+    fun zeile(ortung: Ortungslage, verbunden: Boolean, bestaetigt: Boolean = true): String {
+        val empfang = when {
+            !bestaetigt -> UNBESTAETIGT
+            verbunden -> EMPFAENGT
+            else -> GETRENNT
+        }
+        return "${ortung.text} · $empfang"
+    }
 }

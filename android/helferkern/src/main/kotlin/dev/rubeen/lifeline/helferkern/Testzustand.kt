@@ -16,7 +16,7 @@ enum class Testzustand(val wert: String) {
     RUHT("ruht"),
     BEENDET("beendet"),
 
-    // Aufträge (ADR-0104); „angemeldet“ zeigt den leeren Bereich.
+    // Aufträge (ADR-0105); „angemeldet“ zeigt den leeren Bereich.
 
     /** „Angemeldet“ mit offenen, übernommenen und aufgehobenen Aufträgen. */
     AUFTRAEGE("auftraege"),
