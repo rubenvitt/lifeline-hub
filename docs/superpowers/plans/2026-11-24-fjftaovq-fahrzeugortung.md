@@ -1,6 +1,6 @@
 # Fahrzeugortung Implementation Plan (LLH-2091)
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Eingeworfene Positionen (Scope `positionen:write`) bewegen gekoppelte Einsatzfahrzeuge
 laufender Einsätze live auf der Lagekarte, mit Alter und Marke „veraltet“, ohne Verlauf.
@@ -75,7 +75,7 @@ Vitest, Playwright-Bildlauf.
   Option<PositionQuelle>`, `position_gemessen_at: Option<String>`, `ortung_gekoppelt: bool`
   (aus `EXISTS (SELECT 1 FROM ortung_kopplung k WHERE k.einsatz_fahrzeug_id = ef.id)`).
 
-- [ ] **Step 1: Failing tests** in `tests/einsatz_fahrzeug.rs`:
+- [x] **Step 1: Failing tests** in `tests/einsatz_fahrzeug.rs`:
   `manuelle_position_setzt_quelle_und_zeiten` (PATCH lat/lon → Antwort `position_quelle ==
   "manuell"`, `position_gemessen_at` gesetzt, in der DB `position_gesetzt_at ==
   position_gemessen_at`); `geloeschte_position_leert_quelle_und_zeiten` (PATCH null/null → beide
@@ -83,15 +83,15 @@ Vitest, Playwright-Bildlauf.
   `tz_fachaufgabe` → Quelle bleibt wie vorher); `anzeige_traegt_keine_kennung` (JSON von
   `GET …/vehicles` enthält weder `kennung` noch `zugang`, `ortung_gekoppelt == false`).
   Enum-Kontrakt-Eintrag für `PositionQuelle`.
-- [ ] **Step 2:** `cargo test --test einsatz_fahrzeug position` → FAIL (Felder fehlen).
-- [ ] **Step 3:** Migration schreiben. Bestand: `UPDATE einsatz_fahrzeug SET position_quelle =
+- [x] **Step 2:** `cargo test --test einsatz_fahrzeug position` → FAIL (Felder fehlen).
+- [x] **Step 3:** Migration schreiben. Bestand: `UPDATE einsatz_fahrzeug SET position_quelle =
   'manuell' WHERE lat IS NOT NULL`. `CHECK (position_quelle IN ('manuell','ortung'))`. Index
   `ortung_kopplung(einsatz_id)`. `update_position`: setzt nur, wenn `lat` oder `lon` im Patch
   stehen, `position_quelle = CASE WHEN neue lat IS NULL THEN NULL ELSE 'manuell' END` und beide
   Zeiten auf `zeit::jetzt()` bzw. NULL. Codegen laufen lassen.
-- [ ] **Step 4:** `cargo test --test einsatz_fahrzeug && cargo test --test enum_wire_kontrakt &&
+- [x] **Step 4:** `cargo test --test einsatz_fahrzeug && cargo test --test enum_wire_kontrakt &&
   scripts/check-typ-codegen.sh` → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Positionsquelle und Kopplungstabelle (LLH-2091)`.
+- [x] **Step 5:** Commit `feat(ortung): Positionsquelle und Kopplungstabelle (LLH-2091)`.
 
 ### Task 2: Org-Schalter `ortung_hauptamt`
 
@@ -105,14 +105,14 @@ Vitest, Playwright-Bildlauf.
 - Produces: `OrgEinstellungen.ortung_hauptamt: Option<i64>`, `pub fn
   is_ortung_hauptamt(&self) -> bool` (nur `Some(1)` ist an). Wire-Feld `ortung_hauptamt`.
 
-- [ ] **Step 1: Failing tests:** `ortung_hauptamt_ist_standardmaessig_aus` (GET ohne Zeile →
+- [x] **Step 1: Failing tests:** `ortung_hauptamt_ist_standardmaessig_aus` (GET ohne Zeile →
   `false`/null), `nur_admin_schaltet_ortung_hauptamt` (Führungskraft PUT → 403, Admin → 200 und
   `admin_audit`-Zeile), `ortung_hauptamt_geht_nicht_in_die_stammdaten` (die Liste der
   synchronisierten Spalten enthält ihn nicht).
-- [ ] **Step 2:** `cargo test --test org_einstellungen ortung` → FAIL.
-- [ ] **Step 3:** Feld durchreichen wie `auto_etb_eintraege`; Codegen.
-- [ ] **Step 4:** Tests + `scripts/check-typ-codegen.sh` → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Org-Schalter für hauptamtliche Besatzung (LLH-2091)`.
+- [x] **Step 2:** `cargo test --test org_einstellungen ortung` → FAIL.
+- [x] **Step 3:** Feld durchreichen wie `auto_etb_eintraege`; Codegen.
+- [x] **Step 4:** Tests + `scripts/check-typ-codegen.sh` → PASS.
+- [x] **Step 5:** Commit `feat(ortung): Org-Schalter für hauptamtliche Besatzung (LLH-2091)`.
 
 ### Task 3: Übernahme mit Vorrang, Drossel und Nachlauf
 
@@ -141,7 +141,7 @@ Vitest, Playwright-Bildlauf.
   - `pub fn is_nachlauf_vorgemerkt(ef_id: i64) -> bool` (Test-Hook) und
     `async fn run_nachlauf(…)` hinter `tokio::time::sleep(ORTUNG_DROSSEL_S)`.
 
-- [ ] **Step 1: Failing tests** (`apply_position_tx` direkt, mit Zeitstempeln):
+- [x] **Step 1: Failing tests** (`apply_position_tx` direkt, mit Zeitstempeln):
   `gekoppelte_kennung_schreibt_position_und_quelle_ortung`;
   `ohne_kopplung_aendert_nichts`; `beendetes_fahrzeug_aendert_nichts`;
   `abgeschlossener_einsatz_aendert_nichts`; `gespiegelter_einsatz_aendert_nichts`;
@@ -152,11 +152,11 @@ Vitest, Playwright-Bildlauf.
   `zweiter_fix_binnen_15_s_wird_gedrosselt` (→ `Gedrosselt`, DB unverändert);
   `nachlauf_schreibt_die_juengste_position` (nach `Gedrosselt` mit `jetzt + 15 s` erneut →
   `Geschrieben` mit den Koordinaten des zweiten Fixes).
-- [ ] **Step 2:** `cargo test --test ortung` → FAIL.
-- [ ] **Step 3:** Implementieren; Nachlauf-Menge als `static Mutex<HashSet<i64>>`, Eintrag beim
+- [x] **Step 2:** `cargo test --test ortung` → FAIL.
+- [x] **Step 3:** Implementieren; Nachlauf-Menge als `static Mutex<HashSet<i64>>`, Eintrag beim
   Vormerken, Entfernen nach dem Lauf.
-- [ ] **Step 4:** `cargo test --test ortung` → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Übernahme eingeworfener Positionen (LLH-2091)`.
+- [x] **Step 4:** `cargo test --test ortung` → PASS.
+- [x] **Step 5:** Commit `feat(ortung): Übernahme eingeworfener Positionen (LLH-2091)`.
 
 ### Task 4: Einwurf stößt die Übernahme an
 
@@ -166,18 +166,18 @@ Vitest, Playwright-Bildlauf.
 
 **Interfaces:** Consumes `ortung::uebernahme::apply_position(&state, &zugang.id, &inhalt.kennung)`.
 
-- [ ] **Step 1: Failing tests** über den echten Einwurf (`GET /api/v1/intake/{key}/position?id=…&lat=…&lon=…`, Helfer wie `tests/einwurf.rs`):
+- [x] **Step 1: Failing tests** über den echten Einwurf (`GET /api/v1/intake/{key}/position?id=…&lat=…&lon=…`, Helfer wie `tests/einwurf.rs`):
   `einwurf_mit_gekoppelter_kennung_bewegt_das_fahrzeug_und_meldet_live` (204, DB lat/lon, ein
   `fahrzeug`-Ereignis am Live-Hub abonniert); `einwurf_ohne_kopplung_antwortet_gleich`
   (204, Fahrzeug unverändert, gleiche Header); `einwurf_nach_abschluss_aendert_kein_fahrzeug`
   (Kopplungszeile per SQL nach Abschluss erzwungen → 204, keine Änderung);
   `aelterer_fix_stoesst_nichts_an` (`Aelter` → kein Ereignis).
-- [ ] **Step 2:** `cargo test --test ortung einwurf` → FAIL.
-- [ ] **Step 3:** Nach dem `write_retry!` bei `PositionErgebnis::Uebernommen`
+- [x] **Step 2:** `cargo test --test ortung einwurf` → FAIL.
+- [x] **Step 3:** Nach dem `write_retry!` bei `PositionErgebnis::Uebernommen`
   `crate::ortung::uebernahme::apply_position(&state, &zugang.id, &inhalt.kennung).await;`.
-- [ ] **Step 4:** `cargo test --test ortung && cargo test --test einwurf && scripts/check-architektur.sh`
+- [x] **Step 4:** `cargo test --test ortung && cargo test --test einwurf && scripts/check-architektur.sh`
   → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Einwurf stößt die Übernahme an (LLH-2091)`.
+- [x] **Step 5:** Commit `feat(ortung): Einwurf stößt die Übernahme an (LLH-2091)`.
 
 ### Task 5: Koppeln, Trennen, Kandidaten (Routen)
 
@@ -212,7 +212,7 @@ Vitest, Playwright-Bildlauf.
   fremd oder falscher Scope; 422 Code `volunteer_crew_required`, wenn Schalter aus und nicht
   bestätigt.
 
-- [ ] **Step 1: Failing tests:** `koppeln_schreibt_etb_und_uebernimmt_vorhandene_position`;
+- [x] **Step 1: Failing tests:** `koppeln_schreibt_etb_und_uebernimmt_vorhandene_position`;
   `koppeln_ohne_bestaetigung_bei_ausgeschaltetem_schalter_ist_422`;
   `koppeln_ohne_bestaetigung_bei_eingeschaltetem_schalter_geht`;
   `belegte_kennung_ist_409`; `koppeln_im_gespiegelten_einsatz_ist_409_ohne_etb`;
@@ -221,14 +221,14 @@ Vitest, Playwright-Bildlauf.
   `kandidaten_ohne_koordinaten_ohne_fremde_org_ohne_widerrufene_und_ohne_alte`
   (Zeile 25 h alt fehlt; JSON-Schlüssel ohne `lat`/`lon`); `routen_waechter_ist_gruen`
   (`scripts/check-api-routen.sh` im Gate, nicht als Rust-Test).
-- [ ] **Step 2:** `cargo test --test ortung kopp` → FAIL.
-- [ ] **Step 3:** Implementieren; ETB über `crate::etb::system_audit_tx`, danach
+- [x] **Step 2:** `cargo test --test ortung kopp` → FAIL.
+- [x] **Step 3:** Implementieren; ETB über `crate::etb::system_audit_tx`, danach
   `state.live.publiziere(einsatz_id, etb_id)` und `sse_fahrzeug`; nach dem Koppeln
   `apply_position_tx` in derselben Transaktion. Glossar ergänzen, utoipa nur falls die
   Einsatzrouten es führen.
-- [ ] **Step 4:** `cargo test --test ortung && scripts/check-api-routen.sh &&
+- [x] **Step 4:** `cargo test --test ortung && scripts/check-api-routen.sh &&
   scripts/check-typ-codegen.sh` → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Koppeln und Trennen im Einsatz (LLH-2091)`.
+- [x] **Step 5:** Commit `feat(ortung): Koppeln und Trennen im Einsatz (LLH-2091)`.
 
 ### Task 6: Lebenszyklus — Entlassen, Stornieren, Abschluss, Rückgängig
 
@@ -247,22 +247,22 @@ Vitest, Playwright-Bildlauf.
   Option<Kopplung>`; `Ruecknahme.ausgelassen` bekommt den Eintrag „Ortung“, wenn sie nicht
   zurückkommt.
 
-- [ ] **Step 1: Failing tests:** `entlassen_trennt_die_ortung_mit_etb`;
+- [x] **Step 1: Failing tests:** `entlassen_trennt_die_ortung_mit_etb`;
   `stornieren_trennt_die_ortung_mit_etb`;
   `abschluss_trennt_alle_kopplungen_und_loescht_gps_positionen_aber_keine_manuellen`;
   `rueckgaengig_nach_entlassen_stellt_die_kopplung_her`;
   `rueckgaengig_laesst_die_kopplung_aus_wenn_die_kennung_inzwischen_belegt_ist` (Review Focus 1);
   `rueckgaengig_prueft_zugang_der_org` (fremder `zugang_id` im Vorzustand → ausgelassen);
   `wiedereroeffnen_stellt_keine_kopplung_her`.
-- [ ] **Step 2:** `cargo test --test ortung lebens` bzw. die Namen → FAIL.
-- [ ] **Step 3:** Implementieren. Abschluss: im bestehenden Abschluss-tx nur bei
+- [x] **Step 2:** `cargo test --test ortung lebens` bzw. die Namen → FAIL.
+- [x] **Step 3:** Implementieren. Abschluss: im bestehenden Abschluss-tx nur bei
   `rows_affected() == 1`: Kopplungen löschen, je Fahrzeug ETB „Ortung getrennt“, dann `UPDATE
   einsatz_fahrzeug SET lat = NULL, lon = NULL, position_quelle = NULL, position_gemessen_at =
   NULL, position_gesetzt_at = NULL WHERE einsatz_id = ? AND position_quelle = 'ortung'`; die
   ETB-IDs in `etb_eintrag_ids` anhängen. Rückgängig: Ehrenamt-Bedingung erneut wie beim PUT.
-- [ ] **Step 4:** `cargo test --test ortung && cargo test --test einsatz_fahrzeug && cargo test
+- [x] **Step 4:** `cargo test --test ortung && cargo test --test einsatz_fahrzeug && cargo test
   --test einsatz` (bzw. die Abschluss-Suite) → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Kopplung endet mit dem Fahrzeug und dem Einsatz (LLH-2091)`.
+- [x] **Step 5:** Commit `feat(ortung): Kopplung endet mit dem Fahrzeug und dem Einsatz (LLH-2091)`.
 
 ### Task 7: ADR-0098 und Verlaufs-Wächter
 
@@ -272,15 +272,15 @@ Vitest, Playwright-Bildlauf.
   jede Tabelle mit Spalten `lat` und `lon` hat einen eindeutigen Schlüssel, der höchstens eine
   Zeile je Fahrzeug bzw. Kennung erlaubt; erlaubte Liste ausdrücklich im Test)
 
-- [ ] **Step 1:** Test schreiben, laufen lassen; er muss mit der erlaubten Liste grün sein und
+- [x] **Step 1:** Test schreiben, laufen lassen; er muss mit der erlaubten Liste grün sein und
   rot werden, wenn man testweise eine Tabelle `ortung_verlauf(lat, lon, …)` anlegt (Mutationsprobe,
   nicht committen).
-- [ ] **Step 2:** ADR schreiben: Regeln aus Entwurf „Doku“; Prüfung u. a.
+- [x] **Step 2:** ADR schreiben: Regeln aus Entwurf „Doku“; Prüfung u. a.
   `verlange 'apply_position' src/public_api/einwurf/routen.rs`,
   `verbiete 'tracing::' src/ortung/`, `verlange "spiegel = 0" src/ortung/uebernahme.rs`.
-- [ ] **Step 3:** `scripts/adr-fuer.sh src/ortung/uebernahme.rs` nennt ADR-0098 und ADR-0023;
+- [x] **Step 3:** `scripts/adr-fuer.sh src/ortung/uebernahme.rs` nennt ADR-0098 und ADR-0023;
   `scripts/check-architektur.sh` grün.
-- [ ] **Step 4:** Commit `docs(adr): ADR-0098 Ortung nur für gekoppelte Fahrzeuge (LLH-2091)`.
+- [x] **Step 4:** Commit `docs(adr): ADR-0098 Ortung nur für gekoppelte Fahrzeuge (LLH-2091)`.
 
 ### Task 8: Frontend — Koppeln im Zeilenmenü der Fahrzeuge
 
@@ -298,15 +298,15 @@ Vitest, Playwright-Bildlauf.
   `/api/incidents/…`. Org-Schalter aus `useOrgEinstellungen()` (bestehender Hook) →
   `ortung_hauptamt`.
 
-- [ ] **Step 1: Failing tests:** Dialog zeigt Kandidaten als „{Zugang} · {Kennung} · vor 2 min“,
+- [x] **Step 1: Failing tests:** Dialog zeigt Kandidaten als „{Zugang} · {Kennung} · vor 2 min“,
   gekoppelte deaktiviert; bei Schalter aus ist „Besatzung ist ehrenamtlich“ Pflicht (Absenden
   gesperrt bis angehakt), bei an nicht sichtbar; ohne Kandidaten der Satz „Keine Position in den
   letzten 24 Stunden eingegangen.“; Menü zeigt „Ortung koppeln …“ bzw. „Ortung trennen“ je nach
   `ortung_gekoppelt`, nicht ohne Schreibrecht.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend vitest run OrtungKoppelnDialog FahrzeugePage` → FAIL.
-- [ ] **Step 3:** Implementieren nach `FahrzeugAngabenDialog`; Alter über `anzeige/dauer.ts`.
-- [ ] **Step 4:** Tests, `pnpm -C frontend lint`, `tsc` → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Ortung im Einsatz koppeln (LLH-2091)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend vitest run OrtungKoppelnDialog FahrzeugePage` → FAIL.
+- [x] **Step 3:** Implementieren nach `FahrzeugAngabenDialog`; Alter über `anzeige/dauer.ts`.
+- [x] **Step 4:** Tests, `pnpm -C frontend lint`, `tsc` → PASS.
+- [x] **Step 5:** Commit `feat(ortung): Ortung im Einsatz koppeln (LLH-2091)`.
 
 ### Task 9: Frontend — Lagekarte zeigt Quelle und Alter
 
@@ -320,25 +320,25 @@ Vitest, Playwright-Bildlauf.
   `export function ortungStand(f: Pick<EinsatzFahrzeug,'position_quelle'|'position_gemessen_at'>,
   jetzt: Date): { quelle: 'gps' | 'manuell' | null; veraltet: boolean; alterText: string | null }`.
 
-- [ ] **Step 1: Failing tests:** 10 min genau → nicht veraltet, 10 min + 1 s → veraltet;
+- [x] **Step 1: Failing tests:** 10 min genau → nicht veraltet, 10 min + 1 s → veraltet;
   manuell nie veraltet und ohne Alter; Raster-Text „GPS · vor 3 min“, „GPS · veraltet · vor 14
   min“, „manuell“; Marker eines GPS-Fahrzeugs trägt die Marke „GPS“, veraltet zusätzlich in
   Worten; Live-Update ruft keine Kamerafahrt (`AUTOMATISCH`) auf.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend vitest run ortungAlter marker leistenDaten` → FAIL.
-- [ ] **Step 3:** Implementieren; Takt `useMinutenTakt`; Farben aus `rollen.achtungText` wie
+- [x] **Step 2:** `mise exec -- pnpm -C frontend vitest run ortungAlter marker leistenDaten` → FAIL.
+- [x] **Step 3:** Implementieren; Takt `useMinutenTakt`; Farben aus `rollen.achtungText` wie
   `FachebeneStand`; Trefferzone und Status-Ring unverändert.
-- [ ] **Step 4:** Tests, Lint → PASS.
-- [ ] **Step 5:** Commit `feat(ortung): Lagekarte zeigt GPS und veraltet (LLH-2091)`.
+- [x] **Step 4:** Tests, Lint → PASS.
+- [x] **Step 5:** Commit `feat(ortung): Lagekarte zeigt GPS und veraltet (LLH-2091)`.
 
 ### Task 10: Frontend — Org-Schalter bei Anbindungen
 
 **Files:** Modify `frontend/src/pages/einstellungen/Anbindungen.tsx` (oder
 `EinwurfZugaenge.tsx`), Test daneben.
 
-- [ ] **Step 1: Failing test:** Schalter mit Text und Zustandszeile aus „Global Constraints“,
+- [x] **Step 1: Failing test:** Schalter mit Text und Zustandszeile aus „Global Constraints“,
   speichert `ortung_hauptamt: 1/0` über `PUT /api/org-settings`, nur für Admin bedienbar.
-- [ ] **Step 2–4:** rot → implementieren nach `EinsatzKennzahlen.tsx:76-112` → grün, Lint.
-- [ ] **Step 5:** Commit `feat(ortung): Schalter für hauptamtliche Besatzung (LLH-2091)`.
+- [x] **Step 2–4:** rot → implementieren nach `EinsatzKennzahlen.tsx:76-112` → grün, Lint.
+- [x] **Step 5:** Commit `feat(ortung): Schalter für hauptamtliche Besatzung (LLH-2091)`.
 
 ### Task 11: Doku — Architektur und Anwender
 
@@ -348,17 +348,17 @@ Vitest, Playwright-Bildlauf.
 einrichten, Schalter, DSFA-Vorlage), `lagekarte.md`, `fahrzeuge.md`; Bilder per
 `pnpm doku:bilder --grep <kapitel>` nach `docs/anwender/AGENTS.md`.
 
-- [ ] **Step 1:** Kapitel schreiben; jede Aussage durch Code gedeckt. DSFA-Vorlage: Zweck,
+- [x] **Step 1:** Kapitel schreiben; jede Aussage durch Code gedeckt. DSFA-Vorlage: Zweck,
   Rechtsgrundlage (Platzhalter, Art. 6 DSGVO für das Ehrenamt, Betriebs-/Dienstvereinbarung für
   das Hauptamt), Speicherdauer (Ablage 24 h, am Fahrzeug bis zum Abschluss), kein Verlauf,
   Empfänger (Einsatzkräfte mit Zugriff, Spiegel-Instanzen), TOM.
-- [ ] **Step 2:** Doku-Wächter aus `check-all.sh` (Bündel `schnell`) → grün.
-- [ ] **Step 3:** Commit `docs(ortung): Architektur- und Anwenderkapitel (LLH-2091)`.
+- [x] **Step 2:** Doku-Wächter aus `check-all.sh` (Bündel `schnell`) → grün.
+- [x] **Step 3:** Commit `docs(ortung): Architektur- und Anwenderkapitel (LLH-2091)`.
 
 ### Task 12: Gesamtprüfung
 
 - [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` → grün; Ergebnis für den PR notieren.
 - [ ] Prüfstein von Hand: `curl "https://…/api/v1/intake/<key>/position?id=fuekw&lat=52.52&lon=13.40"`
   gegen den lokalen Stack (mit Schalter für TLS-Ausnahme), Marker bewegt sich.
-- [ ] Folgeaufgabe „Ortung in gespiegelten Einsätzen“ auf dem Board anlegen
+- [x] Folgeaufgabe „Ortung in gespiegelten Einsätzen“ (LLH-2119; dazu LLH-2120 admin_audit) auf dem Board anlegen
   (`zunder-task-anlegen`).
