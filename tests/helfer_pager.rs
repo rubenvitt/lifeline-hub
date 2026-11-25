@@ -804,3 +804,28 @@ async fn quittung_meldet_den_anderen_helfern_live() {
     let text = common::sse_lesen_fuer(&mut strom_h2, std::time::Duration::from_millis(800)).await;
     assert!(text.contains("event: helfer_auftrag"), "{text}");
 }
+
+// ---------- Leitung ----------
+
+#[tokio::test]
+async fn auftragsdetail_zeigt_helfer_gesendet_und_quittierenden_helfer() {
+    let l = lage().await;
+    let (_, h1) = helfer(&l, "unit", l.einheit, "Max M.").await;
+    helfer(&l, "unit", l.einheit, "Lisa K.").await;
+    let (auftrag, v) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
+    // Die Antwort des Erteilens entsteht vor der Zustellung; das Detail zählt.
+    assert!(v["empfaenger"][0].get("quittiert_von_helfer").is_none(), "{v}");
+    let empf = zeile(&l.pool, auftrag).await;
+    quittieren(&l, &h1, auftrag, empf).await;
+    let (s, d) = anfrage_json(
+        &l.app,
+        "GET",
+        &format!("/api/incidents/{}/tasks/{auftrag}", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    assert_eq!(d["empfaenger"][0]["helfer_gesendet"], 2, "{d}");
+    assert_eq!(d["empfaenger"][0]["quittiert_von_helfer"], "Max M.", "{d}");
+}

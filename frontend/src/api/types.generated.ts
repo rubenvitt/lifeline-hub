@@ -1198,11 +1198,19 @@ export interface components {
             funktion?: components["schemas"]["Fuehrungsfunktion"] | null;
             /** @description Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549). */
             funktion_text?: string | null;
+            /**
+             * Format: int64
+             * @description An wie viele Helfer-Apps die Zeile ging (ADR-0104); fehlt vor der Zustellung und bei
+             *     Typen, die kein Helfer empfängt.
+             */
+            helfer_gesendet?: number | null;
             /** Format: int64 */
             id: number;
             /** Format: int64 */
             person_id?: number | null;
             quittiert_at?: string | null;
+            /** @description Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0104). */
+            quittiert_von_helfer?: string | null;
             /** Format: int64 */
             quittiert_von_id?: number | null;
             snap_anzeige: string;

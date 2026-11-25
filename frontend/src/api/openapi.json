@@ -3246,6 +3246,14 @@
             ],
             "description": "Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549)."
           },
+          "helfer_gesendet": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "An wie viele Helfer-Apps die Zeile ging (ADR-0104); fehlt vor der Zustellung und bei\nTypen, die kein Helfer empfängt."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -3262,6 +3270,13 @@
               "string",
               "null"
             ]
+          },
+          "quittiert_von_helfer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0104)."
           },
           "quittiert_von_id": {
             "type": [

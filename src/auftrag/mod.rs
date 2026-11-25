@@ -274,6 +274,13 @@ pub struct AuftragEmpfaengerAnzeige {
     pub snap_anzeige: String,
     pub quittiert_at: Option<String>,
     pub quittiert_von_id: Option<i64>,
+    /// An wie viele Helfer-Apps die Zeile ging (ADR-0104); fehlt vor der Zustellung und bei
+    /// Typen, die kein Helfer empfängt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub helfer_gesendet: Option<i64>,
+    /// Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0104).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quittiert_von_helfer: Option<String>,
 }
 
 /// Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und
