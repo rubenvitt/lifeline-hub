@@ -72,7 +72,7 @@ test('Als Anlage an …: an einen offenen Entwurf und an einen neuen Lagevortrag
   expect(anlage).toMatchObject({ nummer: 1, art: 'lageplan', titel: 'Lageplan' });
   const bild = await bildDerAnlage(
     page,
-    `/api/einsaetze/${einsatzId}/situation-reports/${entwurf}/enclosures/${anlage.id}/file`,
+    `/api/incidents/${einsatzId}/situation-reports/${entwurf}/enclosures/${anlage.id}/file`,
   );
   test.info().annotations.push({
     type: 'messwert',

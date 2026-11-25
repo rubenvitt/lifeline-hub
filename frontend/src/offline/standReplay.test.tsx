@@ -17,8 +17,8 @@ import { useOfflineSync } from './useOfflineSync';
  */
 
 const BENUTZER = 11;
-const NEU = '/api/einsaetze/7/evacuation/districts/3/progress';
-const ALT = '/api/einsaetze/7/betreuung/bezirke/3/staende';
+const NEU = '/api/incidents/7/evacuation/districts/3/progress';
+const ALT = '/api/incidents/7/betreuung/bezirke/3/staende';
 
 function wrapper() {
   const client = new QueryClient({

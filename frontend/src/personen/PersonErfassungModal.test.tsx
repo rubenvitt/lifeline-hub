@@ -65,19 +65,19 @@ beforeEach(() => {
   sessionStorage.clear();
   suchen = [];
   server.use(
-    http.get('/api/einsaetze/:eid', ({ params }) =>
+    http.get('/api/incidents/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/:eid/persons/units', () =>
+    http.get('/api/incidents/:eid/persons/units', () =>
       HttpResponse.json([
         { id: 4, name: 'Streife 2', abschnitt_id: 1, abschnitt_name: 'Bühne' },
         { id: 5, name: 'RTW 1' },
       ]),
     ),
-    http.get('/api/einsaetze/:eid/place-preview', () =>
+    http.get('/api/incidents/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/:eid/place-search', ({ request }) => {
+    http.get('/api/incidents/:eid/place-search', ({ request }) => {
       suchen.push(new URL(request.url).searchParams.get('q') ?? '');
       return HttpResponse.json({
         zustand: 'ok',

@@ -1,4 +1,4 @@
-//! Modulzähler des Navigationsrahmens (LFH-612): `GET /api/einsaetze/{id}/module-counts`.
+//! Modulzähler des Navigationsrahmens (LFH-612): `GET /api/incidents/{id}/module-counts`.
 //!
 //! Zwei Zusicherungen tragen:
 //! - **Parität**: „offen", „überfällig", „fällig", „ungelesen" bedeuten dasselbe wie in den
@@ -17,7 +17,7 @@ use common::{
 };
 
 fn uri(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/module-counts")
+    format!("/api/incidents/{einsatz}/module-counts")
 }
 
 async fn zaehler(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -64,7 +64,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (status, v) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -75,7 +75,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
 #[tokio::test]
 async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
     let (app, admin, einsatz) = aufbau().await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let mut personen = vec![];
     for _ in 0..4 {
         let p = post(
@@ -135,7 +135,7 @@ async fn mengen_zaehlen_den_bestand_ohne_stornierte() {
 #[tokio::test]
 async fn kommunikationszaehler_entsprechen_den_listen() {
     let (app, admin, einsatz) = aufbau().await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
 
     // Meldungen: drei, davon eine gesichtet und eine erledigt.
     let mut meldungen = vec![];
@@ -309,7 +309,7 @@ async fn sofort_und_dringend_zaehlen_offen_und_unbestaetigt() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
 
     let v = zaehler(&app, &admin, einsatz).await;
     assert_eq!(v["meldungen"]["sofort_offen"], json!(0), "{v}");
@@ -410,7 +410,7 @@ async fn auto_frist_zaehlt_als_erinnerung_wenn_der_bezug_sie_nicht_traegt() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let sofort = |inhalt: &str| {
         json!({
             "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -456,7 +456,7 @@ async fn bestaetigung_ueberfaellig_zaehlt_wie_die_liste() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     let meldung = |inhalt: &str, sofort: bool| {
         let mut b = json!({
             "absender": "Florian Nord 1", "empfaenger": "ELW 1", "meldeweg": "funk",
@@ -555,7 +555,7 @@ async fn merkmale_trennen_sich_im_zaehler() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
 
     // Zwei pflichtige, unbestätigte Meldungen mit künftiger Frist; nur eine ist eskaliert.
     let mut ids = vec![];
@@ -628,7 +628,7 @@ async fn chat_zaehlt_je_benutzer() {
     let karla_id = benutzer_anlegen(&app, &admin, "karla", "keine").await;
     rolle_setzen(&app, &admin, einsatz, karla_id, "fuehrungspersonal").await;
     let karla = login_cookie(&app, "karla", "karlapw1").await;
-    let basis = format!("/api/einsaetze/{einsatz}/chat/channels");
+    let basis = format!("/api/incidents/{einsatz}/chat/channels");
 
     let kanaele = get(&app, &admin, &basis).await;
     let kid = kanaele[0]["id"].as_i64().unwrap();
@@ -670,7 +670,7 @@ async fn chat_zaehlt_je_benutzer() {
 #[tokio::test]
 async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
     let (app, admin, einsatz) = aufbau().await;
-    let pfad = format!("/api/einsaetze/{einsatz}/documents");
+    let pfad = format!("/api/incidents/{einsatz}/documents");
     let mut ids = vec![];
     for titel in ["Lageplan", "Funkskizze", "Foto"] {
         let (status, v) = multipart_post(
@@ -701,7 +701,7 @@ async fn dokumente_zaehlen_wie_die_liste_ohne_geloeschte() {
 #[tokio::test]
 async fn nachforderungen_zaehlen_wie_die_liste() {
     let (app, admin, einsatz) = aufbau().await;
-    let pfad = format!("/api/einsaetze/{einsatz}/resource-requests");
+    let pfad = format!("/api/incidents/{einsatz}/resource-requests");
     // Je Fall die Stufen, die nach dem Anlegen geschaltet werden.
     let faelle: [&[&str]; 6] = [
         &[],
@@ -771,7 +771,7 @@ async fn nachforderungen_ueberfaellig_wie_das_board() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/resource-requests");
+    let pfad = format!("/api/incidents/{einsatz}/resource-requests");
     // Je Fall: Stufen nach der Zusage, Eintreffen verstrichen?
     let faelle: [(&[&str], Option<bool>); 6] = [
         (&[], None),                                  // angefordert
@@ -939,7 +939,7 @@ async fn org_rollensperre_laesst_modul_fehlen() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/persons"),
+        &format!("/api/incidents/{einsatz}/persons"),
         &erika,
         None,
     )
@@ -997,7 +997,7 @@ async fn einsatzfuehrung_zaehlt_fuer_die_einsatzleitung() {
     let (status, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/personen"),
+        &format!("/api/incidents/{einsatz}/module-overrides/personen"),
         &lena,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"einsatzfuehrung"}"#),
     )
@@ -1016,7 +1016,7 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}");
+    let basis = format!("/api/incidents/{einsatz}");
     post(
         &app,
         &admin,

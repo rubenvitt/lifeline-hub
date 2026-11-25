@@ -46,9 +46,9 @@ const antraege: SpiegelAntragAnzeige[] = [
 function mitServer(liste = antraege) {
   const verworfen: number[] = [];
   server.use(
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
-    http.get('/api/einsaetze/1/requests', () => HttpResponse.json(liste)),
-    http.delete('/api/einsaetze/1/requests/:aid', ({ params }) => {
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
+    http.get('/api/incidents/1/requests', () => HttpResponse.json(liste)),
+    http.delete('/api/incidents/1/requests/:aid', ({ params }) => {
       verworfen.push(Number(params.aid));
       return new HttpResponse(null, { status: 204 });
     }),
@@ -197,8 +197,8 @@ describe('SpiegelBand: Anträge folgen den Zählern im Kopf (LLH-1492)', () => {
   it('lädt die Anträge neu, sobald sich ein Zähler im Kopf ändert, sonst nicht', async () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
-      http.get('/api/einsaetze/1/requests', () => {
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzFixture({ spiegel: spiegel() }))),
+      http.get('/api/incidents/1/requests', () => {
         abrufe += 1;
         return HttpResponse.json(antraege);
       }),
@@ -317,23 +317,23 @@ const bruchliste: BruchErfassung[] = [
 function mitBruchServer(liste = bruchliste) {
   const aufrufe: string[] = [];
   server.use(
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json(einsatzFixture({ spiegel: spiegel({ bruchstelle: liste.length }) })),
     ),
-    http.get('/api/einsaetze/1/requests', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/breaks', () => HttpResponse.json(liste)),
-    http.post('/api/einsaetze/1/breaks/requests', () => {
+    http.get('/api/incidents/1/requests', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/breaks', () => HttpResponse.json(liste)),
+    http.post('/api/incidents/1/breaks/requests', () => {
       aufrufe.push('alle');
       return HttpResponse.json({
         gestellt: 1,
         offen: [{ id: 2, grund: 'Bezug noch nicht beim Führer.' }],
       });
     }),
-    http.post('/api/einsaetze/1/breaks/:bid/request', ({ params }) => {
+    http.post('/api/incidents/1/breaks/:bid/request', ({ params }) => {
       aufrufe.push(`stellen ${String(params.bid)}`);
       return HttpResponse.json({ antrag: { id: 9, zustand: 'ausstehend' } }, { status: 202 });
     }),
-    http.post('/api/einsaetze/1/breaks/:bid/discard', ({ params }) => {
+    http.post('/api/incidents/1/breaks/:bid/discard', ({ params }) => {
       aufrufe.push(`verwerfen ${String(params.bid)}`);
       return new HttpResponse(null, { status: 204 });
     }),
@@ -393,7 +393,7 @@ describe('SpiegelBand: nicht übernommene Erfassungen nachreichen (LLH-1646)', (
     const { user, liste } = await bruchAufklappen();
     // Nach „Alle stellen“ ist nur noch die Meldung offen.
     server.use(
-      http.get('/api/einsaetze/1/breaks', () => HttpResponse.json([bruchliste[1], bruchliste[2]])),
+      http.get('/api/incidents/1/breaks', () => HttpResponse.json([bruchliste[1], bruchliste[2]])),
     );
     await user.click(within(liste).getByRole('button', { name: 'Alle stellen' }));
     await waitFor(() =>

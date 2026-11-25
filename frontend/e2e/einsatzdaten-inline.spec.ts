@@ -17,7 +17,7 @@ test.use({ timezoneId: 'Europe/Berlin' });
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenPerApi(page, 'admin', PW);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Einsatzdaten inline ${Date.now()}` },
   });
   expect(antwort.ok()).toBeTruthy();
@@ -25,7 +25,7 @@ async function anmeldenUndAnlegen(page: Page): Promise<number> {
 }
 
 async function stand(page: Page, id: number): Promise<Record<string, unknown>> {
-  return (await (await page.request.get(`/api/einsaetze/${id}`)).json()) as Record<string, unknown>;
+  return (await (await page.request.get(`/api/incidents/${id}`)).json()) as Record<string, unknown>;
 }
 
 test('LFH-472: Leitstellen-Nr. inline nachtragen, die Leseansicht bleibt stehen', async ({

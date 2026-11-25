@@ -42,7 +42,7 @@ test.describe(KAPITEL, () => {
   test.beforeAll(async () => {
     const api = await apiAlsAdmin();
     const demo = await demoEinsatz(api);
-    await fuelle(api, 'post', `/api/einsaetze/${demo.id}/reminders`, {
+    await fuelle(api, 'post', `/api/incidents/${demo.id}/reminders`, {
       titel: 'Lagemeldung aller Einsatzabschnitte',
       beschreibung: 'Stand Kräfte, Betroffene und Schäden je Abschnitt abfragen.',
       faellig_at: inMinuten(45),

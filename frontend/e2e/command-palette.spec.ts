@@ -356,7 +356,7 @@ test('„Status setzen“ öffnet das Statusmenü der Fokuszeile UND legt den Fo
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Status setzen ${Date.now()}`);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const katalogAntwort = await page.request.get('/api/vehicle-statuses');
   expect(katalogAntwort.ok(), await katalogAntwort.text()).toBeTruthy();
   const katalog = (await katalogAntwort.json()) as {

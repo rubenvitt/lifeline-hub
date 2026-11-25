@@ -197,7 +197,7 @@ async fn abschluss_beendet_das_livebild_und_leert_den_speicher() {
     let (s, _) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &format!("/api/incidents/{}/close", u.einsatz),
         &u.admin,
         None,
     )

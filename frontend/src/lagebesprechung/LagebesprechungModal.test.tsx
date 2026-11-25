@@ -58,7 +58,7 @@ beforeEach(() => {
   gesendet = [];
   postAntwort = () => HttpResponse.json(antwort(), { status: 201 });
   server.use(
-    http.post('/api/einsaetze/1/briefings', async ({ request }) => {
+    http.post('/api/incidents/1/briefings', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return postAntwort();
     }),

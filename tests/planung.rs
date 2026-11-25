@@ -117,7 +117,7 @@ async fn ohne_recht_403_fremde_planung_404() {
 async fn anlegen_und_liste_ohne_einsatz_doppelte_bezeichnung_409() {
     let app = setup().await;
     let admin = admin(&app).await;
-    let (_, einsaetze_vorher) = anfrage(&app, "GET", "/api/einsaetze", &admin, None).await;
+    let (_, einsaetze_vorher) = anfrage(&app, "GET", "/api/incidents", &admin, None).await;
 
     let (s, plan) = post(
         &app,
@@ -141,7 +141,7 @@ async fn anlegen_und_liste_ohne_einsatz_doppelte_bezeichnung_409() {
     assert_eq!(plan["posten"], json!([]));
     assert_eq!(plan["kennzahlen"]["soll"], 0);
 
-    let (_, einsaetze) = anfrage(&app, "GET", "/api/einsaetze", &admin, None).await;
+    let (_, einsaetze) = anfrage(&app, "GET", "/api/incidents", &admin, None).await;
     assert_eq!(einsaetze, einsaetze_vorher, "eine Planung ist kein Einsatz");
 
     let (s, _) = post(

@@ -76,7 +76,7 @@ async function storeDichte(page: Page, dichte: Dichte) {
 }
 
 async function createEinsatz(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Rahmen CLS ${Date.now()}` },
   });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
@@ -260,7 +260,7 @@ for (const dichte of ['komfortabel', 'handschuh'] as const) {
     test.setTimeout(150_000);
     const einsatzId = await prepare(page, dichte);
     const pfad = `/einsaetze/${einsatzId}/ueberblick`;
-    await page.route(/\/api\/einsaetze\/\d+\/etb(\?|$)/, async (route) => {
+    await page.route(/\/api\/incidents\/\d+\/etb(\?|$)/, async (route) => {
       // Keine Antwort: die Einträge bleiben vorgemerkt.
       if (route.request().method() === 'POST') return;
       await route.continue();

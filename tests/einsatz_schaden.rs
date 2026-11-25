@@ -13,7 +13,7 @@ async fn schaden_anlegen(app: &axum::Router, cookie: &str, einsatz: i64, body: &
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/damages"),
+        &format!("/api/incidents/{einsatz}/damages"),
         cookie,
         Some(body),
     )
@@ -27,7 +27,7 @@ async fn personal_disponieren(app: &axum::Router, cookie: &str, einsatz: i64, na
     let (s, v) = anfrage_json(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/personnel"),
+        &format!("/api/incidents/{einsatz}/personnel"),
         cookie,
         Some(&json!({ "adhoc": { "name": name } })),
     )
@@ -50,7 +50,7 @@ async fn anlegen_vergibt_s_nummer_und_status_offen() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&json!({"typ":"umweltschaden","ausmass":"gross","ort":"Hauptstr. 17"})),
     )
@@ -71,7 +71,7 @@ async fn registriernr_fortlaufend_je_einsatz() {
     let (_, v2) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&gueltig()),
     )
@@ -93,7 +93,7 @@ async fn anlegen_ohne_pflichtfelder_ist_400() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -124,7 +124,7 @@ async fn anlegen_mit_leerem_pflichtfeld_ist_400() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -150,7 +150,7 @@ async fn anlegen_mit_unbekanntem_enum_ist_400() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -171,7 +171,7 @@ async fn anlegen_meldung_trennt_fehlenden_und_leeren_ort() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let u = format!("/api/einsaetze/{e}/damages");
+    let u = format!("/api/incidents/{e}/damages");
 
     let (s_fehlt, v_fehlt) = anfrage_json(
         &app,
@@ -211,7 +211,7 @@ async fn anlegen_mit_status_ungleich_offen_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body),
     )
@@ -228,7 +228,7 @@ async fn uebergeben_setzt_status_und_adressat() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{sid}/hand-over"),
         &admin,
         Some(&json!({"uebergeben_an":"Stadtwerke"})),
     )
@@ -252,7 +252,7 @@ async fn uebergeben_ohne_adressat_ist_400() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{sid}/hand-over"),
         &admin,
         Some(&json!({})),
     )
@@ -270,7 +270,7 @@ async fn uebergeben_mit_leerem_adressat_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let u = format!("/api/einsaetze/{e}/damages/{sid}/hand-over");
+    let u = format!("/api/incidents/{e}/damages/{sid}/hand-over");
 
     let (s, v) = anfrage_json(
         &app,
@@ -308,7 +308,7 @@ async fn uebergeben_aus_abgeschlossen_ist_422() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben"})),
     )
@@ -316,7 +316,7 @@ async fn uebergeben_aus_abgeschlossen_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{sid}/hand-over"),
         &admin,
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
@@ -333,7 +333,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     let (a1, v1) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{s1}/close"),
+        &format!("/api/incidents/{e}/damages/{s1}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben"})),
     )
@@ -344,7 +344,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{s2}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{s2}/hand-over"),
         &admin,
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
@@ -352,7 +352,7 @@ async fn abschliessen_aus_offen_und_aus_uebergeben_ok() {
     let (a2, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{s2}/close"),
+        &format!("/api/incidents/{e}/damages/{s2}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben"})),
     )
@@ -373,7 +373,7 @@ async fn abschliessen_ohne_grund_ist_400() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({})),
     )
@@ -392,7 +392,7 @@ async fn abschliessen_mit_leerem_grund_ist_400() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"   "})),
     )
@@ -413,7 +413,7 @@ async fn abschliessen_mit_unbekanntem_grund_ist_400() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"quatsch"})),
     )
@@ -431,7 +431,7 @@ async fn abschliessen_aus_abgeschlossen_ist_422() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben"})),
     )
@@ -439,7 +439,7 @@ async fn abschliessen_aus_abgeschlossen_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben"})),
     )
@@ -458,7 +458,7 @@ async fn abschliessen_haengt_notiz_an_beschreibung_an() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"behoben","notiz":"vor Ort erledigt"})),
     )
@@ -466,7 +466,7 @@ async fn abschliessen_haengt_notiz_an_beschreibung_an() {
     let (_, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -490,7 +490,7 @@ async fn geschaedigt_beide_felder_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body),
     )
@@ -510,7 +510,7 @@ async fn geschaedigt_fk_auf_storniert_person_bleibt_zulaessig() {
     let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/persons/{p}"),
+        &format!("/api/incidents/{e}/persons/{p}"),
         &admin,
         None,
     )
@@ -519,7 +519,7 @@ async fn geschaedigt_fk_auf_storniert_person_bleibt_zulaessig() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -541,7 +541,7 @@ async fn patch_loescht_uebergeben_an_bei_status_uebergeben_ist_422() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{sid}/hand-over"),
         &admin,
         Some(&json!({"uebergeben_an":"Stadtwerke"})),
     )
@@ -549,7 +549,7 @@ async fn patch_loescht_uebergeben_an_bei_status_uebergeben_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"uebergeben_an": null})),
     )
@@ -573,7 +573,7 @@ async fn patch_geschaedigt_xor_effektivzustand_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"geschaedigt_person_id": p})),
     )
@@ -590,7 +590,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     let (s1, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -599,7 +599,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     let (_, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         None,
     )
@@ -612,7 +612,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     let (_, liste2) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages?inkl_storniert=true"),
+        &format!("/api/incidents/{e}/damages?inkl_storniert=true"),
         &admin,
         None,
     )
@@ -625,7 +625,7 @@ async fn soft_delete_blendet_aus_und_doppelt_ist_409() {
     let (s2, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -642,7 +642,7 @@ async fn patch_auf_storniertem_schaden_ist_409() {
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -650,7 +650,7 @@ async fn patch_auf_storniertem_schaden_ist_409() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"ausmass":"gross"})),
     )
@@ -680,7 +680,7 @@ async fn liste_filtert_nach_status_typ_ausmass() {
     let (_, nur_umwelt) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages?typ=umweltschaden"),
+        &format!("/api/incidents/{e}/damages?typ=umweltschaden"),
         &admin,
         None,
     )
@@ -689,7 +689,7 @@ async fn liste_filtert_nach_status_typ_ausmass() {
     let (_, nur_gross) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages?ausmass=gross"),
+        &format!("/api/incidents/{e}/damages?ausmass=gross"),
         &admin,
         None,
     )
@@ -749,7 +749,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/hand-over"),
+        &format!("/api/incidents/{e}/damages/{sid}/hand-over"),
         &admin,
         Some(&json!({"uebergeben_an":"Bauhof"})),
     )
@@ -757,7 +757,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages/{sid}/close"),
+        &format!("/api/incidents/{e}/damages/{sid}/close"),
         &admin,
         Some(&json!({"abschluss_grund":"kein_handlungsbedarf","notiz":"GEHEIM_NOTIZ"})),
     )
@@ -765,7 +765,7 @@ async fn lifecycle_etb_je_event_ein_eintrag_ohne_leak() {
     anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -835,7 +835,7 @@ async fn etb_id_mit(app: &axum::Router, cookie: &str, einsatz: i64, teil: &str) 
     let (_, json) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -863,7 +863,7 @@ async fn lifecycle_meldet_etb_und_schaden_live() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{e}/damages");
+    let basis = format!("/api/incidents/{e}/damages");
 
     let schritte: [(&str, String, Option<Value>, &str); 4] = [
         ("POST", basis.clone(), Some(gueltig()), "S-001 angelegt"),
@@ -915,7 +915,7 @@ async fn marker_ohne_freitext_und_ohne_stornierte() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{dritter}"),
+        &format!("/api/incidents/{e}/damages/{dritter}"),
         &admin,
         None,
     )
@@ -925,7 +925,7 @@ async fn marker_ohne_freitext_und_ohne_stornierte() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/marker"),
+        &format!("/api/incidents/{e}/damages/marker"),
         &admin,
         None,
     )
@@ -972,13 +972,13 @@ async fn marker_hinter_dem_modulrecht() {
     let gid = benutzer_anlegen(&app, &admin, "gustav", "fuehrungskraft").await;
     rolle_setzen(&app, &admin, e, gid, "fuehrungspersonal").await;
     let gustav = login_cookie(&app, "gustav", "gustavpw1").await;
-    let marker = format!("/api/einsaetze/{e}/damages/marker");
+    let marker = format!("/api/incidents/{e}/damages/marker");
     let (s, _) = anfrage(&app, "GET", &marker, &gustav, None).await;
     assert_eq!(s, StatusCode::OK, "Vorbedingung: sichtbar liest er");
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/schaeden"),
+        &format!("/api/incidents/{e}/module-overrides/schaeden"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -987,7 +987,7 @@ async fn marker_hinter_dem_modulrecht() {
     let (s_liste, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &gustav,
         None,
     )
@@ -1015,7 +1015,7 @@ async fn beobachter_kann_lesen_nicht_schreiben() {
     let (s_get, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &beob,
         None,
     )
@@ -1024,7 +1024,7 @@ async fn beobachter_kann_lesen_nicht_schreiben() {
     let (s_post, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &beob,
         Some(&gueltig()),
     )
@@ -1042,7 +1042,7 @@ async fn fremder_einsatz_ohne_mitgliedschaft_ist_403() {
     let (s, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &fremd,
         None,
     )
@@ -1062,7 +1062,7 @@ async fn geschaedigt_aus_fremdem_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e1}/damages"),
+        &format!("/api/incidents/{e1}/damages"),
         &admin,
         Some(&body),
     )
@@ -1083,7 +1083,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/close"),
+        &format!("/api/incidents/{e}/close"),
         &admin,
         Some(&json!({})),
     )
@@ -1091,7 +1091,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     let (s_get, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         None,
     )
@@ -1104,7 +1104,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     let (s_post, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&gueltig()),
     )
@@ -1117,7 +1117,7 @@ async fn abgeschlossener_einsatz_ist_read_only() {
     let (s_del, _) = anfrage_json(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -1168,7 +1168,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     let (s_get_fk, _) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e2}/damages"),
+        &format!("/api/incidents/{e2}/damages"),
         &chef,
         None,
     )
@@ -1183,7 +1183,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     let (s_get_admin, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e2}/damages"),
+        &format!("/api/incidents/{e2}/damages"),
         &admin,
         None,
     )
@@ -1203,7 +1203,7 @@ async fn fremde_org_lesen_fuehrungskraft_403_admin_serverweit() {
     let (s_post, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e2}/damages"),
+        &format!("/api/incidents/{e2}/damages"),
         &admin,
         Some(&gueltig()),
     )
@@ -1224,7 +1224,7 @@ async fn anlegen_mit_geschaedigt_einsatzkraft_ist_201_mit_name() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body),
     )
@@ -1250,7 +1250,7 @@ async fn anlegen_mit_geschaedigt_einsatzkraft_aus_fremdem_einsatz_ist_404() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e1}/damages"),
+        &format!("/api/incidents/{e1}/damages"),
         &admin,
         Some(&body),
     )
@@ -1274,7 +1274,7 @@ async fn anlegen_mit_geschaedigt_organisation_erzwingt_eigene_org() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body),
     )
@@ -1304,7 +1304,7 @@ async fn anlegen_mit_zwei_geschaedigt_quellen_ist_422() {
     let (s1, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body),
     )
@@ -1321,7 +1321,7 @@ async fn anlegen_mit_zwei_geschaedigt_quellen_ist_422() {
     let (s2, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&body2),
     )
@@ -1347,7 +1347,7 @@ async fn patch_geschaedigt_personal_auf_kontakt_effektivzustand_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"geschaedigt_personal_id": ep})),
     )
@@ -1370,7 +1370,7 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"geschaedigt_organisation_id": 99999})),
     )
@@ -1379,7 +1379,7 @@ async fn patch_geschaedigt_organisation_erzwingt_eigene_org() {
     let (s_get, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         None,
     )
@@ -1402,7 +1402,7 @@ async fn anlegen_koordinaten_speichert_paar_samt_grenzwerten() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{e}/damages");
+    let pfad = format!("/api/incidents/{e}/damages");
 
     for (lat, lon) in [(52.1, 8.5), (0.0, 0.0), (-90.0, -180.0), (90.0, 180.0)] {
         let mut body = gueltig();
@@ -1436,7 +1436,7 @@ async fn anlegen_koordinaten_sind_optional_auch_bei_explizitem_null() {
         let (status, schaden) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -1476,7 +1476,7 @@ async fn anlegen_koordinaten_unvollstaendig_oder_ausserhalb_range_ist_422_ohne_w
         let (status, antwort) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -1517,7 +1517,7 @@ async fn schaden_verorten_setzt_lat_lon() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": 51.0, "lon": 7.0})),
     )
@@ -1536,7 +1536,7 @@ async fn schaden_verorten_nur_lon_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lon": 7.0})),
     )
@@ -1557,7 +1557,7 @@ async fn schaden_verorten_nur_lat_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": 51.0})),
     )
@@ -1578,7 +1578,7 @@ async fn schaden_verorten_ausserhalb_range_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": 99.0, "lon": 7.0})),
     )
@@ -1587,7 +1587,7 @@ async fn schaden_verorten_ausserhalb_range_ist_422() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": 51.0, "lon": 200.0})),
     )
@@ -1604,7 +1604,7 @@ async fn schaden_verorten_loeschen_setzt_null() {
     let (s, _) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": 51.0, "lon": 7.0})),
     )
@@ -1613,7 +1613,7 @@ async fn schaden_verorten_loeschen_setzt_null() {
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/damages/{sid}"),
+        &format!("/api/incidents/{e}/damages/{sid}"),
         &admin,
         Some(&json!({"lat": null, "lon": null})),
     )
@@ -1636,7 +1636,7 @@ async fn filter_unbekannter_enum_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let basis = format!("/api/einsaetze/{e}/damages");
+    let basis = format!("/api/incidents/{e}/damages");
 
     for q in ["status=quatsch", "typ=quatsch", "ausmass=quatsch"] {
         let (s, v) = anfrage_json(&app, "GET", &format!("{basis}?{q}"), &admin, None).await;
@@ -1673,7 +1673,7 @@ async fn patch_unbekannter_enum_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let u = format!("/api/einsaetze/{e}/damages/{sid}");
+    let u = format!("/api/incidents/{e}/damages/{sid}");
 
     for body in [
         json!({"typ": "quatsch"}),
@@ -1703,7 +1703,7 @@ async fn patch_leerer_ort_ist_400() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let u = format!("/api/einsaetze/{e}/damages/{sid}");
+    let u = format!("/api/incidents/{e}/damages/{sid}");
 
     let (s, v) = anfrage_json(&app, "PATCH", &u, &admin, Some(&json!({"ort": "   "}))).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "{v:?}");
@@ -1742,7 +1742,7 @@ async fn gefahrenart_und_schadensgrad_werden_gespeichert_und_im_etb_in_worten_ge
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(&json!({
             "typ": "infrastruktur", "ausmass": "gross", "ort": "Trafostation",
@@ -1769,7 +1769,7 @@ async fn ohne_gefahrenart_fehlen_die_felder_in_der_antwort() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         Some(
             &json!({ "typ": "sachschaden", "ausmass": "gering", "ort": "A",
@@ -1796,7 +1796,7 @@ async fn unbekannte_gefahrenart_oder_schadensgrad_ist_400_ohne_write() {
         let (s, v) = anfrage_json(
             &app,
             "POST",
-            &format!("/api/einsaetze/{e}/damages"),
+            &format!("/api/incidents/{e}/damages"),
             &admin,
             Some(&body),
         )
@@ -1806,7 +1806,7 @@ async fn unbekannte_gefahrenart_oder_schadensgrad_ist_400_ohne_write() {
     let (_, liste) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages"),
+        &format!("/api/incidents/{e}/damages"),
         &admin,
         None,
     )
@@ -1820,7 +1820,7 @@ async fn unbekannte_gefahrenart_oder_schadensgrad_ist_400_ohne_write() {
         let (s, v) = anfrage_json(
             &app,
             "PATCH",
-            &format!("/api/einsaetze/{e}/damages/{sid}"),
+            &format!("/api/incidents/{e}/damages/{sid}"),
             &admin,
             Some(&body),
         )
@@ -1830,7 +1830,7 @@ async fn unbekannte_gefahrenart_oder_schadensgrad_ist_400_ohne_write() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages?gefahrenart=lawine"),
+        &format!("/api/incidents/{e}/damages?gefahrenart=lawine"),
         &admin,
         None,
     )
@@ -1844,7 +1844,7 @@ async fn patch_setzt_laesst_und_leert_gefahrenart_dreiwertig() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let sid = schaden_anlegen(&app, &admin, e, &gueltig()).await;
-    let pfad = format!("/api/einsaetze/{e}/damages/{sid}");
+    let pfad = format!("/api/incidents/{e}/damages/{sid}");
     let (s, v) = anfrage_json(
         &app,
         "PATCH",
@@ -1902,7 +1902,7 @@ async fn liste_kennzahlen_und_marker_kennen_die_gefahrenart() {
     let (s, v) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages?gefahrenart=explosion,brand"),
+        &format!("/api/incidents/{e}/damages?gefahrenart=explosion,brand"),
         &admin,
         None,
     )
@@ -1912,7 +1912,7 @@ async fn liste_kennzahlen_und_marker_kennen_die_gefahrenart() {
     let (_, k) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/metrics?gefahrenart=explosion"),
+        &format!("/api/incidents/{e}/damages/metrics?gefahrenart=explosion"),
         &admin,
         None,
     )
@@ -1922,7 +1922,7 @@ async fn liste_kennzahlen_und_marker_kennen_die_gefahrenart() {
     let (_, m) = anfrage_json(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/damages/marker"),
+        &format!("/api/incidents/{e}/damages/marker"),
         &admin,
         None,
     )
@@ -1954,7 +1954,7 @@ async fn csv_export_nennt_gefahr_und_schadensgrad_in_worten() {
     let antwort = tower::ServiceExt::oneshot(
         app.clone(),
         axum::http::Request::builder()
-            .uri(format!("/api/einsaetze/{e}/damages/export"))
+            .uri(format!("/api/incidents/{e}/damages/export"))
             .header("cookie", &admin)
             .body(axum::body::Body::empty())
             .unwrap(),
@@ -2001,7 +2001,7 @@ async fn lage_snapshot_friert_gefahrenart_und_schadensgrad_ein() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/situation-snapshots"),
+        &format!("/api/incidents/{e}/situation-snapshots"),
         &admin,
         Some(&json!({ "bezeichnung": "Stand" })),
     )

@@ -98,7 +98,7 @@ test('„Vollzug melden“ (useVerwerfenSchutz): Enter in der Rückfrage führt 
     startseite: false,
   });
   const id = await einsatzPerApi(page, `Rückfrage Vollzug ${Date.now()}`);
-  const r = await page.request.post(`/api/einsaetze/${id}/tasks`, {
+  const r = await page.request.post(`/api/incidents/${id}/tasks`, {
     data: {
       auftrag_text: 'Hydrant H12 freilegen',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],

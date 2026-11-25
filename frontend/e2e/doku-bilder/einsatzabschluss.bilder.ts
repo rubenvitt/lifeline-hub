@@ -56,10 +56,10 @@ test.describe(KAPITEL, () => {
 
   test('Dialog „Einsatz wieder öffnen“', async ({ page }) => {
     await anmelden(page);
-    const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/einsaetze', {
+    const einsatz = await fuelle<{ id: number }>(page, 'post', '/api/incidents', {
       bezeichnung: 'Ölspur B 27',
     });
-    await fuelle(page, 'post', `/api/einsaetze/${einsatz.id}/close`);
+    await fuelle(page, 'post', `/api/incidents/${einsatz.id}/close`);
     await uhrAnhalten(page);
     await page.goto(`/einsaetze/${einsatz.id}/einsatzdaten`);
     const abschluss = page.getByRole('region', { name: 'Einsatzabschluss' });

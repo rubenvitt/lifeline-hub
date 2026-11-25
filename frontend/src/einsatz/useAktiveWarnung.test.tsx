@@ -17,9 +17,9 @@ import type { ModulFreigaben, Warnstufe, WetterWarnstufe } from '../api/types';
 import { useAktiveWarnung } from './useAktiveWarnung';
 import { useModulZaehler } from './useModulZaehler';
 
-const GEBIETE = '/api/einsaetze/7/hazard-areas';
-const ZAEHLER = '/api/einsaetze/7/module-counts';
-const WETTER = '/api/einsaetze/7/weather';
+const GEBIETE = '/api/incidents/7/hazard-areas';
+const ZAEHLER = '/api/incidents/7/module-counts';
+const WETTER = '/api/incidents/7/weather';
 
 const STUNDE = 60 * 60_000;
 const um = (ms: number) => new Date(Date.now() + ms).toISOString();

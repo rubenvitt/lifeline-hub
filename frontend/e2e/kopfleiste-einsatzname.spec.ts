@@ -164,7 +164,7 @@ test('390 px: die Zählplakette überdeckt „Ton blockiert“ nicht und nimmt k
     }
   });
   let ungelesen = 0;
-  await page.route('**/api/einsaetze/*/notifications', async (route) => {
+  await page.route('**/api/incidents/*/notifications', async (route) => {
     const antwort = await route.fetch();
     const json = (await antwort.json()) as { ungelesen: number };
     await route.fulfill({ response: antwort, json: { ...json, ungelesen } });

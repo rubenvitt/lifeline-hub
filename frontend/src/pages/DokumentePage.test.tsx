@@ -81,24 +81,24 @@ function rendere(
   aenderungen = [];
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
-    http.get('/api/einsaetze/1/documents', () =>
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatz)),
+    http.get('/api/incidents/1/documents', () =>
       listeStatus === 200
         ? HttpResponse.json(dokumente)
         : new HttpResponse(null, { status: listeStatus }),
     ),
-    http.delete('/api/einsaetze/1/documents/:dokId', ({ params }) => {
+    http.delete('/api/incidents/1/documents/:dokId', ({ params }) => {
       loeschAufrufe.push(String(params.dokId));
       return new HttpResponse(null, { status: 204 });
     }),
-    http.patch('/api/einsaetze/1/documents/:dokId', async ({ params, request }) => {
+    http.patch('/api/incidents/1/documents/:dokId', async ({ params, request }) => {
       const body = await request.json();
       aenderungen.push({ id: String(params.dokId), body });
       return HttpResponse.json(dokument({ ...(body as object), id: Number(params.dokId) }));
     }),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/etb', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/etb', () => HttpResponse.json([])),
   );
   const seite = (
     <Routes>
@@ -267,10 +267,10 @@ describe('DokumentePage', () => {
     await schliesseAblegen();
     const knopf = () => within(kopfAktionen()).getByRole('button', { name: 'Dokument ablegen' });
 
-    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzBeobachter)));
+    server.use(http.get('/api/incidents/1', () => HttpResponse.json(einsatzBeobachter)));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(() => expect(knopf()).toBeDisabled());
-    server.use(http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)));
+    server.use(http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)));
     await act(() => client.invalidateQueries({ queryKey: einsatzKeys.einsatz(1) }));
     await waitFor(() => expect(knopf()).toBeEnabled());
     expect(screen.queryAllByRole('dialog')).toHaveLength(0);
@@ -412,7 +412,7 @@ describe('DokumentePage', () => {
   it('zeigt ein gescheitertes Entfernen im Hinweis-Slot der Seite', async () => {
     rendere(einsatzAktiv, [dokument()]);
     server.use(
-      http.delete('/api/einsaetze/1/documents/:dokId', () =>
+      http.delete('/api/incidents/1/documents/:dokId', () =>
         HttpResponse.json({ error: 'Dokument ist gesperrt' }, { status: 409 }),
       ),
     );
@@ -439,7 +439,7 @@ describe('DokumentePage', () => {
     const frei = new Promise<void>((res) => (freigeben = res));
     let geloescht = false;
     server.use(
-      http.delete('/api/einsaetze/1/documents/:dokId', async ({ params }) => {
+      http.delete('/api/incidents/1/documents/:dokId', async ({ params }) => {
         loeschAufrufe.push(String(params.dokId));
         await frei;
         const r = antwort();
@@ -459,7 +459,7 @@ describe('DokumentePage', () => {
     rendere(einsatzAktiv, [dokument(), zweite]);
     const halt = haltLoeschen(antwort);
     server.use(
-      http.get('/api/einsaetze/1/documents', () =>
+      http.get('/api/incidents/1/documents', () =>
         HttpResponse.json(halt.geloescht() ? [zweite] : [dokument(), zweite]),
       ),
     );
@@ -552,7 +552,7 @@ describe('DokumentePage', () => {
     let listeFrei!: () => void;
     const liste = new Promise<void>((res) => (listeFrei = res));
     server.use(
-      http.get('/api/einsaetze/1/documents', async () => {
+      http.get('/api/incidents/1/documents', async () => {
         await liste;
         return HttpResponse.json([dokument({ id: 6, titel: 'Foto Einsatzstelle' })]);
       }),
@@ -634,8 +634,8 @@ describe('DokumentePage', () => {
   it('zeigt einen Seitenfehler, wenn der Einsatz nicht lädt', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => new HttpResponse(null, { status: 404 })),
-      http.get('/api/einsaetze/1/documents', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => new HttpResponse(null, { status: 404 })),
+      http.get('/api/incidents/1/documents', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>

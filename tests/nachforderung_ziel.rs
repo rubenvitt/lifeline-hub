@@ -12,7 +12,7 @@ mod common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/resource-requests")
+    format!("/api/incidents/{einsatz}/resource-requests")
 }
 
 /// „2× RTW“ an die Leitstelle, ergänzt um `extra`.
@@ -46,7 +46,7 @@ async fn raum(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -> i64
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas"),
+        &format!("/api/incidents/{einsatz}/staging-areas"),
         cookie,
         Some(&json!({ "bezeichnung": name }).to_string()),
     )
@@ -59,7 +59,7 @@ async fn raum_status(app: &axum::Router, cookie: &str, einsatz: i64, br: i64, st
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/staging-areas/{br}/status"),
+        &format!("/api/incidents/{einsatz}/staging-areas/{br}/status"),
         cookie,
         Some(&json!({ "status": status }).to_string()),
     )
@@ -71,7 +71,7 @@ async fn abschnitt(app: &axum::Router, cookie: &str, einsatz: i64, name: &str) -
     let (s, j) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&json!({ "name": name }).to_string()),
     )
@@ -84,7 +84,7 @@ async fn modul_ausblenden(app: &axum::Router, admin: &str, einsatz: i64, modul: 
     let (s, j) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/{modul}"),
+        &format!("/api/incidents/{einsatz}/module-overrides/{modul}"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -105,7 +105,7 @@ async fn etb_inhalt(app: &axum::Router, cookie: &str, einsatz: i64, n: &Value) -
     let (s, etb) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/etb"),
+        &format!("/api/incidents/{einsatz}/etb"),
         cookie,
         None,
     )
@@ -290,7 +290,7 @@ async fn aufgeloester_oder_stornierter_raum_ist_409() {
     let (s, j) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{e}/staging-areas/{storniert}"),
+        &format!("/api/incidents/{e}/staging-areas/{storniert}"),
         &admin,
         None,
     )

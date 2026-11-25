@@ -183,7 +183,7 @@ test('live: ein umgehängter Unterabschnitt steht ohne Neuladen am neuen Ort', a
       .filter({ has: page.getByRole('link', { name, exact: true }) });
   await expect(spalte(ABSCHNITT).getByRole('link', { name: 'Unterabschnitt Deich' })).toBeVisible();
 
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
+  const antwort = await page.request.patch(`/api/incidents/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();
@@ -211,7 +211,7 @@ test('Übernahme: genau ein POST, kein PATCH, danach der Bericht', async ({ page
   });
   await page.getByRole('button', { name: 'In Lagebericht übernehmen' }).click();
   await expect(page).toHaveURL(new RegExp(`/einsaetze/${einsatzId}/lageberichte/\\d+$`));
-  expect(anfragen).toEqual([`POST /api/einsaetze/${einsatzId}/situation-reports`]);
+  expect(anfragen).toEqual([`POST /api/incidents/${einsatzId}/situation-reports`]);
   await expect(page.getByText(ABSCHNITT).first()).toBeVisible();
 });
 
@@ -303,7 +303,7 @@ test('Schleuse, Fokus: ein aufgelöster Abschnitt unter dem Fokus bleibt als Pla
   const vorher = await spalten
     .filter({ has: page.getByRole('link', { name: 'Einsatzabschnitt 3', exact: true }) })
     .boundingBox();
-  const antwort = await page.request.delete(`/api/einsaetze/${einsatzId}/sectors/${abschnitte[2]}`);
+  const antwort = await page.request.delete(`/api/incidents/${einsatzId}/sectors/${abschnitte[2]}`);
   expect(antwort.ok(), `Auflösen: ${await antwort.text()}`).toBeTruthy();
 
   // Der Link wird zum Platzhalter ohne Link; der Fokus fällt nicht auf `body`, sondern auf die
@@ -333,7 +333,7 @@ test('Schleuse, Zeiger: ein umgehängter Unterabschnitt springt nicht unter dem 
   await ziel(page).hover();
   await expect(stand(page)).toHaveText('Live pausiert');
   const vorher = await rechteck(page);
-  const antwort = await page.request.patch(`/api/einsaetze/${einsatzId}/sectors/${unter}`, {
+  const antwort = await page.request.patch(`/api/incidents/${einsatzId}/sectors/${unter}`, {
     data: { ueber_abschnitt_id: abschnitte[1] },
   });
   expect(antwort.ok(), `Umhängen: ${await antwort.text()}`).toBeTruthy();

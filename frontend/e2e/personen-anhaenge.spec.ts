@@ -40,7 +40,7 @@ async function einsatzAnlegen(page: Page, name: string): Promise<string> {
 
 /** Person per API (Cookie-Jar geteilt); liefert die id. */
 async function personAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/persons`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/persons`, {
     data: { name: 'Müller', vorname: 'Erika' },
   });
   expect(antwort.ok(), `Person: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -49,7 +49,7 @@ async function personAnlegen(page: Page, einsatzId: string): Promise<number> {
 
 async function seedeAnhang(page: Page, einsatzId: string, personId: number, name: string) {
   const antwort = await page.request.post(
-    `/api/einsaetze/${einsatzId}/persons/${personId}/attachments`,
+    `/api/incidents/${einsatzId}/persons/${personId}/attachments`,
     { multipart: { datei: { name, mimeType: 'image/jpeg', buffer: MINI_JPEG } } },
   );
   expect(antwort.status(), await antwort.text()).toBe(201);
@@ -99,7 +99,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
   const anker = bereich(page).getByRole('link', { name: /^Erika_Mueller\.jpg, / });
   await expect(anker).toHaveAttribute(
     'href',
-    new RegExp(`/api/einsaetze/${einsatzId}/persons/${personId}/attachments/\\d+/file$`),
+    new RegExp(`/api/incidents/${einsatzId}/persons/${personId}/attachments/\\d+/file$`),
   );
 
   // ── 2 · Download per Klick ──────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ test('Person: aufklappen, ablegen, herunterladen, protokolliert, pseudonym im ET
   // ── 6 · Zugehörigkeit: Liste über die Adresse eines anderen Einsatzes → 404 ──────────
   const andererEinsatz = await einsatzAnlegen(page, `E2E Nebenlage ${Date.now()}`);
   const fremd = await page.request.get(
-    `/api/einsaetze/${andererEinsatz}/persons/${personId}/attachments`,
+    `/api/incidents/${andererEinsatz}/persons/${personId}/attachments`,
   );
   expect(fremd.status()).toBe(404);
 });

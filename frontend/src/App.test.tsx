@@ -89,14 +89,14 @@ describe('App-Routing', () => {
       http.post('/api/auth/login', () => HttpResponse.json(admin)),
       http.get('/api/dev/users', () => HttpResponse.json([])),
       http.get('/api/auth/providers', () => HttpResponse.json([])),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
       // Der Admin darf beide Einstellungen lesen. Die Default-403 stieße sonst die
       // Benutzerprüfung an (LLH-1360), und `/me` antwortet hier immer 401.
       http.get('/api/org-settings', () =>
         HttpResponse.json({ org_id: 1, zeitzone: 'Europe/Berlin' }),
       ),
-      http.get('/api/einsaetze/7/settings', () =>
+      http.get('/api/incidents/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           etb_nummer_eingefroren: false,
@@ -127,8 +127,8 @@ describe('App-Routing', () => {
     server.use(
       meHandler(admin),
       http.post('/api/auth/logout', () => new HttpResponse(null, { status: 204 })),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
       http.get('/api/auth/providers', () => HttpResponse.json([])),
     );
     const { router } = renderApp('/einsaetze');
@@ -151,8 +151,8 @@ describe('App-Routing', () => {
   it('lädt das per React.lazy eingebundene Meldebild (Kräfteübersicht) im Data Router', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/kraefteuebersicht');
     expect(await screen.findByRole('heading', { name: /Kräfteübersicht/ })).toBeInTheDocument();
@@ -171,8 +171,8 @@ describe('App-Routing', () => {
     setzeViewportBreite(1440);
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     );
     const { router } = renderApp('/einsaetze/7');
     await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
@@ -195,8 +195,8 @@ describe('App-Routing', () => {
   ])('%s führt in den Einsatz', async (alt) => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     );
     const { router } = renderApp(alt);
     await waitFor(() => expect(router.state.location.pathname).toBe('/einsaetze/7/ueberblick'));
@@ -231,7 +231,7 @@ describe('App-Routing', () => {
       vi.stubGlobal('EventSource', AufzeichnendeEventSource);
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
       );
       renderApp('/einsaetze');
       expect(await screen.findByText('Hochwasser Nord')).toBeInTheDocument();
@@ -242,12 +242,12 @@ describe('App-Routing', () => {
       vi.stubGlobal('EventSource', AufzeichnendeEventSource);
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
       );
       renderApp('/einsaetze/7/ueberblick');
       expect(await screen.findByRole('heading', { name: 'Überblick' })).toBeInTheDocument();
-      await waitFor(() => expect(offene()).toEqual(['/api/einsaetze/7/live']));
+      await waitFor(() => expect(offene()).toEqual(['/api/incidents/7/live']));
       // Auch nicht kurzzeitig: beim Direktaufruf laufen die Effekte des Einsatz-Rahmens vor
       // denen der Betriebszeile, der Org-Strom darf trotzdem nie aufgehen.
       expect(urls.map((u) => u.url)).not.toContain('/api/live');
@@ -257,16 +257,16 @@ describe('App-Routing', () => {
       vi.stubGlobal('EventSource', AufzeichnendeEventSource);
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
       );
       const { router } = renderApp('/einsaetze/7/ueberblick');
-      await waitFor(() => expect(offene()).toEqual(['/api/einsaetze/7/live']));
+      await waitFor(() => expect(offene()).toEqual(['/api/incidents/7/live']));
 
       await act(() => router.navigate('/einsaetze'));
 
       await waitFor(() => expect(offene()).toEqual(['/api/live']));
-      expect(urls.find((u) => u.url === '/api/einsaetze/7/live')?.closed).toBe(true);
+      expect(urls.find((u) => u.url === '/api/incidents/7/live')?.closed).toBe(true);
     });
 
     // Die Betriebszeile steht hinter `RequireAuth`: ohne Anmeldung wird sie gar nicht gerendert.
@@ -288,7 +288,7 @@ describe('App-Routing', () => {
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
     );
 
     renderApp('/einsaetze');
@@ -301,8 +301,8 @@ describe('App-Routing', () => {
   it('WIP-Modul-Route rendert den Stub', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
     );
     renderApp('/einsaetze/7/wip-probe');
     await waitFor(() => expect(platzhalterTitel()).toHaveTextContent('WIP-Probe'));
@@ -311,14 +311,14 @@ describe('App-Routing', () => {
   it('gefahren-Route rendert die Gefahrenmatrix statt auf die Lagekarte umzuleiten', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/hazard-areas', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/hazard-areas', () =>
         HttpResponse.json([
           { id: 1, einsatz_id: 7, label: 'Nord', zonen_ids: [], hoechste_warnstufe: 'keine' },
         ]),
       ),
-      http.get('/api/einsaetze/7/hazard-areas/1/matrix', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/hazard-areas/1/matrix', () => HttpResponse.json([])),
     );
     renderApp('/einsaetze/7/gefahren');
     // Matrix-eigene Gefahrentyp-Zeile beweist: GefahrenPage rendert (kein Redirect, kein Stub).
@@ -334,8 +334,8 @@ describe('App-Routing', () => {
     function einsatzServer() {
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
       );
     }
 
@@ -365,7 +365,7 @@ describe('App-Routing', () => {
     it('ist der Überblick gesperrt, führt der Rückweg ins erste freie Modul', async () => {
       einsatzServer();
       server.use(
-        http.get('/api/einsaetze/7/module-access', () =>
+        http.get('/api/incidents/7/module-access', () =>
           HttpResponse.json(freigabenFixture({ ueberblick: { zugriff: false } })),
         ),
       );
@@ -405,9 +405,9 @@ describe('App-Routing', () => {
     it('führt nicht auf die Adresse einer unbekannten Person', async () => {
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-        http.get('/api/einsaetze/7/persons/999999', () =>
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/incidents/7/persons/999999', () =>
           HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
         ),
       );
@@ -438,9 +438,9 @@ describe('App-Routing', () => {
     it('stellt den Ort davor unverändert wieder her, ohne seine Frist zu verlängern', async () => {
       server.use(
         meHandler(admin),
-        http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-        http.get('/api/einsaetze/7/persons/999999', () =>
+        http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+        http.get('/api/incidents/7/persons/999999', () =>
           HttpResponse.json({ error: 'Nicht gefunden' }, { status: 404 }),
         ),
       );
@@ -466,9 +466,9 @@ describe('App-Routing', () => {
   function einstellungenServer() {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/settings', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/settings', () =>
         HttpResponse.json({
           einsatz_id: 7,
           etb_nummer_eingefroren: false,
@@ -503,9 +503,9 @@ describe('App-Routing', () => {
   it('betreuung-Route rendert die BetreuungPage statt Stub (LFH-639)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/care', () => HttpResponse.json({ stellen: [] })),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/care', () => HttpResponse.json({ stellen: [] })),
     );
     renderApp('/einsaetze/7/betreuung');
     await waitFor(() =>
@@ -517,9 +517,9 @@ describe('App-Routing', () => {
   it('evakuierung-Route rendert die EvakuierungPage statt Stub (LLH-1034)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/evacuation', () => HttpResponse.json({ bezirke: [] })),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/evacuation', () => HttpResponse.json({ bezirke: [] })),
     );
     renderApp('/einsaetze/7/evakuierung');
     await waitFor(() =>
@@ -531,9 +531,9 @@ describe('App-Routing', () => {
   it('verpflegung-Route rendert die VerpflegungPage statt Stub (LFH-634)', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/catering', () =>
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/catering', () =>
         HttpResponse.json({
           zeitfenster: [],
           stellen: [],
@@ -553,9 +553,9 @@ describe('App-Routing', () => {
   it('fahrzeuge-Route rendert die echte FahrzeugePage statt Stub', async () => {
     server.use(
       meHandler(admin),
-      http.get('/api/einsaetze', () => HttpResponse.json([einsatz])),
-      http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz)),
-      http.get('/api/einsaetze/7/vehicles', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([einsatz])),
+      http.get('/api/incidents/7', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/7/vehicles', () => HttpResponse.json([])),
       http.get('/api/vehicle-statuses', () => HttpResponse.json([])),
       http.get('/api/vehicles', () => HttpResponse.json([])),
     );

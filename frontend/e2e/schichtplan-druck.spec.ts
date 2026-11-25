@@ -26,12 +26,12 @@ const SUBPIXEL = 1;
 const UHS_SCHICHTEN = 30;
 
 async function seede(page: Page): Promise<number> {
-  const neu = await page.request.post('/api/einsaetze', {
+  const neu = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Schichtplan Druck ${Date.now()}` },
   });
   expect(neu.ok(), `Einsatz: ${neu.status()}`).toBeTruthy();
   const einsatzId = ((await neu.json()) as { id: number }).id;
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const sende = async (pfad: string, data: unknown) => {
     const a = await page.request.post(`${basis}/${pfad}`, { data });
     expect(a.ok(), `${pfad}: ${a.status()} ${await a.text()}`).toBeTruthy();

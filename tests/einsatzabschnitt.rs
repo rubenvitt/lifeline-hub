@@ -14,7 +14,7 @@ async fn anlegen_schreibt_etb_und_liste_zeigt_abschnitt() {
     let (status, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"Nord"}"#),
     )
@@ -26,7 +26,7 @@ async fn anlegen_schreibt_etb_und_liste_zeigt_abschnitt() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -45,7 +45,7 @@ async fn leiter_setzen_und_aufloesen() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(&format!(r#"{{"name":"Nord","leiter_id":{leiter}}}"#)),
     )
@@ -58,7 +58,7 @@ async fn leiter_setzen_und_aufloesen() {
         anfrage(
             &app,
             "DELETE",
-            &format!("/api/einsaetze/{einsatz}/sectors/{aid}"),
+            &format!("/api/incidents/{einsatz}/sectors/{aid}"),
             &admin,
             None
         )
@@ -85,7 +85,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/sectors"),
+            &format!("/api/incidents/{einsatz}/sectors"),
             &erika_c,
             None
         )
@@ -97,7 +97,7 @@ async fn beobachter_liest_aber_schreibt_nicht() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/sectors"),
+            &format!("/api/incidents/{einsatz}/sectors"),
             &erika_c,
             Some(r#"{"name":"X"}"#)
         )
@@ -115,7 +115,7 @@ async fn abgeschlossener_einsatz_ist_409() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )
@@ -124,7 +124,7 @@ async fn abgeschlossener_einsatz_ist_409() {
         anfrage(
             &app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/sectors"),
+            &format!("/api/incidents/{einsatz}/sectors"),
             &admin,
             Some(r#"{"name":"X"}"#)
         )
@@ -148,7 +148,7 @@ async fn fremde_org_kann_abschnitte_nicht_lesen_oder_schreiben() {
     let status_get = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &fremd_c,
         None,
     )
@@ -161,7 +161,7 @@ async fn fremde_org_kann_abschnitte_nicht_lesen_oder_schreiben() {
     let status_post = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &fremd_c,
         Some(r#"{"name":"X"}"#),
     )
@@ -217,7 +217,7 @@ async fn abschnitt_anlegen(
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(
             r#"{{"name":"{name}","sprechgruppe_ids":[{ids}]}}"#
@@ -272,7 +272,7 @@ async fn liste_ordnet_sprechgruppen_je_abschnitt_sortiert_zu() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -311,7 +311,7 @@ async fn liste_ohne_abschnitte_ist_leer() {
     let (status, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -327,7 +327,7 @@ async fn abschnitt_voll(app: &axum::Router, cookie: &str, einsatz: i64, sg: i64)
     let (s, json) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         cookie,
         Some(&format!(
             r#"{{"name":"Nord","bemerkung":"Bem","rufname":"Florian Nord 1",
@@ -352,7 +352,7 @@ async fn patch_nur_name_laesst_leiter_und_verbindungen_stehen() {
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/sectors/{a}");
+    let pfad = format!("/api/incidents/{einsatz}/sectors/{a}");
     anfrage(
         &app,
         "PATCH",
@@ -394,7 +394,7 @@ async fn patch_rufname_null_und_leere_verbindungen_loeschen_nur_diese_felder() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/sectors/{a}");
+    let pfad = format!("/api/incidents/{einsatz}/sectors/{a}");
 
     let (status, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"rufname":null}"#)).await;
     assert_eq!(status, StatusCode::OK);
@@ -421,7 +421,7 @@ async fn patch_leiter_id_null_entfernt_leiter_absent_laesst_ihn_stehen() {
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
     let ep = stammpersonal_disponieren(&app, &admin, einsatz, "Leiter").await;
-    let pfad = format!("/api/einsaetze/{einsatz}/sectors/{a}");
+    let pfad = format!("/api/incidents/{einsatz}/sectors/{a}");
 
     let (_, json) = anfrage(
         &app,
@@ -449,7 +449,7 @@ async fn patch_sprechgruppe_ids_leeres_array_leert_absent_laesst_stehen() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/sectors/{a}");
+    let pfad = format!("/api/incidents/{einsatz}/sectors/{a}");
 
     let (_, json) = anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"N2"}"#)).await;
     assert_eq!(bezeichnungen(&json["sprechgruppen"]), vec!["100_T_LAGE"]);
@@ -474,7 +474,7 @@ async fn patch_leerer_name_ist_400_absenter_laesst_namen_stehen() {
     let einsatz = einsatz_anlegen(&app, &admin).await;
     let sg = sprechgruppe_anlegen(&app, &admin, "100_T_LAGE", "TMO", 10).await;
     let a = abschnitt_voll(&app, &admin, einsatz, sg).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/sectors/{a}");
+    let pfad = format!("/api/incidents/{einsatz}/sectors/{a}");
 
     assert_eq!(
         anfrage(&app, "PATCH", &pfad, &admin, Some(r#"{"name":"   "}"#))
@@ -504,7 +504,7 @@ async fn verbindungen_werden_ersetzt_und_geprueft() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}/sectors");
+    let basis = format!("/api/incidents/{einsatz}/sectors");
     let (s, json) = anfrage(&app, "POST", &basis, &admin, Some(r#"{"name":"Nord"}"#)).await;
     assert_eq!(s, StatusCode::CREATED);
     assert_eq!(json["verbindungen"], serde_json::json!([]));
@@ -558,7 +558,7 @@ async fn altfelder_kommunikationsmittel_und_erreichbarkeit_sind_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let basis = format!("/api/einsaetze/{einsatz}/sectors");
+    let basis = format!("/api/incidents/{einsatz}/sectors");
     for body in [
         r#"{"name":"Nord","kommunikationsmittel":"mobil"}"#,
         r#"{"name":"Nord","erreichbarkeit":"0170 1"}"#,
@@ -592,7 +592,7 @@ async fn patch_abschnitt(
     anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/sectors/{aid}"),
+        &format!("/api/incidents/{einsatz}/sectors/{aid}"),
         cookie,
         Some(&body.to_string()),
     )
@@ -635,7 +635,7 @@ async fn name_mit_veraltetem_altwert_ist_409_und_schreibt_nichts() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -735,7 +735,7 @@ async fn verbindungen_als_ganzes_mit_altwert() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -830,7 +830,7 @@ async fn aufloesen_etb_geht_live_hinaus() {
     let (s, json) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"Nord"}"#),
     )
@@ -841,7 +841,7 @@ async fn aufloesen_etb_geht_live_hinaus() {
     let (s, _) = anfrage(
         &app,
         "DELETE",
-        &format!("/api/einsaetze/{einsatz}/sectors/{aid}"),
+        &format!("/api/incidents/{einsatz}/sectors/{aid}"),
         &admin,
         None,
     )
@@ -867,7 +867,7 @@ async fn patch_mit_unbekannter_sprechgruppe_schreibt_nichts() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/sectors/{a}"),
+        &format!("/api/incidents/{einsatz}/sectors/{a}"),
         &admin,
         Some(r#"{"sortier":7,"bemerkung":"Neu","sprechgruppe_ids":[987654]}"#),
     )
@@ -877,7 +877,7 @@ async fn patch_mit_unbekannter_sprechgruppe_schreibt_nichts() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )
@@ -910,7 +910,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_ersten_schreiben() {
     let (s, _) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/talk-groups"),
+        &format!("/api/incidents/{einsatz}/talk-groups"),
         &admin,
         Some(r#"{"bezeichnung":"412_F_DRK","betriebsart":"TMO"}"#),
     )
@@ -921,7 +921,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_ersten_schreiben() {
     let (s, json) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}/sectors/{a}"),
+        &format!("/api/incidents/{einsatz}/sectors/{a}"),
         &admin,
         Some(&format!(
             r#"{{"sortier":7,"rufname":"Florian Nord","sprechgruppe_ids":[{sg}]}}"#
@@ -932,7 +932,7 @@ async fn sprechgruppen_paar_scheitert_vor_dem_ersten_schreiben() {
     let (_, liste) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         None,
     )

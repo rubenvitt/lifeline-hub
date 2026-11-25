@@ -11,7 +11,7 @@ export function setzeLagekennzahlWahl(
   gewaehlt: Lagekennzahl[],
 ): Promise<LagekennzahlWahl> {
   return apiSend<LagekennzahlWahl>(
-    `/api/einsaetze/${einsatzId}/situation-metric-selection`,
+    `/api/incidents/${einsatzId}/situation-metric-selection`,
     'PUT',
     {
       gewaehlt,

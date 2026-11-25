@@ -40,7 +40,7 @@ export async function anmelden(page: Page, optionen?: { startseite?: boolean }) 
 
 /** Einsatz per API: acht Einsätze über die UI wären 32 Formularaktionen ohne Erkenntnisgewinn. */
 export async function einsatzAnlegen(page: Page, bezeichnung: string): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', { data: { bezeichnung } });
+  const antwort = await page.request.post('/api/incidents', { data: { bezeichnung } });
   expect(
     antwort.ok(),
     `Seeding Einsatz „${bezeichnung}": ${antwort.status()} ${await antwort.text()}`,
@@ -56,7 +56,7 @@ export async function anlegen(
   data: unknown,
   was: string,
 ) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
   expect(antwort.ok(), `Seeding ${was}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
 }
 

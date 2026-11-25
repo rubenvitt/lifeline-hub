@@ -72,15 +72,15 @@ function renderPage(
   const abrufe: string[] = [];
   let liste = 0;
   server.use(
-    http.get('/api/einsaetze/5', () => HttpResponse.json(EINSATZ)),
-    http.get('/api/einsaetze/5/care', () =>
+    http.get('/api/incidents/5', () => HttpResponse.json(EINSATZ)),
+    http.get('/api/incidents/5/care', () =>
       HttpResponse.json({ stellen: [{ id: 8, bezeichnung: 'Turnhalle Ost' }] }),
     ),
-    http.get('/api/einsaetze/5/care/positions/8/registrations', () => {
+    http.get('/api/incidents/5/care/positions/8/registrations', () => {
       liste += 1;
       return HttpResponse.json(LISTE);
     }),
-    http.get('/api/einsaetze/5/care/positions/8/registrations/print', ({ request }) => {
+    http.get('/api/incidents/5/care/positions/8/registrations/print', ({ request }) => {
       const url = new URL(request.url);
       abrufe.push(url.search);
       return antwort(url.searchParams.get('unvertraeglichkeiten') === '1');

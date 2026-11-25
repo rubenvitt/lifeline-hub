@@ -172,7 +172,7 @@ async function dashboardMitSperreOeffnen(
   await anmelden(page);
   const id = await einsatzAnlegen(page, `E2E Kennzahlen Sperre ${Date.now()}`);
   for (const key of GESPERRTE_MODULE) {
-    const antwort = await page.request.put(`/api/einsaetze/${id}/module-overrides/${key}`, {
+    const antwort = await page.request.put(`/api/incidents/${id}/module-overrides/${key}`, {
       data: { sichtbar: true, benoetigte_rolle: 'admin' },
     });
     // Ein still gescheitertes Seeding führte zurück in den ungesperrten Zustand.

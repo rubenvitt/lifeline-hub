@@ -170,8 +170,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('öffnet via ?neu=1 den Anlegen-Dialog (aktiver Einsatz)', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1');
     expect(await screen.findByText('Unfallhilfsstelle anlegen')).toBeInTheDocument();
@@ -186,8 +186,8 @@ describe('UnfallhilfsstellenPage', () => {
   it('ein hängender Router-Commit öffnet den geschlossenen Dialog nach neuem Recht nicht wieder (LLH-1558)', async () => {
     let rolle: 'einsatzleitung' | 'beobachter' = 'einsatzleitung';
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort(rolle))),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort(rolle))),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     const { qc } = renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1', {
       adresseSteht: true,
@@ -207,8 +207,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('ein neuer Link ?neu=1 öffnet den Dialog wieder (LLH-1558)', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/liste?neu=1', {
       daneben: <Link to="/einsaetze/1/unfallhilfsstellen/liste?neu=1">neuer-link</Link>,
@@ -234,8 +234,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('rendert die UHS-Liste mit Status-Badge', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([
           {
             id: 7,
@@ -263,8 +263,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('Neu-Button ist disabled für Beobachter', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort('beobachter'))),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort('beobachter'))),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     renderPage();
     const btn = await screen.findByRole('button', { name: 'Neu' });
@@ -278,8 +278,8 @@ describe('UnfallhilfsstellenPage', () => {
    */
   it('zeigt bei gescheitertem UHS-Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => new HttpResponse(null, { status: 500 })),
     );
     renderPage();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
@@ -298,13 +298,13 @@ describe('UnfallhilfsstellenPage', () => {
    */
   it('meldet den veralteten Stand, wenn die Aktualisierung mit Zeilen im Cache scheitert', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([bhp50])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([bhp50])),
     );
     const { qc } = renderPage();
     await screen.findByText('BHP 50');
 
-    server.use(http.get('/api/einsaetze/1/uhs', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/uhs', () => new HttpResponse(null, { status: 500 })));
     await qc.refetchQueries({ queryKey: einsatzKeys.uhs(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
@@ -317,8 +317,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('zeigt bei leerer Liste den Leertext und KEINEN Fehler', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
@@ -332,8 +332,8 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('bietet ohne Schreibrecht im Leerzustand keine Anlage an', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort('beobachter'))),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort('beobachter'))),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     renderPage();
     expect(await screen.findByText('Noch keine Unfallhilfsstellen erfasst')).toBeInTheDocument();
@@ -344,9 +344,9 @@ describe('UnfallhilfsstellenPage', () => {
   // Switcher; `frontend/AGENTS.md`, „Bearbeiten in der Ansicht“, Punkt 7.
   it('springt nach dem Anlegen in die neue UHS', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/uhs', () =>
         HttpResponse.json({ ...bhp50, id: 42, bezeichnung: 'PA 1' }, { status: 201 }),
       ),
     );
@@ -363,9 +363,9 @@ describe('UnfallhilfsstellenPage', () => {
   it('fokussiert Bezeichnung und legt per Enter aus diesem Feld an', async () => {
     let body: unknown = null;
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/uhs', async ({ request }) => {
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/uhs', async ({ request }) => {
         body = await request.json();
         return HttpResponse.json(
           {
@@ -397,9 +397,9 @@ describe('UnfallhilfsstellenPage', () => {
 
   it('lässt den Dialog und die Bezeichnung bei einem Anlegefehler stehen', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
-      http.post('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
+      http.post('/api/incidents/1/uhs', () =>
         HttpResponse.json({ error: 'UHS abgelehnt' }, { status: 500 }),
       ),
     );
@@ -427,7 +427,7 @@ describe('UnfallhilfsstellenPage', () => {
     const onClose = vi.fn();
     const onAngelegt = vi.fn();
     server.use(
-      http.post('/api/einsaetze/1/uhs', async () => {
+      http.post('/api/incidents/1/uhs', async () => {
         postGestartet();
         await antwortGate;
         return HttpResponse.json(bhp50, { status: 201 });
@@ -466,8 +466,8 @@ describe('UnfallhilfsstellenPage · Sortieren und Filtern (LLH-1096)', () => {
 
   beforeEach(() => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([bhp50, ablage])),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([bhp50, ablage])),
     );
   });
 
@@ -508,8 +508,8 @@ describe('UnfallhilfsstellenPage · Sortieren und Filtern (LLH-1096)', () => {
 describe('Grundriss DnD', () => {
   it('öffnet Detail und zeigt den Grundriss mit Plätzen', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([
           {
             id: 7,
@@ -528,7 +528,7 @@ describe('Grundriss DnD', () => {
           },
         ]),
       ),
-      http.get('/api/einsaetze/1/uhs/7', () =>
+      http.get('/api/incidents/1/uhs/7', () =>
         HttpResponse.json({
           id: 7,
           einsatz_id: 1,
@@ -560,7 +560,7 @@ describe('Grundriss DnD', () => {
           material: [],
         }),
       ),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
     );
     renderPage();
     await userEvent.click(await screen.findByText('BHP 50'));
@@ -574,8 +574,8 @@ describe('Grundriss DnD', () => {
 describe('UhsDetailPage', () => {
   it('merkt die geöffnete UHS als zuletzt ausgewählt', async () => {
     server.use(
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAntwort())),
-      http.get('/api/einsaetze/1/uhs', () =>
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAntwort())),
+      http.get('/api/incidents/1/uhs', () =>
         HttpResponse.json([
           {
             id: 7,
@@ -594,7 +594,7 @@ describe('UhsDetailPage', () => {
           },
         ]),
       ),
-      http.get('/api/einsaetze/1/uhs/7', () =>
+      http.get('/api/incidents/1/uhs/7', () =>
         HttpResponse.json({
           id: 7,
           einsatz_id: 1,
@@ -614,7 +614,7 @@ describe('UhsDetailPage', () => {
           material: [],
         }),
       ),
-      http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
     );
     renderPage('/einsaetze/1/unfallhilfsstellen/7');
     // Der Wechsler im Titel, nicht das ⋮ des Kopfs („Weitere Aktionen zu BHP 50“, LLH-1722).

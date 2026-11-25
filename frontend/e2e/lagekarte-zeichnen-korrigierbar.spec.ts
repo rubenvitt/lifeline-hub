@@ -90,7 +90,7 @@ test('Zeichnen: Punkt zurück nimmt genau einen Punkt, Esc ist zweistufig', asyn
   await expect(zaehler).toHaveText('3 Punkte');
   await page.getByRole('button', { name: 'Abschließen' }).click();
   const anfrage = page.waitForRequest(
-    (r) => r.method() === 'POST' && r.url().endsWith(`/api/einsaetze/${eid}/zones`),
+    (r) => r.method() === 'POST' && r.url().endsWith(`/api/incidents/${eid}/zones`),
   );
   await page.getByRole('button', { name: 'Speichern' }).click();
   const body = (await anfrage).postDataJSON() as { geometrie: string };

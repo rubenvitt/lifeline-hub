@@ -50,7 +50,7 @@ async function einloesen(code: string) {
 
 /** Ein paar Kopplungen in verschiedenen Zuständen, damit die Liste etwas zeigt (D3). */
 async function geraeteAnlegen(page: Page, einsatz: number) {
-  const basis = `/api/einsaetze/${einsatz}`;
+  const basis = `/api/incidents/${einsatz}`;
   const uhs = await ersteId(page, `${basis}/uhs`);
   const br = await ersteId(page, `${basis}/staging-areas`);
   const tablet = await fuelle<Kopplung>(page, 'post', `${basis}/devices`, {
@@ -93,7 +93,7 @@ test.describe(KAPITEL, () => {
   test('Dialog „Code für …“ nach dem Koppeln', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const betreuung = await page.request.get(`/api/einsaetze/${demo.id}/care`);
+    const betreuung = await page.request.get(`/api/incidents/${demo.id}/care`);
     const [stelle] = ((await betreuung.json()) as { stellen: { bezeichnung: string }[] }).stellen;
     expect(stelle, 'der Demo-Einsatz hat eine Betreuungsstelle').toBeDefined();
 
@@ -150,7 +150,7 @@ test.describe(KAPITEL, () => {
   test('Maske mit wahlweiser Verpflegungsstelle', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}/catering/positions`;
+    const basis = `/api/incidents/${demo.id}/catering/positions`;
     const { id } = await fuelle<{ id: number }>(page, 'post', basis, {
       bezeichnung: 'Feldküche BR Sportplatz',
       art: 'feldkueche',

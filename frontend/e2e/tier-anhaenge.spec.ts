@@ -49,7 +49,7 @@ const paneel = (page: Page) => page.getByRole('region', { name: 'Fotos und Datei
 
 /** Tier per API (Cookie-Jar geteilt); liefert die id. */
 async function tierAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/animals`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/animals`, {
     data: { spezies: 'hund', rufname: 'Bello' },
   });
   expect(antwort.ok(), `Tier: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
@@ -58,7 +58,7 @@ async function tierAnlegen(page: Page, einsatzId: string): Promise<number> {
 
 async function seedeAnhang(page: Page, einsatzId: string, tierId: number, name: string) {
   const antwort = await page.request.post(
-    `/api/einsaetze/${einsatzId}/animals/${tierId}/attachments`,
+    `/api/incidents/${einsatzId}/animals/${tierId}/attachments`,
     {
       multipart: { datei: { name, mimeType: 'image/jpeg', buffer: JPG } },
     },
@@ -89,7 +89,7 @@ test('legt am Tier ab, lädt herunter, schreibt den pseudonymen ETB-Nachweis und
   const anker = paneel(page).getByRole('link', { name: /^Müller_Bello\.jpg, / });
   await expect(anker).toHaveAttribute(
     'href',
-    new RegExp(`/api/einsaetze/${einsatzId}/animals/${tierId}/attachments/\\d+/file$`),
+    new RegExp(`/api/incidents/${einsatzId}/animals/${tierId}/attachments/\\d+/file$`),
   );
   const [download] = await Promise.all([page.waitForEvent('download'), anker.click()]);
   expect(download.suggestedFilename()).toBe('Müller_Bello.jpg');

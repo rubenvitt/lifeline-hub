@@ -22,7 +22,7 @@ export interface PlanPatch {
   nacht_umkehren?: boolean;
 }
 
-const basis = (einsatzId: number, uhsId: number) => `/api/einsaetze/${einsatzId}/uhs/${uhsId}/plan`;
+const basis = (einsatzId: number, uhsId: number) => `/api/incidents/${einsatzId}/uhs/${uhsId}/plan`;
 
 /**
  * Bild-Route: ohne Audit, mit ETag. Ein API-Pfad, keine Navigation. `?v=` trägt den sha256: der

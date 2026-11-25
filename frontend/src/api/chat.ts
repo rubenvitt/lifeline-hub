@@ -16,7 +16,7 @@ import {
 } from '../components/fensterBeideRichtungen';
 
 export function listeKanaele(einsatzId: number): Promise<ChatKanal[]> {
-  return apiGet<ChatKanal[]>(`/api/einsaetze/${einsatzId}/chat/channels`);
+  return apiGet<ChatKanal[]>(`/api/incidents/${einsatzId}/chat/channels`);
 }
 
 interface NeuerKanal {
@@ -25,12 +25,12 @@ interface NeuerKanal {
 }
 
 export function legeKanalAn(einsatzId: number, daten: NeuerKanal): Promise<ChatKanal> {
-  return apiSend<ChatKanal>(`/api/einsaetze/${einsatzId}/chat/channels`, 'POST', daten);
+  return apiSend<ChatKanal>(`/api/incidents/${einsatzId}/chat/channels`, 'POST', daten);
 }
 
 /** Markiert alle aktuell vorhandenen Nachrichten des Kanals für den Benutzer gelesen. */
 export function markiereKanalGelesen(einsatzId: number, kanalId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/chat/channels/${kanalId}/read`, 'POST');
+  return apiSend<void>(`/api/incidents/${einsatzId}/chat/channels/${kanalId}/read`, 'POST');
 }
 
 /** Seitengröße der Nachrichten-Pagination. Muss dem Backend-Default (STANDARD_LIMIT,
@@ -55,7 +55,7 @@ export function listeNachrichten(
         ? `?before_id=${param.aelter}`
         : `?after_id=${param.neuer}&limit=${seitenLimit(CHAT_SEITENGROESSE, param)}`;
   return apiGet<ChatNachricht[]>(
-    `/api/einsaetze/${einsatzId}/chat/channels/${kanalId}/messages${q}`,
+    `/api/incidents/${einsatzId}/chat/channels/${kanalId}/messages${q}`,
   );
 }
 
@@ -76,7 +76,7 @@ export function ladeAnhaengeHoch(
 ): Promise<Anhang[]> {
   const formData = new FormData();
   for (const datei of dateien) formData.append('datei', datei);
-  return apiUploadMitFortschritt<Anhang[]>(`/api/einsaetze/${einsatzId}/attachments`, formData, {
+  return apiUploadMitFortschritt<Anhang[]>(`/api/incidents/${einsatzId}/attachments`, formData, {
     timeoutMs: UPLOAD_TIMEOUT_MS,
     onFortschritt,
   });
@@ -91,7 +91,7 @@ export function sendeNachricht(
   erwaehnungen: ChatErwaehnung[] = [],
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/channels/${kanalId}/messages`,
+    `/api/incidents/${einsatzId}/chat/channels/${kanalId}/messages`,
     'POST',
     erwaehnungen.length > 0
       ? { inhalt, anhang_ids: anhangIds, erwaehnungen }
@@ -105,14 +105,14 @@ export function bearbeiteNachricht(
   inhalt: string,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}`,
+    `/api/incidents/${einsatzId}/chat/messages/${nachrichtId}`,
     'PATCH',
     { inhalt },
   );
 }
 
 export function loescheNachricht(einsatzId: number, nachrichtId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/chat/messages/${nachrichtId}`, 'DELETE');
 }
 
 /** Setzt/ändert den polymorphen Sachbezug einer Nachricht (LFH-103) auf ein
@@ -124,7 +124,7 @@ export function setzeBezug(
   zielId: number,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}/reference`,
+    `/api/incidents/${einsatzId}/chat/messages/${nachrichtId}/reference`,
     'PUT',
     { typ, ziel_id: zielId },
   );
@@ -133,7 +133,7 @@ export function setzeBezug(
 /** Löst den Sachbezug einer Nachricht (LFH-103). */
 export function loescheBezug(einsatzId: number, nachrichtId: number): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}/reference`,
+    `/api/incidents/${einsatzId}/chat/messages/${nachrichtId}/reference`,
     'DELETE',
   );
 }
@@ -153,7 +153,7 @@ export function heraufstufenZuEtb(
   // LFH-700: gewählte Anhänge gehen als Kopie ins ETB. Ohne Auswahl fehlt das Feld, der Server
   // übernimmt dann keine Datei.
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}/promote-to-etb`,
+    `/api/incidents/${einsatzId}/chat/messages/${nachrichtId}/promote-to-etb`,
     'POST',
     {
       typ,
@@ -172,7 +172,7 @@ export function heraufstufenZuAuftrag(
   daten: NeuerAuftrag,
 ): Promise<ChatNachricht> {
   return apiSend<ChatNachricht>(
-    `/api/einsaetze/${einsatzId}/chat/messages/${nachrichtId}/promote-to-task`,
+    `/api/incidents/${einsatzId}/chat/messages/${nachrichtId}/promote-to-task`,
     'POST',
     daten,
   );

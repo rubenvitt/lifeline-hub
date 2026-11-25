@@ -58,7 +58,7 @@ test.describe(KAPITEL, () => {
   test('Meldungskarte mit Marke „berichtigt“', async ({ page }) => {
     await anmelden(page);
     const demo = await demoEinsatz(page);
-    const basis = `/api/einsaetze/${demo.id}`;
+    const basis = `/api/incidents/${demo.id}`;
     // Die Rückmeldung der UHS aus dem Demo-Szenario; ihr ETB-Eintrag entstand beim Import.
     const antwort = await page.request.get(`${basis}/reports`);
     expect(antwort.ok(), `Meldungen: ${antwort.status()}`).toBe(true);

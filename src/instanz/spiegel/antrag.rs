@@ -109,7 +109,7 @@ fn erfassungszeit_feld(art: &str) -> Option<&'static str> {
 pub const BEANTRAGBAR: &[Beantragbar] = &[
     b(
         "etb",
-        "/api/einsaetze/{id}/etb",
+        "/api/incidents/{id}/etb",
         &[],
         &[e("berichtigt_eintrag_id", "etb_eintrag")],
         "etb_eintrag",
@@ -117,7 +117,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "meldung",
-        "/api/einsaetze/{id}/reports",
+        "/api/incidents/{id}/reports",
         &[],
         &[
             e("einheit_id", "einsatz_einheit"),
@@ -128,7 +128,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "person",
-        "/api/einsaetze/{id}/persons",
+        "/api/incidents/{id}/persons",
         &[],
         &[
             e("uhs_id", "uhs"),
@@ -141,7 +141,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "sichtung",
-        "/api/einsaetze/{id}/persons/{pid}/triage",
+        "/api/incidents/{id}/persons/{pid}/triage",
         PERSON,
         &[e("bestaetigt_personal_id", "einsatz_personal")],
         "person_sichtung",
@@ -149,7 +149,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "verbleib",
-        "/api/einsaetze/{id}/persons/{pid}/whereabouts",
+        "/api/incidents/{id}/persons/{pid}/whereabouts",
         PERSON,
         &[
             e("betreuungsstelle_id", "betreuungsstelle"),
@@ -161,7 +161,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "notiz",
-        "/api/einsaetze/{id}/persons/{pid}/notes",
+        "/api/incidents/{id}/persons/{pid}/notes",
         PERSON,
         &[],
         "person_verlaufsnotiz",
@@ -169,7 +169,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "transport",
-        "/api/einsaetze/{id}/persons/{pid}/transport",
+        "/api/incidents/{id}/persons/{pid}/transport",
         PERSON,
         &[e("bestaetigt_personal_id", "einsatz_personal")],
         "person_transport",
@@ -177,7 +177,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "anlass",
-        "/api/einsaetze/{id}/persons/{pid}/reason",
+        "/api/incidents/{id}/persons/{pid}/reason",
         PERSON,
         &[],
         "person_anlass",
@@ -185,7 +185,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "massnahme",
-        "/api/einsaetze/{id}/persons/{pid}/interventions",
+        "/api/incidents/{id}/persons/{pid}/interventions",
         PERSON,
         &[e("bestaetigt_personal_id", "einsatz_personal")],
         "person_massnahme",
@@ -193,7 +193,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "verletzung",
-        "/api/einsaetze/{id}/persons/{pid}/injuries",
+        "/api/incidents/{id}/persons/{pid}/injuries",
         PERSON,
         &[e("bestaetigt_personal_id", "einsatz_personal")],
         "person_verletzung",
@@ -201,7 +201,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "stand",
-        "/api/einsaetze/{id}/evacuation/districts/{bid}/progress",
+        "/api/incidents/{id}/evacuation/districts/{bid}/progress",
         &[("bid", "evakuierungsbezirk")],
         &[],
         "evakuierung_stand",
@@ -209,7 +209,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "belegung",
-        "/api/einsaetze/{id}/care/positions/{sid}/occupancies",
+        "/api/incidents/{id}/care/positions/{sid}/occupancies",
         STELLE,
         &[],
         "betreuungsstelle_belegung",
@@ -217,7 +217,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "registrierung",
-        "/api/einsaetze/{id}/care/positions/{sid}/registrations",
+        "/api/incidents/{id}/care/positions/{sid}/registrations",
         STELLE,
         &[e("haushalt_id", "haushalt")],
         "haushalt",
@@ -225,7 +225,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "abmeldung",
-        "/api/einsaetze/{id}/care/positions/{sid}/departures",
+        "/api/incidents/{id}/care/positions/{sid}/departures",
         STELLE,
         &[
             e("haushalt_id", "haushalt"),
@@ -236,7 +236,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "eintreffen",
-        "/api/einsaetze/{id}/staging-areas/{bid}/arrival",
+        "/api/incidents/{id}/staging-areas/{bid}/arrival",
         &[("bid", "bereitstellungsraum")],
         &[
             BodyVerweis {
@@ -260,7 +260,7 @@ pub const BEANTRAGBAR: &[Beantragbar] = &[
     ),
     b(
         "ausgabe",
-        "/api/einsaetze/{id}/catering/time-slots/{zid}/distributions",
+        "/api/incidents/{id}/catering/time-slots/{zid}/distributions",
         &[("zid", "verpflegung_zeitfenster")],
         &[
             e("nachforderung_id", "nachforderung"),
@@ -325,7 +325,7 @@ const fn is_erfassung(pfad: &str) -> bool {
         }
         true
     }
-    gleich(pfad, "/api/einsaetze/{id}/etb") || gleich(pfad, "/api/einsaetze/{id}/reports")
+    gleich(pfad, "/api/incidents/{id}/etb") || gleich(pfad, "/api/incidents/{id}/reports")
 }
 
 /// Arten der Offline-Warteschlange, die keine Anträge sind, mit Grund.
@@ -406,7 +406,7 @@ pub async fn schicht(
 }
 
 fn einsatz_aus_pfad(pfad: &str) -> Option<i64> {
-    pfad.strip_prefix("/api/einsaetze/")?
+    pfad.strip_prefix("/api/incidents/")?
         .split('/')
         .next()?
         .parse()
@@ -1764,8 +1764,8 @@ mod tests {
         assert_eq!(
             erfassen,
             BTreeSet::from([
-                ("POST", "/api/einsaetze/{id}/etb"),
-                ("POST", "/api/einsaetze/{id}/reports"),
+                ("POST", "/api/incidents/{id}/etb"),
+                ("POST", "/api/incidents/{id}/reports"),
             ])
         );
     }

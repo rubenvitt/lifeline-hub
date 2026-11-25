@@ -35,10 +35,10 @@ const zeit = (minuten: number) => new Date(Date.now() + minuten * 60_000).toISOS
 /** Einsatz mit „Mittag Stellen“ (laufend, 200 EP) und „Abend Stellen“ (anstehend, ohne Stelle). */
 async function saeen(page: Page) {
   await anmeldenAlsAdmin(page);
-  const { id: e } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: e } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `E2E Stellen ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${e}/catering`;
+  const basis = `/api/incidents/${e}/catering`;
   const { id: mittag } = await senden(page, 'post', `${basis}/time-slots`, {
     bezeichnung: 'Mittag Stellen',
     von_at: zeit(-20),

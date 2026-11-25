@@ -47,7 +47,7 @@ function quellen(freigaben = freigabenFixture()) {
   const aufrufe = new Map<string, number>();
   const zaehle = (pfad: string) => aufrufe.set(pfad, (aufrufe.get(pfad) ?? 0) + 1);
   const json = (pfad: string, antwort: () => unknown) =>
-    http.get(`/api/einsaetze/${E}${pfad}`, () => {
+    http.get(`/api/incidents/${E}${pfad}`, () => {
       zaehle(pfad);
       return HttpResponse.json(antwort() as never);
     });
@@ -57,7 +57,7 @@ function quellen(freigaben = freigabenFixture()) {
     param: string,
     kBeendet: keyof EinsatzberichtRoh['quellen'],
   ) =>
-    http.get(`/api/einsaetze/${E}${pfad}`, ({ request }) => {
+    http.get(`/api/incidents/${E}${pfad}`, ({ request }) => {
       zaehle(pfad);
       const beendet = new URL(request.url).searchParams.has(param);
       return HttpResponse.json(wert(roh, beendet ? kBeendet : k));
@@ -77,7 +77,7 @@ function quellen(freigaben = freigabenFixture()) {
     mitBeendeten('/units', 'einheiten', 'aufgeloeste', 'einheitenAufgeloest'),
     json('/units/timeline', () => wert(roh, 'einheitenPerioden')),
     // Die Anlage „Personal je Kopf“ steht in der Akte immer; sie braucht Namen.
-    http.get(`/api/einsaetze/${E}/personnel`, ({ request }) =>
+    http.get(`/api/incidents/${E}/personnel`, ({ request }) =>
       HttpResponse.json(
         new URL(request.url).searchParams.has('entlassene')
           ? []
@@ -87,11 +87,11 @@ function quellen(freigaben = freigabenFixture()) {
     json('/personnel/timeline', () => wert(roh, 'personalPerioden')),
     json('/vehicles', () => wert(roh, 'fahrzeuge')),
     json('/situation-reports', () => berichte),
-    http.get(`/api/einsaetze/${E}/situation-reports/:lid`, ({ params }) => {
+    http.get(`/api/incidents/${E}/situation-reports/:lid`, ({ params }) => {
       zaehle(`/lageberichte/${String(params.lid)}`);
       return HttpResponse.json(berichte.find((b) => b.id === Number(params.lid)));
     }),
-    http.get(`/api/einsaetze/${E}/situation-reports/:lid/enclosures`, () => HttpResponse.json([])),
+    http.get(`/api/incidents/${E}/situation-reports/:lid/enclosures`, () => HttpResponse.json([])),
     json('/persons', () => wert(roh, 'personen')),
     json('/persons/whereabouts-details', () => wert(roh, 'personenVerbleibAngaben')),
     json('/persons/print', () => [person()]),
@@ -102,7 +102,7 @@ function quellen(freigaben = freigabenFixture()) {
     json('/care', () => wert(roh, 'betreuung')),
     json('/catering', () => wert(roh, 'verpflegung')),
     json('/etb/counts', () => wert(roh, 'etbZaehler')),
-    http.get(`/api/einsaetze/${E}/etb`, ({ request }) => {
+    http.get(`/api/incidents/${E}/etb`, ({ request }) => {
       zaehle('/etb');
       const typ = new URL(request.url).searchParams.get('typ');
       return HttpResponse.json(
@@ -126,11 +126,11 @@ function quellen(freigaben = freigabenFixture()) {
       befehl({}),
       befehl({ id: 12, titel: 'Befehl Entwurf', status: 'entwurf' }),
     ]),
-    http.get(`/api/einsaetze/${E}/orders/:bid`, ({ params }) => {
+    http.get(`/api/incidents/${E}/orders/:bid`, ({ params }) => {
       zaehle(`/befehle/${String(params.bid)}`);
       return HttpResponse.json(befehl({ id: Number(params.bid) }));
     }),
-    http.get(`/api/einsaetze/${E}/orders/:bid/enclosures`, () => HttpResponse.json([])),
+    http.get(`/api/incidents/${E}/orders/:bid/enclosures`, () => HttpResponse.json([])),
   );
   return { aufrufe, lageQuelle: wert<LageberichtQuelle>(roh, 'lageberichte') };
 }
@@ -198,7 +198,7 @@ describe('EinsatzakteDruckPage', () => {
     rendere();
     await waitFor(() => expect(druckKnopf()).toBeEnabled());
     const zip = screen.getByRole('link', { name: 'Anhänge und Tabellen (ZIP)' });
-    expect(zip).toHaveAttribute('href', `/api/einsaetze/${E}/case-file/attachments.zip`);
+    expect(zip).toHaveAttribute('href', `/api/incidents/${E}/case-file/attachments.zip`);
     expect(zip).toHaveAttribute('download');
   });
 
@@ -225,7 +225,7 @@ describe('EinsatzakteDruckPage', () => {
   it('scheitert ein Kapitel, ist Drucken gesperrt und das Kapitel genannt', async () => {
     quellen();
     server.use(
-      http.get(`/api/einsaetze/${E}/tasks`, () =>
+      http.get(`/api/incidents/${E}/tasks`, () =>
         HttpResponse.json({ error: 'kaputt' }, { status: 422 }),
       ),
     );

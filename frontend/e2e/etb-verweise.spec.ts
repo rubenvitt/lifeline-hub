@@ -23,10 +23,10 @@ test.beforeEach(async ({ page }) => {
 test('Verweise im ETB führen auf die hervorgehobene Meldung und Nachforderung (LLH-1104)', async ({
   page,
 }) => {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E ETB-Verweise ${Date.now()}`,
   });
-  const basis = `/api/einsaetze/${id}`;
+  const basis = `/api/incidents/${id}`;
   const meldung = await post<{ id: number; lfd_nr: number }>(page, `${basis}/reports`, {
     absender: 'Florian Nord 1',
     empfaenger: 'ELW 1',

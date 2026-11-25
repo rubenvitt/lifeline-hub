@@ -337,7 +337,7 @@ async fn geraetekonto_bekommt_kein_abo() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/devices"),
+        &format!("/api/incidents/{einsatz}/devices"),
         &admin,
         Some(r#"{"ansicht":"lagemonitor","bezeichnung":"Monitor"}"#),
     )

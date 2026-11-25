@@ -40,7 +40,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 }
 
 async function einsatzMitMeldungen(page: Page): Promise<string> {
-  const e = await page.request.post('/api/einsaetze', {
+  const e = await page.request.post('/api/incidents', {
     data: { bezeichnung: 'Stilprobe Icons' },
   });
   expect(e.ok(), await e.text()).toBe(true);
@@ -49,7 +49,7 @@ async function einsatzMitMeldungen(page: Page): Promise<string> {
     'Brücke Nord gesperrt, Umleitung über die B12 eingerichtet',
     'Pegel Mühlbach steigt, Sandsäcke an der Schule angefordert',
   ]) {
-    const m = await page.request.post(`/api/einsaetze/${einsatzId}/reports`, {
+    const m = await page.request.post(`/api/incidents/${einsatzId}/reports`, {
       data: {
         absender: 'Florian Nord 1',
         meldeweg: 'funk',

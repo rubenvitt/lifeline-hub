@@ -16,16 +16,16 @@ async function post<T = { id: number }>(page: Page, pfad: string, data: unknown)
 }
 
 async function etbInhalte(page: Page, einsatzId: string): Promise<string[]> {
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   return ((await etb.json()) as { inhalt: string }[]).map((x) => x.inhalt);
 }
 
 async function seed(page: Page) {
-  const { id } = await post(page, '/api/einsaetze', {
+  const { id } = await post(page, '/api/incidents', {
     bezeichnung: `E2E Material Ort Ausgabe ${Date.now()}`,
   });
   const einsatzId = String(id);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   const einheit = await post(page, `${basis}/units`, { name: 'Staffel A' });
   await post(page, `${basis}/uhs`, { typ: 'behandlungsplatz', bezeichnung: 'Turnhalle' });
   await post(page, `${basis}/material`, {

@@ -48,19 +48,19 @@ beforeEach(() => {
       { status: 201 },
     );
   server.use(
-    http.get('/api/einsaetze/1/module-access', () => HttpResponse.json(freigaben)),
-    http.get('/api/einsaetze/1/care', () => {
+    http.get('/api/incidents/1/module-access', () => HttpResponse.json(freigaben)),
+    http.get('/api/incidents/1/care', () => {
       betreuungAbrufe += 1;
       return HttpResponse.json({ stellen: [NORD, SUED] });
     }),
-    http.get('/api/einsaetze/1/persons/transport-means', () =>
+    http.get('/api/incidents/1/persons/transport-means', () =>
       HttpResponse.json({
         im_einsatz: [{ einsatz_fahrzeug_id: 9, funkrufname: '1/83-1', fahrzeugtyp: 'RTW' }],
         bisher: ['RTW 3/83-2'],
         stamm: ['KTW 4/85-1'],
       }),
     ),
-    http.post('/api/einsaetze/1/persons/2/whereabouts', async ({ request }) => {
+    http.post('/api/incidents/1/persons/2/whereabouts', async ({ request }) => {
       gesendet.push((await request.json()) as Record<string, unknown>);
       return postAntwort();
     }),
@@ -270,7 +270,7 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
     let freigeben!: () => void;
     const gehalten = new Promise<void>((r) => (freigeben = r));
     server.use(
-      http.get('/api/einsaetze/1/care', async () => {
+      http.get('/api/incidents/1/care', async () => {
         await gehalten;
         return new HttpResponse(null, { status: 403 });
       }),
@@ -290,7 +290,7 @@ describe('VerbleibErfassung — Betreuungsstelle (LFH-674)', () => {
 
   it('ein anderer Fehler der Betreuung ist ein Ausfall und sagt sich am Feld', async () => {
     const user = userEvent.setup();
-    server.use(http.get('/api/einsaetze/1/care', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/care', () => new HttpResponse(null, { status: 500 })));
     zeige();
     await waehle(user, 'Art', 'Notunterkunft');
     expect(await screen.findByText(/Stellen konnten nicht geladen werden/)).toBeInTheDocument();

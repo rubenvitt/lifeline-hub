@@ -36,9 +36,9 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
       setzeViewportBreite(breite);
       server.use(
         meHandler(nutzer),
-        http.get('/api/einsaetze/7', () => HttpResponse.json(einsatz('aktiv'))),
-        http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
-        http.get('/api/einsaetze/7/etb/counts', () =>
+        http.get('/api/incidents/7', () => HttpResponse.json(einsatz('aktiv'))),
+        http.get('/api/incidents/7/etb', () => HttpResponse.json([])),
+        http.get('/api/incidents/7/etb/counts', () =>
           HttpResponse.json({
             gesamt: 0,
             je_typ: {
@@ -68,11 +68,11 @@ describe('EtbPage – kein Einsatzabschluss (LFH-960)', () => {
   it('zeigt Beobachtern keine Schreib-/Verwaltungsaktionen (read-only)', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/7', () =>
+      http.get('/api/incidents/7', () =>
         HttpResponse.json({ ...einsatz('aktiv'), meine_rolle: 'beobachter' }),
       ),
-      http.get('/api/einsaetze/7/etb', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/7/etb/counts', () =>
+      http.get('/api/incidents/7/etb', () => HttpResponse.json([])),
+      http.get('/api/incidents/7/etb/counts', () =>
         HttpResponse.json({
           gesamt: 0,
           je_typ: {

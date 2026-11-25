@@ -72,7 +72,7 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   await anmelden(page);
   const demo = await demoEinsatz(page);
   if (sofortmeldung) {
-    await fuelle(page, 'post', `/api/einsaetze/${demo.id}/reports`, {
+    await fuelle(page, 'post', `/api/incidents/${demo.id}/reports`, {
       absender: 'EA Nord',
       meldeweg: 'funk',
       inhalt: 'Person unter Trümmern, Rettung läuft',
@@ -84,17 +84,17 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
   // Der Demo-Einsatz trägt keinen verorteten Einsatzort; ohne ihn bliebe die Kartenkachel leer
   // („Kein Einsatzort verortet“). Teil-PATCH des Einsatzkopfs; `orteZuruecksetzen` räumt ihn
   // wieder ab, damit kein anderes Kapitel ihn sieht.
-  await fuelle(page, 'patch', `/api/einsaetze/${demo.id}`, EINSATZORT);
+  await fuelle(page, 'patch', `/api/incidents/${demo.id}`, EINSATZORT);
   const uhs = await ersteUhs(page, demo.id);
-  await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/uhs/${uhs}`, UHS_ORT);
+  await fuelle(page, 'patch', `/api/incidents/${demo.id}/uhs/${uhs}`, UHS_ORT);
   const abschnitt = await ersterAbschnitt(page, demo.id);
-  await fuelle(page, 'patch', `/api/einsaetze/${demo.id}/sectors/${abschnitt}/area`, {
+  await fuelle(page, 'patch', `/api/incidents/${demo.id}/sectors/${abschnitt}/area`, {
     flaeche_geojson: ABSCHNITT_FLAECHE,
   });
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/devices`,
+    `/api/incidents/${demo.id}/devices`,
     { ansicht: 'lagemonitor', bezeichnung: 'Monitor Stab' },
   );
   const kontext = await browser.newContext({ viewport: KONTEXTE.lagemonitor });
@@ -116,7 +116,7 @@ async function monitor(page: Page, browser: Browser, { sofortmeldung = false } =
 
 /** Der erste Abschnitt des Demo-Einsatzes. */
 async function ersterAbschnitt(page: Page, einsatz: number): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/sectors`);
+  const antwort = await page.request.get(`/api/incidents/${einsatz}/sectors`);
   expect(antwort.ok(), `Abschnitte: ${antwort.status()}`).toBe(true);
   const [erster] = (await antwort.json()) as { id: number }[];
   expect(erster, 'der Demo-Einsatz hat einen Abschnitt').toBeDefined();
@@ -125,7 +125,7 @@ async function ersterAbschnitt(page: Page, einsatz: number): Promise<number> {
 
 /** Die UHS des Demo-Einsatzes. */
 async function ersteUhs(page: Page, einsatz: number): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/uhs`);
+  const antwort = await page.request.get(`/api/incidents/${einsatz}/uhs`);
   expect(antwort.ok(), `UHS: ${antwort.status()}`).toBe(true);
   const [erste] = (await antwort.json()) as { id: number }[];
   expect(erste, 'der Demo-Einsatz hat eine UHS').toBeDefined();
@@ -134,14 +134,14 @@ async function ersteUhs(page: Page, einsatz: number): Promise<number> {
 
 /** Nimmt Einsatzort, UHS-Ort und Abschnittsfläche wieder heraus (Teil-PATCH mit `null`). */
 async function orteZuruecksetzen(page: Page, einsatz: number, uhs: number, abschnitt: number) {
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/sectors/${abschnitt}/area`, {
+  await fuelle(page, 'patch', `/api/incidents/${einsatz}/sectors/${abschnitt}/area`, {
     flaeche_geojson: null,
   });
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}`, {
+  await fuelle(page, 'patch', `/api/incidents/${einsatz}`, {
     einsatzort_lat: null,
     einsatzort_lon: null,
   });
-  await fuelle(page, 'patch', `/api/einsaetze/${einsatz}/uhs/${uhs}`, { lat: null, lon: null });
+  await fuelle(page, 'patch', `/api/incidents/${einsatz}/uhs/${uhs}`, { lat: null, lon: null });
 }
 
 test.describe(KAPITEL, () => {
@@ -155,7 +155,7 @@ test.describe(KAPITEL, () => {
       ).toContainText('1');
       // Gerendert heißt: Einsatzort, UHS, die Abschnittsfläche und je Gefahrenzone ihre
       // Beschriftung (LLH-1746) stehen als Marken auf der Karte.
-      const zonen = await page.request.get(`/api/einsaetze/${einsatz}/zones`);
+      const zonen = await page.request.get(`/api/incidents/${einsatz}/zones`);
       expect(zonen.ok(), `Zonen: ${zonen.status()}`).toBe(true);
       const gefahrenzonen = ((await zonen.json()) as { typ: string }[]).filter((z) =>
         ['gefahrengebiet', 'absperrbereich', 'absperrgrenze', 'sperrgebiet'].includes(z.typ),

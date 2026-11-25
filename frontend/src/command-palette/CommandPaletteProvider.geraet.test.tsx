@@ -59,7 +59,7 @@ describe('Sprungpalette am Gerät (LFH-892)', () => {
     server.use(
       meHandler(benutzerFixture({ anzeigename: 'EL' })),
       http.get('/api/user-settings', () => HttpResponse.json({ eintraege: {} })),
-      http.get('/api/einsaetze', () => HttpResponse.json([])),
+      http.get('/api/incidents', () => HttpResponse.json([])),
     );
     const u = userEvent.setup();
     rendern();

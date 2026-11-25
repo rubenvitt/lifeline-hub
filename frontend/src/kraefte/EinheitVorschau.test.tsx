@@ -36,7 +36,7 @@ const einheit = (o: Partial<Einheit> = {}): Einheit =>
   }) as unknown as Einheit;
 
 function liefere(liste: Einheit[]) {
-  server.use(http.get('/api/einsaetze/5/units', () => HttpResponse.json(liste)));
+  server.use(http.get('/api/incidents/5/units', () => HttpResponse.json(liste)));
 }
 
 describe('EinheitVorschau (LFH-664)', () => {
@@ -157,7 +157,7 @@ describe('EinheitVorschau (LFH-664)', () => {
   it('holt bei warmem Fach der Palette nicht neu', () => {
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/5/units', () => {
+      http.get('/api/incidents/5/units', () => {
         abrufe += 1;
         return HttpResponse.json([]);
       }),

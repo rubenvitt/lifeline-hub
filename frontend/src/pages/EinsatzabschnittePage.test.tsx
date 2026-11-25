@@ -79,7 +79,7 @@ function isModalClosed(): boolean {
 function recordPatches(basis: Record<string, unknown>, aid = 5) {
   const bodies: Record<string, unknown>[] = [];
   server.use(
-    http.patch(`/api/einsaetze/1/sectors/${aid}`, async ({ request }) => {
+    http.patch(`/api/incidents/1/sectors/${aid}`, async ({ request }) => {
       const body = (await request.json()) as Record<string, unknown>;
       bodies.push(body);
       // Der Altwert (Feld-CAS, LLH-1945) ist kein Feld des Abschnitts.
@@ -132,13 +132,13 @@ function handlers(
   sprechgruppen: unknown[] = [tmoSprechgruppe, dmoSprechgruppe],
 ) {
   return [
-    http.get('/api/einsaetze/1', () =>
+    http.get('/api/incidents/1', () =>
       HttpResponse.json({ ...einsatz, meine_rolle: rolle, status }),
     ),
-    http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(abschnitte)),
-    http.get('/api/einsaetze/1/units', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
+    http.get('/api/incidents/1/sectors', () => HttpResponse.json(abschnitte)),
+    http.get('/api/incidents/1/units', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/talk-groups', () => HttpResponse.json(sprechgruppen)),
   ];
 }
 
@@ -232,7 +232,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           {
             id: 1,
@@ -333,7 +333,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           einheit(1, 'Sanitätszug', 5, null, [1, 0, 2], [1, 1, 3]),
           einheit(2, 'Sanitätsgruppe UHS', 6, 1, [0, 1, 1], [0, 1, 1]),
@@ -399,7 +399,7 @@ describe('EinsatzabschnittePage', () => {
       ]),
     );
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           einheit(1, 'Zug Nord', 5, null, [1, 0, 2], [1, 1, 3]),
           einheit(2, 'Gruppe Nord', null, 1, [0, 1, 1], [0, 1, 1]),
@@ -502,7 +502,7 @@ describe('EinsatzabschnittePage', () => {
     it('ein hängender Router-Commit öffnet die geschlossene Erfassung nach neuem Recht nicht wieder (LLH-1530)', async () => {
       let rolle = 'einsatzleitung';
       server.use(
-        http.get('/api/einsaetze/1', () =>
+        http.get('/api/incidents/1', () =>
           HttpResponse.json({ ...einsatz, meine_rolle: rolle, status: 'aktiv' }),
         ),
         ...handlers(),
@@ -650,7 +650,7 @@ describe('EinsatzabschnittePage', () => {
   it('Abschnittsleiter ablösen: genau `leiter_id` geht hinaus (LFH-1208)', async () => {
     // Der erste passende Handler gewinnt: das Personal steht vor der Grundausstattung.
     server.use(
-      http.get('/api/einsaetze/1/personnel', () =>
+      http.get('/api/incidents/1/personnel', () =>
         HttpResponse.json([
           { id: 3, name: 'Carla Christ' },
           { id: 4, name: 'Dora Dreher' },
@@ -710,7 +710,7 @@ describe('EinsatzabschnittePage', () => {
     const bodies: Record<string, unknown>[] = [];
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [nord]),
-      http.patch('/api/einsaetze/1/sectors/5', async ({ request }) => {
+      http.patch('/api/incidents/1/sectors/5', async ({ request }) => {
         const body = (await request.json()) as { name: string; erwartet?: { name: string } };
         bodies.push(body);
         if (body.erwartet && body.erwartet.name !== nord.name) {
@@ -744,7 +744,7 @@ describe('EinsatzabschnittePage', () => {
     const bodies: unknown[] = [];
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [nord]),
-      http.patch('/api/einsaetze/1/sectors/5', async ({ request }) => {
+      http.patch('/api/incidents/1/sectors/5', async ({ request }) => {
         bodies.push(await request.json());
         return HttpResponse.json(
           { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
@@ -866,7 +866,7 @@ describe('EinsatzabschnittePage', () => {
    */
   it('zeigt bei gescheitertem Abschnitts-Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/sectors', () => new HttpResponse(null, { status: 500 })),
       ...handlers(),
     );
     renderPage();
@@ -894,7 +894,7 @@ describe('EinsatzabschnittePage', () => {
     const { client } = renderPage();
     await findInTree('Nord');
 
-    server.use(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/sectors', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
 
     const hinweis = await screen.findByText('Stand womöglich veraltet');
@@ -946,7 +946,7 @@ describe('EinsatzabschnittePage', () => {
     let posts = 0;
     server.use(
       ...handlers(),
-      http.post('/api/einsaetze/1/sectors', () => {
+      http.post('/api/incidents/1/sectors', () => {
         posts += 1;
         return HttpResponse.json({});
       }),
@@ -991,7 +991,7 @@ describe('EinsatzabschnittePage', () => {
     const liste: unknown[] = [{ ...funkAbschnitt }];
     server.use(
       ...handlers('einsatzleitung', 'aktiv', liste),
-      http.post('/api/einsaetze/1/sectors', async ({ request }) => {
+      http.post('/api/incidents/1/sectors', async ({ request }) => {
         bodies.push(await request.json());
         liste.push(ost);
         return HttpResponse.json(ost);
@@ -1073,7 +1073,7 @@ describe('EinsatzabschnittePage', () => {
     it('ohne Freigabe der Lagekarte gesperrt mit Grund, kein Link', async () => {
       server.use(
         ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
-        http.get('/api/einsaetze/1/module-access', () =>
+        http.get('/api/incidents/1/module-access', () =>
           HttpResponse.json(freigabenFixture({ lagekarte: { zugriff: false } })),
         ),
       );
@@ -1094,7 +1094,7 @@ describe('EinsatzabschnittePage', () => {
         { ...funkAbschnitt, id: 5, name: 'Nord', kurzbezeichnung: 'EA-N' },
         { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1, kurzbezeichnung: 'EA-S' },
       ]),
-      http.patch('/api/einsaetze/1/sectors/6', () => {
+      http.patch('/api/incidents/1/sectors/6', () => {
         gesendet = true;
         return HttpResponse.json({});
       }),
@@ -1144,7 +1144,7 @@ describe('EinsatzabschnittePage', () => {
       { ...funkAbschnitt, id: 6, name: 'Süd', sortier: 1 },
     ];
     server.use(
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(liste)),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json(liste)),
       ...handlers('einsatzleitung', 'aktiv', []),
     );
     const { client } = renderPage();
@@ -1210,7 +1210,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
   }
   // Die Modul-Freigaben (Stab, Lageberichte) liefert der MSW-Default: alles frei.
   const organigrammHandler = [
-    http.get('/api/einsaetze/1/stab', () => HttpResponse.json({ besetzung: [] })),
+    http.get('/api/incidents/1/stab', () => HttpResponse.json({ besetzung: [] })),
   ];
 
   it('schaltet auch ohne Schreibrecht auf das Organigramm um', async () => {
@@ -1242,7 +1242,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
     const { client } = rendereMit('/einsaetze/1/einsatzabschnitte?ansicht=organigramm');
     const organigramm = await screen.findByRole('region', { name: 'Organigramm' });
     await within(organigramm).findByRole('link', { name: 'Nord' });
-    server.use(http.get('/api/einsaetze/1/sectors', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/sectors', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.abschnitte(1) });
     const hinweis = await screen.findByText('Stand womöglich veraltet');
     const stand = organigramm.querySelector('[data-lfh="org-stand"]') as HTMLElement;
@@ -1310,7 +1310,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
 
   it('ohne Abschnitte behauptet es keine leere Lage, solange die Einheiten fehlen', async () => {
     server.use(
-      http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/units', () => new HttpResponse(null, { status: 500 })),
       ...handlers('einsatzleitung', 'aktiv', []),
       ...organigrammHandler,
     );
@@ -1341,7 +1341,7 @@ describe('EinsatzabschnittePage — Ansicht Organigramm (LFH-626)', () => {
   it('nennt fehlende Einheiten als Grund und zeigt keine Stärke', async () => {
     // Der erste passende Handler gewinnt: der Fehler muss vor der Grundausstattung stehen.
     server.use(
-      http.get('/api/einsaetze/1/units', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/units', () => new HttpResponse(null, { status: 500 })),
       ...handlers(),
       ...organigrammHandler,
     );
@@ -1379,7 +1379,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Zeile: der Grund steht an der Zeile, die Eingabe bleibt, kein Toast', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
-      http.patch('/api/einsaetze/1/sectors/5', () =>
+      http.patch('/api/incidents/1/sectors/5', () =>
         HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
@@ -1397,7 +1397,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     let erster = true;
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
-      http.patch('/api/einsaetze/1/sectors/5', async () => {
+      http.patch('/api/incidents/1/sectors/5', async () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 });
@@ -1419,7 +1419,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Zeile: Abbrechen und erneutes Öffnen zeigen keinen alten Grund', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt]),
-      http.patch('/api/einsaetze/1/sectors/5', () =>
+      http.patch('/api/incidents/1/sectors/5', () =>
         HttpResponse.json({ error: 'Bemerkung zu lang' }, { status: 422 }),
       ),
     );
@@ -1446,13 +1446,13 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
     const liste = [funkAbschnitt, sued];
     let geloescht = false;
     server.use(
-      http.get('/api/einsaetze/1/sectors', async () => {
+      http.get('/api/incidents/1/sectors', async () => {
         // Der Neuabruf nach dem Auflösen hängt: belegt wird der Cache, nicht der Server.
         if (geloescht) await neuabrufGesperrt;
         return HttpResponse.json(liste);
       }),
       ...handlers('einsatzleitung', 'aktiv', []),
-      http.delete('/api/einsaetze/1/sectors/5', () => {
+      http.delete('/api/incidents/1/sectors/5', () => {
         geloescht = true;
         liste.splice(0, 1);
         return new HttpResponse(null, { status: 204 });
@@ -1468,7 +1468,7 @@ describe('EinsatzabschnittePage · Speicherfehler am Ort (LFH-1077)', () => {
   it('Auflösen: der Grund steht im Detailpaneel, der Wechsel des Abschnitts räumt ihn', async () => {
     server.use(
       ...handlers('einsatzleitung', 'aktiv', [funkAbschnitt, sued]),
-      http.delete('/api/einsaetze/1/sectors/5', () =>
+      http.delete('/api/incidents/1/sectors/5', () =>
         HttpResponse.json({ error: 'Abschnitt hat aktive Aufträge' }, { status: 409 }),
       ),
     );
@@ -1520,11 +1520,11 @@ describe('EinsatzabschnittePage · Sprechgruppen einzeln (LLH-1456)', () => {
     };
     server.use(
       // Vor `handlers`: der erste passende Handler gewinnt.
-      http.get('/api/einsaetze/1/sectors', () => HttpResponse.json([abschnitt])),
+      http.get('/api/incidents/1/sectors', () => HttpResponse.json([abschnitt])),
       ...handlers('einsatzleitung', 'aktiv', []),
-      http.put('/api/einsaetze/1/sectors/5/talk-groups/:sg', weg),
-      http.delete('/api/einsaetze/1/sectors/5/talk-groups/:sg', weg),
-      http.patch('/api/einsaetze/1/sectors/5', async ({ request }) => {
+      http.put('/api/incidents/1/sectors/5/talk-groups/:sg', weg),
+      http.delete('/api/incidents/1/sectors/5/talk-groups/:sg', weg),
+      http.patch('/api/incidents/1/sectors/5', async ({ request }) => {
         patches.push(await request.json());
         return HttpResponse.json(abschnitt);
       }),
@@ -1610,14 +1610,14 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
     const einheitPatches: { id: number; body: unknown }[] = [];
     server.use(
       // Vor den Grund-Handlern: MSW nimmt den ersten passenden.
-      http.get('/api/einsaetze/1/units', () => HttpResponse.json(einheiten)),
+      http.get('/api/incidents/1/units', () => HttpResponse.json(einheiten)),
       ...handlers(rolle, 'aktiv', [nord, nordOst, sued]),
-      http.patch('/api/einsaetze/1/sectors/:aid', async ({ request, params }) => {
+      http.patch('/api/incidents/1/sectors/:aid', async ({ request, params }) => {
         const body = await request.json();
         abschnittPatches.push({ id: Number(params.aid), body });
         return HttpResponse.json({ ...nordOst, ...(body as object) });
       }),
-      http.patch('/api/einsaetze/1/units/:eid', async ({ request, params }) => {
+      http.patch('/api/incidents/1/units/:eid', async ({ request, params }) => {
         const body = await request.json();
         einheitPatches.push({ id: Number(params.eid), body });
         return HttpResponse.json({ ...zug, ...(body as object) });
@@ -1707,8 +1707,8 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       const { abschnittPatches } = mitPatches();
       let liste = [nord, nordOst, sued];
       server.use(
-        http.get('/api/einsaetze/1/sectors', () => HttpResponse.json(liste)),
-        http.patch('/api/einsaetze/1/sectors/:aid', async ({ request, params }) => {
+        http.get('/api/incidents/1/sectors', () => HttpResponse.json(liste)),
+        http.patch('/api/incidents/1/sectors/:aid', async ({ request, params }) => {
           abschnittPatches.push({ id: Number(params.aid), body: await request.json() });
           return HttpResponse.json(
             { error: 'zwischenzeitlich geändert', grund: 'veraltet' },
@@ -1738,7 +1738,7 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
     it('eine Ablehnung steht im Dialog, der Dialog bleibt offen, kein Toast', async () => {
       mitPatches();
       server.use(
-        http.patch('/api/einsaetze/1/sectors/:aid', () =>
+        http.patch('/api/incidents/1/sectors/:aid', () =>
           HttpResponse.json({ error: 'Zyklus in der Abschnittshierarchie' }, { status: 422 }),
         ),
       );
@@ -1771,7 +1771,7 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       mitPatches();
       const geloescht: string[] = [];
       server.use(
-        http.delete('/api/einsaetze/1/sectors/:aid', ({ params }) => {
+        http.delete('/api/incidents/1/sectors/:aid', ({ params }) => {
           geloescht.push(String(params.aid));
           return new HttpResponse(null, { status: 204 });
         }),
@@ -1924,8 +1924,8 @@ describe('EinsatzabschnittePage · Umhängen (LFH-1212)', () => {
       const { einheitPatches } = mitPatches();
       let stand = { ...zug };
       server.use(
-        http.get('/api/einsaetze/1/units', () => HttpResponse.json([stand])),
-        http.patch('/api/einsaetze/1/units/:eid', async ({ request, params }) => {
+        http.get('/api/incidents/1/units', () => HttpResponse.json([stand])),
+        http.patch('/api/incidents/1/units/:eid', async ({ request, params }) => {
           const body = (await request.json()) as {
             abschnitt_id: number | null;
             erwartet?: { abschnitt_id: number | null };

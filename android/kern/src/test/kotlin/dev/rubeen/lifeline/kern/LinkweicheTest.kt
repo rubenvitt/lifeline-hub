@@ -31,10 +31,10 @@ class LinkweicheTest {
 
     @Test
     fun `Dateirouten werden heruntergeladen`() {
-        assertEquals(Linkweiche.Entscheidung.Download, navigation("https://elw.local:8443/api/einsaetze/1/export.csv"))
+        assertEquals(Linkweiche.Entscheidung.Download, navigation("https://elw.local:8443/api/incidents/1/export.csv"))
         assertEquals(
             Linkweiche.Entscheidung.Download,
-            navigation("https://elw.local:8443/api/einsaetze/1/export.csv", neuesFenster = true),
+            navigation("https://elw.local:8443/api/incidents/1/export.csv", neuesFenster = true),
         )
     }
 

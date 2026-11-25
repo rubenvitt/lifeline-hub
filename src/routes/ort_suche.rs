@@ -2,9 +2,9 @@
 //! Organisation fragen, Antwort bauen. Drei Einstiege teilen ihn (Spec `lagekarte-ortssuche`,
 //! „Adresssuche über den Server mit Grenzen“; Spec `ortsfeld`):
 //!
-//! - `GET /api/einsaetze/:id/map/place-search` — Lagekarte, am Modul gegatet
+//! - `GET /api/incidents/:id/map/place-search` — Lagekarte, am Modul gegatet
 //!   (`routes::karte_ort_suche`);
-//! - `GET /api/einsaetze/:id/place-search` — Ortsfeld im Einsatz, Recht der Einsatzdaten
+//! - `GET /api/incidents/:id/place-search` — Ortsfeld im Einsatz, Recht der Einsatzdaten
 //!   ([`im_einsatz`]);
 //! - `GET /api/place-search` — Ortsfeld ohne Einsatz, wer Einsätze anlegen darf ([`in_org`]).
 //!
@@ -128,7 +128,7 @@ pub(crate) fn ausschnitt_um(lat: Option<f64>, lon: Option<f64>) -> Option<suche:
     }
 }
 
-/// GET /api/einsaetze/:id/place-search?q= — Ortsfeld im Einsatz (LFH-1175). Dasselbe Recht wie der
+/// GET /api/incidents/:id/place-search?q= — Ortsfeld im Einsatz (LFH-1175). Dasselbe Recht wie der
 /// PATCH der Kopfdaten, für den die Suche da ist; kein Modul-Gate. Bevorzugt die Umgebung des
 /// Einsatzorts.
 pub async fn im_einsatz(

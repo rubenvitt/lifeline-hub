@@ -202,7 +202,7 @@ async fn abgeschlossener_einsatz_ist_offline() {
     let (s, _) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &format!("/api/incidents/{}/close", u.einsatz),
         &u.admin,
         None,
     )

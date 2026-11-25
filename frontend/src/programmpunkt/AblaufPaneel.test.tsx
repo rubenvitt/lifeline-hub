@@ -34,15 +34,15 @@ beforeEach(() => {
     { id: 2, bezeichnung: 'Feuerwerk', zeitpunkt_at: wireAb(90) },
   ];
   server.use(
-    http.get('/api/einsaetze/1/agenda-items', () => HttpResponse.json(punkte)),
-    http.post('/api/einsaetze/1/agenda-items', async ({ request }) => {
+    http.get('/api/incidents/1/agenda-items', () => HttpResponse.json(punkte)),
+    http.post('/api/incidents/1/agenda-items', async ({ request }) => {
       const body = (await request.json()) as { bezeichnung: string; zeitpunkt_at: string };
       gesendet.push({ methode: 'POST', pfad: new URL(request.url).pathname, body });
       const neu = { id: 9, ...body };
       punkte = [...punkte, neu];
       return HttpResponse.json(neu, { status: 201 });
     }),
-    http.patch('/api/einsaetze/1/agenda-items/:pid', async ({ request, params }) => {
+    http.patch('/api/incidents/1/agenda-items/:pid', async ({ request, params }) => {
       const body = (await request.json()) as Partial<Programmpunkt> & {
         erwartet?: Partial<Programmpunkt>;
       };
@@ -60,7 +60,7 @@ beforeEach(() => {
       punkte = punkte.map((p) => (p.id === id ? { ...p, ...daten } : p));
       return HttpResponse.json(punkte.find((p) => p.id === id));
     }),
-    http.delete('/api/einsaetze/1/agenda-items/:pid', ({ request, params }) => {
+    http.delete('/api/incidents/1/agenda-items/:pid', ({ request, params }) => {
       gesendet.push({ methode: 'DELETE', pfad: new URL(request.url).pathname, body: null });
       punkte = punkte.filter((p) => p.id !== Number(params.pid));
       return new HttpResponse(null, { status: 204 });
@@ -122,7 +122,7 @@ describe('AblaufPaneel', () => {
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toEqual({
       methode: 'PATCH',
-      pfad: '/api/einsaetze/1/agenda-items/2',
+      pfad: '/api/incidents/1/agenda-items/2',
       body: { bezeichnung: 'Höhenfeuerwerk', erwartet: { bezeichnung: 'Feuerwerk' } },
     });
   });
@@ -173,7 +173,7 @@ describe('AblaufPaneel', () => {
     await waitFor(() => expect(gesendet).toHaveLength(1));
     expect(gesendet[0]).toMatchObject({
       methode: 'DELETE',
-      pfad: '/api/einsaetze/1/agenda-items/2',
+      pfad: '/api/incidents/1/agenda-items/2',
     });
     await waitFor(() => expect(within(p).queryByText('Feuerwerk')).toBeNull());
   });

@@ -38,7 +38,7 @@ pub struct PraesenzFeldBody {
 pub type PraesenzEinsatzEndeBody = PraesenzEinsatzBody;
 pub type PraesenzFeldEndeBody = PraesenzFeldBody;
 
-/// PUT /api/einsaetze/{id}/presence — beginnt oder verlängert die Präsenz eines Fensters an
+/// PUT /api/incidents/{id}/presence — beginnt oder verlängert die Präsenz eines Fensters an
 /// Angaben von Einsatzkopf oder Führungsstelle. 204.
 pub async fn einsatz_melden(
     State(state): State<AppState>,
@@ -65,7 +65,7 @@ pub async fn einsatz_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/presence — idempotent, 204; Body wie beim PUT.
+/// DELETE /api/incidents/{id}/presence — idempotent, 204; Body wie beim PUT.
 pub async fn einsatz_beenden(
     State(state): State<AppState>,
     ctx: EinsatzVerwaltungszugriff,
@@ -85,7 +85,7 @@ pub async fn einsatz_beenden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PUT /api/einsaetze/{id}/units/{eid}/presence — Präsenz an Angaben einer Einheit. Eine
+/// PUT /api/incidents/{id}/units/{eid}/presence — Präsenz an Angaben einer Einheit. Eine
 /// Einheit eines anderen Einsatzes ist 404, eine aufgelöste 409 (wie der PATCH daneben).
 pub async fn einheit_melden(
     State(state): State<AppState>,
@@ -111,7 +111,7 @@ pub async fn einheit_melden(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/units/{eid}/presence — idempotent, 204; Body wie beim PUT.
+/// DELETE /api/incidents/{id}/units/{eid}/presence — idempotent, 204; Body wie beim PUT.
 pub async fn einheit_beenden(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Einheiten>,

@@ -55,7 +55,7 @@ async function einsatzAnlegenUndOeffnen(page: Page): Promise<number> {
 
 /** Setzt die Einsatzort-Koordinate. Der Kopf-PATCH liest nur vorhandene Schlüssel (Teil-PATCH). */
 async function einsatzortSetzen(page: Page, eid: number, ort: { lat: number; lon: number }) {
-  const antwort = await page.request.patch(`/api/einsaetze/${eid}`, {
+  const antwort = await page.request.patch(`/api/incidents/${eid}`, {
     data: { einsatzort_lat: ort.lat, einsatzort_lon: ort.lon },
   });
   expect(antwort.ok(), await antwort.text()).toBeTruthy();
@@ -96,7 +96,7 @@ test('Lagekarte: MapLibre startet, Controls leben, terra-draw greift', async ({ 
   const eid = await einsatzAnlegenUndOeffnen(page);
   // Ein gesicherter Stand: ohne ihn steht statt der Zeitachse nur der Knopf „Stand sichern“
   // (LLH-1936), und die Überdeckungsmessung unten hätte kein Band.
-  const stand = await page.request.post(`/api/einsaetze/${eid}/situation-snapshots`, {
+  const stand = await page.request.post(`/api/incidents/${eid}/situation-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
   expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -259,7 +259,7 @@ test('Lagekarte: startet auf dem Einsatzort; die Zeitachse deckt die Karte nicht
   const eid = await einsatzAnlegenUndOeffnen(page);
   const ort = { lat: 49.3519, lon: 9.1457 };
   await einsatzortSetzen(page, eid, ort);
-  const stand = await page.request.post(`/api/einsaetze/${eid}/situation-snapshots`, {
+  const stand = await page.request.post(`/api/incidents/${eid}/situation-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
   expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -326,7 +326,7 @@ test('Lagekarte: die Auswahl „Stand“ zeigt die Erfassungszeit unter der Beze
   await page.setViewportSize({ width: 390, height: 844 });
   await anmelden(page);
   const eid = await einsatzAnlegenUndOeffnen(page);
-  const stand = await page.request.post(`/api/einsaetze/${eid}/situation-snapshots`, {
+  const stand = await page.request.post(`/api/incidents/${eid}/situation-snapshots`, {
     data: { bezeichnung: 'Stand vor Ort' },
   });
   expect(stand.ok(), await stand.text()).toBeTruthy();
@@ -475,7 +475,7 @@ test('Lagekarte: Beschriftungsplaketten stehen sofort, auch nach einem Stilwechs
   const ort = { lat: 49.3519, lon: 9.1457 };
   await einsatzortSetzen(page, eid, ort);
   // Eine Schadenstelle neben dem Einsatzort: im Bild bei Zoom 14, nicht im selben Cluster.
-  const r = await page.request.post(`/api/einsaetze/${eid}/damages`, {
+  const r = await page.request.post(`/api/incidents/${eid}/damages`, {
     data: {
       typ: 'sachschaden',
       ausmass: 'mittel',
@@ -640,7 +640,7 @@ test.describe('Lagekarte: Fachobjekt-Zeichen', () => {
       [-1, -1],
     ];
     for (const [i, ausmass] of ['gering', 'mittel', 'gross', 'katastrophal'].entries()) {
-      const r = await page.request.post(`/api/einsaetze/${eid}/damages`, {
+      const r = await page.request.post(`/api/incidents/${eid}/damages`, {
         data: {
           typ: 'sachschaden',
           ausmass,
@@ -738,7 +738,7 @@ test.describe('Lagekarte: freie Zeichen', () => {
 
     const spec = '{"v":1,"spec":{"kind":"hazard","technicalFill":"rot"}}';
     const gespeichert = (await (
-      await page.request.get(`/api/einsaetze/${eid}/free-symbols`)
+      await page.request.get(`/api/incidents/${eid}/free-symbols`)
     ).json()) as { zeichen_spec?: string; grundzeichen?: string }[];
     // Gespeichert als Zeichenbeschreibung; die Altform gibt es im DTO nicht mehr (LLH-1160).
     expect(gespeichert.map((z) => [z.zeichen_spec, z.grundzeichen ?? null])).toEqual([

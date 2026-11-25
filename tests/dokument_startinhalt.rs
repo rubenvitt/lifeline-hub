@@ -23,7 +23,7 @@ async fn lagebericht_mit_startinhalt_entsteht_in_einem_schritt() {
     let (status, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(
             r##"{"vorlage":"freitext","titel":"Funkplan 301200Sep26","abschnitte":[{"schluessel":"text","text":"# Funkplan\n- EA Nord"}]}"##,
@@ -54,7 +54,7 @@ async fn nicht_genannte_abschnitte_der_vorlage_bleiben_leer_in_vorlagenreihenfol
     let (status, bf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         Some(
             r#"{"vorlage":"befehl_lad","titel":"B","abschnitte":[{"schluessel":"durchfuehrung","text":"Zugweise"},{"schluessel":"lage","text":"Hochwasser"}]}"#,
@@ -88,7 +88,7 @@ async fn unbekannter_schluessel_ist_400_und_hinterlaesst_keinen_entwurf() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/situation-reports");
+    let pfad = format!("/api/incidents/{einsatz}/situation-reports");
 
     let (status, antwort) = anfrage(
         &app,
@@ -109,7 +109,7 @@ async fn doppelter_schluessel_ist_400_und_hinterlaesst_keinen_entwurf() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
-    let pfad = format!("/api/einsaetze/{einsatz}/orders");
+    let pfad = format!("/api/incidents/{einsatz}/orders");
 
     let (status, antwort) = anfrage(
         &app,
@@ -134,7 +134,7 @@ async fn ohne_startinhalt_bleibt_das_leere_skelett() {
     let (status, lb) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/situation-reports"),
+        &format!("/api/incidents/{einsatz}/situation-reports"),
         &admin,
         Some(r#"{"vorlage":"lagebericht","titel":"Lage 10:00"}"#),
     )
@@ -155,12 +155,12 @@ async fn patch_mit_doppeltem_schluessel_ist_400_und_aendert_nichts() {
     let (_, bf) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/orders"),
+        &format!("/api/incidents/{einsatz}/orders"),
         &admin,
         Some(r#"{"vorlage":"befehl_lad","titel":"B"}"#),
     )
     .await;
-    let pfad = format!("/api/einsaetze/{einsatz}/orders/{}", bf["id"]);
+    let pfad = format!("/api/incidents/{einsatz}/orders/{}", bf["id"]);
 
     let (status, antwort) = anfrage(
         &app,

@@ -46,10 +46,10 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 
 /** Einsatz über die API; der Name trägt keinen Modulnamen (Palette). */
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Vorratscache ${Date.now()}` },
   });
-  expect(antwort.ok(), `POST /api/einsaetze: ${antwort.status()} ${await antwort.text()}`).toBe(
+  expect(antwort.ok(), `POST /api/incidents: ${antwort.status()} ${await antwort.text()}`).toBe(
     true,
   );
   return ((await antwort.json()) as { id: number }).id;

@@ -26,7 +26,7 @@ import { rechteHinweisSteht } from './trefflaeche-kern';
 const BREITE = 390;
 
 async function einsatzAnlegen(page: Page): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Lagebesprechung Modul ${Date.now()}` },
   });
   expect(r.ok(), `Einsatz anlegen: ${r.status()}`).toBeTruthy();
@@ -47,13 +47,13 @@ const vorbereitungsZeile = (page: Page, schluessel: string) =>
 function terminAntwort(page: Page, einsatzId: number) {
   return page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefing/schedule`) &&
+      r.url().endsWith(`/api/incidents/${einsatzId}/briefing/schedule`) &&
       r.request().method() === 'PUT',
   );
 }
 
 async function einsatzKopf(page: Page, einsatzId: number): Promise<Record<string, unknown>> {
-  return (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as Record<
+  return (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as Record<
     string,
     unknown
   >;
@@ -68,7 +68,7 @@ async function abschliessen(page: Page, einsatzId: number, entschluss: string) {
   await dialog.getByLabel('Entschluss').fill(entschluss);
   const gespeichert = page.waitForResponse(
     (r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/briefings`) && r.request().method() === 'POST',
+      r.url().endsWith(`/api/incidents/${einsatzId}/briefings`) && r.request().method() === 'POST',
   );
   await dialog.getByRole('button', { name: 'Abschließen', exact: true }).click();
   expect((await gespeichert).status()).toBe(201);
@@ -152,7 +152,7 @@ test.describe('LLH-1111: Modul Lagebesprechung', () => {
 
     // Vorbedingung: einen Stab kennen die Freigaben nicht mehr, die Lagebesprechung ist frei.
     const freigaben = (await (
-      await page.request.get(`/api/einsaetze/${id}/module-access`)
+      await page.request.get(`/api/incidents/${id}/module-access`)
     ).json()) as Record<string, { sichtbar: boolean; zugriff: boolean }>;
     expect(freigaben.stab, 'Vorbedingung: kein Modul Stab').toBeUndefined();
     expect(freigaben.lagebesprechung, 'Vorbedingung: Lagebesprechung frei').toEqual({
@@ -202,7 +202,7 @@ test.describe('LLH-1111: Lagebesprechung am Handy', () => {
   /** Ein Einsatz mit einer abgeschlossenen Besprechung und einem langen Entschluss. */
   async function seede(page: Page): Promise<number> {
     const id = await einsatzAnlegen(page);
-    const r = await page.request.post(`/api/einsaetze/${id}/briefings`, {
+    const r = await page.request.post(`/api/incidents/${id}/briefings`, {
       data: {
         entschluss:
           'Evakuierung Ortsteil Nord fortführen, Sandsackverbau am Nordufer verstärken, ' +
@@ -290,7 +290,7 @@ test.describe('LFH-695: Kontrast des Zeilenziels im Verlauf', () => {
     test(`ETB-Eintrag im Verlauf hält den Textboden im Modus ${modus}`, async ({ page }) => {
       await anmeldenAlsAdmin(page);
       const id = await einsatzAnlegen(page);
-      const r = await page.request.post(`/api/einsaetze/${id}/briefings`, {
+      const r = await page.request.post(`/api/incidents/${id}/briefings`, {
         data: { entschluss: 'Lage unverändert' },
       });
       expect(r.status(), `Abschluss säen: ${await r.text()}`).toBe(201);

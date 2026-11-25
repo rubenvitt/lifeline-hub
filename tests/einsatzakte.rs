@@ -1,4 +1,4 @@
-//! Einsatzakte (LLH-1835): `GET /api/einsaetze/{id}/case-file/attachments.zip`, Spec `einsatzakte`
+//! Einsatzakte (LLH-1835): `GET /api/incidents/{id}/case-file/attachments.zip`, Spec `einsatzakte`
 //! („ZIP mit Anhängen und Tabellen“, „ZIP-Abruf wird protokolliert“, „Vollständig oder gar
 //! nicht“, „Ein ZIP-Bau je Einsatz zugleich“).
 
@@ -24,7 +24,7 @@ async fn zip_laden(app: &axum::Router, cookie: &str, e: i64) -> Antwort {
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri(format!("/api/einsaetze/{e}/case-file/attachments.zip"))
+                .uri(format!("/api/incidents/{e}/case-file/attachments.zip"))
                 .header(header::COOKIE, cookie)
                 .body(Body::empty())
                 .unwrap(),
@@ -259,7 +259,7 @@ async fn gesperrtes_modul_lehnt_ab_ohne_protokoll() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/personen"),
+        &format!("/api/incidents/{e}/module-overrides/personen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -298,7 +298,7 @@ async fn ausgeblendetes_modul_faellt_weg() {
     let (s, _) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/tiere"),
+        &format!("/api/incidents/{e}/module-overrides/tiere"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -419,7 +419,7 @@ async fn gekoppeltes_geraet_bekommt_kein_zip() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs"),
+        &format!("/api/incidents/{e}/uhs"),
         &admin,
         Some(&serde_json::json!({"typ": "behandlungsplatz", "bezeichnung": "BHP 1"})),
     )
@@ -429,7 +429,7 @@ async fn gekoppeltes_geraet_bekommt_kein_zip() {
     let (s, _) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/uhs/{uhs}/status"),
+        &format!("/api/incidents/{e}/uhs/{uhs}/status"),
         &admin,
         Some(&serde_json::json!({"status": "aktiv"})),
     )
@@ -438,7 +438,7 @@ async fn gekoppeltes_geraet_bekommt_kein_zip() {
     let (s, v) = anfrage_json(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/devices"),
+        &format!("/api/incidents/{e}/devices"),
         &admin,
         Some(
             &serde_json::json!({"ansicht": "uhs-tablet", "uhs_id": uhs, "bezeichnung": "Tablet 1"}),
