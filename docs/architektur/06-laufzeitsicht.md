@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -761,6 +761,39 @@ sequenceDiagram
   URL steht nie in Log oder Fehlertext, nur `ebene_id` und der Fehlercode.
 - Beim Anlegen aus einer URL holt der Server einmal synchron (Antwort 400 mit `grund` bei Fehler,
   ohne die URL zu nennen); eine Datei läuft durch den Virenscan (`src/anhang`) und denselben Parser.
+
+## 6.6i Versand an eine Externe Stelle
+
+Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Senden-Dialog
+  participant Hub as lifeline-hub (src/routes/ausgang.rs, src/ausgang/)
+  participant DB as SQLite (ausgang, etb_eintrag)
+  participant SMTP as Mailserver
+  FE->>Hub: POST …/deliveries {client_id, recipients}
+  Hub->>DB: Quelle, Stelle, Adresse, Anbindung prüfen; je Adresse eine Zeile (wartet)
+  Hub-->>FE: 201 Versände; Lauf wird geweckt
+  loop Takt 2 s und Wecken: fällige Zeilen (höchstens 4)
+    Hub->>DB: Zeile, Anbindung und Quelle lesen, Verbindung zurückgeben
+    Hub->>Hub: zugang_fuer_versand entschlüsselt das Passwort, Nachricht bauen
+    Hub->>SMTP: STARTTLS oder TLS, MAIL, RCPT, DATA
+    SMTP-->>Hub: 250 oder Fehler
+    Hub->>DB: BEGIN, Ergebnis und ETB-Eintrag, COMMIT
+    Hub-->>FE: Live-Ereignis ausgang (nach dem Commit)
+  end
+```
+
+- Vor jeder Zustellung prüft der Lauf die Quelle (jüngste freigegebene Version, Nachforderung
+  nicht zurückgezogen) und den Spiegel; ein überholter Versand geht ohne Netz auf
+  `fehlgeschlagen` (`src/ausgang/lauf.rs`).
+- Vorübergehende Fehler wiederholt der Lauf mit Backoff `30 s · 2^(n−1)` bis 5 min und höchstens
+  30 min ab dem ersten Versuch; dauerhafte Fehler stehen sofort im ETB. Bricht die Verbindung
+  nach DATA ab, ist der Versand `ungewiss` und wartet auf „Erneut senden“ durch einen Menschen
+  (`src/ausgang/zustand.rs`).
+- Beim Start behandelt `beim_start` eine mitten in der Zustellung unterbrochene Zeile wie
+  `ungewiss`.
 
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 

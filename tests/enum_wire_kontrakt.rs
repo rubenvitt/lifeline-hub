@@ -366,6 +366,33 @@ fn serde_wire_gleich_as_str() {
         Hilfsorganisation,
         Sonstige,
     });
+    enum_wire_as_str!(lifeline_hub::ausgang::QuelleArt {
+        Lagebericht,
+        Befehl,
+        Nachforderung,
+    });
+    enum_wire_as_str!(lifeline_hub::ausgang::VersandZustand {
+        Wartet,
+        Uebergeben,
+        Fehlgeschlagen,
+    });
+    enum_wire_as_str!(lifeline_hub::ausgang::AusgangFehler {
+        Voruebergehend,
+        Abgelehnt,
+        Ungewiss,
+        Ueberholt,
+        AnbindungFehlt,
+        AnbindungAngehalten,
+        AnbindungFehler,
+        ZuGross,
+        Spiegel,
+    });
+    enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
+        Email,
+        Fax,
+        Matrix,
+        Threema,
+    });
     enum_wire_as_str!(lifeline_hub::einheit::EinheitStatusQuelle {
         Fahrzeuge,
         Gemischt,
@@ -834,6 +861,7 @@ fn serde_wire_gleich_as_str() {
         Text => "text",
         Zahl => "zahl",
         Url => "url",
+        Host => "host",
     });
     // Veranstaltungen-Abruf v1 (LLH-2097): Wire des Vertrags und Spalten `art`/`status` von
     // `veranstaltung_extern`.
@@ -1755,6 +1783,7 @@ fn live_event_wire() {
         KarteFremdebene => "karte_fremdebene",
         Etb => "etb",
         Befehl => "befehl",
+        Ausgang => "ausgang",
         Lagebesprechung => "lagebesprechung",
         Fernmeldewesen => "fernmeldewesen",
         Dokument => "dokument",

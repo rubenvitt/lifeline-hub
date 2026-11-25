@@ -1,5 +1,7 @@
-import type { ExterneStelle, ExterneStelleArt } from './types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { ExterneStelle, ExterneStelleArt, ExterneStelleKanal, KanalMitStelle } from './types';
 import { apiGet, apiSend } from './client';
+import { globalKeys } from './queryKeys';
 
 /** Anlegen einer externen Stelle (LFH-1194); Request-Typ von Hand (`src/AGENTS.md`, Typ-Codegen). */
 export interface NeueExterneStelle {
@@ -36,4 +38,70 @@ export function createExterneStelle(daten: NeueExterneStelle): Promise<ExterneSt
 
 export function updateExterneStelle(id: number, patch: ExterneStellePatch): Promise<ExterneStelle> {
   return apiSend<ExterneStelle>(`/api/external-agencies/${id}`, 'PATCH', patch);
+}
+
+// ---- Kanaladressen (LLH-2093) ----
+
+export interface NeuerKanal {
+  channel: 'email';
+  address: string;
+  label?: string;
+}
+
+export function fetchExterneStelleKanaele(stelleId: number): Promise<ExterneStelleKanal[]> {
+  return apiGet<ExterneStelleKanal[]>(`/api/external-agencies/${stelleId}/channels`);
+}
+
+/** Alle Adressen eines Kanals der aktiven Stellen der Organisation. */
+export function fetchKanaeleSammlung(kanal: 'email'): Promise<KanalMitStelle[]> {
+  return apiGet<KanalMitStelle[]>(`/api/external-agencies/channels?channel=${kanal}`);
+}
+
+export function createKanal(stelleId: number, daten: NeuerKanal): Promise<ExterneStelleKanal> {
+  return apiSend<ExterneStelleKanal>(`/api/external-agencies/${stelleId}/channels`, 'POST', daten);
+}
+
+export function deleteKanal(stelleId: number, kanalId: number): Promise<void> {
+  return apiSend<void>(`/api/external-agencies/${stelleId}/channels/${kanalId}`, 'DELETE');
+}
+
+/**
+ * Schreiben nur mit Netz, ohne Warteschlange (`frontend/src/offline/AGENTS.md`, „Schreiben ohne
+ * Netz“): eine Adresse der Stelle wird nicht vorgemerkt, die Maske sagt es.
+ */
+const SOFORT_ODER_NIE = { networkMode: 'always' } as const;
+
+/** Adressen einer Stelle. `aktiv` hält die Abfrage zurück, solange keine Stelle gewählt ist. */
+export function useExterneStelleKanaele(stelleId: number | undefined) {
+  return useQuery({
+    queryKey: globalKeys.externeStelleKanaele(stelleId ?? 0),
+    queryFn: () => fetchExterneStelleKanaele(stelleId as number),
+    enabled: stelleId !== undefined,
+  });
+}
+
+/** Alle Mailadressen der aktiven Stellen (Zählhinweis der Liste, Auswahl beim Senden). */
+export function useKanaeleSammlung(kanal: 'email') {
+  return useQuery({
+    queryKey: globalKeys.externeStellenKanaeleSammlung(kanal),
+    queryFn: () => fetchKanaeleSammlung(kanal),
+  });
+}
+
+export function useCreateKanal(stelleId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (daten: NeuerKanal) => createKanal(stelleId, daten),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.externeStellen() }),
+  });
+}
+
+export function useDeleteKanal(stelleId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    ...SOFORT_ODER_NIE,
+    mutationFn: (kanalId: number) => deleteKanal(stelleId, kanalId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: globalKeys.externeStellen() }),
+  });
 }

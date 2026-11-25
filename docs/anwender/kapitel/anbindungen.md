@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/drohne/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/drohne/art.rs]
 ---
 
 ## Überblick
@@ -205,6 +205,20 @@ Für den System-Admin:
 
 Ein neuer Adapter ruft sofort ab. Fehlt ihm ein Geheimnis, das seine Art verlangt, hält er mit
 „Geheimnis fehlt“ an, bis es gesetzt ist.
+
+### Mailserver für den Versand einrichten
+
+Für den System-Admin; jede Organisation hat höchstens eine E-Mail-Anbindung:
+
+1. Unter „Einstellungen“ „Anbindungen“ im Paneel „Adapter“ „Adapter anlegen“ wählen und die Art
+   „E-Mail (SMTP)“ wählen.
+2. „Server“ (Name oder Adresse des Mailservers), „Port“, „Verschlüsselung“ („starttls“ oder
+   „tls“), „Benutzer“, „Absenderadresse“ und optional „Absendername“ ausfüllen.
+3. „Anlegen“ wählen und in der Ansicht des Adapters das „Passwort“ als Geheimnis setzen.
+4. „Verbindung prüfen“ wählen. Das Ergebnis steht im Verlauf; es wird keine Mail gesendet.
+
+Ohne diese Anbindung meldet der Senden-Dialog „Kein Mailserver eingerichtet“; ist sie angehalten,
+„Mailanbindung angehalten“.
 
 ### Geheimnis setzen oder ersetzen
 
@@ -614,6 +628,17 @@ abschalten. Führungskräfte bekommen sie nicht, Admins anderer Organisationen a
 
 Läuft der Server ohne Schlüssel für Geheimnisse, halten alle Adapter mit Geheimnis an. Das meldet
 der Server nicht: Beheben kann es nur, wer den Server betreibt.
+
+### Mailversand
+
+Die Art „E-Mail (SMTP)“ ruft nichts ab, sondern stellt Nachrichten zu, die Personen aus dem
+Einsatz senden (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail“). Der Server prüft
+das Ziel wie bei Webhooks (keine Weiterleitung, kein Ziel im internen Netz ohne „Ziel im eigenen
+Netz erlauben“) und prüft das Zertifikat des Mailservers gegen die Vertrauensanker des Systems.
+Das Passwort bleibt wie jedes Geheimnis verschlüsselt und wird nur beim Zustellen entschlüsselt;
+Antworttexte des Mailservers werden nie gespeichert, die Versandliste nennt nur einen festen
+Grund („Vom Mailserver abgelehnt“, „Mailanbindung fehlerhaft eingerichtet“). Eine Organisation, die
+sich bei einem Hub meldet, hat keine eigene Mailanbindung.
 
 ### Geheimnisse eines Adapters
 

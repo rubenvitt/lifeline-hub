@@ -3,6 +3,7 @@
 //! meldende Stelle und den Adressaten einer Nachforderung; beide speichern nur Text (Speicherform
 //! A). Herleitung: `openspec/changes/archive/2026-10-11-lfh-1194-externe-stellen-katalog/design.md`.
 
+pub mod kanal;
 pub mod repo;
 
 use crate::wire_enum::wire_enum;
@@ -31,6 +32,49 @@ wire_enum! {
         Sonstige => "sonstige",
     }
     try_from = |s| format!("Ungültige Art einer externen Stelle: {s}");
+}
+
+wire_enum! {
+    /// Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
+    /// Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
+    /// angenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum KanalArt {
+        Email => "email",
+        Fax => "fax",
+        Matrix => "matrix",
+        Threema => "threema",
+    }
+    try_from = |s| format!("Ungültiger Kanal: {s}");
+}
+
+impl KanalArt {
+    /// Ob API und Oberfläche den Kanal annehmen. Heute nur E-Mail.
+    pub fn is_freigeschaltet(self) -> bool {
+        matches!(self, KanalArt::Email)
+    }
+}
+
+/// Eine Kanaladresse einer externen Stelle. Wire englisch, Rust-Feld = Wire-Feld.
+#[derive(Debug, Clone, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ExterneStelleKanal {
+    pub id: i64,
+    pub externe_stelle_id: i64,
+    #[sqlx(rename = "kanal", try_from = "String")]
+    pub channel: KanalArt,
+    #[sqlx(rename = "adresse")]
+    pub address: String,
+    #[sqlx(rename = "bezeichnung")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+/// Eine Kanaladresse samt ihrer Stelle, für die Auswahl im Senden-Dialog.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct KanalMitStelle {
+    pub channel: ExterneStelleKanal,
+    pub agency_id: i64,
+    pub agency_name: String,
 }
 
 /// Eine externe Stelle des Katalogs.

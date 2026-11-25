@@ -1112,3 +1112,41 @@ describe('LageberichtDetailPage — Stand der Übernahme (LLH-1357)', () => {
     );
   });
 });
+
+/** Senden per E-Mail (LLH-2093): Aktion neben „Fortschreiben“, nur freigegeben und mit Schreibrecht. */
+describe('LageberichtDetailPage — Senden (LLH-2093)', () => {
+  function lade(meineRolle: string) {
+    vi.mocked(einsaetzeApi.ladeEinsatz).mockResolvedValue({
+      id: 1,
+      status: 'aktiv',
+      meine_rolle: meineRolle,
+      bezeichnung: 'Übung',
+    } as never);
+    vi.mocked(lageberichteApi.ladeLagebericht).mockResolvedValue(bericht() as never);
+    server.use(
+      http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
+      http.get('/api/external-agencies/channels', () => HttpResponse.json([])),
+    );
+  }
+
+  it('zeigt „Senden“ neben „Fortschreiben“ am freigegebenen Bericht', async () => {
+    lade('einsatzleitung');
+    renderBei('/einsaetze/1/lageberichte/9');
+    expect(await screen.findByRole('button', { name: 'Senden' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
+  });
+
+  it('öffnet den Dialog mit dem Grund, wenn keine Mailadresse hinterlegt ist', async () => {
+    lade('einsatzleitung');
+    renderBei('/einsaetze/1/lageberichte/9');
+    await userEvent.click(await screen.findByRole('button', { name: 'Senden' }));
+    expect(await screen.findByText('Keine Mailadresse hinterlegt')).toBeInTheDocument();
+  });
+
+  it('blendet „Senden“ ohne Schreibrecht aus', async () => {
+    lade('beobachter');
+    renderBei('/einsaetze/1/lageberichte/9');
+    await screen.findByText('Freigegeben');
+    expect(screen.queryByRole('button', { name: 'Senden' })).toBeNull();
+  });
+});
