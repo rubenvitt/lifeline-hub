@@ -136,3 +136,23 @@ pub async fn anlage_entfernen(
 ) -> Result<StatusCode, AppError> {
     kern::anlage_entfernen::<Lagebericht>(&state, &benutzer, einsatz_id, lid, aid).await
 }
+
+/// POST /api/incidents/{id}/situation-reports/{lid}/deliveries — die freigegebene Fassung per
+/// E-Mail senden (LLH-2093). Schreibrecht + aktiv.
+pub async fn create_deliveries(
+    State(state): State<AppState>,
+    CurrentUser(benutzer): CurrentUser,
+    PfadParam((einsatz_id, lid)): PfadParam<(i64, i64)>,
+    JsonBody(body): JsonBody<crate::routes::ausgang::CreateDeliveriesBody>,
+) -> Result<(StatusCode, Json<Vec<crate::ausgang::Versand>>), AppError> {
+    let einsatz = kern::fordere_schreiben::<Lagebericht>(&state, &benutzer, einsatz_id).await?;
+    crate::routes::ausgang::anlegen_dokument(
+        &state,
+        benutzer.id,
+        &einsatz,
+        crate::ausgang::QuelleArt::Lagebericht,
+        lid,
+        body,
+    )
+    .await
+}

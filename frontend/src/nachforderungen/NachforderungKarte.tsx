@@ -1,5 +1,5 @@
 import { Button, Flex, Space, Typography, theme } from 'antd';
-import { memo, useId, type ReactNode } from 'react';
+import { memo, useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import type {
   Einheit,
@@ -51,6 +51,8 @@ import { zielZeile, type ZielAbschnitt, type ZielNamen, type ZielRaum } from './
 import { zusageZeilen } from './zusage';
 import ZusageFormular from './ZusageFormular';
 import BearbeitenFormular from './BearbeitenFormular';
+import SendenDialog from '../ausgang/SendenDialog';
+import Versandliste from '../ausgang/Versandliste';
 
 const { Text } = Typography;
 
@@ -92,7 +94,8 @@ export type KartenFormular = 'zusage' | 'bearbeiten';
  * Die Einträge des ⋮-Menüs: an einer offenen Karte Bearbeiten und die Abschlüsse (D10), an einer
  * eingetroffenen die Rücknahme des Eintreffens (LLH-1539).
  */
-type MenueAktion = 'bearbeiten' | 'zurueckziehen' | 'ablehnen' | 'eintreffen-zuruecknehmen';
+type MenueAktion =
+  'bearbeiten' | 'senden' | 'zurueckziehen' | 'ablehnen' | 'eintreffen-zuruecknehmen';
 
 /** Zustand eines aus dem Einsatz genommenen Postens, Wortlaut der Materialliste (LLH-1093). */
 const AUS_DEM_EINSATZ = 'aus dem Einsatz genommen';
@@ -436,6 +439,7 @@ function NachforderungKarte({
   const { token, rollen } = useRollen();
   const sperrgrundId = useId();
   const einheitSperrgrundId = useId();
+  const [sendenOffen, setSendenOffen] = useState(false);
   const status = NACHFORDERUNG_STATUS[n.status] ?? NACHFORDERUNG_STATUS.angefordert;
   const next = NAECHSTER[n.status];
   const abgelehnt = n.status === 'abgelehnt';
@@ -468,12 +472,17 @@ function NachforderungKarte({
     abschlussGesperrt
       ? { key, label: `${label} (${EINHEITEN_VERKNUEPFT})`, gefahr: true, gesperrt: true }
       : { key, label, gefahr: true };
+  // Senden per E-Mail (LLH-2093): jede Nachforderung, die nicht zurückgezogen oder abgelehnt ist
+  // (der Server lehnt sonst mit 422 ab); schreibt der Ausgangskorb, nicht die Nachforderung.
+  const sendenEintrag: MenueEintrag<MenueAktion> | null =
+    darfSchreiben && !abgelehnt && !zurueckgezogen ? { key: 'senden', label: 'Senden' } : null;
   const menue: MenueEintrag<MenueAktion>[] =
     darfSchreiben && n.ist_offen
       ? [
           ...(onFormular && onBearbeiten
             ? [{ key: 'bearbeiten' as const, label: 'Bearbeiten' }]
             : []),
+          ...(sendenEintrag ? [sendenEintrag] : []),
           ...(onZurueckziehen ? [abschluss('zurueckziehen', 'Zurückziehen')] : []),
           ...(onAblehnen ? [abschluss('ablehnen', 'Ablehnen')] : []),
         ]
@@ -481,7 +490,8 @@ function NachforderungKarte({
   // Gesperrt, wo der Server die Rücknahme ablehnt (übernommenes Material, verknüpfte Einheit).
   const eintreffenSperre = n.status === 'eingetroffen' ? ruecknahmeSperre(n) : null;
   const waehle = (key: MenueAktion) => {
-    if (key === 'eintreffen-zuruecknehmen') {
+    if (key === 'senden') setSendenOffen(true);
+    else if (key === 'eintreffen-zuruecknehmen') {
       if (eintreffenSperre == null) onStatus?.(n.id, 'unterwegs');
     } else if (key === 'bearbeiten') onFormular?.(n.id, 'bearbeiten');
     else if (abschlussGesperrt) return;
@@ -574,10 +584,15 @@ function NachforderungKarte({
             gesperrt: true,
           }
       : null;
+  // Am eingetroffenen Satz hängt „Senden“ am Menü der Rücknahme (kein offenes Menü dort).
+  const sendenAmEingetroffenen = eingetroffen && sendenEintrag ? sendenEintrag : null;
   const kartenAktionen: KartenAktion[] = [
     ...(fortschalten ? [{ ...fortschalten, ...(laeuft ? { gesperrt: true as const } : {}) }] : []),
     ...[einheitAktion, materialAktion, zuordnenAktion].filter((a) => a != null),
     ...menueAktionen,
+    ...(sendenAmEingetroffenen
+      ? [{ ...sendenAmEingetroffenen, onWahl: () => waehle('senden') }]
+      : []),
     ...(ruecknahmeEintrag
       ? [
           {
@@ -621,7 +636,7 @@ function NachforderungKarte({
     ruecknahmeEintrag ? (
       <MenueAusloeser<MenueAktion>
         key="ruecknahme"
-        eintraege={[ruecknahmeEintrag]}
+        eintraege={[ruecknahmeEintrag, ...(sendenAmEingetroffenen ? [sendenAmEingetroffenen] : [])]}
         zugaenglicherName={`Aktionen zu Nachforderung ${name}`}
         laeuft={laeuft}
         onWahl={waehle}
@@ -785,6 +800,22 @@ function NachforderungKarte({
         <Space size="middle" wrap style={{ marginTop: token.marginSM, width: '100%' }}>
           {aktionen}
         </Space>
+      )}
+      {/* Versand (LLH-2093): nur mit mindestens einem Versand. */}
+      <Versandliste
+        einsatzId={n.einsatz_id}
+        quelle={{ kind: 'nachforderung', id: n.id }}
+        darfSchreiben={!!darfSchreiben}
+      />
+      {sendenOffen && (
+        <SendenDialog
+          offen
+          onClose={() => setSendenOffen(false)}
+          einsatzId={n.einsatz_id}
+          quelle={{ kind: 'nachforderung', id: n.id }}
+          vorschlagNamen={n.adressat_bezeichnung ? [n.adressat_bezeichnung] : []}
+          vorschauText={[nachforderungName(n), n.begruendung ?? ''].join('\n')}
+        />
       )}
       {kontextMenue}
     </KommKarte>

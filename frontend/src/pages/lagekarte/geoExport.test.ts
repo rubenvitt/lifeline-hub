@@ -1,4 +1,7 @@
+import { theme, type GlobalToken } from 'antd';
 import { describe, expect, it } from 'vitest';
+import { rollenFarbe, type Statusrolle } from '../../theme/statusFarben';
+import { antdAlgorithmus, antdToken, farbenDunkel, farbenHell } from '../../theme/tokens';
 import {
   EXPORT_MARKER_ARTEN,
   GEFAHR_EXPORT_FARBE,
@@ -43,8 +46,18 @@ function marker(typ: MarkerTyp, teil: Partial<KarteMarker> = {}): KarteMarker {
   };
 }
 
+function modusToken(dunkel: boolean): GlobalToken {
+  return theme.getDesignToken({
+    token: antdToken(dunkel ? farbenDunkel : farbenHell),
+    algorithm: antdAlgorithmus(dunkel),
+  });
+}
+const TAG = modusToken(false);
+const NACHT = modusToken(true);
+
 function eingabe(teil: Partial<ExportEingabe> = {}): ExportEingabe {
   return {
+    token: TAG,
     marker: [],
     flaechen: [],
     zonen: [],
@@ -139,6 +152,29 @@ describe('collectExportObjekte', () => {
   it('ein Marker ohne Zeichen trägt kein zeichen, aber seine Farbe als Hex', () => {
     const [o] = collectExportObjekte(eingabe({ marker: [marker('uhs', { farbe: '#555' })] }));
     expect(o.zeichen).toBeUndefined();
+    expect(o.stil.markerFarbe).toBe('#555555');
+  });
+
+  it('Rollenfarben der Marker: nachts exportiert dieselben Farben wie am Tag (LLH-2133)', () => {
+    const rollen: Statusrolle[] = ['alarm', 'achtung', 'normal', 'bedien', 'marke'];
+    const farben = (token: GlobalToken) =>
+      collectExportObjekte(
+        eingabe({
+          token,
+          marker: rollen.map((r, i) =>
+            marker('uhs', { schluessel: `uhs-${i}`, farbe: rollenFarbe(r, token) }),
+          ),
+        }),
+      ).map((o) => o.stil.markerFarbe);
+    const tag = farben(TAG);
+    expect(farben(NACHT)).toEqual(tag);
+    expect(tag).toEqual(rollen.map((r) => rollenFarbe(r, TAG).toLowerCase()));
+  });
+
+  it('feste Markerfarben bleiben nachts unverändert', () => {
+    const [o] = collectExportObjekte(
+      eingabe({ token: NACHT, marker: [marker('uhs', { farbe: '#555' })] }),
+    );
     expect(o.stil.markerFarbe).toBe('#555555');
   });
 

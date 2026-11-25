@@ -642,3 +642,70 @@ async fn neues_ziel_entfernt_die_geheimnisse() {
         ["adapter_geaendert", "adapter_geheimnis_entfernt"]
     );
 }
+
+#[tokio::test]
+async fn geaenderter_host_entfernt_passwort() {
+    let (app, pool, _art, admin) = setup().await;
+    let (_, a) = anlegen(
+        &app,
+        &admin,
+        json!({ "art": "test", "name": "Mail", "einstellungen": { "server": "A.Example.org" } }),
+    )
+    .await;
+    assert_eq!(a["einstellungen"]["server"], "a.example.org");
+    let id = a["id"].as_str().unwrap().to_string();
+    let pfad = format!("{LISTE}/{id}");
+    anfrage_json(
+        &app,
+        "PUT",
+        &geheimnis_pfad(&id),
+        &admin,
+        Some(&json!({ "wert": TOKEN })),
+    )
+    .await;
+
+    // Gleicher Host in anderer Schreibweise: das Geheimnis bleibt.
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "einstellungen": { "server": "a.example.org", "gruppe": "x" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["geheimnisse"][0]["is_gesetzt"], true);
+
+    // Ein Host mit Port ist kein Host (400).
+    let (s, _) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "einstellungen": { "server": "b.example.org:25" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    // Anderer Host: das Geheimnis ist weg.
+    let (s, c) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "einstellungen": { "server": "b.example.org" } })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{c}");
+    assert_eq!(c["geheimnisse"][0]["is_gesetzt"], false);
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM adapter_geheimnis")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+    let aktionen: Vec<String> = spur(&pool).await.into_iter().map(|z| z.0).collect();
+    assert_eq!(
+        &aktionen[aktionen.len() - 2..],
+        ["adapter_geaendert", "adapter_geheimnis_entfernt"]
+    );
+}

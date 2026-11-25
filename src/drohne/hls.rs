@@ -160,7 +160,7 @@ impl AdapterArt for HlsAdresseArt {
                 kontext.adapter_id,
                 erg,
                 &playlist_url,
-                kontext.is_lan_erlaubt(),
+                kontext.lan_erlaubt(),
             )?;
             if probe {
                 return Ok(Box::new(OhneUebernahme(videos.len() as i64)) as Box<dyn Uebernahme>);

@@ -27,6 +27,7 @@ use super::repo::{self, Adapter, Versuch};
 use super::ziel::AbrufKontext;
 use super::zustand::{meldung_nach_fehlschlag, nach_fehlschlag, AdapterFehler, AdapterGemeldet};
 use super::Rahmen;
+use crate::ausgang::AusgangFehler;
 use crate::benachrichtigung::{self, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug};
 use crate::error::AppError;
 use crate::live::LiveHub;
@@ -266,6 +267,106 @@ pub(super) async fn prepare(
         einstellungen,
         geheimnisse,
     }))
+}
+
+/// Was der Ausgangskorb zum Zustellen einer Mail braucht (LLH-2093, Spec Abschnitt 3): die
+/// geprüften Einstellungen und die entschlüsselten Geheimnisse der SMTP-Anbindung der Org. Lebt
+/// nur für eine Zustellung im Speicher; `Debug` nennt keine Geheimnisse.
+pub struct Versandzugang {
+    pub einstellungen: Map<String, Value>,
+    pub geheimnisse: HashMap<String, SecretString>,
+    pub lan_erlaubt: bool,
+    pub adapter_id: String,
+}
+
+impl Versandzugang {
+    fn text(&self, name: &str) -> Option<&str> {
+        self.einstellungen
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|t| !t.is_empty())
+    }
+
+    /// Die Absenderadresse, wie gespeichert (getrimmt, noch nicht normalisiert).
+    pub fn absender(&self) -> Option<&str> {
+        self.text("absender")
+    }
+
+    /// Der Anzeigename des Absenders, falls gesetzt.
+    pub fn absender_name(&self) -> Option<&str> {
+        self.text("absender_name")
+    }
+}
+
+impl std::fmt::Debug for Versandzugang {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut plaetze: Vec<&str> = self.geheimnisse.keys().map(String::as_str).collect();
+        plaetze.sort_unstable();
+        f.debug_struct("Versandzugang")
+            .field("adapter_id", &self.adapter_id)
+            .field("lan_erlaubt", &self.lan_erlaubt)
+            .field("einstellungen", &self.einstellungen)
+            .field("geheimnisse", &plaetze)
+            .finish()
+    }
+}
+
+/// Prüft beim Anlegen eines Versands nur, ob die Org einen Mailserver hat, den ein Versand
+/// nutzen darf: Anbindung vorhanden, nicht angehalten, Org nicht an einem Hub (LLH-2093). Liest
+/// nur die Zeile der Anbindung und ihren Zustand; Geheimnisse werden **nicht** entschlüsselt,
+/// das tut allein der Lauf über [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
+pub async fn pruefe_versand_moeglich(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    org_id: i64,
+) -> Result<Result<(), AusgangFehler>, AppError> {
+    if is_org_am_hub(pool, org_id).await? {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    }
+    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    if a.is_angehalten() {
+        return Ok(Err(AusgangFehler::AnbindungAngehalten));
+    }
+    if rahmen.arten.find(&a.art).is_none() {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    }
+    Ok(Ok(()))
+}
+
+/// Der Zugang zur SMTP-Anbindung einer Org für einen Versand (LLH-2093, Spec Abschnitt 2):
+/// `AnbindungFehlt` ohne Anbindung (oder wenn die Org sich bei einem Hub meldet),
+/// `AnbindungAngehalten`, wenn sie angehalten ist (gestört ist erlaubt), `AnbindungFehler`, wenn
+/// Einstellungen oder Geheimnisse nicht taugen. Liest Geheimnisse über denselben Weg wie der
+/// Lauf ([`prepare`]); ändert an der Anbindung nichts. Kein Netz; keine Verbindung danach.
+pub async fn zugang_fuer_versand(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    org_id: i64,
+) -> Result<Result<Versandzugang, AusgangFehler>, AppError> {
+    if is_org_am_hub(pool, org_id).await? {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    }
+    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    if a.is_angehalten() {
+        return Ok(Err(AusgangFehler::AnbindungAngehalten));
+    }
+    let Some(art) = rahmen.arten.find(&a.art).cloned() else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    Ok(match prepare(pool, rahmen, &*art, &a).await? {
+        Ok(v) => Ok(Versandzugang {
+            einstellungen: v.einstellungen,
+            geheimnisse: v.geheimnisse,
+            lan_erlaubt: a.lan_erlaubt,
+            adapter_id: a.id,
+        }),
+        Err(_) => Err(AusgangFehler::AnbindungFehler),
+    })
 }
 
 /// Ergebnis eines Abrufs ohne Übernahme (Probelauf) oder vor ihr.

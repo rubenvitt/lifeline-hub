@@ -65,6 +65,14 @@ pub enum AppError {
         meldung: String,
         zeilen: Vec<ZeilenGrund>,
     },
+    /// 422 mit maschinenlesbarem Grund (LLH-2093): `{error, grund}`, additiv zum Umschlag wie
+    /// [`AppError::Veraltet`] und [`AppError::NichtInListe`]. Der Client liest `grund` aus jedem
+    /// Fehlerkörper (`frontend/src/api/client.ts`); heute nur der Ausgangskorb
+    /// (`ausgang::AusgangFehler::as_str`), etwa „Kein Mailserver eingerichtet“.
+    UnprocessableGrund {
+        meldung: String,
+        grund: &'static str,
+    },
     /// Die Person steht in keiner Liste dieser Sitzung (404, LLH-1682, Change
     /// `l3vfnpdz-personen-zeilenabgleich` D4): `{error, grund: "nicht_in_liste"}`. Additiv zum
     /// Umschlag wie [`AppError::Zeilen`], damit der Client sie vom 404 einer unbekannten Route
@@ -163,6 +171,7 @@ impl std::fmt::Display for AppError {
                 "Der Datensatz wurde zwischenzeitlich geändert. Bitte neu laden."
             ),
             AppError::UnprocessableEntity(m) => write!(f, "{m}"),
+            AppError::UnprocessableGrund { meldung, .. } => write!(f, "{meldung}"),
             AppError::Database(e) => write!(f, "Datenbankfehler: {e}"),
             AppError::Internal(m) => write!(f, "{m}"),
             AppError::NotImplemented(m) => write!(f, "{m}"),
@@ -204,7 +213,9 @@ impl AppError {
             AppError::NotFound | AppError::NichtInListe => StatusCode::NOT_FOUND,
             AppError::Validation(_) => StatusCode::BAD_REQUEST,
             AppError::Conflict(_) | AppError::Veraltet => StatusCode::CONFLICT,
-            AppError::UnprocessableEntity(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            AppError::UnprocessableEntity(_) | AppError::UnprocessableGrund { .. } => {
+                StatusCode::UNPROCESSABLE_ENTITY
+            }
             // Sicherheitsnetz: nicht vorab abgefangene Constraint-Verletzungen bekommen einen
             // fachlichen
             // Statuscode statt 500.
@@ -356,6 +367,9 @@ impl IntoResponse for AppError {
             )
                 .into_response();
         }
+        if let AppError::UnprocessableGrund { meldung, grund } = self {
+            return (status, Json(json!({ "error": meldung, "grund": grund }))).into_response();
+        }
         if let AppError::Veraltet = self {
             let message = self.public_message();
             return (
@@ -454,6 +468,20 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(json["error"], "Die Datei ist zu groß (höchstens 10 MB).");
         assert_eq!(json["grund"], "zu_gross");
+    }
+
+    #[tokio::test]
+    async fn unprocessable_grund_ist_422_mit_grund() {
+        let resp = AppError::UnprocessableGrund {
+            meldung: "Kein Mailserver eingerichtet".into(),
+            grund: "anbindung_fehlt",
+        }
+        .into_response();
+        assert_eq!(resp.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(json["error"], "Kein Mailserver eingerichtet");
+        assert_eq!(json["grund"], "anbindung_fehlt");
     }
 
     #[tokio::test]

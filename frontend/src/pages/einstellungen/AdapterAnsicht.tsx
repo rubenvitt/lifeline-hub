@@ -301,7 +301,7 @@ export default function AdapterAnsicht() {
       ? art.felder.map((f): BearbeitbaresFeld<Werte> => ({
           name: feldName(f.name),
           label: f.bezeichnung,
-          breit: f.typ === 'url',
+          breit: f.typ === 'url' || f.typ === 'host',
           mono: f.typ !== 'text',
           anzeige: einstellungen[f.name] != null ? String(einstellungen[f.name]) : '—',
           eingabe:

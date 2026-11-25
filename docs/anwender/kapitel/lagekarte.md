@@ -2,7 +2,7 @@
 titel: Lagekarte, Zeichnen und Messen
 gruppen: [alle, fuehrung]
 reihenfolge: 410
-quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs, frontend/src/pages/lagekarte/CopernicusBilderZusatz.tsx, frontend/src/pages/lagekarte/copernicusBildLayer.ts, src/karte/copernicus_bilder.rs, frontend/src/pages/lagekarte/useGeoExport.ts, frontend/src/pages/lagekarte/geoExport.ts, frontend/src/pages/lagekarte/geojsonWriter.ts, frontend/src/pages/lagekarte/kmlWriter.ts, frontend/src/pages/lagekarte/kmzPacker.ts, frontend/src/pages/lagekarte/zeichenPng.ts, frontend/src/pages/lagekarte/FremdebeneDialog.tsx, frontend/src/pages/lagekarte/FremdebenenZeilen.tsx, frontend/src/pages/lagekarte/FremdebeneDetail.tsx, frontend/src/pages/lagekarte/useFremdebenen.ts, frontend/src/pages/lagekarte/fremdebenenLayer.ts, frontend/src/api/fremdebenen.ts, src/routes/karte_fremdebene.rs, src/karte_fremdebene/mod.rs, src/karte_fremdebene/abruf.rs, src/karte_fremdebene/einlesen/, frontend/src/pages/lagekarte/geortet.ts]
+quellen: [frontend/src/pages/LagekartePage.tsx, frontend/src/pages/lagekarte/Sidebar.tsx, frontend/src/pages/lagekarte/MarkerSuche.tsx, frontend/src/pages/lagekarte/objektsuche.ts, frontend/src/pages/lagekarte/Ebenenbaum.tsx, frontend/src/pages/lagekarte/ModusBand.tsx, frontend/src/pages/lagekarte/BildHintergruende.tsx, frontend/src/pages/lagekarte/leistenWahl.ts, frontend/src/pages/lagekarte/kamera.ts, frontend/src/pages/lagekarte/KartenUeberlagerung.tsx, frontend/src/pages/lagekarte/leistenDaten.ts, frontend/src/pages/lagekarte/MessSteuerung.tsx, frontend/src/pages/lagekarte/ZeichnenSteuerung.tsx, frontend/src/pages/lagekarte/zeichnenEsc.ts, frontend/src/pages/lagekarte/FreiesZeichenPicker.tsx, frontend/src/pages/lagekarte/Werkzeugmenue.tsx, frontend/src/pages/lagekarte/werkzeugZeilen.ts, frontend/src/pages/lagekarte/ZeichenWahlDialog.tsx, frontend/src/pages/lagekarte/PlatzierSteuerung.tsx, frontend/src/pages/lagekarte/useKartenInteraktion.ts, frontend/src/pages/lagekarte/verortungsauftrag.ts, frontend/src/pages/lagekarte/klickziel.ts, frontend/src/pages/lagekarte/kontextmenue.ts, frontend/src/pages/lagekarte/zeichenWahl.ts, frontend/src/pages/lagekarte/FreiesZeichenInspector.tsx, frontend/src/zeichen/freiesZeichen.ts, frontend/src/pages/lagekarte/taktischesZeichen.ts, frontend/src/pages/lagekarte/marker.ts, frontend/src/pages/lagekarte/brEbene.ts, frontend/src/pages/lagekarte/tierEbene.ts, frontend/src/pages/lagekarte/tierMarker.ts, frontend/src/pages/lagekarte/sammelstelleMarker.ts, frontend/src/pages/lagekarte/geplantRing.ts, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/pages/lagekarte/basemapStil.ts, frontend/src/pages/lagekarte/useLageplan.ts, frontend/src/pages/lagekarte/kartenGrafik.ts, frontend/src/pages/lagekarte/Kartenflaeche.tsx, frontend/src/pages/lagekarte/lageplan.ts, frontend/src/pages/lagekarte/lageplanBild.ts, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/lagekarte/LageplanAnlageDialog.tsx, frontend/src/pages/lagekarte/abschnittFokus.ts, frontend/src/pages/lagekarte/useAbschnittFokus.ts, frontend/src/pages/lagekarte/FokusBand.tsx, frontend/src/pages/lagekarte/EinsatzortBand.tsx, frontend/src/pages/lagekarte/clusterDonut.ts, frontend/src/pages/lagekarte/Inspector.tsx, frontend/src/pages/lagekarte/markerIcons.ts, frontend/src/zeichen/zeichenTheme.ts, frontend/src/routing/deeplinks.ts, src/routes/karte.rs, src/routes/lage_zone.rs, src/vorlagendokument/anlage.rs, frontend/src/pages/lagekarte/KreisSteuerung.tsx, frontend/src/pages/lagekarte/kreisVorschau.ts, frontend/src/pages/lagekarte/ZonenInspector.tsx, frontend/src/pages/lagekarte/messung.ts, frontend/src/pages/lagekarte/BearbeitenSteuerung.tsx, frontend/src/pages/lagekarte/zonenBearbeitung.ts, frontend/src/pages/lagekarte/zonenBearbeitungKarte.ts, frontend/src/pages/lagekarte/messZeichnung.ts, frontend/src/pages/lagekarte/lageStand.ts, frontend/src/components/useFeldKonflikt.tsx, frontend/src/pages/lagekarte/CopernicusZusatz.tsx, src/karte/copernicus.rs, frontend/src/pages/lagekarte/CopernicusBilderZusatz.tsx, frontend/src/pages/lagekarte/copernicusBildLayer.ts, src/karte/copernicus_bilder.rs, frontend/src/pages/lagekarte/useGeoExport.ts, frontend/src/pages/lagekarte/geoExport.ts, frontend/src/pages/lagekarte/geojsonWriter.ts, frontend/src/pages/lagekarte/kmlWriter.ts, frontend/src/pages/lagekarte/kmzPacker.ts, frontend/src/pages/lagekarte/zeichenPng.ts, frontend/src/pages/lagekarte/FremdebeneDialog.tsx, frontend/src/pages/lagekarte/FremdebenenZeilen.tsx, frontend/src/pages/lagekarte/FremdebeneDetail.tsx, frontend/src/pages/lagekarte/FremdebeneUebernehmenDialog.tsx, frontend/src/pages/lagekarte/useFremdebeneUebernahme.ts, frontend/src/pages/lagekarte/fremdebeneUebernahme.ts, src/routes/freies_zeichen.rs, frontend/src/pages/lagekarte/useFremdebenen.ts, frontend/src/pages/lagekarte/fremdebenenLayer.ts, frontend/src/api/fremdebenen.ts, src/routes/karte_fremdebene.rs, src/karte_fremdebene/mod.rs, src/karte_fremdebene/abruf.rs, src/karte_fremdebene/einlesen/, frontend/src/pages/lagekarte/geortet.ts, frontend/src/pages/lagekarte/DrohnenQuelle.tsx, frontend/src/pages/lagekarte/DrohnenVideoFenster.tsx, frontend/src/pages/lagekarte/FachebenenInspector.tsx, frontend/src/pages/lagekarte/fachebenenLayer.ts, frontend/src/pages/lagekarte/fachebenen.ts, frontend/src/api/drohne.ts, src/routes/drohne.rs, src/drohne/]
 ---
 
 ## Überblick
@@ -216,6 +216,63 @@ Dritter auf der Karte, etwa Suchgebiete eines Nachbarkreises als GeoJSON, KML od
    Verbindung ist das Menü gesperrt, über den Zeilen steht dann „Ohne Verbindung nicht änderbar“.
 5. Ein Objekt einer Fremdebene auf der Karte antippen zeigt seinen Namen und seine Beschreibung
    unter „Fremde Daten“, nur zum Lesen.
+
+### Ein Objekt einer Fremdebene als eigene Zeichnung übernehmen
+
+Für alle, die in der Lagekarte zeichnen dürfen. Aus einem fremden Objekt wird eine Zeichnung des
+Einsatzes; sie bleibt, wenn die Fremdebene entfernt wird, und lässt sich wie jede andere ändern
+oder löschen.
+
+1. Das Objekt auf der Karte antippen. Die Karte unter „Fremde Daten“ öffnet sich.
+2. „Übernehmen …“ wählen.
+3. Bei einer Fläche die Art wählen: Gefahrengebiet (vorgewählt), Absperrbereich, Sperrgebiet oder
+   freie Skizze. Bei einer Linie: Absperrgrenze (vorgewählt) oder freie Skizze. Bei einem Punkt
+   öffnet sich die Zeichenwahl; dort das taktische Zeichen wählen.
+4. „Übernehmen“ bzw. „Platzieren“ wählen. Die App meldet „Objekt übernommen“.
+
+Name des Objekts wird die Bezeichnung, bei einer Zone stehen Herkunft und Beschreibung in der
+Notiz. Das ETB vermerkt die Herkunft, etwa „Gefahrengebiet «Brandfläche» eingerichtet
+(übernommen aus Fremdebene «Lage Kreis X», Datei)“. Ein Objekt aus mehreren Teilen wird zu einer
+Zeichnung je Teil, beschriftet „(1/3)“, „(2/3)“ und so fort; mehr als 20 Teile und Objekte, die
+Flächen, Linien und Punkte mischen, lassen sich nicht übernehmen. Bricht die Übernahme ab, nennt
+die Meldung, wie viele Teile schon angelegt sind.
+
+### Drohnenbild aus Suchlage zuschalten oder abschalten
+
+Für die Einsatzleitung in einem laufenden Einsatz. Voraussetzung ist eine Anbindung „Suchlage
+(Drohne)“ der Organisation (Kapitel [Anbindungen](anbindungen.md)).
+
+1. In der Leiste unter „Ebenen“ die Gruppe „Fachebenen“ und darin „Drohne“ aufklappen. Unter der
+   Ebene „Drohnenlage (Suchlage)“ steht je Drohnenquelle ihr Name und „Nicht zugeschaltet“.
+
+   ![Gruppe „Drohne“ mit der Quelle „Drohnengruppe Suchlage“, „Nicht zugeschaltet“ und dem Knopf „Suchlage zuschalten“](../bilder/lagekarte/drohne-zuschalten.png)
+
+2. „Suchlage zuschalten“ wählen. Die Zeile zeigt danach „Zugeschaltet · Mission …“ mit dem Namen
+   des laufenden Einsatzes in Suchlage.
+3. Die Ebene „Drohnenlage (Suchlage)“ antippen, um sie einzublenden; sie steht zunächst aus. Auf
+   der Karte erscheinen Fluggerät mit Blickrichtung, Flugspur, Suchgebiete und Fotos der Drohne.
+4. Zum Abschalten in derselben Zeile „Abschalten“ wählen. Die Zeile steht wieder auf „Nicht
+   zugeschaltet“, und die Drohnenlage verschwindet von der Karte.
+
+### Das Livebild der Drohne ansehen
+
+1. In der Leiste unter „Drohne“ an der zugeschalteten Quelle „Livebild“ wählen. Der Knopf steht
+   nur, solange Suchlage ein Video meldet.
+2. Über der Karte öffnet sich das Fenster „Livebild“ mit dem Bild der Drohne, ohne Ton. Karte und
+   Leiste bleiben bedienbar.
+
+   ![Fenster „Livebild“ mit dem Wärmebild der Drohne über der Karte, daneben Flugspur und Suchgebiet](../bilder/lagekarte/drohne-livebild.png)
+
+3. Das Kreuz oben rechts im Fenster schließt es.
+
+### Ein Foto der Drohne ansehen
+
+1. Bei eingeblendeter Ebene „Drohnenlage (Suchlage)“ auf der Karte einen Bildpunkt der Drohnenlage
+   antippen.
+2. Die Leiste zeigt unter „Auswahl“ die Vorschau des Fotos mit Linse, Aufnahmezeit und
+   Blickrichtung.
+
+   ![Auswahl eines Drohnenfotos mit Wärmebild-Vorschau, Linse, Aufnahmezeit und Blickrichtung](../bilder/lagekarte/drohne-foto.png)
 
 ## Hintergrund
 
@@ -544,13 +601,47 @@ der Lage, im Lagemonitor und im Lagebild extern erscheinen sie nicht.
 - **Verantwortung:** Fremde Daten sind nicht geprüft und nicht Teil des Lagebilds. Wer sie in
   der Lagedarstellung verwendet, verantwortet ihre Herkunft.
 
+### Drohnenbild aus Suchlage
+
+Suchlage führt die Drohnengruppe: Fluggeräte, Flüge, Suchgebiete, Livebild und Fotos. Lifeline
+Hub zeigt davon, was der laufende Einsatz in Suchlage meldet, auf der Lagekarte des Einsatzes, an
+dem die Quelle zugeschaltet ist.
+
+- **Ein Einsatz je Quelle:** Eine Drohnenquelle ist höchstens an einem laufenden Einsatz
+  zugeschaltet. Hält ein anderer sie, steht in der Zeile „Bereits an Einsatz … zugeschaltet“, ohne
+  Leserecht an diesem Einsatz „Bereits an einem anderen Einsatz zugeschaltet“, und kein Knopf.
+  Freigegeben wird sie dort mit „Abschalten“ oder mit dem Abschluss jenes Einsatzes. Zu- und
+  Abschalten stehen im Einsatztagebuch („Drohnenbild aus Suchlage zugeschaltet“ bzw.
+  „… abgeschaltet“).
+- **Was die Karte zeigt:** Fluggerät, Flugspuren und Suchgebiete des Einsatzes in Suchlage, auch
+  von Flügen vor dem Zuschalten. Fotos erscheinen erst ab dem Zuschalten; was die Drohne davor
+  aufgenommen hat, gehört nicht zu diesem Einsatz. Die Lage erneuert sich etwa alle 5 Sekunden.
+- **Nichts wird gespeichert:** Lage, Livebild und Fotos holt der Server von Suchlage und gibt sie
+  nur weiter. In der Datenbank steht nur, dass und seit wann die Quelle zugeschaltet ist. In einem
+  gesicherten Stand der Lage gibt es weder die Quellenzeile noch das Livebild.
+- **Seriennummern bleiben beim Server:** Fluggeräte, Videos und Fotos tragen im Browser eigene
+  Kennungen, nicht die Seriennummern von Fluggerät oder Fernsteuerung.
+- **Fotos:** Die Vorschau entfernt Metadaten wie Ort und Kamera, bevor sie den Browser erreicht.
+  Fotos liefert Suchlage nur, wenn der Großbild-Zugang „Fotos für Lifeline Hub“ trägt.
+- **Gestörte Anbindung:** Bringt kein Abruf einen neuen Stand, bleibt die letzte Lage auf der Karte;
+  nach einer Minute steht an der Ebene „veraltet · Stand …“ mit der Zeit des letzten Stands. Ohne
+  jeden Stand, etwa direkt nach einem Neustart, steht die Ebene auf „offline“. Ist die Anbindung angehalten, braucht sie einen
+  Eingriff oder ist Suchlage nicht erreichbar, zeigt das Fenster „Kein Livebild“ und die Auswahl
+  eines Fotos „Vorschau nicht abrufbar“. Kommt das Video zurück, startet das Fenster von selbst
+  neu. Eine Störung der Anbindung meldet der Server den Admins (Kapitel
+  [Anbindungen](anbindungen.md)).
+- **Instanzkopplung:** An einer Organisation, die sich bei einem anderen Server meldet, ruft keine
+  Anbindung ab; dort gibt es kein Drohnenbild.
+
 ### Rechte
 
 Lesen, Ebenen schalten, Messen und Exportieren gehen mit jeder Rolle. Verorten, Zeichnen, Zeichen
 setzen und Fremdebenen hinzufügen, ändern und entfernen brauchen das Schreibrecht im Einsatz:
 Einsatzleitung oder Führungspersonal in einem laufenden Einsatz (Kapitel
 [Rechte im Einsatz](rechte-im-einsatz.md)). Ohne Schreibrecht fehlt der Knopf „Zeichnen“, und
-„Fremdebene hinzufügen …“ steht nicht im Menü.
+„Fremdebene hinzufügen …“ steht nicht im Menü. Das Drohnenbild aus Suchlage schaltet nur die
+Einsatzleitung in einem laufenden Einsatz zu und ab; Drohnenlage, Livebild und Fotos sieht jede
+Person, die die Lagekarte des Einsatzes lesen darf.
 
 ### Bereitstellungsräume
 

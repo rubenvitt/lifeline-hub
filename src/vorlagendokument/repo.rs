@@ -440,15 +440,7 @@ pub async fn freigeben_tx<T: Dokumentart>(
     }
     let v = vorlage::<T>(&dok.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
     validiere_freigabe::<T>(v, &dok.abschnitte)?;
-    // LLH-1476: der Zeitstand in Zone und Darstellung des Einsatzes, gelesen auf derselben
-    // Verbindung (ein Import sieht so die Einstellungen seines noch offenen Einsatzes).
-    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
-    let mut render = render_snapshot(&stil, v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
-    // LFH-1028: die Anlagen stehen im selben Snapshot, gelesen in derselben Transaktion.
-    render.push_str(&super::anlage::snapshot_abschnitt::<T>(&mut *conn, einsatz_id, id).await?);
-    // LLH-1172: der Verteiler nach den Anlagen und als `an`; ohne Verteiler bleibt beides wie
-    // vorher (kein Abschnitt, `an` = „System“).
-    render.push_str(&super::verteiler::render_abschnitt(&dok.verteiler));
+    let render = render_freigabe::<T>(&mut *conn, einsatz_id, &dok).await?;
     let an = super::verteiler::build_an(&dok.verteiler);
     snapshot_freigeben_tx::<T>(
         &mut *conn,
@@ -461,6 +453,48 @@ pub async fn freigeben_tx<T: Dokumentart>(
     )
     .await?;
     laden::<T>(&mut *conn, einsatz_id, id).await
+}
+
+/// Rendert den Freigabe-Snapshot eines Dokuments: Vorlage, Abschnitte, Anlagen und Verteiler
+/// in Zone und Darstellung des Einsatzes, alles auf der übergebenen Verbindung. Derselbe Weg für
+/// den ETB-Eintrag der Freigabe ([`freigeben_tx`]) und die E-Mail des Ausgangskorbs
+/// (LLH-2093): eine freigegebene Fassung ist unveränderlich, also ergibt das beide Male
+/// denselben Text.
+pub async fn render_freigabe<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    dok: &Dokument<T::Abschnitt>,
+) -> Result<String, AppError> {
+    let v = vorlage::<T>(&dok.vorlage).ok_or(AppError::Internal("Vorlage verschwunden".into()))?;
+    // LLH-1476: der Zeitstand in Zone und Darstellung des Einsatzes, gelesen auf derselben
+    // Verbindung (ein Import sieht so die Einstellungen seines noch offenen Einsatzes).
+    let stil = crate::zeitdarstellung::zeitstil_laden(&mut *conn, einsatz_id).await?;
+    let mut render = render_snapshot(&stil, v, &dok.titel, &dok.zeitstand, &dok.abschnitte);
+    // LFH-1028: die Anlagen stehen im selben Snapshot, gelesen in derselben Transaktion.
+    render.push_str(&super::anlage::snapshot_abschnitt::<T>(&mut *conn, einsatz_id, dok.id).await?);
+    // LLH-1172: der Verteiler nach den Anlagen und als `an`; ohne Verteiler bleibt beides wie
+    // vorher (kein Abschnitt, `an` = „System“).
+    render.push_str(&super::verteiler::render_abschnitt(&dok.verteiler));
+    Ok(render)
+}
+
+/// Ob die Fassung `id` freigegeben und die jüngste freigegebene ihrer Kette ist (LLH-2093,
+/// dieselbe Bedingung wie [`quittierbar_column`]). `NotFound`, wenn sie nicht zum Einsatz gehört.
+pub async fn is_juengste_freigabe<T: Dokumentart>(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    id: i64,
+) -> Result<bool, AppError> {
+    sqlx::query_scalar::<_, bool>(sqlx::AssertSqlSafe(format!(
+        "SELECT {} FROM {} l WHERE l.id = ? AND l.einsatz_id = ?",
+        quittierbar_column::<T>("l"),
+        T::TABELLE
+    )))
+    .bind(id)
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)
 }
 
 /// Schreibt den fertig gerenderten Snapshot ins ETB, verknüpft beide Seiten und setzt das

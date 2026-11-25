@@ -22,6 +22,7 @@ export type Funktionsansicht = S['Funktionsansicht'];
 export type GeraetAnzeige = S['GeraetAnzeige'];
 export type LagemonitorAnzeige = S['LagemonitorAnzeige'];
 export type LagemonitorKachel = S['LagemonitorKachel'];
+export type LagemonitorDrohne = S['LagemonitorDrohne'];
 export type LagemonitorUhs = S['LagemonitorUhs'];
 export type LagemonitorZone = S['LagemonitorZone'];
 export type LagemonitorAbschnitt = S['LagemonitorAbschnitt'];
@@ -328,12 +329,25 @@ export interface ModulOverrideUpdate {
 
 // ============================== ETB ==============================
 export type EtbTyp = S['EtbTyp'];
+/** Quelle eines Versands im Ausgangskorb (LLH-2093). */
+export type QuelleArt = S['QuelleArt'];
 export type MeldeWeg = S['MeldeWeg'];
 export type EtbEintragAnzeige = S['EtbEintragAnzeige'];
 export type EtbBaustein = S['EtbBaustein'];
 /** Katalog „Externe Stellen“ (LFH-1194). */
 export type ExterneStelle = S['ExterneStelle'];
 export type ExterneStelleArt = S['ExterneStelleArt'];
+/** Mailadresse (und später weitere Kanäle) einer externen Stelle (LLH-2093). */
+export type ExterneStelleKanal = S['ExterneStelleKanal'];
+export type KanalArt = S['KanalArt'];
+/** Adresse samt Stelle, für die Auswahl im Senden-Dialog. */
+export type KanalMitStelle = S['KanalMitStelle'];
+/** Ein Versand des Ausgangskorbs, wie ihn die Versandliste zeigt (LLH-2093). */
+export type Versand = S['Versand'];
+export type VersandZustand = S['VersandZustand'];
+/** Fehlercode eines Versands und `grund` einer 422-Antwort beim Senden (LLH-2093). */
+export type AusgangFehler = S['AusgangFehler'];
+export type SendenAnfrage = S['CreateDeliveriesBody'];
 /** Eigener Lesestand im Tagebuch eines Einsatzes (LFH-611). */
 export type EtbLesemarke = S['EtbLesemarkeAnzeige'];
 /** Exakte Zahl der ETB-Einträge gesamt und je Typ, filtertreu zur Liste (LFH-612). */

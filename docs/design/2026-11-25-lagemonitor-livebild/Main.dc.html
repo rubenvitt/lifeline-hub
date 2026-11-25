@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Lagemonitor mit Livebild</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&amp;family=JetBrains+Mono:wght@500;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#8ec2f0}a:hover{color:#7db3e8}
+</style>
+</helmet>
+<div style="width: 1920px; height: 1080px; box-sizing: border-box; display: grid; grid-template-rows: minmax(0, 1fr) auto; background: #08090b; color: #e8ebee; font-family: Archivo, system-ui, sans-serif; overflow: hidden">
+  <main style="display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; padding: 16px; min-height: 0">
+    <div style="display: flex; flex-direction: column; gap: 16px; min-height: 0">
+      <section aria-label="Was brennt" style="background: #1c0a0d; border: 1px solid #22262b; border-radius: 8px; padding: 12px 24px; display: flex; gap: 32px; align-items: baseline; font-size: 28px; line-height: 1.2">
+        <span style="color: #ff6b6b; font-weight: 700">1 Rückmeldung überfällig</span>
+        <span style="color: #e8cc3a">Abschnitt Nord kritisch</span>
+      </section>
+      <section aria-label="Lagekarte" style="flex: 1 1 0; min-height: 0; background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Lagekarte</h2>
+        <div style="flex: 1 1 0; min-height: 0; border: 1px solid #22262b; background: #0d1014; display: grid; place-items: center; color: #9199a2; font-size: 28px">[Karte wie heute: Einsatzort, UHS, Zonen, Abschnitte]</div>
+      </section>
+      <div style="display: flex; gap: 16px; height: 440px; min-width: 0">
+        <section aria-label="Livebild" style="flex: 0 0 734px; background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box">
+          <div style="display: flex; align-items: baseline; gap: 24px">
+            <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Livebild</h2>
+            <span style="margin-left: auto; font-size: 28px; line-height: 1.2; font-family: 'JetBrains Mono', monospace; color: {{standFarbe}}; white-space: nowrap">{{stand}}</span>
+          </div>
+          <sc-if value="{{bild}}" hint-placeholder-val="{{ true }}">
+            <div style="flex: 1 1 0; min-height: 0; background: #000000; display: grid; place-items: center; color: #9199a2; font-size: 28px; aspect-ratio: 16 / 9">[Videobild der Drohne, 16 : 9, stumm, ohne Bedienung]</div>
+          </sc-if>
+          <sc-if value="{{kein}}" hint-placeholder-val="{{ false }}">
+            <div style="flex: 1 1 0; min-height: 0; background: #0d1014; border: 1px solid #22262b; display: grid; place-items: center; color: #c6ccd2; font-size: 28px">Kein Livebild</div>
+          </sc-if>
+        </section>
+        <div style="flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <section aria-label="Meldungen" style="background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Sofortmeldungen</h2>
+            <span style="font-size: 72px; line-height: 1; font-family: 'JetBrains Mono', monospace; font-weight: 700">2</span>
+          </section>
+          <section aria-label="Ablauf" style="flex: 1 1 0; min-height: 0; background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+            <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Ablauf</h2>
+            <div style="font-size: 28px; line-height: 1.2"><span style="font-family: 'JetBrains Mono', monospace">1800</span> <span style="color: #9fa7b0">in 22 min</span></div>
+            <div style="font-size: 28px; line-height: 1.2; overflow-wrap: anywhere">Lagebesprechung</div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 16px; min-height: 0">
+      <section aria-label="Betroffene" style="background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Betroffene</h2>
+        <span style="font-size: 96px; line-height: 1; font-family: 'JetBrains Mono', monospace; font-weight: 700">14</span>
+        <div style="display: flex; gap: 32px; font-size: 28px; font-family: 'JetBrains Mono', monospace"><span>SK I 2</span><span>SK II 5</span><span>SK III 7</span></div>
+      </section>
+      <section aria-label="Kräfte" style="background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+        <div style="display: flex; align-items: baseline"><h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Kräfte</h2><span style="margin-left: auto; font-size: 28px">9 an UHS</span></div>
+        <span style="font-size: 96px; line-height: 1; font-family: 'JetBrains Mono', monospace; font-weight: 700">38</span>
+      </section>
+      <section aria-label="Belegung" style="flex: 1 1 0; min-height: 0; background: #151719; border: 1px solid #22262b; border-radius: 8px; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 32px; line-height: 1.2; font-weight: 600; color: #9fa7b0">Belegung</h2>
+        <div style="font-size: 28px; line-height: 1.4">UHS 1 · 6 / 10<br>UHS 2 · 3 / 8</div>
+      </section>
+    </div>
+  </main>
+  <footer style="display: flex; gap: 32px; align-items: baseline; padding: 12px 24px; background: #151719; border-top: 1px solid #22262b; font-size: 28px; line-height: 1.2">
+    <span style="font-weight: 600">Vermisstensuche Waldsee</span>
+    <span style="color: #9fa7b0">Stand <span style="font-family: 'JetBrains Mono', monospace">1742</span></span>
+    <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace">1743</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"zustand":{"editor":"enum","options":["bild","kein"],"default":"bild"},"$preview":{"width":1920,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const z = this.props.zustand ?? 'bild';
+    return {
+      bild: z === 'bild',
+      kein: z === 'kein',
+      stand: z === 'bild' ? 'Stand 1742' : 'Stand 1731',
+      standFarbe: z === 'bild' ? '#e8ebee' : '#e8cc3a',
+    };
+  }
+}
+</script>
+</body>
+</html>

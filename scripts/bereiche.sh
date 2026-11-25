@@ -117,6 +117,13 @@ bereiche_von() {
     # und prüft App-Symbol und Startfarbe der iOS-App mit der Bildmarke (marke.guard.test.ts).
     ios/App/Huelle/* | ios/App/Assets.xcassets/*)
       echo "frontend ios" ;;
+    # Der Marken-Wächter hält die Bildmarke der Helfer-App auf der Geometrie der Oberfläche und
+    # verbietet Kreuze als Markenzeichen (marke.guard.test.ts, „Bildmarke — Helfer-App“).
+    ios/HelferKern/Sources/HelferKern/Bildmarke.swift | ios/Helfer/*)
+      echo "frontend ios" ;;
+    android/helferkern/src/main/kotlin/dev/rubeen/lifeline/helferkern/Bildmarke.kt | \
+      android/helfer/src/main/kotlin/dev/rubeen/lifeline/helfer/seiten/Bausteine.kt)
+      echo "frontend android" ;;
     # ── Keine schwere Suite ───────────────────────────────────────────────────────────
     # Marketing-Seite (eigener Build, LFH-1111), Doku, Pläne, Agenten-Werkzeug. Markdown
     # liest keine Suite; Prettier über `frontend/` und `website/` läuft in den Schnellprüfungen.

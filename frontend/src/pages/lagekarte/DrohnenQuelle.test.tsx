@@ -165,4 +165,50 @@ describe('DrohnenQuelle (LLH-2106)', () => {
     expect(await screen.findByText(/Zugeschaltet/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Livebild' })).toBeNull();
   });
+  describe('Schalter „Livebild auf dem Lagemonitor“ (LLH-2109)', () => {
+    const AUS = 'Aus (Vorgabe): das Großbild zeigt kein Livebild.';
+    const AN = 'Das Großbild zeigt das Livebild; Personen im Bild sind dort sichtbar.';
+
+    it('schaltet das Livebild auf den Lagemonitor, Vorgabe aus', async () => {
+      api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true })]);
+      api.schalteDrohnenQuelleZu.mockResolvedValue(quelle({ connected: true, lagemonitor: true }));
+      renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
+      const schalter = await screen.findByRole('switch', { name: 'Livebild auf dem Lagemonitor' });
+      expect(schalter).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText(AUS)).toBeInTheDocument();
+      fireEvent.click(schalter);
+      await waitFor(() =>
+        expect(api.schalteDrohnenQuelleZu).toHaveBeenCalledWith(7, 'suchlage-1', true),
+      );
+    });
+
+    it('nennt eingeschaltet die Personen im Bild und schaltet wieder aus', async () => {
+      api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true, lagemonitor: true })]);
+      api.schalteDrohnenQuelleZu.mockResolvedValue(quelle({ connected: true }));
+      renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
+      const schalter = await screen.findByRole('switch', { name: 'Livebild auf dem Lagemonitor' });
+      expect(schalter).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByText(AN)).toBeInTheDocument();
+      fireEvent.click(schalter);
+      await waitFor(() =>
+        expect(api.schalteDrohnenQuelleZu).toHaveBeenCalledWith(7, 'suchlage-1', false),
+      );
+    });
+
+    it('zeigt ohne Schaltrecht nur den Zustand', async () => {
+      api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true, lagemonitor: true })]);
+      renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten={false} />);
+      expect(await screen.findByText(AN)).toBeInTheDocument();
+      expect(screen.queryByRole('switch')).toBeNull();
+    });
+
+    it('fehlt an einer nicht zugeschalteten Quelle', async () => {
+      renderMitProviders(<DrohnenQuelle einsatzId={7} darfSchalten />);
+      expect(
+        await screen.findByRole('button', { name: 'Suchlage zuschalten' }),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('switch')).toBeNull();
+      expect(screen.queryByText(AUS)).toBeNull();
+    });
+  });
 });

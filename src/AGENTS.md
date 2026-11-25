@@ -282,7 +282,9 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
   (LLH-2025); sonst ändert nichts ein Chiffrat, ohne den Wert neu zu setzen.
   Ein PATCH, der ein neues Ziel einträgt (`art::has_neues_ziel`: anderer oder neuer Host einer
-  URL), entfernt die Geheimnisse; eine neue Art mit URL-Feldern erbt das, ohne eigenen Code.
+  URL oder eines `Host`-Felds), entfernt die Geheimnisse; eine neue Art mit URL- oder Host-Feldern
+  erbt das, ohne eigenen Code. `Host` (`ziel::check_host`) ist ein Name oder eine IP ohne Schema,
+  Port und Pfad; ein Name wird erst beim Verbinden aufgelöst und geprüft.
 - **Fehlercodes:** ein neuer Code kommt in `AdapterFehler` samt Einteilung in
   `zustand::braucht_eingriff` und Enum-Kontrakt; ein Text des Ziels wird nie gespeichert. Seine
   Bezeichnung für die Meldung steht in `benachrichtigung::adapter::fehler_text`, gleichlautend mit
@@ -318,6 +320,10 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   nachgeführt (`set_zugeschaltet`, bei `false` wird der Stand geleert). „Laufend“ heißt
   `einsatz.status = 'aktiv'` (wie `fordere_aktiv`, ohne Nachlauffrist). Ein Adapter hängt an
   höchstens einem laufenden Einsatz (`find_active_holder`); ein abgeschlossener zählt nicht mehr.
+- **Versandweg** (LLH-2093): Eine Art darf außer dem Abruf auch einen Versandweg haben (heute
+  `smtp`, `adapter::smtp_art`). Das Geheimnis entschlüsselt dafür allein
+  `adapter::lauf::zugang_fuer_versand` (neben dem Lauf); der Ausgangskorb hält es nur für die
+  Dauer einer Zustellung. Regeln: Abschnitt „Ausgang an Menschen“.
 
 ## Anhänge
 
@@ -449,6 +455,59 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt
   sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
   `--heic-decoder-verzeichnis` genau diese zwei Namen.
+
+## Ausgang an Menschen (LLH-2093)
+
+Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbindung
+`src/adapter/smtp.rs` und `smtp_art.rs`, Routen `src/routes/ausgang.rs`
+([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
+- **Nur ein Mensch löst aus:** Absenden am freigegebenen Dokument (`POST …/deliveries`) oder
+  „Erneut senden“. Kein Ereignis, Webhook oder Adapterlauf legt einen Versand an; Webhooks
+  (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.
+- **Eine Zeile je Adresse, mit Schnappschuss** (`betreff`, `inhalt`, `stelle_bezeichnung`,
+  `adresse`). „Erneut senden“ sendet den Schnappschuss, nicht die neuere Fassung. `client_id`
+  macht das Absenden idempotent (`UNIQUE(org_id, client_id)`); vorhandene Versände einer
+  wiederholten Anfrage kommen **vor** den Zustandsprüfungen zurück, geprüft wird nur, was neu
+  angelegt wird.
+- **Lauf ohne Datenbankverbindung während SMTP:** fällige Zeile lesen, Verbindung zurückgeben,
+  zustellen; Ergebnis und ETB-Eintrag in **einer** Transaktion (`write_retry!`),
+  `live.publiziere` und Einsatz-Ereignis erst **nach** dem Commit.
+- **Quellprüfung vor jeder Zustellung:** jüngste freigegebene Version (`is_juengste_freigabe`),
+  Nachforderung nicht zurückgezogen oder abgelehnt; sonst `fehlgeschlagen` mit `ueberholt` ohne
+  Netz. Auch „Erneut senden“ prüft das (422).
+- **Spiegel:** `ausgang` steht in `instanz::spiegel::art::AUSGENOMMEN`; am Spiegel lehnt das
+  Anlegen mit 422 `spiegel` ab, der Lauf setzt `fehlgeschlagen` mit `spiegel` **ohne** ETB-Eintrag
+  (am Spiegel gesperrt). Ein Versand ist nie halb: zugestellt und im ETB oder sichtbar
+  fehlgeschlagen. **Die eine Ausnahme:** scheitert nach einer Übergabe der ETB-Eintrag (etwa
+  weil der Einsatz während der Zustellung zum Spiegel wurde), bleibt der Versand `uebergeben`
+  ohne ETB-Eintrag und der Fehler steht im Log; eine übergebene Mail lässt sich nicht
+  zurückholen, die Versandliste zeigt sie als übergeben (Test
+  `spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb`).
+- **Wiederholung:** vorübergehende Fehler mit Backoff `30 s · 2^(n−1)`, gedeckelt auf 5 min,
+  höchstens **30 min** ab `erster_versuch_at`; dauerhafte Fehler sofort `fehlgeschlagen`.
+  `ungewiss` (Abbruch nach DATA, auch ein Absturz mitten in der Zustellung, `versuch_begonnen_at`)
+  wird **nie** selbst wiederholt. Einen Merker, der länger als `lauf::HAENGT_NACH` (Sitzung plus
+  Datenphase plus 2 min) steht und den kein laufender Versuch hält, schließt jeder Durchgang wie
+  der Neustart als `ungewiss` ab. Den Versuch beansprucht `repo::mark_begonnen`; ein Ergebnis
+  schreibt nur, wer den Merker hält, sonst kein ETB-Eintrag (keine Doppelzustellung).
+- **Fehlercodes:** Versandfehler sind `AusgangFehler` (`voruebergehend`, `abgelehnt`, `ungewiss`,
+  `ueberholt`, `anbindung_fehlt`, `anbindung_angehalten`, `anbindung_fehler`, `zu_gross`,
+  `spiegel`) mit Enum-Kontrakt und Text in `frontend/src/api/ausgang.ts`; die SMTP-Sitzung
+  nutzt die bestehenden `AdapterFehler` (535 → `abgelehnt`, TLS → `tls`). Ein 422 mit Grund ist
+  `AppError::UnprocessableGrund` (`{error, grund}`). Kein Text des Mailservers und kein
+  Geheimnis in Spalte, ETB, Log, Antwort oder Fehlertext.
+- **Geheimnis nur über `adapter::lauf::zugang_fuer_versand`, und das nur im Lauf;** das Anlegen
+  prüft die Anbindung mit `adapter::lauf::pruefe_versand_moeglich` (Zeile und Zustand, ohne
+  Entschlüsseln; ein unlesbares Geheimnis zeigt sich erst im Lauf). Keine zweite Tabelle für Zustand
+  oder Geheimnisse der Anbindung, `ausgang` hält Nachrichten. Der SMTP-Client ist
+  `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
+  `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
+- **Test-Zusteller nur für e2e:** `--ausgang-testzusteller` (versteckt, ohne Umgebungsvariable)
+  setzt `ausgang::zusteller::AufzeichnenderZusteller` statt SMTP ein; es gibt ihn nur im
+  Debug-Build (`testzusteller()`), ein Release-Binary beendet sich mit dem Schalter.
+- **Routen** bleiben unter `/api/incidents/{id}/…` (Segmente `deliveries`, `retry`): die
+  Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle
+  `org_externe_stelle_kanal` hat keine Änderungsspur (nicht Teil des ELW-Abgleichs).
 
 ## Backend — Schutzköpfe (LFH-797)
 
