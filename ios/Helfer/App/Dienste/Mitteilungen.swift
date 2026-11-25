@@ -62,7 +62,8 @@ final class Meldungsdelegat: NSObject, UNUserNotificationCenterDelegate {
 }
 
 /// Zwischen `Meldungsdelegat` und `HelferModell`: ein Tippen beim Kaltstart kommt, bevor das
-/// Modell steht, und wartet hier, bis `HelferModell.start` es verbindet.
+/// Modell steht, und wartet hier, bis `HelferModell.start` es verbindet; im Modell wartet es dann,
+/// bis die Phase bekannt ist (`Phase.meldungstipp`).
 @MainActor
 enum Meldungsweg {
     private static var modell: HelferModell?
@@ -107,11 +108,11 @@ enum Mitteilungen {
         }
     }
 
-    /// Alert, Ton und Badge; zeitkritisch trägt die Capability
-    /// (`com.apple.developer.usernotifications.time-sensitive`), keine eigene Option.
+    /// Alert und Ton, kein Badge (die App setzt keine Zahl am Symbol); zeitkritisch trägt die
+    /// Capability (`com.apple.developer.usernotifications.time-sensitive`), keine eigene Option.
     static func requestFreigabe() async -> Bool {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [
-            .alert, .sound, .badge,
+            .alert, .sound,
         ])) ?? false
     }
 
