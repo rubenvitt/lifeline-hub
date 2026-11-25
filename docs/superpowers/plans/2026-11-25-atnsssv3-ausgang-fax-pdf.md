@@ -66,7 +66,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/atnsssv3lxb9m7h4r2rkr8ag
 | `src/externe_stelle/kanal.rs` | `normalize_fax`, `list_fuer_org(kanal)` |
 | `src/externe_stelle/mod.rs` | `KanalArt::is_freigeschaltet`, `KanalArt::adapter_art` |
 | `src/routes/externe_stelle.rs` | Fax prüfen, Sammlung für `email` und `fax` |
-| `migrations/0384_ausgang_fax.sql` | Umbau `ausgang` (neue Werte, neue Spalten) |
+| `migrations/0385_ausgang_fax.sql` | Umbau `ausgang` (neue Werte, neue Spalten) |
 | `src/ausgang/zustand.rs` | `Zugestellt`, `NichtZugestellt`, Abfrage-Konstanten, `naechste_abfrage` |
 | `src/ausgang/mod.rs` | `Versand.delivered_at`, `Versand.without_pdf`, `VersandZeile`-Spalten |
 | `src/ausgang/pdf.rs` (neu) | `baue_pdf`, Fax-Grenze, Dateiname |
@@ -146,7 +146,7 @@ Faxnummer“). `is_freigeschaltet` gilt für `Email | Fax`. `pruefe_adresse` ver
 ### Task 2: Datenmodell „zugestellt“, „nicht zugestellt“, Abfrage und „ohne PDF“
 
 **Files:**
-- Create: `migrations/0384_ausgang_fax.sql` (Nummer nach `migrations/AGENTS.md` prüfen)
+- Create: `migrations/0385_ausgang_fax.sql` (Nummer nach `migrations/AGENTS.md` prüfen)
 - Modify: `src/ausgang/zustand.rs`, `src/ausgang/mod.rs`, `src/ausgang/repo.rs` (Anzeige-Mapping)
 - Modify: `tests/enum_wire_kontrakt.rs`, `src/ausgang/tests.rs` (`check_listen_entsprechen_den_enums`)
 - Regenerate: `frontend/src/api/openapi.json`, `frontend/src/api/types.generated.ts` (Pfade wie `scripts/check-typ-codegen.sh` sie nennt)

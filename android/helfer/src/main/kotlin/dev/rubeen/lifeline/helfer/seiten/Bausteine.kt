@@ -52,6 +52,10 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.heading
@@ -65,7 +69,9 @@ import dev.rubeen.lifeline.helfer.ui.Stil
 import dev.rubeen.lifeline.helfer.ui.eckig
 import dev.rubeen.lifeline.helfer.ui.farbe
 import dev.rubeen.lifeline.helfer.ui.farbe as thema
+import dev.rubeen.lifeline.helferkern.Bildmarke
 import dev.rubeen.lifeline.helferkern.LifelineAbstand
+import dev.rubeen.lifeline.helferkern.LifelineFarbe
 import dev.rubeen.lifeline.helferkern.LifelineGroesse
 
 // Bausteine der Seiten im Lifeline Design System: eckige Flächen (Radius 0 aus den Tokens), feine
@@ -149,19 +155,43 @@ fun Augenbraue(text: String, modifier: Modifier = Modifier, farbe: Color = thema
     )
 }
 
-/** Markenzeichen: rotes Quadrat mit weißem Kreuz (Rolle `marke`). */
+/**
+ * Markenzeichen: die Bildmarke „Lebenslinie“ als Kachel, wie das App-Symbol (Kopf-Schwarz,
+ * Pulslinie, Quadrat in `marke`). Geometrie nur aus `helferkern/Bildmarke.kt`. Kein Kreuz.
+ */
 @Composable
 fun Markenzeichen(groesse: Dp = 40.dp) {
     val marke = farbe.marke
     Canvas(modifier = Modifier.size(groesse)) {
-        drawRect(marke)
-        val balken = size.width * 0.18f
-        val laenge = size.width * 0.56f
-        val mitte = size.width / 2
-        drawRect(Color.White, Offset(mitte - balken / 2, mitte - laenge / 2), Size(balken, laenge))
-        drawRect(Color.White, Offset(mitte - laenge / 2, mitte - balken / 2), Size(laenge, balken))
+        val s = size.minDimension / Bildmarke.KACHEL
+        val mx = size.width / 2
+        val my = size.height / 2
+        fun punkt(x: Float, y: Float) = Offset(mx + (x - Bildmarke.MITTE_X) * s, my + y * s)
+        drawRect(KOPF_SCHWARZ)
+        val pfad = Path().apply {
+            Bildmarke.linie.forEachIndexed { index, (x, y) ->
+                val p = punkt(x, y)
+                if (index == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+            }
+        }
+        drawPath(
+            pfad,
+            LINIE_HELL,
+            style = Stroke(
+                width = Bildmarke.LINIEN_STAERKE * s,
+                miter = Bildmarke.GEHRUNGSGRENZE,
+                cap = StrokeCap.Butt,
+                join = StrokeJoin.Miter,
+            ),
+        )
+        val kante = Bildmarke.QUADRAT_KANTE * s
+        drawRect(marke, punkt(Bildmarke.QUADRAT_X, Bildmarke.QUADRAT_Y), Size(kante, kante))
     }
 }
+
+/** Kopf-Schwarz und Linie der Bildmarke: immer dunkel, wie das App-Symbol. */
+private val KOPF_SCHWARZ = Color(LifelineFarbe.rahmenGrund.nacht)
+private val LINIE_HELL = Color(LifelineFarbe.rahmenText.nacht)
 
 /** Kopf jeder Seite: Markenzeichen, App-Name und optional der Server. */
 @Composable

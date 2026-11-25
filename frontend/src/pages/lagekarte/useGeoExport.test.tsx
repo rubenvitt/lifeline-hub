@@ -1,3 +1,4 @@
+import { theme } from 'antd';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -21,6 +22,7 @@ vi.mock('./kmzPacker', async (orig) => ({
 
 const KMZ = 'Exportieren: Google Earth (KMZ)';
 const GEOJSON = 'Exportieren: GIS (GeoJSON)';
+const GPX = 'Exportieren: Fireboard (GPX)';
 
 const einsatzort: KarteMarker = {
   schluessel: 'einsatzort-1',
@@ -36,6 +38,7 @@ const eingabe = (marker: KarteMarker[], stand: Date | null = null): ExportEingab
   marker,
   flaechen: [],
   zonen: [],
+  token: theme.getDesignToken(),
   einsatzName: 'Hochwasser',
   stand,
 });
@@ -67,22 +70,25 @@ beforeEach(() => {
 afterEach(() => setzeViewportZurueck());
 
 describe('useGeoExport', () => {
-  it('zwei Einträge mit den Namen der Ausgabeprogramme', () => {
+  it('drei Einträge mit den Namen der Ausgabeprogramme', () => {
     renderMitProviders(<Seite daten={eingabe([einsatzort])} />);
     expect(screen.getByRole('button', { name: KMZ })).toBeEnabled();
     expect(screen.getByRole('button', { name: GEOJSON })).toBeEnabled();
+    expect(screen.getByRole('button', { name: GPX })).toBeEnabled();
   });
 
-  it('ohne sichtbare Objekte: beide gesperrt, der Grund steht am Eintrag', () => {
+  it('ohne sichtbare Objekte: alle gesperrt, der Grund steht am Eintrag', () => {
     renderMitProviders(<Seite daten={eingabe([])} />);
     expect(screen.getByRole('button', { name: `${KMZ} (Nichts eingeblendet)` })).toBeDisabled();
     expect(screen.getByRole('button', { name: `${GEOJSON} (Nichts eingeblendet)` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: `${GPX} (Nichts eingeblendet)` })).toBeDisabled();
   });
 
   it('ohne Eingabe (Daten laden noch): gesperrt mit „lädt“, nicht „Nichts eingeblendet“', () => {
     renderMitProviders(<Seite daten={null} />);
     expect(screen.getByRole('button', { name: `${KMZ} (lädt)` })).toBeDisabled();
     expect(screen.getByRole('button', { name: `${GEOJSON} (lädt)` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: `${GPX} (lädt)` })).toBeDisabled();
   });
 
   it('ein gesicherter Stand trägt seine Zeit, nicht die des Klicks', async () => {
@@ -126,6 +132,19 @@ describe('useGeoExport', () => {
     expect(blob.type).toBe('application/geo+json');
     expect(name).toMatch(/^lagekarte-einsatz-42-\d{4}-\d{2}-\d{2}-\d{4}\.geojson$/);
     expect(JSON.parse(await blob.text()).features).toHaveLength(1);
+  });
+
+  it('GPX: speichert einen Blob vom Typ gpx+xml mit dem Stand in den Metadaten', async () => {
+    const gesichert = new Date(Date.UTC(2026, 10, 24, 9, 0, 0));
+    renderMitProviders(<Seite daten={eingabe([einsatzort], gesichert)} />);
+    await userEvent.click(screen.getByRole('button', { name: GPX }));
+    await waitFor(() => expect(speichere).toHaveBeenCalledTimes(1));
+    const [blob, name] = speichere.mock.calls[0] as [Blob, string];
+    expect(blob.type).toBe('application/gpx+xml');
+    expect(name).toMatch(/^lagekarte-einsatz-42-\d{4}-\d{2}-\d{2}-\d{4}\.gpx$/);
+    const xml = await blob.text();
+    expect(xml).toContain('<time>2026-11-24T09:00:00Z</time>');
+    expect(xml).toContain('<wpt lat="54.1" lon="9.9"><name>Einsatzort</name>');
   });
 
   it('KMZ: packt und speichert mit Endung kmz', async () => {

@@ -30,6 +30,9 @@ vi.mock('../alarm/alarmTon', async (original) => ({
   spieleAlarmTon: vi.fn(),
 }));
 
+// jsdom hat kein MediaSource: der Player gibt auf, die Kachel zeigt „Kein Livebild“.
+vi.mock('hls.js', () => ({ default: { isSupported: () => false } }));
+
 // jsdom hat kein WebGL: die Karte selbst gehört nach `e2e/geraet-lagemonitor.spec.ts`.
 vi.mock('./LagemonitorKarte', async (original) => ({
   ...(await original<typeof import('./LagemonitorKarte')>()),
@@ -847,5 +850,89 @@ describe('Bausteine', () => {
         { lat: 53, lon: 12 },
       ]),
     ).toEqual({ art: 'rahmen', west: 12, sued: 52, ost: 13, nord: 53 });
+  });
+});
+
+describe('Lagemonitor — Livebild der Drohne (LLH-2109)', () => {
+  const drohne = { videos: ['v1'], stand_at: '2026-10-04 09:59:30' };
+
+  it('ohne Block „drohne“ keine Kachel Livebild, die Zeile bleibt wie bisher', async () => {
+    bereit();
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Betroffene' });
+    expect(screen.queryByRole('region', { name: 'Livebild' })).toBeNull();
+    expect(document.querySelector('video')).toBeNull();
+  });
+
+  it('mit Block steht die Kachel mit stummem Bild ohne Bedienung, in eigener Grenze', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, drohne });
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Livebild' });
+    const video = kachel.querySelector('video')!;
+    expect(video.muted).toBe(true);
+    expect(video.hasAttribute('controls')).toBe(false);
+    // Alarmzeile, Karte, Livebild, Meldungen, Betroffene, Kräfte, Belegung.
+    pruefeKachelGrenzen(kachel.closest('main')!, 7);
+    expect(within(kachel).getByText(/Stand/)).toBeInTheDocument();
+  });
+
+  it('ohne Video: „Kein Livebild“ ohne Alarm, nichts in „Was brennt“', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, drohne: { ...drohne, videos: [] } });
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Livebild' });
+    expect(await within(kachel).findByText('Kein Livebild')).toBeInTheDocument();
+    expect(within(kachel).queryByRole('alert')).toBeNull();
+    const zeile = document.querySelector('[data-lfh="alarm-zeile"]')!;
+    expect(zeile.textContent).not.toMatch(/Livebild/);
+  });
+
+  it('Datenstand des Livebilds älter als 2 Minuten ist hervorgehoben', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({ ...lage, drohne: { ...drohne, stand_at: '2026-10-04 09:55:00' } });
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Livebild' });
+    const stand = kachel.querySelector('[data-lfh="monitor-zusatz"]')!;
+    expect(stand.getAttribute('data-veraltet')).toBe('ja');
+  });
+
+  it('Meldungen und Ablauf stehen rechts neben dem Livebild übereinander', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: JETZT });
+    bereit();
+    lagebildAntwort = () =>
+      HttpResponse.json({
+        ...lage,
+        drohne,
+        programm: [
+          { id: 1, bezeichnung: 'Beginn', zeitpunkt_at: '2026-10-04 10:20:30' },
+          { id: 2, bezeichnung: 'Feuerwerk', zeitpunkt_at: '2026-10-04 11:05:30' },
+          { id: 3, bezeichnung: 'Ende', zeitpunkt_at: '2026-10-04 12:00:30' },
+        ],
+      });
+    renderApp('/geraet/7/monitor');
+    const kachel = await screen.findByRole('region', { name: 'Livebild' });
+    const meldungen = screen.getByRole('region', { name: 'Meldungen' });
+    const ablauf = screen.getByRole('region', { name: 'Ablauf' });
+    // Neben dem Livebild nur der nächste Programmpunkt, der Rest als „+2 weitere“ (Ruben,
+    // 25.11.2026): drei lange Bezeichnungen passten nicht in die Spalte.
+    expect(within(ablauf).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(ablauf).getByText('Beginn')).toBeInTheDocument();
+    expect(within(ablauf).getByText('+2 weitere')).toBeInTheDocument();
+    const spalte = meldungen.closest('[data-lfh="livebild-nebenspalte"]');
+    expect(spalte).not.toBeNull();
+    expect(spalte!.contains(ablauf)).toBe(true);
+    expect(spalte!.contains(kachel)).toBe(false);
+  });
+
+  it('ohne Meldungen und Ablauf nimmt das Livebild die Zeile allein', async () => {
+    bereit();
+    lagebildAntwort = () => HttpResponse.json({ ...lage, drohne, ausgeblendet: ['meldungen'] });
+    renderApp('/geraet/7/monitor');
+    await screen.findByRole('region', { name: 'Livebild' });
+    expect(document.querySelector('[data-lfh="livebild-nebenspalte"]')).toBeNull();
   });
 });

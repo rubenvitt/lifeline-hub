@@ -6,7 +6,8 @@
 //! Schalter gibt es nicht). Deshalb ruft hier ein eingesetzter [`FremdebeneAbrufer`] ab, nach dem
 //! Muster des `Zusteller` der Webhooks: er spielt ein Skript von Antworten ab und merkt sich, was
 //! er bekam (URL, LAN-Entscheidung, Validatoren). Zielschutz und LAN-Entscheidung rechnet der
-//! Produktionsweg; der echte `adapter::ziel::fetch_bedingt` ist in seinen Lib-Tests geprüft.
+//! Produktionsweg; der echte `adapter::ziel::fetch_bedingt` ist in seinen Lib-Tests geprüft, gegen
+//! einen echten HTTPS-Server in `src/adapter/ziel_fetch_tests.rs` (LLH-2132).
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};

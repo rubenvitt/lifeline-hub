@@ -16,7 +16,7 @@ use tower::ServiceExt;
 mod common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, recv_until_tag,
-    rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,
+    rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live, system_etb_inhalte,
 };
 
 const ZWEI_PUNKTE: &str = r#"{"type":"FeatureCollection","features":[
@@ -473,4 +473,160 @@ async fn live_ereignis_bei_jeder_aenderung() {
     let (s, _) = anfrage(&app, "DELETE", &pfad, &admin, None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     recv_until_tag(&mut rx, "karte_fremdebene", warten).await;
+}
+
+// ── Übernehmen eines Objekts als eigene Zeichnung (LLH-2129) ───────────────────────────
+// Entwurf `docs/superpowers/specs/2026-11-25-vzxkonvu-fremdebene-objekt-uebernehmen-design.md`.
+
+const FLAECHE: &str =
+    r#"{"type":"Polygon","coordinates":[[[9.0,50.0],[9.1,50.0],[9.1,50.1],[9.0,50.0]]]}"#;
+const STELLE_SANITAET: &str =
+    r#"{"v":1,"spec":{"bodyMarks":["medical-service"],"kind":"post","organization":"feuerwehr"}}"#;
+
+/// Lädt eine Datei-Ebene „Lage Kreis X“ hoch und liefert ihre ID.
+async fn ebene_anlegen(app: &axum::Router, einsatz: i64, cookie: &str) -> i64 {
+    let (s, ebene) = hochladen(
+        app,
+        einsatz,
+        cookie,
+        &[("name", "Lage Kreis X")],
+        Some(("lage.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{ebene}");
+    ebene["id"].as_i64().unwrap()
+}
+
+#[tokio::test]
+async fn zone_mit_fremdebene_traegt_herkunft_im_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, einsatz, &admin).await;
+
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":FLAECHE,
+        "label":"Brandfläche","fremdebene_id":ebene})
+    .to_string();
+    let (s, z) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter().any(|t| t
+            == "Gefahrengebiet «Brandfläche» eingerichtet (übernommen aus Fremdebene «Lage Kreis X», Datei)"),
+        "ETB: {etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn zone_mit_fremder_fremdebene_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, anderer, &admin).await;
+
+    let body = json!({"typ":"gefahrengebiet","geometrie_typ":"Polygon","geometrie":FLAECHE,
+        "label":"Brandfläche","fremdebene_id":ebene})
+    .to_string();
+    let (s, _) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        Some(&body),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/zones"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
+}
+
+async fn zeichen_anlegen(
+    app: &axum::Router,
+    cookie: &str,
+    einsatz: i64,
+    extra: Value,
+) -> (StatusCode, Value) {
+    let mut body =
+        json!({"lat": 50.1, "lon": 9.1, "zeichen_spec": STELLE_SANITAET, "label": "Sammelpunkt"});
+    body.as_object_mut()
+        .unwrap()
+        .extend(extra.as_object().unwrap().clone());
+    anfrage(
+        app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/free-symbols"),
+        cookie,
+        Some(&body.to_string()),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn zeichen_mit_fremdebene_schreibt_system_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, einsatz, &admin).await;
+
+    let (s, z) = zeichen_anlegen(&app, &admin, einsatz, json!({"fremdebene_id": ebene})).await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+    let etb = system_etb_inhalte(&app, &admin, einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t
+                == "Freies Zeichen «Sammelpunkt» übernommen aus Fremdebene «Lage Kreis X», Datei"),
+        "ETB: {etb:?}"
+    );
+}
+
+#[tokio::test]
+async fn zeichen_ohne_fremdebene_schreibt_kein_etb() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let vorher = system_etb_inhalte(&app, &admin, einsatz).await.len();
+
+    let (s, z) = zeichen_anlegen(&app, &admin, einsatz, json!({})).await;
+    assert_eq!(s, StatusCode::CREATED, "{z}");
+    assert_eq!(
+        system_etb_inhalte(&app, &admin, einsatz).await.len(),
+        vorher
+    );
+}
+
+#[tokio::test]
+async fn zeichen_mit_fremder_fremdebene_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let ebene = ebene_anlegen(&app, anderer, &admin).await;
+
+    let (s, _) = zeichen_anlegen(&app, &admin, einsatz, json!({"fremdebene_id": ebene})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (_, liste) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{einsatz}/free-symbols"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(liste.as_array().unwrap().len(), 0);
 }

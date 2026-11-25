@@ -324,8 +324,9 @@ export default defineConfig(({ mode }) => {
     },
     test: {
       // Zeitzone der Suite (LLH-1433, Regel in `frontend/AGENTS.md`, „Zeiteingabe in der
-      // Anzeigezone“): im Hauptprozess gesetzt, bevor ein Worker startet.
-      globalSetup: './src/test/suitenZone.ts',
+      // Anzeigezone“): im Hauptprozess gesetzt, bevor ein Worker startet. Davor die
+      // Node-Version (LLH-2134): unter einer fremden Hauptversion bricht die Suite ab.
+      globalSetup: ['./src/test/suitenNode.ts', './src/test/suitenZone.ts'],
       environment: 'jsdom',
       // Erst eindeutige antd-Kennungen (LLH-1625), dann die übrige Einrichtung.
       setupFiles: ['./src/test/eindeutigeIds.ts', './src/test/setup.ts'],

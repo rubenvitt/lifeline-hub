@@ -1,27 +1,15 @@
 import { Button } from 'antd';
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useDrohnenQuellen } from '../../api/drohne';
 import { IconKreuz } from '../../icons';
 import { Paneel, Textstufe, useRollen } from '../../components/instrument';
 import { UEBERLAGERUNG_RAND, kartenKnopfBreite } from './KartenUeberlagerung';
+import { useHlsWiedergabe } from './useHlsWiedergabe';
+
+export { livebildUrl, wiederholNachMs } from './useHlsWiedergabe';
 
 /** `data-lfh` des Fensters — die Seite und die Tests finden es darüber. */
 export const DROHNEN_VIDEO_FENSTER = 'drohnen-video-fenster';
-
-/** Playlist-Einstieg des Proxys (Route `…/drone/video/{key}/hls/index.m3u8`, LLH-2107). */
-export function livebildUrl(einsatzId: number, videoKey: string): string {
-  return `/api/incidents/${einsatzId}/drone/video/${encodeURIComponent(videoKey)}/hls/index.m3u8`;
-}
-
-type Zustand = 'laedt' | 'laeuft' | 'kein';
-
-/**
- * Wartezeit vor dem nächsten Versuch nach `fehlschlaege` gescheiterten Versuchen in Folge: 5 s,
- * 10 s, 20 s, dann höchstens 30 s. Ein kurzer Funkausfall (LTE) beendet das Livebild so nicht.
- */
-export function wiederholNachMs(fehlschlaege: number): number {
-  return Math.min(5_000 * 2 ** Math.max(0, fehlschlaege - 1), 30_000);
-}
 
 export interface DrohnenVideoFensterProps {
   einsatzId: number;
@@ -53,101 +41,7 @@ export default function DrohnenVideoFenster({
 }: DrohnenVideoFensterProps) {
   const { token, rollen } = useRollen();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [zustand, setZustand] = useState<Zustand>(videoKey == null ? 'kein' : 'laedt');
-  // Jeder neue Versuch nach einem Ausfall zählt hoch und startet den Player neu.
-  const [versuch, setVersuch] = useState(0);
-  // Gescheiterte Versuche in Folge, je Schlüssel; ein laufendes Bild setzt zurück.
-  const fehlschlaege = useRef<{ key: string | null; n: number }>({ key: null, n: 0 });
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (videoKey == null || !video) {
-      setZustand('kein');
-      return;
-    }
-    if (fehlschlaege.current.key !== videoKey) fehlschlaege.current = { key: videoKey, n: 0 };
-    setZustand('laedt');
-    const url = livebildUrl(einsatzId, videoKey);
-    let beendet = false;
-    let abbau: (() => void) | undefined;
-    let wiederholung: ReturnType<typeof setTimeout> | undefined;
-    const spiele = () => {
-      void video.play?.()?.catch(() => undefined);
-    };
-    const laeuft = () => {
-      fehlschlaege.current.n = 0;
-      setZustand('laeuft');
-    };
-    /** Aufgegeben: „Kein Livebild“ und mit Pause ein neuer Versuch. */
-    const ausgefallen = () => {
-      if (beendet) return;
-      setZustand('kein');
-      fehlschlaege.current.n += 1;
-      clearTimeout(wiederholung);
-      wiederholung = setTimeout(
-        () => setVersuch((v) => v + 1),
-        wiederholNachMs(fehlschlaege.current.n),
-      );
-    };
-
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      const kaputt = () => ausgefallen();
-      video.addEventListener('playing', laeuft);
-      video.addEventListener('error', kaputt);
-      video.src = url;
-      abbau = () => {
-        video.removeEventListener('playing', laeuft);
-        video.removeEventListener('error', kaputt);
-        video.removeAttribute('src');
-        video.load?.();
-      };
-    } else {
-      void import('hls.js').then(
-        ({ default: Hls }) => {
-          if (beendet) return;
-          if (!Hls.isSupported()) {
-            setZustand('kein');
-            return;
-          }
-          const player = new Hls({ lowLatencyMode: false });
-          let neuGeladen = false;
-          let wiederhergestellt = false;
-          video.addEventListener('playing', laeuft);
-          player.on(Hls.Events.MANIFEST_PARSED, spiele);
-          player.on(Hls.Events.ERROR, (_ereignis, daten) => {
-            if (!daten.fatal) return;
-            // Erst der eigene Weg des Players, je einmal; dann Neustart mit Pause.
-            if (daten.type === Hls.ErrorTypes.NETWORK_ERROR && !neuGeladen) {
-              neuGeladen = true;
-              player.startLoad();
-              return;
-            }
-            if (daten.type === Hls.ErrorTypes.MEDIA_ERROR && !wiederhergestellt) {
-              wiederhergestellt = true;
-              player.recoverMediaError();
-              return;
-            }
-            player.destroy();
-            ausgefallen();
-          });
-          player.loadSource(url);
-          player.attachMedia(video);
-          abbau = () => {
-            video.removeEventListener('playing', laeuft);
-            player.destroy();
-          };
-        },
-        () => {
-          if (!beendet) setZustand('kein');
-        },
-      );
-    }
-    return () => {
-      beendet = true;
-      clearTimeout(wiederholung);
-      abbau?.();
-    };
-  }, [einsatzId, videoKey, versuch]);
+  const zustand = useHlsWiedergabe(einsatzId, videoKey, videoRef);
 
   const kein = zustand === 'kein';
   return (

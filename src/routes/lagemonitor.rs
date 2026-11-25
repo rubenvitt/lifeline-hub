@@ -321,6 +321,20 @@ pub struct LagemonitorAnzeige {
     /// der Monitor lässt die Kachel weg. Leer fehlt das Feld; nur [`lagebild`] füllt es.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub ausgeblendet: Vec<LagemonitorKachel>,
+    /// Livebild der Drohne (LLH-2109): nur wenn die Einsatzleitung den Schalter „Livebild auf dem
+    /// Lagemonitor“ eingeschaltet hat; nur [`lagebild`] füllt ihn.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub drohne: Option<LagemonitorDrohne>,
+}
+
+/// Was der Lagemonitor vom Livebild der Drohne erfährt (LLH-2109): die eigenen Videokennungen
+/// (keine Seriennummern) und den Datenstand der Drohnenlage. Leer, wenn die Quelle gerade keinen
+/// Strom meldet; die Kachel zeigt dann „Kein Livebild“.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct LagemonitorDrohne {
+    pub videos: Vec<String>,
+    /// Zeit des letzten Abrufs bei Suchlage (UTC, SQLite-Format); ohne Abruf die Zuschaltung.
+    pub stand_at: String,
 }
 
 /// GET /api/incidents/{id}/situation-monitor — nur für einen gekoppelten Lagemonitor; eine Person und
@@ -355,7 +369,35 @@ pub async fn lagebild(
     // ausgeblendet, stehen beide auf 0, und die Kachel fehlt.
     anzeige.sofortmeldungen_offen = alarm.sofort_offen;
     anzeige.alarm = Some(alarm);
+    // Livebild nur bei eingeschaltetem Schalter und sichtbarer Lagekarte (LLH-2109).
+    if !aus.contains("lagekarte") {
+        anzeige.drohne = load_drohne(&state, ctx.einsatz.id).await?;
+    }
     Ok(Json(anzeige))
+}
+
+/// Der Block `drohne` für den Lagemonitor (LLH-2109), aus der Zuschaltung mit eingeschaltetem
+/// Schalter und dem Speicher ihres Adapters.
+async fn load_drohne(
+    state: &AppState,
+    einsatz_id: i64,
+) -> Result<Option<LagemonitorDrohne>, AppError> {
+    let zuschaltung = {
+        let mut conn = state.pool.acquire().await?;
+        crate::drohne::repo::find_lagemonitor(&mut conn, einsatz_id).await?
+    };
+    Ok(zuschaltung.map(|z| match state.drohne.get(&z.adapter_id) {
+        Some(stand) => LagemonitorDrohne {
+            videos: stand.lage.videos.iter().map(|v| v.key.clone()).collect(),
+            stand_at: chrono::DateTime::from_timestamp_millis(stand.lage.stand_ms)
+                .map(crate::zeit::formatiere_utc)
+                .unwrap_or(z.zugeschaltet_at),
+        },
+        None => LagemonitorDrohne {
+            videos: Vec::new(),
+            stand_at: z.zugeschaltet_at,
+        },
+    }))
 }
 
 /// Die Werte der Alarmzeile für den Lagemonitor (LLH-1743, design.md D5). Prüft keine Rechte: der
@@ -599,6 +641,7 @@ pub async fn load_anzeige(
         sanitaetsdienst,
         alarm: None,
         ausgeblendet,
+        drohne: None,
     })
 }
 
@@ -1225,6 +1268,7 @@ mod tests {
             sanitaetsdienst: None,
             alarm: None,
             ausgeblendet: Vec::new(),
+            drohne: None,
         };
         (pool, kopf, verdichtet)
     }
