@@ -533,5 +533,5 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 
 ### Task 20: Gate
 
-- [ ] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün; jeden roten Schritt an der Ursache beheben, nichts abschalten.
-- [ ] **Step 2:** Commit etwaiger Nacharbeiten.
+- [x] **Step 1:** `./scripts/check-all.sh --geaendert --ohne-e2e` → alle Schritte grün; jeden roten Schritt an der Ursache beheben, nichts abschalten.
+- [x] **Step 2:** Commit etwaiger Nacharbeiten.
