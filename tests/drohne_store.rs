@@ -250,7 +250,9 @@ async fn abschluss_und_zuschalten_im_selben_moment_lassen_den_merker_an() {
     // A schließt: Zeile weg, das Nachführen zieht seine Marke und liest.
     {
         let mut conn = u.pool.acquire().await.unwrap();
-        repo::delete_for_einsatz(&mut conn, u.einsatz).await.unwrap();
+        repo::delete_for_einsatz(&mut conn, u.einsatz)
+            .await
+            .unwrap();
     }
     let marke_a = store.marke();
     let an_a = {
