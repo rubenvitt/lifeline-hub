@@ -374,6 +374,8 @@ export function setzeFachebeneDaten(
  * ist Kontur.
  */
 export function fachebeneClickLayerIds(def: FachebeneDef): string[] {
+  // Rasterebenen zeichnen keine Features (LLH-2021, `copernicusBildLayer.ts`).
+  if (def.darstellung === 'raster') return [];
   if (def.gemischteGeometrie) {
     return ['fill', 'linie', 'circle', 'treffer'].map((t) => `fachebene-${def.key}-${t}`);
   }
