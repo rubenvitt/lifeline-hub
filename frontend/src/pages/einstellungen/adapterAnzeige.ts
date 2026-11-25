@@ -155,12 +155,17 @@ export function einstellungenVonAdapter(
  * Prüfregeln eines Einstellungsfelds der Art, wie der Server sie anwendet (`art::check_einstellungen`):
  * Pflicht, Höchstlänge, eine Adresse nur mit https. Anlegen und Bearbeiten teilen sie.
  */
-export function einstellungsRegeln(feld: AdapterFeld): FormRule[] {
+export function einstellungsRegeln(feld: AdapterFeld, httpImLan = false): FormRule[] {
+  // Erlaubt eine Art `http` im LAN (ADR-0105), prüft der Server Netz und LAN-Ausnahme.
+  const url = httpImLan
+    ? {
+        pattern: /^\s*https?:\/\//i,
+        message: `${feld.bezeichnung} beginnt mit https:// oder, im LAN, mit http://`,
+      }
+    : { pattern: /^\s*https:\/\//i, message: `${feld.bezeichnung} beginnt mit https://` };
   return [
     ...(feld.pflicht ? [pflicht(feld.bezeichnung, { whitespace: feld.typ !== 'zahl' })] : []),
     ...(feld.max > 0 ? [{ max: feld.max, message: `Höchstens ${feld.max} Zeichen` }] : []),
-    ...(feld.typ === 'url'
-      ? [{ pattern: /^\s*https:\/\//i, message: `${feld.bezeichnung} beginnt mit https://` }]
-      : []),
+    ...(feld.typ === 'url' ? [url] : []),
   ];
 }

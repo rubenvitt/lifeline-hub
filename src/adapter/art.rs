@@ -294,6 +294,8 @@ pub struct AdapterArtAnzeige {
     pub felder: Vec<Feld>,
     pub intervall_min_s: i64,
     pub intervall_vorschlag_s: i64,
+    /// Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105).
+    pub http_im_lan: bool,
 }
 
 impl AdapterArtAnzeige {
@@ -305,6 +307,7 @@ impl AdapterArtAnzeige {
             felder: art.felder().to_vec(),
             intervall_min_s: art.intervall_min_s(),
             intervall_vorschlag_s: art.intervall_vorschlag_s(),
+            http_im_lan: art.http_im_lan(),
         }
     }
 }

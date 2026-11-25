@@ -1154,7 +1154,8 @@
           "plaetze",
           "felder",
           "intervall_min_s",
-          "intervall_vorschlag_s"
+          "intervall_vorschlag_s",
+          "http_im_lan"
         ],
         "properties": {
           "bezeichnung": {
@@ -1168,6 +1169,10 @@
             "items": {
               "$ref": "#/components/schemas/Feld"
             }
+          },
+          "http_im_lan": {
+            "type": "boolean",
+            "description": "Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105)."
           },
           "intervall_min_s": {
             "type": "integer",

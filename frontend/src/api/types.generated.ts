@@ -500,6 +500,8 @@ export interface components {
             bezeichnung: string;
             code: string;
             felder: components["schemas"]["Feld"][];
+            /** @description Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105). */
+            http_im_lan: boolean;
             /** Format: int64 */
             intervall_min_s: number;
             /** Format: int64 */
