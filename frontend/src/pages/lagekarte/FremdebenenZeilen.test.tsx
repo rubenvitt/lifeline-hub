@@ -92,7 +92,9 @@ describe('Zeilen der Fremdebenen (LLH-2099)', () => {
     try {
       zeilen();
       await waitFor(() =>
-        expect(screen.getByRole('button', { name: 'Aktionen zu Lage Nachbarkreis' })).toBeDisabled(),
+        expect(
+          screen.getByRole('button', { name: 'Aktionen zu Lage Nachbarkreis' }),
+        ).toBeDisabled(),
       );
       expect(screen.getByText(OHNE_VERBINDUNG_NICHT_AENDERBAR)).toBeVisible();
     } finally {
@@ -124,6 +126,44 @@ describe('Zeilen der Fremdebenen (LLH-2099)', () => {
     expect(knopf).toHaveClass('ant-btn-dangerous');
     await userEvent.click(knopf);
     expect(props.onEntfernen).toHaveBeenCalledWith(4);
+  });
+
+  it('eine sichtbare Ebene, deren Daten laden, sagt „lädt“', () => {
+    zeilen({ datenZustand: new Map([[4, { art: 'laedt' as const }]]) });
+    expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toHaveAccessibleDescription(
+      /lädt/,
+    );
+  });
+
+  it('ohne Netz und ohne Daten sagt die Zeile „offline“', () => {
+    zeilen({ datenZustand: new Map([[4, { art: 'offline' as const }]]) });
+    expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toHaveAccessibleDescription(
+      /offline/,
+    );
+  });
+
+  it('ein Ladefehler der Daten steht an der Zeile, mit erneutem Abruf', async () => {
+    const neuLaden = vi.fn();
+    zeilen({
+      datenZustand: new Map([
+        [
+          4,
+          {
+            art: 'fehler' as const,
+            fehler: new Error('kaputt'),
+            laeuft: false,
+            neuLaden,
+          },
+        ],
+      ]),
+    });
+    expect(screen.getByRole('switch', { name: 'Lage Nachbarkreis' })).toHaveAccessibleDescription(
+      /nicht geladen/,
+    );
+    const alarm = screen.getByRole('alert');
+    expect(within(alarm).getByText('Daten von „Lage Nachbarkreis“ nicht geladen')).toBeVisible();
+    await userEvent.click(within(alarm).getByRole('button', { name: 'Erneut abrufen' }));
+    expect(neuLaden).toHaveBeenCalledTimes(1);
   });
 
   it('Farbe wählt einen Ton der Palette', async () => {

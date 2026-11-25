@@ -1,6 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { theme } from 'antd';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type QueryObserverResult,
+} from '@tanstack/react-query';
+import type { FeatureCollection } from '../../api/fachebenen';
 import {
   aktualisiereFremdebene,
   ladeFremdebeneDaten,
@@ -59,6 +66,37 @@ export function fremdebeneTakt(
   return document.visibilityState === 'visible' ? URL_TAKT_MS : false;
 }
 
+/**
+ * Zustand einer sichtbaren Ebene ohne Daten: lädt, ohne Verbindung angehalten oder gescheitert. Eine
+ * Ebene mit Daten hat keinen Eintrag; ein gescheiterter Nachabruf lässt den gezeigten Stand stehen.
+ */
+export type FremdebeneDatenZustand =
+  | { art: 'laedt' }
+  | { art: 'offline' }
+  | { art: 'fehler'; fehler: unknown; laeuft: boolean; neuLaden: () => void };
+
+/** Was die Seite aus einer Datenabfrage über ihren Zustand braucht; Funktionen bleiben draußen. */
+interface AbrufStand {
+  isPending: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  error: unknown;
+}
+
+/**
+ * `useQueries` teilt das Ergebnis von `combine` strukturell (`replaceEqualDeep`): ein Abruf mit
+ * gleichem Inhalt lässt die Datenliste `daten` stehen, auch wenn sich `stand` (abrufend → fertig)
+ * ändert. `dataUpdatedAt` stünde dagegen nach jedem Minutenabruf neu da, und die Karte spielte bis
+ * zu 5000 Objekte neu ein (LFH-945).
+ */
+const fasseDatenZusammen = (r: QueryObserverResult<FeatureCollection>[]) => ({
+  daten: r.map((q) => q.data),
+  stand: r.map((q): AbrufStand => ({
+    isPending: q.isPending,
+    fetchStatus: q.fetchStatus,
+    error: q.error,
+  })),
+});
+
 interface FremdebenenOptionen {
   /** Aus im gesicherten Stand (Snapshot): der kennt keine Fremdebenen. Vorgabe an. */
   aktiv?: boolean;
@@ -102,30 +140,52 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
     });
   }, []);
 
-  const daten = useQueries({
+  const { daten, stand } = useQueries({
     queries: ebenen.map((e) => ({
       queryKey: einsatzKeys.fremdebeneDaten(einsatzId, e.id),
       queryFn: () => ladeFremdebeneDaten(einsatzId, e.id),
       enabled: sichtbar.has(e.id),
       refetchInterval: () => fremdebeneTakt(e, sichtbar.has(e.id)),
     })),
+    combine: fasseDatenZusammen,
   });
-  // Stabil über Renders: die Karte spielt nur bei neuem Inhalt Daten ein (LFH-945).
-  const datenStand = daten.map((d) => d.dataUpdatedAt).join(',');
   // Der Modus als Wert: ein Wechsel Tag ↔ Nacht färbt die Ebenen um.
   const modusMarke = fremdebeneFarbe('fremd-1', token);
   const aktive = useMemo<AktiveFremdebene[]>(
     () =>
       ebenen.flatMap((e, i) => {
-        const fc = daten[i]?.data;
+        const fc = daten[i];
         return sichtbar.has(e.id) && fc
           ? [{ id: e.id, name: e.name, daten: fc, farbe: fremdebeneFarbe(e.color, token) }]
           : [];
       }),
-    // `daten` und `token` stehen über `datenStand` und `modusMarke` in den Deps.
+    // `token` steht über `modusMarke` in den Deps; `daten` ist strukturell geteilt (oben).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-    [ebenen, sichtbar, datenStand, modusMarke],
+    [ebenen, sichtbar, daten, modusMarke],
   );
+
+  const datenZustand = useMemo(() => {
+    const zustand = new Map<number, FremdebeneDatenZustand>();
+    ebenen.forEach((e, i) => {
+      const q = stand[i];
+      if (!q || !sichtbar.has(e.id) || daten[i]) return;
+      if (q.error != null) {
+        zustand.set(e.id, {
+          art: 'fehler',
+          fehler: q.error,
+          laeuft: q.fetchStatus === 'fetching',
+          neuLaden: () =>
+            void qc.refetchQueries({
+              queryKey: einsatzKeys.fremdebeneDaten(einsatzId, e.id),
+              exact: true,
+            }),
+        });
+      } else if (q.isPending) {
+        zustand.set(e.id, { art: q.fetchStatus === 'paused' ? 'offline' : 'laedt' });
+      }
+    });
+    return zustand;
+  }, [ebenen, sichtbar, daten, stand, qc, einsatzId]);
 
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.fremdebenen(einsatzId) });
   const aendern = useMutation({
@@ -149,6 +209,8 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
     toggle,
     /** Sichtbare Ebenen mit Daten, für Karte und Legende. */
     aktive,
+    /** Sichtbare Ebenen ohne Daten: lädt, ohne Verbindung oder gescheitert (Zeile der Leiste). */
+    datenZustand,
     /** Die Ebene einer ID (Detailkarte). */
     finde: (id: number) => ebenen.find((e) => e.id === id),
     umbenennen: (id: number, name: string) => aendern.mutate({ id, patch: { name } }),

@@ -392,7 +392,10 @@ export default function Ebenenbaum(props: SidebarProps) {
   // Fremdebenen (LLH-2099): eine eigene Gruppe neben dem Hintergrund, nur wenn es welche gibt
   // (hinzugefügt wird über „Weitere Aktionen zur Lagekarte“). Ein Fehler-Slot steht offen.
   const fremd = props.fremdebenen;
-  const fremdFehler = sektionFehler.fremdebenen != null;
+  // Auch ein Ladefehler der Daten einer Ebene hält die Gruppe offen: zugeklappt stünde er nirgends.
+  const fremdFehler =
+    sektionFehler.fremdebenen != null ||
+    [...(fremd?.datenZustand?.values() ?? [])].some((z) => z.art === 'fehler');
   const fremdListe = fremd ? filtereGruppe(suche, ['Fremdebenen'], fremd.ebenen) : [];
   const fremdTreffer = fremd != null && (fremdListe.length > 0 || (fremdFehler && !suche));
 

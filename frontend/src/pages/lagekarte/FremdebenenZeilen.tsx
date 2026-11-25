@@ -4,6 +4,7 @@ import { IconWarndreieck } from '../../icons';
 import { Stapel, Textstufe, schriftStil, useRollen } from '../../components/instrument';
 import type { WeitereAktionen } from '../../components/Datensicht';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { SeitenFehler } from '../../components/SeitenZustand';
 import { ZeilenMenueAusloeser } from '../../components/ZeilenMenueAusloeser';
 import { vorText } from '../../anzeige/dauer';
 import { useMinutenTakt } from '../../components/useMinutenTakt';
@@ -13,6 +14,7 @@ import { FREMDEBENE_TOENE, type FremdebeneTon } from '../../theme/tokens';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
 import { loeschDialogBild } from './BildHintergruende';
 import { Farbfeld, ebenenZeileStil } from './leistenTeile';
+import type { FremdebeneDatenZustand } from './useFremdebenen';
 
 /** Namen der Palettentöne in der Farbwahl: ein Wort statt einer Nummer. */
 const TON_NAME: Record<FremdebeneTon, string> = {
@@ -36,7 +38,16 @@ export interface FremdebenenZeilenProps {
   onEntfernen: (id: number) => void;
   /** Abgelehnter Schreibweg (Umbenennen, Farbe, Entfernen). */
   fehler?: unknown;
+  /** Sichtbare Ebenen ohne Daten (`useFremdebenen`): lädt, offline oder gescheitert. */
+  datenZustand?: ReadonlyMap<number, FremdebeneDatenZustand>;
 }
+
+/** Das Zustandswort rechts in der Zeile, wie bei den Fachebenen („lädt“ statt eines Kreisels). */
+const ZUSTAND_WORT: Record<FremdebeneDatenZustand['art'], string> = {
+  laedt: 'lädt',
+  offline: 'offline',
+  fehler: 'nicht geladen',
+};
 
 type Dialog = { art: 'umbenennen' | 'farbe' | 'entfernen'; id: number } | null;
 
@@ -94,6 +105,7 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
             key={e.id}
             ebene={e}
             sichtbar={props.sichtbar.has(e.id)}
+            daten={props.datenZustand?.get(e.id)}
             onToggle={() => props.onToggle(e.id)}
             menue={menue}
             gesperrt={ohneVerbindung}
@@ -165,12 +177,14 @@ export default function FremdebenenZeilen(props: FremdebenenZeilenProps) {
 function FremdebeneZeile({
   ebene,
   sichtbar,
+  daten,
   onToggle,
   menue,
   gesperrt,
 }: {
   ebene: Fremdebene;
   sichtbar: boolean;
+  daten: FremdebeneDatenZustand | undefined;
   onToggle: () => void;
   menue: WeitereAktionen<Fremdebene> | undefined;
   gesperrt: boolean;
@@ -179,69 +193,95 @@ function FremdebeneZeile({
   const jetzt = useMinutenTakt();
   const standId = useId();
   const fehlerId = useId();
+  const zustandId = useId();
   const istUrl = ebene.source === 'url';
   const fehler = istUrl && ebene.error ? FREMDEBENE_FEHLERTEXT[ebene.error] : null;
   // „Fachebenen nennen ihr Alter“: eine URL-Ebene sagt, wann der Server zuletzt abgeholt hat.
   const alter = istUrl && ebene.fetched_at ? vorText(ebene.fetched_at, jetzt) : '';
-  const beschreibung = [alter ? standId : null, fehler ? fehlerId : null]
+  const zustand = sichtbar && daten ? ZUSTAND_WORT[daten.art] : null;
+  const beschreibung = [
+    alter ? standId : null,
+    fehler ? fehlerId : null,
+    zustand ? zustandId : null,
+  ]
     .filter((x) => x != null)
     .join(' ');
   return (
-    <div
-      data-fremdebene={ebene.id}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        borderBlockEnd: `1px solid ${rollen.flaeche3}`,
-        paddingInlineEnd: token.paddingXS,
-      }}
-    >
-      <button
-        type="button"
-        role="switch"
-        aria-checked={sichtbar}
-        aria-label={ebene.name}
-        aria-describedby={beschreibung || undefined}
-        className="lfh-ebenenzeile"
-        onClick={onToggle}
+    <div style={{ borderBlockEnd: `1px solid ${rollen.flaeche3}` }}>
+      <div
+        data-fremdebene={ebene.id}
         style={{
-          ...ebenenZeileStil(token),
-          flex: 1,
-          minWidth: 0,
-          alignItems: 'flex-start',
-          lineHeight: token.lineHeight,
-          color: sichtbar ? rollen.text : rollen.text2,
+          display: 'flex',
+          alignItems: 'center',
+          paddingInlineEnd: token.paddingXS,
         }}
       >
-        <Farbfeld an={sichtbar} farbe={fremdebeneFarbe(ebene.color, token)} />
-        <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-          <Textstufe stufe="textKlein" ton={sichtbar ? 'text' : 'text2'}>
-            {ebene.name}
-          </Textstufe>
-          {alter && (
-            <span id={standId} style={{ ...schriftStil('meta'), color: rollen.text2 }}>
-              {`abgerufen ${alter}`}
-            </span>
-          )}
-          {/* Der Text trägt die Aussage, die Farbe ist der zweite Kanal; das Zeichen ist stumm. */}
-          {fehler && (
-            <span
-              id={fehlerId}
-              data-lfh="fremdebene-fehler"
-              style={{ ...schriftStil('textKlein'), color: rollen.achtungText }}
-            >
-              <span
-                aria-hidden="true"
-                style={{ display: 'inline-flex', marginInlineEnd: token.marginXXS }}
-              >
-                <IconWarndreieck size={12} />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={sichtbar}
+          aria-label={ebene.name}
+          aria-describedby={beschreibung || undefined}
+          className="lfh-ebenenzeile"
+          onClick={onToggle}
+          style={{
+            ...ebenenZeileStil(token),
+            flex: 1,
+            minWidth: 0,
+            alignItems: 'flex-start',
+            lineHeight: token.lineHeight,
+            color: sichtbar ? rollen.text : rollen.text2,
+          }}
+        >
+          <Farbfeld an={sichtbar} farbe={fremdebeneFarbe(ebene.color, token)} />
+          <span style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+            <Textstufe stufe="textKlein" ton={sichtbar ? 'text' : 'text2'}>
+              {ebene.name}
+            </Textstufe>
+            {alter && (
+              <span id={standId} style={{ ...schriftStil('meta'), color: rollen.text2 }}>
+                {`abgerufen ${alter}`}
               </span>
-              {fehler}
+            )}
+            {/* Der Text trägt die Aussage, die Farbe ist der zweite Kanal; das Zeichen ist stumm. */}
+            {fehler && (
+              <span
+                id={fehlerId}
+                data-lfh="fremdebene-fehler"
+                style={{ ...schriftStil('textKlein'), color: rollen.achtungText }}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{ display: 'inline-flex', marginInlineEnd: token.marginXXS }}
+                >
+                  <IconWarndreieck size={12} />
+                </span>
+                {fehler}
+              </span>
+            )}
+          </span>
+          {/* `nowrap`: sonst bricht das Wort mitten durch. */}
+          {zustand && (
+            <span
+              id={zustandId}
+              data-lfh="fremdebene-zustand"
+              style={{ ...schriftStil('textKlein'), whiteSpace: 'nowrap', color: rollen.text2 }}
+            >
+              {zustand}
             </span>
           )}
-        </span>
-      </button>
-      {menue && <ZeilenMenueAusloeser menue={menue} zeile={ebene} gesperrt={gesperrt} />}
+        </button>
+        {menue && <ZeilenMenueAusloeser menue={menue} zeile={ebene} gesperrt={gesperrt} />}
+      </div>
+      {/* Außerhalb des Schalters: ein Knopf ist kein Inhalt eines Knopfs. */}
+      {sichtbar && daten?.art === 'fehler' && (
+        <SeitenFehler
+          text={`Daten von „${ebene.name}“ nicht geladen`}
+          ursache={daten.fehler}
+          onWiederholen={daten.neuLaden}
+          laedt={daten.laeuft}
+        />
+      )}
     </div>
   );
 }

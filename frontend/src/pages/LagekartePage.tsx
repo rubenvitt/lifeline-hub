@@ -2122,6 +2122,7 @@ export default function LagekartePage() {
                 onFarbe: fremd.setzeFarbe,
                 onEntfernen: fremd.entfernen,
                 fehler: fremd.fehler,
+                datenZustand: fremd.datenZustand,
               }
             : undefined
         }
