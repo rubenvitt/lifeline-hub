@@ -4368,7 +4368,7 @@ export interface components {
          *     `migrations/0286_geraet_kopplung_einheit.sql`.
          * @enum {string}
          */
-        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit";
+        Funktionsansicht: "uhs-tablet" | "uhs-laptop" | "lagemonitor" | "betreuungsstelle" | "bereitstellungsraum" | "einsatzabschnitt" | "verpflegung" | "einheit" | "helfer";
         /**
          * @description Aufgelöste Matrix-Zelle (gefahrengebiet-skopiert). Die Liste enthält jede bewertete Zelle,
          *     auch `warnstufe = 'keine'`; das Frontend rendert das 13×5-Raster aus den Katalogen und zeigt
@@ -4573,6 +4573,19 @@ export interface components {
              */
             url?: string | null;
         };
+        /** @description Der Einsatz einer Helfer-Kopplung, nur Kennung und Bezeichnung. */
+        HelferEinsatz: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Warum eine Helfer-Kopplung endet. Der Server liefert nur `rejected` (die abgelehnte
+         *     Kopplung beantwortet `GET /api/devices/me` noch); jedes andere Ende ist 401, und die App
+         *     nennt den Grund aus der letzten bekannten Antwort selbst.
+         * @enum {string}
+         */
+        HelferEndeGrund: "incident_closed" | "revoked" | "expired" | "rejected" | "signed_out";
         /** @description Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung. */
         HelferPerson: {
             /** Format: int64 */
@@ -4604,6 +4617,45 @@ export interface components {
          * @enum {string}
          */
         HelferZielArt: "unit" | "vehicle";
+        /** @description Ein wählbares Ziel vor dem Einlösen. */
+        HelferZielOption: {
+            /** @description Eigener Funkrufname der Einheit; fehlt beim Fahrzeug (der Name ist sein Rufname). */
+            call_sign?: string | null;
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+            /** @description Taktisches Zeichen: Fachaufgabe (`tz_fachaufgabe`). */
+            sign_function?: string | null;
+            /** @description Taktisches Zeichen: Organisation (`tz_organisation`). */
+            sign_organization?: string | null;
+        };
+        /**
+         * @description Antwort von `GET /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
+         *     Personen.
+         */
+        HelferZielliste: {
+            /** @description Ob die Organisation „Auch Personen orten“ erlaubt; sonst blendet die App das Häkchen aus. */
+            person_tracking_allowed: boolean;
+            targets: components["schemas"]["HelferZielOption"][];
+        };
+        /** @description Der eigene Zustand einer Helfer-Kopplung (`GET /api/devices/me`, Antwort auf das Einlösen). */
+        HelferZustand: {
+            /** @description Ablauf der Kopplung (UTC, `%Y-%m-%d %H:%M:%S`). */
+            expires_at: string;
+            incident: components["schemas"]["HelferEinsatz"];
+            /** @description Das Gerät schreibt die Position seines Ziels. */
+            is_tracker: boolean;
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            reason?: components["schemas"]["HelferEndeGrund"] | null;
+            /** @description Uhrzeit des Servers in derselben Form, für Restzeiten auf dem Gerät. */
+            server_time: string;
+            /** @description `beendet` kommt hier nicht vor: nach dem Ende ist die Sitzung ungültig (401). */
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
+        };
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
             /**

@@ -148,3 +148,30 @@ pub async fn einladung_einloesen(
     .await?;
     treffer.ok_or(AppError::Unauthorized)
 }
+
+/// Eine gültige Einladung zu einem Code, ohne sie einzulösen (Zielliste vor dem Anmelden).
+/// Liefert `(einladung_id, einsatz_id, org_id)`; jeder Fehlschlag ist 401 wie bei
+/// [`einladung_einloesen`].
+pub async fn einladung_pruefen(pool: &SqlitePool, code: &str) -> Result<(i64, i64, i64), AppError> {
+    let code = code::normalisiere(code).ok_or(AppError::Unauthorized)?;
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT h.id, h.einsatz_id, e.org_id FROM helfer_einladung h \
+         JOIN einsatz e ON e.id = h.einsatz_id \
+         WHERE h.code_hash = ? AND h.widerrufen_at IS NULL AND h.laeuft_ab_at > datetime('now') \
+           AND e.status = 'aktiv' AND e.geloescht_at IS NULL",
+    )
+    .bind(code::hash(&code))
+    .fetch_optional(pool)
+    .await?;
+    treffer.ok_or(AppError::Unauthorized)
+}
+
+/// Wer die Einladung angelegt hat; die Helfer-Kopplung trägt ihn als `erstellt_von`.
+pub async fn ersteller(conn: &mut SqliteConnection, einladung_id: i64) -> Result<i64, AppError> {
+    Ok(
+        sqlx::query_scalar("SELECT erstellt_von FROM helfer_einladung WHERE id = ?")
+            .bind(einladung_id)
+            .fetch_one(&mut *conn)
+            .await?,
+    )
+}

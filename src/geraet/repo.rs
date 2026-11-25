@@ -144,10 +144,11 @@ const ANZEIGE_SELECT: &str = concat!(
      LEFT JOIN einsatz_einheit ee ON ee.id = k.einheit_id"
 );
 
-/// Alle Kopplungen eines Einsatzes, neueste zuerst.
+/// Alle Kopplungen eines Einsatzes, neueste zuerst, ohne Helfer: die stehen in der
+/// Helfer-Übersicht (`crate::helfer::liste`).
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<KopplungAnzeige>, AppError> {
     let zeilen: Vec<KopplungZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "{ANZEIGE_SELECT} WHERE k.einsatz_id = ? ORDER BY k.id DESC"
+        "{ANZEIGE_SELECT} WHERE k.einsatz_id = ? AND k.ansicht <> 'helfer' ORDER BY k.id DESC"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -193,18 +194,32 @@ pub fn anzeigename(stelle: Option<&str>, bezeichnung: &str) -> String {
     }
 }
 
-/// Legt Gerätekonto und Kopplung an (eine Transaktion des Aufrufers). Liefert die Kopplungs-ID.
-pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Result<i64, AppError> {
+/// Legt das Gerätekonto einer Kopplung an: ohne Rolle, ohne Passwortweg.
+async fn geraetekonto_anlegen(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    anzeigename: &str,
+) -> Result<i64, AppError> {
     let benutzername = format!("geraet-{}", uuid::Uuid::new_v4().simple());
-    let benutzer_id: i64 = sqlx::query_scalar(
+    Ok(sqlx::query_scalar(
         "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle) \
          VALUES (?, ?, ?, ?, 'keiner', 'keine') RETURNING id",
     )
-    .bind(neu.org_id)
-    .bind(anzeigename(neu.stelle_name, neu.bezeichnung))
+    .bind(org_id)
+    .bind(anzeigename)
     .bind(&benutzername)
     .bind(PASSWORT_HASH_SSO_ONLY)
     .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Legt Gerätekonto und Kopplung an (eine Transaktion des Aufrufers). Liefert die Kopplungs-ID.
+pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Result<i64, AppError> {
+    let benutzer_id = geraetekonto_anlegen(
+        &mut *conn,
+        neu.org_id,
+        &anzeigename(neu.stelle_name, neu.bezeichnung),
+    )
     .await?;
     let spalte = |art: Bindungsart| neu.stelle.filter(|s| s.art == art).map(|s| s.id);
     let kopplung_id: i64 = sqlx::query_scalar(
@@ -237,6 +252,122 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     )
     .await?;
     Ok(kopplung_id)
+}
+
+/// Dauer einer Helfer-Kopplung im Zustand `unbestaetigt`, in Minuten (Spec Helfer-App, „Dauer“).
+pub const HELFER_UNBESTAETIGT_MINUTEN: i64 = 120;
+
+/// Ziel einer Helfer-Kopplung in der Datenbank: genau eine der beiden Spalten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelferZielSpalte {
+    Einheit(i64),
+    Fahrzeug(i64),
+}
+
+impl HelferZielSpalte {
+    fn spalten(self) -> (Option<i64>, Option<i64>) {
+        match self {
+            HelferZielSpalte::Einheit(id) => (Some(id), None),
+            HelferZielSpalte::Fahrzeug(id) => (None, Some(id)),
+        }
+    }
+}
+
+/// Eingabe für eine neue Helfer-Kopplung, schon geprüft (`routes::helfer::einloesen`).
+pub struct NeueHelferKopplung<'a> {
+    pub einsatz_id: i64,
+    pub org_id: i64,
+    pub einladung_id: i64,
+    /// Ersteller der Einladung; er steht als `erstellt_von` an der Kopplung.
+    pub einladung_von: i64,
+    pub anzeigename: &'a str,
+    pub ziel: HelferZielSpalte,
+    pub person_gewuenscht: bool,
+}
+
+/// Ergebnis von [`anlegen_helfer`].
+pub struct HelferAngelegt {
+    pub kopplung_id: i64,
+    pub benutzer_id: i64,
+    pub laeuft_ab_at: String,
+}
+
+/// Legt Gerätekonto und Helfer-Kopplung im Zustand `unbestaetigt` an (eine Transaktion des
+/// Aufrufers): Ansicht `helfer`, gekoppelt sofort, Ablauf nach
+/// [`HELFER_UNBESTAETIGT_MINUTEN`]. Die Spur trägt die Einlösung ohne handelnde Person.
+pub async fn anlegen_helfer(
+    conn: &mut SqliteConnection,
+    neu: NeueHelferKopplung<'_>,
+    peer_ip: Option<&str>,
+) -> Result<HelferAngelegt, AppError> {
+    let benutzer_id = geraetekonto_anlegen(
+        &mut *conn,
+        neu.org_id,
+        &anzeigename(Some(Funktionsansicht::Helfer.label()), neu.anzeigename),
+    )
+    .await?;
+    let (einheit_id, fahrzeug_id) = neu.ziel.spalten();
+    let (kopplung_id, laeuft_ab_at): (i64, String) = sqlx::query_as(
+        "INSERT INTO geraet_kopplung \
+           (einsatz_id, benutzer_id, ansicht, einheit_id, fahrzeug_id, bezeichnung, anzeigename, \
+            erstellt_von, laeuft_ab_at, gekoppelt_at, helfer_zustand, einladung_id, \
+            person_gewuenscht) \
+         VALUES (?, ?, 'helfer', ?, ?, ?, ?, ?, datetime('now', ?), datetime('now'), \
+                 'unbestaetigt', ?, ?) \
+         RETURNING id, laeuft_ab_at",
+    )
+    .bind(neu.einsatz_id)
+    .bind(benutzer_id)
+    .bind(einheit_id)
+    .bind(fahrzeug_id)
+    .bind(neu.anzeigename)
+    .bind(neu.anzeigename)
+    .bind(neu.einladung_von)
+    .bind(format!("+{HELFER_UNBESTAETIGT_MINUTEN} minutes"))
+    .bind(neu.einladung_id)
+    .bind(neu.person_gewuenscht)
+    .fetch_one(&mut *conn)
+    .await?;
+    ereignis(
+        &mut *conn,
+        kopplung_id,
+        KopplungEreignis::Eingeloest,
+        None,
+        peer_ip,
+    )
+    .await?;
+    Ok(HelferAngelegt {
+        kopplung_id,
+        benutzer_id,
+        laeuft_ab_at,
+    })
+}
+
+/// Setzt das Ziel einer Helfer-Kopplung, nur im Zustand `unbestaetigt` (sonst 409: danach setzt
+/// es nur die Leitung). Das Ziel ist schon gegen den Einsatz geprüft.
+pub async fn helfer_ziel_setzen(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    ziel: HelferZielSpalte,
+) -> Result<(), AppError> {
+    let (einheit_id, fahrzeug_id) = ziel.spalten();
+    let geaendert = sqlx::query(
+        "UPDATE geraet_kopplung SET einheit_id = ?, fahrzeug_id = ? \
+         WHERE id = ? AND ansicht = 'helfer' AND helfer_zustand = 'unbestaetigt'",
+    )
+    .bind(einheit_id)
+    .bind(fahrzeug_id)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if geaendert == 1 {
+        Ok(())
+    } else {
+        Err(AppError::Conflict(
+            "Nach der Bestätigung setzt nur die Einsatzleitung ein neues Ziel".into(),
+        ))
+    }
 }
 
 /// Schreibt ein Ereignis in die Kopplungsspur.

@@ -1206,6 +1206,18 @@ fn helfer_status_wire() {
     } in lifeline_hub::helfer::HelferStatus::ALLE);
 }
 
+/// Helfer-App: Grund des Endes einer Helfer-Kopplung (die App nennt ihn).
+#[test]
+fn helfer_ende_grund_wire() {
+    enum_wire!(lifeline_hub::helfer::anmeldung::HelferEndeGrund {
+        EinsatzBeendet => "incident_closed",
+        Widerrufen => "revoked",
+        Abgelaufen => "expired",
+        Abgelehnt => "rejected",
+        Abgemeldet => "signed_out",
+    } in lifeline_hub::helfer::anmeldung::HelferEndeGrund::ALLE);
+}
+
 /// Helfer-App: Art des Ziels einer Helfer-Kopplung.
 #[test]
 fn helfer_ziel_art_wire() {
@@ -2096,6 +2108,7 @@ fn geraet_kopplung_wire() {
         Einsatzabschnitt => "einsatzabschnitt",
         Verpflegung => "verpflegung",
         Einheit => "einheit",
+        Helfer => "helfer",
     } in lifeline_hub::geraet::Funktionsansicht::ALLE);
     enum_wire!(lifeline_hub::geraet::Bindungsart {
         Uhs => "uhs",

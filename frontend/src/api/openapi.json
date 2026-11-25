@@ -10940,7 +10940,8 @@
           "bereitstellungsraum",
           "einsatzabschnitt",
           "verpflegung",
-          "einheit"
+          "einheit",
+          "helfer"
         ]
       },
       "GefahrBewertungAnzeige": {
@@ -11441,6 +11442,34 @@
           }
         }
       },
+      "HelferEinsatz": {
+        "type": "object",
+        "description": "Der Einsatz einer Helfer-Kopplung, nur Kennung und Bezeichnung.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "HelferEndeGrund": {
+        "type": "string",
+        "description": "Warum eine Helfer-Kopplung endet. Der Server liefert nur `rejected` (die abgelehnte\nKopplung beantwortet `GET /api/devices/me` noch); jedes andere Ende ist 401, und die App\nnennt den Grund aus der letzten bekannten Antwort selbst.",
+        "enum": [
+          "incident_closed",
+          "revoked",
+          "expired",
+          "rejected",
+          "signed_out"
+        ]
+      },
       "HelferPerson": {
         "type": "object",
         "description": "Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung.",
@@ -11522,6 +11551,136 @@
           "unit",
           "vehicle"
         ]
+      },
+      "HelferZielOption": {
+        "type": "object",
+        "description": "Ein wählbares Ziel vor dem Einlösen.",
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "call_sign": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Eigener Funkrufname der Einheit; fehlt beim Fahrzeug (der Name ist sein Rufname)."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HelferZielArt"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name der Einheit bzw. Funkrufname des Fahrzeugs."
+          },
+          "sign_function": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Taktisches Zeichen: Fachaufgabe (`tz_fachaufgabe`)."
+          },
+          "sign_organization": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Taktisches Zeichen: Organisation (`tz_organisation`)."
+          }
+        }
+      },
+      "HelferZielliste": {
+        "type": "object",
+        "description": "Antwort von `GET /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne\nPersonen.",
+        "required": [
+          "targets",
+          "person_tracking_allowed"
+        ],
+        "properties": {
+          "person_tracking_allowed": {
+            "type": "boolean",
+            "description": "Ob die Organisation „Auch Personen orten“ erlaubt; sonst blendet die App das Häkchen aus."
+          },
+          "targets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelferZielOption"
+            }
+          }
+        }
+      },
+      "HelferZustand": {
+        "type": "object",
+        "description": "Der eigene Zustand einer Helfer-Kopplung (`GET /api/devices/me`, Antwort auf das Einlösen).",
+        "required": [
+          "state",
+          "incident",
+          "is_tracker",
+          "paused",
+          "expires_at",
+          "server_time"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "description": "Ablauf der Kopplung (UTC, `%Y-%m-%d %H:%M:%S`)."
+          },
+          "incident": {
+            "$ref": "#/components/schemas/HelferEinsatz"
+          },
+          "is_tracker": {
+            "type": "boolean",
+            "description": "Das Gerät schreibt die Position seines Ziels."
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "person": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferPerson",
+                "description": "Die Person, die die Leitung zugeordnet hat; fehlt vor der Bestätigung."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferEndeGrund"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "server_time": {
+            "type": "string",
+            "description": "Uhrzeit des Servers in derselben Form, für Restzeiten auf dem Gerät."
+          },
+          "state": {
+            "$ref": "#/components/schemas/HelferStatus",
+            "description": "`beendet` kommt hier nicht vor: nach dem Ende ist die Sitzung ungültig (401)."
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferZiel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "HintergrundbildAnzeige": {
         "type": "object",

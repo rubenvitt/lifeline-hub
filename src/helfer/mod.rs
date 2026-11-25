@@ -3,9 +3,11 @@
 //! oder Fahrzeug, optional die Person).
 //!
 //! - [`einladung`]: die Helfer-Einladung der Leitung (Code, Gültigkeit, Widerruf, Einlösen).
+//! - [`anmeldung`]: Zielliste, Prüfung des Ziels und der eigene Zustand des Geräts.
 //! - Die Helfer-Kopplung ist eine Zeile in `geraet_kopplung` mit `ansicht = 'helfer'`
 //!   (Migration 0373); [`liste`] zeigt sie der Leitung.
 
+pub mod anmeldung;
 pub mod einladung;
 
 use crate::error::AppError;

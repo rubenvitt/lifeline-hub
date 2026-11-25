@@ -79,7 +79,10 @@ pub async fn liste(
     ctx.fordere_einsatzleitung()?;
     let kopplungen = repo::liste(&state.pool, ctx.einsatz.id).await?;
     let mut sperren = Vec::new();
-    for ansicht in Funktionsansicht::ALLE {
+    for ansicht in Funktionsansicht::ALLE
+        .into_iter()
+        .filter(|a| !a.nur_per_einladung())
+    {
         let gesperrt = gesperrt_fuer_geraet(
             &state.pool,
             ctx.einsatz.id,
@@ -94,7 +97,7 @@ pub async fn liste(
     }
     let ansichten = Funktionsansicht::ALLE
         .into_iter()
-        .filter(|a| a.ist_verfuegbar())
+        .filter(|a| a.ist_verfuegbar() && !a.nur_per_einladung())
         .map(|ansicht| AnsichtAuswahl {
             ansicht,
             stellenart: ansicht.stellenart(),
@@ -228,6 +231,13 @@ pub async fn anlegen(
     if bezeichnung.chars().count() > BEZEICHNUNG_MAX {
         return Err(AppError::Validation(format!(
             "bezeichnung darf höchstens {BEZEICHNUNG_MAX} Zeichen haben"
+        )));
+    }
+    // Helfer melden sich selbst über die Einladung an (Spec Helfer-App, „Anmelden“).
+    if ansicht.nur_per_einladung() {
+        return Err(AppError::UnprocessableEntity(format!(
+            "{} entstehen nur über die Helfer-Einladung",
+            ansicht.label()
         )));
     }
     if !ansicht.ist_verfuegbar() {

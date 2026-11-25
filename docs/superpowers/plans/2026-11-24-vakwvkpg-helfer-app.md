@@ -260,7 +260,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - „Beendet“ nach dem Ende der Sitzung beantwortet der Server mit 401. Den Grund liefert die
     App selbst aus der letzten bekannten Antwort; der Server hält ihn nicht.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `helfer_loest_einladung_ein_und_ist_unbestaetigt`;
   - `zwei_geraete_loesen_dieselbe_einladung_ein`: zwei Kopplungen, beide `unbestaetigt`;
   - `personensitzung_kann_nicht_einloesen` (409);
@@ -269,10 +269,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - `unbestaetigte_kopplung_laeuft_nach_zwei_stunden_ab` (Zeit über `laeuft_ab_at` in der DB
     zurücksetzen → 401);
   - `ziel_aendern_nur_unbestaetigt`.
-- [ ] **Step 2:** Run → FAIL.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run `cargo test --test helfer --test geraet_kopplung --test geraet_routen_guard` → PASS; `scripts/check-typ-codegen.sh`.
-- [ ] **Step 5:** Commit `feat: Helfer lösen die Einladung ein`.
+- [x] **Step 2:** Run → FAIL.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** Run `cargo test --test helfer --test geraet_kopplung --test geraet_routen_guard` → PASS; `scripts/check-typ-codegen.sh`.
+- [x] **Step 5:** Commit `feat: Helfer lösen die Einladung ein`.
 
 ### Task 6: Bestätigen, Ablehnen, Entfernen, Ortungsgerät
 

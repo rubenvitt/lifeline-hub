@@ -217,6 +217,52 @@ async fn anlegen_prueft_eingaben() {
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
 
+/// Helfer-App (Spec 2026-11-24-vakwvkpg): eine Helfer-Kopplung entsteht nur über die Einladung
+/// (`POST /api/devices/helpers/redeem`), nie über die Kopplungsmaske der Leitung.
+#[tokio::test]
+async fn helfer_ansicht_entsteht_nur_ueber_die_einladung() {
+    let (app, pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        einsatz,
+        json!({"ansicht": "helfer", "bezeichnung": "Handy"}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM geraet_kopplung")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
+
+/// Routenliste `helfer`: den Helferzustand erreicht nur eine Helfer-Kopplung; andere Geräte und
+/// Personen bekommen 403.
+#[tokio::test]
+async fn nur_helfer_erreichen_den_helferzustand() {
+    let (app, _pool, _live) = setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let uhs = uhs_anlegen(&app, &admin, einsatz, "UHS Nord").await;
+    let (_, geraet) = tablet(&app, &admin, einsatz, uhs).await;
+    for cookie in [&geraet, &admin] {
+        let (s, v) = anfrage(&app, "GET", "/api/devices/me", cookie, None).await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+        let (s, v) = anfrage(
+            &app,
+            "PUT",
+            "/api/devices/me",
+            cookie,
+            Some(r#"{"target":{"kind":"unit","id":1}}"#),
+        )
+        .await;
+        assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    }
+}
+
 #[tokio::test]
 async fn uhs_eines_anderen_einsatzes_ist_404() {
     let (app, _pool, _live) = setup_mit_pool_und_live().await;

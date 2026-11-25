@@ -297,6 +297,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
     ("/api/einsaetze/{id}/command", None),
     // Gerätekopplung (LFH-892): Verwaltung der Einsatzleitung, modul-los wie die Mitglieder.
     ("/api/einsaetze/{id}/devices", None),
+    // Helfer-App (Spec 2026-11-24-vakwvkpg): Einladung und Helfer der Leitung, kein Modul.
+    ("/api/incidents/{id}/helpers", None),
     // Freigabe für Maschinenzugänge (LLH-1638): Verwaltung der Einsatzleitung wie die Geräte.
     ("/api/einsaetze/{id}/integrations", None),
     // Lagebild für Externe (LLH-1496): Links der Einsatzleitung, modul-los wie die Anbindungen.

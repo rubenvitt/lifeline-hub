@@ -112,8 +112,10 @@ fn routenliste_ist_duplikatfrei() {
     );
     for a in Funktionsansicht::ALLE {
         for eintrag in a.routen() {
+            // Die Helfer-Liste steht für sich und nennt die gemeinsamen Routen, die sie braucht,
+            // selbst (`darf_route` liest für sie keine gemeinsame Liste).
             assert!(
-                !gesehen.contains(eintrag),
+                a == Funktionsansicht::Helfer || !gesehen.contains(eintrag),
                 "{a:?}: {} {} steht schon in einer gemeinsamen Liste",
                 eintrag.0,
                 eintrag.1
@@ -132,6 +134,9 @@ fn routenliste_ist_duplikatfrei() {
 #[test]
 fn ansichtslisten_tragen_nur_einsatzrouten() {
     for (herkunft, _, pfad) in alle_eintraege() {
+        if herkunft == "Helfer" {
+            continue;
+        }
         if herkunft != "ALLE_GERAETE" {
             assert!(
                 pfad.starts_with("/api/einsaetze/{id}"),
@@ -202,4 +207,43 @@ fn lagemonitor_schreibt_nichts() {
         verstoesse.is_empty(),
         "Lagemonitor darf schreiben: {verstoesse:?}"
     );
+}
+
+/// Helfer-App (Spec 2026-11-24-vakwvkpg, „Routenliste `helfer`“): eine Helfer-Sitzung erreicht
+/// genau ihre Liste, keine gemeinsame Route darüber hinaus. Gelesen wird die echte Routentabelle:
+/// auch eine neue Route in `ALLE_GERAETE` oder `ALLE_ANSICHTEN` öffnet sich dem Helfer nicht.
+#[test]
+fn helfer_erreicht_nur_seine_liste() {
+    let quelle = fs::read_to_string("src/app.rs").expect("src/app.rs lesbar");
+    let liste = Funktionsansicht::Helfer.routen();
+    let mut geprueft = 0usize;
+    let mut verstoesse = Vec::new();
+    for (pfad, block) in alle_route_bloecke(&quelle) {
+        for methode in ["GET", "POST", "PATCH", "PUT", "DELETE"] {
+            if !block.contains(&format!("{}(", methode.to_lowercase())) {
+                continue;
+            }
+            geprueft += 1;
+            let erlaubt =
+                lifeline_hub::geraet::darf_route(Funktionsansicht::Helfer, methode, &pfad);
+            if erlaubt != liste.contains(&(methode, pfad.as_str())) {
+                verstoesse.push(format!("{methode} {pfad}"));
+            }
+        }
+    }
+    assert!(
+        geprueft > 500,
+        "Selbstbeweis: nur {geprueft} Routen gefunden"
+    );
+    assert!(
+        verstoesse.is_empty(),
+        "Helfer erreicht anderes als seine Liste: {verstoesse:?}"
+    );
+    // Keine Lage: aus dem Einsatz nur der Live-Kanal (Ende der Kopplung, eigener Zustand).
+    for (m, p) in liste {
+        assert!(
+            !p.starts_with("/api/einsaetze/{id}") || *p == "/api/einsaetze/{id}/live",
+            "Helfer darf {m} {p} nicht"
+        );
+    }
 }
