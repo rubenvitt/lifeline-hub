@@ -1733,9 +1733,11 @@ mod tests {
             async move {
                 let jetzt = l.fetch_add(1, Ordering::SeqCst) + 1;
                 h.fetch_max(jetzt, Ordering::SeqCst);
-                for _ in 0..5 {
-                    tokio::task::yield_now().await;
-                }
+                // Wirklich warten statt nur abgeben: vor jedem Abruf liest `load_teilstand` den
+                // Cache aus SQLite, und diese Antwort kommt aus einem anderen Thread. Fünf
+                // `yield_now` reichten nicht, bis der zweite Auftrag hier ankam; gemessen wurde
+                // dann 1 statt 2.
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
                 l.fetch_sub(1, Ordering::SeqCst);
                 g.fetch_add(1, Ordering::SeqCst);
                 Err::<Value, String>("HTTP 404".into())
