@@ -24,7 +24,10 @@ export interface OrtungKoppelnDialogProps {
   onSchliessen: () => void;
 }
 
-/** Der Hub holt die Kennungen vom ELW nach; so oft fragt der Dialog erneut nach (LLH-2119). */
+/**
+ * Am führenden ELW holt das ELW die Kennungen beim Hub; so oft fragt der Dialog erneut nach
+ * (LLH-2119).
+ */
 const HUB_ABFRAGE_MS = 2000;
 /** So lange wartet der Dialog auf den Hub, bevor er „antwortet nicht“ sagt (LLH-2119). */
 const HUB_GEDULD_MS = 15_000;
@@ -42,9 +45,9 @@ const SCHALTER_AUS_TEXT =
  * Kandidatenliste (die Org-Einstellungen darf nicht jeder Schreibberechtigte lesen). Ist er aus,
  * erklärt der Dialog das und sperrt „Koppeln“; maßgeblich ist der Server (422). Die Kandidaten
  * werden beim Öffnen geholt, nicht live und nicht im Lagebild ohne Netz (`NICHT_LIVE_KEYS`). Die
- * Liste trägt keine Koordinaten. Im gespiegelten Einsatz holt der Hub die Kennungen vom ELW nach
- * (`pending`, LLH-2119): der Dialog fragt dann alle 2 s erneut und meldet nach 15 s, dass der Hub
- * nicht antwortet; Kennungen von dort tragen „über den Hub“.
+ * Liste trägt keine Koordinaten. Am führenden ELW (der Einsatz ist dort nicht gespiegelt) holt
+ * das ELW die Kennungen beim Hub (`pending`, LLH-2119): der Dialog fragt dann alle 2 s erneut und
+ * meldet nach 15 s, dass der Hub nicht antwortet; Kennungen von dort tragen „über den Hub“.
  */
 export default function OrtungKoppelnDialog({
   einsatzId,
@@ -67,8 +70,8 @@ export default function OrtungKoppelnDialog({
     // Ein Schnappschuss beim Öffnen: ein erneutes Öffnen holt frisch.
     staleTime: 0,
     gcTime: 0,
-    // Solange der Hub die Kennungen noch holt (`pending`), nur bei offenem Dialog und höchstens
-    // {@link HUB_GEDULD_MS} lang erneut fragen; danach gilt „antwortet nicht“.
+    // Solange das ELW die Kennungen noch beim Hub holt (`pending`), nur bei offenem Dialog und
+    // höchstens {@link HUB_GEDULD_MS} lang erneut fragen; danach gilt „antwortet nicht“.
     refetchInterval: (q) =>
       offen && !hubStumm && q.state.data?.pending === true ? HUB_ABFRAGE_MS : false,
   });
