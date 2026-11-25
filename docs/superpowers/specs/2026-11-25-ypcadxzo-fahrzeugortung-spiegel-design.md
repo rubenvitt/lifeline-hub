@@ -1,6 +1,6 @@
 # Fahrzeugortung in gespiegelten Einsätzen: der Hub liefert Positionen an das führende ELW (LLH-2119)
 
-**Status:** Entwurf, wartet auf Freigabe · **Datum:** 2026-11-25 · **Zunder:**
+**Status:** Entwurf, wartet auf Freigabe (nach Gegenlese) · **Datum:** 2026-11-25 · **Zunder:**
 https://zunder.rubeen.dev/#/aufgabe/ypcadxzog8lomshl4wapmybc · **Route:** `entwurf` (E1 Weg der
 Weiterleitung, E2 neue ADR neben ADR-0103, E3 `src/instanz/spiegel`, `src/ortung`, Frontend, Doku)
 
@@ -27,7 +27,7 @@ Spiegel ans ELW.
   (5 s, solange ein Einsatz aktiv ist). Am ELW gelten dieselben Regeln wie bei der lokalen
   Ortung: Baustein, Vorrang, Drossel, Org-Schalter, Ende.
 - Über den bestehenden Spiegel sieht auch der Hub die Position.
-- Gibt das ELW die Führung ab, enden seine Kopplungen mit einem ETB-Eintrag. Das gilt auch für
+- Gibt das ELW die Führung ab, enden seine Kopplungen still, ohne ETB-Eintrag. Das gilt auch für
   lokale Kopplungen eines Hubs, der die Führung abgibt.
 
 ## Nicht-Ziele
@@ -136,6 +136,11 @@ Typen sind es nicht. Die Wahl der Feldnamen liegt beim Bauenden, solange sie eng
   - höchstens 200 Anfragen je Paket, Überzählige überliest der Hub;
   - die Kandidaten zählen gegen `SPIEGEL_MAX` wie die übrigen Felder.
 
+Der Hub stellt seine Antwortfelder **außerhalb** der `write_retry!`-Transaktion von
+`handle_abgleich` zusammen (danach, rein lesend). Ein SQL-Fehler dort rollt so den Abgleich nicht
+zurück. Ebenso übernimmt das ELW die Positionen nach dem Commit des Abgleichs, in eigener
+Transaktion.
+
 Den Hub-Teil baut ein eigenes Modul `src/ortung/fern.rs` (Name dem Bauenden überlassen). `abgleich.rs` ruft
 es auf beiden Seiten nur auf. Ein Fehler in diesem Teil darf den übrigen Abgleich nicht
 scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
@@ -148,9 +153,10 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
   `klemme_zeitpunkt` und `schreibe_position`.
 - `uebernahme.rs` bekommt dafür einen zweiten Einstieg, der die Kopplung über den Hub-Schlüssel
   findet und die Position aus dem Paket statt aus `position_letzte` nimmt.
-- Die Drossel von 15 s gilt unverändert. Einen Nachlauf braucht dieser Weg nicht: Der nächste
-  Abgleich liefert dieselbe oder eine jüngere Position erneut. Der Bauende entscheidet, ob der
-  Nachlauf für diesen Weg einfach nicht vorgemerkt wird.
+- Die Drossel von 15 s gilt unverändert. Einen Nachlauf gibt es auf diesem Weg **nicht**: Der
+  Nachlauf liest `position_letzte`, und die liegt am Hub. Der nächste Abgleich liefert dieselbe
+  oder eine jüngere Position ohnehin erneut. ADR-0104 nennt diese Ausnahme ausdrücklich, weil
+  ADR-0103 „genau einen Nachlauf“ verlangt.
 - Nach dem Commit `ortung::publiziere`. Der Spiegel am Hub bekommt die Position über die
   bestehenden Trigger.
 - Endet die Instanzkopplung oder wird die Org-Abbildung widerrufen, bleiben die Kopplungen
@@ -189,17 +195,32 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
   Sie kommt mit dem nächsten Abgleich. Nach dem PUT wird der Takt geweckt.
 - `DELETE`, Entlassen, Stornieren, Ablehnen, Abschluss und Rückgängig nach Entlassen arbeiten auf
   der Zeile, egal welche Art.
-  - Zum Rückgängig: Es stellt eine Hub-Kopplung mit ihren gespeicherten Hub-Spalten wieder her,
-    sofern die Kennung nicht inzwischen anderswo gekoppelt ist. Diese Prüfung gilt für jede Art.
+  - Zum Rückgängig: `OrtungVorzustand` (`src/fahrzeug/mod.rs`) bekommt die Hub-Spalten
+    (`instanz_kopplung_id`, `fremder_zugang_id`, `zugang_name`) als optionale Felder dazu. Die
+    Rücknahme stellt eine Hub-Kopplung **ohne** Pufferprüfung her. Geprüft wird nur:
+    - die Instanzkopplung besteht noch;
+    - die Org hat noch eine Abbildung dorthin;
+    - die Kennung ist nicht anderswo gekoppelt.
+    Der Hub prüft den Zugang bei jeder Lieferung selbst; ein falscher Wert liefert schlicht nichts.
+    (Entscheidung beim Entwurf nach der Gegenlese.)
+- **Bestehende Abfragen umbauen** (eigene Plan-Schritte):
+  - `SELECT_KOPPLUNG` verbindet heute per INNER JOIN mit `einwurf_zugang` (`src/ortung/kopplung.rs`)
+    und würde Hub-Kopplungen still verlieren, samt ETB beim Trennen und beim Abschluss. Es braucht
+    einen LEFT JOIN, den Namen aus `COALESCE(z.name, k.zugang_name)` und ein optionales
+    `zugang_id` im Typ `Kopplung`.
+  - `run_nachlauf` (`uebernahme.rs`) überspringt Hub-Kopplungen.
 - `GET …/tracking` nennt bei einer Hub-Kopplung `access_name` aus `zugang_name`.
 
 ### Führungswechsel
 
 - In `fuehrung::werde_spiegel`, direkt neben `helfer::ende::beende_alle_im_einsatz` und noch vor
-  dem Spiegel:
-  - `ortung::kopplung::beende_bei_fuehrungsabgabe_tx(conn, einsatz_id)` löscht alle Kopplungen
-    des Einsatzes, egal welcher Art;
-  - je Fahrzeug folgt ein ETB-Systemeintrag „Ortung getrennt: <Funkrufname> (Führung abgegeben)“.
+  dem Spiegel: `ortung::kopplung::beende_bei_fuehrungsabgabe_tx(conn, einsatz_id)` löscht alle
+  Kopplungen des Einsatzes, egal welcher Art.
+- **Kein ETB-Eintrag** (Ruben, 25.11.2026, nach der Gegenlese). Ein Eintrag in diesem Moment käme
+  nach `bekannt_bis`, würde zur Bruchstelle (`sichere_bruchstelle`), und der neue Führer baute den
+  Spiegel ohne ihn neu auf. Jede Abgabe mit Kopplung würde zum Bruchfall. Die Kopplung endet also
+  still, wie die Helfer-Kopplungen. Die Marke „Ortung“ verschwindet, die Position wird veraltet.
+  `ortung_kopplung` schreibt keinen Spiegel-Log, das Löschen ist deshalb kein Bruch.
 - Positionen bleiben als letzter Stand stehen. Sie gehören zum Einsatz und reisen ohnehin schon
   mit dem Spiegel. Gelöscht werden sie erst beim Abschluss durch den neuen Führer, wie heute
   (Quelle `einwurf`).
@@ -234,7 +255,9 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
   - Kandidaten ohne Koordinaten;
   - kein Zustand am Hub;
   - geschrieben wird am ELW nur über `schreibe_position`;
-  - Kopplungen enden bei Abgabe der Führung mit ETB-Eintrag;
+  - Kopplungen enden bei Abgabe der Führung still, vor dem Anlegen des Spiegels;
+  - Ausnahme von ADR-0103 „genau ein Nachlauf“: Auf dem Weg über den Hub ersetzt der nächste
+    Abgleich den Nachlauf. Der Nachlauf liest `position_letzte`, und die liegt am Hub.
   - kein Protokoll mit Kennung, Schlüssel oder Koordinaten.
   - Prüfung per `verlange`/`verbiete`, etwa: kein `tracing::` mit Kennung in `src/ortung/fern.rs`,
     `beende_bei_fuehrungsabgabe_tx` in `fuehrung.rs`, `serde(default)` an den neuen Feldern.
@@ -266,14 +289,36 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
 - Ein ELW ohne die neuen Felder (alter Stand) und ein Hub ohne sie: Der Abgleich läuft, die Felder
   bleiben leer.
 - Koppeln mit einer Kennung, die nicht im Puffer steht: 422. Doppelt gekoppelt: 409.
-- Führungsabgabe am ELW beendet Hub-Kopplungen mit ETB-Eintrag, ebenso lokale Kopplungen am Hub,
-  der abgibt.
+- Führungsabgabe am ELW beendet Hub-Kopplungen ohne ETB-Eintrag und ohne Bruchstelle
+  (`bruch_offen` bleibt falsch). Ebenso bei lokalen Kopplungen am Hub, der abgibt.
 - Drossel: zwei Lieferungen binnen 15 s schreiben einmal.
 - Entlassen, Stornieren, Abschluss und Rückgängig wirken auf Hub-Kopplungen wie auf lokale
   (vorhandene Tests mit einer Hub-Kopplung parametrisieren, wo es billig ist).
 - `keine_tabelle_haelt_einen_positionsverlauf` bleibt grün. Der CHECK der Tabelle lehnt gemischte
   Zeilen ab.
 - Frontend: Dialog mit `pending`, Zeitüberschreitung, Zusatz „über den Hub“.
+
+## Nach der Gegenlese
+
+Ein Gegenleser hat den Entwurf als Bauender gelesen. Ruben hat entschieden, dass die Führungsabgabe
+still trennt. Beim Entwurf festgelegt und oben eingetragen sind:
+
+- kein Nachlauf auf dem Hub-Weg, als Ausnahme in ADR-0104;
+- der Hub liest außerhalb der Abgleichstransaktion;
+- Rückgängig ohne Pufferprüfung;
+- Umbau von `SELECT_KOPPLUNG` und `run_nachlauf`.
+
+Außerdem:
+
+- **Dieselbe Kennung an mehreren Instanzen:** Zwei ELW an einem Hub oder der Hub selbst können
+  dieselbe Hub-Kennung zugleich koppeln. Der Hub hält bewusst keinen Zustand dafür (Anti-Ziel).
+  Hingenommen: Ein Gerät sitzt in genau einem Fahrzeug, und Doppelkopplungen sind Bedienfehler,
+  die sich auf der Karte zeigen. `coupled` in den Kandidaten bezieht sich nur auf die eigene
+  Instanz; der Dialog sagt das nicht eigens.
+- **Mehrere Hubs:** Anfragen gehen über die `instanz_kopplung_id`, die an der Kopplung steht, und
+  Kandidaten kommen vom Hub aus `hub_fuer_org`. Wandert die Abbildung zu einer anderen Kopplung,
+  liefert der alte Hub nichts mehr. Die Zeilen bleiben, bis jemand trennt oder `ON DELETE CASCADE`
+  sie mitnimmt.
 
 ## Dem Bauenden überlassen
 
