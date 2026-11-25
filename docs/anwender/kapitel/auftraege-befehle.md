@@ -2,7 +2,7 @@
 titel: Aufträge und Befehle
 gruppen: [fuehrung]
 reihenfolge: 140
-quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/vorlagendokument/benachrichtigung.rs, src/auftrag/benachrichtigung.rs, src/benachrichtigung/text.rs, src/erinnerung/benachrichtigung.rs]
+quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/pages/AuftraegePage.tsx, frontend/src/components/ListeDetail.tsx, frontend/src/auftraege/AuftraegeListe.tsx, frontend/src/auftraege/AuftragErteilenDialog.tsx, frontend/src/auftraege/AuftragFormular.tsx, frontend/src/auftraege/auftragsschemaKern.ts, frontend/src/auftraege/auftragBerichtigungKern.ts, frontend/src/auftraege/AuftragListenKarte.tsx, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/auftraege/AuftragTeile.tsx, frontend/src/auftraege/EmpfaengerQuittung.tsx, frontend/src/auftraege/EmpfaengerFilter.tsx, frontend/src/auftraege/VollzugMeldenModal.tsx, frontend/src/auftraege/AuftragAufhebenDialog.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/auftraege/AuftragDruckBlatt.tsx, frontend/src/auftraege/BefehlListe.tsx, frontend/src/auftraege/BefehlListenKarte.tsx, frontend/src/auftraege/BefehlDetail.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, frontend/src/fuehrung/EmpfaengerWahl.tsx, frontend/src/fuehrung/ExterneEmpfaenger.tsx, frontend/src/befehle/vorlagen.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/kommunikation/gruppierung.ts, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/auftrag.rs, src/auftrag/repo.rs, src/auftrag/eingabe.rs, src/routes/befehl.rs, src/befehl/mod.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/repo.rs, src/vorlagendokument/benachrichtigung.rs, src/auftrag/benachrichtigung.rs, src/benachrichtigung/text.rs, src/erinnerung/benachrichtigung.rs, frontend/src/ausgang/SendenDialog.tsx, frontend/src/ausgang/Versandliste.tsx, src/ausgang/lauf.rs]
 ---
 
 ## Überblick
@@ -217,6 +217,16 @@ Ein Befehl ohne jeden Text lässt sich nicht freigeben; die Rückfrage meldet da
 leer und kann nicht freigegeben werden“. Die Fassung steht als „v1“, „v2“ … an der Karte; eine
 Fortschreibung trägt denselben Titel wie ihr Vorgänger.
 
+### Einen Einsatzbefehl per E-Mail senden
+
+Für Einsatzleitung und Führungspersonal, mit freigegebenem Befehl:
+
+1. Den Befehl in der Ansicht „Freigegeben“ öffnen und „Senden“ wählen.
+2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen; vorbelegt sind die externen Stellen des
+   Verteilers mit Mailadresse.
+3. „Senden“ wählen. Unter dem Befehlstext zeigt der Abschnitt „Versand“ je Adresse „wartet“,
+   „übergeben 14:32“ oder „fehlgeschlagen: …“; dort steht auch „Erneut senden“.
+
 ## Hintergrund
 
 ### Fristen und Alarm
@@ -321,6 +331,13 @@ Die eigene Freigabe bleibt still: Wer freigibt, bekommt nichts, auch wenn die ei
 Verteiler steht. Entwurf und Bearbeiten melden nichts. Eine Fortschreibung meldet sich erst mit
 ihrer eigenen Freigabe, dann erneut an alle Funktionen in ihrem Verteiler; jede Freigabe meldet
 sich genau einmal.
+
+### Versand per E-Mail
+
+Der Versand eines Befehls verhält sich wie der eines Lageberichts: nur die jüngste freigegebene
+Fassung, höchstens 30 Minuten Wiederholung bei Störungen, „Zustellung unklar“ ohne Wiederholung
+von selbst, jedes Ergebnis im ETB. Einzelheiten stehen im Kapitel
+[Lageberichte](lageberichte.md), „Versand per E-Mail“. Ein Einzelauftrag wird nicht gesendet.
 
 ### Verteiler
 
