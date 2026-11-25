@@ -68,7 +68,7 @@ import BetroffenenSeitenleiste from '../personen/BetroffenenSeitenleiste';
 import Sichtungszeile from '../personen/Sichtungszeile';
 import Sichtungsboard from '../personen/Sichtungsboard';
 import ListenzugriffeDrawer from '../personen/ListenzugriffeDrawer';
-import PassExportDialog from '../personen/PassExportDialog';
+import PassListeDialog from '../personen/PassListeDialog';
 import type { ZeilenRueckmeldung } from '../personen/ZeilenSichtung';
 import VerbleibErfassung from '../personen/VerbleibErfassung';
 import { UebergabeDialog } from '../personen/UebergabeQuittieren';
@@ -274,8 +274,8 @@ export default function PersonenPage() {
   // Am Einsatz festgemacht wie die Erfassungsmasken: ein Wechsel des Einsatzes schließt die
   // Listenzugriffe, statt sie für den nächsten Einsatz zu laden (LFH-916).
   const [listenzugriffeFuer, setListenzugriffeFuer] = useState<number | null>(null);
-  // Rückfrage vor dem PASS-Export (LLH-1198), am Einsatz festgemacht wie die Listenzugriffe.
-  const [passExportFuer, setPassExportFuer] = useState<number | null>(null);
+  // Dialog der PASS-Liste (LLH-1198), am Einsatz festgemacht wie die Listenzugriffe.
+  const [passListeFuer, setPassListeFuer] = useState<number | null>(null);
   const [dokumentSichtbar, setDokumentSichtbar] = useState(
     () => typeof document === 'undefined' || document.visibilityState === 'visible',
   );
@@ -1107,22 +1107,15 @@ export default function PersonenPage() {
             onWahl: csvExport.exportieren,
           },
           // PASS-Liste für die Personenauskunftsstelle (LLH-1198): nur die Einsatzleitung, der
-          // Server prüft dasselbe; das CSV erst nach der Rückfrage zur Zweckbindung.
+          // Server prüft dasselbe. EIN Eintrag (Entscheidung 25.11.2026, der Kopf war voll); sein
+          // Dialog nennt die Zweckbindung und bietet Druckansicht und CSV.
           ...(istEinsatzLeitung(einsatz)
             ? [
                 {
-                  ...druckansichtNebenweg({
-                    ziel: passListeDruckPfad(einsatzId),
-                    navigate,
-                    dokument: 'PASS-Liste',
-                  }),
-                  key: 'pass-druck',
-                },
-                {
-                  key: 'pass-csv',
-                  label: 'PASS-Liste als CSV',
+                  key: 'pass-liste',
+                  label: 'PASS-Liste',
                   laeuft: passExport.laeuft,
-                  onWahl: () => setPassExportFuer(einsatzId),
+                  onWahl: () => setPassListeFuer(einsatzId),
                 },
                 {
                   key: 'listenzugriffe',
@@ -1497,13 +1490,18 @@ export default function PersonenPage() {
         }}
       />
       {istEinsatzLeitung(einsatz) && (
-        <PassExportDialog
-          offen={passExportFuer === einsatzId}
+        <PassListeDialog
+          offen={passListeFuer === einsatzId}
+          druckZiel={passListeDruckPfad(einsatzId)}
+          onDruckansicht={() => {
+            setPassListeFuer(null);
+            navigate(passListeDruckPfad(einsatzId));
+          }}
           onExportieren={() => {
-            setPassExportFuer(null);
+            setPassListeFuer(null);
             passExport.exportieren();
           }}
-          onAbbrechen={() => setPassExportFuer(null)}
+          onAbbrechen={() => setPassListeFuer(null)}
         />
       )}
       {istEinsatzLeitung(einsatz) && (

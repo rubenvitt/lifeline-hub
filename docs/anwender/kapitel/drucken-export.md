@@ -2,7 +2,7 @@
 titel: Drucken und Export
 gruppen: [alle, fuehrung]
 reihenfolge: 170
-quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/abloesung/schichtplan/ausgabe/useSchichtplanAusgabe.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/betreuung/registrierung/RegistrierungPaneel.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css, frontend/src/pages/EinsatzakteDruckPage.tsx, frontend/src/pages/PassListeDruckPage.tsx, frontend/src/personen/passListe.ts, frontend/src/personen/PassExportDialog.tsx, src/person/pass.rs]
+quellen: [frontend/src/components/druck/DruckKnopf.tsx, frontend/src/components/druck/useDruckNebenwege.ts, frontend/src/components/druck/useDrucken.ts, frontend/src/components/druck/Druckkopf.tsx, frontend/src/druck/druck.css, frontend/src/druck/ListenDruckSeite.tsx, frontend/src/pages/EtbPage.tsx, frontend/src/pages/EtbDruckPage.tsx, frontend/src/etb/EtbDruckTabelle.tsx, frontend/src/etb/etbDruckTabelle.css, frontend/src/etb/druckAuswahl.ts, frontend/src/routing/deeplinks.ts, frontend/src/pages/PersonenDruckPage.tsx, frontend/src/pages/PersonenPage.tsx, frontend/src/pages/TierePage.tsx, frontend/src/pages/SchaedenPage.tsx, frontend/src/pages/BefehlDetailPage.tsx, frontend/src/pages/AuftragDruckPage.tsx, frontend/src/pages/PersonDruckPage.tsx, frontend/src/personen/zugriffArt.ts, frontend/src/auftraege/AuftragDetail.tsx, frontend/src/pages/KraefteuebersichtPage.tsx, frontend/src/pages/EinsatzabschnittePage.tsx, frontend/src/abloesung/schichtplan/ausgabe/useSchichtplanAusgabe.tsx, frontend/src/planung/PlanungPage.tsx, frontend/src/betreuung/registrierung/RegistrierungPaneel.tsx, frontend/src/pages/FunkplanPage.tsx, frontend/src/pages/KommunikationsplanPage.tsx, frontend/src/pages/einsatzabschnitte/Organigramm.tsx, frontend/src/pages/EinsatzdatenPage.tsx, frontend/src/hilfe/HilfePage.tsx, frontend/src/components/useCsvExport.ts, frontend/src/stammdaten/OrganisationTab.tsx, frontend/src/admin/adminNav.tsx, frontend/src/pages/lagekarte/LageplanDruck.tsx, frontend/src/pages/gefahren/GefahrenPage.tsx, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/dokumentAnlagen.css, frontend/src/pages/lagekarte/lageplanDruck.css, frontend/src/fernmeldewesen/skizze/skizzeDruck.css, frontend/src/pages/EinsatzakteDruckPage.tsx, frontend/src/pages/PassListeDruckPage.tsx, frontend/src/personen/passListe.ts, frontend/src/personen/PassListeDialog.tsx, src/person/pass.rs]
 ---
 
 ## Überblick
@@ -101,11 +101,11 @@ Export sofort und meldet das an der Seite.
 
 Für die Einsatzleitung:
 
-1. In „Betroffene“ im Kopf der Seite „PASS-Liste als CSV“ oder „PASS-Liste – Druckansicht“
-   wählen; auf schmalen Bildschirmen und in der Bediendichte „Komfortabel“ oder „Handschuh“ unter
-   „Weitere“.
-2. Beim CSV fragt ein Dialog nach der Zweckbindung; „Exportieren“ lädt die Datei herunter,
-   „Abbrechen“ lädt nichts.
+1. In „Betroffene“ im Kopf der Seite „PASS-Liste“ wählen; auf schmalen Bildschirmen und in der
+   Bediendichte „Komfortabel“ oder „Handschuh“ unter „Weitere“. Der Dialog nennt die
+   Zweckbindung.
+2. „Als CSV exportieren“ lädt die Datei herunter; „Druckansicht“ öffnet die Druckseite.
+   „Abbrechen“ ruft nichts ab.
 3. In der Druckansicht „Drucken / als PDF“ wählen.
 
 ### Ein Dokument oder einen Plan drucken

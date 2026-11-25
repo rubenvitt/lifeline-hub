@@ -220,5 +220,7 @@ Gilt für `frontend/src/personen/`, `pages/personen/`, `pages/PersonenPage.tsx` 
   Ableitung der Art der Betroffenheit stehen nur im Server (`src/person/pass.rs`), er liefert je
   Spalte fertigen Text; der Client zeigt ihn an und ordnet nichts zu (`personen/passListe.ts`
   trägt nur Kopfwörter und den Wortlaut der Zweckbindung). Nur die Einsatzleitung, serverseitig
-  geprüft; das CSV erst nach der Rückfrage `personen/PassExportDialog.tsx`. Protokollarten
+  geprüft. EIN Kopf-Eintrag „PASS-Liste“ (Entscheidung 25.11.2026, der Kopf war voll); sein
+  Dialog `personen/PassListeDialog.tsx` nennt die Zweckbindung und bietet Druckansicht und CSV,
+  abgerufen wird erst mit der Wahl. Protokollarten
   `pass_export` und `pass_druck`, getrennt von `export` und `druck`.

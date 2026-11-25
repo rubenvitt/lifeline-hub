@@ -59,8 +59,8 @@ ein Muster vorliegt.
   Nummer nach `migrations/AGENTS.md`.
 - **Wire-Enum (ADR-0006):** neue Varianten in `ZugriffArt` und im Enum-Wire-Kontrakt;
   `scripts/check-typ-codegen.sh` läuft, beide generierten Dateien werden mitcommittet.
-- **Druck:** über den Browser (`frontend/src/druck/AGENTS.md`). Der Einstieg heißt nach seiner
-  Wirkung „PASS-Liste – Druckansicht“ (`druckansichtVon`).
+- **Druck:** über den Browser (`frontend/src/druck/AGENTS.md`). Der Weg im Dialog heißt nach
+  seiner Wirkung „Druckansicht“ (`DRUCKANSICHT`), die Seite trägt `dokumentart="PASS-Liste"`.
 
 ## Ansätze
 
@@ -114,9 +114,9 @@ Listenzugriffen (`liste_listenweit`) und im Erfassungsfenster je Person, wie dor
 
 ### Zweckbindung
 
-- **CSV:** Ein Bestätigungsdialog vor dem Download: „Die PASS-Liste enthält Personendaten
-  Betroffener. Nur für die Personenauskunft verwenden und nicht weitergeben. Der Abruf wird
-  protokolliert.“ Knöpfe „Exportieren“ und „Abbrechen“. Erst „Exportieren“ ruft den Server.
+- **Dialog vor beiden Wegen:** „Die PASS-Liste enthält Personendaten Betroffener. Nur für die
+  Personenauskunft verwenden und nicht weitergeben. Der Abruf wird protokolliert.“ Knöpfe
+  „Abbrechen“, „Druckansicht“ und „Als CSV exportieren“. Erst die Wahl ruft den Server.
 - **Druck:** Die Druckseite zeigt am Bildschirm denselben Hinweis. Auf dem Blatt steht unter dem
   Kopf „Zweckgebunden: nur für die Personenauskunftsstelle.“
 - Der genaue Wortlaut ist meine Wahl und darf beim Bauen geschliffen werden. Die drei Inhalte
@@ -173,8 +173,10 @@ Abgleich und kosten nichts.
 
 ### Oberfläche
 
-- Zwei Einträge in „Weitere Aktionen zu den Betroffenen“, nur für die Einsatzleitung:
-  „PASS-Liste – Druckansicht“ und „PASS-Liste als CSV“.
+- Ein Eintrag „PASS-Liste“ in „Weitere Aktionen zu den Betroffenen“, nur für die
+  Einsatzleitung. Er öffnet einen Dialog mit dem Hinweis auf die Zweckbindung und den Wegen
+  „Druckansicht“ und „Als CSV exportieren“. Nachgeschärft am 25.11.2026: Zuerst waren es zwei
+  Einträge, damit brach der ohnehin volle Seitenkopf bei 1440 px in eine zweite Knopfzeile um.
 - Die Druckseite liegt unter `/einsaetze/:id/personen/pass-druck` (App-Route deutsch) und nutzt
   `ListenDruckSeite` mit `dokumentart="PASS-Liste"`.
 - Die Tabelle zeigt dieselben Spalten wie das CSV. Datenregeln wie `PersonenDruckPage`: kein
