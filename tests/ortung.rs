@@ -1274,3 +1274,90 @@ async fn keine_tabelle_haelt_einen_positionsverlauf() {
         assert!(tabellen.iter().any(|t| t == n), "{n} fehlt");
     }
 }
+
+// ── Review-Nachträge (LLH-2091) ────────────────────────────────────────────────────────────
+
+#[tokio::test]
+async fn abweisen_einer_einheit_trennt_die_ortung_mit_etb_und_meldet_live() {
+    let (f, live) = fix_fuer_einwurf().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/staging-areas", f.einsatz),
+        &admin,
+        Some(r#"{"bezeichnung":"Sportplatz"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let br = v["id"].as_i64().unwrap();
+    let (s, _) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/staging-areas/{br}/status", f.einsatz),
+        &admin,
+        Some(r#"{"status":"aktiv"}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/staging-areas/{br}/arrival", f.einsatz),
+        &admin,
+        Some(r#"{"unangemeldet":{"fahrzeuge":[{"funkrufname":"Florian 7"}]}}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let einheit = v["einheit_id"].as_i64().unwrap();
+    let ef2 = v["fahrzeug_ids"][0].as_i64().unwrap();
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, kennung, \
+         ehrenamt_bestaetigt, gekoppelt_at, gekoppelt_von) \
+         SELECT ?, einsatz_id, org_id, zugang_id, 'geraet-2', 0, gekoppelt_at, gekoppelt_von \
+         FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
+    )
+    .bind(ef2)
+    .bind(f.ef)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+
+    let mut rx = live.abonniere(f.einsatz);
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/units/{einheit}/reject", f.einsatz),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    assert!(!f.hat_kopplung(ef2).await);
+    assert!(f.hat_kopplung(f.ef).await);
+    assert_eq!(f.ortung_etb(&admin).await, ["Ortung getrennt: Florian 7"]);
+    let n = recv_until_tag(&mut rx, "fahrzeug", std::time::Duration::from_secs(2)).await;
+    let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(data["fahrzeug_id"].as_i64(), Some(ef2));
+}
+
+#[tokio::test]
+async fn abschluss_meldet_fahrzeug_live_fuer_gekoppelte_und_geortete() {
+    let (f, live) = fix_fuer_einwurf().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    f.einwerfen(48.1, 11.5, T, T).await;
+    assert_eq!(f.uebernehmen(T).await, geschrieben(&f));
+    let mut rx = live.abonniere(f.einsatz);
+    let (s, v) = anfrage(
+        &f.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", f.einsatz),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let n = recv_until_tag(&mut rx, "fahrzeug", std::time::Duration::from_secs(2)).await;
+    let data: serde_json::Value = serde_json::from_str(&n.data).unwrap();
+    assert_eq!(data["fahrzeug_id"].as_i64(), Some(f.ef));
+}

@@ -1175,7 +1175,7 @@ pub async fn abweisen(
     let jetzt = crate::zeit::jetzt();
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let benutzer_id = ctx.benutzer.id;
-    let (ergebnis, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, etb_id, getrennt_ids) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis =
             einheit_repo::abweisen_tx(conn, org_id, einsatz_id, eid, benutzer_id, &jetzt).await?;
         let fahrzeuge: Vec<String> = ergebnis
@@ -1196,9 +1196,29 @@ pub async fn abweisen(
         );
         let etb_id =
             crate::etb::system_audit_tx(conn, einsatz_id, benutzer_id, startwert, &text).await?;
-        Ok((ergebnis, etb_id))
+        // Die Ortung endet mit dem Fahrzeug (LLH-2091): je getrennter Kopplung ein Eintrag in
+        // derselben Transaktion.
+        let mut getrennt_ids = Vec::new();
+        for (_, funkrufname, e) in &ergebnis.entlassen {
+            if e.ortung.is_some() {
+                getrennt_ids.push(
+                    crate::etb::system_audit_tx(
+                        conn,
+                        einsatz_id,
+                        benutzer_id,
+                        startwert,
+                        &crate::fahrzeug::etb_text_getrennt(funkrufname),
+                    )
+                    .await?,
+                );
+            }
+        }
+        Ok((ergebnis, etb_id, getrennt_ids))
     })?;
     state.live.publiziere(einsatz_id, etb_id);
+    for id in getrennt_ids {
+        state.live.publiziere(einsatz_id, id);
+    }
     notify_aufgeloest(&state, einsatz_id, eid, &ergebnis.aufgeloest).await;
     let mut fuehrungsstelle = false;
     for (ef_id, _, e) in &ergebnis.entlassen {

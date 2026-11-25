@@ -839,6 +839,9 @@ pub async fn liste_fuer(
 pub struct MitEtbEintraegen {
     pub einsatz: Einsatz,
     pub etb_eintrag_ids: Vec<i64>,
+    /// Einsatzfahrzeuge, deren Kopplung oder GPS-Position der Abschluss entfernt hat (LLH-2091);
+    /// die Route meldet sie nach dem Commit als `fahrzeug`. Sonst leer.
+    pub ortung_ef_ids: Vec<i64>,
 }
 
 /// Wortlaut des System-Eintrags, den der Abschluss schreibt (LLH-1814, Spec `einsatz-abschluss`,
@@ -871,6 +874,7 @@ pub async fn abschliessen(
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
 
     let mut etb_eintrag_ids = Vec::new();
+    let mut ortung_ef_ids: Vec<i64> = Vec::new();
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
         "UPDATE einsatz \
@@ -920,6 +924,7 @@ pub async fn abschliessen(
         for (ef_id, _) in
             crate::ortung::kopplung::delete_kopplungen_einsatz_tx(&mut tx, einsatz_id).await?
         {
+            ortung_ef_ids.push(ef_id);
             let funkrufname =
                 crate::fahrzeug::disposition_repo::transport_fahrzeug(&mut *tx, einsatz_id, ef_id)
                     .await?
@@ -945,6 +950,17 @@ pub async fn abschliessen(
                 )
                 .await?,
             );
+        }
+        let geleert: Vec<i64> = sqlx::query_scalar(
+            "SELECT id FROM einsatz_fahrzeug WHERE einsatz_id = ? AND position_quelle = 'ortung'",
+        )
+        .bind(einsatz_id)
+        .fetch_all(&mut *tx)
+        .await?;
+        for id in geleert {
+            if !ortung_ef_ids.contains(&id) {
+                ortung_ef_ids.push(id);
+            }
         }
         sqlx::query(
             "UPDATE einsatz_fahrzeug SET lat = NULL, lon = NULL, position_quelle = NULL, \
@@ -1044,6 +1060,7 @@ pub async fn abschliessen(
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
+        ortung_ef_ids,
     })
 }
 
@@ -1393,6 +1410,7 @@ pub async fn frist_setzen(
     Ok(MitEtbEintraegen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids: vec![etb_id],
+        ortung_ef_ids: Vec::new(),
     })
 }
 
