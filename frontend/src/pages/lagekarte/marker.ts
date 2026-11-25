@@ -28,6 +28,7 @@ import {
 import type { GeoJsonGeometry, GeoJsonPolygon } from './geo';
 import { registrierNummer } from '../../anzeige/registrierNummer';
 import { positionsAlter } from './positionsAlter';
+import { relativ } from '../../anzeige/dauer';
 import { staerkeText } from '../../anzeige/staerke';
 import { staerkeImRaum, type RaumEinheit } from '../../bereitstellungsraum/brZahlen';
 import {
@@ -186,7 +187,7 @@ function positionsHinweis(
   const alter = name ? positionsAlter(aktualisiertAt, jetzt) : null;
   if (!name || !alter) return {};
   return {
-    untertitel: `${name} · vor ${alter.minuten} min`,
+    untertitel: `${name} · ${relativ(alter.minuten, 'vor')}`,
     ...(alter.veraltet ? { deckkraft: VERALTET_DECKKRAFT } : {}),
   };
 }
