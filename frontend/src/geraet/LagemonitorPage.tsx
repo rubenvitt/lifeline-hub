@@ -39,6 +39,7 @@ import { schrift } from '../theme/tokens';
 import { GROSS_BEZUG, grossMass } from '../components/grossbild/grossMass';
 import { useBildschirmWach } from '../components/grossbild/useBildschirmWach';
 import LagemonitorKarte from './LagemonitorKarte';
+import LagemonitorLivebild from './LagemonitorLivebild';
 import { AlarmZeile } from '../components/instrument';
 import { alarmAusMonitor } from '../lage/alarmAusMonitor';
 import { wasBrennt } from '../lage/wasBrennt';
@@ -61,6 +62,10 @@ export const MENUE_ZU_MS = 30_000;
  * erreichen ihn nicht (sie tragen Personenkennungen), die Kopfzahlen ändern sich trotzdem.
  */
 export const ABRUF_TAKT_MS = 30_000;
+
+/** Höhe der Zeile mit dem Livebild und Breite seiner Kachel bei 1920 × 1080 (LLH-2109, Entwurf). */
+const LIVEBILD_ZEILE_PX = 440;
+const LIVEBILD_BREITE_PX = 734;
 
 /**
  * So lange hebt der Monitor eine gestiegene Zahl hervor (Spec `lagemonitor`, „Neue Dringlichkeit
@@ -107,6 +112,7 @@ function Kachel({
   titel,
   zusatz,
   zusatzAlarm = false,
+  zusatzVeraltet,
   children,
   style,
 }: {
@@ -115,6 +121,8 @@ function Kachel({
   zusatz?: string;
   /** Der Zusatz ist das Wort einer Hervorhebung und steht in der Alarmfarbe. */
   zusatzAlarm?: boolean;
+  /** Der Zusatz ist ein Datenstand; älter als 2 Minuten steht er in der Achtungsfarbe (LLH-2109). */
+  zusatzVeraltet?: boolean;
   children: ReactNode;
   style?: CSSProperties;
 }) {
@@ -151,13 +159,18 @@ function Kachel({
         {zusatz && (
           <span
             data-lfh="monitor-zusatz"
+            data-veraltet={zusatzVeraltet == null ? undefined : zusatzVeraltet ? 'ja' : 'nein'}
             style={{
               marginLeft: 'auto',
               fontSize: grossMass(GROSS_BEZUG.text),
               lineHeight: 1.2,
               fontVariantNumeric: 'tabular-nums',
-              fontWeight: zusatzAlarm ? 700 : 400,
-              color: zusatzAlarm ? rollen.alarmText : rollen.text,
+              fontWeight: zusatzAlarm || zusatzVeraltet ? 700 : 400,
+              color: zusatzAlarm
+                ? rollen.alarmText
+                : zusatzVeraltet
+                  ? rollen.achtungText
+                  : rollen.text,
               whiteSpace: 'nowrap',
             }}
           >
@@ -811,6 +824,12 @@ export default function LagemonitorPage() {
   const sk1Neu = useAnstieg(aus.has('betroffene') ? undefined : lage?.betroffene.sk1);
   const ablauf = anstehendeProgrammpunkte(lage?.programm ?? [], dayjs(jetzt), ABLAUF_SICHTBAR);
   const schliesseMenue = useCallback(() => setMenueOffen(false), []);
+  // Livebild der Drohne (LLH-2109): nur mit Block `drohne`, also bei eingeschaltetem Schalter.
+  const drohne = lage?.drohne;
+  const { konventionen } = useAnzeigeKonventionen();
+  const drohnenStandMs = drohne ? dayjs.utc(drohne.stand_at).valueOf() : 0;
+  const nebenspalte = !aus.has('meldungen') || ablauf.length > 0;
+  const livebildFlex = nebenspalte ? `0 0 ${LIVEBILD_BREITE_PX}px` : '1 1 0';
 
   if (!geraet) return null;
   const einsatzort =
@@ -876,14 +895,39 @@ export default function LagemonitorPage() {
               </div>
             </Kachel>
           </KachelGrenze>
-          {/* Meldungen und Ablauf teilen die untere Zeile; ohne anstehenden Programmpunkt nimmt
-              „Meldungen“ sie allein (LLH-1570, design.md D4). */}
-          {/* Ohne Meldungen (Modul ausgeblendet, LLH-2072) nimmt „Ablauf“ die Zeile allein; fehlen
-              beide, entfällt sie, und die Karte wird höher. */}
-          {(!aus.has('meldungen') || ablauf.length > 0) && (
-            <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
-              {!aus.has('meldungen') && (
-                <KachelGrenze
+          {drohne ? (
+            // Livebild der Drohne (LLH-2109, Entwurf `docs/design/2026-11-25-lagemonitor-livebild/`):
+            // eine Zeile von 440 px unter der Karte, links das Bild in 16 : 9, rechts daneben
+            // Meldungen über Ablauf; fehlen beide, nimmt das Livebild die Zeile allein.
+            <div style={{ display: 'flex', gap: 16, height: LIVEBILD_ZEILE_PX, minWidth: 0 }}>
+              <KachelGrenze
+                titel="Livebild"
+                form="gross"
+                neuversuch={lageQuery.dataUpdatedAt}
+                ersatzStil={{ flex: livebildFlex }}
+              >
+                <Kachel
+                  titel="Livebild"
+                  zusatz={datenstandText(drohnenStandMs, jetzt, { konv: konventionen })}
+                  zusatzVeraltet={istVeraltet(drohnenStandMs, jetzt)}
+                  style={{ flex: livebildFlex }}
+                >
+                  <LagemonitorLivebild einsatzId={einsatzId} videoKey={drohne.videos[0] ?? null} />
+                </Kachel>
+              </KachelGrenze>
+              {nebenspalte && (
+                <div
+                  data-lfh="livebild-nebenspalte"
+                  style={{
+                    flex: '1 1 0',
+                    minWidth: 0,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 16,
+                  }}
+                >
+                  {!aus.has('meldungen') && (
+                    <KachelGrenze
                   titel="Meldungen"
                   form="gross"
                   neuversuch={lageQuery.dataUpdatedAt}
@@ -895,9 +939,9 @@ export default function LagemonitorPage() {
                     allein={ablauf.length === 0}
                   />
                 </KachelGrenze>
-              )}
-              {ablauf.length > 0 && (
-                <KachelGrenze
+                  )}
+                  {ablauf.length > 0 && (
+                    <KachelGrenze
                   titel="Ablauf"
                   form="gross"
                   neuversuch={lageQuery.dataUpdatedAt}
@@ -905,8 +949,43 @@ export default function LagemonitorPage() {
                 >
                   <AblaufKachel punkte={ablauf} jetzt={jetzt} />
                 </KachelGrenze>
+                  )}
+                </div>
               )}
             </div>
+          ) : (
+            /* Meldungen und Ablauf teilen die untere Zeile; ohne anstehenden Programmpunkt nimmt
+               „Meldungen“ sie allein (LLH-1570, design.md D4). Ohne Meldungen (Modul
+               ausgeblendet, LLH-2072) nimmt „Ablauf“ die Zeile allein; fehlen beide, entfällt
+               sie, und die Karte wird höher. */
+            nebenspalte && (
+              <div style={{ display: 'flex', gap: 16, minWidth: 0 }}>
+                {!aus.has('meldungen') && (
+                  <KachelGrenze
+                  titel="Meldungen"
+                  form="gross"
+                  neuversuch={lageQuery.dataUpdatedAt}
+                  ersatzStil={{ flex: ablauf.length === 0 ? '1 1 0' : '0 0 auto' }}
+                >
+                  <MeldungenKachel
+                    offen={lage?.sofortmeldungen_offen}
+                    neu={sofortNeu}
+                    allein={ablauf.length === 0}
+                  />
+                </KachelGrenze>
+                )}
+                {ablauf.length > 0 && (
+                  <KachelGrenze
+                  titel="Ablauf"
+                  form="gross"
+                  neuversuch={lageQuery.dataUpdatedAt}
+                  ersatzStil={{ flex: '1 1 0', minWidth: 0 }}
+                >
+                  <AblaufKachel punkte={ablauf} jetzt={jetzt} />
+                </KachelGrenze>
+                )}
+              </div>
+            )
           )}
         </div>
         {rechts && (
