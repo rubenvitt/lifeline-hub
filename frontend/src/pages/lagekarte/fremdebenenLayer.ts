@@ -163,3 +163,30 @@ export function entferneFremdebeneLayer(map: MapLibreMap, ebeneId: number): void
 
 /** Die anklickbaren Layer einer Fremdebene; die Beschriftung ist kein Ziel. */
 export const fremdebeneClickLayerIds = (ebeneId: number) => fremdebeneLayerIds(ebeneId).slice(0, 3);
+
+/** Ein leerer Wert zählt wie ein fehlender: die Karte reicht `null` nicht verlässlich durch. */
+const gefuellt = (p: Record<string, unknown> | null | undefined) =>
+  Object.entries(p ?? {}).filter(([, v]) => v != null);
+
+/**
+ * Steht das gewählte Objekt noch auf der Karte? Nur dann bleibt seine Detailkarte offen: eine
+ * ausgeblendete oder entfernte Ebene oder ein Objekt, das ein Abgleich gestrichen oder geändert hat,
+ * zeigte sonst alte Angaben. Die Wire-Features tragen keine ID (die Karte zählt sie selbst), also
+ * gilt ein Objekt mit denselben Properties als dasselbe.
+ */
+export function fremdObjektSichtbar(
+  aktive: readonly AktiveFremdebene[],
+  ebeneId: number,
+  properties: Record<string, unknown>,
+): boolean {
+  const ebene = aktive.find((e) => e.id === ebeneId);
+  if (!ebene) return false;
+  const gesucht = gefuellt(properties);
+  return ebene.daten.features.some((f) => {
+    const p = gefuellt(f.properties as Record<string, unknown> | null | undefined);
+    return (
+      p.length === gesucht.length &&
+      gesucht.every(([k, v]) => p.some(([k2, v2]) => k2 === k && v2 === v))
+    );
+  });
+}

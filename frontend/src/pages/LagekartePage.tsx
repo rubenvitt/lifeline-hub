@@ -57,6 +57,7 @@ import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDa
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useFremdebenen } from './lagekarte/useFremdebenen';
+import { fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
 import FremdebeneDetail from './lagekarte/FremdebeneDetail';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
 import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
@@ -781,7 +782,16 @@ export default function LagekartePage() {
     ebeneId: number;
     properties: Record<string, unknown>;
   } | null>(null);
-  const fremdAuswahlEbene = fremdAuswahl ? fremd.finde(fremdAuswahl.ebeneId) : undefined;
+  // Die Detailkarte gilt nur, solange das Objekt auf der Karte steht: ausgeblendet, entfernt oder
+  // beim Abgleich gestrichen räumt sie die Auswahl (sonst hielte sie `useAuswahlVorn` vorn).
+  const fremdAuswahlGilt =
+    fremdAuswahl != null &&
+    fremdObjektSichtbar(fremd.aktive, fremdAuswahl.ebeneId, fremdAuswahl.properties);
+  const fremdAuswahlEbene =
+    fremdAuswahl && fremdAuswahlGilt ? fremd.finde(fremdAuswahl.ebeneId) : undefined;
+  useEffect(() => {
+    if (fremdAuswahl != null && !fremdAuswahlGilt) setFremdAuswahl(null);
+  }, [fremdAuswahl, fremdAuswahlGilt]);
 
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).

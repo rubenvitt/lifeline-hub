@@ -4,6 +4,7 @@ import { synchronisiereBildLayer } from './bildLayer';
 import {
   bildAnker,
   entferneFremdebeneLayer,
+  fremdObjektSichtbar,
   fremdebeneIdVon,
   fremdebeneLayerIds,
   fremdebeneSourceId,
@@ -204,5 +205,38 @@ describe('Fremdebenen auf der Karte (LLH-2099)', () => {
     expect(fremdebeneIdVon('fremdebene-12-punkt')).toBe(12);
     expect(fremdebeneIdVon('fremdebene-12-flaeche')).toBe(12);
     expect(fremdebeneIdVon('fachebene-dwd-fill')).toBeNull();
+  });
+});
+
+describe('Auswahl eines Fremdebenen-Objekts (LLH-2099)', () => {
+  const aktiv = [{ id: 7, name: 'Hydranten', daten: DATEN, farbe: FARBE }];
+
+  it('gilt, solange die Ebene gezeigt wird und das Objekt darin steht', () => {
+    expect(fremdObjektSichtbar(aktiv, 7, { name: 'H 12', description: 'DN 100' })).toBe(true);
+  });
+
+  it('gilt nicht mehr, wenn die Ebene ausgeblendet oder entfernt ist', () => {
+    expect(fremdObjektSichtbar([], 7, { name: 'H 12', description: 'DN 100' })).toBe(false);
+  });
+
+  it('gilt nicht mehr, wenn das Objekt beim Abgleich weggefallen oder geändert ist', () => {
+    expect(fremdObjektSichtbar(aktiv, 7, { name: 'H 13', description: 'DN 100' })).toBe(false);
+    expect(fremdObjektSichtbar(aktiv, 7, { name: 'H 12' })).toBe(false);
+  });
+
+  it('ein fehlendes und ein leeres Feld gelten gleich (die Karte reicht Leeres nicht durch)', () => {
+    const ohneBeschreibung: FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [13, 52] },
+          properties: { name: 'H 1', description: null },
+        },
+      ],
+    };
+    expect(
+      fremdObjektSichtbar([{ ...aktiv[0], daten: ohneBeschreibung }], 7, { name: 'H 1' }),
+    ).toBe(true);
   });
 });
