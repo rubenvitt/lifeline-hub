@@ -16,7 +16,8 @@ import { KATEGORIEN } from '../../aufbewahrung/kategorieText';
  *
  * **Ausnahme `aufbewahrung_kategorien`** (LFH-749, design.md D8): die Liste ist KEIN Vollersatz —
  * fehlt das Feld, bleibt sie am Server unverändert. `zuUpdate` lässt sie deshalb weg; nur die
- * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit.
+ * Sektion „Einsatz-Defaults“ schickt sie über {@link normalisiereEinsatz} mit. Ebenso die beiden
+ * Ortungs-Schalter der Helfer-App (`ortung_im_einsatz`, `ortung_personen`): fehlen sie, bleiben sie.
  *
  * **Ausnahme `fremdebenen_lan_erlaubt`** (LLH-2099): ebenfalls kein Vollersatz, fehlt das Feld,
  * bleibt der Wert am Server. `zuUpdate` lässt es weg; nur die Sektion „Anzeige“ (Paneel
@@ -47,6 +48,10 @@ export interface FormWerteEinsatz {
   auftrag_quittierung_frist_min?: number;
   rueckmeldung_frist_min?: number;
   auto_etb_eintraege: boolean;
+  /** „Ortung im Einsatz“ (Helfer-App); an erst nach dem Bestätigungsdialog. */
+  ortung_im_einsatz: boolean;
+  /** „Auch Personen orten“; gesperrt, solange `ortung_im_einsatz` aus ist. */
+  ortung_personen: boolean;
   /** Dauer und Rechtsgrundlage je Datenkategorie (LFH-749); leere Dauer = keine eigene Frist. */
   kategorien?: Partial<Record<Datenkategorie, KategorieFormWert>>;
 }
@@ -120,6 +125,8 @@ export function normalisiereEinsatz(
   | 'rueckmeldung_frist_min'
   | 'auto_etb_eintraege'
   | 'aufbewahrung_kategorien'
+  | 'ortung_im_einsatz'
+  | 'ortung_personen'
 > {
   return {
     retention_dauer_tage: w.retention_dauer_tage ?? null,
@@ -134,6 +141,9 @@ export function normalisiereEinsatz(
     rueckmeldung_frist_min: w.rueckmeldung_frist_min ?? null,
     auto_etb_eintraege: w.auto_etb_eintraege,
     aufbewahrung_kategorien: kategorieVorgaben(w.kategorien),
+    ortung_im_einsatz: w.ortung_im_einsatz,
+    // Spiegel von `routes::org_einstellungen::setzen`: Personen nur mit Ortung im Einsatz.
+    ortung_personen: w.ortung_im_einsatz && w.ortung_personen,
   };
 }
 
@@ -179,6 +189,8 @@ export function initialEinsatz(e: OrgEinstellungen): FormWerteEinsatz {
     auftrag_quittierung_frist_min: e.auftrag_quittierung_frist_min ?? undefined,
     rueckmeldung_frist_min: e.rueckmeldung_frist_min ?? undefined,
     auto_etb_eintraege: e.auto_etb_eintraege !== 0,
+    ortung_im_einsatz: e.ortung_im_einsatz,
+    ortung_personen: e.ortung_im_einsatz && e.ortung_personen,
     kategorien: Object.fromEntries(
       (e.aufbewahrung_kategorien ?? []).map((v) => [
         v.kategorie,

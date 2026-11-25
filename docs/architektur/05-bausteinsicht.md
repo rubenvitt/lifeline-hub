@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 25.11.2026 (Fremdebenen `src/karte_fremdebene`, LLH-2099; Veranstaltungen-Abruf `src/veranstaltung_extern`, LLH-2097; iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 25.11.2026 (Fremdebenen `src/karte_fremdebene`, LLH-2099; iOS-Helfer-App `ios/Helfer` mit Live-Aktivität, ADR-0101; Veranstaltungen-Abruf `src/veranstaltung_extern`, LLH-2097; iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -122,6 +122,8 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | Pfad | Zweck | Schnittstellen |
 | --- | --- | --- |
 | `src/einsatz` | Einsatz-Lebenszyklus, Rollen, Modulsichtbarkeit, Einstellungen, Zugriffs-Extractor, Nummernvergabe, Purge-Scheduler, Schwärzung und Archiv nach der Nachbereitung (`archiv.rs`) | Routen `/api/incidents`, `…/{id}/module-counts`, `…/{id}/situation-metric-selection`; Live `einsatz` |
+| `src/helfer` | Helfer-Einladung (Code, Vorgabe 4 h, höchstens 72 h), Einlösen durch die Helfer-App, Bestätigen der Kopplung durch die Einsatzleitung und Position der Helfer-App (nur die letzte Position) | Routen für Einladung, Einlösen, Bestätigen und Position unter `/api/incidents/{einsatz_id}/…`; Deeplink `lifeline-helfer://anmelden` | `src/helfer/` |
+| `src/ortung` | Positionsbaustein: Quelle, Zeitpunkt und eine einzige Schreibstelle für die Position einer Einheit; Aufrufer sind Stab und Helfer-App | Rust-API `ortung::…`, keine eigene Route | `src/ortung/` |
 | `src/einsatzakte` | Einsatzakte (LLH-1835): ZIP mit allen Anhängen (bereinigt), den Tabellen von Betroffenen, Tieren und Schäden und einem Inhaltsverzeichnis; Sammeln über die Linker, Bausperre je Einsatz und Server. Das Druckstück der Akte baut der Browser | `GET …/{id}/case-file/attachments.zip`; nutzt `routes::support::anhang_fuer_akte`, `routes::backup::chunk_stream` |
 | `src/einsatz_vorlage` | Org-Katalog „Einsatz-Vorlagen“: Modulsatz, der beim Anlegen Module ausblendet | `/api/incident-templates`; nutzt `einsatz::repo::anlegen_tx` |
 | `src/einsatzabschnitt` | Abschnittsbaum mit Leiter, Fläche und Sprechgruppen; schreibt System-ETB beim Anlegen | `…/{id}/sectors`; Live `abschnitt` |
@@ -135,7 +137,7 @@ aus `src/live/mod.rs`. `{id}` ist die Einsatz-ID.
 | --- | --- | --- |
 | `src/karte` | Fachebenen-Aggregator (NINA, DWD, PEGELONLINE, KRITIS u. a.), Style-/Tile-Proxy mit SSRF-Schutz, MBTiles, Offline-Karten-Registry und -Download | `/api/map/…`; ruft `karten-service`; Cache in `src/cache_db.rs` |
 | `src/karte_hintergrundbild` | Hochgeladene Hintergrundbilder (PNG/JPEG) mit vier Eckkoordinaten | `…/{id}/map/background-images`; Live `karte_bild` |
-| `src/karte_fremdebene` | Fremdebenen der Lagekarte (GeoJSON, KML, KMZ aus Datei oder https-Adresse): liest fremde Dateien ohne DTD und ohne Nachladen ein (`einlesen/`), speichert nur normiertes GeoJSON je Ebene (`repo.rs`) und holt eine URL-Ebene beim Lesen höchstens einmal je 60 s nach (`abruf.rs`, über `adapter::ziel`; [ADR-0101](entscheidungen/ADR-0101-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)) | `…/{id}/map/foreign-layers` (Liste, Anlegen, `…/{ebeneId}/data`, PATCH, DELETE); Live `karte_fremdebene`; Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`) |
+| `src/karte_fremdebene` | Fremdebenen der Lagekarte (GeoJSON, KML, KMZ aus Datei oder https-Adresse): liest fremde Dateien ohne DTD und ohne Nachladen ein (`einlesen/`), speichert nur normiertes GeoJSON je Ebene (`repo.rs`) und holt eine URL-Ebene beim Lesen höchstens einmal je 60 s nach (`abruf.rs`, über `adapter::ziel`; [ADR-0102](entscheidungen/ADR-0102-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)) | `…/{id}/map/foreign-layers` (Liste, Anlegen, `…/{ebeneId}/data`, PATCH, DELETE); Live `karte_fremdebene`; Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`) |
 | `src/karten_ansicht` | Einsatzweit geteilte, benannte Kartenkonfiguration | `…/{id}/map-views`; Live `karten_ansicht` |
 | `src/lage_snapshot` | Unveränderlicher Stand des vollen Lagebilds als JSON-Dokument | `…/{id}/situation-snapshots`; Live `lage_snapshot` |
 | `src/lage_zone` | Freie Gefahren- und Absperrzonen als GeoJSON | `…/{id}/zones`; Live `lage_zone` |
@@ -473,6 +475,19 @@ Init-Skript `android/app/src/main/assets/huelle.js` meldet der Seite die Kennung
 `__LIFELINE_HUELLE__` und beschreibt das Wire-Format in seinem Kopf. `android/gradle` trägt
 Wrapper und Versionskatalog `libs.versions.toml`, `android/settings.gradle.kts` bindet den Kern per
 `includeBuild` ein; die Version schreibt `scripts/android/version.sh`.
+
+### Helfer-App (`ios/Helfer`, `android/helfer`)
+
+Die Helfer-App (ADR-0101, Regeln in [ios/Helfer/AGENTS.md](../../ios/Helfer/AGENTS.md) und
+[android/helfer/AGENTS.md](../../android/helfer/AGENTS.md)) ist je Plattform eine eigene native App
+(SwiftUI, Compose) neben den Hüllen: Helfer lösen eine Einladung ein und senden danach die letzte
+Position an den Server ihrer Kopplung. Die Logik steht im Kern (`ios/HelferKern`,
+`android/helferkern`), die App-Ziele bleiben dünn. Die Hüllen `ios` und `android` bleiben
+unverändert. Unter iOS stehen im XcodeGen-Projekt `ios/project.yml` das App-Ziel `LifelineHelfer`
+(`ios/Helfer/App`: Modell, Dienste für Server, Ortung und Live-Aktivität, Seiten), die
+Widget-Erweiterung `HelferAktivitaet` (`ios/Helfer/Aktivitaet`, Live-Aktivität mit „Pausieren“),
+der gemeinsame Teil beider (`ios/Helfer/Gemeinsam`) und die Tests `ios/HelferTests` und
+`ios/HelferUITests` (Bildschirmbilder über `-HelferTestzustand`).
 
 ### `push-relais`
 

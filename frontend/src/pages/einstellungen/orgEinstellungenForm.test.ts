@@ -93,6 +93,8 @@ describe('normalisiereEinsatz', () => {
       normalisiereEinsatz({
         etb_nummer_praefix: '  ',
         auto_etb_eintraege: false,
+        ortung_im_einsatz: false,
+        ortung_personen: false,
       }),
     ).toEqual({
       retention_dauer_tage: null,
@@ -107,13 +109,27 @@ describe('normalisiereEinsatz', () => {
       rueckmeldung_frist_min: null,
       auto_etb_eintraege: false,
       aufbewahrung_kategorien: [],
+      ortung_im_einsatz: false,
+      ortung_personen: false,
     });
+  });
+
+  it('Helfer-App: „Auch Personen orten“ geht nur mit „Ortung im Einsatz“ hinaus', () => {
+    const basis = { auto_etb_eintraege: true };
+    expect(
+      normalisiereEinsatz({ ...basis, ortung_im_einsatz: false, ortung_personen: true }),
+    ).toMatchObject({ ortung_im_einsatz: false, ortung_personen: false });
+    expect(
+      normalisiereEinsatz({ ...basis, ortung_im_einsatz: true, ortung_personen: true }),
+    ).toMatchObject({ ortung_im_einsatz: true, ortung_personen: true });
   });
 
   it('LFH-749: nur Kategorien mit Dauer gehen hinaus, Rechtsgrundlage getrimmt, feste Reihenfolge', () => {
     expect(
       normalisiereEinsatz({
         auto_etb_eintraege: true,
+        ortung_im_einsatz: false,
+        ortung_personen: false,
         kategorien: {
           anhaenge: { dauer_tage: 30, rechtsgrundlage: ' § 32b NKatSG ' },
           behandlung: { dauer_tage: null, rechtsgrundlage: 'ohne Dauer' },
@@ -128,8 +144,12 @@ describe('normalisiereEinsatz', () => {
 
   it('LFH-617: trimmt das Einsatznummer-Präfix', () => {
     expect(
-      normalisiereEinsatz({ einsatz_nummer_praefix: ' WF- ', auto_etb_eintraege: true })
-        .einsatz_nummer_praefix,
+      normalisiereEinsatz({
+        einsatz_nummer_praefix: ' WF- ',
+        auto_etb_eintraege: true,
+        ortung_im_einsatz: false,
+        ortung_personen: false,
+      }).einsatz_nummer_praefix,
     ).toBe('WF-');
   });
 });

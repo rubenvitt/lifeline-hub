@@ -25,6 +25,8 @@ const beispielAnzeige: OrgEinstellungen = {
   auto_etb_eintraege: 1,
   geocoder_url: null,
   fremdebenen_lan_erlaubt: false,
+  ortung_im_einsatz: false,
+  ortung_personen: false,
   geaendert_at: '2026-06-19 12:00:00',
   geaendert_von: 1,
 };
@@ -55,6 +57,8 @@ describe('ladeOrgEinstellungen', () => {
       auto_etb_eintraege: null,
       geocoder_url: null,
       fremdebenen_lan_erlaubt: false,
+      ortung_im_einsatz: false,
+      ortung_personen: false,
       geaendert_at: null,
       geaendert_von: null,
     };

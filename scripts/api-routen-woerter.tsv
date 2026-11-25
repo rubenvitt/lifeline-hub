@@ -159,6 +159,7 @@ intake-credentials	Einwurf-Zugänge
 integrations	Anbindungen
 interventions	Maßnahmen
 inventory	Bestand
+invitations	Einladungen
 ios-push	-
 jwks.json	-
 key	Schlüssel
@@ -323,6 +324,7 @@ subscription	Abo
 system	-
 take-over	übernehmen
 talk-groups	Sprechgruppen
+targets	Ziele
 task	Auftrag
 tasks	Aufträge
 template	Vorlage

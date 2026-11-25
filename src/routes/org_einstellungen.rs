@@ -70,6 +70,13 @@ pub struct OrgEinstellungenUpdate {
     /// übrigen Felder kein Vollersatz: fehlt das Feld, bleibt der Wert, damit ein älterer Client
     /// die Erlaubnis nicht still entzieht. Eine Änderung steht in der Admin-Spur.
     pub fremdebenen_lan_erlaubt: Option<bool>,
+    /// „Ortung im Einsatz“ (Helfer-App). Fehlt das Feld, bleibt der Schalter, wie er ist: ein
+    /// älterer Client schaltet die Ortung nicht still ab. Der Wechsel von aus auf an gilt als
+    /// Bestätigung von Einwilligung bzw. Betriebsvereinbarung (der Dialog im Client).
+    pub ortung_im_einsatz: Option<bool>,
+    /// „Auch Personen orten“; nur zusammen mit `ortung_im_einsatz` (sonst 422). Fehlt das Feld,
+    /// bleibt der Wert, außer die Ortung geht aus: dann geht er mit aus.
+    pub ortung_personen: Option<bool>,
 }
 
 /// GET /api/org-settings — Org-weite Einstellungen lesen.
@@ -213,9 +220,29 @@ pub async fn setzen(
         }
     }
 
+    // Ortung (Helfer-App): „Personen orten“ ohne „Ortung im Einsatz“ ist ein Zusammenhang,
+    // kein kaputtes Feld (422, `src/AGENTS.md`, Statuscode-Konvention).
+    let (ortung_im_einsatz, ortung_personen) =
+        if req.ortung_im_einsatz.is_some() || req.ortung_personen.is_some() {
+            let alt = einstellungen::ortung_der_org(&state.pool, benutzer.org_id).await?;
+            let im = req.ortung_im_einsatz.unwrap_or(alt.im_einsatz);
+            let personen = match req.ortung_personen {
+                Some(true) if !im => {
+                    return Err(AppError::UnprocessableEntity(
+                        "„Auch Personen orten“ geht nur mit „Ortung im Einsatz“".into(),
+                    ));
+                }
+                Some(p) => p,
+                None => im && alt.personen,
+            };
+            (Some(im), Some(personen))
+        } else {
+            (None, None)
+        };
+
     // Fremdebenen im eigenen Netz: fehlendes Feld = unverändert. Der alte Wert kommt aus der
-    // Speicher-Transaktion, damit die Admin-Spur zum Endzustand passt.
-    let (gespeichert, lan_alt) = einstellungen::speichern_mit_lan_vorher(
+    // Speicher-Transaktion (`Gespeichert::lan_vorher`), damit die Admin-Spur zum Endzustand passt.
+    let gespeichert = einstellungen::speichern(
         &state.pool,
         benutzer.org_id,
         benutzer.id,
@@ -238,12 +265,14 @@ pub async fn setzen(
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
             fremdebenen_lan_erlaubt: req.fremdebenen_lan_erlaubt,
+            ortung_im_einsatz,
+            ortung_personen,
             aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
-    let lan_neu = gespeichert.fremdebenen_lan_erlaubt != 0;
-    if lan_neu != lan_alt {
+    let lan_neu = gespeichert.einstellungen.fremdebenen_lan_erlaubt != 0;
+    if lan_neu != gespeichert.lan_vorher {
         schreibe(
             &state.pool,
             AdminEintrag {
@@ -260,8 +289,15 @@ pub async fn setzen(
         )
         .await;
     }
+    for (einsatz_id, person_id) in gespeichert.personen_geloescht {
+        crate::ortung::publiziere(
+            &state,
+            einsatz_id,
+            crate::ortung::Ortungsziel::Person(person_id),
+        );
+    }
     let kategorien = aufbewahrung_kategorie::laden(&state.pool, benutzer.org_id).await?;
-    Ok(Json(gespeichert.anzeige(kategorien)))
+    Ok(Json(gespeichert.einstellungen.anzeige(kategorien)))
 }
 
 /// Trimmt und filtert leere Strings (None bei leerem Wert).

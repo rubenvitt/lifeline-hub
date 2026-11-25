@@ -536,6 +536,20 @@ describe('ApiError.grund', () => {
     const unbekannt = (await apiGet('/api/unbekannt').catch((x: unknown) => x)) as ApiError;
     expect(unbekannt.grund).toBeNull();
   });
+
+  it('liest den englischen `reason` neuer Routen als Grund und hält die übrigen Felder (Helfer-App)', async () => {
+    server.use(
+      http.post('/api/belegt', () =>
+        HttpResponse.json(
+          { error: 'Belegt', reason: 'tracker_taken', holder: 12 },
+          { status: 409 },
+        ),
+      ),
+    );
+    const e = (await apiSend('/api/belegt', 'POST', {}).catch((x: unknown) => x)) as ApiError;
+    expect(e.grund).toBe('tracker_taken');
+    expect(e.details.holder).toBe(12);
+  });
 });
 
 describe('Versatz zur Serveruhr aus dem Date-Header (LFH-705)', () => {

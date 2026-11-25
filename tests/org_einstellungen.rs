@@ -1024,3 +1024,69 @@ async fn fremdebenen_lan_als_fuehrungskraft_ist_403() {
         .unwrap());
     assert!(lan_spur(&pool).await.is_empty());
 }
+
+// ─── Ortung im Einsatz (Helfer-App, Spec 2026-11-24-vakwvkpg) ─────────────
+
+/// Beide Schalter sind anfangs aus; wer „Ortung im Einsatz“ einschaltet, wird mit Zeitpunkt
+/// festgehalten; „Auch Personen orten“ ohne den ersten Schalter ist ein unbrauchbarer
+/// Zusammenhang (422) und schreibt nichts.
+#[tokio::test]
+async fn org_ortung_ist_anfangs_aus_und_braucht_bestaetigung() {
+    let app = setup().await;
+    let admin_cookie = login_cookie(&app, "admin", "startpw12").await;
+
+    let (status, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ortung_im_einsatz"], false, "body={body}");
+    assert_eq!(body["ortung_personen"], false, "body={body}");
+    assert!(body["ortung_bestaetigt_at"].is_null(), "body={body}");
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_personen": true, "ortung_im_einsatz": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body={body}");
+    let (_, body) = get_einstellungen(&app, Some(&admin_cookie)).await;
+    assert_eq!(body["ortung_personen"], false, "422 schreibt nichts");
+
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_im_einsatz": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    assert_eq!(body["ortung_im_einsatz"], true);
+    assert_eq!(body["ortung_personen"], false);
+    let bestaetigt = body["ortung_bestaetigt_at"].clone();
+    assert!(bestaetigt.is_string(), "Bestätigung gesetzt: body={body}");
+
+    // Ein weiterer PUT, der den Schalter an lässt, schreibt die Bestätigung nicht neu; ein PUT
+    // ohne die Felder lässt die Ortung stehen (kein stilles Abschalten durch ältere Clients).
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_im_einsatz": true, "ortung_personen": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    assert_eq!(body["ortung_personen"], true);
+    assert_eq!(body["ortung_bestaetigt_at"], bestaetigt);
+    let (status, body) = put_einstellungen(&app, &admin_cookie, serde_json::json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["ortung_im_einsatz"], true, "fehlend = unverändert");
+    assert_eq!(body["ortung_personen"], true, "fehlend = unverändert");
+
+    // Abschalten nimmt „Personen orten“ mit.
+    let (status, body) = put_einstellungen(
+        &app,
+        &admin_cookie,
+        serde_json::json!({"ortung_im_einsatz": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body={body}");
+    assert_eq!(body["ortung_im_einsatz"], false);
+    assert_eq!(body["ortung_personen"], false);
+}

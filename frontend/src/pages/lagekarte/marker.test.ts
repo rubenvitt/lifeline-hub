@@ -311,6 +311,107 @@ describe('buildLageMeldungMarker', () => {
   });
 });
 
+describe('buildTaktischeMarker: Quelle und Alter der Position (Helfer-App)', () => {
+  const jetzt = new Date('2026-11-24T12:10:00Z');
+  const fahrzeug = (
+    id: number,
+    position_quelle: string | null,
+    position_aktualisiert_at: string | null,
+  ) => ({
+    id,
+    funkrufname: `Florian ${id}`,
+    lat: 50.2,
+    lon: 8.7,
+    tz_fachaufgabe: null,
+    tz_organisation: null,
+    status_farbe: null,
+    fahrzeugtyp: null,
+    opta: null,
+    traegerorganisation: null,
+    ...(position_quelle ? { position_quelle } : {}),
+    ...(position_aktualisiert_at ? { position_aktualisiert_at } : {}),
+  });
+  const baue = (fahrzeuge: ReturnType<typeof fahrzeug>[]) =>
+    buildTaktischeMarker(
+      {
+        einheiten: [],
+        fahrzeuge: fahrzeuge as unknown as TaktischeQuelle['fahrzeuge'],
+        fuehrungskraefte: [],
+        orgDefault: null,
+      },
+      token,
+      jetzt,
+    ).verortet;
+
+  it('Quelle helfer zeigt „Helfer-App · vor 6 min“, und das Symbol hat die Deckkraft 0,5', () => {
+    const [m] = baue([fahrzeug(1, 'helfer', '2026-11-24 12:04:00')]);
+    expect(m.untertitel).toBe('Helfer-App · vor 6 min');
+    expect(m.deckkraft).toBe(0.5);
+  });
+
+  it('frisch bleibt das Symbol voll; der Einwurf heißt „Ortung“', () => {
+    const [m] = baue([fahrzeug(2, 'einwurf', '2026-11-24 12:06:00')]);
+    expect(m.untertitel).toBe('Ortung · vor 4 min');
+    expect(m.deckkraft).toBeUndefined();
+  });
+
+  it('eine Handposition und der Bestand ohne Zeitpunkt tragen weder Untertitel noch Blässe', () => {
+    const [hand, bestand] = baue([
+      fahrzeug(3, 'manuell', '2026-11-24 11:00:00'),
+      fahrzeug(4, null, null),
+    ]);
+    for (const m of [hand, bestand]) {
+      expect(m.untertitel).toBeUndefined();
+      expect(m.deckkraft).toBeUndefined();
+    }
+  });
+
+  it('gilt ebenso für Einheit und Person', () => {
+    const { verortet } = buildTaktischeMarker(
+      {
+        einheiten: [
+          {
+            id: 5,
+            name: 'Zug 1',
+            typ_label: 'Zug',
+            lat: 50.1,
+            lon: 8.6,
+            tz_fachaufgabe: null,
+            tz_organisation: null,
+            position_quelle: 'helfer',
+            position_aktualisiert_at: '2026-11-24 12:09:00',
+          },
+        ] as unknown as TaktischeQuelle['einheiten'],
+        fahrzeuge: [],
+        fuehrungskraefte: [
+          {
+            id: 6,
+            name: 'Müller',
+            lat: 50.4,
+            lon: 8.9,
+            tz_fachaufgabe: null,
+            tz_organisation: null,
+            funktion: null,
+            ist_einheitsfuehrer: false,
+            ist_abschnittsleiter: false,
+            position_quelle: 'helfer',
+            position_aktualisiert_at: '2026-11-24 12:00:00',
+          },
+        ] as unknown as TaktischeQuelle['fuehrungskraefte'],
+        orgDefault: null,
+      },
+      token,
+      jetzt,
+    );
+    const einheit = verortet.find((m) => m.schluessel === 'einheit-5');
+    const person = verortet.find((m) => m.schluessel === 'fuehrung-6');
+    expect(einheit?.untertitel).toBe('Helfer-App · vor 1 min');
+    expect(einheit?.deckkraft).toBeUndefined();
+    expect(person?.untertitel).toBe('Helfer-App · vor 10 min');
+    expect(person?.deckkraft).toBe(0.5);
+  });
+});
+
 describe('buildTaktischeMarker', () => {
   it('leitet taktische Marker + nicht-verortet ab', () => {
     const einheiten = [

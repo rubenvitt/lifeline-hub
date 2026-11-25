@@ -479,6 +479,67 @@ async fn nach_uebergabe_ist_schreiben_409_und_lesen_bleibt() {
 }
 
 #[tokio::test]
+async fn abgabe_beendet_helfer_und_loescht_personenpositionen() {
+    let (hub, elw) = gekoppelt().await;
+    let (e, _) = elw_einsatz(&hub, &elw).await;
+    let person = common::stammpersonal_disponieren(&elw.app, &elw.admin, e, "Erika M.").await;
+    let einheit = common::einheit_bilden(&elw.app, &elw.admin, e, "San-Trupp 2").await;
+    // Eine bestätigte Helfer-Kopplung mit Person und ihre Position, wie die App sie schriebe.
+    let benutzer: i64 = sqlx::query_scalar(
+        "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, aktiv) \
+         VALUES (1, 'Erika', 'helfer-erika', 'x', 1) RETURNING id",
+    )
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    let kopplung: i64 = sqlx::query_scalar(
+        "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, erstellt_von, \
+         laeuft_ab_at, helfer_zustand, anzeigename, einheit_id, person_id, person_gewuenscht, \
+         ortungsgeraet) VALUES (?, ?, 'helfer', 'Erika', 1, '2099-01-01 00:00:00', 'aktiv', \
+         'Erika', ?, ?, 1, 1) RETURNING id",
+    )
+    .bind(e)
+    .bind(benutzer)
+    .bind(einheit)
+    .bind(person)
+    .fetch_one(&elw.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "UPDATE einsatz_personal SET lat = 50.1, lon = 8.6, position_quelle = 'helfer', \
+         position_aktualisiert_at = datetime('now') WHERE id = ?",
+    )
+    .bind(person)
+    .execute(&elw.pool)
+    .await
+    .unwrap();
+
+    abgleichen(&elw).await;
+    let (s, v) = post(
+        &elw,
+        &format!("/api/incidents/{e}/command/hand-over"),
+        json!({"an": hub.kennung}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let widerrufen: Option<String> =
+        sqlx::query_scalar("SELECT widerrufen_at FROM geraet_kopplung WHERE id = ?")
+            .bind(kopplung)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert!(widerrufen.is_some(), "Helfer-Kopplung beendet");
+    let (lat, lon): (Option<f64>, Option<f64>) =
+        sqlx::query_as("SELECT lat, lon FROM einsatz_personal WHERE id = ?")
+            .bind(person)
+            .fetch_one(&elw.pool)
+            .await
+            .unwrap();
+    assert_eq!((lat, lon), (None, None), "Personenposition lokal gelöscht");
+}
+
+#[tokio::test]
 async fn fuehrungspersonal_bedient_die_fuehrung_nicht() {
     let (hub, elw) = gekoppelt().await;
     let (e, _) = elw_einsatz(&hub, &elw).await;

@@ -28,6 +28,7 @@ import { darfImEinsatzSchreiben, darfModuleVerwalten } from './schreibrecht';
 import { Status, UebungsBand, UebungsMarke } from '../components/instrument';
 import FuehrungHinweisband from '../instanz/FuehrungHinweisband';
 import IosPushHubBand from '../instanz/IosPushHubBand';
+import HelferWartenBand from './HelferWartenBand';
 import { fuehrungBeiKurz } from '../instanz/fuehrungText';
 import { sprungmarkenNachKategorie, type Sprungmarke } from './sprungmarken';
 import EinsatzSwitcher from './EinsatzSwitcher';
@@ -756,6 +757,8 @@ function EinsatzRahmen({ einsatzId }: { einsatzId: number }) {
           <IosPushHubBand einsatz={einsatz} />
         </EinsatzAnzeigeProvider>
       ) : null}
+      {/* Helfer-App: wartende Helfer, nur für die Einsatzleitung (im Band geprüft). */}
+      {einsatz && <HelferWartenBand einsatz={einsatz} />}
       {modulFreigabenQuery.isError && (
         <Alert
           type="warning"

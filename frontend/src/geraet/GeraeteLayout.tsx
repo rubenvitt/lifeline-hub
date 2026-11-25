@@ -94,6 +94,9 @@ export function geraetStartPfad(geraet: GeraetAnzeige): string | null {
       return geraetVerpflegungPfad(geraet.einsatz_id);
     case 'einheit':
       return geraetAuftraegePfad(geraet.einsatz_id);
+    // Der Helfer hat keine Seiten in der Hülle (Spec Helfer-App): er nutzt die Helfer-App.
+    case 'helfer':
+      return null;
   }
 }
 

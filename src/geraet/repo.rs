@@ -11,7 +11,8 @@ use utoipa::ToSchema;
 wire_enum! {
     #[wire(ohne_serde)]
     /// Ereignis der Kopplungsspur. Wire-Werte stehen als CHECK in
-    /// `migrations/0147_geraet_kopplung.sql`.
+    /// `migrations/0147_geraet_kopplung.sql`, die drei der Helfer-App in
+    /// `migrations/0377_helfer_app.sql`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub enum KopplungEreignis {
         Angelegt => "angelegt",
@@ -19,6 +20,13 @@ wire_enum! {
         Eingeloest => "eingeloest",
         Verlaengert => "verlaengert",
         Widerrufen => "widerrufen",
+        /// Die Leitung hat eine Helfer-Kopplung bestätigt oder ihr Ziel, ihre Person oder ihre
+        /// Ortungsrolle geändert.
+        Bestaetigt => "bestaetigt",
+        /// Die Leitung hat eine Helfer-Anmeldung abgelehnt.
+        Abgelehnt => "abgelehnt",
+        /// Die Kraft hat sich in der Helfer-App abgemeldet.
+        Abgemeldet => "abgemeldet",
     }
 }
 
@@ -144,10 +152,11 @@ const ANZEIGE_SELECT: &str = concat!(
      LEFT JOIN einsatz_einheit ee ON ee.id = k.einheit_id"
 );
 
-/// Alle Kopplungen eines Einsatzes, neueste zuerst.
+/// Alle Kopplungen eines Einsatzes, neueste zuerst, ohne Helfer: die stehen in der
+/// Helfer-Übersicht (`crate::helfer::liste`).
 pub async fn liste(pool: &SqlitePool, einsatz_id: i64) -> Result<Vec<KopplungAnzeige>, AppError> {
     let zeilen: Vec<KopplungZeile> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "{ANZEIGE_SELECT} WHERE k.einsatz_id = ? ORDER BY k.id DESC"
+        "{ANZEIGE_SELECT} WHERE k.einsatz_id = ? AND k.ansicht <> 'helfer' ORDER BY k.id DESC"
     )))
     .bind(einsatz_id)
     .fetch_all(pool)
@@ -193,18 +202,32 @@ pub fn anzeigename(stelle: Option<&str>, bezeichnung: &str) -> String {
     }
 }
 
-/// Legt Gerätekonto und Kopplung an (eine Transaktion des Aufrufers). Liefert die Kopplungs-ID.
-pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Result<i64, AppError> {
+/// Legt das Gerätekonto einer Kopplung an: ohne Rolle, ohne Passwortweg.
+async fn geraetekonto_anlegen(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    anzeigename: &str,
+) -> Result<i64, AppError> {
     let benutzername = format!("geraet-{}", uuid::Uuid::new_v4().simple());
-    let benutzer_id: i64 = sqlx::query_scalar(
+    Ok(sqlx::query_scalar(
         "INSERT INTO benutzer (org_id, anzeigename, benutzername, passwort_hash, system_rolle, org_rolle) \
          VALUES (?, ?, ?, ?, 'keiner', 'keine') RETURNING id",
     )
-    .bind(neu.org_id)
-    .bind(anzeigename(neu.stelle_name, neu.bezeichnung))
+    .bind(org_id)
+    .bind(anzeigename)
     .bind(&benutzername)
     .bind(PASSWORT_HASH_SSO_ONLY)
     .fetch_one(&mut *conn)
+    .await?)
+}
+
+/// Legt Gerätekonto und Kopplung an (eine Transaktion des Aufrufers). Liefert die Kopplungs-ID.
+pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Result<i64, AppError> {
+    let benutzer_id = geraetekonto_anlegen(
+        &mut *conn,
+        neu.org_id,
+        &anzeigename(neu.stelle_name, neu.bezeichnung),
+    )
     .await?;
     let spalte = |art: Bindungsart| neu.stelle.filter(|s| s.art == art).map(|s| s.id);
     let kopplung_id: i64 = sqlx::query_scalar(
@@ -237,6 +260,123 @@ pub async fn anlegen(conn: &mut SqliteConnection, neu: NeueKopplung<'_>) -> Resu
     )
     .await?;
     Ok(kopplung_id)
+}
+
+/// Dauer einer Helfer-Kopplung im Zustand `unbestaetigt`, in Minuten (Spec Helfer-App, „Dauer“).
+pub const HELFER_UNBESTAETIGT_MINUTEN: i64 = 120;
+
+/// Ziel einer Helfer-Kopplung in der Datenbank: genau eine der beiden Spalten.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HelferZielSpalte {
+    Einheit(i64),
+    Fahrzeug(i64),
+}
+
+impl HelferZielSpalte {
+    fn spalten(self) -> (Option<i64>, Option<i64>) {
+        match self {
+            HelferZielSpalte::Einheit(id) => (Some(id), None),
+            HelferZielSpalte::Fahrzeug(id) => (None, Some(id)),
+        }
+    }
+}
+
+/// Eingabe für eine neue Helfer-Kopplung, schon geprüft (`routes::helfer::einloesen`).
+pub struct NeueHelferKopplung<'a> {
+    pub einsatz_id: i64,
+    pub org_id: i64,
+    pub einladung_id: i64,
+    /// Ersteller der Einladung; er steht als `erstellt_von` an der Kopplung.
+    pub einladung_von: i64,
+    pub anzeigename: &'a str,
+    pub ziel: HelferZielSpalte,
+    pub person_gewuenscht: bool,
+}
+
+/// Ergebnis von [`anlegen_helfer`].
+pub struct HelferAngelegt {
+    pub kopplung_id: i64,
+    pub benutzer_id: i64,
+    pub laeuft_ab_at: String,
+}
+
+/// Legt Gerätekonto und Helfer-Kopplung im Zustand `unbestaetigt` an (eine Transaktion des
+/// Aufrufers): Ansicht `helfer`, gekoppelt sofort, Ablauf nach
+/// [`HELFER_UNBESTAETIGT_MINUTEN`]. Die Spur trägt die Einlösung ohne handelnde Person.
+///
+/// Den Namen gibt die Kraft selbst ein; er steht nur in `geraet_kopplung.anzeigename`, das die
+/// Schwärzung des Einsatzes leert (`einsatz::schwaerzung_registry`). `bezeichnung` und das
+/// Gerätekonto, das die Schwärzung nicht erreicht (`benutzer` ist org-weit), heißen nur
+/// „Helfer“.
+pub async fn anlegen_helfer(
+    conn: &mut SqliteConnection,
+    neu: NeueHelferKopplung<'_>,
+    peer_ip: Option<&str>,
+) -> Result<HelferAngelegt, AppError> {
+    let benutzer_id =
+        geraetekonto_anlegen(&mut *conn, neu.org_id, Funktionsansicht::Helfer.label()).await?;
+    let (einheit_id, fahrzeug_id) = neu.ziel.spalten();
+    let (kopplung_id, laeuft_ab_at): (i64, String) = sqlx::query_as(
+        "INSERT INTO geraet_kopplung \
+           (einsatz_id, benutzer_id, ansicht, einheit_id, fahrzeug_id, bezeichnung, anzeigename, \
+            erstellt_von, laeuft_ab_at, gekoppelt_at, helfer_zustand, einladung_id, \
+            person_gewuenscht) \
+         VALUES (?, ?, 'helfer', ?, ?, ?, ?, ?, datetime('now', ?), datetime('now'), \
+                 'unbestaetigt', ?, ?) \
+         RETURNING id, laeuft_ab_at",
+    )
+    .bind(neu.einsatz_id)
+    .bind(benutzer_id)
+    .bind(einheit_id)
+    .bind(fahrzeug_id)
+    .bind(Funktionsansicht::Helfer.label())
+    .bind(neu.anzeigename)
+    .bind(neu.einladung_von)
+    .bind(format!("+{HELFER_UNBESTAETIGT_MINUTEN} minutes"))
+    .bind(neu.einladung_id)
+    .bind(neu.person_gewuenscht)
+    .fetch_one(&mut *conn)
+    .await?;
+    ereignis(
+        &mut *conn,
+        kopplung_id,
+        KopplungEreignis::Eingeloest,
+        None,
+        peer_ip,
+    )
+    .await?;
+    Ok(HelferAngelegt {
+        kopplung_id,
+        benutzer_id,
+        laeuft_ab_at,
+    })
+}
+
+/// Setzt das Ziel einer Helfer-Kopplung, nur im Zustand `unbestaetigt` (sonst 409: danach setzt
+/// es nur die Leitung). Das Ziel ist schon gegen den Einsatz geprüft.
+pub async fn helfer_ziel_setzen(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    ziel: HelferZielSpalte,
+) -> Result<(), AppError> {
+    let (einheit_id, fahrzeug_id) = ziel.spalten();
+    let geaendert = sqlx::query(
+        "UPDATE geraet_kopplung SET einheit_id = ?, fahrzeug_id = ? \
+         WHERE id = ? AND ansicht = 'helfer' AND helfer_zustand = 'unbestaetigt'",
+    )
+    .bind(einheit_id)
+    .bind(fahrzeug_id)
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if geaendert == 1 {
+        Ok(())
+    } else {
+        Err(AppError::Conflict(
+            "Nach der Bestätigung setzt nur die Einsatzleitung ein neues Ziel".into(),
+        ))
+    }
 }
 
 /// Schreibt ein Ereignis in die Kopplungsspur.
@@ -420,6 +560,29 @@ pub async fn widerrufen(
     widerrufen_durch(conn, kopplung_id, Some(von)).await
 }
 
+/// Lehnt eine Helfer-Anmeldung ab (Spec Helfer-App, „Bestätigen“): Zustand `abgelehnt`, dann wie
+/// ein Widerruf Sitzungen weg und Gerätekonto inaktiv, Ereignis `abgelehnt`. Nur eine offene
+/// Kopplung im Zustand `unbestaetigt`; liefert, ob abgelehnt wurde.
+pub async fn helfer_ablehnen(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: i64,
+) -> Result<bool, AppError> {
+    let geaendert = sqlx::query(
+        "UPDATE geraet_kopplung SET helfer_zustand = 'abgelehnt' \
+         WHERE id = ? AND ansicht = 'helfer' AND helfer_zustand = 'unbestaetigt' \
+           AND widerrufen_at IS NULL AND laeuft_ab_at > datetime('now')",
+    )
+    .bind(kopplung_id)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    if geaendert == 0 {
+        return Ok(false);
+    }
+    beenden(conn, kopplung_id, Some(von), KopplungEreignis::Abgelehnt).await
+}
+
 /// Widerruft jede offene Kopplung eines Spiegels, ohne handelnde Person (LLH-1814, Spec
 /// `einsatz-abschluss`, „Kopplung bleibt beendet“): Kopplungen werden nicht gespiegelt, und eine,
 /// die eine Führungsübergabe am abgebenden Ende stehen ließ, lebte sonst mit dem Wiederöffnen
@@ -440,10 +603,58 @@ pub async fn widerrufe_am_spiegel(
     Ok(())
 }
 
+/// Widerruft jede offene Helfer-Kopplung des Einsatzes ohne handelnde Person, damit die
+/// Personenposition lokal fällt ([`crate::helfer::ende::beende_alle_im_einsatz`], Führungswechsel).
+/// Liefert die Kennungen der beendeten Kopplungen.
+pub async fn widerrufe_helfer_im_einsatz(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let offene: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM geraet_kopplung \
+         WHERE einsatz_id = ? AND ansicht = 'helfer' AND widerrufen_at IS NULL ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut beendet = Vec::new();
+    for id in offene {
+        if widerrufen_durch(&mut *conn, id, None).await? {
+            beendet.push(id);
+        }
+    }
+    Ok(beendet)
+}
+
 async fn widerrufen_durch(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
     von: Option<i64>,
+) -> Result<bool, AppError> {
+    beenden(conn, kopplung_id, von, KopplungEreignis::Widerrufen).await
+}
+
+/// Meldet eine Helfer-Kopplung ab, wenn die Kraft sich in der App abmeldet
+/// (`POST /api/auth/logout` mit ihrer Sitzung, Spec Helfer-App, „Enden“): wie ein Widerruf durch
+/// das Gerät selbst (`von` = sein Gerätekonto), Ereignis `abgemeldet`. Liefert, ob beendet wurde.
+pub async fn abmelden(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: i64,
+) -> Result<bool, AppError> {
+    beenden(conn, kopplung_id, Some(von), KopplungEreignis::Abgemeldet).await
+}
+
+/// Beendet eine Kopplung (`widerrufen_at`), löscht Sitzungen und Code, setzt das Gerätekonto
+/// inaktiv und schreibt `art` in die Spur. Eine schon beendete bleibt, wie sie ist (`false`).
+/// Jeder Widerrufsweg endet hier; deshalb löscht diese Stelle auch die Personenposition einer
+/// Helfer-Kopplung ([`crate::helfer::ende::beende_ortung`]). Das Live-Ereignis meldet der
+/// Aufrufer (`routes::helfer::melde_helfer_ende`).
+async fn beenden(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: Option<i64>,
+    art: KopplungEreignis,
 ) -> Result<bool, AppError> {
     let geaendert = sqlx::query(
         "UPDATE geraet_kopplung SET widerrufen_at = datetime('now'), widerrufen_von = ? \
@@ -471,14 +682,8 @@ async fn widerrufen_durch(
     .bind(kopplung_id)
     .execute(&mut *conn)
     .await?;
-    ereignis(
-        &mut *conn,
-        kopplung_id,
-        KopplungEreignis::Widerrufen,
-        von,
-        None,
-    )
-    .await?;
+    ereignis(&mut *conn, kopplung_id, art, von, None).await?;
+    crate::helfer::ende::beende_ortung(conn, kopplung_id).await?;
     Ok(true)
 }
 

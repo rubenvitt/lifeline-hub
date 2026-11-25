@@ -45,6 +45,9 @@ const VOLL = {
   auto_etb_eintraege: 0,
   geocoder_url: 'https://geo.example',
   aufbewahrung_kategorien: [],
+  ortung_im_einsatz: false,
+  ortung_personen: false,
+  ortung_bestaetigt_at: null as string | null,
   geaendert_at: null,
   geaendert_von: null,
 };
@@ -96,6 +99,8 @@ describe('EinsatzDefaults', () => {
         rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
         aufbewahrung_kategorien: [],
+        ortung_im_einsatz: false,
+        ortung_personen: false,
       }),
     );
   });
@@ -761,5 +766,71 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
 
     expect(screen.getByRole('combobox', { name: 'Benötigte Rolle: Chat' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Benötigte Rolle: ETB' })).toBeNull();
+  });
+
+  // ---------- Helfer-App: Ortung im Einsatz (Spec 2026-11-24-vakwvkpg) ----------
+
+  // Wortlaut bewusst als Literal, nicht aus `ORTUNG_EINWILLIGUNG`: der Test hält den Text fest.
+  const EINWILLIGUNG =
+    'Ich bestätige, dass für diese Organisation eine Einwilligung der Helfenden bzw. eine Betriebsvereinbarung vorliegt.';
+
+  it('Ortung im Einsatz: erst „Bestätigen“ im Dialog setzt den Schalter, dann ist „Auch Personen orten“ frei', async () => {
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    expect(await screen.findByRole('heading', { name: 'Ortung' })).toBeInTheDocument();
+    const ortung = screen.getByRole('switch', { name: 'Ortung im Einsatz' });
+    const personen = screen.getByRole('switch', { name: 'Auch Personen orten' });
+    expect(ortung).not.toBeChecked();
+    expect(personen).toBeDisabled();
+
+    // Abbrechen lässt den Schalter aus.
+    fireEvent.click(ortung);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(EINWILLIGUNG)).toBeInTheDocument();
+    // Die DSFA-Vorlage liegt im Repository; der Dialog nennt ihren Pfad.
+    expect(within(dialog).getByText('docs/datenschutz/dsfa-vorlage-ortung.md')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
+    expect(ortung).not.toBeChecked();
+    expect(personen).toBeDisabled();
+
+    fireEvent.click(ortung);
+    fireEvent.click(await screen.findByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(ortung).toBeChecked());
+    expect(personen).not.toBeDisabled();
+    fireEvent.click(personen);
+    await waitFor(() => expect(personen).toBeChecked());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ ortung_im_einsatz: true, ortung_personen: true }),
+      ),
+    );
+  });
+
+  it('Ortung im Einsatz: Ausschalten fragt nicht und nimmt „Auch Personen orten“ mit', async () => {
+    vi.mocked(ladeOrgEinstellungen).mockResolvedValue({
+      ...VOLL,
+      ortung_im_einsatz: true,
+      ortung_personen: true,
+      ortung_bestaetigt_at: '2026-11-24 08:00:00',
+    } as never);
+    renderMitProviders(<EinsatzDefaults />, { datenRouter: true });
+    const ortung = await screen.findByRole('switch', { name: 'Ortung im Einsatz' });
+    const personen = screen.getByRole('switch', { name: 'Auch Personen orten' });
+    expect(ortung).toBeChecked();
+    expect(personen).toBeChecked();
+
+    fireEvent.click(ortung);
+    await waitFor(() => expect(ortung).not.toBeChecked());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(personen).not.toBeChecked();
+    expect(personen).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() =>
+      expect(speichereOrgEinstellungen).toHaveBeenCalledWith(
+        expect.objectContaining({ ortung_im_einsatz: false, ortung_personen: false }),
+      ),
+    );
   });
 });

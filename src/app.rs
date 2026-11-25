@@ -185,6 +185,24 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/devices/pair",
             post(routes::geraet::koppeln).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
         )
+        // Helfer-App (Spec 2026-11-24-vakwvkpg): Zielliste und Einlösen der Einladung (öffentlich,
+        // Rate-Limit je Quelle wie `/api/devices/pair`), der eigene Zustand der Helfer-Kopplung.
+        .route(
+            "/api/devices/helpers/targets",
+            post(routes::helfer::ziele).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            "/api/devices/helpers/redeem",
+            post(routes::helfer::einloesen).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
+        .route(
+            "/api/devices/me",
+            get(routes::helfer::zustand).put(routes::helfer::ziel_aendern),
+        )
+        .route(
+            "/api/devices/me/position",
+            put(routes::helfer::position_senden),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(
@@ -1582,6 +1600,39 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         .route(
             "/api/incidents/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
+        )
+        // Helfer-App (Spec 2026-11-24-vakwvkpg, ADR-0101): Einladung und Helfer der Leitung.
+        .route(
+            "/api/incidents/{id}/helpers",
+            get(routes::helfer::uebersicht),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations",
+            post(routes::helfer::einladung_anlegen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations/{einladung_id}/revoke",
+            post(routes::helfer::einladung_widerrufen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/revoke",
+            post(routes::helfer::alle_entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/confirm",
+            post(routes::helfer::bestaetigen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/reject",
+            post(routes::helfer::ablehnen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/revoke",
+            post(routes::helfer::entfernen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/{gid}/extend",
+            post(routes::helfer::verlaengern),
         )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).

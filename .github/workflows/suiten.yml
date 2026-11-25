@@ -157,7 +157,8 @@ jobs:
       checks: read
 
   # ── Swift-Kern der iOS-Hülle (LLH-1978) ────────────────────────────────────────────
-  # `swift test` in ios/LifelineKern über Schritt 18 von check-all.sh, unter Linux. Das App-Target
+  # `swift test` in ios/LifelineKern und ios/HelferKern über Schritt 18 von check-all.sh, unter
+  # Linux. Das App-Target
   # baut nur `ios-pruefung.yml` auf einem macOS-Runner. IOS_SWIFT_PFLICHT=1 macht eine fehlende
   # Toolchain rot statt zur Lücke. Swift in derselben Version wie lokal (Werkzeugversion 6.1 in
   # ios/LifelineKern/Package.swift), aus dem offiziellen Image `swift` per Digest gepinnt. Keine

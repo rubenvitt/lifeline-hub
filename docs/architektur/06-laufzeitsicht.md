@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Fremdebene aus URL beim Lesen nachholen, LLH-2099; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -131,6 +131,10 @@ sequenceDiagram
   anderer Wortlaut darunter 409 (`CLIENT_ID_KONFLIKT`).
 - Über den Kanal geht nur die Kennung; der Client lädt mit seinen eigenen Rechten nach. Welches
   Ereignis welchem Modul gehört, legt `LiveEvent::modul_keys` fest (`src/live/mod.rs`).
+  Ergänzung zu ADR-0003 (Helfer-App, ADR-0101): `LiveEvent::Helfer` trägt kein Modul, sondern
+  ist über `LiveEvent::nur_leitung` an die Einsatzleitung gebunden. Ohne dieses Kennzeichen der
+  Verbindung erreicht es niemanden (fail-closed, `LiveNachricht::fuer_verbindung`,
+  `src/live/mod.rs`); die Variante steht im Enum-Wire-Kontrakt wie jede andere.
 - Puffer `KANAL_KAPAZITAET` und `REPLAY_KAPAZITAET` je 256, `REPLAY_KARENZ` 10 min
   (`src/live/mod.rs`). Nach einem Abriss liefert `Last-Event-ID` das Verpasste nach; nach einem
   Überlauf kommt `lagged`, und der Client gleicht alle Keys ab. Je Benutzer höchstens 16 Ströme,
@@ -663,7 +667,7 @@ sequenceDiagram
 
 Eine Fremdebene aus einer https-Adresse hat keinen Hintergrundlauf: der Server holt sie nach,
 wenn jemand ihre Daten liest (LLH-2099,
-[ADR-0101](entscheidungen/ADR-0101-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
+[ADR-0102](entscheidungen/ADR-0102-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
 
 ```mermaid
 sequenceDiagram
@@ -695,7 +699,7 @@ sequenceDiagram
   sich nur der Zeitpunkt des Abrufs, bei 200 ersetzt das neu normierte GeoJSON den Inhalt und ein
   Live-Ereignis `karte_fremdebene` geht an die Arbeitsplätze.
 - Ein gestörter Abruf setzt nur den Fehlercode an der Ebene; der letzte gute Inhalt bleibt
-  (ADR-0101). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
+  (ADR-0102). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
   Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`), nicht aus der Ebene.
 - Den Abruf stellt der Trait `FremdebeneAbrufer` bereit, Tests setzen einen zählenden ein; die
   URL steht nie in Log oder Fehlertext, nur `ebene_id` und der Fehlercode.
