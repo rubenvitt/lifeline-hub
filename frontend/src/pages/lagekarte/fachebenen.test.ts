@@ -21,6 +21,7 @@ import {
   copernicusAktivierungen,
   copernicusBilder,
   fitsCopernicusAusschnitt,
+  ohneAbgeschaltete,
 } from './fachebenen';
 import { faerbeHochwasser, hochwasserRadius } from './hochwasserStil';
 import { faerbeLuftqualitaet, luftqualitaetRadius } from './luftqualitaetStil';
@@ -796,5 +797,22 @@ describe('Copernicus-Satellitenbilder (LLH-2021)', () => {
       ],
     };
     expect(copernicusBilder(fc)).toEqual([]);
+  });
+});
+
+describe('ohneAbgeschaltete (LLH-2104)', () => {
+  it('setzt abgeschaltete Ebenen auf unsichtbar und lässt die übrigen stehen', () => {
+    const sichtbar = { ...defaultFachebenenSichtbar(), nina: true, dwd: true };
+    const wirksam = ohneAbgeschaltete(sichtbar, ['nina']);
+    expect(wirksam.nina).toBe(false);
+    expect(wirksam.dwd).toBe(true);
+    // Die gespeicherte Wahl bleibt unberührt.
+    expect(sichtbar.nina).toBe(true);
+  });
+
+  it('ohne Liste (alter Server) oder mit leerer Liste dasselbe Objekt', () => {
+    const sichtbar = { ...defaultFachebenenSichtbar(), nina: true };
+    expect(ohneAbgeschaltete(sichtbar, undefined)).toBe(sichtbar);
+    expect(ohneAbgeschaltete(sichtbar, [])).toBe(sichtbar);
   });
 });

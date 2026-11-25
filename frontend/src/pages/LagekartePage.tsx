@@ -56,7 +56,7 @@ import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDa
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
-import { braucheViewportBbox, rasterBbox } from './lagekarte/fachebenen';
+import { braucheViewportBbox, ohneAbgeschaltete, rasterBbox } from './lagekarte/fachebenen';
 import { ZONE_TYPEN, zoneStil, zoneTypLabel } from './lagekarte/zonenStil';
 import { zeichenAuftragZuEntwurf } from './lagekarte/zeichenAuftrag';
 import { bezirkAuftragEntschieden, bezirkZeichnenEntwurf } from './lagekarte/bezirkZeichnen';
@@ -272,6 +272,13 @@ export default function LagekartePage() {
     speichern,
     speichertGerade,
   } = useKartenAnsicht({ einsatzId, config, aktiveAnsichtId: ansichtParam });
+  // Vom Betreiber abgeschaltete Fachebenen (LLH-2104) gelten als unsichtbar: kein Abruf, keine
+  // Zeile im Ebenenbaum. Gespeichert bleibt die Wahl der Ansicht.
+  const fachebenenAbgeschaltet = config?.fachebenen_abgeschaltet;
+  const fachebenenWirksam = useMemo(
+    () => ohneAbgeschaltete(fachebenenSichtbar, fachebenenAbgeschaltet),
+    [fachebenenSichtbar, fachebenenAbgeschaltet],
+  );
 
   // Domänen-Daten + Marker-Ableitungen. Live liegt im EinsatzLayout; eine zweite Verbindung je
   // Seite spränge das HTTP/1.1-Limit von 6.
@@ -338,7 +345,7 @@ export default function LagekartePage() {
     copernicusBilder,
     setViewportBbox,
     setKartenZoom,
-  } = useFachebenen({ einsatzId, fachebenenSichtbar, setFachebenenSichtbar });
+  } = useFachebenen({ einsatzId, fachebenenSichtbar: fachebenenWirksam, setFachebenenSichtbar });
 
   const { style, basisAttribution, zeichenTheme } = useBasemap({
     basemap: effektiveBasemap,
@@ -1703,9 +1710,7 @@ export default function LagekartePage() {
         // Der Ausschnitt hängt an jeder sichtbaren bbox-Ebene — sonst bliebe „Energie an, KRITIS
         // aus" leer.
         onBboxAenderung={
-          braucheViewportBbox(fachebenenSichtbar)
-            ? (b) => setViewportBbox(rasterBbox(b))
-            : undefined
+          braucheViewportBbox(fachebenenWirksam) ? (b) => setViewportBbox(rasterBbox(b)) : undefined
         }
         onZoomAenderung={setKartenZoom}
         onFachebeneKlick={onFachebeneKlick}
@@ -2052,7 +2057,8 @@ export default function LagekartePage() {
         ansichtDirty={dirty}
         ansichtSpeichert={speichertGerade}
         onAnsichtSpeichern={onAnsichtSpeichern}
-        fachebenenSichtbar={fachebenenSichtbar}
+        fachebenenSichtbar={fachebenenWirksam}
+        fachebenenAbgeschaltet={fachebenenAbgeschaltet}
         fachebenenStatus={fachebenenStatus}
         onFachebeneToggle={onFachebeneToggle}
         zoomZuKlein={zoomZuKlein}

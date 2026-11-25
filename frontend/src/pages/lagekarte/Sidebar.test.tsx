@@ -514,6 +514,27 @@ describe('Sidebar Bild-Hintergründe', () => {
     }
   });
 
+  it('blendet eine vom Betreiber abgeschaltete Fachebene aus (LLH-2104)', () => {
+    renderMitProviders(
+      <Sidebar
+        {...ebenenProps}
+        fachebenenSichtbar={{ ...basisProps.fachebenenSichtbar, nina: true }}
+        fachebenenAbgeschaltet={['nina']}
+      />,
+    );
+    expect(document.querySelector('[data-fachebene="nina"]')).toBeNull();
+    expect(screen.queryByText(FACHEBENEN.nina.label)).toBeNull();
+    // Die Gruppe „Warnungen“ bleibt mit DWD stehen.
+    expect(document.querySelector('[data-fachebene="dwd"]')).not.toBeNull();
+    // Der Zähler „N an“ der Fachebenen zählt die abgeschaltete NINA nicht mit.
+    expect(screen.getByRole('button', { name: /^Fachebenen/ })).not.toHaveTextContent(/\d+ an/);
+  });
+
+  it('ohne Abschaltung bleibt NINA im Ebenenbaum (LLH-2104)', () => {
+    renderMitProviders(<Sidebar {...ebenenProps} fachebenenAbgeschaltet={[]} />);
+    expect(document.querySelector('[data-fachebene="nina"]')).not.toBeNull();
+  });
+
   // Zeile einer Fachebene: die Zeile um Schalter, Label und Hinweis (`data-fachebene`).
   const fachebenenZeile = (label: string) =>
     screen.getByText(label).closest<HTMLElement>('[data-fachebene]')!;
