@@ -221,3 +221,40 @@ pub fn rahmen_smtp() -> (Rahmen, Arc<SmtpSkript>) {
     );
     (rahmen, pruefer)
 }
+
+/// Ein sipgate-Prüfer, der ein Skript von Ergebnissen abspielt (leer heißt Erfolg) und sich die
+/// Faxline merkt, die er prüfen sollte, und ob ein Token da war (LLH-2095).
+#[derive(Default)]
+pub struct SipgateSkript {
+    pub skript: Mutex<VecDeque<Result<(), lifeline_hub::adapter::sipgate::SipgateFehler>>>,
+    pub gesehen: Mutex<Vec<String>>,
+}
+
+impl lifeline_hub::adapter::sipgate_fax_art::SipgatePruefer for SipgateSkript {
+    fn pruefe<'a>(
+        &'a self,
+        zugang: &'a lifeline_hub::adapter::sipgate::SipgateZugang<'a>,
+        faxline_id: &'a str,
+    ) -> BoxFuture<'a, Result<(), lifeline_hub::adapter::sipgate::SipgateFehler>> {
+        Box::pin(async move {
+            self.gesehen.lock().unwrap().push(format!(
+                "{} {faxline_id} {}",
+                zugang.token_id,
+                !age::secrecy::ExposeSecret::expose_secret(zugang.token).is_empty()
+            ));
+            self.skript.lock().unwrap().pop_front().unwrap_or(Ok(()))
+        })
+    }
+}
+
+/// Ein Rahmen mit Schlüssel und der Fax-Art mit Skript-Prüfer.
+pub fn rahmen_sipgate() -> (Rahmen, Arc<SipgateSkript>) {
+    let pruefer = Arc::new(SipgateSkript::default());
+    let rahmen = Rahmen::new(
+        Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
+        Verzeichnis::new(vec![Arc::new(
+            lifeline_hub::adapter::sipgate_fax_art::SipgateFaxArt::new(pruefer.clone()),
+        )]),
+    );
+    (rahmen, pruefer)
+}
