@@ -891,19 +891,82 @@ async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
     assert_eq!(w.etb_anzahl().await, vorher);
 }
 
+/// Ein PNG-Chunk, wie ihn die Bereinigung liest (sie prüft die CRC nicht).
+fn png_chunk(typ: &[u8; 4], daten: &[u8]) -> Vec<u8> {
+    let mut c = (daten.len() as u32).to_be_bytes().to_vec();
+    c.extend_from_slice(typ);
+    c.extend_from_slice(daten);
+    c.extend_from_slice(&[0, 0, 0, 0]);
+    c
+}
+
+/// Setzt `chunk` hinter den IHDR (Signatur 8 + IHDR 25 Bytes) eines PNG.
+fn png_mit_chunk(chunk: &[u8]) -> Vec<u8> {
+    let png = png_bytes(32, 24);
+    let mut aus = png[..33].to_vec();
+    aus.extend_from_slice(chunk);
+    aus.extend_from_slice(&png[33..]);
+    aus
+}
+
+/// Die Bytes der Anlage `anlage-1.png` aus der Mail (Base64-Teil bis zur nächsten Grenze).
+fn anlage_aus_mail(mail: &str) -> Vec<u8> {
+    use base64::Engine;
+    let ab = mail
+        .find("filename=\"anlage-1.png\"")
+        .expect("Anlage fehlt in der Mail");
+    let rest = &mail[ab..];
+    let start = rest.find("\r\n\r\n").expect("Kopf der Anlage endet nicht") + 4;
+    let koerper: String = rest[start..]
+        .lines()
+        .take_while(|z| !z.starts_with("--"))
+        .collect::<Vec<_>>()
+        .concat();
+    base64::engine::general_purpose::STANDARD
+        .decode(koerper.trim())
+        .expect("Anlage ist kein Base64")
+}
+
+#[tokio::test]
+async fn anlage_geht_bereinigt_hinaus_nicht_im_original() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    // Gespeichert bleibt das Original mit Textchunk (LFH-747); nach außen nur die bereinigte Fassung.
+    let original = png_mit_chunk(&png_chunk(b"tEXt", b"Comment\0Fundort Gartenweg 7"));
+    sqlx::query("UPDATE anhang SET daten = ? WHERE einsatz_id = ? AND mime = 'image/png'")
+        .bind(&original)
+        .bind(w.einsatz)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+
+    w.durchgang(t0).await;
+
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    let gesehen = w.skript.gesehen();
+    let anlage = anlage_aus_mail(&String::from_utf8_lossy(&gesehen[0].mail));
+    assert!(anlage.starts_with(b"\x89PNG\r\n\x1a\n"), "keine PNG-Anlage");
+    assert!(
+        !anlage.windows(b"tEXt".len()).any(|f| f == b"tEXt"),
+        "der Textchunk des Originals ging mit hinaus"
+    );
+}
+
 #[tokio::test]
 async fn lauf_prueft_die_echten_bytes_der_anlagen() {
     let w = welt().await;
     let lid = w.lagebericht_freigeben(true).await;
-    // Die gespeicherte Größe ist klein, die Bytes sind über 20 MiB.
-    sqlx::query(
-        "UPDATE anhang SET daten = zeroblob(?) WHERE einsatz_id = ? AND mime = 'image/png'",
-    )
-    .bind(20 * 1024 * 1024 + 1)
-    .bind(w.einsatz)
-    .execute(&w.pool)
-    .await
-    .unwrap();
+    // Die gespeicherte Größe ist klein, die Bytes sind über 20 MiB: ein gültiges PNG mit einem
+    // übergroßen IDAT, das auch die Bereinigung behält.
+    let riesig = png_mit_chunk(&png_chunk(b"IDAT", &vec![0u8; 20 * 1024 * 1024 + 1]));
+    sqlx::query("UPDATE anhang SET daten = ? WHERE einsatz_id = ? AND mime = 'image/png'")
+        .bind(&riesig)
+        .bind(w.einsatz)
+        .execute(&w.pool)
+        .await
+        .unwrap();
     let t0 = Utc::now();
     let id = w.versand("lagebericht", lid, t0).await;
 

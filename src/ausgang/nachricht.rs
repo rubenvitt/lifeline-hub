@@ -206,8 +206,9 @@ pub async fn pruefe_anhaenge_gespeichert<T: Dokumentart>(
     pruefe_gespeicherte_summe(&liste)
 }
 
-/// Die PNG-Anlagen eines freigegebenen Dokuments als `(anlage-{n}.png, Bytes)` in der
-/// Reihenfolge der Anlagen. Die Anlagen einer freigegebenen Fassung sind unveränderlich. Summe
+/// Die PNG-Anlagen eines freigegebenen Dokuments als `(anlage-{n}.png, Bytes)` in der Reihenfolge
+/// der Anlagen, bereinigt wie jeder Download (LFH-747; unbereinigbar → [`AnhangFehler::App`]).
+/// Die Anlagen einer freigegebenen Fassung sind unveränderlich. Summe
 /// über [`ANHANG_MAX_BYTES`] → [`AnhangFehler::ZuGross`] (der Aufrufer macht daraus 422 beim
 /// Anlegen bzw. `zu_gross` im Lauf). Eine Art ohne Anlagen liefert eine leere Liste.
 pub async fn load_anhaenge<T: Dokumentart>(
@@ -224,7 +225,8 @@ pub async fn load_anhaenge<T: Dokumentart>(
     let mut out = Vec::with_capacity(liste.len());
     for a in &liste {
         let anhang_id = anlage::anhang_id_fuer_download::<T>(pool, einsatz_id, id, a.id).await?;
-        let (_, _, daten) = crate::anhang::repo::laden_bytes(pool, anhang_id).await?;
+        // Nach außen nur die bereinigte Fassung (src/AGENTS.md, „Anhänge“, LFH-747).
+        let (_, daten) = crate::routes::support::anhang_bereinigt_kopieren(pool, anhang_id).await?;
         out.push((format!("anlage-{}.png", a.nummer), daten));
     }
     pruefe_anhang_groesse(&out).map_err(|_| AnhangFehler::ZuGross)?;
