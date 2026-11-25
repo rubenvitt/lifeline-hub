@@ -2173,6 +2173,33 @@ fn lese_sperre_wire() {
 }
 
 #[test]
+fn fremdebene_quelle_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneQuelle {
+        Datei => "datei",
+        Url => "url",
+    } in lifeline_hub::karte_fremdebene::FremdebeneQuelle::ALLE);
+}
+
+#[test]
+fn fremdebene_fehler_wire() {
+    enum_wire!(lifeline_hub::karte_fremdebene::FremdebeneFehler {
+        Unlesbar => "unlesbar",
+        Dtd => "dtd",
+        ZuGross => "zu_gross",
+        ZuVieleObjekte => "zu_viele_objekte",
+        Leer => "leer",
+        Koordinaten => "koordinaten",
+        Virus => "virus",
+        NichtErreichbar => "nicht_erreichbar",
+        Weiterleitung => "weiterleitung",
+        Abgelehnt => "abgelehnt",
+        Status => "status",
+        ZielIntern => "ziel_intern",
+        Zeitlimit => "zeitlimit",
+    } in lifeline_hub::karte_fremdebene::FremdebeneFehler::ALLE);
+}
+
+#[test]
 fn vorschau_zustand_wire() {
     enum_wire!(lifeline_hub::einheit::aus_vorlage::VorschauZustand {
         Neu => "neu",

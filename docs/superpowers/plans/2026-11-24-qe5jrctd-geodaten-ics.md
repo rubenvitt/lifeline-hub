@@ -327,16 +327,16 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
   - Repo: `liste(pool, einsatz_id) -> Vec<FremdebeneAnzeige>`, `anlegen(pool, einsatz_id, angelegt_von, name, quelle, url: Option<&str>, farbe, normiert) -> FremdebeneAnzeige`, `laden_daten(pool, einsatz_id, id) -> Option<(String /*geojson*/, String /*sha256*/)>`, `aktualisiere(pool, einsatz_id, id, patch)`, `loeschen(pool, einsatz_id, id)`, `ersetze_daten(...)`, `setze_abruf(...)`;
   - `FremdebeneAnzeige` mit den Wire-Feldern `id, name, source, url: Option<String>, url_host: Option<String>, color, feature_count, dropped_count, fetched_at, attempted_at, error: Option<FremdebeneFehler>, created_at`.
 
-- [ ] **Step 1:** Failing Tests:
+- [x] **Step 1:** Failing Tests:
   - Einlesen: `geojson_featurecollection_wird_normiert` (nur `name` und `description`, 6 Stellen); `nackte_geometrie_und_geometrycollection`; `mercator_meter_sind_koordinatenfehler` (lon 1 113 194 → `Koordinaten`); `objekt_ohne_geometrie_wird_gezaehlt`; `zu_viele_objekte`; `zu_viele_stuetzpunkte_je_ring`; `leere_datei_ist_leer`; `html_in_description_wird_text`.
   - Registry: `cargo test --lib schwaerzung_registry spiegel::art` grün.
-- [ ] **Step 2:** `cargo test --lib karte_fremdebene` → FAIL.
-- [ ] **Step 3:** Migration, Modul, Registrierungen und Fehlervariante umsetzen; die Bereichsprüfung als eigene Funktion in `einlesen/pruefen.rs`.
-- [ ] **Step 4:** Prüfen:
+- [x] **Step 2:** `cargo test --lib karte_fremdebene` → FAIL.
+- [x] **Step 3:** Migration, Modul, Registrierungen und Fehlervariante umsetzen; die Bereichsprüfung als eigene Funktion in `einlesen/pruefen.rs`.
+- [x] **Step 4:** Prüfen:
   - `cargo test --lib karte_fremdebene schwaerzung_registry spiegel einsatz::archiv db::tests` → PASS;
   - `cargo test --test enum_wire_kontrakt` → PASS;
   - `scripts/check-migrationen.sh` → grün.
-- [ ] **Step 5:** Commit `feat: Fremdebenen speichern und GeoJSON einlesen` (Zunder B).
+- [x] **Step 5:** Commit `feat: Fremdebenen speichern und GeoJSON einlesen` (Zunder B).
 
 ### Task 12: KML und KMZ einlesen
 
