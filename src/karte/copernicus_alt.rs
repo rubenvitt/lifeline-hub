@@ -6,7 +6,7 @@
 //! dem ZIP. Nur mit „Ältere Aktivierungen“ (`archiv`).
 //!
 //! Herleitung: `docs/superpowers/specs/2026-11-24-pjfe442j-copernicus-aeltere-aktivierungen-design.md`,
-//! ADR-0098. Pflege eines Eintrags: `docs/fachebenen-quellen.md`, Abschnitt „Copernicus EMS“.
+//! ADR-0099. Pflege eines Eintrags: `docs/fachebenen-quellen.md`, Abschnitt „Copernicus EMS“.
 
 use crate::karte::copernicus::{
     format_zeitpunkt, parse_ebenen_art, Details, EbenenArt, Gebiet, Produkt,
@@ -15,7 +15,7 @@ use crate::karte::typen::Bbox;
 use serde_json::Value;
 use std::sync::OnceLock;
 
-/// Nur von hier lädt der Altbestand Vector Packages (ADR-0098); gilt auch für die Adresse nach
+/// Nur von hier lädt der Altbestand Vector Packages (ADR-0099); gilt auch für die Adresse nach
 /// Weiterleitungen.
 pub(crate) const PAKET_BASIS: &str =
     "https://cems-mapping-website.s3.eu-west-1.amazonaws.com/static/activations/";
@@ -105,6 +105,8 @@ fn parse_produkt(p: &Value) -> Option<Produkt> {
         // Die ZIPs nennen keine Aufnahmezeit maschinenlesbar; es zählt die Lieferung.
         aufnahme: None,
         sensor: None,
+        // Die Vector Packages enthalten keine Rasterbilder (LLH-2021).
+        bilder: Vec::new(),
         geliefert: p
             .get("geliefert")
             .and_then(Value::as_str)
@@ -253,7 +255,7 @@ pub(crate) fn is_paket_url(url: &str) -> bool {
     url.starts_with(PAKET_BASIS)
 }
 
-/// Weiterleitungen nur innerhalb von `basis` (ADR-0098); eine auf einen anderen Host wird nicht
+/// Weiterleitungen nur innerhalb von `basis` (ADR-0099); eine auf einen anderen Host wird nicht
 /// verfolgt, die Antwort bleibt die Weiterleitung selbst.
 pub(crate) fn redirect_policy(basis: String) -> reqwest::redirect::Policy {
     reqwest::redirect::Policy::custom(move |a| {

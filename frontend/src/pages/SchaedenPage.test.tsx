@@ -20,7 +20,7 @@ beforeEach(() => {
   sessionStorage.clear();
   // Ort-Zeile unter dem Schadensort (LLH-1121).
   server.use(
-    http.get('/api/einsaetze/:eid/place-preview', () =>
+    http.get('/api/incidents/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
   );
@@ -112,11 +112,11 @@ function render(
 ) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => schaeden).handler,
     // Quellen der Geschädigt-Combobox (mounten beim Öffnen der Formulare):
-    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json(personen)),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json(personal)),
+    http.get('/api/incidents/1/persons/selection', () => HttpResponse.json(personen)),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json(personal)),
   );
   return renderMitProviders(
     <Routes>
@@ -137,10 +137,10 @@ function SchadenEinsatzWechsel() {
 function renderSchaedenPage(route: string) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
     ...schaedenAttrappe(1, () => []).handler,
-    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/persons/selection', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -154,10 +154,10 @@ function renderSchaedenPage(route: string) {
 function renderSchaedenPageMitEinsatz(einsatzObj: object, route: string) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => []).handler,
-    http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/persons/selection', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <Routes>
@@ -318,7 +318,7 @@ describe('SchaedenPage', () => {
       const schaeden: object[] = [];
       let gesendet: Record<string, unknown> = {};
       server.use(
-        http.post('/api/einsaetze/1/damages', async ({ request }) => {
+        http.post('/api/incidents/1/damages', async ({ request }) => {
           gesendet = (await request.json()) as Record<string, unknown>;
           // Nur das versandte Paar kommt beim nächsten Listen-GET zurück; eine feste verortete
           // Antwort verdeckte einen vergessenen Request-Wert.
@@ -444,7 +444,7 @@ describe('SchaedenPage', () => {
   it('Erfassung schickt Pflichtfelder', async () => {
     let body: Record<string, unknown> = {};
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -476,7 +476,7 @@ describe('SchaedenPage', () => {
   it('„Speichern und nächste" lässt den Dialog offen und behält den Ort', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -511,7 +511,7 @@ describe('SchaedenPage', () => {
   it('Serien-Speichern trägt den Geschädigten NICHT, den verorteten Ort schon in den nächsten Schaden', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -547,7 +547,7 @@ describe('SchaedenPage', () => {
   it('„Erfassen" schließt den Dialog', async () => {
     const koerper: Record<string, unknown>[] = [];
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         koerper.push((await request.json()) as Record<string, unknown>);
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -565,7 +565,7 @@ describe('SchaedenPage', () => {
   it('merkt den Ort nach Erfolg fürs Wiederöffnen, ohne die eigene Organisation vorzuwählen', async () => {
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/damages', () => {
+      http.post('/api/incidents/1/damages', () => {
         versuche += 1;
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -596,7 +596,7 @@ describe('SchaedenPage', () => {
   it('merkt den Ort bei einem fehlgeschlagenen Schaden nicht und lässt den Wortlaut stehen', async () => {
     let versuche = 0;
     server.use(
-      http.post('/api/einsaetze/1/damages', () => {
+      http.post('/api/incidents/1/damages', () => {
         versuche += 1;
         return HttpResponse.json({ error: 'Schaden abgelehnt' }, { status: 500 });
       }),
@@ -632,7 +632,7 @@ describe('SchaedenPage', () => {
       ...schaedenAttrappe(1, () =>
         postBeantwortet ? [basisSchaden({ id: 99, ort: 'Wartort Schaden' })] : [],
       ).handler,
-      http.post('/api/einsaetze/1/damages', async () => {
+      http.post('/api/incidents/1/damages', async () => {
         postGestartet();
         await antwortGate;
         postBeantwortet = true;
@@ -668,16 +668,16 @@ describe('SchaedenPage', () => {
     sessionStorage.setItem('lfh:erfassung:2:schaden:ort', 'Schadenort B');
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/:einsatzId', ({ params }) => {
+      http.get('/api/incidents/:einsatzId', ({ params }) => {
         const id = Number(params.einsatzId);
         return HttpResponse.json({ ...einsatzAktiv, id, bezeichnung: `Lage ${id}` });
       }),
       ...schaedenAttrappe(1, () => []).handler,
       ...schaedenAttrappe(2, () => []).handler,
-      http.get('/api/einsaetze/:einsatzId/persons/selection', ({ params }) =>
+      http.get('/api/incidents/:einsatzId/persons/selection', ({ params }) =>
         HttpResponse.json(params.einsatzId === '1' ? [einePerson] : []),
       ),
-      http.get('/api/einsaetze/:einsatzId/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/:einsatzId/personnel', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -720,7 +720,7 @@ describe('SchaedenPage', () => {
   it('Erfassung: Betroffene Person aus Combobox → geschaedigt_person_id', async () => {
     let body: Record<string, unknown> = {};
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -747,7 +747,7 @@ describe('SchaedenPage', () => {
   it('Erfassung: Einsatzkraft aus Combobox → geschaedigt_personal_id', async () => {
     let body: Record<string, unknown> = {};
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -773,7 +773,7 @@ describe('SchaedenPage', () => {
   it('Erfassung: Freitext → externer Kontakt (geschaedigt_kontakt)', async () => {
     let body: Record<string, unknown> = {};
     server.use(
-      http.post('/api/einsaetze/1/damages', async ({ request }) => {
+      http.post('/api/incidents/1/damages', async ({ request }) => {
         body = (await request.json()) as Record<string, unknown>;
         return HttpResponse.json(basisSchaden(), { status: 201 });
       }),
@@ -827,10 +827,10 @@ describe('SchaedenPage', () => {
     let einsatz: object = einsatzAktiv;
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatz)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatz)),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/persons/selection', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
     );
     const { client } = renderMitProviders(
       <AdresseSteht>
@@ -861,10 +861,10 @@ describe('SchaedenPage', () => {
     }
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/persons/selection', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <>
@@ -945,11 +945,11 @@ describe('SchaedenPage', () => {
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
-      http.get('/api/einsaetze/1/damages', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1/damages', () => new HttpResponse(null, { status: 500 })),
       ...schaedenAttrappe(1, () => []).handler,
-      http.get('/api/einsaetze/1/persons/selection', () => HttpResponse.json([])),
-      http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/persons/selection', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
     );
     renderMitProviders(
       <Routes>
@@ -980,7 +980,7 @@ describe('SchaedenPage', () => {
     const { client } = render(einsatzAktiv, [basisSchaden()]);
     await screen.findByText('S-001');
 
-    server.use(http.get('/api/einsaetze/1/damages', () => new HttpResponse(null, { status: 500 })));
+    server.use(http.get('/api/incidents/1/damages', () => new HttpResponse(null, { status: 500 })));
     await client.refetchQueries({ queryKey: einsatzKeys.schaeden(1) });
 
     expect(await screen.findByText(/Aktualisierung fehlgeschlagen/)).toBeInTheDocument();
@@ -1042,7 +1042,7 @@ describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
     ]);
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
       ...attrappe.handler,
     );
     renderMitProviders(
@@ -1065,7 +1065,7 @@ describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
     // Nach `render`: sonst finge die Einzelabruf-Route der Attrappe `/export` als Schaden-ID.
     server.use(
       http.get(
-        '/api/einsaetze/1/damages/export',
+        '/api/incidents/1/damages/export',
         () => new HttpResponse('registrier_nr;status\nS-001;offen\n'),
       ),
     );
@@ -1081,7 +1081,7 @@ describe('SchaedenPage — Gefahr und CSV (LLH-1115)', () => {
     const speichern = vi.spyOn(dateiSpeichern, 'speichereDatei').mockImplementation(() => {});
     render(einsatzAktiv, [basisSchaden()]);
     server.use(
-      http.get('/api/einsaetze/1/damages/export', () =>
+      http.get('/api/incidents/1/damages/export', () =>
         HttpResponse.json({ error: 'Kein Zugriff auf das Modul Schäden' }, { status: 403 }),
       ),
     );
@@ -1101,7 +1101,7 @@ describe('SchaedenPage — Reiter in der Adresse (LLH-1826)', () => {
   function renderMitOrt(route = '/einsaetze/1/schaeden') {
     server.use(
       meHandler(nutzer),
-      http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzAktiv)),
+      http.get('/api/incidents/1', () => HttpResponse.json(einsatzAktiv)),
       ...schaedenAttrappe(1, () => []).handler,
     );
     return renderMitProviders(

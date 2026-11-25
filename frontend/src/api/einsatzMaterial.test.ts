@@ -13,7 +13,7 @@ import {
 function faengeKoerper(): unknown[] {
   const koerper: unknown[] = [];
   server.use(
-    http.post('/api/einsaetze/:id/material', async ({ request }) => {
+    http.post('/api/incidents/:id/material', async ({ request }) => {
       koerper.push(await request.json());
       return HttpResponse.json({ id: 1 }, { status: 201 });
     }),
@@ -79,7 +79,7 @@ describe('api/einsatzMaterial — vorhandenen Posten verknüpfen (LLH-1259 D1)',
   it('sendet die Nachforderung an den eigenen Schreibweg, ergaenzen nur als true', async () => {
     const aufrufe: { pfad: string; koerper: unknown }[] = [];
     server.use(
-      http.post('/api/einsaetze/:id/material/:em/resource-request', async ({ request, params }) => {
+      http.post('/api/incidents/:id/material/:em/resource-request', async ({ request, params }) => {
         aufrufe.push({
           pfad: `${String(params.id)}/${String(params.em)}`,
           koerper: await request.json(),
@@ -101,7 +101,7 @@ describe('api/einsatzMaterial — Fehlzuordnung lösen (LLH-1403 D1)', () => {
     const aufrufe: { pfad: string; koerper: string }[] = [];
     server.use(
       http.delete(
-        '/api/einsaetze/:id/material/:em/resource-request',
+        '/api/incidents/:id/material/:em/resource-request',
         async ({ request, params }) => {
           aufrufe.push({
             pfad: `${String(params.id)}/${String(params.em)}`,
@@ -120,7 +120,7 @@ describe('api/einsatzMaterial — Altwert am PATCH (LLH-1945)', () => {
   it('legt `erwartet` in den Körper, `nurWennFrei` bleibt in der Adresse', async () => {
     const aufrufe: { url: string; koerper: unknown }[] = [];
     server.use(
-      http.patch('/api/einsaetze/:id/material/:em', async ({ request }) => {
+      http.patch('/api/incidents/:id/material/:em', async ({ request }) => {
         const url = new URL(request.url);
         aufrufe.push({ url: `${url.pathname}${url.search}`, koerper: await request.json() });
         return HttpResponse.json({ id: 7 });
@@ -130,10 +130,10 @@ describe('api/einsatzMaterial — Altwert am PATCH (LLH-1945)', () => {
     await updateDisposition(5, 7, { einheit_id: null }, { nurWennFrei: true });
     expect(aufrufe).toEqual([
       {
-        url: '/api/einsaetze/5/material/7',
+        url: '/api/incidents/5/material/7',
         koerper: { bemerkung: 'Tor 3', erwartet: { bemerkung: null } },
       },
-      { url: '/api/einsaetze/5/material/7?nur_wenn_frei=1', koerper: { einheit_id: null } },
+      { url: '/api/incidents/5/material/7?nur_wenn_frei=1', koerper: { einheit_id: null } },
     ]);
   });
 });

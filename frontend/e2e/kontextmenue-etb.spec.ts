@@ -27,10 +27,10 @@ test.beforeEach(async ({ page }) => {
 
 /** Ein Einsatz mit einem Eintrag; liefert seine Zeile auf der ETB-Seite in der erwarteten Form. */
 async function eintragZeile(page: Page, form: 'spalten' | 'handschirm'): Promise<Locator> {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Kontextmenü ETB ${Date.now()}`,
   });
-  await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+  await post(page, `/api/incidents/${einsatzId}/etb`, {
     typ: 'meldung',
     inhalt: 'Wasserentnahme an Hydrant 4 bereit',
     von: 'ELW 1',
@@ -104,7 +104,7 @@ test('Handschirm-Zeile: das Kontextmenü zeigt die Einträge des ⋮, mit dem Ve
 test('die Felder der Erfassung behalten das Browsermenü (kein eigenes Kontextmenü)', async ({
   page,
 }) => {
-  const einsatzId = await post(page, '/api/einsaetze', {
+  const einsatzId = await post(page, '/api/incidents', {
     bezeichnung: `E2E Kontextmenü Feld ${Date.now()}`,
   });
   await page.goto(`/einsaetze/${einsatzId}/etb`);

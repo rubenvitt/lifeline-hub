@@ -17,7 +17,7 @@ export function listeNachforderungen(
   filter: NachforderungFilter = {},
 ): Promise<Nachforderung[]> {
   return apiGet<Nachforderung[]>(
-    mitParametern(`/api/einsaetze/${einsatzId}/resource-requests`, { status: filter.status }),
+    mitParametern(`/api/incidents/${einsatzId}/resource-requests`, { status: filter.status }),
   );
 }
 
@@ -26,14 +26,14 @@ export function listeNachforderungen(
  * Benutzer lesen darf, nach Zahl der Einsätze; ohne den laufenden.
  */
 export function listeUeblicheArten(einsatzId: number): Promise<NachforderungArtUeblich[]> {
-  return apiGet<NachforderungArtUeblich[]>(`/api/einsaetze/${einsatzId}/resource-requests/types`);
+  return apiGet<NachforderungArtUeblich[]>(`/api/incidents/${einsatzId}/resource-requests/types`);
 }
 
 export function legeNachforderungAn(
   einsatzId: number,
   daten: NeueNachforderung,
 ): Promise<Nachforderung> {
-  return apiSend<Nachforderung>(`/api/einsaetze/${einsatzId}/resource-requests`, 'POST', daten);
+  return apiSend<Nachforderung>(`/api/incidents/${einsatzId}/resource-requests`, 'POST', daten);
 }
 
 /** Bedarfs-Status weiterschalten (linear: zugesagt/unterwegs/eingetroffen). */
@@ -43,7 +43,7 @@ export function setzeNachforderungStatus(
   status: NachforderungStatus,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/status`,
+    `/api/incidents/${einsatzId}/resource-requests/${nachforderungId}/status`,
     'POST',
     { status },
   );
@@ -56,7 +56,7 @@ export function lehneNachforderungAb(
   grund?: string,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/decline`,
+    `/api/incidents/${einsatzId}/resource-requests/${nachforderungId}/decline`,
     'POST',
     { grund },
   );
@@ -69,7 +69,7 @@ export function erfasseZusage(
   zusage: NachforderungZusageEingabe,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/commitment`,
+    `/api/incidents/${einsatzId}/resource-requests/${nachforderungId}/commitment`,
     'POST',
     zusage,
   );
@@ -82,7 +82,7 @@ export function zieheNachforderungZurueck(
   grund?: string,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}/withdraw`,
+    `/api/incidents/${einsatzId}/resource-requests/${nachforderungId}/withdraw`,
     'POST',
     { grund },
   );
@@ -95,7 +95,7 @@ export function patcheNachforderung(
   aenderung: PatchNachforderung,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/resource-requests/${nachforderungId}`,
+    `/api/incidents/${einsatzId}/resource-requests/${nachforderungId}`,
     'PATCH',
     aenderung,
   );

@@ -36,7 +36,7 @@ interface Uhs {
 }
 
 async function demoUhs(page: Page, einsatz: number): Promise<Uhs> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatz}/uhs`);
+  const antwort = await page.request.get(`/api/incidents/${einsatz}/uhs`);
   expect(antwort.ok(), `UHS: ${antwort.status()}`).toBe(true);
   const [erste] = (await antwort.json()) as Uhs[];
   expect(erste, 'der Demo-Einsatz hat eine UHS').toBeDefined();
@@ -60,7 +60,7 @@ async function uhsGeraet(
   const k = await fuelle<{ code: { code: string } }>(
     page,
     'post',
-    `/api/einsaetze/${demo.id}/devices`,
+    `/api/incidents/${demo.id}/devices`,
     { ansicht, stelle_id: uhs.id, bezeichnung },
   );
   const kontext = await browser.newContext({ viewport });
@@ -157,14 +157,14 @@ test.describe(KAPITEL, () => {
       const person = await fuelle<{ id: number }>(
         page,
         'post',
-        `/api/einsaetze/${einsatz}/persons`,
+        `/api/incidents/${einsatz}/persons`,
         {
           name: 'Neumann',
           uhs_id: uhs.id,
         },
       );
       const bestaetiger = (await (
-        await geraet.request.get(`/api/einsaetze/${einsatz}/persons/confirmers`)
+        await geraet.request.get(`/api/incidents/${einsatz}/persons/confirmers`)
       ).json()) as { name: string; funktion: string | null }[];
       const mit = bestaetiger.find((b) => b.funktion) ?? bestaetiger[0];
       expect(mit, 'Personal im Demo-Einsatz').toBeDefined();

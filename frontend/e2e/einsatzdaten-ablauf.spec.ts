@@ -16,7 +16,7 @@ test.use({ timezoneId: 'Europe/Berlin' });
 async function anmeldenUndAnlegen(page: Page): Promise<number> {
   await page.setViewportSize({ width: 1366, height: 768 });
   await anmeldenPerApi(page, 'admin', PW);
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Ablauf ${Date.now()}` },
   });
   expect(antwort.ok()).toBeTruthy();
@@ -27,7 +27,7 @@ async function punkte(
   page: Page,
   id: number,
 ): Promise<{ id: number; bezeichnung: string; zeitpunkt_at: string }[]> {
-  return (await (await page.request.get(`/api/einsaetze/${id}/agenda-items`)).json()) as {
+  return (await (await page.request.get(`/api/incidents/${id}/agenda-items`)).json()) as {
     id: number;
     bezeichnung: string;
     zeitpunkt_at: string;

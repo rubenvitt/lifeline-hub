@@ -43,23 +43,23 @@ for (const modus of ['light', 'dark'] as const) {
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await anmeldenAlsAdmin(page, { startseite: false });
 
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E 874 Fehlertext ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
+    await post(page, `/api/incidents/${einsatzId}/tasks`, {
       auftrag_text: 'Deich sichern',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
       frist_at: '2026-06-01 10:00:00',
     });
 
     // Ein Bezirk mit einer Fläche: nur dann ruft das Paneel „Gebiet“ die Zonen ab.
-    const bezirkId = await post(page, `/api/einsaetze/${einsatzId}/evacuation/districts`, {
+    const bezirkId = await post(page, `/api/incidents/${einsatzId}/evacuation/districts`, {
       bezeichnung: 'Uferstraße 12–40',
       plan_personen: 120,
       plan_erhebung: 'geschaetzt',
     });
     const [w, o, s, n] = [9.354, 9.358, 52.103, 52.105];
-    await post(page, `/api/einsaetze/${einsatzId}/zones`, {
+    await post(page, `/api/incidents/${einsatzId}/zones`, {
       typ: 'evakuierungsbezirk',
       geometrie_typ: 'Polygon',
       geometrie: JSON.stringify({
@@ -77,7 +77,7 @@ for (const modus of ['light', 'dark'] as const) {
       evakuierungsbezirk_id: bezirkId,
     });
     // Der Abruf des Gebiets scheitert am Server; alles andere läuft echt.
-    await page.route(`**/api/einsaetze/${einsatzId}/zones`, (route) =>
+    await page.route(`**/api/incidents/${einsatzId}/zones`, (route) =>
       route.request().method() === 'GET'
         ? route.fulfill({
             status: 500,

@@ -43,7 +43,7 @@ test('Druck der Modul-Listen: Einstieg mit Filter, Kopf, Auswahl und Druckbild',
 }) => {
   await anmelden(page);
   const einsatzId = await einsatzAnlegen(page, `E2E Listen-Druck ${Date.now()}`);
-  const basis = `/api/einsaetze/${einsatzId}`;
+  const basis = `/api/incidents/${einsatzId}`;
   // Zwei Betroffene (Sichtung hebt auf „betroffen"), eine vermisste Person.
   await saeen(page, `${basis}/persons`, { name: 'Albers', sichtung: 'sk1' });
   await saeen(page, `${basis}/persons`, { name: 'Brandt', sichtung: 'sk3' });

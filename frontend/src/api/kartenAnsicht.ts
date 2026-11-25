@@ -4,7 +4,7 @@ import { apiGet, apiSend } from './client';
 /** Kartenansichten eines Einsatzes (LFH-319). Der GET legt lazy die einsatzweit
  *  geteilte Standardansicht an (Seed aus den Einsatz-Einstellungen). */
 export function ladeKartenAnsichten(einsatzId: number): Promise<KartenAnsicht[]> {
-  return apiGet<KartenAnsicht[]>(`/api/einsaetze/${einsatzId}/map-views`);
+  return apiGet<KartenAnsicht[]>(`/api/incidents/${einsatzId}/map-views`);
 }
 
 /** „Für den Einsatz speichern" / Umbenennen / Standard setzen — je nach gesetzten Feldern. */
@@ -14,7 +14,7 @@ export function patcheKartenAnsicht(
   daten: PatchKartenAnsicht,
 ): Promise<KartenAnsicht> {
   return apiSend<KartenAnsicht>(
-    `/api/einsaetze/${einsatzId}/map-views/${ansichtId}`,
+    `/api/incidents/${einsatzId}/map-views/${ansichtId}`,
     'PATCH',
     daten,
   );
@@ -25,7 +25,7 @@ export function erstelleKartenAnsicht(
   einsatzId: number,
   daten: NeueKartenAnsicht,
 ): Promise<KartenAnsicht> {
-  return apiSend<KartenAnsicht>(`/api/einsaetze/${einsatzId}/map-views`, 'POST', daten);
+  return apiSend<KartenAnsicht>(`/api/incidents/${einsatzId}/map-views`, 'POST', daten);
 }
 
 /** Löscht eine Ansicht (LFH-320). `objekte` bestimmt das Schicksal der gebundenen Objekte:
@@ -36,7 +36,7 @@ export function loescheKartenAnsicht(
   objekte: 'freigeben' | 'loeschen' = 'freigeben',
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/map-views/${ansichtId}?objekte=${objekte}`,
+    `/api/incidents/${einsatzId}/map-views/${ansichtId}?objekte=${objekte}`,
     'DELETE',
   );
 }

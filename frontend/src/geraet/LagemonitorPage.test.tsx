@@ -94,12 +94,12 @@ function bereit(g: GeraetAnzeige = monitor) {
   lagebildAntwort = () => HttpResponse.json(lage);
   server.use(
     meHandler({ ...benutzerFixture({ id: 51, anzeigename: 'Monitor Stab' }), geraet: g }),
-    http.get('/api/einsaetze/7', () =>
+    http.get('/api/incidents/7', () =>
       HttpResponse.json(
         einsatzFixture({ id: 7, bezeichnung: 'Stadtfest', meine_rolle: 'beobachter' }),
       ),
     ),
-    http.get('/api/einsaetze/7/situation-monitor', () => lagebildAntwort()),
+    http.get('/api/incidents/7/situation-monitor', () => lagebildAntwort()),
   );
 }
 
@@ -218,7 +218,7 @@ describe('Lagemonitor — Großbild', () => {
   it('eine Übung trägt in der Statusleiste die Übungsmarke in mindestens 28 px (LLH-1725)', async () => {
     bereit();
     server.use(
-      http.get('/api/einsaetze/7', () =>
+      http.get('/api/incidents/7', () =>
         HttpResponse.json(
           einsatzFixture({
             id: 7,
@@ -245,7 +245,7 @@ describe('Lagemonitor — Großbild', () => {
 
   it('scheitert der Einsatzkopf, nennt die Statusleiste „Einsatzart nicht geladen“ (LLH-1725)', async () => {
     bereit();
-    server.use(http.get('/api/einsaetze/7', () => new HttpResponse(null, { status: 503 })));
+    server.use(http.get('/api/incidents/7', () => new HttpResponse(null, { status: 503 })));
     renderApp('/geraet/7/monitor');
     await screen.findByRole('region', { name: 'Betroffene' });
     const leiste = document.querySelector<HTMLElement>('[data-lfh="monitor-statusleiste"]')!;
@@ -257,7 +257,7 @@ describe('Lagemonitor — Großbild', () => {
     bereit();
     let abrufe = 0;
     server.use(
-      http.get('/api/einsaetze/7', () => {
+      http.get('/api/incidents/7', () => {
         abrufe += 1;
         return abrufe === 1
           ? new HttpResponse(null, { status: 503 })
@@ -641,7 +641,7 @@ describe('Lagemonitor — offene Sofortmeldungen und neue Dringlichkeit', () => 
     // Die Kacheln rechts stehen erst mit dem ersten Stand.
     await screen.findByRole('region', { name: 'Betroffene' });
     const strom = FakeEventSource.instanzen.find(
-      (q) => q.url === '/api/einsaetze/7/live' && !q.closed,
+      (q) => q.url === '/api/incidents/7/live' && !q.closed,
     );
     expect(strom, 'der Einsatzstrom des Monitors ist offen').toBeDefined();
     act(() => {

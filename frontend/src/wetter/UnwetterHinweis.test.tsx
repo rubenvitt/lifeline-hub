@@ -31,11 +31,11 @@ async function hinweisBei(jetzt: string): Promise<string> {
   const t = Date.parse(jetzt);
   server.use(
     // Die Einstellungen kommen absichtlich NACH dem Wetter: der Hinweis muss auf sie warten.
-    http.get('/api/einsaetze/7/settings', async () => {
+    http.get('/api/incidents/7/settings', async () => {
       await new Promise((r) => setTimeout(r, 50));
       return HttpResponse.json({ zeitzone: 'America/New_York' });
     }),
-    http.get('/api/einsaetze/7/weather', () =>
+    http.get('/api/incidents/7/weather', () =>
       HttpResponse.json({
         warnungen: {
           zustand: 'ok',

@@ -43,13 +43,13 @@ const TREFFER = {
 
 beforeEach(() => {
   server.use(
-    http.get('/api/einsaetze/:eid', ({ params }) =>
+    http.get('/api/incidents/:eid', ({ params }) =>
       HttpResponse.json({ id: Number(params.eid), einsatzort_lat: 52.1, einsatzort_lon: 8.6 }),
     ),
-    http.get('/api/einsaetze/:eid/place-preview', () =>
+    http.get('/api/incidents/:eid/place-preview', () =>
       HttpResponse.json({ ortsname: null, peilung: null }),
     ),
-    http.get('/api/einsaetze/:eid/place-search', () => HttpResponse.json(TREFFER)),
+    http.get('/api/incidents/:eid/place-search', () => HttpResponse.json(TREFFER)),
     http.get('/api/qualifications', () =>
       HttpResponse.json([{ id: 2, label: 'Rettungssanitäter', aktiv: true }]),
     ),
@@ -59,7 +59,7 @@ beforeEach(() => {
 function mitschnitt(antwort?: (n: number) => Response | undefined) {
   const rumpfe: Record<string, unknown>[] = [];
   server.use(
-    http.patch('/api/einsaetze/1/uhs/9', async ({ request }) => {
+    http.patch('/api/incidents/1/uhs/9', async ({ request }) => {
       rumpfe.push((await request.json()) as Record<string, unknown>);
       return antwort?.(rumpfe.length) ?? HttpResponse.json({ ...basis });
     }),

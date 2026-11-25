@@ -1,6 +1,6 @@
 //! Integrationstests der Quittung je Verteiler-Empfänger am Einsatzbefehl (LLH-1173, Spec
 //! `befehl-quittung`, Herleitung `openspec/changes/archive/2026-10-13-koiqi51u-befehl-quittung/design.md`) über
-//! `POST /api/einsaetze/{id}/orders/{bid}/distribution/{vid}/{acknowledge|undo}`:
+//! `POST /api/incidents/{id}/orders/{bid}/distribution/{vid}/{acknowledge|undo}`:
 //! Quittung und Rücknahme samt ETB, Fassungsregel, Rechte, Liste und Live-Ereignis.
 
 use axum::http::StatusCode;
@@ -27,7 +27,7 @@ async fn umgebung_mit(app: axum::Router) -> Umgebung {
     let (s, j) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/sectors"),
+        &format!("/api/incidents/{einsatz}/sectors"),
         &admin,
         Some(r#"{"name":"EA Süd"}"#),
     )
@@ -47,7 +47,7 @@ async fn umgebung() -> Umgebung {
 
 impl Umgebung {
     fn befehl(&self, id: i64) -> String {
-        format!("/api/einsaetze/{}/orders/{id}", self.einsatz)
+        format!("/api/incidents/{}/orders/{id}", self.einsatz)
     }
 
     /// Entwurf mit dem Verteiler „EA Süd, S3 Einsatz“.
@@ -55,7 +55,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{}/orders", self.einsatz),
+            &format!("/api/incidents/{}/orders", self.einsatz),
             &self.admin,
             Some(BEFEHL),
         )
@@ -124,7 +124,7 @@ impl Umgebung {
         let (s, j) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/orders", self.einsatz),
+            &format!("/api/incidents/{}/orders", self.einsatz),
             &self.admin,
             None,
         )
@@ -137,7 +137,7 @@ impl Umgebung {
         let (_, j) = anfrage(
             &self.app,
             "GET",
-            &format!("/api/einsaetze/{}/etb", self.einsatz),
+            &format!("/api/incidents/{}/etb", self.einsatz),
             &self.admin,
             None,
         )
@@ -327,7 +327,7 @@ async fn fremde_zeile_und_fremder_einsatz_sind_nicht_vorhanden() {
     let anderer = einsatz_anlegen(&u.app, &u.admin).await;
     let (s, _) = u
         .post(&format!(
-            "/api/einsaetze/{anderer}/orders/{}/distribution/{}/acknowledge",
+            "/api/incidents/{anderer}/orders/{}/distribution/{}/acknowledge",
             id(&a),
             id_of_row(&a, 0)
         ))
@@ -388,7 +388,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     let (s, j) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/situation-reports", u.einsatz),
+        &format!("/api/incidents/{}/situation-reports", u.einsatz),
         &u.admin,
         Some(r#"{"vorlage":"freitext","titel":"Lage 12:00","zeitstand":"2026-06-02 10:00:00","abschnitte":[{"schluessel":"text","text":"Ruhig"}]}"#),
     )
@@ -399,7 +399,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     let (s, liste) = anfrage(
         &u.app,
         "GET",
-        &format!("/api/einsaetze/{}/situation-reports", u.einsatz),
+        &format!("/api/incidents/{}/situation-reports", u.einsatz),
         &u.admin,
         None,
     )
@@ -416,7 +416,7 @@ async fn lagebericht_bleibt_ohne_quittung() {
     // Es gibt keine Quittungsroute am Lagebericht.
     let (s, _) = u
         .post(&format!(
-            "/api/einsaetze/{}/situation-reports/{lid}/distribution/1/acknowledge",
+            "/api/incidents/{}/situation-reports/{lid}/distribution/1/acknowledge",
             u.einsatz
         ))
         .await;

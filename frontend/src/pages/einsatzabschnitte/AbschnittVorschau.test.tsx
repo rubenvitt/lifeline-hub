@@ -49,11 +49,11 @@ function liefere(
 ) {
   let abrufe = 0;
   server.use(
-    http.get('/api/einsaetze/5/sectors', () => {
+    http.get('/api/incidents/5/sectors', () => {
       abrufe += 1;
       return HttpResponse.json(abschnitte);
     }),
-    http.get('/api/einsaetze/5/units', einheitenAntwort),
+    http.get('/api/incidents/5/units', einheitenAntwort),
   );
   return () => abrufe;
 }

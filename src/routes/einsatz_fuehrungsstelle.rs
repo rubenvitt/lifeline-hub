@@ -1,5 +1,5 @@
 //! Die eigene Führungsstelle eines Einsatzes (LFH-849): `GET`/`PATCH
-//! /api/einsaetze/{id}/command-post`.
+//! /api/incidents/{id}/command-post`.
 //!
 //! Lesen mit dem Einsatz (kein Modul), Schreiben mit den Rechten der Kopfdaten. Eine Änderung
 //! meldet das Ereignis `einsatz` über `routes::einsatz::kopf_geaendert` (Spec `einsatzkopf-live`).
@@ -185,7 +185,7 @@ fn check_einsatzleiter(body: EinsatzleiterBody) -> Result<CheckedEinsatzleiter, 
     })
 }
 
-/// GET /api/einsaetze/{id}/command-post — ohne erfasste Angaben alles leer (200).
+/// GET /api/incidents/{id}/command-post — ohne erfasste Angaben alles leer (200).
 pub async fn lesen(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -210,7 +210,7 @@ async fn vermerke(
     .await
 }
 
-/// PATCH /api/einsaetze/{id}/command-post — echter Teil-Patch. Prüfungen vor dem Schreiben,
+/// PATCH /api/incidents/{id}/command-post — echter Teil-Patch. Prüfungen vor dem Schreiben,
 /// das Schreiben in EINER Transaktion: ein Fehler speichert nichts teilweise.
 pub async fn aendern(
     State(state): State<AppState>,
@@ -460,7 +460,7 @@ async fn etb_sprechgruppe(
     super::etb_sprechgruppe(state, einsatz_id, org_id, benutzer_id, traeger, sg, wirkung).await;
 }
 
-/// PUT /api/einsaetze/{id}/command-post/talk-groups/{sg} — eine Sprechgruppe zuordnen
+/// PUT /api/incidents/{id}/command-post/talk-groups/{sg} — eine Sprechgruppe zuordnen
 /// (LFH-893, design.md D5). Idempotent; dieselbe Prüfung, Zuordnung und Live-Wirkung (`einsatz`)
 /// wie der PATCH mit `sprechgruppe_ids`. Anders als der PATCH schreibt eine wirksame Zuordnung
 /// einen System-Eintrag ins ETB (LLH-1456, D2), eine wiederholte keinen.
@@ -486,7 +486,7 @@ pub async fn sprechgruppe_zuordnen(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/einsaetze/{id}/command-post/talk-groups/{sg} — Zuordnung lösen, idempotent;
+/// DELETE /api/incidents/{id}/command-post/talk-groups/{sg} — Zuordnung lösen, idempotent;
 /// eine wirksame Lösung schreibt einen System-Eintrag ins ETB (LLH-1456, D2).
 pub async fn sprechgruppe_loesen(
     State(state): State<AppState>,

@@ -303,10 +303,14 @@ export const FACHEBENEN_GRUPPEN: readonly {
   {
     kennung: 'verkehr',
     name: 'Verkehr & Infrastruktur',
-    ebenen: ['autobahn', 'kritis', 'energie'],
+    ebenen: ['autobahn', 'autobahn_parken', 'kritis', 'energie'],
   },
   // LLH-1200: Auswertungen von Satellitenbildern, später auch deren Rasterbilder.
-  { kennung: 'satellit', name: 'Satellitenauswertung', ebenen: ['copernicus'] },
+  {
+    kennung: 'satellit',
+    name: 'Satellitenauswertung',
+    ebenen: ['copernicus', 'copernicus_bilder'],
+  },
   // LLH-2106: das Drohnenbild aus Suchlage; die Zeile der Quelle schaltet die Einsatzleitung zu.
   { kennung: 'drohne', name: 'Drohne', ebenen: ['drohne'] },
 ];

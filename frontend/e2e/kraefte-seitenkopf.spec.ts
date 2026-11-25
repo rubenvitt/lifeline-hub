@@ -35,12 +35,12 @@ const KRAFT = 'Seitenkopf, Sabine';
 const MATERIAL = 'Feldbett';
 
 async function seede(page: Page, einsatzId: string, pfad: string, data: unknown) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/${pfad}`, { data });
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/${pfad}`, { data });
   expect(antwort.ok(), `Seeding ${pfad}: ${antwort.status()} ${await antwort.text()}`).toBeTruthy();
 }
 
 async function einsatzMitKraeften(page: Page, dichte: string): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', {
+  const r = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Kräftekopf ${dichte} ${Date.now()}` },
   });
   expect(r.ok(), await r.text()).toBeTruthy();

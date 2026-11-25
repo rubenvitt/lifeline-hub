@@ -25,14 +25,14 @@ async fn nachricht(app: &axum::Router, einsatz: i64, cookie: &str, inhalt: &str)
     let kanaele = lesen(
         app,
         cookie,
-        &format!("/api/einsaetze/{einsatz}/chat/channels"),
+        &format!("/api/incidents/{einsatz}/chat/channels"),
     )
     .await;
     let kid = kanaele[0]["id"].as_i64().unwrap();
     let (s, m) = anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{einsatz}/chat/channels/{kid}/messages"),
         cookie,
         Some(&format!(r#"{{"inhalt":"{inhalt}"}}"#)),
     )
@@ -51,7 +51,7 @@ async fn heraufstufen(
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/chat/messages/{mid}/promote-to-etb"),
+        &format!("/api/incidents/{einsatz}/chat/messages/{mid}/promote-to-etb"),
         cookie,
         Some(body),
     )
@@ -81,13 +81,13 @@ async fn meldung_aus_dem_chat_legt_meldung_und_einen_eintrag_an() {
     assert_eq!(s, StatusCode::OK, "{hoch}");
     let etb_id = hoch["etb_eintrag_id"].as_i64().unwrap();
 
-    let etb = lesen(&app, &admin, &format!("/api/einsaetze/{e}/etb")).await;
+    let etb = lesen(&app, &admin, &format!("/api/incidents/{e}/etb")).await;
     assert_eq!(
         etb.len(),
         1,
         "genau ein Eintrag, kein Auto-ETB der Meldung: {etb:?}"
     );
-    let meldungen = lesen(&app, &admin, &format!("/api/einsaetze/{e}/reports")).await;
+    let meldungen = lesen(&app, &admin, &format!("/api/incidents/{e}/reports")).await;
     assert_eq!(meldungen.len(), 1, "{meldungen:?}");
     let meldung = &meldungen[0];
     assert_eq!(meldung["meldungsart"], "sonstige");
@@ -129,7 +129,7 @@ async fn lage_aus_dem_chat_steht_in_den_lagemeldungen() {
     let lage = lesen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/situation/reports"),
+        &format!("/api/incidents/{e}/situation/reports"),
     )
     .await;
     assert_eq!(lage.len(), 1, "{lage:?}");
@@ -150,12 +150,12 @@ async fn ohne_feld_oder_mit_false_wird_nur_protokolliert() {
         assert_eq!(s, StatusCode::OK, "{body}: {v}");
     }
     assert_eq!(
-        lesen(&app, &admin, &format!("/api/einsaetze/{e}/etb"))
+        lesen(&app, &admin, &format!("/api/incidents/{e}/etb"))
             .await
             .len(),
         2
     );
-    assert!(lesen(&app, &admin, &format!("/api/einsaetze/{e}/reports"))
+    assert!(lesen(&app, &admin, &format!("/api/incidents/{e}/reports"))
         .await
         .is_empty());
 }
@@ -177,7 +177,7 @@ async fn anordnung_mit_meldungseingang_ist_422_und_schreibt_nichts() {
     )
     .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
-    assert!(lesen(&app, &admin, &format!("/api/einsaetze/{e}/etb"))
+    assert!(lesen(&app, &admin, &format!("/api/incidents/{e}/etb"))
         .await
         .is_empty());
 
@@ -197,7 +197,7 @@ async fn ohne_freigabe_der_meldungen_ist_403_und_nichts_entsteht() {
     let (s, v) = anfrage(
         &app,
         "PUT",
-        &format!("/api/einsaetze/{e}/module-overrides/meldungen"),
+        &format!("/api/incidents/{e}/module-overrides/meldungen"),
         &admin,
         Some(r#"{"sichtbar":true,"benoetigte_rolle":"admin"}"#),
     )
@@ -215,16 +215,16 @@ async fn ohne_freigabe_der_meldungen_ist_403_und_nichts_entsteht() {
     )
     .await;
     assert_eq!(s, StatusCode::FORBIDDEN);
-    assert!(lesen(&app, &admin, &format!("/api/einsaetze/{e}/etb"))
+    assert!(lesen(&app, &admin, &format!("/api/incidents/{e}/etb"))
         .await
         .is_empty());
-    assert!(lesen(&app, &admin, &format!("/api/einsaetze/{e}/reports"))
+    assert!(lesen(&app, &admin, &format!("/api/incidents/{e}/reports"))
         .await
         .is_empty());
     let liste = lesen(
         &app,
         &admin,
-        &format!("/api/einsaetze/{e}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{e}/chat/channels/{kid}/messages"),
     )
     .await;
     assert_eq!(liste[0]["etb_eintrag_id"], Value::Null, "kein Rückverweis");
@@ -248,7 +248,7 @@ async fn zweite_heraufstufung_ist_409_und_legt_keine_zweite_meldung_an() {
     let (s, _) = heraufstufen(&app, &admin, e, mid, body).await;
     assert_eq!(s, StatusCode::CONFLICT);
     assert_eq!(
-        lesen(&app, &admin, &format!("/api/einsaetze/{e}/reports"))
+        lesen(&app, &admin, &format!("/api/incidents/{e}/reports"))
             .await
             .len(),
         1
@@ -324,7 +324,7 @@ async fn zweiter_versuch_holt_eine_verlorene_zustellung_nach() {
     }
     assert!(tags.iter().any(|t| t == "meldung"), "{tags:?}");
     assert_eq!(
-        lesen(&app, &admin, &format!("/api/einsaetze/{e}/reports"))
+        lesen(&app, &admin, &format!("/api/incidents/{e}/reports"))
             .await
             .len(),
         1

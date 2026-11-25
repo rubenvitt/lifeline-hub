@@ -53,6 +53,6 @@ gehört nicht in eine neue Lage.
 Die Ebene steht sofort bereit und erbt Cache, ETag, Offline-Verhalten und die Marke „veraltet“
 der Fachebenen. Historische Aktivierungen sind nur über den Schalter „Ältere Aktivierungen“ zu
 sehen, nach einem Neuladen ist er wieder aus. Was vor 2023 lag, kommt seit LLH-2022 aus einem
-kuratierten Katalog mit Vector Packages (ADR-0098); dort steht auch, dass ersatzweise die
+kuratierten Katalog mit Vector Packages (ADR-0099); dort steht auch, dass ersatzweise die
 Lieferzeit gilt, wo die Aufnahmezeit fehlt. Zieht der Adapter-Rahmen ein, ist ein Umzug möglich, aber
 nicht nötig.

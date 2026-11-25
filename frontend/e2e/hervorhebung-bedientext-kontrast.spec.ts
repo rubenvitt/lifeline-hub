@@ -27,7 +27,7 @@ async function anmelden(page: Page, modus: 'light' | 'dark') {
 }
 
 async function einsatz(page: Page, bezeichnung: string, begonnen_at?: string): Promise<number> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung, begonnen_at } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung, begonnen_at } });
   expect(r.ok(), `Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   return (await r.json()).id;
 }
@@ -37,12 +37,12 @@ async function einsatz(page: Page, bezeichnung: string, begonnen_at?: string): P
  * Einsatz nach vorn (`EinsaetzePage`), und die Suite legt in derselben Datenbank parallel
  * Einsätze an: über den Org-Strom lädt die Liste neu, die gemessene Kachel rückt eine Stelle
  * weiter, und der Zeiger steht auf der Nachbarkachel. Gemessen wird dann die Ruhe, rot je nach
- * Zeitpunkt. Interzipiert wird nur `GET /api/einsaetze` (Muster `einsatzauswahl-cls.spec.ts`);
+ * Zeitpunkt. Interzipiert wird nur `GET /api/incidents` (Muster `einsatzauswahl-cls.spec.ts`);
  * die Antwort bleibt die echte des Servers. `gelesen` sammelt die IDs jeder Liste, die die
  * Seite abgeholt hat, damit die Störprobe auf den Neuabruf warten kann statt auf eine Frist.
  */
 async function nurDieserEinsatz(page: Page, id: number, gelesen: Set<number>) {
-  await page.route(/\/api\/einsaetze(\?.*)?$/, async (route) => {
+  await page.route(/\/api\/incidents(\?.*)?$/, async (route) => {
     if (route.request().method() !== 'GET') return route.fallback();
     const antwort = await route.fetch();
     const liste = (await antwort.json()) as { id: number }[];
@@ -114,10 +114,10 @@ for (const modus of ['light', 'dark'] as const) {
     const einsatzId = await einsatz(page, `E2E 879 Chat ${modus} ${Date.now()}`);
 
     // Das Markieren scheitert, die Kanalliste behält ihren ungelesenen Stand (`ChatPage`).
-    await page.route(`**/api/einsaetze/${einsatzId}/chat/channels/*/read`, (route) =>
+    await page.route(`**/api/incidents/${einsatzId}/chat/channels/*/read`, (route) =>
       route.fulfill({ status: 500, body: '' }),
     );
-    await page.route(`**/api/einsaetze/${einsatzId}/chat/channels`, async (route) => {
+    await page.route(`**/api/incidents/${einsatzId}/chat/channels`, async (route) => {
       if (route.request().method() !== 'GET') return route.fallback();
       const antwort = await route.fetch();
       const kanaele = (await antwort.json()) as { ungelesen_anzahl: number }[];

@@ -51,7 +51,7 @@ for (const { dichte, soll, fuge: fugeBoden, titel } of STAFFEL) {
   }) => {
     test.setTimeout(90_000);
     await anmelden(page, { startseite: false });
-    const r = await page.request.post('/api/einsaetze', {
+    const r = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E Dialogfuß ${dichte} ${Date.now()}` },
     });
     expect(r.ok(), await r.text()).toBeTruthy();

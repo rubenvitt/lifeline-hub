@@ -12,7 +12,7 @@ import { merkeServerzeit } from '../offline/serveruhr';
 // und der Abruf der Seite `/extern` mit dem Schlüssel aus dem Link.
 
 export function ladeLagebildFreigaben(einsatzId: number): Promise<LagebildFreigabeAnzeige[]> {
-  return apiGet<LagebildFreigabeAnzeige[]>(`/api/einsaetze/${einsatzId}/situation-picture-shares`);
+  return apiGet<LagebildFreigabeAnzeige[]>(`/api/incidents/${einsatzId}/situation-picture-shares`);
 }
 
 export interface NeueLagebildFreigabe {
@@ -27,7 +27,7 @@ export function legeLagebildFreigabeAn(
   werte: NeueLagebildFreigabe,
 ): Promise<LagebildFreigabeMitSchluessel> {
   return apiSend<LagebildFreigabeMitSchluessel>(
-    `/api/einsaetze/${einsatzId}/situation-picture-shares`,
+    `/api/incidents/${einsatzId}/situation-picture-shares`,
     'POST',
     werte,
   );
@@ -39,7 +39,7 @@ export function widerrufeLagebildFreigabe(
   freigabeId: number,
 ): Promise<LagebildFreigabeAnzeige[]> {
   return apiSend<LagebildFreigabeAnzeige[]>(
-    `/api/einsaetze/${einsatzId}/situation-picture-shares/${freigabeId}/revoke`,
+    `/api/incidents/${einsatzId}/situation-picture-shares/${freigabeId}/revoke`,
     'POST',
   );
 }

@@ -20,7 +20,7 @@ import { FakeEventSource } from '../test/eventSource';
  * Schreib-Buttons für Beobachter" (`SchaedenPage.test.tsx`) deckt nur den Knopf ab.
  *
  * Eigene Datei: `vi.mock` hoistet dateiweit, und `src/test/setup.ts` fährt MSW mit
- * `onUnhandledFrame: 'error'` — das echte `useBefehle` fordert beim Öffnen `/api/einsaetze` an.
+ * `onUnhandledFrame: 'error'` — das echte `useBefehle` fordert beim Öffnen `/api/incidents` an.
  *
  * Gegriffen wird auf `#cmd-tastatur:<id>`, nicht auf den Wortlaut: der kommt aus
  * `TASTATUR_AKTIONEN` und ist dort gepinnt (`befehle.test.ts`).
@@ -86,10 +86,10 @@ const einSchaden = {
 function render(einsatzObj: object) {
   server.use(
     meHandler(nutzer),
-    http.get('/api/einsaetze/1', () => HttpResponse.json(einsatzObj)),
+    http.get('/api/incidents/1', () => HttpResponse.json(einsatzObj)),
     ...schaedenAttrappe(1, () => [einSchaden]).handler,
-    http.get('/api/einsaetze/1/persons', () => HttpResponse.json([])),
-    http.get('/api/einsaetze/1/personnel', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/persons', () => HttpResponse.json([])),
+    http.get('/api/incidents/1/personnel', () => HttpResponse.json([])),
   );
   return renderMitProviders(
     <CommandPaletteProvider>

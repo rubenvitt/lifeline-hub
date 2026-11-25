@@ -31,7 +31,7 @@ async fn ablage_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/animals"),
+        &format!("/api/incidents/{einsatz}/animals"),
         &admin,
         Some(r#"{"spezies":"hund"}"#),
     )
@@ -67,7 +67,7 @@ async fn ablage_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
             Request::builder()
                 .method("POST")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz}/animals/{besitzer}/attachments"
+                    "/api/incidents/{einsatz}/animals/{besitzer}/attachments"
                 ))
                 .header(header::COOKIE, admin.as_str())
                 .header(

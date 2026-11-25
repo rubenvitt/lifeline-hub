@@ -132,7 +132,7 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     const { container } = zeige(false);
     expect(
       await screen.findByRole('link', { name: 'Anlage 1: Fernmeldeskizze herunterladen' }),
-    ).toHaveAttribute('href', '/api/einsaetze/3/orders/7/enclosures/41/file');
+    ).toHaveAttribute('href', '/api/incidents/3/orders/7/enclosures/41/file');
     expect(screen.queryByRole('button', { name: /entfernen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Fernmeldeskizze anfügen' })).toBeNull();
 
@@ -143,7 +143,7 @@ describe('DokumentAnlagen (LFH-1028)', () => {
     );
     expect(blatt!.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/einsaetze/3/orders/7/enclosures/41/file',
+      '/api/incidents/3/orders/7/enclosures/41/file',
     );
     // Das Paneel ist Bedienung, nicht Papier.
     expect(

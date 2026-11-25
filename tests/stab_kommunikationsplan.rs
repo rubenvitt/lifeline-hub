@@ -12,23 +12,23 @@ mod common;
 use common::*;
 
 fn plan_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan")
+    format!("/api/incidents/{einsatz}/staff/comms-plan")
 }
 
 fn stellen_pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions")
+    format!("/api/incidents/{einsatz}/staff/comms-plan/positions")
 }
 
 fn stelle_pfad(einsatz: i64, sid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{sid}")
+    format!("/api/incidents/{einsatz}/staff/comms-plan/positions/{sid}")
 }
 
 fn verbindungen_pfad(einsatz: i64, sid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan/positions/{sid}/connections")
+    format!("/api/incidents/{einsatz}/staff/comms-plan/positions/{sid}/connections")
 }
 
 fn verbindung_pfad(einsatz: i64, vid: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/staff/comms-plan/connections/{vid}")
+    format!("/api/incidents/{einsatz}/staff/comms-plan/connections/{vid}")
 }
 
 async fn laden(app: &axum::Router, cookie: &str, einsatz: i64) -> Value {
@@ -888,7 +888,7 @@ async fn abgeschlossener_einsatz_ist_409_und_bleibt_lesbar() {
     anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/close"),
+        &format!("/api/incidents/{einsatz}/close"),
         &admin,
         None,
     )

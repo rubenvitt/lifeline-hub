@@ -294,7 +294,7 @@ async fn liste(app: &axum::Router, cookie: &str, einsatz: i64, pfad: &str) -> Ve
     let (status, v) = common::anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}{pfad}"),
+        &format!("/api/incidents/{einsatz}{pfad}"),
         cookie,
         None,
     )
@@ -317,11 +317,11 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
 
     // Überblick zeigt die Lage.
     let (status, einsatz) =
-        common::anfrage(&app, "GET", &format!("/api/einsaetze/{e}"), &admin, None).await;
+        common::anfrage(&app, "GET", &format!("/api/incidents/{e}"), &admin, None).await;
     assert_eq!(status, StatusCode::OK, "{einsatz}");
     assert_eq!(einsatz["einsatzart"], "uebung");
     assert_eq!(einsatz["lagekennzahlen"], serde_json::json!(["evakuiert"]));
-    let (status, alle) = common::anfrage(&app, "GET", "/api/einsaetze", &admin, None).await;
+    let (status, alle) = common::anfrage(&app, "GET", "/api/incidents", &admin, None).await;
     assert_eq!(status, StatusCode::OK);
     let in_liste: Vec<&Value> = alle
         .as_array()
@@ -366,7 +366,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, betreuung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/care"),
+        &format!("/api/incidents/{e}/care"),
         &admin,
         None,
     )
@@ -376,7 +376,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, evakuierung) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/evacuation"),
+        &format!("/api/incidents/{e}/evacuation"),
         &admin,
         None,
     )
@@ -397,7 +397,7 @@ async fn import_ist_je_modul_ueber_die_lese_endpunkte_sichtbar() {
     let (status, rm) = common::anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{e}/reports/check-ins"),
+        &format!("/api/incidents/{e}/reports/check-ins"),
         &admin,
         None,
     )
@@ -631,7 +631,7 @@ async fn neu_import_ersetzt_den_einsatz_und_sendet_lagged() {
     assert_eq!(aktive_koepfe(&pool, org).await, 1);
     assert!(!einsatz_existiert(&pool, alt).await);
     let (status, _) =
-        common::anfrage(&app, "GET", &format!("/api/einsaetze/{alt}"), &admin, None).await;
+        common::anfrage(&app, "GET", &format!("/api/incidents/{alt}"), &admin, None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 
     let n = naechste(&mut rx).await.expect("lagged auf dem alten Kanal");
@@ -1182,7 +1182,7 @@ async fn abgelehntes_entfernen_meldet_nichts() {
 }
 
 /// Keine Wiederverwendung der Einsatz-ID: der Demo-Einsatz ist der jüngste (frische DB, kein
-/// anderer Einsatz), wird entfernt, und der danach über `POST /api/einsaetze` angelegte echte
+/// anderer Einsatz), wird entfernt, und der danach über `POST /api/incidents` angelegte echte
 /// Einsatz liegt über seiner ID.
 #[tokio::test]
 async fn echter_einsatz_nach_dem_entfernen_hat_eine_groessere_id() {
@@ -1266,7 +1266,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/vehicles"),
+        format!("/api/incidents/{e}/vehicles"),
         format!(r#"{{"fahrzeug_id":{}}}"#, fz["id"]),
     )
     .await;
@@ -1276,7 +1276,7 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/personnel"),
+        format!("/api/incidents/{e}/personnel"),
         format!(r#"{{"personal_id":{}}}"#, pers["id"]),
     )
     .await;
@@ -1286,17 +1286,17 @@ async fn nachbar_mit_stammdaten(app: &axum::Router, admin: &str) {
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/material"),
+        format!("/api/incidents/{e}/material"),
         format!(r#"{{"material_id":{},"menge":5}}"#, mat["id"]),
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/etb"),
+        format!("/api/incidents/{e}/etb"),
         r#"{"von":"ELW 1","an":"ELW 1","typ":"meldung","inhalt":"Lage im Nachbar-Einsatz"}"#.into(),
     )
     .await;
     post(
-        format!("/api/einsaetze/{e}/persons"),
+        format!("/api/incidents/{e}/persons"),
         r#"{"name":"Muster","vorname":"Max"}"#.into(),
     )
     .await;

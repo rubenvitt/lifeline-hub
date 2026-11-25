@@ -1,5 +1,5 @@
 ---
-id: ADR-0098
+id: ADR-0099
 titel: Copernicus-Aktivierungen vor 2023 kommen aus einem kuratierten Katalog mit Vector Packages zur Laufzeit
 status: akzeptiert
 datum: 2026-11-24
@@ -13,7 +13,7 @@ herleitung:
   - ADR-0079
 ---
 
-# ADR-0098: Copernicus-Aktivierungen vor 2023 kommen aus einem kuratierten Katalog mit Vector Packages zur Laufzeit
+# ADR-0099: Copernicus-Aktivierungen vor 2023 kommen aus einem kuratierten Katalog mit Vector Packages zur Laufzeit
 
 ## Regeln
 

@@ -59,7 +59,7 @@ describe('BereitstellungsraeumeDefault', () => {
 
   it('leitet auf den ältesten aktiven BR um, wenn keiner zuletzt ausgewählt ist', async () => {
     server.use(
-      http.get('/api/einsaetze/1/staging-areas', () =>
+      http.get('/api/incidents/1/staging-areas', () =>
         HttpResponse.json([br(7, 'aktiv'), br(3, 'aktiv'), br(9, 'geplant')]),
       ),
     );
@@ -70,7 +70,7 @@ describe('BereitstellungsraeumeDefault', () => {
   it('bevorzugt den zuletzt ausgewählten BR — auch vor einem aktiven', async () => {
     merkeLetztenBr(1, 9);
     server.use(
-      http.get('/api/einsaetze/1/staging-areas', () =>
+      http.get('/api/incidents/1/staging-areas', () =>
         HttpResponse.json([br(3, 'aktiv'), br(9, 'geplant')]),
       ),
     );
@@ -80,7 +80,7 @@ describe('BereitstellungsraeumeDefault', () => {
 
   it('leitet auf den zuletzt angelegten BR um, wenn keiner aktiv ist', async () => {
     server.use(
-      http.get('/api/einsaetze/1/staging-areas', () =>
+      http.get('/api/incidents/1/staging-areas', () =>
         HttpResponse.json([br(2, 'geplant'), br(7, 'aufgeloest'), br(4, 'geplant')]),
       ),
     );
@@ -89,7 +89,7 @@ describe('BereitstellungsraeumeDefault', () => {
   });
 
   it('zeigt bei 0 BR einen Leerzustand, dessen CTA den Anlegen-Dialog öffnet', async () => {
-    server.use(http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])));
     renderDefault();
     await userEvent.click(await screen.findByRole('button', { name: 'Ersten BR anlegen' }));
     expect(await screen.findByText('Bereitstellungsraum anlegen')).toBeInTheDocument();
@@ -101,7 +101,7 @@ describe('BereitstellungsraeumeDefault', () => {
    */
   it('zeigt bei gescheitertem Abruf den Fehler und NICHT den Leertext', async () => {
     server.use(
-      http.get('/api/einsaetze/1/staging-areas', () => new HttpResponse(null, { status: 500 })),
+      http.get('/api/incidents/1/staging-areas', () => new HttpResponse(null, { status: 500 })),
     );
     renderDefault();
     expect(await screen.findByRole('button', { name: 'Erneut abrufen' })).toBeInTheDocument();
@@ -109,14 +109,14 @@ describe('BereitstellungsraeumeDefault', () => {
   });
 
   it('zeigt bei 0 BR den Leertext und KEINEN Fehler', async () => {
-    server.use(http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])));
     renderDefault();
     expect(await screen.findByText('Noch keine Bereitstellungsräume erfasst')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Erneut abrufen' })).not.toBeInTheDocument();
   });
 
   it('springt nicht automatisch ins Detail, wenn nachträglich ein aktiver BR auftaucht', async () => {
-    server.use(http.get('/api/einsaetze/1/staging-areas', () => HttpResponse.json([])));
+    server.use(http.get('/api/incidents/1/staging-areas', () => HttpResponse.json([])));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     renderDefault(qc);
     await screen.findByRole('button', { name: 'Ersten BR anlegen' });

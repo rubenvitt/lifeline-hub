@@ -63,26 +63,26 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
   const stempel = Date.now();
   const einsatz = await seede<{ id: number }>(
     page,
-    '/api/einsaetze',
+    '/api/incidents',
     { bezeichnung: `E2E UHS-Plan ${stempel}` },
     'Einsatz',
   );
   const e = einsatz.id;
   const uhs = await seede<{ id: number }>(
     page,
-    `/api/einsaetze/${e}/uhs`,
+    `/api/incidents/${e}/uhs`,
     { typ: 'behandlungsplatz', bezeichnung: 'BHP 50' },
     'UHS',
   );
   const u = uhs.id;
   await seede(
     page,
-    `/api/einsaetze/${e}/uhs/${u}/seats/bulk`,
+    `/api/incidents/${e}/uhs/${u}/seats/bulk`,
     { typ: 'bett', menge: 10 },
     'Plätze',
   );
-  await seede(page, `/api/einsaetze/${e}/uhs/${u}/status`, { status: 'aktiv' }, 'UHS-Status');
-  const abgelegt = await page.request.post(`/api/einsaetze/${e}/uhs/${u}/attachments`, {
+  await seede(page, `/api/incidents/${e}/uhs/${u}/status`, { status: 'aktiv' }, 'UHS-Status');
+  const abgelegt = await page.request.post(`/api/incidents/${e}/uhs/${u}/attachments`, {
     multipart: { datei: { name: 'grundriss.jpg', mimeType: 'image/jpeg', buffer: MINI_JPEG } },
   });
   expect(abgelegt.status(), await abgelegt.text()).toBe(201);
@@ -124,10 +124,10 @@ test('Plan: hochladen, übernehmen, einpassen, Tipp in „Handschuh“, Ansehen 
     .toBe(MINI_JPEG.length);
 
   // Einen Platz weit nach unten rechts verschieben (Server), dann einpassen.
-  const detail = await page.request.get(`/api/einsaetze/${e}/uhs/${u}`);
+  const detail = await page.request.get(`/api/incidents/${e}/uhs/${u}`);
   const plaetze = (await detail.json()).plaetze as { id: number; bezeichnung: string }[];
   const bett1 = plaetze.find((p) => p.bezeichnung === 'Bett 1')!;
-  const verschoben = await page.request.patch(`/api/einsaetze/${e}/uhs/${u}/seats/${bett1.id}`, {
+  const verschoben = await page.request.patch(`/api/incidents/${e}/uhs/${u}/seats/${bett1.id}`, {
     data: { pos_x: 970, pos_y: 730 },
   });
   expect(verschoben.ok(), await verschoben.text()).toBeTruthy();

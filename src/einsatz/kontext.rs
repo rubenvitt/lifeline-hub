@@ -9,7 +9,7 @@
 //! Der **Org-Isolations-Floor** ([`berechtigung::fordere_org_zugehoerigkeit`]) läuft
 //! dabei IMMER im Extractor — damit die Cross-Org-Lücke (LFH-115) für neue Sub-Routen
 //! strukturell nicht mehr „vergessen" werden kann (der Guard-Test
-//! `tests/einsatz_kontext_guard.rs` erzwingt, dass jede `/api/einsaetze/{id}/…`-Route
+//! `tests/einsatz_kontext_guard.rs` erzwingt, dass jede `/api/incidents/{id}/…`-Route
 //! den Extractor zieht).
 //!
 //! Bewusst zieht der Extractor NICHT die volle Lese-Policy (`fordere_lesezugriff`):

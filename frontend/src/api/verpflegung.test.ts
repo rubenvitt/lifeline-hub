@@ -26,7 +26,7 @@ interface Anfrage {
   body: unknown;
 }
 
-const B = '/api/einsaetze/7/catering';
+const B = '/api/incidents/7/catering';
 
 /** Fängt jede Anfrage unter dem Modulpfad und antwortet mit `{ ok: true }` (DELETE: 204). */
 function faengeAnfragen(): Anfrage[] {

@@ -40,7 +40,7 @@ fn sse_objekt_layer(state: &AppState, einsatz_id: i64) {
     }
 }
 
-/// GET /api/einsaetze/{id}/map-views — Liste der Ansichten des Einsatzes.
+/// GET /api/incidents/{id}/map-views — Liste der Ansichten des Einsatzes.
 /// Legt lazy die Standardansicht an, falls noch keine existiert (Seed aus
 /// `einsatz_einstellungen`). Läuft bewusst unter dem Lese-Gate — der Seed ist
 /// race-fest und idempotent (s. `repo::standard_oder_saat`).
@@ -76,7 +76,7 @@ fn validiere_enums(
     Ok(())
 }
 
-/// POST /api/einsaetze/{id}/map-views — „Als neue Ansicht speichern": legt eine
+/// POST /api/incidents/{id}/map-views — „Als neue Ansicht speichern": legt eine
 /// weitere, benannte Ansicht an (nie Standard). Leerer Name scheitert am Feld → 400 (LFH-267),
 /// unbekannter Enum-Wert → 400.
 pub async fn anlegen(
@@ -93,7 +93,7 @@ pub async fn anlegen(
     Ok((StatusCode::CREATED, Json(ansicht)))
 }
 
-/// PATCH /api/einsaetze/{id}/map-views/{aid} — vereint drei unabhängige Operationen
+/// PATCH /api/incidents/{id}/map-views/{aid} — vereint drei unabhängige Operationen
 /// (LFH-320): „Für den Einsatz speichern" (Config-Vollersatz, NUR wenn Config-Felder im
 /// Body — sonst würde ein reines Umbenennen die Config auf NULL wischen), Umbenennen und
 /// Standard-Setzen. Enum-Felder isoliert validiert → 400; eine fremde Ansicht → 404.
@@ -133,7 +133,7 @@ pub struct LoeschParams {
     objekte: Option<String>,
 }
 
-/// DELETE /api/einsaetze/{id}/map-views/{aid} — löscht eine Ansicht. `?objekte=freigeben`
+/// DELETE /api/incidents/{id}/map-views/{aid} — löscht eine Ansicht. `?objekte=freigeben`
 /// (Default) gibt die gebundenen Objekte auf „alle Ansichten" frei; `?objekte=loeschen` löscht
 /// sie mit. Standardansicht/letzte Ansicht → 422; fremde Ansicht → 404; unbekannter
 /// `objekte`-Wert scheitert am Feld → 400 (LFH-267).

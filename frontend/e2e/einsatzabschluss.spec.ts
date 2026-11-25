@@ -72,7 +72,7 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs,
   const name = `E2E Einsatzabschluss ${Date.now()}`;
   const einsatzId = await einsatzAnlegen(page, name);
   // Ein offener Punkt: ein Auftrag ohne Bearbeitung.
-  const auftrag = await page.request.post(`/api/einsaetze/${einsatzId}/tasks`, {
+  const auftrag = await page.request.post(`/api/incidents/${einsatzId}/tasks`, {
     data: {
       auftrag_text: 'Sandsäcke zum Deich bringen',
       empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Logistiktrupp' }],
@@ -134,7 +134,7 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs,
   await expect(dialog).toHaveCount(0);
   const paneel = main.getByRole('region', { name: 'Einsatzabschluss' });
   await expect(paneel.getByText(/^Abgeschlossen am /)).toBeVisible();
-  let einsatz = await page.request.get(`/api/einsaetze/${einsatzId}`);
+  let einsatz = await page.request.get(`/api/incidents/${einsatzId}`);
   expect(((await einsatz.json()) as { status: string }).status).toBe('abgeschlossen');
 
   // Wiederöffnen binnen 24 Stunden, mit Grund.
@@ -146,7 +146,7 @@ test('Einsatzabschluss: nicht im ETB, auf den Einsatzdaten außerhalb des Kopfs,
   await expect(
     main.getByRole('button', { name: 'Einsatz abschließen…', exact: true }),
   ).toBeVisible();
-  einsatz = await page.request.get(`/api/einsaetze/${einsatzId}`);
+  einsatz = await page.request.get(`/api/incidents/${einsatzId}`);
   expect(((await einsatz.json()) as { status: string }).status).toBe('aktiv');
 
   // Beide Schritte stehen im ETB.

@@ -81,13 +81,13 @@ interface Angelegt {
 
 /** Legt einen Einsatz an und schließt ihn ab; optional mit Frist über die API. */
 async function abgeschlossen(page: Page, name: string, frist?: string): Promise<Angelegt> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: name } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung: name } });
   expect(r.ok(), await r.text()).toBeTruthy();
   const e = (await r.json()) as { id: number; einsatznummer_intern: string };
-  const z = await page.request.post(`/api/einsaetze/${e.id}/close`);
+  const z = await page.request.post(`/api/incidents/${e.id}/close`);
   expect(z.ok(), await z.text()).toBeTruthy();
   if (frist) {
-    const f = await page.request.put(`/api/einsaetze/${e.id}/retention-period`, {
+    const f = await page.request.put(`/api/incidents/${e.id}/retention-period`, {
       data: { retention_bis: frist, bestaetigt: true },
     });
     expect(f.ok(), await f.text()).toBeTruthy();
@@ -137,7 +137,7 @@ test.describe('Aufbewahrung (LFH-23)', () => {
     // Admin als Ersteller) liest ihn wieder über die reguläre Route.
     await page.getByRole('menuitem', { name: 'Aufbewahrung' }).click();
     await expect(zeile(page, e.nummer)).toContainText('Frist läuft');
-    const detail = await page.request.get(`/api/einsaetze/${e.id}`);
+    const detail = await page.request.get(`/api/incidents/${e.id}`);
     expect(detail.status()).toBe(200);
   });
 
@@ -172,16 +172,16 @@ test.describe('Aufbewahrung (LFH-23)', () => {
   }, testInfo) => {
     await anmelden(page);
     const stempel = Date.now();
-    const r = await page.request.post('/api/einsaetze', {
+    const r = await page.request.post('/api/incidents', {
       data: { bezeichnung: `Löschersuchen ${stempel}` },
     });
     expect(r.ok(), await r.text()).toBeTruthy();
     const e = (await r.json()) as { id: number };
-    const p = await page.request.post(`/api/einsaetze/${e.id}/persons`, {
+    const p = await page.request.post(`/api/incidents/${e.id}/persons`, {
       data: { name: 'Yilmaz', vorname: 'Ayse' },
     });
     expect(p.ok(), await p.text()).toBeTruthy();
-    const z = await page.request.post(`/api/einsaetze/${e.id}/close`);
+    const z = await page.request.post(`/api/incidents/${e.id}/close`);
     expect(z.ok(), await z.text()).toBeTruthy();
 
     await page.goto(`/admin/aufbewahrung/${e.id}`);

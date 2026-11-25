@@ -54,7 +54,7 @@ async function vorhandene(
   api: APIRequestContext,
   einsatzId: number,
 ): Promise<{ id: number; bezeichnung: string }[]> {
-  const pfad = `/api/einsaetze/${einsatzId}/resource-requests`;
+  const pfad = `/api/incidents/${einsatzId}/resource-requests`;
   const antwort = await api.get(pfad);
   expect(antwort.ok(), `${pfad}: ${antwort.status()}`).toBe(true);
   return (await antwort.json()) as { id: number; bezeichnung: string }[];
@@ -81,7 +81,7 @@ async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
   expect(da, 'Nachforderungen nur zum Teil gesät; Lauf mit frischer Datenbank wiederholen').toEqual(
     [],
   );
-  const basis = `/api/einsaetze/${demo.id}/resource-requests`;
+  const basis = `/api/incidents/${demo.id}/resource-requests`;
   const anlegen = (daten: Record<string, unknown>) =>
     fuelle<{ id: number }>(api, 'post', basis, daten);
   const linden = await anlegen({
@@ -144,13 +144,13 @@ async function nachforderungenFuellen(api: APIRequestContext): Promise<Gesaet> {
     prioritaet: 'dringend',
   });
   await eintreffen(saecke.id);
-  const antwort = await api.get(`/api/einsaetze/${demo.id}/units`);
+  const antwort = await api.get(`/api/incidents/${demo.id}/units`);
   expect(antwort.ok(), `Einheiten: ${antwort.status()}`).toBe(true);
   const staffel = ((await antwort.json()) as { id: number; name: string }[]).find(
     (e) => e.name === 'Rettungsstaffel',
   );
   expect(staffel, 'Demo-Einheit „Rettungsstaffel“ fehlt').toBeTruthy();
-  await fuelle(api, 'post', `/api/einsaetze/${demo.id}/material`, {
+  await fuelle(api, 'post', `/api/incidents/${demo.id}/material`, {
     adhoc: { bezeichnung: 'Sandsäcke' },
     menge: 1200,
     art: 'verbrauchsgut',
@@ -177,7 +177,7 @@ async function einheitNachforderung(
 ): Promise<number> {
   const api = await apiAlsAdmin();
   const demo = await demoEinsatz(api);
-  const basis = `/api/einsaetze/${demo.id}`;
+  const basis = `/api/incidents/${demo.id}`;
   const schon = (await vorhandene(api, demo.id)).find((n) => n.bezeichnung === bezeichnung);
   if (schon) {
     await api.dispose();

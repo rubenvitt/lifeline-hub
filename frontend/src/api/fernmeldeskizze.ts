@@ -29,7 +29,7 @@ import type {
  */
 
 function einsatz(einsatzId: number): string {
-  return `/api/einsaetze/${einsatzId}`;
+  return `/api/incidents/${einsatzId}`;
 }
 
 function skizze(einsatzId: number): string {

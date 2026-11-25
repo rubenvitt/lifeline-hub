@@ -99,10 +99,10 @@ const PEGEL = [
 ];
 
 async function einsatzAnlegen(page: Page): Promise<string> {
-  const r = await page.request.post('/api/einsaetze', { data: { bezeichnung: einsatzName() } });
+  const r = await page.request.post('/api/incidents', { data: { bezeichnung: einsatzName() } });
   expect(r.ok(), `Seeding Einsatz: ${r.status()} ${await r.text()}`).toBeTruthy();
   const id = String(((await r.json()) as { id: number }).id);
-  const p = await page.request.put(`/api/einsaetze/${id}/gauges`, {
+  const p = await page.request.put(`/api/incidents/${id}/gauges`, {
     data: { stationen: [{ station_uuid: STATION, name: 'HANN. MÜNDEN', gewaesser: 'WESER' }] },
   });
   expect(p.ok(), `Pegel festlegen: ${p.status()} ${await p.text()}`).toBeTruthy();
@@ -119,14 +119,14 @@ const FOLGEN: Folge[] = ['Einsatz zuerst', 'Einsatz zuletzt', 'natürlich'];
 type Seite = 'ueberblick' | 'lage-dashboard';
 
 /**
- * Stellt die GET-Abfragen unter `/api/einsaetze/<id>` nach der Folge; der Live-Strom (`/live`)
+ * Stellt die GET-Abfragen unter `/api/incidents/<id>` nach der Folge; der Live-Strom (`/live`)
  * läuft immer durch, er ist kein Datenabruf. Die gehaltenen warten auf `freigeben()`.
  */
 async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite: Seite) {
   await page.unrouteAll({ behavior: 'ignoreErrors' });
   let loslassen!: () => void;
   const tor = new Promise<void>((f) => (loslassen = f));
-  const kopf = `/api/einsaetze/${einsatzId}`;
+  const kopf = `/api/incidents/${einsatzId}`;
   // Die Modulfreigaben gehören wie der Kopf zum Rahmen: bis sie antworten, wartet der Modulwächter
   // (LFH-888) und die Seite rendert noch nicht. Gehalten werden die Abfragen der Seite.
   // Der Überblick wartet mit seinem Körper außerdem auf den Modulzähler (LLH-1430, die
@@ -142,7 +142,7 @@ async function stelleAbfragen(page: Page, einsatzId: string, folge: Folge, seite
   const haelt = (pfad: string) =>
     folge === 'Einsatz zuerst' ? !rahmen(pfad) : folge === 'Einsatz zuletzt' && pfad === kopf;
   let gehalten = 0;
-  await page.route(new RegExp(`/api/einsaetze/${einsatzId}(?:[/?]|$)`), async (route) => {
+  await page.route(new RegExp(`/api/incidents/${einsatzId}(?:[/?]|$)`), async (route) => {
     const anfrage = route.request();
     const pfad = new URL(anfrage.url()).pathname;
     if (anfrage.method() !== 'GET' || pfad.endsWith('/live')) return route.continue();
@@ -270,7 +270,7 @@ test('Meldungsstrom: der Paneelkopf hält seine Höhe über die Verbindungszust�
   await page.goto(`/einsaetze/${einsatzId}/lage-dashboard`);
   const offen = await messeKopf(/^live$/);
   // Ohne Leitung: der Strom wird abgewiesen, das Wort bleibt beim Aufbau bzw. „unterbrochen".
-  await page.route(`**/api/einsaetze/${einsatzId}/live`, (r) => r.abort());
+  await page.route(`**/api/incidents/${einsatzId}/live`, (r) => r.abort());
   await page.reload();
   const ohne = await messeKopf(/^Verbindung (wird aufgebaut|unterbrochen)$/);
   test.info().annotations.push({ type: 'messwert', description: hoehen.join(' | ') });

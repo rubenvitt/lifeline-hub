@@ -34,12 +34,12 @@ async function post(page: Page, pfad: string, data: unknown): Promise<{ id: numb
 
 /** Ein Einsatz mit drei Ad-hoc-Kräften; die mittlere ist das Sprungziel. */
 async function seede(page: Page, modus: string) {
-  const { id: einsatzId } = await post(page, '/api/einsaetze', {
+  const { id: einsatzId } = await post(page, '/api/incidents', {
     bezeichnung: `E2E 698 ${modus} ${Date.now()}`,
   });
   const ids: number[] = [];
   for (const name of ['Albers, Anna', 'Brandt, Bernd', 'Claussen, Clara']) {
-    const kraft = await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
+    const kraft = await post(page, `/api/incidents/${einsatzId}/personnel`, {
       adhoc: { name, funktion: 'Truppführung', traegerorganisation: 'FF Musterstadt' },
     });
     ids.push(kraft.id);
@@ -158,12 +158,12 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 1260 ${modus} ${Date.now()}`,
     });
     const ids: number[] = [];
     for (const bezeichnung of ['Feldbett', 'Tauchpumpe', 'Wolldecke']) {
-      const posten = await post(page, `/api/einsaetze/${einsatzId}/material`, {
+      const posten = await post(page, `/api/incidents/${einsatzId}/material`, {
         adhoc: { bezeichnung },
         menge: 1,
       });
@@ -226,14 +226,14 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 698 ETB ${modus} ${Date.now()}`,
     });
     const ids: number[] = [];
     for (const inhalt of ['Erste Meldung', 'Angesprungene Meldung', 'Dritte Meldung']) {
       ids.push(
         (
-          await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+          await post(page, `/api/incidents/${einsatzId}/etb`, {
             typ: 'meldung',
             von: 'ELW 1',
             an: 'Leitstelle',
@@ -267,12 +267,12 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E 896 ${modus} ${Date.now()}`,
     });
     const auftrag = async (auftrag_text: string, frist_at?: string) =>
       (
-        await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
+        await post(page, `/api/incidents/${einsatzId}/tasks`, {
           auftrag_text,
           empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
           ...(frist_at ? { frist_at } : {}),
@@ -339,11 +339,11 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E oxgob5gk Befehl ${modus} ${Date.now()}`,
     });
     const befehl = async (titel: string) =>
-      (await post(page, `/api/einsaetze/${einsatzId}/orders`, { vorlage: 'befehl_lad', titel })).id;
+      (await post(page, `/api/incidents/${einsatzId}/orders`, { vorlage: 'befehl_lad', titel })).id;
     const nachbarId = await befehl('Nachbarbefehl');
     const zielId = await befehl('Angesprungener Befehl');
     const karte = (id: number) => page.locator(`[data-lfh="komm-karte"][data-befehl-id="${id}"]`);
@@ -377,14 +377,14 @@ for (const modus of ['light', 'dark'] as const) {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await anmelden(page, modus);
-    const { id: einsatzId } = await post(page, '/api/einsaetze', {
+    const { id: einsatzId } = await post(page, '/api/incidents', {
       bezeichnung: `E2E oxgob5gk Wahl ${modus} ${Date.now()}`,
     });
     const ids: number[] = [];
     for (const auftrag_text of ['Erster Auftrag', 'Gewählter Auftrag', 'Dritter Auftrag']) {
       ids.push(
         (
-          await post(page, `/api/einsaetze/${einsatzId}/tasks`, {
+          await post(page, `/api/incidents/${einsatzId}/tasks`, {
             auftrag_text,
             empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'Abschnitt Nord' }],
           })

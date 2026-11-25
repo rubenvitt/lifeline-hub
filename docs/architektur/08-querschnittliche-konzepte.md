@@ -14,7 +14,7 @@ Fähigkeits-Specs unter `openspec/specs/` (eingefroren, ADR-0069), die Design-Do
 Jeder Datensatz mit Fachbezug hängt über `org_id` an einer Organisation; die Organisation ist
 die Mandantengrenze (`Benutzer.org_id` in `src/auth/mod.rs`). Der Org-Floor läuft in jedem
 einsatzgebundenen Handler im Extractor `EinsatzKontext` (`src/einsatz/kontext.rs`, Prüfung
-`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/einsaetze/{id}/…` ihn
+`berechtigung::fordere_org_zugehoerigkeit`). Dass jede Route unter `/api/incidents/{id}/…` ihn
 zieht, erzwingt `tests/einsatz_kontext_guard.rs`; die Grenze gegen eine echte zweite Organisation
 prüft `tests/cross_org.rs`. Wie ein System-Admin über die Org-Grenze liest und schreibt, regelt
 [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Admin-Schreibwege am Einsatz“.

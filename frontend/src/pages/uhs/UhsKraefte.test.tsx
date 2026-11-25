@@ -65,7 +65,7 @@ function uhs(over: Partial<UhsDetail> = {}): UhsDetail {
 }
 
 function mitFreien(liste: UhsKraft[] = [frei]) {
-  server.use(http.get('/api/einsaetze/1/uhs/2/forces/available', () => HttpResponse.json(liste)));
+  server.use(http.get('/api/incidents/1/uhs/2/forces/available', () => HttpResponse.json(liste)));
 }
 
 describe('UhsKraefte', () => {
@@ -108,7 +108,7 @@ describe('UhsKraefte', () => {
     mitFreien();
     let gesendet: unknown = null;
     server.use(
-      http.post('/api/einsaetze/1/uhs/2/forces', async ({ request }) => {
+      http.post('/api/incidents/1/uhs/2/forces', async ({ request }) => {
         gesendet = await request.json();
         return HttpResponse.json(bernd, { status: 201 });
       }),
@@ -133,7 +133,7 @@ describe('UhsKraefte', () => {
     mitFreien();
     let geloest: string | null = null;
     server.use(
-      http.delete('/api/einsaetze/1/uhs/2/forces/:kid', ({ params }) => {
+      http.delete('/api/incidents/1/uhs/2/forces/:kid', ({ params }) => {
         geloest = String(params.kid);
         return new HttpResponse(null, { status: 204 });
       }),
@@ -150,11 +150,11 @@ describe('UhsKraefte', () => {
     mitFreien();
     const aufrufe: string[] = [];
     server.use(
-      http.delete('/api/einsaetze/1/uhs/2/forces/:kid', ({ params }) => {
+      http.delete('/api/incidents/1/uhs/2/forces/:kid', ({ params }) => {
         aufrufe.push(`DELETE ${params.kid}`);
         return new HttpResponse(null, { status: 204 });
       }),
-      http.put('/api/einsaetze/1/uhs/2/forces/:kid', ({ params, request }) => {
+      http.put('/api/incidents/1/uhs/2/forces/:kid', ({ params, request }) => {
         aufrufe.push(`PUT ${params.kid}${new URL(request.url).search}`);
         return HttpResponse.json({ id: Number(params.kid) });
       }),
@@ -175,10 +175,10 @@ describe('UhsKraefte', () => {
     mitFreien();
     server.use(
       http.delete(
-        '/api/einsaetze/1/uhs/2/forces/:kid',
+        '/api/incidents/1/uhs/2/forces/:kid',
         () => new HttpResponse(null, { status: 204 }),
       ),
-      http.put('/api/einsaetze/1/uhs/2/forces/:kid', () =>
+      http.put('/api/incidents/1/uhs/2/forces/:kid', () =>
         HttpResponse.json({ error: 'Bernd Berg steht inzwischen an UHS «Zelt»' }, { status: 409 }),
       ),
     );
@@ -201,7 +201,7 @@ describe('UhsKraefte', () => {
       mitFreien();
       const geloest: string[] = [];
       server.use(
-        http.delete('/api/einsaetze/1/uhs/2/forces/:kid', async ({ params }) => {
+        http.delete('/api/incidents/1/uhs/2/forces/:kid', async ({ params }) => {
           geloest.push(String(params.kid));
           await delay(20);
           return new HttpResponse(null, { status: 204 });
@@ -232,10 +232,10 @@ describe('UhsKraefte', () => {
       const aufrufe: string[] = [];
       server.use(
         http.delete(
-          '/api/einsaetze/1/uhs/2/forces/:kid',
+          '/api/incidents/1/uhs/2/forces/:kid',
           () => new HttpResponse(null, { status: 204 }),
         ),
-        http.put('/api/einsaetze/1/uhs/2/forces/:kid', ({ params, request }) => {
+        http.put('/api/incidents/1/uhs/2/forces/:kid', ({ params, request }) => {
           aufrufe.push(`PUT ${params.kid}${new URL(request.url).search}`);
           return HttpResponse.json({ id: Number(params.kid) });
         }),
@@ -329,7 +329,7 @@ describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
     let frei: () => void = () => {};
     const zweiter = new Promise<void>((r) => (frei = r));
     server.use(
-      http.post('/api/einsaetze/1/uhs/2/forces', async () => {
+      http.post('/api/incidents/1/uhs/2/forces', async () => {
         versuche += 1;
         if (versuche > 1) await zweiter;
         return HttpResponse.json({ error: 'Name bereits an der UHS' }, { status: 409 });
@@ -364,7 +364,7 @@ describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
   it('Kraft zuordnen: der Grund steht im Dialog, kein Toast', async () => {
     mitFreien();
     server.use(
-      http.put('/api/einsaetze/1/uhs/2/forces/:kid', () =>
+      http.put('/api/incidents/1/uhs/2/forces/:kid', () =>
         HttpResponse.json({ error: 'Kraft ist an einer anderen UHS' }, { status: 409 }),
       ),
     );
@@ -389,7 +389,7 @@ describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
   it('Einheit zuordnen: der Grund steht im Dialog, kein Toast', async () => {
     mitFreien();
     server.use(
-      http.put('/api/einsaetze/1/uhs/2/forces/unit/:eid', () =>
+      http.put('/api/incidents/1/uhs/2/forces/unit/:eid', () =>
         HttpResponse.json({ error: 'Einheit ist aufgelöst' }, { status: 409 }),
       ),
     );
@@ -414,7 +414,7 @@ describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
     let lehneAb: () => void = () => {};
     const ersteAblehnung = new Promise<void>((r) => (lehneAb = r));
     server.use(
-      http.delete('/api/einsaetze/1/uhs/2/forces/:kid', async ({ params }) => {
+      http.delete('/api/incidents/1/uhs/2/forces/:kid', async ({ params }) => {
         if (params.kid === '11') {
           await ersteAblehnung;
           return HttpResponse.json({ error: 'Kraft führt die UHS' }, { status: 409 });
@@ -440,7 +440,7 @@ describe('UhsKraefte · Speicherfehler am Ort (LFH-1077)', () => {
     mitFreien();
     let erster = true;
     server.use(
-      http.delete('/api/einsaetze/1/uhs/2/forces/:kid', async () => {
+      http.delete('/api/incidents/1/uhs/2/forces/:kid', async () => {
         if (erster) {
           erster = false;
           return HttpResponse.json({ error: 'Kraft führt die UHS' }, { status: 409 });

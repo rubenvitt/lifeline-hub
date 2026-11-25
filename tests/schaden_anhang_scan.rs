@@ -31,7 +31,7 @@ async fn ablage_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
     let (s, v) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/damages"),
+        &format!("/api/incidents/{einsatz}/damages"),
         &admin,
         Some(r#"{"typ":"sachschaden","ausmass":"gering","ort":"Hauptstr. 1"}"#),
     )
@@ -67,7 +67,7 @@ async fn ablage_ohne_erreichbaren_scanner_ist_503_und_speichert_nichts() {
             Request::builder()
                 .method("POST")
                 .uri(format!(
-                    "/api/einsaetze/{einsatz}/damages/{schaden}/attachments"
+                    "/api/incidents/{einsatz}/damages/{schaden}/attachments"
                 ))
                 .header(header::COOKIE, admin.as_str())
                 .header(

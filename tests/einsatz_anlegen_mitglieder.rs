@@ -1,6 +1,6 @@
 //! Mitglieder schon beim Anlegen (LLH-1820, Entwurf
 //! `docs/superpowers/specs/2026-11-19-efvk5rbs-verwaltung-uebersicht-mitglieder-design.md`):
-//! `POST /api/einsaetze` mit `mitglieder` nimmt die Personen in derselben Transaktion auf. Jede
+//! `POST /api/incidents` mit `mitglieder` nimmt die Personen in derselben Transaktion auf. Jede
 //! ungültige Angabe ist 400, und dann entsteht nichts — weder Einsatz noch Mitgliedschaft noch
 //! Benachrichtigung.
 
@@ -22,7 +22,7 @@ async fn aufbau() -> (axum::Router, SqlitePool, String, String, i64) {
 
 async fn anlegen(app: &axum::Router, cookie: &str, mitglieder: Value) -> (StatusCode, Value) {
     let body = json!({ "bezeichnung": "Lage", "mitglieder": mitglieder }).to_string();
-    anfrage(app, "POST", "/api/einsaetze", cookie, Some(&body)).await
+    anfrage(app, "POST", "/api/incidents", cookie, Some(&body)).await
 }
 
 async fn zahl(pool: &SqlitePool, tabelle: &str) -> i64 {
@@ -59,7 +59,7 @@ async fn rollen(app: &axum::Router, cookie: &str, einsatz: i64) -> Vec<(i64, Str
     let (s, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/members"),
+        &format!("/api/incidents/{einsatz}/members"),
         cookie,
         None,
     )
@@ -153,7 +153,7 @@ async fn ohne_mitglieder_wie_bisher() {
         r#"{"bezeichnung":"Lage"}"#,
         r#"{"bezeichnung":"Lage","mitglieder":[]}"#,
     ] {
-        let (s, j) = anfrage(&app, "POST", "/api/einsaetze", &fk, Some(body)).await;
+        let (s, j) = anfrage(&app, "POST", "/api/incidents", &fk, Some(body)).await;
         assert_eq!(s, StatusCode::CREATED, "{j}");
         let einsatz = j["id"].as_i64().unwrap();
         assert_eq!(

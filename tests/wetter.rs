@@ -1,4 +1,4 @@
-//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/einsaetze/{id}/weather`,
+//! Integrationstests des Wetters am Einsatzort (LFH-633), `GET /api/incidents/{id}/weather`,
 //! samt aktuellen Bedingungen (LFH-864).
 //!
 //! Spec: `openspec/changes/archive/2026-09-29-lfh-633-fachmodul-wetter-pegel/specs/lage-wetter-pegel/spec.md`,
@@ -171,7 +171,7 @@ fn current_weather() -> Value {
 }
 
 fn pfad(einsatz: i64) -> String {
-    format!("/api/einsaetze/{einsatz}/weather")
+    format!("/api/incidents/{einsatz}/weather")
 }
 
 /// Einsatzort per Kopfdaten-PATCH setzen. Bremen-Mitte, nicht auf einer Rundungsgrenze.
@@ -179,7 +179,7 @@ async fn ort_setzen(app: &axum::Router, cookie: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "PATCH",
-        &format!("/api/einsaetze/{einsatz}"),
+        &format!("/api/incidents/{einsatz}"),
         cookie,
         Some(r#"{"einsatzort_lat":53.0793,"einsatzort_lon":8.8017}"#),
     )
@@ -322,7 +322,7 @@ async fn tote_quelle_ist_ausfall_fuer_alle_teile_und_trotzdem_200() {
     let (status, _) = anfrage(
         &u.app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/gauges"),
+        &format!("/api/incidents/{einsatz}/gauges"),
         &admin,
         None,
     )
@@ -357,7 +357,7 @@ async fn modul_ausgeblendet_ist_403_pegel_bleiben_200() {
     let (status, json) = anfrage(
         &u.app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/wetter-pegel"),
+        &format!("/api/incidents/{einsatz}/module-overrides/wetter-pegel"),
         &admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -370,7 +370,7 @@ async fn modul_ausgeblendet_ist_403_pegel_bleiben_200() {
         let (status, _) = anfrage(
             &u.app,
             "GET",
-            &format!("/api/einsaetze/{einsatz}/{suffix}"),
+            &format!("/api/incidents/{einsatz}/{suffix}"),
             &frieda,
             None,
         )

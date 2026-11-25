@@ -197,7 +197,7 @@ async fn geloeschte_zeilen_verschwinden_oder_werden_stillgelegt() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &elw.admin,
         Some(&json!({"material_id": decke})),
     )
@@ -777,7 +777,7 @@ async fn stillgelegte_zeile_verliert_ihre_herkunft_und_eine_wiederverwendete_id_
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &elw.admin,
         Some(&json!({"material_id": decke})),
     )
@@ -1596,7 +1596,7 @@ async fn zurueckgespielt_hub_verlorenes_material_im_einsatz_wird_stillgelegt() {
     let (s, v) = common::anfrage_json(
         &elw.app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/material"),
+        &format!("/api/incidents/{einsatz}/material"),
         &elw.admin,
         Some(&json!({"material_id": decke})),
     )

@@ -128,10 +128,10 @@ async function senden<T = { id: number }>(
  * zurück. Bezirke gehören seit LLH-1034 zum Modul Evakuierung, Stellen zur Betreuung.
  */
 async function saeLage(page: Page, name: string) {
-  const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+  const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
     bezeichnung: `${name} ${Date.now()}`,
   });
-  const evak = `/api/einsaetze/${einsatzId}/evacuation`;
+  const evak = `/api/incidents/${einsatzId}/evacuation`;
   const bezirke: Record<string, number> = {};
   for (const b of BEZIRKE) {
     const { id } = await senden(page, 'post', `${evak}/districts`, {
@@ -143,7 +143,7 @@ async function saeLage(page: Page, name: string) {
     if (b.raeumung !== 'angeordnet')
       await senden(page, 'patch', `${evak}/districts/${id}`, { raeumung: b.raeumung });
   }
-  const basis = `/api/einsaetze/${einsatzId}/care`;
+  const basis = `/api/incidents/${einsatzId}/care`;
   const stellen: Record<string, number> = {};
   for (const s of STELLEN) {
     const { id } = await senden(page, 'post', `${basis}/positions`, {
@@ -509,10 +509,10 @@ for (const [viewport, dichte] of [
     test.setTimeout(150_000);
     await page.setViewportSize(viewport);
     await anmelden(page, { startseite: false });
-    const { id: einsatzId } = await senden(page, 'post', '/api/einsaetze', {
+    const { id: einsatzId } = await senden(page, 'post', '/api/incidents', {
       bezeichnung: `E2E 677 Fokus ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}/care`;
+    const basis = `/api/incidents/${einsatzId}/care`;
     for (let i = 1; i <= 20; i += 1) {
       const { id } = await senden(page, 'post', `${basis}/positions`, {
         bezeichnung: `Turnhalle ${String(i).padStart(2, '0')}`,

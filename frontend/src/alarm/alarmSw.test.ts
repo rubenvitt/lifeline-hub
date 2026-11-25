@@ -339,7 +339,7 @@ describe('alarm-sw.js: Web Push (LLH-1223)', () => {
       const { push, gezeigt } = ladeMitPush([]);
       await push({ ...EREIGNIS, inhalt: true });
       expect(f).toHaveBeenCalledWith(
-        '/api/einsaetze/7/reports/3',
+        '/api/incidents/7/reports/3',
         expect.objectContaining({ credentials: 'same-origin' }),
       );
       expect(gezeigt[0]!.titel).toBe('Sofortmeldung · Rettungsstaffel');

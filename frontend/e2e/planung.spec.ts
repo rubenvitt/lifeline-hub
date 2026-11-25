@@ -234,11 +234,11 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
   await expect(page).toHaveURL(/\/einsaetze\/\d+/);
   const einsatzId = Number(/\/einsaetze\/(\d+)/.exec(page.url())![1]);
   const schichtplan = await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/reliefs/shift-plan`)
+    await page.request.get(`/api/incidents/${einsatzId}/reliefs/shift-plan`)
   ).json();
   expect(schichtplan.bloecke).toHaveLength(1);
   expect(schichtplan.bloecke[0].posten.bezeichnung).toBe('Streife Markt');
-  const abschnitte = await (await page.request.get(`/api/einsaetze/${einsatzId}/sectors`)).json();
+  const abschnitte = await (await page.request.get(`/api/incidents/${einsatzId}/sectors`)).json();
   expect(abschnitte.map((a: { name: string }) => a.name)).toEqual(['Festmeile']);
   expect(schichtplan.helfer.map((h: { name: string }) => h.name)).toEqual(['Hanna Stadtfest']);
   // Derselbe Zeitpunkt wie in der Planung; welche UTC-Zeit 22:30 ist, hängt an der Zone.
@@ -246,7 +246,7 @@ test('Vorplanung: Stadtfest in einen neuen Einsatz übernehmen, danach schreibge
     punkte.map((p) => [p.bezeichnung, p.zeitpunkt_at]);
   const geplant = await (await page.request.get(`/api/plans/${planungId}`)).json();
   const programm = await (
-    await page.request.get(`/api/einsaetze/${einsatzId}/agenda-items`)
+    await page.request.get(`/api/incidents/${einsatzId}/agenda-items`)
   ).json();
   expect(paar(geplant.programmpunkte)).toHaveLength(1);
   expect(paar(geplant.programmpunkte)[0][1]).toMatch(/^2027-06-12 2\d:30:00$/);

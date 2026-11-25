@@ -46,7 +46,7 @@ async function anmelden(page: Page, optionen?: { startseite?: boolean }) {
 
 /** „Lagevortrag zur Entscheidung": die Vorlage mit den meisten Abschnitten (acht). */
 async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/situation-reports`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/situation-reports`, {
     data: { vorlage: 'lagebeurteilung', titel: 'Tippmessung' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
@@ -55,7 +55,7 @@ async function lageberichtAnlegen(page: Page, einsatzId: string): Promise<number
 
 /** Befehl LADEF (erweitert): fünf Abschnitte. */
 async function befehlAnlegen(page: Page, einsatzId: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/orders`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/orders`, {
     data: { vorlage: 'befehl_ladef', titel: 'Tippmessung Befehl' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);

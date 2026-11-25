@@ -8,8 +8,8 @@ import { einsatzKeys } from '../../api/queryKeys';
 import UhsAnhaenge, { UHS_ABLAGE_HINWEIS } from './UhsAnhaenge';
 
 // LFH-758, Spec `uhs-anhaenge`: Reiter „Dateien“ samt Zugriffsprotokoll der Einsatzleitung.
-const LISTE = '/api/einsaetze/1/uhs/9/attachments';
-const ZUGRIFFE = '/api/einsaetze/1/uhs/9/attachments/accesses';
+const LISTE = '/api/incidents/1/uhs/9/attachments';
+const ZUGRIFFE = '/api/incidents/1/uhs/9/attachments/accesses';
 const anhang = {
   id: 4,
   uhs_id: 9,
@@ -66,7 +66,7 @@ describe('UhsAnhaenge (LFH-758)', () => {
     const anker = await screen.findByRole('link', {
       name: /grundriss_halle\.pdf, .*Datei von UHS BHP 50 herunterladen/,
     });
-    expect(anker).toHaveAttribute('href', '/api/einsaetze/1/uhs/9/attachments/4/file');
+    expect(anker).toHaveAttribute('href', '/api/incidents/1/uhs/9/attachments/4/file');
   });
 
   it('zeigt an Fotos kein Vorschaubild: jeder Abruf gehört ins Protokoll (LFH-759)', async () => {

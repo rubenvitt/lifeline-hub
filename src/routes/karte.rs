@@ -53,6 +53,10 @@ pub struct KarteConfigAntwort {
     /// True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds
     /// anstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret.
     pub karten_bau_verfuegbar: bool,
+    /// Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit
+    /// `--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet
+    /// 404. Leer, wenn alle Ebenen an sind.
+    pub fachebenen_abgeschaltet: Vec<String>,
 }
 
 /// Eine gemeinsam angezeigte Offline-Region im Config-Vertrag (LFH-188). `tiles_url` ist
@@ -163,6 +167,12 @@ pub async fn config(State(state): State<AppState>) -> Result<Json<KarteConfigAnt
         offline_format,
         offline_regionen,
         karten_bau_verfuegbar,
+        fachebenen_abgeschaltet: state
+            .fachebenen
+            .abgeschaltet
+            .iter()
+            .map(|q| q.to_string())
+            .collect(),
     }))
 }
 
@@ -575,6 +585,11 @@ pub async fn fachebenen(
     PfadParam(quelle): PfadParam<String>,
     Query(params): Query<HashMap<String, String>>,
 ) -> Result<Response, AppError> {
+    // LLH-2104: eine abgeschaltete Ebene fragt weder Cache noch Quelle (MoWaS-Auflage
+    // „nicht gewerblich“ bei `nina`); vor jedem anderen Schritt, auch vor dem ETag-Vergleich.
+    if state.fachebenen.is_abgeschaltet(&quelle) {
+        return Err(AppError::NotFound);
+    }
     let bbox = params.get("bbox").map(|s| s.as_str());
     // Fachebenen-Cache liegt in einer eigenen Cache-DB (F09/LFH-240: keine Konkurrenz um den
     // operativen Writer); Fallback auf den operativen Pool, falls sie nicht anlegbar ist.
@@ -586,6 +601,8 @@ pub async fn fachebenen(
         "nina" => quellen::fetch_nina(&state.fachebenen, cache_pool).await,
         "hochwasser" => quellen::fetch_hochwasser(&state.fachebenen, cache_pool).await,
         "autobahn" => quellen::fetch_autobahn(&state.fachebenen, cache_pool).await,
+        // LLH-1637: Rastanlagen derselben Quelle, eigene Ebene mit 24 h TTL.
+        "autobahn_parken" => quellen::fetch_autobahn_parken(&state.fachebenen, cache_pool).await,
         "luftqualitaet" => quellen::fetch_luftqualitaet(&state.fachebenen, cache_pool).await,
         "odl" => quellen::fetch_odl(&state.fachebenen, cache_pool).await,
         // KRITIS (LFH-83) kommt aus dem Extrakt-Bestand — kein externer Abruf je Anfrage.
@@ -614,6 +631,70 @@ pub async fn fachebenen(
         _ => return Err(AppError::Validation(format!("Unbekannte Quelle: {quelle}"))),
     };
     fachebene_antwort(&antwort, &headers)
+}
+
+/// GET /api/map/overlays/copernicus/images?bbox=…[&archiv=1] — Satellitenbilder der gezeigten
+/// Copernicus-Produkte (LLH-2021), im Umschlag der Fachebenen und bedingt abrufbar wie sie.
+pub async fn copernicus_bilder(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(params): Query<HashMap<String, String>>,
+) -> Result<Response, AppError> {
+    let cache = crate::cache_db::cache_pool(&state.karten_dir).await;
+    let cache_pool = cache.as_ref().unwrap_or(&state.pool);
+    let archiv = params.get("archiv").is_some_and(|a| a == "1");
+    let antwort = crate::karte::copernicus_bilder::fetch_copernicus_bilder(
+        &state.fachebenen,
+        cache_pool,
+        &state.karten_dir,
+        params.get("bbox").map(String::as_str),
+        archiv,
+    )
+    .await?;
+    fachebene_antwort(&antwort, &headers)
+}
+
+/// Cache-Kopf einer Copernicus-Bildkachel: privat wie die Proxy-Kacheln (LFH-1072), nur Angemeldete
+/// bekommen sie; ein Tag, weil der Server Kopf und Kachel bis zur Verdrängung hält.
+pub const COPERNICUS_KACHEL_CACHE_CONTROL: &str = "private, max-age=86400, immutable";
+
+/// GET /api/map/overlays/copernicus/images/{bild}/{z}/{x}/{y} — PNG-Kachel eines Bildes
+/// (LLH-2021). Nur Kennungen aus der Bilderliste, nie Pfade: 404 sonst, 400 bei falscher Kachel,
+/// 204 ohne Inhalt, 502, wenn die Quelle fehlt und die Kachel nicht im Cache liegt.
+pub async fn copernicus_bild_kachel(
+    // Erstes Argument wie bei den Proxy-Routen: ohne Sitzung 401, bevor Kennung oder Kachel
+    // geprüft werden und bevor ein Abruf die Quelle erreicht.
+    _zugriff: KartenZugriff,
+    State(state): State<AppState>,
+    PfadParam((bild, z, x, y)): PfadParam<(String, i64, i64, i64)>,
+) -> Result<Response, AppError> {
+    use crate::karte::copernicus_bilder::{
+        hole_bereich_s3, liefere_kachel, KachelAntwort, KachelFehler,
+    };
+    let cache = crate::karte::tile_cache::cache_oeffnen(&state.karten_dir)
+        .await
+        .map_err(|e| AppError::ServiceUnavailable(format!("Kachel-Cache nicht verfügbar: {e}")))?;
+    match liefere_kachel(&cache, &hole_bereich_s3, &bild, z, x, y).await {
+        Ok(KachelAntwort::Png(png)) => Ok((
+            [
+                (header::CONTENT_TYPE, "image/png"),
+                (header::CACHE_CONTROL, COPERNICUS_KACHEL_CACHE_CONTROL),
+            ],
+            png,
+        )
+            .into_response()),
+        Ok(KachelAntwort::Leer) => Ok(StatusCode::NO_CONTENT.into_response()),
+        Err(KachelFehler::Unbekannt) => Err(AppError::NotFound),
+        Err(KachelFehler::Ungueltig) => {
+            Err(AppError::Validation("Keine gültige Kachel z/x/y".into()))
+        }
+        Err(KachelFehler::Quelle(e)) => {
+            tracing::warn!("Copernicus-Bildkachel: {e}");
+            Err(AppError::BadGateway(
+                "Satellitenbild nicht erreichbar".into(),
+            ))
+        }
+    }
 }
 
 // ===== Admin-CRUD der Karten-Registry (alle hinter AdminUser) =====

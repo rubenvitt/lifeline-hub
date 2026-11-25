@@ -68,7 +68,7 @@ impl Umgebung {
         let (s, v) = anfrage(
             &self.app,
             "POST",
-            &format!("/api/einsaetze/{einsatz}/close"),
+            &format!("/api/incidents/{einsatz}/close"),
             &self.admin,
             None,
         )
@@ -239,7 +239,7 @@ async fn abgeschlossener_einsatz_kann_nicht_zuschalten() {
     let (s, _) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &format!("/api/incidents/{}/close", u.einsatz),
         &u.admin,
         None,
     )
@@ -265,7 +265,7 @@ async fn fuehrungspersonal_bekommt_am_abgeschlossenen_einsatz_403_statt_409() {
     let (s, _) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &format!("/api/incidents/{}/close", u.einsatz),
         &u.admin,
         None,
     )
@@ -343,7 +343,7 @@ async fn wiedereroeffnen_nach_uebernahme_ergibt_keinen_zweiten_halter() {
     let (s, v) = anfrage(
         &u.app,
         "POST",
-        &format!("/api/einsaetze/{}/reopen", u.einsatz),
+        &format!("/api/incidents/{}/reopen", u.einsatz),
         &u.admin,
         Some(&json!({"grund": "Nachalarmierung"}).to_string()),
     )

@@ -83,7 +83,7 @@ describe('NachforderungenDialog', () => {
   it('hält nach einem Teilfehler offen: Angelegtes steht als angelegt, Gescheitertes bleibt angehakt mit Grund', async () => {
     const angekommen: NeueNachforderung[] = [];
     server.use(
-      http.post('/api/einsaetze/1/resource-requests', async ({ request }) => {
+      http.post('/api/incidents/1/resource-requests', async ({ request }) => {
         const body = (await request.json()) as NeueNachforderung;
         angekommen.push(body);
         if (body.art === 'Decken') {
@@ -132,7 +132,7 @@ describe('NachforderungenDialog', () => {
 
     // Zweiter Lauf: nur noch der gescheiterte Posten.
     server.use(
-      http.post('/api/einsaetze/1/resource-requests', async ({ request }) => {
+      http.post('/api/incidents/1/resource-requests', async ({ request }) => {
         const body = (await request.json()) as NeueNachforderung;
         angekommen.push(body);
         return HttpResponse.json({ id: 9, ...body }, { status: 201 });

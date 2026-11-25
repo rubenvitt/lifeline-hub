@@ -1,7 +1,7 @@
 //! Maßnahmen am Patienten (LLH-1324, Change `y18v58dt-pat-kern`, Spec `personen-massnahmen`,
 //! design.md D1/D5–D7):
-//! - `POST /api/einsaetze/{id}/persons/{pid}/interventions` — erfassen,
-//! - `POST /api/einsaetze/{id}/persons/{pid}/interventions/{mid}/void` — genau einmal aufheben.
+//! - `POST /api/incidents/{id}/persons/{pid}/interventions` — erfassen,
+//! - `POST /api/incidents/{id}/persons/{pid}/interventions/{mid}/void` — genau einmal aufheben.
 //!
 //! Beide schreiben **kein ETB** und melden nur das `person`-Ereignis (Einsatz und Person).
 

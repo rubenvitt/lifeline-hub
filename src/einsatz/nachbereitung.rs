@@ -5,7 +5,7 @@
 //! haben. Danach übergibt die meldende Instanz einen eigenen Einsatz der verwahrenden (D4) und
 //! räumt einen Spiegel ab (D5). Der Abschluss setzt `einsatz.nachbereitung_bis` aus der
 //! Org-Vorgabe `org_einstellungen.nachbereitung_tage`; Einsatzleitung und Admin der Einsatz-Org
-//! ändern sie über `PUT /api/einsaetze/{id}/follow-up`. Ohne Wert passiert nichts Neues.
+//! ändern sie über `PUT /api/incidents/{id}/follow-up`. Ohne Wert passiert nichts Neues.
 //!
 //! Anders als bei der Aufbewahrungsfrist gibt es keinen Bestätigungsschritt: das Ende der
 //! Nachbereitung löscht nichts, was nicht verwahrt ist.

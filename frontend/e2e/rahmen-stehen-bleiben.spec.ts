@@ -36,7 +36,7 @@ async function einsatzAnlegen(
   name: string,
   einsatzart?: 'uebung' | 'realeinsatz',
 ): Promise<string> {
-  const antwort = await page.request.post('/api/einsaetze', {
+  const antwort = await page.request.post('/api/incidents', {
     data: { bezeichnung: name, ...(einsatzart ? { einsatzart } : {}) },
   });
   expect(antwort.ok(), `Einsatz: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -50,7 +50,7 @@ async function einsatzAnlegen(
  */
 async function etbFuellen(page: Page, einsatzId: string) {
   for (let i = 0; i < 80; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: {
         typ: 'meldung',
         inhalt: `Rahmenprobe ${i}: Lagemeldung aus dem Abschnitt, Pegel steigt weiter.`,
@@ -75,7 +75,7 @@ async function etbDreistellig(page: Page, einsatzId: string) {
     ...Array.from({ length: 12 }, () => 'lage'),
   ];
   for (const [i, typ] of weitere.entries()) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/etb`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/etb`, {
       data: { typ, inhalt: `Zählerprobe ${i}`, von: 'ELW 1', an: 'Leitstelle' },
     });
     expect(antwort.ok(), `ETB ${typ} ${i}: ${antwort.status()}`).toBe(true);
@@ -276,7 +276,7 @@ test('1180 px mit offenem Modulmenü: die Stärke steht auf Höhe des Abschnitts
 }) => {
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `Rahmen Überblick ${Date.now()}`);
-  const ab = await page.request.post(`/api/einsaetze/${einsatzId}/sectors`, {
+  const ab = await page.request.post(`/api/incidents/${einsatzId}/sectors`, {
     data: { name: 'Abschnitt Nordufer' },
   });
   expect(ab.ok(), `Abschnitt: ${ab.status()}`).toBe(true);
@@ -445,7 +445,7 @@ for (const ziel of ['etb', 'personal', 'einstellungen', 'verwaltung'] as const) 
     if (ziel === 'etb') await etbDreistellig(page, einsatzId);
     if (ziel === 'personal') {
       for (let i = 0; i < 30; i += 1) {
-        const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+        const antwort = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
           data: { adhoc: { name: `Seitenkopf Kraft ${i}`, funktion: 'Helfer' } },
         });
         expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);
@@ -591,7 +591,7 @@ test('Fokus in der klebenden Rail rollt die Seite nicht (1440 × 900)', async ({
   await anmeldenAlsAdmin(page);
   const einsatzId = await einsatzAnlegen(page, `Rahmen Rail-Fokus ${Date.now()}`);
   for (let i = 0; i < 30; i += 1) {
-    const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+    const antwort = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
       data: { adhoc: { name: `Rail-Fokus Kraft ${i}`, funktion: 'Helfer' } },
     });
     expect(antwort.ok(), `Kraft ${i}: ${antwort.status()}`).toBe(true);

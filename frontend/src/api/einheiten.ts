@@ -44,7 +44,7 @@ export interface EinheitEingabe {
 }
 
 export function listeEinheiten(einsatzId: number): Promise<Einheit[]> {
-  return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/units`);
+  return apiGet<Einheit[]>(`/api/incidents/${einsatzId}/units`);
 }
 
 /** L‑2: Geo-Verortung eines taktischen Objekts. Felder werden nur gesendet, wenn
@@ -69,7 +69,7 @@ export function verorteEinheit(
   erwartet?: PositionPatch,
 ): Promise<Einheit> {
   return apiSend<Einheit>(
-    `/api/einsaetze/${einsatzId}/units/${einheitId}/position`,
+    `/api/incidents/${einsatzId}/units/${einheitId}/position`,
     'PATCH',
     erwartet ? { ...daten, erwartet } : daten,
   );
@@ -110,7 +110,7 @@ export function patchEinheitZeichen(
 }
 
 export function bildeEinheit(einsatzId: number, daten: EinheitEingabe): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/units`, 'POST', daten);
+  return apiSend<Einheit>(`/api/incidents/${einsatzId}/units`, 'POST', daten);
 }
 
 /**
@@ -123,7 +123,7 @@ export function uebernehmeAusNachforderung(
   eingabe: EinheitenAusNachforderungEingabe,
 ): Promise<Nachforderung> {
   return apiSend<Nachforderung>(
-    `/api/einsaetze/${einsatzId}/units/from-resource-request`,
+    `/api/incidents/${einsatzId}/units/from-resource-request`,
     'POST',
     eingabe,
   );
@@ -137,7 +137,7 @@ export function loadEinheitAusVorlage(
   einsatzId: number,
   vorlageId: number,
 ): Promise<VorlageVorschau> {
-  return apiGet<VorlageVorschau>(`/api/einsaetze/${einsatzId}/units/from-template/${vorlageId}`);
+  return apiGet<VorlageVorschau>(`/api/incidents/${einsatzId}/units/from-template/${vorlageId}`);
 }
 
 /**
@@ -150,7 +150,7 @@ export function createEinheitAusVorlage(
   eingabe: AusVorlageEingabe,
 ): Promise<AusVorlageErgebnis> {
   return apiSend<AusVorlageErgebnis>(
-    `/api/einsaetze/${einsatzId}/units/from-template`,
+    `/api/incidents/${einsatzId}/units/from-template`,
     'POST',
     eingabe,
   );
@@ -173,7 +173,7 @@ export function patcheEinheit(
   erwartet?: Partial<EinheitPatch>,
 ): Promise<Einheit> {
   return apiSend<Einheit>(
-    `/api/einsaetze/${einsatzId}/units/${eid}`,
+    `/api/incidents/${einsatzId}/units/${eid}`,
     'PATCH',
     erwartet ? { ...patch, erwartet } : patch,
   );
@@ -189,7 +189,7 @@ export function ordneEinheitSprechgruppeZu(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/units/${eid}/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/units/${eid}/talk-groups/${sprechgruppeId}`,
     'PUT',
   );
 }
@@ -201,7 +201,7 @@ export function loeseEinheitSprechgruppe(
   sprechgruppeId: number,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/units/${eid}/talk-groups/${sprechgruppeId}`,
+    `/api/incidents/${einsatzId}/units/${eid}/talk-groups/${sprechgruppeId}`,
     'DELETE',
   );
 }
@@ -211,7 +211,7 @@ export function loeseEinheitSprechgruppe(
  * ETB-Bezug als aufgelöst im Nachweis; ohne jede Spur löscht der Server sie.
  */
 export function loeseEinheitAuf(einsatzId: number, eid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/units/${eid}`, 'DELETE');
 }
 
 /**
@@ -223,7 +223,7 @@ export function uebernehmeEinheit(
   eid: number,
   daten: UebernahmeBody,
 ): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/units/${eid}/take-over`, 'POST', daten);
+  return apiSend<Einheit>(`/api/incidents/${einsatzId}/units/${eid}/take-over`, 'POST', daten);
 }
 
 /**
@@ -231,12 +231,12 @@ export function uebernehmeEinheit(
  * wird aufgelöst, ihre Fahrzeuge werden entlassen. Unumkehrbar.
  */
 export function weiseEinheitAb(einsatzId: number, eid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/reject`, 'POST');
+  return apiSend<void>(`/api/incidents/${einsatzId}/units/${eid}/reject`, 'POST');
 }
 
 /** Aufgelöste Einheiten des Einsatzes (LLH-1079, Block „Aufgelöst“). */
 export function listAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> {
-  return apiGet<Einheit[]>(`/api/einsaetze/${einsatzId}/units?aufgeloeste=1`);
+  return apiGet<Einheit[]>(`/api/incidents/${einsatzId}/units?aufgeloeste=1`);
 }
 
 /**
@@ -245,12 +245,12 @@ export function listAufgeloesteEinheiten(einsatzId: number): Promise<Einheit[]> 
  * verlässt nur den Raum, den die Übernahme gebucht hat. Antwort ist die Nachforderung.
  */
 export function storniereUebernahme(einsatzId: number, eid: number): Promise<Nachforderung> {
-  return apiSend<Nachforderung>(`/api/einsaetze/${einsatzId}/units/${eid}/annul-takeover`, 'POST');
+  return apiSend<Nachforderung>(`/api/incidents/${einsatzId}/units/${eid}/annul-takeover`, 'POST');
 }
 
 /** Fehlanlage stornieren (LLH-1079): nur eine Einheit ohne jede Spur, sie wird gelöscht. */
 export function storniereEinheit(einsatzId: number, eid: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/annul`, 'POST');
+  return apiSend<void>(`/api/incidents/${einsatzId}/units/${eid}/annul`, 'POST');
 }
 
 /**
@@ -279,13 +279,13 @@ export function ordnePersonalZu(
   optionen?: ZuruecknahmeFilter,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/units/${eid}/personnel/${epId}${zuruecknahmeQuery(optionen)}`,
+    `/api/incidents/${einsatzId}/units/${eid}/personnel/${epId}${zuruecknahmeQuery(optionen)}`,
     'PUT',
   );
 }
 
 export function gibPersonalFrei(einsatzId: number, eid: number, epId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/personnel/${epId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/units/${eid}/personnel/${epId}`, 'DELETE');
 }
 
 export function ordneFahrzeugZu(
@@ -295,13 +295,13 @@ export function ordneFahrzeugZu(
   optionen?: Pick<ZuruecknahmeFilter, 'nurWennFrei'>,
 ): Promise<void> {
   return apiSend<void>(
-    `/api/einsaetze/${einsatzId}/units/${eid}/vehicles/${efId}${zuruecknahmeQuery(optionen)}`,
+    `/api/incidents/${einsatzId}/units/${eid}/vehicles/${efId}${zuruecknahmeQuery(optionen)}`,
     'PUT',
   );
 }
 
 export function gibFahrzeugFrei(einsatzId: number, eid: number, efId: number): Promise<void> {
-  return apiSend<void>(`/api/einsaetze/${einsatzId}/units/${eid}/vehicles/${efId}`, 'DELETE');
+  return apiSend<void>(`/api/incidents/${einsatzId}/units/${eid}/vehicles/${efId}`, 'DELETE');
 }
 
 /**
@@ -314,7 +314,7 @@ export function setzeEinheitStatus(
   eid: number,
   statusId: number | null,
 ): Promise<EinheitStatusAntwort> {
-  return apiSend<EinheitStatusAntwort>(`/api/einsaetze/${einsatzId}/units/${eid}/status`, 'PUT', {
+  return apiSend<EinheitStatusAntwort>(`/api/incidents/${einsatzId}/units/${eid}/status`, 'PUT', {
     status_id: statusId,
   });
 }
@@ -329,5 +329,5 @@ export function nimmEinheitStatuswechselZurueck(
   eid: number,
   beleg: HandStatusRuecknahmeBeleg,
 ): Promise<Einheit> {
-  return apiSend<Einheit>(`/api/einsaetze/${einsatzId}/units/${eid}/status/undo`, 'POST', beleg);
+  return apiSend<Einheit>(`/api/incidents/${einsatzId}/units/${eid}/status/undo`, 'POST', beleg);
 }

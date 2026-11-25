@@ -1,5 +1,5 @@
 //! Ortssuche des Ortsfelds (LFH-1175, Spec `ortsfeld`): Einstieg im Einsatz
-//! `GET /api/einsaetze/{id}/place-search?q=` (Recht der Einsatzdaten, kein Lagekarten-Recht) und in
+//! `GET /api/incidents/{id}/place-search?q=` (Recht der Einsatzdaten, kein Lagekarten-Recht) und in
 //! der Organisation `GET /api/place-search?q=` (wer Einsätze anlegen darf).
 //!
 //! Der Token-Bucket des Geocoders ist prozessweit (1 Anfrage/s) und gilt für alle Tests dieser
@@ -76,7 +76,7 @@ async fn lagekarte_ausblenden(app: &axum::Router, admin: &str, einsatz: i64) {
     let (status, json) = anfrage(
         app,
         "PUT",
-        &format!("/api/einsaetze/{einsatz}/module-overrides/lagekarte"),
+        &format!("/api/incidents/{einsatz}/module-overrides/lagekarte"),
         admin,
         Some(r#"{"sichtbar":false,"benoetigte_rolle":null}"#),
     )
@@ -86,7 +86,7 @@ async fn lagekarte_ausblenden(app: &axum::Router, admin: &str, einsatz: i64) {
 
 fn im_einsatz(einsatz: i64, q: &str) -> String {
     format!(
-        "/api/einsaetze/{einsatz}/place-search?q={}",
+        "/api/incidents/{einsatz}/place-search?q={}",
         url_kodieren(q)
     )
 }
@@ -131,7 +131,7 @@ async fn suchtext_unter_drei_oder_ueber_200_zeichen_ist_400_ohne_geocoder() {
         }
     }
     for pfad in [
-        format!("/api/einsaetze/{einsatz}/place-search"),
+        format!("/api/incidents/{einsatz}/place-search"),
         "/api/place-search".to_string(),
     ] {
         let (status, json) = anfrage(&app, "GET", &pfad, &admin, None).await;
@@ -270,7 +270,7 @@ async fn treffer_umgebung_org_grenze_und_ausfall() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("/api/einsaetze/{einsatz}/map/place-search?q=abc"),
+        &format!("/api/incidents/{einsatz}/map/place-search?q=abc"),
         &fritz,
         None,
     )

@@ -72,7 +72,7 @@ function vor(basis: Date, minuten: number): Date {
 }
 
 async function personNamens(api: APIRequestContext, einsatzId: number, name: string) {
-  const antwort = await api.get(`/api/einsaetze/${einsatzId}/personnel`);
+  const antwort = await api.get(`/api/incidents/${einsatzId}/personnel`);
   expect(antwort.ok(), `Personal: ${antwort.status()}`).toBe(true);
   const person = ((await antwort.json()) as Person[]).find((p) => p.name === name);
   expect(person, `Person „${name}“ im Demo-Einsatz`).toBeDefined();
@@ -85,13 +85,13 @@ test.describe(KAPITEL, () => {
     try {
       const demo = await demoEinsatz(api);
       const jetzt = new Date();
-      const einheiten = await api.get(`/api/einsaetze/${demo.id}/units`);
+      const einheiten = await api.get(`/api/incidents/${demo.id}/units`);
       expect(einheiten.ok(), `Einheiten: ${einheiten.status()}`).toBe(true);
       const rettung = ((await einheiten.json()) as Einheit[]).find(
         (e) => e.name === 'Rettungsstaffel',
       );
       expect(rettung, 'Rettungsstaffel im Demo-Einsatz').toBeDefined();
-      const einheitPfad = `/api/einsaetze/${demo.id}/units/${rettung!.id}/timeline`;
+      const einheitPfad = `/api/incidents/${demo.id}/units/${rettung!.id}/timeline`;
       await fuelle(api, 'post', einheitPfad, {
         art: 'alarmierung',
         zeitpunkt_at: draht(vor(jetzt, 287)),
@@ -103,7 +103,7 @@ test.describe(KAPITEL, () => {
       });
 
       const lena = await personNamens(api, demo.id, 'Lena Beispiel');
-      const personPfad = `/api/einsaetze/${demo.id}/personnel/${lena.id}/timeline`;
+      const personPfad = `/api/incidents/${demo.id}/personnel/${lena.id}/timeline`;
       await fuelle(api, 'post', personPfad, {
         art: 'eintreffen',
         zeitpunkt_at: draht(vor(jetzt, 280)),
@@ -115,15 +115,15 @@ test.describe(KAPITEL, () => {
       });
 
       const anna = await personNamens(api, demo.id, 'Anna Probe');
-      await fuelle(api, 'patch', `/api/einsaetze/${demo.id}/personnel/${anna.id}`, {
+      await fuelle(api, 'patch', `/api/incidents/${demo.id}/personnel/${anna.id}`, {
         einsatzfunktion: 'Sprechfunker',
       });
 
-      const weg = await fuelle<Person>(api, 'post', `/api/einsaetze/${demo.id}/personnel`, {
+      const weg = await fuelle<Person>(api, 'post', `/api/incidents/${demo.id}/personnel`, {
         adhoc: { name: 'Paul Muster', funktion: 'Sanitäter' },
       });
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personnel/${weg.id}/stand-down`);
-      await fuelle(api, 'post', `/api/einsaetze/${demo.id}/personnel`, {
+      await fuelle(api, 'post', `/api/incidents/${demo.id}/personnel/${weg.id}/stand-down`);
+      await fuelle(api, 'post', `/api/incidents/${demo.id}/personnel`, {
         adhoc: { name: OHNE_EINHEIT, funktion: 'Helfer' },
       });
 

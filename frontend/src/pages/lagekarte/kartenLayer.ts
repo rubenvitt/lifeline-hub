@@ -22,6 +22,8 @@ export interface AktiveFachebene {
   farbe: string;
   /** Durchmesser der Trefferzone je Punkt = `token.controlHeight` der Dichtestufe (LFH-600). */
   treffer: number;
+  /** Nur Rasterebenen (`def.darstellung === 'raster'`, LLH-2021): Deckkraft in Prozent. */
+  deckkraft?: number;
 }
 
 /**

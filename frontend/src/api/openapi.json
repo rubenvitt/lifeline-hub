@@ -986,7 +986,7 @@
       },
       "AbschlussPruefung": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/closure/check`: die offenen Punkte je Gruppe.",
+        "description": "Antwort von `GET /api/incidents/{id}/closure/check`: die offenen Punkte je Gruppe.",
         "required": [
           "kraefte",
           "auftraege",
@@ -4309,7 +4309,7 @@
       },
       "BenachrichtigungVorgaben": {
         "type": "object",
-        "description": "`GET /api/einsaetze/{id}/notification-defaults` (design.md D4).",
+        "description": "`GET /api/incidents/{id}/notification-defaults` (design.md D4).",
         "required": [
           "funktionen",
           "arten"
@@ -9418,7 +9418,7 @@
       },
       "EtbAnzahlAnzeige": {
         "type": "object",
-        "description": "Trefferzahl eines ETB-Filters (`GET /api/einsaetze/{id}/etb/count`).",
+        "description": "Trefferzahl eines ETB-Filters (`GET /api/incidents/{id}/etb/count`).",
         "required": [
           "anzahl"
         ],
@@ -9747,7 +9747,7 @@
       },
       "EtbZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/etb/counts`.",
+        "description": "Antwort von `GET /api/incidents/{id}/etb/counts`.",
         "required": [
           "gesamt",
           "je_typ"
@@ -11913,7 +11913,7 @@
       },
       "InfotelefonZaehler": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/staff/info-line/counts`.",
+        "description": "Antwort von `GET /api/incidents/{id}/staff/info-line/counts`.",
         "required": [
           "gesamt",
           "offen",
@@ -12516,9 +12516,17 @@
           "online_styles",
           "offline_verfuegbar",
           "offline_regionen",
-          "karten_bau_verfuegbar"
+          "karten_bau_verfuegbar",
+          "fachebenen_abgeschaltet"
         ],
         "properties": {
+          "fachebenen_abgeschaltet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fachebenen, die der Betreiber abgeschaltet hat (LLH-2104, etwa `nina` mit\n`--nina false`). Die Lagekarte zeigt sie nicht und fragt sie nie ab; ihre Route antwortet\n404. Leer, wenn alle Ebenen an sind."
+          },
           "karten_bau_verfuegbar": {
             "type": "boolean",
             "description": "True, wenn der zentrale karten-service konfiguriert ist (URL+Token) → Admin darf Region-Builds\nanstoßen. Steuert die Sichtbarkeit der Bau-UI (LFH-203). Reine Verfügbarkeit, kein Secret."
@@ -15672,7 +15680,7 @@
       },
       "ModulFreigabe": {
         "type": "object",
-        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/einsaetze/{id}/module-access` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
+        "description": "Die effektive Modulfreigabe eines Benutzers für ein Modul (LFH-669) — Antwort von\n`GET /api/incidents/{id}/module-access` und die EINE Auswertung hinter\n[`fordere_modul_zugriff`] und [`erlaubte_module`].",
         "required": [
           "sichtbar",
           "zugriff"
@@ -15690,7 +15698,7 @@
       },
       "ModulZaehlerAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/module-counts`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
+        "description": "Antwort von `GET /api/incidents/{id}/module-counts`. Feldnamen = Modul-Keys\n(`MODUL_KEYS`, Test unten); ein fehlendes Feld heißt „Modul nicht erlaubt\".",
         "properties": {
           "auftraege": {
             "oneOf": [
@@ -25306,7 +25314,7 @@
       },
       "WetterAnzeige": {
         "type": "object",
-        "description": "Antwort von `GET /api/einsaetze/{id}/weather`.",
+        "description": "Antwort von `GET /api/incidents/{id}/weather`.",
         "required": [
           "warnungen",
           "vorhersage",

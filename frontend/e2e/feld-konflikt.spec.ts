@@ -63,7 +63,7 @@ test('Einsatzdaten · Leitstellen-Nr.: B sieht den fremden Wert und wird gefragt
       b.getByRole('button', { name: 'Leitstellen-Nr. bearbeiten' }),
     ).toHaveAccessibleDescription('ILS-4711');
 
-    const kopf = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as {
+    const kopf = (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as {
       leitstellen_nr: string;
       vermerke?: Record<string, { von?: string }>;
     };
@@ -84,7 +84,7 @@ test('Einsatzort · Adresse: eine reine Textänderung lässt die fremd verschobe
   await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Feld-CAS Ort ${Date.now()}`);
   const kopf = (daten: Record<string, unknown>) =>
-    page.request.patch(`/api/einsaetze/${einsatzId}`, { data: daten });
+    page.request.patch(`/api/incidents/${einsatzId}`, { data: daten });
   expect(
     (
       await kopf({ einsatzort: 'Hinter der Halle', einsatzort_lat: 52.5, einsatzort_lon: 13.4 })
@@ -104,7 +104,7 @@ test('Einsatzort · Adresse: eine reine Textänderung lässt die fremd verschobe
   await expect(paneel.getByRole('button', { name: 'Adresse bearbeiten' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  const e = (await (await page.request.get(`/api/einsaetze/${einsatzId}`)).json()) as {
+  const e = (await (await page.request.get(`/api/incidents/${einsatzId}`)).json()) as {
     einsatzort: string;
     einsatzort_lat: number;
   };
@@ -119,7 +119,7 @@ test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ sc
   test.setTimeout(90_000);
   await anmeldenPerApi(page, ADMIN, ADMIN_PW, { startseite: false });
   const einsatzId = await einsatzPerApi(page, `E2E Feld-CAS Einheit ${Date.now()}`);
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/units`, {
     data: { name: 'Trupp 1' },
   });
   expect(antwort.ok(), await antwort.text()).toBe(true);
@@ -131,7 +131,7 @@ test('Einheit · Bemerkung: B wird gefragt, „Meine Änderung übernehmen“ sc
     await b.getByRole('button', { name: 'Bemerkung eintragen' }).click();
     await b.getByRole('textbox', { name: 'Bemerkung' }).fill('Halle 2');
 
-    const a = await page.request.patch(`/api/einsaetze/${einsatzId}/units/${eid}`, {
+    const a = await page.request.patch(`/api/incidents/${einsatzId}/units/${eid}`, {
       data: { bemerkung: 'Tor 3' },
     });
     expect(a.ok()).toBe(true);

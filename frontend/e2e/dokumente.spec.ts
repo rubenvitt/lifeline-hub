@@ -73,7 +73,7 @@ async function seedeDokument(
   dateiname: string,
   inhalt: Buffer,
 ) {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/documents`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/documents`, {
     multipart: {
       datei: { name: dateiname, mimeType: 'application/octet-stream', buffer: inhalt },
       titel,
@@ -370,7 +370,7 @@ test('Rückmeldung: Fortschritt, Prüfphase und Entfernen-Zustand (LFH-654)', as
   await expect(page.getByRole('link', { name: 'Foto Zufahrt', exact: true })).toBeVisible();
   let loeschFrei!: () => void;
   const loeschen = new Promise<void>((res) => (loeschFrei = res));
-  await page.route(`**/api/einsaetze/${einsatzId}/documents/*`, async (route) => {
+  await page.route(`**/api/incidents/${einsatzId}/documents/*`, async (route) => {
     if (route.request().method() !== 'DELETE') return route.fallback();
     await loeschen;
     await route.continue();
@@ -421,7 +421,7 @@ test('Bearbeiten: Titel und Kategorie ändern, Datei bleibt, ETB weist die Ände
   ]);
   expect(download.suggestedFilename()).toBe('Lageplan Nord.pdf');
 
-  const etb = await page.request.get(`/api/einsaetze/${einsatzId}/etb`);
+  const etb = await page.request.get(`/api/incidents/${einsatzId}/etb`);
   const eintraege = (await etb.json()) as { typ: string; inhalt: string }[];
   expect(
     eintraege.filter((e) => e.typ === 'system' && e.inhalt.startsWith('Dokument geändert:')),

@@ -172,7 +172,7 @@ pub(crate) async fn publish_neuer_einsatz(state: &AppState, einsatz_id: i64, ben
     .await;
 }
 
-/// POST /api/einsaetze — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
+/// POST /api/incidents — neuen Einsatz anlegen; Ersteller wird Einsatzleitung.
 /// Erfordert Anlege-Berechtigung (System-Admin oder org-weite Führungskraft).
 pub async fn anlegen(
     State(state): State<AppState>,
@@ -257,7 +257,7 @@ pub async fn anlegen(
     ))
 }
 
-/// GET /api/einsaetze — alle Einsätze mit der Rolle des Abfragenden (`meine_rolle`).
+/// GET /api/incidents — alle Einsätze mit der Rolle des Abfragenden (`meine_rolle`).
 pub async fn liste(
     State(state): State<AppState>,
     CurrentUser(benutzer): CurrentUser,
@@ -265,7 +265,7 @@ pub async fn liste(
     Ok(Json(repo::liste_fuer(&state.pool, &benutzer).await?))
 }
 
-/// GET /api/einsaetze/{id} — Einsatz-Detail; gemäß DSGVO-Lese-Policy.
+/// GET /api/incidents/{id} — Einsatz-Detail; gemäß DSGVO-Lese-Policy.
 /// Mitglieder (je nach Status/Frist) sowie höhere Berechtigungen (auch ohne
 /// Mitgliedschaft) dürfen lesen; `meine_rolle` ist dann ggf. `null`.
 pub async fn detail(
@@ -310,7 +310,7 @@ pub async fn detail(
     Ok(Json(anzeige))
 }
 
-/// POST /api/einsaetze/{id}/close — Einsatz abschließen (read-only).
+/// POST /api/incidents/{id}/close — Einsatz abschließen (read-only).
 /// Nur Einsatzleitung, nur wenn der Einsatz aktuell aktiv ist.
 pub async fn abschliessen(
     State(state): State<AppState>,
@@ -340,7 +340,7 @@ pub async fn abschliessen(
     )))
 }
 
-/// GET /api/einsaetze/{id}/closure/check — offene Punkte vor dem Abschluss (LLH-1814, Spec
+/// GET /api/incidents/{id}/closure/check — offene Punkte vor dem Abschluss (LLH-1814, Spec
 /// `einsatz-abschluss`, „Offene Punkte vor dem Abschluss“). Nur Einsatzleitung eines aktiven
 /// Einsatzes; gezählt wird über den ganzen Einsatz, ohne Filter nach Modulfreigabe. Texte und
 /// Bezeichnungen nur aus Modulen, die die Person lesen darf (design.md D1).
@@ -374,7 +374,7 @@ pub struct Wiedereroeffnen {
     pub grund: Option<String>,
 }
 
-/// POST /api/einsaetze/{id}/reopen — einen abgeschlossenen Einsatz binnen
+/// POST /api/incidents/{id}/reopen — einen abgeschlossenen Einsatz binnen
 /// `NACHLAUF_STUNDEN` wieder öffnen (LLH-1814, Spec `einsatz-abschluss`, design.md D4). Gate
 /// `EinsatzWiedereroeffnungszugriff` (Einsatzleitung oder Admin der Einsatz-Org, kein Gerät).
 /// Grund fehlt, leer oder über `etb::INHALT_MAX` → 400; Zustand, Frist, Aufbewahrung → 422;
@@ -424,7 +424,7 @@ pub struct FristSetzen {
     pub bestaetigt: bool,
 }
 
-/// PUT /api/einsaetze/{id}/retention-period — Aufbewahrungsfrist setzen, ändern
+/// PUT /api/incidents/{id}/retention-period — Aufbewahrungsfrist setzen, ändern
 /// oder aufheben (LFH-130). Nur Einsatzleitung oder System-Admin der Einsatz-Org. Eine Verkürzung
 /// (inkl. erstmaligem Setzen auf einen bislang unbegrenzten Einsatz) erfordert
 /// `bestaetigt=true`. Schreibt einen ETB-System-Eintrag als Audit. Die Frist greift
@@ -537,7 +537,7 @@ where
     Option::<String>::deserialize(d).map(Some)
 }
 
-/// PUT /api/einsaetze/{id}/follow-up — Nachbereitungsfrist setzen, ändern oder aufheben
+/// PUT /api/incidents/{id}/follow-up — Nachbereitungsfrist setzen, ändern oder aufheben
 /// (LLH-1494, design.md D1). Rechte wie der Frist-PUT: Einsatzleitung oder System-Admin der
 /// Einsatz-Org. Nur an einem abgeschlossenen Einsatz (laufend 422), der weder vorgemerkt noch
 /// geschwärzt noch übergeben ist (409); am Spiegel 409 aus dem Schutz. Fehlt das Feld, 400.
@@ -582,7 +582,7 @@ pub async fn nachbereitung_setzen(
     )))
 }
 
-/// GET /api/einsaetze/{id}/retention-categories — Aufbewahrung je Datenkategorie (LFH-749,
+/// GET /api/incidents/{id}/retention-categories — Aufbewahrung je Datenkategorie (LFH-749,
 /// Spec `aufbewahrung-kategorien`, „Zustand je Kategorie“): alle drei Kategorien mit Frist,
 /// Zustand und Rechtsgrundlage, bei einem aktiven Einsatz mit der Dauer der Org-Vorgabe. Kein
 /// Personenbezug; lesen darf, wer den Einsatz lesen darf, dazu Einsatzleitung und System-Admin
@@ -628,7 +628,7 @@ pub struct KategorieFristSetzen {
     pub rechtsgrundlage: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/retention-period/{kategorie} — Frist einer Datenkategorie am
+/// PUT /api/incidents/{id}/retention-period/{kategorie} — Frist einer Datenkategorie am
 /// abgeschlossenen Einsatz setzen, verlängern oder aufheben, in der Karenz auch die Vormerkung
 /// zurücknehmen (LFH-749, Spec `aufbewahrung-kategorien`). Rechte wie
 /// [`aufbewahrungsfrist_setzen`]: Einsatzleitung oder System-Admin; kein Lesegate (die Antwort
@@ -770,7 +770,7 @@ pub struct EinstellungenUpdate {
     pub retention_dauer_tage: Option<i64>,
 }
 
-/// GET /api/einsaetze/{id}/settings — Einsatz-Einstellungen (LFH-131).
+/// GET /api/incidents/{id}/settings — Einsatz-Einstellungen (LFH-131).
 /// Lesezugriff gemäß DSGVO-Lese-Policy; existiert keine Zeile → Defaults.
 pub async fn einstellungen_laden(
     State(state): State<AppState>,
@@ -810,7 +810,7 @@ async fn freeze_flags(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/settings — Einstellungen setzen (Vollersatz).
+/// PUT /api/incidents/{id}/settings — Einstellungen setzen (Vollersatz).
 /// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (Freeze → 409).
 pub async fn einstellungen_setzen(
     State(state): State<AppState>,
@@ -1006,7 +1006,7 @@ pub async fn einstellungen_setzen(
     ))
 }
 
-/// GET /api/einsaetze/{id}/module-overrides — alle Modul-Overrides eines Einsatzes
+/// GET /api/incidents/{id}/module-overrides — alle Modul-Overrides eines Einsatzes
 /// (LFH-132), als Map `modul_key → Override`. Lesezugriff gemäß DSGVO-Lese-Policy;
 /// existieren keine Overrides, ist die Map leer (= der Einsatz erbt alles). `sichtbar: null` =
 /// kein eigener Wert (LLH-1179); den wirksamen Wert liefert `…/module-access`.
@@ -1018,7 +1018,7 @@ pub async fn modul_overrides_laden(
     Ok(Json(modul_override::laden_alle(&state.pool, id).await?))
 }
 
-/// GET /api/einsaetze/{id}/module-defaults — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
+/// GET /api/incidents/{id}/module-defaults — die Modul-Vorgaben (Rolle, Sichtbarkeit) der
 /// Organisation des Einsatzes (LLH-1183), in der Form von `GET /api/org-module-settings`.
 /// Damit sieht der Editor „Module“ die Herkunft auch bei einer Einsatzleitung ohne Org-Rolle.
 ///
@@ -1042,7 +1042,7 @@ pub async fn load_modul_vorgaben(
     ))
 }
 
-/// GET /api/einsaetze/{id}/module-access — die effektive Freigabe jedes Moduls für den
+/// GET /api/incidents/{id}/module-access — die effektive Freigabe jedes Moduls für den
 /// anfragenden Benutzer (LFH-669), als Map `modul_key → { sichtbar, zugriff }`.
 ///
 /// `EinsatzLesezugriff<OhneModul>`: Org-Floor + Lesezugriff, **kein** Modul-Gate. `zugriff`
@@ -1074,7 +1074,7 @@ pub struct ModulOverrideUpdate {
     pub benoetigte_rolle: Option<String>,
 }
 
-/// PUT /api/einsaetze/{id}/module-overrides/{modul_key} — Sichtbarkeit + benötigte
+/// PUT /api/incidents/{id}/module-overrides/{modul_key} — Sichtbarkeit + benötigte
 /// Rolle eines Moduls überschreiben (LFH-132); `sichtbar: null` = erbt (LLH-1179). Gate: Einsatzleitung ODER System-Admin der
 /// Einsatz-Org (fremde Org → 403, LFH-995), plus aktiver Einsatz (Freeze → 409). Unbekannter Modul-Key → 400. Nicht-ausblendbare
 /// Module (einsatzdaten, einsatz-einstellungen) lassen sich nicht verstecken
@@ -1138,7 +1138,7 @@ pub struct MitgliedRolle {
     pub fuehrungsfunktion: Option<Option<String>>,
 }
 
-/// GET /api/einsaetze/{id}/members — Mitgliederliste; gemäß DSGVO-Lese-Policy.
+/// GET /api/incidents/{id}/members — Mitgliederliste; gemäß DSGVO-Lese-Policy.
 pub async fn mitglieder(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff,
@@ -1147,7 +1147,7 @@ pub async fn mitglieder(
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
-/// GET /api/einsaetze/{id}/members/selection — die Personen, die die Einsatzleitung aufnehmen
+/// GET /api/incidents/{id}/members/selection — die Personen, die die Einsatzleitung aufnehmen
 /// kann (LFH-1141, Spec `einsatz-zugriff`). Dieselbe Tür wie [`mitglied_setzen`]: wer die Liste
 /// sieht, kann aus ihr aufnehmen, auch ohne Systemrolle; die Benutzerverwaltung bleibt admin-only.
 /// Gekoppelte Geräte erreichen die Route nicht (Positivliste in `src/geraet/mod.rs`).
@@ -1160,7 +1160,7 @@ pub async fn mitglied_auswahl(
     ))
 }
 
-/// GET /api/einsaetze/member-selection — die Personen, die sich beim Anlegen gleich aufnehmen
+/// GET /api/incidents/member-selection — die Personen, die sich beim Anlegen gleich aufnehmen
 /// lassen (LLH-1820): aktive Personen der eigenen Org ohne die anfragende Person, nur Kennung und
 /// Anzeigename. Dieselbe Tür wie [`anlegen`] (`darf_einsatz_anlegen`).
 pub async fn mitglied_auswahl_anlage(
@@ -1175,7 +1175,7 @@ pub async fn mitglied_auswahl_anlage(
     ))
 }
 
-/// PUT /api/einsaetze/{id}/members/{benutzer_id} — Mitglied hinzufügen oder
+/// PUT /api/incidents/{id}/members/{benutzer_id} — Mitglied hinzufügen oder
 /// dessen Rolle ändern. Nur Einsatzleitung, nur bei aktivem Einsatz.
 /// Schützt die letzte Einsatzleitung vor Herabstufung.
 pub async fn mitglied_setzen(
@@ -1281,7 +1281,7 @@ pub async fn mitglied_setzen(
     Ok(Json(repo::mitglieder(&state.pool, id).await?))
 }
 
-/// DELETE /api/einsaetze/{id}/members/{benutzer_id} — Mitglied entfernen.
+/// DELETE /api/incidents/{id}/members/{benutzer_id} — Mitglied entfernen.
 /// Nur Einsatzleitung, nur bei aktivem Einsatz.
 /// Schützt die letzte Einsatzleitung vor Entfernung.
 pub async fn mitglied_entfernen(
@@ -1317,7 +1317,7 @@ fn bereinige(feld: Option<String>) -> Option<String> {
 /// PATCH-Body der Kopfdaten (LFH-306, Tri-State): jedes Feld optional, absent =
 /// unverändert, `null`/`""` = leeren. Ersetzt den früheren Vollersatz-Body
 /// `KopfdatenUpdate`, der ersatzlos entfällt — er hatte genau diesen einen Aufrufer
-/// (POST /api/einsaetze nimmt `NeuerEinsatz` und behält dort seine Pflichtfelder).
+/// (POST /api/incidents nimmt `NeuerEinsatz` und behält dort seine Pflichtfelder).
 ///
 /// **Kein `#[serde(default)]` an den NOT-NULL-Feldern** — `bezeichnung`, `einsatzart` und
 /// `begonnen_at` sind `Option<String>` ohne Attribut: absent lässt die Spalte in Ruhe,
@@ -1384,7 +1384,7 @@ pub struct KopfErwartet {
     pub begonnen_at: Option<String>,
 }
 
-/// PATCH /api/einsaetze/{id} — Kopf-/Stammdaten als echter Teil-Patch (LFH-306).
+/// PATCH /api/incidents/{id} — Kopf-/Stammdaten als echter Teil-Patch (LFH-306).
 /// Gate: Einsatz-Schreibrecht ODER System-Admin, plus aktiver Einsatz (sonst 409).
 /// Feld absent = unverändert; `null`/`""` bei den optionalen Feldern = leeren.
 pub async fn aktualisieren(

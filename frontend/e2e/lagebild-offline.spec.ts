@@ -166,10 +166,10 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
 
     await anmelden(page);
     await serviceWorkerZustaendig(page);
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Funkloch ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     await post(page, `${basis}/etb`, {
       typ: 'meldung',
       inhalt: 'Offline-Probe Lagemeldung',
@@ -256,10 +256,10 @@ test.describe('Lagebild ohne Netz (LFH-723)', () => {
     test.setTimeout(120_000);
     await anmelden(page);
     await serviceWorkerZustaendig(page);
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Abmeldung ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+    await post(page, `/api/incidents/${einsatzId}/etb`, {
       typ: 'meldung',
       inhalt: 'Offline-Probe vor dem Abmelden',
       von: 'ELW 1',
@@ -305,10 +305,10 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
   /** Einsatz mit einem ETB-Eintrag, das ETB einmal online geladen. Vorbedingung, gelesen statt
    *  erwartet: sein Stand liegt auf der Platte, die Queue ist leer. */
   async function etbVorhalten(page: Page, bezeichnung: string): Promise<number> {
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `${bezeichnung} ${Date.now()}`,
     });
-    await post(page, `/api/einsaetze/${einsatzId}/etb`, {
+    await post(page, `/api/incidents/${einsatzId}/etb`, {
       typ: 'meldung',
       inhalt: 'Kaltstart-Probe vorher',
       von: 'ELW 1',
@@ -377,7 +377,7 @@ test.describe('Kaltstart ohne Server (LFH-780)', () => {
     await app.context().setOffline(false);
     await expect.poll(() => queueEintraege(app), { timeout: 60_000 }).toBe(0);
     await expect(app).not.toHaveURL(/\/login/);
-    const etb = await app.request.get(`/api/einsaetze/${einsatzId}/etb`);
+    const etb = await app.request.get(`/api/incidents/${einsatzId}/etb`);
     expect(etb.ok(), await etb.text()).toBeTruthy();
     expect(await etb.text()).toContain('Kaltstart-Probe offline erfasst');
     expect(seitenFehler).toEqual([]);

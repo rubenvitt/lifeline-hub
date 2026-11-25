@@ -20,14 +20,14 @@ for (const modus of ['light', 'dark'] as const) {
     await page.addInitScript((m) => localStorage.setItem('lifeline-hub.theme', m), modus);
     await anmeldenAlsAdmin(page, { startseite: false });
 
-    const antwort = await page.request.post('/api/einsaetze', {
+    const antwort = await page.request.post('/api/incidents', {
       data: { bezeichnung: `E2E 1827 Deeplink ${Date.now()}` },
     });
     expect(antwort.ok(), `Seeding Einsatz: ${antwort.status()}`).toBe(true);
     const { id: einsatzId } = (await antwort.json()) as { id: number };
 
     const einzelabruf = page.waitForResponse((r) =>
-      r.url().endsWith(`/api/einsaetze/${einsatzId}/reports/99999`),
+      r.url().endsWith(`/api/incidents/${einsatzId}/reports/99999`),
     );
     await page.goto(meldungenPfad(einsatzId, { meldung: 99999 }));
     expect((await einzelabruf).status()).toBe(404);

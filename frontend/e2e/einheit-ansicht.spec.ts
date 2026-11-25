@@ -22,7 +22,7 @@ const LAUF = Date.now();
 /** Körper aller PATCH an diese Einheit (Angaben und Lageweg), in Reihenfolge. */
 function recordWrites(page: Page, einsatzId: string, einheitId: number) {
   const bodies: { pfad: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/units/${einheitId}(/position)?$`);
+  const pattern = new RegExp(`/api/incidents/${einsatzId}/units/${einheitId}(/position)?$`);
   page.on('request', (r: Request) => {
     if (r.method() === 'PATCH' && pattern.test(r.url())) {
       bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
@@ -34,7 +34,7 @@ function recordWrites(page: Page, einsatzId: string, einheitId: number) {
 /** Körper aller Sammel-Dispositionen (LLH-1100) dieses Einsatzes, in Reihenfolge. */
 function recordSammel(page: Page, einsatzId: string) {
   const bodies: { pfad: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/(personnel|vehicles)/bulk$`);
+  const pattern = new RegExp(`/api/incidents/${einsatzId}/(personnel|vehicles)/bulk$`);
   page.on('request', (r: Request) => {
     if (r.method() === 'POST' && pattern.test(r.url())) {
       bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
@@ -46,7 +46,7 @@ function recordSammel(page: Page, einsatzId: string) {
 /** Körper aller Besatzungs-Zuordnungen über die Sammelroute (LLH-1073 D12), in Reihenfolge. */
 function recordBesatzung(page: Page, einsatzId: string) {
   const bodies: { pfad: string; body: unknown }[] = [];
-  const pattern = new RegExp(`/api/einsaetze/${einsatzId}/vehicles/\\d+/crew$`);
+  const pattern = new RegExp(`/api/incidents/${einsatzId}/vehicles/\\d+/crew$`);
   page.on('request', (r: Request) => {
     if (r.method() === 'POST' && pattern.test(r.url())) {
       bodies.push({ pfad: new URL(r.url()).pathname, body: r.postDataJSON() });
@@ -77,7 +77,7 @@ async function put(page: Page, pfad: string): Promise<void> {
 
 /** `einsatz_personal.id` der Kraft mit diesem Namen im Einsatz. */
 async function epIdVon(page: Page, einsatzId: string, name: string): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/personnel`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/personnel`);
   const liste = (await antwort.json()) as { id: number; name: string }[];
   const treffer = liste.find((p) => p.name === name);
   if (!treffer) throw new Error(`Kraft ${name} nicht im Einsatz`);
@@ -86,7 +86,7 @@ async function epIdVon(page: Page, einsatzId: string, name: string): Promise<num
 
 /** `einsatz_fahrzeug.id` des Fahrzeugs mit diesem Funkrufnamen im Einsatz. */
 async function efIdVon(page: Page, einsatzId: string, funkrufname: string): Promise<number> {
-  const antwort = await page.request.get(`/api/einsaetze/${einsatzId}/vehicles`);
+  const antwort = await page.request.get(`/api/incidents/${einsatzId}/vehicles`);
   const liste = (await antwort.json()) as { id: number; funkrufname: string }[];
   const treffer = liste.find((f) => f.funkrufname === funkrufname);
   if (!treffer) throw new Error(`Fahrzeug ${funkrufname} nicht im Einsatz`);
@@ -94,7 +94,7 @@ async function efIdVon(page: Page, einsatzId: string, funkrufname: string): Prom
 }
 
 async function createEinheit(page: Page, einsatzId: string, name: string): Promise<number> {
-  const antwort = await page.request.post(`/api/einsaetze/${einsatzId}/units`, {
+  const antwort = await page.request.post(`/api/incidents/${einsatzId}/units`, {
     data: { name },
   });
   expect(antwort.ok(), `Seeding Einheit: ${antwort.status()} ${await antwort.text()}`).toBe(true);
@@ -132,7 +132,7 @@ for (const dichte of DICHTEN) {
       await expect(page.getByRole('heading', { name: '1. Zug Nord', level: 1 })).toBeVisible();
       expect(bodies).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/units/${einheitId}`,
+          pfad: `/api/incidents/${einsatzId}/units/${einheitId}`,
           // Feldvergleich (LLH-1831): der Wert beim Öffnen geht als `erwartet` mit.
           body: { name: '1. Zug Nord', erwartet: { name: '1. Zug' } },
         },
@@ -156,7 +156,7 @@ for (const dichte of DICHTEN) {
       ).toHaveAccessibleDescription('THW');
       expect(bodies).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/units/${einheitId}/position`,
+          pfad: `/api/incidents/${einsatzId}/units/${einheitId}/position`,
           // Feldvergleich (LLH-1831): der Wert beim Öffnen geht als `erwartet` mit.
           body: { tz_organisation: 'thw', erwartet: { tz_organisation: null } },
         },
@@ -196,11 +196,11 @@ for (const dichte of DICHTEN) {
       await expect(ohne.getByRole('link', { name: person })).toBeVisible();
       expect(bodies).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/vehicles/bulk`,
+          pfad: `/api/incidents/${einsatzId}/vehicles/bulk`,
           body: { fahrzeug_ids: [fahrzeugId], einheit_id: einheitId },
         },
         {
-          pfad: `/api/einsaetze/${einsatzId}/personnel/bulk`,
+          pfad: `/api/incidents/${einsatzId}/personnel/bulk`,
           body: { personal_ids: [personalId], einheit_id: einheitId, fahrzeug_id: null },
         },
       ]);
@@ -213,7 +213,7 @@ for (const dichte of DICHTEN) {
       const epId = await epIdVon(page, einsatzId, person);
       expect(besatzung).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/vehicles/${await efIdVon(page, einsatzId, fahrzeug)}/crew`,
+          pfad: `/api/incidents/${einsatzId}/vehicles/${await efIdVon(page, einsatzId, fahrzeug)}/crew`,
           body: { ep_ids: [epId] },
         },
       ]);
@@ -224,14 +224,14 @@ for (const dichte of DICHTEN) {
     }) => {
       const einsatzId = await einsatzAnlegen(page, `E2E 1267 Übernahme ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '5. Zug');
-      const efId = await post(page, `/api/einsaetze/${einsatzId}/vehicles`, {
+      const efId = await post(page, `/api/incidents/${einsatzId}/vehicles`, {
         adhoc: { funkrufname: `Ü ${dichte} 83-1` },
       });
-      await put(page, `/api/einsaetze/${einsatzId}/units/${einheitId}/vehicles/${efId}`);
+      await put(page, `/api/incidents/${einsatzId}/units/${einheitId}/vehicles/${efId}`);
       const epIds: number[] = [];
       for (const name of ['Ü Berta', 'Ü Carl']) {
-        const epId = await post(page, `/api/einsaetze/${einsatzId}/personnel`, { adhoc: { name } });
-        await put(page, `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`);
+        const epId = await post(page, `/api/incidents/${einsatzId}/personnel`, { adhoc: { name } });
+        await put(page, `/api/incidents/${einsatzId}/units/${einheitId}/personnel/${epId}`);
         epIds.push(epId);
       }
       await ladeInDichte(page, `/einsaetze/${einsatzId}/einheiten/${einheitId}`, dichte);
@@ -261,7 +261,7 @@ for (const dichte of DICHTEN) {
       await expect(aufFahrzeug.getByText('keine freien Kräfte der Einheit')).toBeVisible();
       expect(bodies).toEqual([
         {
-          pfad: `/api/einsaetze/${einsatzId}/vehicles/${efId}/crew`,
+          pfad: `/api/incidents/${einsatzId}/vehicles/${efId}/crew`,
           body: { ep_ids: epIds },
         },
       ]);
@@ -271,11 +271,11 @@ for (const dichte of DICHTEN) {
       const einsatzId = await einsatzAnlegen(page, `E2E 1036 Beobachter ${dichte} ${Date.now()}`);
       const einheitId = await createEinheit(page, einsatzId, '3. Zug');
       // Ein Mitglied, damit „kein Menü“ nicht schon an der leeren Einheit wahr ist.
-      const epId = await post(page, `/api/einsaetze/${einsatzId}/personnel`, {
+      const epId = await post(page, `/api/incidents/${einsatzId}/personnel`, {
         adhoc: { name: 'Beo Mitglied' },
       });
       const zuordnung = await page.request.put(
-        `/api/einsaetze/${einsatzId}/units/${einheitId}/personnel/${epId}`,
+        `/api/incidents/${einsatzId}/units/${einheitId}/personnel/${epId}`,
       );
       expect(zuordnung.ok(), await zuordnung.text()).toBe(true);
       await wechsleZuRolle(page, 'beobachter', einsatzId);

@@ -109,10 +109,10 @@ test.describe('Betroffene ohne Freitexte auf dem Gerät (LFH-1095)', () => {
 
     await anmelden(page);
     await serviceWorkerZustaendig(page);
-    const einsatzId = await post(page, '/api/einsaetze', {
+    const einsatzId = await post(page, '/api/incidents', {
       bezeichnung: `E2E Betroffene offline ${Date.now()}`,
     });
-    const basis = `/api/einsaetze/${einsatzId}`;
+    const basis = `/api/incidents/${einsatzId}`;
     const uhsId = await post(page, `${basis}/uhs`, {
       typ: 'behandlungsplatz',
       bezeichnung: UHS,

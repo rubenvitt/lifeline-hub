@@ -31,7 +31,7 @@ describe('useEinsatzRueckweg', () => {
     { benutzerId = 1, isAktiv = true }: { benutzerId?: number | null; isAktiv?: boolean } = {},
   ) {
     server.use(
-      http.get('/api/einsaetze', () => {
+      http.get('/api/incidents', () => {
         abrufe += 1;
         return HttpResponse.json(einsaetze);
       }),

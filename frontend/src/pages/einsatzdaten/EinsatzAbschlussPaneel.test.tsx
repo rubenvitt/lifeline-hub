@@ -47,8 +47,8 @@ const benutzer = { system_rolle: 'keiner', org_id: 1 } as const;
 
 function setup(einsatz: EinsatzAnzeige) {
   server.use(
-    http.get('/api/einsaetze/7/closure/check', () => HttpResponse.json(nichtsOffen)),
-    http.get('/api/einsaetze/7/module-access', () => HttpResponse.json(freigabenFixture())),
+    http.get('/api/incidents/7/closure/check', () => HttpResponse.json(nichtsOffen)),
+    http.get('/api/incidents/7/module-access', () => HttpResponse.json(freigabenFixture())),
   );
   const r = renderMitProviders(<EinsatzAbschlussPaneel einsatz={einsatz} benutzer={benutzer} />, {
     route: '/einsaetze/7/einsatzdaten',
@@ -106,7 +106,7 @@ describe('EinsatzAbschlussPaneel (LLH-1814)', () => {
     let aufrufe = 0;
     setup(abgeschlossen());
     server.use(
-      http.post('/api/einsaetze/7/reopen', () => {
+      http.post('/api/incidents/7/reopen', () => {
         aufrufe += 1;
         return HttpResponse.json(aktiv());
       }),
@@ -127,7 +127,7 @@ describe('EinsatzAbschlussPaneel (LLH-1814)', () => {
     let aufrufe = 0;
     setup(abgeschlossen());
     server.use(
-      http.post('/api/einsaetze/7/reopen', () => {
+      http.post('/api/incidents/7/reopen', () => {
         aufrufe += 1;
         return HttpResponse.json(aktiv());
       }),

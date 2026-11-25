@@ -19,12 +19,12 @@ sie je Adapter in `veranstaltung_extern`; die IUK-Suite bietet den Vertrag mit A
 
 ## Teil 1 — IUK-Suite (Repo `iuk-suite`, eigener PR)
 
-- [ ] Tabelle `abruf_zugang` (Migration mit Audit-Triggern, `zuletzt_abgeholt_am` ausgenommen), Katalog und Manifest.
-- [ ] `_lib/schluessel.ts`: anlegen, prüfen (vermerkt Abholung), widerrufen, Liste; Tests.
-- [ ] `_lib/abruf.ts`: Vertrag v1 (Fenster: Ende ≥ jetzt − 7 Tage, abgesagte mit, höchstens 500, UTC); Tests.
-- [ ] Route `api/abruf/route.ts` (Host, Schlüssel, 401/404, `no-store`); `ABRUF_OHNE_LOGIN` als Liste mit Tests.
-- [ ] Actions + Flyin „Abruf-Zugänge“ (nur Modul-Admins); Test.
-- [ ] Runbook, Release Note; typecheck, lint, vitest, build, e2e (Veranstaltungen).
+- [x] Tabelle `abruf_zugang` (Migration mit Audit-Triggern, `zuletzt_abgeholt_am` ausgenommen), Katalog und Manifest.
+- [x] `_lib/schluessel.ts`: anlegen, prüfen (vermerkt Abholung), widerrufen, Liste; Tests.
+- [x] `_lib/abruf.ts`: Vertrag v1 (Fenster: Ende ≥ jetzt − 7 Tage, abgesagte mit, höchstens 500, UTC); Tests.
+- [x] Route `api/abruf/route.ts` (Host, Schlüssel, 401/404, `no-store`); `ABRUF_OHNE_LOGIN` als Liste mit Tests.
+- [x] Actions + Flyin „Abruf-Zugänge“ (nur Modul-Admins); Test.
+- [x] Runbook, Release Note; typecheck, lint, vitest, build, e2e (Veranstaltungen).
 
 ## Teil 2 — Lifeline (Repo `lifeline-hub`, PR gegen `alpha`)
 

@@ -156,7 +156,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, einheit) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/units"),
+        &format!("/api/incidents/{einsatz}/units"),
         &admin,
         Some(&format!(r#"{{"name":"RTW 1","typ_id":{typ_id}}}"#)),
     )
@@ -165,7 +165,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     assert_eq!(einheit["quali_soll_eigen"], false);
     assert_eq!(einheit["quali_soll"][0]["label"], "Rettungssanitäter");
     let eid = einheit["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{einsatz}/units/{eid}");
+    let pfad = format!("/api/incidents/{einsatz}/units/{eid}");
     let (s, json) = anfrage(
         &app,
         "PATCH",
@@ -188,7 +188,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     let (s, uhs) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{einsatz}/uhs"),
+        &format!("/api/incidents/{einsatz}/uhs"),
         &admin,
         Some(r#"{"typ":"behandlungsplatz","bezeichnung":"UHS Markt"}"#),
     )
@@ -197,7 +197,7 @@ async fn qualifikationssoll_an_typ_einheit_und_uhs() {
     assert!(uhs["soll_anzahl"].is_null());
     assert!(uhs["quali_soll"].is_null());
     let uid = uhs["id"].as_i64().unwrap();
-    let pfad = format!("/api/einsaetze/{einsatz}/uhs/{uid}");
+    let pfad = format!("/api/incidents/{einsatz}/uhs/{uid}");
     for falsch in [
         r#"{"soll_anzahl":0}"#.to_string(),
         r#"{"soll_anzahl":201}"#.to_string(),

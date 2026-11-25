@@ -107,12 +107,12 @@ describe('NachforderungKarte — Material übernehmen (LLH-1226 D10)', () => {
 
   function zeigeKarte(props: Partial<ComponentProps<typeof NachforderungKarte>>) {
     server.use(
-      http.get('/api/einsaetze/1/units', () =>
+      http.get('/api/incidents/1/units', () =>
         HttpResponse.json([
           { id: 3, name: 'Staffel A', ueber_einheit_id: null, abschnitt_id: null },
         ]),
       ),
-      http.get('/api/einsaetze/1/uhs', () => HttpResponse.json([])),
+      http.get('/api/incidents/1/uhs', () => HttpResponse.json([])),
     );
     return renderMitProviders(<NachforderungKarte nachforderung={eingetroffen()} {...props} />);
   }

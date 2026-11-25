@@ -13,7 +13,7 @@ async fn anlegen(app: &axum::Router, cookie: &str, e: i64, n: usize) -> Vec<i64>
         let (s, v) = anfrage(
             app,
             "POST",
-            &format!("/api/einsaetze/{e}/reminders"),
+            &format!("/api/incidents/{e}/reminders"),
             cookie,
             Some(&format!(
                 r#"{{"titel":"Erinnerung {i}","faellig_at":"2026-10-01 10:00"}}"#
@@ -52,7 +52,7 @@ async fn ohne_parameter_nur_offene_ausdruecklich_alle() {
     let e = einsatz_anlegen(&app, &admin).await;
     let alle = anlegen(&app, &admin, e, 5).await;
     erledigen(&pool, &alle[..3], |i| format!("2026-10-01 11:0{i}:00")).await;
-    let basis = format!("/api/einsaetze/{e}/reminders");
+    let basis = format!("/api/incidents/{e}/reminders");
 
     let (s, v) = anfrage(&app, "GET", &basis, &admin, None).await;
     assert_eq!(s, StatusCode::OK, "{v}");
@@ -90,7 +90,7 @@ async fn abgeschlossene_seitenweise_ohne_duplikat_und_luecke() {
     let e = einsatz_anlegen(&app, &admin).await;
     let alle = anlegen(&app, &admin, e, 13).await;
     erledigen(&pool, &alle, |i| format!("2026-10-01 11:{:02}:00", i / 3)).await;
-    let basis = format!("/api/einsaetze/{e}/reminders?phase=abgeschlossen&limit=4");
+    let basis = format!("/api/incidents/{e}/reminders?phase=abgeschlossen&limit=4");
 
     let (_, v) = anfrage(&app, "GET", &basis, &admin, None).await;
     assert_eq!(ids(&v)[0], alle[12], "zuletzt erledigt zuerst");

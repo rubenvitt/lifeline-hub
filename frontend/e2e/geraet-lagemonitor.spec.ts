@@ -61,39 +61,39 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   test.setTimeout(150_000);
   await anmeldenAlsAdmin(page);
   // Eine Übung (LLH-1725): die Marke steht in der Statusleiste, und die Kachelung muss sie tragen.
-  const einsatz = await anlegen(page, '/api/einsaetze', {
+  const einsatz = await anlegen(page, '/api/incidents', {
     bezeichnung: `E2E Monitor ${Date.now()}`,
     einsatzart: 'uebung',
   });
   const e = einsatz.id;
-  const nord = await anlegen(page, `/api/einsaetze/${e}/uhs`, {
+  const nord = await anlegen(page, `/api/incidents/${e}/uhs`, {
     typ: 'behandlungsplatz',
     bezeichnung: 'UHS Nord',
   });
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
-  const verortet = await page.request.patch(`/api/einsaetze/${e}/uhs/${nord.id}`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/status`, { status: 'aktiv' });
+  const verortet = await page.request.patch(`/api/incidents/${e}/uhs/${nord.id}`, {
     data: { lat: 52.52, lon: 13.405 },
   });
   expect(verortet.ok(), await verortet.text()).toBeTruthy();
   // LLH-1746: zwei Plätze für drei Personen — die UHS Nord ist überbelegt.
-  await anlegen(page, `/api/einsaetze/${e}/uhs/${nord.id}/seats/bulk`, {
+  await anlegen(page, `/api/incidents/${e}/uhs/${nord.id}/seats/bulk`, {
     typ: 'behandlungsplatz',
     menge: 2,
   });
   // „A …“ steht als zweite UHS sichtbar und ist zu lang für eine Zeile: der Name bricht um.
   const langerName = 'UHS A Sportplatz am Nordufer der Spree Ostseite';
   for (const b of [langerName.slice(4), 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']) {
-    await anlegen(page, `/api/einsaetze/${e}/uhs`, { typ: 'sonstige', bezeichnung: `UHS ${b}` });
+    await anlegen(page, `/api/incidents/${e}/uhs`, { typ: 'sonstige', bezeichnung: `UHS ${b}` });
   }
   for (const name of ['Erste', 'Zweite', 'Dritte']) {
-    await anlegen(page, `/api/einsaetze/${e}/persons`, { name, uhs_id: nord.id });
+    await anlegen(page, `/api/incidents/${e}/persons`, { name, uhs_id: nord.id });
   }
   // LFH-1045: zwei Kräfte an der UHS Nord; der Monitor zeigt nur ihre Zahl.
   for (const name of ['Kraft Eins', 'Kraft Zwei']) {
-    const kraft = await anlegen(page, `/api/einsaetze/${e}/personnel`, {
+    const kraft = await anlegen(page, `/api/incidents/${e}/personnel`, {
       adhoc: { name, staerke_position: 'mannschaft' },
     });
-    const zu = await page.request.put(`/api/einsaetze/${e}/uhs/${nord.id}/forces/${kraft.id}`);
+    const zu = await page.request.put(`/api/incidents/${e}/uhs/${nord.id}/forces/${kraft.id}`);
     expect(zu.ok(), await zu.text()).toBeTruthy();
   }
   // LLH-1153: eine Absperrung, ein Bezirk und eine Skizze, dazu ein Abschnitt mit Fläche.
@@ -102,7 +102,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     ['evakuierungsbezirk', 0.004],
     ['freie_skizze', 0.008],
   ] as const) {
-    await anlegen(page, `/api/einsaetze/${e}/zones`, {
+    await anlegen(page, `/api/incidents/${e}/zones`, {
       typ,
       geometrie_typ: 'Polygon',
       geometrie: rechteck(13.4 + versatz, 52.518, 13.403 + versatz, 52.52),
@@ -110,29 +110,29 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     });
   }
   // LLH-1746: ein Gefahrengebiet mit Stufe „hoch“; die Beschriftung der Zone bleibt draußen.
-  const gefahr = await anlegen<{ gefahrengebiet_id: number }>(page, `/api/einsaetze/${e}/zones`, {
+  const gefahr = await anlegen<{ gefahrengebiet_id: number }>(page, `/api/incidents/${e}/zones`, {
     typ: 'gefahrengebiet',
     geometrie_typ: 'Polygon',
     geometrie: rechteck(13.406, 52.521, 13.409, 52.523),
     label: 'Garten Familie Erste',
   });
-  const gebiet = `/api/einsaetze/${e}/hazard-areas/${gefahr.gefahrengebiet_id}`;
+  const gebiet = `/api/incidents/${e}/hazard-areas/${gefahr.gefahrengebiet_id}`;
   const umbenannt = await page.request.patch(gebiet, { data: { label: 'Hangrutsch' } });
   expect(umbenannt.ok(), await umbenannt.text()).toBeTruthy();
   const bewertet = await page.request.put(`${gebiet}/matrix/rating`, {
     data: { gefahrentyp: 'einsturz', schutzobjekt: 'menschen', warnstufe: 'hoch' },
   });
   expect(bewertet.ok(), await bewertet.text()).toBeTruthy();
-  const abschnitt = await anlegen(page, `/api/einsaetze/${e}/sectors`, {
+  const abschnitt = await anlegen(page, `/api/incidents/${e}/sectors`, {
     name: 'EA Nord',
     kurzbezeichnung: 'EA-N',
   });
-  const flaeche = await page.request.patch(`/api/einsaetze/${e}/sectors/${abschnitt.id}/area`, {
+  const flaeche = await page.request.patch(`/api/incidents/${e}/sectors/${abschnitt.id}/area`, {
     data: { flaeche_geojson: rechteck(13.398, 52.516, 13.41, 52.524) },
   });
   expect(flaeche.ok(), await flaeche.text()).toBeTruthy();
   // D12 (Change `kcjecn9e-benachrichtigungskonzept`): eine offene Sofortmeldung kommt nur als Zahl.
-  await anlegen(page, `/api/einsaetze/${e}/reports`, {
+  await anlegen(page, `/api/incidents/${e}/reports`, {
     absender: 'EA Nord',
     meldeweg: 'funk',
     inhalt: 'Keller Familie Erste überflutet',
@@ -157,7 +157,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     [langeBezeichnung('Zugabe'), 200],
     ['Ende', 240],
   ] as const) {
-    await anlegen(page, `/api/einsaetze/${e}/agenda-items`, {
+    await anlegen(page, `/api/incidents/${e}/agenda-items`, {
       bezeichnung,
       zeitpunkt_at: wireAb(minuten),
     });
@@ -166,14 +166,14 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   // sichtbar“), damit die Zeile in 28 px überläuft und „+n“ zeigt: vermisst, kritischer Abschnitt,
   // Einheit mit überfälliger Rückmeldung, überfälliger Auftrag (samt fälliger Erinnerung an die
   // Quittierfrist), dringende Meldung, dazu die Sofortmeldung oben.
-  await anlegen(page, `/api/einsaetze/${e}/persons`, { name: 'Vermisst', status: 'vermisst' });
-  await anlegen(page, `/api/einsaetze/${e}/sectors`, {
+  await anlegen(page, `/api/incidents/${e}/persons`, { name: 'Vermisst', status: 'vermisst' });
+  await anlegen(page, `/api/incidents/${e}/sectors`, {
     name: 'UHS Turnhalle Nordufer',
     lagezustand: 'kritisch',
   });
-  const trupp = await anlegen(page, `/api/einsaetze/${e}/units`, { name: 'Logistiktrupp' });
+  const trupp = await anlegen(page, `/api/incidents/${e}/units`, { name: 'Logistiktrupp' });
   const vorZweiStunden = new Date(Date.now() - 120 * 60_000).toISOString();
-  await anlegen(page, `/api/einsaetze/${e}/reports`, {
+  await anlegen(page, `/api/incidents/${e}/reports`, {
     absender: 'Logistiktrupp',
     meldeweg: 'funk',
     inhalt: 'Lage ruhig',
@@ -181,12 +181,12 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     ereigniszeit: vorZweiStunden,
     einheit_id: trupp.id,
   });
-  await anlegen(page, `/api/einsaetze/${e}/tasks`, {
+  await anlegen(page, `/api/incidents/${e}/tasks`, {
     auftrag_text: 'Sandsäcke an den Deich',
     empfaenger: [{ empfaenger_typ: 'funktion', funktion_text: 'EA Nord' }],
     frist_at: wireAb(-60),
   });
-  await anlegen(page, `/api/einsaetze/${e}/reports`, {
+  await anlegen(page, `/api/incidents/${e}/reports`, {
     absender: 'EA Nord',
     meldeweg: 'funk',
     inhalt: 'Nachschub Trinkwasser',
@@ -195,7 +195,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
   });
   const kopplung = await anlegen<{ kopplung: { id: number }; code: { code: string } }>(
     page,
-    `/api/einsaetze/${e}/devices`,
+    `/api/incidents/${e}/devices`,
     { ansicht: 'lagemonitor', bezeichnung: 'Monitor Stab' },
   );
 
@@ -315,7 +315,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
 
     // Steigt die Zahl, verbreitert „Neue Sofortmeldung“ die Kachel „Meldungen“ neben dem
     // Ablauf; auch dann bleibt alles ganz.
-    await anlegen(page, `/api/einsaetze/${e}/reports`, {
+    await anlegen(page, `/api/incidents/${e}/reports`, {
       absender: 'EA Nord',
       meldeweg: 'funk',
       inhalt: 'Zweite Lage',
@@ -399,7 +399,7 @@ test('LFH-1026: Lagemonitor zeigt das Lagebild ohne Bildlauf und endet beim Wide
     await expect(monitor.getByRole('dialog', { name: 'Gerätemenü' })).toHaveCount(0);
 
     // Widerruf: „Kopplung beendet“ ohne Lagebild, ohne Neuladen.
-    await anlegen(page, `/api/einsaetze/${e}/devices/${kopplung.kopplung.id}/revoke`);
+    await anlegen(page, `/api/incidents/${e}/devices/${kopplung.kopplung.id}/revoke`);
     await expect(monitor).toHaveURL(/\/kopplung-beendet$/);
     await expect(monitor.getByRole('heading', { name: 'Kopplung beendet' })).toBeVisible();
     await expect(monitor.getByText('UHS Nord')).toHaveCount(0);

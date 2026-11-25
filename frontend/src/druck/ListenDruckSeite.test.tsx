@@ -35,7 +35,7 @@ function abfrage(over: Partial<ListenDruckAbfrage> = {}): ListenDruckAbfrage {
 function rendere(
   props: Partial<Parameters<typeof ListenDruckSeite>[0]> & { abfrage: ListenDruckAbfrage },
 ) {
-  server.use(http.get('/api/einsaetze/7', () => HttpResponse.json(EINSATZ)));
+  server.use(http.get('/api/incidents/7', () => HttpResponse.json(EINSATZ)));
   return renderMitProviders(
     <Routes>
       <Route

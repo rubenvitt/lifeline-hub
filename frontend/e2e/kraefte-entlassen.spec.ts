@@ -13,19 +13,19 @@ import { anmeldenAlsAdmin } from './rollen-kern';
 const NAME = 'Entlassen, Erika';
 
 async function seedePerson(page: Page): Promise<string> {
-  const einsatz = await page.request.post('/api/einsaetze', {
+  const einsatz = await page.request.post('/api/incidents', {
     data: { bezeichnung: `E2E Entlassen ${Date.now()}` },
   });
   expect(einsatz.ok(), await einsatz.text()).toBe(true);
   const einsatzId = String(((await einsatz.json()) as { id: number }).id);
-  const kraft = await page.request.post(`/api/einsaetze/${einsatzId}/personnel`, {
+  const kraft = await page.request.post(`/api/incidents/${einsatzId}/personnel`, {
     data: { adhoc: { name: NAME, funktion: 'Sanitäterin' } },
   });
   expect(kraft.ok(), await kraft.text()).toBe(true);
   const id = ((await kraft.json()) as { id: number }).id;
   // Eine offene Periode: nur dann geht die Entlassung in die Zeitachse. Das Eintreffen liegt
   // jetzt, nicht davor: die Disposition hat die Alarmierung eben geschrieben.
-  const nachtrag = await page.request.post(`/api/einsaetze/${einsatzId}/personnel/${id}/timeline`, {
+  const nachtrag = await page.request.post(`/api/incidents/${einsatzId}/personnel/${id}/timeline`, {
     data: { art: 'eintreffen', zeitpunkt_at: new Date().toISOString() },
   });
   expect(nachtrag.ok(), await nachtrag.text()).toBe(true);

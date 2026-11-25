@@ -27,7 +27,7 @@ describe('useModulZaehler (LFH-612)', () => {
   it('liest EINE Zählantwort und lädt keine Listen der Servermodule', async () => {
     server.events.on('request:start', merke);
     server.use(
-      http.get('/api/einsaetze/7/module-counts', () =>
+      http.get('/api/incidents/7/module-counts', () =>
         HttpResponse.json({
           personen: { gesamt: 248 },
           meldungen: { offen: 3, ungesehen: 1 },
@@ -50,17 +50,17 @@ describe('useModulZaehler (LFH-612)', () => {
     // nur bei freigegebenem Modul (LFH-669, hier alle frei).
     await waitFor(() => expect(angefragt).toHaveLength(5));
     expect([...angefragt].sort()).toEqual([
-      '/api/einsaetze/7/care',
-      '/api/einsaetze/7/evacuation',
-      '/api/einsaetze/7/module-counts',
-      '/api/einsaetze/7/reliefs',
-      '/api/einsaetze/7/weather',
+      '/api/incidents/7/care',
+      '/api/incidents/7/evacuation',
+      '/api/incidents/7/module-counts',
+      '/api/incidents/7/reliefs',
+      '/api/incidents/7/weather',
     ]);
   });
 
   it('zeigt keinen Zähler an einem Modul, das der Rahmen ausblendet', async () => {
     server.use(
-      http.get('/api/einsaetze/7/module-counts', () =>
+      http.get('/api/incidents/7/module-counts', () =>
         HttpResponse.json({ personen: { gesamt: 248 }, meldungen: { offen: 3, ungesehen: 1 } }),
       ),
     );
@@ -76,7 +76,7 @@ describe('useModulZaehler (LFH-612)', () => {
   it('zeigt ohne Antwort keine Zahl', async () => {
     let beantwortet = false;
     server.use(
-      http.get('/api/einsaetze/7/module-counts', () => {
+      http.get('/api/incidents/7/module-counts', () => {
         beantwortet = true;
         return HttpResponse.json({ error: 'kaputt' }, { status: 500 });
       }),
@@ -97,7 +97,7 @@ describe('useModulZaehler (LFH-612)', () => {
     server.events.on('request:start', merke);
     let beantwortet = false;
     server.use(
-      http.get('/api/einsaetze/7/module-counts', () => {
+      http.get('/api/incidents/7/module-counts', () => {
         beantwortet = true;
         return HttpResponse.json({ personen: { gesamt: 248 } });
       }),
@@ -107,7 +107,7 @@ describe('useModulZaehler (LFH-612)', () => {
     });
     await waitFor(() => expect(beantwortet).toBe(true));
     await new Promise((r) => setTimeout(r, 20));
-    expect(angefragt).toEqual(['/api/einsaetze/7/module-counts']);
+    expect(angefragt).toEqual(['/api/incidents/7/module-counts']);
     expect(result.current).toEqual({});
   });
 });

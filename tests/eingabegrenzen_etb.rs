@@ -16,7 +16,7 @@ fn x(n: usize) -> String {
 }
 
 async fn etb_anzahl(app: &axum::Router, cookie: &str, e: i64) -> usize {
-    let (s, etb) = anfrage(app, "GET", &format!("/api/einsaetze/{e}/etb"), cookie, None).await;
+    let (s, etb) = anfrage(app, "GET", &format!("/api/incidents/{e}/etb"), cookie, None).await;
     assert_eq!(s, StatusCode::OK);
     etb.as_array().unwrap().len()
 }
@@ -29,7 +29,7 @@ async fn erfassen(app: &axum::Router, cookie: &str, e: i64, body: Value) -> (Sta
     anfrage(
         app,
         "POST",
-        &format!("/api/einsaetze/{e}/etb"),
+        &format!("/api/incidents/{e}/etb"),
         cookie,
         Some(&body.to_string()),
     )
@@ -117,7 +117,7 @@ async fn default_kanal(app: &axum::Router, e: i64, cookie: &str) -> i64 {
     let (_, j) = anfrage(
         app,
         "GET",
-        &format!("/api/einsaetze/{e}/chat/channels"),
+        &format!("/api/incidents/{e}/chat/channels"),
         cookie,
         None,
     )
@@ -131,7 +131,7 @@ async fn chat_nachricht_anlegen_und_bearbeiten_sind_begrenzt() {
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
     let kid = default_kanal(&app, e, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/chat/channels/{kid}/messages");
+    let uri = format!("/api/incidents/{e}/chat/channels/{kid}/messages");
 
     let (s, m) = anfrage(
         &app,
@@ -156,7 +156,7 @@ async fn chat_nachricht_anlegen_und_bearbeiten_sind_begrenzt() {
     let (s, _) = anfrage(
         &app,
         "PATCH",
-        &format!("/api/einsaetze/{e}/chat/messages/{mid}"),
+        &format!("/api/incidents/{e}/chat/messages/{mid}"),
         &admin,
         Some(&json!({ "inhalt": x(INHALT_MAX + 1) }).to_string()),
     )
@@ -173,13 +173,13 @@ async fn chat_heraufstufen_prueft_eigenen_text_und_rueckfall() {
     let (_, m) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/chat/channels/{kid}/messages"),
+        &format!("/api/incidents/{e}/chat/channels/{kid}/messages"),
         &admin,
         Some(r#"{"inhalt":"kurz"}"#),
     )
     .await;
     let mid = m["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{e}/chat/messages/{mid}/promote-to-etb");
+    let uri = format!("/api/incidents/{e}/chat/messages/{mid}/promote-to-etb");
     let vorher = etb_anzahl(&app, &admin, e).await;
 
     let (s, _) = anfrage(
@@ -217,7 +217,7 @@ async fn meldung_inhalt_absender_empfaenger_sind_begrenzt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/reports");
+    let uri = format!("/api/incidents/{e}/reports");
     let ok = x(PARTEI_MAX);
 
     let (s, j) = anfrage(
@@ -256,7 +256,7 @@ async fn nachforderung_texte_sind_begrenzt() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let e = einsatz_anlegen(&app, &admin).await;
-    let uri = format!("/api/einsaetze/{e}/resource-requests");
+    let uri = format!("/api/incidents/{e}/resource-requests");
 
     let (s, j) = anfrage(
         &app,
@@ -293,13 +293,13 @@ async fn vollzugsmeldung_ist_begrenzt() {
     let (_, a) = anfrage(
         &app,
         "POST",
-        &format!("/api/einsaetze/{e}/tasks"),
+        &format!("/api/incidents/{e}/tasks"),
         &admin,
         Some(&auftrag.to_string()),
     )
     .await;
     let aid = a["id"].as_i64().unwrap();
-    let uri = format!("/api/einsaetze/{e}/tasks/{aid}/execution");
+    let uri = format!("/api/incidents/{e}/tasks/{aid}/execution");
 
     let lang = json!({ "status": "vollzogen", "vollzugsmeldung": x(INHALT_MAX + 1) });
     let (s, _) = anfrage(&app, "POST", &uri, &admin, Some(&lang.to_string())).await;
