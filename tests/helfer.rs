@@ -1528,3 +1528,30 @@ async fn leitung_hoert_helfer_live() {
         "alle abmelden"
     );
 }
+
+#[tokio::test]
+async fn uebersicht_nennt_ortungsfreigabe_der_org() {
+    let (app, _pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let pfad = format!("/api/incidents/{einsatz}/helpers");
+
+    let (s, v) = anfrage_json(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["tracking_enabled"], json!(false), "{v}");
+    assert_eq!(v["person_tracking_allowed"], json!(false), "{v}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        "/api/org-settings",
+        &admin,
+        Some(&json!({"ortung_im_einsatz": true, "ortung_personen": true})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage_json(&app, "GET", &pfad, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["tracking_enabled"], json!(true), "{v}");
+    assert_eq!(v["person_tracking_allowed"], json!(true), "{v}");
+}

@@ -4604,6 +4604,10 @@ export interface components {
         HelferUebersicht: {
             helpers: components["schemas"]["HelferAnzeige"][];
             invitation?: components["schemas"]["HelferEinladungAnzeige"] | null;
+            /** @description „Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu. */
+            person_tracking_allowed: boolean;
+            /** @description „Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich. */
+            tracking_enabled: boolean;
         };
         /** @description Ziel einer Helfer-Kopplung. */
         HelferZiel: {

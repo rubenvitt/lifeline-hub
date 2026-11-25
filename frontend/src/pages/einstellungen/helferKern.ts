@@ -110,3 +110,8 @@ export function zielText(ziel: HelferZiel | null | undefined): string {
   if (!ziel) return 'ohne Ziel';
   return `${ziel.kind === 'vehicle' ? 'Fahrzeug' : 'Einheit'} ${ziel.name}`;
 }
+
+/** Auswahlwert eines Ziels: `unit:<id>` bzw. `vehicle:<id>`; leer ohne Ziel. */
+export function zielSchluessel(ziel: HelferZiel | null | undefined): string | undefined {
+  return ziel ? `${ziel.kind}:${ziel.id}` : undefined;
+}

@@ -43,6 +43,25 @@ pub struct HelferUebersicht {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invitation: Option<HelferEinladungAnzeige>,
     pub helpers: Vec<HelferAnzeige>,
+    /// „Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich.
+    pub tracking_enabled: bool,
+    /// „Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu.
+    pub person_tracking_allowed: bool,
+}
+
+/// Baut die Übersicht eines Einsatzes samt Ortungsfreigabe der Organisation.
+async fn baue_uebersicht(
+    state: &AppState,
+    einsatz_id: i64,
+    org_id: i64,
+) -> Result<HelferUebersicht, AppError> {
+    let ortung = crate::org::einstellungen::ortung_der_org(&state.pool, org_id).await?;
+    Ok(HelferUebersicht {
+        invitation: einladung::gueltige(&state.pool, einsatz_id).await?,
+        helpers: helfer::liste(&state.pool, einsatz_id).await?,
+        tracking_enabled: ortung.im_einsatz,
+        person_tracking_allowed: ortung.personen,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,10 +88,9 @@ pub async fn uebersicht(
     ctx: EinsatzLeitungszugriff,
 ) -> Result<Json<HelferUebersicht>, AppError> {
     let einsatz_id = ctx.einsatz.id;
-    Ok(Json(HelferUebersicht {
-        invitation: einladung::gueltige(&state.pool, einsatz_id).await?,
-        helpers: helfer::liste(&state.pool, einsatz_id).await?,
-    }))
+    Ok(Json(
+        baue_uebersicht(&state, einsatz_id, ctx.einsatz.org_id).await?,
+    ))
 }
 
 /// POST /api/incidents/{id}/helpers/invitations — neue Einladung; ersetzt eine gültige alte.
@@ -718,10 +736,9 @@ pub async fn alle_entfernen(
     if let Some(etb_id) = etb_id {
         state.live.publiziere(einsatz_id, etb_id);
     }
-    Ok(Json(HelferUebersicht {
-        invitation: einladung::gueltige(&state.pool, einsatz_id).await?,
-        helpers: helfer::liste(&state.pool, einsatz_id).await?,
-    }))
+    Ok(Json(
+        baue_uebersicht(&state, einsatz_id, ctx.einsatz.org_id).await?,
+    ))
 }
 
 /// POST /api/incidents/{id}/helpers/{gid}/extend — neues Ende eines bestätigten Helfers, wie

@@ -45,14 +45,16 @@ import {
   revokeHelferEinladung,
   type HelferBestaetigungBody,
 } from '../../api/helfer';
-import { ladeOrgEinstellungen } from '../../api/orgEinstellungen';
+import { listeEinheiten } from '../../api/einheiten';
+import { listeEinsatzFahrzeuge } from '../../api/einsatzFahrzeuge';
 import { listeEinsatzPersonal } from '../../api/einsatzPersonal';
-import { einsatzKeys, globalKeys } from '../../api/queryKeys';
+import { einsatzKeys } from '../../api/queryKeys';
 import type {
   EinsatzAnzeige,
   HelferAnzeige,
   HelferEinladungAnzeige,
   HelferUebersicht,
+  HelferZiel,
 } from '../../api/types';
 import { helferAdresse } from '../../routing/deeplinks';
 import { positionsAlter } from '../lagekarte/positionsAlter';
@@ -61,11 +63,13 @@ import {
   EINLADUNG_DAUER_OPTIONEN,
   EINLADUNG_VORGABE_MINUTEN,
   findTracker,
+  gleichesZiel,
   GRUPPEN_TITEL,
   HELFER_GRUPPEN,
   helferGruppe,
   sortHelfer,
   suggestPerson,
+  zielSchluessel,
   zielText,
   type HelferGruppe,
 } from './helferKern';
@@ -83,6 +87,8 @@ interface EinladenWerte {
 }
 
 interface BestaetigenWerte {
+  /** Ziel als `unit:<id>` bzw. `vehicle:<id>` (`zielSchluessel`); vorbelegt mit der Wahl des Helfers. */
+  ziel?: string;
   is_tracker: boolean;
   person_id?: number | null;
 }
@@ -124,8 +130,8 @@ interface Props {
  * Code einlöst, wartet, bis die Leitung ihn bestätigt (Ziel, Person, Ortungsgerät) oder ablehnt.
  *
  * Live über das Ereignis `helfer` (nur an die Einsatzleitung). Ist die Ortung der Organisation aus,
- * ist „Helfer einladen“ gesperrt und nennt den Grund; die Org-Einstellungen liest nur, wer sie
- * lesen darf, sonst meldet es der Server beim Einladen (403).
+ * ist „Helfer einladen“ gesperrt und nennt den Grund; die Freigabe (`tracking_enabled`,
+ * `person_tracking_allowed`) steht in der Helfer-Übersicht selbst, nicht in den Org-Einstellungen.
  */
 export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
   const qc = useQueryClient();
@@ -145,19 +151,25 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
     queryKey: einsatzKeys.helfer(einsatzId),
     queryFn: () => loadHelfer(einsatzId),
   });
-  // Nur Admin und Führungskraft lesen die Org-Einstellungen; ohne Recht bleibt die Ortung
-  // „unbekannt“ und der Server entscheidet beim Einladen.
-  const orgQ = useQuery({
-    queryKey: globalKeys.orgEinstellungen(),
-    queryFn: ladeOrgEinstellungen,
-    retry: false,
+  const ortungAus = helferQ.data?.tracking_enabled === false;
+  const personFeld = bestaetigenFuer != null && helferQ.data?.person_tracking_allowed === true;
+  const zielQ = useQuery({
+    queryKey: [...einsatzKeys.helfer(einsatzId), 'ziele'] as const,
+    queryFn: async () => {
+      const [einheiten, fahrzeuge] = await Promise.all([
+        listeEinheiten(einsatzId),
+        listeEinsatzFahrzeuge(einsatzId),
+      ]);
+      const ziele: HelferZiel[] = [
+        ...einheiten.map((e) => ({ kind: 'unit' as const, id: e.id, name: e.name })),
+        ...fahrzeuge
+          .filter((f) => f.beendet_als == null)
+          .map((f) => ({ kind: 'vehicle' as const, id: f.id, name: f.funkrufname })),
+      ];
+      return ziele;
+    },
+    enabled: bestaetigenFuer != null && darf,
   });
-  const ortungAus = orgQ.data?.ortung_im_einsatz === false;
-  const personenErlaubt = orgQ.data?.ortung_personen;
-  const personFeld =
-    bestaetigenFuer != null &&
-    (personenErlaubt === true ||
-      (personenErlaubt === undefined && bestaetigenFuer.person_requested));
   const personalQ = useQuery({
     queryKey: einsatzKeys.personal(einsatzId),
     queryFn: () => listeEinsatzPersonal(einsatzId),
@@ -166,6 +178,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
 
   const [einladenForm] = Form.useForm<EinladenWerte>();
   const [bestaetigenForm] = Form.useForm<BestaetigenWerte>();
+  const gewaehlt = Form.useWatch('ziel', bestaetigenForm);
   const [verlaengernForm] = Form.useForm<VerlaengernWerte>();
 
   // Sprung aus dem Hinweis im Einsatzkopf: der Bereich steht unter Gerätekopplung und Anbindungen.
@@ -392,7 +405,17 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
     );
   };
 
-  const bestaetigenZiel = bestaetigenFuer?.target ?? null;
+  // Wählbare Ziele; das Ziel des Helfers steht immer darin, auch wenn es nicht mehr geladen ist.
+  const zielOptionen = (() => {
+    const ziele = [...(zielQ.data ?? [])];
+    const eigenes = bestaetigenFuer?.target;
+    if (eigenes && !ziele.some((z) => zielSchluessel(z) === zielSchluessel(eigenes))) {
+      ziele.unshift(eigenes);
+    }
+    return ziele;
+  })();
+  const bestaetigenZiel =
+    zielOptionen.find((z) => zielSchluessel(z) === gewaehlt) ?? bestaetigenFuer?.target ?? null;
   const zielFrei = bestaetigenFuer
     ? findTracker(liste, bestaetigenZiel, bestaetigenFuer.id) == null
     : true;
@@ -409,7 +432,11 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
     w: BestaetigenWerte,
     aktion?: KonfliktAktion,
   ) => {
+    const ziel = zielOptionen.find((z) => zielSchluessel(z) === w.ziel);
     const body: HelferBestaetigungBody = {
+      ...(ziel && !gleichesZiel(ziel, h.target)
+        ? { target: { kind: ziel.kind, id: ziel.id } }
+        : {}),
       is_tracker: aktion === 'nur-person' ? false : w.is_tracker,
       ...(w.person_id != null ? { person_id: w.person_id } : {}),
       ...(aktion === 'ersetzen' ? { replace: true } : {}),
@@ -608,6 +635,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
         }
         form={bestaetigenForm}
         initialValues={{
+          ziel: zielSchluessel(bestaetigenFuer?.target),
           is_tracker: bestaetigenFuer?.state === 'aktiv' ? bestaetigenFuer.is_tracker : zielFrei,
         }}
         erfassenText="Bestätigen"
@@ -636,7 +664,16 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
       >
         {bestaetigenFuer && (
           <Stapel abstand="sm">
-            <Textstufe>{zielText(bestaetigenFuer.target)}</Textstufe>
+            <Feld label="Ziel" name="ziel">
+              <Select<string>
+                aria-label="Ziel"
+                options={zielOptionen.map((z) => ({
+                  value: zielSchluessel(z),
+                  label: zielText(z),
+                }))}
+                loading={zielQ.isPending}
+              />
+            </Feld>
             <Feld
               name="is_tracker"
               valuePropName="checked"
@@ -680,7 +717,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
                 type="warning"
                 showIcon
                 data-lfh="helfer-belegt"
-                title={`${bestaetigenFuer.target?.name ?? 'Das Ziel'} hat schon ein Ortungsgerät (${belegt.halterName}). Ersetzen oder nur Person orten?`}
+                title={`${bestaetigenZiel?.name ?? 'Das Ziel'} hat schon ein Ortungsgerät (${belegt.halterName}). Ersetzen oder nur Person orten?`}
               />
             )}
           </Stapel>

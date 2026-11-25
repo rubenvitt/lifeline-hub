@@ -33,7 +33,9 @@ const helfer = (id: number, state: string, extra: Record<string, unknown> = {}) 
 interface Aufbau {
   helpers?: unknown[];
   invitation?: unknown;
-  org?: Record<string, unknown> | null;
+  /** Ortungsfreigabe der Übersicht; Vorgabe: Ortung an, Personen aus. */
+  tracking_enabled?: boolean;
+  person_tracking_allowed?: boolean;
   bestaetigen?: (body: Record<string, unknown>) => Response | undefined;
 }
 
@@ -41,12 +43,19 @@ function stelleBereit(a: Aufbau = {}) {
   const aufrufe: { pfad: string; body: unknown }[] = [];
   server.use(
     http.get('/api/incidents/1/helpers', () =>
-      HttpResponse.json({ helpers: a.helpers ?? [], invitation: a.invitation ?? null }),
+      HttpResponse.json({
+        helpers: a.helpers ?? [],
+        invitation: a.invitation ?? null,
+        tracking_enabled: a.tracking_enabled ?? true,
+        person_tracking_allowed: a.person_tracking_allowed ?? false,
+      }),
     ),
-    http.get('/api/org-settings', () =>
-      a.org
-        ? HttpResponse.json({ org_id: 1, ...a.org })
-        : HttpResponse.json({ error: 'Keine Berechtigung' }, { status: 403 }),
+    http.get('/api/einsaetze/1/units', () => HttpResponse.json([{ id: 4, name: 'Zug 1' }])),
+    http.get('/api/einsaetze/1/vehicles', () =>
+      HttpResponse.json([
+        { id: 7, funkrufname: 'Rotkreuz 1/83-1', beendet_als: null },
+        { id: 8, funkrufname: 'Rotkreuz 1/83-2', beendet_als: null },
+      ]),
     ),
     http.get('/api/einsaetze/1/personnel', () =>
       HttpResponse.json([
@@ -101,7 +110,7 @@ describe('EinsatzHelfer (Helfer-App)', () => {
   });
 
   it('sperrt „Helfer einladen“ mit Grund, wenn die Ortung der Organisation aus ist', async () => {
-    stelleBereit({ org: { ortung_im_einsatz: false, ortung_personen: false } });
+    stelleBereit({ tracking_enabled: false });
     rendern();
     expect(await screen.findByText(ORTUNG_AUS_TEXT)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Helfer einladen/ })).toBeDisabled();
@@ -157,7 +166,7 @@ describe('EinsatzHelfer (Helfer-App)', () => {
   it('ordnet eine Person zu und schlägt sie nach dem Namen vor', async () => {
     const { aufrufe } = stelleBereit({
       helpers: [helfer(2, 'unbestaetigt', { person_requested: true })],
-      org: { ortung_im_einsatz: true, ortung_personen: true },
+      person_tracking_allowed: true,
     });
     rendern();
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
@@ -167,6 +176,35 @@ describe('EinsatzHelfer (Helfer-App)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
     await waitFor(() => expect(aufrufe).toHaveLength(1));
     expect(aufrufe[0].body).toEqual({ is_tracker: true, person_id: 32 });
+  });
+
+  it('blendet die Personenzuordnung aus, wenn die Organisation keine Personenortung erlaubt', async () => {
+    stelleBereit({
+      helpers: [helfer(2, 'unbestaetigt', { person_requested: true })],
+      person_tracking_allowed: false,
+    });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText('Person')).not.toBeInTheDocument();
+  });
+
+  it('lässt die Leitung das Ziel beim Bestätigen ändern', async () => {
+    const { aufrufe } = stelleBereit({ helpers: [helfer(2, 'unbestaetigt')] });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
+    const dialog = await screen.findByRole('dialog');
+    // Vorbelegt mit der Wahl des Helfers.
+    const ziel = within(dialog).getByRole('combobox', { name: 'Ziel' });
+    expect(within(dialog).getByTitle('Fahrzeug Rotkreuz 1/83-1')).toBeInTheDocument();
+    await userEvent.click(ziel);
+    await userEvent.click(await screen.findByTitle('Einheit Zug 1'));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].body).toEqual({
+      target: { kind: 'unit', id: 4 },
+      is_tracker: true,
+    });
   });
 
   it('zeigt ohne Recht keine Handlungen', async () => {

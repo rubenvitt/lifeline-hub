@@ -11501,7 +11501,9 @@
         "type": "object",
         "description": "Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen.",
         "required": [
-          "helpers"
+          "helpers",
+          "tracking_enabled",
+          "person_tracking_allowed"
         ],
         "properties": {
           "helpers": {
@@ -11519,6 +11521,14 @@
                 "type": "null"
               }
             ]
+          },
+          "person_tracking_allowed": {
+            "type": "boolean",
+            "description": "„Auch Personen orten“ der Organisation; die Leitung ordnet nur dann Personen zu."
+          },
+          "tracking_enabled": {
+            "type": "boolean",
+            "description": "„Ortung im Einsatz“ der Organisation; aus: keine Einladung möglich."
           }
         }
       },
