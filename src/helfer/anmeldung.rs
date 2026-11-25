@@ -90,7 +90,7 @@ pub struct HelferZielOption {
     pub sign_organization: Option<String>,
 }
 
-/// Antwort von `GET /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
+/// Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
 /// Personen.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct HelferZielliste {
@@ -102,29 +102,20 @@ pub struct HelferZielliste {
 /// Prüft den Anzeigenamen (422 leer oder länger als [`ANZEIGENAME_MAX`]) und liefert ihn
 /// getrimmt.
 pub fn pruefe_anzeigename(name: &str) -> Result<String, AppError> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(AppError::UnprocessableEntity(
-            "Bitte einen Namen angeben".into(),
-        ));
-    }
-    if name.chars().count() > ANZEIGENAME_MAX {
-        return Err(AppError::UnprocessableEntity(format!(
-            "Der Name darf höchstens {ANZEIGENAME_MAX} Zeichen haben"
-        )));
-    }
-    Ok(name.to_string())
+    // Das Feld für sich: leer oder zu lang ist 400 (`src/AGENTS.md`, Statuscode-Konvention und
+    // Eingabegrenzen).
+    crate::routes::support::pflicht_max(name, "Der Name", ANZEIGENAME_MAX)
 }
 
 /// Prüft ein Ziel gegen den Einsatz: eine nicht aufgelöste Einheit oder ein nicht beendetes
-/// Fahrzeug dieses Einsatzes. Fehlt das Ziel oder gehört es nicht dazu → 422.
+/// Fahrzeug dieses Einsatzes. Fehlt das Ziel → 400 (Pflichtfeld), gehört es nicht dazu → 422.
 pub async fn pruefe_ziel(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     ziel: Option<ZielEingabe>,
 ) -> Result<HelferZielSpalte, AppError> {
     let ziel = ziel.ok_or_else(|| {
-        AppError::UnprocessableEntity("Bitte eine Einheit oder ein Fahrzeug wählen".into())
+        AppError::Validation("Bitte eine Einheit oder ein Fahrzeug wählen".into())
     })?;
     let (sql, spalte) = match ziel.kind {
         HelferZielArt::Einheit => (
@@ -291,12 +282,12 @@ mod tests {
         assert_eq!(pruefe_anzeigename("  Max M. ").unwrap(), "Max M.");
         assert!(matches!(
             pruefe_anzeigename("   "),
-            Err(AppError::UnprocessableEntity(_))
+            Err(AppError::Validation(_))
         ));
         assert!(pruefe_anzeigename(&"ä".repeat(60)).is_ok());
         assert!(matches!(
             pruefe_anzeigename(&"ä".repeat(61)),
-            Err(AppError::UnprocessableEntity(_))
+            Err(AppError::Validation(_))
         ));
     }
 }

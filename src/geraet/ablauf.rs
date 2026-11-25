@@ -10,6 +10,11 @@
 //! (Spec `docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md`, „Dauer“): ein
 //! System-Eintrag im ETB je Einsatz und Takt, live verteilt ([`warne_helfer`]).
 //!
+//! Derselbe Takt löscht die Personenposition abgelaufener Helfer-Kopplungen
+//! ([`raeume_helfer`], `helfer::ende`): ein Ablauf schreibt sonst nichts, und die Person bliebe
+//! auf der Karte. Das richtet sich nach dem Zustand, nicht nach dem Fenster, und holt deshalb auch
+//! einen Ablauf während eines Neustarts nach.
+//!
 //! Das Fenster ([`AblaufFenster`]) führt der Planer im Speicher. Ein Ablauf während eines Neustarts bleibt ungemeldet:
 //! nach dem Neustart holen die Clients ohnehin alles neu (neuer Live-Kanal, Lücke).
 
@@ -75,15 +80,16 @@ pub async fn warne_helfer(
     bis: DateTime<Utc>,
 ) -> Result<usize, AppError> {
     let vorlauf = Duration::minutes(HELFER_WARNUNG_MINUTEN);
-    let zeilen: Vec<BaldAbgelaufen> = sqlx::query_as(
+    let zeilen: Vec<BaldAbgelaufen> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT gk.einsatz_id, COALESCE(gk.anzeigename, gk.bezeichnung) AS anzeigename, \
                 gk.laeuft_ab_at, COALESCE(gk.bestaetigt_von, gk.erstellt_von) AS von \
          FROM geraet_kopplung gk JOIN einsatz e ON e.id = gk.einsatz_id \
          WHERE gk.ansicht = 'helfer' AND gk.helfer_zustand = 'aktiv' \
            AND gk.widerrufen_at IS NULL AND gk.laeuft_ab_at > ? AND gk.laeuft_ab_at <= ? \
-           AND e.status = 'aktiv' AND e.geloescht_at IS NULL \
+           AND e.status = 'aktiv' AND e.geloescht_at IS NULL AND {} \
          ORDER BY gk.einsatz_id, gk.laeuft_ab_at, gk.id",
-    )
+        crate::einsatz::spiegel_filter::nicht_gespiegelt("gk.einsatz_id")
+    )))
     .bind(crate::zeit::formatiere_utc(seit + vorlauf))
     .bind(crate::zeit::formatiere_utc(bis + vorlauf))
     .fetch_all(pool)
@@ -97,15 +103,47 @@ pub async fn warne_helfer(
     }
     let mut n = 0;
     for (einsatz_id, von, liste) in je_einsatz {
-        let text = warnung_text(&liste);
-        let startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
-        let etb_id = crate::write_retry!(pool, |conn| {
-            crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await
-        })?;
-        live.publiziere(einsatz_id, etb_id);
-        n += 1;
+        // Je Einsatz für sich: ein Fehler hier hielte sonst das Fenster an, und der nächste Takt
+        // schriebe die Warnungen der übrigen Einsätze ein zweites Mal.
+        match warne_einsatz(pool, einsatz_id, von, &warnung_text(&liste)).await {
+            Ok(etb_id) => {
+                live.publiziere(einsatz_id, etb_id);
+                n += 1;
+            }
+            Err(e) => tracing::error!(error = %e, einsatz_id, "Helfer-Warnung nicht geschrieben"),
+        }
     }
     Ok(n)
+}
+
+async fn warne_einsatz(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    von: i64,
+    text: &str,
+) -> Result<i64, AppError> {
+    let startwert = crate::einsatz::einstellungen::etb_startwert(pool, einsatz_id).await?;
+    crate::write_retry!(pool, |conn| {
+        crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, text).await
+    })
+}
+
+/// Löscht die Personenposition abgelaufener Helfer-Kopplungen und meldet je Person `personal`
+/// und je Kopplung `helfer`. Liefert die Zahl der Personen.
+pub async fn raeume_helfer(pool: &SqlitePool, live: &LiveHub) -> Result<usize, AppError> {
+    let geraeumt = crate::write_retry!(pool, |conn| {
+        crate::helfer::ende::raeume_abgelaufene(conn, None).await
+    })?;
+    for g in &geraeumt {
+        live.publiziere_objekt(
+            g.einsatz_id,
+            LiveEvent::Personal,
+            "personal_id",
+            g.person_id,
+        );
+        live.publiziere_helfer(g.einsatz_id, g.kopplung_id);
+    }
+    Ok(geraeumt.len())
 }
 
 fn warnung_text(liste: &[BaldAbgelaufen]) -> String {
@@ -150,6 +188,7 @@ impl AblaufFenster {
         let (ergebnis, luecken) = crate::etb::nachlauf::klammer(pool, async {
             let n = melde_abgelaufene(pool, live, self.letzter, jetzt).await?;
             warne_helfer(pool, live, self.letzter, jetzt).await?;
+            raeume_helfer(pool, live).await?;
             Ok::<_, AppError>(n)
         })
         .await;

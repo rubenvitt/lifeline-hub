@@ -915,6 +915,9 @@ pub async fn abschliessen(
         // LLH-1638: Maschinenzugänge lesen nur laufende Einsätze; der Abschluss beendet ihre
         // Freigabe in derselben Transaktion (ADR-0035).
         crate::public_api::freigabe::delete_fuer_einsatz_tx(&mut tx, einsatz_id).await?;
+        // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
+        // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
+        crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
         if let Some(dauer) =
             super::effektiv::effektive_retention_dauer_tage(&einstellungen, &org_einstellungen)
         {

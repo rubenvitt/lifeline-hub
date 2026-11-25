@@ -1291,6 +1291,9 @@ async fn notify_aufgeloest(
     for g in &ergebnis.geraete {
         state.live.melde_kopplung_ende(g.kopplung_id);
         state.live.publiziere(einsatz_id, g.etb_id);
+        // Ein Helfer der Einheit: die Leitung sieht das Ende, die Lagekarte die Person ohne
+        // Position (`helfer::ende`).
+        super::helfer::melde_helfer_ende(state, einsatz_id, g.kopplung_id).await;
     }
     super::abloesung::publish_kopplung(
         state,

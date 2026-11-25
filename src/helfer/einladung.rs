@@ -19,6 +19,24 @@ use utoipa::ToSchema;
 pub const VORGABE_MINUTEN: i64 = 240;
 /// Höchste Gültigkeit einer Einladung (72 h).
 pub const HOECHSTENS_MINUTEN: i64 = 72 * 60;
+/// Höchstens so oft lässt sich eine Einladung einlösen; danach ist sie ausgeschöpft (422
+/// `invitation_exhausted`), die Leitung legt eine neue an. Ein ausgehängter QR legt sonst ohne
+/// Ende Gerätekonten an.
+pub const EINLOESUNGEN_MAX: i64 = 200;
+/// Meldung zu [`EINLOESUNGEN_MAX`]; der Handler erkennt sie und nennt den Grund.
+pub const AUSGESCHOEPFT: &str =
+    "Diese Einladung ist ausgeschöpft. Bitte die Einsatzleitung um einen neuen QR-Code.";
+
+/// Bedingung „die Einladung `t` ist gültig“ (`t`: Tabelle oder Alias): nicht widerrufen, nicht
+/// abgelaufen, Einsatz aktiv, nicht gelöscht und kein Spiegel (an einem Spiegel scheiterte jedes
+/// Bestätigen am Schutz-Trigger, der Helfer hinge bis zum Ablauf).
+fn gueltig(t: &str) -> String {
+    format!(
+        "{t}.widerrufen_at IS NULL AND {t}.laeuft_ab_at > datetime('now') \
+         AND EXISTS (SELECT 1 FROM einsatz e WHERE e.id = {t}.einsatz_id \
+                     AND e.status = 'aktiv' AND e.geloescht_at IS NULL AND e.spiegel = 0)"
+    )
+}
 
 /// Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -34,11 +52,12 @@ pub struct HelferEinladungAnzeige {
     pub expires_at: String,
 }
 
-/// Prüft die gewünschte Gültigkeit in Minuten (422 außerhalb von 1 bis [`HOECHSTENS_MINUTEN`]).
+/// Prüft die gewünschte Gültigkeit in Minuten (400 außerhalb von 1 bis [`HOECHSTENS_MINUTEN`]:
+/// der Wertebereich des Felds für sich).
 pub fn pruefe_minuten(minuten: Option<i64>) -> Result<i64, AppError> {
     let minuten = minuten.unwrap_or(VORGABE_MINUTEN);
     if !(1..=HOECHSTENS_MINUTEN).contains(&minuten) {
-        return Err(AppError::UnprocessableEntity(format!(
+        return Err(AppError::Validation(format!(
             "Eine Einladung gilt mindestens eine Minute und höchstens {} Stunden",
             HOECHSTENS_MINUTEN / 60
         )));
@@ -47,13 +66,22 @@ pub fn pruefe_minuten(minuten: Option<i64>) -> Result<i64, AppError> {
 }
 
 /// Legt eine neue Einladung an und widerruft eine noch gültige alte desselben Einsatzes.
-/// Liefert die Anzeige mit Code (ohne `url`).
+/// Liefert die Anzeige mit Code (ohne `url`). An einem Spiegel 409 wie jeder Schreibweg dort.
 pub async fn anlegen(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     minuten: i64,
     von: i64,
 ) -> Result<HelferEinladungAnzeige, AppError> {
+    let spiegel: bool = sqlx::query_scalar("SELECT spiegel <> 0 FROM einsatz WHERE id = ?")
+        .bind(einsatz_id)
+        .fetch_one(&mut *conn)
+        .await?;
+    if spiegel {
+        return Err(AppError::Conflict(
+            "Dieser Einsatz ist ein Spiegel; Helfer lädt die führende Instanz ein.".into(),
+        ));
+    }
     sqlx::query(
         "UPDATE helfer_einladung SET widerrufen_at = datetime('now') \
          WHERE einsatz_id = ? AND widerrufen_at IS NULL AND laeuft_ab_at > datetime('now')",
@@ -126,44 +154,72 @@ pub async fn gueltige(
     }))
 }
 
+/// Ob eine sonst gültige Einladung zum Code [`EINLOESUNGEN_MAX`] erreicht hat.
+async fn ist_ausgeschoepft(conn: &mut SqliteConnection, code_hash: &str) -> Result<bool, AppError> {
+    Ok(sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
+        "SELECT EXISTS (SELECT 1 FROM helfer_einladung h \
+         WHERE h.code_hash = ? AND h.einloesungen >= ? AND {})",
+        gueltig("h")
+    )))
+    .bind(code_hash)
+    .bind(EINLOESUNGEN_MAX)
+    .fetch_one(&mut *conn)
+    .await?)
+}
+
 /// Löst einen Einladungscode ein und zählt `einloesungen` hoch. Liefert
 /// `(einladung_id, einsatz_id, org_id)`. Ein unbekannter, abgelaufener oder widerrufener Code und
-/// ein nicht mehr aktiver Einsatz sind einheitlich 401, damit die Antwort nichts verrät; ebenso
-/// eine Eingabe, die nicht die Form eines Codes hat.
+/// ein nicht mehr aktiver Einsatz oder ein Spiegel sind einheitlich 401, damit die Antwort nichts
+/// verrät; ebenso eine Eingabe, die nicht die Form eines Codes hat. Eine ausgeschöpfte Einladung
+/// ist 422 mit [`AUSGESCHOEPFT`].
 pub async fn einladung_einloesen(
     conn: &mut SqliteConnection,
     code: &str,
 ) -> Result<(i64, i64, i64), AppError> {
     let code = code::normalisiere(code).ok_or(AppError::Unauthorized)?;
-    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
+    let code_hash = code::hash(&code);
+    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "UPDATE helfer_einladung SET einloesungen = einloesungen + 1 \
-         WHERE code_hash = ? AND widerrufen_at IS NULL AND laeuft_ab_at > datetime('now') \
-           AND EXISTS (SELECT 1 FROM einsatz e WHERE e.id = helfer_einladung.einsatz_id \
-                       AND e.status = 'aktiv' AND e.geloescht_at IS NULL) \
+         WHERE code_hash = ? AND einloesungen < ? AND {} \
          RETURNING id, einsatz_id, \
                    (SELECT e.org_id FROM einsatz e WHERE e.id = helfer_einladung.einsatz_id)",
-    )
-    .bind(code::hash(&code))
+        gueltig("helfer_einladung")
+    )))
+    .bind(&code_hash)
+    .bind(EINLOESUNGEN_MAX)
     .fetch_optional(&mut *conn)
     .await?;
-    treffer.ok_or(AppError::Unauthorized)
+    match treffer {
+        Some(t) => Ok(t),
+        None if ist_ausgeschoepft(conn, &code_hash).await? => {
+            Err(AppError::UnprocessableEntity(AUSGESCHOEPFT.into()))
+        }
+        None => Err(AppError::Unauthorized),
+    }
 }
 
 /// Eine gültige Einladung zu einem Code, ohne sie einzulösen (Zielliste vor dem Anmelden).
 /// Liefert `(einladung_id, einsatz_id, org_id)`; jeder Fehlschlag ist 401 wie bei
-/// [`einladung_einloesen`].
+/// [`einladung_einloesen`], eine ausgeschöpfte Einladung ebenso 422.
 pub async fn einladung_pruefen(pool: &SqlitePool, code: &str) -> Result<(i64, i64, i64), AppError> {
     let code = code::normalisiere(code).ok_or(AppError::Unauthorized)?;
-    let treffer: Option<(i64, i64, i64)> = sqlx::query_as(
-        "SELECT h.id, h.einsatz_id, e.org_id FROM helfer_einladung h \
+    let mut conn = pool.acquire().await?;
+    let treffer: Option<(i64, i64, i64, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT h.id, h.einsatz_id, e.org_id, h.einloesungen FROM helfer_einladung h \
          JOIN einsatz e ON e.id = h.einsatz_id \
-         WHERE h.code_hash = ? AND h.widerrufen_at IS NULL AND h.laeuft_ab_at > datetime('now') \
-           AND e.status = 'aktiv' AND e.geloescht_at IS NULL",
-    )
+         WHERE h.code_hash = ? AND {}",
+        gueltig("h")
+    )))
     .bind(code::hash(&code))
-    .fetch_optional(pool)
+    .fetch_optional(&mut *conn)
     .await?;
-    treffer.ok_or(AppError::Unauthorized)
+    match treffer {
+        Some((_, _, _, n)) if n >= EINLOESUNGEN_MAX => {
+            Err(AppError::UnprocessableEntity(AUSGESCHOEPFT.into()))
+        }
+        Some((id, einsatz_id, org_id, _)) => Ok((id, einsatz_id, org_id)),
+        None => Err(AppError::Unauthorized),
+    }
 }
 
 /// Wer die Einladung angelegt hat; die Helfer-Kopplung trägt ihn als `erstellt_von`.

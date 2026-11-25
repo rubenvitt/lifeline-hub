@@ -6,12 +6,14 @@
 //! - [`anmeldung`]: Zielliste, Prüfung des Ziels und der eigene Zustand des Geräts.
 //! - [`bestaetigung`]: Bestätigen durch die Leitung, Ziel, Person und Ortungsgerät.
 //! - [`position`]: Position senden und pausieren.
+//! - [`ende`]: die Personenposition endet mit der Kopplung, auf jedem Weg.
 //! - Die Helfer-Kopplung ist eine Zeile in `geraet_kopplung` mit `ansicht = 'helfer'`
 //!   (Migration 0373); [`liste`] zeigt sie der Leitung.
 
 pub mod anmeldung;
 pub mod bestaetigung;
 pub mod einladung;
+pub mod ende;
 pub mod position;
 
 use crate::error::AppError;

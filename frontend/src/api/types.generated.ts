@@ -4637,7 +4637,7 @@ export interface components {
             sign_organization?: string | null;
         };
         /**
-         * @description Antwort von `GET /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
+         * @description Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne
          *     Personen.
          */
         HelferZielliste: {

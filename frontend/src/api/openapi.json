@@ -11607,7 +11607,7 @@
       },
       "HelferZielliste": {
         "type": "object",
-        "description": "Antwort von `GET /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne\nPersonen.",
+        "description": "Antwort von `POST /api/devices/helpers/targets`: Einheiten und Fahrzeuge des Einsatzes, ohne\nPersonen.",
         "required": [
           "targets",
           "person_tracking_allowed"

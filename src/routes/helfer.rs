@@ -27,7 +27,7 @@ use crate::helfer::einladung::{self, HelferEinladungAnzeige};
 use crate::helfer::position::{self, Abweisung};
 use crate::helfer::{self, HelferAnzeige};
 use crate::ortung::{self, Ortungsziel};
-use axum::extract::{FromRequestParts, Query, State};
+use axum::extract::{FromRequestParts, State};
 use axum::http::request::Parts;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -94,7 +94,8 @@ pub async fn uebersicht(
 }
 
 /// POST /api/incidents/{id}/helpers/invitations — neue Einladung; ersetzt eine gültige alte.
-/// 403, wenn die Ortung der Organisation aus ist; 422 bei einer Gültigkeit über 72 h.
+/// 403, wenn die Ortung der Organisation aus ist; 400 bei einer Gültigkeit über 72 h; 409 an
+/// einem Spiegel.
 pub async fn einladung_anlegen(
     State(state): State<AppState>,
     ctx: EinsatzLeitungszugriff,
@@ -134,7 +135,7 @@ pub const GRUND_PERSONENSITZUNG: &str = "person_session";
 pub struct EinloesenBody {
     pub code: String,
     pub display_name: String,
-    /// Fehlt das Ziel, ist das 422 wie ein fremdes.
+    /// Pflicht; fehlt es, ist das 400 (ein fremdes 422).
     #[serde(default)]
     pub target: Option<ZielEingabe>,
     /// „Mich als Person orten“; wird still `false`, wenn die Organisation es nicht erlaubt.
@@ -142,9 +143,39 @@ pub struct EinloesenBody {
     pub track_person: bool,
 }
 
+/// Body von `POST /api/devices/helpers/targets`: der Code steht im Body, nicht in der Adresse,
+/// damit er in keinem Zugriffsprotokoll landet (Spec „Scannen“: er steht im Fragment).
 #[derive(Debug, Deserialize)]
-pub struct ZieleQuery {
+pub struct ZieleBody {
     pub code: String,
+}
+
+/// Wert von `reason` im 422, wenn die Einladung [`einladung::EINLOESUNGEN_MAX`] erreicht hat.
+pub const GRUND_EINLADUNG_AUSGESCHOEPFT: &str = "invitation_exhausted";
+
+/// Die ausgeschöpfte Einladung als 422 mit Grund; jeder andere Fehler bleibt, wie er ist.
+fn ausgeschoepft(e: AppError) -> Result<Response, AppError> {
+    match e {
+        AppError::UnprocessableEntity(m) if m == einladung::AUSGESCHOEPFT => Ok(abgewiesen(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &m,
+            GRUND_EINLADUNG_AUSGESCHOEPFT,
+        )),
+        e => Err(e),
+    }
+}
+
+/// 429, solange die Quelle ihre gelungenen Einlösungen im Fenster aufgebraucht hat
+/// (`rate_limit::helfer_einloesung`).
+fn fordere_einloesung_frei(peer_ip: Option<IpAddr>) -> Result<(), AppError> {
+    match peer_ip {
+        Some(ip) if crate::auth::rate_limit::helfer_einloesung::ist_gesperrt(ip) => {
+            Err(AppError::TooManyRequests(
+                "Zu viele Anmeldungen von dieser Adresse. Bitte später erneut versuchen.".into(),
+            ))
+        }
+        _ => Ok(()),
+    }
 }
 
 /// 429, solange die Adresse nach Fehlversuchen gesperrt ist (wie `/api/devices/pair`).
@@ -176,38 +207,55 @@ async fn fehlversuch(state: &AppState, peer_ip: Option<IpAddr>) {
     .await;
 }
 
-/// Ob das Cookie eine gültige Sitzung eines Personenkontos trägt. Die Sitzung eines Geräts
-/// (etwa eines früheren Helfers) zählt nicht: sie bleibt, wie sie ist, das neue Cookie ersetzt
-/// sie im Gerät.
-async fn ist_personensitzung(state: &AppState, jar: &CookieJar) -> Result<bool, AppError> {
+/// Welche Sitzung das Cookie beim Einlösen trägt.
+enum AlteSitzung {
+    /// Keine gültige, oder die eines anderen Geräts: sie bleibt, wie sie ist, das neue Cookie
+    /// ersetzt sie im Gerät.
+    Keine,
+    /// Ein Personenkonto (409 `person_session`).
+    Person,
+    /// Eine laufende Helfer-Kopplung dieses Geräts: das neue Einlösen meldet sie ab, sonst hielte
+    /// sie ihren Platz als Ortungsgerät und ihre Person bis zum Ablauf fest.
+    Helfer(GeraetKontext, i64),
+}
+
+async fn alte_sitzung(state: &AppState, jar: &CookieJar) -> Result<AlteSitzung, AppError> {
     let Some(cookie) = jar.get(SESSION_COOKIE) else {
-        return Ok(false);
+        return Ok(AlteSitzung::Keine);
     };
     match session::sitzung_aus_token(&state.pool, cookie.value()).await {
-        Ok((_, Some(_), _)) | Err(AppError::Unauthorized) => Ok(false),
-        Ok((benutzer, None, _)) => {
-            Ok(!geraet_repo::ist_geraetekonto(&state.pool, benutzer.id).await?)
+        Ok((benutzer, Some(g), _)) if g.ansicht == Funktionsansicht::Helfer => {
+            Ok(AlteSitzung::Helfer(g, benutzer.id))
         }
+        Ok((_, Some(_), _)) | Err(AppError::Unauthorized) => Ok(AlteSitzung::Keine),
+        Ok((benutzer, None, _)) => Ok(
+            if geraet_repo::ist_geraetekonto(&state.pool, benutzer.id).await? {
+                AlteSitzung::Keine
+            } else {
+                AlteSitzung::Person
+            },
+        ),
         Err(e) => Err(e),
     }
 }
 
-/// GET /api/devices/helpers/targets?code=… — Einheiten und Fahrzeuge des Einsatzes der
+/// POST /api/devices/helpers/targets `{code}` — Einheiten und Fahrzeuge des Einsatzes der
 /// Einladung (Name, Rufname, taktisches Zeichen), keine Personen. Löst den Code nicht ein.
-/// 401 bei ungültigem Code, gedrosselt wie das Einlösen.
+/// 401 bei ungültigem Code, gedrosselt wie das Einlösen; 422 `{reason: "invitation_exhausted"}`.
 pub async fn ziele(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
-    Query(q): Query<ZieleQuery>,
-) -> Result<Json<HelferZielliste>, AppError> {
+    JsonBody(body): JsonBody<ZieleBody>,
+) -> Result<Response, AppError> {
     fordere_nicht_gesperrt(peer_ip)?;
-    let (_, einsatz_id, org_id) = match einladung::einladung_pruefen(&state.pool, &q.code).await {
+    let (_, einsatz_id, org_id) = match einladung::einladung_pruefen(&state.pool, &body.code).await
+    {
         Ok(t) => t,
         Err(AppError::Unauthorized) => {
             fehlversuch(&state, peer_ip).await;
             return Err(AppError::Unauthorized);
         }
-        Err(e) => return Err(e),
+        Err(e) => return ausgeschoepft(e),
     };
     let ortung = crate::org::einstellungen::ortung_der_org(&state.pool, org_id).await?;
     if !ortung.im_einsatz {
@@ -216,15 +264,18 @@ pub async fn ziele(
     Ok(Json(HelferZielliste {
         targets: anmeldung::zielliste(&state.pool, einsatz_id).await?,
         person_tracking_allowed: ortung.personen,
-    }))
+    })
+    .into_response())
 }
 
 /// POST /api/devices/helpers/redeem — löst eine Helfer-Einladung ein: Helfer-Kopplung im Zustand
 /// `unbestaetigt` (2 h), Gerätekonto und Sitzung. 201 mit Set-Cookie und [`HelferZustand`].
 ///
 /// 401 Code ungültig (gedrosselt); 403 Ortung der Organisation aus; 409
-/// `{reason: "person_session"}` mit einer Personensitzung im Cookie; 422 Ziel fremd oder leer,
-/// Name leer oder zu lang. Ein abgewiesenes Einlösen zählt nicht als Einlösung.
+/// `{reason: "person_session"}` mit einer Personensitzung im Cookie; 400 Name leer oder zu lang,
+/// Ziel fehlt; 422 Ziel fremd, `{reason: "invitation_exhausted"}` Einladung ausgeschöpft; 429
+/// gesperrt (Fehlversuche) oder zu viele Einlösungen der Quelle. Ein abgewiesenes Einlösen zählt
+/// nicht als Einlösung.
 pub async fn einloesen(
     State(state): State<AppState>,
     PeerIp(peer_ip): PeerIp,
@@ -233,7 +284,9 @@ pub async fn einloesen(
     JsonBody(body): JsonBody<EinloesenBody>,
 ) -> Result<Response, AppError> {
     fordere_nicht_gesperrt(peer_ip)?;
-    if ist_personensitzung(&state, &jar).await? {
+    fordere_einloesung_frei(peer_ip)?;
+    let alt = alte_sitzung(&state, &jar).await?;
+    if matches!(alt, AlteSitzung::Person) {
         return Ok((
             StatusCode::CONFLICT,
             Json(serde_json::json!({
@@ -275,18 +328,28 @@ pub async fn einloesen(
             let token =
                 session::anlegen_geraet(conn, neu.benutzer_id, neu.kopplung_id, &neu.laeuft_ab_at)
                     .await?;
-            Ok((neu, token, einsatz_id))
+            let abgemeldet = match &alt {
+                AlteSitzung::Helfer(g, konto) => abmelden_tx(conn, g, *konto).await?,
+                AlteSitzung::Keine | AlteSitzung::Person => None,
+            };
+            Ok((neu, token, einsatz_id, abgemeldet))
         }),
         Err(e) => Err(e),
     };
-    let (neu, token, einsatz_id) = match ergebnis {
+    let (neu, token, einsatz_id, abgemeldet) = match ergebnis {
         Ok(wert) => wert,
         Err(AppError::Unauthorized) => {
             fehlversuch(&state, peer_ip).await;
             return Err(AppError::Unauthorized);
         }
-        Err(e) => return Err(e),
+        Err(e) => return ausgeschoepft(e),
     };
+    if let Some(ip) = peer_ip {
+        crate::auth::rate_limit::helfer_einloesung::vermerke(ip);
+    }
+    if let Some(a) = &abgemeldet {
+        melde_abgemeldet(&state, a);
+    }
     tracing::info!(kopplung_id = neu.kopplung_id, peer_ip = ?peer_ip, "Helfer angemeldet");
     state.live.publiziere_helfer(einsatz_id, neu.kopplung_id);
     crate::auth::audit::schreibe(
@@ -341,8 +404,8 @@ pub async fn zustand(
     Ok(Json(anmeldung::zustand(&state.pool, g.kopplung_id).await?))
 }
 
-/// PUT /api/devices/me — Ziel ändern, nur im Zustand `unbestaetigt` (sonst 409); 422 bei einem
-/// fremden oder fehlenden Ziel.
+/// PUT /api/devices/me — Ziel ändern, nur im Zustand `unbestaetigt` (sonst 409); 400 ohne Ziel,
+/// 422 bei einem fremden.
 pub async fn ziel_aendern(
     State(state): State<AppState>,
     HelferSitzung(g): HelferSitzung,
@@ -399,18 +462,20 @@ fn abgewiesen(status: StatusCode, meldung: &str, grund: &str) -> Response {
         .into_response()
 }
 
-/// Prüft eine Position vor der Transaktion (422): Koordinate im Bereich, Zeitpunkt RFC 3339.
+/// Prüft eine Position vor der Transaktion: ein fehlendes Feld und ein Zeitpunkt, der kein
+/// RFC 3339 ist, sind 400 (das Feld für sich, `src/AGENTS.md`, Statuscode-Konvention); eine
+/// Koordinate außerhalb des Bereichs ist 422 (`pruefe_koordinate`, Spec „Fehlerwerte“).
 fn pruefe_position(body: &PositionBody) -> Result<(f64, f64, String), AppError> {
     let (Some(lat), Some(lon), Some(zeitpunkt)) = (body.lat, body.lon, body.recorded_at.as_deref())
     else {
-        return Err(AppError::UnprocessableEntity(
+        return Err(AppError::Validation(
             "Erwartet lat, lon und recorded_at oder paused".into(),
         ));
     };
-    crate::routes::support::pruefe_koordinate(Some(lat), Some(lon), "lat", "lon")?;
     chrono::DateTime::parse_from_rfc3339(zeitpunkt).map_err(|_| {
-        AppError::UnprocessableEntity("recorded_at muss ein Zeitpunkt nach RFC 3339 sein".into())
+        AppError::Validation("recorded_at muss ein Zeitpunkt nach RFC 3339 sein".into())
     })?;
+    crate::routes::support::pruefe_koordinate(Some(lat), Some(lon), "lat", "lon")?;
     Ok((lat, lon, zeitpunkt.to_string()))
 }
 
@@ -423,7 +488,7 @@ fn pruefe_position(body: &PositionBody) -> Result<(f64, f64, String), AppError> 
 /// - 401 Sitzung ungültig (beendet, Einsatz beendet); 403 `{reason: "tracking_off"}` Ortung der
 ///   Organisation aus, `"no_role"` weder Ortungsgerät noch Person, `"target_removed"` Ziel
 ///   aufgelöst oder weg; 409 `{reason: "unconfirmed"}` noch nicht bestätigt, nichts gespeichert;
-///   422 Koordinate oder Zeitpunkt unbrauchbar.
+///   400 Feld fehlt oder Zeitpunkt kein RFC 3339; 422 Koordinate außerhalb des Bereichs.
 pub async fn position_senden(
     State(state): State<AppState>,
     HelferSitzung(g): HelferSitzung,
@@ -517,6 +582,16 @@ pub async fn position_senden(
 /// nennt dessen Kopplung (Spec Helfer-App, „Ein Ortungsgerät je Ziel“).
 pub const GRUND_ORTUNGSGERAET_BELEGT: &str = "tracker_taken";
 
+/// Wert von `reason` im 422 des Bestätigens mit Person, wenn die Kraft „Mich als Person orten“
+/// nicht gewählt hat (Spec Helfer-App, „Bestätigen“: die Einwilligung der Kraft gilt).
+pub const GRUND_PERSON_NICHT_GEWUENSCHT: &str = "person_not_requested";
+
+/// Warum das Bestätigen nichts geschrieben hat.
+enum NichtBestaetigt {
+    Belegt(i64),
+    PersonNichtGewuenscht,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct BestaetigenBody {
     /// Korrigiertes Ziel; fehlt es, bleibt das gewählte.
@@ -536,7 +611,8 @@ pub struct BestaetigenBody {
 ///
 /// 404 fremd; 409 abgelehnt oder beendet, oder `{reason: "tracker_taken", holder}`, wenn das Ziel
 /// schon ein Ortungsgerät hat und `replace` fehlt; 422 Ziel oder Person fremd, Person ohne
-/// Personenortung der Organisation.
+/// Personenortung der Organisation, `{reason: "person_not_requested"}` Person, obwohl die Kraft
+/// keine Personenortung gewählt hat.
 pub async fn bestaetigen(
     State(state): State<AppState>,
     ctx: EinsatzLeitungszugriff,
@@ -568,7 +644,8 @@ pub async fn bestaetigen(
             von,
         };
         match bestaetigung::bestaetigen(conn, &stand, eingabe).await? {
-            Bestaetigt::Belegt { halter } => Ok(Err(halter)),
+            Bestaetigt::Belegt { halter } => Ok(Err(NichtBestaetigt::Belegt(halter))),
+            Bestaetigt::PersonNichtGewuenscht => Ok(Err(NichtBestaetigt::PersonNichtGewuenscht)),
             Bestaetigt::Ja {
                 erstmals,
                 ziel_name,
@@ -593,7 +670,7 @@ pub async fn bestaetigen(
     })?;
     let (etb_id, alte_person) = match ergebnis {
         Ok(wert) => wert,
-        Err(halter) => {
+        Err(NichtBestaetigt::Belegt(halter)) => {
             return Ok((
                 StatusCode::CONFLICT,
                 Json(serde_json::json!({
@@ -603,6 +680,13 @@ pub async fn bestaetigen(
                 })),
             )
                 .into_response())
+        }
+        Err(NichtBestaetigt::PersonNichtGewuenscht) => {
+            return Ok(abgewiesen(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "Die Kraft hat keine Ortung als Person gewählt",
+                GRUND_PERSON_NICHT_GEWUENSCHT,
+            ))
         }
     };
     state.live.publiziere(einsatz_id, etb_id);
@@ -642,22 +726,107 @@ pub async fn ablehnen(
     ))
 }
 
-/// Beendet eine Helfer-Kopplung (ein Schritt der Transaktion): Widerruf wie beim Gerät und, mit
-/// zugeordneter Person, deren Position gelöscht (Spec „Personenposition“). Liefert, ob beendet
-/// wurde, und die Person.
+/// Beendet eine Helfer-Kopplung (ein Schritt der Transaktion): Widerruf wie beim Gerät; die
+/// gemeinsame Endstelle löscht die Position einer zugeordneten Person (Spec „Personenposition“,
+/// `helfer::ende`). Liefert, ob beendet wurde.
 async fn helfer_beenden(
     conn: &mut sqlx::SqliteConnection,
     kopplung_id: i64,
-    person_id: Option<i64>,
     von: i64,
 ) -> Result<bool, AppError> {
-    if !geraet_repo::widerrufen(conn, kopplung_id, von).await? {
-        return Ok(false);
+    geraet_repo::widerrufen(conn, kopplung_id, von).await
+}
+
+/// Live nach dem Ende einer Kopplung, die vielleicht eine Helfer-Kopplung ist (nach dem Commit):
+/// `helfer` an die Leitung und, mit Person, deren Ereignis der Lagekarte. Für Wege, die nicht
+/// wissen, ob sie einen Helfer beendet haben (Einheit auflösen). Ein Lesefehler steht nur im Log:
+/// geschrieben ist schon alles.
+pub(crate) async fn melde_helfer_ende(state: &AppState, einsatz_id: i64, kopplung_id: i64) {
+    let zeile: Result<Option<Option<i64>>, sqlx::Error> = sqlx::query_scalar(
+        "SELECT person_id FROM geraet_kopplung WHERE id = ? AND ansicht = 'helfer'",
+    )
+    .bind(kopplung_id)
+    .fetch_optional(&state.pool)
+    .await;
+    match zeile {
+        Ok(Some(person_id)) => {
+            state.live.publiziere_helfer(einsatz_id, kopplung_id);
+            if let Some(pid) = person_id {
+                ortung::publiziere(state, einsatz_id, Ortungsziel::Person(pid));
+            }
+        }
+        Ok(None) => {}
+        Err(e) => tracing::warn!(error = %e, kopplung_id, "Helfer-Ende nicht gemeldet"),
     }
-    if let Some(pid) = person_id {
-        ortung::loesche_position(conn, Ortungsziel::Person(pid)).await?;
+}
+
+/// Live nach [`helfer::ende::raeume_abgelaufene`] (nach dem Commit).
+fn melde_geraeumt(state: &AppState, geraeumt: &[helfer::ende::Geraeumt]) {
+    for g in geraeumt {
+        state.live.publiziere_helfer(g.einsatz_id, g.kopplung_id);
+        ortung::publiziere(state, g.einsatz_id, Ortungsziel::Person(g.person_id));
     }
-    Ok(true)
+}
+
+/// Ergebnis von [`abmelden_tx`]: ETB-Eintrag, Einsatz und Person der abgemeldeten Kopplung.
+struct Abgemeldet {
+    etb_id: i64,
+    einsatz_id: i64,
+    kopplung_id: i64,
+    person_id: Option<i64>,
+}
+
+/// Die Kraft meldet sich ab (ein Schritt der Transaktion): Kopplung beendet wie ein Widerruf durch
+/// das Gerät selbst, Ereignis `abgemeldet`, Personenposition gelöscht, ETB-Eintrag unter dem
+/// Gerätekonto. `None`, wenn die Kopplung schon beendet war.
+async fn abmelden_tx(
+    conn: &mut sqlx::SqliteConnection,
+    g: &GeraetKontext,
+    geraetekonto: i64,
+) -> Result<Option<Abgemeldet>, AppError> {
+    let stand = bestaetigung::stand(conn, g.einsatz_id, g.kopplung_id).await?;
+    if !geraet_repo::abmelden(conn, g.kopplung_id, geraetekonto).await? {
+        return Ok(None);
+    }
+    let startwert = crate::einsatz::einstellungen::laden_oder_default(&mut *conn, g.einsatz_id)
+        .await?
+        .etb_startwert();
+    let text = format!("Helfer „{}“ hat sich abgemeldet.", stand.anzeigename);
+    let etb_id =
+        crate::etb::system_audit_tx(conn, g.einsatz_id, geraetekonto, startwert, &text).await?;
+    Ok(Some(Abgemeldet {
+        etb_id,
+        einsatz_id: g.einsatz_id,
+        kopplung_id: g.kopplung_id,
+        person_id: stand.person_id,
+    }))
+}
+
+/// Live nach [`abmelden_tx`] (nach dem Commit).
+fn melde_abgemeldet(state: &AppState, a: &Abgemeldet) {
+    state.live.melde_kopplung_ende(a.kopplung_id);
+    state.live.publiziere(a.einsatz_id, a.etb_id);
+    state.live.publiziere_helfer(a.einsatz_id, a.kopplung_id);
+    if let Some(pid) = a.person_id {
+        ortung::publiziere(state, a.einsatz_id, Ortungsziel::Person(pid));
+    }
+}
+
+/// `POST /api/auth/logout` mit der Sitzung einer Helfer-Kopplung (Spec Helfer-App, „Enden“):
+/// beendet die Kopplung, bevor der Logout die Sitzung löscht. Der Platz als Ortungsgerät wird
+/// frei, die Person verschwindet von der Karte, die Leitung sieht das Ende live.
+pub(crate) async fn abmelden_durch_geraet(
+    state: &AppState,
+    g: &GeraetKontext,
+    geraetekonto: i64,
+) -> Result<(), AppError> {
+    let abgemeldet = crate::write_retry!(&state.pool, |conn| {
+        abmelden_tx(conn, g, geraetekonto).await
+    })?;
+    if let Some(a) = abgemeldet {
+        melde_abgemeldet(state, &a);
+    }
+    Ok(())
 }
 
 /// POST /api/incidents/{id}/helpers/{gid}/revoke — meldet einen Helfer ab: Sitzungen weg,
@@ -673,7 +842,7 @@ pub async fn entfernen(
     let leitung = &ctx.benutzer.anzeigename;
     let beendet = crate::write_retry!(&state.pool, |conn| {
         let stand = bestaetigung::stand(conn, einsatz_id, kopplung_id).await?;
-        if !helfer_beenden(conn, kopplung_id, stand.person_id, von).await? {
+        if !helfer_beenden(conn, kopplung_id, von).await? {
             return Ok(None);
         }
         let text = format!("Helfer „{}“ abgemeldet von {leitung}.", stand.anzeigename);
@@ -703,7 +872,9 @@ pub async fn alle_entfernen(
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let von = ctx.benutzer.id;
     let leitung = &ctx.benutzer.anzeigename;
-    let (beendet, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (beendet, etb_id, geraeumt) = crate::write_retry!(&state.pool, |conn| {
+        // Abgelaufene beendet niemand mehr; ihre Personenposition geht hier mit.
+        let geraeumt = helfer::ende::raeume_abgelaufene(conn, Some(einsatz_id)).await?;
         let offen: Vec<(i64, Option<i64>)> = sqlx::query_as(
             "SELECT id, person_id FROM geraet_kopplung \
              WHERE einsatz_id = ? AND ansicht = 'helfer' AND widerrufen_at IS NULL \
@@ -714,7 +885,7 @@ pub async fn alle_entfernen(
         .await?;
         let mut beendet = Vec::new();
         for (id, person_id) in offen {
-            if helfer_beenden(conn, id, person_id, von).await? {
+            if helfer_beenden(conn, id, von).await? {
                 beendet.push((id, person_id));
             }
         }
@@ -724,8 +895,9 @@ pub async fn alle_entfernen(
             let text = format!("{} Helfer abgemeldet von {leitung}.", beendet.len());
             Some(crate::etb::system_audit_tx(conn, einsatz_id, von, startwert, &text).await?)
         };
-        Ok((beendet, etb_id))
+        Ok((beendet, etb_id, geraeumt))
     })?;
+    melde_geraeumt(&state, &geraeumt);
     for (id, person_id) in &beendet {
         state.live.melde_kopplung_ende(*id);
         state.live.publiziere_helfer(einsatz_id, *id);

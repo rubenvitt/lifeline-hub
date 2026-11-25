@@ -177,7 +177,10 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Helfer-App (Spec 2026-11-24-vakwvkpg): Zielliste und Einlösen der Einladung (öffentlich,
         // Rate-Limit je Quelle wie `/api/devices/pair`), der eigene Zustand der Helfer-Kopplung.
-        .route("/api/devices/helpers/targets", get(routes::helfer::ziele))
+        .route(
+            "/api/devices/helpers/targets",
+            post(routes::helfer::ziele).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),
+        )
         .route(
             "/api/devices/helpers/redeem",
             post(routes::helfer::einloesen).layer(DefaultBodyLimit::max(AUTH_CODE_BODY_MAX)),

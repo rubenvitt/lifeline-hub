@@ -221,10 +221,11 @@ async fn einladung_gilt_hoechstens_72_stunden() {
     ortung_einschalten(&app, &admin).await;
     let einsatz = einsatz_anlegen(&app, &admin).await;
 
+    // Der Wertebereich des Felds für sich: 400 (`src/AGENTS.md`, Statuscode-Konvention).
     let (s, v) = einladen(&app, &admin, einsatz, json!({"valid_minutes": 10000})).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
     let (s, v) = einladen(&app, &admin, einsatz, json!({"valid_minutes": 0})).await;
-    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{v}");
     let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM helfer_einladung")
         .fetch_one(&pool)
         .await
@@ -295,6 +296,18 @@ async fn oeffentlich(
         cookie,
         body: serde_json::from_slice(&bytes).unwrap_or(Value::Null),
     }
+}
+
+/// Zielliste vor dem Einlösen: `POST /api/devices/helpers/targets` mit dem Code im Body.
+async fn ziele(app: &axum::Router, code: &str) -> Antwort {
+    oeffentlich(
+        app,
+        "POST",
+        "/api/devices/helpers/targets",
+        None,
+        Some(json!({ "code": code })),
+    )
+    .await
 }
 
 async fn redeem(app: &axum::Router, cookie: Option<&str>, body: Value) -> Antwort {
@@ -372,14 +385,7 @@ async fn helfer_loest_einladung_ein_und_ist_unbestaetigt() {
     let l = lage().await;
 
     // Die Zielliste vor dem Einlösen: Einheiten und Fahrzeuge, keine Personen.
-    let a = oeffentlich(
-        &l.app,
-        "GET",
-        &format!("/api/devices/helpers/targets?code={}", l.code),
-        None,
-        None,
-    )
-    .await;
+    let a = ziele(&l.app, &l.code).await;
     assert_eq!(a.status, StatusCode::OK, "{}", a.body);
     let ziele = a.body["targets"].as_array().unwrap();
     assert!(
@@ -484,14 +490,7 @@ async fn mit_personenortung_bleibt_der_wunsch_stehen() {
     )
     .await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    let a = oeffentlich(
-        &l.app,
-        "GET",
-        &format!("/api/devices/helpers/targets?code={}", l.code),
-        None,
-        None,
-    )
-    .await;
+    let a = ziele(&l.app, &l.code).await;
     assert_eq!(a.body["person_tracking_allowed"], true, "{}", a.body);
     let a = redeem(&l.app, None, anmeldung(&l.code, "vehicle", l.fahrzeug)).await;
     assert_eq!(a.status, StatusCode::CREATED, "{}", a.body);
@@ -571,16 +570,17 @@ async fn ziel_aus_fremdem_einsatz_ist_422() {
     assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
     let mut ohne_ziel = anmeldung(&l.code, "unit", l.einheit);
     ohne_ziel.as_object_mut().unwrap().remove("target");
+    // Fehlendes Ziel, leerer oder zu langer Name: das Feld für sich, 400.
     let a = redeem(&l.app, None, ohne_ziel).await;
-    assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
+    assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
     let mut leer = anmeldung(&l.code, "unit", l.einheit);
     leer["display_name"] = json!("   ");
     let a = redeem(&l.app, None, leer).await;
-    assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
+    assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
     let mut lang = anmeldung(&l.code, "unit", l.einheit);
     lang["display_name"] = json!("x".repeat(61));
     let a = redeem(&l.app, None, lang).await;
-    assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
+    assert_eq!(a.status, StatusCode::BAD_REQUEST, "{}", a.body);
 
     assert_eq!(helfer_kopplungen(&l.pool).await, 0);
     let n: i64 = sqlx::query_scalar("SELECT einloesungen FROM helfer_einladung")
@@ -595,14 +595,7 @@ async fn falscher_code_ist_401_auch_fuer_die_zielliste() {
     let l = lage().await;
     let a = redeem(&l.app, None, anmeldung("ZZZZZZZZ", "unit", l.einheit)).await;
     assert_eq!(a.status, StatusCode::UNAUTHORIZED, "{}", a.body);
-    let a = oeffentlich(
-        &l.app,
-        "GET",
-        "/api/devices/helpers/targets?code=ZZZZZZZZ",
-        None,
-        None,
-    )
-    .await;
+    let a = ziele(&l.app, "ZZZZZZZZ").await;
     assert_eq!(a.status, StatusCode::UNAUTHORIZED, "{}", a.body);
     assert_eq!(helfer_kopplungen(&l.pool).await, 0);
 }
@@ -1032,6 +1025,8 @@ async fn person_nur_mit_personenortung_der_org() {
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
 
     personenortung_einschalten(&l).await;
+    // Erst mit Personenortung der Org bleibt der Wunsch der Kraft stehen.
+    let (gid, _) = anmelden(&l, "unit", l.einheit, "Erika").await;
     let anderer = einsatz_anlegen(&l.app, &l.admin).await;
     let fremd = common::stammpersonal_disponieren(&l.app, &l.admin, anderer, "Fremd").await;
     let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": fremd})).await;
@@ -1460,14 +1455,19 @@ async fn unplausible_koordinate_422() {
     let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
     let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": true})).await;
     assert_eq!(s, StatusCode::OK, "{v}");
-    for body in [
-        punkt(91.0, 8.6),
-        punkt(50.1, 181.0),
-        json!({"lat": 50.1, "lon": 8.6, "recorded_at": "gestern"}),
-        json!({"lat": 50.1, "lon": 8.6}),
+    for (body, status) in [
+        (punkt(91.0, 8.6), StatusCode::UNPROCESSABLE_ENTITY),
+        (punkt(50.1, 181.0), StatusCode::UNPROCESSABLE_ENTITY),
+        // Das Feld für sich: kein RFC 3339 oder fehlend, 400.
+        (
+            json!({"lat": 50.1, "lon": 8.6, "recorded_at": "gestern"}),
+            StatusCode::BAD_REQUEST,
+        ),
+        (json!({"lat": 50.1, "lon": 8.6}), StatusCode::BAD_REQUEST),
+        (json!({}), StatusCode::BAD_REQUEST),
     ] {
         let (s, v) = senden(&l, &cookie, body.clone()).await;
-        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} → {v}");
+        assert_eq!(s, status, "{body} → {v}");
     }
     assert_eq!(
         position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
@@ -1554,4 +1554,438 @@ async fn uebersicht_nennt_ortungsfreigabe_der_org() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(v["tracking_enabled"], json!(true), "{v}");
     assert_eq!(v["person_tracking_allowed"], json!(true), "{v}");
+}
+
+// ---------- Enden der Helfer-Kopplung (Review Backend, I1–I3) ----------
+
+/// Kopplung widerrufen? Und wie oft steht `ereignis` in ihrer Spur?
+async fn ende_und_spur(pool: &sqlx::SqlitePool, gid: i64, ereignis: &str) -> (bool, i64) {
+    sqlx::query_as(
+        "SELECT gk.widerrufen_at IS NOT NULL, \
+                (SELECT COUNT(*) FROM geraet_kopplung_ereignis e \
+                 WHERE e.kopplung_id = gk.id AND e.ereignis = ?) \
+         FROM geraet_kopplung gk WHERE gk.id = ?",
+    )
+    .bind(ereignis)
+    .bind(gid)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+#[tokio::test]
+async fn abmelden_in_der_app_beendet_die_helfer_kopplung() {
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut rx = l.live.abonniere(l.einsatz);
+    let mut ende = l.live.abonniere_kopplung_ende();
+
+    let (s, v) = anfrage(&l.app, "POST", "/api/auth/logout", &cookie, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
+    assert_eq!(
+        ende_und_spur(&l.pool, gid, "abgemeldet").await,
+        (true, 1),
+        "beendet wie ein Widerruf, Ereignis `abgemeldet`"
+    );
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await,
+        (None, Some("helfer".into())),
+        "Person nicht mehr auf der Karte"
+    );
+    assert_eq!(ende.try_recv().unwrap(), gid, "Live: Kopplung endet");
+    assert_eq!(
+        ereignisse(&mut rx, "helfer"),
+        vec![json!({"einsatz_id": l.einsatz, "helfer_id": gid})]
+    );
+    let etb = common::system_etb_inhalte(&l.app, &l.admin, l.einsatz).await;
+    assert!(
+        etb.iter()
+            .any(|t| t == "Helfer „Erika“ hat sich abgemeldet."),
+        "{etb:?}"
+    );
+    let (s, v) = anfrage(
+        &l.app,
+        "GET",
+        &format!("/api/incidents/{}/helpers", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["helpers"][0]["state"], "beendet", "{v}");
+
+    // Der Platz als Ortungsgerät ist frei.
+    let (b, _) = anmelden(&l, "unit", l.einheit, "B").await;
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+}
+
+#[tokio::test]
+async fn abmelden_einer_personensitzung_beruehrt_keine_helfer() {
+    let l = lage().await;
+    let (gid, _cookie, _person) = helfer_mit_person(&l).await;
+    let (s, _) = anfrage(&l.app, "POST", "/api/auth/logout", &l.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    assert_eq!(ende_und_spur(&l.pool, gid, "abgemeldet").await, (false, 0));
+}
+
+#[tokio::test]
+async fn neues_einloesen_meldet_die_alte_helfer_kopplung_ab() {
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let a = redeem(
+        &l.app,
+        Some(&cookie),
+        anmeldung(&l.code, "vehicle", l.fahrzeug),
+    )
+    .await;
+    assert_eq!(a.status, StatusCode::CREATED, "{}", a.body);
+    assert_eq!(ende_und_spur(&l.pool, gid, "abgemeldet").await, (true, 1));
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None
+    );
+    let (b, _) = anmelden(&l, "unit", l.einheit, "B").await;
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "Platz frei: {v}");
+}
+
+#[tokio::test]
+async fn einsatzabschluss_loescht_personenposition() {
+    let l = lage().await;
+    let (_gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let (s, v) = anfrage(
+        &l.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await,
+        (None, Some("helfer".into()))
+    );
+    assert_eq!(
+        position_von(&l.pool, "einsatz_einheit", l.einheit).await.0,
+        Some(50.1),
+        "Einheit behält den letzten Stand"
+    );
+}
+
+#[tokio::test]
+async fn ablauf_loescht_personenposition_im_takt() {
+    use lifeline_hub::geraet::ablauf::AblaufFenster;
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query(
+        "UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?",
+    )
+    .bind(gid)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    let mut rx = l.live.abonniere(l.einsatz);
+
+    let jetzt = chrono::Utc::now();
+    let mut fenster = AblaufFenster::ab(jetzt - chrono::Duration::seconds(30));
+    fenster.takt(&l.pool, &l.live, jetzt).await.unwrap();
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None
+    );
+    assert_eq!(
+        ereignisse(&mut rx, "personal"),
+        vec![json!({"einsatz_id": l.einsatz, "personal_id": person})]
+    );
+    // Ein zweiter Takt findet nichts mehr.
+    fenster
+        .takt(&l.pool, &l.live, jetzt + chrono::Duration::seconds(30))
+        .await
+        .unwrap();
+    assert!(ereignisse(&mut rx, "personal").is_empty());
+}
+
+#[tokio::test]
+async fn alle_abmelden_raeumt_auch_abgelaufene() {
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    sqlx::query(
+        "UPDATE geraet_kopplung SET laeuft_ab_at = datetime('now', '-1 minute') WHERE id = ?",
+    )
+    .bind(gid)
+    .execute(&l.pool)
+    .await
+    .unwrap();
+    let (s, v) = leitung(&l, "/revoke", None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None
+    );
+}
+
+#[tokio::test]
+async fn einheit_aufloesen_loescht_personenposition_des_helfers() {
+    let l = lage().await;
+    let (gid, cookie, person) = helfer_mit_person(&l).await;
+    let (s, v) = senden(&l, &cookie, punkt(50.1, 8.6)).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    let mut rx = l.live.abonniere(l.einsatz);
+    let (s, v) = anfrage(
+        &l.app,
+        "DELETE",
+        &format!("/api/einsaetze/{}/units/{}", l.einsatz, l.einheit),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    assert_eq!(ende_und_spur(&l.pool, gid, "widerrufen").await, (true, 1));
+    assert_eq!(
+        position_von(&l.pool, "einsatz_personal", person).await.0,
+        None
+    );
+    assert!(
+        ereignisse(&mut rx, "helfer").contains(&json!({"einsatz_id": l.einsatz, "helfer_id": gid})),
+        "Leitung sieht das Ende"
+    );
+}
+
+#[tokio::test]
+async fn generische_geraetewege_kennen_keine_helfer() {
+    let l = lage().await;
+    let (gid, cookie) = anmelden(&l, "unit", l.einheit, "Max M.").await;
+    let ende = lifeline_hub::zeit::formatiere_utc(chrono::Utc::now() + chrono::Duration::hours(10));
+    for (pfad, body) in [
+        ("extend", Some(json!({"laeuft_ab_at": ende}))),
+        ("revoke", None),
+        ("code", None),
+    ] {
+        let (s, v) = anfrage_json(
+            &l.app,
+            "POST",
+            &format!("/api/einsaetze/{}/devices/{gid}/{pfad}", l.einsatz),
+            &l.admin,
+            body.as_ref(),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NOT_FOUND, "{pfad}: {v}");
+    }
+    let (s, v) = anfrage(
+        &l.app,
+        "GET",
+        &format!("/api/einsaetze/{}/devices", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(
+        !v.to_string().contains(&format!("\"id\":{gid},")),
+        "kein Helfer in der Geräteliste: {v}"
+    );
+    // Nichts verändert: der Helfer wartet weiter, mit 2 h.
+    let (s, v) = anfrage(&l.app, "GET", "/api/devices/me", &cookie, None).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["state"], "unbestaetigt", "{v}");
+    let codes: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM geraet_kopplungscode WHERE kopplung_id = ?")
+            .bind(gid)
+            .fetch_one(&l.pool)
+            .await
+            .unwrap();
+    assert_eq!(codes, 0);
+}
+
+// ---------- Personenortung nur auf Wunsch (I4) ----------
+
+#[tokio::test]
+async fn person_nur_wenn_die_kraft_es_gewaehlt_hat() {
+    let l = lage().await;
+    personenortung_einschalten(&l).await;
+    let person = common::stammpersonal_disponieren(&l.app, &l.admin, l.einsatz, "Erika M.").await;
+    let mut body = anmeldung(&l.code, "unit", l.einheit);
+    body["track_person"] = json!(false);
+    let a = redeem(&l.app, None, body).await;
+    assert_eq!(a.status, StatusCode::CREATED, "{}", a.body);
+    let gid: i64 = sqlx::query_scalar(
+        "SELECT id FROM geraet_kopplung WHERE ansicht = 'helfer' ORDER BY id DESC LIMIT 1",
+    )
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false, "person_id": person})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["reason"], "person_not_requested", "{v}");
+    let (s, v) = bestaetigen(&l, gid, json!({"is_tracker": false})).await;
+    assert_eq!(s, StatusCode::OK, "ohne Person geht es: {v}");
+}
+
+// ---------- Schwärzung des Namens (I5) ----------
+
+#[tokio::test]
+async fn name_des_helfers_steht_nur_in_der_geschwaerzten_spalte() {
+    let l = lage().await;
+    let (gid, _) = anmelden(&l, "unit", l.einheit, "Max Mustermann").await;
+    let (bezeichnung, konto): (String, String) = sqlx::query_as(
+        "SELECT gk.bezeichnung, b.anzeigename FROM geraet_kopplung gk \
+         JOIN benutzer b ON b.id = gk.benutzer_id WHERE gk.id = ?",
+    )
+    .bind(gid)
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    assert!(!bezeichnung.contains("Mustermann"), "{bezeichnung}");
+    assert!(!konto.contains("Mustermann"), "{konto}");
+    let (s, v) = anfrage(
+        &l.app,
+        "GET",
+        &format!("/api/incidents/{}/helpers", l.einsatz),
+        &l.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["helpers"][0]["display_name"], "Max Mustermann", "{v}");
+
+    let mut tx = l.pool.begin().await.unwrap();
+    lifeline_hub::einsatz::schwaerzung_registry::scrubbe_aus_registry(
+        &mut tx,
+        l.einsatz,
+        lifeline_hub::einsatz::schwaerzung_registry::Umfang::Alles,
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let rest: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM geraet_kopplung gk JOIN benutzer b ON b.id = gk.benutzer_id \
+         WHERE gk.id = ? AND (COALESCE(gk.anzeigename, '') || gk.bezeichnung || b.anzeigename) \
+               LIKE '%Mustermann%'",
+    )
+    .bind(gid)
+    .fetch_one(&l.pool)
+    .await
+    .unwrap();
+    assert_eq!(rest, 0, "kein Name mehr nach der Schwärzung");
+}
+
+// ---------- Einlösen begrenzt, Person einmal, Spiegel (Review Backend, Minor) ----------
+
+#[tokio::test]
+async fn ausgeschoepfte_einladung_ist_422_mit_grund() {
+    let l = lage().await;
+    sqlx::query("UPDATE helfer_einladung SET einloesungen = 200")
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let a = redeem(&l.app, None, anmeldung(&l.code, "unit", l.einheit)).await;
+    assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
+    assert_eq!(a.body["reason"], "invitation_exhausted", "{}", a.body);
+    let a = ziele(&l.app, &l.code).await;
+    assert_eq!(a.status, StatusCode::UNPROCESSABLE_ENTITY, "{}", a.body);
+    assert_eq!(a.body["reason"], "invitation_exhausted", "{}", a.body);
+    assert_eq!(helfer_kopplungen(&l.pool).await, 0);
+
+    sqlx::query("UPDATE helfer_einladung SET einloesungen = 199")
+        .execute(&l.pool)
+        .await
+        .unwrap();
+    let a = redeem(&l.app, None, anmeldung(&l.code, "unit", l.einheit)).await;
+    assert_eq!(a.status, StatusCode::CREATED, "die 200. gilt: {}", a.body);
+}
+
+#[tokio::test]
+async fn gelungene_einloesungen_sind_je_quelle_begrenzt() {
+    use axum::body::{to_bytes, Body};
+    use axum::extract::ConnectInfo;
+    use axum::http::{header, Request};
+    use tower::ServiceExt;
+    let l = lage().await;
+    let quelle: std::net::SocketAddr = "198.51.100.231:4000".parse().unwrap();
+    let einheit = l.einheit;
+    let einloesen_von = |app: axum::Router, code: String| async move {
+        let mut req = Request::builder()
+            .method("POST")
+            .uri("/api/devices/helpers/redeem")
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                json!({
+                    "code": code,
+                    "display_name": "Max",
+                    "target": {"kind": "unit", "id": einheit},
+                })
+                .to_string(),
+            ))
+            .unwrap();
+        req.extensions_mut().insert(ConnectInfo(quelle));
+        let resp = app.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let _ = to_bytes(resp.into_body(), usize::MAX).await;
+        status
+    };
+    for n in 0..lifeline_hub::auth::rate_limit::helfer_einloesung::MAX {
+        let s = einloesen_von(l.app.clone(), l.code.clone()).await;
+        assert_eq!(s, StatusCode::CREATED, "Einlösung {n}");
+    }
+    let s = einloesen_von(l.app.clone(), l.code.clone()).await;
+    assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        helfer_kopplungen(&l.pool).await,
+        lifeline_hub::auth::rate_limit::helfer_einloesung::MAX as i64
+    );
+    // Ohne Quelle (andere Adresse) geht es weiter.
+    let a = redeem(&l.app, None, anmeldung(&l.code, "unit", l.einheit)).await;
+    assert_eq!(a.status, StatusCode::CREATED, "{}", a.body);
+}
+
+#[tokio::test]
+async fn eine_person_ortet_nur_ein_helfer() {
+    let l = lage().await;
+    let (_a, _, person) = helfer_mit_person(&l).await;
+    let (b, _) = anmelden(&l, "vehicle", l.fahrzeug, "Erika 2").await;
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true, "person_id": person})).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    let (s, v) = bestaetigen(&l, b, json!({"is_tracker": true})).await;
+    assert_eq!(s, StatusCode::OK, "ohne Person: {v}");
+}
+
+#[tokio::test]
+async fn am_spiegel_gibt_es_keine_helfer_einladung() {
+    let l = lage().await;
+    let mut tx = l.pool.begin().await.unwrap();
+    for sql in [
+        "INSERT INTO spiegel_uebernahme (id) VALUES (1)",
+        "INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES (?1, 'x/' || ?1)",
+        "DELETE FROM spiegel_uebernahme",
+    ] {
+        sqlx::query(sql)
+            .bind(l.einsatz)
+            .execute(&mut *tx)
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
+    let a = redeem(&l.app, None, anmeldung(&l.code, "unit", l.einheit)).await;
+    assert_eq!(
+        a.status,
+        StatusCode::UNAUTHORIZED,
+        "die alte Einladung gilt nicht mehr: {}",
+        a.body
+    );
+    let (s, v) = einladen(&l.app, &l.admin, l.einsatz, json!({})).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
 }

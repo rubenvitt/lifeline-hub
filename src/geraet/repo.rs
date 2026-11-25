@@ -610,8 +610,22 @@ async fn widerrufen_durch(
     beenden(conn, kopplung_id, von, KopplungEreignis::Widerrufen).await
 }
 
+/// Meldet eine Helfer-Kopplung ab, wenn die Kraft sich in der App abmeldet
+/// (`POST /api/auth/logout` mit ihrer Sitzung, Spec Helfer-App, „Enden“): wie ein Widerruf durch
+/// das Gerät selbst (`von` = sein Gerätekonto), Ereignis `abgemeldet`. Liefert, ob beendet wurde.
+pub async fn abmelden(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    von: i64,
+) -> Result<bool, AppError> {
+    beenden(conn, kopplung_id, Some(von), KopplungEreignis::Abgemeldet).await
+}
+
 /// Beendet eine Kopplung (`widerrufen_at`), löscht Sitzungen und Code, setzt das Gerätekonto
 /// inaktiv und schreibt `art` in die Spur. Eine schon beendete bleibt, wie sie ist (`false`).
+/// Jeder Widerrufsweg endet hier; deshalb löscht diese Stelle auch die Personenposition einer
+/// Helfer-Kopplung ([`crate::helfer::ende::beende_ortung`]). Das Live-Ereignis meldet der
+/// Aufrufer (`routes::helfer::melde_helfer_ende`).
 async fn beenden(
     conn: &mut SqliteConnection,
     kopplung_id: i64,
@@ -645,6 +659,7 @@ async fn beenden(
     .execute(&mut *conn)
     .await?;
     ereignis(&mut *conn, kopplung_id, art, von, None).await?;
+    crate::helfer::ende::beende_ortung(conn, kopplung_id).await?;
     Ok(true)
 }
 

@@ -32,6 +32,8 @@ pub struct HelferStand {
     pub einheit_id: Option<i64>,
     pub fahrzeug_id: Option<i64>,
     pub person_id: Option<i64>,
+    /// Die Kraft hat „Mich als Person orten“ gewählt; nur dann ordnet die Leitung eine Person zu.
+    pub person_gewuenscht: bool,
 }
 
 impl HelferStand {
@@ -61,7 +63,7 @@ pub async fn stand(
     sqlx::query_as(
         "SELECT id, einsatz_id, COALESCE(anzeigename, bezeichnung) AS anzeigename, helfer_zustand, \
                 (widerrufen_at IS NULL AND laeuft_ab_at > datetime('now')) AS offen, \
-                einheit_id, fahrzeug_id, person_id \
+                einheit_id, fahrzeug_id, person_id, person_gewuenscht <> 0 AS person_gewuenscht \
          FROM geraet_kopplung WHERE id = ? AND einsatz_id = ? AND ansicht = 'helfer'",
     )
     .bind(kopplung_id)
@@ -118,6 +120,29 @@ async fn pruefe_person(
     })
 }
 
+/// Eine Person ortet höchstens eine offene Helfer-Kopplung (422): zwei Handys ließen ihre
+/// Position springen, und das Ende des einen löschte, was das andere schreibt.
+async fn fordere_person_frei(
+    conn: &mut SqliteConnection,
+    kopplung_id: i64,
+    person_id: i64,
+) -> Result<(), AppError> {
+    let belegt: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM geraet_kopplung WHERE ansicht = 'helfer' AND person_id = ? \
+           AND id <> ? AND widerrufen_at IS NULL AND laeuft_ab_at > datetime('now'))",
+    )
+    .bind(person_id)
+    .bind(kopplung_id)
+    .fetch_one(&mut *conn)
+    .await?;
+    if belegt {
+        return Err(AppError::UnprocessableEntity(
+            "Diese Person ist schon einem anderen Helfer zugeordnet".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Eingabe von [`bestaetigen`], das Ziel schon gegen den Einsatz geprüft.
 pub struct Bestaetigung {
     pub ziel: HelferZielSpalte,
@@ -143,11 +168,15 @@ pub enum Bestaetigt {
     },
     /// Das Ziel hat schon ein Ortungsgerät; nichts geschrieben.
     Belegt { halter: i64 },
+    /// Eine Person ist angegeben, aber die Kraft hat „Mich als Person orten“ nicht gewählt
+    /// (422 `person_not_requested`); nichts geschrieben.
+    PersonNichtGewuenscht,
 }
 
 /// Bestätigt eine Helfer-Kopplung oder ändert eine aktive (eine Transaktion des Aufrufers).
 /// Eine abgelehnte, beendete oder abgelaufene Kopplung → 409; Person ohne Org-Erlaubnis oder
-/// außerhalb des Einsatzes → 422.
+/// außerhalb des Einsatzes → 422; Person, ohne dass die Kraft es gewählt hat →
+/// [`Bestaetigt::PersonNichtGewuenscht`] (Einwilligung, Spec „Bestätigen“).
 pub async fn bestaetigen(
     conn: &mut SqliteConnection,
     stand: &HelferStand,
@@ -165,7 +194,12 @@ pub async fn bestaetigen(
                 "Die Organisation erlaubt keine Ortung von Personen".into(),
             ))
         }
-        Some(pid) => Some(pruefe_person(conn, einsatz_id, pid).await?),
+        Some(_) if !stand.person_gewuenscht => return Ok(Bestaetigt::PersonNichtGewuenscht),
+        Some(pid) => {
+            let name = pruefe_person(conn, einsatz_id, pid).await?;
+            fordere_person_frei(conn, stand.id, pid).await?;
+            Some(name)
+        }
         None => None,
     };
     let (einheit_id, fahrzeug_id) = match eingabe.ziel {
