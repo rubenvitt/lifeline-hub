@@ -1,4 +1,5 @@
 use crate::app::AppState;
+use crate::einsatz::einstellungen::etb_startwert;
 use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
@@ -90,6 +91,9 @@ pub struct AnlegenBody {
     /// Ansichts-Zugehörigkeit (LFH-320): das FE sendet die aktive Ansicht; absent/NULL =
     /// auf allen Ansichten sichtbar.
     pub ansicht_id: Option<i64>,
+    /// Übernahme aus einer Fremdebene dieses Einsatzes (LLH-2129): nur dann schreibt die Anlage
+    /// einen System-ETB-Eintrag mit der Herkunft. Fremde oder unbekannte Ebene → 404.
+    pub fremdebene_id: Option<i64>,
     #[serde(flatten)]
     pub alt: AltesFormat,
 }
@@ -111,19 +115,46 @@ pub async fn anlegen(
     crate::karten_ansicht::repo::pruefe_zugehoerig(&state.pool, einsatz_id, body.ansicht_id)
         .await?;
 
-    let z = zeichen_repo::anlegen(
-        &state.pool,
-        einsatz_id,
-        ZeichenNeu {
-            lat: body.lat,
-            lon: body.lon,
-            zeichen_spec: &zeichen_spec,
-            label: label.as_deref(),
-            ansicht_id: body.ansicht_id,
-            erstellt_von: ctx.benutzer.id,
-        },
-    )
-    .await?;
+    let neu = ZeichenNeu {
+        lat: body.lat,
+        lon: body.lon,
+        zeichen_spec: &zeichen_spec,
+        label: label.as_deref(),
+        ansicht_id: body.ansicht_id,
+        erstellt_von: ctx.benutzer.id,
+    };
+    let herkunft =
+        crate::karte_fremdebene::herkunft_fuer(&state.pool, einsatz_id, body.fremdebene_id).await?;
+    let z = match herkunft {
+        // Normales Zeichnen bleibt ohne ETB-Eintrag.
+        None => zeichen_repo::anlegen(&state.pool, einsatz_id, neu).await?,
+        // Übernahme (LLH-2129): Zeichen und System-ETB-Eintrag in EINER Tx, verteilt nach dem
+        // Commit (Muster `routes/lage_zone.rs::anlegen`).
+        Some(h) => {
+            let text = match neu.label {
+                Some(l) => format!("Freies Zeichen «{l}» {h}"),
+                None => format!("Freies Zeichen {h}"),
+            };
+            if text.chars().count() > crate::etb::INHALT_MAX {
+                return Err(AppError::Validation("ETB-Text zu lang".into()));
+            }
+            let startwert = etb_startwert(&state.pool, einsatz_id).await?;
+            let (id, etb_id) = crate::write_retry!(&state.pool, |conn| {
+                let id = zeichen_repo::anlegen_tx(conn, einsatz_id, neu).await?;
+                let etb_id = crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &text,
+                )
+                .await?;
+                Ok((id, etb_id))
+            })?;
+            super::etb_verteilen(&state, einsatz_id, [etb_id]);
+            zeichen_repo::laden(&state.pool, einsatz_id, id).await?
+        }
+    };
 
     sse_zeichen(&state, einsatz_id, z.id);
     Ok((StatusCode::CREATED, Json(z)))

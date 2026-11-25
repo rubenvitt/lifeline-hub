@@ -5,6 +5,7 @@ import { warGeraet } from '../geraet/geraetMarke';
 import { fetchErfolgeVerfolgen } from './lagebildBestaetigung';
 import { lagebildDehydrierOptionen, lagebildStandZulaessig } from './lagebildFilter';
 import { lagebildKuerzen } from './lagebildKuerzung';
+import { fremdebenenImBudget } from './fremdebenenBudget';
 import { erzeugeLagebildPersister, type LagebildPersister } from './lagebildPersister';
 import {
   lagebildAnlegen,
@@ -112,7 +113,8 @@ function abonnieren(
       // (`zulaessigeEintraege`).
       clientState: {
         ...clientState,
-        queries: [...clientState.queries.map(lagebildKuerzen), ...rest],
+        // Fremdebenen nur im Budget (LLH-2130), über Live und Vorrat zusammen.
+        queries: fremdebenenImBudget([...clientState.queries.map(lagebildKuerzen), ...rest]),
       },
     };
   };
@@ -163,7 +165,9 @@ function abonnieren(
  */
 function wiederherstellen(qc: QueryClient, client: PersistedClient): void {
   const cache = qc.getQueryCache();
-  const queries = zulaessigeEintraege(qc, client.clientState.queries)
+  // Das Budget der Fremdebenen (LLH-2130) gilt über den ganzen Stand, nie über den Vorrat allein:
+  // dort fehlt die Liste, sobald der Live-Stand sie überdeckt.
+  const queries = fremdebenenImBudget(zulaessigeEintraege(qc, client.clientState.queries))
     .filter((q) => cache.find({ queryKey: q.queryKey, exact: true })?.state.status !== 'error')
     .map((q) =>
       q.state.status === 'error'

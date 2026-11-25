@@ -203,6 +203,35 @@ mod tests {
         assert!(datei.contains(&erwartet));
     }
 
+    /// Der gemeinsame Fall in `src-tauri/faelle/kalender.json` ist genau die Ausgabe des
+    /// Generators: der iOS-Kern liest aus ihm den Termin (LLH-2127). Ändert sich das Format hier,
+    /// muss der Fall mit, und der Swift-Test zeigt, ob iOS die Datei noch liest.
+    #[test]
+    fn gemeinsamer_fall_ist_genau_die_ausgabe_des_generators() {
+        let faelle: serde_json::Value =
+            serde_json::from_str(include_str!("../../src-tauri/faelle/kalender.json"))
+                .expect("kalender.json ist lesbar");
+        let fall = &faelle["termin"];
+        let eingabe = &fall["eingabe"];
+        let zeit = |feld: &str| {
+            DateTime::parse_from_rfc3339(eingabe[feld].as_str().expect(feld))
+                .expect(feld)
+                .with_timezone(&Utc)
+        };
+        let datei = build_ics(
+            &IcsEingabe {
+                einsatz_id: eingabe["einsatz_id"].as_i64().expect("einsatz_id"),
+                bezeichnung: eingabe["bezeichnung"].as_str().expect("bezeichnung"),
+                termin: zeit("termin"),
+                instanz_kennung: eingabe["instanz_kennung"]
+                    .as_str()
+                    .expect("instanz_kennung"),
+            },
+            zeit("jetzt"),
+        );
+        assert_eq!(datei, fall["ics"].as_str().expect("ics"));
+    }
+
     #[test]
     fn dateiname_traegt_einsatz_und_termin() {
         assert_eq!(

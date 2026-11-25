@@ -4,6 +4,7 @@
 
 pub mod art;
 pub mod foto;
+pub mod hls;
 pub mod karte;
 pub mod repo;
 pub mod store;
@@ -13,14 +14,23 @@ pub mod video;
 
 pub use store::Store;
 
-/// Code der einzigen Adapterart mit Drohnenvertrag; die Live-Abrufe der Drohnenrouten verlangen
-/// sie (`adapter::live::live_kontext`).
-pub const ART: &str = "suchlage";
+/// Adapterart „suchlage“: Lage, Livebild und Fotos aus Suchlage.
+pub const SUCHLAGE: &str = "suchlage";
+/// Adapterart „hls_adresse“: nur Livebild aus einer HLS-Adresse (LLH-2110).
+pub const HLS_ADRESSE: &str = "hls_adresse";
+/// Die Adapterarten mit Drohnenvertrag; die Live-Abrufe der Drohnenrouten verlangen die Art des
+/// jeweiligen Adapters (`adapter::live::live_kontext`).
+pub const ARTEN: &[&str] = &[SUCHLAGE, HLS_ADRESSE];
 
 /// Ob eine Adapterart einen Drohnenvertrag hat, also Drohnenbild liefert und je Einsatz
 /// zuschaltbar ist.
 pub fn is_drohnen_art(code: &str) -> bool {
-    code == ART
+    drohnen_art(code).is_some()
+}
+
+/// Die feste Konstante einer Drohnenart zu ihrem Code, sonst `None`.
+pub fn drohnen_art(code: &str) -> Option<&'static str> {
+    ARTEN.iter().copied().find(|a| *a == code)
 }
 
 /// Ob `s` ein sicheres einzelnes Pfadsegment ist: `[A-Za-z0-9._-]+`, aber nicht `.` oder `..`.
@@ -36,6 +46,13 @@ pub fn is_safe_segment(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::is_safe_segment;
+
+    #[test]
+    fn drohnen_art_liefert_die_konstante() {
+        assert_eq!(super::drohnen_art("suchlage"), Some(super::SUCHLAGE));
+        assert_eq!(super::drohnen_art("hls_adresse"), Some(super::HLS_ADRESSE));
+        assert_eq!(super::drohnen_art("test"), None);
+    }
 
     #[test]
     fn sicheres_segment() {

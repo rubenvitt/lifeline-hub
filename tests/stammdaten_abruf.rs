@@ -169,6 +169,51 @@ async fn vorschau_schreibt_nichts_uebernehmen_legt_an_und_leert() {
     assert!(!lauf(&u.pool, "a1", u.org, ZWEI).await);
 }
 
+/// LLH-2121: Die Übernahme eines Schnappschusses meldet `stammdaten` an die Organisation (andere
+/// Tabs laden Listen und den Hinweis „zum Prüfen“ neu); Vorschau und 409 melden nichts.
+#[tokio::test]
+async fn nur_die_uebernahme_meldet_stammdaten() {
+    use lifeline_hub::live::org::{OrgLiveEvent, OrgNachricht};
+    fn stammdaten(rx: &mut tokio::sync::broadcast::Receiver<OrgNachricht>) -> usize {
+        std::iter::from_fn(|| rx.try_recv().ok())
+            .filter(|m| m.event == OrgLiveEvent::Stammdaten)
+            .count()
+    }
+    let (app, pool, live) = common::setup_mit_pool_und_live().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM benutzer WHERE benutzername = 'admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    adapter_in(&pool, "a1", org).await;
+    let u = U {
+        app,
+        pool,
+        org,
+        admin,
+    };
+    lauf(&u.pool, "a1", u.org, ZWEI).await;
+    let alt = offene(&u).await[0]["id"].as_str().unwrap().to_string();
+    lauf(&u.pool, "a1", u.org, DREI).await;
+    let id = offene(&u).await[0]["id"].as_str().unwrap().to_string();
+    let mut rx = live.abonniere_org();
+
+    let post = |pfad: String| {
+        let u = &u;
+        async move {
+            anfrage_json(&u.app, "POST", &pfad, &u.admin, Some(&json!({})))
+                .await
+                .0
+        }
+    };
+    assert_eq!(post(format!("{LISTE}/{id}/preview")).await, StatusCode::OK);
+    assert_eq!(stammdaten(&mut rx), 0, "Vorschau");
+    assert_eq!(post(format!("{LISTE}/{alt}")).await, StatusCode::CONFLICT);
+    assert_eq!(stammdaten(&mut rx), 0, "ersetzter Schnappschuss");
+    assert_eq!(post(format!("{LISTE}/{id}")).await, StatusCode::OK);
+    assert_eq!(stammdaten(&mut rx), 1, "Übernahme");
+}
+
 #[tokio::test]
 async fn erneut_vorlegen_erzwingt_einen_schnappschuss() {
     let u = umgebung().await;

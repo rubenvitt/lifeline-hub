@@ -1154,7 +1154,8 @@
           "plaetze",
           "felder",
           "intervall_min_s",
-          "intervall_vorschlag_s"
+          "intervall_vorschlag_s",
+          "http_im_lan"
         ],
         "properties": {
           "bezeichnung": {
@@ -1168,6 +1169,10 @@
             "items": {
               "$ref": "#/components/schemas/Feld"
             }
+          },
+          "http_im_lan": {
+            "type": "boolean",
+            "description": "Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105)."
           },
           "intervall_min_s": {
             "type": "integer",
@@ -10658,6 +10663,14 @@
           "created_at": {
             "type": "string"
           },
+          "data_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne\nden Inhalt zu serialisieren. Fehlt ohne Inhalt."
+          },
           "dropped_count": {
             "type": "integer",
             "format": "int64",
@@ -14962,6 +14975,17 @@
           "betroffene": {
             "$ref": "#/components/schemas/LagemonitorBetroffene"
           },
+          "drohne": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LagemonitorDrohne",
+                "description": "Livebild der Drohne (LLH-2109): nur wenn die Einsatzleitung den Schalter „Livebild auf dem\nLagemonitor“ eingeschaltet hat; nur [`lagebild`] füllt ihn."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kraefte": {
             "$ref": "#/components/schemas/LagemonitorKraefte"
           },
@@ -15070,6 +15094,26 @@
           "vermisst": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "LagemonitorDrohne": {
+        "type": "object",
+        "description": "Was der Lagemonitor vom Livebild der Drohne erfährt (LLH-2109): die eigenen Videokennungen\n(keine Seriennummern) und den Datenstand der Drohnenlage. Leer, wenn die Quelle gerade keinen\nStrom meldet; die Kachel zeigt dann „Kein Livebild“.",
+        "required": [
+          "videos",
+          "stand_at"
+        ],
+        "properties": {
+          "stand_at": {
+            "type": "string",
+            "description": "Zeit des letzten Abrufs bei Suchlage (UTC, SQLite-Format); ohne Abruf die Zuschaltung."
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },

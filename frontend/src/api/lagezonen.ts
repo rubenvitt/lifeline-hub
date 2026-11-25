@@ -24,6 +24,8 @@ export interface ZoneNeu {
   ansicht_id?: number | null;
   /** Bezirks-Zuordnung beim Anlegen (LLH-1069), nur bei Typ `evakuierungsbezirk`. */
   evakuierungsbezirk_id?: number | null;
+  /** Übernahme aus einer Fremdebene (LLH-2129): der Server hängt die Herkunft an den ETB-Text. */
+  fremdebene_id?: number;
 }
 
 export interface ZonePatch {

@@ -186,6 +186,9 @@ pub async fn uebernehmen(
     for id in fahrzeug_ids {
         super::fahrzeug::stamm_geaendert_melden(&state, benutzer.org_id, id).await;
     }
+    // LLH-2121: Die Route liegt nicht unter `STAMMDATEN_PFADE` (die Vorschau schriebe sonst auch
+    // ein Ereignis); andere Schirme laden ihre Kataloge erst mit dieser Meldung neu.
+    state.live.publiziere_stammdaten(benutzer.org_id);
     tracing::info!(
         org_id = benutzer.org_id,
         benutzer_id = benutzer.id,

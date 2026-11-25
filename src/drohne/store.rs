@@ -12,6 +12,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 
+use futures::future::BoxFuture;
 use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::error::AppError;
@@ -19,6 +20,8 @@ use crate::error::AppError;
 use super::repo;
 use super::suchlage::Upstream;
 use super::vertrag::DrohnenLage;
+use crate::adapter::art::Uebernahme;
+use crate::adapter::repo::Adapter;
 
 /// Letzter Abruf einer Quelle.
 #[derive(Debug, Clone)]
@@ -160,5 +163,41 @@ impl Store {
 
     fn lesen(&self) -> std::sync::RwLockReadGuard<'_, Innen> {
         self.innen.read().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+/// Was der Abruf einer Drohnenart in den Store schreibt. Maßgeblich ist die Datenbank: sie sagt,
+/// ob ein laufender Einsatz die Quelle hält; sonst wird nichts abgelegt.
+pub struct StandUebernahme {
+    pub store: std::sync::Arc<Store>,
+    pub stand: Stand,
+    pub geaendert: bool,
+    /// Was der Lauf als Anzahl zeigt (Fluggeräte, bei einer reinen Videoquelle die Videos).
+    pub anzahl: i64,
+}
+
+impl Uebernahme for StandUebernahme {
+    fn anzahl(&self) -> i64 {
+        self.anzahl
+    }
+
+    fn uebernehmen<'a>(
+        &'a self,
+        conn: &'a mut SqliteConnection,
+        adapter: &'a Adapter,
+    ) -> BoxFuture<'a, Result<i64, AppError>> {
+        Box::pin(async move {
+            // Marke vor dem Lesen (oben, „Abgleich“): ein späterer Abgleich gewinnt, und eine
+            // überholte Übernahme legt keinen Stand ab.
+            let marke = self.store.marke();
+            let aktiv = repo::is_active(conn, &adapter.id).await?;
+            if !self
+                .store
+                .uebernehmen(&adapter.id, aktiv, marke, self.stand.clone())
+            {
+                return Ok(0);
+            }
+            Ok(i64::from(self.geaendert))
+        })
     }
 }

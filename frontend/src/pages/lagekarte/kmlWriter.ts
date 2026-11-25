@@ -11,6 +11,7 @@
  *   `zeichenPng.ts`.
  */
 import type { ExportArt, ExportGeometrie, ExportObjekt } from './geoExport';
+import { escapeXml as esc } from './xmlText';
 
 export const KML_MEDIENTYP = 'application/vnd.google-earth.kml+xml';
 
@@ -64,19 +65,6 @@ export function kmlFarbe(hex: string, deckkraft = 1): string {
     .toString(16)
     .padStart(2, '0');
   return `${a}${bb}${gg}${rr}`.toLowerCase();
-}
-
-// eslint-disable-next-line no-control-regex -- in XML 1.0 unzulässige Steuerzeichen
-const UNZULAESSIG = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
-
-function esc(text: string): string {
-  return text
-    .replace(UNZULAESSIG, '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
 
 const koordinaten = (punkte: number[][]) => punkte.map(([lon, lat]) => `${lon},${lat},0`).join(' ');

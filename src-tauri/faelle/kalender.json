@@ -1,0 +1,196 @@
+{
+  "zweck": "Gemeinsame Fälle für Kalenderdateien (LLH-2127). „oeffnen_als“: ob die mobile Hülle einen Download dem Kalender zeigt (anzeigen) oder im Teilen-Blatt anbietet (teilen); gelesen von ios/LifelineKern und android/kern. „termin“: die .ics, die der Server für den Lagebesprechungstermin erzeugt (src/lagebesprechung/ics.rs prüft, dass build_ics genau sie liefert), und der Termin, den ios/LifelineKern daraus liest. „lesen“: weitere Lesefälle des iOS-Kerns; erwartet null heißt: kein Termin, die Datei geht ins Teilen-Blatt. Die Desktop-Hülle liest diese Datei nicht.",
+  "oeffnen_als": [
+    {
+      "beschreibung": "text/calendar wird dem Kalender gezeigt",
+      "mimetyp": "text/calendar",
+      "endung": "ics",
+      "erwartet": "anzeigen"
+    },
+    {
+      "beschreibung": "so liefert der Server den Lagebesprechungstermin aus",
+      "mimetyp": "text/calendar; charset=utf-8; method=PUBLISH",
+      "endung": "ics",
+      "erwartet": "anzeigen"
+    },
+    {
+      "beschreibung": "die Endung ics reicht, auch groß geschrieben und mit allgemeinem Typ",
+      "mimetyp": "application/octet-stream",
+      "endung": "ICS",
+      "erwartet": "anzeigen"
+    },
+    {
+      "beschreibung": "der Typ zählt ohne Groß- und Kleinschreibung, auch ohne Endung",
+      "mimetyp": "TEXT/Calendar",
+      "endung": "",
+      "erwartet": "anzeigen"
+    },
+    {
+      "beschreibung": "ohne Typ reicht die Endung",
+      "mimetyp": "",
+      "endung": "ics",
+      "erwartet": "anzeigen"
+    },
+    {
+      "beschreibung": "eine Tabelle geht ins Teilen-Blatt",
+      "mimetyp": "text/csv",
+      "endung": "csv",
+      "erwartet": "teilen"
+    },
+    {
+      "beschreibung": "ein PDF geht ins Teilen-Blatt",
+      "mimetyp": "application/pdf",
+      "endung": "pdf",
+      "erwartet": "teilen"
+    }
+  ],
+  "termin": {
+    "beschreibung": "der Lagebesprechungstermin, wie der Server ihn erzeugt (Escaping und gefaltete Zeile)",
+    "eingabe": {
+      "einsatz_id": 42,
+      "bezeichnung": "Hochwasser Ölbachtal, Abschnitt Nord; Deichverteidigung",
+      "termin": "2026-11-24T14:30:00Z",
+      "instanz_kennung": "kennung-1",
+      "jetzt": "2026-11-24T12:00:00Z"
+    },
+    "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Lifeline Hub//Lagebesprechung//DE\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nBEGIN:VEVENT\r\nUID:lagebesprechung-42-20261124T143000Z@kennung-1\r\nDTSTAMP:20261124T120000Z\r\nSEQUENCE:0\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lagebesprechung – Hochwasser Ölbachtal\\, Abschnitt Nord\\; Deichv\r\n erteidigung\r\nSTATUS:CONFIRMED\r\nTRANSP:OPAQUE\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Lagebesprechung\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    "erwartet": {
+      "titel": "Lagebesprechung – Hochwasser Ölbachtal, Abschnitt Nord; Deichverteidigung",
+      "beginn": "2026-11-24T14:30:00Z",
+      "ende": "2026-11-24T15:00:00Z",
+      "erinnerung_minuten": 10
+    }
+  },
+  "lesen": [
+    {
+      "beschreibung": "Zeilen mit LF statt CRLF werden gelesen",
+      "ics": "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nDTSTART:20261124T143000Z\nDTEND:20261124T150000Z\nSUMMARY:Lage\nBEGIN:VALARM\nTRIGGER:-PT10M\nEND:VALARM\nEND:VEVENT\nEND:VCALENDAR\n",
+      "erwartet": {
+        "titel": "Lage",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": 10
+      }
+    },
+    {
+      "beschreibung": "eine mit Tab gefaltete Zeile wird entfaltet",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\n\tbesprechung\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "Lagebesprechung",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "Escaping im Titel wird aufgelöst",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:A\\, B\\; C\\\\D\\nE\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "A, B; C\\D\nE",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "ohne DTEND dauert der Termin 30 Minuten wie beim Server",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "Lage",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "ohne VALARM gibt es keine Erinnerung",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "Lage",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "eine Erinnerung in Stunden wird übernommen",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT1H\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "Lage",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": 60
+      }
+    },
+    {
+      "beschreibung": "eine Erinnerung zu einem festen Zeitpunkt wird nicht übernommen, der Termin schon",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\nBEGIN:VALARM\r\nTRIGGER;VALUE=DATE-TIME:20261124T140000Z\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "Lage",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "ohne SUMMARY bleibt der Titel leer",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": {
+        "titel": "",
+        "beginn": "2026-11-24T14:30:00Z",
+        "ende": "2026-11-24T15:00:00Z",
+        "erinnerung_minuten": null
+      }
+    },
+    {
+      "beschreibung": "eine Zeit mit Zeitzone (TZID) geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART;TZID=Europe/Berlin:20261124T153000\r\nDTEND;TZID=Europe/Berlin:20261124T160000\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ein ganztägiger Termin geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20261124\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "eine Ortszeit ohne Z geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "eine Serie (RRULE) geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\nRRULE:FREQ=WEEKLY\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "zwei Termine gehen ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nDTSTART:20261124T143000Z\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nDTSTART:20261125T143000Z\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ohne DTSTART geht die Datei ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTEND:20261124T150000Z\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ein Ende vor dem Beginn geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261124T150000Z\r\nDTEND:20261124T143000Z\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ein unmögliches Datum geht ins Teilen-Blatt",
+      "ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nDTSTART:20261340T143000Z\r\nSUMMARY:Lage\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ein Text ohne Kalender geht ins Teilen-Blatt",
+      "ics": "Hallo\r\n",
+      "erwartet": null
+    },
+    {
+      "beschreibung": "ein leerer Text geht ins Teilen-Blatt",
+      "ics": "",
+      "erwartet": null
+    }
+  ]
+}

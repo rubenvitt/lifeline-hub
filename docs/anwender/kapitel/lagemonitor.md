@@ -2,7 +2,7 @@
 titel: Lagemonitor
 gruppen: [geraete]
 reihenfolge: 770
-quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/live/liveVerbindung.ts, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/einsatz/ausfall.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs]
+quellen: [frontend/src/geraet/LagemonitorPage.tsx, frontend/src/components/KachelGrenze.tsx, frontend/src/live/liveVerbindung.ts, frontend/src/lage/alarmAusMonitor.ts, frontend/src/lage/wasBrennt.ts, src/live/mod.rs, frontend/src/pages/lage-dashboard/lageVerdichtung.ts, frontend/src/geraet/LagemonitorKarte.tsx, frontend/src/geraet/lagemonitorFlaechen.ts, frontend/src/geraet/GeraeteLayout.tsx, src/routes/lagemonitor.rs, src/einsatz/ausfall.rs, src/meldung/repo.rs, src/geraet/mod.rs, src/programmpunkt/repo.rs, frontend/src/geraet/LagemonitorLivebild.tsx, frontend/src/pages/lagekarte/DrohnenQuelle.tsx, src/routes/drohne.rs]
 ---
 
 ## Überblick
@@ -72,12 +72,45 @@ kann den Bildschirm nicht wach halten: bitte den Bildschirmschoner am Gerät abs
    [Einsatzdaten](einsatzdaten.md): oben Uhrzeit und Abstand, etwa „in 1 h 30 min“, darunter
    die Bezeichnung über die ganze Breite der Kachel.
    Ein Punkt fällt mit seiner Uhrzeit heraus; steht keiner mehr an, fehlt die Kachel.
+   Zeigt der Monitor das Livebild (nächster Abschnitt), nennt „Ablauf“ nur den nächsten Punkt
+   und darunter, wie viele noch folgen, etwa „+2 weitere“.
 8. Steigt die Zahl der offenen Sofortmeldungen oder die Zahl in SK I, ist sie eine Minute lang
    farbig hinterlegt, und oben in der Kachel steht „Neue Sofortmeldung“ bzw. „Neu in SK I“.
 9. Die Statusleiste nennt Einsatz, Gerät, Verbindung („live“, „verbinde …“, „getrennt“), den
    Stand der Daten mit Alter und die Uhr. Kommt 45 Sekunden lang nichts über die Leitung, steht
    dort „verbinde …“, und der Monitor baut die Verbindung neu auf. Bei einer Übung steht vor dem Einsatz die violette
    Marke „ÜBUNG“; „Einsatzart nicht geladen“ heißt, dass der Einsatz gerade nicht abrufbar ist.
+
+### Livebild der Drohne einschalten
+
+Für die Einsatzleitung: Ist am Einsatz eine Drohnenquelle zugeschaltet, kann der Monitor ihr
+Livebild zeigen. Vorgabe ist aus: Personen im Bild wären auf dem Großbild für alle im Raum
+sichtbar.
+
+1. Auf der [Lagekarte](lagekarte.md) in den Ebenen unter „Fachebenen“ die Gruppe „Drohne“
+   ansehen. Unter der zugeschalteten Quelle steht der Schalter „Livebild auf dem Lagemonitor“.
+   Alle anderen sehen statt des Schalters nur, was gilt.
+2. Den Schalter einschalten. Darunter steht „Das Großbild zeigt das Livebild; Personen im Bild
+   sind dort sichtbar.“ Das Einsatztagebuch hält fest: „Livebild auf dem Lagemonitor
+   eingeschaltet“.
+
+   ![Ebenen der Lagekarte mit der Gruppe Drohne: die zugeschaltete Quelle „Suchlage Staffel Nord“, darunter der eingeschaltete Schalter „Livebild auf dem Lagemonitor“ mit dem Hinweis, dass Personen im Bild auf dem Großbild sichtbar sind](../bilder/lagemonitor/livebild-schalter.png)
+
+### Livebild lesen
+
+1. Mit dem nächsten Abruf nach dem Einschalten, spätestens nach 30 Sekunden, steht unter der
+   Lagekarte links die Kachel „Livebild“, rechts daneben „Meldungen“ über „Ablauf“. Die Karte gibt dafür Höhe ab.
+
+   ![Lagemonitor mit der Kachel Livebild unter der Lagekarte, ohne laufenden Stream mit „Kein Livebild“ und oben rechts dem Stand, rechts daneben die Kachel Meldungen mit zwei offenen Sofortmeldungen](../bilder/lagemonitor/livebild.png)
+
+2. Oben rechts in der Kachel steht der Stand der Drohnenlage; ist er älter als zwei Minuten,
+   ist er hervorgehoben.
+3. Das Bild läuft stumm und ohne Bedienelemente. Kommt kein Stream an, bleibt die Kachel stehen
+   und zeigt „Kein Livebild“, ohne Alarmfarbe und ohne Eintrag in „Was brennt“; der Monitor
+   versucht es von selbst erneut.
+
+Ausschalten nimmt die Kachel mit dem nächsten Abruf weg, und der Monitor erreicht das Bild sofort
+nicht mehr. Ist die Lagekarte im Einsatz ausgeblendet, zeigt der Monitor auch kein Livebild.
 
 ### Gerätemenü öffnen
 
@@ -116,8 +149,9 @@ null, endet sie vorzeitig.
 
 ### Was der Monitor zeigt und was nicht
 
-Der Monitor zeigt nur Zahlen, die Karte, die Bezeichnungen der nächsten Programmpunkte und in der
-Zeile „Was brennt“ die Namen von Einheiten und Abschnitten, keine Personendaten und keine Namen von
+Der Monitor zeigt nur Zahlen, die Karte, die Bezeichnungen der nächsten Programmpunkte, in der
+Zeile „Was brennt“ die Namen von Einheiten und Abschnitten und, nur wenn die Einsatzleitung es
+eingeschaltet hat, das Livebild der Drohne, keine Personendaten und keine Namen von
 Personen, keine Texte von Meldungen, Aufträgen oder Erinnerungen. Ist ein Modul im Einsatz
 ausgeblendet, fehlt seine Angabe in „Was brennt“ wie im Überblick, ohne dass der Monitor „Stand
 unvollständig“ meldet, und mit ihr die Kachel des Moduls: „Betroffene“ bzw. „Hilfeleistungen“
