@@ -222,9 +222,9 @@ Für eine URL kommen hinzu (gespeichert in `fehler`, angezeigt an der Ebene): `n
   Warnhinweis und einem ⋮-Menü:
   - Umbenennen;
   - Farbe wählen;
-  - Entfernen. Das ist eine Zuordnung lösen (ADR-0055), also kein Rot, mit
-    Rückgängig-Hinweis nur, wenn der Rückweg den Zustand herstellt. Sonst eine Bestätigung mit einem
-    Folgesatz.
+  - Entfernen. Korrigiert nach dem Abschluss-Review (25.11.2026): Das Entfernen löscht die Daten
+    für alle und hat keinen Rückweg, also unumkehrbar nach ADR-0055 — rot hinter dem Trenner,
+    Rückfrage mit einem Folgesatz und rotem Bestätigungsknopf, wie „Bild entfernen …“.
 - **Sichtbarkeit ist je Arbeitsplatz** (`LayerSichtbar`, über `lib/sichererSpeicher`), nicht am
   Datensatz. Wer eine Fremdebene ausblendet, blendet sie nicht für die anderen aus. Neue
   Ebenen sind sichtbar. Ein neuer Speicherort steht in `GERAETESPEICHER`
@@ -280,6 +280,13 @@ das System aus dem Client, fremde Geodaten kommen nur geprüft über den Server�
 - **`src/AGENTS.md`:** Satz im Abschnitt Adapter.
 
 ### Festlegungen nach dem Builder-Check (meine Wahl)
+
+- **Virenscan nur beim Upload** (Abschluss-Review 25.11.2026): Vom URL-Abruf wird nie das
+  Rohmaterial gespeichert, sondern nur das vom Server neu geschriebene, normierte GeoJSON mit
+  `name` und `description` als reinem Text; ein Scan brächte dort nichts. „Gescannt“ oben gilt
+  für Dateien.
+- **Spiegel-Grundrauschen hingenommen:** Jeder Abrufversuch einer sichtbaren URL-Ebene schreibt
+  `versucht_at` und erzeugt damit höchstens einmal je Minute eine Spiegeländerung.
 
 - **Gekoppelte Instanzen:** Nur die führende Seite eines Einsatzes holt nach. Auf einem Spiegel
   zeigt die Ebene den gespiegelten Stand mit dessen `abgerufen_at`; der Abruf beim Lesen

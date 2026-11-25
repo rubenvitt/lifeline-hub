@@ -134,7 +134,8 @@ END:VCALENDAR
   liefert `exportDateiname`, erweitert um Inhalt und Endung, gemeinsam mit Teil A.
 - **Fehler:** Ein Fehler erscheint im Paneel wie `SpeicherFehler`.
 - **Android (Ruben, 24.11.2026, in diesem Lauf):** Die Hülle öffnet eine Datei mit
-  `text/calendar` bzw. Endung `.ics` per `ACTION_VIEW` mit Auswahl (Kalender-App), sonst bleibt
+  `text/calendar` bzw. Endung `.ics` per `ACTION_VIEW` direkt, ohne eigenen Auswahldialog (mit Chooser griffe der Rückfall auf
+  `ACTION_SEND` bei fehlender Kalender-App nie; Entscheidung bei der Umsetzung, 25.11.2026), sonst bleibt
   `ACTION_SEND`. Die Entscheidung „welcher Intent“ ist eine reine Funktion im Kern
   (`android/AGENTS.md`: keine Anwendungslogik in der Hülle, Kern ohne SDK), mit Test dort.
   Gilt für jeden Download, nicht nur diesen (allgemein „Kalenderdatei öffnen“).
