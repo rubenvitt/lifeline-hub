@@ -723,8 +723,6 @@ pub async fn abgleich_einmal(
         .await?
         .wert;
         antwort.check().map_err(SendError::AntwortUngueltig)?;
-        // Nach dem Commit der Anfrage und außerhalb ihrer Transaktion; fehlerfrei nach außen.
-        crate::ortung::fern::apply_answer(pool, kopplung, &antwort).await;
         let mut uebernommen = Uebernommen::default();
         let mut abzuraeumen = Vec::new();
         crate::write_retry!(pool, |conn| {
@@ -844,6 +842,8 @@ pub async fn abgleich_einmal(
         melde_live(pool, &uebernommen).await;
         lebensende::abraeumen_nach_commit(pool, crate::instanz::stammdaten::live(), &abzuraeumen)
             .await;
+        // Nach dem Commit der Antwortübernahme und in eigener Transaktion; fehlerfrei nach außen.
+        crate::ortung::fern::apply_answer(pool, kopplung, &antwort).await;
         // Anträge an Einsätze, die hier geführt werden; die Quittungen gehen mit der nächsten
         // Anfrage hinaus.
         let mut ausgefuehrt = false;
