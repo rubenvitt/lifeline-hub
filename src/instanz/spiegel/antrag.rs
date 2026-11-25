@@ -1761,7 +1761,7 @@ mod tests {
             einsatz_aus_pfad("/api/incidents/8/map/foreign-layers"),
             Some(8)
         );
-        assert_eq!(einsatz_aus_pfad("/api/retention/incidents/9"), None);
+        assert_eq!(einsatz_aus_pfad("/api/organizations/9"), None);
         assert_eq!(einsatz_aus_pfad("/api/incidents/x"), None);
     }
 

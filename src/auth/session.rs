@@ -679,7 +679,7 @@ mod tests {
         assert!(ist_einsatzroute("/api/incidents/{id}/map/foreign-layers"));
         assert!(ist_einsatzroute("/api/incidents/{id}"));
         assert!(!ist_einsatzroute("/api/geraet/ich"));
-        assert!(!ist_einsatzroute("/api/retention/incidents/{id}"));
+        assert!(!ist_einsatzroute("/api/organizations/{id}"));
     }
 
     #[test]
