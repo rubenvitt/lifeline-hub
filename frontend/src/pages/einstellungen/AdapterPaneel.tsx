@@ -48,7 +48,7 @@ interface AnlegenWerte {
 
 /** Warnung an der LAN-Ausnahme; steht beim Anlegen und in der Ansicht gleich. */
 export const ADAPTER_LAN_WARNUNG =
-  'Nur für einen Server im lokalen Netz, etwa der Wache. Der Rechner selbst und Link-Local-Adressen bleiben gesperrt. Steht im Zugangsprotokoll.';
+  'Nur für einen Server im lokalen Netz, etwa der Wache. Der Rechner selbst und Link-Local-Adressen bleiben gesperrt. Steht im Zugangsprotokoll. Mit http:// (nur zu einer privaten IP-Adresse) gehen Zugangsdaten unverschlüsselt durchs Netz.';
 
 /** Ein Einstellungsfeld der Art als Formularfeld; Name und Regeln aus dem Verzeichnis. */
 export function EinstellungsFeld({ feld, pfad }: { feld: AdapterFeld; pfad: (string | number)[] }) {
