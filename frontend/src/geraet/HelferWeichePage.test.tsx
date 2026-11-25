@@ -21,7 +21,7 @@ describe('HelferWeichePage (Helfer-App)', () => {
     );
     expect(screen.getByText('ABCD-2345')).toBeInTheDocument();
     expect(screen.getByText('iPhone: über TestFlight')).toBeInTheDocument();
-    expect(screen.getByText('Android: APK von der Lifeline-Releaseseite')).toBeInTheDocument();
+    expect(screen.getByText('Android: APK von der Einsatzleitung')).toBeInTheDocument();
     // Kein Abruf, und der Code bleibt im Fragment.
     expect(abruf).not.toHaveBeenCalled();
     expect(window.location.hash).toBe('#ABCD2345');

@@ -23,7 +23,7 @@ import { Select } from '../../components/Select';
 import KopierbarerText from '../../components/KopierbarerText';
 import { ErfassungsModal } from '../../components/Erfassung';
 import { SeitenFehler, SeitenSkeleton } from '../../components/SeitenZustand';
-import { SpeicherFehler } from '../../components/SpeicherHinweis';
+import { SeitenHinweise, SpeicherFehler } from '../../components/SpeicherHinweis';
 import Druckkopf from '../../components/druck/Druckkopf';
 import DruckKnopf from '../../components/druck/DruckKnopf';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
@@ -37,6 +37,7 @@ import {
   confirmHelfer,
   createHelferEinladung,
   extendHelfer,
+  GRUND_PERSON_NOT_REQUESTED,
   GRUND_TRACKER_TAKEN,
   loadHelfer,
   rejectHelfer,
@@ -109,6 +110,18 @@ function istTrackerTaken(e: unknown): e is ApiError {
   return e instanceof ApiError && e.status === 409 && e.grund === GRUND_TRACKER_TAKEN;
 }
 
+function istPersonNichtGewuenscht(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 422 && e.grund === GRUND_PERSON_NOT_REQUESTED;
+}
+
+/** Text zum 422 `person_not_requested`; der Server lehnt eine Person ohne Wunsch der Kraft ab. */
+const PERSON_NICHT_GEWUENSCHT_TEXT =
+  'Die Kraft hat keine Personenortung gewählt. Bitte die Person entfernen und erneut bestätigen.';
+
+/** Rückfrage vor einer neuen Einladung, solange eine gültige besteht. */
+const NEUE_EINLADUNG_FRAGE =
+  'Neue Einladung anlegen? Gedruckte QR-Codes der bisherigen Einladung werden ungültig.';
+
 function istOrtungAus(e: unknown): boolean {
   return e instanceof ApiError && e.status === 403;
 }
@@ -135,7 +148,7 @@ interface Props {
  */
 export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
   const qc = useQueryClient();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { token, rollen } = useRollen();
   const { konventionen: konv } = useAnzeigeKonventionen();
 
@@ -152,7 +165,12 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
     queryFn: () => loadHelfer(einsatzId),
   });
   const ortungAus = helferQ.data?.tracking_enabled === false;
-  const personFeld = bestaetigenFuer != null && helferQ.data?.person_tracking_allowed === true;
+  // Die Person wird nur angeboten, wenn die Kraft „als Person orten“ gewählt hat und die
+  // Organisation Personenortung erlaubt; der Server lehnt sonst mit 422 `person_not_requested` ab.
+  const personFeld =
+    bestaetigenFuer != null &&
+    bestaetigenFuer.person_requested &&
+    helferQ.data?.person_tracking_allowed === true;
   const zielQ = useQuery({
     queryKey: [...einsatzKeys.helfer(einsatzId), 'ziele'] as const,
     queryFn: async () => {
@@ -179,6 +197,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
   const [einladenForm] = Form.useForm<EinladenWerte>();
   const [bestaetigenForm] = Form.useForm<BestaetigenWerte>();
   const gewaehlt = Form.useWatch('ziel', bestaetigenForm);
+  const gewaehltePerson = Form.useWatch('person_id', bestaetigenForm);
   const [verlaengernForm] = Form.useForm<VerlaengernWerte>();
 
   // Sprung aus dem Hinweis im Einsatzkopf: der Bereich steht unter Gerätekopplung und Anbindungen.
@@ -298,7 +317,9 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
   });
 
   if (helferQ.isLoading) return <SeitenSkeleton />;
-  if (helferQ.isError || !helferQ.data) {
+  // Ohne Daten ist der Fehler die Seite; mit Daten bleibt der letzte Stand stehen und ein
+  // Hinweis nennt den gescheiterten Neuabruf (Live-Abgleich, jeder Netzaussetzer löste sonst aus).
+  if (!helferQ.data) {
     return (
       <SeitenFehler
         text="Helfer nicht ladbar"
@@ -419,13 +440,18 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
   const zielFrei = bestaetigenFuer
     ? findTracker(liste, bestaetigenZiel, bestaetigenFuer.id) == null
     : true;
+  // „Nur Person orten“ gibt es nur mit gewählter Person, sonst entstünde ein Helfer ohne Ortung.
   const konfliktAktionen = belegt
     ? [
         { schluessel: 'ersetzen', text: 'Ersetzen' },
-        { schluessel: 'nur-person', text: 'Nur Person orten' },
+        ...(personFeld && gewaehltePerson != null
+          ? [{ schluessel: 'nur-person', text: 'Nur Person orten' }]
+          : []),
       ]
     : undefined;
-  const bestaetigenFehler = istTrackerTaken(bestaetigen.error) ? null : bestaetigen.error;
+  const personNichtGewuenscht = istPersonNichtGewuenscht(bestaetigen.error);
+  const bestaetigenFehler =
+    istTrackerTaken(bestaetigen.error) || personNichtGewuenscht ? null : bestaetigen.error;
 
   const sendeBestaetigung = async (
     h: HelferAnzeige,
@@ -438,7 +464,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
         ? { target: { kind: ziel.kind, id: ziel.id } }
         : {}),
       is_tracker: aktion === 'nur-person' ? false : w.is_tracker,
-      ...(w.person_id != null ? { person_id: w.person_id } : {}),
+      ...(personFeld && w.person_id != null ? { person_id: w.person_id } : {}),
       ...(aktion === 'ersetzen' ? { replace: true } : {}),
     };
     try {
@@ -474,7 +500,16 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
               disabled={ortungAus}
               onClick={() => {
                 einladen.reset();
-                setEinladenOffen(true);
+                if (!invitation) {
+                  setEinladenOffen(true);
+                  return;
+                }
+                modal.confirm({
+                  title: NEUE_EINLADUNG_FRAGE,
+                  okText: 'Neue Einladung',
+                  cancelText: 'Abbrechen',
+                  onOk: () => setEinladenOffen(true),
+                });
               }}
             >
               Helfer einladen
@@ -483,6 +518,11 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
         }
       >
         <Stapel abstand="md">
+          <SeitenHinweise
+            fehler={helferQ.isError ? helferQ.error : null}
+            fehlerTitel="Helfer nicht aktualisiert — letzter Stand"
+            fehlerFallback="Aktualisieren fehlgeschlagen"
+          />
           <div data-lfh="helfer-einladung">
             {invitation ? (
               <Stapel richtung="zeile" abstand="md" ausrichten="mitte" umbruch>
@@ -568,6 +608,9 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
             </Button>
           </Knopfreihe>
         }
+        // Der Code steht nur jetzt da: weder Escape noch ein Klick daneben schließt den Dialog.
+        keyboard={false}
+        maskClosable={false}
         onCancel={() => setNeueEinladung(null)}
         destroyOnHidden
       >
@@ -615,7 +658,7 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
               >
                 <li>
                   App „Lifeline Helfer“ installieren (iPhone: über TestFlight, Android: APK von der
-                  Lifeline-Releaseseite).
+                  Einsatzleitung).
                 </li>
                 <li>QR-Code mit der Kamera scannen oder den Code in der App eingeben.</li>
                 <li>
@@ -712,6 +755,15 @@ export default function EinsatzHelfer({ einsatzId, einsatz, darf }: Props) {
               ) : (
                 <Textstufe ton="gedaempft">Kräfte werden geladen …</Textstufe>
               ))}
+            {personNichtGewuenscht && (
+              <Alert
+                type="error"
+                showIcon
+                data-lfh="helfer-person-nicht-gewuenscht"
+                title="Nicht bestätigt"
+                description={PERSON_NICHT_GEWUENSCHT_TEXT}
+              />
+            )}
             {belegt && belegt.helferId === bestaetigenFuer.id && (
               <Alert
                 type="warning"

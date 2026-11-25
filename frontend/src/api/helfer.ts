@@ -15,6 +15,9 @@ const basis = (einsatzId: number) => `/api/incidents/${einsatzId}/helpers`;
 /** `reason` des 409 beim Bestätigen: das Ziel hat schon ein Ortungsgerät (`holder` = dessen Kopplung). */
 export const GRUND_TRACKER_TAKEN = 'tracker_taken';
 
+/** `reason` des 422 beim Bestätigen: Person zugeordnet, obwohl die Kraft keine Personenortung wollte. */
+export const GRUND_PERSON_NOT_REQUESTED = 'person_not_requested';
+
 /** Gültige Einladung (ohne Code) und alle Helfer des Einsatzes. */
 export function loadHelfer(einsatzId: number): Promise<HelferUebersicht> {
   return apiGet<HelferUebersicht>(basis(einsatzId));

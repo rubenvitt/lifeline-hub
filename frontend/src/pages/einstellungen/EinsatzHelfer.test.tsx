@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
@@ -187,6 +187,106 @@ describe('EinsatzHelfer (Helfer-App)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByText('Person')).not.toBeInTheDocument();
+  });
+
+  it('bietet keine Person an, wenn die Kraft keine Personenortung gewählt hat', async () => {
+    const { aufrufe } = stelleBereit({
+      helpers: [helfer(2, 'unbestaetigt', { person_requested: false })],
+      person_tracking_allowed: true,
+    });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText('Person')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    await waitFor(() => expect(aufrufe).toHaveLength(1));
+    expect(aufrufe[0].body).toEqual({ is_tracker: true });
+  });
+
+  it('nennt den Grund, wenn der Server die Person ohne Wunsch der Kraft ablehnt', async () => {
+    stelleBereit({
+      helpers: [helfer(2, 'unbestaetigt', { person_requested: true })],
+      person_tracking_allowed: true,
+      bestaetigen: () =>
+        HttpResponse.json(
+          { error: 'Keine Person', reason: 'person_not_requested' },
+          { status: 422 },
+        ),
+    });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Bestätigen …' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByTitle('Kraft 2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Bestätigen' }));
+    expect(
+      await within(dialog).findByText(/Die Kraft hat keine Personenortung gewählt/),
+    ).toBeInTheDocument();
+  });
+
+  it('fragt vor einer neuen Einladung, solange eine gültige besteht', async () => {
+    stelleBereit({
+      invitation: { id: 3, expires_at: '2026-11-25 20:00:00' },
+    });
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: /Helfer einladen/ }));
+    expect(
+      (
+        await screen.findAllByText(
+          'Neue Einladung anlegen? Gedruckte QR-Codes der bisherigen Einladung werden ungültig.',
+        )
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Einladen' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Neue Einladung' }));
+    expect(await screen.findByRole('button', { name: 'Einladen' })).toBeInTheDocument();
+  });
+
+  it('schließt den Dialog mit dem Code nicht per Escape', async () => {
+    stelleBereit();
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: /Helfer einladen/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Einladen' }));
+    await screen.findByTestId('helfer-einladung');
+    fireEvent.keyDown(screen.getByRole('dialog', { name: 'Helfer anmelden' }), {
+      key: 'Escape',
+      code: 'Escape',
+      keyCode: 27,
+    });
+    await new Promise((r) => setTimeout(r, 400));
+    // Schließt der Dialog, trägt er die Austrittsanimation (jsdom entfernt ihn danach nicht mehr).
+    expect(screen.getByTestId('helfer-einladung').closest('.ant-modal')).not.toHaveClass(
+      'ant-zoom-leave',
+    );
+    // Schließen geht nur über den ausdrücklichen Knopf.
+    expect(screen.getByRole('button', { name: 'Fertig' })).toBeEnabled();
+  });
+
+  it('behält bei einem gescheiterten Neuabruf den letzten Stand und nennt den Fehler', async () => {
+    let abrufe = 0;
+    stelleBereit({
+      helpers: [helfer(2, 'unbestaetigt')],
+      invitation: { id: 3, expires_at: '2026-11-25 20:00:00' },
+    });
+    server.use(
+      http.get('/api/incidents/1/helpers', () => {
+        abrufe += 1;
+        if (abrufe > 1) return HttpResponse.json({ error: 'Kaputt' }, { status: 500 });
+        return HttpResponse.json({
+          helpers: [helfer(2, 'unbestaetigt')],
+          invitation: { id: 3, expires_at: '2026-11-25 20:00:00' },
+          tracking_enabled: true,
+          person_tracking_allowed: false,
+        });
+      }),
+      http.post('/api/incidents/1/helpers/invitations/3/revoke', () =>
+        HttpResponse.json({}, { status: 200 }),
+      ),
+    );
+    rendern();
+    await userEvent.click(await screen.findByRole('button', { name: 'Einladung widerrufen' }));
+    expect(await screen.findByText(/Helfer nicht aktualisiert/)).toBeInTheDocument();
+    expect(screen.getByText('Kraft 2')).toBeInTheDocument();
+    expect(screen.queryByText('Helfer nicht ladbar')).not.toBeInTheDocument();
   });
 
   it('lässt die Leitung das Ziel beim Bestätigen ändern', async () => {

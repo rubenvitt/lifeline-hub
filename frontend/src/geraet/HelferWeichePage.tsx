@@ -59,7 +59,7 @@ export default function HelferWeichePage() {
             Noch keine App?
           </Textstufe>
           <Textstufe ton="gedaempft">iPhone: über TestFlight</Textstufe>
-          <Textstufe ton="gedaempft">Android: APK von der Lifeline-Releaseseite</Textstufe>
+          <Textstufe ton="gedaempft">Android: APK von der Einsatzleitung</Textstufe>
           <Textstufe ton="gedaempft">Danach den QR-Code noch einmal scannen.</Textstufe>
         </Stapel>
       </Stapel>
