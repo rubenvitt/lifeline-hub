@@ -557,9 +557,9 @@ public enum Ereignis { case gescannt(HelferZiel), eingeloest, bestaetigt, antwor
   - Org-Schalter.
 - Modify: `docs/betrieb/endgeraete.md` (Verweis).
 
-- [ ] **Step 1:** Schreiben. Run `scripts/check-architektur.sh` und die Wächter der
+- [x] **Step 1:** Schreiben. Run `scripts/check-architektur.sh` und die Wächter der
   Anwenderdoku aus `docs/anwender/AGENTS.md` → PASS.
-- [ ] **Step 2:** Commit `docs: Helfer-App für Anwender, Betrieb und Datenschutz`.
+- [x] **Step 2:** Commit `docs: Helfer-App für Anwender, Betrieb und Datenschutz`.
 
 ### Task 15: Gates, TestFlight, PR
 

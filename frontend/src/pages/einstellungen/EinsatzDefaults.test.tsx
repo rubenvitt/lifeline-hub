@@ -786,6 +786,8 @@ describe('EinsatzDefaults · Speicherleiste und Verlassen-Guard (LFH-346)', () =
     fireEvent.click(ortung);
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByText(EINWILLIGUNG)).toBeInTheDocument();
+    // Die DSFA-Vorlage liegt im Repository; der Dialog nennt ihren Pfad.
+    expect(within(dialog).getByText('docs/datenschutz/dsfa-vorlage-ortung.md')).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
     expect(ortung).not.toBeChecked();
     expect(personen).toBeDisabled();

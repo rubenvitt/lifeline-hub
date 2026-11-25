@@ -402,6 +402,9 @@ export default function EinsatzDefaults() {
 const ORTUNG_EINWILLIGUNG =
   'Ich bestätige, dass für diese Organisation eine Einwilligung der Helfenden bzw. eine Betriebsvereinbarung vorliegt.';
 
+/** Pfad der Vorlage im Repository (`docs/datenschutz/`); die App liefert die Docs nicht aus. */
+const ORTUNG_DSFA_VORLAGE = 'docs/datenschutz/dsfa-vorlage-ortung.md';
+
 interface OrtungSchalterProps {
   id?: string;
   checked?: boolean;
@@ -444,6 +447,11 @@ function OrtungSchalter({ id, checked, onChange, onAus }: OrtungSchalterProps) {
         destroyOnHidden
       >
         <Typography.Paragraph>{ORTUNG_EINWILLIGUNG}</Typography.Paragraph>
+        {/* Die Docs liefert die App nicht aus: der Pfad steht als Text, die Vorlage liegt im Repository. */}
+        <Typography.Paragraph type="secondary">
+          {'Vorlage zur Datenschutz-Folgenabschätzung: '}
+          <Typography.Text code>{ORTUNG_DSFA_VORLAGE}</Typography.Text>
+        </Typography.Paragraph>
       </Modal>
     </>
   );
