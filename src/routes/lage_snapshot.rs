@@ -159,3 +159,45 @@ pub async fn loeschen(
     sse_snapshot(&state, einsatz_id, sid);
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// `Cache-Control` eines eingefrorenen Inhalts: er ändert sich unter seinem Hash nie.
+const STAND_FREMDEBENE_CACHE_CONTROL: &str = "private, max-age=31536000, immutable";
+
+/// GET /api/incidents/{id}/situation-snapshots/{sid}/foreign-layers/{sha256}/data — der
+/// eingefrorene Inhalt einer Fremdebene des Stands (LLH-2130). Adressiert über den Hash: er ist
+/// über Instanzen und das Löschen der Ebene hinweg stabil. 404, wenn der Stand den Hash nicht
+/// nennt. `ETag` und 304 wie die Live-Route.
+pub async fn fremdebene_daten(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
+    PfadParam((_id, sid, sha)): PfadParam<(i64, i64, String)>,
+    req_headers: axum::http::HeaderMap,
+) -> Result<axum::response::Response, AppError> {
+    use axum::http::{header, HeaderValue};
+    use axum::response::IntoResponse;
+    if sha.len() != 64 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(AppError::NotFound);
+    }
+    let geojson = crate::lage_snapshot::fremdebene::laden(&state.pool, ctx.einsatz.id, sid, &sha)
+        .await?
+        .ok_or(AppError::NotFound)?;
+    let etag = crate::routes::support::etag_von(&sha);
+    let mut headers = axum::http::HeaderMap::new();
+    headers.insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag)
+            .map_err(|e| AppError::Internal(format!("Ungültiger ETag: {e}")))?,
+    );
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(STAND_FREMDEBENE_CACHE_CONTROL),
+    );
+    if crate::routes::support::if_none_match_matcht(&req_headers, &etag) {
+        return Ok((StatusCode::NOT_MODIFIED, headers).into_response());
+    }
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/geo+json"),
+    );
+    Ok((headers, geojson).into_response())
+}

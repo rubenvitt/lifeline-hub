@@ -2401,6 +2401,41 @@ describe('LagekartePage · Neuentwurf S5', () => {
     expect(document.querySelector('[data-lfh="einsatzort-band"]')).toBeNull();
   });
 
+  it('zeigt im gesicherten Stand die eingefrorenen Fremdebenen als Zeile, ohne Menü (LLH-2130)', async () => {
+    const sha = 'b'.repeat(64);
+    const fremd = {
+      id: 4,
+      name: 'Pegel damals',
+      color: 'fremd-2',
+      source: 'url',
+      url_host: 'geo.example.org',
+      feature_count: 1,
+      dropped_count: 0,
+      sha256: sha,
+    };
+    basisHandler([
+      http.get('/api/incidents/1/situation-snapshots', () => HttpResponse.json([STAND_A])),
+      http.get('/api/incidents/1/situation-snapshots/3', () =>
+        HttpResponse.json({ ...STAND_A, daten: { einsatz: EINSATZ, fremdebenen: [fremd] } }),
+      ),
+      http.get(`/api/incidents/1/situation-snapshots/3/foreign-layers/${sha}/data`, () =>
+        HttpResponse.json({ type: 'FeatureCollection', features: [] }),
+      ),
+    ]);
+    renderSeite('/einsaetze/1/lagekarte?snapshot=3');
+    await screen.findByText('Historischer Stand — schreibgeschützt');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Ebenen' }));
+    if (!screen.queryByRole('switch', { name: 'Pegel damals' })) {
+      await user.click(await screen.findByRole('button', { name: /^Fremdebenen/ }));
+    }
+    const zeile = await screen.findByRole('switch', { name: 'Pegel damals' });
+    expect(zeile).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Pegel damals.*Aktionen|Aktionen.*Pegel damals/ }),
+    ).toBeNull();
+  });
+
   it('zeigt die Drohnenquellen nur live, im gesicherten Stand weder Zeile noch Abfrage (LLH-2106)', async () => {
     const abgefragt = vi.fn();
     const quellen = http.get('/api/incidents/1/drone/sources', () => {

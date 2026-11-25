@@ -4276,6 +4276,12 @@ export interface components {
             created_at: string;
             /**
              * Format: int64
+             * @description Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne
+             *     den Inhalt zu serialisieren. Fehlt ohne Inhalt.
+             */
+            data_size?: number | null;
+            /**
+             * Format: int64
              * @description Zahl der Objekte ohne lesbare Geometrie.
              */
             dropped_count: number;

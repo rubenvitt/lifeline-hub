@@ -1987,6 +1987,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
                 .patch(routes::lage_snapshot::patch)
                 .delete(routes::lage_snapshot::loeschen),
         )
+        // Eingefrorene Fremdebenen eines Stands (LLH-2130), Grenze wie die Live-Daten.
+        .route(
+            "/api/incidents/{id}/situation-snapshots/{sid}/foreign-layers/{sha256}/data",
+            get(routes::lage_snapshot::fremdebene_daten).route_layer(download_grenze()),
+        )
         .route("/api/incidents/{id}/zones", get(routes::lage_zone::liste))
         .route(
             "/api/incidents/{id}/zones",

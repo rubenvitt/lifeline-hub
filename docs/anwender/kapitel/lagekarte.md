@@ -575,8 +575,8 @@ verantwortet den Empfängerkreis.
 Eine Fremdebene ist eine Kartenebene aus Daten Dritter. Sie gehört zum Einsatz und ist für alle
 sichtbar, die ihn sehen; ein- oder ausgeblendet wird je Arbeitsplatz, und das Gerät merkt sich
 die Wahl je Einsatz. Fremde Daten erscheinen auf der Karte, im Lageplan samt Legende
-(„Fremde Daten: Name“) und bei der Auswahl; in den Export (KMZ, GeoJSON, GPX), in gesicherte Stände
-der Lage, im Lagemonitor und im Lagebild extern erscheinen sie nicht.
+(„Fremde Daten: Name“), bei der Auswahl und in gesicherten Ständen der Lage; in den Export (KMZ,
+GeoJSON, GPX), im Lagemonitor und im Lagebild extern erscheinen sie nicht.
 
 - **Dateien:** GeoJSON, KML und KMZ, jeweils bis 10 MB; ein KMZ darf entpackt höchstens 20 MB
   haben. Eine Ebene trägt höchstens 5000 Objekte und 200000 Stützpunkte, eine einzelne Linie oder
@@ -600,8 +600,14 @@ der Lage, im Lagemonitor und im Lagebild extern erscheinen sie nicht.
   führt; eine Spiegel-Instanz zeigt den letzten gespeicherten Stand.
 - **Die Adresse sehen nur Schreibende:** Wer nur lesen darf, sieht den Namen des Servers, nicht
   die vollständige Adresse.
-- **Ohne Netz:** Die App hält die Ebenen für die Arbeit ohne Netz vor. Hinzufügen, Umbenennen,
-  Färben und Entfernen brauchen eine Verbindung; die Einträge sind ohne Netz gesperrt.
+- **Gesicherte Stände:** „Stand sichern“ hält jede Fremdebene mit ihrem damaligen Inhalt fest.
+  Die Historienansicht zeigt genau diesen Inhalt, auch wenn die Ebene inzwischen neu abgerufen,
+  geändert oder entfernt wurde. Werden die Anhänge eines abgeschlossenen Einsatzes geschwärzt,
+  fällt der festgehaltene Inhalt mit; die Zeile sagt dann „nicht geladen“.
+- **Ohne Netz:** Die App hält die Ebenen für die Arbeit ohne Netz vor, zusammen höchstens 16 MB je
+  Einsatz, die kleinsten zuerst, und nur die, die an diesem Gerät eingeblendet waren. Eine Ebene
+  darüber steht ohne Netz als „offline“ in der Leiste. Hinzufügen, Umbenennen, Färben und
+  Entfernen brauchen eine Verbindung; die Einträge sind ohne Netz gesperrt.
 - **Verantwortung:** Fremde Daten sind nicht geprüft und nicht Teil des Lagebilds. Wer sie in
   der Lagedarstellung verwendet, verantwortet ihre Herkunft.
 

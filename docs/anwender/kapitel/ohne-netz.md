@@ -78,7 +78,8 @@ heißt es weiter „Offline vorgemerkt“.
 - Aufträge und Befehle
 - Betroffene, Unfallhilfsstellen, Betreuung
 - Bereitstellungsräume als Liste mit Standort und Belegung; die Seite eines einzelnen Raums nicht
-- Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden
+- Lagekarte mit Zonen, Zeichen, Gefahrengebieten und Schäden; eingeblendete Fremdebenen zusammen bis 16 MB je
+  Einsatz, die kleinsten zuerst
 - Rückmeldungen und der Kommunikationsplan des Fernmeldewesens
 - „Eingänge“, der Verlauf der eigenen Benachrichtigungen
 
