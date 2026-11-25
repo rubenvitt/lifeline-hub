@@ -15,6 +15,7 @@ import type {
   LageMeldungStand,
   KartenAnsicht,
 } from '../../api/types';
+import type { FremdebeneImStand } from '../../api/fremdebenen';
 import type { Hintergrundbild } from '../../api/kartenbilder';
 import type { TierKartenEintrag } from './tierMarker';
 
@@ -70,4 +71,9 @@ export interface SnapshotDaten {
    * (`TierKarte` in `src/tier/mod.rs`). Optional wie `bereitstellungsraeume`.
    */
   tiere?: TierKartenEintrag[];
+  /**
+   * Fremdebenen mit Inhalt (LLH-2130): Angaben und Hash, der Inhalt kommt über
+   * `ladeStandFremdebeneDaten`. Optional: ältere Stände tragen das Feld nicht.
+   */
+  fremdebenen?: FremdebeneImStand[];
 }

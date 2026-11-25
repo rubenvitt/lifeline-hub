@@ -164,6 +164,10 @@ pub struct FremdebeneAnzeige {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<FremdebeneFehler>,
     pub created_at: String,
+    /// Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne
+    /// den Inhalt zu serialisieren. Fehlt ohne Inhalt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_size: Option<i64>,
 }
 
 impl FremdebeneAnzeige {

@@ -78,7 +78,7 @@ async fn liste_liefert_metadaten_ohne_daten_einzel_liefert_dokument() {
     let (pool, einsatz_id, benutzer_id, _org_id) = setup().await;
     let daten = json!({"version": 1, "marker": [{"typ": "uhs", "id": 1}]});
     let id = repo::insert_roh(
-        &pool,
+        &mut *pool.acquire().await.unwrap(),
         einsatz_id,
         benutzer_id,
         Some("08:00"),
@@ -113,7 +113,7 @@ async fn lade_und_loesche_sind_einsatz_gescopt() {
     let (pool, einsatz_id, benutzer_id, _org_id) = setup().await;
     let daten = json!({"version": 1});
     let id = repo::insert_roh(
-        &pool,
+        &mut *pool.acquire().await.unwrap(),
         einsatz_id,
         benutzer_id,
         None,
@@ -941,7 +941,7 @@ async fn snapshot_traegt_zeichen_spec_und_alter_stand_bleibt_lesbar() {
     let mut alt = neu["daten"].clone();
     alt["freie_zeichen"] = alt_zeichen.clone();
     let sid = repo::insert_roh(
-        &pool,
+        &mut *pool.acquire().await.unwrap(),
         e,
         benutzer_id,
         Some("Alt"),

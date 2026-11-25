@@ -13,7 +13,7 @@ use sqlx::SqlitePool;
 /// Die Tabellen, deren Zeilen der Nachlauf einzeln löscht. Die eine Quelle für den Nachlauf, den
 /// Guard der Registry (`ZeileEinzelnLoeschen` nur hier) und das Warten der Skelett-Löschung.
 /// Jede trägt `id` und `einsatz_id`.
-pub const EINZELN_GELOESCHT: &[&str] = &["anhang", "karte_hintergrundbild"];
+pub const EINZELN_GELOESCHT: &[&str] = &["anhang", "karte_hintergrundbild", "karte_fremdebene_stand"];
 
 /// Kind-Tabellen einer Tabelle aus [`EINZELN_GELOESCHT`] als `(kind, elternteil)`: sie fallen
 /// per `ON DELETE CASCADE` mit deren Zeile, in derselben Transaktion des Nachlaufs (LFH-936, die
@@ -203,5 +203,37 @@ mod tests {
             1,
             "der andere Einsatz wartet auf seinen Lauf"
         );
+    }
+
+    /// Eingefrorene Inhalte der Fremdebenen (LLH-2130) fallen im Nachlauf, sobald die Kategorie
+    /// `anhaenge` eines abgeschlossenen Einsatzes geschwärzt ist.
+    #[tokio::test]
+    async fn stand_inhalt_faellt_im_nachlauf_mit_kategorie_anhaenge() {
+        let pool = crate::db::test_pool().await;
+        let (e, _) = einsatz(&pool, crate::einsatz::STATUS_ABGESCHLOSSEN).await;
+        sqlx::query(
+            "INSERT INTO karte_fremdebene_stand (einsatz_id, sha256, geojson, objekte, verworfen) \
+             VALUES (?, 'abc', x'7b7d', 0, 0)",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO einsatz_aufbewahrung_kategorie \
+                 (einsatz_id, kategorie, rechtsgrundlage, geschwaerzt_at) \
+             VALUES (?, 'anhaenge', 'Test', '2026-03-01 00:00:00')",
+        )
+        .bind(e)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(entferne_vorgesehene(&pool, Some(e)).await.unwrap(), 1);
+        let rest: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM karte_fremdebene_stand")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(rest, 0);
     }
 }

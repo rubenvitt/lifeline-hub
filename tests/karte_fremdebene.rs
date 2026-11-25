@@ -474,3 +474,127 @@ async fn live_ereignis_bei_jeder_aenderung() {
     assert_eq!(s, StatusCode::NO_CONTENT);
     recv_until_tag(&mut rx, "karte_fremdebene", warten).await;
 }
+
+// ---------- Fremdebenen im gesicherten Stand (LLH-2130) ----------
+
+async fn stand_daten(
+    app: &axum::Router,
+    einsatz: i64,
+    stand: i64,
+    sha: &str,
+    cookie: &str,
+    if_none_match: Option<&str>,
+) -> (StatusCode, HeaderMap, Vec<u8>) {
+    let mut req = Request::builder()
+        .method("GET")
+        .uri(format!(
+            "/api/incidents/{einsatz}/situation-snapshots/{stand}/foreign-layers/{sha}/data"
+        ))
+        .header(header::COOKIE, cookie);
+    if let Some(etag) = if_none_match {
+        req = req.header(header::IF_NONE_MATCH, etag);
+    }
+    let resp = app
+        .clone()
+        .oneshot(req.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = resp.status();
+    let headers = resp.headers().clone();
+    let bytes = to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap()
+        .to_vec();
+    (status, headers, bytes)
+}
+
+/// Legt einen Stand an; liefert seine ID und die Hashes seiner Fremdebenen.
+async fn stand_sichern(app: &axum::Router, einsatz: i64, cookie: &str) -> (i64, Vec<String>) {
+    let (s, dok) = anfrage_json(
+        app,
+        "POST",
+        &format!("/api/incidents/{einsatz}/situation-snapshots"),
+        cookie,
+        json!({}),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{dok}");
+    let hashes = dok["daten"]["fremdebenen"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| f["sha256"].as_str().unwrap().to_string())
+        .collect();
+    (dok["id"].as_i64().unwrap(), hashes)
+}
+
+#[tokio::test]
+async fn stand_route_liefert_eingefrorenen_inhalt_und_304() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let (_, ebene) = hochladen(
+        &app,
+        einsatz,
+        &admin,
+        &[("name", "Gebiete")],
+        Some(("g.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    let (_, live_h, live) = daten(&app, einsatz, ebene["id"].as_i64().unwrap(), &admin, None).await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+    assert_eq!(hashes.len(), 1);
+
+    let (s, h, body) = stand_daten(&app, einsatz, stand, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(h[header::CONTENT_TYPE], "application/geo+json");
+    assert_eq!(body, live);
+    let etag = h[header::ETAG].to_str().unwrap().to_string();
+    assert_eq!(etag, live_h[header::ETAG].to_str().unwrap());
+
+    let (s, _, body) = stand_daten(&app, einsatz, stand, &hashes[0], &admin, Some(&etag)).await;
+    assert_eq!(s, StatusCode::NOT_MODIFIED);
+    assert!(body.is_empty());
+}
+
+#[tokio::test]
+async fn fremder_hash_ist_404() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let anderer = einsatz_anlegen(&app, &admin).await;
+    let datei = Some(("g.geojson", ZWEI_PUNKTE.as_bytes()));
+    hochladen(&app, einsatz, &admin, &[("name", "A")], datei).await;
+    let (leer, _) = stand_sichern(&app, anderer, &admin).await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+
+    // Derselbe Inhalt über einen Stand, der ihn nicht nennt, und über einen anderen Einsatz.
+    let (s, _, _) = stand_daten(&app, anderer, leer, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = stand_daten(&app, anderer, stand, &hashes[0], &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _, _) = stand_daten(&app, einsatz, stand, "kein-hash", &admin, None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn beobachter_liest_stand_fremdebene() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    hochladen(
+        &app,
+        einsatz,
+        &admin,
+        &[("name", "A")],
+        Some(("g.geojson", ZWEI_PUNKTE.as_bytes())),
+    )
+    .await;
+    let (stand, hashes) = stand_sichern(&app, einsatz, &admin).await;
+    let beo_id = benutzer_anlegen(&app, &admin, "beobachter-stand", "keine").await;
+    rolle_setzen(&app, &admin, einsatz, beo_id, "beobachter").await;
+    let beo = login_cookie(&app, "beobachter-stand", "beobachter-standpw1").await;
+
+    let (s, _, _) = stand_daten(&app, einsatz, stand, &hashes[0], &beo, None).await;
+    assert_eq!(s, StatusCode::OK);
+}

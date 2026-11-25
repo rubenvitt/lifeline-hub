@@ -803,6 +803,27 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
+        // Eingefrorene Inhalte der Fremdebenen für gesicherte Stände (LLH-2130, Migration 0382).
+        // Einzeln im Nachlauf (`Strategie::ZeileEinzelnLoeschen`): die Tabelle hat keine
+        // Mengengrenze (Versionen × Ebenen × bis 8 MiB), alle in einer Transaktion hielten die
+        // Schreibsperre zu lange (LFH-905). Zuordnung `anhaenge` wie die Bilder der Lagekarte,
+        // weil der Nachlauf genau „Einsatz geschwärzt oder Kategorie `anhaenge`“ erfasst; der
+        // Stand selbst bleibt, seine Route antwortet dann 404. Lesewege übergehen vorgesehene
+        // Zeilen (`lage_snapshot::fremdebene::laden`).
+        tabelle: "karte_fremdebene_stand",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            scrub("id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("einsatz_id", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("sha256", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("geojson", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("objekte", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+            scrub("verworfen", Strategie::ZeileEinzelnLoeschen, Z_ANHAENGE),
+        ],
+    },
+    TabellenRegel {
         // Kartenansicht: einsatzweit geteilte Layout-/Konfig-Daten; einziger Freitext ist der Name.
         tabelle: "karten_ansicht",
         scoping: Scoping::EinsatzId,
@@ -4610,6 +4631,8 @@ mod tests {
             "befehl_anlage",
             "karte_hintergrundbild",
             "karte_hintergrundbild_daten",
+            // Eingefrorene Fremdebenen-Inhalte der Stände (LLH-2130).
+            "karte_fremdebene_stand",
         ] {
             anhaenge.extend(spalten_von(t));
         }

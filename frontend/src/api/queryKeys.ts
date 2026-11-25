@@ -206,6 +206,9 @@ export const EINSATZ_KEYS = {
   // Snapshot-Dokument: eigener Prefix, damit die Listen-Invalidierung (`lage_snapshot`) die
   // unveränderlichen Dokumente nicht per Prefix mit-refetcht.
   lageSnapshotDokument: 'einsatz-lage-snapshot-dokument',
+  // Eingefrorener Inhalt einer Fremdebene eines Stands (LLH-2130): unter seinem Hash unveränderlich,
+  // nicht im Lagebild offline wie das Dokument.
+  lageSnapshotFremdebeneDaten: 'einsatz-lage-snapshot-fremdebene-daten',
   // Maßgebliche Pegel mit Messung: kein Live-Event, 5-min-Nachfrage.
   pegel: 'einsatz-pegel',
   // Wetter am Einsatzort: DWD-Warnungen + Vorhersage, kein Live-Event.
@@ -621,6 +624,8 @@ export const EINSATZ_STREAM_ZIELE: Partial<
  *   Live-Refetch schriebe weitere.
  * - `schichtplanDruck` (LLH-1557): derselbe Schnappschuss-Grundsatz für Aushang und Zettel des
  *   Schichtplans; unter `abloesungen` zöge ihn das Ereignis `abloesung` per Präfix mit.
+ * - `lageSnapshotFremdebeneDaten` (LLH-2130): der Key trägt den Hash des eingefrorenen Inhalts,
+ *   er ändert sich nie; gelöscht wird er nur mit dem Stand.
  * - `anhangHeicVorschau` (LFH-759): ein Anhang ändert sich nie, die Schwärzung löscht ihn nur;
  *   ein Live-Refetch dekodierte dasselbe HEIC noch einmal.
  * - `uhsPlanBild` (LFH-999): der Key trägt den sha256 aus dem live geführten Detail; ein neuer
@@ -649,6 +654,7 @@ export const NICHT_LIVE_KEYS = [
   EINSATZ_KEYS.person,
   EINSATZ_KEYS.personAudit,
   EINSATZ_KEYS.lageSnapshotDokument,
+  EINSATZ_KEYS.lageSnapshotFremdebeneDaten,
   EINSATZ_KEYS.pegel,
   EINSATZ_KEYS.wetter,
   EINSATZ_KEYS.etbDruck,
@@ -867,6 +873,8 @@ export const einsatzKeys = {
   lageSnapshot: (einsatzId: number) => [EINSATZ_KEYS.lageSnapshot, einsatzId] as const,
   lageSnapshotDokument: (einsatzId: number, snapshotId: number) =>
     [EINSATZ_KEYS.lageSnapshotDokument, einsatzId, snapshotId] as const,
+  lageSnapshotFremdebeneDaten: (einsatzId: number, snapshotId: number, sha256: string) =>
+    [EINSATZ_KEYS.lageSnapshotFremdebeneDaten, einsatzId, snapshotId, sha256] as const,
   gefahrengebiete: (einsatzId: number) => [EINSATZ_KEYS.gefahrengebiete, einsatzId] as const,
   gefahrenmatrix: (einsatzId: number, gewaehlt: number | null) =>
     [EINSATZ_KEYS.gefahrenmatrix, einsatzId, gewaehlt] as const,
@@ -1660,7 +1668,7 @@ export const LAGEBILD_OFFLINE = {
     EINSATZ_KEYS.kartenAnsicht,
     EINSATZ_KEYS.kartenbilder,
     // Fremdebenen (LLH-2099): Liste und je Ebene das normierte GeoJSON, damit die Karte ohne Netz
-    // dieselben Ebenen zeigt.
+    // dieselben Ebenen zeigt; die Daten nur im Budget (LLH-2130, `offline/fremdebenenBudget.ts`).
     EINSATZ_KEYS.fremdebenen,
     EINSATZ_KEYS.fremdebeneDaten,
     EINSATZ_KEYS.lageSnapshot,

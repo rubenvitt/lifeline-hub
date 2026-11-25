@@ -788,9 +788,9 @@ export default function LagekartePage() {
     beginneHandlung: kartenFehler.beginne,
   });
 
-  // Fremdebenen (LLH-2099): Liste, Sichtbarkeit je Arbeitsplatz, Daten der sichtbaren Ebenen. Der
-  // gesicherte Stand kennt keine Fremdebenen. Ein Objekt öffnet eine Detailkarte nur zum Lesen.
-  const fremd = useFremdebenen(einsatzId, { aktiv: quelle.typ === 'live' });
+  // Fremdebenen (LLH-2099): Liste, Sichtbarkeit je Arbeitsplatz, Daten der sichtbaren Ebenen. Im
+  // gesicherten Stand die eingefrorenen (LLH-2130). Ein Objekt öffnet eine Detailkarte nur zum Lesen.
+  const fremd = useFremdebenen(einsatzId, { quelle });
   const [fremdAuswahl, setFremdAuswahl] = useState<{
     ebeneId: number;
     properties: Record<string, unknown>;

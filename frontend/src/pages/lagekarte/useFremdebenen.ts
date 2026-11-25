@@ -11,14 +11,18 @@ import type { FeatureCollection } from '../../api/fachebenen';
 import {
   aktualisiereFremdebene,
   ladeFremdebeneDaten,
+  ladeStandFremdebeneDaten,
   listeFremdebenen,
   loescheFremdebene,
   type Fremdebene,
+  type FremdebeneImStand,
 } from '../../api/fremdebenen';
+import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import { einsatzKeys } from '../../api/queryKeys';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
 import type { AktiveFremdebene } from './fremdebenenLayer';
+import type { SnapshotDaten, Standquelle } from './snapshotDaten';
 
 /**
  * Fremdebenen-Leg der Lagekarte (LLH-2099, Entwurf „Oberfläche“): Liste, Sichtbarkeit je
@@ -98,11 +102,36 @@ const fasseDatenZusammen = (r: QueryObserverResult<FeatureCollection>[]) => ({
 });
 
 interface FremdebenenOptionen {
-  /** Aus im gesicherten Stand (Snapshot): der kennt keine Fremdebenen. Vorgabe an. */
-  aktiv?: boolean;
+  /**
+   * Live oder ein gesicherter Stand (LLH-2130). Im Stand kommen die Ebenen aus `daten.fremdebenen`
+   * des Dokuments und ihr Inhalt über den Hash; keine Live-Route, kein Schreibweg. Vorgabe live.
+   */
+  quelle?: Standquelle;
 }
 
-export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenOptionen = {}) {
+const LIVE: Standquelle = { typ: 'live' };
+
+/**
+ * Eine eingefrorene Ebene in der Form der Liste. Eine Ebene ohne `id` (am Spiegel nicht mehr da)
+ * bekommt eine negative Platzhalter-ID: sie ist immer sichtbar und nicht ausblendbar.
+ */
+export function ebeneAusStand(f: FremdebeneImStand, index: number, standAt: string): Fremdebene {
+  return {
+    id: f.id ?? -(index + 1),
+    name: f.name,
+    color: f.color,
+    source: f.source,
+    url_host: f.url_host,
+    fetched_at: f.fetched_at,
+    feature_count: f.feature_count,
+    dropped_count: f.dropped_count,
+    created_at: standAt,
+  };
+}
+
+export function useFremdebenen(einsatzId: number, { quelle = LIVE }: FremdebenenOptionen = {}) {
+  const snapshotId = quelle.typ === 'snapshot' ? quelle.id : undefined;
+  const aktiv = snapshotId == null;
   const qc = useQueryClient();
   const { token } = theme.useToken();
   // Gemerkt je Einsatz; ein Einsatzwechsel liest den Stand des neuen beim Rendern nach.
@@ -123,14 +152,29 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
         ? URL_TAKT_MS
         : false,
   });
-  const ebenen = useMemo(() => (aktiv ? (liste.data ?? []) : []), [aktiv, liste.data]);
+  // Im Stand das Dokument (gleicher Key wie `useLagekarteDaten`, kein zweiter Abruf).
+  const dokument = useQuery({
+    queryKey: einsatzKeys.lageSnapshotDokument(einsatzId, snapshotId as number),
+    queryFn: () => ladeLageSnapshot(einsatzId, snapshotId as number),
+    enabled: snapshotId != null,
+  });
+  const imStand = useMemo<readonly FremdebeneImStand[]>(() => {
+    if (snapshotId == null) return [];
+    return (dokument.data?.daten as SnapshotDaten | undefined)?.fremdebenen ?? [];
+  }, [snapshotId, dokument.data]);
+  const ebenen = useMemo<Fremdebene[]>(() => {
+    if (aktiv) return liste.data ?? [];
+    const standAt = dokument.data?.stand_at ?? '';
+    return imStand.map((f, i) => ebeneAusStand(f, i, standAt));
+  }, [aktiv, liste.data, imStand, dokument.data?.stand_at]);
 
   const sichtbar = useMemo(
-    () => new Set(ebenen.filter((e) => !ausgeblendet.has(e.id)).map((e) => e.id)),
+    () => new Set(ebenen.filter((e) => e.id < 0 || !ausgeblendet.has(e.id)).map((e) => e.id)),
     [ebenen, ausgeblendet],
   );
 
   const toggle = useCallback((id: number) => {
+    if (id < 0) return;
     setSicht((alt) => {
       const aus = new Set(alt.aus);
       if (aus.has(id)) aus.delete(id);
@@ -141,12 +185,23 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
   }, []);
 
   const { daten, stand } = useQueries({
-    queries: ebenen.map((e) => ({
-      queryKey: einsatzKeys.fremdebeneDaten(einsatzId, e.id),
-      queryFn: () => ladeFremdebeneDaten(einsatzId, e.id),
-      enabled: sichtbar.has(e.id),
-      refetchInterval: () => fremdebeneTakt(e, sichtbar.has(e.id)),
-    })),
+    queries: ebenen.map((e, i) => {
+      const sha = imStand[i]?.sha256;
+      return snapshotId != null && sha != null
+        ? {
+            // Unter seinem Hash unveränderlich: kein Takt, kein Veralten.
+            queryKey: einsatzKeys.lageSnapshotFremdebeneDaten(einsatzId, snapshotId, sha),
+            queryFn: () => ladeStandFremdebeneDaten(einsatzId, snapshotId, sha),
+            enabled: sichtbar.has(e.id),
+            staleTime: Infinity,
+          }
+        : {
+            queryKey: einsatzKeys.fremdebeneDaten(einsatzId, e.id),
+            queryFn: () => ladeFremdebeneDaten(einsatzId, e.id),
+            enabled: sichtbar.has(e.id),
+            refetchInterval: () => fremdebeneTakt(e, sichtbar.has(e.id)),
+          };
+    }),
     combine: fasseDatenZusammen,
   });
   // Der Modus als Wert: ein Wechsel Tag ↔ Nacht färbt die Ebenen um.
@@ -176,7 +231,14 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
           laeuft: q.fetchStatus === 'fetching',
           neuLaden: () =>
             void qc.refetchQueries({
-              queryKey: einsatzKeys.fremdebeneDaten(einsatzId, e.id),
+              queryKey:
+                snapshotId != null && imStand[i]
+                  ? einsatzKeys.lageSnapshotFremdebeneDaten(
+                      einsatzId,
+                      snapshotId,
+                      imStand[i].sha256,
+                    )
+                  : einsatzKeys.fremdebeneDaten(einsatzId, e.id),
               exact: true,
             }),
         });
@@ -185,7 +247,7 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
       }
     });
     return zustand;
-  }, [ebenen, sichtbar, daten, stand, qc, einsatzId]);
+  }, [ebenen, sichtbar, daten, stand, qc, einsatzId, snapshotId, imStand]);
 
   const invalidiere = () => qc.invalidateQueries({ queryKey: einsatzKeys.fremdebenen(einsatzId) });
   const aendern = useMutation({
@@ -202,7 +264,7 @@ export function useFremdebenen(einsatzId: number, { aktiv = true }: FremdebenenO
   });
 
   return {
-    /** Alle Ebenen des Einsatzes (leer im gesicherten Stand). */
+    /** Alle Ebenen des Einsatzes, im gesicherten Stand die eingefrorenen. */
     ebenen,
     /** IDs der Ebenen, die dieser Arbeitsplatz zeigt. */
     sichtbar,

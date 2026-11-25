@@ -409,6 +409,53 @@ describe('Lagebild-Sitzung', () => {
     ]);
   });
 
+  it('speicherung_laesst_daten_ueber_budget_draussen und stellt sie nicht wieder her (LLH-2130)', async () => {
+    const MIB = 1024 * 1024;
+    const fc = { type: 'FeatureCollection', features: [] };
+    const erster = neuerClient();
+    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    erster.setQueryData(einsatzKeys.fremdebenen(3), [
+      { id: 1, data_size: 12 * MIB, created_at: '2026-11-25T10:00:00Z' },
+      { id: 2, data_size: 6 * MIB, created_at: '2026-11-25T10:00:00Z' },
+    ]);
+    erster.setQueryData(einsatzKeys.fremdebeneDaten(3, 1), fc);
+    erster.setQueryData(einsatzKeys.fremdebeneDaten(3, 2), fc);
+    const satz = await warteAufGeschrieben((n) => n >= 2);
+    expect(satz.client.clientState.queries.map((q) => q.queryKey)).toEqual([
+      einsatzKeys.fremdebenen(3),
+      einsatzKeys.fremdebeneDaten(3, 2),
+    ]);
+    await lagebildBeenden(erster);
+
+    const zweiter = neuerClient();
+    await lagebildStarten(zweiter, { art: 'netzfehler' }, { drosselMs: DROSSEL });
+    expect(zweiter.getQueryData(einsatzKeys.fremdebeneDaten(3, 2))).toEqual(fc);
+    expect(zweiter.getQueryData(einsatzKeys.fremdebeneDaten(3, 1))).toBeUndefined();
+  });
+
+  it('behält Fremdebenen-Daten aus dem Vorrat, wenn die Liste live kommt (LLH-2130)', async () => {
+    const fc = { type: 'FeatureCollection', features: [] };
+    const ebenen = [{ id: 2, data_size: 100, created_at: '2026-11-25T10:00:00Z' }];
+    const erster = neuerClient();
+    await lagebildStarten(erster, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    erster.setQueryData(einsatzKeys.fremdebenen(3), ebenen);
+    erster.setQueryData(einsatzKeys.fremdebeneDaten(3, 2), fc);
+    await warteAufGeschrieben((n) => n >= 2);
+    await lagebildBeenden(erster);
+
+    // Serverbestätigt: der Stand bleibt Vorrat, die Liste kommt live, die Daten nicht.
+    const zweiter = neuerClient();
+    await lagebildStarten(zweiter, { art: 'ok', benutzer: A }, { drosselMs: DROSSEL });
+    zweiter.setQueryData(einsatzKeys.fremdebenen(3), ebenen);
+    await warte(DROSSEL * 3);
+    zweiter.setQueryData(einsatzKeys.betreuung(3), []);
+    await warte(DROSSEL * 3);
+    const satz = await warteAufGeschrieben((n) => n >= 2);
+    expect(satz.client.clientState.queries.map((q) => q.queryKey)).toContainEqual(
+      einsatzKeys.fremdebeneDaten(3, 2),
+    );
+  });
+
   it('stellt die Liste der Bereitstellungsräume ungekürzt wieder her, das Detail nicht (LLH-1318)', async () => {
     const raum = {
       id: 4,

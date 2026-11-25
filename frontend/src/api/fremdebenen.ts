@@ -9,9 +9,11 @@ export type Fremdebene = components['schemas']['FremdebeneAnzeige'];
 /** Rust: `FremdebeneFehler`, der `grund` einer abgelehnten Datei und `error` einer URL-Ebene. */
 export type FremdebeneFehler = components['schemas']['FremdebeneFehler'];
 
-/** Grenzen des Servers (`karte_fremdebene::DATEI_MAX`, `NAME_MAX`). */
+/** Grenzen des Servers (`karte_fremdebene::DATEI_MAX`, `NAME_MAX`, `GEOJSON_MAX`). */
 export const FREMDEBENE_GRENZEN = {
   dateiBytes: 10 * 1024 * 1024,
+  /** Normiertes GeoJSON einer Ebene höchstens (LLH-2130: Schätzwert ohne `data_size`). */
+  geojsonBytes: 8 * 1024 * 1024,
   nameMax: FREMDEBENE_NAME_MAX,
 } as const;
 
@@ -48,6 +50,34 @@ export function ladeFremdebeneDaten(
   ebeneId: number,
 ): Promise<FeatureCollection> {
   return apiGet<FeatureCollection>(`${basis(einsatzId)}/${ebeneId}/data`);
+}
+
+/**
+ * Eine Fremdebene, wie ein gesicherter Stand sie einfriert (LLH-2130, Rust:
+ * `lage_snapshot::fremdebene::FremdebeneImStand`): ohne `url`, mit dem Hash ihres Inhalts. `id`
+ * ist am Spiegel `null`, wenn die Ebene dort nicht (mehr) besteht.
+ */
+export interface FremdebeneImStand {
+  id: number | null;
+  name: string;
+  color: string;
+  source: Fremdebene['source'];
+  url_host?: string;
+  fetched_at?: string;
+  feature_count: number;
+  dropped_count: number;
+  sha256: string;
+}
+
+/** Der eingefrorene Inhalt einer Fremdebene eines Stands, adressiert über ihren Hash. */
+export function ladeStandFremdebeneDaten(
+  einsatzId: number,
+  snapshotId: number,
+  sha256: string,
+): Promise<FeatureCollection> {
+  return apiGet<FeatureCollection>(
+    `/api/incidents/${einsatzId}/situation-snapshots/${snapshotId}/foreign-layers/${sha256}/data`,
+  );
 }
 
 /** Genau eine Quelle: `datei` oder `url`. Ein leerer Name lässt den Server einen vorschlagen. */
