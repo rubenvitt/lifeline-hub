@@ -207,7 +207,9 @@ und Straßen, gestrichelt umrandet das ausgewertete Gebiet. Außerhalb dieses Um
 ausgewertet; eine leere Fläche dort heißt nicht „trocken“. Unter der Zeile stehen die Aktivierungen
 im Ausschnitt mit ihrer Aufnahmezeit, denn ein Satellitenbild ist Stunden bis Tage alt. Gezeigt
 werden laufende und in den letzten 30 Tagen geänderte Aktivierungen; „Ältere Aktivierungen“
-blendet frühere ein, bis die Seite neu lädt. Aktivierungen vor 2023 fehlen.
+blendet frühere ein, bis die Seite neu lädt. Von den Aktivierungen vor 2023 zeigt sie
+ausgewählte, etwa das Hochwasser im Ahrtal 2021; für sie steht statt der Aufnahmezeit die
+Lieferzeit da, denn diese Daten nennen keine Aufnahme.
 
 Ganz oben in „Ebenen“ steht die Kartenansicht mit „In dieser Ansicht speichern“. Welche Ansicht
 der Leiste vorn steht und welche Gruppen offen sind, merkt sich das Gerät. Zu Beginn sind

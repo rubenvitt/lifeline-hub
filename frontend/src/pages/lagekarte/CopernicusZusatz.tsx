@@ -14,7 +14,8 @@ export interface CopernicusZusatzProps {
 
 /**
  * Zusatz unter der Zeile der Copernicus-Ebene (LLH-1200), außerhalb des Zeilenknopfs: die
- * EMSR-Nummern im Ausschnitt mit ihrer jüngsten Aufnahme, bei `leer` ein Hinweis statt eines
+ * EMSR-Nummern im Ausschnitt mit ihrer jüngsten Aufnahme (im Altbestand ersatzweise der
+ * Lieferung, LLH-2022), bei `leer` ein Hinweis statt eines
  * Fehlers, und der Schalter „Ältere Aktivierungen“.
  *
  * Die Aufnahmezeit steht hier und nicht nur im Inspector: ein Satellitenbild ist Stunden bis Tage
@@ -56,11 +57,18 @@ export default function CopernicusZusatz({
           {aktivierungen.map((a) => (
             <li key={a.emsr}>
               <span style={monoStil('monoFein')}>{a.emsr}</span>
-              {a.aufnahme && (
+              {a.aufnahme ? (
                 <>
                   {' · Aufnahme '}
                   <span style={monoStil('monoFein')}>{zeitKurz(a.aufnahme)}</span>
                 </>
+              ) : (
+                a.geliefert && (
+                  <>
+                    {' · Lieferung '}
+                    <span style={monoStil('monoFein')}>{zeitKurz(a.geliefert)}</span>
+                  </>
+                )
               )}
               {a.unvollstaendig && (
                 <span style={{ color: rollen.achtungText }}> · nicht alle Ebenen geladen</span>

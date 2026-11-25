@@ -837,12 +837,14 @@ function CopernicusInhalt({ p }: { p: Record<string, unknown> }) {
       <div style={{ marginBottom: token.marginSM }}>
         <Status darstellung={copernicusDarstellung(p.klasse)} />
       </div>
-      {isCopernicusAufnahmeAlt(aufnahme, jetzt) && (
+      {isCopernicusAufnahmeAlt(aufnahme ?? s(p.geliefert), jetzt) && (
         <div
           data-lfh="copernicus-aufnahme-alt"
           style={{ marginBottom: token.marginSM, color: rollen.achtungText }}
         >
-          <span aria-hidden="true">⧖ </span>Aufnahme älter als 24 h
+          {/* Altbestand (LLH-2022): ohne Aufnahmezeit zählt die Lieferung. */}
+          <span aria-hidden="true">⧖ </span>
+          {aufnahme ? 'Aufnahme' : 'Lieferung'} älter als 24 h
         </div>
       )}
       <Descriptions column={1}>

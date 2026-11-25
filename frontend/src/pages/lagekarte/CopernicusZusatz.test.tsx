@@ -43,6 +43,27 @@ describe('CopernicusZusatz (LLH-1200)', () => {
     expect(screen.queryByText(/Keine Copernicus-Auswertung/)).toBeNull();
   });
 
+  it('nennt ohne Aufnahme die Lieferung (LLH-2022)', () => {
+    renderMitProviders(
+      <CopernicusZusatz
+        status="ok"
+        archiv
+        onArchiv={() => {}}
+        aktivierungen={[
+          {
+            emsr: 'EMSR517',
+            geliefert: '2021-08-11 12:48:47',
+            unvollstaendig: false,
+            gekuerzt: false,
+          },
+        ]}
+      />,
+    );
+    const liste = screen.getByRole('list', { name: /Copernicus-Aktivierungen/ });
+    expect(liste).toHaveTextContent(/EMSR517 · Lieferung \d{6}/);
+    expect(liste).not.toHaveTextContent(/Aufnahme/);
+  });
+
   it('schaltet das Archiv', () => {
     const onArchiv = vi.fn();
     renderMitProviders(
