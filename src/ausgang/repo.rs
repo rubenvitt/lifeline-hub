@@ -146,6 +146,28 @@ pub async fn create_tx(
     load_anzeige(conn, neu.einsatz_id, &vorhanden).await
 }
 
+/// Der Versand der Org mit dieser `client_id`, falls es ihn gibt, mit seinem Einsatz. Für die
+/// Wiederholung einer Anfrage (Replay) vor jeder Zustandsprüfung.
+pub async fn find_by_client_id(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    client_id: &str,
+) -> Result<Option<(i64, Versand)>, AppError> {
+    let treffer: Option<(String, i64)> =
+        sqlx::query_as("SELECT id, einsatz_id FROM ausgang WHERE org_id = ? AND client_id = ?")
+            .bind(org_id)
+            .bind(client_id)
+            .fetch_optional(&mut *conn)
+            .await?;
+    match treffer {
+        None => Ok(None),
+        Some((id, einsatz_id)) => {
+            let v = load_anzeige(conn, einsatz_id, &id).await?;
+            Ok(Some((einsatz_id, v)))
+        }
+    }
+}
+
 /// Die Versände einer Quelle, neueste zuerst.
 pub async fn list_fuer_quelle(
     pool: &SqlitePool,

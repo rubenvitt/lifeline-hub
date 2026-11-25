@@ -403,7 +403,9 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.
 - **Eine Zeile je Adresse, mit Schnappschuss** (`betreff`, `inhalt`, `stelle_bezeichnung`,
   `adresse`). „Erneut senden“ sendet den Schnappschuss, nicht die neuere Fassung. `client_id`
-  macht das Absenden idempotent (`UNIQUE(org_id, client_id)`).
+  macht das Absenden idempotent (`UNIQUE(org_id, client_id)`); vorhandene Versände einer
+  wiederholten Anfrage kommen **vor** den Zustandsprüfungen zurück, geprüft wird nur, was neu
+  angelegt wird.
 - **Lauf ohne Datenbankverbindung während SMTP:** fällige Zeile lesen, Verbindung zurückgeben,
   zustellen; Ergebnis und ETB-Eintrag in **einer** Transaktion (`write_retry!`),
   `live.publiziere` und Einsatz-Ereignis erst **nach** dem Commit.

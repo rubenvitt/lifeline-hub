@@ -18,6 +18,8 @@ use crate::routes::support::CLIENT_ID_MAX;
 use crate::routes::vorlagendokument::DokumentRoute;
 use crate::vorlagendokument::repo as dokument_repo;
 use crate::vorlagendokument::STATUS_FREIGEGEBEN;
+use std::collections::HashMap;
+
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
 use axum::Json;
@@ -166,9 +168,15 @@ async fn lade_nachforderung_schnappschuss(
     Ok(schnappschuss)
 }
 
-/// Gemeinsamer Ablauf des Anlegens nach Recht und aktivem Einsatz (Prüfreihenfolge der Spec):
-/// Spiegel, Empfänger, Kanaladressen, Anbindung, Schnappschuss, Anhänge, dann alle Zeilen in
-/// einer Transaktion, danach Wecker und Live-Ereignis.
+/// Gemeinsamer Ablauf des Anlegens nach Recht und aktivem Einsatz: Body (400), dann die
+/// Wiederholung derselben Anfrage (Replay), dann für die noch fehlenden Empfänger die
+/// Prüfreihenfolge der Spec (Spiegel, Kanaladressen, Anbindung, Schnappschuss, Anhänge), dann
+/// alle neuen Zeilen in einer Transaktion, danach Wecker und Live-Ereignis.
+///
+/// Replay: gibt es zu einer abgeleiteten `client_id` schon einen Versand, kommt er unverändert
+/// zurück, ohne die Umstände erneut zu prüfen (die Mail ist angelegt und geht hinaus, auch wenn
+/// der Mailserver inzwischen angehalten oder eine neuere Fassung freigegeben ist). Sonst sähe der
+/// Client nach verlorener Antwort ein 422 und sendete mit neuem Schlüssel doppelt.
 async fn anlegen(
     state: &AppState,
     benutzer_id: i64,
@@ -177,14 +185,44 @@ async fn anlegen(
     quelle_id: i64,
     body: CreateDeliveriesBody,
 ) -> Result<(StatusCode, Json<Vec<Versand>>), AppError> {
-    pruefe_kein_spiegel(state, einsatz.id).await?;
     let empfaenger = pruefe_body(&body)?;
 
-    // Jede Adresse gehört zur Org, ihre Stelle ist aktiv, der Kanal ist freigeschaltet.
+    let mut vorhanden: HashMap<String, Versand> = HashMap::new();
+    {
+        let mut conn = state.pool.acquire().await?;
+        for (_, client_id) in &empfaenger {
+            if let Some((einsatz_id, v)) =
+                repo::find_by_client_id(&mut conn, einsatz.org_id, client_id).await?
+            {
+                // Dieselbe `client_id` darf nur dieselbe Quelle meinen.
+                if einsatz_id != einsatz.id || v.source_kind != quelle || v.source_id != quelle_id {
+                    return Err(AppError::Conflict(
+                        "client_id gehört zu einem anderen Versand".into(),
+                    ));
+                }
+                vorhanden.insert(client_id.clone(), v);
+            }
+        }
+    }
+    if vorhanden.len() == empfaenger.len() {
+        let versaende = empfaenger
+            .iter()
+            .filter_map(|(_, c)| vorhanden.remove(c))
+            .collect();
+        return Ok((StatusCode::CREATED, Json(versaende)));
+    }
+
+    pruefe_kein_spiegel(state, einsatz.id).await?;
+
+    // Jede noch fehlende Adresse gehört zur Org, ihre Stelle ist aktiv, der Kanal ist
+    // freigeschaltet.
     let mut adressen = Vec::with_capacity(empfaenger.len());
     {
         let mut conn = state.pool.acquire().await?;
         for (channel_id, client_id) in &empfaenger {
+            if vorhanden.contains_key(client_id) {
+                continue;
+            }
             let (stelle, kanal) =
                 crate::externe_stelle::kanal::load_in_org(&mut conn, einsatz.org_id, *channel_id)
                     .await?;
@@ -242,7 +280,7 @@ async fn anlegen(
     };
     let schnappschuss = &geladen;
 
-    let versaende = crate::write_retry!(&state.pool, |conn| {
+    let neu = crate::write_retry!(&state.pool, |conn| {
         let mut out = Vec::with_capacity(adressen.len());
         for (stelle, kanal, client_id) in &adressen {
             let v = repo::create_tx(
@@ -267,10 +305,15 @@ async fn anlegen(
                     "client_id gehört zu einem anderen Versand".into(),
                 ));
             }
-            out.push(v);
+            out.push((client_id.clone(), v));
         }
         Ok(out)
     })?;
+    vorhanden.extend(neu);
+    let versaende: Vec<Versand> = empfaenger
+        .iter()
+        .filter_map(|(_, c)| vorhanden.remove(c))
+        .collect();
 
     state.ausgang_wecker.notify_one();
     state

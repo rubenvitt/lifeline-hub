@@ -702,3 +702,62 @@ async fn anlegen_klappt_auch_wenn_das_geheimnis_nicht_lesbar_ist() {
     assert_eq!(s, StatusCode::CREATED, "{v}");
     assert_eq!(w.anzahl().await, 1);
 }
+
+#[tokio::test]
+async fn wiederholte_anfrage_liefert_die_versaende_auch_wenn_sich_die_umstaende_aendern() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let (s1, v1) = w.lb_senden(lid, "replay-1", &w.kanaele).await;
+    assert_eq!(s1, StatusCode::CREATED, "{v1}");
+
+    // Die Antwort ging verloren; inzwischen ist der Mailserver angehalten und eine neuere
+    // Fassung freigegeben.
+    sqlx::query("UPDATE adapter SET zustand = 'angehalten', angehalten_at = datetime('now') WHERE art = 'smtp'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    w.fortschreiben_und_freigeben(lid).await;
+
+    let (s2, v2) = w.lb_senden(lid, "replay-1", &w.kanaele).await;
+    assert_eq!(s2, StatusCode::CREATED, "{v2}");
+    let ids = |v: &Value| -> Vec<Value> {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["id"].clone())
+            .collect()
+    };
+    assert_eq!(ids(&v1), ids(&v2));
+    assert_eq!(w.anzahl().await, 2);
+
+    // Fehlt ein Empfänger noch, gelten für ihn die Prüfungen.
+    let (s, v) = w.lb_senden(lid, "replay-2", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(w.anzahl().await, 2);
+}
+
+#[tokio::test]
+async fn wiederholte_anfrage_mit_einem_neuen_empfaenger_prueft_nur_den_neuen() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let (s, v1) = w.lb_senden(lid, "teil-1", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v1}");
+    sqlx::query("UPDATE adapter SET zustand = 'angehalten', angehalten_at = datetime('now') WHERE art = 'smtp'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    // Der neue Empfänger scheitert an der angehaltenen Anbindung, der vorhandene bleibt.
+    let (s, v) = w.lb_senden(lid, "teil-1", &w.kanaele).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_angehalten");
+    assert_eq!(w.anzahl().await, 1);
+    sqlx::query("UPDATE adapter SET zustand = 'aktiv', angehalten_at = NULL WHERE art = 'smtp'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v2) = w.lb_senden(lid, "teil-1", &w.kanaele).await;
+    assert_eq!(s, StatusCode::CREATED, "{v2}");
+    assert_eq!(v2.as_array().unwrap().len(), 2);
+    assert_eq!(v2[0]["id"], v1[0]["id"]);
+    assert_eq!(w.anzahl().await, 2);
+}
