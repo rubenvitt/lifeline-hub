@@ -10815,7 +10815,7 @@ export interface components {
         /**
          * @description LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
          *     `art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`
-         *     (migrations/0381_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
+         *     (migrations/0384_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
          * @enum {string}
          */
         ZugriffArt: "detail" | "export" | "druck" | "anhang" | "registrierliste" | "pass_export" | "pass_druck";
