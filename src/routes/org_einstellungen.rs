@@ -213,11 +213,9 @@ pub async fn setzen(
         }
     }
 
-    // Fremdebenen im eigenen Netz: fehlendes Feld = unverändert.
-    let lan_alt = einstellungen::is_fremdebenen_lan_erlaubt(&state.pool, benutzer.org_id).await?;
-    let lan_neu = req.fremdebenen_lan_erlaubt.unwrap_or(lan_alt);
-
-    let gespeichert = einstellungen::speichern(
+    // Fremdebenen im eigenen Netz: fehlendes Feld = unverändert. Der alte Wert kommt aus der
+    // Speicher-Transaktion, damit die Admin-Spur zum Endzustand passt.
+    let (gespeichert, lan_alt) = einstellungen::speichern_mit_lan_vorher(
         &state.pool,
         benutzer.org_id,
         benutzer.id,
@@ -239,11 +237,12 @@ pub async fn setzen(
             // bool → 0/1; None bleibt None (= Default an).
             auto_etb_eintraege: req.auto_etb_eintraege.map(i64::from),
             geocoder_url: geocoder_url.as_deref(),
-            fremdebenen_lan_erlaubt: lan_neu,
+            fremdebenen_lan_erlaubt: req.fremdebenen_lan_erlaubt,
             aufbewahrung_kategorien: kategorien.as_deref(),
         },
     )
     .await?;
+    let lan_neu = gespeichert.fremdebenen_lan_erlaubt != 0;
     if lan_neu != lan_alt {
         schreibe(
             &state.pool,

@@ -207,9 +207,10 @@ pub struct OrgEinstellungenDaten<'a> {
     pub rueckmeldung_frist_min: Option<i64>,
     pub auto_etb_eintraege: Option<i64>,
     pub geocoder_url: Option<&'a str>,
-    /// Fremdebenen im eigenen Netz (LLH-2099); der Handler löst ein fehlendes Feld des Clients
-    /// vorher gegen den gespeicherten Wert auf.
-    pub fremdebenen_lan_erlaubt: bool,
+    /// Fremdebenen im eigenen Netz (LLH-2099). `None` lässt den gespeicherten Wert stehen (wie
+    /// ein fehlendes Feld des Clients); aufgelöst wird in der Speicher-Transaktion, damit die
+    /// Admin-Spur zum Endzustand passt ([`speichern_mit_lan_vorher`]).
+    pub fremdebenen_lan_erlaubt: Option<bool>,
     /// Kategorie-Vorgaben (LFH-749), bereits geprüft: `Some` ersetzt die Liste, `None` lässt sie
     /// unverändert (anders als die übrigen Felder kein Vollersatz, damit ein älterer Client sie
     /// nicht still löscht).
@@ -258,7 +259,30 @@ pub async fn speichern(
     erfasser_id: i64,
     daten: OrgEinstellungenDaten<'_>,
 ) -> Result<OrgEinstellungen, AppError> {
-    let mut tx = pool.begin().await?;
+    Ok(speichern_mit_lan_vorher(pool, org_id, erfasser_id, daten)
+        .await?
+        .0)
+}
+
+/// Wie [`speichern`], dazu die LAN-Erlaubnis der Fremdebenen vor dem Speichern. Gelesen wird sie
+/// in derselben Transaktion (`BEGIN IMMEDIATE`): zwei Admins, die gleichzeitig schalten, sehen je
+/// den Stand des anderen, und der Eintrag der Admin-Spur folgt dem echten Wechsel
+/// (Abschluss-Review, M5).
+pub async fn speichern_mit_lan_vorher(
+    pool: &SqlitePool,
+    org_id: i64,
+    erfasser_id: i64,
+    daten: OrgEinstellungenDaten<'_>,
+) -> Result<(OrgEinstellungen, bool), AppError> {
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let lan_vorher: Option<i64> = sqlx::query_scalar(
+        "SELECT fremdebenen_lan_erlaubt FROM org_einstellungen WHERE org_id = ?",
+    )
+    .bind(org_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let lan_vorher = lan_vorher.is_some_and(|w| w != 0);
+    let lan_neu = daten.fremdebenen_lan_erlaubt.unwrap_or(lan_vorher);
     sqlx::query(
         "INSERT INTO org_einstellungen \
             (org_id, zeitzone, zeitdarstellung, einheiten, koordinatenformat, \
@@ -305,7 +329,7 @@ pub async fn speichern(
     .bind(daten.rueckmeldung_frist_min)
     .bind(daten.auto_etb_eintraege)
     .bind(daten.geocoder_url)
-    .bind(i64::from(daten.fremdebenen_lan_erlaubt))
+    .bind(i64::from(lan_neu))
     .bind(erfasser_id)
     .execute(&mut *tx)
     .await?;
@@ -313,7 +337,7 @@ pub async fn speichern(
         super::aufbewahrung_kategorie::ersetzen(&mut tx, org_id, erfasser_id, vorgaben).await?;
     }
     tx.commit().await?;
-    laden_oder_default(pool, org_id).await
+    Ok((laden_oder_default(pool, org_id).await?, lan_vorher))
 }
 
 #[cfg(test)]
@@ -394,7 +418,7 @@ mod tests {
                 rueckmeldung_frist_min: Some(90),
                 auto_etb_eintraege: Some(0),
                 geocoder_url: Some("https://nominatim.example.org"),
-                fremdebenen_lan_erlaubt: true,
+                fremdebenen_lan_erlaubt: Some(true),
                 aufbewahrung_kategorien: Some(&vorgaben),
             },
         )
@@ -462,8 +486,8 @@ mod tests {
         );
         assert_eq!(zweite.auto_etb_eintraege, None);
         assert_eq!(
-            zweite.fremdebenen_lan_erlaubt, 0,
-            "Vollersatz setzt die Erlaubnis zurück"
+            zweite.fremdebenen_lan_erlaubt, 1,
+            "ohne Angabe bleibt die Erlaubnis stehen"
         );
 
         // COUNT == 1 nach zwei Speichervorgängen (UPSERT, kein zweiter Insert).
@@ -485,5 +509,31 @@ mod tests {
                 .unwrap(),
             vorgaben
         );
+    }
+
+    #[tokio::test]
+    async fn lan_vorher_kommt_aus_der_speicher_transaktion() {
+        let pool = db::test_pool().await;
+        let bid = fixture(&pool).await;
+        let lan = |wert: Option<bool>| OrgEinstellungenDaten {
+            fremdebenen_lan_erlaubt: wert,
+            ..Default::default()
+        };
+        let (g, vorher) = speichern_mit_lan_vorher(&pool, 1, bid, lan(Some(true)))
+            .await
+            .unwrap();
+        assert_eq!((g.fremdebenen_lan_erlaubt, vorher), (1, false));
+        let (g, vorher) = speichern_mit_lan_vorher(&pool, 1, bid, lan(None))
+            .await
+            .unwrap();
+        assert_eq!(
+            (g.fremdebenen_lan_erlaubt, vorher),
+            (1, true),
+            "unverändert"
+        );
+        let (g, vorher) = speichern_mit_lan_vorher(&pool, 1, bid, lan(Some(false)))
+            .await
+            .unwrap();
+        assert_eq!((g.fremdebenen_lan_erlaubt, vorher), (0, true));
     }
 }
