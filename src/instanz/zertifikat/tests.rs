@@ -175,3 +175,30 @@ async fn erfasser_ohne_tls_liefert_nichts() {
     assert!(e.is_err());
     assert_eq!(erfasser.gesehen(), None);
 }
+
+/// `webpki_config` prüft Kette und Namen gegen die Anker des Systems: ein selbstsigniertes
+/// Zertifikat kommt nicht durch, und der Provider ist der eine erlaubte.
+#[tokio::test]
+async fn webpki_config_lehnt_selbstsigniert_ab() {
+    let (adresse, _fp) = gegenstelle().await;
+    let config = webpki_config().expect("Vertrauensanker des Systems");
+    let fehler = client_mit(config)
+        .get(format!("{adresse}/"))
+        .send()
+        .await
+        .unwrap_err();
+    assert!(is_zertifikat_fehler(&fehler), "{fehler:?}");
+}
+
+#[test]
+fn webpki_config_nutzt_den_einen_provider() {
+    let config = webpki_config().expect("Vertrauensanker des Systems");
+    let erwartet: Vec<_> = provider().cipher_suites.iter().map(|c| c.suite()).collect();
+    let gesehen: Vec<_> = config
+        .crypto_provider()
+        .cipher_suites
+        .iter()
+        .map(|c| c.suite())
+        .collect();
+    assert_eq!(gesehen, erwartet);
+}

@@ -2,7 +2,7 @@
 titel: Nachforderungen
 gruppen: [fuehrung]
 reihenfolge: 270
-quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/pages/MaterialPage.tsx, src/material/disposition_repo.rs, frontend/src/nachforderungen/nurVorwaerts.ts]
+quellen: [src/einsatz/fuehrungsstelle.rs, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/NachforderungenPage.tsx, frontend/src/nachforderungen/NachforderungBoard.tsx, frontend/src/nachforderungen/nachforderungStufen.ts, frontend/src/pages/fuehrung/OffeneVorgaengePaneel.tsx, src/einsatz/zaehler.rs, frontend/src/nachforderungen/NachforderungFormular.tsx, frontend/src/nachforderungen/NachforderungKarte.tsx, frontend/src/nachforderungen/ZusageFormular.tsx, frontend/src/nachforderungen/BearbeitenFormular.tsx, frontend/src/nachforderungen/zusage.ts, migrations/0237_nachforderung_zusage.sql, frontend/src/nachforderungen/MaterialUebernahmeModal.tsx, frontend/src/nachforderungen/materialUebernahme.ts, src/routes/einsatz_material.rs, src/material/mod.rs, migrations/0198_material_nachforderung.sql, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/pages/VerpflegungPage.tsx, frontend/src/pages/uhs/MaterialTab.tsx, frontend/src/routing/deeplinks.ts, frontend/src/betreuung/StelleBedarf.tsx, migrations/0231_nachforderung_betreuungsstelle.sql, src/routes/nachforderung.rs, src/nachforderung/repo.rs, src/nachforderung/mod.rs, frontend/src/stammdaten/externeStellenVorschlaege.ts, src/nachforderung/benachrichtigung.rs, src/benachrichtigung/text.rs, frontend/src/nachforderungen/EinheitUebernahmeModal.tsx, frontend/src/nachforderungen/einheitUebernahme.ts, frontend/src/nachforderungen/artVorschlaege.ts, src/nachforderung/arten.rs, src/einheit/aus_nachforderung.rs, migrations/0239_einheit_nachforderung.sql, frontend/src/kraefte/zulauf.ts, frontend/src/pages/einheit/EinheitUebernahmeStorno.tsx, migrations/0246_einheit_nachforderung_herkunft.sql, migrations/0250_einheit_nachforderung_am_raum.sql, src/nachforderung/erwartet.rs, src/bereitstellungsraum/eintreffen.rs, frontend/src/nachforderungen/PostenZuordnenModal.tsx, frontend/src/pages/MaterialPage.tsx, src/material/disposition_repo.rs, frontend/src/nachforderungen/nurVorwaerts.ts, frontend/src/ausgang/SendenDialog.tsx, frontend/src/ausgang/Versandliste.tsx, src/ausgang/nachricht.rs]
 ---
 
 ## Überblick
@@ -295,7 +295,24 @@ Für Einsatzleitung und Führungspersonal:
 Eine abgelehnte Nachforderung ist abgeschlossen und lässt sich nicht wieder öffnen. Ist schon eine
 Einheit mit ihr verknüpft, steht im Menü „Ablehnen (Einheiten verknüpft)“ gesperrt.
 
+### Eine Nachforderung per E-Mail senden
+
+Für Einsatzleitung und Führungspersonal:
+
+1. An der Karte das Menü ⋮ öffnen und „Senden“ wählen.
+2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen; vorbelegt ist der Adressat der
+   Nachforderung, wenn er eine Mailadresse hat.
+3. „Senden“ wählen. An der Karte zeigt der Abschnitt „Versand“ je Adresse den Stand und
+   „Erneut senden“.
+
 ## Hintergrund
+
+### Versand per E-Mail
+
+Gesendet wird der Stand der Nachforderung beim Absenden (Art, Anzahl, Ziel, Adressat); eine
+zurückgezogene oder abgelehnte Nachforderung lässt sich nicht senden, ein noch wartender Versand
+geht dann nicht mehr hinaus. Wiederholung, „Zustellung unklar“ und Eintrag im ETB wie beim
+Lagebericht (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail“).
 
 ### Benachrichtigungen zum Stand
 
