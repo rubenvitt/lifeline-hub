@@ -14,7 +14,7 @@ use crate::app::AppState;
 use crate::drohne::is_drohnen_art;
 use crate::drohne::repo::{self, Zuschaltung};
 use crate::einsatz::einstellungen;
-use crate::einsatz::kontext::{EinsatzLesezugriff, EinsatzSchreibzugriff};
+use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -124,11 +124,10 @@ pub async fn liste(
 /// PUT /api/incidents/{id}/drone/sources/{aid} — zuschalten (oder die Lagemonitor-Wahl ändern).
 pub async fn zuschalten(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    ctx: EinsatzLeitungszugriff<Lagekarte>,
     PfadParam((_eid, adapter_id)): PfadParam<(i64, String)>,
     JsonBody(body): JsonBody<DroneSourceUpdate>,
 ) -> Result<Json<DroneSourceView>, AppError> {
-    ctx.fordere_einsatzleitung()?;
     let einsatz_id = ctx.einsatz.id;
     let org_id = ctx.einsatz.org_id;
     let erfasser = ctx.benutzer.id;
@@ -198,10 +197,9 @@ pub async fn zuschalten(
 /// DELETE /api/incidents/{id}/drone/sources/{aid} — abschalten.
 pub async fn abschalten(
     State(state): State<AppState>,
-    ctx: EinsatzSchreibzugriff<Lagekarte>,
+    ctx: EinsatzLeitungszugriff<Lagekarte>,
     PfadParam((_eid, adapter_id)): PfadParam<(i64, String)>,
 ) -> Result<StatusCode, AppError> {
-    ctx.fordere_einsatzleitung()?;
     let einsatz_id = ctx.einsatz.id;
     let org_id = ctx.einsatz.org_id;
     let erfasser = ctx.benutzer.id;

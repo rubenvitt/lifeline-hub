@@ -230,3 +230,33 @@ async fn abgeschlossener_einsatz_kann_nicht_zuschalten() {
         .unwrap();
     assert_eq!(n, 0);
 }
+
+#[tokio::test]
+async fn fuehrungspersonal_bekommt_am_abgeschlossenen_einsatz_403_statt_409() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let fuehrung = benutzer_anlegen(&u.app, &u.admin, "fuehrung", "keine").await;
+    rolle_setzen(&u.app, &u.admin, u.einsatz, fuehrung, "fuehrungspersonal").await;
+    let cookie = login_cookie(&u.app, "fuehrung", "fuehrungpw1").await;
+    let (s, _) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, _) = anfrage(
+        &u.app,
+        "PUT",
+        &u.pfad(u.einsatz, "a1"),
+        &cookie,
+        Some(r#"{"lagemonitor":true}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+    let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &cookie, None).await;
+    assert_eq!(s, StatusCode::FORBIDDEN);
+}
