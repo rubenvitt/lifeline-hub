@@ -1,6 +1,6 @@
 # Fahrzeugortung in gespiegelten Einsätzen: der Hub liefert Positionen an das führende ELW (LLH-2119)
 
-**Status:** Entwurf, wartet auf Freigabe (nach Gegenlese) · **Datum:** 2026-11-25 · **Zunder:**
+**Status:** freigegeben (Ruben, 25.11.2026) · **Datum:** 2026-11-25 · **Zunder:**
 https://zunder.rubeen.dev/#/aufgabe/ypcadxzog8lomshl4wapmybc · **Route:** `entwurf` (E1 Weg der
 Weiterleitung, E2 neue ADR neben ADR-0103, E3 `src/instanz/spiegel`, `src/ortung`, Frontend, Doku)
 
