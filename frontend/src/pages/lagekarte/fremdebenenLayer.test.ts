@@ -5,6 +5,7 @@ import {
   bildAnker,
   entferneFremdebeneLayer,
   fremdObjektSichtbar,
+  fremdebeneClickLayerIds,
   fremdebeneIdVon,
   fremdebeneLayerIds,
   fremdebeneSourceId,
@@ -85,7 +86,7 @@ const DATEN: FeatureCollection = {
 const FARBE = '#2f54eb';
 
 describe('Fremdebenen auf der Karte (LLH-2099)', () => {
-  it('legt Quelle und vier Layer in der Ebenenfarbe an', () => {
+  it('legt Quelle und fünf Layer in der Ebenenfarbe an', () => {
     const map = fakeMap();
     sorgeFuerFremdebeneLayer(map as never, 7, DATEN, FARBE);
 
@@ -96,6 +97,7 @@ describe('Fremdebenen auf der Karte (LLH-2099)', () => {
     expect(fremdebeneSourceId(7)).toBe('fremdebene-7');
     expect(fremdebeneLayerIds(7)).toEqual([
       'fremdebene-7-flaeche',
+      'fremdebene-7-umriss',
       'fremdebene-7-linie',
       'fremdebene-7-punkt',
       'fremdebene-7-text',
@@ -103,6 +105,7 @@ describe('Fremdebenen auf der Karte (LLH-2099)', () => {
     expect(map._folge).toEqual(fremdebeneLayerIds(7));
     expect(map._specs.get('fremdebene-7-flaeche')?.paint?.['fill-color']).toBe(FARBE);
     expect(map._specs.get('fremdebene-7-linie')?.paint?.['line-color']).toBe(FARBE);
+    expect(map._specs.get('fremdebene-7-umriss')?.paint?.['line-color']).toBe(FARBE);
     expect(map._specs.get('fremdebene-7-punkt')?.paint?.['circle-color']).toBe(FARBE);
     // Beschriftung aus `name`, erst ab einer Zoomstufe.
     const text = map._specs.get('fremdebene-7-text');
@@ -150,12 +153,24 @@ describe('Fremdebenen auf der Karte (LLH-2099)', () => {
     expect(bildAnker(map as never)).toBe('abschnitte-fill');
   });
 
+  it('der Umriss einer Fläche ist ein eigener Layer und kein Klickziel; die Linie trägt nur Linien', () => {
+    const map = fakeMap();
+    sorgeFuerFremdebeneLayer(map as never, 7, DATEN, FARBE);
+    expect(JSON.stringify(map._specs.get('fremdebene-7-linie')?.filter)).not.toMatch(/Polygon/);
+    expect(JSON.stringify(map._specs.get('fremdebene-7-umriss')?.filter)).toMatch(/Polygon/);
+    expect(fremdebeneClickLayerIds(7)).toEqual([
+      'fremdebene-7-flaeche',
+      'fremdebene-7-linie',
+      'fremdebene-7-punkt',
+    ]);
+  });
+
   it('ist idempotent: ein zweiter Lauf spielt Daten ein und zieht die Farbe nach', () => {
     const map = fakeMap();
     sorgeFuerFremdebeneLayer(map as never, 7, DATEN, FARBE);
     sorgeFuerFremdebeneLayer(map as never, 7, DATEN, '#9e1068');
     expect(map.addSource).toHaveBeenCalledTimes(1);
-    expect(map.addLayer).toHaveBeenCalledTimes(4);
+    expect(map.addLayer).toHaveBeenCalledTimes(5);
     expect(map._quellen.get('fremdebene-7')?.setData).toHaveBeenCalledWith(DATEN);
     expect(map._specs.get('fremdebene-7-flaeche')?.paint?.['fill-color']).toBe('#9e1068');
     expect(map._specs.get('fremdebene-7-punkt')?.paint?.['circle-color']).toBe('#9e1068');

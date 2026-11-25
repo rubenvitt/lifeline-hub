@@ -368,6 +368,9 @@ describe('ordneKlickebene', () => {
     expect(ordneKlickebene('fremdebene-7-linie')).toBe('fachebene');
     expect(ordneKlickebene('fremdebene-7-flaeche')).toBe('fachebeneFlaeche');
     expect(ordneKlickebene('fremdebene-7-text')).toBeNull();
+    // Der Umriss einer fremden Fläche ist Kontur, kein Punktziel: er gewönne sonst in der
+    // Trefferzone eines eigenen Markers.
+    expect(ordneKlickebene('fremdebene-7-umriss')).toBeNull();
     // Die Doppelkante (LFH-600) ist Kontur, kein Ziel — die Trefferzone deckt sie ab.
     expect(ordneKlickebene('fachebene-pegelonline-kante')).toBeNull();
     expect(ordneKlickebene('fachebene-kritis-buendel-kante')).toBeNull();

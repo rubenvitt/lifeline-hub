@@ -25,6 +25,7 @@ export const fremdebeneSourceId = (id: number) => `fremdebene-${id}`;
 /** Alle Layer einer Ebene, in Zeichenfolge (unten zuerst). */
 export const fremdebeneLayerIds = (id: number) => [
   `fremdebene-${id}-flaeche`,
+  `fremdebene-${id}-umriss`,
   `fremdebene-${id}-linie`,
   `fremdebene-${id}-punkt`,
   `fremdebene-${id}-text`,
@@ -32,7 +33,7 @@ export const fremdebeneLayerIds = (id: number) => [
 
 /** Die Ebene einer Layer-ID (`fremdebene-<id>-<teil>`), sonst `null`. */
 export function fremdebeneIdVon(layerId: string): number | null {
-  const m = /^fremdebene-(\d+)-(flaeche|linie|punkt|text)$/.exec(layerId);
+  const m = /^fremdebene-(\d+)-(flaeche|umriss|linie|punkt|text)$/.exec(layerId);
   return m ? Number(m[1]) : null;
 }
 
@@ -70,7 +71,7 @@ export function bildAnker(map: MapLibreMap): string {
 }
 
 /**
- * Idempotent: Quelle und vier Layer einer Fremdebene anlegen, Daten einspielen, Farbe nachziehen
+ * Idempotent: Quelle und fünf Layer einer Fremdebene anlegen, Daten einspielen, Farbe nachziehen
  * (ein Moduswechsel oder „Farbe …“ legt keinen Layer neu an).
  */
 export function sorgeFuerFremdebeneLayer(
@@ -87,7 +88,7 @@ export function sorgeFuerFremdebeneLayer(
   else map.addSource(src, { type: 'geojson', data: daten as never, generateId: true });
 
   const vor = vorEigenenLagen(map);
-  const [flaeche, linie, punkt, text] = fremdebeneLayerIds(ebeneId);
+  const [flaeche, umriss, linie, punkt, text] = fremdebeneLayerIds(ebeneId);
   const anlegen = (spec: Parameters<MapLibreMap['addLayer']>[0]) => {
     if (!map.getLayer(spec.id)) map.addLayer(spec, vor);
   };
@@ -98,14 +99,26 @@ export function sorgeFuerFremdebeneLayer(
     filter: isGeometrieTyp('Polygon') as never,
     paint: { 'fill-color': farbe, 'fill-opacity': 0.25 },
   });
-  // Linien und der Umriss der Flächen in einem Layer: beide tragen dieselbe Farbe.
+  // Der Umriss der Flächen ist ein eigener Layer ohne Klickrolle (`ordneKlickebene`): als Teil der
+  // Linie wäre er ein schmales Punktziel und gewönne in der Trefferzone eines eigenen Markers gegen
+  // ihn. Den Tipp auf eine Fläche trägt `-flaeche`.
+  const strich = {
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': farbe, 'line-width': 2 },
+  } as const;
+  anlegen({
+    id: umriss,
+    type: 'line',
+    source: src,
+    filter: isGeometrieTyp('Polygon') as never,
+    ...strich,
+  });
   anlegen({
     id: linie,
     type: 'line',
     source: src,
-    filter: ['any', isGeometrieTyp('LineString'), isGeometrieTyp('Polygon')] as never,
-    layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': farbe, 'line-width': 2 },
+    filter: isGeometrieTyp('LineString') as never,
+    ...strich,
   });
   anlegen({
     id: punkt,
@@ -144,6 +157,7 @@ export function sorgeFuerFremdebeneLayer(
   });
   const ziele: [string, 'fill-color' | 'line-color' | 'circle-color'][] = [
     [flaeche, 'fill-color'],
+    [umriss, 'line-color'],
     [linie, 'line-color'],
     [punkt, 'circle-color'],
   ];
@@ -161,8 +175,12 @@ export function entferneFremdebeneLayer(map: MapLibreMap, ebeneId: number): void
   if (map.getSource(src)) map.removeSource(src);
 }
 
-/** Die anklickbaren Layer einer Fremdebene; die Beschriftung ist kein Ziel. */
-export const fremdebeneClickLayerIds = (ebeneId: number) => fremdebeneLayerIds(ebeneId).slice(0, 3);
+/** Die anklickbaren Layer einer Fremdebene; Umriss und Beschriftung sind kein Ziel. */
+export const fremdebeneClickLayerIds = (ebeneId: number) => [
+  `fremdebene-${ebeneId}-flaeche`,
+  `fremdebene-${ebeneId}-linie`,
+  `fremdebene-${ebeneId}-punkt`,
+];
 
 /** Ein leerer Wert zählt wie ein fehlender: die Karte reicht `null` nicht verlässlich durch. */
 const gefuellt = (p: Record<string, unknown> | null | undefined) =>
