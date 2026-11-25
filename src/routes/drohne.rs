@@ -3,8 +3,9 @@
 //! (`AppState.drohne`) bekommt sie erst nach dem Commit (die Datenbank ist maßgeblich). Ein
 //! Adapter ist in höchstens einem laufenden Einsatz zugeschaltet.
 
+use axum::body::Body;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::Response;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -14,11 +15,13 @@ use crate::adapter::repo as adapter_repo;
 use crate::app::AppState;
 use crate::drohne::is_drohnen_art;
 use crate::drohne::repo::{self, Zuschaltung};
+use crate::drohne::video::{buendel, check_playlist, content_type_for, ttl_for, VideoFehler};
 use crate::einsatz::einstellungen;
 use crate::einsatz::kontext::{EinsatzLeitungszugriff, EinsatzLesezugriff};
 use crate::einsatz::modul::Lagekarte;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
+use crate::http_begrenzt::{DECKEL_PLAYLIST, DECKEL_VIDEO};
 use crate::zeit::jetzt;
 
 /// Name des anderen Einsatzes, wenn die Person ihn nicht lesen darf.
@@ -269,4 +272,128 @@ pub async fn karte(
         }
     };
     crate::routes::karte::fachebene_antwort(&antwort, &headers)
+}
+
+/// Ob `file` ein einfacher Dateiname ist: `[A-Za-z0-9._-]+`, ohne `..`.
+fn is_dateiname(file: &str) -> bool {
+    !file.is_empty()
+        && !file.contains("..")
+        && file
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}
+
+/// Holt eine HLS-Datei der Quelle. Der `LiveKontext` entsteht hier, im Abruf, und fällt mit ihm
+/// (`src/AGENTS.md`, „Adapter“): er geht nie ins Bündel.
+async fn hls_abrufen(
+    state: AppState,
+    org_id: i64,
+    adapter_id: String,
+    gateway_sn: String,
+    file: String,
+) -> Result<axum::body::Bytes, VideoFehler> {
+    use crate::adapter::live::{live_kontext, LiveVerweigert};
+    use age::secrecy::ExposeSecret;
+
+    let kontext = live_kontext(
+        &state.pool,
+        &state.adapter,
+        &state.adapter.arten,
+        org_id,
+        &adapter_id,
+    )
+    .await
+    .map_err(|v| match v {
+        LiveVerweigert::Intern => VideoFehler::Intern,
+        _ => VideoFehler::Verweigert,
+    })?;
+    let basis = kontext
+        .einstellung_text("basis_url")
+        .ok_or(VideoFehler::Verweigert)?;
+    let token = kontext.geheimnis("token").ok_or(VideoFehler::Verweigert)?;
+    let url = format!(
+        "{}/api/lagemonitor/v1/video/{gateway_sn}/hls/{file}",
+        basis.trim_end_matches('/')
+    );
+    let fehl = |f: crate::adapter::art::Fehlschlag| {
+        // Nur Code und Status, nie URL oder Seriennummer.
+        tracing::warn!("Livebild-Abruf gescheitert: {:?}", f);
+        VideoFehler::Upstream
+    };
+    let anfrage = kontext
+        .get(&url)
+        .map_err(fehl)?
+        .bearer_auth(token.expose_secret());
+    let antwort = kontext.send(anfrage).await.map_err(fehl)?;
+    let is_playlist = file.ends_with(".m3u8");
+    let deckel = if is_playlist {
+        DECKEL_PLAYLIST
+    } else {
+        DECKEL_VIDEO
+    };
+    let bytes = kontext.read_bytes(antwort, deckel).await.map_err(fehl)?;
+    if is_playlist {
+        check_playlist(&bytes)?;
+    }
+    Ok(bytes)
+}
+
+/// GET /api/incidents/{id}/drone/video/{key}/hls/{*file} — das Livebild einer Drohnenquelle,
+/// gebündelt: viele Zuschauer, ein Abruf je Datei. Die Quelle muss in diesem Einsatz
+/// zugeschaltet sein und die Videokennung zu ihr gehören; die Query der Anfrage wird verworfen.
+pub async fn video(
+    State(state): State<AppState>,
+    ctx: EinsatzLesezugriff<Lagekarte>,
+    PfadParam((_eid, key, file)): PfadParam<(i64, String, String)>,
+) -> Result<Response, AppError> {
+    if !is_dateiname(&file) {
+        return Err(AppError::NotFound);
+    }
+    let (Some(ttl), Some(content_type)) = (ttl_for(&file), content_type_for(&file)) else {
+        return Err(AppError::NotFound);
+    };
+    let (adapter_id, gateway_sn) = state.drohne.find_video(&key).ok_or(AppError::NotFound)?;
+    let zugeschaltet = {
+        let mut conn = state.pool.acquire().await?;
+        repo::load_for_einsatz(&mut conn, ctx.einsatz.id)
+            .await?
+            .iter()
+            .any(|z| z.adapter_id == adapter_id)
+    };
+    if !zugeschaltet {
+        return Err(AppError::NotFound);
+    }
+    let org_id = ctx.einsatz.org_id;
+    let is_playlist = file.ends_with(".m3u8");
+    let schluessel = (adapter_id.clone(), key, file.clone());
+    let bytes = buendel()
+        .get_or_fetch(schluessel, ttl, move || {
+            hls_abrufen(state, org_id, adapter_id, gateway_sn, file)
+        })
+        .await
+        .map_err(|f| match f {
+            VideoFehler::Verweigert => AppError::ServiceUnavailable("Kein Livebild".into()),
+            VideoFehler::Intern => AppError::Internal("Livebild nicht abrufbar".into()),
+            VideoFehler::Upstream => AppError::BadGateway("Livebild nicht abrufbar".into()),
+        })?;
+    let cache = if is_playlist {
+        "private, no-cache"
+    } else {
+        "private, max-age=30"
+    };
+    let mut antwort = Response::new(Body::from(bytes));
+    let kopf = antwort.headers_mut();
+    kopf.insert(
+        header::CONTENT_TYPE,
+        header::HeaderValue::from_static(content_type),
+    );
+    kopf.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        header::HeaderValue::from_static("nosniff"),
+    );
+    kopf.insert(
+        header::CACHE_CONTROL,
+        header::HeaderValue::from_static(cache),
+    );
+    Ok(antwort)
 }

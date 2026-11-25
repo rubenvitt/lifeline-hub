@@ -400,6 +400,8 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   In einer Überlagerung ohne Bedienelemente (Palettenvorschau) `grossansicht={false}`.
   Eine künftige App-CSP muss `img-src blob:`, `worker-src 'self'` und `'wasm-unsafe-eval'`
   erlauben (HEIC-Decoder, `frontend/src/heic/`).
+  Das Drohnen-Livebild (LLH-2107, hls.js) braucht zusätzlich `media-src 'self' blob:` und
+  `worker-src 'self' blob:`; der Spieler hängt die Segmente über MSE als `blob:` ein.
 - **HEIC-Decoder austauschbar halten** (LGPL 3.0, LFH-1000, `frontend/src/heic/LIESMICH.md`):
   Glue und WASM von libheif gehen unverändert unter `/bibliotheken/libheif/` aus, nie in einen
   Chunk unter `assets/` gebündelt (Build-Wächter in `frontend/vite.config.ts`); der Worker lädt

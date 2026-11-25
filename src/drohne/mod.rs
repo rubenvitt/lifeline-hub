@@ -8,6 +8,7 @@ pub mod repo;
 pub mod store;
 pub mod suchlage;
 pub mod vertrag;
+pub mod video;
 
 pub use store::Store;
 

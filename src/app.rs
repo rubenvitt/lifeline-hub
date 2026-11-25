@@ -1957,6 +1957,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
         )
         // Drohnenlage als Fachebene der Lagekarte (LLH-2106).
         .route("/api/incidents/{id}/map/drone", get(routes::drohne::karte))
+        // Livebild der Drohne als gebündelter HLS-Proxy (LLH-2107).
+        .route(
+            "/api/incidents/{id}/drone/video/{key}/hls/{*file}",
+            get(routes::drohne::video),
+        )
         .route(
             "/api/einsaetze/{id}/hazard-areas",
             get(routes::gefahr::gebiete),
