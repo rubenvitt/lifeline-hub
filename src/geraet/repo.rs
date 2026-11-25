@@ -303,17 +303,18 @@ pub struct HelferAngelegt {
 /// Legt Gerätekonto und Helfer-Kopplung im Zustand `unbestaetigt` an (eine Transaktion des
 /// Aufrufers): Ansicht `helfer`, gekoppelt sofort, Ablauf nach
 /// [`HELFER_UNBESTAETIGT_MINUTEN`]. Die Spur trägt die Einlösung ohne handelnde Person.
+///
+/// Den Namen gibt die Kraft selbst ein; er steht nur in `geraet_kopplung.anzeigename`, das die
+/// Schwärzung des Einsatzes leert (`einsatz::schwaerzung_registry`). `bezeichnung` und das
+/// Gerätekonto, das die Schwärzung nicht erreicht (`benutzer` ist org-weit), heißen nur
+/// „Helfer“.
 pub async fn anlegen_helfer(
     conn: &mut SqliteConnection,
     neu: NeueHelferKopplung<'_>,
     peer_ip: Option<&str>,
 ) -> Result<HelferAngelegt, AppError> {
-    let benutzer_id = geraetekonto_anlegen(
-        &mut *conn,
-        neu.org_id,
-        &anzeigename(Some(Funktionsansicht::Helfer.label()), neu.anzeigename),
-    )
-    .await?;
+    let benutzer_id =
+        geraetekonto_anlegen(&mut *conn, neu.org_id, Funktionsansicht::Helfer.label()).await?;
     let (einheit_id, fahrzeug_id) = neu.ziel.spalten();
     let (kopplung_id, laeuft_ab_at): (i64, String) = sqlx::query_as(
         "INSERT INTO geraet_kopplung \
@@ -328,7 +329,7 @@ pub async fn anlegen_helfer(
     .bind(benutzer_id)
     .bind(einheit_id)
     .bind(fahrzeug_id)
-    .bind(neu.anzeigename)
+    .bind(Funktionsansicht::Helfer.label())
     .bind(neu.anzeigename)
     .bind(neu.einladung_von)
     .bind(format!("+{HELFER_UNBESTAETIGT_MINUTEN} minutes"))

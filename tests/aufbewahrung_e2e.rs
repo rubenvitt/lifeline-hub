@@ -277,6 +277,41 @@ const AUSNAHMEN_SYSTEM_ETB: &[Ausnahme] = &[
         gruppe: Gruppe::Einsatzkraft,
         begruendung: "alte und neue Besatzung beim Besatzungswechsel der Ablösung (LLH-1150): wer wann in welcher Einheit eingesetzt war",
     },
+    Ausnahme {
+        datei: "src/helfer/bestaetigung.rs",
+        funktion: "etb_text",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name, den die Helferin oder der Helfer selbst eingibt, beim Bestätigen und Ändern (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "ablehnen",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name der abgelehnten Helfer-Anmeldung (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "entfernen",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, den die Leitung abmeldet (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/routes/helfer.rs",
+        funktion: "abmelden_tx",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, der sich in der App abmeldet (Helfer-App)",
+    },
+    Ausnahme {
+        datei: "src/geraet/ablauf.rs",
+        funktion: "warnung_text",
+        spalte: "geraet_kopplung.anzeigename",
+        gruppe: Gruppe::Einsatzkraft,
+        begruendung: "Name des Helfers, dessen Anmeldung bald endet (Helfer-App)",
+    },
     // --- Lagestruktur: Bezeichnungen der Ordnung des Raums und der Betreuung (Zonen, Gebiete,
     // Bezirke, Stellen) und der Streichgrund der Kräfte-Zeitachse. Bewusst behalten, LFH-752. ---
     Ausnahme {

@@ -3178,7 +3178,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("uhs_id", G_FK),
             retain(
                 "bezeichnung",
-                "Gerätename (operatives Label wie „Tablet 1“, kein Personenbezug)",
+                "Gerätename (operatives Label wie „Tablet 1“, kein Personenbezug); bei der \
+                 Helfer-Kopplung fest „Helfer“, ihr Name steht in `anzeigename`",
             ),
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
