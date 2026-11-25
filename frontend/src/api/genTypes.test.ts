@@ -19,9 +19,7 @@ describe('generateTypes (LLH-2141)', () => {
   it('erzeugt die committete types.generated.ts aus openapi.json', () => {
     const input = JSON.parse(readFileSync('src/api/openapi.json', 'utf8'));
     const expected = readFileSync('src/api/types.generated.ts', 'utf8');
-    // Der Kopf steht im nächsten Test; den Kopf der Datei hält check-typ-codegen.sh aktuell.
-    const body = (text: string) => text.slice(text.indexOf('*/\n') + 3);
-    expect(body(generateTypes(input))).toBe(body(expected));
+    expect(generateTypes(input)).toBe(expected);
   });
 
   it('trägt den eigenen Dateikopf und die leeren Exporte', () => {
