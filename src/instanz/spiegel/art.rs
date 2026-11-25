@@ -153,6 +153,10 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
 /// Einsatztabellen, die nicht gespiegelt werden, mit Grund (D3).
 pub const AUSGENOMMEN: &[(&str, &str)] = &[
     (
+        "ortung_kopplung",
+        "Lokale Betriebsangabe der führenden Seite (ADR-0103, ADR-0105): die Position kommt über das Einsatzfahrzeug in den Spiegel",
+    ),
+    (
         "ausgang",
         "Zustellung ist an die Instanz mit Anbindung und Geheimnis gebunden; der Versand steht über das ETB im Spiegel",
     ),
