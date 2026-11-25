@@ -123,7 +123,8 @@ final class AuftraegeTests: XCTestCase {
         XCTAssertEqual(Phase.pausiert.meldungstipp, .oeffnen)
         XCTAssertEqual(Phase.ruht(.keineRolle).meldungstipp, .oeffnen)
         XCTAssertEqual(Phase.unbestaetigt.meldungstipp, .verwerfen)
-        XCTAssertEqual(Phase.anmelden.meldungstipp, .verwerfen)
+        let ziel = HelferZiel(server: URL(string: "https://elw.local:8443/")!, code: "AB12CD34")
+        XCTAssertEqual(Phase.anmelden(ziel).meldungstipp, .verwerfen)
         XCTAssertEqual(Phase.beendet(.abgemeldet).meldungstipp, .verwerfen)
     }
 
