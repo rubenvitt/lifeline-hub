@@ -590,8 +590,17 @@ pub async fn handle_abgleich(
             akten,
             mitarbeit_nachtraege,
             mitarbeit_quittungen: annahme.quittungen,
+            tracking_requests: Vec::new(),
+            tracking_candidates_wanted: Vec::new(),
+            tracking_positions: Vec::new(),
+            tracking_candidates: Vec::new(),
         })
     })?;
+    // Fahrzeugortung (LLH-2119): rein lesend und nach dem Commit, damit ein Fehler dort den
+    // Abgleich nicht zurückrollt.
+    let mut antwort = antwort;
+    (antwort.tracking_positions, antwort.tracking_candidates) =
+        crate::ortung::fern::answer_hub(pool, eigen, kopplung, anfrage).await;
     melde_live(pool, &uebernommen).await;
     lebensende::abraeumen_nach_commit(pool, Some(live), &abzuraeumen).await;
     super::hinweis::ausfuehren(pool, live, hinweis_folgen).await;
@@ -689,6 +698,10 @@ pub async fn abgleich_einmal(
                 akten,
                 mitarbeit_nachtraege,
                 mitarbeit_quittungen: mitarbeit_quittungen.clone(),
+                tracking_requests: Vec::new(),
+                tracking_candidates_wanted: Vec::new(),
+                tracking_positions: Vec::new(),
+                tracking_candidates: Vec::new(),
             })
         })
         .map_err(fehler)?;

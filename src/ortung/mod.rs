@@ -172,5 +172,6 @@ pub fn publiziere(state: &AppState, einsatz_id: i64, ziel: Ortungsziel) {
     }
 }
 
+pub mod fern;
 pub mod kopplung;
 pub mod uebernahme;

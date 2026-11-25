@@ -109,6 +109,59 @@ pub struct SpiegelPaket {
     /// Kennungen der Nachträge des Gegenübers, die ich verarbeitet habe.
     #[serde(default)]
     pub mitarbeit_quittungen: Vec<i64>,
+    /// Fahrzeugortung (LLH-2119): Kennungen eines Zugangs des Gegenübers, deren letzte Position
+    /// ich brauche. Der Hub liest höchstens [`TRACKING_ANFRAGEN_MAX`]; ein älteres Gegenüber
+    /// überliest das Feld.
+    #[serde(default)]
+    pub tracking_requests: Vec<RemoteTrackingRequest>,
+    /// Org-Kennungen, für die ich die Kennungen des Gegenübers sehen will (Koppeldialog).
+    #[serde(default)]
+    pub tracking_candidates_wanted: Vec<String>,
+    /// Antwort auf `tracking_requests`: je Anfrage höchstens eine Position.
+    #[serde(default)]
+    pub tracking_positions: Vec<RemoteTrackingPosition>,
+    /// Antwort auf `tracking_candidates_wanted`, ohne Koordinaten.
+    #[serde(default)]
+    pub tracking_candidates: Vec<RemoteTrackingCandidates>,
+}
+
+/// Höchstens so viele Ortungsanfragen je Paket beantwortet der Hub; Überzählige überliest er.
+pub const TRACKING_ANFRAGEN_MAX: usize = 200;
+
+/// Anfrage nach der letzten Position einer Kennung (`org` ist die Org-Kennung des Abgleichs).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrackingRequest {
+    pub org: String,
+    pub access_id: String,
+    pub device_id: String,
+}
+
+/// Die letzte Position einer angefragten Kennung (`measured_at` im Format von `zeit::FORMAT`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrackingPosition {
+    pub org: String,
+    pub access_id: String,
+    pub device_id: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub measured_at: String,
+}
+
+/// Eine Kennung der letzten 24 Stunden, bewusst ohne Koordinaten.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrackingCandidate {
+    pub access_id: String,
+    pub access_name: String,
+    pub device_id: String,
+    pub received_at: String,
+}
+
+/// Kennungen einer Org des Hubs; `tracking_enabled` ist ihr Org-Schalter „Ortung im Einsatz“.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RemoteTrackingCandidates {
+    pub org: String,
+    pub tracking_enabled: bool,
+    pub items: Vec<RemoteTrackingCandidate>,
 }
 
 /// Wie ein Einsatz beim Führer endet (D3).
