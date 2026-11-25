@@ -1,9 +1,9 @@
 use super::FreiesZeichenAnzeige;
 use crate::error::AppError;
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 /// Felder zum Anlegen eines freien Zeichens (durch den Handler validiert/normalisiert).
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct ZeichenNeu<'a> {
     pub lat: f64,
     pub lon: f64,
@@ -104,6 +104,19 @@ pub async fn anlegen(
     einsatz_id: i64,
     daten: ZeichenNeu<'_>,
 ) -> Result<FreiesZeichenAnzeige, AppError> {
+    let mut conn = pool.acquire().await?;
+    let id = anlegen_tx(&mut conn, einsatz_id, daten).await?;
+    drop(conn);
+    laden(pool, einsatz_id, id).await
+}
+
+/// Legt ein Zeichen in einer laufenden Transaktion an und liefert seine ID (LLH-2129: mit dem
+/// System-ETB-Eintrag der Herkunft in einer Tx).
+pub async fn anlegen_tx(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+    daten: ZeichenNeu<'_>,
+) -> Result<i64, AppError> {
     let id = sqlx::query_scalar::<_, i64>(
         "INSERT INTO freies_zeichen \
             (einsatz_id, lat, lon, zeichen_spec, label, ansicht_id, erstellt_von) \
@@ -116,9 +129,9 @@ pub async fn anlegen(
     .bind(daten.label)
     .bind(daten.ansicht_id)
     .bind(daten.erstellt_von)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
-    laden(pool, einsatz_id, id).await
+    Ok(id)
 }
 
 /// Teil-Patch von Zeichenbeschreibung, `label` und Ansicht; `geaendert_at` wird immer
