@@ -312,7 +312,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 ### Task 11: Tabellen, Registrierung, Einlesen GeoJSON und Prüfung
 
 **Files:**
-- Create: `migrations/0377_karte_fremdebene.sql` (Nummer prüfen); `src/karte_fremdebene/{mod.rs,repo.rs,einlesen/mod.rs,einlesen/geojson.rs,einlesen/pruefen.rs}`
+- Create: `migrations/0378_karte_fremdebene.sql` (Nummer prüfen); `src/karte_fremdebene/{mod.rs,repo.rs,einlesen/mod.rs,einlesen/geojson.rs,einlesen/pruefen.rs}`
 - Modify: `src/lib.rs`; `src/instanz/spiegel/art.rs` (Metadaten `K::Lage`, Daten `K::Anhaenge`); `src/instanz/spiegel/uebernehmen.rs` (wie :1087); `src/einsatz/schwaerzung_registry.rs` (`TabellenRegel` für beide Tabellen; `name` und `url` `scrub(…, Strategie::Platzhalter, Z_EINSATZ)`, Daten `Scoping::UeberParent { fk: "ebene_id", parent: "karte_fremdebene" }`); `src/einsatz/schwaerzung_nachlauf.rs`, `src/einsatz/archiv/tests.rs`, `src/db/tests.rs`, `src/karten_ansicht/repo.rs` (wo die Wächter es verlangen); `src/error.rs`; `tests/enum_wire_kontrakt.rs`
 
 **Interfaces:**
@@ -397,7 +397,7 @@ Ausführende lesen den zur Aufgabe gehörenden Spec mit.
 ### Task 14: Org-Schalter für LAN-Ziele
 
 **Files:**
-- Create: `migrations/0378_org_fremdebenen_lan.sql`
+- Create: `migrations/0379_org_fremdebenen_lan.sql`
 - Modify: `src/org/einstellungen.rs` (Spalte `fremdebenen_lan_erlaubt`); `src/routes/org_einstellungen.rs`; `src/auth/admin_audit.rs` (`FremdebenenLanErlaubt`/`FremdebenenLanEntzogen`, `Ziel` um eine Org-Variante erweitern, falls nötig); Frontend-Verwaltung der Org-Einstellungen (Schalter „Fremdebenen dürfen das eigene Netz abrufen“)
 - Test: bestehender Test der Org-Einstellungen erweitert
 
