@@ -31,6 +31,12 @@ export type KopplungStatus = S['KopplungStatus'];
 export type KopplungMitCode = S['KopplungMitCode'];
 export type KopplungsCode = S['KopplungsCode'];
 export type GeraeteUebersicht = S['GeraeteUebersicht'];
+export type HelferAnzeige = S['HelferAnzeige'];
+export type HelferEinladungAnzeige = S['HelferEinladungAnzeige'];
+export type HelferStatus = S['HelferStatus'];
+export type HelferUebersicht = S['HelferUebersicht'];
+export type HelferZiel = S['HelferZiel'];
+export type HelferZielArt = S['HelferZielArt'];
 // Anbindungen: Maschinenzugänge für Fremdsysteme (LLH-1652)
 export type AnbindungenListe = S['AnbindungenListe'];
 export type AnbindungAnzeige = S['AnbindungAnzeige'];

@@ -364,7 +364,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
 - Modify: Einsatzkopf (Hinweis „{n} Helfer warten auf Bestätigung“, Link zu `…/einstellungen/geraete#helfer`)
 - Test: `EinsatzHelfer.test.tsx`, `helferKern.test.ts`, `HelferWeichePage.test.tsx`, `deeplinks.test.ts`
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `helferKern`: Sortierung „Wartet“ vor „Angemeldet“ vor „Beendet“, je nach `created_at`;
     Namensvorschlag für die Person nach Gleichheit von `display_name` und `snap_name` (ohne Groß-
     und Kleinschreibung, erstes Wort);
@@ -374,14 +374,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
     orten?“;
   - die Weiche zeigt „In Lifeline Helfer öffnen“ mit dem `lifeline-helfer://`-Link und löst nicht
     ein (kein Request).
-- [ ] **Step 2:** Run `mise exec -- pnpm -C frontend vitest run src/pages/einstellungen src/geraet src/routing` → FAIL.
-- [ ] **Step 3:** Umsetzen nach `frontend/AGENTS.md`:
+- [x] **Step 2:** Run `mise exec -- pnpm -C frontend vitest run src/pages/einstellungen src/geraet src/routing` → FAIL.
+- [x] **Step 3:** Umsetzen nach `frontend/AGENTS.md`:
   - Gestaltung im bestehenden Stil der Geräteseite;
   - Druck des QR über das vorhandene Druckmuster (`frontend/src/druck/AGENTS.md`), Blatt
     „Helfer anmelden“ mit QR, Einsatzname, Gültigkeit und drei Schritten;
   - Live: Geräte-Ereignis invalidiert `EINSATZ_KEYS.helfer`.
-- [ ] **Step 4:** Vitest und `mise exec -- pnpm -C frontend lint` → PASS.
-- [ ] **Step 5:** Commit `feat: Helfer einladen und bestätigen`.
+- [x] **Step 4:** Vitest und `mise exec -- pnpm -C frontend lint` → PASS.
+- [x] **Step 5:** Commit `feat: Helfer einladen und bestätigen`.
 
 ### Task 9: Gemeinsame Fälle und native Design-Tokens
 

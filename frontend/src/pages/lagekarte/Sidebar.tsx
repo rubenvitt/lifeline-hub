@@ -19,6 +19,7 @@ import type { KarteMarker, MarkerTyp, NichtVerortet } from './marker';
 import type { BasemapModus, KartenThemeWahl } from './basemapStil';
 import type { GefundenerOrt } from '../../anzeige/ortssuche';
 import MarkerSuche from './MarkerSuche';
+import GeortetListe from './GeortetListe';
 import EscKappe from './EscKappe';
 import { zielSchluessel, type ObjektEintrag } from './objektsuche';
 import type { LatLon } from '../../anzeige/koordinaten';
@@ -407,6 +408,7 @@ function ObjekteAnsicht(props: SidebarProps & { id: string; hidden: boolean }) {
   return (
     <div role="tabpanel" id={props.id} aria-label="Objekte" hidden={props.hidden}>
       <div data-paneel="objekte">
+        <GeortetListe verortet={props.verortet} onMarkerWaehlen={props.onMarkerWaehlen} />
         <MarkerSuche
           eintraege={props.objekte}
           onMarkerWaehlen={props.onMarkerWaehlen}
