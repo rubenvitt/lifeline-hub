@@ -87,6 +87,21 @@ pub async fn delete(
     Ok(r.rows_affected() > 0)
 }
 
+/// Räumt alle Zuschaltungen eines Einsatzes ab (Abschluss, Spiegel) und nennt die betroffenen
+/// Adapter, damit der Aufrufer nach dem Commit den Store nachführt. Ein abgeschlossener Einsatz
+/// hält keine Quelle mehr; wird er wieder geöffnet, beginnt er ohne Zuschaltung.
+pub async fn delete_for_einsatz(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Vec<String>, AppError> {
+    Ok(
+        sqlx::query_scalar("DELETE FROM adapter_einsatz WHERE einsatz_id = ? RETURNING adapter_id")
+            .bind(einsatz_id)
+            .fetch_all(conn)
+            .await?,
+    )
+}
+
 /// Hält ein laufender Einsatz den Adapter?
 pub async fn is_active(conn: &mut SqliteConnection, adapter_id: &str) -> Result<bool, AppError> {
     Ok(find_active_holder(conn, adapter_id).await?.is_some())

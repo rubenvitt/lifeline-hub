@@ -1,7 +1,8 @@
 //! Drohnenquellen je Einsatz (LLH-2105): auflisten, zuschalten, abschalten unter
 //! `/api/incidents/{id}/drone/sources`. Die Zuschaltung steht in `adapter_einsatz`; der Store
 //! (`AppState.drohne`) bekommt sie erst nach dem Commit (die Datenbank ist maßgeblich). Ein
-//! Adapter ist in höchstens einem laufenden Einsatz zugeschaltet.
+//! Adapter ist in höchstens einem laufenden Einsatz zugeschaltet; der Abschluss eines Einsatzes
+//! räumt seine Zuschaltungen ab (`einsatz::repo::abschliessen`, dann [`sync_store`]).
 
 use axum::body::Body;
 use axum::extract::State;
@@ -32,7 +33,7 @@ const ANDERER_EINSATZ: &str = "anderer Einsatz";
 pub struct DroneSourceView {
     pub adapter_id: String,
     pub label: String,
-    /// In diesem Einsatz zugeschaltet.
+    /// In diesem laufenden Einsatz zugeschaltet (ein abgeschlossener hält keine Quelle).
     pub connected: bool,
     /// Name des anderen laufenden Einsatzes, der die Quelle hält (`anderer Einsatz`, wenn die
     /// Person ihn nicht lesen darf).
@@ -65,13 +66,31 @@ async fn halter_name(state: &AppState, benutzer_id: i64, halter: i64) -> Result<
     })
 }
 
+/// Führt den Store nach einem Commit für die genannten Adapter nach: zugeschaltet bleibt nur,
+/// was ein laufender Einsatz noch hält (die Datenbank ist maßgeblich).
+pub async fn sync_store(state: &AppState, adapter_ids: &[String]) -> Result<(), AppError> {
+    if adapter_ids.is_empty() {
+        return Ok(());
+    }
+    let mut conn = state.pool.acquire().await?;
+    for id in adapter_ids {
+        let an = repo::is_active(&mut conn, id).await?;
+        state.drohne.set_zugeschaltet(id, an);
+    }
+    Ok(())
+}
+
+/// Die Sicht auf eine Quelle. `zuschaltung` zählt nur in einem laufenden Einsatz (`laufend`):
+/// ein abgeschlossener sieht weder Missionsname noch Videokennungen (Spec §7).
 async fn sicht(
     state: &AppState,
     benutzer_id: i64,
     einsatz_id: i64,
+    laufend: bool,
     a: &adapter_repo::Adapter,
     zuschaltung: Option<&Zuschaltung>,
 ) -> Result<DroneSourceView, AppError> {
+    let zuschaltung = zuschaltung.filter(|_| laufend);
     let connected = zuschaltung.is_some();
     let held_by_other = if connected {
         None
@@ -117,10 +136,11 @@ pub async fn liste(
             repo::load_for_einsatz(&mut conn, einsatz_id).await?,
         )
     };
+    let laufend = ctx.einsatz.status == crate::einsatz::EinsatzStatus::Aktiv;
     let mut aus = Vec::new();
     for a in adapter.iter().filter(|a| is_drohnen_art(&a.art)) {
         let z = zuschaltungen.iter().find(|z| z.adapter_id == a.id);
-        aus.push(sicht(&state, ctx.benutzer.id, einsatz_id, a, z).await?);
+        aus.push(sicht(&state, ctx.benutzer.id, einsatz_id, laufend, a, z).await?);
     }
     Ok(Json(aus))
 }
@@ -194,7 +214,15 @@ pub async fn zuschalten(
         state.live.publiziere(einsatz_id, id);
     }
     Ok(Json(
-        sicht(&state, erfasser, einsatz_id, &adapter, Some(&zuschaltung)).await?,
+        sicht(
+            &state,
+            erfasser,
+            einsatz_id,
+            true,
+            &adapter,
+            Some(&zuschaltung),
+        )
+        .await?,
     ))
 }
 
@@ -340,14 +368,17 @@ async fn hls_abrufen(
 }
 
 /// GET /api/incidents/{id}/drone/video/{key}/hls/{*file} — das Livebild einer Drohnenquelle,
-/// gebündelt: viele Zuschauer, ein Abruf je Datei. Die Quelle muss in diesem Einsatz
-/// zugeschaltet sein und die Videokennung zu ihr gehören; die Query der Anfrage wird verworfen.
+/// gebündelt: viele Zuschauer, ein Abruf je Datei. Die Quelle muss in diesem
+/// laufenden Einsatz zugeschaltet sein und die Videokennung zu ihr gehören, sonst 404; die Query
+/// der Anfrage wird verworfen.
 pub async fn video(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Lagekarte>,
     PfadParam((_eid, key, file)): PfadParam<(i64, String, String)>,
 ) -> Result<Response, AppError> {
-    if !is_dateiname(&file) {
+    // Ein abgeschlossener Einsatz hält keine Quelle (Spec §7), auch nicht mit einer übrig
+    // gebliebenen Zeile.
+    if ctx.einsatz.status != crate::einsatz::EinsatzStatus::Aktiv || !is_dateiname(&file) {
         return Err(AppError::NotFound);
     }
     let (Some(ttl), Some(content_type)) = (ttl_for(&file), content_type_for(&file)) else {

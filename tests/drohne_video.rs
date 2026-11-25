@@ -9,7 +9,7 @@ use tower::ServiceExt;
 use lifeline_hub::app::build_router;
 use lifeline_hub::drohne::store::Stand;
 use lifeline_hub::drohne::suchlage::Upstream;
-use lifeline_hub::drohne::vertrag::DrohnenLage;
+use lifeline_hub::drohne::vertrag::{DrohnenLage, DrohnenVideo};
 use lifeline_hub::drohne::Store;
 use lifeline_hub::live::LiveHub;
 use std::sync::Arc;
@@ -82,10 +82,10 @@ impl Umgebung {
                 lage: DrohnenLage {
                     stand_ms: 1,
                     quelle_stand_ms: 1,
-                    mission_name: None,
+                    mission_name: Some("Suche Waldweg".into()),
                     fluggeraete: vec![],
                     karte: None,
-                    videos: vec![],
+                    videos: vec![DrohnenVideo { key: key.into() }],
                     fotos: vec![],
                     verworfen: 0,
                 },
@@ -171,4 +171,79 @@ async fn ohne_zugang_503_ohne_seriennummer() {
     let (s, body) = u.holen("k1/hls/index.m3u8?x=1").await;
     assert_eq!(s, StatusCode::SERVICE_UNAVAILABLE);
     assert!(!body.contains("SN-GEHEIM"));
+}
+
+async fn liste(u: &Umgebung) -> serde_json::Value {
+    let (s, v) = anfrage(
+        &u.app,
+        "GET",
+        &format!("/api/incidents/{}/drone/sources", u.einsatz),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    v
+}
+
+#[tokio::test]
+async fn abschluss_beendet_das_livebild_und_leert_den_speicher() {
+    let u = umgebung().await;
+    u.adapter_anlegen("a1").await;
+    u.zuschalten("a1").await;
+    u.stand_mit_video("a1", "k1");
+    assert_eq!(liste(&u).await[0]["mission_name"], "Suche Waldweg");
+
+    let (s, _) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    assert!(!u.drohne.is_zugeschaltet("a1"));
+    assert!(u.drohne.get("a1").is_none());
+    let (s, _) = u.holen("k1/hls/index.m3u8").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Tiefenverteidigung: auch mit einer übrig gebliebenen Zeile (etwa aus einem älteren Stand)
+/// zeigt ein abgeschlossener Einsatz weder Livebild noch Missionsname.
+#[tokio::test]
+async fn abgeschlossener_einsatz_mit_alter_zeile_sieht_nichts() {
+    let u = umgebung().await;
+    u.adapter_anlegen("a1").await;
+    u.zuschalten("a1").await;
+    sqlx::query("UPDATE einsatz SET status = 'abgeschlossen', abgeschlossen_at = datetime('now') WHERE id = ?")
+        .bind(u.einsatz)
+        .execute(&u.pool)
+        .await
+        .unwrap();
+    // Ein anderer Einsatz könnte die Quelle inzwischen halten: der Stand ist da.
+    u.stand_mit_video("a1", "k1");
+
+    let (s, _) = u.holen("k1/hls/index.m3u8").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let v = liste(&u).await;
+    assert_eq!(v[0]["connected"], false);
+    assert!(v[0]["mission_name"].is_null());
+    assert!(v[0]["video_keys"].as_array().unwrap().is_empty());
+    assert_eq!(v[0]["lagemonitor"], false);
+}
+
+#[tokio::test]
+async fn adapter_loeschen_leert_den_speicher() {
+    let u = umgebung().await;
+    u.adapter_anlegen("a1").await;
+    u.zuschalten("a1").await;
+    u.stand_mit_video("a1", "k1");
+    assert!(u.drohne.is_zugeschaltet("a1"));
+
+    let (s, v) = anfrage(&u.app, "DELETE", "/api/admin/adapter/a1", &u.admin, None).await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v:?}");
+    assert!(!u.drohne.is_zugeschaltet("a1"));
+    assert!(u.drohne.get("a1").is_none());
+    assert!(u.drohne.find_video("k1").is_none());
 }

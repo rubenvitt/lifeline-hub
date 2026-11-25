@@ -324,6 +324,13 @@ pub async fn abschliessen(
     for kopplung_id in crate::geraet::repo::offene_ids(&state.pool, id).await? {
         state.live.melde_kopplung_ende(kopplung_id);
     }
+    // Erst nach dem Commit: der Store der Drohnenquellen ist nur das Abbild der Datenbank
+    // (LLH-2105). Hält inzwischen ein anderer laufender Einsatz die Quelle, bleibt sie an. Der
+    // Abschluss steht schon; ein Lesefehler hier heilt der nächste Lauf der Art.
+    if let Err(e) = crate::routes::drohne::sync_store(&state, &ergebnis.drohnen_abgeschaltet).await
+    {
+        tracing::error!("Drohnen-Store nach dem Abschluss nicht nachgeführt: {e}");
+    }
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
     Ok(Json(ergebnis.einsatz.anzeige(

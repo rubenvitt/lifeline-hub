@@ -194,3 +194,24 @@ async fn andere_org_hat_keinen_zugriff() {
     assert_eq!(s, StatusCode::FORBIDDEN);
     assert!(v.get("features").is_none());
 }
+
+#[tokio::test]
+async fn abgeschlossener_einsatz_ist_offline() {
+    let u = umgebung().await;
+    u.adapter_zuschalten().await;
+    let (s, _) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{}/close", u.einsatz),
+        &u.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK);
+    // Auch wenn ein Stand im Speicher liegt (etwa für einen anderen Einsatz).
+    u.stand_setzen();
+    let (s, _, v) = u.holen(u.einsatz, &u.admin, None).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(v["status"], "offline");
+    assert!(v["features"]["features"].as_array().unwrap().is_empty());
+}

@@ -64,6 +64,28 @@ impl Umgebung {
         .await
     }
 
+    async fn schliessen(&self, einsatz: i64) {
+        let (s, v) = anfrage(
+            &self.app,
+            "POST",
+            &format!("/api/einsaetze/{einsatz}/close"),
+            &self.admin,
+            None,
+        )
+        .await;
+        assert_eq!(s, StatusCode::OK, "{v:?}");
+    }
+
+    async fn zeilen(&self) -> Vec<(String, i64, bool)> {
+        sqlx::query_as(
+            "SELECT adapter_id, einsatz_id, lagemonitor FROM adapter_einsatz \
+             ORDER BY adapter_id, einsatz_id",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .unwrap()
+    }
+
     async fn liste(&self, einsatz: i64, cookie: &str) -> (StatusCode, Value) {
         anfrage(
             &self.app,
@@ -141,6 +163,8 @@ async fn zweiter_einsatz_bekommt_409() {
     assert_eq!(s, StatusCode::OK);
     let (s, body) = u.zuschalten(zweiter, "a1").await;
     assert_eq!(s, StatusCode::CONFLICT, "{body:?}");
+    // Der Konflikt legt für den zweiten Einsatz keine Zeile an.
+    assert_eq!(u.zeilen().await, vec![("a1".to_string(), u.einsatz, true)]);
 
     // Im zweiten Einsatz steht die Quelle als „gehalten“, mit dem Namen des ersten.
     let (_, liste) = u.liste(zweiter, &u.admin).await;
@@ -260,3 +284,76 @@ async fn fuehrungspersonal_bekommt_am_abgeschlossenen_einsatz_403_statt_409() {
     let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &cookie, None).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
 }
+
+#[tokio::test]
+async fn nur_die_lagemonitor_wahl_aendern_setzt_das_flag() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let (s, _) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = anfrage(
+        &u.app,
+        "PUT",
+        &u.pfad(u.einsatz, "a1"),
+        &u.admin,
+        Some(r#"{"lagemonitor":false}"#),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+    assert_eq!(v["lagemonitor"], false);
+    assert_eq!(u.zeilen().await, vec![("a1".to_string(), u.einsatz, false)]);
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(liste[0]["lagemonitor"], false);
+    assert_eq!(liste[0]["connected"], true);
+}
+
+#[tokio::test]
+async fn abschluss_raeumt_die_zuschaltung_ab() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let (s, _) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+
+    u.schliessen(u.einsatz).await;
+    assert!(u.zeilen().await.is_empty());
+    let (s, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(liste[0]["connected"], false);
+    assert!(liste[0]["held_by_other"].is_null());
+
+    // Abschalten am abgeschlossenen Einsatz ist ein Konflikt und ändert nichts.
+    let (s, _) = anfrage(&u.app, "DELETE", &u.pfad(u.einsatz, "a1"), &u.admin, None).await;
+    assert_eq!(s, StatusCode::CONFLICT);
+    assert!(u.zeilen().await.is_empty());
+}
+
+#[tokio::test]
+async fn wiedereroeffnen_nach_uebernahme_ergibt_keinen_zweiten_halter() {
+    let u = umgebung().await;
+    u.adapter("a1", "suchlage", u.org_id).await;
+    let (s, _) = u.zuschalten(u.einsatz, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+    u.schliessen(u.einsatz).await;
+
+    let zweiter = einsatz_anlegen_mit(&u.app, &u.admin, "Lage B").await;
+    let (s, _) = u.zuschalten(zweiter, "a1").await;
+    assert_eq!(s, StatusCode::OK);
+
+    let (s, v) = anfrage(
+        &u.app,
+        "POST",
+        &format!("/api/einsaetze/{}/reopen", u.einsatz),
+        &u.admin,
+        Some(&json!({"grund": "Nachalarmierung"}).to_string()),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v:?}");
+
+    // Nur der zweite Einsatz hält die Quelle; der wieder geöffnete beginnt ohne Zuschaltung.
+    assert_eq!(u.zeilen().await, vec![("a1".to_string(), zweiter, true)]);
+    let (_, liste) = u.liste(u.einsatz, &u.admin).await;
+    assert_eq!(liste[0]["connected"], false);
+    assert_eq!(liste[0]["held_by_other"], "Lage B");
+}
+
