@@ -3,6 +3,7 @@ import type { PegelAnzeige } from '../api/types';
 import { uhrzeit } from '../anzeige/zeitDarstellung';
 import {
   messEpoche,
+  PEGEL_NOTIZ_PLATZHALTER,
   pegelKennzahl,
   pegelNotizKurz,
   pegelZeile,
@@ -228,9 +229,22 @@ describe('pegelNotizKurz (Überblick)', () => {
   it('ohne Pegel keine Notiz, bei Ausfall „Pegel: Stand unbekannt", veraltet mit Wort', () => {
     expect(pegelNotizKurz([], JETZT)).toBeNull();
     expect(pegelNotizKurz([pegel({ messung: null })], JETZT)).toBe('Pegel: Stand unbekannt');
-    expect(pegelNotizKurz([pegel()], JETZT + 2 * 3_600_000)).toBe(
-      'Pegel 6,84 m steigend · veraltet',
-    );
+  });
+
+  // LLH-2102: „veraltet“ tritt an die Stelle des Trends. Der Trend einer Messung von vor über
+  // einer Stunde sagt nichts über jetzt, und die Notiz wird nie breiter als der Platzhalter.
+  it('veraltet ersetzt das Trendwort, in jeder Richtung und ohne Trend', () => {
+    const spaet = JETZT + 2 * 3_600_000;
+    for (const trend_cm_pro_h of [9, -4, 0, null]) {
+      expect(
+        pegelNotizKurz([pegel({ messung: { ...pegel().messung!, trend_cm_pro_h } })], spaet),
+      ).toBe('Pegel 6,84 m veraltet');
+    }
+  });
+
+  it('veraltet ist nie länger als der Platzhalter, den der Kopf beim Laden hält', () => {
+    const notiz = pegelNotizKurz([pegel()], JETZT + 2 * 3_600_000)!;
+    expect(notiz.length).toBeLessThanOrEqual(PEGEL_NOTIZ_PLATZHALTER.length);
   });
 });
 
