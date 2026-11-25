@@ -337,10 +337,10 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   --ohne-e2e` erst in Task 8.
 - [ ] **Schritt 5:** Commit `feat(fahrzeuge): Ortung über den Hub im Koppeldialog (LLH-2119)`.
 
-### Task 7: ADR-0104 und Doku
+### Task 7: ADR-0105 und Doku
 
 **Dateien:**
-- Neu: `docs/architektur/entscheidungen/ADR-0104-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md`
+- Neu: `docs/architektur/entscheidungen/ADR-0105-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md`
   (Nummer vorher gegen `origin/alpha` prüfen)
 - Ändern:
   - arc42, Kapitel 6 und 8, sowie die Tabelle nach `docs/architektur/AGENTS.md`;
@@ -359,11 +359,11 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
       `SammelzeileJe`, ohne Kennung; das Muster danach ausrichten.
     - `verbiete '\b(lat|lon)\b'` im Typ `TrackingCandidate` (über einen eigenen Abschnitt oder
       einen Test).
-- [ ] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0104 und ADR-0103;
+- [ ] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0105 und ADR-0103;
   `scripts/check-adr-nummern.sh` ist grün.
 - [ ] **Schritt 3:** Architektur- und Anwendertexte. Bilder nach `docs/anwender/AGENTS.md`
   (Bildlauf), soweit der Dialog betroffen ist.
-- [ ] **Schritt 4:** Commit `docs: ADR-0104 und Doku zur Ortung über den Hub (LLH-2119)`.
+- [ ] **Schritt 4:** Commit `docs: ADR-0105 und Doku zur Ortung über den Hub (LLH-2119)`.
 
 ### Task 8: Gates, Bilder, Abschluss
 

@@ -273,7 +273,8 @@ Kopplung her, `ortung_hauptamt` wird nicht synchronisiert.
 
 ## Offen für später
 
-- Ortung in gespiegelten Einsätzen (Position am Hub an das führende ELW weiterleiten).
+- Ortung in gespiegelten Einsätzen (Position am Hub an das führende ELW weiterleiten):
+  umgesetzt in LLH-2119, `docs/superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`.
 - Rechtliche Klärung „Ortung von Hauptamtlichen“ (Jurist, Schnittstellen-Ausbau).
 - Gezielte Zeilen-Aktualisierung statt breiter Invalidierung, falls die Drossel nicht reicht.
 

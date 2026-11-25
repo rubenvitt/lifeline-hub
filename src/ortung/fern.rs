@@ -98,13 +98,13 @@ async fn antworten(
         .bind(&jetzt)
         .fetch_optional(pool)
         .await?;
-        if let Some((lat, lon, measured_at)) = zeile {
+        if let Some((breite, laenge, measured_at)) = zeile {
             positionen.push(RemoteTrackingPosition {
                 org: r.org.clone(),
                 access_id: r.access_id.clone(),
                 device_id: r.device_id.clone(),
-                lat,
-                lon,
+                lat: breite,
+                lon: laenge,
                 measured_at,
             });
         }
