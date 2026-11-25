@@ -78,7 +78,9 @@ final class HelferModellTests: XCTestCase {
         XCTAssertEqual(modell.stand(auftrag, empfaenger: zeile), .offen)
         await modell.quittiere(auftrag, empfaenger: zeile)
         let neu = try XCTUnwrap(modell.auftrag(Beispiel.offenerAuftrag))
-        guard case .quittiert(let um, let von) = modell.stand(neu, empfaenger: zeile) else {
+        // Die Zeile aus dem neuen Stand: der Stand liest die Quittung aus der Zeile selbst.
+        let neueZeile = try XCTUnwrap(neu.recipients.first { $0.id == zeile.id })
+        guard case .quittiert(let um, let von) = modell.stand(neu, empfaenger: neueZeile) else {
             return XCTFail("nicht quittiert")
         }
         XCTAssertTrue(
