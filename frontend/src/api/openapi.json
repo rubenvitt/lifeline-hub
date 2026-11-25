@@ -11337,6 +11337,192 @@
           }
         }
       },
+      "HelferAnzeige": {
+        "type": "object",
+        "description": "Eine Helfer-Kopplung, wie die Leitung sie sieht.",
+        "required": [
+          "id",
+          "display_name",
+          "state",
+          "person_requested",
+          "is_tracker",
+          "paused",
+          "expires_at",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string"
+          },
+          "display_name": {
+            "type": "string",
+            "description": "Name, den die Kraft beim Anmelden eingegeben hat."
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Kennung der Kopplung (`geraet_kopplung.id`)."
+          },
+          "is_tracker": {
+            "type": "boolean",
+            "description": "Das Gerät schreibt die Position seines Ziels („Ortungsgerät“)."
+          },
+          "last_position_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der letzten Position, die dieses Gerät geschrieben hat (Quelle `helfer`)."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Die Kraft hat die Ortung pausiert."
+          },
+          "person": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferPerson"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "person_requested": {
+            "type": "boolean",
+            "description": "Die Kraft hat „Mich als Person orten“ gewählt."
+          },
+          "state": {
+            "$ref": "#/components/schemas/HelferStatus"
+          },
+          "target": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferZiel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "HelferEinladungAnzeige": {
+        "type": "object",
+        "description": "Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal.",
+        "required": [
+          "id",
+          "expires_at"
+        ],
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Der Code (8 Zeichen); fehlt außer in der Antwort auf das Anlegen."
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`https://<server>/helfer#<CODE>`, wenn der Server seine öffentliche Adresse kennt; sonst\nbaut der Client die Adresse aus seinem Origin (`helferAdresse`)."
+          }
+        }
+      },
+      "HelferPerson": {
+        "type": "object",
+        "description": "Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "HelferStatus": {
+        "type": "string",
+        "description": "Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in\n`geraet_kopplung.helfer_zustand` (CHECK in Migration 0373); `beendet` leitet der Server\nab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.",
+        "enum": [
+          "unbestaetigt",
+          "aktiv",
+          "abgelehnt",
+          "beendet"
+        ]
+      },
+      "HelferUebersicht": {
+        "type": "object",
+        "description": "Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen.",
+        "required": [
+          "helpers"
+        ],
+        "properties": {
+          "helpers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelferAnzeige"
+            }
+          },
+          "invitation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HelferEinladungAnzeige"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "HelferZiel": {
+        "type": "object",
+        "description": "Ziel einer Helfer-Kopplung.",
+        "required": [
+          "kind",
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/HelferZielArt"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name der Einheit bzw. Funkrufname des Fahrzeugs."
+          }
+        }
+      },
+      "HelferZielArt": {
+        "type": "string",
+        "description": "Art des Ziels einer Helfer-Kopplung.",
+        "enum": [
+          "unit",
+          "vehicle"
+        ]
+      },
       "HintergrundbildAnzeige": {
         "type": "object",
         "description": "Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.",

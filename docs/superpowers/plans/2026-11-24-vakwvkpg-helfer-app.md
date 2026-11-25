@@ -220,16 +220,16 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - `pub async fn einladung_einloesen(conn, code: &str) -> Result<(einladung_id, einsatz_id, org_id), AppError>` (zählt `einloesungen` hoch; abgelaufen, widerrufen oder Einsatz nicht aktiv → 401).
   - `url` = `helferAdresse(origin, code)` = `https://<host>/helfer#<CODE>`. Der Server baut sie aus der konfigurierten öffentlichen Adresse wie beim Koppeln; fehlt die, baut der Client sie.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `leitung_legt_helfer_einladung_an_und_neue_ersetzt_alte`: zweiter POST → erste Einladung
     beim Einlösen 401;
   - `ohne_ortung_der_org_keine_einladung` (403);
   - `fuehrungspersonal_darf_keine_einladung_anlegen` (403);
   - `einladung_gilt_hoechstens_72_stunden` (`valid_minutes: 10000` → 422).
-- [ ] **Step 2:** Run `cargo test --test helfer` → FAIL.
-- [ ] **Step 3:** Umsetzen; Glossar-Wörter aus Task 1.
-- [ ] **Step 4:** Run `cargo test --test helfer`, `scripts/check-api-routen.sh`, `scripts/check-typ-codegen.sh` → PASS.
-- [ ] **Step 5:** Commit `feat: Helfer-Einladung am Einsatz`.
+- [x] **Step 2:** Run `cargo test --test helfer` → FAIL.
+- [x] **Step 3:** Umsetzen; Glossar-Wörter aus Task 1.
+- [x] **Step 4:** Run `cargo test --test helfer`, `scripts/check-api-routen.sh`, `scripts/check-typ-codegen.sh` → PASS.
+- [x] **Step 5:** Commit `feat: Helfer-Einladung am Einsatz`.
 
 ### Task 5: Einlösen, Ansicht `helfer`, eigener Zustand
 

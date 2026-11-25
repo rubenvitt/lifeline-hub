@@ -1194,6 +1194,27 @@ fn positionsquelle_wire() {
     } in lifeline_hub::ortung::Positionsquelle::ALLE);
 }
 
+/// Helfer-App: Zustand einer Helfer-Kopplung; die ersten drei = CHECK von `helfer_zustand`
+/// (Migration 0373), `beendet` leitet der Server ab.
+#[test]
+fn helfer_status_wire() {
+    enum_wire!(lifeline_hub::helfer::HelferStatus {
+        Unbestaetigt => "unbestaetigt",
+        Aktiv => "aktiv",
+        Abgelehnt => "abgelehnt",
+        Beendet => "beendet",
+    } in lifeline_hub::helfer::HelferStatus::ALLE);
+}
+
+/// Helfer-App: Art des Ziels einer Helfer-Kopplung.
+#[test]
+fn helfer_ziel_art_wire() {
+    enum_wire!(lifeline_hub::helfer::HelferZielArt {
+        Einheit => "unit",
+        Fahrzeug => "vehicle",
+    } in lifeline_hub::helfer::HelferZielArt::ALLE);
+}
+
 #[test]
 fn fuehrungsfunktion_art_wire() {
     enum_wire!(lifeline_hub::fuehrung::FunktionsArt {

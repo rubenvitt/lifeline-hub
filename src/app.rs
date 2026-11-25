@@ -1569,6 +1569,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/einsaetze/{id}/devices/{gid}/revoke",
             post(routes::geraet::widerrufen),
         )
+        // Helfer-App (Spec 2026-11-24-vakwvkpg, ADR-0098): Einladung und Helfer der Leitung.
+        .route(
+            "/api/incidents/{id}/helpers",
+            get(routes::helfer::uebersicht),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations",
+            post(routes::helfer::einladung_anlegen),
+        )
+        .route(
+            "/api/incidents/{id}/helpers/invitations/{einladung_id}/revoke",
+            post(routes::helfer::einladung_widerrufen),
+        )
         // LLH-1638: Freigabe des Einsatzes für Maschinenzugänge (Einsatzleitung, auch am
         // Spiegel).
         .route(

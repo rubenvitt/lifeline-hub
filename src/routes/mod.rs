@@ -55,6 +55,7 @@ pub mod fuehrungsfunktion;
 pub mod gefahr;
 pub mod geraet;
 pub mod health;
+pub mod helfer;
 pub mod infotelefon;
 pub mod instanz;
 pub mod ios_push;

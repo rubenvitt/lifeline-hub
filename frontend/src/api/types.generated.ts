@@ -4537,6 +4537,73 @@ export interface components {
             nummer: number;
             personen: components["schemas"]["RegistriertePerson"][];
         };
+        /** @description Eine Helfer-Kopplung, wie die Leitung sie sieht. */
+        HelferAnzeige: {
+            created_at: string;
+            /** @description Name, den die Kraft beim Anmelden eingegeben hat. */
+            display_name: string;
+            expires_at: string;
+            /**
+             * Format: int64
+             * @description Kennung der Kopplung (`geraet_kopplung.id`).
+             */
+            id: number;
+            /** @description Das Gerät schreibt die Position seines Ziels („Ortungsgerät“). */
+            is_tracker: boolean;
+            /** @description Zeitpunkt der letzten Position, die dieses Gerät geschrieben hat (Quelle `helfer`). */
+            last_position_at?: string | null;
+            /** @description Die Kraft hat die Ortung pausiert. */
+            paused: boolean;
+            person?: components["schemas"]["HelferPerson"] | null;
+            /** @description Die Kraft hat „Mich als Person orten“ gewählt. */
+            person_requested: boolean;
+            state: components["schemas"]["HelferStatus"];
+            target?: components["schemas"]["HelferZiel"] | null;
+        };
+        /** @description Eine Helfer-Einladung. Den Klartext-`code` trägt nur die Antwort auf das Anlegen, einmal. */
+        HelferEinladungAnzeige: {
+            /** @description Der Code (8 Zeichen); fehlt außer in der Antwort auf das Anlegen. */
+            code?: string | null;
+            expires_at: string;
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description `https://<server>/helfer#<CODE>`, wenn der Server seine öffentliche Adresse kennt; sonst
+             *     baut der Client die Adresse aus seinem Origin (`helferAdresse`).
+             */
+            url?: string | null;
+        };
+        /** @description Zugeordnete Person (Kraft in `einsatz_personal`); setzt nur die Leitung. */
+        HelferPerson: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        /**
+         * @description Zustand einer Helfer-Kopplung. `unbestaetigt`, `aktiv` und `abgelehnt` stehen in
+         *     `geraet_kopplung.helfer_zustand` (CHECK in Migration 0373); `beendet` leitet der Server
+         *     ab (widerrufen oder abgelaufen). Im Text heißt `unbestaetigt` „wartet“.
+         * @enum {string}
+         */
+        HelferStatus: "unbestaetigt" | "aktiv" | "abgelehnt" | "beendet";
+        /** @description Helfer-Übersicht der Leitung: die gültige Einladung (ohne Code) und alle Helfer-Kopplungen. */
+        HelferUebersicht: {
+            helpers: components["schemas"]["HelferAnzeige"][];
+            invitation?: components["schemas"]["HelferEinladungAnzeige"] | null;
+        };
+        /** @description Ziel einer Helfer-Kopplung. */
+        HelferZiel: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["HelferZielArt"];
+            /** @description Name der Einheit bzw. Funkrufname des Fahrzeugs. */
+            name: string;
+        };
+        /**
+         * @description Art des Ziels einer Helfer-Kopplung.
+         * @enum {string}
+         */
+        HelferZielArt: "unit" | "vehicle";
         /** @description Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe. */
         HintergrundbildAnzeige: {
             /**

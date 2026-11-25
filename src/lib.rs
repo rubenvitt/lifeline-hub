@@ -43,6 +43,7 @@ pub mod fuehrung;
 pub mod gefahr;
 pub mod geocoding;
 pub mod geraet;
+pub mod helfer;
 pub mod http_begrenzt;
 pub mod infotelefon;
 pub mod instanz;
