@@ -26,6 +26,10 @@ pub const OBJEKTE_MAX: usize = 5_000;
 pub const STUETZPUNKTE_MAX: usize = 200_000;
 /// Höchstzahl der Stützpunkte einer Linie oder eines Rings.
 pub const STUETZPUNKTE_JE_LINIE_MAX: usize = 5_000;
+/// Höchste Schachtelung von Geometrien: offene KML-Geometrien eines Placemark bzw. Ebenen einer
+/// `GeometryCollection`. Tiefer ist die Datei `unlesbar`; sonst sprengte die Rekursion über ein
+/// tief verschachteltes Objekt den Stack und risse den Server mit (Abschluss-Review, C1).
+pub const GEOMETRIE_TIEFE_MAX: usize = 16;
 /// Höchstgröße des normierten GeoJSON in Bytes (8 MiB).
 pub const GEOJSON_MAX: usize = 8 * 1024 * 1024;
 /// Höchstlänge des Namens eines Objekts (Zeichen); länger wird gekürzt.

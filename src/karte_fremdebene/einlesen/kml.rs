@@ -13,7 +13,9 @@
 //! Grenzen wie eine GeoJSON-Datei. Der `name` des äußersten `Document` ist der Namensvorschlag.
 
 use super::{build_feature, finish, normalize_geometrie, Grenzen, Normiert};
-use crate::karte_fremdebene::{FremdebeneFehler, STUETZPUNKTE_JE_LINIE_MAX, STUETZPUNKTE_MAX};
+use crate::karte_fremdebene::{
+    FremdebeneFehler, GEOMETRIE_TIEFE_MAX, STUETZPUNKTE_JE_LINIE_MAX, STUETZPUNKTE_MAX,
+};
 use quick_xml::events::{BytesRef, Event};
 use quick_xml::Reader;
 use serde_json::{json, Value};
@@ -133,7 +135,7 @@ pub fn read_kml(text: &str, grenzen: &mut Grenzen) -> Result<Normiert, Fremdeben
                     if UEBERLESEN.contains(&name.as_str()) {
                         ueberlesen_ab = Some(tiefe);
                     } else if let Some(p) = placemark.as_mut() {
-                        oeffne_in_placemark(p, &name, eltern, tiefe, &mut text_ziel);
+                        oeffne_in_placemark(p, &name, eltern, tiefe, &mut text_ziel)?;
                     } else if name == "Placemark" {
                         grenzen.count_objekt()?;
                         placemark = Some(Placemark {
@@ -244,14 +246,30 @@ fn entity(r: &BytesRef<'_>) -> Result<char, FremdebeneFehler> {
     }
 }
 
-/// Ein Element innerhalb eines Placemark beginnt.
+/// Elemente, die eine Geometrie öffnen (einen [`Rahmen`]).
+const GEOMETRIEN: &[&str] = &[
+    "Point",
+    "LineString",
+    "LinearRing",
+    "Polygon",
+    "Track",
+    "MultiGeometry",
+    "MultiTrack",
+];
+
+/// Ein Element innerhalb eines Placemark beginnt. Mehr als [`GEOMETRIE_TIEFE_MAX`] offene
+/// Geometrien machen die Datei `Unlesbar`: sonst wüchse der Wert so tief, wie die Datei
+/// schachtelt, und Normieren wie Freigeben gingen rekursiv über den Stack.
 fn oeffne_in_placemark(
     p: &mut Placemark,
     name: &str,
     eltern: Option<&str>,
     tiefe: usize,
     text_ziel: &mut Option<(Textziel, usize)>,
-) {
+) -> Result<(), FremdebeneFehler> {
+    if GEOMETRIEN.contains(&name) && p.rahmen.len() >= GEOMETRIE_TIEFE_MAX {
+        return Err(FremdebeneFehler::Unlesbar);
+    }
     let in_geometrie = !p.rahmen.is_empty();
     match name {
         "name" if eltern == Some("Placemark") => *text_ziel = Some((Textziel::Name, tiefe)),
@@ -287,6 +305,7 @@ fn oeffne_in_placemark(
         "MultiGeometry" | "MultiTrack" => p.rahmen.push(Rahmen::Mehrere(Vec::new())),
         _ => {}
     }
+    Ok(())
 }
 
 /// Der gesammelte Text eines Elements im Placemark.
@@ -441,7 +460,7 @@ fn zusammenfassen(g: Value) -> Value {
 mod tests {
     use super::super::read_datei;
     use super::*;
-    use crate::karte_fremdebene::{OBJEKTE_MAX, STUETZPUNKTE_JE_LINIE_MAX};
+    use crate::karte_fremdebene::{GEOMETRIE_TIEFE_MAX, OBJEKTE_MAX, STUETZPUNKTE_JE_LINIE_MAX};
     use serde_json::{json, Value};
 
     fn lies(text: &str) -> Result<Normiert, FremdebeneFehler> {
@@ -655,6 +674,43 @@ mod tests {
         );
         assert_eq!(n.namensvorschlag.as_deref(), Some("Lage"));
         assert!(!n.geojson.contains("example.invalid"));
+    }
+
+    #[test]
+    fn tief_verschachtelte_multigeometry_wird_abgelehnt_ohne_absturz() {
+        let tiefe = 10_000;
+        let text = kml(&placemark(&format!(
+            "{}{}",
+            "<MultiGeometry>".repeat(tiefe),
+            "</MultiGeometry>".repeat(tiefe)
+        )));
+        // Ein kleiner Stack beweist, dass nichts rekursiv in die Tiefe geht.
+        let ergebnis = std::thread::Builder::new()
+            .stack_size(256 * 1024)
+            .spawn(move || lies(&text))
+            .unwrap()
+            .join()
+            .expect("kein Absturz");
+        assert_eq!(ergebnis, Err(FremdebeneFehler::Unlesbar));
+
+        // Bis zur Grenze offener Geometrien wird gelesen.
+        let punkt = "<Point><coordinates>9,52</coordinates></Point>";
+        let rahmen = |n: usize| {
+            kml(&placemark(&format!(
+                "{}{punkt}{}",
+                "<MultiGeometry>".repeat(n - 1),
+                "</MultiGeometry>".repeat(n - 1)
+            )))
+        };
+        let n = lies(&rahmen(GEOMETRIE_TIEFE_MAX)).unwrap();
+        assert_eq!(
+            features(&n)[0]["geometry"],
+            json!({"type":"Point","coordinates":[9.0,52.0]})
+        );
+        assert_eq!(
+            lies(&rahmen(GEOMETRIE_TIEFE_MAX + 1)),
+            Err(FremdebeneFehler::Unlesbar)
+        );
     }
 
     #[test]

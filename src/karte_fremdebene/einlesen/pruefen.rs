@@ -7,7 +7,7 @@
 //! Geometrie), verwirft das eine Objekt (`Ok(None)`); der Aufrufer zählt es.
 
 use super::Grenzen;
-use crate::karte_fremdebene::{FremdebeneFehler, NACHKOMMASTELLEN};
+use crate::karte_fremdebene::{FremdebeneFehler, GEOMETRIE_TIEFE_MAX, NACHKOMMASTELLEN};
 use serde_json::{json, Value};
 
 /// Bereichsprüfung einer Position: endlich, Länge in [-180, 180], Breite in [-90, 90]. Liefert
@@ -118,11 +118,24 @@ fn mehrere<T>(
 
 /// Normiert eine GeoJSON-Geometrie: Höhe weg, gerundet, Ringe geschlossen, eine
 /// `GeometryCollection` flachgeklopft (ein Teil allein steht für sich). `Ok(None)` heißt: das
-/// Objekt hat keine lesbare Geometrie und wird verworfen.
+/// Objekt hat keine lesbare Geometrie und wird verworfen. Sammlungen tiefer als
+/// [`GEOMETRIE_TIEFE_MAX`] machen die Datei `Unlesbar`.
 pub fn normalize_geometrie(
     v: &Value,
     zaehler: &mut Grenzen,
 ) -> Result<Option<Value>, FremdebeneFehler> {
+    normalize_tief(v, zaehler, 0)
+}
+
+/// [`normalize_geometrie`] mit der Tiefe in verschachtelten Sammlungen.
+fn normalize_tief(
+    v: &Value,
+    zaehler: &mut Grenzen,
+    tiefe: usize,
+) -> Result<Option<Value>, FremdebeneFehler> {
+    if tiefe > GEOMETRIE_TIEFE_MAX {
+        return Err(FremdebeneFehler::Unlesbar);
+    }
     let Some(typ) = v.get("type").and_then(Value::as_str) else {
         return Ok(None);
     };
@@ -132,7 +145,7 @@ pub fn normalize_geometrie(
         };
         let mut flach = Vec::new();
         for t in teile {
-            match normalize_geometrie(t, zaehler)? {
+            match normalize_tief(t, zaehler, tiefe + 1)? {
                 Some(g) if g["type"] == "GeometryCollection" => {
                     if let Some(Value::Array(innen)) = g.get("geometries") {
                         flach.extend(innen.iter().cloned());
@@ -203,6 +216,26 @@ mod tests {
         assert_eq!(
             normalize_geometrie(&v, &mut g).unwrap(),
             Some(json!({"type":"MultiPoint","coordinates":[[9.0,52.0]]}))
+        );
+    }
+
+    #[test]
+    fn zu_tief_verschachtelte_sammlung_wird_abgelehnt() {
+        let sammlung = |tiefe: usize| {
+            let mut v = json!({"type":"Point","coordinates":[9,52]});
+            for _ in 0..tiefe {
+                v = json!({"type":"GeometryCollection","geometries":[v]});
+            }
+            v
+        };
+        let mut g = Grenzen::default();
+        assert_eq!(
+            normalize_geometrie(&sammlung(GEOMETRIE_TIEFE_MAX), &mut g).unwrap(),
+            Some(json!({"type":"Point","coordinates":[9.0,52.0]}))
+        );
+        assert_eq!(
+            normalize_geometrie(&sammlung(GEOMETRIE_TIEFE_MAX + 1), &mut g),
+            Err(FremdebeneFehler::Unlesbar)
         );
     }
 }
