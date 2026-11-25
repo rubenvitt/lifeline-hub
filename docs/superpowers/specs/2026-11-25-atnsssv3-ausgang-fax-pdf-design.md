@@ -3,7 +3,7 @@
 Zunder: https://zunder.rubeen.dev/#/aufgabe/atnsssv3lxb9m7h4r2rkr8ag
 (Unteraufgabe von LLH-1197, Konzept `docs/konzepte/2026-11-10-schnittstellen-ausbau.md`, E8)
 
-Stand: 25.11.2026, Entwurf. Abgestimmt am Phase-1-Checkpoint am 25.11.2026: Das PDF entsteht am
+Stand: 25.11.2026, freigegeben. Abgestimmt am Phase-1-Checkpoint am 25.11.2026: Das PDF entsteht am
 Server in schlankem Rust. Es gibt den Zustand „zugestellt“ mit Abfrage bei sipgate. Der Schnitt
 setzt auf PR #1711 (LLH-2093) auf. Das PDF geht auch an E-Mails.
 
@@ -219,6 +219,14 @@ DB: `fn baue_pdf(&PdfVorlage) -> Result<Vec<u8>, PdfFehler>`.
 Für die E-Mail kommt das PDF als erster Anhang `application/pdf` hinzu. Die PNG-Anlagen bleiben
 zusätzlich dran, der Mailtext bleibt. Die Grenze von 20 MiB für Anhänge aus #1711 zählt das PDF
 mit.
+
+**Die Grenze von 30 Seiten und 10 MiB gilt nur für Fax** (Freigabe vom 25.11.2026). Nur ein
+Versand an eine Faxnummer rendert das PDF schon beim Anlegen. Für E-Mail rendert erst der Lauf.
+Ist das PDF zu groß oder schlägt die Erzeugung fehl, geht die Mail ohne PDF raus, wie in #1711
+als Text mit PNG-Anlagen. Die Zeile bekommt den Vermerk `ohne_pdf` (neue boolesche Spalte in
+derselben Migration), die Versandliste zeigt „ohne PDF“, und das Log schreibt einen Eintrag ohne
+Inhalt. Ein Fax, dessen PDF im Lauf doch zu groß wird (etwa weil sich Einsatzname oder
+Übungsstatus seit dem Anlegen geändert haben), endet `fehlgeschlagen` mit `zu_gross`.
 
 ### 7. Oberfläche
 
