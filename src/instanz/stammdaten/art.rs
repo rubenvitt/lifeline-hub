@@ -112,6 +112,11 @@ pub const BESCHREIBUNGEN: &[ArtBeschreibung] = &[
             "einsatz_nummer_praefix",
             "skelett_dauer_tage",
             "nachbereitung_tage",
+            // Helfer-App: der Schalter gilt am Spiegel wie am Hub. `ortung_bestaetigt_von` ist eine
+            // lokale Benutzer-id und bleibt wie `geaendert_von` daheim.
+            "ortung_im_einsatz",
+            "ortung_personen",
+            "ortung_bestaetigt_at",
         ],
         verweise: &[],
         quali_soll: None,

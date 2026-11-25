@@ -142,22 +142,22 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
   - Rust: `OrgEinstellungen.ortung_im_einsatz: i64`, `ortung_personen: i64`. Wire in `OrgEinstellungenAnzeige`: `ortung_im_einsatz: bool`, `ortung_personen: bool`, `ortung_bestaetigt_at: Option<String>` (Typ deutsch, Feld folgt dem Typ).
   - `pub async fn ortung_der_org(pool: &SqlitePool, org_id: i64) -> Result<OrtungFreigabe, AppError>` in `src/org/einstellungen.rs` mit `pub struct OrtungFreigabe { pub im_einsatz: bool, pub personen: bool }`.
 
-- [ ] **Step 1: Failing test** `org_ortung_ist_anfangs_aus_und_braucht_bestaetigung` in `tests/org_einstellungen.rs`:
+- [x] **Step 1: Failing test** `org_ortung_ist_anfangs_aus_und_braucht_bestaetigung` in `tests/org_einstellungen.rs`:
   - GET `/api/org-settings` → `ortung_im_einsatz == false`, `ortung_personen == false`;
   - PUT mit `ortung_im_einsatz: true` → 200 und `ortung_bestaetigt_at` gesetzt;
   - PUT `ortung_personen: true` bei `ortung_im_einsatz: false` → 422.
-- [ ] **Step 2:** Run `cargo test --test org_einstellungen org_ortung` → FAIL.
-- [ ] **Step 3:** Migration schreiben. Felder in Struct, Anzeige und `setzen` ergänzen: Bestätigung
+- [x] **Step 2:** Run `cargo test --test org_einstellungen org_ortung` → FAIL.
+- [x] **Step 3:** Migration schreiben. Felder in Struct, Anzeige und `setzen` ergänzen: Bestätigung
   setzen, wenn der Schalter von aus auf an geht; 422, wenn `personen` ohne `im_einsatz` kommt.
   `ortung_der_org` anlegen.
-- [ ] **Step 4:** Run `cargo test --test org_einstellungen` und `scripts/check-migrationen.sh` → PASS.
-- [ ] **Step 5: Frontend failing test:** Ein Klick auf den Schalter „Ortung im Einsatz“ öffnet
+- [x] **Step 4:** Run `cargo test --test org_einstellungen` und `scripts/check-migrationen.sh` → PASS.
+- [x] **Step 5: Frontend failing test:** Ein Klick auf den Schalter „Ortung im Einsatz“ öffnet
   einen Dialog mit dem Text „Ich bestätige, dass für diese Organisation eine Einwilligung der
   Helfenden bzw. eine Betriebsvereinbarung vorliegt.“; erst „Bestätigen“ setzt das Feld. Darunter
   liegt der Schalter „Auch Personen orten“, gesperrt, solange der erste aus ist.
-- [ ] **Step 6:** Umsetzen in `EinsatzDefaults.tsx` unter einer eigenen Gruppe „Ortung“. Dann
+- [x] **Step 6:** Umsetzen in `EinsatzDefaults.tsx` unter einer eigenen Gruppe „Ortung“. Dann
   `scripts/check-typ-codegen.sh` und `mise exec -- pnpm -C frontend vitest run src/pages/einstellungen` → PASS.
-- [ ] **Step 7:** Commit `feat: Org-Schalter „Ortung im Einsatz“ und Schema der Helfer-App`.
+- [x] **Step 7:** Commit `feat: Org-Schalter „Ortung im Einsatz“ und Schema der Helfer-App`.
 
 ### Task 3: Positionsbaustein
 

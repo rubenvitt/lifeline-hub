@@ -16324,7 +16324,9 @@
         "description": "API-Darstellung der Org-Einstellungen (flach, alle Felder serialisiert).",
         "required": [
           "org_id",
-          "aufbewahrung_kategorien"
+          "aufbewahrung_kategorien",
+          "ortung_im_einsatz",
+          "ortung_personen"
         ],
         "properties": {
           "aufbewahrung_kategorien": {
@@ -16429,6 +16431,21 @@
           "org_id": {
             "type": "integer",
             "format": "int64"
+          },
+          "ortung_bestaetigt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde."
+          },
+          "ortung_im_einsatz": {
+            "type": "boolean",
+            "description": "„Ortung im Einsatz“ (Helfer-App); Vorgabe aus."
+          },
+          "ortung_personen": {
+            "type": "boolean",
+            "description": "„Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist."
           },
           "retention_dauer_tage": {
             "type": [

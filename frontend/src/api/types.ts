@@ -243,6 +243,11 @@ export interface OrgEinstellungenUpdate {
   /** Kategorie-Vorgaben (LFH-749). Fehlt das Feld, bleiben sie am Server unverändert — nur die
    *  Sektion „Einsatz-Defaults“ schickt es mit. */
   aufbewahrung_kategorien?: KategorieVorgabe[];
+  /** „Ortung im Einsatz“ (Helfer-App). Fehlt das Feld, bleibt der Schalter am Server, wie er ist;
+   *  nur die Sektion „Einsatz-Vorgaben“ schickt es mit. Einschalten bestätigt die Einwilligung. */
+  ortung_im_einsatz?: boolean;
+  /** „Auch Personen orten“; nur zusammen mit `ortung_im_einsatz` (sonst 422). */
+  ortung_personen?: boolean;
 }
 
 /** Benötigte Rolle eines Moduls (Spec `modul-freigabe`, LFH-1150); `null` = frei. Der Server

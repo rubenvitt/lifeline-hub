@@ -6677,6 +6677,12 @@ export interface components {
             nachbereitung_tage?: number | null;
             /** Format: int64 */
             org_id: number;
+            /** @description Wann „Ortung im Einsatz“ zuletzt eingeschaltet und bestätigt wurde. */
+            ortung_bestaetigt_at?: string | null;
+            /** @description „Ortung im Einsatz“ (Helfer-App); Vorgabe aus. */
+            ortung_im_einsatz: boolean;
+            /** @description „Auch Personen orten“; nur an, wenn `ortung_im_einsatz` an ist. */
+            ortung_personen: boolean;
             /** Format: int64 */
             retention_dauer_tage?: number | null;
             /**

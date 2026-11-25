@@ -695,6 +695,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("fahrzeug_id", G_FK),
@@ -1162,6 +1165,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("angelegt_von", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
@@ -1238,6 +1244,9 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einheit_id", G_FK),
             retain("lat", G_GEO),
             retain("lon", G_GEO),
+            // Positionsbaustein der Helfer-App (0373): Zeitpunkt und Quelle, kein Personenbezug.
+            retain("position_aktualisiert_at", G_ZEIT),
+            retain("position_quelle", G_ENUM),
             retain("tz_fachaufgabe", G_ENUM),
             retain("tz_organisation", G_ENUM),
             retain("aktueller_br_id", G_FK),
@@ -3183,6 +3192,38 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("abschnitt_id", G_FK),
             retain("verpflegungsstelle_id", G_FK),
             retain("einheit_id", G_FK),
+            // Helfer-App (0373): Zustand, Ziel und Person der Helfer-Kopplung.
+            retain("helfer_zustand", G_ENUM),
+            retain("einladung_id", G_FK),
+            // Den Namen gibt die Kraft selbst ein: er geht mit dem Einsatz.
+            scrub("anzeigename", Strategie::NullSetzen, Z_EINSATZ),
+            retain("fahrzeug_id", G_FK),
+            retain("person_id", G_FK),
+            retain("person_gewuenscht", G_KONFIG),
+            retain("ortungsgeraet", G_KONFIG),
+            retain("pausiert_at", G_ZEIT),
+            retain("bestaetigt_at", G_ZEIT),
+            retain("bestaetigt_von", G_FK),
+        ],
+    },
+    // Helfer-Einladung (Helfer-App, 0373): QR-Code eines Einsatzes, nur sein SHA-256.
+    TabellenRegel {
+        tabelle: "helfer_einladung",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain(
+                "code_hash",
+                "SHA-256 eines Einladungscodes (technisch, kein Personenbezug)",
+            ),
+            retain("laeuft_ab_at", G_ZEIT),
+            retain("widerrufen_at", G_ZEIT),
+            retain("erstellt_von", G_FK),
+            retain("erstellt_at", G_ZEIT),
+            retain("einloesungen", G_ZAEHLER),
         ],
     },
     TabellenRegel {
