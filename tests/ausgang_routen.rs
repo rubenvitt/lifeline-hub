@@ -688,3 +688,17 @@ async fn liste_ohne_filter_zeigt_nur_lesbare_quellarten() {
     .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn anlegen_klappt_auch_wenn_das_geheimnis_nicht_lesbar_ist() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    // Das gespeicherte Passwort wird unlesbar; Entschlüsseln würde scheitern.
+    sqlx::query("UPDATE adapter_geheimnis SET chiffrat = x'00'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v) = w.lb_senden(lid, "m-geheim", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(w.anzahl().await, 1);
+}

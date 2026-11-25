@@ -33,7 +33,8 @@ herleitung:
 - MUST NOT: Text des Mailservers, Passwort oder Zugangsdaten stehen in Spalte, ETB, Log,
   Antwort oder Fehlertext; gespeichert wird nur ein `AusgangFehler`-Code und der SMTP-Status.
 - MUST: Das Passwort entschlüsselt nur `adapter::lauf::zugang_fuer_versand` (neben dem Lauf
-  der Adapter); der Ausgangskorb hält es nur für die Dauer einer Zustellung.
+  der Adapter); der Ausgangskorb hält es nur für die Dauer einer Zustellung. Die Route prüft beim
+  Anlegen nur Zeile und Zustand der Anbindung (`pruefe_versand_moeglich`), ohne zu entschlüsseln.
 - MUST: Die Anbindung ist eine Adapter-Art (`smtp`, ADR-0077) mit eigenem SMTP-Client über den
   Zielschutz von `adapter::ziel`; keine zweite Tabelle für Zustand oder Geheimnisse.
 - MUST NOT: Ein Webhook nach ADR-0038/ADR-0046 trägt Nachrichten an Menschen; beide Wege bleiben
@@ -49,6 +50,7 @@ Die Einzelregeln mit Dateien stehen in `src/AGENTS.md`, „Ausgang an Menschen�
 # Exit 0, solange die Regeln gelten (Hilfen und Grenzen: docs/architektur/AGENTS.md).
 verlange 'pub async fn zugang_fuer_versand' src/adapter/lauf.rs
 verbiete '\.decrypt\(' 'src/ausgang/**/*.rs' 'src/routes/ausgang.rs'
+verbiete 'zugang_fuer_versand' src/routes/ausgang.rs
 verbiete 'lettre::transport|AsyncSmtpTransport' 'src/**/*.rs'
 verlange 'ausgang' src/instanz/spiegel/art.rs
 ```

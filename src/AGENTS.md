@@ -424,7 +424,9 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   nutzt die bestehenden `AdapterFehler` (535 → `abgelehnt`, TLS → `tls`). Ein 422 mit Grund ist
   `AppError::UnprocessableGrund` (`{error, grund}`). Kein Text des Mailservers und kein
   Geheimnis in Spalte, ETB, Log, Antwort oder Fehlertext.
-- **Geheimnis nur über `adapter::lauf::zugang_fuer_versand`;** keine zweite Tabelle für Zustand
+- **Geheimnis nur über `adapter::lauf::zugang_fuer_versand`, und das nur im Lauf;** das Anlegen
+  prüft die Anbindung mit `adapter::lauf::pruefe_versand_moeglich` (Zeile und Zustand, ohne
+  Entschlüsseln; ein unlesbares Geheimnis zeigt sich erst im Lauf). Keine zweite Tabelle für Zustand
   oder Geheimnisse der Anbindung, `ausgang` hält Nachrichten. Der SMTP-Client ist
   `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
   `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.

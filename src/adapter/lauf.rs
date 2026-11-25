@@ -312,6 +312,30 @@ impl std::fmt::Debug for Versandzugang {
     }
 }
 
+/// Prüft beim Anlegen eines Versands nur, ob die Org einen Mailserver hat, den ein Versand
+/// nutzen darf: Anbindung vorhanden, nicht angehalten, Org nicht an einem Hub (LLH-2093). Liest
+/// nur die Zeile der Anbindung und ihren Zustand; Geheimnisse werden **nicht** entschlüsselt,
+/// das tut allein der Lauf über [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
+pub async fn pruefe_versand_moeglich(
+    pool: &SqlitePool,
+    rahmen: &Rahmen,
+    org_id: i64,
+) -> Result<Result<(), AusgangFehler>, AppError> {
+    if is_org_am_hub(pool, org_id).await? {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    }
+    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    if a.is_angehalten() {
+        return Ok(Err(AusgangFehler::AnbindungAngehalten));
+    }
+    if rahmen.arten.find(&a.art).is_none() {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    }
+    Ok(Ok(()))
+}
+
 /// Der Zugang zur SMTP-Anbindung einer Org für einen Versand (LLH-2093, Spec Abschnitt 2):
 /// `AnbindungFehlt` ohne Anbindung (oder wenn die Org sich bei einem Hub meldet),
 /// `AnbindungAngehalten`, wenn sie angehalten ist (gestört ist erlaubt), `AnbindungFehler`, wenn

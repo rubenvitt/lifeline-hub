@@ -203,9 +203,10 @@ async fn anlegen(
         }
     }
 
-    // Eine nicht angehaltene SMTP-Anbindung der Org (sonst 422 mit Code).
+    // Eine nicht angehaltene SMTP-Anbindung der Org (sonst 422 mit Code). Nur Zustand, kein
+    // Entschlüsseln: das Geheimnis liest allein der Lauf.
     if let Err(fehler) =
-        crate::adapter::lauf::zugang_fuer_versand(&state.pool, &state.adapter, einsatz.org_id)
+        crate::adapter::lauf::pruefe_versand_moeglich(&state.pool, &state.adapter, einsatz.org_id)
             .await?
     {
         let meldung = match fehler {
