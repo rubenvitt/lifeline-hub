@@ -213,13 +213,13 @@ async fn takt(
 }
 
 /// Was ein Abruf braucht, aus der Datenbank gelesen und geprüft.
-struct Vorbereitet {
-    einstellungen: Map<String, Value>,
-    geheimnisse: HashMap<String, SecretString>,
+pub(super) struct Vorbereitet {
+    pub(super) einstellungen: Map<String, Value>,
+    pub(super) geheimnisse: HashMap<String, SecretString>,
 }
 
 /// Liest Geheimnisse und prüft Einstellungen. Kein Netz; die Verbindung ist danach zurück.
-async fn prepare(
+pub(super) async fn prepare(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     art: &dyn AdapterArt,
@@ -292,7 +292,7 @@ async fn fetch(
 }
 
 /// Ob die Org sich bei einem Hub meldet; dann läuft hier kein Adapter.
-async fn is_org_am_hub(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
+pub(super) async fn is_org_am_hub(pool: &SqlitePool, org_id: i64) -> Result<bool, AppError> {
     let mut conn = pool.acquire().await?;
     Ok(crate::public_api::zugang::hub_fuer_org(&mut conn, org_id)
         .await?

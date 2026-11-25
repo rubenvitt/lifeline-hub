@@ -131,6 +131,17 @@ pub async fn create(
         .ok_or_else(|| AppError::Internal("Adapter nach dem Anlegen nicht lesbar".into()))
 }
 
+/// Ohne Org-Bezug; nur für Aufrufer, die die Org des Adapters selbst gegen ihre Anfrage prüfen
+/// (`adapter::live`).
+pub async fn load(conn: &mut SqliteConnection, id: &str) -> Result<Option<Adapter>, sqlx::Error> {
+    sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {SPALTEN} FROM adapter WHERE id = ?"
+    )))
+    .bind(id)
+    .fetch_optional(conn)
+    .await
+}
+
 pub async fn load_in_org(
     conn: &mut SqliteConnection,
     org_id: i64,

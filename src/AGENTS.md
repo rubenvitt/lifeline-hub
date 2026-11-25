@@ -245,7 +245,12 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
   vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
-  entschlüsselt nur im Lauf (`adapter::lauf`). Ein Geheimnis geht nie in Log, Fehlertext,
+  entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
+  (`adapter::live::live_kontext`, LLH-2107,
+  [ADR-0098](../docs/architektur/entscheidungen/ADR-0098-adapter-rufen-fuer-ihre-eigenen-routen-auch-ausserhalb-des-laufs-ab.md)):
+  je Abruf entschlüsselt, nie zwischengespeichert, über denselben `AbrufKontext`; verweigert bei
+  unbekanntem, angehaltenem oder Eingriff brauchendem Adapter, gesperrtem Speicher und Org am Hub
+  (`LiveVerweigert`); die Route prüft selbst, dass der Adapter zur Org der Anfrage gehört. Ein Geheimnis geht nie in Log, Fehlertext,
   Antwort oder Admin-Spur; ein `Fehlschlag` trägt nur einen `AdapterFehler`-Code und den Status.
   Einen Schlüsselwechsel schlüsselt `lauf::umschluesseln` beim Start in einer Transaktion um
   (LLH-2025); sonst ändert nichts ein Chiffrat, ohne den Wert neu zu setzen.
