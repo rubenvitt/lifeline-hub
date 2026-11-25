@@ -663,7 +663,7 @@ sequenceDiagram
 
 Eine Fremdebene aus einer https-Adresse hat keinen Hintergrundlauf: der Server holt sie nach,
 wenn jemand ihre Daten liest (LLH-2099,
-[ADR-0098](entscheidungen/ADR-0098-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
+[ADR-0101](entscheidungen/ADR-0101-geodaten-verlassen-das-system-aus-dem-client-fremde-nur-gepruef-ueber-den-server.md)).
 
 ```mermaid
 sequenceDiagram
@@ -695,7 +695,7 @@ sequenceDiagram
   sich nur der Zeitpunkt des Abrufs, bei 200 ersetzt das neu normierte GeoJSON den Inhalt und ein
   Live-Ereignis `karte_fremdebene` geht an die Arbeitsplätze.
 - Ein gestörter Abruf setzt nur den Fehlercode an der Ebene; der letzte gute Inhalt bleibt
-  (ADR-0098). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
+  (ADR-0101). Ob der Server das eigene Netz abrufen darf, liest er bei jedem Abruf aus dem
   Org-Schalter `fremdebenen_lan_erlaubt` (`src/org/einstellungen.rs`), nicht aus der Ebene.
 - Den Abruf stellt der Trait `FremdebeneAbrufer` bereit, Tests setzen einen zählenden ein; die
   URL steht nie in Log oder Fehlertext, nur `ebene_id` und der Fehlercode.

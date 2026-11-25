@@ -1,5 +1,5 @@
 ---
-id: ADR-0098
+id: ADR-0101
 titel: Geodaten verlassen das System aus dem Client, fremde kommen nur geprüft über den Server herein
 status: akzeptiert
 datum: 2026-11-24
@@ -14,7 +14,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-24-qe5jrctd-fremdebenen-design.md
 ---
 
-# ADR-0098: Geodaten verlassen das System aus dem Client, fremde kommen nur geprüft über den Server herein
+# ADR-0101: Geodaten verlassen das System aus dem Client, fremde kommen nur geprüft über den Server herein
 
 ## Regeln
 
