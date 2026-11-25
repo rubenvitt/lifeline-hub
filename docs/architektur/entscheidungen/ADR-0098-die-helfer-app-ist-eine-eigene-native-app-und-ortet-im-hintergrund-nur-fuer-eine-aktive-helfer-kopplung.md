@@ -7,6 +7,7 @@ gilt_fuer:
   - ios/Helfer/**
   - ios/HelferKern/**
   - android/helfer/**
+  - android/helferkern/**
 herleitung:
   - docs/superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md
   - https://zunder.rubeen.dev/#/aufgabe/vakwvkpgn0ivb1wpq8mlqwhx
@@ -41,6 +42,8 @@ verbiete 'NSLocationAlways' 'ios/Helfer/**/*.swift' 'ios/Helfer/**/*.plist' 'ios
 # Der Kern bleibt ohne System: kein UIKit, CoreLocation oder SwiftUI (ios/Helfer/AGENTS.md).
 verbiete '^import (UIKit|CoreLocation|SwiftUI)' 'ios/HelferKern/**/*.swift'
 verbiete 'ACCESS_BACKGROUND_LOCATION' 'android/helfer/**/*.xml' 'android/helfer/**/*.kt' 'android/helfer/**/*.kts'
+# Auch der Android-Kern bleibt ohne System: kein android.*-Import (android/helfer/AGENTS.md).
+verbiete 'import android\.' 'android/helferkern/**/*.kt'
 ```
 
 ## Kontext

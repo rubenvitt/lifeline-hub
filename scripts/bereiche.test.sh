@@ -65,6 +65,7 @@ fall ios/App/Huelle/huelle.js "frontend ios"
 # Android-Hülle (LLH-1989): der Kotlin-Kern hat seine eigene Prüfung; das Init-Skript der App
 # führt Vitest aus wie das der iOS-Hülle.
 fall android/kern/src/main/kotlin/dev/rubeen/lifeline/kern/Adresse.kt "android"
+fall android/helferkern/src/main/kotlin/dev/rubeen/lifeline/helferkern/Takt.kt "android"
 fall android/gradle/libs.versions.toml "android"
 fall android/app/src/main/assets/huelle.js "frontend android"
 fall android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml "frontend android"

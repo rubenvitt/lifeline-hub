@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird. Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; wie dort wird jede http-Adresse verworfen, auch für localhost und *.local. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
+  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird, „wiederholung“ den Abstand bis zur nächsten Wiederholung nach so vielen Fehlern in Folge (5, 10, 20, 40 s, dann höchstens jede Minute; ein Erfolg setzt zurück). Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; wie dort wird jede http-Adresse verworfen, auch für localhost und *.local. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
   "deute": [
     {
       "beschreibung": "QR mit https und Fragment wird gelesen",
@@ -140,5 +140,14 @@
     { "beschreibung": "kurz vor dem Lebenszeichen und ohne Bewegung: nichts senden", "seit_letzter_s": 299, "bewegt_m": 0, "senden": false },
     { "beschreibung": "Lebenszeichen nach 300 s ohne Bewegung: senden", "seit_letzter_s": 300, "bewegt_m": 0, "senden": true },
     { "beschreibung": "weit über dem Lebenszeichen: senden", "seit_letzter_s": 900, "bewegt_m": 3, "senden": true }
+  ],
+  "wiederholung": [
+    { "beschreibung": "erster Fehler: 5 s", "fehler_in_folge": 1, "abstand_s": 5 },
+    { "beschreibung": "zweiter Fehler in Folge: 10 s", "fehler_in_folge": 2, "abstand_s": 10 },
+    { "beschreibung": "dritter Fehler in Folge: 20 s", "fehler_in_folge": 3, "abstand_s": 20 },
+    { "beschreibung": "vierter Fehler in Folge: 40 s", "fehler_in_folge": 4, "abstand_s": 40 },
+    { "beschreibung": "fünfter Fehler in Folge: Obergrenze 60 s", "fehler_in_folge": 5, "abstand_s": 60 },
+    { "beschreibung": "sechster Fehler in Folge: bleibt bei 60 s", "fehler_in_folge": 6, "abstand_s": 60 },
+    { "beschreibung": "siebter Fehler in Folge: bleibt bei 60 s", "fehler_in_folge": 7, "abstand_s": 60 }
   ]
 }

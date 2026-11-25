@@ -95,6 +95,8 @@ jobs:
           key: ${{ steps.abhaengigkeiten.outputs.cache-primary-key }}
       - name: Kotlin-Kern
         run: ./android/gradlew -p android/kern test --console=plain
+      - name: Kotlin-Kern der Helfer-App
+        run: ./android/gradlew -p android/helferkern test --console=plain
       - name: Bildschirmbilder
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -112,5 +114,6 @@ jobs:
           path: |
             android/app/build/reports/tests/
             android/kern/build/reports/tests/
+            android/helferkern/build/reports/tests/
           if-no-files-found: ignore
           retention-days: 3

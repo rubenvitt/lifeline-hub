@@ -280,6 +280,7 @@ enthaelt "19 ANDROID_KERN_PFLICHT nennt den Grund" 'ANDROID_KERN_PFLICHT'
 rc=0; fahren "ROOT='$ARBEIT/s20'; PATH='$ARBEIT/s20/gruen':\"\$PATH\"; JAVA_HOME=; $schritt_20_def" 0 20 || rc=$?
 pruefe "19 mit java → grün" 0 "$rc"
 enthaelt "19 mit java → gradlew testet den Kern" "^gradlew-lief -p $ARBEIT/s20/android/kern test"
+enthaelt "19 mit java → gradlew testet auch den Kern der Helfer-App" "^gradlew-lief -p $ARBEIT/s20/android/helferkern test"
 # Ein `java`, das nicht läuft (macOS legt `/usr/bin/java` als Platzhalter an, der ohne JDK mit 1
 # endet), zählt wie keins: Lücke bzw. rot mit Grund, nie ein Abbruch ohne Meldung unter pipefail.
 mkdir -p "$ARBEIT/s20/platzhalter" "$ARBEIT/s20/jdk11/bin" "$ARBEIT/s20/jdk21/bin"

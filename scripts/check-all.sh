@@ -40,7 +40,7 @@ set -euo pipefail
 #                    von `rust`)
 #   --nur ios        Swift-Kern der iOS-Hülle (`swift test`, LLH-1978); ohne Swift eine Lücke,
 #                    mit IOS_SWIFT_PFLICHT=1 (CI) rot
-#   --nur android    Kotlin-Kern der Android-Hülle (`gradlew -p android/kern test`, LLH-1989);
+#   --nur android    Kotlin-Kern der Android-Hülle (`gradlew -p android/kern test` und `-p android/helferkern test`, LLH-1989);
 #                    ohne Java 17+ eine Lücke, mit ANDROID_KERN_PFLICHT=1 (CI) rot
 #   --nur baut       nur kompilieren: Backend mit allen Zielen und Feature dev-seeds,
 #                    Frontend-Typprüfung (schneller lokaler Test, ob ein Stand übersetzt;
@@ -611,6 +611,9 @@ schritt_20() {
   # Der Kotlin-Compiler legt Klassen mit Umlauten im Namen an (Testnamen als Satz); unter der
   # Locale C scheitert das mit `InvalidPathException`. Deshalb immer mit UTF-8.
   LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/kern" test --console=plain
+  # Kern der Helfer-App (ADR-0098): eigener Build, gleiche Voraussetzungen, gemeinsame Fälle
+  # `src-tauri/faelle/helfer.json`.
+  LC_ALL=C.UTF-8 "$ROOT/android/gradlew" -p "$ROOT/android/helferkern" test --console=plain
 }
 
 schritt_21() {

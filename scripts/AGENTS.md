@@ -14,7 +14,7 @@ Gilt für `scripts/` und `.github/workflows/`, zusätzlich zur `AGENTS.md` der W
 Lücke, mit `IOS_SWIFT_PFLICHT=1` wie in der CI rot) →
 `cargo build --bin lifeline-hub` + `cargo check -p karten-service` (Schritt 19, Bündel `rust` und
 allein `binaer`, LLH-2033/LLH-2038) →
-`gradlew -p android/kern test` (Schritt 20, Bündel `android`, LLH-1989; ohne Java 17+ eine
+`gradlew -p android/kern test` und `gradlew -p android/helferkern test` (Schritt 20, Bündel `android`, LLH-1989; ohne Java 17+ eine
 Lücke, mit `ANDROID_KERN_PFLICHT=1` rot).
 Außerhalb des vollen Laufs: Schritt 17 (`--nur baut`, nur kompilieren) als schneller lokaler
 Kompilierlauf; Schritt 3, 4 und 15 übersetzen dasselbe und testen es.

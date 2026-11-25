@@ -505,11 +505,11 @@ public enum Ereignis { case gescannt(HelferZiel), eingeloest, bestaetigt, antwor
 `entscheide(status: Int): Antwort`, `Takt.soll(seitLetzterS, bewegtM)`, `Puffer.merke/faellig`,
 `Anmeldung.verarbeite(ereignis)`, sealed `Phase`, enum `Grund`).
 
-- [ ] **Step 1: Failing tests** wie Task 10.
-- [ ] **Step 2:** Run `LC_ALL=C.UTF-8 android/gradlew -p android/helferkern test --console=plain` → FAIL.
-- [ ] **Step 3:** Umsetzen.
-- [ ] **Step 4:** Run → PASS.
-- [ ] **Step 5:** Commit `feat: Kern der Android-Helfer-App`.
+- [x] **Step 1: Failing tests** wie Task 10.
+- [x] **Step 2:** Run `LC_ALL=C.UTF-8 android/gradlew -p android/helferkern test --console=plain` → FAIL.
+- [x] **Step 3:** Umsetzen.
+- [x] **Step 4:** Run → PASS.
+- [x] **Step 5:** Commit `feat: Kern der Android-Helfer-App`.
 
 ### Task 13: Android-App `:helfer`
 
