@@ -258,6 +258,7 @@ mod herkunft_tests {
             attempted_at: None,
             error: None,
             created_at: "2026-11-25T00:00:00Z".into(),
+            data_size: None,
         }
     }
 
