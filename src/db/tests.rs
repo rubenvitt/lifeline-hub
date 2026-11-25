@@ -15197,14 +15197,7 @@ async fn migration_0373_baut_kopplung_um_und_setzt_positionsquelle() {
     .fetch_one(&pool)
     .await
     .unwrap();
-    sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
-        "INSERT INTO spiegel_uebernahme (id) VALUES (1); \
-         INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({spiegel}, 'n/1'); \
-         DELETE FROM spiegel_uebernahme"
-    )))
-    .execute(&pool)
-    .await
-    .unwrap();
+    crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, spiegel).await;
 
     let handy: i64 = sqlx::query_scalar(
         "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, einheit_id, bezeichnung, \

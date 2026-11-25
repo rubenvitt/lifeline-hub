@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird. Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; anders als dort ist http für localhost und *.local erlaubt (Entwicklung und Einsatznetz ohne TLS), jede andere http-Adresse wird verworfen. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
+  "zweck": "Gemeinsame Fälle der Helfer-App (ios/HelferKern, android/helferkern; die Desktop-Hülle hat keine Helfer-App und liest diese Datei nicht, ADR-0098). „deute“ liest QR-Inhalt und Deeplink der Einladung (ergebnis null: wirkungslos), „antwort“ legt fest, was der Ortungsdienst auf einen Status des Servers tut (Status 0: Netzfehler, keine Antwort), „takt“, ob eine neue Position gesendet wird. Werte wie im Backend: 200 weiter, 409 warten (Kopplung unbestätigt), 401/403/404 stoppen, 422 verwerfen, 429/500/502/503 wiederholen. Takt: höchstens alle 30 s, nur bei Bewegung über 25 m, ohne Bewegung ein Lebenszeichen nach 300 s. Adressen stehen in normalisierter Form wie in adresse.json; wie dort wird jede http-Adresse verworfen, auch für localhost und *.local. Der Code wird groß geschrieben und sonst unverändert durchgereicht; Normalform und Prüfung des Codes macht der Server.",
   "deute": [
     {
       "beschreibung": "QR mit https und Fragment wird gelesen",
@@ -42,14 +42,14 @@
       "ergebnis": { "server": "https://elw.local:8443/", "code": "K7M2Q9XA" }
     },
     {
-      "beschreibung": "http ist für localhost erlaubt",
+      "beschreibung": "http wird auch für localhost verworfen",
       "eingabe": "http://localhost:8080/helfer#AB12CD34",
-      "ergebnis": { "server": "http://localhost:8080/", "code": "AB12CD34" }
+      "ergebnis": null
     },
     {
-      "beschreibung": "http ist für *.local erlaubt",
+      "beschreibung": "http wird auch für *.local verworfen",
       "eingabe": "http://elw.local:8080/helfer#AB12CD34",
-      "ergebnis": { "server": "http://elw.local:8080/", "code": "AB12CD34" }
+      "ergebnis": null
     },
     {
       "beschreibung": "http ohne TLS wird verworfen",
