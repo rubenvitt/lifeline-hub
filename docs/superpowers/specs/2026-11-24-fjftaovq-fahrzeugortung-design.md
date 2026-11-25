@@ -52,7 +52,7 @@ Fahrzeug direkt nach `einsatz_fahrzeug.lat/lon`“ verworfen und „nur im Einsa
 
 - **ADR-0023** bleibt in Kraft: der Einwurf schreibt nur in seine Ablage, ändert keinen Einsatz,
   liest nichts, antwortet ohne Daten. Die Übernahme ist ein **eigener Schritt außerhalb des
-  Einwurfs** und braucht eine neue ADR (ADR-0098, ergänzend, kein `ersetzt`).
+  Einwurfs** und braucht eine neue ADR (ADR-0103, ergänzend, kein `ersetzt`).
 - **ADR-0005:** die neuen Einsatzrouten nutzen genau einen Gate-Extraktor
   (`EinsatzSchreibzugriff<Fahrzeuge>` bzw. Lesezugriff).
 - **ADR-0006:** die Positionsquelle ist ein `wire_enum!` mit Eintrag in
@@ -225,7 +225,7 @@ hauptamtlicher Besatzung“, Zustandszeile „Nur mit Betriebs- oder Dienstverei
 
 ### Doku
 
-- **ADR-0098** „Die Ortung übernimmt eingeworfene Positionen nur für gekoppelte Fahrzeuge
+- **ADR-0103** „Die Ortung übernimmt eingeworfene Positionen nur für gekoppelte Fahrzeuge
   laufender Einsätze“. Regeln: eigener Schritt nach dem Einwurf, ohne Wirkung auf die Antwort; nur
   aktive Kopplung, aktives Fahrzeug, aktiver ungespiegelter Einsatz; jüngste Messzeit gewinnt;
   kein Verlauf; Kopplung endet mit Trennen, Entlassen, Stornieren, Abschluss; der Abschluss
@@ -276,3 +276,48 @@ Kopplung her, `ortung_hauptamt` wird nicht synchronisiert.
 - Ortung in gespiegelten Einsätzen (Position am Hub an das führende ELW weiterleiten).
 - Rechtliche Klärung „Ortung von Hauptamtlichen“ (Jurist, Schnittstellen-Ausbau).
 - Gezielte Zeilen-Aktualisierung statt breiter Invalidierung, falls die Drossel nicht reicht.
+
+## Nachtrag 25.11.2026: Zusammenführung mit der Helfer-App
+
+`alpha` brachte die Helfer-App (ADR-0101, Spec
+[`2026-11-24-vakwvkpg-helfer-app-design.md`](2026-11-24-vakwvkpg-helfer-app-design.md), Abschnitt
+„Ortung der Organisation und Positionsbaustein (für LLH-2091 mit)“) mit einem Org-Schalter und
+einem Positionsbaustein, die beide auch den Einwurf regeln. Ruben hat beim Zusammenführen
+entschieden; was oben anders steht, gilt in dieser Fassung:
+
+- **Org-Schalter statt Ehrenamt-Bestätigung:** Es gilt `org_einstellungen.ortung_im_einsatz`
+  (vorgabemäßig aus, der Admin bestätigt beim Einschalten Einwilligung bzw.
+  Betriebsvereinbarung). Koppeln (PUT und Rückgängig nach Entlassen) geht nur mit ihm; sonst 422
+  „Ortung ist für diese Organisation ausgeschaltet (Verwaltung → Einsatz-Vorgaben)“, als Zustand
+  nach der Statuscode-Konvention. Die Übernahme schreibt ohne ihn nichts. Entfallen sind
+  `ortung_hauptamt` (Spalte, Einstellungsfeld, Paneel `OrtungHauptamt`), die Bestätigung
+  „Besatzung ist ehrenamtlich“ (`ehrenamt_bestaetigt`, `is_ehrenamt_ok`, `volunteer_crew_*`, der
+  422 mit Grund und `AppError::UnprocessableGrund`) und das Kästchen im Dialog. Die
+  Kandidatenliste nennt stattdessen `tracking_enabled`; der Dialog erklärt damit die Sperre.
+- **Positionsbaustein statt eigener Spalten:** Die Übernahme schreibt über
+  `ortung::schreibe_position` mit `Positionsquelle::Einwurf` und `Ortungsziel::Fahrzeug`, mit der
+  Messzeit `gemessen_at` aus `position_letzte`, geklemmt über `klemme_zeitpunkt` (die Ablage
+  nimmt bis 5 min Zukunft an, die Klemme setzt ab 60 s die Serverzeit). Entfallen sind
+  `position_gemessen_at`, `position_gesetzt_at` und `PositionQuelle` (`manuell`/`ortung`);
+  es gelten `position_quelle` (`manuell`/`einwurf`/`helfer`) und `position_aktualisiert_at`. Der
+  Vorrang ist der des Bausteins: der jüngere Zeitpunkt gewinnt, eine manuelle Position gilt beim
+  Setzen immer; der Handweg ist der von `alpha`.
+- **Drossel:** 15 s je Fahrzeug mit genau einem Nachlauf bleiben. Gemessen wird die Messzeit des
+  neuen Fixes gegen `position_aktualisiert_at` der gespeicherten Einwurf-Position (beide vom
+  Gerät, ein Uhrversatz hebt sich auf); gegen `manuell` und `helfer` drosselt nichts. Dieselbe
+  oder eine ältere Messzeit als die gespeicherte Einwurf-Position ist nichts Neues.
+- **Abschluss:** In derselben Transaktion laufen `helfer::ende::beende_ortung_im_einsatz`
+  (Personen) und danach `ortung::kopplung::beende_im_einsatz_tx` (Kopplungen löschen, ETB je
+  Fahrzeug, Positionen der Quelle `einwurf` über `ortung::loesche_position` leeren; Quelle und
+  Zeitpunkt bleiben als Hinweis). Live nach dem Commit über `ortung::publiziere`.
+- **Anzeige:** „veraltet“ gilt einheitlich ab 5 min. `ortungAlter.ts` und die Marke „GPS“ am
+  Marker entfallen; die Lagekarte zeigt wie bei der Helfer-App „Ortung · vor 3 min“
+  (`positionsHinweis`, `positionsAlter`, Liste „Geortet“), die Zeile „Position“ im Paneel
+  „Auswahl“ liest denselben Text (`positionsHinweisText`). Im Lagestand misst das Alter gegen
+  `stand_at` (`positionsJetzt` von `alpha`). Die Marke an der Fahrzeugzeile heißt „Ortung“.
+- **Nummern:** Migration `0380_fahrzeugortung.sql` (nur noch `ortung_kopplung` ohne
+  `ehrenamt_bestaetigt`), ADR-0103 (vorher ADR-0098, neu auf Schalter und Baustein geschrieben).
+- Alles Übrige bleibt wie entworfen: Koppeln im Zeilenmenü, Kennung eindeutig je Zugang, Ende mit
+  Entlassen, Stornieren und Ablehnen der Einheit, Wiederherstellen beim Rückgängig, Spiegel über
+  die bestehenden Trigger, Lagestände behalten Positionen, kein Verlauf
+  (`keine_tabelle_haelt_einen_positionsverlauf`).

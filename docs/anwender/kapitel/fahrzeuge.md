@@ -205,17 +205,18 @@ Für Einsatzleitung und Führungspersonal, wenn das Modul Material freigegeben i
 ### Ein Fahrzeug orten
 
 Für Einsatzleitung und Führungspersonal, wenn das Gerät im Fahrzeug seine Position an einen
-Einwurf-Zugang für Positionen meldet (Einrichtung im Kapitel [Anbindungen](anbindungen.md)):
+Einwurf-Zugang für Positionen meldet und die Organisation die Ortung freigegeben hat (Einrichtung
+im Kapitel [Anbindungen](anbindungen.md)):
 
 1. In der Zeile des Fahrzeugs „Weitere Aktionen“ öffnen und „Ortung koppeln …“ wählen.
 2. Im Dialog „Ortung koppeln“ die Kennung wählen. Die Liste nennt den Zugang, die Kennung und
    wann zuletzt eine Position kam; es stehen nur Kennungen aus den letzten 24 Stunden zur Wahl.
    Eine Kennung, die schon an einem Fahrzeug hängt, ist grau.
-3. Ist die Ortung bei hauptamtlicher Besatzung nicht freigeschaltet, „Besatzung ist
-   ehrenamtlich“ ankreuzen. Ohne das Häkchen bleibt „Koppeln“ gesperrt.
-4. „Koppeln“ wählen. Das Fahrzeug trägt die Marke „GPS“, und liegt schon eine Position der
+   Hat die Organisation die Ortung nicht freigegeben (Schalter „Ortung im Einsatz“), nennt der
+   Dialog das statt der Liste, und „Koppeln“ bleibt gesperrt.
+3. „Koppeln“ wählen. Das Fahrzeug trägt die Marke „Ortung“, und liegt schon eine Position der
    Kennung vor, steht sie sofort auf der Lagekarte.
-5. Soll die Ortung enden, in derselben Zeile „Ortung trennen“ wählen. Eine Rückfrage gibt es
+4. Soll die Ortung enden, in derselben Zeile „Ortung trennen“ wählen. Eine Rückfrage gibt es
    nicht; die letzte Position bleibt stehen.
 
 ### Ein Fahrzeug aus dem Einsatz entlassen
@@ -383,30 +384,31 @@ Bereitstellungsraum belegen lehnt die App ab.
 ### Ortung
 
 Die Ortung bewegt den Marker eines Fahrzeugs auf der Lagekarte, solange das Gerät im laufenden
-Einsatz an das Fahrzeug gekoppelt ist. Ohne Kopplung ändert eine eingehende Position kein
-Fahrzeug. In einem gespiegelten Einsatz lässt sich nicht koppeln (die App zeigt das Menü dort
+Einsatz an das Fahrzeug gekoppelt ist und die Organisation die Ortung freigegeben hat. Ohne
+Kopplung oder ohne Freigabe ändert eine eingehende Position kein Fahrzeug. In einem gespiegelten Einsatz lässt sich nicht koppeln (die App zeigt das Menü dort
 nicht, der Server lehnt mit 409 ab). Eine Kennung hängt an höchstens einem Fahrzeug; eine schon
 vergebene lehnt der Server ab. Ein erneutes Koppeln desselben Fahrzeugs ersetzt die Kopplung.
 
-- **Wann die Kopplung endet:** mit „Ortung trennen“, dem Entlassen, dem Stornieren und dem
-  Abschluss des Einsatzes. „Rückgängig“ direkt nach dem Entlassen stellt die Kopplung wieder her,
-  wenn die Kennung noch frei ist, der Zugang noch gilt und die Bestätigung der Besatzung weiter
-  genügt; sonst bleibt sie aus, und der Hinweis nennt es.
-- **Wessen Position gilt:** Die zuletzt empfangene Position gewinnt, auch gegen eine von Hand
-  gesetzte. Setzt jemand das Fahrzeug von Hand auf der Karte, gilt das, bis die nächste Position
-  des Geräts eintrifft. Maßgeblich ist der Zeitpunkt des Empfangs am Server, nicht die Uhr des
-  Geräts. Löscht jemand die Position von Hand, setzt die nächste sie wieder.
+- **Wann die Kopplung endet:** mit „Ortung trennen“, dem Entlassen, dem Stornieren, dem Ablehnen
+  der Einheit und dem Abschluss des Einsatzes. „Rückgängig“ direkt nach dem Entlassen stellt die
+  Kopplung wieder her, wenn die Ortung noch freigegeben, die Kennung noch frei ist und der Zugang
+  noch gilt; sonst bleibt sie aus, und der Hinweis nennt es.
+- **Wessen Position gilt:** Die jüngere Position gewinnt. Setzt jemand das Fahrzeug von Hand auf
+  der Karte, gilt das mit der Uhrzeit des Setzens, bis eine später gemessene Position des Geräts
+  eintrifft. Maßgeblich ist die Uhrzeit der Messung am Gerät; geht dessen Uhr mehr als eine Minute
+  vor, zählt stattdessen die Uhrzeit des Servers. Löscht jemand die Position von Hand, setzt die
+  nächste sie wieder.
 - **Takt:** Je Fahrzeug schreibt die Ortung höchstens alle 15 Sekunden. Kommt eine Position
   früher, folgt die jüngste nach Ablauf.
 - **Was gespeichert bleibt:** je Fahrzeug nur die letzte Position, kein Verlauf. Mit dem
-  Abschluss des Einsatzes werden die per GPS gesetzten Positionen gelöscht; von Hand gesetzte
-  bleiben. Die Position geht wie jede Änderung am Fahrzeug an Spiegel-Instanzen des Einsatzes,
+  Abschluss des Einsatzes werden die Positionen aus der Ortung gelöscht; von Hand oder von der
+  Helfer-App gesetzte bleiben. Die Position geht wie jede Änderung am Fahrzeug an Spiegel-Instanzen des Einsatzes,
   die Kopplung selbst nicht.
-- **Besatzung:** Ohne die Freischaltung „Ortung auch bei hauptamtlicher Besatzung“ (Verwaltung,
-  „Einstellungen“, „Anbindungen“) verlangt das Koppeln die Bestätigung „Besatzung ist
-  ehrenamtlich“. Die Person, die koppelt, gibt sie; die App prüft sie nicht.
+- **Freigabe:** Koppeln geht nur, solange der Schalter „Ortung im Einsatz“ der Organisation an
+  ist (Verwaltung, „Einstellungen“, „Einsatz-Vorgaben“, Bereich „Ortung“). Ist er aus, kommt auch
+  an einem schon gekoppelten Fahrzeug keine Position mehr an.
 - **Rechte:** Koppeln und Trennen dürfen wie das Entlassen Einsatzleitung und Führungspersonal,
-  solange der Einsatz läuft. Wer nur liest, sieht an der Zeile die Marke „GPS“.
+  solange der Einsatz läuft. Wer nur liest, sieht an der Zeile die Marke „Ortung“.
 
 ### Einsatztagebuch
 
@@ -414,9 +416,8 @@ Disponieren, jeder Statuswechsel, das Zuordnen und Lösen der Besatzung, das Zuo
 Einheit, das Ändern der Angaben eines Ad-hoc-Fahrzeugs (ein Eintrag, der jede Änderung mit altem
 und neuem Wert nennt), das Entlassen, seine Rücknahme („Entlassung zurückgenommen“, mit dem, was
 ausblieb), das erneute Disponieren und das Stornieren stehen im
-Einsatztagebuch. Ebenso das Koppeln der Ortung („Ortung gekoppelt: Funkrufname (Zugang / Kennung)“,
-mit dem Zusatz „Besatzung ehrenamtlich bestätigt“, wenn bestätigt wurde) und das Trennen („Ortung
-getrennt: Funkrufname“), auch wenn es Entlassen, Stornieren oder der Abschluss bewirken. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
+Einsatztagebuch. Ebenso das Koppeln der Ortung („Ortung gekoppelt: Funkrufname (Zugang / Kennung)“)
+und das Trennen („Ortung getrennt: Funkrufname“), auch wenn es Entlassen, Stornieren oder der Abschluss bewirken. Mehrere Fahrzeuge aus einem Absenden stehen dort als ein Eintrag mit Zahl,
 Einheit und Funkrufnamen. Ebenso steht „Personal der Einheit übernehmen“ als ein Eintrag mit Zahl
 und Namen der Kräfte. Ein Fahrzeug als eigene Einheit zu führen schreibt drei Einträge: die
 gebildete Einheit, das zugeordnete Fahrzeug und, wenn Personen mitkommen, die mitgekommenen Kräfte.

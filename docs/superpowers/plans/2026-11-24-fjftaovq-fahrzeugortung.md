@@ -264,10 +264,10 @@ Vitest, Playwright-Bildlauf.
   --test einsatz` (bzw. die Abschluss-Suite) → PASS.
 - [x] **Step 5:** Commit `feat(ortung): Kopplung endet mit dem Fahrzeug und dem Einsatz (LLH-2091)`.
 
-### Task 7: ADR-0098 und Verlaufs-Wächter
+### Task 7: ADR-0103 und Verlaufs-Wächter
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0098-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md` (Vorlage `VORLAGE.md`, unter 80 Zeilen, `gilt_fuer: src/ortung/**, src/routes/ortung.rs`, `herleitung:` Design-Doc)
+- Create: `docs/architektur/entscheidungen/ADR-0103-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md` (Vorlage `VORLAGE.md`, unter 80 Zeilen, `gilt_fuer: src/ortung/**, src/routes/ortung.rs`, `herleitung:` Design-Doc)
 - Test: `tests/ortung.rs` (`keine_tabelle_haelt_einen_positionsverlauf`: über `sqlite_master`
   jede Tabelle mit Spalten `lat` und `lon` hat einen eindeutigen Schlüssel, der höchstens eine
   Zeile je Fahrzeug bzw. Kennung erlaubt; erlaubte Liste ausdrücklich im Test)
@@ -278,9 +278,9 @@ Vitest, Playwright-Bildlauf.
 - [x] **Step 2:** ADR schreiben: Regeln aus Entwurf „Doku“; Prüfung u. a.
   `verlange 'apply_position' src/public_api/einwurf/routen.rs`,
   `verbiete 'tracing::' src/ortung/`, `verlange "spiegel = 0" src/ortung/uebernahme.rs`.
-- [x] **Step 3:** `scripts/adr-fuer.sh src/ortung/uebernahme.rs` nennt ADR-0098 und ADR-0023;
+- [x] **Step 3:** `scripts/adr-fuer.sh src/ortung/uebernahme.rs` nennt ADR-0103 und ADR-0023;
   `scripts/check-architektur.sh` grün.
-- [x] **Step 4:** Commit `docs(adr): ADR-0098 Ortung nur für gekoppelte Fahrzeuge (LLH-2091)`.
+- [x] **Step 4:** Commit `docs(adr): ADR-0103 Ortung nur für gekoppelte Fahrzeuge (LLH-2091)`.
 
 ### Task 8: Frontend — Koppeln im Zeilenmenü der Fahrzeuge
 
@@ -362,3 +362,22 @@ einrichten, Schalter, DSFA-Vorlage), `lagekarte.md`, `fahrzeuge.md`; Bilder per
   gegen den lokalen Stack (mit Schalter für TLS-Ausnahme), Marker bewegt sich.
 - [x] Folgeaufgabe „Ortung in gespiegelten Einsätzen“ (LLH-2119; dazu LLH-2120 admin_audit) auf dem Board anlegen
   (`zunder-task-anlegen`).
+
+## Nachtrag 25.11.2026: Zusammenführung mit der Helfer-App
+
+Ruben hat beim Merge von `origin/alpha` (Helfer-App, ADR-0101) entschieden; Einzelheiten im
+Design-Doc, Abschnitt „Nachtrag 25.11.2026“. Umgesetzt nach dem Merge-Commit:
+
+- [x] Org-Schalter `ortung_im_einsatz` statt `ortung_hauptamt` und Ehrenamt-Bestätigung: Koppeln
+  und Rückgängig 422 ohne Schalter (`kopplung::is_schalter_an_tx`), Übernahme schreibt nichts,
+  Kandidatenliste mit `tracking_enabled`, Dialog ohne Kästchen; `OrtungHauptamt.tsx`,
+  `AppError::UnprocessableGrund` und `volunteer_crew_*` entfernt.
+- [x] Übernahme über `ortung::schreibe_position` (`Einwurf`, `Fahrzeug`, `klemme_zeitpunkt`), eigene
+  Positionsspalten und `PositionQuelle` entfernt, Handweg wie `alpha`; Drossel über
+  `position_aktualisiert_at`, ein Nachlauf.
+- [x] Abschluss: `beende_ortung_im_einsatz` und `beende_im_einsatz_tx` in einer Transaktion.
+- [x] Anzeige auf `alpha` (`positionsHinweis`, 5 min); `ortungAlter.ts` entfernt, Zeile
+  „Position“ über `positionsHinweisText`.
+- [x] Migration `0380_fahrzeugortung.sql`, ADR-0103, arc42 05/06/08/11 (R56)/12, Anwenderkapitel
+  Anbindungen, Fahrzeuge, Lagekarte, `docs/api/einwurf.md`.
+- [x] Tests: `tests/ortung.rs` vereint die Tests des Bausteins (`alpha`) und der Fahrzeugortung.
