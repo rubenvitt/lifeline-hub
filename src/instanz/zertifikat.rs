@@ -23,7 +23,9 @@ use std::time::Duration;
 /// daran den Fall „neues Zertifikat bestätigen“.
 pub const PASST_NICHT: &str = "beglaubigtes Zertifikat passt nicht";
 
-fn provider() -> Arc<CryptoProvider> {
+/// Der eine erlaubte Crypto-Provider (aws-lc-rs, `Cargo.toml`): der Vorgabe-Provider des
+/// Prozesses, sonst aws-lc-rs. Jede eigene TLS-Konfiguration baut darauf.
+pub fn provider() -> Arc<CryptoProvider> {
     CryptoProvider::get_default()
         .cloned()
         .unwrap_or_else(|| Arc::new(rustls::crypto::aws_lc_rs::default_provider()))
@@ -196,6 +198,21 @@ fn config_mit(verifier: Arc<dyn ServerCertVerifier>) -> Result<rustls::ClientCon
 /// Fingerabdruck (LLH-1872, ADR-0092).
 pub fn tls_config(erwartet: Option<String>) -> Result<rustls::ClientConfig, String> {
     config_mit(Arc::new(Verifier::new(erwartet)))
+}
+
+/// TLS-Konfiguration mit Prüfung von Kette und Namen gegen die Vertrauensanker des Systems
+/// (`rustls-platform-verifier`) und dem einen [`provider`]. Für Ziele, die ein öffentlich
+/// beglaubigtes Zertifikat zeigen (SMTP-Ausgang, LLH-2093). Ohne Anker des Systems ein Fehler,
+/// nie eine Konfiguration, die jedes Zertifikat annimmt.
+pub fn webpki_config() -> Result<rustls::ClientConfig, String> {
+    let verifier =
+        rustls_platform_verifier::Verifier::new(provider()).map_err(|e| e.to_string())?;
+    Ok(rustls::ClientConfig::builder_with_provider(provider())
+        .with_safe_default_protocol_versions()
+        .map_err(|e| e.to_string())?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth())
 }
 
 /// TLS-Konfiguration mit einem [`Erfasser`]; jeder Handshake damit scheitert nach dem Lesen des

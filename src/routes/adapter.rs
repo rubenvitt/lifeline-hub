@@ -291,16 +291,19 @@ async fn anzeige(
     })
 }
 
-/// Host der ersten URL in den Einstellungen, für die Admin-Spur.
+/// Host der ersten URL oder des ersten Host-Felds in den Einstellungen, für die Admin-Spur.
 fn host_der_einstellungen(
     art: Option<&dyn AdapterArt>,
     einstellungen: &Map<String, Value>,
 ) -> Option<String> {
-    art?.felder()
-        .iter()
-        .filter(|f| f.typ == FeldTyp::Url)
-        .find_map(|f| einstellungen.get(f.name).and_then(Value::as_str))
-        .and_then(host_von)
+    art?.felder().iter().find_map(|f| {
+        let wert = einstellungen.get(f.name).and_then(Value::as_str)?;
+        match f.typ {
+            FeldTyp::Url => host_von(wert),
+            FeldTyp::Host => Some(wert.to_string()),
+            _ => None,
+        }
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -484,6 +487,20 @@ pub async fn create(
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
+        // Eine Org hat höchstens eine E-Mail-Anbindung, auch eine angehaltene zählt (LLH-2093).
+        if code == crate::adapter::smtp_art::CODE {
+            let (vorhanden,): (i64,) =
+                sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
+                    .bind(org_id)
+                    .bind(code)
+                    .fetch_one(&mut *conn)
+                    .await?;
+            if vorhanden > 0 {
+                return Err(AppError::UnprocessableEntity(
+                    "Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.".into(),
+                ));
+            }
+        }
         repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
     })?;
     spur(

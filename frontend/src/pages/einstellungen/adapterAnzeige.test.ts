@@ -14,6 +14,7 @@ import {
 const felder: AdapterFeld[] = [
   { name: 'url', bezeichnung: 'Adresse', typ: 'url', pflicht: true, max: 512 },
   { name: 'standort', bezeichnung: 'Standort-Kennung', typ: 'text', pflicht: false, max: 40 },
+  { name: 'server', bezeichnung: 'Mailserver', typ: 'host', pflicht: false, max: 100 },
   { name: 'seite', bezeichnung: 'Seitengröße', typ: 'zahl', pflicht: false, max: 0 },
 ];
 
@@ -82,6 +83,19 @@ describe('hostWechsel', () => {
     expect(hostWechsel(felder, {}, { url: 'https://alarm.example' })).toEqual([
       { feld: 'Adresse', bisher: null, neu: 'alarm.example' },
     ]);
+  });
+
+  it('meldet einen geänderten Host-Namen, nicht eine andere Schreibung', () => {
+    expect(
+      hostWechsel(felder, { server: 'smtp.a.example' }, { server: ' SMTP.A.example ' }),
+    ).toEqual([]);
+    expect(hostWechsel(felder, { server: 'smtp.a.example' }, { server: 'smtp.b.example' })).toEqual(
+      [{ feld: 'Mailserver', bisher: 'smtp.a.example', neu: 'smtp.b.example' }],
+    );
+    expect(hostWechsel(felder, {}, { server: 'smtp.b.example' })).toEqual([
+      { feld: 'Mailserver', bisher: null, neu: 'smtp.b.example' },
+    ]);
+    expect(hostWechsel(felder, { server: 'smtp.a.example' }, { server: '' })).toEqual([]);
   });
 
   it('übergeht eine unlesbare oder geleerte Adresse und Felder ohne URL', () => {
