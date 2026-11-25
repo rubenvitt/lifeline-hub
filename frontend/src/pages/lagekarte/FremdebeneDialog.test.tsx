@@ -89,6 +89,35 @@ describe('FremdebeneDialog', () => {
     expect(lege).not.toHaveBeenCalled();
   });
 
+  it('nimmt das Schema auch groß geschrieben an', async () => {
+    lege.mockResolvedValue({ id: 5 } as never);
+    rendere();
+    const d = await dialog();
+    await waehleAdresse(d);
+    await userEvent.type(
+      within(d).getByRole('textbox', { name: 'Adresse' }),
+      'HTTPS://example.org/a.kml',
+    );
+    await userEvent.click(within(d).getByRole('button', { name: 'Hinzufügen' }));
+    await waitFor(() => expect(lege).toHaveBeenCalled());
+    expect(within(d).queryByText('Die Adresse muss mit https:// beginnen')).toBeNull();
+  });
+
+  it('der Name erklärt nichts; der Platzhalter nennt, woher der Vorschlag kommt', async () => {
+    rendere();
+    const d = await dialog();
+    expect(within(d).queryByText(/Leer lassen/)).toBeNull();
+    expect(within(d).getByRole('textbox', { name: 'Name' })).toHaveAttribute(
+      'placeholder',
+      'aus der Datei',
+    );
+    await waehleAdresse(d);
+    expect(within(d).getByRole('textbox', { name: 'Name' })).toHaveAttribute(
+      'placeholder',
+      'aus der Adresse',
+    );
+  });
+
   it('hält eine zu lange Adresse für ungültig', async () => {
     rendere();
     const d = await dialog();

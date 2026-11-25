@@ -19,6 +19,7 @@ import {
   legeFremdebeneAn,
   type FremdebeneFehler,
 } from '../../api/fremdebenen';
+import { WEBHOOK_URL_MAX } from '../../api/eingabegrenzen';
 import { einsatzKeys } from '../../api/queryKeys';
 import { ErfassungsModal } from '../../components/Erfassung';
 import DateiFeld from '../../components/DateiFeld';
@@ -57,8 +58,16 @@ export function fremdebeneNebenweg({
 /** Dateiwahl vorfiltern; erkannt wird serverseitig am Inhalt. */
 export const FREMDEBENE_ACCEPT = '.geojson,.json,.kml,.kmz';
 
-/** Längste Adresse, die der Server annimmt. */
-export const FREMDEBENE_URL_MAX = 2048;
+/**
+ * Längste Adresse, die der Server annimmt: der Abruf prüft sie mit dem Ziel-Check der Webhooks
+ * (`public_api::webhook::URL_MAX`). Kein natives `maxLength` am Feld: es kürzte eine eingefügte
+ * Adresse still (`frontend/AGENTS.md`, „Freitext nie länger als der Server erlaubt“, nie kürzen);
+ * die Prüfung am Feld sperrt das Senden.
+ */
+export const FREMDEBENE_URL_MAX = WEBHOOK_URL_MAX;
+
+/** Das Schema darf groß geschrieben sein (aus einer Mail kopiert). */
+const HTTPS = /^https:\/\//i;
 
 type Quelle = 'datei' | 'url';
 
@@ -173,7 +182,7 @@ export default function FremdebeneDialog({ offen, einsatzId, onSchliessen }: Pro
               validator: (_, wert?: string) => {
                 const url = (wert ?? '').trim();
                 if (url === '') return Promise.resolve();
-                if (!url.startsWith('https://'))
+                if (!HTTPS.test(url))
                   return Promise.reject(new Error('Die Adresse muss mit https:// beginnen'));
                 if (url.length > FREMDEBENE_URL_MAX)
                   return Promise.reject(
@@ -187,13 +196,12 @@ export default function FremdebeneDialog({ offen, einsatzId, onSchliessen }: Pro
           <Input placeholder="https://…" inputMode="url" data-erfassung-fokus="" />
         </Feld>
       )}
-      <Feld
-        name="name"
-        label="Name"
-        abstand="ohne"
-        extra="Leer lassen: der Server schlägt einen vor."
-      >
-        <Input maxLength={FREMDEBENE_GRENZEN.nameMax} />
+      {/* Der Platzhalter zeigt, woher der Name kommt, wenn das Feld leer bleibt. */}
+      <Feld name="name" label="Name" abstand="ohne">
+        <Input
+          maxLength={FREMDEBENE_GRENZEN.nameMax}
+          placeholder={quelle === 'url' ? 'aus der Adresse' : 'aus der Datei'}
+        />
       </Feld>
     </ErfassungsModal>
   );
