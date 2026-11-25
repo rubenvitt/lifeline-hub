@@ -10589,6 +10589,14 @@
           "created_at": {
             "type": "string"
           },
+          "data_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne\nden Inhalt zu serialisieren. Fehlt ohne Inhalt."
+          },
           "dropped_count": {
             "type": "integer",
             "format": "int64",

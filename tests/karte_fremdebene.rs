@@ -515,7 +515,7 @@ async fn stand_sichern(app: &axum::Router, einsatz: i64, cookie: &str) -> (i64, 
         "POST",
         &format!("/api/incidents/{einsatz}/situation-snapshots"),
         cookie,
-        json!({}),
+        Some(&json!({})),
     )
     .await;
     assert_eq!(s, StatusCode::CREATED, "{dok}");
