@@ -202,6 +202,51 @@ datei "$r" alpha migrations/0003_fremd.sql
 pruefe "Kollision mit Umlaut im Namen rot" 1 "$(lauf "$r")"
 enthaelt "Umlaut-Datei wird im Klartext genannt" "0003_größe.sql"
 
+# 16 — Reparatur einer Doppelung auf alpha (LLH-2030-Fenster, 25.11.2026 zweimal 0381): zwei
+# PRs mergten kurz nacheinander dieselbe Nummer. Der Reparatur-Branch legt EINE der beiden
+# hinter alpha; das ist kein Umbenennen einer eingespielten Migration, denn mit doppelter
+# Nummer startet kein Server, und ohne diese Ausnahme bliebe der Pflicht-Status rot.
+doppelt_auf_alpha() { # <name> — alpha mit 0003_x und 0003_y, feature zweigt danach ab
+  local r
+  r="$(repo_neu "$1")"
+  datei "$r" alpha migrations/0003_x.sql > /dev/null
+  datei "$r" alpha migrations/0003_y.sql > /dev/null
+  git -C "$r" branch -f feature alpha
+  printf '%s\n' "$r"
+}
+r="$(doppelt_auf_alpha doppel_reparatur)"
+git -C "$r" checkout -q feature
+git -C "$r" mv migrations/0003_y.sql migrations/0004_y.sql
+git -C "$r" commit -q -m umlegen
+pruefe "Doppelung auf alpha aufgelöst grün" 0 "$(lauf "$r")"
+enthaelt "Auflösung nennt die umgelegte Datei" "0003_y.sql"
+
+# 17 — Die Ausnahme gilt nur, solange die Nummer danach genau einmal bleibt: beide Dateien
+# wegzunehmen löscht eine Migration, die eine DB schon eingespielt haben kann.
+r="$(doppelt_auf_alpha doppel_beide)"
+git -C "$r" checkout -q feature
+git -C "$r" mv migrations/0003_x.sql migrations/0004_x.sql
+git -C "$r" mv migrations/0003_y.sql migrations/0005_y.sql
+git -C "$r" commit -q -m beide
+pruefe "beide Dateien einer Doppelung umgelegt rot" 1 "$(lauf "$r")"
+
+# 18 — Bleibt die Nummer danach doppelt (hier lag sie dreifach), ist das Umlegen keine
+# Auflösung.
+r="$(doppelt_auf_alpha doppel_bleibt)"
+datei "$r" alpha migrations/0003_z.sql > /dev/null
+git -C "$r" branch -f feature alpha
+git -C "$r" checkout -q feature
+git -C "$r" mv migrations/0003_y.sql migrations/0004_y.sql
+git -C "$r" commit -q -m bleibt
+pruefe "Doppelung nicht aufgelöst rot" 1 "$(lauf "$r")"
+
+# 19 — Eine einmalige Bestands-Nummer bleibt unantastbar, auch neben einer Doppelung.
+r="$(doppelt_auf_alpha doppel_fremd)"
+git -C "$r" checkout -q feature
+git -C "$r" mv migrations/0002_b.sql migrations/0004_b.sql
+git -C "$r" commit -q -m fremd
+pruefe "einmalige Bestands-Migration umgelegt rot" 1 "$(lauf "$r")"
+
 # 14 — Eine unbekannte Basis ist ein Aufruffehler, kein Befund.
 r="$(repo_neu basis_fehlt)"
 code=0
