@@ -36,6 +36,10 @@ bereiche_von() {
       echo "rust frontend e2e" ;;
     docs/schnittstellen/stammdaten-datei.md)
       echo "rust" ;;
+    # Rust liest das Beispiel des Vertrags „Stammdaten-Abruf“ (`include_str!` in
+    # src/stammdaten_eingang/json.rs, LLH-1194).
+    docs/schnittstellen/beispiele/stammdaten-abruf.json)
+      echo "rust" ;;
     # Rust liest die gemeinsamen Fälle der Dauerform (`include_str!` in src/zeitdarstellung.rs,
     # LLH-1750); der Kern im Frontend liest sie ebenso.
     frontend/src/anzeige/dauer.faelle.json)
