@@ -95,6 +95,8 @@ export default function FremdebeneDetail({
       )}
       {teile && art && art !== 'punkt' && (
         <FremdebeneUebernehmenDialog
+          // Neu je Art: die gewählte Zonenart einer Fläche passt nicht zu einer Linie.
+          key={art}
           offen={dialogOffen}
           art={art}
           anzahl={teile.length}

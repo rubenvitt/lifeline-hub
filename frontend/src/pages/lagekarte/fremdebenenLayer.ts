@@ -222,7 +222,8 @@ function gleicheAngaben(
 /**
  * Die volle Geometrie des gewählten Objekts (LLH-2129) aus den Daten der Ebene, nicht die
  * gekachelte der Karte. Der Index (MapLibre-`id` dank `generateId`) gilt, solange das Objekt dort
- * dieselben Angaben trägt; nach einem Abgleich wird nach den Angaben gesucht.
+ * dieselben Angaben trägt; nach einem Abgleich wird nach den Angaben gesucht, aber nur ein
+ * eindeutiger Treffer gilt.
  */
 export function fremdObjektGeometrie(
   aktive: readonly AktiveFremdebene[],
@@ -232,9 +233,13 @@ export function fremdObjektGeometrie(
 ): unknown {
   const features = aktive.find((e) => e.id === ebeneId)?.daten.features ?? [];
   const amIndex = index != null ? features[index] : undefined;
-  const treffer =
-    amIndex && gleicheAngaben(amIndex.properties as Record<string, unknown>, properties)
-      ? amIndex
-      : features.find((f) => gleicheAngaben(f.properties as Record<string, unknown>, properties));
-  return treffer?.geometry ?? null;
+  if (amIndex && gleicheAngaben(amIndex.properties as Record<string, unknown>, properties)) {
+    return amIndex.geometry ?? null;
+  }
+  // Ohne passenden Index nur ein eindeutiger Treffer: bei mehreren Objekten mit denselben
+  // Angaben (etwa unbenannten) wäre jede Wahl geraten.
+  const treffer = features.filter((f) =>
+    gleicheAngaben(f.properties as Record<string, unknown>, properties),
+  );
+  return treffer.length === 1 ? (treffer[0].geometry ?? null) : null;
 }

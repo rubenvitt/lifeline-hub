@@ -119,4 +119,41 @@ describe('Detailkarte eines Fremdebenen-Objekts (LLH-2099)', () => {
     );
     expect(screen.getByText('Mehr als 20 Teile lassen sich nicht übernehmen')).toBeInTheDocument();
   });
+
+  it('nach dem Wechsel von Fläche zu Linie gilt die Vorgabe der Linie', async () => {
+    const onUebernehmen = vi.fn(() => Promise.resolve(true));
+    const LINIE = {
+      type: 'LineString',
+      coordinates: [
+        [9, 50],
+        [9.1, 50.1],
+      ],
+    };
+    const { rerender } = renderMitProviders(
+      <FremdebeneDetail
+        ebene={EBENE}
+        properties={{}}
+        geometrie={FLAECHE}
+        darfSchreiben
+        onUebernehmen={onUebernehmen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    rerender(
+      <FremdebeneDetail
+        ebene={EBENE}
+        properties={{}}
+        geometrie={LINIE}
+        darfSchreiben
+        onUebernehmen={onUebernehmen}
+        onSchliessen={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen …' }));
+    expect(screen.getByRole('radio', { name: 'Absperrgrenze' })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Übernehmen' }));
+    expect(onUebernehmen).toHaveBeenCalledWith(
+      expect.objectContaining({ zonenTyp: 'absperrgrenze' }),
+    );
+  });
 });

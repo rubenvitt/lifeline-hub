@@ -297,4 +297,18 @@ describe('Geometrie eines gewählten Fremdebenen-Objekts (LLH-2129)', () => {
     expect(fremdObjektGeometrie([], 7, { name: 'A' }, 0)).toBeNull();
     expect(fremdObjektGeometrie(aktiv, 7, { name: 'Z' }, 0)).toBeNull();
   });
+
+  it('bei mehrdeutigen Angaben ohne passenden Index lieber keine Geometrie als eine geratene', () => {
+    const gleich: FeatureCollection = {
+      type: 'FeatureCollection',
+      features: [
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} },
+        { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: {} },
+      ],
+    };
+    const a = [{ id: 7, name: 'E', daten: gleich, farbe: FARBE }];
+    expect(fremdObjektGeometrie(a, 7, {}, 1)).toEqual({ type: 'Point', coordinates: [2, 2] });
+    expect(fremdObjektGeometrie(a, 7, {}, undefined)).toBeNull();
+    expect(fremdObjektGeometrie(a, 7, {}, 5)).toBeNull();
+  });
 });

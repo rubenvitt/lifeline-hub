@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { legeZoneAn } from '../../api/lagezonen';
 import { legeFreiesZeichenAn } from '../../api/freieZeichen';
@@ -39,9 +39,13 @@ export function useFremdebeneUebernahme({
 }) {
   const qc = useQueryClient();
   const [laeuft, setLaeuft] = useState(false);
+  // Ein doppelter Tipp darf nicht alles doppelt anlegen; der State käme dafür zu spät.
+  const laeuftRef = useRef(false);
 
   const uebernehme = useCallback(
     async (a: UebernahmeAuftrag): Promise<boolean> => {
+      if (laeuftRef.current) return false;
+      laeuftRef.current = true;
       const n = a.teile.length;
       let angelegt = 0;
       setLaeuft(true);
@@ -93,6 +97,7 @@ export function useFremdebeneUebernahme({
             void qc.invalidateQueries({ queryKey: einsatzKeys.gefahrengebiete(einsatzId) });
           }
         }
+        laeuftRef.current = false;
         setLaeuft(false);
       }
     },

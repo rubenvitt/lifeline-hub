@@ -151,4 +151,29 @@ describe('useFremdebeneUebernahme (LLH-2129)', () => {
     });
     expect(invalidiere).toHaveBeenCalledWith({ queryKey: einsatzKeys.freieZeichen(3) });
   });
+
+  it('ein zweiter Aufruf während eines laufenden legt nichts an', async () => {
+    let gib!: (v: unknown) => void;
+    lagezonenApi.legeZoneAn.mockImplementationOnce(() => new Promise((r) => (gib = r)));
+    const { result } = aufbau();
+    const auftrag = {
+      ebene: EBENE,
+      teile: [poly(9)],
+      name: 'A',
+      beschreibung: null,
+      zonenTyp: 'gefahrengebiet' as const,
+    };
+    let erster!: Promise<boolean>;
+    let zweiter = true;
+    await act(async () => {
+      erster = result.current.uebernehme(auftrag);
+      zweiter = await result.current.uebernehme(auftrag);
+    });
+    expect(zweiter).toBe(false);
+    await act(async () => {
+      gib({ id: 1 });
+      await erster;
+    });
+    expect(lagezonenApi.legeZoneAn).toHaveBeenCalledTimes(1);
+  });
 });
