@@ -1193,3 +1193,63 @@ async fn wiedereroeffnen_stellt_keine_kopplung_her() {
     assert_eq!(s, StatusCode::OK, "{v}");
     assert_eq!(f.kopplungen().await, 0);
 }
+
+/// ADR-0098: keine Tabelle hält einen Positionsverlauf. Jede Tabelle mit den Spalten `lat` und
+/// `lon` steht in einer der beiden Listen: Karten- und Lagedaten, die eine Einsatzkraft selbst
+/// setzt (je Zeile ein Ort, kein Messverlauf), oder Positionsablagen, deren eindeutiger Schlüssel
+/// höchstens eine Zeile je Fahrzeug bzw. Kennung erlaubt. Eine neue Tabelle mit `lat`/`lon` macht
+/// den Test rot, bis sie hier bewusst einsortiert ist.
+#[tokio::test]
+async fn keine_tabelle_haelt_einen_positionsverlauf() {
+    /// Ein Ort je Zeile, von Menschen gesetzt; keine Messreihe eines Geräts.
+    const ORTE_VON_MENSCHEN: &[&str] = &[
+        "bereitstellungsraum",
+        "betreuungsstelle",
+        "einsatz_einheit",
+        "einsatz_personal",
+        "einsatz_schaden",
+        "freies_zeichen",
+        "meldung",
+        "uhs",
+        "verpflegungsstelle",
+    ];
+    /// Positionsablagen mit dem Schlüssel, der die Zeilen je Fahrzeug bzw. Kennung begrenzt.
+    const POSITIONSABLAGEN: &[(&str, &[&str])] = &[
+        ("einsatz_fahrzeug", &["id"]),
+        ("position_letzte", &["zugang_id", "kennung"]),
+    ];
+
+    let pool = lifeline_hub::db::test_pool().await;
+    let tabellen: Vec<String> = sqlx::query_scalar(
+        "SELECT m.name FROM sqlite_master m WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%' \
+         AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'lat') \
+         AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'lon') \
+         ORDER BY m.name",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    for t in &tabellen {
+        let ablage = POSITIONSABLAGEN.iter().find(|(n, _)| n == t);
+        if let Some((_, schluessel)) = ablage {
+            // Die Spalten des Primärschlüssels sind genau die erlaubten.
+            let pk: Vec<String> = sqlx::query_scalar(
+                "SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk",
+            )
+            .bind(t)
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            assert_eq!(&pk, schluessel, "Primärschlüssel von {t}");
+        } else {
+            assert!(
+                ORTE_VON_MENSCHEN.contains(&t.as_str()),
+                "Tabelle {t} hat lat und lon: ein Positionsverlauf ist nach ADR-0098 verboten; \
+                 gehört sie zu den von Menschen gesetzten Orten, in die Liste eintragen"
+            );
+        }
+    }
+    for (n, _) in POSITIONSABLAGEN {
+        assert!(tabellen.iter().any(|t| t == n), "{n} fehlt");
+    }
+}
