@@ -15,14 +15,13 @@ import {
   listeFremdebenen,
   loescheFremdebene,
   type Fremdebene,
-  type FremdebeneImStand,
 } from '../../api/fremdebenen';
 import { ladeLageSnapshot } from '../../api/lageSnapshot';
 import { einsatzKeys } from '../../api/queryKeys';
 import { sicherLesen, sicherSchreiben } from '../../lib/sichererSpeicher';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
 import type { AktiveFremdebene } from './fremdebenenLayer';
-import type { SnapshotDaten, Standquelle } from './snapshotDaten';
+import type { FremdebeneImStand, SnapshotDaten, Standquelle } from './snapshotDaten';
 
 /**
  * Fremdebenen-Leg der Lagekarte (LLH-2099, Entwurf „Oberfläche“): Liste, Sichtbarkeit je

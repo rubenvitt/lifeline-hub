@@ -52,23 +52,6 @@ export function ladeFremdebeneDaten(
   return apiGet<FeatureCollection>(`${basis(einsatzId)}/${ebeneId}/data`);
 }
 
-/**
- * Eine Fremdebene, wie ein gesicherter Stand sie einfriert (LLH-2130, Rust:
- * `lage_snapshot::fremdebene::FremdebeneImStand`): ohne `url`, mit dem Hash ihres Inhalts. `id`
- * ist am Spiegel `null`, wenn die Ebene dort nicht (mehr) besteht.
- */
-export interface FremdebeneImStand {
-  id: number | null;
-  name: string;
-  color: string;
-  source: Fremdebene['source'];
-  url_host?: string;
-  fetched_at?: string;
-  feature_count: number;
-  dropped_count: number;
-  sha256: string;
-}
-
 /** Der eingefrorene Inhalt einer Fremdebene eines Stands, adressiert über ihren Hash. */
 export function ladeStandFremdebeneDaten(
   einsatzId: number,
