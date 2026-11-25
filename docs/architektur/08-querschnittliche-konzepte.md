@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 22.11.2026 (iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Ortung von Fahrzeugen, LLH-2091; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -499,3 +499,26 @@ Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs
   kein Adapter, und die Verwaltung ist gesperrt.
 
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.
+
+## 8.33 Ortung von Fahrzeugen
+
+Positionen von Einsatzfahrzeugen sind personenbezogen. Die Ortung (`src/ortung/`, LLH-2091,
+[ADR-0098](entscheidungen/ADR-0098-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md),
+Design-Doc [`2026-11-24-fjftaovq-fahrzeugortung-design.md`](../superpowers/specs/2026-11-24-fjftaovq-fahrzeugortung-design.md))
+begrenzt sie auf das, was der Einsatz braucht:
+
+- **Nur gekoppelt und nur im Einsatz:** ohne bewusste Kopplung einer Kennung an ein Fahrzeug ändert
+  ein Einwurf keinen Einsatz; die Kopplung endet mit Trennen, Entlassen, Stornieren und Abschluss
+  (Ablauf 6.6e1).
+- **Kein Verlauf:** je Kennung eine Position in der Ablage (24 h), je Fahrzeug eine am Einsatzfahrzeug;
+  Schema-Test `keine_tabelle_haelt_einen_positionsverlauf` in `tests/ortung.rs`. Der Abschluss
+  löscht die GPS-Positionen des Einsatzes, manuell gesetzte bleiben (`src/einsatz/repo.rs`).
+- **Ehrenamt als Voraussetzung:** ohne den Org-Schalter `ortung_hauptamt` (Verwaltung,
+  „Ortung auch bei hauptamtlicher Besatzung“; lokal je Instanz, nicht Teil der
+  Stammdaten-Synchronisation, `migrations/0373_fahrzeugortung.sql`) verlangt das Koppeln die
+  Bestätigung „Besatzung ist ehrenamtlich“ (422, Grund `GRUND_EHRENAMT_ERFORDERLICH`). Risiko: R55.
+- **Kein Koordinatenweg über die Kopplung:** die Kandidatenliste und die Abfrage der
+  Kopplung tragen keine Koordinaten und kein Protokoll Kennung, Schlüssel oder Koordinaten (Prüfung
+  in ADR-0098); `EinsatzFahrzeugAnzeige` nennt nur `ortung_gekoppelt`, `position_quelle` und
+  `position_gemessen_at`.
+- **Anwender:** DSFA-Vorlage und Einrichtung im Kapitel [Anbindungen](../anwender/kapitel/anbindungen.md).

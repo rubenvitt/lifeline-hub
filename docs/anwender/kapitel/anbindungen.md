@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, frontend/src/pages/einstellungen/OrtungHauptamt.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/routes/org_einstellungen.rs]
 ---
 
 ## Überblick
@@ -160,6 +160,22 @@ Der bisherige Schlüssel gilt ab der Bestätigung nicht mehr. Bis die neue Adres
 eingetragen ist, werden seine Einwürfe abgelehnt; gesperrt wird dadurch niemand. Ein abgelaufener
 Zugang bekommt keinen neuen Schlüssel: Sein Menü bietet nur „Widerrufen …“, danach wird er neu
 angelegt.
+
+### Ortung für ein Fahrzeug einrichten
+
+Für den System-Admin; das Koppeln selbst übernehmen Einsatzleitung und Führungspersonal. Die Ortung zeigt die Position des Geräts in einem
+Fahrzeug auf der Lagekarte (Hintergrund: „Ortung von Fahrzeugen“).
+
+1. Wie unter „Einwurf-Zugang anlegen“ einen Zugang mit dem Zweck „Positionen einliefern“
+   anlegen und die Adresse im Gerät eintragen, etwa als Server-URL in OsmAnd oder im Traccar
+   Client. Als Kennung („Device ID“) eine Bezeichnung wählen, die sich dem Fahrzeug zuordnen lässt.
+2. Das Gerät sendet seine Position. Erst dann erscheint die Kennung in der Auswahl.
+3. Im Einsatz bei „Fahrzeuge“ in der Zeile des Fahrzeugs „Weitere Aktionen“ und „Ortung koppeln …“
+   wählen, die Kennung ankreuzen und „Koppeln“ wählen (Kapitel [Fahrzeuge und FMS](fahrzeuge.md)).
+4. Für hauptamtliche Besatzung zusätzlich in der Verwaltung unter „Einstellungen“ „Anbindungen“
+   im Paneel „Ortung“ den Schalter „Ortung auch bei hauptamtlicher Besatzung“ einschalten. Ihn
+   ändert nur der System-Admin; er gilt für die ganze Organisation. Eine Betriebs- oder
+   Dienstvereinbarung muss vorliegen, bevor er eingeschaltet wird.
 
 ### Einwurf-Zugang widerrufen
 
@@ -396,7 +412,9 @@ lesen, keinen Einsatz anlegen und keinen ändern. Die Antwort an den Absender is
 - **Positionen** hängen an der Kennung, die der Absender mitschickt (bei OsmAnd die „Device ID“).
   Je Zugang und Kennung hält der Server genau eine Position, ohne Verlauf. Eine Position mit
   älterer Uhrzeit als die gespeicherte wird nicht übernommen. Kommt 24 Stunden lang keine neue,
-  wird sie gelöscht. Die Lagekarte zeigt diese Positionen noch nicht.
+  wird sie gelöscht. Die Lagekarte zeigt eine Position nur, wenn ihre Kennung im laufenden
+  Einsatz an ein Fahrzeug gekoppelt ist (Abschnitt „Ortung von Fahrzeugen“); sonst bleibt sie
+  in der Ablage und ändert nichts.
 
 Ruft ein Absender dieselbe Adresse mit demselben Inhalt mehrmals auf, entsteht kein zweiter
 Eintrag: Der Server vermerkt am ersten, wie oft und wann er erneut kam. Ohne eigene Kennung des
@@ -405,6 +423,46 @@ Absenders gilt das zwei Minuten lang nach dem letzten Empfang; danach entsteht e
 Je Zugang nimmt der Server höchstens 30 Einwürfe am Stück an, danach einen alle zwei Sekunden,
 dazu höchstens 5 000 neue Alarmmeldungen am Tag und Positionen für 200 Kennungen. Ist die
 Tagesgrenze erreicht, lehnt er jeden weiteren Einwurf des Zugangs ab, bis wieder Platz ist.
+
+### Ortung von Fahrzeugen
+
+Ein Einwurf bewegt nur dann ein Fahrzeug, wenn dessen Kennung im Einsatz gekoppelt wurde. Zur
+Auswahl stehen die Kennungen, von denen in den letzten 24 Stunden eine Position kam und deren
+Zugang nicht widerrufen und nicht abgelaufen ist, den Zweck „Positionen einliefern“ trägt und zur
+eigenen Organisation gehört. Die Liste zeigt keine Koordinaten.
+
+- **Ehrenamt:** Ohne den Schalter „Ortung auch bei hauptamtlicher Besatzung“ muss, wer koppelt,
+  „Besatzung ist ehrenamtlich“ bestätigen. Der Schalter trägt den Hinweis „Nur mit Betriebs- oder
+  Dienstvereinbarung (§ 87 Abs. 1 Nr. 6 BetrVG).“ Die App prüft weder die Vereinbarung noch die
+  Besatzung; beides verantwortet die Organisation.
+- **Einsatzbezug:** Gekoppelt wird nur in einem laufenden, nicht gespiegelten Einsatz. Die Kopplung
+  endet mit „Ortung trennen“, dem Entlassen, dem Stornieren und dem Abschluss; jedes Ende und das
+  Koppeln stehen im Einsatztagebuch. Wird der Zugang widerrufen, bleibt die Kopplung stehen, es
+  kommt aber keine Position mehr an.
+- **Marker:** „GPS“ an der Marke, „veraltet“, wenn die Messung über zehn Minuten zurückliegt
+  (Kapitel [Lagekarte](lagekarte.md)). Je Fahrzeug schreibt die Ortung höchstens alle 15 Sekunden.
+- **Kein Verlauf:** Es gibt keine Spur und keine Liste früherer Orte. Je Kennung hält die Ablage
+  die letzte Position 24 Stunden, am Fahrzeug steht die letzte Position bis zum Abschluss; der
+  Abschluss löscht die GPS-Positionen.
+- **Spiegel-Instanzen:** Die Position am Fahrzeug geht wie jede Änderung an Spiegel-Instanzen des
+  Einsatzes. Die Kopplung bleibt auf der Instanz.
+
+#### Vorlage für die Datenschutz-Folgenabschätzung
+
+Diese Vorlage ordnet, was die App tut; sie ersetzt keine rechtliche Prüfung. Zu ergänzen ist, was
+nur die Organisation weiß. Die Stellen in eckigen Klammern sind auszufüllen.
+
+| Punkt | Inhalt |
+| --- | --- |
+| Zweck | Anzeige der Position von Einsatzfahrzeugen auf der Lagekarte während eines laufenden Einsatzes, zur Koordination der Kräfte. [Weitere Zwecke der Organisation oder „keine“] |
+| Rechtsgrundlage | [Vom Verantwortlichen einzutragen. Für ehrenamtliche Besatzung kommt Art. 6 DSGVO in Betracht, etwa Absatz 1 Buchstabe f; für hauptamtliche Besatzung zusätzlich die Betriebs- oder Dienstvereinbarung nach § 87 Abs. 1 Nr. 6 BetrVG bzw. dem Personalvertretungsrecht. Einschätzung der Organisation oder ihrer Datenschutzbeauftragten.] |
+| Betroffene | Besatzung des gekoppelten Fahrzeugs [ehrenamtlich / hauptamtlich] |
+| Daten | Kennung des Geräts, Koordinaten, Zeitpunkt der Messung. Es gibt keine Zuordnung zu Personen außer über die Besatzung, die am Fahrzeug eingetragen ist. |
+| Speicherdauer | Letzte Position je Kennung 24 Stunden nach dem Empfang in der Ablage. Am Fahrzeug bis zum Abschluss des Einsatzes; dann werden GPS-Positionen gelöscht. |
+| Verlauf | Kein Positionsverlauf, keine Spur, kein Geofencing. |
+| Empfänger | Personen mit Zugriff auf den Einsatz in der Organisation und, bei gespiegelten Einsätzen, die Spiegel-Instanzen. [Weitere Empfänger der Organisation] |
+| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Bestätigung „Besatzung ist ehrenamtlich“ oder Freischaltung durch die Organisation; Kandidatenliste ohne Koordinaten; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
+| Risiken | Ortung von Beschäftigten ohne Vereinbarung; Weitergabe der Adresse eines Zugangs. [Bewertung der Organisation] |
 
 ### Einwurf nur verschlüsselt
 

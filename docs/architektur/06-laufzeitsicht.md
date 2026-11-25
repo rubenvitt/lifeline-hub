@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 23.11.2026 (Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Fahrzeugortung, LLH-2091; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -574,11 +574,58 @@ sequenceDiagram
   zwei Minuten lang als Wiederholung und wird am Eintrag gezählt (`alarmmeldung_ablegen` in
   `src/public_api/einwurf/ablage.rs`). Den Einsatzvorschlag baut LLH-1192 auf der Ablage.
 - Eine Position ersetzt die letzte ihrer Kennung, wenn sie nicht älter ist (`position_ablegen`,
-  Tabelle `position_letzte`); einen Verlauf gibt es nicht.
+  Tabelle `position_letzte`); einen Verlauf gibt es nicht. Die Lagekarte liest die Ablage nicht;
+  in ein Fahrzeug gelangt eine Position nur über die Ortung (§ 6.6e1).
 - Der Span der Anfrage nennt den Pfad mit `***` statt des Schlüssels (`pfad_fuer_protokoll` in
   `src/app.rs`, `einwurf::maskiere_pfad`).
 - Der Purge-Lauf löscht Alarmmeldungen nach 7 Tagen und Positionen nach 24 Stunden
   (`einwurf::purge`, aufgerufen in `src/einsatz/purge_scheduler.rs`).
+
+## 6.6e1 Fahrzeugortung: vom Einwurf bis zur Lagekarte
+
+Eine Position aus dem Einwurf bewegt den Marker eines Fahrzeugs nur, wenn dessen Kennung im
+laufenden Einsatz an das Einsatzfahrzeug gekoppelt ist (LLH-2091,
+[ADR-0098](entscheidungen/ADR-0098-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md),
+Design-Doc [`2026-11-24-fjftaovq-fahrzeugortung-design.md`](../superpowers/specs/2026-11-24-fjftaovq-fahrzeugortung-design.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Fahrzeuge
+  participant Hub as lifeline-hub (src/routes/ortung.rs, src/ortung/)
+  participant A as Absender (OsmAnd, Traccar Client)
+  participant K as frontend Lagekarte
+  FE->>Hub: GET …/vehicles/{ef_id}/tracking/candidates
+  Hub-->>FE: Kennungen der letzten 24 h, ohne Koordinaten, und ob die Bestätigung Pflicht ist
+  FE->>Hub: PUT …/tracking {access_id, device_id, volunteer_crew_confirmed}
+  Hub->>Hub: Kopplung, vorhandene Position übernehmen, ETB-Eintrag (eine Transaktion)
+  A->>Hub: GET /api/v1/intake/<schlüssel>/position?id=…&lat=…&lon=…
+  Hub->>Hub: position_letzte schreiben, committen
+  Hub-->>A: 204
+  Hub->>Hub: apply_position: Kopplung, aktives Fahrzeug, aktiver ungespiegelter Einsatz, Vorrang, Drossel
+  Hub-->>K: Live fahrzeug (nach dem Commit)
+```
+
+- Die Übernahme (`apply_position` in `src/ortung/uebernahme.rs`) läuft im Handler des Einwurfs
+  nach dessen Commit und vor der Antwort, in eigener Transaktion; ihr Fehler wird verworfen, die
+  Antwort bleibt `204` (ADR-0023). Nur ein Fahrzeug mit Kopplung, ohne `beendet_at`, in einem
+  Einsatz mit `status = 'aktiv'` und `spiegel = 0` wird geschrieben.
+- Vorrang hat die Serverzeit des Empfangs: Eine Position wird nur übernommen, wenn
+  `position_letzte.empfangen_at` später liegt als `einsatz_fahrzeug.position_gesetzt_at`. Eine von
+  Hand gesetzte Position bleibt deshalb bis zum nächsten empfangenen Fix stehen; die Uhr des
+  Geräts (`position_gemessen_at`) trägt nur das Alter der Anzeige.
+- Die Drossel (`ORTUNG_DROSSEL_S`, 15 s je Fahrzeug) schreibt einen zu frühen Fix nicht, sondern
+  merkt genau einen Nachlauf vor (`schedule_nachlauf`, nur im Speicher), der die jüngste Position
+  nach Ablauf übernimmt.
+- Die Kopplung endet mit Trennen (`DELETE …/tracking`), Entlassen, Stornieren und
+  Einsatzabschluss (`delete_kopplung_tx`, `delete_kopplungen_einsatz_tx`), jeweils mit einem
+  ETB-Eintrag in derselben Transaktion; der Abschluss löscht außerdem die GPS-Positionen
+  (`position_quelle = 'ortung'`) des Einsatzes. „Rückgängig“ nach dem Entlassen stellt die
+  Kopplung wieder her, wenn die Kennung noch frei ist und die Org-Regel sie erlaubt
+  (`restore_ortung_tx` in `src/fahrzeug/disposition_repo.rs`).
+- Die Tabelle `ortung_kopplung` ist lokal (`migrations/0373_fahrzeugortung.sql`); in einem
+  gespiegelten Einsatz lässt sich nicht koppeln (409), und eine dortige Kopplung wird nicht
+  übernommen. Die Position selbst steht in `lat`/`lon` von `einsatz_fahrzeug` und läuft wie jede
+  Fahrzeugänderung zu den Spiegeln.
 
 ## 6.6f Ausgangsereignis: vom Schreiben bis zum Abruf
 
