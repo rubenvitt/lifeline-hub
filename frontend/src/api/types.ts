@@ -239,6 +239,8 @@ export interface OrgEinstellungenUpdate {
   rueckmeldung_frist_min: number | null;
   /** Auto-ETB-Dual-Publish: false schaltet ab; true/null = an. */
   auto_etb_eintraege: boolean | null;
+  /** Ortung auch bei hauptamtlicher Besatzung (LLH-2091): bool auf dem Draht; fehlt = aus. */
+  ortung_hauptamt?: boolean | null;
   geocoder_url: string | null;
   /** Kategorie-Vorgaben (LFH-749). Fehlt das Feld, bleiben sie am Server unverändert — nur die
    *  Sektion „Einsatz-Defaults“ schickt es mit. */

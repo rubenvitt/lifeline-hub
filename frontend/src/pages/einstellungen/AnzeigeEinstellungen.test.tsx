@@ -35,6 +35,7 @@ const VOLL = {
   auftrag_quittierung_frist_min: 45,
   rueckmeldung_frist_min: 25,
   auto_etb_eintraege: 0,
+  ortung_hauptamt: 1,
   geocoder_url: null,
   geaendert_at: null,
   geaendert_von: null,
@@ -89,6 +90,7 @@ describe('AnzeigeEinstellungen', () => {
         auftrag_quittierung_frist_min: 45,
         rueckmeldung_frist_min: 25,
         auto_etb_eintraege: false,
+        ortung_hauptamt: true,
         geocoder_url: 'https://geo.example.org',
       }),
     );
