@@ -481,19 +481,19 @@ public enum Ereignis { case gescannt(HelferZiel), eingeloest, bestaetigt, antwor
     `--scheme`).
 - Modify: `ios/AGENTS.md` (ein Satz: Helfer-App unter `ios/Helfer/`, eigene Regeln dort)
 
-- [ ] **Step 1:** UI-Smoke-Test und ein Unit-Test für `HelferModell`: Scan → Phase `anmelden`.
-- [ ] **Step 2:** Bildschirme bauen nach dem Spec, Abschnitt „Bildschirme“:
+- [x] **Step 1:** UI-Smoke-Test und ein Unit-Test für `HelferModell`: Scan → Phase `anmelden`. (Lauf: CI am PR)
+- [x] **Step 2:** Bildschirme bauen nach dem Spec, Abschnitt „Bildschirme“:
   - SwiftUI, `NavigationStack`, große Typografie;
   - `.glassEffect()` nur hinter `if #available(iOS 26, *)`;
   - Haptik bei Bestätigung;
   - Dynamic Type bis AX3 ohne Abschneiden;
   - Hell und Dunkel über `LifelineFarbe.Paar`.
-- [ ] **Step 3:** Ortungsdienst und Live-Aktivität. Start nur aus dem Vordergrund beim
+- [x] **Step 3:** Ortungsdienst und Live-Aktivität. Start nur aus dem Vordergrund beim
   Einlösen. Stopp bei `Antwort.stoppen` oder beim Abmelden; danach `Activity.end`.
-- [ ] **Step 4:** Run (CI `ios-pruefung.yml` um das Ziel `LifelineHelfer` erweitert:
-  `xcodebuild build test -scheme LifelineHelfer -destination 'platform=iOS Simulator,name=iPhone 17'`) → PASS.
-- [ ] **Step 5:** ADR-Prüfung (`verlange 'UIBackgroundModes'`) aus Task 1 scharf schalten; `scripts/check-architektur.sh` → PASS.
-- [ ] **Step 6:** Commit `feat: iOS-App Lifeline Helfer`.
+- [x] **Step 4:** Run (CI `ios-pruefung.yml` um das Ziel `LifelineHelfer` erweitert:
+  `xcodebuild build test -scheme LifelineHelfer -destination 'platform=iOS Simulator,name=iPhone 17'`) → PASS. (CI am PR, Lauf steht aus)
+- [x] **Step 5:** ADR-Prüfung (`verlange 'UIBackgroundModes'`) aus Task 1 scharf schalten; `scripts/check-architektur.sh` → PASS.
+- [x] **Step 6:** Commit `feat: iOS-App Lifeline Helfer`.
 
 ### Task 12: Android `helferkern`
 

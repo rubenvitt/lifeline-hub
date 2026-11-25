@@ -1,0 +1,69 @@
+import HelferKern
+import XCTest
+
+@testable import LifelineHelfer
+
+/// Modell der Helfer-App ohne Systemdienste (`Umgebung.test`): welche Phase gilt, entscheidet der
+/// Kern; das Modell reicht Scan und Eingabe richtig durch.
+@MainActor
+final class HelferModellTests: XCTestCase {
+    let einladung = HelferZiel(server: URL(string: "https://elw.local:8443/")!, code: "AB12CD34")
+
+    func testEinScanFuehrtZurPhaseAnmelden() {
+        let modell = HelferModell(umgebung: .test)
+        XCTAssertEqual(modell.phase, .start)
+        XCTAssertTrue(modell.gescannt("https://elw.local:8443/helfer#ab12cd34"))
+        XCTAssertEqual(modell.phase, .anmelden(einladung))
+        XCTAssertEqual(modell.einladung, einladung)
+        XCTAssertNil(modell.meldung)
+    }
+
+    func testEinFremderQRCodeBleibtAufDemStartMitMeldung() {
+        let modell = HelferModell(umgebung: .test)
+        XCTAssertFalse(modell.gescannt("https://elw.local:8443/koppeln#AB12CD34"))
+        XCTAssertEqual(modell.phase, .start)
+        XCTAssertNotNil(modell.meldung)
+    }
+
+    func testCodeEingebenOhneSchemaGiltAlsHttps() {
+        let modell = HelferModell(umgebung: .test)
+        XCTAssertTrue(modell.eingegeben(server: "elw.local:8443/", code: " ab12cd34 "))
+        XCTAssertEqual(modell.phase, .anmelden(einladung))
+    }
+
+    func testEinDeeplinkFuehrtZurPhaseAnmelden() {
+        let modell = HelferModell(umgebung: .test)
+        modell.oeffne(URL(string: "lifeline-helfer://anmelden?server=https://elw.local:8443#AB12CD34")!)
+        XCTAssertEqual(modell.phase, .anmelden(einladung))
+    }
+
+    func testEinNeuerScanWaehrendDerAnmeldungFragtErst() {
+        let modell = HelferModell.start(argumente: ["-HelferTestzustand", "angemeldet"])
+        XCTAssertEqual(modell.phase, .aktiv)
+        XCTAssertTrue(modell.gescannt("https://anderer.example.org/helfer#ZZ99"))
+        XCTAssertEqual(modell.phase, .aktiv, "die alte Anmeldung bleibt, bis die Kraft zustimmt")
+        XCTAssertEqual(modell.ausstehenderScan?.code, "ZZ99")
+    }
+
+    func testJederTestzustandZeigtSeinePhase() {
+        let erwartet: [Testzustand: Phase] = [
+            .start: .start,
+            .anmelden: .anmelden(Beispiel.einladung),
+            .wartet: .unbestaetigt,
+            .angemeldet: .aktiv,
+            .pausiert: .pausiert,
+            .beendet: .beendet(.einsatzBeendet),
+        ]
+        for zustand in Testzustand.allCases {
+            let modell = HelferModell.start(argumente: ["-HelferTestzustand", zustand.rawValue])
+            XCTAssertEqual(modell.phase, erwartet[zustand], zustand.rawValue)
+        }
+    }
+
+    func testDerAblaufRechnetMitDerUhrDesServers() throws {
+        let zustand = Beispiel.zustand(state: "aktiv")
+        let ablauf = try XCTUnwrap(zustand.ablauf)
+        // Beispiel: Ablauf 8 h nach der Serverzeit.
+        XCTAssertEqual(ablauf.timeIntervalSinceNow, 8 * 3600, accuracy: 5)
+    }
+}

@@ -35,9 +35,10 @@ herleitung:
 ## Prüfung
 
 ```sh
-# Task 11 (iOS) und Task 13 (Android) setzen die verlange-Zeilen scharf, sobald die Dateien
-# existieren: verlange 'UIBackgroundModes' 'ios/project.yml' und
+# Die Helfer-App ortet im Hintergrund (nur ihr Ziel trägt den Schlüssel; die Hülle nennt ihn nur im
+# Kommentar). Task 13 (Android) setzt die zweite verlange-Zeile scharf, sobald die Datei existiert:
 # verlange 'foregroundServiceType="location"' 'android/helfer/src/main/AndroidManifest.xml'.
+verlange '^        UIBackgroundModes:$' 'ios/project.yml'
 verbiete 'NSLocationAlways' 'ios/Helfer/**/*.swift' 'ios/Helfer/**/*.plist' 'ios/project.yml'
 # Der Kern bleibt ohne System: kein UIKit, CoreLocation oder SwiftUI (ios/Helfer/AGENTS.md).
 verbiete '^import (UIKit|CoreLocation|SwiftUI)' 'ios/HelferKern/**/*.swift'

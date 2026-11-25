@@ -2,7 +2,8 @@
 
 Gilt für `ios/`, zusätzlich zur `AGENTS.md` der Wurzel. Entscheidung: ADR-0068; Anforderungen in
 den Specs `ios-huelle`, `huellen-vertrag` und `ios-auslieferung`; Herleitung im `design.md` der
-Change `t39ltxxi-ios-huelle`.
+Change `t39ltxxi-ios-huelle`. Die Helfer-App liegt unter `ios/Helfer/` (Kern `ios/HelferKern`) und
+hat eigene Regeln in `ios/Helfer/AGENTS.md`.
 
 - **Keine Anwendungslogik in der Hülle:** der Webview lädt die Oberfläche des Servers. Native
   Seiten nur für Onboarding, Serverliste, Einstellungen der Hülle und Status (kein Server, nicht

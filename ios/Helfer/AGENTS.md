@@ -16,3 +16,8 @@ Wurzel. Entscheidung: ADR-0098; Herleitung: `docs/superpowers/specs/2026-11-24-v
   Speicher.
 - **Design-Tokens** nur aus dem Generator `scripts/design/tokens-nativ.mjs`, nie von Hand in
   `Tokens.swift`.
+- **Version** nur aus `scripts/ios/helfer-version.sh` (eigene Zählung, nicht `[workspace.package]`),
+  Build-Nummer aus `ios-helfer.yml`; TestFlight über `scripts/ios/testflight.sh --app helfer`.
+- **Seite aus der Phase:** welche Seite gilt, entscheidet `Anmeldung` im Kern;
+  `App/Modell/HelferModell.swift` führt nur die Wirkungen aus. Jede Seite hat ein Bild in
+  `ios/HelferUITests` (Startargument `-HelferTestzustand <seite>`, ohne Netz und Ablage).

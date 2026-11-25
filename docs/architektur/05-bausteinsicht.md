@@ -1,6 +1,6 @@
 # 5. Bausteinsicht
 
-Stand: 22.11.2026 (iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
+Stand: 25.11.2026 (iOS-Helfer-App `ios/Helfer` mit Live-Aktivität, ADR-0098; iOS-Push `src/ios_push` und Push-Relais `push-relais`, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle `android`, LLH-1989; Adapter-Rahmen `src/adapter`, LLH-2017; iOS-Hülle `ios`, LLH-1978; Absturzbericht des Clients, LLH-1822; Einwurf-Zugang, LLH-1654; Lage für Maschinenzugänge, LLH-1638, mit dem entfallenen Lesezugang der Lagemonitore).
 
 Dieses Kapitel nennt jeden Baustein des Repos mit einem Satz Zweck und seinen Schnittstellen.
 Der Wächter `scripts/check-architektur.sh` verlangt, dass jedes Modul unter `src/`, jedes
@@ -478,7 +478,11 @@ Die Helfer-App (ADR-0098, Regeln in [ios/Helfer/AGENTS.md](../../ios/Helfer/AGEN
 (SwiftUI, Compose) neben den Hüllen: Helfer lösen eine Einladung ein und senden danach die letzte
 Position an den Server ihrer Kopplung. Die Logik steht im Kern (`ios/HelferKern`,
 `android/helferkern`), die App-Ziele bleiben dünn. Die Hüllen `ios` und `android` bleiben
-unverändert.
+unverändert. Unter iOS stehen im XcodeGen-Projekt `ios/project.yml` das App-Ziel `LifelineHelfer`
+(`ios/Helfer/App`: Modell, Dienste für Server, Ortung und Live-Aktivität, Seiten), die
+Widget-Erweiterung `HelferAktivitaet` (`ios/Helfer/Aktivitaet`, Live-Aktivität mit „Pausieren“),
+der gemeinsame Teil beider (`ios/Helfer/Gemeinsam`) und die Tests `ios/HelferTests` und
+`ios/HelferUITests` (Bildschirmbilder über `-HelferTestzustand`).
 
 ### `push-relais`
 

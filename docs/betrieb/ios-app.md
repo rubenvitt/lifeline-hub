@@ -282,6 +282,34 @@ Gerätecode, Sperre und Verlust: [endgeraete.md](endgeraete.md).
   Drucken, Start ohne Server, Push im Hintergrund (Gerätetest: [push-relais.md](push-relais.md), „Gerätetest“).
   Bisher belegt sind nur Simulator und Tests (`ios-pruefung.yml`).
 
+## Helfer-App (Lifeline Helfer)
+
+Eigene native App neben der Hülle (ADR-0098, Regeln `ios/Helfer/AGENTS.md`): Helfer scannen den
+Einsatz-QR, melden sich mit Namen und Ziel an und senden danach ihre Position, auch bei gesperrtem
+Bildschirm. Bundle-ID `dev.rubeen.lifeline.helfer`, Widget-Erweiterung
+`dev.rubeen.lifeline.helfer.aktivitaet` (Live-Aktivität), App Group
+`group.dev.rubeen.lifeline.helfer`, eigene App „Lifeline Helfer“ in App Store Connect.
+
+- **Upload:** `.github/workflows/ios-helfer.yml` an einem PR mit dem Label `testflight-helfer`
+  (beim Setzen und bei jedem weiteren Push) oder per Handstart (Actions → „Helfer-App
+  (TestFlight)“). Den Ablauf trägt `scripts/ios/testflight.sh --app helfer --build <n>`; die
+  Build-Nummer ist die Laufnummer plus 1000, die Version steht in `scripts/ios/helfer-version.sh`.
+  Secrets und Signierung wie bei der Hülle (unten).
+- **Verteilen:** die interne Gruppe „Intern“ der Helfer-App verteilt automatisch; einen
+  Verteilschritt gibt es nicht. Für eine externe Gruppe prüft Apple `UIBackgroundModes location`
+  in der Beta-Prüfung. Beschreibung dafür: „Lifeline Helfer sendet die Position von
+  Einsatzkräften an die Einsatzleitung eines Sanitäts- oder Katastrophenschutzeinsatzes, solange
+  die Kraft am Einsatz angemeldet ist. Die Ortung läuft auch bei gesperrtem Bildschirm, ist durch
+  die Standortanzeige und eine Live-Aktivität sichtbar und lässt sich dort pausieren. Sie endet
+  mit dem Abmelden, dem Einsatzende oder dem Widerruf durch die Einsatzleitung. Gespeichert wird
+  nur die letzte Position.“ Für die Prüfung braucht Apple eine Einladung eines Testservers.
+- **Auf dem Gerät:** das Sitzungs-Cookie der Kopplung liegt im Schlüsselbund, sonst nichts
+  außer dem zuletzt eingegebenen Anzeigenamen. Positionen nur im Speicher. Wird die App beendet,
+  endet die Ortung; nach einem Neustart fragt die App, ob sie sie wieder starten soll.
+- **Nicht gemessen:** Akku über 4 h Sanitätsdienst, Hintergrundortung auf echten Geräten,
+  Live-Aktivität auf Sperrbildschirm und Dynamic Island. Belegt sind nur Simulator und Tests
+  (`ios-pruefung.yml`).
+
 ## Release-Ablauf
 
 - Server und App tragen dieselbe Version aus `[workspace.package]`; `ios/` hat keine eigene.
