@@ -603,6 +603,29 @@ pub async fn widerrufe_am_spiegel(
     Ok(())
 }
 
+/// Widerruft jede offene Helfer-Kopplung des Einsatzes ohne handelnde Person, damit die
+/// Personenposition lokal fällt ([`crate::helfer::ende::beende_alle_im_einsatz`], Führungswechsel).
+/// Liefert die Kennungen der beendeten Kopplungen.
+pub async fn widerrufe_helfer_im_einsatz(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    let offene: Vec<i64> = sqlx::query_scalar(
+        "SELECT id FROM geraet_kopplung \
+         WHERE einsatz_id = ? AND ansicht = 'helfer' AND widerrufen_at IS NULL ORDER BY id",
+    )
+    .bind(einsatz_id)
+    .fetch_all(&mut *conn)
+    .await?;
+    let mut beendet = Vec::new();
+    for id in offene {
+        if widerrufen_durch(&mut *conn, id, None).await? {
+            beendet.push(id);
+        }
+    }
+    Ok(beendet)
+}
+
 async fn widerrufen_durch(
     conn: &mut SqliteConnection,
     kopplung_id: i64,

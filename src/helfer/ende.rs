@@ -11,6 +11,9 @@
 //! - [`raeume_abgelaufene`] löscht die Personenposition abgelaufener Kopplungen; der Ablauf-Takt
 //!   (`geraet::ablauf`) und die Schreibwege der Leitung rufen es, denn ein Ablauf schreibt sonst
 //!   nichts.
+//! - [`beende_alle_im_einsatz`] ruft der Führungswechsel, bevor dieser Einsatz zum Spiegel wird
+//!   (`instanz::spiegel::fuehrung::werde_spiegel`): Abgabe, Übergabe oder Übernahme durch
+//!   andere. Helfer-Kopplungen und Personenpositionen gehören der führenden Instanz.
 //! - An einem Spiegel schreibt keiner dieser Wege: seine Zeilen gehören der führenden Instanz.
 //! - Das Live-Ereignis meldet der Aufrufer nach dem Commit (`routes::helfer::melde_helfer_ende`).
 
@@ -65,6 +68,17 @@ pub async fn beende_ortung_im_einsatz(
         ortung::loesche_position(conn, Ortungsziel::Person(*pid)).await?;
     }
     Ok(personen)
+}
+
+/// Beendet vor einer Abgabe der Führung jede offene Helfer-Kopplung des Einsatzes; über die
+/// gemeinsame Endstelle fallen dabei die Personenpositionen lokal. Der Aufruf muss vor dem
+/// Anlegen des Spiegels stehen, danach schreibt kein Weg mehr an den Einsatz. Liefert die
+/// beendeten Kopplungen.
+pub async fn beende_alle_im_einsatz(
+    conn: &mut SqliteConnection,
+    einsatz_id: i64,
+) -> Result<Vec<i64>, AppError> {
+    crate::geraet::repo::widerrufe_helfer_im_einsatz(conn, einsatz_id).await
 }
 
 /// Eine abgelaufene Helfer-Kopplung, deren Personenposition [`raeume_abgelaufene`] gelöscht hat.
