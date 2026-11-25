@@ -80,6 +80,68 @@ final class StartTests: XCTestCase {
         bild("helfer-beendet")
     }
 
+    // MARK: Aufträge (ADR-0105)
+
+    @MainActor
+    func testAngemeldetOhneAuftraege() {
+        let app = launch("angemeldet")
+        XCTAssertTrue(element(app, "auftraege-leer").waitForExistence(timeout: 15))
+        XCTAssertTrue(
+            app.staticTexts["Keine Aufträge. Neue Aufträge kommen als Mitteilung."].exists)
+        bild("helfer-angemeldet-ohne-auftraege")
+    }
+
+    @MainActor
+    func testAngemeldetMitAuftraegen() {
+        let app = launch("auftraege")
+        XCTAssertTrue(app.buttons["auftrag-7"].waitForExistence(timeout: 15))
+        XCTAssertTrue(element(app, "auftraege-offen").exists)
+        bild("helfer-angemeldet-mit-auftraegen")
+    }
+
+    @MainActor
+    func testMitteilungenAus() {
+        let app = launch("mitteilungen-aus")
+        XCTAssertTrue(element(app, "mitteilungen-aus").waitForExistence(timeout: 15))
+        XCTAssertTrue(
+            app.staticTexts["Mitteilungen aus — du bekommst Aufträge nur bei offener App"].exists)
+        bild("helfer-mitteilungen-aus")
+    }
+
+    @MainActor
+    func testAuftragOffen() {
+        let app = launch("auftrag-offen")
+        XCTAssertTrue(app.buttons["uebernehmen-101"].waitForExistence(timeout: 15))
+        bild("helfer-auftrag-offen")
+        app.buttons["uebernehmen-101"].tap()
+        XCTAssertTrue(element(app, "uebernommen-101").waitForExistence(timeout: 5))
+        bild("helfer-auftrag-uebernommen-selbst")
+    }
+
+    @MainActor
+    func testAuftragVonAnderemUebernommen() {
+        let app = launch("auftrag-uebernommen")
+        XCTAssertTrue(element(app, "uebernommen-99").waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["uebernehmen-99"].exists)
+        bild("helfer-auftrag-uebernommen-anderer")
+    }
+
+    @MainActor
+    func testAuftragAufgehoben() {
+        let app = launch("auftrag-aufgehoben")
+        XCTAssertTrue(element(app, "aufgehoben").waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["uebernehmen-98"].exists)
+        bild("helfer-auftrag-aufgehoben")
+    }
+
+    @MainActor
+    func testQuittungFehlgeschlagen() {
+        let app = launch("quittung-fehler")
+        XCTAssertTrue(element(app, "quittung-fehler").waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Bitte über Funk bestätigen"].exists)
+        bild("helfer-quittung-fehlgeschlagen")
+    }
+
     /// Größte Schrift (AX3): der Start bleibt bedienbar.
     @MainActor
     func testStartMitGrosserSchrift() {

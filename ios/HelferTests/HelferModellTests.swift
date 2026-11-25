@@ -54,11 +54,57 @@ final class HelferModellTests: XCTestCase {
             .pausiert: .pausiert,
             .ruht: .ruht(.keineRolle),
             .beendet: .beendet(.einsatzBeendet),
+            .auftraege: .aktiv,
+            .mitteilungenAus: .aktiv,
+            .auftragOffen: .aktiv,
+            .auftragUebernommen: .aktiv,
+            .auftragAufgehoben: .aktiv,
+            .quittungFehler: .aktiv,
         ]
         for zustand in Testzustand.allCases {
             let modell = HelferModell.start(argumente: ["-HelferTestzustand", zustand.rawValue])
             XCTAssertEqual(modell.phase, erwartet[zustand], zustand.rawValue)
         }
+    }
+
+    /// Aufträge (ADR-0105): Ordnung aus dem Kern, Detail aus dem Testzustand, „Übernommen“ ohne
+    /// Netz im Testzustand.
+    func testDieAuftraegeKommenGeordnetUndDerKnopfQuittiert() async throws {
+        let modell = HelferModell.start(argumente: ["-HelferTestzustand", "auftrag-offen"])
+        XCTAssertEqual(modell.auftraege.map(\.id), [7, 6, 5])
+        XCTAssertEqual(modell.geoeffneterAuftrag, Beispiel.offenerAuftrag)
+        let auftrag = try XCTUnwrap(modell.auftrag(Beispiel.offenerAuftrag))
+        let zeile = try XCTUnwrap(auftrag.recipients.first)
+        XCTAssertEqual(modell.stand(auftrag, empfaenger: zeile), .offen)
+        await modell.quittiere(auftrag, empfaenger: zeile)
+        let neu = try XCTUnwrap(modell.auftrag(Beispiel.offenerAuftrag))
+        guard case .quittiert(let um, let von) = modell.stand(neu, empfaenger: zeile) else {
+            return XCTFail("nicht quittiert")
+        }
+        XCTAssertTrue(
+            modell.quittungstext(zeile, um: um, von: von).hasPrefix("Übernommen um "),
+            "die eigene Quittung nennt keinen Namen")
+    }
+
+    func testEinAndererHatUebernommenUndAufgehobenGehtVor() throws {
+        let modell = HelferModell.start(argumente: ["-HelferTestzustand", "auftrag-uebernommen"])
+        let anderer = try XCTUnwrap(modell.auftrag(Beispiel.uebernommenerAuftrag))
+        let zeile = try XCTUnwrap(anderer.recipients.first)
+        guard case .quittiert(let um, let von) = modell.stand(anderer, empfaenger: zeile) else {
+            return XCTFail("nicht quittiert")
+        }
+        XCTAssertTrue(modell.quittungstext(zeile, um: um, von: von).hasPrefix("Übernommen von Lisa K. um "))
+        let weg = try XCTUnwrap(modell.auftrag(Beispiel.aufgehobenerAuftrag))
+        XCTAssertEqual(modell.stand(weg, empfaenger: weg.recipients[0]), .aufgehoben)
+    }
+
+    func testEineGescheiterteQuittungBittetUmFunk() throws {
+        let modell = HelferModell.start(argumente: ["-HelferTestzustand", "quittung-fehler"])
+        let auftrag = try XCTUnwrap(modell.auftrag(Beispiel.offenerAuftrag))
+        XCTAssertEqual(
+            modell.stand(auftrag, empfaenger: auftrag.recipients[0]),
+            .fehler(AuftragAnzeige.quittungFehlgeschlagen))
+        XCTAssertTrue(HelferModell.start(argumente: ["-HelferTestzustand", "mitteilungen-aus"]).mitteilungenAus)
     }
 
     func testAbgewieseneAnfragenNutzenDieTexteDesKerns() {

@@ -3,7 +3,8 @@ import SwiftUI
 
 /// Bildschirm 4 „Angemeldet“ (Spec „Bildschirme“): große Anzeige „Ortung an“ mit Ziel, Alter der
 /// letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe
-/// (`Phase.ruht`) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“.
+/// (`Phase.ruht`) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“. Unter der
+/// Ortungsanzeige in jeder dieser Phasen der Bereich „Aufträge“ (ADR-0105).
 struct AngemeldetSeite: View {
     @Bindable var modell: HelferModell
     @State private var abmeldenFragen = false
@@ -35,6 +36,7 @@ struct AngemeldetSeite: View {
                     farbe: Farbe.normal, flaeche: Farbe.normalFlaeche,
                     pulsiert: modell.ortungLaeuft)
             }
+            AuftraegeBereich(modell: modell)
             VStack(alignment: .leading, spacing: LifelineAbstand.abstandKomfortabelSm) {
                 Wertzeile(bezeichnung: "Ziel", wert: modell.zielname, symbol: "scope")
                 if let person = modell.zustand?.person {
