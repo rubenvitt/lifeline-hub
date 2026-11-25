@@ -11,7 +11,9 @@
 //! wenn PLAIN fehlt), MAIL, RCPT, DATA mit CRLF-Normalisierung und Dot-Stuffing, QUIT.
 //! Zugangsdaten gehen nur über TLS hinaus: ohne STARTTLS-Angebot bricht der Client ab (`Tls`),
 //! bevor er etwas anderes als EHLO und QUIT sendet. Antworten sind gedeckelt (Zeilenlänge und
-//! -zahl), Zeitlimits: Verbindung 5 s, jede Antwort 30 s, gesamte Sitzung 120 s.
+//! -zahl), Zeitlimits: Verbindung 5 s, jede Antwort 30 s, der Dialog bis zur `354` auf DATA
+//! 120 s; Daten schreiben und die abschließende Antwort abwarten bekommen eigene 10 min
+//! (RFC 5321 §4.5.3.2).
 //!
 //! Regeln: `src/AGENTS.md`, „Backend — Adapter“. Kein Geheimnis in Log oder Fehler: `SmtpFehler`
 //! trägt nur einen Code und den Status des Servers, nie seinen Text.
@@ -37,8 +39,13 @@ use crate::public_api::webhook::ziel::{check_host, filter_adressen, ZielFehler};
 pub const VERBINDUNG_ZEITLIMIT: Duration = Duration::from_secs(5);
 /// Frist für jede Antwort des Servers (auch für den TLS-Handshake).
 pub const ANTWORT_ZEITLIMIT: Duration = Duration::from_secs(30);
-/// Frist für die ganze Sitzung, Verbindung eingeschlossen.
+/// Frist für den Dialog bis einschließlich der `354` auf DATA, Verbindung eingeschlossen.
 pub const SITZUNG_ZEITLIMIT: Duration = Duration::from_secs(120);
+/// Frist für die Datenphase: Daten samt Abschluss schreiben und auf die abschließende Antwort
+/// warten. Beginnt nach der `354` und hängt nicht am Rest von [`SITZUNG_ZEITLIMIT`]: große Anhänge
+/// über eine langsame Leitung und ein prüfender Server brauchen Zeit (RFC 5321 §4.5.3.2.5 und
+/// §4.5.3.2.6 nennen 3 bzw. 10 Minuten). QUIT danach bekommt noch [`QUIT_ZEITLIMIT`].
+pub const DATEN_ZEITLIMIT: Duration = Duration::from_secs(10 * 60);
 /// Längste Antwortzeile ohne CRLF.
 pub const ZEILE_MAX: usize = 4096;
 /// Meiste Zeilen einer (mehrzeiligen) Antwort.
@@ -308,10 +315,13 @@ where
             &[250, 251],
         )?;
         erwarte(leitung.befehl("DATA").await?, &[354])?;
+        // Ab der 354 gilt die eigene Frist der Datenphase, nicht der Rest der Sitzung.
+        leitung.ende = Instant::now() + DATEN_ZEITLIMIT;
         // Schreibfehler hier: der Abschluss ist nicht vollständig hinaus, also nicht ungewiss.
         leitung.schreibe_daten(&daten_bytes(nachricht)).await?;
         // Ab hier ist der Abschluss geschrieben: ohne lesbare Antwort ist der Ausgang ungewiss.
-        match leitung.lies_antwort_roh().await {
+        // Die abschließende Antwort darf die ganze Datenfrist brauchen (Virenprüfung).
+        match leitung.lies_abschluss().await {
             Ok(a) if (200..300).contains(&a.code) => {}
             Ok(a) if (400..600).contains(&a.code) => return Err(einordnen(a.code)),
             _ => return Err(SmtpFehler::Ungewiss),
@@ -517,7 +527,7 @@ impl Leitung {
         }
     }
 
-    /// Die Daten samt Abschluss; Frist ist nur das Ende der Sitzung (große Anhänge).
+    /// Die Daten samt Abschluss; Frist ist nur das Ende der Datenphase (große Anhänge).
     async fn schreibe_daten(&mut self, bytes: &[u8]) -> Result<(), SmtpFehler> {
         let ende = self.ende;
         self.schreibe_bis(bytes, ende).await
@@ -543,6 +553,13 @@ impl Leitung {
             let _ = self.lies_antwort_bis(frist).await;
         }
         let _ = timeout_at(frist, self.strom.shutdown()).await;
+    }
+
+    /// Die abschließende Antwort nach den Daten: Frist ist das Ende der Datenphase, nicht
+    /// [`ANTWORT_ZEITLIMIT`].
+    async fn lies_abschluss(&mut self) -> Result<Antwort, LeseFehler> {
+        let ende = self.ende;
+        self.lies_antwort_bis(ende).await
     }
 
     async fn lies_antwort_roh(&mut self) -> Result<Antwort, LeseFehler> {

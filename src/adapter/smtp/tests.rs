@@ -439,6 +439,57 @@ async fn stille_nach_daten_ist_ungewiss() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn abschliessende_antwort_nach_drei_minuten_gilt_als_zugestellt() {
+    let k = schluessel();
+    let server = k.server.clone();
+    let (ergebnis, ()) = fahre(ziel(None), k.client, SENDEN, |s| async move {
+        let mut s = s.vorspann(server, &[]).await;
+        // Ein zäher Dialog bis zur 354 verbraucht schon einen guten Teil der Sitzungsfrist.
+        let zaeh = Duration::from_secs(25);
+        for _ in 0..2 {
+            s.hoer().await;
+            tokio::time::sleep(zaeh).await;
+            s.sag("250 ok").await;
+        }
+        s.erwarte("DATA").await;
+        tokio::time::sleep(zaeh).await;
+        s.sag("354 los").await;
+        s.daten().await;
+        // Der Server prüft lange (Virenscan), bevor er antwortet.
+        tokio::time::sleep(Duration::from_secs(180)).await;
+        s.sag("250 angenommen").await;
+        s.rest().await;
+    })
+    .await;
+    assert_eq!(ergebnis, Ok(()));
+}
+
+#[tokio::test(start_paused = true)]
+async fn stille_nach_daten_endet_erst_nach_der_datenfrist() {
+    let k = schluessel();
+    let server = k.server.clone();
+    let start = Instant::now();
+    let (ergebnis, ()) = fahre(ziel(None), k.client, SENDEN, |s| async move {
+        let mut s = s.vorspann(server, &[]).await;
+        for _ in 0..2 {
+            s.hoer().await;
+            s.sag("250 ok").await;
+        }
+        s.erwarte("DATA").await;
+        s.sag("354 los").await;
+        s.daten().await;
+        s.rest().await;
+    })
+    .await;
+    assert_eq!(ergebnis, Err(SmtpFehler::Ungewiss));
+    let dauer = start.elapsed();
+    assert!(
+        dauer >= DATEN_ZEITLIMIT && dauer < DATEN_ZEITLIMIT + Duration::from_secs(30),
+        "{dauer:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn stille_vor_daten_ist_zeitueberschreitung() {
     let k = schluessel();
     let server = k.server.clone();
