@@ -56,6 +56,29 @@ final class BrueckenbefehlTests: XCTestCase {
         XCTAssertEqual(Bruecke.parse(["cmd": "location_clear", "watch": 6]), .locationClear(watch: 6))
     }
 
+    /// Unter Darwin gelingt der Cast von `NSNumber(0)`/`NSNumber(1)` nach `Bool`; eine Frist von
+    /// 0 oder 1 ms ist trotzdem eine Zahl, nur ein echter Wahrheitswert nicht (LLH-2082).
+    func testEineFristVon0Oder1MsIstEineZahlKeinWahrheitswert() {
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 1, "timeout": NSNumber(value: 0)]),
+            .locationCurrent(id: 1, highAccuracy: false, timeout: .milliseconds(0)))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_watch", "id": 2, "timeout": NSNumber(value: 1)]),
+            .locationWatch(id: 2, highAccuracy: false, timeout: .milliseconds(1)))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 3, "timeout": NSNumber(value: 2.5)]),
+            .locationCurrent(id: 3, highAccuracy: false, timeout: .milliseconds(3)))
+        XCTAssertEqual(
+            Bruecke.parse(["cmd": "location_current", "id": 4, "timeout": true]),
+            .ungueltig(id: 4, grund: "Die Frist muss eine Zahl ab 0 sein."))
+        #if canImport(Darwin)
+            // So kommt ein JS-Wahrheitswert aus dem WKWebView an (`CFBoolean`).
+            XCTAssertEqual(
+                Bruecke.parse(["cmd": "location_current", "id": 5, "timeout": NSNumber(value: false)]),
+                .ungueltig(id: 5, grund: "Die Frist muss eine Zahl ab 0 sein."))
+        #endif
+    }
+
     func testFehlerhafteStandortbefehle() {
         XCTAssertEqual(
             Bruecke.parse(["cmd": "location_current", "id": 1, "timeout": -1]),

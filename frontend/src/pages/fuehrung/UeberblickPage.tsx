@@ -68,7 +68,11 @@ import { UNBESTAETIGT } from '../gefahren/beurteilung';
 import { pegelAbfrage } from '../../api/pegel';
 import { wetterAbfrage } from '../../api/wetter';
 import { unwetterLage } from '../../wetter/unwetter';
-import { PEGEL_STAND_UNBEKANNT, pegelNotizKurz } from '../../pegel/pegelKennzahl';
+import {
+  PEGEL_NOTIZ_PLATZHALTER,
+  PEGEL_STAND_UNBEKANNT,
+  pegelNotizKurz,
+} from '../../pegel/pegelKennzahl';
 import { listeAbloesungen } from '../../api/abloesungen';
 import { listeEinheitenPerioden } from '../../api/kraefteZeitachse';
 import { findOhneSchicht } from '../../abloesung/ohneSchicht';
@@ -715,8 +719,13 @@ export default function UeberblickPage() {
     zWarnstufe === 'daten' && warnstufe.nichtBeurteilt > 0
       ? `${warnstufe.nichtBeurteilt} ${UNBESTAETIGT}`
       : null;
+  // Platz für die Pegel-Notiz, solange sie lädt (LLH-2085): Kam sie als erste Lage-Angabe in den
+  // Kopf, brach er mit langem Einsatznamen bei 1024 px um (CLS 0,40). Ob ein Pegel festgelegt
+  // ist, sagt der Einsatz vorher; ohne Pegel bleibt keine Lücke.
+  const pegelErwartet =
+    pegelNotiz == null && pegelQ.isPending && einsatz?.lagekennzahlen.includes('pegel') === true;
   const kopfLage =
-    warnTon || nichtBeurteilt || pegelNotiz ? (
+    warnTon || nichtBeurteilt || pegelNotiz || pegelErwartet ? (
       <span
         data-lfh="ueberblick-lage-kopf"
         style={{
@@ -732,7 +741,24 @@ export default function UeberblickPage() {
             {nichtBeurteilt}
           </span>
         )}
-        {pegelNotiz && <span data-lfh="kopf-pegel">{pegelNotiz}</span>}
+        {/* Platzhalter und Notiz sind zwei Knoten (`key`): ein neuer Knoten erscheint, statt zu
+            rücken (`components/EinsatzSeite.tsx`, Meta und Datenstand). */}
+        {pegelNotiz ? (
+          <span key="pegel" data-lfh="kopf-pegel">
+            {pegelNotiz}
+          </span>
+        ) : (
+          pegelErwartet && (
+            <span
+              key="pegel-platzhalter"
+              data-lfh="kopf-pegel-platzhalter"
+              aria-hidden="true"
+              style={{ visibility: 'hidden' }}
+            >
+              {PEGEL_NOTIZ_PLATZHALTER}
+            </span>
+          )
+        )}
       </span>
     ) : undefined;
 

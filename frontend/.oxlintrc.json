@@ -132,7 +132,8 @@
       "rules": {
         "lfh/e2e-riegel": "error",
         "lfh/e2e-anmeldeformular": "error",
-        "lfh/e2e-einblendung": "error"
+        "lfh/e2e-einblendung": "error",
+        "lfh/e2e-wartezeit": "error"
       }
     },
     {
@@ -149,6 +150,30 @@
         "e2e/doku-bilder/**/*.ts" // Bildlauf der Anwenderdoku, kein e2e-Lauf (LFH-1128)
       ],
       "rules": { "lfh/e2e-anmeldeformular": "off" }
+    },
+    {
+      // LLH-2090: Bestand mit festen Wartezeiten vom 24.11.2026. Die Liste wird nur kürzer: wer
+      // eine Datei anfasst, ersetzt die Wartezeit durch einen Zustand oder begründet sie an der
+      // Zeile (frontend/e2e/AGENTS.md, „Warten auf einen Zustand“).
+      "files": [
+        "e2e/betreuung-offline-uhrversatz.spec.ts",
+        "e2e/betroffene-karte-schleuse.spec.ts",
+        "e2e/betroffene-layout.spec.ts",
+        "e2e/cls-kern.ts",
+        "e2e/einsatzauswahl-cls.spec.ts",
+        "e2e/gate3-trefflaeche.spec.ts",
+        "e2e/geraet-uhs-tablet.spec.ts",
+        "e2e/kontextmenue-datensatz.spec.ts",
+        "e2e/kontextmenue-karten.spec.ts",
+        "e2e/lagebericht-schmal.spec.ts",
+        "e2e/lagebericht-tippen.spec.ts",
+        "e2e/lagekarte-touch.spec.ts",
+        "e2e/pegel-pruefliste.spec.ts",
+        "e2e/rahmen-stehen-bleiben.spec.ts",
+        "e2e/sitzung-mehrere-tabs.spec.ts",
+        "e2e/uhs-grundriss-dnd.spec.ts"
+      ],
+      "rules": { "lfh/e2e-wartezeit": "off" }
     },
     {
       // LLH-2067: der Dialog-Kern ist die eine Stelle, die die Einblend-Klassen kennt; der

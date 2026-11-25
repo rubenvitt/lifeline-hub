@@ -3,7 +3,7 @@ import { act, render, screen, fireEvent, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../test/server';
-import { renderMitProviders } from '../../test/utils';
+import { renderMitProviders, setzeOnline } from '../../test/utils';
 import FachebenenInspector from './FachebenenInspector';
 import { fachebeneFarbenHell } from '../../theme/tokens';
 import { DEFAULT_KONVENTIONEN } from '../../anzeige/format';
@@ -163,6 +163,84 @@ describe('FachebenenInspector', () => {
         />,
       );
       expect(screen.queryByText(/angekündigt/)).toBeNull();
+    });
+  });
+
+  describe('Vollmeldung bei warnung.bund.de (LLH-2103)', () => {
+    const vollmeldung = () =>
+      screen.queryByRole('link', { name: /Vollmeldung bei warnung\.bund\.de/ });
+
+    it('NINA-Warnung verlinkt die Vollmeldung über ihre id in neuem Tab', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Gefahrstoffaustritt', id: 'mow.DE-SL-SLS-W038-20260904-000' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      const link = vollmeldung();
+      expect(link).toHaveAttribute(
+        'href',
+        'https://warnung.bund.de/meldungen/mow.DE-SL-SLS-W038-20260904-000/',
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    });
+
+    it('die id wird als Pfadsegment kodiert', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test', id: 'a/b?c' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(vollmeldung()).toHaveAttribute('href', 'https://warnung.bund.de/meldungen/a%2Fb%3Fc/');
+    });
+
+    it('ohne id kein Link', () => {
+      render(
+        <FachebenenInspector
+          quelle="nina"
+          properties={{ titel: 'Test' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(vollmeldung()).toBeNull();
+      expect(screen.queryByText(/Vollmeldung/)).toBeNull();
+    });
+
+    it('DWD-Warnung bekommt keinen warnung.bund.de-Link', () => {
+      render(
+        <FachebenenInspector
+          quelle="dwd"
+          properties={{ EVENT: 'FROST', id: 'x' }}
+          onSchliessen={() => {}}
+        />,
+      );
+      expect(screen.queryByText(/Vollmeldung/)).toBeNull();
+    });
+
+    it('ohne Netz ist der Knopf gesperrt und nennt den Grund', () => {
+      setzeOnline(false);
+      try {
+        render(
+          <FachebenenInspector
+            quelle="nina"
+            properties={{ titel: 'Test', id: 'mow.X' }}
+            onSchliessen={() => {}}
+          />,
+        );
+        expect(vollmeldung()).toBeNull();
+        const knopf = screen.getByRole('button', { name: /Vollmeldung bei warnung\.bund\.de/ });
+        expect(knopf).toBeDisabled();
+        expect(screen.getByText('Ohne Netz nicht abrufbar')).toBeInTheDocument();
+        act(() => setzeOnline(true));
+        expect(vollmeldung()).not.toBeNull();
+        expect(screen.queryByText('Ohne Netz nicht abrufbar')).toBeNull();
+      } finally {
+        setzeOnline(true);
+      }
     });
   });
 

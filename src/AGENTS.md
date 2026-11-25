@@ -140,6 +140,27 @@ Response-Typen werden generiert: `#[derive(ToSchema)]` → `src/api_doc.rs` →
   `#[schema(required)]`. **Testfalle:** Presence per `contains_key`, nicht `== Value::Null`
   (`tests/ort_vorschau.rs`).
 
+## Backend↔Frontend — Property-Tests (LLH-2090)
+
+Gilt für Backend (`proptest`) und Frontend (`fast-check`).
+
+- **Wofür:** eine reine Funktion (ohne DB, Netz, Uhr) mit einer Eigenschaft, die für jede Eingabe
+  gilt: Hin und zurück (formatieren/lesen, schreiben/parsen), Idempotenz (zweimal wie einmal),
+  Invarianten (liegt nach `jetzt`, sitzt auf dem Raster, Textfolge gleich Zeitfolge), Gleichwertigkeit
+  (schnell gegen einfach). Beispieltests bleiben daneben; die Eigenschaft ersetzt sie nicht.
+- **Form:** Rust in `mod eigenschaften` im Testmodul der Datei (`src/zeit.rs`,
+  `src/erinnerung/faelligkeit.rs`), Testname als Satz. Frontend als
+  `<name>.eigenschaften.test.ts` neben dem Beispieltest
+  (`frontend/src/routing/listenZustand.eigenschaften.test.ts`). Vorgabe der Fallzahl (256 bzw. 100)
+  nicht senken, um Laufzeit zu sparen; ein langsamer Generator wird enger, nicht seltener.
+- **Was die Kodierung bewusst verwirft,** steht als Erwartung im Test (Funktion `erwartet`), mit
+  Grund, nie als stiller Filter im Generator. So bleibt eine Grenze sichtbar, die fast-check findet.
+- **Ein Gegenbeispiel ist ein Befund:** beheben und den geschrumpften Fall zusätzlich als
+  Beispieltest festhalten. Die Saatdatei unter `proptest-regressions/` wird nur committet, wenn sie
+  einen echten Fehler festhält; Saaten aus einer Mutationsprobe werden gelöscht.
+- **Beleg:** eine Mutationsprobe am Code macht die Eigenschaft rot (wie bei jedem Test,
+  `AGENTS.md`, „Qualitäts-Gates“).
+
 ## Backend — Öffentliche API v1 (LLH-1653)
 
 Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0096](../docs/architektur/entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),

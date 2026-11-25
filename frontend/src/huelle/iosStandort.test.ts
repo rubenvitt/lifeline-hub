@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   antworteIosHuelle,
   beendeHuelle,
@@ -44,9 +44,15 @@ function aktuell(optionen?: PositionOptions) {
 }
 
 describe('Standort über die iOS-Hülle (LLH-2071)', () => {
+  // Die ids beginnen je Dokument bei einem Zufallswert (LLH-2082); hier fest bei 1, damit die
+  // Erwartungen lesbar bleiben.
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
   afterEach(() => {
     beendeHuelle();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('getCurrentPosition fragt die Hülle und liefert eine GeolocationPosition', async () => {

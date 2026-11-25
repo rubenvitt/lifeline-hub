@@ -15133,9 +15133,9 @@ async fn migration_0372_zieht_die_pfadvorlage_des_eintreffens_auf_staging_areas_
 /// Genau ein Ziel, je Art/Org/Herkunft/Kennung höchstens ein Ziel, je Fahrzeug bzw. Person nur eine
 /// Kennung je Herkunft (Qualifikationen dürfen Aliasse tragen), Löschen des Ziels kaskadiert.
 #[tokio::test]
-async fn migration_0373_stammdaten_kennung() {
+async fn migration_0374_stammdaten_kennung() {
     // Die Nummer steht nur hier und im Dateinamen (Umlegen: `check-migrationen.sh`).
-    const VERSION: i64 = 373;
+    const VERSION: i64 = 374;
     let pool = pool_bis(
         SqliteConnectOptions::new().filename(":memory:"),
         VERSION - 1,

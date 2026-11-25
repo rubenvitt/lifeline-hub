@@ -12,7 +12,7 @@
 -- verwiesene Zeile (demo::schema_tests::kein_fk_kaskadiert_in_stammdaten), und eine übernommene
 -- Kennung zeigt echte Nutzung. Eine Qualifikation nimmt ihre Kennungen mit. Die Herkunft ist normalisiert (getrimmt, Kleinschreibung).
 -- Die Org des Ziels muss gleich `org_id` sein; das prüft Rust beim Schreiben. Abgesichert von
--- db::tests::migration_0373_stammdaten_kennung.
+-- db::tests::migration_0374_stammdaten_kennung.
 CREATE TABLE stammdaten_kennung (
     id               INTEGER PRIMARY KEY,
     org_id           INTEGER NOT NULL REFERENCES organisation(id) ON DELETE CASCADE,
