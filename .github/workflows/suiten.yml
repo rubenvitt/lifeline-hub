@@ -94,17 +94,6 @@ jobs:
         with:
           version: 2026.9.1
           cache: true
-      # Auslagerung wie im Coverage-Job: Am 26.11. (d8ccab46) starb der Runner nach der ganzen
-      # Workspace-Suite in Schritt 15 (dev-seeds bauen) mit „shutdown signal“, ohne Fehlermeldung.
-      - name: Auslagerung vergrößern
-        run: |
-          sudo swapoff -a
-          sudo rm -f /mnt/swapfile /swapfile
-          sudo fallocate -l 16G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile > /dev/null
-          sudo swapon /swapfile
-          free -h
       - name: Rust-Suite
         # Platte und Speicher jede Minute ins Log: Stirbt der Runner, endet das Log hier mit dem
         # letzten Stand, statt raten zu lassen, ob Platte oder Speicher ausging.
