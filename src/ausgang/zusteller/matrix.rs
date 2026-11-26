@@ -392,6 +392,10 @@ fn matrix_fehlschlag(f: MatrixFehler, teile: Vec<(i64, String)>) -> Fehlschlag {
                 Zustellfehler::Verschluesselung,
                 "Verschlüsseln nicht möglich",
             ),
+            MatrixFehler::KeineUploadGrenze => (
+                Zustellfehler::Abgelehnt,
+                "Homeserver nennt keine Grenze für Anlagen",
+            ),
             MatrixFehler::Antwort => (
                 Zustellfehler::Abgelehnt,
                 "vom Homeserver abgelehnt (Antwort nicht verwertbar)",
@@ -496,6 +500,7 @@ mod tests {
             M::ZuGross,
             M::Verschluesselung,
             M::SchluesselPassenNicht,
+            M::KeineUploadGrenze,
             M::Antwort,
         ];
         for f in alle {
@@ -519,6 +524,7 @@ mod tests {
         assert_eq!(art(M::NichtGefunden), Zustellfehler::KeinZutritt);
         assert_eq!(art(M::ZuGross), Zustellfehler::ZuGross);
         assert_eq!(art(M::Verschluesselung), Zustellfehler::Verschluesselung);
+        assert_eq!(art(M::KeineUploadGrenze), Zustellfehler::Abgelehnt);
         let jetzt = Utc::now();
         match art(M::RateLimit(Some(Duration::from_secs(600)))) {
             Zustellfehler::Voruebergehend { nicht_vor: Some(n) } => {

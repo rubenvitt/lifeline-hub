@@ -695,6 +695,35 @@ async fn anlage_ueber_der_grenze_des_homeservers_ist_zu_gross_vor_dem_text() {
 }
 
 #[tokio::test]
+async fn homeserver_ohne_grenze_fuer_anlagen_ist_endgueltig_mit_eigenem_grund() {
+    let w = welt().await;
+    let _sync = w.hs.raum_im_sync(false).await;
+    w.hs.senden_nimmt_an().await;
+    // Der Homeserver nennt kein `m.upload.size`.
+    let _ohne_grenze = Mock::given(method("GET"))
+        .and(path("/_matrix/client/v1/media/config"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({})))
+        .with_priority(1)
+        .mount_as_scoped(w.hs.server.server())
+        .await;
+    let lid = w.lagebericht_freigeben(true).await;
+    let t0 = Utc::now();
+    let id = w.versand(RAUM, lid, t0).await;
+
+    w.durchgang(t0).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen, "{z:?}");
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Abgelehnt));
+    assert!(w.hs.gesendet().await.is_empty(), "kein Text ohne Grenze");
+    let etb = w.letzter_etb().await;
+    assert!(
+        etb.contains("Homeserver nennt keine Grenze für Anlagen"),
+        "{etb}"
+    );
+}
+
+#[tokio::test]
 async fn in_verschluesselten_raum_geht_nie_klartext() {
     in_verschluesselten_raum_senden(false).await;
 }

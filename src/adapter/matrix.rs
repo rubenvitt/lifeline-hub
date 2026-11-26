@@ -111,6 +111,9 @@ pub enum MatrixFehler {
     Verschluesselung,
     /// Der Schlüsselspeicher gehört zu einem anderen Gerät als dem des Tokens.
     SchluesselPassenNicht,
+    /// Der Homeserver nennt keine Grenze für Dateien (`m.upload.size` fehlt); ohne sie lädt das
+    /// SDK keine Anlage hoch.
+    KeineUploadGrenze,
     /// Die Antwort ließ sich nicht einordnen.
     Antwort,
 }
@@ -143,6 +146,7 @@ impl From<MatrixFehler> for AdapterFehler {
             | MatrixFehler::NichtGefunden
             | MatrixFehler::ZuGross
             | MatrixFehler::Verschluesselung
+            | MatrixFehler::KeineUploadGrenze
             | MatrixFehler::Antwort => AdapterFehler::AntwortUngueltig,
         }
     }
@@ -856,6 +860,7 @@ pub fn sdk_fehler(e: &matrix_sdk::Error) -> MatrixFehler {
         | Error::MediaStore(_)
         | Error::CrossProcessLockError(_) => MatrixFehler::Verschluesselung,
         Error::Media(MediaError::MediaTooLargeToUpload { .. }) => MatrixFehler::ZuGross,
+        Error::Media(MediaError::FetchMaxUploadSizeFailed(_)) => MatrixFehler::KeineUploadGrenze,
         Error::WrongRoomState(_) => MatrixFehler::Verboten,
         Error::Timeout => MatrixFehler::Zeit,
         Error::ConcurrentRequestFailed => MatrixFehler::Netz,
@@ -961,6 +966,10 @@ mod tests {
             current: matrix_sdk::ruma::uint!(11),
         });
         assert_eq!(sdk_fehler(&zu_gross), MatrixFehler::ZuGross);
+        let ohne_grenze = matrix_sdk::Error::Media(MediaError::FetchMaxUploadSizeFailed(
+            "the homeserver does not advertise `m.upload.size`".into(),
+        ));
+        assert_eq!(sdk_fehler(&ohne_grenze), MatrixFehler::KeineUploadGrenze);
         assert_eq!(sdk_fehler(&matrix_sdk::Error::Timeout), MatrixFehler::Zeit);
         assert_eq!(
             sdk_fehler(&matrix_sdk::Error::NoOlmMachine),
