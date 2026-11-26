@@ -1,5 +1,5 @@
 //! Aufträge der Helfer-App (Stufe 2, Spec
-//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0106): welche
+//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0107): welche
 //! Empfängerzeilen einer Helfer-Kopplung gehören, und die eigene Auftragsliste.
 //!
 //! Eigene Zeile: `einheit` an die Ziel-Einheit, `fahrzeug` an das Ziel-Fahrzeug, `person` an die

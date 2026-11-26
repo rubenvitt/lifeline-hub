@@ -67,7 +67,7 @@ final class HelferModellTests: XCTestCase {
         }
     }
 
-    /// Aufträge (ADR-0106): Ordnung aus dem Kern, Detail aus dem Testzustand, „Übernommen“ ohne
+    /// Aufträge (ADR-0107): Ordnung aus dem Kern, Detail aus dem Testzustand, „Übernommen“ ohne
     /// Netz im Testzustand.
     func testDieAuftraegeKommenGeordnetUndDerKnopfQuittiert() async throws {
         let modell = HelferModell.start(argumente: ["-HelferTestzustand", "auftrag-offen"])

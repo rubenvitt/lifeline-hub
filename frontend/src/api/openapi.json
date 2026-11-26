@@ -3257,7 +3257,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "An wie viele Helfer-Apps die Zeile ging (ADR-0106); fehlt vor der Zustellung und bei\nTypen, die kein Helfer empfängt."
+            "description": "An wie viele Helfer-Apps die Zeile ging (ADR-0107); fehlt vor der Zustellung und bei\nTypen, die kein Helfer empfängt."
           },
           "id": {
             "type": "integer",
@@ -3281,7 +3281,7 @@
               "string",
               "null"
             ],
-            "description": "Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0106)."
+            "description": "Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0107)."
           },
           "quittiert_von_id": {
             "type": [

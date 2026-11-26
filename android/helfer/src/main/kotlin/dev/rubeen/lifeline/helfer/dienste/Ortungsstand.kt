@@ -17,7 +17,7 @@ object Ortungsstand {
     /** Ob der Dienst gerade ortet. */
     val laeuft = MutableStateFlow(false)
 
-    /** Ob der Helfer-Dienst läuft (ortend oder nur empfangend, ADR-0106). */
+    /** Ob der Helfer-Dienst läuft (ortend oder nur empfangend, ADR-0107). */
     val dienstLaeuft = MutableStateFlow(false)
 
     /** Uhrzeit des Geräts, zu der die letzte Sendung angenommen wurde. */

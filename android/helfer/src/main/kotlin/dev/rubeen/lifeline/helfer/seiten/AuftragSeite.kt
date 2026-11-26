@@ -30,7 +30,7 @@ import dev.rubeen.lifeline.helferkern.HelperTaskRecipient
 import dev.rubeen.lifeline.helferkern.Quittungsstand
 import java.time.ZoneId
 
-// Aufträge in der Helfer-App (ADR-0106, Entwurf „Oberfläche der App“): der Bereich auf „Angemeldet“
+// Aufträge in der Helfer-App (ADR-0107, Entwurf „Oberfläche der App“): der Bereich auf „Angemeldet“
 // und das Detail mit „Übernommen“. Gegenstück zu ios/Helfer/App/Seiten/AuftragSeite.swift.
 
 /**

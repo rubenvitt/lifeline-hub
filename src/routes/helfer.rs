@@ -419,7 +419,7 @@ pub async fn ziel_aendern(
     Ok(Json(anmeldung::zustand(&state.pool, g.kopplung_id).await?))
 }
 
-// ---------- Aufträge (Helfer-Sitzung, Stufe 2, ADR-0106) ----------
+// ---------- Aufträge (Helfer-Sitzung, Stufe 2, ADR-0107) ----------
 
 /// Wert von `reason` im 403, solange die Leitung den Helfer nicht bestätigt hat.
 pub const GRUND_NICHT_BESTAETIGT: &str = "not_confirmed";

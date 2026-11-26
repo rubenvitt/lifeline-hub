@@ -1,5 +1,5 @@
 //! Push-Anmeldung der iOS-Helfer-App (Spec
-//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0106): je Helfer-Kopplung
+//! `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`, ADR-0107): je Helfer-Kopplung
 //! höchstens eine, mit der Kopplung gelöscht (`ON DELETE CASCADE`) und von jedem Endweg geräumt
 //! ([`delete_registration`], [`delete_ended`]). Kein Verweis auf Benutzer oder Sitzung: die Anmeldung
 //! gehört der Kopplung.

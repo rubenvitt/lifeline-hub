@@ -115,7 +115,7 @@ pub async fn stream(
         )),
         Some(_) => futures::StreamExt::boxed(futures::stream::empty()),
     };
-    // Aufträge an die eigene Helfer-Kopplung (ADR-0106), am Ring vorbei und ohne `id:`; die App
+    // Aufträge an die eigene Helfer-Kopplung (ADR-0107), am Ring vorbei und ohne `id:`; die App
     // lädt danach `GET /api/devices/me/tasks`.
     let helfer_strom = match &ctx.geraet {
         Some(g) if g.ansicht == crate::geraet::Funktionsansicht::Helfer => {

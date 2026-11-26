@@ -143,7 +143,7 @@ class GemeinsameFaelleTest {
         assertEquals(Antwort.entries.map { it.kennwort }.toSet(), genannt)
     }
 
-    // Aufträge (ADR-0106) gegen `src-tauri/faelle/helfer-auftrag.json`; `nutzlast` gilt nur für iOS.
+    // Aufträge (ADR-0107) gegen `src-tauri/faelle/helfer-auftrag.json`; `nutzlast` gilt nur für iOS.
 
     @Serializable
     private class AuftragsDatei(

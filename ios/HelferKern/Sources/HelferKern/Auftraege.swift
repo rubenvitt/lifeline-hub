@@ -1,6 +1,6 @@
 import Foundation
 
-/// Ein Auftrag an die Helfer-App (Stufe 2, ADR-0106), wie `GET /api/devices/me/tasks` ihn liefert
+/// Ein Auftrag an die Helfer-App (Stufe 2, ADR-0107), wie `GET /api/devices/me/tasks` ihn liefert
 /// (`HelperTask` in src/helfer/auftraege.rs). Die Felder sind die englischen Wire-Namen in
 /// camelCase; `HelferAuftrag.decoder` übersetzt aus snake_case. Zeiten sind UTC
 /// `YYYY-MM-DD HH:MM:SS` (`Serverzeit`). Aufträge liegen nur im Speicher, nie auf der Platte.

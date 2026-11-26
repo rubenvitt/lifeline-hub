@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  Berechtigungen des Mitteilungsdienstes der Helfer-App (ADR-0106): dieselbe App Group wie die App
+  Berechtigungen des Mitteilungsdienstes der Helfer-App (ADR-0107): dieselbe App Group wie die App
   (Helfer/App/LifelineHelfer.entitlements). Sie dient hier als Schlüsselbund-Gruppe für den
   Schlüssel der Nutzlast (`LifelineSchluesselbundGruppe` in der Info.plist, Gemeinsam/Schluesselbund.swift).
   Push empfängt nur die App.

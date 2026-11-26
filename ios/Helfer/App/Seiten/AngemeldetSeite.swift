@@ -4,7 +4,7 @@ import SwiftUI
 /// Bildschirm 4 „Angemeldet“ (Spec „Bildschirme“): große Anzeige „Ortung an“ mit Ziel, Alter der
 /// letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe
 /// (`Phase.ruht`) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“. Unter der
-/// Ortungsanzeige in jeder dieser Phasen der Bereich „Aufträge“ (ADR-0106).
+/// Ortungsanzeige in jeder dieser Phasen der Bereich „Aufträge“ (ADR-0107).
 struct AngemeldetSeite: View {
     @Bindable var modell: HelferModell
     @State private var abmeldenFragen = false

@@ -301,7 +301,7 @@ const HELFER: &[(&str, &str)] = &[
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/me"),
     ("GET", "/api/incidents/{id}/live"),
-    // Stufe 2 (ADR-0106): die eigenen Aufträge und ihre Quittung; der Handler prüft „bestätigt“
+    // Stufe 2 (ADR-0107): die eigenen Aufträge und ihre Quittung; der Handler prüft „bestätigt“
     // und „eigene Zeile“ (`helfer::auftraege`).
     ("GET", "/api/devices/me/tasks"),
     (

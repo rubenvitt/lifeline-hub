@@ -6,7 +6,7 @@ import XCTest
 
 /// Entschlüsseln der Auftrags-Nutzlast (`ios/Gemeinsam/Entschluesseler.swift`, in App und
 /// Mitteilungsdienst) gegen den gemeinsamen Testvektor des Servers
-/// (`src-tauri/faelle/helfer-auftrag.json`, Abschnitt `nutzlast`; ADR-0106). Gelesen über
+/// (`src-tauri/faelle/helfer-auftrag.json`, Abschnitt `nutzlast`; ADR-0107). Gelesen über
 /// `#filePath` wie `ios/AppTests/EntschluesselerTests.swift`: der Simulator sieht das Dateisystem
 /// des Macs.
 final class PagerEntschluesselnTests: XCTestCase {

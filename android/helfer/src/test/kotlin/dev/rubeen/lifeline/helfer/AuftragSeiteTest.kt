@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** Detail eines Auftrags (ADR-0106, Entwurf „Oberfläche der App“): Übernommen, Quittung, aufgehoben. */
+/** Detail eines Auftrags (ADR-0107, Entwurf „Oberfläche der App“): Übernommen, Quittung, aufgehoben. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class AuftragSeiteTest {

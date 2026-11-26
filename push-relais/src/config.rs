@@ -32,7 +32,7 @@ pub struct RelaisConfig {
         default_value = "dev.rubeen.lifeline.ios"
     )]
     pub bundle_id: String,
-    /// Weitere erlaubte Bundle-IDs als Komma-Liste (ADR-0106, etwa die Helfer-App). Eine
+    /// Weitere erlaubte Bundle-IDs als Komma-Liste (ADR-0107, etwa die Helfer-App). Eine
     /// Nachricht wählt eine davon mit `thema`; ohne `thema` gilt `bundle_id`.
     #[arg(
         long,

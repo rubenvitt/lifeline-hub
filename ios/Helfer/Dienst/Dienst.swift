@@ -3,7 +3,7 @@ import HelferKern
 import LifelineKern
 import UserNotifications
 
-/// Mitteilungsdienst der Helfer-App (Notification Service Extension, ADR-0106): öffnet die
+/// Mitteilungsdienst der Helfer-App (Notification Service Extension, ADR-0107): öffnet die
 /// verschlüsselte Nutzlast `l` eines Auftrags mit dem Schlüssel der Kennung und setzt Titel,
 /// Text, Thread, Ton und Zeitkritik, dazu `task_id` für das Antippen. Dünn wie
 /// `ios/Benachrichtigungsdienst/Dienst.swift`: kein Netz, keine Ablage; was angezeigt wird,

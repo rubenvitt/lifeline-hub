@@ -23,7 +23,7 @@ public struct PagerMeldung: Equatable, Sendable {
     public let auftragId: Int64
 }
 
-/// Die Nutzlast eines Auftrags-Push lesen (ADR-0106, gemeinsame Fälle
+/// Die Nutzlast eines Auftrags-Push lesen (ADR-0107, gemeinsame Fälle
 /// `src-tauri/faelle/helfer-auftrag.json`, Abschnitt `nutzlast`): erst den Umschlag `l` wie die
 /// Lifeline-App (`PushNutzlast.umschlag`, AES-256-GCM, AAD = Kennung), nach dem Entschlüsseln den
 /// Klartext. Die Entschlüsselung selbst gehört wie bei der Hülle nicht in den Kern: unter Linux gibt

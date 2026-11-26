@@ -114,7 +114,7 @@ final class Serververbindung {
         await anfrage("PUT", "api/devices/me/position", body: Pausensendung(paused: pausiert))
     }
 
-    // MARK: Aufträge (Stufe 2, ADR-0106)
+    // MARK: Aufträge (Stufe 2, ADR-0107)
 
     /// Eigene Aufträge; 403 `not_confirmed` vor der Bestätigung.
     func auftraege() async -> Rueckmeldung {

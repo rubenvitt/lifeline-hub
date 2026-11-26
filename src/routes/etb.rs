@@ -421,7 +421,7 @@ pub async fn auftrag_erteilen(
     state
         .live
         .publiziere_einsatz(einsatz_id, LiveEvent::Auftrag);
-    // Helfer-App Stufe 2 (ADR-0106): an die Helfer-Apps der Empfänger.
+    // Helfer-App Stufe 2 (ADR-0107): an die Helfer-Apps der Empfänger.
     crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
 
     Ok((StatusCode::CREATED, Json(detail)))

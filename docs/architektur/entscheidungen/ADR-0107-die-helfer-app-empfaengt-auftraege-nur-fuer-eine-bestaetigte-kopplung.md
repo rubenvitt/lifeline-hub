@@ -1,5 +1,5 @@
 ---
-id: ADR-0106
+id: ADR-0107
 titel: Die Helfer-App empfängt Aufträge nur für eine bestätigte Kopplung, iOS über das Relais ohne Inhalt, Android über die eigene Verbindung zum Server
 status: akzeptiert
 datum: 2026-11-25
@@ -15,7 +15,7 @@ herleitung:
   - https://zunder.rubeen.dev/#/aufgabe/c19brpvf22lzcfr0i43vcl4q
 ---
 
-# ADR-0106: Die Helfer-App empfängt Aufträge nur für eine bestätigte Kopplung, iOS über das Relais ohne Inhalt, Android über die eigene Verbindung zum Server
+# ADR-0107: Die Helfer-App empfängt Aufträge nur für eine bestätigte Kopplung, iOS über das Relais ohne Inhalt, Android über die eigene Verbindung zum Server
 
 ## Regeln
 

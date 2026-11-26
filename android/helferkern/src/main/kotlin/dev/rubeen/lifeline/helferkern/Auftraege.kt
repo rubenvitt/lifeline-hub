@@ -17,7 +17,7 @@ sealed interface Quittungsstand {
 }
 
 /**
- * Entscheidungen zur Auftragsliste der Helfer-App (ADR-0106; gemeinsame Fälle
+ * Entscheidungen zur Auftragsliste der Helfer-App (ADR-0107; gemeinsame Fälle
  * `src-tauri/faelle/helfer-auftrag.json`, Abschnitte `ordnung`, `mitteilung`, `quittungsstand`).
  */
 object Auftraege {

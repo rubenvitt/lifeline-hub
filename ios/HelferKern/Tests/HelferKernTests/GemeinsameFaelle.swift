@@ -172,7 +172,7 @@ final class HelferFaelleTests: XCTestCase {
 }
 
 /// Nutzlast, Ordnung, Mitteilung und Quittungsstand der Aufträge gegen
-/// `src-tauri/faelle/helfer-auftrag.json` (ADR-0106). Das Entschlüsseln selbst prüft
+/// `src-tauri/faelle/helfer-auftrag.json` (ADR-0107). Das Entschlüsseln selbst prüft
 /// `ios/HelferTests` im Simulator (kein CryptoKit unter Linux); hier Umschlag und Klartext.
 final class HelferAuftragFaelleTests: XCTestCase {
     struct Datei: Decodable {

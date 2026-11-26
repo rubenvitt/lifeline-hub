@@ -6,7 +6,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 
 /**
- * Was der Live-Strom `GET /api/incidents/{id}/live` der Helfer-App sagt (ADR-0106; gemeinsame
+ * Was der Live-Strom `GET /api/incidents/{id}/live` der Helfer-App sagt (ADR-0107; gemeinsame
  * Fälle `src-tauri/faelle/helfer-auftrag.json`, Abschnitt `sse`).
  */
 sealed interface LiveEreignis {

@@ -1,5 +1,5 @@
 -- Helfer-App Stufe 2 (Pager, Zunder c19brpvf, Spec
--- docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md, ADR-0106).
+-- docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md, ADR-0107).
 --
 -- 1. `helfer_push_anmeldung`: die Push-Anmeldung der iOS-Helfer-App, je Helfer-Kopplung höchstens
 --    eine, mit der Kopplung gelöscht. Kein Verweis auf Benutzer oder Sitzung.

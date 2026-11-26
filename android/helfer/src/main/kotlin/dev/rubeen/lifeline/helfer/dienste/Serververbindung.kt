@@ -65,7 +65,7 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
 
     fun abmelden(): Rueckmeldung = anfrage("POST", "api/auth/logout").also { cookie = null }
 
-    // Aufträge (ADR-0106, src/routes/helfer.rs).
+    // Aufträge (ADR-0107, src/routes/helfer.rs).
 
     fun auftraege(): Rueckmeldung = anfrage("GET", "api/devices/me/tasks")
 
