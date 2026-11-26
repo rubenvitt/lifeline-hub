@@ -2,11 +2,11 @@ import HelferKern
 import SwiftUI
 
 /// Lifeline Helfer (ADR-0101, Regeln `ios/Helfer/AGENTS.md`): am Einsatz anmelden, die Position
-/// senden und Aufträge empfangen (ADR-0106). Welche Seite gilt, entscheidet die Phase der
+/// senden und Aufträge empfangen (ADR-0111). Welche Seite gilt, entscheidet die Phase der
 /// `Anmeldung` im Kern.
 @main
 struct HelferApp: App {
-    /// Token von APNs und Delegate der Mitteilungen (Aufträge, ADR-0106).
+    /// Token von APNs und Delegate der Mitteilungen (Aufträge, ADR-0111).
     @UIApplicationDelegateAdaptor(HelferAppDelegat.self) private var appDelegat
     @State private var modell = HelferModell.start(argumente: ProcessInfo.processInfo.arguments)
     @Environment(\.scenePhase) private var scenePhase

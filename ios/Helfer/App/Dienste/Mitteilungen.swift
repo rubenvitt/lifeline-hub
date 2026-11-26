@@ -3,7 +3,7 @@ import LifelineKern
 import UIKit
 import UserNotifications
 
-// Push und Mitteilungen der Helfer-App (Stufe 2, ADR-0106): Recht, Token von APNs, Kennung und
+// Push und Mitteilungen der Helfer-App (Stufe 2, ADR-0111): Recht, Token von APNs, Kennung und
 // Schlüssel der Kopplung, Mitteilungen bei offener App und das Antippen. Muster ist die Hülle
 // (ios/App/LifelineHubApp.swift, ios/App/Systemdienste.swift). Token und Schlüssel stehen in keinem
 // Log; Aufträge liegen nie auf der Platte.

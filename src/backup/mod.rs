@@ -486,7 +486,7 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
-        // Helfer-App (0386): die Push-Anmeldung einer Helfer-Kopplung ebenso.
+        // Helfer-App (0389): die Push-Anmeldung einer Helfer-Kopplung ebenso.
         let einsatz: i64 = sqlx::query_scalar(
             "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'E') RETURNING id",
         )

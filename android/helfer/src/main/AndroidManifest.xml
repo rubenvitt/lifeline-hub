@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Lifeline Helfer (ADR-0101, Regeln android/helfer/AGENTS.md): eine App mit einer Aufgabe, am Einsatz
-  anmelden, die Position senden und Aufträge empfangen (ADR-0106). Ortung und Empfang nur im einen
+  anmelden, die Position senden und Aufträge empfangen (ADR-0111). Ortung und Empfang nur im einen
   Vordergrund-Dienst vom Typ `location|remoteMessaging`, gestartet aus der geöffneten App; kein Recht
   für den Standort im Hintergrund, kein Google-Push.
 -->
@@ -60,7 +60,7 @@
 
         <!--
           Die einzige Stelle, die im Hintergrund sendet und empfängt; nur aus der App gestartet
-          (ADR-0101, ADR-0106). Ohne Ortung läuft er allein mit `remoteMessaging`.
+          (ADR-0101, ADR-0111). Ohne Ortung läuft er allein mit `remoteMessaging`.
         -->
         <service
             android:name=".dienste.OrtungsDienst"

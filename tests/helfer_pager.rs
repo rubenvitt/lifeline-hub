@@ -1,5 +1,5 @@
 //! Helfer-App Stufe 2 (Pager, Spec `docs/superpowers/specs/2026-11-25-c19brpvf-helfer-pager-design.md`,
-//! ADR-0106): Aufträge an die Helfer-App, Quittung, Push-Anmeldung und Zustellung.
+//! ADR-0111): Aufträge an die Helfer-App, Quittung, Push-Anmeldung und Zustellung.
 
 use axum::http::StatusCode;
 use serde_json::{json, Value};

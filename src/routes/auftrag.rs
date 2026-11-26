@@ -492,7 +492,7 @@ pub async fn aufheben(
     )
     .await?;
     sse(&state, einsatz_id);
-    // Helfer-App Stufe 2: die App zeigt den Auftrag als aufgehoben (ADR-0106).
+    // Helfer-App Stufe 2: die App zeigt den Auftrag als aufgehoben (ADR-0111).
     crate::helfer::pager::notify_changed(&state, einsatz_id, auftrag_id).await;
     Ok(Json(d))
 }
@@ -508,7 +508,7 @@ pub async fn berichtigen(
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
     // Helfer-App Stufe 2: wer den Auftrag vor der Berichtigung hatte, erfährt sie auch dann,
-    // wenn seine Zeile wegfällt (ADR-0106).
+    // wenn seine Zeile wegfällt (ADR-0111).
     let helfer_vorher = crate::helfer::pager::kopplungen(&state.pool, einsatz_id, auftrag_id)
         .await
         .unwrap_or_default();
@@ -541,7 +541,7 @@ pub async fn berichtigen(
         &berichtigt.hinzu,
     )
     .await;
-    // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0106).
+    // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0111).
     crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
     crate::helfer::pager::notify_removed(&state, helfer_vorher, auftrag_id);
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;

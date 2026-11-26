@@ -3,7 +3,7 @@ package dev.rubeen.lifeline.helferkern
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-/** Neu verbinden, warten oder enden (ADR-0106, Entwurf „Empfang“). */
+/** Neu verbinden, warten oder enden (ADR-0111, Entwurf „Empfang“). */
 class EmpfangTest {
     @Test
     fun `der Abstand waechst von einer Sekunde bis hoechstens einer Minute`() {

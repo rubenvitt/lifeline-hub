@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * Aufträge dieser Kopplung und der Empfang, wie der Helfer-Dienst sie dem Modell meldet: nur im
- * Speicher des Prozesses (ADR-0106: Aufträge nie auf die Platte). Nach einem Ende des Prozesses ist
+ * Speicher des Prozesses (ADR-0111: Aufträge nie auf die Platte). Nach einem Ende des Prozesses ist
  * alles weg; die App lädt die Liste beim nächsten Öffnen neu.
  */
 object Auftragsstand {

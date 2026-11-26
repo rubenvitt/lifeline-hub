@@ -3,7 +3,7 @@ import XCTest
 
 @testable import HelferKern
 
-/// Aufträge über die gemeinsamen Fälle hinaus (ADR-0106): Wire-Format, mehrere Zeilen, Stand
+/// Aufträge über die gemeinsamen Fälle hinaus (ADR-0111): Wire-Format, mehrere Zeilen, Stand
 /// während der Quittung, Texte.
 final class AuftraegeTests: XCTestCase {
     private func auftrag(

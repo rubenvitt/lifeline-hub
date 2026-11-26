@@ -64,7 +64,7 @@ data class Dienstvorgabe(
 )
 
 /**
- * Der Helfer-Dienst (ADR-0101, ADR-0106): ortet und empfängt Aufträge, mit **einer**
+ * Der Helfer-Dienst (ADR-0101, ADR-0111): ortet und empfängt Aufträge, mit **einer**
  * Benachrichtigung; die einzige Stelle, die im Hintergrund sendet und empfängt.
  *
  * - Ein Vordergrund-Dienst vom Typ `location|remoteMessaging`, gestartet nur aus der geöffneten App
@@ -654,7 +654,7 @@ class OrtungsDienst : Service() {
 
         /**
          * Startet den Dienst oder gibt dem laufenden eine neue [vorgabe]. Gestartet wird er nur aus
-         * der geöffneten App (ADR-0101, ADR-0106); aus dem Hintergrund erreicht die Vorgabe nur einen
+         * der geöffneten App (ADR-0101, ADR-0111); aus dem Hintergrund erreicht die Vorgabe nur einen
          * Dienst, der schon läuft. `false`, wenn das System den Dienst nicht zulässt.
          */
         fun starte(context: Context, vorgabe: Dienstvorgabe): Boolean {

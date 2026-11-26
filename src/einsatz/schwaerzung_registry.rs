@@ -805,7 +805,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
         ],
     },
     TabellenRegel {
-        // Eingefrorene Inhalte der Fremdebenen für gesicherte Stände (LLH-2130, Migration 0386).
+        // Eingefrorene Inhalte der Fremdebenen für gesicherte Stände (LLH-2130, Migration 0385).
         // Einzeln im Nachlauf (`Strategie::ZeileEinzelnLoeschen`): die Tabelle hat keine
         // Mengengrenze (Versionen × Ebenen × bis 8 MiB), alle in einer Transaktion hielten die
         // Schreibsperre zu lange (LFH-905). Zuordnung `anhaenge` wie die Bilder der Lagekarte,
@@ -2615,7 +2615,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("quittiert_at", G_ZEIT),
             retain("quittiert_von_id", G_FK),
-            // Helfer-App Stufe 2 (0386): an wie viele Helfer-Apps die Zeile ging.
+            // Helfer-App Stufe 2 (0389): an wie viele Helfer-Apps die Zeile ging.
             retain("helfer_gesendet", G_ZAEHLER),
         ],
     },
@@ -3316,7 +3316,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einloesungen", G_ZAEHLER),
         ],
     },
-    // Push-Anmeldung der Helfer-App (Stufe 2, 0386): Gerätetoken und Schlüssel sind technisch,
+    // Push-Anmeldung der Helfer-App (Stufe 2, 0389): Gerätetoken und Schlüssel sind technisch,
     // aber an ein Privatgerät gebunden; die Schwärzung überschreibt sie.
     TabellenRegel {
         tabelle: "helfer_push_anmeldung",

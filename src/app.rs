@@ -206,7 +206,7 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/devices/me/position",
             put(routes::helfer::position_senden),
         )
-        // Helfer-App Stufe 2 (ADR-0106): eigene Aufträge lesen und quittieren.
+        // Helfer-App Stufe 2 (ADR-0111): eigene Aufträge lesen und quittieren.
         .route("/api/devices/me/tasks", get(routes::helfer::auftraege))
         .route(
             "/api/devices/me/push",

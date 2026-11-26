@@ -131,7 +131,7 @@ data class HelperTaskRecipient(
 
 /**
  * Ein Auftrag an diese Kopplung (`HelperTask`, `GET /api/devices/me/tasks`). Zeiten in UTC,
- * `yyyy-MM-dd HH:mm:ss` ([Wire.serverzeit]). Liegt nur im Speicher (ADR-0106: nie auf die Platte).
+ * `yyyy-MM-dd HH:mm:ss` ([Wire.serverzeit]). Liegt nur im Speicher (ADR-0111: nie auf die Platte).
  */
 @Serializable
 data class HelperTask(

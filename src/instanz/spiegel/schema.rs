@@ -16,7 +16,7 @@ use std::collections::HashMap;
 /// Spalten, die nur an dieser Instanz gelten und nie geliefert werden.
 pub const LOKALE_SPALTEN: &[(&str, &str)] = &[
     ("einsatz", "spiegel"),
-    // Helfer-Apps hängen an der Instanz, die zustellt (Helfer-App Stufe 2, 0386).
+    // Helfer-Apps hängen an der Instanz, die zustellt (Helfer-App Stufe 2, 0389).
     ("auftrag_empfaenger", "helfer_gesendet"),
 ];
 

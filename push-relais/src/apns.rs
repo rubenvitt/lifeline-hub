@@ -73,7 +73,7 @@ pub struct Nachricht {
     pub stufe: Stufe,
     pub kollaps: Option<String>,
     pub nutzlast: String,
-    /// Bundle-ID der Ziel-App (ADR-0106); fehlt es, gilt die eingestellte `bundle_id`. Nur
+    /// Bundle-ID der Ziel-App (ADR-0111); fehlt es, gilt die eingestellte `bundle_id`. Nur
     /// erlaubte Werte ([`ApnsClient::thema_erlaubt`]).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thema: Option<String>,

@@ -55,7 +55,7 @@ ADR-0093 erlaubt ihnen Standort nur im Vordergrund. Beides trägt eine dauerhaft
 
 ## Konsequenzen
 
-Ergänzt durch [ADR-0106](ADR-0106-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md): Empfang von Aufträgen (iOS über das Relais, Android über die eigene Verbindung).
+Ergänzt durch [ADR-0111](ADR-0111-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md): Empfang von Aufträgen (iOS über das Relais, Android über die eigene Verbindung).
 
 
 Es gibt zwei eigene native Apps mit eigener Kennung, eigenem Kern und eigener Auslieferung; die
