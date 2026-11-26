@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/adapter/matrix_art.rs, src/adapter/matrix.rs, src/drohne/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/adapter/matrix_art.rs, src/adapter/matrix.rs, src/drohne/art.rs, src/adapter/sipgate_fax_art.rs, src/adapter/sipgate.rs, src/ortung/fern.rs, src/instanz/spiegel/fuehrung.rs]
 ---
 
 ## Überblick
@@ -177,6 +177,8 @@ Fahrzeug auf der Lagekarte (Hintergrund: „Ortung von Fahrzeugen“).
 3. Das Gerät sendet seine Position. Erst dann erscheint die Kennung in der Auswahl.
 4. Im Einsatz bei „Fahrzeuge“ in der Zeile des Fahrzeugs „Weitere Aktionen“ und „Ortung koppeln …“
    wählen, die Kennung ankreuzen und „Koppeln“ wählen (Kapitel [Fahrzeuge und FMS](fahrzeuge.md)).
+   Im Verbund Hub und ELW wird am ELW gekoppelt, der Zugang liegt am Hub (Abschnitt „Ortung von
+   Fahrzeugen“).
 
 ### Einwurf-Zugang widerrufen
 
@@ -256,6 +258,22 @@ Für den System-Admin; jede Organisation hat höchstens ein Matrix-Konto:
 
 Ohne dieses Konto sind im Senden-Dialog die Matrix-Räume nach dem Senden mit „Kein Matrix-Konto
 eingerichtet“ gesperrt; ist es angehalten, mit „Das Matrix-Konto ist angehalten“.
+
+### Faxzugang (sipgate) für den Versand einrichten
+
+Für den System-Admin; jede Organisation hat höchstens eine Fax-Anbindung. Vorher in der
+sipgate-App ein Personal Access Token mit den Rechten `sessions:fax:write` und `history:read`
+anlegen und die Faxline nachsehen (sipgate-App → Routing → Fax, in der Adresse steht etwa `f0`):
+
+1. Unter „Einstellungen“ „Anbindungen“ im Paneel „Adapter“ „Adapter anlegen“ wählen und die Art
+   „Fax (sipgate)“ wählen.
+2. „Token-ID“, „Faxline (etwa f0)“ und optional „Absender im Fax-Kopf“ (etwa „ELW 1 Kreis X“)
+   ausfüllen.
+3. „Anlegen“ wählen und in der Ansicht des Adapters das „Token (Personal Access Token)“ als
+   Geheimnis setzen.
+4. „Verbindung prüfen“ wählen. Geprüft werden Token und Faxline; es wird kein Fax gesendet.
+
+Ohne diese Anbindung meldet der Senden-Dialog „Kein Faxzugang eingerichtet“.
 
 ### Geheimnis setzen oder ersetzen
 
@@ -584,6 +602,14 @@ eigenen Organisation gehört. Die Liste zeigt keine Koordinaten.
   Abschluss löscht die Positionen aus der Ortung.
 - **Spiegel-Instanzen:** Die Position am Fahrzeug geht wie jede Änderung an Spiegel-Instanzen des
   Einsatzes. Die Kopplung bleibt auf der Instanz.
+- **Ortung im Verbund Hub und ELW:** Ein ELW, das an einen Hub gekoppelt ist, nimmt keinen
+  Einwurf an; die Geräte melden an den Hub. Führt das ELW den Einsatz, nennt es dem Hub im
+  Abgleich die Kennungen, die es gekoppelt hat, und bekommt deren letzte Position zurück. Der
+  Hub liefert nur für Zugänge der abgebildeten Organisation mit dem Zweck „Positionen
+  einliefern“, die weder widerrufen noch abgelaufen sind, und nur bei eingeschaltetem Schalter
+  „Ortung im Einsatz“ (am Hub einzuschalten). Er merkt sich nicht, was ein ELW gekoppelt hat, und
+  schickt für nicht gekoppelte Kennungen keine Koordinaten; die Kennungen zur Auswahl kommen ohne
+  Koordinaten. Gibt das ELW die Führung ab, enden die Kopplungen.
 
 #### Vorlage für die Datenschutz-Folgenabschätzung
 
@@ -600,8 +626,8 @@ die Organisation weiß. Die Stellen in eckigen Klammern sind auszufüllen.
 | Daten | Kennung des Geräts, Koordinaten, Zeitpunkt der Messung. Es gibt keine Zuordnung zu Personen außer über die Besatzung, die am Fahrzeug eingetragen ist. |
 | Speicherdauer | Letzte Position je Kennung 24 Stunden nach dem Empfang in der Ablage. Am Fahrzeug bis zum Abschluss des Einsatzes; dann werden die Positionen aus der Ortung gelöscht. Eingefrorene Lagestände behalten die Position bis zur Löschung des Einsatzes. |
 | Verlauf | Kein Positionsverlauf, keine Spur, kein Geofencing. |
-| Empfänger | Personen mit Zugriff auf den Einsatz in der Organisation und, bei gespiegelten Einsätzen, die Spiegel-Instanzen. [Weitere Empfänger der Organisation] |
-| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Freigabe durch die Organisation über den Schalter „Ortung im Einsatz“ (vorgabemäßig aus; wer ihn wann eingeschaltet hat, hält der Server fest); Kandidatenliste ohne Koordinaten; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
+| Empfänger | Personen mit Zugriff auf den Einsatz in der Organisation und, bei gespiegelten Einsätzen, die Spiegel-Instanzen. Im Verbund Hub und ELW zusätzlich das führende ELW, an das der Hub die Position einer dort gekoppelten Kennung übermittelt. [Weitere Empfänger der Organisation] |
+| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Freigabe durch die Organisation über den Schalter „Ortung im Einsatz“ (vorgabemäßig aus; wer ihn wann eingeschaltet hat, hält der Server fest); Kandidatenliste ohne Koordinaten; Übermittlung an das führende ELW nur für dort gekoppelte Kennungen, nur im Abgleich der gekoppelten Instanzen; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
 | Risiken | Ortung von Kräften ohne Einwilligung oder Vereinbarung, wenn der Schalter ohne Grundlage eingeschaltet wird; Weitergabe der Adresse eines Zugangs. [Bewertung der Organisation] |
 
 ### Einwurf nur verschlüsselt
@@ -705,6 +731,16 @@ die sich bei einem Hub meldet, hat kein eigenes Matrix-Konto.
 - **Fehler.** Ein abgelehntes Token hält die Anbindung mit „Zugang abgelehnt“ an. Die Versandliste nennt
   nur feste Gründe („Kein Zutritt zum Raum“, „Verschlüsseln nicht möglich“, „Vom Matrix-Server
   abgelehnt“), das ETB höchstens den Fehlercode des Matrix-Servers, nie seinen Text.
+
+### Faxversand
+
+Die Art „Fax (sipgate)“ ruft ebenfalls nichts ab: ihr regelmäßiger Lauf prüft nur Token und
+Faxline. Gesendet wird ein PDF, das der Server aus dem freigegebenen Text und den Anlagen baut;
+gesprochen wird nur mit `api.sipgate.com`, ohne Weiterleitung. Ein Fax gilt erst als
+„zugestellt“, wenn sipgate es auf Nachfrage bestätigt (Kapitel [Lageberichte](lageberichte.md),
+„Versand per Fax“). Ist das Guthaben bei sipgate aufgebraucht oder das Token abgelehnt, steht der
+Versand als „fehlgeschlagen: Faxzugang fehlerhaft eingerichtet“ da, das ETB nennt den Grund
+(„Guthaben bei sipgate aufgebraucht“), und der Adapter prüft sich gleich neu.
 
 ### Geheimnisse eines Adapters
 

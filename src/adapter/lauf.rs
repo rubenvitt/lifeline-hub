@@ -282,6 +282,11 @@ pub struct Versandzugang {
 }
 
 impl Versandzugang {
+    /// Ein Textfeld der Einstellungen, getrimmt; leer zählt als fehlend.
+    pub fn einstellung(&self, name: &str) -> Option<&str> {
+        self.text(name)
+    }
+
     fn text(&self, name: &str) -> Option<&str> {
         self.einstellungen
             .get(name)
@@ -314,20 +319,11 @@ impl std::fmt::Debug for Versandzugang {
     }
 }
 
-/// Die Adapterart, die einen Kanal des Ausgangs bedient (LLH-2094, Spec Abschnitt 6, „Zugang je
-/// Kanal“): `smtp` für E-Mail, `matrix` für Matrix; Fax und Threema haben noch keine.
-pub fn art_fuer_kanal(kanal: KanalArt) -> Option<&'static str> {
-    match kanal {
-        KanalArt::Email => Some(super::smtp_art::CODE),
-        KanalArt::Matrix => Some(super::matrix_art::CODE),
-        KanalArt::Fax | KanalArt::Threema => None,
-    }
-}
-
 /// Prüft beim Anlegen eines Versands nur, ob die Org für den Kanal eine Anbindung hat, die ein
-/// Versand nutzen darf: Anbindung der passenden Art ([`art_fuer_kanal`]) vorhanden, nicht
-/// angehalten, Org nicht an einem Hub (LLH-2093, LLH-2094). Liest nur die Zeile der Anbindung und
-/// ihren Zustand; Geheimnisse werden **nicht** entschlüsselt, das tut allein der Lauf über
+/// Versand nutzen darf: Anbindung der passenden Art ([`KanalArt::adapter_art`]: E-Mail `smtp`,
+/// Fax `sipgate_fax`, Matrix `matrix`) vorhanden, nicht angehalten, Org nicht an einem Hub
+/// (LLH-2093, LLH-2094, LLH-2095). Liest nur die Zeile der Anbindung und ihren Zustand;
+/// Geheimnisse werden **nicht** entschlüsselt, das tut allein der Lauf über
 /// [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
 pub async fn pruefe_versand_moeglich(
     pool: &SqlitePool,
@@ -349,7 +345,7 @@ async fn anbindung_fuer_versand(
     org_id: i64,
     kanal: KanalArt,
 ) -> Result<Result<(Adapter, Arc<dyn AdapterArt>), AusgangFehler>, AppError> {
-    let Some(code) = art_fuer_kanal(kanal) else {
+    let Some(code) = kanal.adapter_art() else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if is_org_am_hub(pool, org_id).await? {

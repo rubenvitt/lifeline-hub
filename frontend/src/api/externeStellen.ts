@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ExterneStelle, ExterneStelleArt, ExterneStelleKanal, KanalMitStelle } from './types';
+import type {
+  ExterneStelle,
+  ExterneStelleArt,
+  ExterneStelleKanal,
+  KanalArt,
+  KanalMitStelle,
+} from './types';
 import { apiGet, apiSend } from './client';
 import { globalKeys } from './queryKeys';
 
@@ -40,11 +46,11 @@ export function updateExterneStelle(id: number, patch: ExterneStellePatch): Prom
   return apiSend<ExterneStelle>(`/api/external-agencies/${id}`, 'PATCH', patch);
 }
 
-// ---- Kanaladressen (LLH-2093) ----
+// ---- Kanaladressen (LLH-2093, Fax LLH-2095) ----
 
 export interface NeuerKanal {
-  /** Der Server nimmt `email` und `matrix` an (LLH-2094); Fax und Threema sind noch zu. */
-  channel: 'email' | 'matrix';
+  /** Der Server nimmt `email`, `fax` (LLH-2095) und `matrix` (LLH-2094) an; Threema ist noch zu. */
+  channel: KanalArt;
   address: string;
   label?: string;
 }
@@ -54,7 +60,7 @@ export function fetchExterneStelleKanaele(stelleId: number): Promise<ExterneStel
 }
 
 /** Alle Adressen der aktiven Stellen der Organisation, ohne `kanal` aller Kanäle. */
-export function fetchKanaeleSammlung(kanal?: 'email' | 'matrix'): Promise<KanalMitStelle[]> {
+export function fetchKanaeleSammlung(kanal?: KanalArt): Promise<KanalMitStelle[]> {
   return apiGet<KanalMitStelle[]>(
     kanal ? `/api/external-agencies/channels?channel=${kanal}` : '/api/external-agencies/channels',
   );
@@ -84,7 +90,7 @@ export function useExterneStelleKanaele(stelleId: number | undefined) {
 }
 
 /** Alle Adressen der aktiven Stellen (Zählhinweis der Liste, Auswahl beim Senden). */
-export function useKanaeleSammlung(kanal?: 'email' | 'matrix') {
+export function useKanaeleSammlung(kanal?: KanalArt) {
   return useQuery({
     queryKey: globalKeys.externeStellenKanaeleSammlung(kanal ?? 'alle'),
     queryFn: () => fetchKanaeleSammlung(kanal),

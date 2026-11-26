@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 26.11.2026 (Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 26.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -641,6 +641,49 @@ sequenceDiagram
   `position_aktualisiert_at` von `einsatz_fahrzeug` und läuft wie jede Fahrzeugänderung zu den
   Spiegeln.
 
+## 6.6e2 Fahrzeugortung über den Hub: Positionen im Spiegelabgleich
+
+Gespiegelte Einsätze liefern die Position nicht über den Einwurf: Ein an einen Hub gekoppeltes ELW
+nimmt keinen Einwurf an, die Geräte melden an den Hub. Führt das ELW den Einsatz, holt es die
+Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0109](entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
+Design-Doc [`2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`](../superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Fahrzeuge
+  participant ELW as ELW (src/ortung/fern.rs, src/routes/ortung.rs)
+  participant Hub as lifeline-hub (src/ortung/fern.rs)
+  FE->>ELW: GET …/tracking/candidates
+  ELW-->>FE: Puffer der Kennungen des Hubs, pending bis die Antwort da ist
+  ELW->>Hub: POST /api/instance/mirror (tracking_requests, tracking_candidates_wanted)
+  Hub->>Hub: position_letzte lesen, nur für abgebildete Org, gültigen Zugang, Schalter an
+  Hub-->>ELW: tracking_positions, tracking_candidates (ohne Koordinaten)
+  ELW->>ELW: apply_remote_position_tx → ortung::schreibe_position (Quelle einwurf)
+  ELW-->>FE: Live fahrzeug (ortung::publiziere, nach dem Commit)
+```
+
+- **Koppeln am ELW:** `PUT …/tracking` liest `access_id` als Zugang des Hubs, wenn die Org einen Hub
+  hat (`hub_fuer_org`); die Kennung muss im Kandidaten-Puffer stehen (sonst 422). Die Zeile in
+  `ortung_kopplung` trägt dann `instanz_kopplung_id`, `fremder_zugang_id` und `zugang_name` statt
+  `zugang_id` (`migrations/0387_ortung_kopplung_hub.sql`, eine Art je Zeile per `CHECK`). Die
+  vorhandene Position kommt erst mit dem nächsten Abgleich; der Takt wird geweckt.
+- **Kandidaten:** `src/ortung/fern.rs` hält je Org einen flüchtigen Puffer und einen Wunsch (60 s).
+  Fehlt der Puffer oder ist er älter als 10 s, merkt die Route den Wunsch vor, weckt den Takt und
+  antwortet mit `pending`; der Dialog fragt alle 2 s, höchstens 15 s.
+- **Anfrage und Antwort:** `SpiegelPaket` trägt `tracking_requests`, `tracking_candidates_wanted`,
+  `tracking_positions` und `tracking_candidates` (`src/instanz/spiegel/paket.rs`, `serde(default)`,
+  höchstens `TRACKING_ANFRAGEN_MAX` Anfragen). Der Hub baut die Antwort in `answer_hub` nach dem
+  Abgleich, rein lesend; ein Fehler zählt eine Sammelzeile und liefert leere Listen.
+- **Übernahme:** nach dem Commit des Abgleichs in eigener Transaktion (`apply_answer`), über
+  `apply_remote_position_tx` in `src/ortung/uebernahme.rs` mit denselben Regeln wie die lokale
+  Übernahme (Schalter, aktives Fahrzeug, aktiver nicht gespiegelter Einsatz, Drossel 15 s). Einen
+  Nachlauf gibt es hier nicht; der nächste Abgleich bringt die jüngste Position. Der Spiegel am Hub
+  bekommt sie über die bestehenden Trigger.
+- **Führungsabgabe:** `fuehrung::werde_spiegel` ruft `ortung::kopplung::beende_bei_fuehrungsabgabe_tx`
+  neben `helfer::ende::beende_alle_im_einsatz`, vor dem Spiegel; alle Kopplungen des Einsatzes
+  enden ohne ETB-Eintrag (ein Eintrag nach `bekannt_bis` wäre eine Bruchstelle). Die Position
+  bleibt stehen und wird veraltet.
+
 ## 6.6f Ausgangsereignis: vom Schreiben bis zum Abruf
 
 Ein Fremdsystem erfährt über `GET /api/v1/events`, dass sich an seinem freigegebenen Einsatz etwas
@@ -820,6 +863,29 @@ sequenceDiagram
   `verschluesselung`. Der Prüflauf der Anbindung (`adapter::matrix::pruefe`) teilt denselben
   Client und sendet nichts.
 
+Ein Fax (LLH-2095, [ADR-0110](entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md))
+läuft durch denselben Korb; sipgate nimmt nur an, ob es durchging, zeigt erst die Abfrage.
+
+```mermaid
+sequenceDiagram
+  participant Hub as lifeline-hub (src/ausgang/lauf.rs)
+  participant DB as SQLite (ausgang, etb_eintrag)
+  participant SG as sipgate (api.sipgate.com)
+  Hub->>DB: fällige Fax-Zeile, Verbindung zurückgeben
+  Hub->>Hub: PDF aus Schnappschuss und Anlagen (src/ausgang/pdf.rs)
+  Hub->>SG: POST /v2/sessions/fax (Basic-Auth, Token)
+  SG-->>Hub: 200 sessionId
+  Hub->>DB: uebergeben, anbieter_ref, nächste Abfrage in 30 s (kein ETB)
+  loop jede Minute bis Endstand, höchstens 2 h
+    Hub->>SG: GET /v2/history/{sessionId}
+    SG-->>Hub: faxStatusType
+  end
+  Hub->>DB: BEGIN, zugestellt bzw. fehlgeschlagen und ETB-Eintrag, COMMIT
+```
+
+- Ohne Endstand nach 2 h ist das Fax `ungewiss`; ein Abbruch nach dem Senden ebenso, ohne
+  zweites Fax. Ein Neustart fragt weiter und sendet nicht neu.
+
 ## 6.7 Kartenkacheln über Proxy, Cache und Offline-Karte
 
 ```mermaid
@@ -996,3 +1062,44 @@ sequenceDiagram
   [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „iOS-Push“; Hülle:
   [`ios/AGENTS.md`](../../ios/AGENTS.md), „Push über APNs“; Betrieb:
   [`docs/betrieb/push-relais.md`](../betrieb/push-relais.md).
+
+### 6.8c Auftrag an die Helfer-App: zustellen und übernehmen
+
+Ein Auftrag an Einheit, Fahrzeug oder zugeordnete Person erreicht die bestätigten Helfer-Apps
+(LLH-2111, [ADR-0111](entscheidungen/ADR-0111-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend (Leitung)
+  participant BE as lifeline-hub (src/routes/auftrag.rs)
+  participant PG as src/helfer/pager.rs
+  participant IP as src/ios_push/helfer.rs
+  participant R as push-relais
+  participant HA as Helfer-App (Android, Dienst)
+  participant HI as Helfer-App (iOS, HelferDienst)
+  FE->>BE: POST /api/incidents/{id}/tasks
+  BE->>PG: nach_erteilung → deliver
+  PG->>PG: resolve: bestätigte Kopplungen mit eigener Zeile, Einsatz aktiv
+  PG->>PG: helfer_gesendet an Zeilen mit NULL
+  PG-->>HA: LiveHub::melde_helfer_auftrag → SSE helfer_auftrag {task_id}
+  PG->>IP: versenden_helfer (nur Ziele, für die der Auftrag neu ist)
+  IP->>R: POST /v1/senden, thema = dev.rubeen.lifeline.helfer
+  R-->>HI: APNs, Umschlag l
+  HA->>BE: GET /api/devices/me/tasks
+  HI->>BE: GET /api/devices/me/tasks (Tippen oder Vordergrund)
+  HA->>BE: POST /api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge
+  BE->>BE: auftrag::quittung::acknowledge (wie am Auftrag)
+  BE-->>FE: Live auftrag
+  BE-->>HA: SSE helfer_auftrag an die übrigen Helfer des Auftrags
+```
+
+- `deliver` läuft auch nach einer Berichtigung (`routes::auftrag::berichtigen`): neue Zeilen
+  tragen `helfer_gesendet IS NULL`, Push geht nur an Kopplungen ohne ältere eigene Zeile; die
+  übrigen laden über das Live-Ereignis neu. Aufhebung und Quittung melden nur live
+  (`notify_changed`).
+- Das SSE-Ereignis `helfer_auftrag` ist kein `LiveEvent`: es läuft über einen eigenen Broadcast am
+  Ring vorbei und nur im Strom der genannten Helfer-Kopplung (`helfer_auftraege` in
+  `src/routes/live.rs`); `lese_module(Helfer)` bleibt leer.
+- Die Push-Anmeldung (`helfer_push_anmeldung`, Migration 0389) endet mit der Kopplung:
+  `geraet::repo::beenden`, Ablauf-Takt (`geraet::ablauf::raeume_helfer`) und Einsatzabschluss
+  (`einsatz::repo::abschliessen`) löschen sie; `resolve` prüft trotzdem bei jeder Zustellung frisch.

@@ -35,11 +35,12 @@ function groesse(bytes: number): string {
 }
 
 /**
- * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail oder
- * Matrix (LLH-2093, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum Anhaken
- * (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer Adresse
- * vorbelegt. Fehlt das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein
- * Versand wird nie vorgemerkt.
+ * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax oder
+ * Matrix (LLH-2093, LLH-2095, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum
+ * Anhaken (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
+ * Adresse vorbelegt, nie mit einer Faxnummer, damit eine Stelle nicht doppelt Post bekommt. Fehlt
+ * das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein Versand wird nie
+ * vorgemerkt.
  */
 export default function SendenDialog({
   offen,
@@ -71,11 +72,14 @@ export default function SendenDialog({
   const gewaehlt = Form.useWatch('kanaele', form) as number[] | undefined;
   const kanaeleQuery = useKanaeleSammlung();
   const sende = useSendeVersaende(einsatzId, quelle);
-  // Der Server kennt heute E-Mail und Matrix; ein anderer Kanal bleibt aus der Auswahl.
+  // Der Server kennt heute E-Mail, Fax und Matrix; ein anderer Kanal bleibt aus der Auswahl.
   const kanaele = useMemo(
     () =>
       kanaeleQuery.data?.filter(
-        (k) => k.channel.channel === 'email' || k.channel.channel === 'matrix',
+        (k) =>
+          k.channel.channel === 'email' ||
+          k.channel.channel === 'fax' ||
+          k.channel.channel === 'matrix',
       ),
     [kanaeleQuery.data],
   );

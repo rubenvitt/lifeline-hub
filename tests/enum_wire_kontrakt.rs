@@ -374,6 +374,7 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(lifeline_hub::ausgang::VersandZustand {
         Wartet,
         Uebergeben,
+        Zugestellt,
         Fehlgeschlagen,
     });
     enum_wire_as_str!(lifeline_hub::ausgang::AusgangFehler {
@@ -386,6 +387,7 @@ fn serde_wire_gleich_as_str() {
         AnbindungFehler,
         ZuGross,
         Spiegel,
+        NichtZugestellt,
         KeinZutritt,
         Verschluesselung,
     });
@@ -728,6 +730,10 @@ fn serde_wire_gleich_as_str() {
         AdapterFortgesetzt,
         FremdebenenLanErlaubt,
         FremdebenenLanEntzogen,
+        OrtungEingeschaltet,
+        OrtungAusgeschaltet,
+        OrtungPersonenEingeschaltet,
+        OrtungPersonenAusgeschaltet,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {
@@ -1803,6 +1809,7 @@ fn live_event_wire() {
         Benachrichtigung => "benachrichtigung",
         Praesenz => "praesenz",
         Helfer => "helfer",
+        HelferAuftrag => "helfer_auftrag",
         Lagged => "lagged",
     } in lifeline_hub::live::LiveEvent::ALLE);
 }

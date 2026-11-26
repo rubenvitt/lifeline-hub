@@ -15,8 +15,8 @@
 # Version: MARKETING_VERSION aus scripts/ios/helfer-version.sh (einzige Stelle), Build-Nummer die
 # Laufnummer dieses Workflows plus 1000 (steigt mit jedem Lauf; App Store Connect verlangt eine
 # steigende Nummer je Version). Signiert wird über den App-Store-Connect-API-Schlüssel
-# (APP_STORE_CONNECT_*), auf dem Runner liegt kein Zertifikat; App-ID, Erweiterung und App Group
-# legt `-allowProvisioningUpdates` an. Runner und Xcode wie ios.yml: Xcode 26.6 auf macos-26.
+# (APP_STORE_CONNECT_*), auf dem Runner liegt kein Zertifikat; App-IDs, beide Erweiterungen
+# (Live-Aktivität, Mitteilungsdienst `…helfer.dienst`, ADR-0105), App Group und Push legt `-allowProvisioningUpdates` an. Runner und Xcode wie ios.yml: Xcode 26.6 auf macos-26.
 #
 # KEIN PFLICHT-CHECK (ADR-0048). Alle Actions sind per Commit-SHA gepinnt (Tag im Kommentar).
 name: Helfer-App (TestFlight)
@@ -88,6 +88,7 @@ jobs:
               "Apps" => "/v1/apps?limit=1",
               "Kennung helfer" => "/v1/bundleIds?filter[identifier]=dev.rubeen.lifeline.helfer",
               "Kennung aktivitaet" => "/v1/bundleIds?filter[identifier]=dev.rubeen.lifeline.helfer.aktivitaet",
+              "Kennung dienst" => "/v1/bundleIds?filter[identifier]=dev.rubeen.lifeline.helfer.dienst",
               "Zertifikate" => "/v1/certificates?limit=1",
               "Profile" => "/v1/profiles?limit=1",
             }.each do |name, pfad|

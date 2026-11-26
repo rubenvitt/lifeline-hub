@@ -145,8 +145,9 @@ pub async fn load_in_org(
     .await
 }
 
-/// Die Anbindung einer Art, von der eine Org höchstens eine hat (`smtp`, LLH-2093; `matrix`,
-/// LLH-2094; auch angehaltene zählen). Bei Altdaten mit mehreren gilt die zuerst angelegte.
+/// Die Anbindung einer Versand-Art einer Org (`smtp`, LLH-2093; `sipgate_fax`, LLH-2095;
+/// `matrix`, LLH-2094; höchstens eine je Art, auch angehaltene zählen). Bei Altdaten mit
+/// mehreren gilt die zuerst angelegte.
 pub async fn load_fuer_org(
     pool: &SqlitePool,
     org_id: i64,

@@ -18,7 +18,9 @@ use futures::future::BoxFuture;
 use lifeline_hub::adapter::matrix::{self, Clients, MatrixZiel};
 use lifeline_hub::adapter::Rahmen;
 use lifeline_hub::ausgang::lauf::{self, Fehlschlag, Versandauftrag, Versandzugang, Zusteller};
-use lifeline_hub::ausgang::zusteller::{MatrixZusteller, Zustellt};
+use lifeline_hub::ausgang::zusteller::{
+    AufzeichnenderFaxZusteller, MatrixZusteller, Zustellt, Zustellwege,
+};
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use matrix_sdk::ruma::{device_id, user_id, RoomVersionId};
@@ -383,7 +385,12 @@ impl Welt {
     }
 
     async fn durchgang(&self, jetzt: DateTime<Utc>) {
-        lauf::durchgang(&self.pool, &self.rahmen, &self.live, &self.zusteller, jetzt)
+        // Ein Fax kommt hier nicht vor; der Fax-Weg ist das Doppel ohne Netz.
+        let wege = Zustellwege {
+            mail: self.zusteller.clone(),
+            fax: Arc::new(AufzeichnenderFaxZusteller::default()),
+        };
+        lauf::durchgang(&self.pool, &self.rahmen, &self.live, &wege, jetzt)
             .await
             .unwrap();
     }

@@ -354,11 +354,12 @@ fn normalize_email_lehnt_mehrere_und_anzeigenamen_ab() {
 }
 
 #[test]
-fn matrix_ist_freigeschaltet() {
+fn email_fax_und_matrix_sind_freigeschaltet_threema_nicht() {
     use super::KanalArt;
     assert!(KanalArt::Email.is_freigeschaltet());
+    assert!(KanalArt::Fax.is_freigeschaltet());
     assert!(KanalArt::Matrix.is_freigeschaltet());
-    for k in [KanalArt::Fax, KanalArt::Threema] {
+    for k in [KanalArt::Threema] {
         assert!(!k.is_freigeschaltet());
     }
 }
@@ -372,6 +373,29 @@ fn matrix_raum_id_und_alias_werden_angenommen() {
     assert_eq!(
         super::kanal::normalize_matrix(" #lage:example.org ").unwrap(),
         "#lage:example.org"
+    );
+}
+
+#[test]
+fn faxnummern_in_alltagsform_werden_e164() {
+    use super::kanal::normalize_fax;
+    assert_eq!(normalize_fax("0511 / 123 45-6").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("+49 (0) 511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("0049 511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax(" (0511) 123456 ").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("+43 1 58801").unwrap(), "+43158801");
+    assert_eq!(normalize_fax("+49.511.123456").unwrap(), "+49511123456");
+    assert!(normalize_fax("511 123").is_err(), "ohne 0, 00 oder +");
+    assert!(normalize_fax("+49 12").is_err(), "unter 8 Ziffern");
+    assert!(
+        normalize_fax("+49 1234 5678 9012 34").is_err(),
+        "über 15 Ziffern"
+    );
+    assert!(normalize_fax("0511 abc").is_err());
+    assert!(normalize_fax("").is_err());
+    assert!(
+        normalize_fax("+0511123456").is_err(),
+        "Länderkennung beginnt nie mit 0"
     );
 }
 
@@ -416,6 +440,40 @@ fn matrix_adresse_ueber_255_bytes_abgelehnt() {
     let zu_lang = format!("#{}:example.org", "a".repeat(250));
     assert!(zu_lang.len() > 255);
     assert!(super::kanal::normalize_matrix(&zu_lang).is_err());
+}
+
+#[test]
+fn die_null_der_vorwahl_hinter_plus_49_faellt_weg_und_jeder_leerraum_zaehlt_nicht() {
+    use super::kanal::normalize_fax;
+    assert_eq!(normalize_fax("+49 (0511) 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("+49 0511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("0049 0511 123456").unwrap(), "+49511123456");
+    assert_eq!(normalize_fax("0511\u{a0}123456").unwrap(), "+49511123456");
+    assert_eq!(
+        normalize_fax("0511\t123\u{2009}456").unwrap(),
+        "+49511123456"
+    );
+    // Nur bei +49: andere Länder behalten ihre Ziffern (Italien wählt die 0 mit).
+    assert_eq!(normalize_fax("+39 06 1234567").unwrap(), "+39061234567");
+}
+
+mod fax_eigenschaften {
+    use super::super::kanal::normalize_fax;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn jede_angenommene_nummer_ist_e164_und_bleibt_bei_erneuter_pruefung_gleich(roh in "[ 0-9+()/.-]{0,30}") {
+            if let Ok(n) = normalize_fax(&roh) {
+                prop_assert!(n.starts_with('+'));
+                let ziffern = &n[1..];
+                prop_assert!(ziffern.chars().all(|c| c.is_ascii_digit()));
+                prop_assert!((8..=15).contains(&ziffern.len()), "{}", n);
+                prop_assert!(!ziffern.starts_with('0'));
+                prop_assert_eq!(normalize_fax(&n).unwrap(), n);
+            }
+        }
+    }
 }
 
 #[tokio::test]

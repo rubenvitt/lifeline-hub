@@ -201,3 +201,17 @@ describe('Angaben einer Anbindung (LLH-1652)', () => {
     );
   });
 });
+
+describe('Ortung im Einsatz (LLH-2120)', () => {
+  it('benennt jeden Wechsel der beiden Org-Schalter', () => {
+    expect(AKTION_TEXT.ortung_eingeschaltet).toBe('Ortung im Einsatz eingeschaltet');
+    expect(AKTION_TEXT.ortung_ausgeschaltet).toBe('Ortung im Einsatz ausgeschaltet');
+    expect(AKTION_TEXT.ortung_personen_eingeschaltet).toBe('Ortung von Personen eingeschaltet');
+    expect(AKTION_TEXT.ortung_personen_ausgeschaltet).toBe('Ortung von Personen ausgeschaltet');
+  });
+
+  it('hat kein Namensziel (das Ziel ist der Schalter selbst)', () => {
+    expect(hasNamensziel('ortung_eingeschaltet')).toBe(false);
+    expect(hasNamensziel('ortung_personen_ausgeschaltet')).toBe(false);
+  });
+});

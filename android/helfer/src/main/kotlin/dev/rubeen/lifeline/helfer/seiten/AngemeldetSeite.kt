@@ -32,8 +32,9 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Bildschirm 4 „Angemeldet“ (Spec „Bildschirme“): große Anzeige „Ortung an“ mit Ziel, Alter der
- * letzten Sendung und Verbindungszustand, „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe
- * ([Phase.Ruht]) „Angemeldet – Ortung ruht“ mit dem Grund und nur „Abmelden“.
+ * letzten Sendung und Verbindungszustand, darunter der Bereich „Aufträge“ (ADR-0111, auch pausiert
+ * und in der Ruhe), „Pausieren“/„Fortsetzen“, „Abmelden“. In der Ruhe ([Phase.Ruht]) „Angemeldet –
+ * Ortung ruht“ mit dem Grund und nur „Abmelden“.
  */
 @Composable
 fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStarten: () -> Unit, onEinstellungen: () -> Unit) {
@@ -106,6 +107,7 @@ fun AngemeldetSeite(modell: HelferModell, onFortsetzen: () -> Unit, onOrtungStar
                 Wertzeile("Angemeldet bis", UHRZEIT.format(ablauf.atZone(ZoneId.systemDefault())), R.drawable.symbol_sanduhr)
             }
         }
+        AuftraegeBereich(modell)
         OrtungsHinweise(modell, onOrtungStarten, onEinstellungen)
         modell.meldung?.let { Hinweis(it) }
         Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {

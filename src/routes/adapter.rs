@@ -392,11 +392,15 @@ fn check_platz_setzbar(art: &dyn AdapterArt, platz: &str) -> Result<(), AppError
 }
 
 /// Die Meldung, wenn eine Art höchstens einmal je Org angelegt werden darf und es schon eine gibt
-/// (auch eine angehaltene zählt): `smtp` (LLH-2093), `matrix` (LLH-2094). `None` für andere Arten.
+/// (auch eine angehaltene zählt): `smtp` (LLH-2093), `sipgate_fax` (LLH-2095), `matrix`
+/// (LLH-2094). `None` für andere Arten.
 fn meldung_schon_vorhanden(code: &str) -> Option<&'static str> {
     match code {
         crate::adapter::smtp_art::CODE => {
             Some("Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.")
+        }
+        crate::adapter::sipgate_fax_art::CODE => {
+            Some("Es gibt schon eine Fax-Anbindung; ändere oder lösche sie.")
         }
         crate::adapter::matrix_art::CODE => {
             Some("Es gibt schon eine Matrix-Anbindung; ändere oder lösche sie.")
@@ -566,8 +570,9 @@ pub async fn create(
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
-        // Eine Org hat höchstens eine E-Mail- und eine Matrix-Anbindung, auch eine angehaltene
-        // zählt (LLH-2093, LLH-2094).
+        // Eine Org hat höchstens eine E-Mail-, eine Fax- und eine Matrix-Anbindung, auch eine
+        // angehaltene zählt (LLH-2093, LLH-2095, LLH-2094): der Ausgangskorb wählt die Anbindung
+        // je Kanal.
         if let Some(meldung) = meldung_schon_vorhanden(code) {
             let (vorhanden,): (i64,) =
                 sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
@@ -755,8 +760,11 @@ pub async fn delete(
         Ok((a, erledigt))
     })?;
     // Mit dem Adapter fallen seine Zuschaltungen (`ON DELETE CASCADE`); erst nach dem Commit
-    // vergisst der Store Merker und Stand (LLH-2105).
-    state.drohne.set_zugeschaltet(&id, false);
+    // vergisst der Store Merker und Stand (LLH-2105), über den geordneten Abgleich (LLH-2123).
+    // Der Adapter ist schon weg; ein Lesefehler lässt höchstens einen Merker ohne Abruf stehen.
+    if let Err(e) = crate::routes::drohne::sync_store(&state, std::slice::from_ref(&id)).await {
+        tracing::error!("Drohnen-Store nach dem Löschen nicht nachgeführt: {e}");
+    }
     verwerfen_falls_matrix(&state.adapter, &a.art, &id).await;
     crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(

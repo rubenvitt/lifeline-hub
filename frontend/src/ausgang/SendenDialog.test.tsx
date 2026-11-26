@@ -11,7 +11,7 @@ const kanal = (
   id: number,
   stelle: string,
   adresse: string,
-  art: 'email' | 'matrix' = 'email',
+  art: 'email' | 'fax' | 'matrix' = 'email',
   stelleId = id,
 ): KanalMitStelle => ({
   agency_id: stelleId,
@@ -219,5 +219,69 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /zweite@example\.org/ })).not.toBeChecked();
     expect(screen.getByRole('button', { name: 'Senden' })).toBeEnabled();
+  });
+
+  it('zeigt Faxnummern mit Kanalzeichen und sendet an eine Faxnummer', async () => {
+    kanaele([...KANAELE, kanal(21, 'Kreis', '+49511123456', 'fax')]);
+    const bodies: unknown[] = [];
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json([], { status: 201 });
+      }),
+    );
+    zeige({ vorschlagNamen: [] });
+    const fax = await screen.findByRole('checkbox', { name: /Kreis · \+49511123456/ });
+    expect(fax.closest('label')).toHaveTextContent(/^Fax\s*Kreis/);
+    await userEvent.click(fax);
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((bodies[0] as { recipients: unknown }).recipients).toEqual([{ channel_id: 21 }]);
+  });
+
+  it('belegt nur Mailadressen vor, nie zusätzlich die Faxnummer derselben Stelle', async () => {
+    kanaele([...KANAELE, kanal(21, 'ILS Nord', '+49511123456', 'fax', 11)]);
+    zeige();
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: /ILS Nord · ils@/ })).toBeChecked(),
+    );
+    expect(screen.getByRole('checkbox', { name: /ILS Nord · \+49/ })).not.toBeChecked();
+  });
+
+  it('nennt den fehlenden Faxzugang, wenn nur Faxe gehen', async () => {
+    kanaele([kanal(21, 'Kreis', '+49511123456', 'fax')]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Faxzugang eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige({ vorschlagNamen: [] });
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Kreis/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(await screen.findByText('Kein Faxzugang eingerichtet')).toBeInTheDocument();
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
+  });
+
+  it('zeigt bei zu_gross den Text des Servers, der den Kanal nennt', async () => {
+    kanaele([kanal(21, 'Kreis', '+49511123456', 'fax')]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          {
+            error: 'Das Fax hätte 45 Seiten; erlaubt sind höchstens 30 Seiten und 10 MiB',
+            grund: 'zu_gross',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige({ vorschlagNamen: [] });
+    await userEvent.click(await screen.findByRole('checkbox', { name: /Kreis/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect(await screen.findByText(/Das Fax hätte 45 Seiten/)).toBeInTheDocument();
+    expect(screen.queryByText('Anhänge zu groß für eine Mail')).toBeNull();
   });
 });

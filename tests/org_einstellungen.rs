@@ -1090,3 +1090,97 @@ async fn org_ortung_ist_anfangs_aus_und_braucht_bestaetigung() {
     assert_eq!(body["ortung_im_einsatz"], false);
     assert_eq!(body["ortung_personen"], false);
 }
+
+/// Einträge der Admin-Spur zur Ortung: (Aktion, Ziel, akteur_name, Zeitpunkt gesetzt).
+async fn ortung_spur(pool: &sqlx::SqlitePool) -> Vec<(String, String, Option<String>, bool)> {
+    sqlx::query_as(
+        "SELECT aktion, ziel, akteur_name, zeitpunkt IS NOT NULL FROM admin_audit \
+         WHERE aktion LIKE 'ortung_%' ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+/// LLH-2120: Jeder Wechsel eines Ortungsschalters steht mit Person und Zeitpunkt in der
+/// Admin-Spur; ein gleicher oder fehlender Wert schreibt nichts. Geht die Ortung aus, während
+/// „Personen orten“ an war, wechseln beide Schalter, also zwei Zeilen.
+#[tokio::test]
+async fn ortung_umschalten_schreibt_die_admin_spur_nur_bei_wechsel() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let zeile = |aktion: &str, ziel: &str| {
+        (
+            aktion.to_string(),
+            ziel.to_string(),
+            Some("admin".to_string()),
+            true,
+        )
+    };
+
+    let (status, body) =
+        put_einstellungen(&app, &admin, serde_json::json!({"ortung_im_einsatz": true})).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(
+        ortung_spur(&pool).await,
+        vec![zeile("ortung_eingeschaltet", "ortung")]
+    );
+
+    // Gleicher Wert, fehlendes Feld: keine neue Zeile.
+    for body in [
+        serde_json::json!({"ortung_im_einsatz": true}),
+        serde_json::json!({"zeitzone": "UTC"}),
+    ] {
+        let (status, _) = put_einstellungen(&app, &admin, body).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    assert_eq!(ortung_spur(&pool).await.len(), 1);
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"ortung_im_einsatz": true, "ortung_personen": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Eine abgelehnte Anfrage (422) schreibt nichts.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"ortung_im_einsatz": false, "ortung_personen": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"ortung_im_einsatz": false}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        ortung_spur(&pool).await,
+        vec![
+            zeile("ortung_eingeschaltet", "ortung"),
+            zeile("ortung_personen_eingeschaltet", "ortung_personen"),
+            zeile("ortung_ausgeschaltet", "ortung"),
+            zeile("ortung_personen_ausgeschaltet", "ortung_personen"),
+        ]
+    );
+}
+
+/// Eine Führungskraft schaltet nicht (403) und hinterlässt keine Spur.
+#[tokio::test]
+async fn ortung_als_fuehrungskraft_schreibt_keine_spur() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) =
+        put_einstellungen(&app, &fk, serde_json::json!({"ortung_im_einsatz": true})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(ortung_spur(&pool).await.is_empty());
+}

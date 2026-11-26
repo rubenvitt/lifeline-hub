@@ -14,13 +14,14 @@ use sqlx::{SqliteConnection, SqlitePool};
 const ZEILE: &str = "id, org_id, einsatz_id, client_id, quelle_art, quelle_id, kanal, \
      externe_stelle_id, stelle_bezeichnung, adresse, betreff, inhalt, zustand, versuche, \
      naechster_versuch_at, erster_versuch_at, versuch_begonnen_at, fehler_art, fehler_status, \
-     erstellt_von_id, erstellt_at, uebergeben_at, etb_eintrag_id";
+     erstellt_von_id, erstellt_at, uebergeben_at, etb_eintrag_id, anbieter_ref, zugestellt_at, \
+     naechste_abfrage_at, ohne_pdf";
 
 /// Spalten der Versandliste (ohne Text), mit dem Namen des Absenders.
 const ANZEIGE: &str = "a.id, a.quelle_art, a.quelle_id, a.kanal, a.externe_stelle_id, \
      a.stelle_bezeichnung, a.adresse, a.betreff, a.zustand, a.fehler_art, a.fehler_status, \
      a.versuche, a.erstellt_von_id, b.anzeigename AS erstellt_von_name, a.erstellt_at, \
-     a.uebergeben_at";
+     a.uebergeben_at, a.zugestellt_at, a.ohne_pdf";
 
 #[derive(sqlx::FromRow)]
 struct AnzeigeZeile {
@@ -41,6 +42,8 @@ struct AnzeigeZeile {
     erstellt_von_name: Option<String>,
     erstellt_at: String,
     uebergeben_at: Option<String>,
+    zugestellt_at: Option<String>,
+    ohne_pdf: bool,
 }
 
 impl From<AnzeigeZeile> for Versand {
@@ -62,15 +65,23 @@ impl From<AnzeigeZeile> for Versand {
             created_by_name: z.erstellt_von_name,
             created_at: z.erstellt_at,
             handed_over_at: z.uebergeben_at,
+            delivered_at: z.zugestellt_at,
+            without_pdf: z.ohne_pdf,
         }
     }
 }
 
 /// Ergebnis eines Zustellversuchs, wie [`save_ergebnis_tx`] es schreibt.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Ergebnis {
-    /// Vom Mailserver angenommen.
-    Uebergeben { at: DateTime<Utc> },
+    /// Vom Mailserver bzw. Fax-Anbieter angenommen. Ein Fax trägt die Session des Anbieters
+    /// (`anbieter_ref`), danach fragt der Lauf ab ([`super::zustand::erste_abfrage`]); eine Mail
+    /// ohne PDF trägt `ohne_pdf`.
+    Uebergeben {
+        at: DateTime<Utc>,
+        anbieter_ref: Option<String>,
+        ohne_pdf: bool,
+    },
     /// Vorübergehender Fehler: bleibt `wartet`, nächster Versuch zum Zeitpunkt `naechster`.
     Wiederholen {
         naechster: DateTime<Utc>,
@@ -233,7 +244,8 @@ pub async fn retry_tx(
     let geaendert = sqlx::query(
         "UPDATE ausgang SET zustand = 'wartet', versuche = 0, erster_versuch_at = ?, \
              naechster_versuch_at = ?, versuch_begonnen_at = NULL, fehler_art = NULL, \
-             fehler_status = NULL, uebergeben_at = NULL \
+             fehler_status = NULL, uebergeben_at = NULL, anbieter_ref = NULL, \
+             zugestellt_at = NULL, naechste_abfrage_at = NULL, ohne_pdf = 0 \
          WHERE id = ? AND einsatz_id = ? AND zustand = 'fehlgeschlagen'",
     )
     .bind(&t)
@@ -269,6 +281,70 @@ pub async fn load_faellige(
     .fetch_all(pool)
     .await
     .map_err(Into::into)
+}
+
+/// Übergebene Faxe, deren nächste Abfrage beim Anbieter fällig ist (LLH-2095, Spec Abschnitt 5);
+/// nach Fälligkeit sortiert. Eine Mail hat keine `anbieter_ref` und kommt nie hierher.
+pub async fn load_abzufragende(
+    pool: &SqlitePool,
+    jetzt: DateTime<Utc>,
+    limit: i64,
+) -> Result<Vec<VersandZeile>, AppError> {
+    sqlx::query_as::<_, VersandZeile>(sqlx::AssertSqlSafe(format!(
+        "SELECT {ZEILE} FROM ausgang \
+         WHERE zustand = 'uebergeben' AND anbieter_ref IS NOT NULL \
+           AND naechste_abfrage_at <= ? \
+         ORDER BY naechste_abfrage_at, id LIMIT ?"
+    )))
+    .bind(zeit(jetzt))
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(Into::into)
+}
+
+/// Ergebnis einer Abfrage beim Fax-Anbieter, wie [`save_abfrage_tx`] es schreibt.
+#[derive(Debug, Clone, Copy)]
+pub enum Abfrage {
+    /// Der Anbieter bestätigt die Zustellung.
+    Zugestellt { at: DateTime<Utc> },
+    /// Der Anbieter meldet, dass das Fax nicht durchging.
+    NichtZugestellt,
+    /// Kein Endstand innerhalb der Frist.
+    Ungewiss,
+    /// Noch kein Endstand: wieder fragen zu `naechste`.
+    Weiter { naechste: DateTime<Utc> },
+}
+
+/// Schreibt das Ergebnis einer Abfrage, aber nur an einem Fax, das noch `uebergeben` ist.
+/// Liefert, ob eine Zeile sich änderte (sonst hat ein anderer Lauf schon abgeschlossen).
+pub async fn save_abfrage_tx(
+    conn: &mut SqliteConnection,
+    id: &str,
+    a: Abfrage,
+) -> Result<bool, AppError> {
+    const BEDINGUNG: &str = "WHERE id = ? AND zustand = 'uebergeben' AND anbieter_ref IS NOT NULL";
+    let q = match a {
+        Abfrage::Zugestellt { at } => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'zugestellt', zugestellt_at = ?, \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        )))
+        .bind(zeit(at)),
+        Abfrage::NichtZugestellt => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'fehlgeschlagen', fehler_art = 'nicht_zugestellt', \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        ))),
+        Abfrage::Ungewiss => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET zustand = 'fehlgeschlagen', fehler_art = 'ungewiss', \
+             naechste_abfrage_at = NULL {BEDINGUNG}"
+        ))),
+        Abfrage::Weiter { naechste } => sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE ausgang SET naechste_abfrage_at = ? {BEDINGUNG}"
+        )))
+        .bind(zeit(naechste)),
+    };
+    let n = q.bind(id).execute(&mut *conn).await?.rows_affected();
+    Ok(n == 1)
 }
 
 /// Beansprucht einen Zustellversuch vor dem Netz: setzt `versuch_begonnen_at`, zählt `versuche`
@@ -314,12 +390,25 @@ pub async fn save_ergebnis_tx(
     // `IS ?` vergleicht auch mit NULL (SQLite).
     const BEDINGUNG: &str = "WHERE id = ? AND zustand = 'wartet' AND versuch_begonnen_at IS ?";
     let q = match ergebnis {
-        Ergebnis::Uebergeben { at } => sqlx::query(sqlx::AssertSqlSafe(format!(
-            "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
+        Ergebnis::Uebergeben {
+            at,
+            anbieter_ref,
+            ohne_pdf,
+        } => {
+            let abfrage = anbieter_ref
+                .as_ref()
+                .map(|_| zeit(super::zustand::erste_abfrage(at)));
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
                  naechster_versuch_at = NULL, versuch_begonnen_at = NULL, fehler_art = NULL, \
-                 fehler_status = NULL {BEDINGUNG}"
-        )))
-        .bind(zeit(at)),
+                 fehler_status = NULL, anbieter_ref = ?, naechste_abfrage_at = ?, ohne_pdf = ? \
+                 {BEDINGUNG}"
+            )))
+            .bind(zeit(at))
+            .bind(anbieter_ref)
+            .bind(abfrage)
+            .bind(ohne_pdf)
+        }
         Ergebnis::Wiederholen {
             naechster,
             fehler,

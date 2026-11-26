@@ -15,6 +15,8 @@ pub mod live;
 pub mod matrix;
 pub mod matrix_art;
 pub mod repo;
+pub mod sipgate;
+pub mod sipgate_fax_art;
 pub mod smtp;
 pub mod smtp_art;
 pub mod ziel;

@@ -13,11 +13,15 @@ use std::time::Duration;
 use axum::http::StatusCode;
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
+use lifeline_hub::adapter::sipgate::{FaxStatus, SipgateFehler};
 use lifeline_hub::adapter::smtp::SmtpFehler;
 use lifeline_hub::adapter::Rahmen;
 use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
 use lifeline_hub::ausgang::lauf::{Fehlschlag, Versandauftrag, Zustellfehler, Zustellt};
-use lifeline_hub::ausgang::zusteller::{AufzeichnenderZusteller, SmtpTransport, Zustellerwahl};
+use lifeline_hub::ausgang::zusteller::{
+    AufzeichnenderFaxZusteller, AufzeichnenderZusteller, SmtpTransport, Zustellerwahl,
+    Zustellwege,
+};
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use serde_json::json;
@@ -29,6 +33,7 @@ use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie, multipart
 const PASSWORT: &str = "Geheim-Passwort-4711";
 const ADRESSE: &str = "lagedienst@leitstelle.example";
 const STELLE: &str = "Leitstelle Nord";
+const FAXNUMMER: &str = "+49511123456";
 
 /// Ein SMTP-Transport, der vorgegebene Ergebnisse abspielt (leer heißt angenommen) und mitschreibt.
 #[derive(Default)]
@@ -88,10 +93,12 @@ struct Welt {
     org_id: i64,
     benutzer_id: i64,
     adapter_id: String,
+    fax_adapter_id: String,
     skript: Arc<Skript>,
     /// Was der Matrix-Zweig der Weiche angenommen hat (ohne Netz).
     matrix: Arc<AufzeichnenderZusteller>,
-    zusteller: Arc<dyn Zusteller>,
+    fax: Arc<AufzeichnenderFaxZusteller>,
+    wege: Zustellwege,
 }
 
 async fn welt() -> Welt {
@@ -100,7 +107,7 @@ async fn welt() -> Welt {
         .await
         .unwrap();
     let live = LiveHub::new();
-    let (rahmen, _pruefer) = adapter_testart::rahmen_smtp_matrix();
+    let (rahmen, _smtp, _fax) = adapter_testart::rahmen_ausgang();
     let mut state = common::test_state(&pool, &live);
     state.adapter = rahmen.clone();
     let app = lifeline_hub::app::build_router(state);
@@ -137,8 +144,35 @@ async fn welt() -> Welt {
     .await;
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 
+    let body = json!({
+        "art": "sipgate_fax", "name": "Fax",
+        "einstellungen": { "token_id": "token-ABC", "faxline_id": "f0", "absender_kennung": "ELW 1" }
+    });
+    let (s, a) = anfrage_json(&app, "POST", "/api/admin/adapter", &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::CREATED, "{a}");
+    let fax_adapter_id = a["id"].as_str().unwrap().to_string();
+    let (s, v) = anfrage_json(
+        &app,
+        "PUT",
+        &format!("/api/admin/adapter/{fax_adapter_id}/secrets/token"),
+        &admin,
+        Some(&json!({ "wert": "Geheim-Token-0815" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+
     let skript = Arc::new(Skript::default());
     let matrix = Arc::new(AufzeichnenderZusteller::default());
+    let fax = Arc::new(AufzeichnenderFaxZusteller::default());
+    // Wie produktiv eine Weiche je Kanal: E-Mail über SMTP, Matrix an ein Doppel ohne Netz (der
+    // echte Matrix-Zusteller: `tests/ausgang_matrix.rs`); das Fax an das Fax-Doppel.
+    let wege = Zustellwege {
+        mail: Arc::new(Zustellerwahl::new(
+            Arc::new(SmtpZusteller::mit_transport(skript.clone())),
+            matrix.clone(),
+        )),
+        fax: fax.clone(),
+    };
     Welt {
         app,
         pool,
@@ -149,18 +183,23 @@ async fn welt() -> Welt {
         org_id,
         benutzer_id,
         adapter_id,
-        // Wie produktiv eine Weiche je Kanal: E-Mail über SMTP, Matrix an ein Doppel ohne Netz
-        // (der echte Matrix-Zusteller: `tests/ausgang_matrix.rs`).
-        zusteller: Arc::new(Zustellerwahl::new(
-            Arc::new(SmtpZusteller::mit_transport(skript.clone())),
-            matrix.clone(),
-        )),
+        fax_adapter_id,
         skript,
         matrix,
+        fax,
+        wege,
     }
 }
 
 impl Welt {
+    /// Die Wege des Laufs mit einem eigenen Zusteller für E-Mail und Matrix; Faxe an das Doppel.
+    fn wege_mit(&self, mail: Arc<dyn Zusteller>) -> Zustellwege {
+        Zustellwege {
+            mail,
+            fax: self.fax.clone(),
+        }
+    }
+
     fn lb(&self, rest: &str) -> String {
         format!("/api/incidents/{}/situation-reports{rest}", self.einsatz)
     }
@@ -227,12 +266,17 @@ impl Welt {
 
     /// Legt einen wartenden Versand an, fällig zu `ab`.
     async fn versand(&self, quelle: &str, quelle_id: i64, ab: DateTime<Utc>) -> String {
-        self.versand_in("email", ADRESSE, quelle, quelle_id, ab)
+        self.versand_an("email", ADRESSE, quelle, quelle_id, ab)
             .await
     }
 
-    /// Wie [`Welt::versand`], in einem Kanal an eine Adresse.
-    async fn versand_in(
+    /// Legt einen wartenden Fax-Versand an, fällig zu `ab`.
+    async fn fax_versand(&self, quelle: &str, quelle_id: i64, ab: DateTime<Utc>) -> String {
+        self.versand_an("fax", FAXNUMMER, quelle, quelle_id, ab)
+            .await
+    }
+
+    async fn versand_an(
         &self,
         kanal: &str,
         adresse: &str,
@@ -275,7 +319,7 @@ impl Welt {
     }
 
     async fn durchgang(&self, jetzt: DateTime<Utc>) {
-        lauf::durchgang(&self.pool, &self.rahmen, &self.live, &self.zusteller, jetzt)
+        lauf::durchgang(&self.pool, &self.rahmen, &self.live, &self.wege, jetzt)
             .await
             .unwrap();
     }
@@ -284,7 +328,8 @@ impl Welt {
     async fn etb_versand(&self) -> Vec<(String, String)> {
         sqlx::query_as(
             "SELECT inhalt, an FROM etb_eintrag \
-             WHERE einsatz_id = ? AND typ = 'system' AND inhalt LIKE '%per E-Mail an%' ORDER BY id",
+             WHERE einsatz_id = ? AND typ = 'system' \
+               AND (inhalt LIKE '%per E-Mail an%' OR inhalt LIKE '%per Fax an%') ORDER BY id",
         )
         .bind(self.einsatz)
         .fetch_all(&self.pool)
@@ -784,7 +829,7 @@ async fn veraltete_kopie_nach_dem_abschluss_stellt_nicht_ein_zweites_mal_zu() {
         &w.pool,
         &w.rahmen,
         &w.live,
-        &w.zusteller,
+        &w.wege,
         veraltet.clone(),
         t0 + chrono::Duration::seconds(1),
     )
@@ -804,7 +849,7 @@ async fn veraltete_kopie_nach_dem_abschluss_stellt_nicht_ein_zweites_mal_zu() {
         &w.pool,
         &w.rahmen,
         &w.live,
-        &w.zusteller,
+        &w.wege,
         veraltet,
         t0 + chrono::Duration::seconds(2),
     )
@@ -826,7 +871,10 @@ async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
         begonnen: tokio::sync::Notify::new(),
         frei: tokio::sync::Semaphore::new(0),
     });
-    let gesperrt: Arc<dyn Zusteller> = Arc::new(SmtpZusteller::mit_transport(sperre.clone()));
+    let gesperrt = Zustellwege {
+        mail: Arc::new(SmtpZusteller::mit_transport(sperre.clone())),
+        fax: w.fax.clone(),
+    };
 
     // Lauf A beansprucht die Zeile und hängt im Netz.
     let a = {
@@ -841,7 +889,7 @@ async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
     sperre.begonnen.notified().await;
     // Lauf B mit der Kopie von vorher (ungesperrt, damit der Test nie hängt): bekommt die
     // Zeile nicht.
-    lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &w.zusteller, veraltet, t0)
+    lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &w.wege, veraltet, t0)
         .await
         .unwrap();
     sperre.frei.add_permits(2);
@@ -926,7 +974,10 @@ async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
         begonnen: tokio::sync::Notify::new(),
         frei: tokio::sync::Semaphore::new(0),
     });
-    let gesperrt: Arc<dyn Zusteller> = Arc::new(SmtpZusteller::mit_transport(sperre.clone()));
+    let gesperrt = Zustellwege {
+        mail: Arc::new(SmtpZusteller::mit_transport(sperre.clone())),
+        fax: w.fax.clone(),
+    };
     let lauf_a = {
         let (pool, rahmen, live, z) = (
             w.pool.clone(),
@@ -1079,7 +1130,7 @@ async fn teile_werden_mit_dem_ergebnis_gespeichert() {
     doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
         teile: teile(&[(0, "$text"), (1, "$anlage")]),
     }));
-    let zusteller: Arc<dyn Zusteller> = doppel.clone();
+    let zusteller = w.wege_mit(doppel.clone());
 
     lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
         .await
@@ -1111,7 +1162,7 @@ async fn gemerkte_teile_gehen_dem_naechsten_versuch_mit() {
     doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
         teile: teile(&[(1, "$anlage")]),
     }));
-    let zusteller: Arc<dyn Zusteller> = doppel.clone();
+    let zusteller = w.wege_mit(doppel.clone());
 
     lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
         .await
@@ -1139,7 +1190,7 @@ async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
     let lid = w.lagebericht_freigeben(false).await;
     let t0 = Utc::now();
     let id = w
-        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
         .await;
 
     w.durchgang(t0).await;
@@ -1198,9 +1249,9 @@ async fn kein_zutritt_und_verschluesselung_sind_endgueltig_mit_eigenem_code() {
         let lid = w.lagebericht_freigeben(false).await;
         let t0 = Utc::now();
         let id = w
-            .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+            .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
             .await;
-        let zusteller: Arc<dyn Zusteller> = Arc::new(Scheitert(fehler, grund));
+        let zusteller = w.wege_mit(Arc::new(Scheitert(fehler, grund)));
 
         lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
             .await
@@ -1252,10 +1303,10 @@ async fn geloeschter_versand_nimmt_seine_teile_ohne_fehler_mit() {
     let lid = w.lagebericht_freigeben(false).await;
     let t0 = Utc::now();
     let id = w
-        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
         .await;
     let zeile = w.zeile(&id).await;
-    let zusteller: Arc<dyn Zusteller> = Arc::new(LoeschtDieZeile(w.pool.clone()));
+    let zusteller = w.wege_mit(Arc::new(LoeschtDieZeile(w.pool.clone())));
     let vorher = w.etb_anzahl().await;
 
     lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &zusteller, zeile, t0)
@@ -1270,6 +1321,117 @@ async fn geloeschter_versand_nimmt_seine_teile_ohne_fehler_mit() {
     );
 }
 
+/// Ersetzt die Bytes der jüngsten PNG-Anlage durch ein PNG, das die Bereinigung durchlässt, das
+/// aber kein Bild ergibt (IDAT ohne gültige Daten).
+async fn anlage_unlesbar_machen(w: &Welt) {
+    let png = png_bytes(32, 24);
+    let mut kaputt = png[..33].to_vec();
+    kaputt.extend_from_slice(&png_chunk(b"IDAT", b"kein zlib"));
+    kaputt.extend_from_slice(&png_chunk(b"IEND", b""));
+    let n = sqlx::query(
+        "UPDATE anhang SET daten = ?, groesse = ? WHERE id = \
+         (SELECT id FROM anhang WHERE einsatz_id = ? AND mime = 'image/png' ORDER BY id DESC LIMIT 1)",
+    )
+    .bind(&kaputt)
+    .bind(kaputt.len() as i64)
+    .bind(w.einsatz)
+    .execute(&w.pool)
+    .await
+    .unwrap()
+    .rows_affected();
+    assert_eq!(n, 1);
+}
+
+async fn without_pdf(w: &Welt, id: &str) -> bool {
+    sqlx::query_scalar("SELECT ohne_pdf FROM ausgang WHERE id = ?")
+        .bind(id)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn eine_mail_traegt_das_pdf_als_ersten_anhang() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    w.durchgang(t0).await;
+    let text = String::from_utf8_lossy(&w.skript.gesehen()[0].mail).to_lowercase();
+    let pdf = text
+        .find("content-type: application/pdf")
+        .expect("PDF fehlt");
+    let png = text.find("content-type: image/png").expect("PNG fehlt");
+    assert!(pdf < png, "das PDF kommt vor den PNG-Anlagen");
+    assert!(text.contains("filename=\"lagebericht-1.pdf\""), "{text}");
+    assert!(!without_pdf(&w, &id).await);
+}
+
+#[tokio::test]
+async fn scheitert_das_pdf_geht_die_mail_ohne_pdf_und_ist_vermerkt() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    anlage_unlesbar_machen(&w).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    w.durchgang(t0).await;
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    let text = String::from_utf8_lossy(&w.skript.gesehen()[0].mail).to_lowercase();
+    assert!(!text.contains("application/pdf"), "{text}");
+    assert!(
+        text.contains("content-type: image/png"),
+        "die PNG-Anlage geht trotzdem mit"
+    );
+    assert!(without_pdf(&w, &id).await);
+}
+
+#[tokio::test]
+async fn ein_fax_wird_uebergeben_und_merkt_die_session() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    let t0 = Utc::now();
+    let id = w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Ok("sess-1".into()));
+    w.durchgang(t0).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    assert_eq!(z.anbieter_ref.as_deref(), Some("sess-1"));
+    assert!(z.naechste_abfrage_at.is_some());
+    let gesendet = w.fax.gesendet();
+    assert_eq!(gesendet.len(), 1);
+    assert_eq!(gesendet[0].empfaenger, FAXNUMMER);
+    assert_eq!(gesendet[0].faxline_id, "f0");
+    assert_eq!(gesendet[0].dateiname, "lagebericht-1.pdf");
+    assert!(gesendet[0].pdf.starts_with(b"%PDF-"));
+    assert!(gesendet[0].mit_token, "das Token kam nicht im Zugang an");
+    assert!(w.skript.gesehen().is_empty(), "keine Mail für ein Fax");
+    assert!(w.etb_versand().await.is_empty(), "ETB erst beim Endstand");
+}
+
+#[tokio::test]
+async fn fax_402_ist_anbindung_fehler_mit_etb() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Err(SipgateFehler::Status(402)));
+    w.durchgang(t0).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::AnbindungFehler));
+    assert_eq!(z.fehler_status, Some(402));
+    let etb = w.etb_versand().await;
+    assert_eq!(etb.len(), 1);
+    assert_eq!(
+        etb[0].0,
+        format!(
+            "Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}) nicht zugestellt: \
+             Guthaben bei sipgate aufgebraucht"
+        )
+    );
+}
+
 #[tokio::test]
 async fn matrix_zeile_ohne_matrix_anbindung_ist_anbindung_fehlt() {
     // Der Mailserver ist da; er zählt für Matrix nicht.
@@ -1277,7 +1439,7 @@ async fn matrix_zeile_ohne_matrix_anbindung_ist_anbindung_fehlt() {
     let lid = w.lagebericht_freigeben(false).await;
     let t0 = Utc::now();
     let id = w
-        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
         .await;
 
     w.durchgang(t0).await;
@@ -1293,4 +1455,256 @@ async fn matrix_zeile_ohne_matrix_anbindung_ist_anbindung_fehlt() {
     .await
     .unwrap();
     assert!(text.contains("kein Matrix-Konto eingerichtet"), "{text}");
+}
+
+#[tokio::test]
+async fn fax_407_ist_abgelehnt() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Err(SipgateFehler::Status(407)));
+    w.durchgang(t0).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Abgelehnt));
+}
+
+#[tokio::test]
+async fn fax_503_wird_wiederholt() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Err(SipgateFehler::Status(503)));
+    w.durchgang(t0).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Voruebergehend));
+    let naechster =
+        lifeline_hub::zeit::parse_utc(z.naechster_versuch_at.as_deref().unwrap()).unwrap();
+    let abstand = (naechster - t0).num_seconds();
+    assert!((29..=32).contains(&abstand), "{abstand}");
+    assert!(w.etb_versand().await.is_empty());
+}
+
+#[tokio::test]
+async fn fax_abbruch_nach_dem_senden_ist_ungewiss_ohne_zweiten_versuch() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Err(SipgateFehler::Ungewiss));
+    w.durchgang(t0).await;
+    w.durchgang(t0 + chrono::Duration::minutes(5)).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Ungewiss));
+    assert_eq!(w.fax.gesendet().len(), 1, "kein zweites Fax");
+}
+
+#[tokio::test]
+async fn fax_401_zieht_die_pruefung_der_anbindung_vor() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    sqlx::query("UPDATE adapter SET naechster_abruf_at = '2099-01-01 00:00:00' WHERE id = ?")
+        .bind(&w.fax_adapter_id)
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    w.fax_versand("lagebericht", lid, t0).await;
+    w.fax.plane_senden(Err(SipgateFehler::Status(401)));
+    w.durchgang(t0).await;
+    let naechster: String =
+        sqlx::query_scalar("SELECT naechster_abruf_at FROM adapter WHERE id = ?")
+            .bind(&w.fax_adapter_id)
+            .fetch_one(&w.pool)
+            .await
+            .unwrap();
+    assert!(naechster.as_str() < "2099", "{naechster}");
+}
+
+#[tokio::test]
+async fn fax_status_doppel_liefert_den_geplanten_stand() {
+    // Hilfstest für das Doppel selbst: ohne Plan ist der Stand „gesendet“.
+    let f = AufzeichnenderFaxZusteller::default();
+    f.plane_status(Ok(FaxStatus::Laeuft));
+    let z = Versandzugang {
+        einstellungen: Default::default(),
+        geheimnisse: Default::default(),
+        lan_erlaubt: false,
+        adapter_id: "a".into(),
+    };
+    use lifeline_hub::ausgang::zusteller::FaxZusteller;
+    assert_eq!(f.status(&z, "s").await, Ok(FaxStatus::Laeuft));
+    assert_eq!(f.status(&z, "s").await, Ok(FaxStatus::Gesendet));
+}
+
+impl Welt {
+    /// Ein übergebenes Fax: legt es an und lässt einen Durchgang es senden.
+    async fn uebergebenes_fax(&self, t0: DateTime<Utc>) -> String {
+        let lid = self.lagebericht_freigeben(false).await;
+        let id = self.fax_versand("lagebericht", lid, t0).await;
+        self.durchgang(t0).await;
+        assert_eq!(self.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+        id
+    }
+}
+
+#[tokio::test]
+async fn sent_wird_zugestellt_mit_etb() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    let mut rx = w.live.abonniere(w.einsatz);
+    w.fax.plane_status(Ok(FaxStatus::Gesendet));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Zugestellt);
+    assert!(z.zugestellt_at.is_some());
+    assert!(z.naechste_abfrage_at.is_none());
+    let etb = w.etb_versand().await;
+    assert_eq!(
+        etb,
+        vec![(
+            format!("Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}) zugestellt"),
+            STELLE.to_string()
+        )]
+    );
+    common::recv_until_tag(&mut rx, "ausgang", Duration::from_secs(2)).await;
+    let (_, v) = anfrage_json(
+        &w.app,
+        "GET",
+        &format!("/api/incidents/{}/deliveries", w.einsatz),
+        &w.admin,
+        None,
+    )
+    .await;
+    let eintrag = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == id.as_str())
+        .unwrap()
+        .clone();
+    assert_eq!(eintrag["state"], "zugestellt");
+    assert!(eintrag["delivered_at"].is_string(), "{eintrag}");
+}
+
+#[tokio::test]
+async fn failed_wird_nicht_zugestellt_und_laesst_sich_erneut_senden() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Gescheitert));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::NichtZugestellt));
+    assert_eq!(
+        w.etb_versand().await[0].0,
+        format!(
+            "Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}) nicht zugestellt: \
+             Gegenstelle nicht erreicht"
+        )
+    );
+    let (s, v) = anfrage_json(
+        &w.app,
+        "POST",
+        &format!("/api/incidents/{}/deliveries/{id}/retry", w.einsatz),
+        &w.admin,
+        None,
+    )
+    .await;
+    assert!(s.is_success(), "{s} {v}");
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet);
+    assert!(z.anbieter_ref.is_none() && z.naechste_abfrage_at.is_none());
+}
+
+#[tokio::test]
+async fn laeuft_fragt_eine_minute_spaeter_erneut() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Laeuft));
+    let t1 = t0 + chrono::Duration::seconds(31);
+    w.durchgang(t1).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    let naechste =
+        lifeline_hub::zeit::parse_utc(z.naechste_abfrage_at.as_deref().unwrap()).unwrap();
+    assert!(((naechste - t1).num_seconds() - 60).abs() <= 1);
+    // Vor der nächsten Abfrage wird nicht gefragt.
+    w.durchgang(t1 + chrono::Duration::seconds(30)).await;
+    assert_eq!(w.fax.abfragen(), 1);
+    w.durchgang(t1 + chrono::Duration::seconds(61)).await;
+    assert_eq!(w.fax.abfragen(), 2);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Zugestellt);
+}
+
+#[tokio::test]
+async fn abfragefehler_fragt_spaeter_erneut() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Err(SipgateFehler::Verbindung));
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    assert!(z.naechste_abfrage_at.is_some());
+    assert!(w.etb_versand().await.is_empty());
+}
+
+#[tokio::test]
+async fn ohne_endstand_nach_zwei_stunden_ungewiss() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    w.fax.plane_status(Ok(FaxStatus::Laeuft));
+    w.durchgang(t0 + chrono::Duration::minutes(121)).await;
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Ungewiss));
+    assert_eq!(
+        w.etb_versand().await[0].0,
+        format!("Lagebericht Nr. 1 per Fax an {STELLE} ({FAXNUMMER}): Zustellung nicht bestätigt")
+    );
+}
+
+#[tokio::test]
+async fn vor_der_ersten_abfrage_wird_nicht_gefragt() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    w.uebergebenes_fax(t0).await;
+    w.durchgang(t0 + chrono::Duration::seconds(29)).await;
+    assert_eq!(w.fax.abfragen(), 0);
+}
+
+#[tokio::test]
+async fn neustart_mit_uebergebenem_fax_fragt_weiter_und_sendet_nicht() {
+    let w = welt().await;
+    let t0 = Utc::now();
+    let id = w.uebergebenes_fax(t0).await;
+    lauf::beim_start(&w.pool, &w.live).await.unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    w.durchgang(t0 + chrono::Duration::seconds(31)).await;
+    assert_eq!(w.fax.gesendet().len(), 1, "nicht erneut gesendet");
+    assert_eq!(w.fax.abfragen(), 1);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Zugestellt);
+}
+
+#[tokio::test]
+async fn eine_mail_auf_uebergeben_wird_nie_abgefragt() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    w.durchgang(t0).await;
+    w.durchgang(t0 + chrono::Duration::minutes(5)).await;
+    assert_eq!(w.fax.abfragen(), 0);
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
 }

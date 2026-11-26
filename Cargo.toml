@@ -192,6 +192,7 @@ matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-e
 # Nur für `CollectStrategy` (Raumschlüssel an alle Geräte, Spec Abschnitt 6), das matrix-sdk nicht
 # wieder ausführt; dieselbe Version, die matrix-sdk ohnehin zieht, ohne Features.
 matrix-sdk-crypto = { version = "=0.20.0", default-features = false }
+printpdf = { version = "0.12", default-features = false, features = ["png"] }
 
 [dev-dependencies]
 # "danger-credential-internals" schaltet `From<Credential> for Passkey` frei, damit Tests aus

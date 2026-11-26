@@ -313,6 +313,7 @@ impl Verzeichnis {
             Arc::new(crate::veranstaltung_extern::art::VeranstaltungenAbrufArt),
             Arc::new(super::smtp_art::SmtpArt::produktiv()),
             Arc::new(super::matrix_art::MatrixArt::new(matrix)),
+            Arc::new(super::sipgate_fax_art::SipgateFaxArt::produktiv()),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
@@ -628,5 +629,6 @@ mod tests {
         assert!(produktiv.find("stammdaten_abruf").is_some());
         assert!(produktiv.find("smtp").is_some());
         assert!(produktiv.find("matrix").is_some());
+        assert!(produktiv.find("sipgate_fax").is_some());
     }
 }

@@ -23,7 +23,11 @@ class TestzustandTest {
     @Test
     fun `die Werte sind die der iOS-App`() {
         assertEquals(
-            listOf("start", "anmelden", "wartet", "angemeldet", "pausiert", "ruht", "beendet"),
+            listOf(
+                "start", "anmelden", "wartet", "angemeldet", "pausiert", "ruht", "beendet",
+                "auftraege", "mitteilungen-aus", "auftrag-offen", "auftrag-uebernommen", "auftrag-aufgehoben",
+                "quittung-fehler",
+            ),
             Testzustand.entries.map { it.wert },
         )
     }

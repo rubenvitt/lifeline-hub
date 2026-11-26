@@ -132,6 +132,8 @@ async fn warne_einsatz(
 /// und je Kopplung `helfer`. Liefert die Zahl der Personen.
 pub async fn raeume_helfer(pool: &SqlitePool, live: &LiveHub) -> Result<usize, AppError> {
     let geraeumt = crate::write_retry!(pool, |conn| {
+        // Stufe 2 (ADR-0111): Push-Anmeldungen beendeter Kopplungen gehen mit.
+        crate::helfer::push::delete_ended(conn).await?;
         crate::helfer::ende::raeume_abgelaufene(conn, None).await
     })?;
     for g in &geraeumt {

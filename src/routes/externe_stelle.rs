@@ -141,7 +141,7 @@ use crate::externe_stelle::{ExterneStelleKanal, KanalArt, KanalMitStelle};
 const UNGUELTIGER_KANAL: &str = "Ungültiger Kanal";
 const KANAL_NICHT_FREIGESCHALTET: &str = "Dieser Kanal ist noch nicht freigeschaltet";
 
-/// Nimmt nur freigeschaltete Kanäle an (heute E-Mail und Matrix), alles andere ist 400.
+/// Nimmt nur freigeschaltete Kanäle an (heute E-Mail, Fax und Matrix), alles andere ist 400.
 fn parse_kanal(roh: &str) -> Result<KanalArt, AppError> {
     let kanal = parse_enum(KanalArt::parse, roh.trim(), UNGUELTIGER_KANAL)?;
     if !kanal.is_freigeschaltet() {
@@ -154,6 +154,7 @@ fn parse_kanal(roh: &str) -> Result<KanalArt, AppError> {
 fn pruefe_adresse(kanal: KanalArt, roh: &str) -> Result<String, AppError> {
     match kanal {
         KanalArt::Email => kanal::normalize_email(roh).map_err(AppError::Validation),
+        KanalArt::Fax => kanal::normalize_fax(roh).map_err(AppError::Validation),
         KanalArt::Matrix => kanal::normalize_matrix(roh).map_err(AppError::Validation),
         // `parse_kanal` lässt nur freigeschaltete Kanäle durch.
         _ => Err(AppError::Validation(KANAL_NICHT_FREIGESCHALTET.into())),
@@ -175,7 +176,7 @@ pub struct KanalQuery {
     pub channel: Option<String>,
 }
 
-/// GET /api/external-agencies/channels[?channel=email] — alle Adressen der aktiven Stellen der
+/// GET /api/external-agencies/channels[?channel=email|fax|matrix] — alle Adressen der aktiven Stellen der
 /// Organisation mit ihrer Stelle (Auswahl im Senden-Dialog).
 pub async fn kanal_sammlung(
     State(state): State<AppState>,

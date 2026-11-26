@@ -2,7 +2,7 @@
 titel: Fahrzeuge und FMS
 gruppen: [fuehrung]
 reihenfolge: 230
-quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/components/FilterKnopf.tsx, frontend/src/kraefte/useStatusQuittung.ts, src/status_ruecknahme.rs, frontend/src/components/StatusWahl.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, frontend/src/api/ortung.ts, src/routes/ortung.rs, src/ortung/kopplung.rs, src/ortung/uebernahme.rs]
+quellen: [frontend/src/components/useHoldGeloest.ts, frontend/src/pages/FahrzeugePage.tsx, frontend/src/components/Datensicht.tsx, frontend/src/components/listenGedaechtnis.ts, frontend/src/kraefte/MaterialAmOrt.tsx, frontend/src/kraefte/MaterialHierherModal.tsx, frontend/src/kraefte/EinheitAngabe.tsx, frontend/src/kraefte/FahrzeugAngabenDialog.tsx, frontend/src/kraefte/EigeneEinheitDialog.tsx, frontend/src/kraefte/eigeneEinheit.ts, frontend/src/kraefte/BesatzungUebernehmenDialog.tsx, frontend/src/kraefte/besatzungVorschlag.ts, frontend/src/kraefte/AdhocFahrzeugFelder.tsx, frontend/src/kraefte/kraeftebaumKern.ts, frontend/src/api/eingabegrenzen.ts, src/einheit/mitglied_repo.rs, src/routes/einsatz_einheit.rs, src/fahrzeug/mod.rs, frontend/src/kraefte/FahrzeugeDisponierenModal.tsx, frontend/src/kraefte/EntlassenBlock.tsx, frontend/src/kraefte/FmsTableau.tsx, frontend/src/kraefte/fmsTableauKern.ts, frontend/src/kraefte/meldebildRaster.ts, frontend/src/einsatz/sprungmarken.ts, frontend/src/components/Erfassung.tsx, frontend/src/einsatz/schreibrecht.ts, frontend/src/stammdaten/StatusKatalogTab.tsx, src/routes/einsatz_fahrzeug.rs, src/fahrzeug/disposition_repo.rs, src/fahrzeug/besatzung_repo.rs, src/kraefte_disposition.rs, src/entlassung.rs, src/bereitstellungsraum/belegung_repo.rs, src/katalog.rs, frontend/src/components/SpaltenSchalter.tsx, frontend/src/components/InlineAngabe.tsx, frontend/src/components/KennungMitZusatz.tsx, frontend/src/components/useFeldKonflikt.tsx, frontend/src/components/useBemerkungMitAltwert.ts, frontend/src/components/FilterKnopf.tsx, frontend/src/kraefte/useStatusQuittung.ts, src/status_ruecknahme.rs, frontend/src/components/StatusWahl.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, frontend/src/api/ortung.ts, src/routes/ortung.rs, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/ortung/fern.rs, src/instanz/spiegel/fuehrung.rs]
 ---
 
 ## Überblick
@@ -213,9 +213,13 @@ im Kapitel [Anbindungen](anbindungen.md)):
    wann zuletzt eine Position kam; es stehen nur Kennungen aus den letzten 24 Stunden zur Wahl.
    Eine Kennung, die schon an einem Fahrzeug hängt, ist grau.
    Hat die Organisation die Ortung nicht freigegeben (Schalter „Ortung im Einsatz“), nennt der
-   Dialog das statt der Liste, und „Koppeln“ bleibt gesperrt.
+   Dialog das statt der Liste, und „Koppeln“ bleibt gesperrt. Meldet die Organisation an einen
+   Hub (Verbund Hub und ELW), stammen die Kennungen vom Hub und tragen den Zusatz „über den Hub“;
+   bis sie da sind, steht „Kennungen werden vom Hub geholt …“, und antwortet der Hub nach 15
+   Sekunden nicht, „Der Hub antwortet gerade nicht. Später erneut versuchen.“
 3. „Koppeln“ wählen. Das Fahrzeug trägt die Marke „Ortung“, und liegt schon eine Position der
-   Kennung vor, steht sie sofort auf der Lagekarte.
+   Kennung vor, steht sie sofort auf der Lagekarte. Bei einer Kennung des Hubs kommt die Position
+   mit dem nächsten Abgleich, also nach wenigen Sekunden.
 4. Soll die Ortung enden, in derselben Zeile „Ortung trennen“ wählen. Eine Rückfrage gibt es
    nicht; die letzte Position bleibt stehen.
 
@@ -407,6 +411,16 @@ vergebene lehnt der Server ab. Ein erneutes Koppeln desselben Fahrzeugs ersetzt 
 - **Freigabe:** Koppeln geht nur, solange der Schalter „Ortung im Einsatz“ der Organisation an
   ist (Verwaltung, „Einstellungen“, „Einsatz-Vorgaben“, Bereich „Ortung“). Ist er aus, kommt auch
   an einem schon gekoppelten Fahrzeug keine Position mehr an.
+- **Über den Hub:** Führt das ELW den Einsatz und melden die Geräte an den Hub, wird am ELW
+  gekoppelt; das ELW holt die Positionen seiner gekoppelten Kennungen im Abgleich mit dem Hub ab
+  (etwa alle 5 Sekunden, solange der Einsatz läuft). Am Hub, der den Einsatz nur spiegelt, lässt
+  sich nicht koppeln; die Zeile trägt die Marke „Ortung“, solange die Position aus der Ortung
+  stammt und nicht veraltet ist. Die Position wird nicht sofort übernommen, und kommt vom Hub
+  nichts mehr (Verbund beendet, Zugang widerrufen, Schalter am Hub aus), wird sie nach fünf
+  Minuten „veraltet“; die Kopplung bleibt stehen, bis jemand trennt.
+- **Führungsabgabe:** Gibt ein Einsatz die Führung ab, enden seine Kopplungen ohne Eintrag im
+  Einsatztagebuch, auch lokale Kopplungen eines Hubs, der an ein ELW abgibt. Die letzte Position
+  bleibt stehen und wird veraltet. Beim neuen Führer wird neu gekoppelt.
 - **Rechte:** Koppeln und Trennen dürfen wie das Entlassen Einsatzleitung und Führungspersonal,
   solange der Einsatz läuft. Wer nur liest, sieht an der Zeile die Marke „Ortung“.
 

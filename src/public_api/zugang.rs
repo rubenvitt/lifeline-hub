@@ -548,6 +548,24 @@ pub async fn hub_fuer_org(
     .await?)
 }
 
+/// Wie [`hub_fuer_org`], liefert aber die ID der Instanzkopplung und den Namen des Hubs
+/// (LLH-2119: Ortung über den Hub braucht die Kopplung, an der die Kennungen hängen).
+pub async fn hub_kopplung_fuer_org(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+) -> Result<Option<(i64, String)>, AppError> {
+    Ok(sqlx::query_as(
+        "SELECT k.id, k.gegenueber_name FROM instanz_kopplung k \
+         JOIN instanz_kopplung_org o ON o.kopplung_id = k.id \
+         WHERE k.richtung = 'meldet_sich' AND k.zustand = 'aktiv' AND k.art = 'standard' \
+           AND o.org_id = ? AND o.widerrufen_at IS NULL \
+         ORDER BY k.id LIMIT 1",
+    )
+    .bind(org_id)
+    .fetch_optional(&mut *conn)
+    .await?)
+}
+
 /// Räumt abgelaufene `jti`, Codes einen Tag nach Ablauf und Abrufe nach 365 Tagen (Purge-Lauf,
 /// Phase C). Zugänge bleiben, auch widerrufene.
 pub async fn purge(pool: &SqlitePool, jetzt: &str) -> Result<(), sqlx::Error> {

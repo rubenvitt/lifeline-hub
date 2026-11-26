@@ -1488,7 +1488,11 @@
           "adapter_angehalten",
           "adapter_fortgesetzt",
           "fremdebenen_lan_erlaubt",
-          "fremdebenen_lan_entzogen"
+          "fremdebenen_lan_entzogen",
+          "ortung_eingeschaltet",
+          "ortung_ausgeschaltet",
+          "ortung_personen_eingeschaltet",
+          "ortung_personen_ausgeschaltet"
         ]
       },
       "AdressatKategorie": {
@@ -3252,6 +3256,14 @@
             ],
             "description": "Freitext — oder Bezeichnung bei `funktion` Führungshilfspersonal/Fachberater (LFH-549)."
           },
+          "helfer_gesendet": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "An wie viele Helfer-Apps die Zeile ging (ADR-0111); fehlt vor der Zustellung und bei\nTypen, die kein Helfer empfängt."
+          },
           "id": {
             "type": "integer",
             "format": "int64"
@@ -3268,6 +3280,13 @@
               "string",
               "null"
             ]
+          },
+          "quittiert_von_helfer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0111)."
           },
           "quittiert_von_id": {
             "type": [
@@ -3490,7 +3509,7 @@
       },
       "AusgangFehler": {
         "type": "string",
-        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.\n`kein_zutritt` und `verschluesselung` kommen nur aus der Zustellung per Matrix (LLH-2094).",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des\nZiels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter\nmeldet, dass das Fax nicht durchging (LLH-2095). `kein_zutritt` und `verschluesselung`\nkommen nur aus der Zustellung per Matrix (LLH-2094).",
         "enum": [
           "voruebergehend",
           "abgelehnt",
@@ -3501,6 +3520,7 @@
           "anbindung_fehler",
           "zu_gross",
           "spiegel",
+          "nicht_zugestellt",
           "kein_zutritt",
           "verschluesselung"
         ]
@@ -12136,6 +12156,128 @@
           }
         }
       },
+      "HelperTask": {
+        "type": "object",
+        "description": "Ein Auftrag in der Helfer-App.",
+        "required": [
+          "id",
+          "text",
+          "priority",
+          "issued_at",
+          "recipients"
+        ],
+        "properties": {
+          "cancelled_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deadline_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "issued_at": {
+            "type": "string"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location_lat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "location_lon": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "number": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/Prioritaet"
+          },
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelperTaskRecipient"
+            }
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "HelperTaskList": {
+        "type": "object",
+        "description": "Antwort von `GET /api/devices/me/tasks`.",
+        "required": [
+          "tasks"
+        ],
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HelperTask"
+            }
+          }
+        }
+      },
+      "HelperTaskRecipient": {
+        "type": "object",
+        "description": "Eine eigene Empfängerzeile eines Auftrags.",
+        "required": [
+          "id",
+          "kind",
+          "label"
+        ],
+        "properties": {
+          "acknowledged_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acknowledged_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wer quittiert hat: Anzeigename der Helfer-Kopplung, sonst Name des Kontos."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`unit`, `vehicle` oder `person`."
+          },
+          "label": {
+            "type": "string",
+            "description": "Empfänger, wie beim Erteilen angezeigt."
+          }
+        }
+      },
       "HintergrundbildAnzeige": {
         "type": "object",
         "description": "Anzeige-DTO (ohne BLOB-Bytes). `sichtbar` als bool für saubere JSON-Ausgabe.",
@@ -13108,7 +13250,7 @@
       },
       "KanalArt": {
         "type": "string",
-        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen werden heute E-Mail und Matrix (siehe [`KanalArt::is_freigeschaltet`]).",
+        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen werden heute E-Mail, Fax und Matrix (siehe [`KanalArt::is_freigeschaltet`]).",
         "enum": [
           "email",
           "fax",
@@ -15603,6 +15745,7 @@
           "benachrichtigung",
           "praesenz",
           "helfer",
+          "helfer_auftrag",
           "lagged"
         ]
       },
@@ -17734,11 +17877,27 @@
           "kennung"
         ],
         "properties": {
+          "instanz_kopplung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt: die Kopplung hing an einer Kennung des Hubs (LLH-2119)."
+          },
           "kennung": {
             "type": "string"
           },
           "zugang_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Der lokale Einwurf-Zugang, mit `instanz_kopplung_id` der Zugang auf dem Hub."
+          },
+          "zugang_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Hub-Zugangs für das ETB."
           }
         }
       },
@@ -23001,7 +23160,8 @@
           "access_name",
           "device_id",
           "received_at",
-          "coupled"
+          "coupled",
+          "via_hub"
         ],
         "properties": {
           "access_id": {
@@ -23019,6 +23179,10 @@
           },
           "received_at": {
             "type": "string"
+          },
+          "via_hub": {
+            "type": "boolean",
+            "description": "Kommt die Kennung vom Hub (gespiegelte Org) statt aus der eigenen Ablage?"
           }
         }
       },
@@ -23027,7 +23191,8 @@
         "description": "Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“\n(ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu\ndürfen, und erklärt, warum Koppeln gesperrt ist.",
         "required": [
           "tracking_enabled",
-          "candidates"
+          "candidates",
+          "pending"
         ],
         "properties": {
           "candidates": {
@@ -23035,6 +23200,10 @@
             "items": {
               "$ref": "#/components/schemas/TrackingCandidate"
             }
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "Die Liste des Hubs ist angefragt, aber noch nicht (frisch) da; der Dialog fragt erneut."
           },
           "tracking_enabled": {
             "type": "boolean",
@@ -24514,7 +24683,8 @@
           "state",
           "attempts",
           "created_by_id",
-          "created_at"
+          "created_at",
+          "without_pdf"
         ],
         "properties": {
           "address": {
@@ -24549,6 +24719,13 @@
               "string",
               "null"
             ]
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Fax-Anbieter die Zustellung bestätigt hat (nur Fax, LLH-2095)."
           },
           "error": {
             "oneOf": [
@@ -24589,15 +24766,20 @@
           },
           "subject": {
             "type": "string"
+          },
+          "without_pdf": {
+            "type": "boolean",
+            "description": "Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war."
           }
         }
       },
       "VersandZustand": {
         "type": "string",
-        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver oder `fehlgeschlagen`.",
+        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver bzw. Fax-Anbieter, `zugestellt` (nur Fax: der Anbieter hat die Zustellung\nbestätigt, LLH-2095) oder `fehlgeschlagen`.",
         "enum": [
           "wartet",
           "uebergeben",
+          "zugestellt",
           "fehlgeschlagen"
         ]
       },

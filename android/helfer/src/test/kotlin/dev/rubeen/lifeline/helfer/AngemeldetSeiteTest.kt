@@ -5,6 +5,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import dev.rubeen.lifeline.helfer.seiten.AngemeldetSeite
 import dev.rubeen.lifeline.helfer.ui.HelferThema
+import dev.rubeen.lifeline.helferkern.Auftraege
 import dev.rubeen.lifeline.helferkern.Ruhegrund
 import dev.rubeen.lifeline.helferkern.Testzustand
 import org.junit.Rule
@@ -37,6 +38,26 @@ class AngemeldetSeiteTest {
         compose.onNodeWithTag("abmelden").assertExists()
         compose.onNodeWithTag("pausieren").assertDoesNotExist()
         compose.onNodeWithTag("fortsetzen").assertDoesNotExist()
+    }
+
+    @Test
+    fun `ohne Auftraege steht der Leertext und der Empfang`() {
+        zeige(Testzustand.ANGEMELDET)
+        compose.onNodeWithText(Auftraege.LEER, useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("empfang").assertExists()
+        compose.onNodeWithTag("mitteilungen-aus").assertDoesNotExist()
+    }
+
+    @Test
+    fun `ohne Mitteilungsrecht steht der Hinweis`() {
+        zeige(Testzustand.MITTEILUNGEN_AUS)
+        compose.onNodeWithText(Auftraege.MITTEILUNGEN_AUS, useUnmergedTree = true).assertExists()
+    }
+
+    @Test
+    fun `auch in der Ruhe gibt es den Bereich Auftraege`() {
+        zeige(Testzustand.RUHT)
+        compose.onNodeWithTag("auftraege").assertExists()
     }
 
     @Test

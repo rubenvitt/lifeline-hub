@@ -168,7 +168,12 @@ async fn scrub_sessions(ziel: &Path) -> Result<(), AppError> {
         .filename(ziel)
         .journal_mode(SqliteJournalMode::Delete);
     let pool = SqlitePool::connect_with(options).await?;
-    for tabelle in ["session", "ios_push_anmeldung", "ios_push_relais"] {
+    for tabelle in [
+        "session",
+        "ios_push_anmeldung",
+        "ios_push_relais",
+        "helfer_push_anmeldung",
+    ] {
         sqlx::query(sqlx::AssertSqlSafe(format!("DELETE FROM {tabelle}")))
             .execute(&pool)
             .await?;
@@ -481,13 +486,44 @@ mod tests {
         .execute(&pool)
         .await
         .unwrap();
+        // Helfer-App (0389): die Push-Anmeldung einer Helfer-Kopplung ebenso.
+        let einsatz: i64 = sqlx::query_scalar(
+            "INSERT INTO einsatz (org_id, bezeichnung) VALUES (1, 'E') RETURNING id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let kopplung: i64 = sqlx::query_scalar(
+            "INSERT INTO geraet_kopplung (einsatz_id, benutzer_id, ansicht, bezeichnung, \
+               erstellt_von, laeuft_ab_at, helfer_zustand) \
+             VALUES (?, ?, 'helfer', 'H', ?, datetime('now', '+1 hour'), 'aktiv') RETURNING id",
+        )
+        .bind(einsatz)
+        .bind(bid)
+        .bind(bid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO helfer_push_anmeldung \
+               (kopplung_id, kennung, token, umgebung, schluessel, angelegt_at) \
+             VALUES (?, 'k', 'ab', 'sandbox', 'geheim', 'jetzt')",
+        )
+        .bind(kopplung)
+        .execute(&pool)
+        .await
+        .unwrap();
 
         let dir = tempfile::tempdir().unwrap();
         let ziel = dir.path().join("backup.sqlite");
         erzeuge_sicherung(&pool, &ziel).await.unwrap();
 
         let backup_pool = oeffne_sicherung(&ziel).await;
-        for tabelle in ["ios_push_anmeldung", "ios_push_relais"] {
+        for tabelle in [
+            "ios_push_anmeldung",
+            "ios_push_relais",
+            "helfer_push_anmeldung",
+        ] {
             let n: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
                 "SELECT COUNT(*) FROM {tabelle}"
             )))

@@ -48,7 +48,7 @@ export default function ExterneStellenTab() {
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
-  // Adressen je Stelle und Kanal für den Hinweis in der Liste (LLH-2093, LLH-2094); nur aktive Stellen.
+  // Adressen je Stelle und Kanal für den Hinweis in der Liste (LLH-2093, Fax LLH-2095, Matrix LLH-2094); nur aktive Stellen.
   const kanaeleQuery = useKanaeleSammlung();
   const anzahlJeKanal = new Map<KanalArt, Map<number, number>>();
   for (const k of kanaeleQuery.data ?? []) {
@@ -56,7 +56,7 @@ export default function ExterneStellenTab() {
     zaehler.set(k.agency_id, (zaehler.get(k.agency_id) ?? 0) + 1);
     anzahlJeKanal.set(k.channel.channel, zaehler);
   }
-  /** „2 Mail, 1 Matrix“, je Kanal ein Posten; leer, wenn die Stelle keine Adresse hat. */
+  /** „2 Mail, 1 Matrix, 1 Fax“, je Kanal ein Posten; leer, wenn die Stelle keine Adresse hat. */
   const adressenText = (id: number) =>
     KANAL_REIHENFOLGE.filter((art) => anzahlJeKanal.get(art)?.has(id))
       .map((art) => `${anzahlJeKanal.get(art)?.get(id)} ${kanalKurz(art)}`)

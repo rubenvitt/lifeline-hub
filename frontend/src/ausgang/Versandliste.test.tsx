@@ -24,6 +24,7 @@ const versand = (over: Partial<Versand>): Versand => ({
   source_kind: 'lagebericht',
   state: 'wartet',
   subject: 'Lagebericht',
+  without_pdf: false,
   ...over,
 });
 
@@ -132,5 +133,43 @@ describe('Versandliste (LLH-2093)', () => {
     expect(ausgangFehlerText('kein_zutritt', 'matrix')).toBe('Kein Zutritt zum Raum');
     expect(ausgangFehlerText('verschluesselung', 'matrix')).toBe('Verschlüsseln nicht möglich');
     expect(ausgangFehlerText(null, 'matrix')).toBeNull();
+  });
+
+  it('zeigt Fax-Zustände: geprüft, zugestellt, nicht zugestellt, ohne PDF (LLH-2095)', async () => {
+    liste([
+      versand({
+        id: 'f1',
+        channel: 'fax',
+        address: '+49511123456',
+        state: 'uebergeben',
+        handed_over_at: '2026-11-24 13:32:00',
+      }),
+      versand({
+        id: 'f2',
+        channel: 'fax',
+        state: 'zugestellt',
+        handed_over_at: '2026-11-24 13:32:00',
+        delivered_at: '2026-11-24 13:34:00',
+      }),
+      versand({ id: 'f3', channel: 'fax', state: 'fehlgeschlagen', error: 'nicht_zugestellt' }),
+      versand({ id: 'f4', channel: 'fax', state: 'fehlgeschlagen', error: 'abgelehnt' }),
+      versand({
+        id: 'm1',
+        state: 'uebergeben',
+        handed_over_at: '2026-11-24 13:32:00',
+        without_pdf: true,
+      }),
+    ]);
+    renderMitProviders(<Versandliste einsatzId={1} quelle={quelle} />);
+    expect(
+      await screen.findByText(/^übergeben \d{2}:?\d{2}, Zustellung wird geprüft$/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/^zugestellt \d{2}:?\d{2}$/)).toBeInTheDocument();
+    expect(screen.getByText('fehlgeschlagen: Fax nicht zugestellt')).toBeInTheDocument();
+    expect(screen.getByText('fehlgeschlagen: Von sipgate abgelehnt')).toBeInTheDocument();
+    expect(screen.getByText(/^übergeben \d{2}:?\d{2} · ohne PDF$/)).toBeInTheDocument();
+    expect(screen.getByText(/ILS Nord · \+49511123456/).closest('li')).toHaveTextContent(/^Fax/);
+    expect(screen.getAllByRole('button', { name: 'Erneut senden' })).toHaveLength(2);
+    expect(ausgangFehlerText('abgelehnt', 'fax')).toBe('Von sipgate abgelehnt');
   });
 });

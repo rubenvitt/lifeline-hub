@@ -684,6 +684,8 @@ async fn beenden(
     .await?;
     ereignis(&mut *conn, kopplung_id, art, von, None).await?;
     crate::helfer::ende::beende_ortung(conn, kopplung_id).await?;
+    // Helfer-App Stufe 2 (ADR-0111): die Push-Anmeldung endet mit der Kopplung.
+    crate::helfer::push::delete_registration(conn, kopplung_id).await?;
     Ok(true)
 }
 

@@ -133,10 +133,12 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   `waitForResponse` vor dem Schritt anlegen, danach abwarten.
 - **Zurück zum Admin über `wechsleZuAdmin`** (LLH-1317): ein Objekt `{ …, passwort: ADMIN_PW }`
   im Spec meldet GitGuardian als echtes Passwort.
-- **Der e2e-Server stellt weder Mail über SMTP noch Nachrichten an einen Homeserver zu** (LLH-2093,
-  LLH-2094): `playwright.config.ts` startet ihn mit `--ausgang-testzusteller` (nur Debug-Build,
-  nimmt beide Kanäle an) und einem frischen `LIFELINE_GEHEIMNIS_SCHLUESSEL`
-  (`e2eGeheimnisSchluessel` in `e2e/lauf-kern.ts`), damit sich Passwort und Access-Token der
-  Anbindungen speichern lassen. Anbindungen und Stellen legt der Spec über die API an
-  (`e2e/ausgang.spec.ts`); die Verbindungsprüfung der Matrix-Anbindung erreicht keinen Homeserver,
-  eine gestörte Anbindung hält den Versand nicht auf.
+- **Der e2e-Server stellt weder Mail über SMTP noch Fax über sipgate noch Nachrichten an einen
+  Homeserver zu** (LLH-2093, LLH-2095, LLH-2094): `playwright.config.ts` startet ihn mit
+  `--ausgang-testzusteller` (nur Debug-Build, nimmt Mail und Matrix an, Faxe über das Fax-Doppel)
+  und einem frischen `LIFELINE_GEHEIMNIS_SCHLUESSEL` (`e2eGeheimnisSchluessel` in
+  `e2e/lauf-kern.ts`), damit sich Passwort, Token und Access-Token der Anbindungen speichern
+  lassen. Anbindungen und Stellen legt der Spec über die API an (`e2e/ausgang.spec.ts`); die
+  Verbindungsprüfung der Matrix-Anbindung erreicht keinen Homeserver, eine gestörte Anbindung hält
+  den Versand nicht auf. Das Fax-Doppel meldet ein Fax bei der ersten Abfrage (30 s nach der
+  Übergabe) als gesendet.

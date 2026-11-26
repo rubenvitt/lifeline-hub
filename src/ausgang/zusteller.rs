@@ -5,7 +5,9 @@
 //! Abschluss bleiben im Lauf. Produktiv stellt [`SmtpZusteller`] E-Mails über den SMTP-Client mit
 //! den Vertrauensankern des Systems zu und [`MatrixZusteller`] Nachrichten in Matrix-Räume über
 //! den Client der Anbindung; Tests setzen einen eigenen [`Zusteller`] oder einen eigenen
-//! [`SmtpTransport`] ein (Muster `public_api::webhook::ziel::Zusteller`).
+//! [`SmtpTransport`] ein (Muster `public_api::webhook::ziel::Zusteller`). Das Fax hat einen
+//! eigenen Weg mit Übergabe und späterer Abfrage des Stands ([`FaxZusteller`], LLH-2095); beide
+//! Wege trägt [`Zustellwege`].
 
 use std::sync::Arc;
 
@@ -17,6 +19,7 @@ use futures::future::BoxFuture;
 
 use super::nachricht::{self, Anhang, Schnappschuss};
 pub use crate::adapter::lauf::Versandzugang;
+use crate::adapter::sipgate::{self, FaxAuftrag, FaxStatus, SipgateFehler, SipgateZugang};
 use crate::adapter::smtp::{self, SmtpFehler};
 use crate::adapter::smtp_art::smtp_ziel;
 use crate::externe_stelle::KanalArt;
@@ -32,6 +35,9 @@ pub struct Versandauftrag<'a> {
     pub betreff: &'a str,
     pub inhalt: &'a str,
     pub anhaenge: &'a [Anhang],
+    /// Das PDF des Versands als `(Dateiname, Bytes)`; nur die E-Mail hängt es an (als erstes,
+    /// LLH-2095), Matrix sendet es nicht.
+    pub pdf: Option<(&'a str, &'a [u8])>,
     /// Schon gesendete und gemerkte Teile eines früheren Versuchs (`ausgang_teil`); der Zusteller
     /// lässt sie aus. Bei SMTP immer leer.
     pub gesendet: &'a [i64],
@@ -200,6 +206,151 @@ impl<T: SmtpTransport> Zusteller for SmtpZusteller<T> {
     }
 }
 
+/// Übergibt ein Fax und fragt seinen Stand ab (LLH-2095). Der Aufrufer hält dabei keine
+/// Datenbankverbindung.
+pub trait FaxZusteller: Send + Sync {
+    /// Übergibt das Fax; liefert die Session-ID des Anbieters.
+    fn senden<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        auftrag: &'a FaxAuftrag<'a>,
+    ) -> BoxFuture<'a, Result<String, SipgateFehler>>;
+
+    /// Stand der Session.
+    fn status<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        session: &'a str,
+    ) -> BoxFuture<'a, Result<FaxStatus, SipgateFehler>>;
+}
+
+/// Beide Wege nach draußen, wie der Lauf sie braucht: `mail` stellt einen [`Versandauftrag`] zu
+/// (produktiv die [`Zustellerwahl`] für E-Mail und Matrix), `fax` übergibt Faxe und fragt ihren
+/// Stand ab.
+#[derive(Clone)]
+pub struct Zustellwege {
+    pub mail: Arc<dyn Zusteller>,
+    pub fax: Arc<dyn FaxZusteller>,
+}
+
+/// Die echte sipgate-API (`adapter::sipgate`).
+pub struct SipgateZusteller;
+
+/// Zugang aus der Anbindung; ohne Token-ID oder Token ist die Anmeldung so gut wie abgelehnt.
+fn sipgate_zugang(zugang: &Versandzugang) -> Result<SipgateZugang<'_>, SipgateFehler> {
+    let token_id = zugang
+        .einstellung("token_id")
+        .ok_or(SipgateFehler::Status(401))?;
+    let token = zugang
+        .geheimnisse
+        .get("token")
+        .ok_or(SipgateFehler::Status(401))?;
+    Ok(SipgateZugang {
+        token_id,
+        token,
+        lan_erlaubt: zugang.lan_erlaubt,
+    })
+}
+
+impl FaxZusteller for SipgateZusteller {
+    fn senden<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        auftrag: &'a FaxAuftrag<'a>,
+    ) -> BoxFuture<'a, Result<String, SipgateFehler>> {
+        Box::pin(async move { sipgate::senden(&sipgate_zugang(zugang)?, auftrag).await })
+    }
+
+    fn status<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        session: &'a str,
+    ) -> BoxFuture<'a, Result<FaxStatus, SipgateFehler>> {
+        Box::pin(async move { sipgate::status(&sipgate_zugang(zugang)?, session).await })
+    }
+}
+
+/// Ein vom Fax-Doppel übergebenes Fax.
+#[derive(Debug, Clone)]
+pub struct GesendetesFax {
+    pub faxline_id: String,
+    pub empfaenger: String,
+    pub dateiname: String,
+    pub pdf: Vec<u8>,
+    pub mit_token: bool,
+}
+
+/// Das Fax-Doppel der e2e-Suite und der Tests (LLH-2095): nimmt jedes Fax an (Session
+/// `sess-<n>`) und meldet es beim ersten Abfragen als gesendet, sofern nichts anderes geplant
+/// ist. Ohne Netz; im Betrieb nur über [`testfaxzusteller`] und damit nur im Debug-Build.
+#[derive(Default)]
+pub struct AufzeichnenderFaxZusteller {
+    gesendet: std::sync::Mutex<Vec<GesendetesFax>>,
+    senden_plan: std::sync::Mutex<std::collections::VecDeque<Result<String, SipgateFehler>>>,
+    status_plan: std::sync::Mutex<std::collections::VecDeque<Result<FaxStatus, SipgateFehler>>>,
+    abfragen: std::sync::atomic::AtomicUsize,
+}
+
+impl AufzeichnenderFaxZusteller {
+    pub fn gesendet(&self) -> Vec<GesendetesFax> {
+        self.gesendet.lock().unwrap().clone()
+    }
+    /// Das Ergebnis des nächsten Sendens.
+    pub fn plane_senden(&self, e: Result<String, SipgateFehler>) {
+        self.senden_plan.lock().unwrap().push_back(e);
+    }
+    /// Das Ergebnis der nächsten Abfrage.
+    pub fn plane_status(&self, e: Result<FaxStatus, SipgateFehler>) {
+        self.status_plan.lock().unwrap().push_back(e);
+    }
+    /// Wie oft der Stand abgefragt wurde.
+    pub fn abfragen(&self) -> usize {
+        self.abfragen.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+impl FaxZusteller for AufzeichnenderFaxZusteller {
+    fn senden<'a>(
+        &'a self,
+        zugang: &'a Versandzugang,
+        auftrag: &'a FaxAuftrag<'a>,
+    ) -> BoxFuture<'a, Result<String, SipgateFehler>> {
+        Box::pin(async move {
+            let mut liste = self.gesendet.lock().unwrap();
+            liste.push(GesendetesFax {
+                faxline_id: auftrag.faxline_id.to_string(),
+                empfaenger: auftrag.empfaenger.to_string(),
+                dateiname: auftrag.dateiname.to_string(),
+                pdf: auftrag.pdf.to_vec(),
+                mit_token: zugang.geheimnisse.contains_key("token"),
+            });
+            let n = liste.len();
+            drop(liste);
+            self.senden_plan
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| Ok(format!("sess-{n}")))
+        })
+    }
+
+    fn status<'a>(
+        &'a self,
+        _zugang: &'a Versandzugang,
+        _session: &'a str,
+    ) -> BoxFuture<'a, Result<FaxStatus, SipgateFehler>> {
+        Box::pin(async move {
+            self.abfragen
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.status_plan
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or(Ok(FaxStatus::Gesendet))
+        })
+    }
+}
+
 /// Der Fehlschlag eines Kanals, den der Zusteller nicht bedient (fester Grund, nie gesendet).
 fn kanal_nicht_bedient() -> Fehlschlag {
     Fehlschlag {
@@ -213,7 +364,8 @@ fn kanal_nicht_bedient() -> Fehlschlag {
 }
 
 /// Die Weiche des Laufs: gibt jeden Versand dem Zusteller seines Kanals (LLH-2094, Spec
-/// Abschnitt 6). Fax und Threema haben keinen und scheitern ohne Netz.
+/// Abschnitt 6). Das Fax geht nicht hier, sondern über [`Zustellwege::fax`]; Fax und Threema
+/// scheitern hier ohne Netz.
 pub struct Zustellerwahl {
     email: Arc<dyn Zusteller>,
     matrix: Arc<dyn Zusteller>,
@@ -292,6 +444,7 @@ fn baue_smtp_mail(auftrag: &Versandauftrag<'_>) -> Result<(String, Vec<u8>), Feh
         auftrag.adresse,
         &message_id(auftrag.versand_id, &von),
         &schnappschuss,
+        auftrag.pdf,
         auftrag.anhaenge,
     )
     .map_err(|_| anbindung_unbrauchbar())?;
@@ -334,6 +487,12 @@ pub fn smtp_fehlschlag(e: SmtpFehler) -> Fehlschlag {
         smtp_status: e.status(),
         teile: Vec::new(),
     }
+}
+
+
+/// Das aufzeichnende Fax-Doppel, nur in einem Debug-Build (wie [`testzusteller`]).
+pub fn testfaxzusteller() -> Option<Arc<AufzeichnenderFaxZusteller>> {
+    cfg!(debug_assertions).then(|| Arc::new(AufzeichnenderFaxZusteller::default()))
 }
 
 /// Eine vom Test-Doppel angenommene Zustellung (ohne Text: der enthält Inhalt). `umfang` ist bei
@@ -408,6 +567,7 @@ mod tests {
             betreff: "Betreff",
             inhalt: "abc",
             anhaenge: &[],
+            pdf: None,
             gesendet: &[],
         };
         z.zustellen(&auftrag).await.unwrap();
@@ -438,6 +598,7 @@ mod tests {
             betreff: "Betreff",
             inhalt: "abc",
             anhaenge: &[],
+            pdf: None,
             gesendet: &[],
         }
     }
@@ -559,11 +720,13 @@ mod tests {
     #[test]
     fn im_debug_build_gibt_es_das_doppel() {
         assert!(testzusteller().is_some());
+        assert!(testfaxzusteller().is_some());
     }
 
     #[cfg(not(debug_assertions))]
     #[test]
     fn im_release_build_gibt_es_das_doppel_nie() {
         assert!(testzusteller().is_none());
+        assert!(testfaxzusteller().is_none());
     }
 }

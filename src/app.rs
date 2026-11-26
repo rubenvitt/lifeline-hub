@@ -206,6 +206,16 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/devices/me/position",
             put(routes::helfer::position_senden),
         )
+        // Helfer-App Stufe 2 (ADR-0111): eigene Aufträge lesen und quittieren.
+        .route("/api/devices/me/tasks", get(routes::helfer::auftraege))
+        .route(
+            "/api/devices/me/push",
+            put(routes::helfer::push_anmelden).delete(routes::helfer::push_abmelden),
+        )
+        .route(
+            "/api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge",
+            post(routes::helfer::auftrag_quittieren),
+        )
         .route("/api/auth/oidc/start", get(routes::auth::oidc_start))
         .route("/api/auth/oidc/callback", get(routes::auth::oidc_callback))
         .route(

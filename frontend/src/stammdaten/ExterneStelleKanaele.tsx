@@ -1,12 +1,11 @@
-import { Button, Input, Radio } from 'antd';
+import { Button, Input } from 'antd';
 import { useId, useState } from 'react';
-import { Augenbraue, FeldFehler, Stapel, Textstufe } from '../components/instrument';
+import { Augenbraue, FeldFehler, SegmentFeld, Stapel, Textstufe } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useOhneVerbindung } from '../offline/verbindung';
-import { kanalKurz } from '../ausgang/kanalAnzeige';
 import { useCreateKanal, useDeleteKanal, useExterneStelleKanaele } from '../api/externeStellen';
 import { useStammdatenHerkunft } from '../instanz/herkunft';
-import type { ExterneStelle } from '../api/types';
+import type { ExterneStelle, KanalArt } from '../api/types';
 
 /** Höchstlänge einer Adresse, wie der Server sie prüft (RFC 5321). */
 const ADRESSE_MAX = 254;
@@ -14,7 +13,8 @@ const ADRESSE_MAX = 254;
 const MATRIX_MAX = 255;
 const BESCHRIFTUNG_MAX = 100;
 
-type Art = 'email' | 'matrix';
+/** Kanäle, die eine Stelle heute bekommt (Server: `KanalArt::is_freigeschaltet`). */
+type Art = 'email' | 'fax' | 'matrix';
 
 /**
  * Grobe Formprüfung vor dem Senden: genau ein „@“, kein Leerzeichen, kein Komma, beidseitig
@@ -26,6 +26,23 @@ export function istMailFormGueltig(adresse: string): boolean {
   if (/[\s,]/.test(a)) return false;
   const teile = a.split('@');
   return teile.length === 2 && teile[0] !== '' && teile[1] !== '';
+}
+
+/**
+ * Grobe Prüfung einer Faxnummer wie der Server (`normalize_fax`, LLH-2095): `+`, `00` oder eine
+ * führende `0`, danach 8 bis 15 Ziffern; Leerzeichen, `-`, `/`, `.`, Klammern und ein `(0)`
+ * hinter der Landeskennung zählen nicht. Der Server bringt die Nummer in die Form E.164.
+ */
+export function istFaxnummerGueltig(roh: string): boolean {
+  let a = roh.trim();
+  if (a.startsWith('+') || a.startsWith('00')) a = a.replace('(0)', '');
+  a = a.replace(/[\s\-/.()]/g, '');
+  let ziffern: string;
+  if (a.startsWith('+')) ziffern = a.slice(1);
+  else if (a.startsWith('00')) ziffern = a.slice(2);
+  else if (a.startsWith('0')) ziffern = `49${a.slice(1)}`;
+  else return false;
+  return /^[1-9][0-9]{7,14}$/.test(ziffern);
 }
 
 /**
@@ -52,9 +69,20 @@ function matrixFormFehler(adresse: string): string {
   return 'Matrix-Raum ungültig';
 }
 
+const KANAL_TEXT: Record<Art, { name: string; adresse: string }> = {
+  email: { name: 'E-Mail', adresse: 'Mailadresse' },
+  fax: { name: 'Fax', adresse: 'Faxnummer' },
+  matrix: { name: 'Matrix', adresse: 'Matrix-Raum' },
+};
+
+/** Wie eine Adresse heißt (Knopf „… entfernen“); Threema spricht wie die E-Mail. */
+function adressName(kanal: KanalArt): string {
+  return kanal === 'threema' ? KANAL_TEXT.email.adresse : KANAL_TEXT[kanal].adresse;
+}
+
 /**
- * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093): die
- * Adressen der Stelle (E-Mail oder Matrix-Raum), jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
+ * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093, Fax
+ * LLH-2095, Matrix LLH-2094): die Mailadressen, Faxnummern und Matrix-Räume der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
  * Eingaben hier stehen außerhalb seines `Form` (kein Feld, Enter fügt die Adresse hinzu, statt
  * das Modal abzusenden). Eine Stelle vom Hub ist nur lesbar, ihre Adressen kommen mit.
  */
@@ -65,22 +93,29 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
   const herkunft = useStammdatenHerkunft();
   const ohneNetz = useOhneVerbindung();
   const fehlerId = useId();
-  const [art, setArt] = useState<Art>('email');
+  const [kanal, setKanal] = useState<Art>('email');
   const [adresse, setAdresse] = useState('');
   const [beschriftung, setBeschriftung] = useState('');
   const [formFehler, setFormFehler] = useState<string | null>(null);
   const vomHub = herkunft.istVomHub('externe_stelle', stelle.id);
 
   const hinzufuegen = () => {
-    const gueltig = art === 'matrix' ? istMatrixFormGueltig(adresse) : istMailFormGueltig(adresse);
-    if (!gueltig) {
-      setFormFehler(art === 'matrix' ? matrixFormFehler(adresse) : 'Mailadresse ungültig');
+    if (kanal === 'email' && !istMailFormGueltig(adresse)) {
+      setFormFehler('Mailadresse ungültig');
+      return;
+    }
+    if (kanal === 'fax' && !istFaxnummerGueltig(adresse)) {
+      setFormFehler('Keine gültige Faxnummer');
+      return;
+    }
+    if (kanal === 'matrix' && !istMatrixFormGueltig(adresse)) {
+      setFormFehler(matrixFormFehler(adresse));
       return;
     }
     setFormFehler(null);
     const label = beschriftung.trim();
     anlegen.mutate(
-      { channel: art, address: adresse.trim(), ...(label ? { label } : {}) },
+      { channel: kanal, address: adresse.trim(), ...(label ? { label } : {}) },
       {
         onSuccess: () => {
           setAdresse('');
@@ -107,7 +142,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
             <li key={k.id}>
               <Stapel richtung="zeile" abstand="sm" ausrichten="baseline" umbruch>
                 <Textstufe stufe="textKlein" ton="gedaempft">
-                  {kanalKurz(k.channel)}
+                  {k.channel === 'threema' ? 'Threema' : KANAL_TEXT[k.channel].name}
                 </Textstufe>
                 <span data-schrift="kennung">{k.address}</span>
                 {k.label && (
@@ -118,7 +153,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 {!vomHub && (
                   <Button
                     danger
-                    aria-label={`Adresse ${k.address} entfernen`}
+                    aria-label={`${adressName(k.channel)} ${k.address} entfernen`}
                     disabled={ohneNetz}
                     loading={entfernen.isPending && entfernen.variables === k.id}
                     onClick={() => entfernen.mutate(k.id)}
@@ -136,27 +171,34 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
           </Textstufe>
         ) : (
           <Stapel abstand="xs">
-            <Radio.Group
-              aria-label="Art der Adresse"
-              value={art}
-              onChange={(e) => {
-                setArt(e.target.value as Art);
+            <SegmentFeld<Art>
+              beschriftung="Kanal der neuen Adresse"
+              value={kanal}
+              onChange={(w) => {
+                setKanal(w);
                 setFormFehler(null);
               }}
-              options={[
-                { label: 'E-Mail', value: 'email' },
-                { label: 'Matrix', value: 'matrix' },
+              optionen={[
+                { wert: 'email', label: KANAL_TEXT.email.name },
+                { wert: 'fax', label: KANAL_TEXT.fax.name },
+                { wert: 'matrix', label: KANAL_TEXT.matrix.name },
               ]}
             />
             <Stapel richtung="zeile" abstand="sm" umbruch>
               <Input
-                aria-label={art === 'matrix' ? 'Matrix-Raum' : 'Mailadresse'}
+                aria-label={KANAL_TEXT[kanal].adresse}
                 aria-invalid={formFehler ? true : undefined}
                 aria-describedby={formFehler ? fehlerId : undefined}
                 type="text"
-                inputMode={art === 'matrix' ? 'text' : 'email'}
-                placeholder={art === 'matrix' ? '#lageraum:beispiel.de' : 'leitstelle@beispiel.de'}
-                maxLength={art === 'matrix' ? MATRIX_MAX : ADRESSE_MAX}
+                inputMode={kanal === 'fax' ? 'tel' : kanal === 'matrix' ? 'text' : 'email'}
+                placeholder={
+                  kanal === 'fax'
+                    ? '0511 123456'
+                    : kanal === 'matrix'
+                      ? '#lageraum:beispiel.de'
+                      : 'leitstelle@beispiel.de'
+                }
+                maxLength={kanal === 'matrix' ? MATRIX_MAX : ADRESSE_MAX}
                 value={adresse}
                 onChange={(e) => {
                   setAdresse(e.target.value);

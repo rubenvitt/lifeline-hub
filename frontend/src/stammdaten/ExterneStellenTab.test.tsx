@@ -86,22 +86,22 @@ describe('ExterneStellenTab', () => {
       agency_id: stelle,
       agency_name: 'x',
     });
+    const alle = [
+      adresse(1, 1, 'a@example.org'),
+      adresse(2, 1, 'b@example.org'),
+      adresse(3, 2, 'c@example.org'),
+      adresse(4, 2, '+49511123456', 'fax'),
+      adresse(5, 1, '#lage:example.org', 'matrix'),
+    ];
     server.use(
-      http.get('/api/external-agencies/channels', () =>
-        HttpResponse.json([
-          adresse(1, 1, 'a@example.org'),
-          adresse(2, 1, 'b@example.org'),
-          adresse(3, 2, 'c@example.org'),
-          adresse(4, 1, '#lage:example.org', 'matrix'),
-        ]),
-      ),
+      http.get('/api/external-agencies/channels', () => HttpResponse.json(alle)),
     );
     const { container } = render(admin);
     await screen.findByText('Polizei Musterstadt');
     await waitFor(() =>
       expect(bezeichnungen(container)).toEqual([
         'ILS Musterkreis zuständig 2 Mail, 1 Matrix',
-        'Polizei Musterstadt 1 Mail',
+        'Polizei Musterstadt 1 Mail, 1 Fax',
         'Ordnungsamt',
       ]),
     );

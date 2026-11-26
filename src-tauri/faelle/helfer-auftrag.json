@@ -1,0 +1,537 @@
+{
+  "zweck": "Gemeinsame Fälle der Aufträge an die Helfer-App (ADR-0111) für Server (Rust), HelferKern (Swift) und helferkern (Kotlin). nutzlast: Testvektor wie push-nutzlast.json (AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat + 16-Byte-Tag, umschlag = base64url des kompakten JSON {c,k,n}; alle Binärwerte base64url ohne Auffüllung). sse: Rohtext des Live-Stroms und die Ereignisse, die ein Leser daraus macht (ein Rahmen endet mit einer Leerzeile; nur event helfer_auftrag mit data {task_id} ist ein Auftrag, heartbeat ein Lebenszeichen, alles andere unbekannt; Kommentar- und retry-Rahmen ohne event erzeugen nichts). ordnung: Liste aus GET /api/devices/me/tasks → Reihenfolge der IDs. mitteilung: ob ein Auftrag eine Mitteilung bekommt (offen, nicht aufgehoben, noch nicht gemeldet, issued_at höchstens 10 Minuten vor jetzt; Zeiten UTC). quittungsstand: Stand einer Empfängerzeile (erste Zeile des Auftrags). quittungstext: ob eine quittierte Empfängerzeile die eigene ist (acknowledged_by leer oder gleich dem eigenen Anzeigenamen, beide ohne Rand verglichen) und der Text dazu in UTC; offen: nicht eigen, kein Text.",
+  "nutzlast": [
+    {
+      "beschreibung": "Auftrag an eine Einheit",
+      "kennung": "0b7e4e0a-3c1d-4f2a-9a55-1d2f6a7c8e90",
+      "schluessel": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+      "nonce": "AgICAgICAgICAgIC",
+      "klartext": "{\"v\":1,\"s\":\"Lifeline\",\"art\":\"auftrag\",\"e\":42,\"t\":7,\"titel\":\"San-Trupp 2\",\"text\":\"Verletzte Person, Zelt 3\"}",
+      "chiffrat": "fPS_a3Bm7d-g7obqEM6k187cv4rJna8Qr_PCwVqaARkDDX9QT0OBimUUZtuzBShZkELy9dMzqUOnYYmQMFUjpyCW5JLW6i9KXXU73ZhoShspIT5TJ81A__IYNJs5MqJ7MmlsHl06A7jTRzSGKeGh4PflgCx4lYZdrHvh",
+      "umschlag": "eyJjIjoiZlBTX2EzQm03ZC1nN29icUVNNmsxODdjdjRySm5hOFFyX1BDd1ZxYUFSa0REWDlRVDBPQmltVVVadHV6QlNoWmtFTHk5ZE16cVVPbllZbVFNRlVqcHlDVzVKTFc2aTlLWFhVNzNaaG9TaHNwSVQ1VEo4MUFfX0lZTkpzNU1xSjdNbWxzSGwwNkE3alRSelNHS2VHaDRQZmxnQ3g0bFlaZHJIdmgiLCJrIjoiMGI3ZTRlMGEtM2MxZC00ZjJhLTlhNTUtMWQyZjZhN2M4ZTkwIiwibiI6IkFnSUNBZ0lDQWdJQ0FnSUMifQ"
+    },
+    {
+      "beschreibung": "Umlaute, Person als Empfänger",
+      "kennung": "7c9d1a52-8e44-4b0f-b3a6-5e2d9c4f1a07",
+      "schluessel": "EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+      "nonce": "AwMDAwMDAwMDAwMD",
+      "klartext": "{\"v\":1,\"s\":\"Kreisverband Süd\",\"art\":\"auftrag\",\"e\":5,\"t\":1201,\"titel\":\"An dich\",\"text\":\"Bitte zur Ausgabestelle Ost – Getränke für Abschnitt Süd\"}",
+      "chiffrat": "hb-EOXjowvysX3BxnMj05Vl6nVmCih6i9LP9vdxSLa61FYAXoCmDG_JYq_Pggd83aBqjCQ2soOOZL4A5zHbgVmdAPKhJy72e2P6ABxse4kHQ7bpVCFWsGHB4ZM-RHzJbxWHWdgazq0HyMCu9jp7Baz0ozv1liqvo3n_6tRCpyMyBHtxcRNk6fYtzuS-XFmXkfdwfAAQsfX0m1hmwCMQf_U1dzEBLPis",
+      "umschlag": "eyJjIjoiaGItRU9Yam93dnlzWDNCeG5NajA1Vmw2blZtQ2loNmk5TFA5dmR4U0xhNjFGWUFYb0NtREdfSllxX1BnZ2Q4M2FCcWpDUTJzb09PWkw0QTV6SGJnVm1kQVBLaEp5NzJlMlA2QUJ4c2U0a0hRN2JwVkNGV3NHSEI0Wk0tUkh6SmJ4V0hXZGdhenEwSHlNQ3U5anA3QmF6MG96djFsaXF2bzNuXzZ0UkNweU15Qkh0eGNSTms2Zll0enVTLVhGbVhrZmR3ZkFBUXNmWDBtMWhtd0NNUWZfVTFkekVCTFBpcyIsImsiOiI3YzlkMWE1Mi04ZTQ0LTRiMGYtYjNhNi01ZTJkOWM0ZjFhMDciLCJuIjoiQXdNREF3TURBd01EQXdNRCJ9"
+    }
+  ],
+  "sse": [
+    {
+      "beschreibung": "Auftrag und Lebenszeichen",
+      "eingabe": ":verbunden\n\nretry: 3000\n\nevent: helfer_auftrag\ndata: {\"task_id\":7}\n\nevent: heartbeat\ndata: {}\n\n",
+      "ereignisse": [
+        {
+          "art": "auftrag",
+          "task_id": 7
+        },
+        {
+          "art": "lebenszeichen"
+        }
+      ]
+    },
+    {
+      "beschreibung": "Fremdes Ereignis wird übergangen, Kommentar ist kein Ereignis",
+      "eingabe": ": ping\n\nevent: auftrag\ndata: {}\n\nevent: helfer_auftrag\ndata: {\"task_id\":12}\n\n",
+      "ereignisse": [
+        {
+          "art": "unbekannt"
+        },
+        {
+          "art": "auftrag",
+          "task_id": 12
+        }
+      ]
+    },
+    {
+      "beschreibung": "Mehrzeiliges data und CRLF",
+      "eingabe": "event: helfer_auftrag\r\ndata: {\"task_id\":\r\ndata: 3}\r\n\r\n",
+      "ereignisse": [
+        {
+          "art": "auftrag",
+          "task_id": 3
+        }
+      ]
+    },
+    {
+      "beschreibung": "Abgeschnittener Rahmen ohne Leerzeile liefert nichts",
+      "eingabe": "event: helfer_auftrag\ndata: {\"task_id\":9}\n",
+      "ereignisse": []
+    },
+    {
+      "beschreibung": "Kaputte Daten sind unbekannt",
+      "eingabe": "event: helfer_auftrag\ndata: kein json\n\n",
+      "ereignisse": [
+        {
+          "art": "unbekannt"
+        }
+      ]
+    }
+  ],
+  "ordnung": [
+    {
+      "beschreibung": "offen vor quittiert vor aufgehoben, je neueste zuerst",
+      "auftraege": [
+        {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "number": 2,
+          "text": "Auftrag 2",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:05:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 102,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": "2026-11-25 10:06:00",
+              "acknowledged_by": "Max M."
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "number": 3,
+          "text": "Auftrag 3",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:10:00",
+          "cancelled_at": "2026-11-25 10:11:00",
+          "recipients": [
+            {
+              "id": 103,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "number": 4,
+          "text": "Auftrag 4",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:15:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 104,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "number": 5,
+          "text": "Auftrag 5",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 09:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 105,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": "2026-11-25 09:01:00",
+              "acknowledged_by": "Lisa K."
+            }
+          ]
+        }
+      ],
+      "erwartet": [
+        4,
+        1,
+        2,
+        5,
+        3
+      ]
+    }
+  ],
+  "mitteilung": [
+    {
+      "beschreibung": "neu, offen und jung",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "bereits_gemeldet": [],
+      "jetzt": "2026-11-25 10:03:00",
+      "erwartet": true
+    },
+    {
+      "beschreibung": "schon gemeldet",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "bereits_gemeldet": [
+        1
+      ],
+      "jetzt": "2026-11-25 10:03:00",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "schon quittiert",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": "2026-11-25 10:01:00",
+            "acknowledged_by": "Max M."
+          }
+        ]
+      },
+      "bereits_gemeldet": [],
+      "jetzt": "2026-11-25 10:03:00",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "aufgehoben",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": "2026-11-25 10:01:00",
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "bereits_gemeldet": [],
+      "jetzt": "2026-11-25 10:03:00",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "älter als 10 Minuten",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "bereits_gemeldet": [],
+      "jetzt": "2026-11-25 10:10:01",
+      "erwartet": false
+    },
+    {
+      "beschreibung": "genau 10 Minuten alt",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "bereits_gemeldet": [],
+      "jetzt": "2026-11-25 10:10:00",
+      "erwartet": true
+    }
+  ],
+  "quittungsstand": [
+    {
+      "beschreibung": "offen",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": null,
+            "acknowledged_by": null
+          }
+        ]
+      },
+      "erwartet": {
+        "stand": "offen"
+      }
+    },
+    {
+      "beschreibung": "von anderem übernommen",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": null,
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": "2026-11-25 10:01:00",
+            "acknowledged_by": "Max M."
+          }
+        ]
+      },
+      "erwartet": {
+        "stand": "quittiert",
+        "um": "2026-11-25 10:01:00",
+        "von": "Max M."
+      }
+    },
+    {
+      "beschreibung": "aufgehoben geht vor",
+      "auftrag": {
+        "id": 1,
+        "number": 1,
+        "text": "Auftrag 1",
+        "location": null,
+        "location_lat": null,
+        "location_lon": null,
+        "priority": "normal",
+        "deadline_at": null,
+        "issued_at": "2026-11-25 10:00:00",
+        "cancelled_at": "2026-11-25 10:02:00",
+        "recipients": [
+          {
+            "id": 101,
+            "kind": "unit",
+            "label": "San-Trupp 2",
+            "acknowledged_at": "2026-11-25 10:01:00",
+            "acknowledged_by": "Max M."
+          }
+        ]
+      },
+      "erwartet": {
+        "stand": "aufgehoben"
+      }
+    }
+  ],
+  "quittungstext": [
+    {
+      "beschreibung": "selbst übernommen",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Max M."
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ein anderer war schneller",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Lisa K."
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": false,
+        "text": "Übernommen von Lisa K. um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ohne Namen vom Server gilt als eigen",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": null
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "Rand zählt nicht",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": " Max M. "
+      },
+      "eigener_name": "Max M.  ",
+      "erwartet": {
+        "eigen": true,
+        "text": "Übernommen um 10:01"
+      }
+    },
+    {
+      "beschreibung": "ohne eigenen Namen ist ein Name fremd",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": "2026-11-25 10:01:00",
+        "acknowledged_by": "Max M."
+      },
+      "eigener_name": "",
+      "erwartet": {
+        "eigen": false,
+        "text": "Übernommen von Max M. um 10:01"
+      }
+    },
+    {
+      "beschreibung": "offen: nicht eigen, kein Text",
+      "empfaenger": {
+        "id": 101,
+        "kind": "unit",
+        "label": "San-Trupp 2",
+        "acknowledged_at": null,
+        "acknowledged_by": null
+      },
+      "eigener_name": "Max M.",
+      "erwartet": {
+        "eigen": false,
+        "text": null
+      }
+    }
+  ]
+}

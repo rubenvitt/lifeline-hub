@@ -14,6 +14,7 @@ import java.io.IOException
 import java.net.HttpCookie
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.concurrent.thread
 
 /** Antwort des Servers; [status] `0` heißt Netzfehler ohne Antwort (wie [entscheide]). */
 data class Rueckmeldung(val status: Int, val text: String) {
@@ -63,6 +64,70 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
     fun pausiere(pausiert: Boolean): Rueckmeldung = anfrage("PUT", "api/devices/me/position", Wire.pause(pausiert))
 
     fun abmelden(): Rueckmeldung = anfrage("POST", "api/auth/logout").also { cookie = null }
+
+    // Aufträge (ADR-0111, src/routes/helfer.rs).
+
+    fun auftraege(): Rueckmeldung = anfrage("GET", "api/devices/me/tasks")
+
+    fun quittiere(auftragId: Long, empfaengerId: Long): Rueckmeldung =
+        anfrage("POST", "api/devices/me/tasks/$auftragId/recipients/$empfaengerId/acknowledge")
+
+    /** Die gerade offene Live-Verbindung; [trenneLive] bricht ein blockiertes Lesen ab. */
+    @Volatile
+    private var liveVerbindung: HttpURLConnection? = null
+
+    /**
+     * Hält `GET /api/incidents/{id}/live` offen und gibt jede Zeile an [zeile] (ohne Zeilenende);
+     * [offen] läuft einmal, sobald der Strom steht. Blockiert bis zum Ende des Stroms, einem
+     * Netzfehler oder [trenneLive]. Liefert den Status des Aufbaus (`0` ohne Antwort); wie die
+     * anderen Anfragen ohne Weiterleitung und nur mit dem Cookie dieser Kopplung.
+     */
+    fun live(einsatzId: Long, offen: () -> Unit, zeile: (String) -> Unit): Int {
+        val verbindung = try {
+            URL(server.text.trimEnd('/') + "/api/incidents/$einsatzId/live").openConnection() as HttpURLConnection
+        } catch (_: IOException) {
+            return 0
+        }
+        liveVerbindung = verbindung
+        return try {
+            verbindung.requestMethod = "GET"
+            verbindung.connectTimeout = 15_000
+            // Der Server sendet regelmäßig ein Lebenszeichen; bleibt es so lange aus, ist die Leitung tot.
+            verbindung.readTimeout = LIVE_STILLE_MS
+            verbindung.instanceFollowRedirects = false
+            verbindung.useCaches = false
+            verbindung.setRequestProperty("Accept", "text/event-stream")
+            verbindung.setRequestProperty("User-Agent", kennung)
+            cookie?.let { verbindung.setRequestProperty("Cookie", "$COOKIE_NAME=$it") }
+            val status = verbindung.responseCode
+            uebernimmCookie(verbindung.headerFields)
+            if (status !in 200..299) return status
+            offen()
+            verbindung.inputStream.bufferedReader(Charsets.UTF_8).use { leser ->
+                while (true) {
+                    val z = leser.readLine() ?: break
+                    zeile(z)
+                }
+            }
+            status
+        } catch (_: IOException) {
+            0
+        } finally {
+            liveVerbindung = null
+            verbindung.disconnect()
+        }
+    }
+
+    /**
+     * Beendet die Live-Verbindung von außen (Dienst endet, Empfang aus). Die offene Verbindung wird
+     * hier gegriffen, damit ein gleich danach geöffneter Strom bleibt; `disconnect` schließt den
+     * Socket (bei TLS mit einem Schreiben) und läuft deshalb auf einem eigenen Faden, nie auf dem
+     * Hauptfaden.
+     */
+    fun trenneLive() {
+        val offen = liveVerbindung ?: return
+        thread(name = "helfer-live-trennen", isDaemon = true) { offen.disconnect() }
+    }
 
     private fun anfrage(methode: String, pfad: String, body: String? = null): Rueckmeldung {
         val verbindung = try {
@@ -122,5 +187,8 @@ class Serververbindung(val server: ServerAdresse, cookie: String?, private val k
         const val COOKIE_NAME = "lifeline_sid"
 
         private const val TAG = "LifelineHelfer"
+
+        /** Längste Stille im Live-Strom, bevor die App neu verbindet (Lebenszeichen alle 15 s, src/live/strom.rs). */
+        private const val LIVE_STILLE_MS = 45_000
     }
 }

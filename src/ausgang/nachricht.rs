@@ -2,8 +2,9 @@
 //! aus der freigegebenen Fassung bzw. der Nachforderung, die PNG-Anlagen und die fertige
 //! RFC-5322-Nachricht.
 
-use super::zustand::AusgangFehler;
+use super::zustand::{AusgangFehler, QuelleArt};
 use crate::error::AppError;
+use crate::externe_stelle::KanalArt;
 use crate::vorlagendokument::{anlage, repo as dokument_repo, Dokumentart};
 use chrono::Utc;
 use lettre::message::header::ContentType;
@@ -236,8 +237,135 @@ pub async fn load_anhaenge<T: Dokumentart>(
     Ok(out)
 }
 
+/// Die PNG-Anlagen der Quelle eines Versands (Nachforderung: keine).
+pub async fn load_anhaenge_quelle(
+    pool: &SqlitePool,
+    quelle: QuelleArt,
+    einsatz_id: i64,
+    quelle_id: i64,
+) -> Result<Vec<Anhang>, AnhangFehler> {
+    match quelle {
+        QuelleArt::Lagebericht => {
+            load_anhaenge::<crate::lagebericht::Lagebericht>(pool, einsatz_id, quelle_id).await
+        }
+        QuelleArt::Befehl => {
+            load_anhaenge::<crate::befehl::Befehl>(pool, einsatz_id, quelle_id).await
+        }
+        QuelleArt::Nachforderung => Ok(Vec::new()),
+    }
+}
+
+/// Was das PDF über Absender, Einsatz und Quelle braucht (LLH-2095, Spec Abschnitt 6).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PdfKopf {
+    /// Absenderkennung der Fax-Anbindung oder der Name der Organisation.
+    pub absender: String,
+    pub einsatz: String,
+    pub uebung: bool,
+    /// Version der Kette bei Lagebericht und Befehl, für den Dateinamen.
+    pub version: Option<i64>,
+}
+
+/// Lädt den Kopf des PDFs. `absender_kennung` ohne Inhalt gilt als nicht gesetzt.
+pub async fn pdf_kopf_laden(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    quelle: QuelleArt,
+    quelle_id: i64,
+    absender_kennung: Option<&str>,
+) -> Result<PdfKopf, AppError> {
+    let mut conn = pool.acquire().await?;
+    let (einsatz, art, org): (String, String, String) = sqlx::query_as(
+        "SELECT e.bezeichnung, e.einsatzart, o.name FROM einsatz e \
+         JOIN organisation o ON o.id = e.org_id WHERE e.id = ?",
+    )
+    .bind(einsatz_id)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound)?;
+    let version = match quelle {
+        QuelleArt::Lagebericht => Some(
+            dokument_repo::laden::<crate::lagebericht::Lagebericht>(
+                &mut *conn, einsatz_id, quelle_id,
+            )
+            .await?
+            .version,
+        ),
+        QuelleArt::Befehl => Some(
+            dokument_repo::laden::<crate::befehl::Befehl>(&mut *conn, einsatz_id, quelle_id)
+                .await?
+                .version,
+        ),
+        QuelleArt::Nachforderung => None,
+    };
+    let absender = absender_kennung
+        .map(str::trim)
+        .filter(|k| !k.is_empty())
+        .map_or(org, str::to_string);
+    Ok(PdfKopf {
+        absender,
+        einsatz,
+        uebung: art == crate::einsatz::EINSATZART_UEBUNG,
+        version,
+    })
+}
+
+/// Die Zeile „An:“ des PDFs: Stelle und Adresse mit Kanal.
+pub fn an_text(kanal: KanalArt, stelle: &str, adresse: &str) -> String {
+    match kanal {
+        KanalArt::Fax => format!("{stelle} (Fax {adresse})"),
+        _ => format!("{stelle} ({adresse})"),
+    }
+}
+
+/// Baut das PDF eines Versands aus Kopf, Schnappschuss und Anlagen.
+pub fn baue_pdf_fuer(
+    kopf: &PdfKopf,
+    an: &str,
+    betreff: &str,
+    inhalt: &str,
+    anlagen: &[(String, Vec<u8>)],
+    erzeugt_at: chrono::DateTime<Utc>,
+) -> Result<super::pdf::PdfDatei, super::pdf::PdfFehler> {
+    super::pdf::baue_pdf(&super::pdf::PdfVorlage {
+        absender: &kopf.absender,
+        erzeugt_at,
+        uebung: kopf.uebung,
+        betreff,
+        an,
+        einsatz: &kopf.einsatz,
+        inhalt,
+        anlagen,
+    })
+}
+
+/// Baut das PDF auf einem Blocking-Thread (Bilder dekodieren, verdichten): der Lauf und die Route
+/// halten so keinen Worker der Laufzeit an. Gibt die Anlagen zurück, damit die Mail sie danach
+/// noch anhängen kann.
+pub async fn baue_pdf_im_hintergrund(
+    kopf: PdfKopf,
+    an: String,
+    betreff: String,
+    inhalt: String,
+    anlagen: Vec<(String, Vec<u8>)>,
+    erzeugt_at: chrono::DateTime<Utc>,
+) -> (
+    Result<super::pdf::PdfDatei, super::pdf::PdfFehler>,
+    Vec<(String, Vec<u8>)>,
+) {
+    let geteilt = std::sync::Arc::new(anlagen);
+    let fuer_pdf = std::sync::Arc::clone(&geteilt);
+    let pdf = tokio::task::spawn_blocking(move || {
+        baue_pdf_fuer(&kopf, &an, &betreff, &inhalt, &fuer_pdf, erzeugt_at)
+    })
+    .await
+    .unwrap_or(Err(super::pdf::PdfFehler::Erzeugung));
+    let anlagen = std::sync::Arc::try_unwrap(geteilt).unwrap_or_else(|a| (*a).clone());
+    (pdf, anlagen)
+}
+
 /// Baut die Nachricht als RFC-5322-Bytes: `text/plain; charset=utf-8`, mit Anhängen als
-/// `multipart/mixed` mit `image/png`. Betreff und Anzeigename kodiert lettre nach RFC 2047.
+/// `multipart/mixed`: zuerst das PDF (`application/pdf`, LLH-2095), dann die `image/png`. Betreff und Anzeigename kodiert lettre nach RFC 2047.
 /// `message_id` steht mit den spitzen Klammern, wie sie in den Kopf kommen.
 pub fn baue_mail(
     von_adresse: &str,
@@ -245,6 +373,7 @@ pub fn baue_mail(
     an: &str,
     message_id: &str,
     s: &Schnappschuss,
+    pdf: Option<(&str, &[u8])>,
     anhaenge: &[Anhang],
 ) -> Result<Vec<u8>, AusgangFehler> {
     fn fehler<E>(_: E) -> AusgangFehler {
@@ -265,10 +394,14 @@ pub fn baue_mail(
         .header(ContentType::parse("text/plain; charset=utf-8").map_err(fehler)?)
         .body(s.inhalt.clone());
     let png = ContentType::parse("image/png").map_err(fehler)?;
-    let mail = if anhaenge.is_empty() {
+    let mail = if anhaenge.is_empty() && pdf.is_none() {
         builder.singlepart(text)
     } else {
         let mut teile = MultiPart::mixed().singlepart(text);
+        if let Some((name, daten)) = pdf {
+            let typ = ContentType::parse("application/pdf").map_err(fehler)?;
+            teile = teile.singlepart(Attachment::new(name.to_string()).body(daten.to_vec(), typ));
+        }
         for (name, daten) in anhaenge {
             teile =
                 teile.singlepart(Attachment::new(name.clone()).body(daten.clone(), png.clone()));
@@ -510,6 +643,7 @@ mod tests {
             "ils@example.org",
             "<ausgang-1@host.example>",
             &schnappschuss(),
+            None,
             &[],
         )
         .unwrap();
@@ -543,6 +677,7 @@ mod tests {
             "ils@example.org",
             "<ausgang-2@host.example>",
             &schnappschuss(),
+            None,
             &[("anlage-1.png".to_string(), png.clone())],
         )
         .unwrap();

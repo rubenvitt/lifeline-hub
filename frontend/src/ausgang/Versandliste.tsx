@@ -13,10 +13,20 @@ import { Textstufe, schriftStil } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
 import { adresseAnzeige, kanalKurz } from './kanalAnzeige';
 
-/** Zustandstext eines Versands (Spec 7): „wartet“, „übergeben 14:32“, „fehlgeschlagen: …“. */
+/**
+ * Zustandstext eines Versands (Spec 7): „wartet“, „übergeben 14:32“, beim Fax „übergeben 14:32,
+ * Zustellung wird geprüft“ und „zugestellt 14:34“ (LLH-2095), „fehlgeschlagen: …“. Eine Mail
+ * ohne PDF sagt es dazu.
+ */
 export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) => string): string {
+  const fax = v.channel === 'fax';
+  const ohnePdf = v.without_pdf ? ' · ohne PDF' : '';
   if (v.state === 'wartet') return 'wartet';
-  if (v.state === 'uebergeben') return `übergeben ${uhrzeit(v.handed_over_at)}`.trim();
+  if (v.state === 'zugestellt') return `zugestellt ${uhrzeit(v.delivered_at)}`.trim();
+  if (v.state === 'uebergeben') {
+    const zeit = `übergeben ${uhrzeit(v.handed_over_at)}`.trim();
+    return fax ? `${zeit}, Zustellung wird geprüft` : `${zeit}${ohnePdf}`;
+  }
   // Unklar ist kein Fehlschlag mit Grund, sondern eine offene Frage: der Wortlaut steht allein.
   const kanal = ausgangKanal(v.channel);
   if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss', kanal) as string;
@@ -25,7 +35,7 @@ export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) =>
 }
 
 /**
- * Versandliste einer Quelle (LLH-2093): je Versand Kanal, Stelle, Adresse (Matrix: der Raum), Zeit und Zustand, bei
+ * Versandliste einer Quelle (LLH-2093, Fax LLH-2095): je Versand Kanal, Stelle, Adresse (Matrix: der Raum), Zeit und Zustand, bei
  * `fehlgeschlagen` „Erneut senden“. Ohne Versand steht nichts da. Live über `ausgang`.
  */
 export default function Versandliste({
