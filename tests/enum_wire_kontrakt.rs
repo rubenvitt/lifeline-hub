@@ -386,6 +386,8 @@ fn serde_wire_gleich_as_str() {
         AnbindungFehler,
         ZuGross,
         Spiegel,
+        KeinZutritt,
+        Verschluesselung,
     });
     enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
         Email,

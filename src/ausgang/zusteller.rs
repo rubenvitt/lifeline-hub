@@ -3,10 +3,14 @@
 //! je Versand einen [`Versandauftrag`] und bekommt [`Zustellt`] oder einen [`Fehlschlag`] mit dem
 //! fertigen deutschen ETB-Grund zurück; die Zuordnung zu `AusgangFehler`, Wiederholung, ETB und
 //! Abschluss bleiben im Lauf. Produktiv stellt [`SmtpZusteller`] E-Mails über den SMTP-Client mit
-//! den Vertrauensankern des Systems zu; Tests setzen einen eigenen [`Zusteller`] oder einen
-//! eigenen [`SmtpTransport`] ein (Muster `public_api::webhook::ziel::Zusteller`).
+//! den Vertrauensankern des Systems zu und [`MatrixZusteller`] Nachrichten in Matrix-Räume über
+//! den Client der Anbindung; Tests setzen einen eigenen [`Zusteller`] oder einen eigenen
+//! [`SmtpTransport`] ein (Muster `public_api::webhook::ziel::Zusteller`).
 
 use std::sync::Arc;
+
+mod matrix;
+pub use matrix::{MatrixZusteller, MATRIX_ZUSTELL_ZEITLIMIT};
 
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
@@ -220,11 +224,12 @@ impl Zustellerwahl {
         Zustellerwahl { email, matrix }
     }
 
-    /// E-Mail über [`SmtpZusteller::produktiv`]; Matrix vorerst [`MatrixNichtVerfuegbar`].
-    pub fn produktiv() -> Self {
+    /// E-Mail über [`SmtpZusteller::produktiv`], Matrix über [`MatrixZusteller`] mit den Clients
+    /// des Prozesses (dieselben wie in `Rahmen::matrix`).
+    pub fn produktiv(matrix: Arc<crate::adapter::matrix::Clients>) -> Self {
         Zustellerwahl::new(
             Arc::new(SmtpZusteller::produktiv()),
-            Arc::new(MatrixNichtVerfuegbar),
+            Arc::new(MatrixZusteller::new(matrix)),
         )
     }
 }
@@ -239,28 +244,6 @@ impl Zusteller for Zustellerwahl {
             KanalArt::Matrix => self.matrix.zustellen(auftrag),
             KanalArt::Fax | KanalArt::Threema => Box::pin(async { Err(kanal_nicht_bedient()) }),
         }
-    }
-}
-
-/// Platzhalter für Matrix, bis es den Matrix-Zusteller gibt: jeder Versand scheitert endgültig
-/// als Fehler der Anbindung, ohne Netz.
-pub struct MatrixNichtVerfuegbar;
-
-impl Zusteller for MatrixNichtVerfuegbar {
-    fn zustellen<'a>(
-        &'a self,
-        _auftrag: &'a Versandauftrag<'a>,
-    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
-        Box::pin(async {
-            Err(Fehlschlag {
-                fehler: Zustellfehler::Anbindung {
-                    pruefung_vorziehen: false,
-                },
-                grund: "Matrix-Zustellung noch nicht verfügbar".into(),
-                smtp_status: None,
-                teile: Vec::new(),
-            })
-        })
     }
 }
 
@@ -516,20 +499,60 @@ mod tests {
         assert_eq!(email.angenommen().len() + matrix.angenommen().len(), 2);
     }
 
-    #[tokio::test]
-    async fn matrix_ist_vorerst_nicht_verfuegbar() {
-        let zugang = zugang();
-        let f = MatrixNichtVerfuegbar
-            .zustellen(&auftrag(KanalArt::Matrix, &zugang))
-            .await
-            .unwrap_err();
-        assert_eq!(f.grund, "Matrix-Zustellung noch nicht verfügbar");
-        assert_eq!(
-            f.fehler,
-            Zustellfehler::Anbindung {
-                pruefung_vorziehen: false
+    /// Die ETB-Gründe der E-Mail stehen fest: eine Änderung hier ist eine bewusste Änderung der
+    /// Texte im Einsatztagebuch. Der `match` ohne Platzhalter bricht den Build, wenn ein neuer
+    /// `SmtpFehler` keinen Eintrag bekommt.
+    #[test]
+    fn smtp_gruende_stehen_fest() {
+        fn eintrag(e: SmtpFehler) -> (&'static str, Zustellfehler, Option<u16>) {
+            let v = Zustellfehler::Voruebergehend { nicht_vor: None };
+            let a = |p| Zustellfehler::Anbindung {
+                pruefung_vorziehen: p,
+            };
+            match e {
+                SmtpFehler::Voruebergehend(_) => (
+                    "Mailserver nimmt vorübergehend nicht an (SMTP 451)",
+                    v,
+                    Some(451),
+                ),
+                SmtpFehler::Dns => ("Mailserver nicht gefunden", v, None),
+                SmtpFehler::Zeitueberschreitung => ("Mailserver antwortet nicht", v, None),
+                SmtpFehler::Verbindung => ("Mailserver nicht erreichbar", v, None),
+                SmtpFehler::Abgelehnt(_) => (
+                    "vom Mailserver abgelehnt (SMTP 550)",
+                    Zustellfehler::Abgelehnt,
+                    Some(550),
+                ),
+                SmtpFehler::Ungewiss => ("Zustellung unklar", Zustellfehler::Ungewiss, None),
+                SmtpFehler::Anmeldung => ("Anmeldung am Mailserver abgelehnt", a(true), None),
+                SmtpFehler::Tls => (
+                    "verschlüsselte Verbindung zum Mailserver gescheitert",
+                    a(true),
+                    None,
+                ),
+                SmtpFehler::ZielIntern => ("Adresse des Mailservers nicht erlaubt", a(false), None),
+                SmtpFehler::Antwort => ("Antwort des Mailservers unlesbar", a(false), None),
             }
-        );
+        }
+        for e in [
+            SmtpFehler::Voruebergehend(451),
+            SmtpFehler::Dns,
+            SmtpFehler::Zeitueberschreitung,
+            SmtpFehler::Verbindung,
+            SmtpFehler::Abgelehnt(550),
+            SmtpFehler::Ungewiss,
+            SmtpFehler::Anmeldung,
+            SmtpFehler::Tls,
+            SmtpFehler::ZielIntern,
+            SmtpFehler::Antwort,
+        ] {
+            let (grund, fehler, status) = eintrag(e);
+            let f = smtp_fehlschlag(e);
+            assert_eq!(f.grund, grund, "{e:?}");
+            assert_eq!(f.fehler, fehler, "{e:?}");
+            assert_eq!(f.smtp_status, status, "{e:?}");
+            assert!(f.teile.is_empty());
+        }
     }
 
     #[cfg(debug_assertions)]

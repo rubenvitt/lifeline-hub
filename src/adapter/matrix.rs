@@ -32,6 +32,7 @@ use matrix_sdk::ruma::api::client::sync::sync_events::v3::Filter as SyncFilter;
 use matrix_sdk::ruma::api::error::{ErrorKind, RetryAfter};
 use matrix_sdk::ruma::{OwnedDeviceId, OwnedUserId};
 use matrix_sdk::{HttpError, SessionMeta};
+use matrix_sdk_crypto::CollectStrategy;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -54,8 +55,9 @@ pub const UPLOAD_ZEITLIMIT: Duration = Duration::from_secs(120);
 /// dem Zeitbudget eines Requests (`zulassung::REQUEST_BUDGET`).
 pub const PRUEF_ZEITLIMIT: Duration = Duration::from_secs(45);
 
-/// Wie lange das Verwerfen höchstens darauf wartet, dass ein Hintergrund-Task des SDK den alten
-/// Client loslässt, bevor es das Verzeichnis trotzdem löscht.
+/// Wie lange das Schließen höchstens darauf wartet, dass ein Hintergrund-Task des SDK den alten
+/// Client loslässt; danach scheitert der Zugriff mit [`MatrixFehler::Zeit`] (der nächste wartet
+/// weiter), nie wird ein Speicher gelöscht oder neu geöffnet, solange der alte Client lebt.
 const FREIGABE_WARTEZEIT: Duration = Duration::from_secs(10);
 
 /// Deckel für die Antwort von `whoami` (ein kleines JSON-Objekt).
@@ -290,8 +292,8 @@ impl Clients {
     /// Sperrt den Client der Anbindung; ist ein Verwerfen vorgemerkt, erledigt es der Halter der
     /// Sperre zuerst. Das Verwerfen läuft in einem eigenen Task, der die Sperre hält: bricht der
     /// Aufrufer ab (Frist), endet nur sein Warten, nie das Verwerfen halb. Scheitert es (alter
-    /// Client nicht frei, Verzeichnis nicht löschbar), bleibt es vorgemerkt, und der Zugriff
-    /// scheitert, statt einen Speicher zu öffnen, der fallen soll.
+    /// Client nicht frei: `Zeit`; Verzeichnis nicht löschbar: `Verschluesselung`), bleibt es
+    /// vorgemerkt, und der Zugriff scheitert, statt einen Speicher zu öffnen, der fallen soll.
     async fn sperre(
         &self,
         adapter_id: &str,
@@ -506,6 +508,9 @@ impl Clients {
                     .disable_retry(),
             )
             .sqlite_store(&dir, Some(ziel.passphrase.expose_secret()))
+            // Raumschlüssel an alle Geräte der Mitglieder, auch unverifizierte (Spec Abschnitt 6):
+            // der Bot verifiziert niemanden. Ausdrücklich, nicht die Vorgabe des SDK.
+            .with_room_key_recipient_strategy(CollectStrategy::AllDevices)
             .build()
             .await
             .map_err(|e| {
@@ -610,7 +615,8 @@ async fn pruefe_ohne_frist(
 /// ihn losgelassen haben (keine starke Referenz mehr, damit Speicher und Verbindungen zu sind).
 /// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen. Der
 /// schwache Verweis bleibt unter der Sperre, bis er frei ist: bricht das Warten ab, wartet der
-/// nächste Halter weiter. Ist er nach [`FREIGABE_WARTEZEIT`] nicht frei, scheitert es.
+/// nächste Halter weiter. Ist er nach [`FREIGABE_WARTEZEIT`] nicht frei, scheitert es mit `Zeit`
+/// (vorübergehend: ein späterer Zugriff versucht es wieder).
 async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), MatrixFehler> {
     if let Some(alt) = zugriff.offen.take() {
         zugriff.alt = Some(alt.client.downgrade());
@@ -625,7 +631,7 @@ async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), Matrix
                 adapter = adapter_id,
                 "Matrix: alter Client nach {FREIGABE_WARTEZEIT:?} noch gehalten"
             );
-            return Err(MatrixFehler::Verschluesselung);
+            return Err(MatrixFehler::Zeit);
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
@@ -796,8 +802,11 @@ pub fn http_fehler(e: &HttpError) -> MatrixFehler {
 }
 
 /// Ordnet einen Fehler des SDK ein; Schlüsselspeicher eines anderen Kontos oder Geräts ist
-/// `SchluesselPassenNicht`, andere Fehler der Verschlüsselung `Verschluesselung`.
+/// `SchluesselPassenNicht`, andere Fehler der Verschlüsselung und des (verschlüsselten)
+/// Speichers `Verschluesselung`. Eine Datei über der Grenze des Homeservers ist `ZuGross`, ein
+/// Raum, in dem der Bot nicht (mehr) Mitglied ist, `Verboten`.
 pub fn sdk_fehler(e: &matrix_sdk::Error) -> MatrixFehler {
+    use matrix_sdk::media::MediaError;
     use matrix_sdk::Error;
     match e {
         Error::Http(h) => http_fehler(h),
@@ -807,8 +816,18 @@ pub fn sdk_fehler(e: &matrix_sdk::Error) -> MatrixFehler {
         Error::CryptoStoreError(_)
         | Error::OlmError(_)
         | Error::MegolmError(_)
+        | Error::DecryptorError(_)
+        | Error::SignatureError(_)
         | Error::BadCryptoStoreState
-        | Error::NoOlmMachine => MatrixFehler::Verschluesselung,
+        | Error::NoOlmMachine
+        | Error::StateStore(_)
+        | Error::EventCacheStore(_)
+        | Error::MediaStore(_)
+        | Error::CrossProcessLockError(_) => MatrixFehler::Verschluesselung,
+        Error::Media(MediaError::MediaTooLargeToUpload { .. }) => MatrixFehler::ZuGross,
+        Error::WrongRoomState(_) => MatrixFehler::Verboten,
+        Error::Timeout => MatrixFehler::Zeit,
+        Error::ConcurrentRequestFailed => MatrixFehler::Netz,
         _ => MatrixFehler::Antwort,
     }
 }
@@ -878,6 +897,43 @@ mod tests {
             ..ziel
         };
         assert_eq!(pruefe(&c, &ziel).await, Err(MatrixFehler::ZielIntern));
+    }
+
+    /// Ein alter Client, den noch jemand hält, lässt den Zugriff vorübergehend scheitern (`Zeit`),
+    /// nicht als Fehler der Verschlüsselung; ist er los, gelingt das Schließen.
+    #[tokio::test(start_paused = true)]
+    async fn gehaltener_alter_client_ist_zeit() {
+        let client = matrix_sdk::Client::builder()
+            .homeserver_url("http://127.0.0.1:1")
+            .build()
+            .await
+            .expect("Client ohne Netz");
+        let gehalten = client.clone();
+        let mut zugriff = Zugriff {
+            offen: None,
+            alt: Some(client.downgrade()),
+        };
+        drop(client);
+        assert_eq!(schliesse(&mut zugriff, "a").await, Err(MatrixFehler::Zeit));
+        assert!(zugriff.alt.is_some(), "der nächste Halter wartet weiter");
+        drop(gehalten);
+        assert_eq!(schliesse(&mut zugriff, "a").await, Ok(()));
+        assert!(zugriff.alt.is_none());
+    }
+
+    #[test]
+    fn sdk_fehler_beim_senden_werden_eingeordnet() {
+        use matrix_sdk::media::MediaError;
+        let zu_gross = matrix_sdk::Error::Media(MediaError::MediaTooLargeToUpload {
+            max: matrix_sdk::ruma::uint!(10),
+            current: matrix_sdk::ruma::uint!(11),
+        });
+        assert_eq!(sdk_fehler(&zu_gross), MatrixFehler::ZuGross);
+        assert_eq!(sdk_fehler(&matrix_sdk::Error::Timeout), MatrixFehler::Zeit);
+        assert_eq!(
+            sdk_fehler(&matrix_sdk::Error::NoOlmMachine),
+            MatrixFehler::Verschluesselung
+        );
     }
 
     #[test]

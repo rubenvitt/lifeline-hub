@@ -32,6 +32,7 @@ wire_enum! {
 
 wire_enum! {
     /// Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+    /// `kein_zutritt` und `verschluesselung` kommen nur aus der Zustellung per Matrix (LLH-2094).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AusgangFehler {
         Voruebergehend => "voruebergehend",
@@ -43,6 +44,8 @@ wire_enum! {
         AnbindungFehler => "anbindung_fehler",
         ZuGross => "zu_gross",
         Spiegel => "spiegel",
+        KeinZutritt => "kein_zutritt",
+        Verschluesselung => "verschluesselung",
     }
     try_from = |s| format!("Ungültiger Fehler eines Versands: {s}");
     sqlx = |s| format!("Ungültiger Fehler eines Versands: {s}");

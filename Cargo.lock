@@ -4676,6 +4676,7 @@ dependencies = [
  "libsqlite3-sys",
  "lifeline-machine-client",
  "matrix-sdk",
+ "matrix-sdk-crypto",
  "matrix-sdk-test",
  "mdns-sd",
  "mime_guess",

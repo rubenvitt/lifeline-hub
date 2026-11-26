@@ -453,7 +453,9 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
             }
         } else {
             // Je Kanal sein Zusteller; eine Matrix-Zeile erreicht nie den SMTP-Zusteller.
-            std::sync::Arc::new(lifeline_hub::ausgang::lauf::Zustellerwahl::produktiv())
+            std::sync::Arc::new(lifeline_hub::ausgang::lauf::Zustellerwahl::produktiv(
+                adapter_rahmen.matrix.clone(),
+            ))
         };
     let _ausgang_task = lifeline_hub::ausgang::lauf::start(
         pool.clone(),

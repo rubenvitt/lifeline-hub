@@ -17,7 +17,7 @@ use lifeline_hub::adapter::smtp::SmtpFehler;
 use lifeline_hub::adapter::Rahmen;
 use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
 use lifeline_hub::ausgang::lauf::{Fehlschlag, Versandauftrag, Zustellfehler, Zustellt};
-use lifeline_hub::ausgang::zusteller::{MatrixNichtVerfuegbar, SmtpTransport, Zustellerwahl};
+use lifeline_hub::ausgang::zusteller::{AufzeichnenderZusteller, SmtpTransport, Zustellerwahl};
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use serde_json::json;
@@ -89,6 +89,8 @@ struct Welt {
     benutzer_id: i64,
     adapter_id: String,
     skript: Arc<Skript>,
+    /// Was der Matrix-Zweig der Weiche angenommen hat (ohne Netz).
+    matrix: Arc<AufzeichnenderZusteller>,
     zusteller: Arc<dyn Zusteller>,
 }
 
@@ -136,6 +138,7 @@ async fn welt() -> Welt {
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 
     let skript = Arc::new(Skript::default());
+    let matrix = Arc::new(AufzeichnenderZusteller::default());
     Welt {
         app,
         pool,
@@ -146,12 +149,14 @@ async fn welt() -> Welt {
         org_id,
         benutzer_id,
         adapter_id,
-        // Wie produktiv: E-Mail über SMTP, Matrix noch ohne Zusteller.
+        // Wie produktiv eine Weiche je Kanal: E-Mail über SMTP, Matrix an ein Doppel ohne Netz
+        // (der echte Matrix-Zusteller: `tests/ausgang_matrix.rs`).
         zusteller: Arc::new(Zustellerwahl::new(
             Arc::new(SmtpZusteller::mit_transport(skript.clone())),
-            Arc::new(MatrixNichtVerfuegbar),
+            matrix.clone(),
         )),
         skript,
+        matrix,
     }
 }
 
@@ -1140,9 +1145,11 @@ async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
     w.durchgang(t0).await;
 
     assert!(w.skript.gesehen().is_empty(), "Matrix ging an SMTP");
+    let angenommen = w.matrix.angenommen();
+    assert_eq!(angenommen.len(), 1, "{angenommen:?}");
+    assert_eq!(angenommen[0].adresse, "#lage:example.org");
     let z = w.zeile(&id).await;
-    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
-    assert_eq!(z.fehler_art, Some(AusgangFehler::AnbindungFehler));
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
     let text: String = sqlx::query_scalar(
         "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
     )
@@ -1151,9 +1158,115 @@ async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
     .await
     .unwrap();
     assert!(text.contains("per Matrix an"), "{text}");
-    assert!(
-        text.contains("Matrix-Zustellung noch nicht verfügbar"),
-        "{text}"
+}
+
+/// Ein Zusteller, der mit einem festen Fehlschlag scheitert.
+struct Scheitert(Zustellfehler, &'static str);
+
+impl Zusteller for Scheitert {
+    fn zustellen<'a>(
+        &'a self,
+        _auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            Err(Fehlschlag {
+                fehler: self.0.clone(),
+                grund: self.1.into(),
+                smtp_status: None,
+                teile: Vec::new(),
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn kein_zutritt_und_verschluesselung_sind_endgueltig_mit_eigenem_code() {
+    for (fehler, grund, code) in [
+        (
+            Zustellfehler::KeinZutritt,
+            "kein Zutritt zum Raum (M_FORBIDDEN)",
+            AusgangFehler::KeinZutritt,
+        ),
+        (
+            Zustellfehler::Verschluesselung,
+            "Verschlüsseln nicht möglich",
+            AusgangFehler::Verschluesselung,
+        ),
+    ] {
+        let w = welt().await;
+        w.matrix_anbindung().await;
+        let lid = w.lagebericht_freigeben(false).await;
+        let t0 = Utc::now();
+        let id = w
+            .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+            .await;
+        let zusteller: Arc<dyn Zusteller> = Arc::new(Scheitert(fehler, grund));
+
+        lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+            .await
+            .unwrap();
+
+        let z = w.zeile(&id).await;
+        assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+        assert_eq!(z.fehler_art, Some(code));
+        let text: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+        )
+        .bind(w.einsatz)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+        assert!(
+            text.ends_with(&format!("nicht zugestellt: {grund}")),
+            "{text}"
+        );
+    }
+}
+
+/// Ein Zusteller, der den Versand während der Zustellung verschwinden lässt (Einsatz gelöscht,
+/// Kaskade) und gesendete Teile meldet.
+struct LoeschtDieZeile(sqlx::SqlitePool);
+
+impl Zusteller for LoeschtDieZeile {
+    fn zustellen<'a>(
+        &'a self,
+        auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            sqlx::query("DELETE FROM ausgang WHERE id = ?")
+                .bind(auftrag.versand_id)
+                .execute(&self.0)
+                .await
+                .unwrap();
+            Ok(Zustellt {
+                teile: teile(&[(0, "$text")]),
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn geloeschter_versand_nimmt_seine_teile_ohne_fehler_mit() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_in("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+    let zeile = w.zeile(&id).await;
+    let zusteller: Arc<dyn Zusteller> = Arc::new(LoeschtDieZeile(w.pool.clone()));
+    let vorher = w.etb_anzahl().await;
+
+    lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &zusteller, zeile, t0)
+        .await
+        .expect("ein verschwundener Versand ist kein Fehler");
+
+    assert!(w.teile(&id).await.is_empty());
+    assert_eq!(
+        w.etb_anzahl().await,
+        vorher,
+        "kein ETB-Eintrag für einen gelöschten Versand"
     );
 }
 

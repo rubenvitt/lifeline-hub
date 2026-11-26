@@ -359,7 +359,8 @@ pub async fn list_teile(pool: &SqlitePool, versand_id: &str) -> Result<Vec<i64>,
 }
 
 /// Merkt gesendete Teile `(teil, event_id)` eines Versands. Ein schon gemerkter Teil behält
-/// seine erste Event-ID.
+/// seine erste Event-ID. Ist der Versand inzwischen weg (Einsatz gelöscht, Kaskade), gibt es
+/// nichts mehr zu merken: kein Fehler, nur eine Warnung.
 pub async fn save_teile_tx(
     conn: &mut SqliteConnection,
     versand_id: &str,
@@ -368,16 +369,28 @@ pub async fn save_teile_tx(
 ) -> Result<(), AppError> {
     let at = zeit(at);
     for (teil, event_id) in teile {
-        sqlx::query(
-            "INSERT INTO ausgang_teil (versand_id, teil, event_id, gesendet_at) VALUES (?, ?, ?, ?) \
+        let n = sqlx::query(
+            "INSERT INTO ausgang_teil (versand_id, teil, event_id, gesendet_at) \
+             SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM ausgang WHERE id = ?) \
              ON CONFLICT (versand_id, teil) DO NOTHING",
         )
         .bind(versand_id)
         .bind(teil)
         .bind(event_id)
         .bind(&at)
+        .bind(versand_id)
         .execute(&mut *conn)
-        .await?;
+        .await?
+        .rows_affected();
+        if n == 0
+            && !sqlx::query_scalar::<_, bool>("SELECT EXISTS (SELECT 1 FROM ausgang WHERE id = ?)")
+                .bind(versand_id)
+                .fetch_one(&mut *conn)
+                .await?
+        {
+            tracing::warn!(versand = %versand_id, "Ausgang: Versand verschwunden, gesendete Teile nicht gemerkt");
+            return Ok(());
+        }
     }
     Ok(())
 }

@@ -1318,9 +1318,10 @@ export interface components {
         };
         /**
          * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+         *     `kein_zutritt` und `verschluesselung` kommen nur aus der Zustellung per Matrix (LLH-2094).
          * @enum {string}
          */
-        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel";
+        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel" | "kein_zutritt" | "verschluesselung";
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */

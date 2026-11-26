@@ -186,6 +186,9 @@ hkdf = "0.13"
 # Ohne Vorgabe-Features: `rustls-aws-lc-rs` statt nativem TLS, damit kein zweiter Crypto-Provider
 # (`ring`) mitkommt (tls::tests::rcgen_pem_ist_per_rustls_ladbar); dasselbe reqwest 0.13.
 matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown"] }
+# Nur für `CollectStrategy` (Raumschlüssel an alle Geräte, Spec Abschnitt 6), das matrix-sdk nicht
+# wieder ausführt; dieselbe Version, die matrix-sdk ohnehin zieht, ohne Features.
+matrix-sdk-crypto = { version = "=0.20.0", default-features = false }
 
 [dev-dependencies]
 # "danger-credential-internals" schaltet `From<Credential> for Passkey` frei, damit Tests aus
@@ -206,9 +209,9 @@ tokio = { version = "1", features = ["full", "test-util"] }
 # Property-Tests (LLH-2090, `src/AGENTS.md`, „Backend↔Frontend — Property-Tests“): Eigenschaften,
 # die für jede Eingabe gelten, gegen viele erzeugte Fälle. Ohne Standard-Features: kein `fork`.
 proptest = { version = "1", default-features = false, features = ["std"] }
-# Nachgebauter Homeserver für den Matrix-Ausgang (LLH-2094, `tests/matrix_spike.rs`): `testing`
-# schaltet `matrix_sdk::test_utils::mocks::MatrixMockServer` frei (wiremock), samt Schlüssel-
-# Endpunkten, an denen ein zweites Gerät echte Olm-Schlüssel hochlädt. Nur Dev, wie oben.
+# Nachgebauter Homeserver für den Matrix-Ausgang (LLH-2094, `tests/ausgang_matrix.rs`,
+# `tests/adapter_matrix.rs`): `testing` schaltet `matrix_sdk::test_utils::mocks::MatrixMockServer`
+# frei (wiremock), samt Schlüssel-Endpunkten, an denen ein zweites Gerät echte Olm-Schlüssel hochlädt. Nur Dev, wie oben.
 matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown", "testing"] }
 # Sync-Antworten und Raumereignisse für den Mock-Server; dieselbe Version wie matrix-sdk.
 matrix-sdk-test = "=0.20.0"

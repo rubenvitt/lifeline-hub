@@ -3485,7 +3485,7 @@
       },
       "AusgangFehler": {
         "type": "string",
-        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.\n`kein_zutritt` und `verschluesselung` kommen nur aus der Zustellung per Matrix (LLH-2094).",
         "enum": [
           "voruebergehend",
           "abgelehnt",
@@ -3495,7 +3495,9 @@
           "anbindung_angehalten",
           "anbindung_fehler",
           "zu_gross",
-          "spiegel"
+          "spiegel",
+          "kein_zutritt",
+          "verschluesselung"
         ]
       },
       "Ausmass": {

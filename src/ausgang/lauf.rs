@@ -132,11 +132,18 @@ pub async fn beim_start(pool: &SqlitePool, live: &LiveHub) -> Result<u64, AppErr
 }
 
 /// Ab wann ein begonnener Versuch als hängengeblieben gilt: länger als jede Sitzung dauern
-/// kann (Dialog und Datenphase des SMTP-Clients) und zwei Minuten Rand.
+/// kann (Dialog und Datenphase des SMTP-Clients) und zwei Minuten Rand. Eine Matrix-Zustellung
+/// endet früher (`zusteller::MATRIX_ZUSTELL_ZEITLIMIT`).
 pub const HAENGT_NACH: Duration = Duration::from_secs(
     crate::adapter::smtp::SITZUNG_ZEITLIMIT.as_secs()
         + crate::adapter::smtp::DATEN_ZEITLIMIT.as_secs()
         + 120,
+);
+
+// Eine Matrix-Zustellung endet vor der Frist, ab der ein Merker als hängengeblieben gilt.
+const _: () = assert!(
+    super::zusteller::MATRIX_ZUSTELL_ZEITLIMIT.as_secs() < HAENGT_NACH.as_secs(),
+    "Matrix-Zustellung länger als HAENGT_NACH"
 );
 
 /// Im laufenden Betrieb: ein Versand, dessen Merker seit [`HAENGT_NACH`] steht und den kein
@@ -553,11 +560,9 @@ fn nach_fehler(
         Zustellfehler::Abgelehnt => endgueltig(AusgangFehler::Abgelehnt),
         Zustellfehler::Ungewiss => endgueltig(AusgangFehler::Ungewiss),
         Zustellfehler::ZuGross => endgueltig(AusgangFehler::ZuGross),
-        // Eigene Codes für Matrix (`kein_zutritt`, `verschluesselung`) kommen mit dessen
-        // Zusteller; bis dahin erzeugt sie keiner.
-        Zustellfehler::Anbindung { .. }
-        | Zustellfehler::KeinZutritt
-        | Zustellfehler::Verschluesselung => endgueltig(AusgangFehler::AnbindungFehler),
+        Zustellfehler::KeinZutritt => endgueltig(AusgangFehler::KeinZutritt),
+        Zustellfehler::Verschluesselung => endgueltig(AusgangFehler::Verschluesselung),
+        Zustellfehler::Anbindung { .. } => endgueltig(AusgangFehler::AnbindungFehler),
     }
 }
 
@@ -639,6 +644,8 @@ fn fester_grund(fehler: AusgangFehler, kanal: KanalArt) -> &'static str {
         AusgangFehler::Ueberholt => "Quelle überholt",
         AusgangFehler::ZuGross => "Anhänge zu groß",
         AusgangFehler::Spiegel => "Einsatz wird von einer anderen Instanz geführt",
+        AusgangFehler::KeinZutritt => "kein Zutritt zum Raum",
+        AusgangFehler::Verschluesselung => "Verschlüsseln nicht möglich",
     }
 }
 
