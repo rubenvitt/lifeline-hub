@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiGet, apiSend } from './client';
 import { einsatzKeys } from './queryKeys';
-import type { AusgangFehler, QuelleArt, SendenAnfrage, Versand } from './types';
+import type { AusgangFehler, KanalArt, QuelleArt, SendenAnfrage, Versand } from './types';
 
 /**
- * Ausgang per E-Mail (LLH-2093): Versand eines freigegebenen Lageberichts, Befehls oder einer
+ * Ausgang per E-Mail (LLH-2093) und Fax (LLH-2095): Versand eines freigegebenen Lageberichts, Befehls oder einer
  * Nachforderung. Die Routen hängen am Dokument, die Liste und das Wiederholen am Einsatz.
  */
 
@@ -30,19 +30,59 @@ export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
   anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
   zu_gross: 'Anhänge zu groß für eine Mail',
   spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+  nicht_zugestellt: 'Fax nicht zugestellt',
+};
+
+/** Wortlaut beim Fax, wo er sich von der Mail unterscheidet (LLH-2095). */
+export const AUSGANG_FEHLER_TEXT_FAX: Partial<Record<AusgangFehler, string>> = {
+  voruebergehend: 'sipgate vorübergehend nicht erreichbar',
+  abgelehnt: 'Von sipgate abgelehnt',
+  ungewiss: 'Zustellung nicht bestätigt',
+  anbindung_fehlt: 'Kein Faxzugang eingerichtet',
+  anbindung_angehalten: 'Faxzugang angehalten',
+  anbindung_fehler: 'Faxzugang fehlerhaft eingerichtet',
+  zu_gross: 'Fax zu lang (höchstens 30 Seiten)',
 };
 
 /** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */
-export function ausgangFehlerText(code: string | null | undefined): string | null {
+export function ausgangFehlerText(
+  code: string | null | undefined,
+  kanal?: KanalArt,
+): string | null {
   if (!code) return null;
+  if (kanal === 'fax') {
+    const fax = (AUSGANG_FEHLER_TEXT_FAX as Record<string, string | undefined>)[code];
+    if (fax) return fax;
+  }
   return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
 }
 
 /**
+ * Gründe, deren Text der Server je Kanal setzt (Anbindung fehlt oder gestört; Fax zu lang oder
+ * Anhänge zu groß): nur er weiß, ob die Mail oder das Fax es auslöste (LLH-2095).
+ */
+const SERVER_TEXT_GRUENDE = new Set([
+  'anbindung_fehlt',
+  'anbindung_angehalten',
+  'anbindung_fehler',
+  'zu_gross',
+]);
+
+/**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
- * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist.
+ * Servertextes; alles andere bleibt, wie es ist. Bei einer Anbindung und bei „zu groß“ bleibt
+ * der Text des Servers, denn nur er weiß, ob Mail oder Fax es auslöste (LLH-2095).
  */
 export function versandFehler(fehler: unknown): unknown {
+  if (
+    fehler instanceof ApiError &&
+    fehler.grund &&
+    SERVER_TEXT_GRUENDE.has(fehler.grund) &&
+    fehler.vomAnwendungsserver &&
+    fehler.message
+  ) {
+    return fehler;
+  }
   if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT) {
     return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[fehler.grund as AusgangFehler], {
       grund: fehler.grund,

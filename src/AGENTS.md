@@ -460,11 +460,32 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
   `--heic-decoder-verzeichnis` genau diese zwei Namen.
 
-## Ausgang an Menschen (LLH-2093)
+## Ausgang an Menschen (LLH-2093, Fax LLH-2095)
 
-Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbindung
-`src/adapter/smtp.rs` und `smtp_art.rs`, Routen `src/routes/ausgang.rs`
-([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
+Nachrichten an Menschen (E-Mail und Fax an Externe Stellen): `src/ausgang/`, Anbindungen
+`src/adapter/smtp.rs`, `smtp_art.rs`, `sipgate.rs` und `sipgate_fax_art.rs`, Routen
+`src/routes/ausgang.rs`
+([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
+[ADR-0110](../docs/architektur/entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
+Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md` und
+`docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md`):
+- **Ein Kanal, eine Anbindung:** `KanalArt::adapter_art` wählt die Art (`email` → `smtp`,
+  `fax` → `sipgate_fax`), höchstens eine je Art und Org. `pruefe_versand_moeglich` und
+  `zugang_fuer_versand` nehmen den Kanal; der Lauf verzweigt in `run_one` auf `zeile.kanal`,
+  ohne zweiten Korb oder Lauf. Ein neuer Kanal kommt in `KanalArt`, bekommt eine Art und einen
+  Zusteller in `ausgang::zusteller::Zustellwege`.
+- **Faxnummern** stehen in E.164 (`externe_stelle::kanal::normalize_fax`, `+49` bei nationaler
+  Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0110); die Grenze von 30 Seiten und 10 MiB
+  gilt nur für Fax und wird **beim Anlegen** geprüft (der ganze Antrag 422 `zu_gross`). Eine Mail
+  trägt dasselbe PDF als ersten Anhang; ist es zu groß oder nicht erzeugbar, geht sie ohne PDF
+  und trägt `ohne_pdf`.
+- **Zugestellt erst nach Rückfrage (nur Fax):** sipgate bestätigt beim Absenden nur die Annahme.
+  `uebergeben` trägt die Session (`anbieter_ref`); derselbe Lauf fragt nach 30 s, dann jede
+  Minute (`repo::load_abzufragende`, `lauf::abfragen_one`): `SENT` → `zugestellt`, `FAILED` →
+  `fehlgeschlagen` mit `nicht_zugestellt`, ohne Endstand nach 2 h `ungewiss`. Ein Fax bekommt
+  seinen ETB-Eintrag erst beim Endstand; eine Mail weiter bei `uebergeben`. Beim Fax ist ein
+  Abbruch nach dem Verbindungsaufbau `ungewiss` (kein zweites Fax); 401/403/402 sind Fehler der
+  Anbindung, 429/5xx und Verbindungsfehler davor werden wiederholt.
 - **Nur ein Mensch löst aus:** Absenden am freigegebenen Dokument (`POST …/deliveries`) oder
   „Erneut senden“. Kein Ereignis, Webhook oder Adapterlauf legt einen Versand an; Webhooks
   (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.
@@ -496,10 +517,11 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   schreibt nur, wer den Merker hält, sonst kein ETB-Eintrag (keine Doppelzustellung).
 - **Fehlercodes:** Versandfehler sind `AusgangFehler` (`voruebergehend`, `abgelehnt`, `ungewiss`,
   `ueberholt`, `anbindung_fehlt`, `anbindung_angehalten`, `anbindung_fehler`, `zu_gross`,
-  `spiegel`) mit Enum-Kontrakt und Text in `frontend/src/api/ausgang.ts`; die SMTP-Sitzung
+  `spiegel`, `nicht_zugestellt`) mit Enum-Kontrakt und Text in `frontend/src/api/ausgang.ts`; die SMTP-Sitzung
   nutzt die bestehenden `AdapterFehler` (535 → `abgelehnt`, TLS → `tls`). Ein 422 mit Grund ist
-  `AppError::UnprocessableGrund` (`{error, grund}`). Kein Text des Mailservers und kein
-  Geheimnis in Spalte, ETB, Log, Antwort oder Fehlertext.
+  `AppError::UnprocessableGrund` (`{error, grund}`). Kein Text des Mailservers oder von sipgate
+  und kein Geheimnis in Spalte, ETB, Log, Antwort oder Fehlertext; `fehler_status` (Wire
+  `smtp_status`) trägt beim Fax den HTTP-Status.
 - **Geheimnis nur über `adapter::lauf::zugang_fuer_versand`, und das nur im Lauf;** das Anlegen
   prüft die Anbindung mit `adapter::lauf::pruefe_versand_moeglich` (Zeile und Zustand, ohne
   Entschlüsseln; ein unlesbares Geheimnis zeigt sich erst im Lauf). Keine zweite Tabelle für Zustand
@@ -507,8 +529,9 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
   `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
 - **Test-Zusteller nur für e2e:** `--ausgang-testzusteller` (versteckt, ohne Umgebungsvariable)
-  setzt `ausgang::zusteller::AufzeichnenderZusteller` statt SMTP ein; es gibt ihn nur im
-  Debug-Build (`testzusteller()`), ein Release-Binary beendet sich mit dem Schalter.
+  setzt `ausgang::zusteller::AufzeichnenderZusteller` statt SMTP und
+  `AufzeichnenderFaxZusteller` statt sipgate ein; es gibt sie nur im Debug-Build
+  (`testzusteller()`, `testfaxzusteller()`), ein Release-Binary beendet sich mit dem Schalter.
 - **Routen** bleiben unter `/api/incidents/{id}/…` (Segmente `deliveries`, `retry`): die
   Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle
   `org_externe_stelle_kanal` hat keine Änderungsspur (nicht Teil des ELW-Abgleichs).

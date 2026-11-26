@@ -1319,10 +1319,12 @@ export interface components {
             zeitfenster: components["schemas"]["ZeitfensterAnzeige"];
         };
         /**
-         * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+         * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des
+         *     Ziels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter
+         *     meldet, dass das Fax nicht durchging (LLH-2095).
          * @enum {string}
          */
-        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel";
+        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel" | "nicht_zugestellt";
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -5241,7 +5243,7 @@ export interface components {
         /**
          * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
          *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
-         *     angenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).
+         *     angenommen werden heute E-Mail und Fax (siehe [`KanalArt::is_freigeschaltet`]).
          * @enum {string}
          */
         KanalArt: "email" | "fax" | "matrix" | "threema";
@@ -9773,6 +9775,8 @@ export interface components {
             /** Format: int64 */
             created_by_id: number;
             created_by_name?: string | null;
+            /** @description Wann der Fax-Anbieter die Zustellung bestätigt hat (nur Fax, LLH-2095). */
+            delivered_at?: string | null;
             error?: components["schemas"]["AusgangFehler"] | null;
             handed_over_at?: string | null;
             id: string;
@@ -9783,13 +9787,16 @@ export interface components {
             source_kind: components["schemas"]["QuelleArt"];
             state: components["schemas"]["VersandZustand"];
             subject: string;
+            /** @description Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war. */
+            without_pdf: boolean;
         };
         /**
          * @description Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den
-         *     Mailserver oder `fehlgeschlagen`.
+         *     Mailserver bzw. Fax-Anbieter, `zugestellt` (nur Fax: der Anbieter hat die Zustellung
+         *     bestätigt, LLH-2095) oder `fehlgeschlagen`.
          * @enum {string}
          */
-        VersandZustand: "wartet" | "uebergeben" | "fehlgeschlagen";
+        VersandZustand: "wartet" | "uebergeben" | "zugestellt" | "fehlgeschlagen";
         /** @description Die Antwort von `GET /api/release-notes` und `POST /api/release-notes/read`. */
         VersionsstandAnzeige: {
             /** @description Die Version, bis zu der die Neuigkeiten als gelesen gelten. */

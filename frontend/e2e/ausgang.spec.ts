@@ -88,3 +88,78 @@ test('Lagebericht freigeben, an die Leitstelle senden, Versandliste zeigt „üb
     await page.request.patch(`/api/external-agencies/${stelleId}`, { data: { aktiv: false } });
   }
 });
+
+/**
+ * Ausgang per Fax (LLH-2095): eine Faxnummer an der Stelle, Senden per Fax, die Versandliste
+ * zeigt nach der Abfrage beim Doppel „zugestellt“. Das Fax-Doppel hängt am selben Schalter
+ * (`--ausgang-testzusteller`) und meldet jedes Fax beim ersten Abfragen als gesendet; die erste
+ * Abfrage kommt 30 s nach der Übergabe. Fehlerfälle stehen in `tests/ausgang_lauf.rs`.
+ */
+test('Lagebericht per Fax senden, Versandliste zeigt „zugestellt“', async ({ page }) => {
+  test.setTimeout(120_000);
+  await anmeldenAlsAdmin(page);
+  const marke = Date.now();
+
+  const vorhanden = await page.request.get('/api/admin/adapter');
+  expect(vorhanden.ok(), await vorhanden.text()).toBe(true);
+  const { adapter: liste } = (await vorhanden.json()) as { adapter: { art: string }[] };
+  if (!liste.some((a) => a.art === 'sipgate_fax')) {
+    const angelegt = await page.request.post('/api/admin/adapter', {
+      data: {
+        art: 'sipgate_fax',
+        name: 'Fax e2e',
+        einstellungen: { token_id: 'token-e2e', faxline_id: 'f0', absender_kennung: 'ELW 1' },
+      },
+    });
+    expect(angelegt.status(), `Anbindung: ${await angelegt.text()}`).toBe(201);
+    const id = ((await angelegt.json()) as { id: string }).id;
+    const token = await page.request.put(`/api/admin/adapter/${id}/secrets/token`, {
+      data: { wert: 'e2e-nur-fuer-den-test' },
+    });
+    expect(token.status(), `Token: ${await token.text()}`).toBe(204);
+  }
+
+  const stelleName = `Kreis Fax e2e ${marke}`;
+  const stelle = await page.request.post('/api/external-agencies', {
+    data: { bezeichnung: stelleName, art: 'behoerde' },
+  });
+  expect(stelle.status(), `Stelle: ${await stelle.text()}`).toBe(201);
+  const stelleId = ((await stelle.json()) as { id: number }).id;
+  try {
+    const kanal = await page.request.post(`/api/external-agencies/${stelleId}/channels`, {
+      data: { channel: 'fax', address: '0511 123456' },
+    });
+    expect(kanal.status(), `Kanal: ${await kanal.text()}`).toBe(201);
+
+    const einsatzId = await einsatzPerApi(page, `E2E Fax ${marke}`);
+    const api = `/api/incidents/${einsatzId}/situation-reports`;
+    const bericht = await page.request.post(api, {
+      data: {
+        vorlage: 'freitext',
+        titel: 'Lage Fax',
+        abschnitte: [{ schluessel: 'text', text: 'Pegel steigt' }],
+      },
+    });
+    expect(bericht.status(), `Lagebericht: ${await bericht.text()}`).toBe(201);
+    const berichtId = ((await bericht.json()) as { id: number }).id;
+    const frei = await page.request.post(`${api}/${berichtId}/release`);
+    expect(frei.ok(), `Freigabe: ${await frei.text()}`).toBe(true);
+
+    await page.goto(`/einsaetze/${einsatzId}/lageberichte/${berichtId}`);
+    await page.getByRole('button', { name: 'Senden', exact: true }).click();
+    const dialog = await dialogSteht(page, 'Senden', { exact: true });
+    const gruppe = dialog.getByRole('group', { name: 'Fax' });
+    const haken = gruppe.getByRole('checkbox', { name: new RegExp(stelleName) });
+    await expect(haken).toBeVisible();
+    await haken.check();
+    await dialog.getByRole('button', { name: 'Senden', exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    const versand = page.locator('[data-lfh="versandliste"]');
+    await expect(versand).toContainText('Fax +49511123456');
+    await expect(versand.locator('[data-state="zugestellt"]')).toHaveCount(1, { timeout: 90_000 });
+    await expect(versand).toContainText('zugestellt');
+  } finally {
+    await page.request.patch(`/api/external-agencies/${stelleId}`, { data: { aktiv: false } });
+  }
+});

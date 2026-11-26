@@ -3493,7 +3493,7 @@
       },
       "AusgangFehler": {
         "type": "string",
-        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des\nZiels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter\nmeldet, dass das Fax nicht durchging (LLH-2095).",
         "enum": [
           "voruebergehend",
           "abgelehnt",
@@ -3503,7 +3503,8 @@
           "anbindung_angehalten",
           "anbindung_fehler",
           "zu_gross",
-          "spiegel"
+          "spiegel",
+          "nicht_zugestellt"
         ]
       },
       "Ausmass": {
@@ -13109,7 +13110,7 @@
       },
       "KanalArt": {
         "type": "string",
-        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).",
+        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen werden heute E-Mail und Fax (siehe [`KanalArt::is_freigeschaltet`]).",
         "enum": [
           "email",
           "fax",
@@ -24541,7 +24542,8 @@
           "state",
           "attempts",
           "created_by_id",
-          "created_at"
+          "created_at",
+          "without_pdf"
         ],
         "properties": {
           "address": {
@@ -24576,6 +24578,13 @@
               "string",
               "null"
             ]
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Fax-Anbieter die Zustellung bestätigt hat (nur Fax, LLH-2095)."
           },
           "error": {
             "oneOf": [
@@ -24616,15 +24625,20 @@
           },
           "subject": {
             "type": "string"
+          },
+          "without_pdf": {
+            "type": "boolean",
+            "description": "Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war."
           }
         }
       },
       "VersandZustand": {
         "type": "string",
-        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver oder `fehlgeschlagen`.",
+        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver bzw. Fax-Anbieter, `zugestellt` (nur Fax: der Anbieter hat die Zustellung\nbestätigt, LLH-2095) oder `fehlgeschlagen`.",
         "enum": [
           "wartet",
           "uebergeben",
+          "zugestellt",
           "fehlgeschlagen"
         ]
       },

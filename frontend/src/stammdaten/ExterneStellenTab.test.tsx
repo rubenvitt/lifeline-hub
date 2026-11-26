@@ -80,27 +80,30 @@ describe('ExterneStellenTab', () => {
     expect(screen.getByText('Inaktiv')).toBeInTheDocument();
   });
 
-  it('nennt an der Stelle, wie viele Mailadressen sie hat', async () => {
-    const adresse = (id: number, stelle: number, a: string) => ({
-      channel: { id, externe_stelle_id: stelle, channel: 'email', address: a },
+  it('nennt an der Stelle, wie viele Mailadressen und Faxnummern sie hat', async () => {
+    const adresse = (id: number, stelle: number, a: string, art = 'email') => ({
+      channel: { id, externe_stelle_id: stelle, channel: art, address: a },
       agency_id: stelle,
       agency_name: 'x',
     });
+    const alle = [
+      adresse(1, 1, 'a@example.org'),
+      adresse(2, 1, 'b@example.org'),
+      adresse(3, 2, 'c@example.org'),
+      adresse(4, 2, '+49511123456', 'fax'),
+    ];
     server.use(
-      http.get('/api/external-agencies/channels', () =>
-        HttpResponse.json([
-          adresse(1, 1, 'a@example.org'),
-          adresse(2, 1, 'b@example.org'),
-          adresse(3, 2, 'c@example.org'),
-        ]),
-      ),
+      http.get('/api/external-agencies/channels', ({ request }) => {
+        const art = new URL(request.url).searchParams.get('channel');
+        return HttpResponse.json(alle.filter((k) => k.channel.channel === art));
+      }),
     );
     const { container } = render(admin);
     await screen.findByText('Polizei Musterstadt');
     await waitFor(() =>
       expect(bezeichnungen(container)).toEqual([
         'ILS Musterkreis zuständig 2 Mailadressen',
-        'Polizei Musterstadt 1 Mailadresse',
+        'Polizei Musterstadt 1 Mailadresse 1 Faxnummer',
         'Ordnungsamt',
       ]),
     );

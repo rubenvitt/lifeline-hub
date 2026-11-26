@@ -1140,7 +1140,7 @@ describe('LageberichtDetailPage — Senden (LLH-2093)', () => {
     lade('einsatzleitung');
     renderBei('/einsaetze/1/lageberichte/9');
     await userEvent.click(await screen.findByRole('button', { name: 'Senden' }));
-    expect(await screen.findByText('Keine Mailadresse hinterlegt')).toBeInTheDocument();
+    expect(await screen.findByText('Keine Adresse hinterlegt')).toBeInTheDocument();
   });
 
   it('blendet „Senden“ ohne Schreibrecht aus', async () => {

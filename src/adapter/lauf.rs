@@ -30,6 +30,7 @@ use super::Rahmen;
 use crate::ausgang::AusgangFehler;
 use crate::benachrichtigung::{self, Anlass, BenachrichtigungArt, BenachrichtigungBezugTyp, Bezug};
 use crate::error::AppError;
+use crate::externe_stelle::KanalArt;
 use crate::live::LiveHub;
 use crate::zeit;
 
@@ -280,6 +281,11 @@ pub struct Versandzugang {
 }
 
 impl Versandzugang {
+    /// Ein Textfeld der Einstellungen, getrimmt; leer zählt als fehlend.
+    pub fn einstellung(&self, name: &str) -> Option<&str> {
+        self.text(name)
+    }
+
     fn text(&self, name: &str) -> Option<&str> {
         self.einstellungen
             .get(name)
@@ -312,19 +318,24 @@ impl std::fmt::Debug for Versandzugang {
     }
 }
 
-/// Prüft beim Anlegen eines Versands nur, ob die Org einen Mailserver hat, den ein Versand
-/// nutzen darf: Anbindung vorhanden, nicht angehalten, Org nicht an einem Hub (LLH-2093). Liest
+/// Prüft beim Anlegen eines Versands nur, ob die Org für den Kanal eine Anbindung hat, die ein
+/// Versand nutzen darf (E-Mail: SMTP, Fax: sipgate; LLH-2093, LLH-2095): vorhanden, nicht
+/// angehalten, Org nicht an einem Hub. Liest
 /// nur die Zeile der Anbindung und ihren Zustand; Geheimnisse werden **nicht** entschlüsselt,
 /// das tut allein der Lauf über [`zugang_fuer_versand`] (`src/AGENTS.md`, „Ausgang an Menschen“).
 pub async fn pruefe_versand_moeglich(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     org_id: i64,
+    kanal: KanalArt,
 ) -> Result<Result<(), AusgangFehler>, AppError> {
     if is_org_am_hub(pool, org_id).await? {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     }
-    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+    let Some(art) = kanal.adapter_art() else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    let Some(a) = repo::load_fuer_org(pool, org_id, art).await? else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if a.is_angehalten() {
@@ -336,7 +347,8 @@ pub async fn pruefe_versand_moeglich(
     Ok(Ok(()))
 }
 
-/// Der Zugang zur SMTP-Anbindung einer Org für einen Versand (LLH-2093, Spec Abschnitt 2):
+/// Der Zugang zur Anbindung des Kanals einer Org für einen Versand (LLH-2093, Spec Abschnitt 2;
+/// Fax LLH-2095):
 /// `AnbindungFehlt` ohne Anbindung (oder wenn die Org sich bei einem Hub meldet),
 /// `AnbindungAngehalten`, wenn sie angehalten ist (gestört ist erlaubt), `AnbindungFehler`, wenn
 /// Einstellungen oder Geheimnisse nicht taugen. Liest Geheimnisse über denselben Weg wie der
@@ -345,11 +357,15 @@ pub async fn zugang_fuer_versand(
     pool: &SqlitePool,
     rahmen: &Rahmen,
     org_id: i64,
+    kanal: KanalArt,
 ) -> Result<Result<Versandzugang, AusgangFehler>, AppError> {
     if is_org_am_hub(pool, org_id).await? {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     }
-    let Some(a) = repo::load_smtp_fuer_org(pool, org_id).await? else {
+    let Some(art_code) = kanal.adapter_art() else {
+        return Ok(Err(AusgangFehler::AnbindungFehlt));
+    };
+    let Some(a) = repo::load_fuer_org(pool, org_id, art_code).await? else {
         return Ok(Err(AusgangFehler::AnbindungFehlt));
     };
     if a.is_angehalten() {

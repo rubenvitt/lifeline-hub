@@ -25,6 +25,16 @@ struct Welt {
 }
 
 async fn stelle_mit_kanal(pool: &sqlx::SqlitePool, org_id: i64, name: &str, adresse: &str) -> i64 {
+    stelle_mit_kanal_art(pool, org_id, name, "email", adresse).await
+}
+
+async fn stelle_mit_kanal_art(
+    pool: &sqlx::SqlitePool,
+    org_id: i64,
+    name: &str,
+    kanal: &str,
+    adresse: &str,
+) -> i64 {
     let stelle: i64 = sqlx::query_scalar(
         "INSERT INTO org_externe_stelle (org_id, bezeichnung, art) VALUES (?, ?, 'leitstelle') RETURNING id",
     )
@@ -35,10 +45,11 @@ async fn stelle_mit_kanal(pool: &sqlx::SqlitePool, org_id: i64, name: &str, adre
     .unwrap();
     sqlx::query_scalar(
         "INSERT INTO org_externe_stelle_kanal (org_id, externe_stelle_id, kanal, adresse) \
-         VALUES (?, ?, 'email', ?) RETURNING id",
+         VALUES (?, ?, ?, ?) RETURNING id",
     )
     .bind(org_id)
     .bind(stelle)
+    .bind(kanal)
     .bind(adresse)
     .fetch_one(pool)
     .await
@@ -52,7 +63,7 @@ async fn welt_mit(anbindung: bool) -> Welt {
         .unwrap();
     common::pool_merken(&pool);
     let live = LiveHub::new();
-    let (rahmen, _pruefer) = adapter_testart::rahmen_smtp();
+    let (rahmen, _smtp, _fax) = adapter_testart::rahmen_ausgang();
     let mut state = common::test_state(&pool, &live);
     state.adapter = rahmen;
     let app = lifeline_hub::app::build_router(state);
@@ -167,6 +178,62 @@ impl Welt {
             Some(&self.senden_body(client_id, kanaele)),
         )
         .await
+    }
+
+    /// Legt die Fax-Anbindung (sipgate) der Org mit Token an.
+    async fn fax_anbindung(&self) {
+        let body = json!({
+            "art": "sipgate_fax", "name": "Fax",
+            "einstellungen": { "token_id": "token-ABC", "faxline_id": "f0" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        let (s, v) = anfrage_json(
+            &self.app,
+            "PUT",
+            &format!("/api/admin/adapter/{id}/secrets/token"),
+            &self.admin,
+            Some(&json!({ "wert": "Geheim-Token-4711" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+
+    /// Eine Faxnummer an einer neuen Stelle.
+    async fn faxkanal(&self) -> i64 {
+        stelle_mit_kanal_art(&self.pool, self.org_id, "Kreis Fax", "fax", "+49511123456").await
+    }
+
+    /// Ein freigegebener Lagebericht, dessen PDF über 30 Seiten hat.
+    async fn langer_lagebericht(&self) -> i64 {
+        let text = (1..=3000)
+            .map(|n| format!("Zeile {n}: Pegel steigt weiter."))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let body = json!({
+            "vorlage": "freitext", "titel": "Lage",
+            "abschnitte": [{ "schluessel": "text", "text": text }]
+        });
+        let (s, lb) = anfrage(
+            &self.app,
+            "POST",
+            &self.lb(""),
+            &self.admin,
+            Some(&body.to_string()),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{lb}");
+        let lid = lb["id"].as_i64().unwrap();
+        self.freigeben(lid).await;
+        lid
     }
 
     async fn anzahl(&self) -> i64 {
@@ -823,6 +890,85 @@ async fn anlegen_liest_keine_anlagenbytes_sondern_die_gespeicherte_groesse() {
         .await
         .unwrap();
     let (s, v) = w.lb_senden(lid, "gross-2", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(w.anzahl().await, 1);
+}
+
+#[tokio::test]
+async fn fax_senden_legt_einen_versand_an_die_faxnummer_an() {
+    let w = welt().await;
+    w.fax_anbindung().await;
+    let fax = w.faxkanal().await;
+    let lid = w.lagebericht(true).await;
+    let (s, v) = w.lb_senden(lid, "fax-1", &[fax]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v[0]["channel"], "fax");
+    assert_eq!(v[0]["address"], "+49511123456");
+    assert_eq!(v[0]["state"], "wartet");
+    assert_eq!(v[0]["without_pdf"], false);
+}
+
+#[tokio::test]
+async fn fax_ohne_faxzugang_ist_anbindung_fehlt() {
+    let w = welt().await;
+    let fax = w.faxkanal().await;
+    let lid = w.lagebericht(true).await;
+    let (s, v) = w.lb_senden(lid, "fax-2", &[fax]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_fehlt");
+    assert!(
+        v["error"].as_str().unwrap_or_default().contains("Fax"),
+        "{v}"
+    );
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn mail_ohne_mailzugang_aber_mit_faxzugang_ist_anbindung_fehlt() {
+    let w = welt_mit(false).await;
+    w.fax_anbindung().await;
+    let lid = w.lagebericht(true).await;
+    let (s, v) = w.lb_senden(lid, "mail-1", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_fehlt");
+    assert!(
+        v["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("Mailserver"),
+        "{v}"
+    );
+}
+
+#[tokio::test]
+async fn ein_fax_ueber_30_seiten_wird_beim_anlegen_abgelehnt() {
+    let w = welt().await;
+    w.fax_anbindung().await;
+    let fax = w.faxkanal().await;
+    let lid = w.langer_lagebericht().await;
+    let (s, v) = w.lb_senden(lid, "fax-lang", &[fax]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "zu_gross");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn mail_und_fax_zusammen_werden_ganz_abgelehnt_wenn_das_fax_zu_gross_ist() {
+    let w = welt().await;
+    w.fax_anbindung().await;
+    let fax = w.faxkanal().await;
+    let lid = w.langer_lagebericht().await;
+    let (s, v) = w.lb_senden(lid, "beide-lang", &[w.kanaele[0], fax]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "zu_gross");
+    assert_eq!(w.anzahl().await, 0, "keine Zeile, auch nicht für die Mail");
+}
+
+#[tokio::test]
+async fn eine_lange_mail_ist_nicht_begrenzt() {
+    let w = welt().await;
+    let lid = w.langer_lagebericht().await;
+    let (s, v) = w.lb_senden(lid, "mail-lang", &w.kanaele[..1]).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
     assert_eq!(w.anzahl().await, 1);
 }
