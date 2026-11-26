@@ -1,6 +1,6 @@
 //! Das PDF des Ausgangs (LLH-2095, Design-Doc
 //! `docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md`, Abschnitt 6;
-//! ADR-0106): A4, schwarz auf weiß, eingebettete Archivo, gebaut aus dem Schnappschuss eines
+//! ADR-0110): A4, schwarz auf weiß, eingebettete Archivo, gebaut aus dem Schnappschuss eines
 //! Versands und den PNG-Anlagen der Freigabe. Kein Netz, keine Datenbank, keine Systemschrift.
 //!
 //! Gedruckt wird weiter nur im Browser (`frontend/src/druck/AGENTS.md`); dieses PDF entsteht nur

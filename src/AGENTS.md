@@ -272,7 +272,7 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Adapter-URL prüft `ziel::check_adapter_url`; `http` nur für eine Art mit
   `AdapterArt::http_im_lan`, nur mit LAN-Ausnahme und nur zu einem privaten IP-Literal, nie zu
   einem Hostnamen (LLH-2110,
-  [ADR-0106](../docs/architektur/entscheidungen/ADR-0106-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
+  [ADR-0105](../docs/architektur/entscheidungen/ADR-0105-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
   Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
@@ -466,7 +466,7 @@ Nachrichten an Menschen (E-Mail und Fax an Externe Stellen): `src/ausgang/`, Anb
 `src/adapter/smtp.rs`, `smtp_art.rs`, `sipgate.rs` und `sipgate_fax_art.rs`, Routen
 `src/routes/ausgang.rs`
 ([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
-[ADR-0106](../docs/architektur/entscheidungen/ADR-0106-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
+[ADR-0110](../docs/architektur/entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
 Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md` und
 `docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md`):
 - **Ein Kanal, eine Anbindung:** `KanalArt::adapter_art` wählt die Art (`email` → `smtp`,
@@ -475,7 +475,7 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   ohne zweiten Korb oder Lauf. Ein neuer Kanal kommt in `KanalArt`, bekommt eine Art und einen
   Zusteller in `ausgang::zusteller::Zustellwege`.
 - **Faxnummern** stehen in E.164 (`externe_stelle::kanal::normalize_fax`, `+49` bei nationaler
-  Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0106); die Grenze von 30 Seiten und 10 MiB
+  Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0110); die Grenze von 30 Seiten und 10 MiB
   gilt nur für Fax und wird **beim Anlegen** geprüft (der ganze Antrag 422 `zu_gross`). Eine Mail
   trägt dasselbe PDF als ersten Anhang; ist es zu groß oder nicht erzeugbar, geht sie ohne PDF
   und trägt `ohne_pdf`.

@@ -66,7 +66,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/atnsssv3lxb9m7h4r2rkr8ag
 | `src/externe_stelle/kanal.rs` | `normalize_fax`, `list_fuer_org(kanal)` |
 | `src/externe_stelle/mod.rs` | `KanalArt::is_freigeschaltet`, `KanalArt::adapter_art` |
 | `src/routes/externe_stelle.rs` | Fax prüfen, Sammlung für `email` und `fax` |
-| `migrations/0386_ausgang_fax.sql` | Umbau `ausgang` (neue Werte, neue Spalten) |
+| `migrations/0388_ausgang_fax.sql` | Umbau `ausgang` (neue Werte, neue Spalten) |
 | `src/ausgang/zustand.rs` | `Zugestellt`, `NichtZugestellt`, Abfrage-Konstanten, `naechste_abfrage` |
 | `src/ausgang/mod.rs` | `Versand.delivered_at`, `Versand.without_pdf`, `VersandZeile`-Spalten |
 | `src/ausgang/pdf.rs` (neu) | `baue_pdf`, Fax-Grenze, Dateiname |
@@ -146,7 +146,7 @@ Faxnummer“). `is_freigeschaltet` gilt für `Email | Fax`. `pruefe_adresse` ver
 ### Task 2: Datenmodell „zugestellt“, „nicht zugestellt“, Abfrage und „ohne PDF“
 
 **Files:**
-- Create: `migrations/0386_ausgang_fax.sql` (Nummer nach `migrations/AGENTS.md` prüfen)
+- Create: `migrations/0388_ausgang_fax.sql` (Nummer nach `migrations/AGENTS.md` prüfen)
 - Modify: `src/ausgang/zustand.rs`, `src/ausgang/mod.rs`, `src/ausgang/repo.rs` (Anzeige-Mapping)
 - Modify: `tests/enum_wire_kontrakt.rs`, `src/ausgang/tests.rs` (`check_listen_entsprechen_den_enums`)
 - Regenerate: `frontend/src/api/openapi.json`, `frontend/src/api/types.generated.ts` (Pfade wie `scripts/check-typ-codegen.sh` sie nennt)
@@ -185,7 +185,7 @@ Faxnummer“). `is_freigeschaltet` gilt für `Email | Fax`. `pruefe_adresse` ver
 **Files:**
 - Create: `src/ausgang/pdf.rs`, `assets/schriften/Archivo-Regular.ttf`, `assets/schriften/Archivo-Bold.ttf`, `assets/schriften/OFL.txt`
 - Modify: `Cargo.toml` (`printpdf`, ggf. `ttf-parser` für Breiten), `src/ausgang/mod.rs` (`pub mod pdf;`)
-- Create: `docs/architektur/entscheidungen/ADR-0106-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md` (nächste freie Nummer prüfen; Form und Prüfzeilen nach `docs/architektur/AGENTS.md`)
+- Create: `docs/architektur/entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md` (nächste freie Nummer prüfen; Form und Prüfzeilen nach `docs/architektur/AGENTS.md`)
 - Modify: `frontend/src/druck/AGENTS.md` (Verweis auf die Ausnahme), Prüfskript der ADR-Regeln, wie `docs/architektur/AGENTS.md` es nennt
 
 **Interfaces:**
@@ -232,7 +232,7 @@ pub fn dateiname(quelle: QuelleArt, version: Option<i64>) -> String; // lageberi
   ADR schreiben (MUST: PDF nur in `src/ausgang/pdf.rs`, nur aus Schnappschuss und Anlagen;
   MUST NOT: Browser oder Systemschrift im Laufzeitbild; Prüfung: `printpdf` nur in
   `src/ausgang/pdf.rs`). `frontend/src/druck/AGENTS.md`: Satz „Gedruckt wird über den Browser,
-  nie auf dem Server“ um „Ausnahme: das PDF des Ausgangs, ADR-0106“ ergänzen.
+  nie auf dem Server“ um „Ausnahme: das PDF des Ausgangs, ADR-0110“ ergänzen.
 - [ ] **Step 4:** Tests + `scripts/adr-fuer.sh src/ausgang/pdf.rs` + Lizenz-/Advisory-Prüfung
   laut `scripts/AGENTS.md` → PASS
 - [ ] **Step 5: Commit** — `feat(ausgang): PDF des Ausgangs am Server (LLH-2095)`
@@ -452,7 +452,7 @@ pub async fn save_abfrage_tx(conn: &mut SqliteConnection, id: &str, a: Abfrage) 
 
 **Files:**
 - Modify: `src/AGENTS.md` („Ausgang an Menschen“: Kanäle, zugestellt, Faxfehler, PDF nur für Fax begrenzt)
-- Modify: `docs/architektur/05-bausteinsicht.md`, `06-laufzeitsicht.md` (Ablauf Fax mit Nachfragen), `08-querschnittliche-konzepte.md`, `12-glossar.md` („zugestellt“), ADR-0104 (Verweis auf ADR-0106)
+- Modify: `docs/architektur/05-bausteinsicht.md`, `06-laufzeitsicht.md` (Ablauf Fax mit Nachfragen), `08-querschnittliche-konzepte.md`, `12-glossar.md` („zugestellt“), ADR-0104 (Verweis auf ADR-0110)
 - Modify: `docs/anwender/kapitel/anbindungen.md` (sipgate einrichten: Token mit Scopes `sessions:fax:write` und `history:read`, Faxline-ID `f0` aus der sipgate-App), Kapitel zum Senden, `quellen:` der Kapitel nach `docs/anwender/AGENTS.md`
 - Modify: `docs/konzepte/2026-11-10-schnittstellen-ausbau.md:53` (E8 „entschieden: PDF am Server, LLH-2095“)
 
