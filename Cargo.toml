@@ -185,6 +185,9 @@ hkdf = "0.13"
 # `matrix-sdk-sqlite` gepatcht ist (`[patch.crates-io]` unten, `vendor/matrix-sdk-sqlite/PATCH.md`).
 # Ohne Vorgabe-Features: `rustls-aws-lc-rs` statt nativem TLS, damit kein zweiter Crypto-Provider
 # (`ring`) mitkommt (tls::tests::rcgen_pem_ist_per_rustls_ladbar); dasselbe reqwest 0.13.
+# Lizenzen: matrix-sdk ist Apache-2.0; der Baum bringt daneben MPL-2.0 mit (`eyeball`, `imbl`,
+# `readlock`, `as_variant` …), wie schon webauthn-rs und cssparser. Advisory: PATCH.md der Kopie.
+# `rusqlite` kommt nur transitiv über die Kopie, nie direkt (ADR-0108).
 matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown"] }
 # Nur für `CollectStrategy` (Raumschlüssel an alle Geräte, Spec Abschnitt 6), das matrix-sdk nicht
 # wieder ausführt; dieselbe Version, die matrix-sdk ohnehin zieht, ohne Features.

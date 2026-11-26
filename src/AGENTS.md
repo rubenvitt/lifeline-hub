@@ -320,10 +320,32 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   nachgeführt (`set_zugeschaltet`, bei `false` wird der Stand geleert). „Laufend“ heißt
   `einsatz.status = 'aktiv'` (wie `fordere_aktiv`, ohne Nachlauffrist). Ein Adapter hängt an
   höchstens einem laufenden Einsatz (`find_active_holder`); ein abgeschlossener zählt nicht mehr.
-- **Versandweg** (LLH-2093): Eine Art darf außer dem Abruf auch einen Versandweg haben (heute
-  `smtp`, `adapter::smtp_art`). Das Geheimnis entschlüsselt dafür allein
-  `adapter::lauf::zugang_fuer_versand` (neben dem Lauf); der Ausgangskorb hält es nur für die
-  Dauer einer Zustellung. Regeln: Abschnitt „Ausgang an Menschen“.
+- **Versandweg** (LLH-2093): Eine Art darf außer dem Abruf auch einen Versandweg haben (`smtp`,
+  `adapter::smtp_art`; `matrix`, `adapter::matrix_art`, LLH-2094). Das Geheimnis entschlüsselt
+  dafür allein `adapter::lauf::zugang_fuer_versand` (neben dem Lauf); der Ausgangskorb hält es nur
+  für die Dauer einer Zustellung. Regeln: Abschnitt „Ausgang an Menschen“.
+- **Matrix** (LLH-2094,
+  [ADR-0107](../docs/architektur/entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md)):
+  der Lauf der Art prüft nur die Verbindung (`adapter::matrix::pruefe`), er sendet nichts. Einen
+  `matrix_sdk::Client` baut nur `adapter::matrix`, mit dem `reqwest::Client` aus
+  `ziel::client_builder_mit_zielschutz` (nur `https`, die Art erklärt kein `http_im_lan`) und
+  einer Homeserver-URL nach `check_url`; kein `.well-known`, keine Wiederholung im SDK. Je
+  Anbindung hält `adapter::matrix::Clients` (in `Rahmen::matrix`, geteilt mit dem Ausgangskorb)
+  höchstens einen Client hinter einer Sperre.
+  - **Speicher:** `<Verzeichnis der Datenbank>/matrix/<adapter_id>/` (`config::default_matrix_dir`),
+    SQLite von `matrix-sdk-sqlite`, verschlüsselt mit dem internen Platz `speicher_passphrase`
+    (beim Anlegen erzeugt, nie im Formular). **Nie in einer Sicherung** (`backup` kennt das
+    Verzeichnis nicht); nach Restore oder Umzug meldet die Prüfung `schluessel_passen_nicht`, und der
+    Bot braucht ein neues Token. Die Merkdatei `geraet.json` bindet den Speicher an Nutzer und
+    Gerät des Tokens; ein Token eines anderen Geräts (auch eines, das aus Element kopiert ist)
+    öffnet ihn nicht.
+  - **Verwerfen** (neues Token, neuer Homeserver, Löschen; `Clients::verwerfen`): unter der Sperre
+    schließt `schliesse` zuerst den alten Client mit `Client::pause` (schließt seine vier
+    Speicher und schaltet seine Send-Queue ab), wartet höchstens `FREIGABE_WARTEZEIT`, bis kein
+    Hintergrund-Task ihn mehr hält, und löscht das Verzeichnis erst, wenn alles zu ist; sonst
+    scheitert es vorübergehend und bleibt vorgemerkt. Nie öffnet ein neuer Client einen Speicher,
+    solange der alte lebt. `rusqlite` kommt nur transitiv über `vendor/matrix-sdk-sqlite`
+    ([ADR-0108](../docs/architektur/entscheidungen/ADR-0108-rusqlite-nur-transitiv-fuer-den-speicher-des-matrix-sdk.md)).
 
 ## Anhänge
 
@@ -456,11 +478,15 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
   `--heic-decoder-verzeichnis` genau diese zwei Namen.
 
-## Ausgang an Menschen (LLH-2093)
+## Ausgang an Menschen (LLH-2093, LLH-2094)
 
-Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbindung
-`src/adapter/smtp.rs` und `smtp_art.rs`, Routen `src/routes/ausgang.rs`
-([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`):
+Nachrichten an Menschen (E-Mail und Matrix-Räume Externer Stellen): `src/ausgang/`, Anbindungen
+`src/adapter/smtp.rs`, `smtp_art.rs`, `matrix.rs` und `matrix_art.rs`, Routen
+`src/routes/ausgang.rs`
+([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
+[ADR-0107](../docs/architektur/entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md),
+Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md` und
+`docs/superpowers/specs/2026-11-25-ntaizave-ausgang-matrix-design.md`):
 - **Nur ein Mensch löst aus:** Absenden am freigegebenen Dokument (`POST …/deliveries`) oder
   „Erneut senden“. Kein Ereignis, Webhook oder Adapterlauf legt einen Versand an; Webhooks
   (ADR-0038/ADR-0046) tragen keine Nachrichten an Menschen.
@@ -502,8 +528,42 @@ Nachrichten an Menschen (heute E-Mail an Externe Stellen): `src/ausgang/`, Anbin
   oder Geheimnisse der Anbindung, `ausgang` hält Nachrichten. Der SMTP-Client ist
   `adapter::smtp` (tokio-rustls mit `instanz::zertifikat::webpki_config`, Zielschutz über
   `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
+- **Kanalneutraler Zusteller** (LLH-2094): `ausgang::zusteller::Zusteller` nimmt einen
+  `Versandauftrag` und liefert `Zustellt` oder `Fehlschlag` mit `Zustellfehler`;
+  `Zustellerwahl` gibt ihn dem Zusteller seines Kanals (`SmtpZusteller`, `MatrixZusteller`), Fax
+  und Threema scheitern ohne Netz. Die Zuordnung `Zustellfehler → AusgangFehler`, Wiederholung, ETB
+  und Abschluss stehen nur im Lauf. Ein neuer Kanal bringt einen Zusteller, keinen Lauf. Das
+  Anlegen prüft je Empfänger die Anbindung seines Kanals (`pruefe_versand_moeglich(…, kanal)`).
+- **Matrix-Zustellung** (`ausgang/zusteller/matrix.rs`, unter der Sperre des Clients): Alias
+  auflösen, beitreten, falls nicht Mitglied (verweigert → `kein_zutritt`), dann **vor jedem
+  Senden** ein `sync_once` nur für diesen Raum mit vollem Zustand und `sync_members`; die
+  Verbindungsprüfung synct ohne Räume, ein inkrementeller Sync brächte Verschlüsselungszustand
+  und Geräte nicht. **Nie `m.room.message` in einen verschlüsselten Raum:** das SDK verschlüsselt
+  mit `CollectStrategy::AllDevices` (am Client gesetzt, nicht der Vorgabe überlassen), jeder Fehler
+  dabei ist `verschluesselung`, nie Rückfall auf Klartext. Text ist Teil 0, jede PNG-Anlage ein
+  `m.image` mit Teil 1…; jeder Teil trägt die Transaktions-ID `ausgang-{versand_id}-{teil}`, und
+  jeder gelungene Teil steht mit Event-ID in `ausgang_teil` (`Fehlschlag`/`Zustellt.teile`); ein
+  späterer Versuch und „Erneut senden“ überspringen gemerkte Teile (`Versandauftrag::gesendet`).
+  Darum ist ein abgebrochener Matrix-Versuch vorübergehend, nicht `ungewiss`. Eine Anlage über
+  `m.upload.size` bricht vor dem Text ab (`zu_gross`); nennt der Homeserver keine Grenze, gehen
+  keine Anlagen (eigener Grund). Fehlercodes dazu: `kein_zutritt`, `verschluesselung`; das ETB
+  nennt höchstens den Matrix-`errcode`, `smtp_status` bleibt leer.
+- **Matrix-Text:** Betreff fett, dann der Inhalt des Schnappschusses, als `text_html` mit
+  Klartext in `body`. `text_markdown` des SDK maskiert HTML **nicht**; `matrix_text` maskiert
+  deshalb jedes ASCII-Satzzeichen selbst mit einem CommonMark-Backslash (`maskiere`), ein Einzug am
+  Zeilenanfang wird zu U+00A0 (`einzug_fest`, sonst ein Codeblock mit sichtbaren Escapes), und
+  erkennt das SDK keine Auszeichnung, ist das HTML der HTML-maskierte Klartext (`html_aus`,
+  `html_maskiert`), nie die Quelle. Kein Link und kein Bild aus Fremdinhalt.
+- **Bekannte Grenzen (Matrix):** Wird ein Raum zwischen Sync und Senden verschlüsselt, bleibt ein
+  kleines Fenster, in dem das SDK den alten Zustand kennt. Ein Absturz mitten im Senden schließt
+  `schliesse_unterbrochen` als `ungewiss` ab, ohne die schon gesendeten Teile zu merken; „Erneut
+  senden“ kann dann einen Teil doppelt bringen, wenn das Fenster der Transaktions-ID beim
+  Homeserver abgelaufen ist. `ausgang_teil.gesendet_at` ist die Zeit des Hubs, nicht des
+  Homeservers. Hält ein Hintergrund-Task den alten Client dauerhaft, scheitert jeder Zugriff
+  vorübergehend bis zum Neustart; auf Windows bleibt ein Verwerfen mit offenen Dateien
+  vorgemerkt.
 - **Test-Zusteller nur für e2e:** `--ausgang-testzusteller` (versteckt, ohne Umgebungsvariable)
-  setzt `ausgang::zusteller::AufzeichnenderZusteller` statt SMTP ein; es gibt ihn nur im
+  setzt `ausgang::zusteller::AufzeichnenderZusteller` für alle Kanäle statt SMTP und Matrix ein; es gibt ihn nur im
   Debug-Build (`testzusteller()`), ein Release-Binary beendet sich mit dem Schalter.
 - **Routen** bleiben unter `/api/incidents/{id}/…` (Segmente `deliveries`, `retry`): die
   Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle

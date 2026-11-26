@@ -11,6 +11,11 @@
 //! neuer Homeserver und gelöschte Anbindung verwerfen Client und Verzeichnis
 //! ([`Clients::verwerfen`]); eine Prüfung endet spätestens nach [`PRUEF_ZEITLIMIT`].
 //!
+//! Schließen (`schliesse`): vor jedem Loslassen und vor dem Löschen des Verzeichnisses schließt
+//! `Client::pause` die Speicher des alten Clients; das schaltet auch seine Send-Queue ab, er
+//! sendet danach nichts mehr. Gelöscht wird erst, wenn kein Hintergrund-Task ihn mehr hält
+//! (`FREIGABE_WARTEZEIT`); sonst bleibt das Verwerfen vorgemerkt.
+//!
 //! Netz: matrix-sdk bekommt unseren `reqwest::Client` aus [`ziel::client_builder_mit_zielschutz`]
 //! (filternder Resolver, keine Weiterleitung, nur `https`); die Homeserver-URL besteht vorher
 //! `check_url`. Kein `.well-known`, keine Wiederholung im SDK (das macht der Ausgangskorb).

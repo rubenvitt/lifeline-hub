@@ -292,7 +292,7 @@ Zielschutz. Gesendete Teile stehen in `ausgang_teil`, damit nichts doppelt im Ra
 
 **Files:**
 - Modify: `frontend/e2e/ausgang.spec.ts` (Matrix-Raum eintragen, senden, „übergeben“ mit Testdoppel)
-- Modify: `docs/architektur/entscheidungen/ADR-0103-…md` (Nachtrag; prüfen gegen `docs/architektur/AGENTS.md`, ob neue ADR nötig), `src/AGENTS.md` („Ausgang an Menschen“, „Adapter“), `docs/architektur/05-bausteinsicht.md`, `06-laufzeitsicht.md`, `07-verteilungssicht.md`, `docs/betrieb/…` (Datenverzeichnis `matrix/`, Restore → neues Token), `docs/anwender/kapitel/anbindungen.md`, `stammdaten.md`, `lageberichte.md` (Senden), Bilder nach `docs/anwender/AGENTS.md`
+- Modify: `docs/architektur/entscheidungen/ADR-0104-…md` (Nachtrag; prüfen gegen `docs/architektur/AGENTS.md`, ob neue ADR nötig), `src/AGENTS.md` („Ausgang an Menschen“, „Adapter“), `docs/architektur/05-bausteinsicht.md`, `06-laufzeitsicht.md`, `07-verteilungssicht.md`, `docs/betrieb/…` (Datenverzeichnis `matrix/`, Restore → neues Token), `docs/anwender/kapitel/anbindungen.md`, `stammdaten.md`, `lageberichte.md` (Senden), Bilder nach `docs/anwender/AGENTS.md`
 - Create: `pr-bilder/ntaizave/*.png` (verify-Skill)
 
 - [ ] **Step 1:** e2e-Fall schreiben, rot; Testdoppel nimmt Matrix an; grün

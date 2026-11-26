@@ -12,7 +12,7 @@ Anbindung.
 ## Absicht
 
 Der E-Mail-Schnitt hat den Ausgangskorb gebaut: Ein Mensch löst aus, der Server stellt zu, jeder
-Versand steht im ETB (ADR-0103). Matrix ist der zweite Kanal. Viele Leitstellen, Stäbe und
+Versand steht im ETB (ADR-0104). Matrix ist der zweite Kanal. Viele Leitstellen, Stäbe und
 Behörden-Messenger (BwMessenger, TI-Messenger, eigene Synapse-Server der Hilfsorganisationen)
 arbeiten in Matrix-Räumen, und diese Räume sind fast immer **verschlüsselt**. Ein Matrix-Ausgang
 ohne E2EE erreichte genau diese Empfänger nicht. Deshalb kommt E2EE gleich mit.
@@ -89,7 +89,9 @@ Verworfen:
 - `vendor/matrix-sdk-sqlite/`: unveränderte Kopie von `matrix-sdk-sqlite 0.20.0` bis auf die eine
   Zeile `rusqlite = "0.42"` und eine `PATCH.md` (was geändert, warum, Prüfweg „upstream hebt
   rusqlite → Kopie löschen“). Eingebunden über `[patch.crates-io]`.
-- Lizenzen (Apache-2.0 durchgehend) und Advisories nach `scripts/AGENTS.md`; der Baum wächst um
+- Lizenzen und Advisories nach `scripts/AGENTS.md`: matrix-sdk selbst ist Apache-2.0, der Baum
+  enthält daneben MPL-2.0-Crates (zulässig, schon vorher im Baum; berichtigt 26.11.2026, vorher
+  hieß es „Apache-2.0 durchgehend“); der Baum wächst um
   rund 370 Crates. Prüfen, dass `cargo deny` (bzw. das Advisory-Gate) grün bleibt und kein
   zweiter Crypto-Provider entsteht (`tls::tests::rcgen_pem_ist_per_rustls_ladbar`).
 - Ein Wächtertest hält fest, dass im Lockfile genau ein `libsqlite3-sys` steht (der bestehende
@@ -243,8 +245,12 @@ Verworfen:
   der Fuß („Gesendet mit Lifeline Hub“, Einsatz, absendende Person, Uhrzeit).
 - Markdown wird als HTML (`formatted_body`) mitgeschickt; `body` trägt den Klartext, den Clients
   ohne HTML zeigen. Das HTML wird aus dem eigenen Markdown erzeugt und enthält keine Links oder
-  Bilder aus Fremdinhalt (der Inhalt stammt aus freigegebenen Dokumenten; die Renderfunktion des
-  SDK maskiert HTML im Text).
+  Bilder aus Fremdinhalt (der Inhalt stammt aus freigegebenen Dokumenten). *Berichtigt
+  26.11.2026:* `RoomMessageEventContent::text_markdown` maskiert HTML **nicht**; der Zusteller
+  maskiert deshalb selbst jedes ASCII-Satzzeichen mit einem CommonMark-Backslash, ein Einzug am
+  Zeilenanfang wird zu U+00A0 (kein Codeblock), und der Rückfall ohne Markdown ist der
+  HTML-maskierte Klartext (`src/ausgang/zusteller/matrix.rs`, Regel in `src/AGENTS.md`,
+  „Ausgang an Menschen“).
 - Anlagen: `anlage-{n}.png` als `m.image` mit Größe und Abmessungen.
 
 ### 8. Oberfläche
@@ -264,10 +270,12 @@ Verworfen:
 
 ### 9. Regel, Entscheidung, Doku
 
-- **ADR-0103** bekommt einen Nachtrag statt einer neuen ADR: Der Ausgangskorb ist kanalneutral;
-  Matrix mit E2EE; Speicherverzeichnis je Anbindung außerhalb der Hub-Datenbank und außerhalb der
-  Sicherung. Falls `docs/architektur/AGENTS.md` für eine neue Speicherdatei eine eigene ADR
-  verlangt, wird es eine neue (nächste freie Nummer).
+- **ADR-0104** bekommt einen Nachtrag: Der Ausgangskorb ist kanalneutral; Matrix mit E2EE;
+  Speicherverzeichnis je Anbindung außerhalb der Hub-Datenbank und außerhalb der Sicherung.
+  *Berichtigt 26.11.2026:* Eine akzeptierte ADR ist unveränderlich (`docs/architektur/AGENTS.md`,
+  „Entscheidungen“); der Nachtrag ist deshalb eine eigene ADR, die ADR-0104 präzisiert (Muster
+  ADR-0098 zu ADR-0077), ebenso der Nachtrag zu ADR-0002 (`rusqlite` nur transitiv über
+  `vendor/matrix-sdk-sqlite` für den Speicher des SDK).
 - **`src/AGENTS.md`, „Ausgang an Menschen“:** kanalneutraler Zusteller; je Kanal genau eine
   Anbindung je Org; Matrix-Client nur über `adapter::matrix` mit unserem reqwest-Client; nie
   Klartext in einen verschlüsselten Raum; Speicherverzeichnis nie in Sicherung und nie

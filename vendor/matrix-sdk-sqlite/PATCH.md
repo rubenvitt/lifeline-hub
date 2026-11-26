@@ -30,6 +30,16 @@ sqlx und der Matrix-Schlüsselspeicher teilen.
   vendor/matrix-sdk-sqlite` zeigt nur die `rusqlite`-Zeile, `Cargo.lock`, `.cargo-ok` und
   diese Datei.
 
+## Advisories
+
+`scripts/check-deps.sh` meldet mit matrix-sdk eine zusätzliche erlaubte Warnung:
+`derivative` (RUSTSEC-2024-0388, nicht mehr gepflegt). Sie kommt nur über
+`wasm_evt_listener`, einen wasm-Zweig von matrix-sdk, der für die Ziele des Hubs nicht gebaut
+wird; `.cargo/audit.toml` ignoriert sie nicht eigens. Taucht sie in einem nativen Pfad auf
+(`cargo tree -i derivative`), ist das ein Befund für den nächsten Bump. Eine Lücke in
+`rusqlite` oder `libsqlite3-sys` betrifft Hub und Schlüsselspeicher gemeinsam (eine SQLite im
+Binary); sie wird wie jede SQLite-Lücke über den Crate-Bump geschlossen (ADR-0002, ADR-0108).
+
 ## Wann die Kopie fällt
 
 Sobald eine Version von `matrix-sdk-sqlite` erscheint, die `rusqlite` mit derselben
