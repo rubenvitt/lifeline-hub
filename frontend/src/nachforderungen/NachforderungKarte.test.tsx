@@ -1044,23 +1044,20 @@ describe('NachforderungKarte — Kontextmenü (LLH-1598)', () => {
 describe('NachforderungKarte — Senden (LLH-2093)', () => {
   function stelle() {
     server.use(
-      http.get('/api/external-agencies/channels', ({ request }) =>
-        HttpResponse.json(
-          new URL(request.url).searchParams.get('channel') === 'email'
-            ? [
-                {
-                  agency_id: 4,
-                  agency_name: 'ILS Nord',
-                  channel: {
-                    id: 21,
-                    externe_stelle_id: 4,
-                    channel: 'email',
-                    address: 'ils@example.org',
-                  },
-                },
-              ]
-            : [],
-        ),
+      // Der Dialog lädt alle Kanäle auf einmal (eine Liste, LLH-2094/2095).
+      http.get('/api/external-agencies/channels', () =>
+        HttpResponse.json([
+          {
+            agency_id: 4,
+            agency_name: 'ILS Nord',
+            channel: {
+              id: 21,
+              externe_stelle_id: 4,
+              channel: 'email',
+              address: 'ils@example.org',
+            },
+          },
+        ]),
       ),
       http.get('/api/incidents/1/deliveries', () => HttpResponse.json([])),
     );
