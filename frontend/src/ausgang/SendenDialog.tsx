@@ -12,7 +12,7 @@ import {
   versandFehler,
   type QuelleFilter,
 } from '../api/ausgang';
-import type { AusgangFehler, KanalArt } from '../api/types';
+import type { AusgangFehler, KanalArt, KanalMitStelle } from '../api/types';
 import { zahlText } from '../anzeige/zahl';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -20,7 +20,7 @@ import { Feld, Textstufe, schriftStil } from '../components/instrument';
 import { neueClientId } from '../offline/clientId';
 import { useOnline } from '../offline/useOnline';
 import { empfaengerVorschlag } from './empfaengerVorschlag';
-import { kanalKurz } from './kanalAnzeige';
+import { KANAL_REIHENFOLGE, kanalKurz } from './kanalAnzeige';
 
 interface FormWerte {
   kanaele: number[];
@@ -35,9 +35,26 @@ function groesse(bytes: number): string {
 }
 
 /**
+ * Die Adressen je Stelle, Stellen nach Namen, in einer Stelle nach Kanal: Gesendet wird an eine
+ * Stelle, und ihre Mail-, Fax- und Matrix-Adresse stehen so beieinander statt verstreut.
+ */
+function nachStelle(kanaele: readonly KanalMitStelle[]): KanalMitStelle[][] {
+  const gruppen = new Map<number, KanalMitStelle[]>();
+  for (const k of kanaele) {
+    const gruppe = gruppen.get(k.agency_id);
+    if (gruppe) gruppe.push(k);
+    else gruppen.set(k.agency_id, [k]);
+  }
+  const rang = (k: KanalMitStelle) => KANAL_REIHENFOLGE.indexOf(k.channel.channel);
+  return [...gruppen.values()]
+    .map((g) => [...g].sort((a, b) => rang(a) - rang(b)))
+    .sort((a, b) => a[0].agency_name.localeCompare(b[0].agency_name, 'de'));
+}
+
+/**
  * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax oder
  * Matrix (LLH-2093, LLH-2095, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum
- * Anhaken (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
+ * Anhaken, je Stelle beisammen unter ihrem Namen (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
  * Adresse vorbelegt, nie mit einer Faxnummer, damit eine Stelle nicht doppelt Post bekommt. Fehlt
  * das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein Versand wird nie
  * vorgemerkt.
@@ -199,25 +216,42 @@ export default function SendenDialog({
         />
       ) : (
         <Feld label="An" name="kanaele">
-          <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-            {kanaele.map((k) => (
-              <Checkbox
-                key={k.channel.id}
-                value={k.channel.id}
-                disabled={k.channel.channel === 'matrix' && matrixGesperrt !== null}
+          <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginSM }}>
+            {nachStelle(kanaele).map((gruppe) => (
+              <div
+                key={gruppe[0].agency_id}
+                role="group"
+                aria-label={gruppe[0].agency_name}
+                data-lfh="senden-stelle"
+                style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
               >
-                <Textstufe stufe="textKlein" ton="gedaempft">
-                  {kanalKurz(k.channel.channel)}
-                </Textstufe>{' '}
-                {k.agency_name} · {k.channel.address}
-                {k.channel.label ? ` (${k.channel.label})` : ''}
-                {k.channel.channel === 'matrix' && matrixGesperrt !== null && (
-                  <Typography.Text type="danger" style={schriftStil('textKlein')}>
-                    {' '}
-                    · {matrixGesperrt}
-                  </Typography.Text>
-                )}
-              </Checkbox>
+                <Textstufe stufe="textKlein" ton="text2">
+                  {gruppe[0].agency_name}
+                </Textstufe>
+                {gruppe.map((k) => {
+                  const gesperrtMatrix = k.channel.channel === 'matrix' && matrixGesperrt !== null;
+                  return (
+                    <Checkbox
+                      key={k.channel.id}
+                      value={k.channel.id}
+                      disabled={gesperrtMatrix}
+                      aria-label={`${kanalKurz(k.channel.channel)} ${k.agency_name} · ${k.channel.address}`}
+                    >
+                      <Textstufe stufe="textKlein" ton="gedaempft">
+                        {kanalKurz(k.channel.channel)}
+                      </Textstufe>{' '}
+                      {k.channel.address}
+                      {k.channel.label ? ` (${k.channel.label})` : ''}
+                      {gesperrtMatrix && (
+                        <Typography.Text type="danger" style={schriftStil('textKlein')}>
+                          {' '}
+                          · {matrixGesperrt}
+                        </Typography.Text>
+                      )}
+                    </Checkbox>
+                  );
+                })}
+              </div>
             ))}
           </Checkbox.Group>
         </Feld>

@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
@@ -42,6 +42,28 @@ function zeige(over: Partial<React.ComponentProps<typeof SendenDialog>> = {}) {
 afterEach(() => setzeOnline(true));
 
 describe('SendenDialog (LLH-2093)', () => {
+  it('ordnet die Adressen je Stelle, Stellen nach Namen, in der Stelle Mail, Matrix, Fax', async () => {
+    kanaele([
+      kanal(31, 'THW OV', 'thw@example.org', 'email', 3),
+      kanal(21, 'ILS Nord', '+49511123456', 'fax', 2),
+      kanal(32, 'Kreis', 'kreis@example.org', 'email', 4),
+      kanal(22, 'ILS Nord', 'ils@example.org', 'email', 2),
+      kanal(23, 'ILS Nord', '#lageraum:example.org', 'matrix', 2),
+    ]);
+    zeige({ vorschlagNamen: [] });
+    await screen.findByRole('checkbox', { name: /thw@/ });
+    const stellen = [...document.querySelectorAll('[data-lfh="senden-stelle"]')].map((g) =>
+      g.getAttribute('aria-label'),
+    );
+    expect(stellen).toEqual(['ILS Nord', 'Kreis', 'THW OV']);
+    const ils = within(screen.getByRole('group', { name: 'ILS Nord' }));
+    expect(ils.getAllByRole('checkbox').map((c) => c.getAttribute('value'))).toEqual([
+      '22',
+      '23',
+      '21',
+    ]);
+  });
+
   it('belegt die Stellen des Verteilers vor und schickt die Auswahl einmal', async () => {
     kanaele(KANAELE);
     const bodies: unknown[] = [];
@@ -113,8 +135,8 @@ describe('SendenDialog (LLH-2093)', () => {
       http.get('/api/external-agencies/channels', ({ request }) => {
         abgerufen = new URL(request.url).search;
         return HttpResponse.json([
-          kanal(21, 'ILS Nord', 'ils@example.org'),
-          kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix'),
+          kanal(21, 'ILS Nord', 'ils@example.org', 'email', 2),
+          kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 2),
         ]);
       }),
     );
@@ -122,8 +144,11 @@ describe('SendenDialog (LLH-2093)', () => {
     const mail = await screen.findByRole('checkbox', { name: /ils@example\.org/ });
     const matrix = screen.getByRole('checkbox', { name: /#lageraum:example\.org/ });
     // Kanal als kleines Wort vor der Adresse, Sammlung ohne Filter.
-    expect(mail.closest('label')).toHaveTextContent(/^Mail\s*ILS Nord/);
-    expect(matrix.closest('label')).toHaveTextContent(/^Matrix\s*ILS Nord/);
+    expect(mail.closest('label')).toHaveTextContent(/^Mail\s*ils@example\.org/);
+    expect(matrix.closest('label')).toHaveTextContent(/^Matrix\s*#lageraum/);
+    // Beide Adressen stehen beisammen unter dem Namen ihrer Stelle, Mail vor Matrix.
+    const stelle = screen.getByRole('group', { name: 'ILS Nord' });
+    expect(within(stelle).getAllByRole('checkbox')).toEqual([mail, matrix]);
     expect(abgerufen).toBe('');
   });
 
@@ -232,7 +257,7 @@ describe('SendenDialog (LLH-2093)', () => {
     );
     zeige({ vorschlagNamen: [] });
     const fax = await screen.findByRole('checkbox', { name: /Kreis · \+49511123456/ });
-    expect(fax.closest('label')).toHaveTextContent(/^Fax\s*Kreis/);
+    expect(fax.closest('label')).toHaveTextContent(/^Fax\s*\+49511123456/);
     await userEvent.click(fax);
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
