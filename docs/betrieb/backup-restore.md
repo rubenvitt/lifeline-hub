@@ -216,6 +216,26 @@ zurückspielen will, braucht den alten Schlüssel (dann wie in Schritt 2 neu sta
 deshalb aufbewahren, solange es solche Sicherungen gibt. Nach einem Leck heißt das auch: Diese
 Sicherungen sind so gefährdet wie der alte Schlüssel.
 
+### Schlüsselspeicher der Matrix-Anbindung (LLH-2094)
+
+Die Anbindung „Matrix“ (Ausgang in Matrix-Räume) legt je Anbindung einen Schlüsselspeicher an:
+`<Verzeichnis von --db-path>/matrix/<adapter_id>/` (im Abbild `/data/matrix/`). Darin liegen die
+SQLite-Dateien des Matrix-SDK (Geräte- und Raumschlüssel, Werte verschlüsselt mit einer
+Passphrase aus dem Geheimnisspeicher) und `geraet.json`. **Dieses Verzeichnis ist nie Teil einer
+Sicherung**, weder per Weboberfläche noch automatisch, und gehört auch nicht von Hand in eine:
+ein reiner Sender verliert ohne es nur die Verifizierung seines alten Geräts.
+
+Nach einem Restore auf einem anderen Rechner, einem Umzug ohne das Verzeichnis oder nach seinem
+Verlust meldet „Verbindung prüfen“ an der Anbindung „Schlüssel passen nicht zum Gerät des
+Tokens. Ein neues Access-Token anlegen.“ (`schluessel_passen_nicht`). Abhilfe: im Bot-Konto ein **neues Access-Token** anlegen (neue
+Anmeldung, also ein neues Gerät) und an der Anbindung setzen; der Server legt den Speicher neu
+an. Ein Token, das aus Element (oder einem anderen Client) kopiert ist, gehört dessen Gerät und
+führt zum selben Fehler: der Bot braucht ein eigenes, frisches Token. Empfänger sehen danach ein
+neues, nicht verifiziertes Gerät des Bots; alte Sitzungen räumt man im Bot-Konto auf
+(Anwenderkapitel „Anbindungen“). Wer das Verzeichnis bei einem Umzug mitnimmt, nimmt es samt
+derselben Datenbank und demselben `LIFELINE_GEHEIMNIS_SCHLUESSEL` mit, sonst lässt es sich nicht
+öffnen.
+
 ### „Auf der Datenbank ist noch eine Verbindung offen"
 
 Liegen `-wal`/`-shm` neben der Ziel-Datenbank, bricht der Restore ab. Diese Dateien

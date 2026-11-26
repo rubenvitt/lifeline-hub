@@ -155,14 +155,19 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
 5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
 6. „Anlegen“ wählen.
 
-Mailadressen einer bestehenden Stelle (für das Senden von Lageberichten, Befehlen und
-Nachforderungen):
+Mailadressen und Matrix-Räume einer bestehenden Stelle (für das Senden von Lageberichten,
+Befehlen und Nachforderungen):
 
-1. Die Stelle öffnen und im Abschnitt „Erreichbar per“ die Mailadresse eintragen, nach Bedarf eine
-   Beschriftung („Lagedienst“).
-2. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert; „Mailadresse ungültig“
-   erscheint, wenn sie nicht stimmt.
-3. Zum Entfernen den Eintrag der Adresse entfernen.
+1. In der Zeile der Stelle „Bearbeiten“ wählen. Im Abschnitt „Erreichbar per“ unter „Art der
+   Adresse“ „E-Mail“ oder „Matrix“ wählen.
+2. Die „Mailadresse“ bzw. den „Matrix-Raum“ eintragen, nach Bedarf eine Beschriftung
+   („Lagedienst“). Ein Matrix-Raum ist eine Raum-ID (`!abc123:beispiel.de`) oder ein Alias
+   (`#lageraum:beispiel.de`), wie ihn der Matrix-Client in den Raumeinstellungen zeigt.
+3. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert und steht mit „Mail“ oder
+   „Matrix“ davor in der Liste. Stimmt sie nicht, erscheint „Mailadresse ungültig“ bzw.
+   „Matrix-Raum ungültig“; eine Nutzer-ID (`@name:server`) lehnt das Feld mit „Nutzer-IDs gehen
+   noch nicht, bitte den Raum eintragen“ ab.
+4. Zum Entfernen an der Adresse „Entfernen“ wählen.
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
 deaktivierte Stelle lässt sich mit „Aktivieren“ zurückholen.
@@ -376,10 +381,13 @@ Sicherheit bleiben pflegbar.
   in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
   [Nachforderung](nachforderung.md).
 
-Eine Stelle kann mehrere Mailadressen haben; die Adresse wird klein geschrieben gespeichert, eine
-doppelte ist nicht möglich. Eine Stelle, die vom Hub kommt, zeigt ihre Adressen nur an. Die
-Liste nennt „n Mailadressen“ an der Bezeichnung. Gesendet wird an die Adresse, wie sie beim
-Absenden stand; spätere Änderungen betreffen nur neue Versände.
+Eine Stelle kann mehrere Mailadressen und Matrix-Räume haben; bei einer Mailadresse wird der
+Teil nach dem „@“ klein geschrieben gespeichert, eine doppelte Adresse ist nicht möglich. Eine Stelle, die vom Hub kommt,
+zeigt ihre Adressen nur an. Die Liste zählt die Adressen je Weg an der Bezeichnung, etwa „2 Mail,
+1 Matrix“. Gesendet wird an die Adresse, wie sie beim Absenden stand; spätere Änderungen
+betreffen nur neue Versände. In einen Matrix-Raum sendet das Matrix-Konto der Organisation
+(Kapitel [Anbindungen](anbindungen.md)); es muss in den Raum eingeladen sein, wenn er nicht
+öffentlich ist.
 
 ### Einsatz-Vorlagen
 

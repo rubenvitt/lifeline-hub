@@ -2,7 +2,7 @@
 titel: Lageberichte
 gruppen: [fuehrung]
 reihenfolge: 420
-quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/ausgang/SendenDialog.tsx, frontend/src/ausgang/SendenAktion.tsx, frontend/src/ausgang/Versandliste.tsx, frontend/src/api/ausgang.ts, src/ausgang/lauf.rs, src/ausgang/nachricht.rs, src/ausgang/zustand.rs, src/routes/ausgang.rs]
+quellen: [frontend/src/pages/LageberichtePage.tsx, frontend/src/lageberichte/LageberichtUebersicht.tsx, frontend/src/lageberichte/uebersicht.ts, frontend/src/lageberichte/NeuerLagevortragKnopf.tsx, frontend/src/pages/LageberichtDetailPage.tsx, frontend/src/lageberichte/vorlagen.ts, frontend/src/entwurf/DokumentEntwurf.tsx, frontend/src/lageberichte/AbschnittUebernahme.tsx, frontend/src/lageberichte/LeereAbschnitteFuellen.tsx, frontend/src/lageberichte/startinhalt.ts, frontend/src/lageberichte/standFeld.ts, frontend/src/lageberichte/UebernahmeStand.tsx, frontend/src/lageberichte/uebernahmen.ts, frontend/src/lageberichte/eigeneLageUebernahme.ts, frontend/src/lageberichte/schadenlageUebernahme.ts, frontend/src/lageberichte/lageentwicklungUebernahme.ts, frontend/src/lageberichte/fuehrungsproblemeUebernahme.ts, frontend/src/entwurf/useEntwurfVerlustschutz.ts, frontend/src/entwurf/useDokumentFreigabe.ts, frontend/src/entwurf/DokumentAnlagen.tsx, frontend/src/entwurf/VerteilerField.tsx, frontend/src/entwurf/verteilerKern.ts, src/vorlagendokument/repo.rs, src/vorlagendokument/verteiler.rs, src/vorlagendokument/benachrichtigung.rs, src/benachrichtigung/vorgabe.rs, src/lagebericht/mod.rs, src/routes/lagebericht.rs, frontend/src/einsatz/schreibrecht.ts, frontend/src/api/queryKeys.ts, frontend/src/ausgang/SendenDialog.tsx, frontend/src/ausgang/SendenAktion.tsx, frontend/src/ausgang/Versandliste.tsx, frontend/src/api/ausgang.ts, src/ausgang/lauf.rs, src/ausgang/nachricht.rs, src/ausgang/zustand.rs, src/routes/ausgang.rs, src/ausgang/zusteller/matrix.rs, frontend/src/ausgang/empfaengerVorschlag.ts, frontend/src/ausgang/kanalAnzeige.ts]
 ---
 
 ## Überblick
@@ -92,21 +92,28 @@ sie.
    „Stand der Übernahme“ mit ⧖ und „aus der Vorfassung“; eine neue Übernahme im Abschnitt bringt
    die aktuellen Zahlen.
 
-### Einen Lagebericht per E-Mail senden
+### Einen Lagebericht per E-Mail oder Matrix senden
 
 Für Einsatzleitung und Führungspersonal, mit freigegebenem Bericht:
 
 1. Einen freigegebenen Bericht öffnen und „Senden“ wählen.
-2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen. Vorbelegt sind die Stellen aus dem
-   Verteiler des Berichts, die eine Mailadresse haben; hat eine Stelle mehrere, steht jede Adresse
-   einzeln da.
+2. Im Dialog „Senden“ unter „An“ die Adressen ankreuzen. Jede Adresse einer Stelle steht einzeln
+   da, mit „Mail“ oder „Matrix“ davor. Vorbelegt ist je Stelle aus dem Verteiler des Berichts
+   genau eine Adresse: ihr erster Matrix-Raum, sonst ihre erste Mailadresse. Soll dieselbe Stelle
+   den Bericht auf beiden Wegen bekommen, die zweite Adresse dazu ankreuzen.
+
 3. „Senden“ wählen. Unter dem Berichtstext erscheint der Abschnitt „Versand“ mit einer Zeile je
-   Adresse und ihrem Stand: „wartet“, „übergeben 14:32“ oder „fehlgeschlagen: …“.
+   Adresse, ihrem Weg und ihrem Stand: „wartet“, „übergeben 14:32“ oder „fehlgeschlagen: …“. Ein
+   Matrix-Raum steht dort mit seinem Alias, eine Raum-ID gekürzt.
 4. Ist ein Versand fehlgeschlagen oder die Zustellung unklar, in seiner Zeile „Erneut senden“
    wählen.
 
-Fehlt jede Mailadresse, steht im Dialog „Keine Mailadresse hinterlegt“ mit dem Weg zu den Externen
-Stellen; ist kein Mailserver eingerichtet, meldet der Dialog „Kein Mailserver eingerichtet“.
+Hat keine Stelle eine Adresse, steht im Dialog „Keine Adresse hinterlegt“, für Admins mit dem Weg
+„Adressen bei den Externen Stellen eintragen“. Ist kein Mailserver eingerichtet, meldet der Dialog
+„Kein Mailserver eingerichtet“. Fehlt das Matrix-Konto oder ist es angehalten, lehnt der Server
+erst beim Senden ab, und es geht nichts hinaus: danach sind die Matrix-Räume mit „Kein
+Matrix-Konto eingerichtet“ bzw. „Das Matrix-Konto ist angehalten“ gesperrt, und je betroffener
+Stelle ist stattdessen ihre erste Mailadresse angekreuzt. Erneut „Senden“ wählen.
 
 ## Hintergrund
 
@@ -194,10 +201,11 @@ sehen darf. Wer freigibt, bekommt nichts, auch wenn die eigene Funktion im Verte
 Entwürfe melden nichts; eine Fortschreibung meldet sich erst mit ihrer eigenen Freigabe, und jede
 Freigabe meldet sich genau einmal.
 
-### Versand per E-Mail
+### Versand per E-Mail und Matrix
 
-Der Versand gilt nur für Stellen mit hinterlegter Mailadresse (Kapitel [Stammdaten](stammdaten.md),
-„Externe Stellen“) und braucht eine eingerichtete Mailanbindung der Organisation (Kapitel
+Der Versand gilt nur für Stellen mit hinterlegter Mailadresse oder hinterlegtem Matrix-Raum
+(Kapitel [Stammdaten](stammdaten.md), „Externe Stellen“) und braucht für jeden Weg die passende
+Anbindung der Organisation: einen Mailserver bzw. ein Matrix-Konto (Kapitel
 [Anbindungen](anbindungen.md)). Ein Mensch löst jeden Versand aus; nichts geht von selbst hinaus.
 
 - **Nur freigegebene, jüngste Fassung.** Gesendet wird der Text der Freigabe mit den Anlagen als
@@ -205,15 +213,24 @@ Der Versand gilt nur für Stellen mit hinterlegter Mailadresse (Kapitel [Stammda
   freigegeben, geht ein noch wartender Versand nicht mehr hinaus und steht als „fehlgeschlagen:
   Neuere Fassung freigegeben“ da. „Erneut senden“ sendet den Text, wie er beim Absenden war; für
   eine Fortschreibung die neue Fassung senden. Übersteigen die Anlagen zusammen 20 MB, meldet der
-  Versand „Anhänge zu groß für eine Mail“.
+  Versand „Anhänge zu groß für eine Mail“ bzw. „Anhänge zu groß für den Matrix-Server“; in einen
+  Matrix-Raum geht jede Anlage außerdem nur bis zur Grenze, die der Matrix-Server nennt.
 - **Wiederholung.** Ist der Mailserver nicht erreichbar, versucht die App es bis zu 30 Minuten
   lang weiter; danach steht der Versand als „fehlgeschlagen“ da. Eine Ablehnung durch den
   Mailserver, eine falsche Anmeldung oder eine gestörte Anbindung scheitern sofort.
 - **„Zustellung unklar“.** Bricht die Verbindung ab, nachdem der Text übertragen wurde, aber bevor
   der Mailserver bestätigt, ist offen, ob die Mail raus ist. Die App wiederholt dann nicht von
   selbst; ob „Erneut senden“, entscheidet die Person (sonst käme dieselbe Meldung doppelt an).
+  Ebenso nach einem Neustart des Servers mitten in einer Zustellung, auf beiden Wegen.
+- **Matrix-Räume.** Eine Nachricht in einen Matrix-Raum besteht aus dem Text (Betreff fett) und
+  je Anlage einem Bild. Bricht die Verbindung mitten im Senden ab, versucht die App es im selben
+  Fenster von 30 Minuten weiter und sendet nur, was noch fehlt; der Matrix-Server erkennt einen
+  wiederholten Teil und legt ihn nicht doppelt ab. Ist der Raum verschlüsselt, geht die Nachricht
+  verschlüsselt hinaus, nie im Klartext; geht das nicht, steht der Versand als „fehlgeschlagen:
+  Verschlüsseln nicht möglich“ da. Das Matrix-Konto tritt einem Raum bei, wenn es eingeladen ist
+  oder der Raum öffentlich ist; sonst „fehlgeschlagen: Kein Zutritt zum Raum“.
 - **Einsatztagebuch.** Jedes Ergebnis steht im ETB, etwa „Lagebericht Nr. 3 per E-Mail an Leitstelle
-  Nord (lagedienst@…) übergeben“; ein Wiederholungsversuch im Fenster schreibt nichts. Ein Versand
+  Nord (lagedienst@…) übergeben“ oder „… per Matrix an Leitstelle Nord (#lage:…) übergeben“; ein Wiederholungsversuch im Fenster schreibt nichts. Ein Versand
   ist nie halb: er ist übergeben und im ETB, oder er steht sichtbar als fehlgeschlagen da.
 - **Rechte und Netz.** Senden und „Erneut senden“ brauchen das Schreibrecht; die Liste „Versand“
   sehen alle, die den Bericht lesen dürfen. Ohne Netz ist „Senden“ gesperrt („Ohne Netz nicht

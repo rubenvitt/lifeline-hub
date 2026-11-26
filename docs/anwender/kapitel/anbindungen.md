@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/drohne/art.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/adapter/matrix_art.rs, src/adapter/matrix.rs, src/drohne/art.rs]
 ---
 
 ## Überblick
@@ -235,6 +235,27 @@ Für den System-Admin; jede Organisation hat höchstens eine E-Mail-Anbindung:
 
 Ohne diese Anbindung meldet der Senden-Dialog „Kein Mailserver eingerichtet“; ist sie angehalten,
 „Mailanbindung angehalten“.
+
+### Matrix-Konto für den Versand einrichten
+
+Für den System-Admin; jede Organisation hat höchstens ein Matrix-Konto:
+
+1. Auf dem Homeserver ein eigenes Konto für den Versand anlegen (etwa `@lifeline:beispiel.de`)
+   und es in die Räume der Stellen einladen, die nicht öffentlich sind.
+2. Für dieses Konto ein Access-Token mit einer **eigenen, neuen Anmeldung** holen, etwa über die
+   Anmeldung der Client-API des Homeservers (`POST /_matrix/client/v3/login`). Kein Token aus
+   einer laufenden Sitzung von Element oder einem anderen Client kopieren: es gehört dem Gerät
+   dieser Sitzung.
+3. Unter „Einstellungen“ „Anbindungen“ im Paneel „Adapter“ „Adapter anlegen“ wählen und die Art
+   „Matrix“ wählen.
+4. Unter „Homeserver“ die Adresse der Client-API eintragen (`https://matrix.beispiel.de`), nicht
+   nur den Servernamen; optional einen „Anzeigename“, unter dem der Versand im Raum erscheint.
+5. „Anlegen“ wählen und in der Ansicht des Adapters das „Access-Token“ als Geheimnis setzen.
+6. „Verbindung prüfen“ wählen. Es wird nichts gesendet. Im Paneel „Verifizierung“ steht, wie das
+   Gerät des Versands bei den Empfängern erscheint.
+
+Ohne dieses Konto sind im Senden-Dialog die Matrix-Räume nach dem Senden mit „Kein Matrix-Konto
+eingerichtet“ gesperrt; ist es angehalten, mit „Das Matrix-Konto ist angehalten“.
 
 ### Geheimnis setzen oder ersetzen
 
@@ -648,13 +669,42 @@ der Server nicht: Beheben kann es nur, wer den Server betreibt.
 ### Mailversand
 
 Die Art „E-Mail (SMTP)“ ruft nichts ab, sondern stellt Nachrichten zu, die Personen aus dem
-Einsatz senden (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail“). Der Server prüft
+Einsatz senden (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail und Matrix“). Der Server prüft
 das Ziel wie bei Webhooks (keine Weiterleitung, kein Ziel im internen Netz ohne „Ziel im eigenen
 Netz erlauben“) und prüft das Zertifikat des Mailservers gegen die Vertrauensanker des Systems.
 Das Passwort bleibt wie jedes Geheimnis verschlüsselt und wird nur beim Zustellen entschlüsselt;
 Antworttexte des Mailservers werden nie gespeichert, die Versandliste nennt nur einen festen
 Grund („Vom Mailserver abgelehnt“, „Mailanbindung fehlerhaft eingerichtet“). Eine Organisation, die
 sich bei einem Hub meldet, hat keine eigene Mailanbindung.
+
+### Versand in Matrix-Räume
+
+Die Art „Matrix“ ruft ebenfalls nichts ab: ihr Lauf prüft nur die Verbindung (vorgeschlagen
+stündlich, frühestens alle 15 Minuten) und sendet nichts. Gesendet wird, was Personen aus dem
+Einsatz senden (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail und Matrix“). Alle
+Anfragen gehen an den eingetragenen Homeserver, nur über `https://` und mit demselben Zielschutz
+wie bei Webhooks; die Adresse wird nicht über den Servernamen nachgeschlagen. Eine Organisation,
+die sich bei einem Hub meldet, hat kein eigenes Matrix-Konto.
+
+- **Verschlüsselte Räume.** Der Versand ist ein eigenes Gerät des Kontos mit eigenen Schlüsseln.
+  In einen verschlüsselten Raum geht jede Nachricht verschlüsselt, an alle Geräte aller Mitglieder,
+  nie im Klartext. Die Empfänger sehen das Gerät als nicht verifiziert, bis jemand es in der
+  Geräteliste des Kontos bestätigt; die Nachricht kommt trotzdem an. Die Prüfung legt, wo der
+  Homeserver es erlaubt, die Schlüssel für die Gegenzeichnung an (Cross-Signing); verlangt er dafür
+  eine erneute Anmeldung, bleibt das Gerät ohne, ohne Fehler.
+- **Schlüsselspeicher.** Die Schlüssel des Geräts liegen auf dem Server in einem eigenen
+  Verzeichnis je Anbindung, verschlüsselt, und **nie in einer Sicherung**. Nach einer
+  Wiederherstellung auf einem anderen Rechner, nach einem Umzug oder mit einem Token, das zu einem
+  anderen Gerät gehört (etwa aus Element kopiert), meldet die Prüfung „Schlüssel passen nicht zum
+  Gerät des Tokens. Ein neues Access-Token anlegen.“: dann wie in Schritt 2 oben ein neues Token
+  holen und als Geheimnis ersetzen. Die Empfänger sehen danach ein neues Gerät.
+- **Token und Homeserver ändern.** Ein neues Access-Token, ein anderer Homeserver und das Löschen
+  der Anbindung verwerfen den Schlüsselspeicher; ein anderer Homeserver entfernt auch das Token.
+  Das alte Gerät bleibt beim Homeserver angemeldet: alte Sitzungen räumt man in der Geräteliste
+  des Kontos auf, etwa in Element, angemeldet als dieses Konto.
+- **Fehler.** Ein abgelehntes Token hält die Anbindung mit „Zugang abgelehnt“ an. Die Versandliste nennt
+  nur feste Gründe („Kein Zutritt zum Raum“, „Verschlüsseln nicht möglich“, „Vom Matrix-Server
+  abgelehnt“), das ETB höchstens den Fehlercode des Matrix-Servers, nie seinen Text.
 
 ### Geheimnisse eines Adapters
 

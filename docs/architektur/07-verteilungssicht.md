@@ -1,6 +1,6 @@
 # 7. Verteilungssicht
 
-Stand: 25.11.2026 (Helfer-App über TestFlight und als APK, ADR-0101; Push-Relais hinter Cloudflare mit Proxy-Liste, LLH-2080; Push-Relais für iOS, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
+Stand: 26.11.2026 (Schlüsselspeicher des Matrix-Ausgangs unter `matrix/`, LLH-2094; Helfer-App über TestFlight und als APK, ADR-0101; Push-Relais hinter Cloudflare mit Proxy-Liste, LLH-2080; Push-Relais für iOS, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Testjobs auf Kanal-Branches laufen zu Ende, ADR-0091; Android-App als APK, LLH-1989; CI nur auf GitHub, ADR-0078; Geheimnisspeicher und Abrufe der Adapter, LLH-2017; iOS-App über TestFlight, LLH-1978; ein Workflow je Ereignis, Ruleset-Prüfung, kein „Baut mit Ziel-Branch“; LLH-1896/1895/1899).
 
 Lifeline Hub läuft als **ein Serverprozess** (`lifeline-hub`) mit eingebettetem Frontend und
 SQLite. Die Endgeräte greifen über Browser, installierte PWA, Desktop-App, iOS-App oder Android-App darauf zu. Einen
@@ -23,7 +23,7 @@ flowchart LR
   subgraph SR["Server-Rechner (Mini-PC, Notebook, VM oder Container)"]
     RP["Reverse-Proxy (optional,<br/>TLS, X-Forwarded-Proto)"]
     LH["lifeline-hub<br/>(Binary oder Abbild)"]
-    DATA[("Datenverzeichnis<br/>lifeline.db, karten/,<br/>TLS-Zertifikat")]
+    DATA[("Datenverzeichnis<br/>lifeline.db, karten/, matrix/,<br/>TLS-Zertifikat")]
     BK[("--backup-verzeichnis")]
     CL["clamd (optional)"]
   end
@@ -109,6 +109,7 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 | --- | --- | --- |
 | `--db-path` (Vorgabe `lifeline.db`, Abbild `/data/lifeline.db`) | Datenbank im WAL-Modus; Anhänge als BLOB in der Tabelle `anhang`, Schlüssel des Web Push, Zugang zum Push-Relais (`ios_push_relais`) | `src/config.rs`, `migrations/0052_anhang.sql`, `src/web_push/mod.rs` |
 | `<Verzeichnis von --db-path>/karten` | Offline-Karten (MBTiles), `tile-cache.db`, Welt-Übersicht, `kritis/` | `default_karten_dir` in `src/config.rs`, `src/karte/tile_cache.rs`, `src/karte/kritis/scheduler.rs` |
+| `<Verzeichnis von --db-path>/matrix` | je Matrix-Anbindung ein Unterverzeichnis `<adapter_id>/`: SQLite-Speicher des SDK (Krypto-, Zustands- und Ereignis-Speicher, Werte verschlüsselt mit der Passphrase der Anbindung aus dem Geheimnisspeicher) und `geraet.json` (Nutzer und Gerät des Tokens). **Nicht in der Sicherung**; nach Restore oder Umzug braucht der Bot ein neues Access-Token (LLH-2094) | `default_matrix_dir` in `src/config.rs`, `src/adapter/matrix.rs`, [ADR-0107](entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md), [`backup-restore.md`](../betrieb/backup-restore.md) |
 | neben der Datenbank | `lifeline-tls-cert.pem`/`lifeline-tls-key.pem` (Zertifikat-Cache), `lifeline-download-…` (Kopie für den Sicherungs-Download) | `src/tls/mod.rs`, `src/backup/mod.rs` |
 | `--backup-verzeichnis` | automatische Sicherungen, Vorgabe alle 360 min, 7 behalten, mit `--backup-empfaenger` per age verschlüsselt | `src/config.rs`, [`backup-restore.md`](../betrieb/backup-restore.md) |
 | `LIFELINE_GEHEIMNIS_SCHLUESSEL` oder `…_DATEI` (Umgebung, Flag oder eine Datei, deren Pfad die Umgebung nennt; nie Datenbank oder Sicherung) | privater age-Schlüssel des Geheimnisspeichers der Adapter; in der Datenbank liegen nur Chiffrate mit seinem Fingerabdruck (`adapter_geheimnis`). Getrennt sichern: ohne ihn sind die Geheimnisse nach einer Wiederherstellung neu zu setzen. Für einen Wechsel zusätzlich `…_ALT` (oder `…_ALT_DATEI`) für einen Neustart; der Start schlüsselt um (LLH-2025) | `src/config.rs`, `src/adapter/geheimnis.rs`, [ADR-0077](entscheidungen/ADR-0077-geheimnisse-der-adapter-liegen-nur-verschluesselt-und-adapter-rufen-nur-ueber-den-rahmen-ab.md), [`backup-restore.md`](../betrieb/backup-restore.md) |
@@ -119,8 +120,8 @@ oder vom lokalen DNS ([`packaging.md`](../betrieb/packaging.md), „Lokaler Betr
 | `push-relais` | Volume `/data` mit `push-relais.sqlite` (Server, Hash des Geheimnisses, Sperre; keine Tokens), `.p8` nur lesbar eingehängt unter `/geheimnisse/AuthKey.p8` | `push-relais/Dockerfile`, `push-relais/src/speicher.rs`, [`push-relais.md`](../betrieb/push-relais.md) |
 | `karten-service` | Volume `/opt/karten-build/out`, Ergebnis im Objektspeicher | `karten-service/Dockerfile`, `karten-service/src/storage/s3.rs` |
 
-Das Abbild legt Datenbank und `karten/` auf **ein** Volume `/data`, weil der Kartenpfad aus dem
-Datenbankpfad folgt (`Dockerfile`). Datenbank, Sicherungen und Swap gehören auf einen
+Das Abbild legt Datenbank, `karten/` und `matrix/` auf **ein** Volume `/data`, weil Karten- und
+Matrix-Pfad aus dem Datenbankpfad folgen (`Dockerfile`, `src/config.rs`). Datenbank, Sicherungen und Swap gehören auf einen
 verschlüsselten Datenträger; die Anwendung verschlüsselt nicht selbst und prüft das stündlich
 ([`packaging.md`](../betrieb/packaging.md), „Datenträgerverschlüsselung ist Pflicht“).
 
