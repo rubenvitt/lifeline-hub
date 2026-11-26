@@ -1,15 +1,20 @@
-import { Button, Input } from 'antd';
+import { Button, Input, Radio } from 'antd';
 import { useId, useState } from 'react';
 import { Augenbraue, FeldFehler, Stapel, Textstufe } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useOhneVerbindung } from '../offline/verbindung';
+import { kanalKurz } from '../ausgang/kanalAnzeige';
 import { useCreateKanal, useDeleteKanal, useExterneStelleKanaele } from '../api/externeStellen';
 import { useStammdatenHerkunft } from '../instanz/herkunft';
 import type { ExterneStelle } from '../api/types';
 
 /** Höchstlänge einer Adresse, wie der Server sie prüft (RFC 5321). */
 const ADRESSE_MAX = 254;
+/** Höchstlänge einer Matrix-Adresse in Bytes, wie der Server sie prüft (Spec 2). */
+const MATRIX_MAX = 255;
 const BESCHRIFTUNG_MAX = 100;
+
+type Art = 'email' | 'matrix';
 
 /**
  * Grobe Formprüfung vor dem Senden: genau ein „@“, kein Leerzeichen, kein Komma, beidseitig
@@ -24,8 +29,27 @@ export function istMailFormGueltig(adresse: string): boolean {
 }
 
 /**
+ * Grobe Formprüfung einer Matrix-Adresse: Raum-ID (`!…:server`) oder Alias (`#…:server`), kein
+ * Leerraum, beidseitig des Doppelpunkts etwas. Ein `matrix.to`-Link geht durch; der Server packt
+ * ihn zur Adresse aus. Die Antwort des Servers (ruma-Parser) ist maßgeblich.
+ */
+export function istMatrixFormGueltig(adresse: string): boolean {
+  const a = adresse.trim();
+  if (a.length === 0 || new TextEncoder().encode(a).length > MATRIX_MAX) return false;
+  if (/^https:\/\/matrix\.to\/#\/\S+$/.test(a)) return true;
+  return /^[!#][^\s:]+:\S+$/.test(a);
+}
+
+/** Meldung zu einer ungültigen Matrix-Eingabe; eine Nutzer-ID bekommt den Hinweis des Servers. */
+function matrixFormFehler(adresse: string): string {
+  return adresse.trim().startsWith('@')
+    ? 'Nutzer-IDs gehen noch nicht, bitte den Raum eintragen'
+    : 'Matrix-Raum ungültig';
+}
+
+/**
  * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093): die
- * Mailadressen der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
+ * Adressen der Stelle (E-Mail oder Matrix-Raum), jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
  * Eingaben hier stehen außerhalb seines `Form` (kein Feld, Enter fügt die Adresse hinzu, statt
  * das Modal abzusenden). Eine Stelle vom Hub ist nur lesbar, ihre Adressen kommen mit.
  */
@@ -36,20 +60,22 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
   const herkunft = useStammdatenHerkunft();
   const ohneNetz = useOhneVerbindung();
   const fehlerId = useId();
+  const [art, setArt] = useState<Art>('email');
   const [adresse, setAdresse] = useState('');
   const [beschriftung, setBeschriftung] = useState('');
   const [formFehler, setFormFehler] = useState<string | null>(null);
   const vomHub = herkunft.istVomHub('externe_stelle', stelle.id);
 
   const hinzufuegen = () => {
-    if (!istMailFormGueltig(adresse)) {
-      setFormFehler('Mailadresse ungültig');
+    const gueltig = art === 'matrix' ? istMatrixFormGueltig(adresse) : istMailFormGueltig(adresse);
+    if (!gueltig) {
+      setFormFehler(art === 'matrix' ? matrixFormFehler(adresse) : 'Mailadresse ungültig');
       return;
     }
     setFormFehler(null);
     const label = beschriftung.trim();
     anlegen.mutate(
-      { channel: 'email', address: adresse.trim(), ...(label ? { label } : {}) },
+      { channel: art, address: adresse.trim(), ...(label ? { label } : {}) },
       {
         onSuccess: () => {
           setAdresse('');
@@ -68,13 +94,16 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
         {abfrage.isError && <SpeicherFehler fehler={abfrage.error} titel="Nicht geladen" />}
         {kanaele.length === 0 && !abfrage.isLoading && !abfrage.isError && (
           <Textstufe stufe="textKlein" ton="gedaempft">
-            Noch keine Mailadresse hinterlegt.
+            Noch keine Adresse hinterlegt.
           </Textstufe>
         )}
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {kanaele.map((k) => (
             <li key={k.id}>
               <Stapel richtung="zeile" abstand="sm" ausrichten="baseline" umbruch>
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  {kanalKurz(k.channel)}
+                </Textstufe>
                 <span data-schrift="kennung">{k.address}</span>
                 {k.label && (
                   <Textstufe stufe="textKlein" ton="gedaempft">
@@ -84,7 +113,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 {!vomHub && (
                   <Button
                     danger
-                    aria-label={`Mailadresse ${k.address} entfernen`}
+                    aria-label={`Adresse ${k.address} entfernen`}
                     disabled={ohneNetz}
                     loading={entfernen.isPending && entfernen.variables === k.id}
                     onClick={() => entfernen.mutate(k.id)}
@@ -102,15 +131,27 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
           </Textstufe>
         ) : (
           <Stapel abstand="xs">
+            <Radio.Group
+              aria-label="Art der Adresse"
+              value={art}
+              onChange={(e) => {
+                setArt(e.target.value as Art);
+                setFormFehler(null);
+              }}
+              options={[
+                { label: 'E-Mail', value: 'email' },
+                { label: 'Matrix', value: 'matrix' },
+              ]}
+            />
             <Stapel richtung="zeile" abstand="sm" umbruch>
               <Input
-                aria-label="Mailadresse"
+                aria-label={art === 'matrix' ? 'Matrix-Raum' : 'Mailadresse'}
                 aria-invalid={formFehler ? true : undefined}
                 aria-describedby={formFehler ? fehlerId : undefined}
                 type="text"
-                inputMode="email"
-                placeholder="leitstelle@beispiel.de"
-                maxLength={ADRESSE_MAX}
+                inputMode={art === 'matrix' ? 'text' : 'email'}
+                placeholder={art === 'matrix' ? '#lageraum:beispiel.de' : 'leitstelle@beispiel.de'}
+                maxLength={art === 'matrix' ? MATRIX_MAX : ADRESSE_MAX}
                 value={adresse}
                 onChange={(e) => {
                   setAdresse(e.target.value);

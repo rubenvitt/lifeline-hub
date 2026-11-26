@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError, apiGet, apiSend } from './client';
 import { einsatzKeys } from './queryKeys';
-import type { AusgangFehler, QuelleArt, SendenAnfrage, Versand } from './types';
+import type { AusgangFehler, KanalArt, QuelleArt, SendenAnfrage, Versand } from './types';
 
 /**
- * Ausgang per E-Mail (LLH-2093): Versand eines freigegebenen Lageberichts, Befehls oder einer
+ * Ausgang per E-Mail und Matrix (LLH-2093, LLH-2094): Versand eines freigegebenen Lageberichts, Befehls oder einer
  * Nachforderung. Die Routen hängen am Dokument, die Liste und das Wiederholen am Einsatz.
  */
 
@@ -19,34 +19,81 @@ export interface QuelleFilter {
   id: number;
 }
 
-/** Wortlaut je `AusgangFehler` (Code in `Versand.error` und im `grund` einer 422-Antwort). */
-export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
-  voruebergehend: 'Mailserver vorübergehend nicht erreichbar',
-  abgelehnt: 'Vom Mailserver abgelehnt',
-  ungewiss: 'Zustellung unklar',
-  ueberholt: 'Neuere Fassung freigegeben',
-  anbindung_fehlt: 'Kein Mailserver eingerichtet',
-  anbindung_angehalten: 'Mailanbindung angehalten',
-  anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
-  zu_gross: 'Anhänge zu groß für eine Mail',
-  spiegel: 'Einsatz wird von einer anderen Instanz geführt',
-  kein_zutritt: 'Kein Zutritt zum Raum',
-  verschluesselung: 'Verschlüsseln nicht möglich',
+/** Kanäle, die der Ausgang heute bedient (Wire-Enum `KanalArt` kennt mehr). */
+export type AusgangKanal = 'email' | 'matrix';
+
+/** Ein Kanal der Wire-Art: alles außer Matrix spricht mit dem Wortlaut der E-Mail. */
+export function ausgangKanal(kanal: KanalArt | null | undefined): AusgangKanal {
+  return kanal === 'matrix' ? 'matrix' : 'email';
+}
+
+/**
+ * Wortlaut je `AusgangFehler` und Kanal (Code in `Versand.error` und im `grund` einer
+ * 422-Antwort). Die `anbindung_*`-Texte der Matrix entsprechen den Meldungen des Servers
+ * (`src/routes/ausgang.rs`, `meldung_anbindung`).
+ */
+export const AUSGANG_FEHLER_TEXT: Record<AusgangKanal, Record<AusgangFehler, string>> = {
+  email: {
+    voruebergehend: 'Mailserver vorübergehend nicht erreichbar',
+    abgelehnt: 'Vom Mailserver abgelehnt',
+    ungewiss: 'Zustellung unklar',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Mailserver eingerichtet',
+    anbindung_angehalten: 'Mailanbindung angehalten',
+    anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
+    zu_gross: 'Anhänge zu groß für eine Mail',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
+  matrix: {
+    voruebergehend: 'Matrix-Server vorübergehend nicht erreichbar',
+    abgelehnt: 'Vom Matrix-Server abgelehnt',
+    ungewiss: 'Zustellung unklar',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Matrix-Konto eingerichtet',
+    anbindung_angehalten: 'Das Matrix-Konto ist angehalten',
+    anbindung_fehler: 'Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen',
+    zu_gross: 'Anhänge zu groß für den Matrix-Server',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
 };
 
 /** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */
-export function ausgangFehlerText(code: string | null | undefined): string | null {
+export function ausgangFehlerText(
+  code: string | null | undefined,
+  kanal: AusgangKanal,
+): string | null {
   if (!code) return null;
-  return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
+  return (AUSGANG_FEHLER_TEXT[kanal] as Record<string, string>)[code] ?? code;
+}
+
+/** Gründe, die auf ein fehlendes, angehaltenes oder gestörtes Konto des Kanals deuten. */
+export const ANBINDUNG_GRUENDE: ReadonlySet<string> = new Set([
+  'anbindung_fehlt',
+  'anbindung_angehalten',
+  'anbindung_fehler',
+]);
+
+/**
+ * Der Kanal, auf den sich eine 422 mit `anbindung_*` bezieht. Der Server nennt ihn nur im
+ * Meldungstext („Kein Matrix-Konto eingerichtet“); ohne Hinweis darauf gilt die E-Mail.
+ */
+export function anbindungKanal(fehler: unknown): AusgangKanal {
+  return fehler instanceof ApiError && /Matrix/.test(fehler.message) ? 'matrix' : 'email';
 }
 
 /**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
- * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist.
+ * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist. Der Kanal
+ * folgt dem Servertext bei `anbindung_*`, sonst gilt der Wortlaut der E-Mail.
  */
 export function versandFehler(fehler: unknown): unknown {
-  if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT) {
-    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[fehler.grund as AusgangFehler], {
+  if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT.email) {
+    const kanal = ANBINDUNG_GRUENDE.has(fehler.grund) ? anbindungKanal(fehler) : 'email';
+    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[kanal][fehler.grund as AusgangFehler], {
       grund: fehler.grund,
       vomAnwendungsserver: fehler.vomAnwendungsserver,
     });

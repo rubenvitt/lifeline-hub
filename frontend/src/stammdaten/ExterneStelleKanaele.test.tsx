@@ -63,6 +63,40 @@ describe('ExterneStelle Kanaladressen', () => {
     expect(screen.getByText('leitstelle@example.org')).toBeInTheDocument();
   });
 
+  it('bietet_bei_neuer_adresse_email_und_matrix_raum_an', async () => {
+    const liste: unknown[] = [];
+    const bodies: unknown[] = [];
+    server.use(
+      kanaeleHandler(liste),
+      http.post('/api/external-agencies/4/channels', async ({ request }) => {
+        const body = await request.json();
+        bodies.push(body);
+        const neu = { id: 20 + bodies.length, externe_stelle_id: 4, ...(body as object) };
+        liste.push(neu);
+        return HttpResponse.json(neu, { status: 201 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<ExterneStelleFormModal offen stelle={ils} onClose={() => {}} />);
+
+    await nutzer.click(await screen.findByRole('radio', { name: 'Matrix' }));
+    // Eine Mailadresse ist als Matrix-Raum ungültig, ohne Request.
+    await nutzer.type(screen.getByLabelText('Matrix-Raum'), 'ils@example.org');
+    await nutzer.click(screen.getByRole('button', { name: 'Adresse hinzufügen' }));
+    expect(await screen.findByText('Matrix-Raum ungültig')).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+
+    await nutzer.clear(screen.getByLabelText('Matrix-Raum'));
+    await nutzer.type(screen.getByLabelText('Matrix-Raum'), '#lageraum:example.org');
+    await nutzer.click(screen.getByRole('button', { name: 'Adresse hinzufügen' }));
+    await waitFor(() =>
+      expect(bodies).toEqual([{ channel: 'matrix', address: '#lageraum:example.org' }]),
+    );
+    // Die Liste nennt den Kanal vor der Adresse.
+    const eintrag = (await screen.findByText('#lageraum:example.org')).closest('li');
+    expect(eintrag).toHaveTextContent('Matrix');
+  });
+
   it('meldet „Mailadresse ungültig“ ohne Request', async () => {
     let gepostet = false;
     server.use(
@@ -95,7 +129,7 @@ describe('ExterneStelle Kanaladressen', () => {
     renderMitProviders(<ExterneStelleFormModal offen stelle={ils} onClose={() => {}} />);
 
     await nutzer.click(
-      await screen.findByRole('button', { name: 'Mailadresse leitstelle@example.org entfernen' }),
+      await screen.findByRole('button', { name: 'Adresse leitstelle@example.org entfernen' }),
     );
     await waitFor(() => expect(geloescht).toBe('/api/external-agencies/4/channels/11'));
   });

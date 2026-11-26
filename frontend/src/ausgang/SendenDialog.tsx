@@ -1,24 +1,30 @@
 import { Alert, Checkbox, Form, Skeleton, Typography, theme } from 'antd';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { adminSektionPfad, anbindungenPfad } from '../admin/adminPfade';
 import { ApiError } from '../api/client';
 import { useKanaeleSammlung } from '../api/externeStellen';
-import { useSendeVersaende, versandFehler, type QuelleFilter } from '../api/ausgang';
+import {
+  ANBINDUNG_GRUENDE,
+  AUSGANG_FEHLER_TEXT,
+  anbindungKanal,
+  useSendeVersaende,
+  versandFehler,
+  type QuelleFilter,
+} from '../api/ausgang';
+import type { AusgangFehler } from '../api/types';
 import { zahlText } from '../anzeige/zahl';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
-import { Feld, schriftStil } from '../components/instrument';
+import { Feld, Textstufe, schriftStil } from '../components/instrument';
 import { neueClientId } from '../offline/clientId';
 import { useOnline } from '../offline/useOnline';
 import { empfaengerVorschlag } from './empfaengerVorschlag';
+import { kanalKurz } from './kanalAnzeige';
 
 interface FormWerte {
   kanaele: number[];
 }
-
-/** Gründe, die auf eine fehlende oder gestörte Mailanbindung deuten: Admins bekommen den Weg dorthin. */
-const ANBINDUNG_GRUENDE = new Set(['anbindung_fehlt', 'anbindung_angehalten', 'anbindung_fehler']);
 
 const VORSCHAU_ZEILEN = 3;
 
@@ -29,9 +35,11 @@ function groesse(bytes: number): string {
 }
 
 /**
- * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail
- * (LLH-2093, Spec 7): Mailadressen der aktiven Externen Stellen zum Anhaken, die Stellen des
- * Verteilers bzw. der Adressat sind vorbelegt. Nur online; eine Mail wird nie vorgemerkt.
+ * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail oder
+ * Matrix (LLH-2093, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum Anhaken
+ * (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer Adresse
+ * vorbelegt. Fehlt das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein
+ * Versand wird nie vorgemerkt.
  */
 export default function SendenDialog({
   offen,
@@ -61,9 +69,18 @@ export default function SendenDialog({
   const online = useOnline();
   const [form] = Form.useForm<FormWerte>();
   const gewaehlt = Form.useWatch('kanaele', form) as number[] | undefined;
-  const kanaeleQuery = useKanaeleSammlung('email');
+  const kanaeleQuery = useKanaeleSammlung();
   const sende = useSendeVersaende(einsatzId, quelle);
-  const kanaele = kanaeleQuery.data;
+  // Der Server kennt heute E-Mail und Matrix; ein anderer Kanal bleibt aus der Auswahl.
+  const kanaele = useMemo(
+    () =>
+      kanaeleQuery.data?.filter(
+        (k) => k.channel.channel === 'email' || k.channel.channel === 'matrix',
+      ),
+    [kanaeleQuery.data],
+  );
+  /** Grund, warum die Matrix-Adressen gesperrt sind, nachdem der Server das Konto abgelehnt hat. */
+  const [matrixGesperrt, setMatrixGesperrt] = useState<string | null>(null);
 
   // Ein Schlüssel je Öffnen: ein zweiter Versuch derselben Eingabe legt keine zweite Mail an.
   // `offen` ist der Auslöser; der Wert hängt nur an der Öffnung.
@@ -76,6 +93,7 @@ export default function SendenDialog({
   useEffect(() => {
     if (!offen || !kanaele || vorbelegtFuer.current === clientId) return;
     vorbelegtFuer.current = clientId;
+    setMatrixGesperrt(null);
     form.setFieldValue('kanaele', [...empfaengerVorschlag(kanaele, vorschlagNamen)]);
   }, [offen, kanaele, clientId, form, vorschlagNamen]);
 
@@ -83,7 +101,7 @@ export default function SendenDialog({
   const grund = !online
     ? 'Ohne Netz nicht möglich'
     : keineAdresse
-      ? 'Keine Mailadresse hinterlegt'
+      ? 'Keine Adresse hinterlegt'
       : null;
   const gesperrt = grund !== null || kanaele === undefined || (gewaehlt ?? []).length === 0;
 
@@ -92,6 +110,22 @@ export default function SendenDialog({
     sende.error instanceof ApiError &&
     !!sende.error.grund &&
     ANBINDUNG_GRUENDE.has(sende.error.grund);
+
+  /** Eine Ablehnung wegen des Matrix-Kontos sperrt die Matrix-Adressen, nicht den Dialog. */
+  const merkeMatrixSperre = (e: unknown) => {
+    if (
+      e instanceof ApiError &&
+      e.grund &&
+      ANBINDUNG_GRUENDE.has(e.grund) &&
+      anbindungKanal(e) === 'matrix'
+    ) {
+      setMatrixGesperrt(AUSGANG_FEHLER_TEXT.matrix[e.grund as AusgangFehler]);
+      const rest = (form.getFieldValue('kanaele') as number[] | undefined)?.filter(
+        (id) => kanaele?.find((k) => k.channel.id === id)?.channel.channel !== 'matrix',
+      );
+      form.setFieldValue('kanaele', rest ?? []);
+    }
+  };
 
   const vorschau = (vorschauText ?? '')
     .split('\n')
@@ -110,10 +144,15 @@ export default function SendenDialog({
       speicherFehlerTitel="Nicht gesendet"
       speicherFehlerFallback="Senden fehlgeschlagen"
       onErfassen={(w) =>
-        sende.mutateAsync({
-          client_id: clientId,
-          recipients: w.kanaele.map((channel_id) => ({ channel_id })),
-        })
+        sende
+          .mutateAsync({
+            client_id: clientId,
+            recipients: w.kanaele.map((channel_id) => ({ channel_id })),
+          })
+          .catch((e: unknown) => {
+            merkeMatrixSperre(e);
+            throw e;
+          })
       }
       onFertig={onClose}
       onAbbrechen={onClose}
@@ -124,7 +163,7 @@ export default function SendenDialog({
         <Alert
           type="warning"
           showIcon
-          title="Keine Mailadresse hinterlegt"
+          title="Keine Adresse hinterlegt"
           description={
             istAdmin ? (
               <Link to={adminSektionPfad('stammdaten', 'externe-stellen')}>
@@ -137,9 +176,22 @@ export default function SendenDialog({
         <Feld label="An" name="kanaele">
           <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
             {kanaele.map((k) => (
-              <Checkbox key={k.channel.id} value={k.channel.id}>
+              <Checkbox
+                key={k.channel.id}
+                value={k.channel.id}
+                disabled={k.channel.channel === 'matrix' && matrixGesperrt !== null}
+              >
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  {kanalKurz(k.channel.channel)}
+                </Textstufe>{' '}
                 {k.agency_name} · {k.channel.address}
                 {k.channel.label ? ` (${k.channel.label})` : ''}
+                {k.channel.channel === 'matrix' && matrixGesperrt !== null && (
+                  <Typography.Text type="danger" style={schriftStil('textKlein')}>
+                    {' '}
+                    · {matrixGesperrt}
+                  </Typography.Text>
+                )}
               </Checkbox>
             ))}
           </Checkbox.Group>

@@ -80,9 +80,9 @@ describe('ExterneStellenTab', () => {
     expect(screen.getByText('Inaktiv')).toBeInTheDocument();
   });
 
-  it('nennt an der Stelle, wie viele Mailadressen sie hat', async () => {
-    const adresse = (id: number, stelle: number, a: string) => ({
-      channel: { id, externe_stelle_id: stelle, channel: 'email', address: a },
+  it('nennt an der Stelle, wie viele Adressen je Kanal sie hat', async () => {
+    const adresse = (id: number, stelle: number, a: string, art = 'email') => ({
+      channel: { id, externe_stelle_id: stelle, channel: art, address: a },
       agency_id: stelle,
       agency_name: 'x',
     });
@@ -92,6 +92,7 @@ describe('ExterneStellenTab', () => {
           adresse(1, 1, 'a@example.org'),
           adresse(2, 1, 'b@example.org'),
           adresse(3, 2, 'c@example.org'),
+          adresse(4, 1, '#lage:example.org', 'matrix'),
         ]),
       ),
     );
@@ -99,8 +100,8 @@ describe('ExterneStellenTab', () => {
     await screen.findByText('Polizei Musterstadt');
     await waitFor(() =>
       expect(bezeichnungen(container)).toEqual([
-        'ILS Musterkreis zuständig 2 Mailadressen',
-        'Polizei Musterstadt 1 Mailadresse',
+        'ILS Musterkreis zuständig 2 Mail, 1 Matrix',
+        'Polizei Musterstadt 1 Mail',
         'Ordnungsamt',
       ]),
     );

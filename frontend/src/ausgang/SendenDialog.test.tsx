@@ -7,10 +7,16 @@ import { renderMitProviders, setzeOnline } from '../test/utils';
 import type { KanalMitStelle } from '../api/types';
 import SendenDialog from './SendenDialog';
 
-const kanal = (id: number, stelle: string, adresse: string): KanalMitStelle => ({
-  agency_id: id,
+const kanal = (
+  id: number,
+  stelle: string,
+  adresse: string,
+  art: 'email' | 'matrix' = 'email',
+  stelleId = id,
+): KanalMitStelle => ({
+  agency_id: stelleId,
   agency_name: stelle,
-  channel: { id, externe_stelle_id: id, channel: 'email', address: adresse },
+  channel: { id, externe_stelle_id: stelleId, channel: art, address: adresse },
 });
 
 const KANAELE = [kanal(11, 'ILS Nord', 'ils@example.org'), kanal(12, 'THW OV', 'thw@example.org')];
@@ -70,10 +76,10 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(await screen.findByText('Kein Mailserver eingerichtet')).toBeInTheDocument();
   });
 
-  it('sperrt ohne Mailadresse mit sichtbarem Grund', async () => {
+  it('sperrt ohne Adresse mit sichtbarem Grund', async () => {
     kanaele([]);
     zeige();
-    expect(await screen.findByText('Keine Mailadresse hinterlegt')).toBeInTheDocument();
+    expect(await screen.findByText('Keine Adresse hinterlegt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
   });
 
@@ -99,5 +105,55 @@ describe('SendenDialog (LLH-2093)', () => {
     zeige({ vorschlagNamen: [] });
     await screen.findByRole('checkbox', { name: /ILS Nord/ });
     expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
+  });
+
+  it('sammlung_zeigt_kanal_zeichen_je_adresse', async () => {
+    let abgerufen = '';
+    server.use(
+      http.get('/api/external-agencies/channels', ({ request }) => {
+        abgerufen = new URL(request.url).search;
+        return HttpResponse.json([
+          kanal(21, 'ILS Nord', 'ils@example.org'),
+          kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix'),
+        ]);
+      }),
+    );
+    zeige({ vorschlagNamen: [] });
+    const mail = await screen.findByRole('checkbox', { name: /ils@example\.org/ });
+    const matrix = screen.getByRole('checkbox', { name: /#lageraum:example\.org/ });
+    // Kanal als kleines Wort vor der Adresse, Sammlung ohne Filter.
+    expect(mail.closest('label')).toHaveTextContent(/^Mail\s*ILS Nord/);
+    expect(matrix.closest('label')).toHaveTextContent(/^Matrix\s*ILS Nord/);
+    expect(abgerufen).toBe('');
+  });
+
+  it('sperrt_nur_matrix_adressen_wenn_kein_matrix_konto', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Matrix-Konto eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    // Vorbelegt: je Stelle eine Adresse, Matrix vor Mail.
+    await waitFor(() => expect(matrix).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText(/Kein Matrix-Konto eingerichtet/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
+    // Nur die Matrix-Adresse ist gesperrt und abgewählt; die Mailadresse bleibt wählbar.
+    await waitFor(() => expect(matrix).toBeDisabled());
+    expect(matrix).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeEnabled();
   });
 });

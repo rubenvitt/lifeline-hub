@@ -6,16 +6,27 @@ function norm(name: string): string {
 }
 
 /**
- * Vorbelegung des Senden-Dialogs (LLH-2093, Spec 7): die Kanaladressen der Stellen, deren
- * Bezeichnung einem Namen aus dem Verteiler bzw. dem Adressaten gleicht. Ganze Namen, kein
- * Teilvergleich: „Nord“ trifft nicht „Leitstelle Nord“. Liefert die `id`s der Adressen.
+ * Vorbelegung des Senden-Dialogs (LLH-2093, LLH-2094, Spec 8): je Stelle, deren Bezeichnung einem
+ * Namen aus dem Verteiler bzw. dem Adressaten gleicht, genau eine Adresse: die erste
+ * Matrix-Adresse, sonst die erste Mailadresse. Ganze Namen, kein Teilvergleich: „Nord“ trifft
+ * nicht „Leitstelle Nord“. Ein Bericht soll bei derselben Stelle nicht doppelt landen. Liefert
+ * die `id`s der Adressen.
  */
 export function empfaengerVorschlag(
   kanaele: readonly KanalMitStelle[],
   namen: readonly string[],
 ): Set<number> {
   const gesucht = new Set(namen.map(norm).filter((n) => n !== ''));
-  return new Set(kanaele.filter((k) => gesucht.has(norm(k.agency_name))).map((k) => k.channel.id));
+  const jeStelle = new Map<number, KanalMitStelle>();
+  for (const k of kanaele) {
+    if (!gesucht.has(norm(k.agency_name))) continue;
+    const bisher = jeStelle.get(k.agency_id);
+    // Matrix verdrängt eine Mail; sonst bleibt die erste.
+    if (!bisher || (bisher.channel.channel !== 'matrix' && k.channel.channel === 'matrix')) {
+      jeStelle.set(k.agency_id, k);
+    }
+  }
+  return new Set([...jeStelle.values()].map((k) => k.channel.id));
 }
 
 /** Namen der externen Einträge eines Verteilers (`extern_bezeichnung`), für die Vorbelegung. */

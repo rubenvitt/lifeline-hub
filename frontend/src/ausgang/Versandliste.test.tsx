@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { server } from '../test/server';
 import { renderMitProviders, setzeOnline } from '../test/utils';
 import type { Versand } from '../api/types';
+import { ausgangFehlerText } from '../api/ausgang';
 import Versandliste from './Versandliste';
 
 const versand = (over: Partial<Versand>): Versand => ({
@@ -85,5 +86,48 @@ describe('Versandliste (LLH-2093)', () => {
     renderMitProviders(<Versandliste einsatzId={1} quelle={quelle} darfSchreiben={false} />);
     await screen.findByText(/fehlgeschlagen/);
     expect(screen.queryByRole('button', { name: 'Erneut senden' })).toBeNull();
+  });
+
+  it('versandliste_zeigt_raum_und_kanal', async () => {
+    liste([
+      versand({ id: 'm1', channel: 'matrix', address: '#lageraum:example.org', state: 'wartet' }),
+      versand({
+        id: 'm2',
+        channel: 'matrix',
+        address: '!abcdefghijklmnop:example.org',
+        state: 'fehlgeschlagen',
+        error: 'kein_zutritt',
+      }),
+      versand({ id: 'e1', state: 'wartet' }),
+    ]);
+    renderMitProviders(<Versandliste einsatzId={1} quelle={quelle} />);
+
+    const alias = (await screen.findByText(/#lageraum:example\.org/)).closest('li');
+    expect(alias).toHaveTextContent('Matrix');
+    // Ohne Alias steht die Raum-ID gekürzt da.
+    const raum = screen.getByText(/!abcdefgh…:example\.org/).closest('li');
+    expect(raum).toHaveTextContent('Matrix');
+    expect(raum).toHaveTextContent('fehlgeschlagen: Kein Zutritt zum Raum');
+    expect(screen.queryByText(/abcdefghijklmnop/)).toBeNull();
+    expect(screen.getByText(/ils@example\.org/).closest('li')).toHaveTextContent('Mail');
+  });
+
+  it('fehlertext_haengt_vom_kanal_ab', () => {
+    expect(ausgangFehlerText('voruebergehend', 'email')).toBe(
+      'Mailserver vorübergehend nicht erreichbar',
+    );
+    expect(ausgangFehlerText('voruebergehend', 'matrix')).toBe(
+      'Matrix-Server vorübergehend nicht erreichbar',
+    );
+    expect(ausgangFehlerText('anbindung_fehlt', 'matrix')).toBe('Kein Matrix-Konto eingerichtet');
+    expect(ausgangFehlerText('anbindung_angehalten', 'matrix')).toBe(
+      'Das Matrix-Konto ist angehalten',
+    );
+    expect(ausgangFehlerText('anbindung_fehler', 'matrix')).toBe(
+      'Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen',
+    );
+    expect(ausgangFehlerText('kein_zutritt', 'matrix')).toBe('Kein Zutritt zum Raum');
+    expect(ausgangFehlerText('verschluesselung', 'matrix')).toBe('Verschlüsseln nicht möglich');
+    expect(ausgangFehlerText(null, 'matrix')).toBeNull();
   });
 });

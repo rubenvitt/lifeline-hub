@@ -47,12 +47,22 @@ export default function ExterneStellenTab() {
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
-  // Mailadressen je Stelle für den Hinweis in der Liste (LLH-2093); nur aktive Stellen.
-  const kanaeleQuery = useKanaeleSammlung('email');
+  // Adressen je Stelle und Kanal für den Hinweis in der Liste (LLH-2093, LLH-2094); nur aktive Stellen.
+  const kanaeleQuery = useKanaeleSammlung();
   const mailAnzahl = new Map<number, number>();
+  const matrixAnzahl = new Map<number, number>();
   for (const k of kanaeleQuery.data ?? []) {
-    mailAnzahl.set(k.agency_id, (mailAnzahl.get(k.agency_id) ?? 0) + 1);
+    const zaehler = k.channel.channel === 'matrix' ? matrixAnzahl : mailAnzahl;
+    zaehler.set(k.agency_id, (zaehler.get(k.agency_id) ?? 0) + 1);
   }
+  /** „2 Mail, 1 Matrix“; leer, wenn die Stelle keine Adresse hat. */
+  const adressenText = (id: number) =>
+    [
+      mailAnzahl.has(id) ? `${mailAnzahl.get(id)} Mail` : null,
+      matrixAnzahl.has(id) ? `${matrixAnzahl.get(id)} Matrix` : null,
+    ]
+      .filter((t) => t !== null)
+      .join(', ');
   // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
   const zustaendigVomHub = (stellenQuery.data ?? []).some(
     (s) => s.zustaendig && herkunft.istVomHub('externe_stelle', s.id),
@@ -113,13 +123,11 @@ export default function ExterneStellenTab() {
               <Status groesse="klein" ton="normal" wort="zuständig" />
             </>
           )}
-          {(mailAnzahl.get(s.id) ?? 0) > 0 && (
+          {adressenText(s.id) !== '' && (
             <>
               {' '}
               <Textstufe stufe="textKlein" ton="gedaempft">
-                {mailAnzahl.get(s.id) === 1
-                  ? '1 Mailadresse'
-                  : `${mailAnzahl.get(s.id)} Mailadressen`}
+                {adressenText(s.id)}
               </Textstufe>
             </>
           )}

@@ -2,6 +2,7 @@ import { Button, Typography, theme } from 'antd';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import {
   ausgangFehlerText,
+  ausgangKanal,
   useVersaende,
   useWiederholeVersand,
   type QuelleFilter,
@@ -10,19 +11,21 @@ import type { Versand } from '../api/types';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
 import { schriftStil } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
+import { adresseAnzeige, kanalKurz } from './kanalAnzeige';
 
 /** Zustandstext eines Versands (Spec 7): „wartet“, „übergeben 14:32“, „fehlgeschlagen: …“. */
 export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) => string): string {
   if (v.state === 'wartet') return 'wartet';
   if (v.state === 'uebergeben') return `übergeben ${uhrzeit(v.handed_over_at)}`.trim();
   // Unklar ist kein Fehlschlag mit Grund, sondern eine offene Frage: der Wortlaut steht allein.
-  if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss') as string;
-  const grund = ausgangFehlerText(v.error);
+  const kanal = ausgangKanal(v.channel);
+  if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss', kanal) as string;
+  const grund = ausgangFehlerText(v.error, kanal);
   return grund ? `fehlgeschlagen: ${grund}` : 'fehlgeschlagen';
 }
 
 /**
- * Versandliste einer Quelle (LLH-2093): je Versand Stelle, Adresse, Zeit und Zustand, bei
+ * Versandliste einer Quelle (LLH-2093): je Versand Kanal, Stelle, Adresse (Matrix: der Raum), Zeit und Zustand, bei
  * `fehlgeschlagen` „Erneut senden“. Ohne Versand steht nichts da. Live über `ausgang`.
  */
 export default function Versandliste({
@@ -58,7 +61,14 @@ export default function Versandliste({
               style={{ paddingBlock: token.paddingXXS }}
             >
               <span style={{ ...schriftStil('text'), overflowWrap: 'anywhere' }}>
-                {v.agency_name} · {v.address}
+                <Typography.Text
+                  type="secondary"
+                  data-kanal={v.channel}
+                  style={schriftStil('textKlein')}
+                >
+                  {kanalKurz(v.channel)}
+                </Typography.Text>{' '}
+                {v.agency_name} · {adresseAnzeige(v.channel, v.address)}
               </span>{' '}
               <Typography.Text
                 type={fehlgeschlagen ? 'danger' : 'secondary'}

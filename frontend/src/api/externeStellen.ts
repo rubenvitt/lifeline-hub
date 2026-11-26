@@ -43,7 +43,8 @@ export function updateExterneStelle(id: number, patch: ExterneStellePatch): Prom
 // ---- Kanaladressen (LLH-2093) ----
 
 export interface NeuerKanal {
-  channel: 'email';
+  /** Der Server nimmt `email` und `matrix` an (LLH-2094); Fax und Threema sind noch zu. */
+  channel: 'email' | 'matrix';
   address: string;
   label?: string;
 }
@@ -52,9 +53,11 @@ export function fetchExterneStelleKanaele(stelleId: number): Promise<ExterneStel
   return apiGet<ExterneStelleKanal[]>(`/api/external-agencies/${stelleId}/channels`);
 }
 
-/** Alle Adressen eines Kanals der aktiven Stellen der Organisation. */
-export function fetchKanaeleSammlung(kanal: 'email'): Promise<KanalMitStelle[]> {
-  return apiGet<KanalMitStelle[]>(`/api/external-agencies/channels?channel=${kanal}`);
+/** Alle Adressen der aktiven Stellen der Organisation, ohne `kanal` aller Kanäle. */
+export function fetchKanaeleSammlung(kanal?: 'email' | 'matrix'): Promise<KanalMitStelle[]> {
+  return apiGet<KanalMitStelle[]>(
+    kanal ? `/api/external-agencies/channels?channel=${kanal}` : '/api/external-agencies/channels',
+  );
 }
 
 export function createKanal(stelleId: number, daten: NeuerKanal): Promise<ExterneStelleKanal> {
@@ -80,10 +83,10 @@ export function useExterneStelleKanaele(stelleId: number | undefined) {
   });
 }
 
-/** Alle Mailadressen der aktiven Stellen (Zählhinweis der Liste, Auswahl beim Senden). */
-export function useKanaeleSammlung(kanal: 'email') {
+/** Alle Adressen der aktiven Stellen (Zählhinweis der Liste, Auswahl beim Senden). */
+export function useKanaeleSammlung(kanal?: 'email' | 'matrix') {
   return useQuery({
-    queryKey: globalKeys.externeStellenKanaeleSammlung(kanal),
+    queryKey: globalKeys.externeStellenKanaeleSammlung(kanal ?? 'alle'),
     queryFn: () => fetchKanaeleSammlung(kanal),
   });
 }
