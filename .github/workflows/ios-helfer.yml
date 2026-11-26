@@ -100,6 +100,17 @@ jobs:
               puts "#{name}: HTTP #{antwort.code}#{anzahl} #{codes}"
             end
           ' || echo "Vorprüfung selbst fehlgeschlagen (kein Abbruch)."
+      # Entwicklungszertifikate aufräumen (LLH-2149): Xcode legt beim Archivieren auf jedem frischen
+      # Runner ein neues an; ohne Aufräumen scheitert der Lauf an Apples Höchstzahl. Vorher die
+      # älter als 2 h widerrufen, nachher das im Lauf angelegte. Bricht nicht ab: das Archivieren
+      # entscheidet. Ablauf in scripts/ios/entwicklungszertifikate.mjs.
+      - name: Entwicklungszertifikate vorher widerrufen
+        continue-on-error: true
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: node scripts/ios/entwicklungszertifikate.mjs vorher --merke "$RUNNER_TEMP/entwicklungszertifikate.json"
       - name: Archivieren, signieren, hochladen
         env:
           LAUFNUMMER: ${{ github.run_number }}
@@ -109,6 +120,14 @@ jobs:
         run: |
           ./scripts/ios/testflight.sh --app helfer --build "$((LAUFNUMMER + 1000))" \
             --ausgabe "$RUNNER_TEMP/testflight"
+      - name: Entwicklungszertifikate nachher widerrufen
+        if: ${{ always() }}
+        continue-on-error: true
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_P8: ${{ secrets.APP_STORE_CONNECT_KEY_P8 }}
+        run: node scripts/ios/entwicklungszertifikate.mjs nachher --merke "$RUNNER_TEMP/entwicklungszertifikate.json"
       # Zur Diagnose nur bei Rot: die Protokolle des Exports (ohne Schlüssel, der liegt nie in der
       # Ausgabe).
       - name: Export-Protokolle
