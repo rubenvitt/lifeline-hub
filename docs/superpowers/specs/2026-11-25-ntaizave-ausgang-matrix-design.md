@@ -270,12 +270,13 @@ Verworfen:
 
 ### 9. Regel, Entscheidung, Doku
 
-- **ADR-0104** bekommt einen Nachtrag: Der Ausgangskorb ist kanalneutral; Matrix mit E2EE;
-  Speicherverzeichnis je Anbindung außerhalb der Hub-Datenbank und außerhalb der Sicherung.
-  *Berichtigt 26.11.2026:* Eine akzeptierte ADR ist unveränderlich (`docs/architektur/AGENTS.md`,
-  „Entscheidungen“); der Nachtrag ist deshalb eine eigene ADR, die ADR-0104 präzisiert (Muster
-  ADR-0098 zu ADR-0077), ebenso der Nachtrag zu ADR-0002 (`rusqlite` nur transitiv über
-  `vendor/matrix-sdk-sqlite` für den Speicher des SDK).
+- **ADR-0107** (neu, präzisiert ADR-0104 und ADR-0105): Der Ausgangskorb ist kanalneutral;
+  Matrix mit E2EE; Speicherverzeichnis je Anbindung außerhalb der Hub-Datenbank und außerhalb der
+  Sicherung. **ADR-0108** (neu, Nachtrag zu ADR-0002): `rusqlite` nur transitiv über
+  `vendor/matrix-sdk-sqlite` für den Speicher des SDK. Beide stehen auf `vorgeschlagen`, bis der
+  Mensch sie akzeptiert. Eine akzeptierte ADR ist unveränderlich (`docs/architektur/AGENTS.md`,
+  „Entscheidungen“); ADR-0104 und ADR-0002 bleiben deshalb unberührt (Muster ADR-0098 zu
+  ADR-0077).
 - **`src/AGENTS.md`, „Ausgang an Menschen“:** kanalneutraler Zusteller; je Kanal genau eine
   Anbindung je Org; Matrix-Client nur über `adapter::matrix` mit unserem reqwest-Client; nie
   Klartext in einen verschlüsselten Raum; Speicherverzeichnis nie in Sicherung und nie

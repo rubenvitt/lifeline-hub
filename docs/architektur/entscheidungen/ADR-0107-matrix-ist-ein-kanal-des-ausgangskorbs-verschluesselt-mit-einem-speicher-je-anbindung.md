@@ -1,7 +1,7 @@
 ---
 id: ADR-0107
 titel: Matrix ist ein Kanal des Ausgangskorbs, verschlüsselt über matrix-sdk, mit einem Schlüsselspeicher je Anbindung außerhalb der Sicherung
-status: akzeptiert
+status: vorgeschlagen
 datum: 2026-11-26
 gilt_fuer:
   - src/adapter/matrix.rs
@@ -55,6 +55,7 @@ verlange 'KanalArt::Matrix => self\.matrix\.zustellen' src/ausgang/zusteller.rs
 verbiete 'matrix_sdk::Client::builder' 'src/**/*.rs' ':(exclude)src/adapter/matrix.rs'
 verbiete 'fn http_im_lan' src/adapter/matrix_art.rs
 verbiete 'matrix' 'src/backup/**/*.rs'
+verbiete 'ohne_zielschutz_fuer_tests' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclude)src/adapter/matrix.rs'
 ```
 
 ## Kontext
