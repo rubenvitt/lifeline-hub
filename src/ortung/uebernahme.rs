@@ -146,7 +146,7 @@ async fn apply_position_gedrosselt_tx(
 /// Position über den Hub (LLH-2119): wie [`apply_position_tx`], nur dass die Position aus der
 /// Antwort des Hubs kommt statt aus `position_letzte` und die Kopplung an einem Zugang des Hubs
 /// hängt (`fremder_zugang_id`). `org_id` ist die Org, unter deren Kennung die Position kam; nur
-/// Kopplungszeilen dieser Org werden getroffen (ADR-0106, ADR-0039). Die Drossel gilt; ein
+/// Kopplungszeilen dieser Org werden getroffen (ADR-0107, ADR-0039). Die Drossel gilt; ein
 /// Nachlauf wird **nicht** vorgemerkt: der nächste Abgleich bringt die jüngste Position ohnehin
 /// (Entwurf, „Übernahme am ELW“). Gehört in eine Schreibtransaktion des Aufrufers.
 #[allow(clippy::too_many_arguments)]

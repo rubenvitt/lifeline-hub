@@ -61,7 +61,7 @@ Spiegel ans ELW.
 - **ADR-0103** (akzeptiert, unveränderlich) gilt weiter: Geschrieben wird nur an einem aktiven
   Fahrzeug eines aktiven, nicht gespiegelten Einsatzes, über `schreibe_position` mit Quelle
   `einwurf`. Am ELW ist der Einsatz nicht gespiegelt. Die Erweiterung steht in einer **neuen,
-  ergänzenden ADR-0106** (nächste freie Nummer auf `alpha`, vor dem Commit prüfen).
+  ergänzenden ADR-0107** (nächste freie Nummer auf `alpha`, vor dem Commit prüfen).
 - **Org-Schalter** `ortung_im_einsatz` reist schon mit den Stammdaten vom Hub ans ELW
   (`src/instanz/stammdaten/art.rs`). Beide Seiten prüfen ihn.
 - **Führungswechsel:** `fuehrung::werde_spiegel` beendet schon die Helfer-Kopplungen, bevor der
@@ -155,7 +155,7 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
   findet und die Position aus dem Paket statt aus `position_letzte` nimmt.
 - Die Drossel von 15 s gilt unverändert. Einen Nachlauf gibt es auf diesem Weg **nicht**: Der
   Nachlauf liest `position_letzte`, und die liegt am Hub. Der nächste Abgleich liefert dieselbe
-  oder eine jüngere Position ohnehin erneut. ADR-0106 nennt diese Ausnahme ausdrücklich, weil
+  oder eine jüngere Position ohnehin erneut. ADR-0107 nennt diese Ausnahme ausdrücklich, weil
   ADR-0103 „genau einen Nachlauf“ verlangt.
 - Nach dem Commit `ortung::publiziere`. Der Spiegel am Hub bekommt die Position über die
   bestehenden Trigger.
@@ -248,7 +248,7 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
 
 ### Doku
 
-- **ADR-0106** „Der Hub liefert eingeworfene Positionen nur für Kennungen, die das führende ELW
+- **ADR-0107** „Der Hub liefert eingeworfene Positionen nur für Kennungen, die das führende ELW
   gekoppelt hat“ (ergänzt ADR-0103, kein `ersetzt`). Regeln:
   - nur im Abgleich, nur auf Anfrage, nur abgebildete Org, nur gültiger Zugang mit
     `positionen:write`, nur bei eingeschaltetem Schalter;
@@ -303,7 +303,7 @@ scheitern lassen: Er wird als Sammelzeile gezählt und das Feld bleibt leer.
 Ein Gegenleser hat den Entwurf als Bauender gelesen. Ruben hat entschieden, dass die Führungsabgabe
 still trennt. Beim Entwurf festgelegt und oben eingetragen sind:
 
-- kein Nachlauf auf dem Hub-Weg, als Ausnahme in ADR-0106;
+- kein Nachlauf auf dem Hub-Weg, als Ausnahme in ADR-0107;
 - der Hub liest außerhalb der Abgleichstransaktion;
 - Rückgängig ohne Pufferprüfung;
 - Umbau von `SELECT_KOPPLUNG` und `run_nachlauf`.

@@ -645,7 +645,7 @@ sequenceDiagram
 
 Gespiegelte Einsätze liefern die Position nicht über den Einwurf: Ein an einen Hub gekoppeltes ELW
 nimmt keinen Einwurf an, die Geräte melden an den Hub. Führt das ELW den Einsatz, holt es die
-Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0106](entscheidungen/ADR-0106-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
+Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0107](entscheidungen/ADR-0107-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
 Design-Doc [`2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`](../superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md)).
 
 ```mermaid
