@@ -766,3 +766,81 @@ async fn zweites_verwerfen_waehrend_des_raeumens_raeumt_vor_dem_oeffnen() {
         .expect("der benutzte Speicher bleibt");
     assert_eq!(befund.device_id, "BOT2");
 }
+
+/// Das Setzen des Anzeigenamens nach der Prüfung bleibt in deren Frist: wartet es auf einen
+/// langen Versand, endet „Verbindung prüfen“ trotzdem vor dem Zeitbudget eines Requests.
+#[tokio::test]
+async fn anzeigename_bleibt_in_der_frist_der_pruefung() {
+    let server = MatrixMockServer::new().await;
+    server.mock_crypto_endpoints_preset().await;
+    let vorlage = server
+        .client_builder_for_crypto_end_to_end(user_id!("@lifeline:example.org"), device_id!("X"))
+        .build()
+        .await;
+    let token = vorlage.access_token().expect("Token des Mock-Clients");
+    drop(vorlage);
+    // `whoami` antwortet langsam: in diesem Fenster hält die Prüfung den Client, und ein Versand
+    // stellt sich hinter ihr an.
+    Mock::given(method("GET"))
+        .and(path("/_matrix/client/v3/account/whoami"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({ "user_id": BOT, "device_id": "BOT1" }))
+                .set_delay(Duration::from_millis(300)),
+        )
+        .mount(server.server())
+        .await;
+    server.mock_versions().ok().mount().await;
+    server.mock_sync().ok(|_| {}).mount().await;
+
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let art = Arc::new(MatrixArt::new(clients.clone()));
+    let pruefung = {
+        let art = art.clone();
+        let uri = server.uri();
+        let token = token.clone();
+        tokio::spawn(async move {
+            let mut einstellungen = Map::new();
+            einstellungen.insert("homeserver".into(), Value::from(uri));
+            einstellungen.insert("anzeigename".into(), Value::from("Lifeline Hub"));
+            let geheimnisse: HashMap<String, SecretString> = [
+                ("access_token", token.as_str()),
+                ("speicher_passphrase", "passphrase-des-speichers"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), SecretString::from(v.to_string())))
+            .collect();
+            let kontext = AbrufKontext::new("a1", 1, &einstellungen, &geheimnisse, false, false);
+            let begonnen = tokio::time::Instant::now();
+            let ergebnis = art.abrufen(&kontext).await.map(|u| u.anzahl());
+            (ergebnis, begonnen.elapsed())
+        })
+    };
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let (los_tx, los_rx) = tokio::sync::oneshot::channel::<()>();
+    let langer = {
+        let clients = clients.clone();
+        let ziel = ziel(&server, &token, "a1");
+        tokio::spawn(async move {
+            clients
+                .mit_client(&ziel, move |_client| {
+                    Box::pin(async move {
+                        los_tx.send(()).unwrap();
+                        tokio::time::sleep(Duration::from_secs(600)).await;
+                    })
+                })
+                .await
+        })
+    };
+    // Der Versand hat den Client nach der Prüfung; ab hier läuft die Uhr nur virtuell.
+    los_rx.await.unwrap();
+    tokio::time::pause();
+    let (ergebnis, dauer) = pruefung.await.unwrap();
+    assert_eq!(ergebnis, Ok(0), "der Name ist kein Fehler der Anbindung");
+    assert!(
+        dauer < matrix::PRUEF_ZEITLIMIT + Duration::from_secs(1),
+        "{dauer:?}"
+    );
+    langer.abort();
+}

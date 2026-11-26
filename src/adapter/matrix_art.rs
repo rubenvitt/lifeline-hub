@@ -98,8 +98,8 @@ pub fn matrix_ziel(
     })
 }
 
-/// Setzt den Anzeigenamen des Bots, wenn er abweicht. Scheitert das, bleibt es beim alten Namen:
-/// kein Fehler der Anbindung.
+/// Setzt den Anzeigenamen des Bots, wenn er abweicht. Scheitert das (auch an der Frist der
+/// Prüfung, `abrufen`), bleibt es beim alten Namen: kein Fehler der Anbindung.
 async fn setze_anzeigename(clients: &Clients, ziel: &MatrixZiel, name: &str) {
     // Der Zugriff darf nur den Client borgen; der Name geht als eigene Kopie hinein.
     let name = name.to_string();
@@ -150,10 +150,19 @@ impl AdapterArt for MatrixArt {
                 kontext.geheimnisse(),
                 kontext.lan_erlaubt(),
             )?;
+            // Eine Frist für Prüfung und Anzeigenamen zusammen: „Verbindung prüfen“ bleibt unter
+            // dem Zeitbudget eines Requests, auch wenn der Name auf einen langen Versand wartet.
+            let frist = tokio::time::Instant::now() + matrix::PRUEF_ZEITLIMIT;
             match matrix::pruefe(&self.clients, &ziel).await {
                 Ok(_) => {
                     if let Some(name) = kontext.einstellung_text("anzeigename") {
-                        setze_anzeigename(&self.clients, &ziel, name).await;
+                        let setzen = setze_anzeigename(&self.clients, &ziel, name);
+                        if tokio::time::timeout_at(frist, setzen).await.is_err() {
+                            tracing::info!(
+                                adapter = %ziel.adapter_id,
+                                "Matrix: Anzeigename nicht gesetzt, Frist der Prüfung abgelaufen"
+                            );
+                        }
                     }
                     Ok(Box::new(OhneUebernahme(0)) as Box<dyn Uebernahme>)
                 }
