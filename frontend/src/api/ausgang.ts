@@ -78,21 +78,27 @@ export const ANBINDUNG_GRUENDE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Der Kanal, auf den sich eine 422 mit `anbindung_*` bezieht. Der Server nennt ihn nur im
- * Meldungstext („Kein Matrix-Konto eingerichtet“); ohne Hinweis darauf gilt die E-Mail.
+ * Der Kanal, auf den sich eine 422 mit `anbindung_*` bezieht. Er folgt den gesendeten Adressen:
+ * nur Mail → E-Mail, nur Matrix → Matrix. Nur im gemischten Fall (oder ohne Angabe) entscheidet
+ * der Meldungstext des Servers („Kein Matrix-Konto eingerichtet“); der Server prüft E-Mail vor
+ * Matrix, ohne Hinweis auf Matrix gilt dort die E-Mail.
  */
-export function anbindungKanal(fehler: unknown): AusgangKanal {
+export function anbindungKanal(fehler: unknown, gesendet?: readonly KanalArt[]): AusgangKanal {
+  const mail = gesendet?.includes('email') ?? false;
+  const matrix = gesendet?.includes('matrix') ?? false;
+  if (matrix && !mail) return 'matrix';
+  if (mail && !matrix) return 'email';
   return fehler instanceof ApiError && /Matrix/.test(fehler.message) ? 'matrix' : 'email';
 }
 
 /**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
  * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist. Der Kanal
- * folgt dem Servertext bei `anbindung_*`, sonst gilt der Wortlaut der E-Mail.
+ * einer `anbindung_*` folgt den gesendeten Adressen (`anbindungKanal`), sonst gilt die E-Mail.
  */
-export function versandFehler(fehler: unknown): unknown {
+export function versandFehler(fehler: unknown, gesendet?: readonly KanalArt[]): unknown {
   if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT.email) {
-    const kanal = ANBINDUNG_GRUENDE.has(fehler.grund) ? anbindungKanal(fehler) : 'email';
+    const kanal = ANBINDUNG_GRUENDE.has(fehler.grund) ? anbindungKanal(fehler, gesendet) : 'email';
     return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[kanal][fehler.grund as AusgangFehler], {
       grund: fehler.grund,
       vomAnwendungsserver: fehler.vomAnwendungsserver,

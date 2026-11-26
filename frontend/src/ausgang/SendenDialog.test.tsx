@@ -156,4 +156,68 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(matrix).not.toBeChecked();
     expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeEnabled();
   });
+  it('sperrt_bei_reinem_matrix_versand_die_matrix_adressen_mit_beliebigem_servertext', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText(/Kein Matrix-Konto eingerichtet/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
+    await waitFor(() => expect(matrix).toBeDisabled());
+  });
+
+  it('zieht_im_gemischten_fall_den_servertext_heran_und_sperrt_matrix_nicht', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Mailserver eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('checkbox', { name: /ils@example\.org/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText('Kein Mailserver eingerichtet')).length).toBeGreaterThan(0);
+    expect(matrix).toBeEnabled();
+  });
+
+  it('waehlt_nach_der_matrix_sperre_die_mailadresse_derselben_stelle_nach', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+      kanal(31, 'ILS Nord', 'zweite@example.org', 'email', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(matrix).toBeDisabled());
+    // Die erste Mailadresse derselben Stelle ersetzt die abgewählte Matrix-Adresse.
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /zweite@example\.org/ })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeEnabled();
+  });
 });

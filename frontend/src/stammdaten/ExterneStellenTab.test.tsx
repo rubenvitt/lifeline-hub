@@ -107,6 +107,30 @@ describe('ExterneStellenTab', () => {
     );
   });
 
+  it('zaehlt_fax_und_threema_als_eigene_posten', async () => {
+    const adresse = (id: number, stelle: number, a: string, art: string) => ({
+      channel: { id, externe_stelle_id: stelle, channel: art, address: a },
+      agency_id: stelle,
+      agency_name: 'x',
+    });
+    server.use(
+      http.get('/api/external-agencies/channels', () =>
+        HttpResponse.json([
+          adresse(1, 1, 'a@example.org', 'email'),
+          adresse(2, 1, '0800 1', 'fax'),
+          adresse(3, 1, 'abc', 'threema'),
+        ]),
+      ),
+    );
+    const { container } = render(admin);
+    await screen.findByText('Polizei Musterstadt');
+    await waitFor(() =>
+      expect(bezeichnungen(container)[0]).toBe(
+        'ILS Musterkreis zuständig 1 Mail, 1 Fax, 1 Threema',
+      ),
+    );
+  });
+
   it('filtert nach Art', async () => {
     const { container } = render(admin);
     await screen.findByText('Polizei Musterstadt');

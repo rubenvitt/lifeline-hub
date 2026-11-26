@@ -9,7 +9,7 @@ import {
 } from '../api/ausgang';
 import type { Versand } from '../api/types';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { schriftStil } from '../components/instrument';
+import { Textstufe, schriftStil } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
 import { adresseAnzeige, kanalKurz } from './kanalAnzeige';
 
@@ -61,21 +61,14 @@ export default function Versandliste({
               style={{ paddingBlock: token.paddingXXS }}
             >
               <span style={{ ...schriftStil('text'), overflowWrap: 'anywhere' }}>
-                <Typography.Text
-                  type="secondary"
-                  data-kanal={v.channel}
-                  style={schriftStil('textKlein')}
-                >
+                <Textstufe stufe="textKlein" ton="gedaempft">
                   {kanalKurz(v.channel)}
-                </Typography.Text>{' '}
+                </Textstufe>{' '}
                 {v.agency_name} · {adresseAnzeige(v.channel, v.address)}
               </span>{' '}
-              <Typography.Text
-                type={fehlgeschlagen ? 'danger' : 'secondary'}
-                style={schriftStil('textKlein')}
-              >
+              <Textstufe stufe="textKlein" ton={fehlgeschlagen ? 'alarm' : 'gedaempft'}>
                 {versandZustandText(v, uhrzeit)}
-              </Typography.Text>
+              </Textstufe>
               {fehlgeschlagen && darfSchreiben && (
                 <>
                   {' '}

@@ -12,7 +12,7 @@ import {
   versandFehler,
   type QuelleFilter,
 } from '../api/ausgang';
-import type { AusgangFehler } from '../api/types';
+import type { AusgangFehler, KanalArt } from '../api/types';
 import { zahlText } from '../anzeige/zahl';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
@@ -81,6 +81,8 @@ export default function SendenDialog({
   );
   /** Grund, warum die Matrix-Adressen gesperrt sind, nachdem der Server das Konto abgelehnt hat. */
   const [matrixGesperrt, setMatrixGesperrt] = useState<string | null>(null);
+  /** Kanäle der zuletzt gesendeten Adressen: nach ihnen richtet sich der Wortlaut einer Ablehnung. */
+  const [gesendet, setGesendet] = useState<KanalArt[]>([]);
 
   // Ein Schlüssel je Öffnen: ein zweiter Versuch derselben Eingabe legt keine zweite Mail an.
   // `offen` ist der Auslöser; der Wert hängt nur an der Öffnung.
@@ -105,25 +107,39 @@ export default function SendenDialog({
       : null;
   const gesperrt = grund !== null || kanaele === undefined || (gewaehlt ?? []).length === 0;
 
-  const fehler = versandFehler(sende.error);
+  const fehler = versandFehler(sende.error, gesendet);
   const anbindungGestoert =
     sende.error instanceof ApiError &&
     !!sende.error.grund &&
     ANBINDUNG_GRUENDE.has(sende.error.grund);
 
   /** Eine Ablehnung wegen des Matrix-Kontos sperrt die Matrix-Adressen, nicht den Dialog. */
-  const merkeMatrixSperre = (e: unknown) => {
+  const merkeMatrixSperre = (e: unknown, arten: readonly KanalArt[]) => {
     if (
       e instanceof ApiError &&
       e.grund &&
       ANBINDUNG_GRUENDE.has(e.grund) &&
-      anbindungKanal(e) === 'matrix'
+      anbindungKanal(e, arten) === 'matrix'
     ) {
       setMatrixGesperrt(AUSGANG_FEHLER_TEXT.matrix[e.grund as AusgangFehler]);
-      const rest = (form.getFieldValue('kanaele') as number[] | undefined)?.filter(
-        (id) => kanaele?.find((k) => k.channel.id === id)?.channel.channel !== 'matrix',
+      const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
+      const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
+      const rest = gewaehlteIds.filter((id) => kanalVon(id)?.channel.channel !== 'matrix');
+      // Betroffene Stellen: die erste Mailadresse derselben Stelle ersetzt die Matrix-Adresse.
+      const betroffen = new Set(
+        gewaehlteIds
+          .filter((id) => kanalVon(id)?.channel.channel === 'matrix')
+          .map((id) => kanalVon(id)?.agency_id),
       );
-      form.setFieldValue('kanaele', rest ?? []);
+      for (const stelleId of betroffen) {
+        const stelleMails = (kanaele ?? []).filter(
+          (k) => k.agency_id === stelleId && k.channel.channel === 'email',
+        );
+        if (stelleMails.length > 0 && !stelleMails.some((k) => rest.includes(k.channel.id))) {
+          rest.push(stelleMails[0].channel.id);
+        }
+      }
+      form.setFieldValue('kanaele', rest);
     }
   };
 
@@ -143,17 +159,22 @@ export default function SendenDialog({
       speicherung={{ error: fehler, isPending: sende.isPending, reset: sende.reset }}
       speicherFehlerTitel="Nicht gesendet"
       speicherFehlerFallback="Senden fehlgeschlagen"
-      onErfassen={(w) =>
-        sende
+      onErfassen={(w) => {
+        const arten = w.kanaele.flatMap((id) => {
+          const art = kanaele?.find((k) => k.channel.id === id)?.channel.channel;
+          return art ? [art] : [];
+        });
+        setGesendet(arten);
+        return sende
           .mutateAsync({
             client_id: clientId,
             recipients: w.kanaele.map((channel_id) => ({ channel_id })),
           })
           .catch((e: unknown) => {
-            merkeMatrixSperre(e);
+            merkeMatrixSperre(e, arten);
             throw e;
-          })
-      }
+          });
+      }}
       onFertig={onClose}
       onAbbrechen={onClose}
     >

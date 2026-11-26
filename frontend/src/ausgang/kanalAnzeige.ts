@@ -1,8 +1,20 @@
 import type { KanalArt } from '../api/types';
 
+/** Reihenfolge, in der Kanäle in einer Aufzählung stehen. */
+export const KANAL_REIHENFOLGE: readonly KanalArt[] = ['email', 'matrix', 'fax', 'threema'];
+
 /** Kurzwort des Kanals, als kleines Zeichen vor einer Adresse. */
 export function kanalKurz(kanal: KanalArt): string {
-  return kanal === 'matrix' ? 'Matrix' : 'Mail';
+  switch (kanal) {
+    case 'email':
+      return 'Mail';
+    case 'matrix':
+      return 'Matrix';
+    case 'fax':
+      return 'Fax';
+    case 'threema':
+      return 'Threema';
+  }
 }
 
 /** Länge des Raum-ID-Anfangs, der in der Anzeige stehen bleibt. */

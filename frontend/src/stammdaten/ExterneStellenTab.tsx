@@ -21,7 +21,8 @@ import {
   fetchExterneStellen,
   useKanaeleSammlung,
 } from '../api/externeStellen';
-import type { ExterneStelle, ExterneStelleArt } from '../api/types';
+import type { ExterneStelle, ExterneStelleArt, KanalArt } from '../api/types';
+import { KANAL_REIHENFOLGE, kanalKurz } from '../ausgang/kanalAnzeige';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import ExterneStelleFormModal from './ExterneStelleFormModal';
@@ -49,19 +50,16 @@ export default function ExterneStellenTab() {
   });
   // Adressen je Stelle und Kanal für den Hinweis in der Liste (LLH-2093, LLH-2094); nur aktive Stellen.
   const kanaeleQuery = useKanaeleSammlung();
-  const mailAnzahl = new Map<number, number>();
-  const matrixAnzahl = new Map<number, number>();
+  const anzahlJeKanal = new Map<KanalArt, Map<number, number>>();
   for (const k of kanaeleQuery.data ?? []) {
-    const zaehler = k.channel.channel === 'matrix' ? matrixAnzahl : mailAnzahl;
+    const zaehler = anzahlJeKanal.get(k.channel.channel) ?? new Map<number, number>();
     zaehler.set(k.agency_id, (zaehler.get(k.agency_id) ?? 0) + 1);
+    anzahlJeKanal.set(k.channel.channel, zaehler);
   }
-  /** „2 Mail, 1 Matrix“; leer, wenn die Stelle keine Adresse hat. */
+  /** „2 Mail, 1 Matrix“, je Kanal ein Posten; leer, wenn die Stelle keine Adresse hat. */
   const adressenText = (id: number) =>
-    [
-      mailAnzahl.has(id) ? `${mailAnzahl.get(id)} Mail` : null,
-      matrixAnzahl.has(id) ? `${matrixAnzahl.get(id)} Matrix` : null,
-    ]
-      .filter((t) => t !== null)
+    KANAL_REIHENFOLGE.filter((art) => anzahlJeKanal.get(art)?.has(id))
+      .map((art) => `${anzahlJeKanal.get(art)?.get(id)} ${kanalKurz(art)}`)
       .join(', ');
   // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
   const zustaendigVomHub = (stellenQuery.data ?? []).some(

@@ -14,6 +14,7 @@ import {
   PaneelZeile,
   Stapel,
   Status,
+  Textstufe,
   monoStil,
   useRollen,
   type BearbeitbaresFeld,
@@ -404,8 +405,10 @@ export default function AdapterAnsicht() {
         {istAbruf && <SchnappschussHinweis adapterId={adapter.id} />}
         {adapter.art === MATRIX && (
           <Paneel titel="Verifizierung" koerperPolster>
-            <span data-lfh="adapter-matrix-verifizierung" style={{ color: rollen.gedaempft }}>
-              {MATRIX_VERIFIZIERUNG_HINWEIS}
+            <span data-lfh="adapter-matrix-verifizierung">
+              <Textstufe stufe="textKlein" ton="gedaempft">
+                {MATRIX_VERIFIZIERUNG_HINWEIS}
+              </Textstufe>
             </span>
           </Paneel>
         )}
