@@ -65,6 +65,25 @@ jobs:
         # Über das Skript: Frist und Wiederholung gegen einen hängenden Spiegel (LFH-1101).
         run: ./scripts/apt-pakete.sh nasm
 
+      # SPEICHER: 4 Kerne, 15 GB. Kalt gebaut (ohne Cache-Treffer) lief der Speicher am 26.11.
+      # nach drei Minuten voll, die vorhandene Auslagerung (rund 3 GB) auch, und der Runner starb
+      # mit „shutdown signal“ (Stand-Log im Rust-Job, f90df2a1; hier f200153f, d8ccab46). 12 GB Auslagerung, auf /mnt,
+      # wenn das eine eigene Platte ist, sonst auf / (kostet dann Platz, s. Plattenplatz).
+      - name: Auslagerung vergrößern
+        run: |
+          ort=/swapfile
+          if mountpoint -q /mnt && [ "$(df --output=source /mnt | tail -1)" != "$(df --output=source / | tail -1)" ]; then
+            ort=/mnt/swapfile
+          fi
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 12G "$ort"
+          sudo chmod 600 "$ort"
+          sudo mkswap "$ort" > /dev/null
+          sudo swapon "$ort"
+          df -h / /mnt 2> /dev/null || df -h /
+          free -h
+
       - name: Rust-Toolchain (stable + llvm-tools)
         run: |
           rustup toolchain install stable --profile minimal --component llvm-tools-preview --no-self-update
