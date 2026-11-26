@@ -367,11 +367,11 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 
 ### Task 8: Gates, Bilder, Abschluss
 
-- [ ] **Schritt 1:** `./scripts/check-all.sh --geaendert --ohne-e2e`: alle Schritte grün,
+- [x] **Schritt 1:** `./scripts/check-all.sh --geaendert --ohne-e2e`: alle Schritte grün,
   ohne `| tail`.
-- [ ] **Schritt 2:** Skill `verify` für die Fahrzeuge-Seite mit offenem Koppeldialog, um die
+- [x] **Schritt 2:** Skill `verify` für die Fahrzeuge-Seite mit offenem Koppeldialog, um die
   Bilder der Änderung zu erzeugen.
-- [ ] **Schritt 3:** Plan abhaken. Push, PR gegen `alpha` mit Spec, Plan und Umsetzung,
+- [x] **Schritt 3:** Plan abhaken. Push, PR gegen `alpha` mit Spec, Plan und Umsetzung,
   Zunder-Zeile und Bildern. Zunder auf `review` mit `pr_url`.
-- [ ] **Schritt 4:** Folgeaufgabe „Ortung bei Direktkopplung zweier ELW“ per
+- [x] **Schritt 4:** Folgeaufgabe „Ortung bei Direktkopplung zweier ELW“ per
   `zunder-task-anlegen`.
