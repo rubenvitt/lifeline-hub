@@ -264,7 +264,7 @@ fn matrix_text(betreff: &str, inhalt: &str) -> (String, String) {
     let mut quelle = format!("**{}**\n\n", maskiere(betreff));
     let zeilen: Vec<&str> = inhalt.lines().collect();
     for (i, zeile) in zeilen.iter().enumerate() {
-        quelle.push_str(&maskiere(zeile.trim_end()));
+        quelle.push_str(&einzug_fest(&maskiere(zeile.trim_end())));
         if let Some(naechste) = zeilen.get(i + 1) {
             if !zeile.trim().is_empty() && !naechste.trim().is_empty() {
                 quelle.push_str("  ");
@@ -272,8 +272,55 @@ fn matrix_text(betreff: &str, inhalt: &str) -> (String, String) {
             quelle.push('\n');
         }
     }
-    let html = FormattedBody::markdown(&quelle).map_or(quelle, |f| f.body);
+    let rueckfall = format!("{betreff}\n\n{inhalt}");
+    let html = html_aus(&quelle, &rueckfall);
     (klartext, html)
+}
+
+/// Das HTML aus der maskierten Markdown-Quelle. Erkennt das SDK darin keine Auszeichnung, ist
+/// das HTML der `rueckfall` als maskierter Klartext (Zeilen als `<br>`), nie die Quelle selbst:
+/// sie ist Markdown, ihre Escapes wären sichtbar.
+fn html_aus(quelle: &str, rueckfall: &str) -> String {
+    FormattedBody::markdown(quelle).map_or_else(
+        || {
+            rueckfall
+                .lines()
+                .map(html_maskiert)
+                .collect::<Vec<_>>()
+                .join("<br>")
+        },
+        |f| f.body,
+    )
+}
+
+/// Maskiert die Zeichen mit Bedeutung in HTML.
+fn html_maskiert(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+/// Ersetzt den führenden Leerraum einer Zeile durch geschützte Leerzeichen (ein Tab zählt vier):
+/// CommonMark macht aus vier Leerzeichen Einzug sonst einen Codeblock, in dem die Escapes von
+/// [`maskiere`] sichtbar würden. Der Einzug bleibt so sichtbar.
+fn einzug_fest(zeile: &str) -> String {
+    let rest = zeile.trim_start_matches([' ', '\t']);
+    let mut out = String::with_capacity(zeile.len() + 8);
+    for c in zeile[..zeile.len() - rest.len()].chars() {
+        let breite = if c == '\t' { 4 } else { 1 };
+        out.extend(std::iter::repeat_n('\u{a0}', breite));
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Maskiert jedes ASCII-Satzzeichen mit Bedeutung in Markdown (CommonMark-Backslash-Escape).
@@ -393,6 +440,35 @@ mod tests {
             "{html}"
         );
         assert!(html.contains("&amp;"), "{html}");
+    }
+
+    #[test]
+    fn eingerueckte_zeilen_werden_kein_codeblock() {
+        let (klar, html) = matrix_text(
+            "Lage",
+            "Absatz\n\n    eingerückt: 1. Zug\n\tmit Tab (S3)\n  zwei Leerzeichen",
+        );
+        assert!(!html.contains("<pre"), "{html}");
+        assert!(!html.contains("<code"), "{html}");
+        assert!(!html.contains('\\'), "{html}");
+        assert!(html.contains("eingerückt: 1. Zug"), "{html}");
+        assert!(html.contains("mit Tab (S3)"), "{html}");
+        assert!(html.contains("zwei Leerzeichen"), "{html}");
+        // Der Klartext bleibt, wie er war.
+        assert!(
+            klar.contains("\n    eingerückt: 1. Zug\n\tmit Tab"),
+            "{klar}"
+        );
+    }
+
+    #[test]
+    fn ohne_markdown_ist_das_html_maskierter_klartext() {
+        // Eine Quelle ohne Auszeichnung: `FormattedBody::markdown` liefert nichts, der Rückfall
+        // greift. Er ist maskierter Klartext, nie die Markdown-Quelle mit ihren Escapes.
+        let html = html_aus("nur Text", "Lage <b> & \"S3\"\nZeile 2");
+        assert_eq!(html, "Lage &lt;b&gt; &amp; &quot;S3&quot;<br>Zeile 2");
+        let html = html_aus("**fett**", "egal");
+        assert_eq!(html, "<strong>fett</strong>");
     }
 
     #[test]
