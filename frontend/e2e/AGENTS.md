@@ -133,7 +133,10 @@ Gilt für `frontend/e2e/`, ergänzt `frontend/AGENTS.md`. Pfade relativ zu `fron
   `waitForResponse` vor dem Schritt anlegen, danach abwarten.
 - **Zurück zum Admin über `wechsleZuAdmin`** (LLH-1317): ein Objekt `{ …, passwort: ADMIN_PW }`
   im Spec meldet GitGuardian als echtes Passwort.
-- **Der e2e-Server stellt keine Mail über SMTP zu** (LLH-2093): `playwright.config.ts` startet ihn mit
-  `--ausgang-testzusteller` (nur Debug-Build) und einem frischen `LIFELINE_GEHEIMNIS_SCHLUESSEL`
-  (`e2eGeheimnisSchluessel` in `e2e/lauf-kern.ts`), damit sich das Passwort der SMTP-Anbindung
-  speichern lässt. Anbindung und Stelle legt der Spec über die API an (`e2e/ausgang.spec.ts`).
+- **Der e2e-Server stellt weder Mail über SMTP noch Nachrichten an einen Homeserver zu** (LLH-2093,
+  LLH-2094): `playwright.config.ts` startet ihn mit `--ausgang-testzusteller` (nur Debug-Build,
+  nimmt beide Kanäle an) und einem frischen `LIFELINE_GEHEIMNIS_SCHLUESSEL`
+  (`e2eGeheimnisSchluessel` in `e2e/lauf-kern.ts`), damit sich Passwort und Access-Token der
+  Anbindungen speichern lassen. Anbindungen und Stellen legt der Spec über die API an
+  (`e2e/ausgang.spec.ts`); die Verbindungsprüfung der Matrix-Anbindung erreicht keinen Homeserver,
+  eine gestörte Anbindung hält den Versand nicht auf.
