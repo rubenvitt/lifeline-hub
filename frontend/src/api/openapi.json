@@ -1487,7 +1487,11 @@
           "adapter_angehalten",
           "adapter_fortgesetzt",
           "fremdebenen_lan_erlaubt",
-          "fremdebenen_lan_entzogen"
+          "fremdebenen_lan_entzogen",
+          "ortung_eingeschaltet",
+          "ortung_ausgeschaltet",
+          "ortung_personen_eingeschaltet",
+          "ortung_personen_ausgeschaltet"
         ]
       },
       "AdressatKategorie": {

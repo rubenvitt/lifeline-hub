@@ -2047,8 +2047,8 @@ Quelle der Wahrheit: `frontend/src/api/queryKeys.ts`.
 
 `typecheck` und `build` rufen `tsc` direkt; seit TypeScript 7 startet `bin/tsc` das native
 Go-Binary (Spitze rund 3,1 GB Arbeitsspeicher, Node-Heap spielt keine Rolle mehr, LLH-1405 ist
-damit hinfällig). Der Typ-Codegen braucht noch die Compiler-API von TypeScript 6 und holt sie über
-`scripts/ts6-fuer-codegen.mjs` aus `@typescript/typescript6` (Rückbau: LLH-2068).
+damit hinfällig). Der Typ-Codegen braucht keine Compiler-API (`scripts/gen-types.mjs`,
+ADR-0106).
 
 ## Frontend — Browserspeicher (LFH-942)
 

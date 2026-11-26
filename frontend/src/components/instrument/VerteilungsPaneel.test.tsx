@@ -1,5 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { schrift } from '../../theme/tokens';
 import { renderMitProviders } from '../../test/utils';
 import VerteilungsPaneel, { Verteilungsliste, type Verteilungszeile } from './VerteilungsPaneel';
 
@@ -77,6 +78,22 @@ describe('VerteilungsPaneel', () => {
       <Verteilungsliste kennung="abschnitt-status" zeilen={ZEILEN} dichte="zeile" />,
     );
     expect(container.querySelectorAll('[data-lfh="abschnitt-status-wert"]')).toHaveLength(3);
+  });
+
+  it('das Wort steht in der Textschrift, nur die Zahl in Mono (ADR-0094)', () => {
+    for (const dichte of ['paneel', 'kompakt', 'zeile'] as const) {
+      const { container, unmount } = renderMitProviders(
+        <Verteilungsliste kennung="v" zeilen={ZEILEN} dichte={dichte} />,
+      );
+      const wort = container.querySelector<HTMLElement>('[data-lfh="v-wort"]')!;
+      const wert = container.querySelector<HTMLElement>('[data-lfh="v-wert"]')!;
+      expect(wort).toHaveStyle({ fontFamily: schrift.text });
+      expect(wort.style.fontFamily).not.toContain('JetBrains Mono');
+      // Boden 11 px (SCHRIFT_BODEN) auch in der dichten Zeile.
+      expect(parseFloat(wort.style.fontSize)).toBeGreaterThanOrEqual(11);
+      expect(wert).toHaveStyle({ fontFamily: schrift.zahl });
+      unmount();
+    }
   });
 
   it('kompakt im Paneel: kleinere Zahl, dieselben Greifer', () => {

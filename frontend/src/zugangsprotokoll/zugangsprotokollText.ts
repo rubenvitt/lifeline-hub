@@ -87,6 +87,10 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   adapter_fortgesetzt: 'Adapter fortgesetzt',
   fremdebenen_lan_erlaubt: 'Fremdebenen: Ziele im lokalen Netz erlaubt',
   fremdebenen_lan_entzogen: 'Fremdebenen: Ziele im lokalen Netz nicht mehr erlaubt',
+  ortung_eingeschaltet: 'Ortung im Einsatz eingeschaltet',
+  ortung_ausgeschaltet: 'Ortung im Einsatz ausgeschaltet',
+  ortung_personen_eingeschaltet: 'Ortung von Personen eingeschaltet',
+  ortung_personen_ausgeschaltet: 'Ortung von Personen ausgeschaltet',
 };
 
 /**
