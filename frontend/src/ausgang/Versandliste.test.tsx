@@ -78,7 +78,10 @@ describe('Versandliste (LLH-2093)', () => {
     const knopf = await screen.findByRole('button', { name: 'Erneut senden' });
     setzeOnline(false);
     await waitFor(() => expect(knopf).toBeDisabled());
-    expect(screen.getByText('Ohne Netz nicht möglich')).toBeInTheDocument();
+    const grund = screen.getByText('Ohne Netz nicht möglich');
+    expect(grund).toBeInTheDocument();
+    // Eine Textstufe wie die übrigen Zeilen, kein antd-Text mit freier Schrift.
+    expect(grund).not.toHaveClass('ant-typography');
   });
 
   it('blendet „Erneut senden“ ohne Schreibrecht aus', async () => {

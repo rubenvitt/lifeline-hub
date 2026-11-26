@@ -80,10 +80,10 @@ export default function Versandliste({
                     Erneut senden
                   </Button>
                   {!online && (
-                    <Typography.Text type="secondary" style={schriftStil('textKlein')}>
+                    <Textstufe stufe="textKlein" ton="gedaempft">
                       {' '}
                       Ohne Netz nicht möglich
-                    </Typography.Text>
+                    </Textstufe>
                   )}
                 </>
               )}
