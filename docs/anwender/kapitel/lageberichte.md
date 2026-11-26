@@ -97,8 +97,8 @@ sie.
 Für Einsatzleitung und Führungspersonal, mit freigegebenem Bericht:
 
 1. Einen freigegebenen Bericht öffnen und „Senden“ wählen.
-2. Im Dialog „Senden“ unter „An“ die Adressen ankreuzen. Jede Adresse einer Stelle steht einzeln
-   da, mit „Mail“, „Fax“ oder „Matrix“ davor. Vorbelegt ist je Stelle aus dem Verteiler des
+2. Im Dialog „Senden“ unter „An“ die Adressen ankreuzen. Die Adressen stehen je Stelle unter
+   ihrem Namen, jede einzeln mit „Mail“, „Matrix“ oder „Fax“ davor. Vorbelegt ist je Stelle aus dem Verteiler des
    Berichts genau eine Adresse: ihr erster Matrix-Raum, sonst ihre erste Mailadresse; eine
    Faxnummer wird immer selbst angekreuzt. Soll dieselbe Stelle den Bericht auf mehreren Wegen
    bekommen, die weitere Adresse dazu ankreuzen.
