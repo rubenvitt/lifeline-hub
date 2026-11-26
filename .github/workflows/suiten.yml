@@ -94,8 +94,25 @@ jobs:
         with:
           version: 2026.9.1
           cache: true
+      # Auslagerung wie im Coverage-Job: Am 26.11. (d8ccab46) starb der Runner nach der ganzen
+      # Workspace-Suite in Schritt 15 (dev-seeds bauen) mit „shutdown signal“, ohne Fehlermeldung.
+      - name: Auslagerung vergrößern
+        run: |
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile > /dev/null
+          sudo swapon /swapfile
+          free -h
       - name: Rust-Suite
-        run: ./scripts/check-all.sh --nur rust
+        # Platte und Speicher jede Minute ins Log: Stirbt der Runner, endet das Log hier mit dem
+        # letzten Stand, statt raten zu lassen, ob Platte oder Speicher ausging.
+        run: |
+          ( while sleep 60; do
+              echo "Stand $(date +%H:%M) Platte $(df -BG --output=avail / | tail -1 | tr -d ' ') frei, Speicher $(free -m | awk '/^Mem:/ {print $7}') MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt"
+            done ) &
+          ./scripts/check-all.sh --nur rust
       - name: Plattenplatz danach
         if: ${{ always() }}
         run: df -h /
