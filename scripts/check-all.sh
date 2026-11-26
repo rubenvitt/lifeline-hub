@@ -352,6 +352,9 @@ schritt_8() {
   # Verteilung an die TestFlight-Gruppen (LLH-1988, ADR-0080): ein Alpha-Build bei externen
   # Testern oder eine doppelte Beta-Prüfung fiele erst am Release auf. Nachgebaute API, ohne Netz.
   mise exec -- node --test "$ROOT/scripts/ios/testflight-verteilen.test.mjs"
+  # Aufräumen der Entwicklungszertifikate (LLH-2149): ein widerrufenes Verteilungszertifikat oder
+  # das Zertifikat eines parallelen Laufs fiele erst am nächsten TestFlight-Lauf auf. Ohne Netz.
+  mise exec -- node --test "$ROOT/scripts/ios/entwicklungszertifikate.test.mjs"
   # Bildschirmbilder des Simulator-Laufs (LLH-1978): ein Name mit " oder : lässt
   # `actions/upload-artifact` das ganze Artefakt abweisen, und eine Debug-Beschreibung ist kein
   # Bild — beides fiele erst auf dem macOS-Runner auf. Ohne Xcode.
