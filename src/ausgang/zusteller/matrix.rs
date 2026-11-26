@@ -364,6 +364,10 @@ fn matrix_fehlschlag(f: MatrixFehler, teile: Vec<(i64, String)>) -> Fehlschlag {
             MatrixFehler::Netz => (voruebergehend(None), "Homeserver nicht erreichbar"),
             MatrixFehler::Zeit => (voruebergehend(None), "Homeserver antwortet nicht"),
             MatrixFehler::Dns => (voruebergehend(None), "Homeserver nicht gefunden"),
+            MatrixFehler::Speicher => (
+                voruebergehend(None),
+                "Matrix-Speicher vorübergehend nicht nutzbar",
+            ),
             MatrixFehler::RateLimit(warte) => (
                 voruebergehend(warte.and_then(|w| {
                     Utc::now().checked_add_signed(chrono::Duration::from_std(w).ok()?)
@@ -499,6 +503,7 @@ mod tests {
             M::NichtGefunden,
             M::ZuGross,
             M::Verschluesselung,
+            M::Speicher,
             M::SchluesselPassenNicht,
             M::KeineUploadGrenze,
             M::Antwort,
@@ -524,6 +529,13 @@ mod tests {
         assert_eq!(art(M::NichtGefunden), Zustellfehler::KeinZutritt);
         assert_eq!(art(M::ZuGross), Zustellfehler::ZuGross);
         assert_eq!(art(M::Verschluesselung), Zustellfehler::Verschluesselung);
+        // Datei-IO, Schließen und Löschen des Speichers sind Probleme des Hubs, nicht der
+        // Verschlüsselung: im Wiederholungsfenster bleiben, mit eigenem Grund.
+        assert_eq!(art(M::Speicher), v);
+        assert_eq!(
+            matrix_fehlschlag(M::Speicher, Vec::new()).grund,
+            "Matrix-Speicher vorübergehend nicht nutzbar"
+        );
         assert_eq!(art(M::KeineUploadGrenze), Zustellfehler::Abgelehnt);
         let jetzt = Utc::now();
         match art(M::RateLimit(Some(Duration::from_secs(600)))) {

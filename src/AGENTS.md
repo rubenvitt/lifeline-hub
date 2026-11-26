@@ -343,7 +343,10 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
     schließt `schliesse` zuerst den alten Client mit `Client::pause` (schließt seine vier
     Speicher und schaltet seine Send-Queue ab), wartet höchstens `FREIGABE_WARTEZEIT`, bis kein
     Hintergrund-Task ihn mehr hält, und löscht das Verzeichnis erst, wenn alles zu ist; sonst
-    scheitert es vorübergehend und bleibt vorgemerkt. Nie öffnet ein neuer Client einen Speicher,
+    scheitert es vorübergehend (`Zeit` oder `MatrixFehler::Speicher`) und bleibt vorgemerkt, als
+    Generation: ein Verwerfen während des Räumens räumt derselbe Halter, bevor er öffnet.
+    `Speicher` (Datei-IO am Verzeichnis, Schließen, Löschen, Bau des Clients außerhalb des
+    SDK-Speichers) ist vorübergehend; `verschluesselung` bleibt Krypto und SDK-Speicher selbst. Nie öffnet ein neuer Client einen Speicher,
     solange der alte lebt. `rusqlite` kommt nur transitiv über `vendor/matrix-sdk-sqlite`
     ([ADR-0108](../docs/architektur/entscheidungen/ADR-0108-rusqlite-nur-transitiv-fuer-den-speicher-des-matrix-sdk.md)).
 
@@ -559,9 +562,11 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   `schliesse_unterbrochen` als `ungewiss` ab, ohne die schon gesendeten Teile zu merken; „Erneut
   senden“ kann dann einen Teil doppelt bringen, wenn das Fenster der Transaktions-ID beim
   Homeserver abgelaufen ist. `ausgang_teil.gesendet_at` ist die Zeit des Hubs, nicht des
-  Homeservers. Hält ein Hintergrund-Task den alten Client dauerhaft, scheitert jeder Zugriff
-  vorübergehend bis zum Neustart; auf Windows bleibt ein Verwerfen mit offenen Dateien
-  vorgemerkt.
+  Homeservers. Hält ein Hintergrund-Task den alten Client dauerhaft oder lässt sich das
+  Speicherverzeichnis nicht schließen, löschen oder lesen, scheitert jeder Zugriff vorübergehend
+  („Matrix-Speicher vorübergehend nicht nutzbar“) bis zum Neustart oder bis der Betrieb das
+  Verzeichnis freigibt; erst am Ende des Wiederholungsfensters wird ein Versand endgültig. Auf
+  Windows bleibt ein Verwerfen mit offenen Dateien so vorgemerkt.
 - **Test-Zusteller nur für e2e:** `--ausgang-testzusteller` (versteckt, ohne Umgebungsvariable)
   setzt `ausgang::zusteller::AufzeichnenderZusteller` für alle Kanäle statt SMTP und Matrix ein; es gibt ihn nur im
   Debug-Build (`testzusteller()`), ein Release-Binary beendet sich mit dem Schalter.

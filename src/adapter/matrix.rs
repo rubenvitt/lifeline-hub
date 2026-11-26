@@ -16,13 +16,19 @@
 //! sendet danach nichts mehr. Gelöscht wird erst, wenn kein Hintergrund-Task ihn mehr hält
 //! (`FREIGABE_WARTEZEIT`); sonst bleibt das Verwerfen vorgemerkt.
 //!
+//! Fehlerklassen: Datei-IO am Verzeichnis, ein gescheitertes Schließen oder Löschen, eine Panik
+//! im Räumen und ein Bau des Clients, der nicht am SDK-Speicher selbst scheitert, sind
+//! [`MatrixFehler::Speicher`] (vorübergehend, ein Versand bleibt im Wiederholungsfenster);
+//! [`MatrixFehler::Verschluesselung`] bleibt Fehlern der Krypto und des SDK-Speichers (Passphrase,
+//! Inhalt, Krypto-Zustand).
+//!
 //! Netz: matrix-sdk bekommt unseren `reqwest::Client` aus [`ziel::client_builder_mit_zielschutz`]
 //! (filternder Resolver, keine Weiterleitung, nur `https`); die Homeserver-URL besteht vorher
 //! `check_url`. Kein `.well-known`, keine Wiederholung im SDK (das macht der Ausgangskorb).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, SystemTime};
 
@@ -112,8 +118,13 @@ pub enum MatrixFehler {
     NichtGefunden,
     /// Zu groß (413, `M_TOO_LARGE`).
     ZuGross,
-    /// Verschlüsseln oder Schlüsselspeicher gescheitert.
+    /// Verschlüsseln gescheitert, oder der Schlüsselspeicher des SDK selbst (Passphrase, Inhalt,
+    /// Krypto-Zustand).
     Verschluesselung,
+    /// Das Speicherverzeichnis oder der Client ließ sich vorübergehend nicht nutzen: Datei-IO am
+    /// Verzeichnis, Schließen oder Löschen des Speichers, Bau des Clients außerhalb der Krypto
+    /// (Panik im Räumen eingeschlossen). Ein Problem des Hubs, kein Grund, den Versand aufzugeben.
+    Speicher,
     /// Der Schlüsselspeicher gehört zu einem anderen Gerät als dem des Tokens.
     SchluesselPassenNicht,
     /// Der Homeserver nennt keine Grenze für Dateien (`m.upload.size` fehlt); ohne sie lädt das
@@ -147,6 +158,7 @@ impl From<MatrixFehler> for AdapterFehler {
             MatrixFehler::Zeit => AdapterFehler::Zeitueberschreitung,
             MatrixFehler::Dns => AdapterFehler::Dns,
             MatrixFehler::ZielIntern => AdapterFehler::ZielIntern,
+            MatrixFehler::Speicher => AdapterFehler::Intern,
             MatrixFehler::RateLimit(_)
             | MatrixFehler::NichtGefunden
             | MatrixFehler::ZuGross
@@ -206,10 +218,12 @@ type Sperre = tokio::sync::OwnedMutexGuard<Zugriff>;
 struct Eintrag {
     zugriff: Arc<tokio::sync::Mutex<Zugriff>>,
     befund: std::sync::Mutex<Option<Pruefbefund>>,
-    /// Vorgemerkt von [`Clients::verwerfen`]: wer als Nächstes an den Client kommt, verwirft ihn
-    /// und löscht das Verzeichnis, bevor er etwas anderes tut. Zurückgesetzt erst, wenn das
-    /// Verzeichnis wirklich weg ist.
-    verwerfen: AtomicBool,
+    /// Vorgemerkt von [`Clients::verwerfen`] als Generation (0: nichts vorgemerkt; jedes Verwerfen
+    /// zählt hoch): wer als Nächstes an den Client kommt, verwirft ihn und löscht das Verzeichnis,
+    /// bevor er etwas anderes tut. [`raeume`] setzt nur die Generation zurück, die es zu Beginn
+    /// sah, und erst, wenn das Verzeichnis wirklich weg ist; ein Verwerfen währenddessen bleibt
+    /// vorgemerkt.
+    verwerfen: AtomicU64,
 }
 
 impl Eintrag {
@@ -304,24 +318,34 @@ impl Clients {
     /// Sperrt den Client der Anbindung; ist ein Verwerfen vorgemerkt, erledigt es der Halter der
     /// Sperre zuerst. Das Verwerfen läuft in einem eigenen Task, der die Sperre hält: bricht der
     /// Aufrufer ab (Frist), endet nur sein Warten, nie das Verwerfen halb. Scheitert es (alter
-    /// Client nicht frei: `Zeit`; Verzeichnis nicht löschbar: `Verschluesselung`), bleibt es
-    /// vorgemerkt, und der Zugriff scheitert, statt einen Speicher zu öffnen, der fallen soll.
+    /// Client nicht frei: `Zeit`; Speicher nicht zu schließen, Verzeichnis nicht löschbar, Panik
+    /// im Räumen: `Speicher`), bleibt es vorgemerkt, und der Zugriff scheitert vorübergehend,
+    /// statt einen Speicher zu öffnen, der fallen soll.
     async fn sperre(
         &self,
         adapter_id: &str,
         eintrag: &Arc<Eintrag>,
     ) -> Result<Sperre, MatrixFehler> {
-        let sperre = eintrag.zugriff.clone().lock_owned().await;
-        if !eintrag.verwerfen.load(Ordering::SeqCst) {
-            return Ok(sperre);
+        let mut sperre = eintrag.zugriff.clone().lock_owned().await;
+        // Kam während des Räumens ein Verwerfen dazu, räumt derselbe Halter noch einmal, bevor
+        // er einen Speicher öffnet.
+        loop {
+            let generation = eintrag.verwerfen.load(Ordering::SeqCst);
+            if generation == 0 {
+                return Ok(sperre);
+            }
+            let task = tokio::spawn(raeume(
+                eintrag.clone(),
+                sperre,
+                self.verzeichnis(adapter_id),
+                adapter_id.to_string(),
+                generation,
+            ));
+            sperre = task.await.unwrap_or_else(|err| {
+                tracing::error!(adapter = adapter_id, "Matrix: Verwerfen abgebrochen: {err}");
+                Err(MatrixFehler::Speicher)
+            })?;
         }
-        let task = tokio::spawn(raeume(
-            eintrag.clone(),
-            sperre,
-            self.verzeichnis(adapter_id),
-            adapter_id.to_string(),
-        ));
-        task.await.unwrap_or(Err(MatrixFehler::Verschluesselung))
     }
 
     /// Führt `f` mit dem Client der Anbindung aus; baut ihn bei Bedarf (Token prüfen, Speicher
@@ -345,7 +369,12 @@ impl Clients {
     /// das Verzeichnis fällt: nie öffnen zwei Clients denselben Speicher.
     pub fn verwerfen<'s>(&'s self, adapter_id: &str) -> impl std::future::Future<Output = ()> + 's {
         let eintrag = self.eintrag(adapter_id);
-        eintrag.verwerfen.store(true, Ordering::SeqCst);
+        // Nie 0 (das hieße „nichts vorgemerkt“), auch nicht nach einem Überlauf.
+        let _ = eintrag
+            .verwerfen
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |g| {
+                Some(g.checked_add(1).unwrap_or(1))
+            });
         eintrag.set_befund(None);
         let adapter_id = adapter_id.to_string();
         async move {
@@ -528,7 +557,7 @@ impl Clients {
             .map_err(|e| {
                 // Der Text nennt keine Geheimnisse (Pfad, Art des Fehlers).
                 tracing::warn!(adapter = %ziel.adapter_id, "Matrix-Speicher nicht geöffnet: {e}");
-                MatrixFehler::Verschluesselung
+                baufehler(&e)
             })?;
         let user_id =
             OwnedUserId::try_from(geraet.user_id.as_str()).map_err(|_| MatrixFehler::Antwort)?;
@@ -650,7 +679,7 @@ async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), Matrix
                     adapter = adapter_id,
                     "Matrix-Speicher nicht geschlossen: {err}"
                 );
-                return Err(MatrixFehler::Verschluesselung);
+                return Err(MatrixFehler::Speicher);
             }
             Err(_) => {
                 tracing::warn!(
@@ -680,12 +709,14 @@ async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), Matrix
 }
 
 /// Verwirft unter der Sperre: Client schließen, Verzeichnis löschen, erst dann die Vormerkung
-/// zurücksetzen. Läuft als eigener Task (siehe [`Clients::sperre`]); gibt die Sperre zurück.
+/// `generation` zurücksetzen, und nur, wenn seither kein Verwerfen dazukam. Läuft als eigener
+/// Task (siehe [`Clients::sperre`]); gibt die Sperre zurück.
 async fn raeume(
     eintrag: Arc<Eintrag>,
     mut sperre: Sperre,
     dir: Option<PathBuf>,
     adapter_id: String,
+    generation: u64,
 ) -> Result<Sperre, MatrixFehler> {
     eintrag.set_befund(None);
     schliesse(&mut sperre, &adapter_id).await?;
@@ -695,11 +726,15 @@ async fn raeume(
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
             Err(err) => {
                 tracing::warn!(adapter = %adapter_id, "Matrix-Speicher nicht gelöscht: {err}");
-                return Err(MatrixFehler::Verschluesselung);
+                return Err(MatrixFehler::Speicher);
             }
         }
     }
-    eintrag.verwerfen.store(false, Ordering::SeqCst);
+    // Kam währenddessen ein Verwerfen dazu, bleibt es vorgemerkt: der nächste Zugriff räumt noch
+    // einmal (die Sperre hielt keinen Client offen, das ist billig).
+    let _ = eintrag
+        .verwerfen
+        .compare_exchange(generation, 0, Ordering::SeqCst, Ordering::SeqCst);
     Ok(sperre)
 }
 
@@ -730,7 +765,9 @@ fn stand(ziel: &MatrixZiel) -> [u8; 32] {
 
 /// Ob das Verzeichnis eine Merkdatei für `geraet` hat (`true`) oder noch keinen Speicher
 /// (`false`: fehlt oder leer). Eine Merkdatei für ein anderes Gerät oder Inhalt ohne Merkdatei
-/// gehört niemandem Bekanntem und wird nicht geöffnet (`SchluesselPassenNicht`).
+/// gehört niemandem Bekanntem und wird nicht geöffnet (`SchluesselPassenNicht`). Eine nach einem
+/// Abbruch liegengebliebene Zwischendatei ([`lege_merkdatei_an`]) zählt nicht als Inhalt und
+/// wird entfernt: vor der Merkdatei öffnet nie ein Client den Speicher.
 async fn hat_passende_merkdatei(dir: &Path, geraet: &Geraet) -> Result<bool, MatrixFehler> {
     let merk = dir.join(GERAET_DATEI);
     match tokio::fs::read(&merk).await {
@@ -745,8 +782,15 @@ async fn hat_passende_merkdatei(dir: &Path, geraet: &Geraet) -> Result<bool, Mat
     }
     match tokio::fs::read_dir(dir).await {
         Ok(mut eintraege) => {
-            if eintraege.next_entry().await.map_err(io_fehler)?.is_some() {
-                return Err(MatrixFehler::SchluesselPassenNicht);
+            while let Some(eintrag) = eintraege.next_entry().await.map_err(io_fehler)? {
+                if eintrag.file_name() != zwischendatei_name().as_str() {
+                    return Err(MatrixFehler::SchluesselPassenNicht);
+                }
+                match tokio::fs::remove_file(eintrag.path()).await {
+                    Ok(()) => {}
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => return Err(io_fehler(err)),
+                }
             }
             Ok(false)
         }
@@ -755,10 +799,15 @@ async fn hat_passende_merkdatei(dir: &Path, geraet: &Geraet) -> Result<bool, Mat
     }
 }
 
+/// Name der Zwischendatei, über die [`lege_merkdatei_an`] die Merkdatei atomar schreibt.
+fn zwischendatei_name() -> String {
+    format!("{GERAET_DATEI}.neu")
+}
+
 /// Legt Verzeichnis und Merkdatei für `geraet` an (atomar über eine Zwischendatei).
 async fn lege_merkdatei_an(dir: &Path, geraet: &Geraet) -> Result<(), MatrixFehler> {
     tokio::fs::create_dir_all(dir).await.map_err(io_fehler)?;
-    let neu = dir.join(format!("{GERAET_DATEI}.neu"));
+    let neu = dir.join(zwischendatei_name());
     let json = serde_json::to_vec(geraet).map_err(|_| MatrixFehler::Antwort)?;
     tokio::fs::write(&neu, json).await.map_err(io_fehler)?;
     tokio::fs::rename(&neu, dir.join(GERAET_DATEI))
@@ -767,9 +816,33 @@ async fn lege_merkdatei_an(dir: &Path, geraet: &Geraet) -> Result<(), MatrixFehl
     Ok(())
 }
 
+/// Datei-IO am Speicherverzeichnis ist vorübergehend (`Speicher`), kein Fehler der
+/// Verschlüsselung.
 fn io_fehler(err: std::io::Error) -> MatrixFehler {
     tracing::warn!("Matrix-Speicherverzeichnis: {err}");
-    MatrixFehler::Verschluesselung
+    MatrixFehler::Speicher
+}
+
+/// Ordnet einen Fehler beim Bau des Clients ein: Fehler des SDK-Speichers selbst (Passphrase,
+/// Version, Migration, Cipher) sind `Verschluesselung`; Datei-IO dabei (Verzeichnis anlegen)
+/// und alles außerhalb des Speichers sind vorübergehend (`Speicher`), HTTP wie sonst. `OpenStoreError` nennt matrix-sdk nicht öffentlich; Datei-IO erkennt die Kette der
+/// Ursachen.
+fn baufehler(e: &matrix_sdk::ClientBuildError) -> MatrixFehler {
+    use matrix_sdk::ClientBuildError as B;
+    match e {
+        B::Http(h) => http_fehler(h),
+        B::SqliteStore(store) => {
+            let mut ursache: Option<&(dyn std::error::Error + 'static)> = Some(store);
+            while let Some(u) = ursache {
+                if u.is::<std::io::Error>() {
+                    return MatrixFehler::Speicher;
+                }
+                ursache = u.source();
+            }
+            MatrixFehler::Verschluesselung
+        }
+        _ => MatrixFehler::Speicher,
+    }
 }
 
 fn netzfehler(e: &reqwest::Error) -> MatrixFehler {
@@ -961,6 +1034,107 @@ mod tests {
         drop(gehalten);
         assert_eq!(schliesse(&mut zugriff, "a").await, Ok(()));
         assert!(zugriff.alt.is_none());
+    }
+
+    /// `raeume` setzt die Vormerkung nur zurück, wenn seit seinem Beginn kein Verwerfen dazukam.
+    #[tokio::test]
+    async fn raeumen_verliert_kein_spaeteres_verwerfen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let eintrag = Arc::new(Eintrag::default());
+        // Begonnen bei Generation 1, inzwischen kam ein zweites Verwerfen (2).
+        eintrag.verwerfen.store(2, Ordering::SeqCst);
+        let sperre = eintrag.zugriff.clone().lock_owned().await;
+        let sperre = raeume(
+            eintrag.clone(),
+            sperre,
+            Some(tmp.path().join("a")),
+            "a".into(),
+            1,
+        )
+        .await
+        .expect("geräumt");
+        assert_eq!(
+            eintrag.verwerfen.load(Ordering::SeqCst),
+            2,
+            "bleibt vorgemerkt"
+        );
+        raeume(
+            eintrag.clone(),
+            sperre,
+            Some(tmp.path().join("a")),
+            "a".into(),
+            2,
+        )
+        .await
+        .expect("geräumt");
+        assert_eq!(eintrag.verwerfen.load(Ordering::SeqCst), 0);
+    }
+
+    fn geraet() -> Geraet {
+        Geraet {
+            user_id: "@lifeline:example.org".into(),
+            device_id: "BOT1".into(),
+        }
+    }
+
+    /// Datei-IO am Speicherverzeichnis und ein Client, dessen Verzeichnis sich nicht anlegen
+    /// lässt, sind vorübergehend (`Speicher`), kein Fehler der Verschlüsselung.
+    #[tokio::test]
+    async fn nicht_nutzbares_verzeichnis_ist_speicher_nicht_verschluesselung() {
+        let tmp = tempfile::tempdir().unwrap();
+        let datei = tmp.path().join("a1");
+        std::fs::write(&datei, b"kein Verzeichnis").unwrap();
+        assert_eq!(
+            hat_passende_merkdatei(&datei, &geraet()).await,
+            Err(MatrixFehler::Speicher)
+        );
+        assert_eq!(
+            lege_merkdatei_an(&datei.join("innen"), &geraet()).await,
+            Err(MatrixFehler::Speicher)
+        );
+        let e = matrix_sdk::Client::builder()
+            .homeserver_url("http://127.0.0.1:1")
+            .sqlite_store(datei.join("innen"), Some("p"))
+            .build()
+            .await
+            .expect_err("Verzeichnis unter einer Datei");
+        assert_eq!(baufehler(&e), MatrixFehler::Speicher);
+    }
+
+    /// Ein Speicher, der sich mit der Passphrase nicht öffnen lässt, bleibt `Verschluesselung`.
+    #[tokio::test]
+    async fn falsche_passphrase_bleibt_verschluesselung() {
+        let tmp = tempfile::tempdir().unwrap();
+        let baue = |passphrase: &'static str| {
+            matrix_sdk::Client::builder()
+                .homeserver_url("http://127.0.0.1:1")
+                .sqlite_store(tmp.path(), Some(passphrase))
+                .build()
+        };
+        let client = baue("richtig").await.expect("neuer Speicher");
+        client.pause().await.expect("Speicher geschlossen");
+        drop(client);
+        let e = baue("falsch").await.expect_err("falsche Passphrase");
+        assert_eq!(baufehler(&e), MatrixFehler::Verschluesselung);
+    }
+
+    /// Eine nach einem Abbruch liegengebliebene Zwischendatei der Merkdatei macht das Verzeichnis
+    /// nicht fremd; sie wird beim Öffnen entfernt.
+    #[tokio::test]
+    async fn liegengebliebene_zwischendatei_macht_das_verzeichnis_nicht_fremd() {
+        let tmp = tempfile::tempdir().unwrap();
+        let neu = tmp.path().join(format!("{GERAET_DATEI}.neu"));
+        std::fs::write(&neu, b"{\"user_id\":\"@l").unwrap();
+        assert_eq!(
+            hat_passende_merkdatei(tmp.path(), &geraet()).await,
+            Ok(false)
+        );
+        assert!(!neu.exists());
+        lege_merkdatei_an(tmp.path(), &geraet()).await.unwrap();
+        assert_eq!(
+            hat_passende_merkdatei(tmp.path(), &geraet()).await,
+            Ok(true)
+        );
     }
 
     #[test]

@@ -611,6 +611,33 @@ async fn abbruch_beim_senden_ist_voruebergehend_nicht_ungewiss() {
     assert!(w.teile(&id).await.is_empty());
 }
 
+/// Ein Speicherverzeichnis, das sich nicht löschen und nicht öffnen lässt (hier eine Datei an
+/// seiner Stelle), ist ein vorübergehendes Problem des Hubs, kein endgültiges „Verschlüsseln
+/// nicht möglich“: der Versand bleibt im Wiederholungsfenster.
+#[tokio::test]
+async fn nicht_nutzbarer_speicher_ist_voruebergehend() {
+    let w = welt().await;
+    let _sync = w.hs.raum_im_sync(false).await;
+    w.hs.senden_nimmt_an().await;
+    let adapter_id = w.ziel().await.adapter_id;
+    let basis = w._basis.path().join("matrix");
+    std::fs::create_dir_all(&basis).unwrap();
+    std::fs::write(basis.join(&adapter_id), b"kein Verzeichnis").unwrap();
+    // Das Verwerfen scheitert am Löschen und bleibt vorgemerkt.
+    w.clients.verwerfen(&adapter_id).await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand(RAUM, lid, t0).await;
+
+    w.durchgang(t0).await;
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet, "{z:?}");
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Voruebergehend));
+    assert!(z.naechster_versuch_at.is_some());
+    assert!(w.hs.gesendet().await.is_empty());
+}
+
 #[tokio::test]
 async fn erneut_senden_ueberspringt_gemerkte_teile() {
     let w = welt().await;

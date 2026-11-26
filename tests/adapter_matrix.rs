@@ -707,3 +707,62 @@ async fn verwerfen_schliesst_den_speicher_auch_wenn_der_alte_client_noch_gehalte
     );
     assert!(!basis.path().join("matrix/a1").exists());
 }
+
+/// Ein zweites Verwerfen, während das erste noch räumt, erledigt derselbe Halter, bevor er einen
+/// Speicher öffnet: nie fällt danach ein Speicher, den ein Client schon benutzt hat (der Server
+/// kennt dann seine Schlüssel, und ein neuer Speicher passte nicht mehr).
+#[tokio::test]
+async fn zweites_verwerfen_waehrend_des_raeumens_raeumt_vor_dem_oeffnen() {
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let (server1, token1) = homeserver("BOT1").await;
+    let ziel1 = ziel(&server1, &token1, "a1");
+    matrix::pruefe(&clients, &ziel1).await.expect("BOT1");
+
+    // Ein Hintergrund-Task hält den alten Client, das Räumen wartet darauf.
+    clients
+        .mit_client(&ziel1, |client| {
+            let halter = client.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(400)).await;
+                drop(halter);
+            });
+            Box::pin(async {})
+        })
+        .await
+        .expect("Zugriff");
+    drop(clients.verwerfen("a1"));
+
+    // Ein Versand mit dem neuen Token räumt zuerst und benutzt dann seinen Speicher (Sync lädt
+    // die Geräteschlüssel hoch).
+    let (server2, token2) = homeserver("BOT2").await;
+    let versand = {
+        let clients = clients.clone();
+        let ziel2 = ziel(&server2, &token2, "a1");
+        tokio::spawn(async move {
+            clients
+                .mit_client(&ziel2, |client| {
+                    Box::pin(async move {
+                        client
+                            .sync_once(matrix_sdk::config::SyncSettings::default())
+                            .await
+                            .map(|_| ())
+                    })
+                })
+                .await
+        })
+    };
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(!versand.is_finished(), "das Räumen wartet noch");
+    drop(clients.verwerfen("a1"));
+    versand
+        .await
+        .unwrap()
+        .expect("Zugriff")
+        .expect("Sync mit dem neuen Speicher");
+
+    let befund = matrix::pruefe(&clients, &ziel(&server2, &token2, "a1"))
+        .await
+        .expect("der benutzte Speicher bleibt");
+    assert_eq!(befund.device_id, "BOT2");
+}
