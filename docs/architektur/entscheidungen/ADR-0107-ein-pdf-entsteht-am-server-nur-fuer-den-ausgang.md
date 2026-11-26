@@ -1,5 +1,5 @@
 ---
-id: ADR-0106
+id: ADR-0107
 titel: Ein PDF entsteht am Server nur für den Ausgang
 status: akzeptiert
 datum: 2026-11-25
@@ -13,7 +13,7 @@ herleitung:
   - docs/konzepte/2026-11-10-schnittstellen-ausbau.md
 ---
 
-# ADR-0106: Ein PDF entsteht am Server nur für den Ausgang
+# ADR-0107: Ein PDF entsteht am Server nur für den Ausgang
 
 ## Regeln
 
@@ -37,7 +37,7 @@ verlange 'include_bytes!\("\.\./\.\./assets/schriften/Archivo' src/ausgang/pdf.r
 verbiete 'printpdf' 'src/**/*.rs' ':!src/ausgang/pdf.rs'
 test -f assets/schriften/OFL.txt
 verlange 'distroless' Dockerfile
-verlange 'ADR-0106' frontend/src/druck/AGENTS.md
+verlange 'ADR-0107' frontend/src/druck/AGENTS.md
 ```
 
 ## Kontext

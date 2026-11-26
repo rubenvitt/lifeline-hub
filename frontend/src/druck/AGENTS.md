@@ -6,7 +6,7 @@ Gilt für `frontend/src/druck/`, `components/druck/` und jede Seite mit Druckwur
 **Gedruckt wird über den Browser, nie auf dem Server** (Herleitung
 `openspec/changes/archive/2026-09-29-lfh-22-druck-export/design.md`, Grundsatz aus
 `docs/superpowers/specs/2026-06-02-lage-lageberichte-design.md`). Einzige Ausnahme: das PDF des
-Ausgangs (Fax und Mail-Anhang) baut der Server, ADR-0106; es ersetzt keine Druckansicht.
+Ausgangs (Fax und Mail-Anhang) baut der Server, ADR-0107; es ersetzt keine Druckansicht.
 
 - **Eine Druckwurzel je Seite** (`data-lfh="druckwurzel"`); Mechanik nur in `druck/druck.css`
   (global in `main.tsx`, nur unter `@media print`; `@page` ist die gepinnte Ausnahme; Rest `display: none`, **nie** `visibility: hidden` + `position: absolute`). `*Print.css` tragen

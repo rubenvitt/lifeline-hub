@@ -557,7 +557,7 @@ Was ein Mensch an eine Externe Stelle sendet (E-Mail, LLH-2093; Fax, LLH-2095), 
   wiederholt.
 - **Ein Kanal, eine Art:** Fax ist die Adapter-Art `sipgate_fax` mit Token als Geheimnis; das Fax
   ist ein PDF, das nur hier am Server entsteht
-  ([ADR-0106](entscheidungen/ADR-0106-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md)) und
+  ([ADR-0107](entscheidungen/ADR-0107-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md)) und
   auch der Mail anhängt. Ein Fax gilt erst als `zugestellt`, wenn sipgate es auf Nachfrage
   bestätigt; das ETB folgt dem Endstand.
 - **Spiegel und Schwärzung:** `ausgang` ist vom Spiegel ausgenommen (`src/instanz/spiegel/art.rs`),
