@@ -134,7 +134,8 @@ Ereignis „helfer“ gehen nur an die Einsatzleitung.
 Die Organisation schaltet die Ortung in der Verwaltung unter „Einsatz-Vorgaben“, Bereich „Ortung“
 ein („Ortung im Einsatz“). Beim Einschalten bestätigt sie, dass eine Einwilligung der Helfenden
 bzw. eine Betriebsvereinbarung vorliegt; der Server hält fest, wer es wann bestätigt hat. „Auch
-Personen orten“ ist ein zweiter, eigener Schalter. Ohne „Ortung im Einsatz“ ist „Helfer einladen“
+Personen orten“ ist ein zweiter, eigener Schalter. Jedes Ein- und Ausschalten beider Schalter
+steht mit Person und Zeitpunkt im [Zugangsprotokoll](zugangsprotokoll.md). Ohne „Ortung im Einsatz“ ist „Helfer einladen“
 gesperrt. Eine Vorlage für die Datenschutz-Folgenabschätzung liegt im Repository unter
 `docs/datenschutz/dsfa-vorlage-ortung.md`.
 

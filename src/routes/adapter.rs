@@ -487,8 +487,14 @@ pub async fn create(
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
-        // Eine Org hat höchstens eine E-Mail-Anbindung, auch eine angehaltene zählt (LLH-2093).
-        if code == crate::adapter::smtp_art::CODE {
+        // Eine Org hat höchstens eine E-Mail- und eine Fax-Anbindung, auch eine angehaltene
+        // zählt (LLH-2093, LLH-2095): der Ausgangskorb wählt die Anbindung je Kanal.
+        let versand = match code {
+            crate::adapter::smtp_art::CODE => Some("E-Mail"),
+            crate::adapter::sipgate_fax_art::CODE => Some("Fax"),
+            _ => None,
+        };
+        if let Some(kanal) = versand {
             let (vorhanden,): (i64,) =
                 sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
                     .bind(org_id)
@@ -496,9 +502,9 @@ pub async fn create(
                     .fetch_one(&mut *conn)
                     .await?;
             if vorhanden > 0 {
-                return Err(AppError::UnprocessableEntity(
-                    "Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.".into(),
-                ));
+                return Err(AppError::UnprocessableEntity(format!(
+                    "Es gibt schon eine {kanal}-Anbindung; ändere oder lösche sie."
+                )));
             }
         }
         repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
@@ -654,8 +660,11 @@ pub async fn delete(
         Ok((a, erledigt))
     })?;
     // Mit dem Adapter fallen seine Zuschaltungen (`ON DELETE CASCADE`); erst nach dem Commit
-    // vergisst der Store Merker und Stand (LLH-2105).
-    state.drohne.set_zugeschaltet(&id, false);
+    // vergisst der Store Merker und Stand (LLH-2105), über den geordneten Abgleich (LLH-2123).
+    // Der Adapter ist schon weg; ein Lesefehler lässt höchstens einen Merker ohne Abruf stehen.
+    if let Err(e) = crate::routes::drohne::sync_store(&state, std::slice::from_ref(&id)).await {
+        tracing::error!("Drohnen-Store nach dem Löschen nicht nachgeführt: {e}");
+    }
     crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(
         &state,

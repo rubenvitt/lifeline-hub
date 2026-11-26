@@ -13,6 +13,8 @@ pub mod geheimnis;
 pub mod lauf;
 pub mod live;
 pub mod repo;
+pub mod sipgate;
+pub mod sipgate_fax_art;
 pub mod smtp;
 pub mod smtp_art;
 pub mod ziel;

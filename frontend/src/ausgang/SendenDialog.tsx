@@ -17,7 +17,7 @@ interface FormWerte {
   kanaele: number[];
 }
 
-/** Gründe, die auf eine fehlende oder gestörte Mailanbindung deuten: Admins bekommen den Weg dorthin. */
+/** Gründe, die auf eine fehlende oder gestörte Anbindung deuten: Admins bekommen den Weg dorthin. */
 const ANBINDUNG_GRUENDE = new Set(['anbindung_fehlt', 'anbindung_angehalten', 'anbindung_fehler']);
 
 const VORSCHAU_ZEILEN = 3;
@@ -29,9 +29,10 @@ function groesse(bytes: number): string {
 }
 
 /**
- * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail
- * (LLH-2093, Spec 7): Mailadressen der aktiven Externen Stellen zum Anhaken, die Stellen des
- * Verteilers bzw. der Adressat sind vorbelegt. Nur online; eine Mail wird nie vorgemerkt.
+ * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail oder Fax
+ * (LLH-2093, LLH-2095): Mailadressen und Faxnummern der aktiven Externen Stellen zum Anhaken,
+ * getrennt nach Kanal. Vorbelegt sind nur die Mailadressen der Stellen des Verteilers bzw. des
+ * Adressaten, damit eine Stelle nicht doppelt Post bekommt. Nur online; nie vorgemerkt.
  */
 export default function SendenDialog({
   offen,
@@ -61,9 +62,22 @@ export default function SendenDialog({
   const online = useOnline();
   const [form] = Form.useForm<FormWerte>();
   const gewaehlt = Form.useWatch('kanaele', form) as number[] | undefined;
-  const kanaeleQuery = useKanaeleSammlung('email');
+  const mailQuery = useKanaeleSammlung('email');
+  const faxQuery = useKanaeleSammlung('fax');
   const sende = useSendeVersaende(einsatzId, quelle);
-  const kanaele = kanaeleQuery.data;
+  // Lädt eine Liste nicht, bleibt die andere nutzbar: ein Fehler bei den Faxnummern sperrt die
+  // Mail nicht (und umgekehrt).
+  const mailFehler = mailQuery.isError;
+  const faxFehler = faxQuery.isError;
+  const mails = useMemo(
+    () => mailQuery.data ?? (mailFehler ? [] : undefined),
+    [mailQuery.data, mailFehler],
+  );
+  const faxe = useMemo(
+    () => faxQuery.data ?? (faxFehler ? [] : undefined),
+    [faxQuery.data, faxFehler],
+  );
+  const kanaele = mails && faxe ? [...mails, ...faxe] : undefined;
 
   // Ein Schlüssel je Öffnen: ein zweiter Versuch derselben Eingabe legt keine zweite Mail an.
   // `offen` ist der Auslöser; der Wert hängt nur an der Öffnung.
@@ -74,16 +88,16 @@ export default function SendenDialog({
   // überschreibt keine Auswahl der Person.
   const vorbelegtFuer = useRef<string | null>(null);
   useEffect(() => {
-    if (!offen || !kanaele || vorbelegtFuer.current === clientId) return;
+    if (!offen || !mails || !faxe || vorbelegtFuer.current === clientId) return;
     vorbelegtFuer.current = clientId;
-    form.setFieldValue('kanaele', [...empfaengerVorschlag(kanaele, vorschlagNamen)]);
-  }, [offen, kanaele, clientId, form, vorschlagNamen]);
+    form.setFieldValue('kanaele', [...empfaengerVorschlag(mails, vorschlagNamen)]);
+  }, [offen, mails, faxe, clientId, form, vorschlagNamen]);
 
   const keineAdresse = kanaele !== undefined && kanaele.length === 0;
   const grund = !online
     ? 'Ohne Netz nicht möglich'
     : keineAdresse
-      ? 'Keine Mailadresse hinterlegt'
+      ? 'Keine Adresse hinterlegt'
       : null;
   const gesperrt = grund !== null || kanaele === undefined || (gewaehlt ?? []).length === 0;
 
@@ -124,7 +138,7 @@ export default function SendenDialog({
         <Alert
           type="warning"
           showIcon
-          title="Keine Mailadresse hinterlegt"
+          title="Keine Adresse hinterlegt"
           description={
             istAdmin ? (
               <Link to={adminSektionPfad('stammdaten', 'externe-stellen')}>
@@ -136,12 +150,31 @@ export default function SendenDialog({
       ) : (
         <Feld label="An" name="kanaele">
           <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-            {kanaele.map((k) => (
-              <Checkbox key={k.channel.id} value={k.channel.id}>
-                {k.agency_name} · {k.channel.address}
-                {k.channel.label ? ` (${k.channel.label})` : ''}
-              </Checkbox>
-            ))}
+            {(
+              [
+                ['E-Mail', mails ?? []],
+                ['Fax', faxe ?? []],
+              ] as const
+            )
+              .filter(([, liste]) => liste.length > 0)
+              .map(([titel, liste]) => (
+                <div
+                  key={titel}
+                  role="group"
+                  aria-label={titel}
+                  style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
+                >
+                  <Typography.Text type="secondary" style={schriftStil('textKlein')}>
+                    {titel}
+                  </Typography.Text>
+                  {liste.map((k) => (
+                    <Checkbox key={k.channel.id} value={k.channel.id}>
+                      {k.agency_name} · {k.channel.address}
+                      {k.channel.label ? ` (${k.channel.label})` : ''}
+                    </Checkbox>
+                  ))}
+                </div>
+              ))}
           </Checkbox.Group>
         </Feld>
       )}

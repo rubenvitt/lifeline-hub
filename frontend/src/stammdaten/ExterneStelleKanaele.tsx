@@ -1,11 +1,11 @@
 import { Button, Input } from 'antd';
 import { useId, useState } from 'react';
-import { Augenbraue, FeldFehler, Stapel, Textstufe } from '../components/instrument';
+import { Augenbraue, FeldFehler, SegmentFeld, Stapel, Textstufe } from '../components/instrument';
 import { SpeicherFehler } from '../components/SpeicherHinweis';
 import { useOhneVerbindung } from '../offline/verbindung';
 import { useCreateKanal, useDeleteKanal, useExterneStelleKanaele } from '../api/externeStellen';
 import { useStammdatenHerkunft } from '../instanz/herkunft';
-import type { ExterneStelle } from '../api/types';
+import type { ExterneStelle, KanalArt } from '../api/types';
 
 /** Höchstlänge einer Adresse, wie der Server sie prüft (RFC 5321). */
 const ADRESSE_MAX = 254;
@@ -24,8 +24,34 @@ export function istMailFormGueltig(adresse: string): boolean {
 }
 
 /**
- * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093): die
- * Mailadressen der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
+ * Grobe Prüfung einer Faxnummer wie der Server (`normalize_fax`, LLH-2095): `+`, `00` oder eine
+ * führende `0`, danach 8 bis 15 Ziffern; Leerzeichen, `-`, `/`, `.`, Klammern und ein `(0)`
+ * hinter der Landeskennung zählen nicht. Der Server bringt die Nummer in die Form E.164.
+ */
+export function istFaxnummerGueltig(roh: string): boolean {
+  let a = roh.trim();
+  if (a.startsWith('+') || a.startsWith('00')) a = a.replace('(0)', '');
+  a = a.replace(/[\s\-/.()]/g, '');
+  let ziffern: string;
+  if (a.startsWith('+')) ziffern = a.slice(1);
+  else if (a.startsWith('00')) ziffern = a.slice(2);
+  else if (a.startsWith('0')) ziffern = `49${a.slice(1)}`;
+  else return false;
+  return /^[1-9][0-9]{7,14}$/.test(ziffern);
+}
+
+const KANAL_TEXT: Record<'email' | 'fax', { name: string; adresse: string }> = {
+  email: { name: 'E-Mail', adresse: 'Mailadresse' },
+  fax: { name: 'Fax', adresse: 'Faxnummer' },
+};
+
+function adressName(kanal: KanalArt): string {
+  return kanal === 'fax' ? KANAL_TEXT.fax.adresse : KANAL_TEXT.email.adresse;
+}
+
+/**
+ * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093, Fax
+ * LLH-2095): die Mailadressen und Faxnummern der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
  * Eingaben hier stehen außerhalb seines `Form` (kein Feld, Enter fügt die Adresse hinzu, statt
  * das Modal abzusenden). Eine Stelle vom Hub ist nur lesbar, ihre Adressen kommen mit.
  */
@@ -36,20 +62,25 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
   const herkunft = useStammdatenHerkunft();
   const ohneNetz = useOhneVerbindung();
   const fehlerId = useId();
+  const [kanal, setKanal] = useState<'email' | 'fax'>('email');
   const [adresse, setAdresse] = useState('');
   const [beschriftung, setBeschriftung] = useState('');
   const [formFehler, setFormFehler] = useState<string | null>(null);
   const vomHub = herkunft.istVomHub('externe_stelle', stelle.id);
 
   const hinzufuegen = () => {
-    if (!istMailFormGueltig(adresse)) {
+    if (kanal === 'email' && !istMailFormGueltig(adresse)) {
       setFormFehler('Mailadresse ungültig');
+      return;
+    }
+    if (kanal === 'fax' && !istFaxnummerGueltig(adresse)) {
+      setFormFehler('Keine gültige Faxnummer');
       return;
     }
     setFormFehler(null);
     const label = beschriftung.trim();
     anlegen.mutate(
-      { channel: 'email', address: adresse.trim(), ...(label ? { label } : {}) },
+      { channel: kanal, address: adresse.trim(), ...(label ? { label } : {}) },
       {
         onSuccess: () => {
           setAdresse('');
@@ -68,13 +99,16 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
         {abfrage.isError && <SpeicherFehler fehler={abfrage.error} titel="Nicht geladen" />}
         {kanaele.length === 0 && !abfrage.isLoading && !abfrage.isError && (
           <Textstufe stufe="textKlein" ton="gedaempft">
-            Noch keine Mailadresse hinterlegt.
+            Noch keine Adresse hinterlegt.
           </Textstufe>
         )}
         <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {kanaele.map((k) => (
             <li key={k.id}>
               <Stapel richtung="zeile" abstand="sm" ausrichten="baseline" umbruch>
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  {k.channel === 'fax' ? KANAL_TEXT.fax.name : KANAL_TEXT.email.name}
+                </Textstufe>
                 <span data-schrift="kennung">{k.address}</span>
                 {k.label && (
                   <Textstufe stufe="textKlein" ton="gedaempft">
@@ -84,7 +118,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 {!vomHub && (
                   <Button
                     danger
-                    aria-label={`Mailadresse ${k.address} entfernen`}
+                    aria-label={`${adressName(k.channel)} ${k.address} entfernen`}
                     disabled={ohneNetz}
                     loading={entfernen.isPending && entfernen.variables === k.id}
                     onClick={() => entfernen.mutate(k.id)}
@@ -102,14 +136,26 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
           </Textstufe>
         ) : (
           <Stapel abstand="xs">
+            <SegmentFeld<'email' | 'fax'>
+              beschriftung="Kanal der neuen Adresse"
+              value={kanal}
+              onChange={(w) => {
+                setKanal(w);
+                setFormFehler(null);
+              }}
+              optionen={[
+                { wert: 'email', label: KANAL_TEXT.email.name },
+                { wert: 'fax', label: KANAL_TEXT.fax.name },
+              ]}
+            />
             <Stapel richtung="zeile" abstand="sm" umbruch>
               <Input
-                aria-label="Mailadresse"
+                aria-label={KANAL_TEXT[kanal].adresse}
                 aria-invalid={formFehler ? true : undefined}
                 aria-describedby={formFehler ? fehlerId : undefined}
                 type="text"
-                inputMode="email"
-                placeholder="leitstelle@beispiel.de"
+                inputMode={kanal === 'fax' ? 'tel' : 'email'}
+                placeholder={kanal === 'fax' ? '0511 123456' : 'leitstelle@beispiel.de'}
                 maxLength={ADRESSE_MAX}
                 value={adresse}
                 onChange={(e) => {

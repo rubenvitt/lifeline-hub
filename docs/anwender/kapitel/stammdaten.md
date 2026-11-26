@@ -155,13 +155,13 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
 5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
 6. „Anlegen“ wählen.
 
-Mailadressen einer bestehenden Stelle (für das Senden von Lageberichten, Befehlen und
-Nachforderungen):
+Mailadressen und Faxnummern einer bestehenden Stelle (für das Senden von Lageberichten, Befehlen
+und Nachforderungen):
 
-1. Die Stelle öffnen und im Abschnitt „Erreichbar per“ die Mailadresse eintragen, nach Bedarf eine
-   Beschriftung („Lagedienst“).
-2. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert; „Mailadresse ungültig“
-   erscheint, wenn sie nicht stimmt.
+1. Die Stelle öffnen und im Abschnitt „Erreichbar per“ „E-Mail“ oder „Fax“ wählen, dann die
+   Mailadresse bzw. Faxnummer eintragen, nach Bedarf eine Beschriftung („Lagedienst“).
+2. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert; „Mailadresse ungültig“ bzw.
+   „Keine gültige Faxnummer“ erscheint, wenn sie nicht stimmt.
 3. Zum Entfernen den Eintrag der Adresse entfernen.
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
@@ -376,9 +376,10 @@ Sicherheit bleiben pflegbar.
   in den Vorschlägen vorn und ist die Vorgabe für den Adressaten einer
   [Nachforderung](nachforderung.md).
 
-Eine Stelle kann mehrere Mailadressen haben; die Adresse wird klein geschrieben gespeichert, eine
-doppelte ist nicht möglich. Eine Stelle, die vom Hub kommt, zeigt ihre Adressen nur an. Die
-Liste nennt „n Mailadressen“ an der Bezeichnung. Gesendet wird an die Adresse, wie sie beim
+Eine Stelle kann mehrere Mailadressen und Faxnummern haben; die Mailadresse wird klein
+geschrieben gespeichert, eine Faxnummer international (aus „0511 123456“ wird „+49511123456“),
+eine doppelte ist nicht möglich. Eine Stelle, die vom Hub kommt, zeigt ihre Adressen nur an. Die
+Liste nennt „n Mailadressen“ und „n Faxnummern“ an der Bezeichnung. Gesendet wird an die Adresse, wie sie beim
 Absenden stand; spätere Änderungen betreffen nur neue Versände.
 
 ### Einsatz-Vorlagen

@@ -95,7 +95,7 @@ async fn admin_legt_mailadresse_an_und_liest_sie() {
 }
 
 #[tokio::test]
-async fn sammelroute_liefert_nur_mailadressen_aktiver_stellen() {
+async fn sammelroute_liefert_je_kanal_nur_dessen_adressen_aktiver_stellen() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let aktiv = stelle_anlegen(&app, &admin, "Aktiv").await;
@@ -129,10 +129,32 @@ async fn sammelroute_liefert_nur_mailadressen_aktiver_stellen() {
     assert_eq!(liste[0]["agency_name"], "Aktiv");
     assert_eq!(liste[0]["channel"]["address"], "a@b.de");
 
-    let (status, _) = anfrage(
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        aktiv,
+        r#"{"channel":"fax","address":"0511 123456"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    let (status, json) = anfrage(
         &app,
         "GET",
         &format!("{PFAD}/channels?channel=fax"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{json}");
+    let liste = json.as_array().unwrap();
+    assert_eq!(liste.len(), 1, "{json}");
+    assert_eq!(liste[0]["channel"]["address"], "+49511123456");
+    assert_eq!(liste[0]["channel"]["channel"], "fax");
+
+    let (status, _) = anfrage(
+        &app,
+        "GET",
+        &format!("{PFAD}/channels?channel=matrix"),
         &admin,
         None,
     )
@@ -141,11 +163,35 @@ async fn sammelroute_liefert_nur_mailadressen_aktiver_stellen() {
 }
 
 #[tokio::test]
-async fn fax_ist_noch_nicht_freigeschaltet() {
+async fn faxnummer_wird_normalisiert_und_ungueltige_abgelehnt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let stelle = stelle_anlegen(&app, &admin, "Leitstelle").await;
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"fax","address":"+49 (0) 511 / 123 45-6"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    assert_eq!(json["address"], "+49511123456");
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"fax","address":"Leitstelle anrufen"}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+}
+
+#[tokio::test]
+async fn matrix_und_threema_sind_noch_nicht_freigeschaltet() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let stelle = stelle_anlegen(&app, &admin, "Kreisverwaltung").await;
-    for kanal in ["fax", "matrix", "threema", "brieftaube"] {
+    for kanal in ["matrix", "threema", "brieftaube"] {
         let (status, json) = kanal_anlegen(
             &app,
             &admin,

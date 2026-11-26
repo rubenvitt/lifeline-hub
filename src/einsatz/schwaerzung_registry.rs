@@ -156,6 +156,8 @@ const G_ZAEHLER: &str = "Laufende Nummer/Zähler/Menge (anonymes Statistik-Skele
 const G_IDEMPOTENZ: &str =
     "Client-Idempotenzschlüssel (technische UUID zur Offline-Dedup, kein Personenbezug)";
 const G_KONFIG: &str = "Einsatz-Konfiguration (kein Personenbezug)";
+const G_ANBIETER: &str =
+    "Technische Kennung eines externen Anbieters (Session-ID, kein Inhalt, kein Personenbezug)";
 const G_POLY: &str =
     "Polymorpher Bezug (objekt_typ/objekt_id o. Ä.; Struktur, Ziel wird eigenständig gescrubbt)";
 // Operatives Struktur-Label (Einheit, Abschnitt, Raum, Funkgruppe): benennt ein Objekt, keine
@@ -3764,7 +3766,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("angelegt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
         ],
     },
-    // ---------- Ausgangskorb für E-Mail (LLH-2093, `ausgang`) ----------
+    // ---------- Ausgangskorb für E-Mail und Fax (LLH-2093, LLH-2095, `ausgang`) ----------
     // Schnappschuss des Versands: Betreff, Text, Adresse und Name der Stelle sind Freitext der
     // Module (Linie A, LFH-701) und werden geschwärzt; der rechtsverbindliche Wortlaut steht im
     // ETB (G_ETB). Zustand, Fehlercode und Zeiten sind Skelett.
@@ -3797,6 +3799,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_at", G_ZEIT),
             retain("uebergeben_at", G_ZEIT),
             retain("etb_eintrag_id", G_FK),
+            // Fax (LLH-2095): die Session-ID von sipgate ist eine technische Kennung des
+            // Anbieters ohne Inhalt; Zeiten und Merker sind Skelett.
+            retain("anbieter_ref", G_ANBIETER),
+            retain("zugestellt_at", G_ZEIT),
+            retain("naechste_abfrage_at", G_ZEIT),
+            retain("ohne_pdf", G_ENUM),
         ],
     },
     // ---------- Ausgangsereignisse für Fremdsysteme (LLH-1655, `maschine_ereignis`) ----------
@@ -3831,6 +3839,10 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            // Kopplung an einen Zugang des Hubs (LLH-2119, migrations/0387, ADR-0109).
+            scrub("instanz_kopplung_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("fremder_zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
+            scrub("zugang_name", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("kennung", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gekoppelt_at", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("gekoppelt_von", Strategie::ZeileLoeschen, Z_EINSATZ),

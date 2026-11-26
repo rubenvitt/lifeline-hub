@@ -374,6 +374,7 @@ fn serde_wire_gleich_as_str() {
     enum_wire_as_str!(lifeline_hub::ausgang::VersandZustand {
         Wartet,
         Uebergeben,
+        Zugestellt,
         Fehlgeschlagen,
     });
     enum_wire_as_str!(lifeline_hub::ausgang::AusgangFehler {
@@ -386,6 +387,7 @@ fn serde_wire_gleich_as_str() {
         AnbindungFehler,
         ZuGross,
         Spiegel,
+        NichtZugestellt,
     });
     enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
         Email,
@@ -726,6 +728,10 @@ fn serde_wire_gleich_as_str() {
         AdapterFortgesetzt,
         FremdebenenLanErlaubt,
         FremdebenenLanEntzogen,
+        OrtungEingeschaltet,
+        OrtungAusgeschaltet,
+        OrtungPersonenEingeschaltet,
+        OrtungPersonenAusgeschaltet,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {

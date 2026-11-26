@@ -19,11 +19,13 @@ wire_enum! {
 
 wire_enum! {
     /// Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den
-    /// Mailserver oder `fehlgeschlagen`.
+    /// Mailserver bzw. Fax-Anbieter, `zugestellt` (nur Fax: der Anbieter hat die Zustellung
+    /// bestätigt, LLH-2095) oder `fehlgeschlagen`.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum VersandZustand {
         Wartet => "wartet",
         Uebergeben => "uebergeben",
+        Zugestellt => "zugestellt",
         Fehlgeschlagen => "fehlgeschlagen",
     }
     try_from = |s| format!("Ungültiger Zustand eines Versands: {s}");
@@ -31,7 +33,9 @@ wire_enum! {
 }
 
 wire_enum! {
-    /// Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.
+    /// Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des
+    /// Ziels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter
+    /// meldet, dass das Fax nicht durchging (LLH-2095).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AusgangFehler {
         Voruebergehend => "voruebergehend",
@@ -43,6 +47,7 @@ wire_enum! {
         AnbindungFehler => "anbindung_fehler",
         ZuGross => "zu_gross",
         Spiegel => "spiegel",
+        NichtZugestellt => "nicht_zugestellt",
     }
     try_from = |s| format!("Ungültiger Fehler eines Versands: {s}");
     sqlx = |s| format!("Ungültiger Fehler eines Versands: {s}");
@@ -69,4 +74,25 @@ pub fn naechster_versuch(
     let exponent = (versuche - 1).clamp(0, 16) as u32;
     let warte = (BACKOFF_START_S << exponent).min(BACKOFF_DECKEL_S);
     Some(jetzt + Duration::seconds(warte))
+}
+
+/// Erste Abfrage beim Fax-Anbieter nach der Übergabe, in Sekunden (LLH-2095, Spec Abschnitt 5).
+pub const ABFRAGE_ERSTE_S: i64 = 30;
+/// Abstand jeder weiteren Abfrage in Sekunden.
+pub const ABFRAGE_TAKT_S: i64 = 60;
+/// Frist seit der Übergabe, nach der ein Fax ohne Endstand `ungewiss` wird (2 h).
+pub const ABFRAGE_FRIST_MINUTEN: i64 = 120;
+
+/// Zeitpunkt der ersten Abfrage nach der Übergabe an den Fax-Anbieter.
+pub fn erste_abfrage(uebergeben: DateTime<Utc>) -> DateTime<Utc> {
+    uebergeben + Duration::seconds(ABFRAGE_ERSTE_S)
+}
+
+/// Zeitpunkt der nächsten Abfrage, oder `None`, wenn seit der Übergabe mehr als die Frist
+/// vergangen ist (dann ist der Versand `fehlgeschlagen` mit `ungewiss`).
+pub fn naechste_abfrage(uebergeben: DateTime<Utc>, jetzt: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    if jetzt - uebergeben > Duration::minutes(ABFRAGE_FRIST_MINUTEN) {
+        return None;
+    }
+    Some(jetzt + Duration::seconds(ABFRAGE_TAKT_S))
 }

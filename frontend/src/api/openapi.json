@@ -1487,7 +1487,11 @@
           "adapter_angehalten",
           "adapter_fortgesetzt",
           "fremdebenen_lan_erlaubt",
-          "fremdebenen_lan_entzogen"
+          "fremdebenen_lan_entzogen",
+          "ortung_eingeschaltet",
+          "ortung_ausgeschaltet",
+          "ortung_personen_eingeschaltet",
+          "ortung_personen_ausgeschaltet"
         ]
       },
       "AdressatKategorie": {
@@ -3504,7 +3508,7 @@
       },
       "AusgangFehler": {
         "type": "string",
-        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der SMTP-Status.",
+        "description": "Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des\nZiels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter\nmeldet, dass das Fax nicht durchging (LLH-2095).",
         "enum": [
           "voruebergehend",
           "abgelehnt",
@@ -3514,7 +3518,8 @@
           "anbindung_angehalten",
           "anbindung_fehler",
           "zu_gross",
-          "spiegel"
+          "spiegel",
+          "nicht_zugestellt"
         ]
       },
       "Ausmass": {
@@ -13242,7 +13247,7 @@
       },
       "KanalArt": {
         "type": "string",
-        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen wird heute nur [`KanalArt::Email`] (siehe [`KanalArt::is_freigeschaltet`]).",
+        "description": "Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der\nTabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;\nangenommen werden heute E-Mail und Fax (siehe [`KanalArt::is_freigeschaltet`]).",
         "enum": [
           "email",
           "fax",
@@ -17869,11 +17874,27 @@
           "kennung"
         ],
         "properties": {
+          "instanz_kopplung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt: die Kopplung hing an einer Kennung des Hubs (LLH-2119)."
+          },
           "kennung": {
             "type": "string"
           },
           "zugang_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Der lokale Einwurf-Zugang, mit `instanz_kopplung_id` der Zugang auf dem Hub."
+          },
+          "zugang_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Hub-Zugangs für das ETB."
           }
         }
       },
@@ -23136,7 +23157,8 @@
           "access_name",
           "device_id",
           "received_at",
-          "coupled"
+          "coupled",
+          "via_hub"
         ],
         "properties": {
           "access_id": {
@@ -23154,6 +23176,10 @@
           },
           "received_at": {
             "type": "string"
+          },
+          "via_hub": {
+            "type": "boolean",
+            "description": "Kommt die Kennung vom Hub (gespiegelte Org) statt aus der eigenen Ablage?"
           }
         }
       },
@@ -23162,7 +23188,8 @@
         "description": "Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“\n(ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu\ndürfen, und erklärt, warum Koppeln gesperrt ist.",
         "required": [
           "tracking_enabled",
-          "candidates"
+          "candidates",
+          "pending"
         ],
         "properties": {
           "candidates": {
@@ -23170,6 +23197,10 @@
             "items": {
               "$ref": "#/components/schemas/TrackingCandidate"
             }
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "Die Liste des Hubs ist angefragt, aber noch nicht (frisch) da; der Dialog fragt erneut."
           },
           "tracking_enabled": {
             "type": "boolean",
@@ -24649,7 +24680,8 @@
           "state",
           "attempts",
           "created_by_id",
-          "created_at"
+          "created_at",
+          "without_pdf"
         ],
         "properties": {
           "address": {
@@ -24684,6 +24716,13 @@
               "string",
               "null"
             ]
+          },
+          "delivered_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Wann der Fax-Anbieter die Zustellung bestätigt hat (nur Fax, LLH-2095)."
           },
           "error": {
             "oneOf": [
@@ -24724,15 +24763,20 @@
           },
           "subject": {
             "type": "string"
+          },
+          "without_pdf": {
+            "type": "boolean",
+            "description": "Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war."
           }
         }
       },
       "VersandZustand": {
         "type": "string",
-        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver oder `fehlgeschlagen`.",
+        "description": "Zustand eines Versands: `wartet` (auch zwischen zwei Versuchen), `uebergeben` an den\nMailserver bzw. Fax-Anbieter, `zugestellt` (nur Fax: der Anbieter hat die Zustellung\nbestätigt, LLH-2095) oder `fehlgeschlagen`.",
         "enum": [
           "wartet",
           "uebergeben",
+          "zugestellt",
           "fehlgeschlagen"
         ]
       },
