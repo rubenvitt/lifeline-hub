@@ -6,18 +6,14 @@ use std::sync::Arc;
 
 use age::secrecy::ExposeSecret;
 use futures::future::BoxFuture;
-use sqlx::SqliteConnection;
 
-use super::repo;
-use super::store::{Stand, Store};
+use super::store::{Stand, StandUebernahme, Store};
 use super::suchlage::{parse_lage, parse_photos, FotosErgebnis, ParseError, Upstream};
 use crate::adapter::art::{
     AdapterArt, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme,
 };
-use crate::adapter::repo::Adapter;
 use crate::adapter::ziel::AbrufKontext;
 use crate::adapter::zustand::AdapterFehler;
-use crate::error::AppError;
 
 /// Deckel der Antwort auf `/lage` (mit Karte).
 pub const LAGE_DECKEL: usize = 4 * 1024 * 1024;
@@ -82,7 +78,7 @@ fn von_parse(f: ParseError) -> Fehlschlag {
 }
 
 /// Ob sich zwei Stände inhaltlich unterscheiden (die Abrufzeiten zählen nicht).
-fn ist_geaendert(vorher: Option<&Stand>, neu: &Stand) -> bool {
+pub(super) fn ist_geaendert(vorher: Option<&Stand>, neu: &Stand) -> bool {
     let Some(v) = vorher else { return true };
     let mut a = v.lage.clone();
     let mut b = neu.lage.clone();
@@ -93,39 +89,9 @@ fn ist_geaendert(vorher: Option<&Stand>, neu: &Stand) -> bool {
     a != b
 }
 
-/// Was ein Abruf in den Store schreibt.
-struct SuchlageUebernahme {
-    store: Arc<Store>,
-    stand: Stand,
-    geaendert: bool,
-}
-
-impl Uebernahme for SuchlageUebernahme {
-    fn anzahl(&self) -> i64 {
-        self.stand.lage.fluggeraete.len() as i64
-    }
-
-    fn uebernehmen<'a>(
-        &'a self,
-        conn: &'a mut SqliteConnection,
-        adapter: &'a Adapter,
-    ) -> BoxFuture<'a, Result<i64, AppError>> {
-        Box::pin(async move {
-            // Maßgeblich ist die Datenbank: sie sagt, ob ein laufender Einsatz die Quelle hält.
-            let aktiv = repo::is_active(conn, &adapter.id).await?;
-            self.store.set_zugeschaltet(&adapter.id, aktiv);
-            if !aktiv {
-                return Ok(0);
-            }
-            self.store.put(&adapter.id, self.stand.clone());
-            Ok(i64::from(self.geaendert))
-        })
-    }
-}
-
 impl AdapterArt for SuchlageArt {
     fn code(&self) -> &'static str {
-        super::ART
+        super::SUCHLAGE
     }
     fn bezeichnung(&self) -> &'static str {
         "Suchlage (Drohne)"
@@ -220,8 +186,9 @@ impl AdapterArt for SuchlageArt {
                 },
             };
             let geaendert = ist_geaendert(vorher.as_ref(), &stand);
-            Ok(Box::new(SuchlageUebernahme {
+            Ok(Box::new(StandUebernahme {
                 store: self.store.clone(),
+                anzahl: stand.lage.fluggeraete.len() as i64,
                 stand,
                 geaendert,
             }) as Box<dyn Uebernahme>)

@@ -26,11 +26,25 @@ struct Umgebung {
 }
 
 async fn umgebung() -> Umgebung {
+    umgebung_mit(false).await
+}
+
+/// Mit `mit_schluessel` ein Rahmen mit Schlüssel und den produktiven Arten: der Live-Abruf wird
+/// dann wirklich vorbereitet.
+async fn umgebung_mit(mit_schluessel: bool) -> Umgebung {
     let pool = lifeline_hub::db::test_pool().await;
     lifeline_hub::auth::bootstrap::bootstrap_admin(&pool, "Test-Orga", "admin", Some("startpw12"))
         .await
         .unwrap();
-    let state = common::test_state(&pool, &LiveHub::new());
+    let mut state = common::test_state(&pool, &LiveHub::new());
+    if mit_schluessel {
+        use lifeline_hub::adapter::art::Verzeichnis;
+        use lifeline_hub::adapter::geheimnis::{GeheimnisSchluessel, Geheimnisspeicher};
+        state.adapter = lifeline_hub::adapter::Rahmen::new(
+            Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
+            Verzeichnis::produktiv(state.drohne.clone(), Default::default()),
+        );
+    }
     let drohne = state.drohne.clone();
     let app = build_router(state);
     let admin = login_cookie(&app, "admin", "startpw12").await;
@@ -46,16 +60,24 @@ async fn umgebung() -> Umgebung {
 
 impl Umgebung {
     async fn adapter_anlegen(&self, id: &str) {
+        self.adapter_anlegen_als(id, "suchlage", "{}", false).await;
+    }
+
+    async fn adapter_anlegen_als(&self, id: &str, art: &str, einstellungen: &str, lan: bool) {
         let org_id: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
             .bind(self.einsatz)
             .fetch_one(&self.pool)
             .await
             .unwrap();
         sqlx::query(
-            "INSERT INTO adapter (id, org_id, art, name, intervall_s) VALUES (?, ?, 'suchlage', 'Drohnen Nord', 30)",
+            "INSERT INTO adapter (id, org_id, art, name, intervall_s, einstellungen, lan_erlaubt) \
+             VALUES (?, ?, ?, 'Drohnen Nord', 30, ?, ?)",
         )
         .bind(id)
         .bind(org_id)
+        .bind(art)
+        .bind(einstellungen)
+        .bind(lan)
         .execute(&self.pool)
         .await
         .unwrap();
@@ -128,6 +150,30 @@ async fn video_ohne_zuschaltung_404() {
     let (s, body) = u.holen("k1/hls/index.m3u8").await;
     assert_eq!(s, StatusCode::NOT_FOUND);
     assert!(!body.contains("SN-GEHEIM"));
+}
+
+const HLS: &str = r#"{"playlist_url":"http://10.0.0.5:8888/drohne/index.m3u8"}"#;
+
+#[tokio::test]
+async fn hls_adresse_nicht_zugeschaltet_404() {
+    let u = umgebung().await;
+    u.adapter_anlegen_als("h1", "hls_adresse", HLS, true).await;
+    u.stand_mit_video("h1", "kh");
+    let (s, _) = u.holen("kh/hls/index.m3u8").await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Die Route nimmt die Art des Adapters: der Live-Abruf wird für `hls_adresse` vorbereitet und
+/// geht ans Ziel (hier nicht erreichbar: 502), statt als fremde Art verweigert zu werden (503).
+#[tokio::test]
+async fn hls_adresse_ruft_ueber_die_eigene_art_ab() {
+    let u = umgebung_mit(true).await;
+    u.adapter_anlegen_als("h1", "hls_adresse", HLS, true).await;
+    u.zuschalten("h1").await;
+    u.stand_mit_video("h1", "kh");
+    let (s, body) = u.holen("kh/hls/index.m3u8").await;
+    assert_eq!(s, StatusCode::BAD_GATEWAY, "{body}");
+    assert!(!body.contains("10.0.0.5"));
 }
 
 #[tokio::test]

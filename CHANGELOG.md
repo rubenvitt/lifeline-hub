@@ -1,3 +1,53 @@
+## [1.0.0-alpha.198](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.197...v1.0.0-alpha.198) (2026-11-25)
+
+### Wichtige Änderungen
+
+- **API-Pfade auf Englisch umgestellt:** Der Einsatz-Präfix `/api/einsaetze` heißt jetzt `/api/incidents`. Auch die Unterpfade sind englisch, darunter Personen, Verletzte, Tiere, Evakuierung, UHS, Betreuung, Verpflegung, Kräfte, Fahrzeuge, ETB, Meldungen, Aufträge, Stab, Fernmeldewesen, Lagebesprechung, Lage, Karte und Stammdaten. Auch Aktionen haben englische Namen, zum Beispiel `stand-down` statt „entlassen“, `strike` statt „streichen“ und `annul` statt „stornieren“. Externe Anbindungen und Skripte, die diese Pfade aufrufen, müssen angepasst werden. Gespeicherte und offene Spiegel-Anträge werden beim Update auf die neuen Pfade umgeschrieben.
+- **Neuer Aufrufparameter `--nina false`:** Damit lässt sich die NINA-Fachebene je Instanz abschalten. Abgeschaltete Fachebenen erscheinen nicht mehr im Ebenenbaum der Lagekarte.
+- **Datenbank-Erweiterungen:** Neue Migrationen für die Helfer-App, Fremdebenen, Kennungen von Stammdaten und geprüfte Stammdaten-Stände.
+- **Neue Organisationsschalter:** „Ortung im Einsatz“ für die Helfer-App und ein Schalter für Fremdebenen aus dem eigenen Netz.
+
+### Helfer-App (neu)
+
+- Neue native Apps **Lifeline Helfer** für iOS und Android. Damit können Einsatzkräfte ihre Position an den Einsatz senden.
+- Anmeldung über einen Einladungs-QR-Code am Einsatz: Die Helferin oder der Helfer löst die Einladung ein, die Leitung bestätigt. Beim Bestätigen lässt sich das Ziel noch ändern, eine Person wird nur auf Wunsch zugeordnet.
+- Die Helfer-Übersicht zeigt, ob die Ortung freigegeben ist. Positionen werden mit Quelle und Zeitpunkt geführt.
+- Die Apps senden nur frische Messungen und kommen auch mit ungefährer Ortung aus. Fehlen Rolle oder Ortungsfreigabe, pausieren sie, statt die Kopplung zu beenden.
+- Gibt die Führung den Einsatz ab, enden alle Helfer-Kopplungen und die Personenpositionen werden gelöscht. Auch auf jedem anderen Weg endet eine Kopplung samt Position.
+- Der Name der Helferin oder des Helfers steht nur in der geschwärzten Spalte.
+
+### Lagekarte
+
+- **Fremdebenen:** Eigene Ebenen aus GeoJSON-, KML- oder KMZ-Dateien oder von einer Adresse hinzufügen. Ebenen von einer Adresse werden nur bei Änderungen neu abgerufen. Laden und Ladefehler werden angezeigt. Zu große oder tief verschachtelte Dateien werden mit einer eindeutigen Meldung abgelehnt.
+- **Export der Lagekarte** als GeoJSON oder als KMZ mit taktischen Zeichen. Der Export enthält den gezeigten Stand, Flächen bleiben geschlossen und Punkte ohne Zeichen behalten ihre Farbe.
+- **Fachebene Drohne:** Eine Drohnenquelle (Suchlage) lässt sich je Einsatz zu- und abschalten; das Schalten setzt Leitungszugriff voraus. Drohnenfotos erscheinen mit Vorschau im Inspector. Das Livebild läuft in einem Videofenster und verbindet sich nach einem Fehler neu. Wird der Einsatz abgeschlossen, endet die Zuschaltung.
+- **Copernicus-Satellitenbilder** als Rasterebene. Auch ältere Aktivierungen vor 2023 sind verfügbar, mit Anzeige der Lieferzeit und nur im sichtbaren Kartenausschnitt.
+- **Autobahn:** Neue Ebene für Lkw-Parkplätze an Bundesautobahnen mit Rastanlagen. Verkehrsmeldungen erscheinen im Inspector, der Reisezeitverlust wird einheitlich angezeigt.
+- NINA-Warnungen verlinken auf die vollständige Meldung bei warnung.bund.de.
+- GeoJSON-Quellen fremder Kartenstile werden über den Server geladen.
+
+### Lagebesprechung
+
+- Einen Termin per Knopf in den eigenen Kalender übernehmen (ICS-Datei). Die Terminzeit steht im Dateinamen.
+- Unter Android öffnen sich Kalenderdateien direkt.
+
+### Überblick und Lagemonitor
+
+- Der Lagemonitor zeigt keine Kacheln ausgeblendeter Module mehr. Eine wieder eingeblendete Kachel gilt nicht als Anstieg.
+- Im Seitenkopf des Überblicks bleibt Platz für die Pegel-Notiz, solange der Pegel lädt.
+
+### Verwaltung und Stammdaten
+
+- **Stammdaten aus einer Datei einlesen:** Die Daten werden über Kennung, Erkennungsmerkmal und Name abgeglichen. Eine Vorschau zeigt das Ergebnis, bevor es in einem Schritt übernommen wird. Doppelte Kennungen gelten als Fehler, Kandidaten außer Dienst werden nicht verändert.
+- **Personal aus der Mitgliederverwaltung abrufen:** Abgerufene Stände werden in der Oberfläche geprüft, bevor sie gelten. Nach der Übernahme werden alarmierte Fahrzeuge benachrichtigt.
+- Veranstaltungen lassen sich über eine neue Adapter-Schnittstelle abrufen.
+
+### Oberfläche
+
+- Wörter erscheinen in der Textschrift statt in Festbreitenschrift. Kennungen haben eine eigene, einheitliche Darstellung.
+- Die Spaltenüberschrift „Aktionen“ steht einzeilig, Tabellenköpfe sind einheitlicher gesetzt.
+- Hilfekapitel werden im Hintergrund vorbereitet, die Hilfe reagiert dadurch schneller.
+
 ## [1.0.0-alpha.197](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.196...v1.0.0-alpha.197) (2026-11-24)
 
 ### Wichtige Änderungen

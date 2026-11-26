@@ -57,7 +57,9 @@ import { QUELLE_BETROFFENE, useLagekarteDaten } from './lagekarte/useLagekarteDa
 import { objektEintraege, suchbareMarker } from './lagekarte/objektsuche';
 import { useFachebenen } from './lagekarte/useFachebenen';
 import { useFremdebenen } from './lagekarte/useFremdebenen';
-import { fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { fremdObjektGeometrie, fremdObjektSichtbar } from './lagekarte/fremdebenenLayer';
+import { useFremdebeneUebernahme } from './lagekarte/useFremdebeneUebernahme';
+import { alsText, pick } from './lagekarte/fachebeneTitel';
 import { standAusWire } from './lagekarte/geoExport';
 import FremdebeneDetail from './lagekarte/FremdebeneDetail';
 import { useKartenInteraktion } from './lagekarte/useKartenInteraktion';
@@ -788,12 +790,14 @@ export default function LagekartePage() {
     beginneHandlung: kartenFehler.beginne,
   });
 
-  // Fremdebenen (LLH-2099): Liste, Sichtbarkeit je Arbeitsplatz, Daten der sichtbaren Ebenen. Der
-  // gesicherte Stand kennt keine Fremdebenen. Ein Objekt öffnet eine Detailkarte nur zum Lesen.
-  const fremd = useFremdebenen(einsatzId, { aktiv: quelle.typ === 'live' });
+  // Fremdebenen (LLH-2099): Liste, Sichtbarkeit je Arbeitsplatz, Daten der sichtbaren Ebenen. Im
+  // gesicherten Stand die eingefrorenen (LLH-2130). Ein Objekt öffnet eine Detailkarte nur zum Lesen.
+  const fremd = useFremdebenen(einsatzId, { quelle });
   const [fremdAuswahl, setFremdAuswahl] = useState<{
     ebeneId: number;
     properties: Record<string, unknown>;
+    /** Index in den Daten der Ebene (LLH-2129); geprüft gegen die Angaben. */
+    index: number | undefined;
   } | null>(null);
   // Die Detailkarte gilt nur, solange das Objekt auf der Karte steht: ausgeblendet, entfernt oder
   // beim Abgleich gestrichen räumt sie die Auswahl (sonst hielte sie `useAuswahlVorn` vorn).
@@ -805,6 +809,25 @@ export default function LagekartePage() {
   useEffect(() => {
     if (fremdAuswahl != null && !fremdAuswahlGilt) setFremdAuswahl(null);
   }, [fremdAuswahl, fremdAuswahlGilt]);
+  const fremdAuswahlGeometrie = useMemo(
+    () =>
+      fremdAuswahl && fremdAuswahlGilt
+        ? fremdObjektGeometrie(
+            fremd.aktive,
+            fremdAuswahl.ebeneId,
+            fremdAuswahl.properties,
+            fremdAuswahl.index,
+          )
+        : null,
+    [fremd.aktive, fremdAuswahl, fremdAuswahlGilt],
+  );
+  // Objekt als eigene Zeichnung übernehmen (LLH-2129); Herkunft schreibt der Server ins ETB.
+  const fremdUebernahme = useFremdebeneUebernahme({
+    einsatzId,
+    ansichtId: aktiveAnsichtId ?? null,
+    beginneHandlung: kartenFehler.beginne,
+    erfolg,
+  });
 
   // Betroffene laufen getrennt von `alleVerortet` und nur bei freiem Modul „Personen" auf die Karte
   // — der Schalter gehört einer geteilten Ansicht und genügt allein nicht (`personenEbene.ts`).
@@ -882,12 +905,12 @@ export default function LagekartePage() {
     if (auswahl != null || zoneAuswahl != null || fachebeneAuswahl != null) setFremdAuswahl(null);
   }, [auswahl, zoneAuswahl, fachebeneAuswahl]);
   const onFremdebeneKlick = useCallback(
-    (properties: Record<string, unknown>, ebeneId: number) => {
+    (properties: Record<string, unknown>, ebeneId: number, index: number | undefined) => {
       if (exklusiverModusAktiv) return; // kein Panel während eines exklusiven Modus
       setAuswahl(null);
       setZoneAuswahl(null);
       setFachebeneAuswahl(null);
-      setFremdAuswahl({ ebeneId, properties });
+      setFremdAuswahl({ ebeneId, properties, index });
     },
     [exklusiverModusAktiv, setAuswahl, setZoneAuswahl, setFachebeneAuswahl],
   );
@@ -1365,7 +1388,8 @@ export default function LagekartePage() {
   });
   const druckNebenwege = useDruckNebenwege({ vorbereiten: lageplan.vorbereitenDruck });
   // Export (Spec `lagekarte-geo-export`): nur, was die Karte gerade zeigt; ein Fehler steht im
-  // Hinweis über der Karte. Die Farben der Marker folgen dem aktiven Modus (`rollenFarbe`).
+  // Hinweis über der Karte. Die Datei trägt immer Tagesfarben; der Token sagt dem Export, in
+  // welchem Modus die Marker gebaut sind (`tagesFarbe`, LLH-2133).
   // Solange die Quellen laden, gibt es keine Eingabe (der Eintrag sagt „lädt“, nicht „Nichts
   // eingeblendet“). Der Stand ist in der Historienansicht der gezeigte gesicherte Stand, live der
   // Moment des Klicks (`stand: null`).
@@ -1381,6 +1405,7 @@ export default function LagekartePage() {
       marker: sichtbareMarker,
       flaechen: kartenFlaechen,
       zonen: zonenFeatures,
+      token,
       einsatzName: rahmenEinsatz?.bezeichnung ?? '',
       stand,
     };
@@ -1392,6 +1417,7 @@ export default function LagekartePage() {
     sichtbareMarker,
     kartenFlaechen,
     zonenFeatures,
+    token,
     rahmenEinsatz?.bezeichnung,
   ]);
   const { beginne: beginneKartenhandlung } = kartenFehler;
@@ -1486,6 +1512,19 @@ export default function LagekartePage() {
           <FremdebeneDetail
             ebene={fremdAuswahlEbene}
             properties={fremdAuswahl.properties}
+            geometrie={fremdAuswahlGeometrie}
+            darfSchreiben={!!darfSchreiben}
+            uebernahmeLaeuft={fremdUebernahme.laeuft}
+            onUebernehmen={async (wahl) => {
+              const ok = await fremdUebernahme.uebernehme({
+                ebene: fremdAuswahlEbene,
+                ...wahl,
+                name: pick(fremdAuswahl.properties, 'name') ?? null,
+                beschreibung: alsText(fremdAuswahl.properties.description) ?? null,
+              });
+              if (ok) setFremdAuswahl(null);
+              return ok;
+            }}
             onSchliessen={() => setFremdAuswahl(null)}
           />
         )}
@@ -2168,20 +2207,18 @@ export default function LagekartePage() {
         }
         fachebenenLaedt={fachebenenLaedt}
         fachebenenAbgerufen={fachebenenAbgerufen}
-        fremdebenen={
-          quelle.typ === 'live'
-            ? {
-                ebenen: fremd.ebenen,
-                sichtbar: fremd.sichtbar,
-                onToggle: fremd.toggle,
-                onUmbenennen: fremd.umbenennen,
-                onFarbe: fremd.setzeFarbe,
-                onEntfernen: fremd.entfernen,
-                fehler: fremd.fehler,
-                datenZustand: fremd.datenZustand,
-              }
-            : undefined
-        }
+        // Auch im gesicherten Stand (LLH-2130): die eingefrorenen Ebenen; ohne Schreibrecht kein Menü,
+        // die Schreibwege des Hooks sind dort ohne Wirkung.
+        fremdebenen={{
+          ebenen: fremd.ebenen,
+          sichtbar: fremd.sichtbar,
+          onToggle: fremd.toggle,
+          onUmbenennen: fremd.umbenennen,
+          onFarbe: fremd.setzeFarbe,
+          onEntfernen: fremd.entfernen,
+          fehler: fremd.fehler,
+          datenZustand: fremd.datenZustand,
+        }}
         bilder={bilder}
         onBildUpload={onBildUpload}
         bildUpload={bildUpload}

@@ -848,6 +848,9 @@ pub struct Abgeschlossen {
     pub einsatz: Einsatz,
     pub etb_eintrag_ids: Vec<i64>,
     pub drohnen_abgeschaltet: Vec<String>,
+    /// Einsatzfahrzeuge, deren Kopplung oder Einwurf-Position der Abschluss entfernt hat
+    /// (LLH-2091); die Route meldet sie nach dem Commit als `fahrzeug`.
+    pub ortung_ef_ids: Vec<i64>,
 }
 
 /// Wortlaut des System-Eintrags, den der Abschluss schreibt (LLH-1814, Spec `einsatz-abschluss`,
@@ -880,6 +883,7 @@ pub async fn abschliessen(
     let stil = crate::zeitdarstellung::zeitstil_laden(pool, einsatz_id).await?;
 
     let mut etb_eintrag_ids = Vec::new();
+    let mut ortung_ef_ids: Vec<i64> = Vec::new();
     let mut drohnen_abgeschaltet = Vec::new();
     let mut tx = pool.begin().await?;
     let ergebnis = sqlx::query(
@@ -928,6 +932,41 @@ pub async fn abschliessen(
         // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
         // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
         crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
+        // LLH-2091 (ADR-0103): die Fahrzeugortung aus dem Einwurf endet mit dem Einsatz, je
+        // Fahrzeug ein ETB-Eintrag; GPS-Positionen gehören nicht in die Einsatzakte, manuelle
+        // bleiben. Unabhängig von den Helfer-Kopplungen oben (Personen), dieselbe Transaktion.
+        let ende = crate::ortung::kopplung::beende_im_einsatz_tx(&mut tx, einsatz_id).await?;
+        for k in &ende.getrennt {
+            let funkrufname = crate::fahrzeug::disposition_repo::transport_fahrzeug(
+                &mut *tx,
+                einsatz_id,
+                k.einsatz_fahrzeug_id,
+            )
+            .await?
+            .map(|f| f.funkrufname)
+            .unwrap_or_default();
+            etb_eintrag_ids.push(
+                crate::etb::repo::anlegen_tx(
+                    &mut tx,
+                    einsatz_id,
+                    von_benutzer_id,
+                    einstellungen.etb_startwert(),
+                    crate::etb::repo::EintragDaten {
+                        typ: crate::etb::TYP_SYSTEM,
+                        inhalt: &crate::fahrzeug::etb_text_getrennt(&funkrufname),
+                        von: None,
+                        an: None,
+                        meldeweg: None,
+                        veranlassung: None,
+                        ereigniszeit: None,
+                        erfasst_lokal_at: None,
+                        berichtigt_eintrag_id: None,
+                    },
+                )
+                .await?,
+            );
+        }
+        ortung_ef_ids = ende.fahrzeuge();
         // LLH-2105: ein abgeschlossener Einsatz hält keine Drohnenquelle mehr (sonst sähe er das
         // Livebild eines Einsatzes, der sie danach zuschaltet, und hielte sie nach dem
         // Wiederöffnen ein zweites Mal). Den Store führt der Aufrufer nach dem Commit nach.
@@ -1022,6 +1061,7 @@ pub async fn abschliessen(
     Ok(Abgeschlossen {
         einsatz: laden(pool, einsatz_id).await?,
         etb_eintrag_ids,
+        ortung_ef_ids,
         drohnen_abgeschaltet,
     })
 }

@@ -43,6 +43,7 @@ const ART = {
   ],
   intervall_min_s: 30,
   intervall_vorschlag_s: 60,
+  http_im_lan: false,
 };
 
 function adapter(jetzt: Date) {

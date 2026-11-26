@@ -46,6 +46,13 @@ pub fn client_builder_mit_zielschutz(lan_erlaubt: bool) -> reqwest::ClientBuilde
         .dns_resolver(Arc::new(WebhookResolver { lan_erlaubt }))
 }
 
+/// Die Schutzeinstellungen des Adapter-Clients, an einer Stelle: [`client_builder_mit_zielschutz`]
+/// samt Gesamtzeitlimit [`ZEITLIMIT`]. Die Tests des echten Abrufs (`ziel_fetch_tests.rs`) bauen
+/// darauf auf.
+fn protected_client_builder(lan_erlaubt: bool) -> reqwest::ClientBuilder {
+    client_builder_mit_zielschutz(lan_erlaubt).timeout(ZEITLIMIT)
+}
+
 /// Nur für Tests gegen einen nachgebauten Server auf `http://127.0.0.1` (LLH-2094): ohne
 /// Zielschutz, sonst wie [`client_builder_mit_zielschutz`] (kein Proxy, keine Weiterleitung).
 /// Kein Produktivpfad ruft das auf.
@@ -57,8 +64,7 @@ pub fn client_builder_ohne_zielschutz_fuer_tests() -> reqwest::ClientBuilder {
 }
 
 fn build_client(lan_erlaubt: bool) -> reqwest::Client {
-    client_builder_mit_zielschutz(lan_erlaubt)
-        .timeout(ZEITLIMIT)
+    protected_client_builder(lan_erlaubt)
         .build()
         .expect("Adapter-Client baubar")
 }
@@ -72,6 +78,52 @@ fn client(lan_erlaubt: bool) -> &'static reqwest::Client {
     } else {
         OEFFENTLICH.get_or_init(|| build_client(false))
     }
+}
+
+/// Der Client für `http` im LAN ([`check_adapter_url`] hat das Ziel vorher geprüft).
+fn client_http_lan() -> &'static reqwest::Client {
+    static HTTP_LAN: OnceLock<reqwest::Client> = OnceLock::new();
+    HTTP_LAN.get_or_init(|| {
+        protected_client_builder(true)
+            .https_only(false)
+            .build()
+            .expect("Adapter-Client baubar")
+    })
+}
+
+/// Zielschutz einer Adapter-URL: [`check_url`], dazu `http` nur, wenn die Art es erlaubt
+/// (`AdapterArt::http_im_lan`), die LAN-Ausnahme gesetzt ist und der Host ein IP-Literal in einem
+/// privaten Netz ist (`ausgehend::zieladresse::klasse`). Ein Hostname geht nie per `http`: er
+/// könnte auf eine öffentliche Adresse zeigen (`src/AGENTS.md`, „Adapter“, ADR-0105).
+pub fn check_adapter_url(
+    roh: &str,
+    lan_erlaubt: bool,
+    http_im_lan: bool,
+) -> Result<reqwest::Url, ZielFehler> {
+    let url = reqwest::Url::parse(roh.trim()).map_err(|_| ZielFehler::Unlesbar)?;
+    if url.scheme() != "http" {
+        return check_url(roh, lan_erlaubt);
+    }
+    if !(http_im_lan && lan_erlaubt) {
+        return Err(ZielFehler::NichtHttps);
+    }
+    let ip = url
+        .host_str()
+        .map(|h| h.trim_start_matches('[').trim_end_matches(']'))
+        .and_then(|h| h.parse::<std::net::IpAddr>().ok())
+        .ok_or(ZielFehler::NichtHttps)?;
+    if crate::ausgehend::zieladresse::klasse(&ip)
+        != crate::ausgehend::zieladresse::Adressklasse::Privat
+    {
+        return Err(ZielFehler::Intern);
+    }
+    // Übrige Regeln (Anmeldedaten, Anker, Host) wie bei `https`.
+    let mut als_https = url.clone();
+    als_https
+        .set_scheme("https")
+        .map_err(|_| ZielFehler::Unlesbar)?;
+    check_url(als_https.as_str(), lan_erlaubt)?;
+    Ok(url)
 }
 
 /// Ordnet einen Status ein: `None` bei 2xx.
@@ -114,6 +166,7 @@ pub struct AbrufKontext<'a> {
     /// „Verbindung prüfen“: nichts übernehmen.
     pub is_probe: bool,
     lan_erlaubt: bool,
+    http_im_lan: bool,
     geheimnisse: &'a HashMap<String, SecretString>,
 }
 
@@ -132,8 +185,16 @@ impl<'a> AbrufKontext<'a> {
             einstellungen,
             is_probe,
             lan_erlaubt,
+            http_im_lan: false,
             geheimnisse,
         }
+    }
+
+    /// `http` zu privaten IP-Literalen erlauben ([`check_adapter_url`]); setzt der Rahmen aus
+    /// `AdapterArt::http_im_lan`.
+    pub fn with_http_im_lan(mut self, http_im_lan: bool) -> Self {
+        self.http_im_lan = http_im_lan;
+        self
     }
 
     /// Ein Geheimnis der Art, entschlüsselt. Nicht loggen, nicht in Fehler schreiben.
@@ -162,7 +223,7 @@ impl<'a> AbrufKontext<'a> {
         methode: reqwest::Method,
         url: &str,
     ) -> Result<reqwest::RequestBuilder, Fehlschlag> {
-        let url = check_url(url, self.lan_erlaubt).map_err(|f| {
+        let url = check_adapter_url(url, self.lan_erlaubt, self.http_im_lan).map_err(|f| {
             Fehlschlag::new(match f {
                 crate::public_api::webhook::ziel::ZielFehler::Intern
                 | crate::public_api::webhook::ziel::ZielFehler::Localhost => {
@@ -171,7 +232,12 @@ impl<'a> AbrufKontext<'a> {
                 _ => AdapterFehler::ZielUngueltig,
             })
         })?;
-        Ok(client(self.lan_erlaubt).request(methode, url))
+        let client = if url.scheme() == "http" {
+            client_http_lan()
+        } else {
+            client(self.lan_erlaubt)
+        };
+        Ok(client.request(methode, url))
     }
 
     pub fn get(&self, url: &str) -> Result<reqwest::RequestBuilder, Fehlschlag> {
@@ -306,8 +372,29 @@ pub async fn fetch_bedingt(
     etag: Option<&str>,
     last_modified: Option<&str>,
 ) -> Result<BedingteAntwort, FremdebeneFehler> {
+    fetch_bedingt_via(
+        client(lan_erlaubt),
+        url,
+        lan_erlaubt,
+        deckel,
+        etag,
+        last_modified,
+    )
+    .await
+}
+
+/// [`fetch_bedingt`] über einen gegebenen Client; die Naht für die Tests gegen einen echten
+/// Server. Bleibt crate-intern: ein Client ohne pinnenden Resolver umginge den Zielschutz.
+async fn fetch_bedingt_via(
+    client: &reqwest::Client,
+    url: &str,
+    lan_erlaubt: bool,
+    deckel: usize,
+    etag: Option<&str>,
+    last_modified: Option<&str>,
+) -> Result<BedingteAntwort, FremdebeneFehler> {
     let ziel = check_url(url, lan_erlaubt).map_err(fremdebene_fehler_aus_ziel)?;
-    let antwort = client(lan_erlaubt)
+    let antwort = client
         .get(ziel)
         .headers(bedingte_koepfe(etag, last_modified))
         .send()
@@ -382,6 +469,59 @@ mod tests {
             mit_lan.get("https://127.0.0.1/x").unwrap_err().art,
             AdapterFehler::ZielIntern
         );
+    }
+
+    #[test]
+    fn http_nur_zu_privatem_ip_literal_mit_beiden_flags() {
+        let m3u8 = "http://10.0.0.5:8888/a/index.m3u8";
+        assert!(check_adapter_url(m3u8, true, true).is_ok());
+        assert_eq!(
+            check_adapter_url(m3u8, true, false),
+            Err(ZielFehler::NichtHttps)
+        );
+        assert!(check_adapter_url(m3u8, false, true).is_err());
+        for ok in [
+            "http://100.64.1.2/x",
+            "http://[fd00::1]/x",
+            "http://192.168.1.9/x",
+        ] {
+            assert!(check_adapter_url(ok, true, true).is_ok(), "{ok}");
+        }
+        for name in [
+            "http://mediamtx.lan/x",
+            "http://8.8.8.8/x",
+            "http://localhost/x",
+        ] {
+            assert!(check_adapter_url(name, true, true).is_err(), "{name}");
+        }
+        for gesperrt in [
+            "http://127.0.0.1/x",
+            "http://169.254.1.1/x",
+            "http://[::1]/x",
+        ] {
+            assert!(
+                check_adapter_url(gesperrt, true, true).is_err(),
+                "{gesperrt}"
+            );
+        }
+        assert_eq!(
+            check_adapter_url("http://u:p@10.0.0.5/x", true, true),
+            Err(ZielFehler::Anmeldedaten)
+        );
+        assert!(check_adapter_url("http://10.0.0.5/x#a", true, true).is_err());
+        assert!(check_adapter_url("ftp://10.0.0.5/x", true, true).is_err());
+        assert!(check_adapter_url("https://beispiel.de/x", false, false).is_ok());
+    }
+
+    #[test]
+    fn kontext_mit_http_im_lan() {
+        let leer = Map::new();
+        let geheimnisse = HashMap::new();
+        let k = AbrufKontext::new("a", 1, &leer, &geheimnisse, true, false).with_http_im_lan(true);
+        assert!(k.get("http://10.0.0.5:8888/d/seg1.mp4").is_ok());
+        assert!(k.get("http://mediamtx.lan/x").is_err());
+        let ohne = AbrufKontext::new("a", 1, &leer, &geheimnisse, true, false);
+        assert!(ohne.get("http://10.0.0.5:8888/d/seg1.mp4").is_err());
     }
 
     #[test]
@@ -499,3 +639,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "ziel_fetch_tests.rs"]
+mod fetch_tests;

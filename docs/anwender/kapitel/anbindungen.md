@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, src/adapter/smtp_art.rs, src/adapter/smtp.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/drohne/art.rs]
 ---
 
 ## Überblick
@@ -161,6 +161,23 @@ eingetragen ist, werden seine Einwürfe abgelehnt; gesperrt wird dadurch niemand
 Zugang bekommt keinen neuen Schlüssel: Sein Menü bietet nur „Widerrufen …“, danach wird er neu
 angelegt.
 
+### Ortung für ein Fahrzeug einrichten
+
+Für den System-Admin; das Koppeln selbst übernehmen Einsatzleitung und Führungspersonal. Die Ortung zeigt die Position des Geräts in einem
+Fahrzeug auf der Lagekarte (Hintergrund: „Ortung von Fahrzeugen“).
+
+1. In der Verwaltung unter „Einstellungen“ „Einsatz-Vorgaben“ im Bereich „Ortung“ den Schalter
+   „Ortung im Einsatz“ einschalten (Kapitel [Helfer anmelden](helfer-anmelden.md)). Beim
+   Einschalten bestätigt der System-Admin, dass eine Einwilligung bzw. eine Betriebs- oder
+   Dienstvereinbarung vorliegt; der Server hält fest, wer es wann bestätigt hat. Der Schalter gilt
+   für die ganze Organisation, für die Helfer-App wie für die Ortung über den Einwurf.
+2. Wie unter „Einwurf-Zugang anlegen“ einen Zugang mit dem Zweck „Positionen einliefern“
+   anlegen und die Adresse im Gerät eintragen, etwa als Server-URL in OsmAnd oder im Traccar
+   Client. Als Kennung („Device ID“) eine Bezeichnung wählen, die sich dem Fahrzeug zuordnen lässt.
+3. Das Gerät sendet seine Position. Erst dann erscheint die Kennung in der Auswahl.
+4. Im Einsatz bei „Fahrzeuge“ in der Zeile des Fahrzeugs „Weitere Aktionen“ und „Ortung koppeln …“
+   wählen, die Kennung ankreuzen und „Koppeln“ wählen (Kapitel [Fahrzeuge und FMS](fahrzeuge.md)).
+
 ### Einwurf-Zugang widerrufen
 
 1. Im Menü der Zeile „Widerrufen …“ wählen.
@@ -188,6 +205,22 @@ Für den System-Admin:
 
 Ein neuer Adapter ruft sofort ab. Fehlt ihm ein Geheimnis, das seine Art verlangt, hält er mit
 „Geheimnis fehlt“ an, bis es gesetzt ist.
+
+### Drohnenbild aus dem eigenen Medienserver
+
+Sendet die Drohnen-App in einen eigenen Medienserver (etwa MediaMTX), zeigt die Lagekarte dessen
+Livebild ohne Suchlage:
+
+1. Einen Adapter der Art „Drohnenbild (HLS-Adresse)“ anlegen.
+2. Unter „Adresse der Playlist“ die HLS-Adresse eintragen, etwa
+   `http://10.0.0.5:8888/drohne/index.m3u8`. `http://` geht nur zu einer privaten IP-Adresse und
+   nur mit „Ziel im eigenen Netz erlauben“; sonst `https://`.
+3. Verlangt der Medienserver eine Anmeldung, „Benutzer“ eintragen und danach das Geheimnis
+   „Passwort“ setzen.
+4. Im Einsatz die Quelle zuschalten wie eine aus Suchlage.
+
+Der Adapter zeigt nur das Bild, keine Position der Drohne. Sendet gerade niemand, bleibt er „ok“
+und das Videofenster zeigt „Kein Livebild“.
 
 ### Mailserver für den Versand einrichten
 
@@ -305,6 +338,26 @@ stellt die Helferverwaltung aus, dort unter ihrem Zugang für Lifeline Hub. Für
 Steht nach „Übernehmen“ „Inzwischen gibt es einen neueren Stand“, hat ein späterer Abruf den
 Stand ersetzt, und übernommen ist nichts. Nach „Schließen“ steht der Hinweis auf den neueren Stand
 da.
+
+### Suchlage anbinden
+
+Suchlage führt die Drohnengruppe; angebunden zeigt Lifeline Hub deren Lage, Livebild und Fotos auf
+der Lagekarte eines Einsatzes (Kapitel [Lagekarte, Zeichnen und Messen](lagekarte.md)). Für den
+System-Admin, zusammen mit einer Person, die Suchlage verwaltet:
+
+1. In Suchlage unter „Einstellungen“ „Großbild“ wählen, eine „Bezeichnung“ eintragen, etwa
+   „Lifeline Hub“, „Fotos für Lifeline Hub“ ankreuzen und „Großbild-Zugang erzeugen“ wählen.
+   Suchlage zeigt die Adresse des Zugangs nur dieses eine Mal. Der Teil nach „#“ ist der Zugang.
+2. Hier „Adapter anlegen“ wählen, unter „Art“ „Suchlage (Drohne)“ wählen und einen „Name“
+   eintragen, etwa „Drohnengruppe Suchlage“.
+3. Unter „Adresse von Suchlage“ die Adresse ohne „/kiosk#…“ eintragen, etwa
+   `https://suchlage.example`, und „Anlegen“ wählen. Das „Intervall“ steht auf 5 Sekunden.
+4. In der Ansicht des Adapters im Paneel „Geheimnisse“ an „Großbild-Zugang“ „Setzen“ wählen, den
+   Teil nach „#“ einfügen und „Speichern“ wählen.
+5. „Verbindung prüfen“ wählen. „erreichbar“ zeigt, dass Adresse und Zugang stimmen.
+
+Abgerufen wird erst, wenn die Einsatzleitung das Drohnenbild an einem laufenden Einsatz
+zuschaltet. Ohne „Fotos für Lifeline Hub“ kommen Lage und Livebild, aber keine Fotos.
 
 ### Erneut vorlegen
 
@@ -473,7 +526,9 @@ lesen, keinen Einsatz anlegen und keinen ändern. Die Antwort an den Absender is
 - **Positionen** hängen an der Kennung, die der Absender mitschickt (bei OsmAnd die „Device ID“).
   Je Zugang und Kennung hält der Server genau eine Position, ohne Verlauf. Eine Position mit
   älterer Uhrzeit als die gespeicherte wird nicht übernommen. Kommt 24 Stunden lang keine neue,
-  wird sie gelöscht. Die Lagekarte zeigt diese Positionen noch nicht.
+  wird sie gelöscht. Die Lagekarte zeigt eine Position nur, wenn ihre Kennung im laufenden
+  Einsatz an ein Fahrzeug gekoppelt ist (Abschnitt „Ortung von Fahrzeugen“); sonst bleibt sie
+  in der Ablage und ändert nichts.
 
 Ruft ein Absender dieselbe Adresse mit demselben Inhalt mehrmals auf, entsteht kein zweiter
 Eintrag: Der Server vermerkt am ersten, wie oft und wann er erneut kam. Ohne eigene Kennung des
@@ -482,6 +537,51 @@ Absenders gilt das zwei Minuten lang nach dem letzten Empfang; danach entsteht e
 Je Zugang nimmt der Server höchstens 30 Einwürfe am Stück an, danach einen alle zwei Sekunden,
 dazu höchstens 5 000 neue Alarmmeldungen am Tag und Positionen für 200 Kennungen. Ist die
 Tagesgrenze erreicht, lehnt er jeden weiteren Einwurf des Zugangs ab, bis wieder Platz ist.
+
+### Ortung von Fahrzeugen
+
+Ein Einwurf bewegt nur dann ein Fahrzeug, wenn dessen Kennung im Einsatz gekoppelt wurde. Zur
+Auswahl stehen die Kennungen, von denen in den letzten 24 Stunden eine Position kam und deren
+Zugang nicht widerrufen und nicht abgelaufen ist, den Zweck „Positionen einliefern“ trägt und zur
+eigenen Organisation gehört. Die Liste zeigt keine Koordinaten.
+
+- **Freigabe der Organisation:** Ohne den Schalter „Ortung im Einsatz“ lässt sich nicht koppeln;
+  der Dialog „Ortung koppeln“ nennt den Grund. Wird der Schalter ausgeschaltet, bleiben bestehende
+  Kopplungen stehen, es kommt aber keine Position mehr am Fahrzeug an. Die App prüft die
+  Einwilligung oder Vereinbarung nicht; sie verantwortet die Organisation.
+- **Einsatzbezug:** Gekoppelt wird nur in einem laufenden, nicht gespiegelten Einsatz. Die Kopplung
+  endet mit „Ortung trennen“, dem Entlassen, dem Stornieren, dem Ablehnen der Einheit und dem
+  Abschluss; jedes Ende und das
+  Koppeln stehen im Einsatztagebuch. Wird der Zugang widerrufen, bleibt die Kopplung stehen, es
+  kommt aber keine Position mehr an.
+- **Marker:** Unter dem Namen steht „Ortung · vor 3 min“; liegt die Messung fünf Minuten oder
+  länger zurück, wird der Marker blass und die Liste „Geortet“ nennt „veraltet“ (Kapitel
+  [Lagekarte](lagekarte.md)). Eine von Hand gesetzte Position bleibt stehen, bis eine später
+  gemessene Position kommt. Je Fahrzeug schreibt die Ortung höchstens alle 15 Sekunden.
+- **Kein Verlauf:** Es gibt keine Spur und keine Liste früherer Orte. Je Kennung hält die Ablage
+  die letzte Position 24 Stunden, am Fahrzeug steht die letzte Position bis zum Abschluss; der
+  Abschluss löscht die Positionen aus der Ortung.
+- **Spiegel-Instanzen:** Die Position am Fahrzeug geht wie jede Änderung an Spiegel-Instanzen des
+  Einsatzes. Die Kopplung bleibt auf der Instanz.
+
+#### Vorlage für die Datenschutz-Folgenabschätzung
+
+Diese Vorlage ordnet, was die App bei der Ortung über den Einwurf tut; sie ersetzt keine rechtliche
+Prüfung. Sie ergänzt die gemeinsame Vorlage für die Ortung im Einsatz (Helfer-App und Einwurf),
+die im Repository unter `docs/datenschutz/dsfa-vorlage-ortung.md` liegt. Zu ergänzen ist, was nur
+die Organisation weiß. Die Stellen in eckigen Klammern sind auszufüllen.
+
+| Punkt | Inhalt |
+| --- | --- |
+| Zweck | Anzeige der Position von Einsatzfahrzeugen auf der Lagekarte während eines laufenden Einsatzes, zur Koordination der Kräfte. [Weitere Zwecke der Organisation oder „keine“] |
+| Rechtsgrundlage | [Vom Verantwortlichen einzutragen: Einwilligung der Besatzung oder Betriebs- bzw. Dienstvereinbarung nach § 87 Abs. 1 Nr. 6 BetrVG bzw. dem Personalvertretungsrecht; daneben kommt Art. 6 DSGVO in Betracht, etwa Absatz 1 Buchstabe f. Das Vorliegen bestätigt der System-Admin beim Einschalten von „Ortung im Einsatz“. Einschätzung der Organisation oder ihrer Datenschutzbeauftragten.] |
+| Betroffene | Besatzung des gekoppelten Fahrzeugs [ehrenamtlich / hauptamtlich] |
+| Daten | Kennung des Geräts, Koordinaten, Zeitpunkt der Messung. Es gibt keine Zuordnung zu Personen außer über die Besatzung, die am Fahrzeug eingetragen ist. |
+| Speicherdauer | Letzte Position je Kennung 24 Stunden nach dem Empfang in der Ablage. Am Fahrzeug bis zum Abschluss des Einsatzes; dann werden die Positionen aus der Ortung gelöscht. Eingefrorene Lagestände behalten die Position bis zur Löschung des Einsatzes. |
+| Verlauf | Kein Positionsverlauf, keine Spur, kein Geofencing. |
+| Empfänger | Personen mit Zugriff auf den Einsatz in der Organisation und, bei gespiegelten Einsätzen, die Spiegel-Instanzen. [Weitere Empfänger der Organisation] |
+| Technische und organisatorische Maßnahmen | Absender nur schreibend, Schlüssel im Pfad nur verschlüsselt angenommen und in keinem Protokoll; Kopplung nur durch Schreibberechtigte im Einsatz und mit Eintrag im Einsatztagebuch; Freigabe durch die Organisation über den Schalter „Ortung im Einsatz“ (vorgabemäßig aus; wer ihn wann eingeschaltet hat, hält der Server fest); Kandidatenliste ohne Koordinaten; Löschung beim Abschluss. [Ergänzungen der Organisation: Zugriffsrechte, Schulung, Prüfintervall] |
+| Risiken | Ortung von Kräften ohne Einwilligung oder Vereinbarung, wenn der Schalter ohne Grundlage eingeschaltet wird; Weitergabe der Adresse eines Zugangs. [Bewertung der Organisation] |
 
 ### Einwurf nur verschlüsselt
 

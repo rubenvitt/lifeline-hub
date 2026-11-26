@@ -315,7 +315,7 @@ export default function AdapterAnsicht() {
             ) : (
               <Input maxLength={f.max > 0 ? f.max : undefined} autoComplete="off" />
             ),
-          regeln: einstellungsRegeln(f),
+          regeln: einstellungsRegeln(f, art.http_im_lan),
         }))
       : []),
   ];

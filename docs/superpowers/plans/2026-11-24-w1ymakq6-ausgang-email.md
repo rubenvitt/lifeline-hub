@@ -341,7 +341,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/w1ymakq6rzew0lggh2ewwbxs
 ### Task 11: Regel, Entscheidung, Doku
 
 **Files:**
-- Create: `docs/architektur/entscheidungen/ADR-0103-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md` (Nummer vorher gegen `origin/alpha` und offene PRs prüfen)
+- Create: `docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md` (Nummer vorher gegen `origin/alpha` und offene PRs prüfen)
 - Modify: `src/AGENTS.md` (Abschnitt „Ausgang an Menschen“, Ergänzung „Adapter“: Versandweg, `zugang_fuer_versand`), `AGENTS.md`-Tabelle nur falls eine neue Bereichsdatei entsteht (keine geplant)
 - Modify: `docs/architektur/` nach Mitänderungsregel (Bausteinsicht, Laufzeitsicht)
 - Modify: `docs/anwender/` Kapitel „Senden an Externe Stellen“ nach `docs/anwender/AGENTS.md` (Bilder über den Bildlauf, falls dort Pflicht)

@@ -4,8 +4,8 @@ use sqlx::SqlitePool;
 use utoipa::ToSchema;
 
 /// LFH-120: Schema-Anker für die `art`-Union. Wire = DB-CHECK
-/// `art IN ('detail','export','druck','anhang','registrierliste')`
-/// (migrations/0311_person_zugriff_audit_registrierliste.sql, zuvor 0141, 0132 und 0021).
+/// `art IN ('detail','export','druck','anhang','registrierliste','pass_export','pass_druck')`
+/// (migrations/0384_person_zugriff_audit_pass.sql, zuvor 0311, 0141, 0132 und 0021).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ZugriffArt {
@@ -20,6 +20,11 @@ pub enum ZugriffArt {
     /// LLH-1616: Druck der Registrierliste einer Betreuungsstelle
     /// (`GET …/positions/{sid}/registrations/print`), je gedruckter Person ein Eintrag.
     Registrierliste,
+    /// LLH-1198: Abruf der PASS-Liste als CSV (`GET …/persons/export?profile=pass`), ohne Person.
+    PassExport,
+    /// LLH-1198: Abruf der PASS-Liste für die Druckansicht (`GET …/persons/print?profile=pass`),
+    /// ohne Person.
+    PassDruck,
 }
 
 /// Ein Audit-Eintrag mit aufgelöstem Benutzernamen (für die Audit-Einsicht).
@@ -35,7 +40,8 @@ pub struct ZugriffAnzeige {
 }
 
 /// Schreibt einen append-only Audit-Eintrag. `person_id = None` beim Export oder Druck der
-/// gesamten Liste. `art` ist 'detail', 'export', 'druck', 'anhang' oder 'registrierliste'.
+/// gesamten Liste. `art` ist 'detail', 'export', 'druck', 'anhang', 'registrierliste',
+/// 'pass_export' oder 'pass_druck'.
 pub async fn create(
     pool: &SqlitePool,
     einsatz_id: i64,

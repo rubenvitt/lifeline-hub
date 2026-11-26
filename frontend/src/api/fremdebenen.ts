@@ -9,9 +9,11 @@ export type Fremdebene = components['schemas']['FremdebeneAnzeige'];
 /** Rust: `FremdebeneFehler`, der `grund` einer abgelehnten Datei und `error` einer URL-Ebene. */
 export type FremdebeneFehler = components['schemas']['FremdebeneFehler'];
 
-/** Grenzen des Servers (`karte_fremdebene::DATEI_MAX`, `NAME_MAX`). */
+/** Grenzen des Servers (`karte_fremdebene::DATEI_MAX`, `NAME_MAX`, `GEOJSON_MAX`). */
 export const FREMDEBENE_GRENZEN = {
   dateiBytes: 10 * 1024 * 1024,
+  /** Normiertes GeoJSON einer Ebene höchstens (LLH-2130: Schätzwert ohne `data_size`). */
+  geojsonBytes: 8 * 1024 * 1024,
   nameMax: FREMDEBENE_NAME_MAX,
 } as const;
 
@@ -48,6 +50,17 @@ export function ladeFremdebeneDaten(
   ebeneId: number,
 ): Promise<FeatureCollection> {
   return apiGet<FeatureCollection>(`${basis(einsatzId)}/${ebeneId}/data`);
+}
+
+/** Der eingefrorene Inhalt einer Fremdebene eines Stands, adressiert über ihren Hash. */
+export function ladeStandFremdebeneDaten(
+  einsatzId: number,
+  snapshotId: number,
+  sha256: string,
+): Promise<FeatureCollection> {
+  return apiGet<FeatureCollection>(
+    `/api/incidents/${einsatzId}/situation-snapshots/${snapshotId}/foreign-layers/${sha256}/data`,
+  );
 }
 
 /** Genau eine Quelle: `datei` oder `url`. Ein leerer Name lässt den Server einen vorschlagen. */

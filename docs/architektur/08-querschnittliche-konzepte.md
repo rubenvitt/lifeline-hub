@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -508,10 +508,43 @@ Design-Doc [`2026-11-21-r19tuh60-adapter-rahmen-design.md`](../superpowers/specs
 
 Regeln: [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Adapter“.
 
-## 8.33 Nachrichten an Menschen: Ausgangskorb
+## 8.33 Ortung von Fahrzeugen
+
+Positionen von Einsatzfahrzeugen sind personenbezogen. Die Ortung aus dem Einwurf (`src/ortung/`,
+LLH-2091,
+[ADR-0103](entscheidungen/ADR-0103-ortung-uebernimmt-positionen-nur-fuer-gekoppelte-fahrzeuge-laufender-einsaetze.md),
+Design-Doc [`2026-11-24-fjftaovq-fahrzeugortung-design.md`](../superpowers/specs/2026-11-24-fjftaovq-fahrzeugortung-design.md))
+begrenzt sie auf das, was der Einsatz braucht, und teilt Schalter und Schreibstelle mit der
+Helfer-App (ADR-0101, Spec
+[`2026-11-24-vakwvkpg-helfer-app-design.md`](../superpowers/specs/2026-11-24-vakwvkpg-helfer-app-design.md),
+„Ortung der Organisation und Positionsbaustein“):
+
+- **Nur mit Freigabe der Organisation:** der Org-Schalter „Ortung im Einsatz“
+  (`org_einstellungen.ortung_im_einsatz`, Verwaltung → Einsatz-Vorgaben) ist vorgabemäßig aus; wer
+  ihn einschaltet, bestätigt Einwilligung bzw. Betriebs- oder Dienstvereinbarung, der Server hält
+  Person und Zeitpunkt fest. Ohne ihn antwortet Koppeln 422 und die Übernahme schreibt nichts.
+  Risiko: R56.
+- **Nur gekoppelt und nur im Einsatz:** ohne bewusste Kopplung einer Kennung an ein Fahrzeug ändert
+  ein Einwurf keinen Einsatz; die Kopplung endet mit Trennen, Entlassen, Stornieren, Ablehnen der
+  Einheit und Abschluss (Ablauf 6.6e1).
+- **Eine Schreibstelle:** die Übernahme schreibt über `ortung::schreibe_position` mit Quelle
+  `einwurf`; Vorrang hat der jüngere Zeitpunkt, die Handwege schreiben `manuell` mit Serverzeit.
+- **Kein Verlauf:** je Kennung eine Position in der Ablage (24 h), je Fahrzeug eine am Einsatzfahrzeug;
+  Schema-Test `keine_tabelle_haelt_einen_positionsverlauf` in `tests/ortung.rs`. Der Abschluss
+  löscht die Einwurf-Positionen des Einsatzes, manuell und von der Helfer-App gesetzte bleiben
+  (`src/ortung/kopplung.rs`, `beende_im_einsatz_tx`).
+- **Kein Koordinatenweg über die Kopplung:** die Kandidatenliste und die Abfrage der
+  Kopplung tragen keine Koordinaten und kein Protokoll Kennung, Schlüssel oder Koordinaten (Prüfung
+  in ADR-0103); `EinsatzFahrzeugAnzeige` nennt nur `ortung_gekoppelt`, `position_quelle` und
+  `position_aktualisiert_at`.
+- **Anzeige:** Quelle und Alter zeigt die Lagekarte wie für die Helfer-App („Ortung · vor 3 min“,
+  ab 5 min blass und „veraltet“, `positionsAlter.ts`); ein Lagestand misst gegen seinen Stand.
+- **Anwender:** DSFA-Vorlage und Einrichtung im Kapitel [Anbindungen](../anwender/kapitel/anbindungen.md).
+
+## 8.34 Nachrichten an Menschen: Ausgangskorb
 
 Was ein Mensch an eine Externe Stelle sendet (heute E-Mail, LLH-2093), geht nur über die Tabelle
-`ausgang` und den Lauf `src/ausgang/` ([ADR-0103](entscheidungen/ADR-0103-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
+`ausgang` und den Lauf `src/ausgang/` ([ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
 [`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
 
 - **Getrennt von Webhooks und Abruf:** ein Webhook meldet einem Fremdsystem, ein Adapter ruft ab;

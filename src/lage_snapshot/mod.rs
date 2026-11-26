@@ -7,6 +7,7 @@
 //! schreibbar; ein PATCH berührt nur `bezeichnung`/`notiz`. Einzige Ausnahme ist die Schwärzung:
 //! die Kategorie `anhaenge` leert `daten.bilder` (`schwaerzung_registry::JSON_TEILE`, LFH-1069).
 
+pub mod fremdebene;
 pub mod repo;
 
 use serde::Serialize;

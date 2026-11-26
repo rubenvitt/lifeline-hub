@@ -143,6 +143,7 @@ const FAHRZEUGE: EinsatzFahrzeug[] = [
   {
     id: 100,
     einsatz_id: 1,
+    ortung_gekoppelt: false,
     einheit_id: 10,
     funkrufname: 'Florian 1/42-1',
     opta: 'FW-1-42-1',
@@ -154,6 +155,7 @@ const FAHRZEUGE: EinsatzFahrzeug[] = [
   {
     id: 101,
     einsatz_id: 1,
+    ortung_gekoppelt: false,
     funkrufname: 'Florian ELW 1',
     disponiert_at: '2026-09-30T10:00:00',
     ist_adhoc: false,

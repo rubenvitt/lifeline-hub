@@ -12,6 +12,9 @@ describe('exportDateiname', () => {
     expect(exportDateiname('personen', 42, 'csv', jetzt)).toBe(
       'personen-einsatz-42-2026-10-01-0705.csv',
     );
+    expect(exportDateiname('pass-liste', 7, 'csv', jetzt)).toBe(
+      'pass-liste-einsatz-7-2026-10-01-0705.csv',
+    );
   });
 
   it('füllt einstellige Monate, Tage und Stunden auf', () => {

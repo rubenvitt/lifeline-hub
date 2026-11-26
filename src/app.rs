@@ -1153,6 +1153,17 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/vehicles/{ef_id}/status/undo",
             post(routes::einsatz_fahrzeug::status_zuruecknehmen),
         )
+        // LLH-2091: Ortung koppeln, trennen und die Kandidaten dazu (ADR-0097: `incidents`).
+        .route(
+            "/api/incidents/{id}/vehicles/{ef_id}/tracking",
+            get(routes::ortung::load)
+                .put(routes::ortung::couple)
+                .delete(routes::ortung::decouple),
+        )
+        .route(
+            "/api/incidents/{id}/vehicles/{ef_id}/tracking/candidates",
+            get(routes::ortung::candidates),
+        )
         .route(
             "/api/incidents/{id}/vehicles/{ef_id}/annul",
             post(routes::einsatz_fahrzeug::stornieren),
@@ -1975,6 +1986,11 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             get(routes::lage_snapshot::einzeln)
                 .patch(routes::lage_snapshot::patch)
                 .delete(routes::lage_snapshot::loeschen),
+        )
+        // Eingefrorene Fremdebenen eines Stands (LLH-2130), Grenze wie die Live-Daten.
+        .route(
+            "/api/incidents/{id}/situation-snapshots/{sid}/foreign-layers/{sha256}/data",
+            get(routes::lage_snapshot::fremdebene_daten).route_layer(download_grenze()),
         )
         .route("/api/incidents/{id}/zones", get(routes::lage_zone::liste))
         .route(

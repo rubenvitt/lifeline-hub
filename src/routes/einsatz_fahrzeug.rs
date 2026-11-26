@@ -635,28 +635,46 @@ pub async fn entlassen(
     // F06/LFH-244 Tier-A: Bindungen lösen, Austritt, Endzustand und System-ETB atomar in EINER
     // Tx. Was das Fahrzeug außerhalb des Fahrzeugmoduls trug, liefert `entlassen_tx`; SSE erst
     // nach dem Commit.
-    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
         let ergebnis =
             disposition_repo::entlassen_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt)
                 .await?;
-        let etb_id = crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::fahrzeug::etb_text_entlassen(
-                &vorher.funkrufname,
-                ergebnis.einheit.as_ref().map(|(_, name)| name.as_str()),
-                ergebnis.material.len(),
-            ),
-        )
-        .await?;
+        let mut etb_ids = Vec::new();
+        etb_ids.push(
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                startwert,
+                &crate::fahrzeug::etb_text_entlassen(
+                    &vorher.funkrufname,
+                    ergebnis.einheit.as_ref().map(|(_, name)| name.as_str()),
+                    ergebnis.material.len(),
+                ),
+            )
+            .await?,
+        );
+        // Die Ortung endet mit dem Fahrzeug (LLH-2091): eigener Eintrag in derselben Tx.
+        if ergebnis.ortung.is_some() {
+            etb_ids.push(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &crate::fahrzeug::etb_text_getrennt(&vorher.funkrufname),
+                )
+                .await?,
+            );
+        }
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        Ok((ergebnis, anzeige, etb_id))
+        Ok((ergebnis, anzeige, etb_ids))
     })?;
     let vorzustand = ergebnis.vorzustand(&jetzt);
-    state.live.publiziere(einsatz_id, etb_id);
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     sse_fahrzeug(&state, einsatz_id, ef_id);
     // Die Zuordnung an der Führungsstelle ist gelöscht (LFH-1106): deren Leser hängen am
     // Ereignis `einsatz`. `fahrzeug` erreicht Einheiten- und Personalleser ohne Fahrzeugrecht
@@ -728,7 +746,7 @@ pub async fn zuruecknehmen(
     };
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let (ergebnis, anzeige, etb_id) = crate::write_retry!(&state.pool, |conn| {
+    let (ergebnis, anzeige, etb_ids) = crate::write_retry!(&state.pool, |conn| {
         let ergebnis = disposition_repo::zuruecknehmen_tx(
             conn,
             einsatz_id,
@@ -740,21 +758,42 @@ pub async fn zuruecknehmen(
         )
         .await?;
         let anzeige = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        let etb_id = crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::fahrzeug::etb_text_entlassung_zurueckgenommen(
-                &anzeige.funkrufname,
-                &ergebnis.ausgelassen,
-            ),
-        )
-        .await?;
-        Ok((ergebnis, anzeige, etb_id))
+        let mut etb_ids = vec![
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                startwert,
+                &crate::fahrzeug::etb_text_entlassung_zurueckgenommen(
+                    &anzeige.funkrufname,
+                    &ergebnis.ausgelassen,
+                ),
+            )
+            .await?,
+        ];
+        // Die wiederhergestellte Ortung steht wie beim Koppeln im ETB (LLH-2091).
+        if let Some(k) = &ergebnis.ortung {
+            etb_ids.push(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &crate::fahrzeug::etb_text_gekoppelt(
+                        &anzeige.funkrufname,
+                        &k.zugang_name,
+                        &k.kennung,
+                    ),
+                )
+                .await?,
+            );
+        }
+        Ok((ergebnis, anzeige, etb_ids))
     })?;
     // Live wie beim Entlassen: dieselben Leser, nur in der Gegenrichtung.
-    state.live.publiziere(einsatz_id, etb_id);
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     sse_fahrzeug(&state, einsatz_id, ef_id);
     if ergebnis.fuehrungsstelle {
         crate::routes::einsatz::kopf_geaendert(&state, einsatz_id).await;
@@ -792,20 +831,40 @@ pub async fn stornieren(
     let einsatz_id = ctx.einsatz.id;
     let startwert = etb_startwert(&state.pool, einsatz_id).await?;
     let jetzt = crate::zeit::jetzt();
-    let etb_id = crate::write_retry!(&state.pool, |conn| {
+    let etb_ids = crate::write_retry!(&state.pool, |conn| {
         disposition_repo::require_aktiv_tx(conn, einsatz_id, ef_id).await?;
         let vorher = disposition_repo::load_anzeige_tx(conn, einsatz_id, ef_id, true).await?;
-        disposition_repo::stornieren_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt).await?;
-        crate::etb::system_audit_tx(
-            conn,
-            einsatz_id,
-            ctx.benutzer.id,
-            startwert,
-            &crate::fahrzeug::etb_text_storniert(&vorher.funkrufname),
-        )
-        .await
+        let ortung =
+            disposition_repo::stornieren_tx(conn, einsatz_id, ef_id, ctx.benutzer.id, &jetzt)
+                .await?;
+        let mut etb_ids = vec![
+            crate::etb::system_audit_tx(
+                conn,
+                einsatz_id,
+                ctx.benutzer.id,
+                startwert,
+                &crate::fahrzeug::etb_text_storniert(&vorher.funkrufname),
+            )
+            .await?,
+        ];
+        // Die Ortung endet mit dem Fahrzeug (LLH-2091).
+        if ortung.is_some() {
+            etb_ids.push(
+                crate::etb::system_audit_tx(
+                    conn,
+                    einsatz_id,
+                    ctx.benutzer.id,
+                    startwert,
+                    &crate::fahrzeug::etb_text_getrennt(&vorher.funkrufname),
+                )
+                .await?,
+            );
+        }
+        Ok(etb_ids)
     })?;
-    state.live.publiziere(einsatz_id, etb_id);
+    for etb_id in etb_ids {
+        state.live.publiziere(einsatz_id, etb_id);
+    }
     sse_fahrzeug(&state, einsatz_id, ef_id);
     Ok(StatusCode::NO_CONTENT)
 }

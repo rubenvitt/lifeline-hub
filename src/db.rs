@@ -115,8 +115,9 @@ pub async fn stand_abweichung(pool: &SqlitePool) -> Result<Option<String>, sqlx:
 /// In-Memory-Pool für Tests (eine Verbindung, damit dieselbe DB geteilt wird), mit
 /// eingespielten Migrationen.
 ///
-/// **Migriert wird einmal je Testprozess, nicht je Test.** Der erste Aufruf migriert eine
-/// Vorlage und hält sie als Abbild (`sqlite3_serialize`); jeder Aufruf spielt es per
+/// **Migriert wird einmal je Stand, nicht je Test und nicht je Prozess.** Der erste Aufruf liest
+/// die Vorlage aus [`vorlagen_datei`] oder migriert sie dort hin, und hält sie als Abbild
+/// (`sqlite3_serialize`); jeder Aufruf spielt es per
 /// `sqlite3_deserialize` in eine FRISCHE `:memory:`-Verbindung ein. Art, Schema und
 /// `_sqlx_migrations` sind dieselben wie nach einer Migration, und jeder Test bekommt seine
 /// eigene Kopie.
@@ -128,11 +129,17 @@ pub async fn test_pool() -> SqlitePool {
 
     let vorlage = VORLAGE
         .get_or_init(|| async {
+            let datei = vorlagen_datei();
+            if let Ok(abbild) = std::fs::read(&datei) {
+                return abbild;
+            }
             let pool = leerer_test_pool().await;
             migrate(&pool).await.expect("Migrationen einspielen");
             let mut conn = pool.acquire().await.expect("Vorlagen-Verbindung");
             let abbild = conn.serialize(None).await.expect("Vorlage serialisieren");
-            abbild.to_vec()
+            let abbild = abbild.to_vec();
+            vorlage_ablegen(&datei, &abbild);
+            abbild
         })
         .await;
 
@@ -146,6 +153,41 @@ pub async fn test_pool() -> SqlitePool {
             .expect("Vorlage einspielen");
     }
     pool
+}
+
+/// Wo [`test_pool`] seine Vorlage zwischen Testprozessen teilt.
+///
+/// Jede Datei unter `tests/` ist ein eigener Prozess, und die Migrationskette kostet im
+/// Debug-Build rund zehn Sekunden: bei knapp 300 Binaries allein gut 45 Minuten der Rust-Suite,
+/// die damit am 25.11.2026 über den Job-Timeout lief. Der erste Prozess legt das Abbild ab, die
+/// folgenden lesen es.
+///
+/// Der Name hängt an allem, was das Abbild bestimmt: Version und Prüfsumme jeder eingebetteten
+/// Migration sowie der Quelltext dieser Datei und des Migrationslaufs. Ändert sich eines davon,
+/// entsteht eine neue Datei; eine veraltete Vorlage kann so nicht gelesen werden.
+fn vorlagen_datei() -> std::path::PathBuf {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for m in sqlx::migrate!("./migrations").iter() {
+        hash.update(m.version.to_le_bytes());
+        hash.update(&m.checksum);
+    }
+    hash.update(include_bytes!("db.rs"));
+    hash.update(include_bytes!("db/migrationslauf.rs"));
+    let kennung: String = hash.finalize()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    std::env::temp_dir().join(format!("lifeline-hub-testvorlage-{kennung}.sqlite"))
+}
+
+/// Legt die Vorlage atomar ab (erst schreiben, dann umbenennen): ein paralleler Prozess liest
+/// die ganze Datei oder keine. Scheitert das, migriert der nächste Prozess eben selbst.
+fn vorlage_ablegen(datei: &std::path::Path, abbild: &[u8]) {
+    let zwischen = datei.with_extension(format!("{}.tmp", std::process::id()));
+    if std::fs::write(&zwischen, abbild).is_ok() && std::fs::rename(&zwischen, datei).is_err() {
+        let _ = std::fs::remove_file(&zwischen);
+    }
 }
 
 /// Die leere Hülle von [`test_pool`]: eine `:memory:`-Verbindung mit Foreign Keys.

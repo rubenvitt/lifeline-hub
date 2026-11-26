@@ -2135,22 +2135,11 @@ pub async fn listenzugriffe(
     ))
 }
 
-/// Einfaches CSV-Feld-Quoting (RFC 4180): in Anführungszeichen, innere `"` verdoppelt.
-/// Entschärft zusätzlich Formel-Injektion (Excel/LibreOffice): Felder, die mit
-/// =,+,-,@,Tab oder CR beginnen, werden mit einem führenden Apostroph neutralisiert.
-fn csv_feld(s: &str) -> String {
-    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
-        format!("'{s}")
-    } else {
-        s.to_string()
-    };
-    format!("\"{}\"", s.replace('"', "\"\""))
-}
-
 /// CSV der Personen wie `GET …/persons/export`; geteilt mit dem ZIP der Einsatzakte
 /// (`openspec/changes/archive/2026-11-18-hsdhm2ki-einsatzakte/design.md` D6). Protokolliert nicht: das tut, wer
 /// die Daten ausliefert.
 pub fn personen_csv(personen: &[PersonAnzeige]) -> String {
+    use crate::person::pass::csv_feld;
     let mut csv =
         String::from("registrier_nr;status;sichtung;name;vorname;geschlecht;alter;antreff_ort\n");
     for p in personen {
@@ -2173,13 +2162,53 @@ pub fn personen_csv(personen: &[PersonAnzeige]) -> String {
     csv
 }
 
+/// Abfrage von Export und Druck (LLH-1198): `profile=pass` liefert die PASS-Liste
+/// (`person::pass`), fehlt es, bleibt alles wie bisher. Ein anderes Profil ist 400.
+#[derive(Debug, Deserialize)]
+pub struct ExportParams {
+    pub profile: Option<String>,
+}
+
+/// Ob die PASS-Liste gemeint ist; ein unbekanntes Profil ist 400.
+fn is_pass_profile(params: &ExportParams) -> Result<bool, AppError> {
+    match params.profile.as_deref() {
+        None => Ok(false),
+        Some("pass") => Ok(true),
+        Some(_) => Err(AppError::Validation("Unbekanntes Exportprofil".into())),
+    }
+}
+
 /// GET /api/incidents/{id}/persons/export — CSV aller (nicht-stornierten)
 /// Personen. **Schreibt einen `export`-Audit-Eintrag** (person_id = NULL).
+///
+/// Mit `?profile=pass` (LLH-1198, Entwurf `2026-11-24-sco62ku3-pass-liste`): die PASS-Liste als
+/// CSV für Excel, nur für die Einsatzleitung (ein Gerät ist es nie), erst der
+/// `pass_export`-Eintrag, dann die Daten.
 pub async fn export(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
+    Query(params): Query<ExportParams>,
 ) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    if is_pass_profile(&params)? {
+        ctx.fordere_einsatzleitung()?;
+        audit_repo::create(
+            &state.pool,
+            einsatz_id,
+            None,
+            ctx.benutzer.id,
+            "pass_export",
+        )
+        .await?;
+        let csv = crate::person::pass::pass_csv(
+            &crate::person::pass::pass_liste(&state.pool, einsatz_id).await?,
+        );
+        return Ok((
+            [(axum::http::header::CONTENT_TYPE, "text/csv; charset=utf-8")],
+            csv,
+        )
+            .into_response());
+    }
     let personen = repo::liste(&state.pool, einsatz_id, None).await?;
     audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "export").await?;
 
@@ -2197,13 +2226,24 @@ pub async fn export(
 /// Daten. Scheitert der Eintrag, verlässt keine Person den Server; ein Fehler danach hinterlässt
 /// höchstens einen Eintrag zu viel, nie einen zu wenig. Kein Statusfilter: gefiltert wird im
 /// Client, wie am Bildschirm.
+///
+/// Mit `?profile=pass` (LLH-1198): die Zeilen der PASS-Liste (`PassZeile[]`) für ihre
+/// Druckansicht, Gate und Reihenfolge wie beim PASS-Export, Eintrag `pass_druck`.
 pub async fn druck(
     State(state): State<AppState>,
     ctx: EinsatzLesezugriff<Personen>,
-) -> Result<Json<Vec<PersonAnzeige>>, AppError> {
+    Query(params): Query<ExportParams>,
+) -> Result<Response, AppError> {
     let einsatz_id = ctx.einsatz.id;
+    if is_pass_profile(&params)? {
+        ctx.fordere_einsatzleitung()?;
+        audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "pass_druck").await?;
+        return Ok(
+            Json(crate::person::pass::pass_liste(&state.pool, einsatz_id).await?).into_response(),
+        );
+    }
     audit_repo::create(&state.pool, einsatz_id, None, ctx.benutzer.id, "druck").await?;
-    Ok(Json(repo::liste(&state.pool, einsatz_id, None).await?))
+    Ok(Json(repo::liste(&state.pool, einsatz_id, None).await?).into_response())
 }
 
 #[derive(Debug, Deserialize)]

@@ -138,6 +138,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
     g("anhang", K::Anhaenge),
     g("karte_hintergrundbild_daten", K::Anhaenge),
     g("karte_fremdebene_daten", K::Anhaenge),
+    g("karte_fremdebene_stand", K::Anhaenge),
     g("uhs_plan", K::Anhaenge),
     g("einsatz_dokument", K::Anhaenge),
     g("einsatz_schaden_anhang", K::Anhaenge),

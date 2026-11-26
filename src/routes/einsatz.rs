@@ -333,6 +333,11 @@ pub async fn abschliessen(
     }
     kopf_geaendert(&state, id).await;
     etb_eintraege_melden(&state, id, &ergebnis.etb_eintrag_ids);
+    // Kopplung und Einwurf-Position sind weg (LLH-2091): offene Fahrzeug- und Lagekartenschirme
+    // ziehen nach.
+    for ef_id in &ergebnis.ortung_ef_ids {
+        crate::ortung::publiziere(&state, id, crate::ortung::Ortungsziel::Fahrzeug(*ef_id));
+    }
     Ok(Json(ergebnis.einsatz.anzeige(
         ctx.rolle.map(|r| r.as_str().to_string()),
         repo::fuehrungsstelle_von(&state.pool, id, ctx.benutzer.id).await?,

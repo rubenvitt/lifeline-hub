@@ -56,6 +56,7 @@ import BenachrichtigungenPage from './pages/BenachrichtigungenPage';
 import EtbPage from './pages/EtbPage';
 import EtbDruckPage from './pages/EtbDruckPage';
 import PersonenDruckPage from './pages/PersonenDruckPage';
+import PassListeDruckPage from './pages/PassListeDruckPage';
 import PersonDruckPage from './pages/PersonDruckPage';
 import TiereDruckPage from './pages/TiereDruckPage';
 import SchaedenDruckPage from './pages/SchaedenDruckPage';
@@ -545,6 +546,7 @@ export const appRouten = createRoutesFromElements(
             <Route path="etb/druck" element={<EtbDruckPage />} />
             {/* Druckansichten der Modul-Listen (LFH-727), Seitenfilter aus der Adresse. */}
             <Route path="personen/druck" element={<PersonenDruckPage />} />
+            <Route path="personen/pass-druck" element={<PassListeDruckPage />} />
             <Route path="tiere/druck" element={<TiereDruckPage />} />
             <Route path="schaeden/druck" element={<SchaedenDruckPage />} />
             {/* Einsatzbericht (LFH-726): Unterroute der Einsatzdaten, die nie ausgeblendet oder

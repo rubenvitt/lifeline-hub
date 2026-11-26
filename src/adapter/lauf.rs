@@ -412,7 +412,8 @@ async fn fetch(
         &v.geheimnisse,
         a.lan_erlaubt,
         is_probe,
-    );
+    )
+    .with_http_im_lan(art.http_im_lan());
     Ok(art.abrufen(&kontext).await)
 }
 

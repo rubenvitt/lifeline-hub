@@ -977,9 +977,10 @@ const NAMENSSTUFEN = [
 // Platzhalter 0,07, also knapp unter der Grenze: der Fall sichert ab, er belegt nichts. Gemessen
 // mit CI-Schriftsetzung.
 //
-// Offen bleibt 768 px mit veraltetem Pegel (0,25, LLH-2102): „· veraltet“ macht die Notiz
-// breiter als den Platzhalter. Ein Platzhalter mit dem Zusatz ließe dafür den frischen Pegel bei
-// mittellangen Namen springen (0,29 bis 0,32, Entscheidung 24.11.2026).
+// Veralteter Pegel bei 768 px (LLH-2102): Mit angehängtem „· veraltet“ war die Notiz breiter als
+// der Platzhalter, und die Meta brach beim Eintreffen in sich (0,25). Seit „veraltet“ an der
+// Stelle des Trends steht („Pegel 6,84 m veraltet“), ist sie nicht breiter als er. Mutationsprobe
+// dieses Falls.
 for (const fall of [
   {
     name: 'der Pegel als erste Lage-Angabe',
@@ -997,7 +998,7 @@ for (const fall of [
   },
   {
     name: 'Warnstufe akut, unbestätigt und Pegel veraltet',
-    breiten: [1024],
+    breiten: [768, 1024],
     namen: [NAMENSSTUFEN[4]],
     gefahren: true,
     veraltet: true,
@@ -1034,9 +1035,7 @@ for (const fall of [
       await wartenBisRuhig(page);
       const marke = await pegel.freigeben();
       await expect(
-        kopf.getByText(
-          fall.veraltet ? /Pegel 6,84 m steigend · veraltet/ : /Pegel 6,84 m steigend/,
-        ),
+        kopf.getByText(fall.veraltet ? /Pegel 6,84 m veraltet/ : /Pegel 6,84 m steigend/),
       ).toBeVisible();
       await wartenBisRuhig(page);
       const b = await beitragAb(page, marke);
