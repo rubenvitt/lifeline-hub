@@ -58,7 +58,9 @@ jobs:
       group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 120 statt 90: Ohne Cache-Treffer (nach einer Lockfile-Änderung, und bis ein Lauf ihn neu
+    # schreibt) dauerte Schritt 4 am 26.11. 82 Minuten, mit Auslagerung beim Bauen.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Immer aufräumen, aber im Hintergrund: Die Suite baut je Datei in `tests/` ein eigenes

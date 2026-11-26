@@ -167,9 +167,19 @@ schritt_4() {
   # ganzen Bibliothek) belegen dort fast die ganze Platte, und Schritt 15 und 19 bauen danach
   # weiter; am 26.11. lief der Runner dabei voll (LLH-2150). Gelaufen sind sie hier schon, also
   # weg damit. Lokal bleiben sie, ein erneutes `cargo test` müsste sie sonst neu linken.
+  # Ein Testprogramm heißt `<name>-<hash>`: im alten Ablageschema unter `debug/deps/`, im neuen
+  # (Cargo mit build-dir) unter `debug/build/<paket>/<hash>/out/`, dort mit demselben Hash wie
+  # sein Ordner. Nur solche Dateien gehen; Build-Skripte und ihre Ausgaben bleiben.
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
-    find "${CARGO_TARGET_DIR:-$ROOT/target}/debug/deps" -maxdepth 1 -type f -perm -u+x ! -name '*.*' -delete
-    df -h / | tail -1
+    local ziel="${CARGO_TARGET_DIR:-$ROOT/target}/debug" datei hash
+    find "$ziel/deps" -maxdepth 1 -type f -perm -u+x ! -name '*.*' -delete 2> /dev/null || true
+    for datei in "$ziel"/build/*/*/out/*-*; do
+      [ -f "$datei" ] && [ -x "$datei" ] || continue
+      hash="${datei%/out/*}"
+      hash="${hash##*/}"
+      case "$datei" in *-"$hash") rm -f "$datei" ;; esac
+    done
+    echo "Testprogramme gelöscht: $(df -h / | tail -1)"
   fi
   ohne_dev_env cargo test -p lifeline-desktop
 }
