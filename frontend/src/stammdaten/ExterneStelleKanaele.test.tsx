@@ -97,6 +97,31 @@ describe('ExterneStelle Kanaladressen', () => {
     expect(eintrag).toHaveTextContent('Matrix');
   });
 
+  it('lehnt einen matrix.to-Link mit eigenem Text ohne Request ab', async () => {
+    let gepostet = false;
+    server.use(
+      kanaeleHandler([]),
+      http.post('/api/external-agencies/4/channels', () => {
+        gepostet = true;
+        return HttpResponse.json({}, { status: 201 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<ExterneStelleFormModal offen stelle={ils} onClose={() => {}} />);
+
+    await nutzer.click(await screen.findByRole('radio', { name: 'Matrix' }));
+    await nutzer.type(
+      screen.getByLabelText('Matrix-Raum'),
+      'https://matrix.to/#/#lageraum:example.org',
+    );
+    await nutzer.click(screen.getByRole('button', { name: 'Adresse hinzufügen' }));
+
+    expect(
+      await screen.findByText('matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen'),
+    ).toBeInTheDocument();
+    expect(gepostet).toBe(false);
+  });
+
   it('meldet „Mailadresse ungültig“ ohne Request', async () => {
     let gepostet = false;
     server.use(

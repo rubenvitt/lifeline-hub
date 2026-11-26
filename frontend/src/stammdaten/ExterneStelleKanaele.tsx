@@ -30,21 +30,26 @@ export function istMailFormGueltig(adresse: string): boolean {
 
 /**
  * Grobe Formprüfung einer Matrix-Adresse: Raum-ID (`!…:server`) oder Alias (`#…:server`), kein
- * Leerraum, beidseitig des Doppelpunkts etwas. Ein `matrix.to`-Link geht durch; der Server packt
- * ihn zur Adresse aus. Die Antwort des Servers (ruma-Parser) ist maßgeblich.
+ * Leerraum, beidseitig des Doppelpunkts etwas. Ein `matrix.to`-Link geht nicht durch: der Server
+ * packt ihn nicht aus und lehnt ihn ab. Die Antwort des Servers (ruma-Parser) ist maßgeblich.
  */
 export function istMatrixFormGueltig(adresse: string): boolean {
   const a = adresse.trim();
   if (a.length === 0 || new TextEncoder().encode(a).length > MATRIX_MAX) return false;
-  if (/^https:\/\/matrix\.to\/#\/\S+$/.test(a)) return true;
   return /^[!#][^\s:]+:\S+$/.test(a);
 }
 
-/** Meldung zu einer ungültigen Matrix-Eingabe; eine Nutzer-ID bekommt den Hinweis des Servers. */
+/**
+ * Meldung zu einer ungültigen Matrix-Eingabe; Nutzer-ID und `matrix.to`-Link bekommen den Text
+ * des Servers (`externe_stelle::kanal::normalize_matrix`).
+ */
 function matrixFormFehler(adresse: string): string {
-  return adresse.trim().startsWith('@')
-    ? 'Nutzer-IDs gehen noch nicht, bitte den Raum eintragen'
-    : 'Matrix-Raum ungültig';
+  const a = adresse.trim();
+  if (a.startsWith('@')) return 'Nutzer-IDs gehen noch nicht, bitte den Raum eintragen';
+  if (/^https?:\/\/matrix\.to\//i.test(a)) {
+    return 'matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen';
+  }
+  return 'Matrix-Raum ungültig';
 }
 
 /**

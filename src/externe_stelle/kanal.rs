@@ -49,8 +49,9 @@ pub const MATRIX_MAX: usize = 255;
 
 /// Prüft eine Matrix-Adresse und bringt sie in Speicherform: getrimmt, entweder Raum-ID
 /// (`!lokal:server`) oder Raum-Alias (`#lokal:server`), geprüft mit dem Parser von ruma. Nutzer-IDs
-/// und `matrix.to`-Links werden abgelehnt (das Entpacken eines Links ist nicht eingebaut). Der
-/// Fehlertext ist für die Oberfläche bestimmt.
+/// und `matrix.to`-Links werden mit eigenem Text abgelehnt (das Entpacken eines Links ist nicht
+/// eingebaut; das Frontend nennt denselben Text, `ExterneStelleKanaele.tsx`). Der Fehlertext ist
+/// für die Oberfläche bestimmt.
 pub fn normalize_matrix(roh: &str) -> Result<String, String> {
     use matrix_sdk::ruma::OwnedRoomOrAliasId;
     let roh = roh.trim();
@@ -59,6 +60,10 @@ pub fn normalize_matrix(roh: &str) -> Result<String, String> {
     }
     if roh.starts_with('@') {
         return Err("Nutzer-IDs gehen noch nicht, bitte den Raum eintragen".into());
+    }
+    let klein = roh.to_ascii_lowercase();
+    if klein.starts_with("https://matrix.to/") || klein.starts_with("http://matrix.to/") {
+        return Err("matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen".into());
     }
     if roh.len() > MATRIX_MAX {
         return Err(format!(

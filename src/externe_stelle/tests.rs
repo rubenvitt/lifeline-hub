@@ -382,6 +382,19 @@ fn matrix_nutzer_id_wird_mit_eigenem_text_abgelehnt() {
 }
 
 #[test]
+fn matrix_to_link_wird_mit_eigenem_text_abgelehnt() {
+    for roh in [
+        "https://matrix.to/#/#lage:example.org",
+        " https://matrix.to/#/!abc:example.org ",
+    ] {
+        assert_eq!(
+            super::kanal::normalize_matrix(roh).unwrap_err(),
+            "matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen"
+        );
+    }
+}
+
+#[test]
 fn matrix_ungueltige_adressen_werden_abgelehnt() {
     for roh in [
         "",

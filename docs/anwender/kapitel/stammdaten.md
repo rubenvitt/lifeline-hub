@@ -166,7 +166,9 @@ Befehlen und Nachforderungen):
 3. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert und steht mit „Mail“ oder
    „Matrix“ davor in der Liste. Stimmt sie nicht, erscheint „Mailadresse ungültig“ bzw.
    „Matrix-Raum ungültig“; eine Nutzer-ID (`@name:server`) lehnt das Feld mit „Nutzer-IDs gehen
-   noch nicht, bitte den Raum eintragen“ ab.
+   noch nicht, bitte den Raum eintragen“ ab, einen `matrix.to`-Link mit „matrix.to-Links gehen
+   nicht, bitte Raum-ID oder Alias eintragen“: dann die Raum-ID oder den Alias aus dem Link
+   (hinter `#/`) eintragen.
 4. Zum Entfernen an der Adresse „Entfernen“ wählen.
 
 Zum Entfernen in der Zeile „Deaktivieren“ wählen und mit „Stelle deaktivieren“ bestätigen. Eine
