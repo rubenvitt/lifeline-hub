@@ -645,7 +645,7 @@ sequenceDiagram
 
 Gespiegelte Einsätze liefern die Position nicht über den Einwurf: Ein an einen Hub gekoppeltes ELW
 nimmt keinen Einwurf an, die Geräte melden an den Hub. Führt das ELW den Einsatz, holt es die
-Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0107](entscheidungen/ADR-0107-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
+Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0109](entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
 Design-Doc [`2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`](../superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md)).
 
 ```mermaid
@@ -665,7 +665,7 @@ sequenceDiagram
 - **Koppeln am ELW:** `PUT …/tracking` liest `access_id` als Zugang des Hubs, wenn die Org einen Hub
   hat (`hub_fuer_org`); die Kennung muss im Kandidaten-Puffer stehen (sonst 422). Die Zeile in
   `ortung_kopplung` trägt dann `instanz_kopplung_id`, `fremder_zugang_id` und `zugang_name` statt
-  `zugang_id` (`migrations/0386_ortung_kopplung_hub.sql`, eine Art je Zeile per `CHECK`). Die
+  `zugang_id` (`migrations/0387_ortung_kopplung_hub.sql`, eine Art je Zeile per `CHECK`). Die
   vorhandene Position kommt erst mit dem nächsten Abgleich; der Takt wird geweckt.
 - **Kandidaten:** `src/ortung/fern.rs` hält je Org einen flüchtigen Puffer und einen Wunsch (60 s).
   Fehlt der Puffer oder ist er älter als 10 s, merkt die Route den Wunsch vor, weckt den Takt und

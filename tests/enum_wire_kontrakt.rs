@@ -726,6 +726,10 @@ fn serde_wire_gleich_as_str() {
         AdapterFortgesetzt,
         FremdebenenLanErlaubt,
         FremdebenenLanEntzogen,
+        OrtungEingeschaltet,
+        OrtungAusgeschaltet,
+        OrtungPersonenEingeschaltet,
+        OrtungPersonenAusgeschaltet,
     });
     // Einwurf (LLH-1654): Transportlage der Verwaltung.
     enum_wire!(lifeline_hub::public_api::einwurf::EinwurfTransport {

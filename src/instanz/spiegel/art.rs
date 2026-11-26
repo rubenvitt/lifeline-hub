@@ -155,7 +155,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
 pub const AUSGENOMMEN: &[(&str, &str)] = &[
     (
         "ortung_kopplung",
-        "Lokale Betriebsangabe der führenden Seite (ADR-0103, ADR-0107): die Position kommt über das Einsatzfahrzeug in den Spiegel",
+        "Lokale Betriebsangabe der führenden Seite (ADR-0103, ADR-0109): die Position kommt über das Einsatzfahrzeug in den Spiegel",
     ),
     (
         "ausgang",
@@ -205,10 +205,6 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("geraet_kopplung", "Geräte hängen an einer Instanz"),
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),
-    (
-        "ortung_kopplung",
-        "Ortung hängt am Einwurf-Zugang dieser Instanz; Spiegel werden nicht geortet (LLH-2091, ADR-0103)",
-    ),
     (
         "helfer_einladung",
         "Helfer koppeln sich an der Instanz, die einlädt",
