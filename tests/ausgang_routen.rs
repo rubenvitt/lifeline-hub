@@ -522,11 +522,12 @@ async fn fremde_kanaladresse_404() {
 }
 
 #[tokio::test]
-async fn fax_adresse_ist_422_nicht_unterstuetzt() {
+async fn threema_adresse_ist_422_nicht_unterstuetzt() {
+    // Fax (LLH-2095) und Matrix (LLH-2094) gehen; Threema hat noch keinen Weg.
     let w = welt().await;
     let lid = w.lagebericht(true).await;
     sqlx::query(
-        "UPDATE org_externe_stelle_kanal SET kanal = 'fax', adresse = '+4930123456' WHERE id = ?",
+        "UPDATE org_externe_stelle_kanal SET kanal = 'threema', adresse = 'ABCD1234' WHERE id = ?",
     )
     .bind(w.kanaele[0])
     .execute(&w.pool)

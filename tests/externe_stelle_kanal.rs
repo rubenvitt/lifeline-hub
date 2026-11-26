@@ -154,7 +154,7 @@ async fn sammelroute_liefert_je_kanal_nur_dessen_adressen_aktiver_stellen() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("{PFAD}/channels?channel=matrix"),
+        &format!("{PFAD}/channels?channel=threema"),
         &admin,
         None,
     )

@@ -489,7 +489,6 @@ pub fn smtp_fehlschlag(e: SmtpFehler) -> Fehlschlag {
     }
 }
 
-
 /// Das aufzeichnende Fax-Doppel, nur in einem Debug-Build (wie [`testzusteller`]).
 pub fn testfaxzusteller() -> Option<Arc<AufzeichnenderFaxZusteller>> {
     cfg!(debug_assertions).then(|| Arc::new(AufzeichnenderFaxZusteller::default()))

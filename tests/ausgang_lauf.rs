@@ -19,8 +19,7 @@ use lifeline_hub::adapter::Rahmen;
 use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
 use lifeline_hub::ausgang::lauf::{Fehlschlag, Versandauftrag, Zustellfehler, Zustellt};
 use lifeline_hub::ausgang::zusteller::{
-    AufzeichnenderFaxZusteller, AufzeichnenderZusteller, SmtpTransport, Zustellerwahl,
-    Zustellwege,
+    AufzeichnenderFaxZusteller, AufzeichnenderZusteller, SmtpTransport, Zustellerwahl, Zustellwege,
 };
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;

@@ -359,9 +359,7 @@ fn email_fax_und_matrix_sind_freigeschaltet_threema_nicht() {
     assert!(KanalArt::Email.is_freigeschaltet());
     assert!(KanalArt::Fax.is_freigeschaltet());
     assert!(KanalArt::Matrix.is_freigeschaltet());
-    for k in [KanalArt::Threema] {
-        assert!(!k.is_freigeschaltet());
-    }
+    assert!(!KanalArt::Threema.is_freigeschaltet());
 }
 
 #[test]

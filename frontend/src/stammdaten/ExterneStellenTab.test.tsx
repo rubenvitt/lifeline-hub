@@ -93,9 +93,7 @@ describe('ExterneStellenTab', () => {
       adresse(4, 2, '+49511123456', 'fax'),
       adresse(5, 1, '#lage:example.org', 'matrix'),
     ];
-    server.use(
-      http.get('/api/external-agencies/channels', () => HttpResponse.json(alle)),
-    );
+    server.use(http.get('/api/external-agencies/channels', () => HttpResponse.json(alle)));
     const { container } = render(admin);
     await screen.findByText('Polizei Musterstadt');
     await waitFor(() =>
