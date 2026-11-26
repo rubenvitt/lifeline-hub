@@ -195,6 +195,27 @@ impl Homeserver {
             .collect()
     }
 
+    /// Die hochgeladenen Dateien als (Content-Type, Bytes), in Reihenfolge.
+    async fn uploads(&self) -> Vec<(String, Vec<u8>)> {
+        self.server
+            .server()
+            .received_requests()
+            .await
+            .unwrap_or_default()
+            .iter()
+            .filter(|r| r.method.as_str() == "POST" && r.url.path().contains("/media/v3/upload"))
+            .map(|r| {
+                let typ = r
+                    .headers
+                    .get("content-type")
+                    .and_then(|t| t.to_str().ok())
+                    .unwrap_or_default()
+                    .to_string();
+                (typ, r.body.clone())
+            })
+            .collect()
+    }
+
     async fn anfragen_an(&self, pfad: &str) -> usize {
         self.server
             .server()
@@ -675,6 +696,17 @@ async fn anlage_ueber_der_grenze_des_homeservers_ist_zu_gross_vor_dem_text() {
 
 #[tokio::test]
 async fn in_verschluesselten_raum_geht_nie_klartext() {
+    in_verschluesselten_raum_senden(false).await;
+}
+
+#[tokio::test]
+async fn in_verschluesselten_raum_geht_auch_die_anlage_nur_verschluesselt() {
+    in_verschluesselten_raum_senden(true).await;
+}
+
+/// Ein Versand in einen verschlüsselten Raum, auf Wunsch mit einer PNG-Anlage: jedes Ereignis
+/// geht als `m.room.encrypted`, die Anlage als verschlüsselte Datei.
+async fn in_verschluesselten_raum_senden(mit_anlage: bool) {
     let w = welt().await;
     let server = &w.hs.server;
     let bot_id = user_id!("@lifeline:example.org");
@@ -718,7 +750,7 @@ async fn in_verschluesselten_raum_geht_nie_klartext() {
         .await;
     w.hs.senden_nimmt_an().await;
     let (_wache, raumschluessel) = server.mock_capture_put_to_device(bot_id).await;
-    let lid = w.lagebericht_freigeben(false).await;
+    let lid = w.lagebericht_freigeben(mit_anlage).await;
     let t0 = Utc::now();
     let id = w.versand(RAUM, lid, t0).await;
 
@@ -739,11 +771,29 @@ async fn in_verschluesselten_raum_geht_nie_klartext() {
     // Entweder verschlüsselt zugestellt oder sichtbar gescheitert, nie still im Klartext.
     match z.zustand {
         VersandZustand::Uebergeben => {
-            assert_eq!(gesendet.len(), 1, "{gesendet:?}");
-            let (_, t, inhalt) = &gesendet[0];
-            assert_eq!(t, &txn(&id, 0));
-            assert_eq!(inhalt["algorithm"], "m.megolm.v1.aes-sha2", "{inhalt}");
-            assert!(inhalt["ciphertext"].is_string());
+            let txns: Vec<&str> = gesendet.iter().map(|(_, t, _)| t.as_str()).collect();
+            if mit_anlage {
+                assert_eq!(txns, vec![txn(&id, 0), txn(&id, 1)]);
+            } else {
+                assert_eq!(txns, vec![txn(&id, 0)]);
+            }
+            for (_, _, inhalt) in &gesendet {
+                assert_eq!(inhalt["algorithm"], "m.megolm.v1.aes-sha2", "{inhalt}");
+                assert!(inhalt["ciphertext"].is_string(), "{inhalt}");
+                assert!(inhalt.get("msgtype").is_none(), "{inhalt}");
+            }
+            if mit_anlage {
+                // Die Datei geht verschlüsselt hoch: als Bytes ohne Typ, nicht als PNG.
+                let uploads = w.hs.uploads().await;
+                assert_eq!(uploads.len(), 1, "eine Anlage, ein Upload");
+                let (typ, daten) = &uploads[0];
+                assert_eq!(typ, "application/octet-stream");
+                assert!(
+                    !daten.starts_with(b"\x89PNG"),
+                    "die Anlage ging als PNG hoch"
+                );
+                assert_ne!(daten, &png_bytes(32, 24));
+            }
             let schluessel: Value = tokio::time::timeout(Duration::from_secs(10), raumschluessel)
                 .await
                 .expect("Raumschlüssel an das Gerät der Leitstelle")
