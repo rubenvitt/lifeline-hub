@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Button, Descriptions, Space, Typography } from 'antd';
+import { Button, Descriptions, Typography } from 'antd';
 import type { FreiesZeichenUpdate, ZoneTyp } from '../../api/types';
-import { useRollen } from '../../components/instrument';
+import { Stapel, useRollen } from '../../components/instrument';
 import { fremdebeneFarbe } from '../../theme/statusFarben';
 import type { Fremdebene } from '../../api/fremdebenen';
 import { alsText, pick } from './fachebeneTitel';
@@ -82,7 +82,7 @@ export default function FremdebeneDetail({
         ]}
       />
       {darfSchreiben && onUebernehmen && (
-        <Space orientation="vertical" size={4}>
+        <Stapel abstand="xs" ausrichten="start">
           <Button disabled={!teile} onClick={() => setDialogOffen(true)}>
             Übernehmen …
           </Button>
@@ -91,7 +91,7 @@ export default function FremdebeneDetail({
               {UEBERNAHME_GRUND_TEXT[zerlegt.grund]}
             </Typography.Text>
           )}
-        </Space>
+        </Stapel>
       )}
       {teile && art && art !== 'punkt' && (
         <FremdebeneUebernehmenDialog
