@@ -206,6 +206,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),
     (
+        "ortung_kopplung",
+        "Ortung hängt am Einwurf-Zugang dieser Instanz; Spiegel werden nicht geortet (LLH-2091, ADR-0103)",
+    ),
+    (
         "helfer_einladung",
         "Helfer koppeln sich an der Instanz, die einlädt",
     ),

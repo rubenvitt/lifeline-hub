@@ -117,6 +117,12 @@ pub const OHNE_ZULASSUNGSGRENZE: &[(&str, &str)] = &[
         "GET",
         "/api/incidents/{id}/map/foreign-layers/{ebeneId}/data",
     ),
+    // Eingefrorene Fremdebene eines gesicherten Stands (LLH-2130): dieselben Daten bis 8 MiB
+    // GeoJSON, dieselbe Download-Grenze. Nur GET.
+    (
+        "GET",
+        "/api/incidents/{id}/situation-snapshots/{sid}/foreign-layers/{sha256}/data",
+    ),
     // UHS-Plan (LFH-999): Multipart bis 26 MiB + clamd-Scan; Voll-BLOB-Auslieferung des Bildes.
     // Nur PUT bzw. GET — PATCH, DELETE und die Übernahme (ein Kopieren in der DB) bleiben geregelt.
     ("PUT", "/api/incidents/{id}/uhs/{uid}/plan"),

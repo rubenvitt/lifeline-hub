@@ -755,8 +755,11 @@ pub async fn delete(
         Ok((a, erledigt))
     })?;
     // Mit dem Adapter fallen seine Zuschaltungen (`ON DELETE CASCADE`); erst nach dem Commit
-    // vergisst der Store Merker und Stand (LLH-2105).
-    state.drohne.set_zugeschaltet(&id, false);
+    // vergisst der Store Merker und Stand (LLH-2105), über den geordneten Abgleich (LLH-2123).
+    // Der Adapter ist schon weg; ein Lesefehler lässt höchstens einen Merker ohne Abruf stehen.
+    if let Err(e) = crate::routes::drohne::sync_store(&state, std::slice::from_ref(&id)).await {
+        tracing::error!("Drohnen-Store nach dem Löschen nicht nachgeführt: {e}");
+    }
     verwerfen_falls_matrix(&state.adapter, &a.art, &id).await;
     crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(
