@@ -155,7 +155,7 @@ pub const GESPIEGELT: &[Gespiegelt] = &[
 pub const AUSGENOMMEN: &[(&str, &str)] = &[
     (
         "ortung_kopplung",
-        "Lokale Betriebsangabe der führenden Seite (ADR-0103, ADR-0106): die Position kommt über das Einsatzfahrzeug in den Spiegel",
+        "Lokale Betriebsangabe der führenden Seite (ADR-0103, ADR-0109): die Position kommt über das Einsatzfahrzeug in den Spiegel",
     ),
     (
         "ausgang",

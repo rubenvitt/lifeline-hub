@@ -1,5 +1,5 @@
 ---
-id: ADR-0106
+id: ADR-0109
 titel: Der Hub liefert eingeworfene Positionen nur für Kennungen, die das führende ELW gekoppelt hat
 status: akzeptiert
 datum: 2026-11-25
@@ -13,7 +13,7 @@ herleitung:
   - docs/superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md
 ---
 
-# ADR-0106: Der Hub liefert eingeworfene Positionen nur für Kennungen, die das führende ELW gekoppelt hat
+# ADR-0109: Der Hub liefert eingeworfene Positionen nur für Kennungen, die das führende ELW gekoppelt hat
 
 Ergänzt ADR-0103; ADR-0103 gilt weiter, soweit nicht eine Regel hier es für den Weg über den Hub
 ausnimmt.

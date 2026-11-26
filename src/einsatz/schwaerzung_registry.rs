@@ -3807,7 +3807,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("einsatz_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("org_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
-            // Kopplung an einen Zugang des Hubs (LLH-2119, migrations/0386, ADR-0106).
+            // Kopplung an einen Zugang des Hubs (LLH-2119, migrations/0387, ADR-0109).
             scrub("instanz_kopplung_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("fremder_zugang_id", Strategie::ZeileLoeschen, Z_EINSATZ),
             scrub("zugang_name", Strategie::ZeileLoeschen, Z_EINSATZ),

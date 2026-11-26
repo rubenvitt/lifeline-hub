@@ -27,7 +27,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 - Kandidaten-Puffer: 60 s gültig, älter als 10 s gilt als `pending`; Dialog fragt alle 2 s nach,
   höchstens 15 s lang.
 - Bezeichner nach `AGENTS.md`: Fachbegriffe deutsch, Technik englisch. Prosa deutsch.
-- Migration: nächste freie Nummer **0386** (umgelegt, s. LLH-2136) (vorher `git fetch origin alpha` und
+- Migration: nächste freie Nummer **0387** (umgelegt, s. LLH-2136) (vorher `git fetch origin alpha` und
   `scripts/check-migrationen.sh`); Blatt-Umbau ohne `-- no-transaction`.
 - Nach jeder DTO-Änderung `scripts/check-typ-codegen.sh`, generierte Dateien mitcommitten.
 - Commit-Body: `Zunder: https://zunder.rubeen.dev/#/aufgabe/ypcadxzog8lomshl4wapmybc`.
@@ -49,7 +49,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
 ### Task 1: Tabelle `ortung_kopplung` mit Hub-Zugängen
 
 **Dateien:**
-- Neu: `migrations/0386_ortung_kopplung_hub.sql`
+- Neu: `migrations/0387_ortung_kopplung_hub.sql`
 - Ändern: `src/ortung/kopplung.rs` (`Kopplung`, `SELECT_KOPPLUNG`, `create_kopplung_tx`)
 - Ändern: `src/ortung/uebernahme.rs` (`run_nachlauf`), `src/routes/ortung.rs`
   (`From<Kopplung>`), `src/fahrzeug/disposition_repo.rs` (Vorzustand aus `Kopplung`)
@@ -81,7 +81,7 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   - `trennen_und_abschluss_sehen_hub_kopplungen`: `delete_kopplung_tx` liefert `Some(..)`;
     `beende_im_einsatz_tx` führt sie in `getrennt`.
 - [x] **Schritt 2:** `cargo test --test ortung` muss mit FAIL enden (Spalte fehlt).
-- [x] **Schritt 3: Migration 0386 schreiben**
+- [x] **Schritt 3: Migration 0387 schreiben**
   - Umbau nach dem Muster 0324: neue Tabelle anlegen, Bestand mit `zugang_id` kopieren, die alte
     Tabelle löschen, umbenennen, Indizes anlegen.
   - Kopfkommentar mit Verweis auf die Spec.
@@ -337,10 +337,10 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
   --ohne-e2e` erst in Task 8.
 - [x] **Schritt 5:** Commit `feat(fahrzeuge): Ortung über den Hub im Koppeldialog (LLH-2119)`.
 
-### Task 7: ADR-0106 und Doku
+### Task 7: ADR-0109 und Doku
 
 **Dateien:**
-- Neu: `docs/architektur/entscheidungen/ADR-0106-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md`
+- Neu: `docs/architektur/entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md`
   (Nummer vorher gegen `origin/alpha` prüfen)
 - Ändern:
   - arc42, Kapitel 6 und 8, sowie die Tabelle nach `docs/architektur/AGENTS.md`;
@@ -359,11 +359,11 @@ Einstieg in `uebernahme.rs`. `werde_spiegel` trennt still.
       `SammelzeileJe`, ohne Kennung; das Muster danach ausrichten.
     - `verbiete '\b(lat|lon)\b'` im Typ `TrackingCandidate` (über einen eigenen Abschnitt oder
       einen Test).
-- [x] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0106 und ADR-0103;
+- [x] **Schritt 2:** `scripts/adr-fuer.sh src/ortung/fern.rs` zeigt ADR-0109 und ADR-0103;
   `scripts/check-adr-nummern.sh` ist grün.
 - [x] **Schritt 3:** Architektur- und Anwendertexte. Bilder nach `docs/anwender/AGENTS.md`
   (Bildlauf), soweit der Dialog betroffen ist.
-- [x] **Schritt 4:** Commit `docs: ADR-0106 und Doku zur Ortung über den Hub (LLH-2119)`.
+- [x] **Schritt 4:** Commit `docs: ADR-0109 und Doku zur Ortung über den Hub (LLH-2119)`.
 
 ### Task 8: Gates, Bilder, Abschluss
 

@@ -362,7 +362,7 @@ pub async fn apply_answer(pool: &SqlitePool, kopplung: &KopplungZeile, antwort: 
         .iter()
         .take(TRACKING_ANFRAGEN_MAX)
     {
-        // Die Position gilt nur für Kopplungszeilen genau der Org, unter der sie kam (ADR-0106).
+        // Die Position gilt nur für Kopplungszeilen genau der Org, unter der sie kam (ADR-0109).
         let Some(org_id) = org_von(&p.org) else {
             continue;
         };

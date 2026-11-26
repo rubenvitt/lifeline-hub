@@ -539,7 +539,7 @@ Helfer-App (ADR-0101, Spec
   `position_aktualisiert_at`.
 - **Anzeige:** Quelle und Alter zeigt die Lagekarte wie für die Helfer-App („Ortung · vor 3 min“,
   ab 5 min blass und „veraltet“, `positionsAlter.ts`); ein Lagestand misst gegen seinen Stand.
-- **Über den Hub (LLH-2119, [ADR-0106](entscheidungen/ADR-0106-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md)):** Koordinaten verlassen den Hub nur im Spiegelabgleich, nur für
+- **Über den Hub (LLH-2119, [ADR-0109](entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md)):** Koordinaten verlassen den Hub nur im Spiegelabgleich, nur für
   Kennungen, die das führende ELW gekoppelt hat und in der Anfrage nennt, nur für eine abgebildete
   Org, einen gültigen Zugang mit `positionen:write` und bei eingeschaltetem Schalter
   (`src/ortung/fern.rs`). Die Kandidatenliste trägt keine Koordinaten, der Hub hält keinen Zustand
