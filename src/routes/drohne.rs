@@ -68,17 +68,29 @@ async fn halter_name(
 }
 
 /// Führt den Store nach einem Commit für die genannten Adapter nach: zugeschaltet bleibt nur,
-/// was ein laufender Einsatz noch hält (die Datenbank ist maßgeblich).
+/// was ein laufender Einsatz noch hält (die Datenbank ist maßgeblich). Gleichzeitige Abgleiche
+/// ordnet die Marke des Stores (`drohne/store.rs`, „Abgleich“, LLH-2123).
 pub async fn sync_store(state: &AppState, adapter_ids: &[String]) -> Result<(), AppError> {
     if adapter_ids.is_empty() {
         return Ok(());
     }
     let mut conn = state.pool.acquire().await?;
     for id in adapter_ids {
-        let an = repo::is_active(&mut conn, id).await?;
-        state.drohne.set_zugeschaltet(id, an);
+        state.drohne.abgleichen(&mut conn, id).await?;
     }
     Ok(())
+}
+
+/// Wie [`sync_store`] für einen Adapter direkt nach dem eigenen Commit einer Route. Der Commit
+/// steht schon; scheitert das Lesen, gilt der gerade geschriebene Wert `ersatz` (mit frischer
+/// Marke), statt die Anfrage scheitern zu lassen.
+async fn sync_nach_commit(state: &AppState, adapter_id: &str, ersatz: bool) {
+    if let Err(e) = sync_store(state, &[adapter_id.to_string()]).await {
+        tracing::error!("Drohnen-Store nicht nachgeführt, eigener Stand gilt: {e}");
+        state
+            .drohne
+            .set_zugeschaltet(adapter_id, ersatz, state.drohne.marke());
+    }
 }
 
 /// Die Sicht auf eine Quelle. `zuschaltung` zählt nur in einem laufenden Einsatz (`laufend`):
@@ -227,8 +239,9 @@ pub async fn zuschalten(
         Ok((adapter, z, etb_ids))
     })?;
 
-    // Erst nach dem Commit: der Store ist nur das Abbild der Datenbank.
-    state.drohne.set_zugeschaltet(&adapter.id, true);
+    // Erst nach dem Commit: der Store ist nur das Abbild der Datenbank. Neu gelesen statt blind
+    // gesetzt, damit ein gleichzeitiges Abschalten nicht überschrieben wird.
+    sync_nach_commit(&state, &adapter.id, true).await;
     for id in etb_ids {
         state.live.publiziere(einsatz_id, id);
     }
@@ -256,7 +269,7 @@ pub async fn abschalten(
     let erfasser = ctx.benutzer.id;
     let startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
 
-    let (etb_id, noch_gehalten) = crate::write_retry!(&state.pool, |conn| {
+    let etb_id = crate::write_retry!(&state.pool, |conn| {
         let adapter = adapter_repo::load_in_org(conn, org_id, &adapter_id)
             .await?
             .ok_or(AppError::NotFound)?;
@@ -275,13 +288,12 @@ pub async fn abschalten(
         } else {
             None
         };
-        // Hält ein anderer laufender Einsatz die Quelle (etwa ein früher abgeschlossener
-        // Einsatz hielt sie nicht), bleibt sie im Store an.
-        let noch = repo::is_active(conn, &adapter.id).await?;
-        Ok((etb_id, noch))
+        Ok(etb_id)
     })?;
 
-    state.drohne.set_zugeschaltet(&adapter_id, noch_gehalten);
+    // Erst nach dem Commit neu lesen: hält ein anderer laufender Einsatz die Quelle, bleibt sie
+    // im Store an (ein Adapter hängt sonst an höchstens einem laufenden Einsatz, daher `false`).
+    sync_nach_commit(&state, &adapter_id, false).await;
     if let Some(id) = etb_id {
         state.live.publiziere(einsatz_id, id);
     }

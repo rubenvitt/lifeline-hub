@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from 'react';
 import DashboardPaneel, { type DashboardPaneelBasis } from './DashboardPaneel';
-import { monoStil, useRollen } from './rollenwerte';
+import { monoStil, schriftStil, useRollen } from './rollenwerte';
 
 /**
  * VerteilungsPaneel — eine Menge nach Kategorien: je Zeile Wort, Zahl und darunter ein
@@ -8,7 +8,9 @@ import { monoStil, useRollen } from './rollenwerte';
  * LLH-1140). Abnehmer: Sichtung nach BBK, Einheiten nach FMS-Status, Einheiten je Status.
  *
  * ZAHL FÜHRT, der Balken ergänzt nur (wie `Aufgliederung`): die Zahl steht in Mono 20 rechts, der
- * Balken ist `aria-hidden`. Der zweite Kanal (WCAG 1.4.1) ist das Wort, nie die Farbe.
+ * Balken ist `aria-hidden`. Der zweite Kanal (WCAG 1.4.1) ist das Wort, nie die Farbe. Das Wort
+ * steht in der Textschrift (Mono trägt nur Zahl, Zeit, Kennung; ADR-0094, `frontend/AGENTS.md`,
+ * „`schriftskala`“).
  *
  * AUSFALL ALS „—“: eine Kategorie mit `wert: null` (Quelle unbekannt) zeigt „—“ und keinen Balken
  * — eine leere Spur sähe aus wie 0. Der Platz des Balkens bleibt (keine springende Zeile).
@@ -48,11 +50,11 @@ export function anteilProzent(anteil: number): string {
   return `${Math.round(sicher * 1000) / 10}%`;
 }
 
-/** Maße je Dichte: Zahl, Wort, Abstand, Balken. */
+/** Maße je Dichte: Zahl, Stufe des Worts (Textschrift, Boden 11 px), Abstand, Balken. */
 const DICHTE = {
-  paneel: { wert: 20, wort: 12, abstand: 14, zeile: 6, balken: 6 },
-  kompakt: { wert: 15, wort: 12, abstand: 8, zeile: 4, balken: 4 },
-  zeile: { wert: 13, wort: 10, abstand: 6, zeile: 3, balken: 4 },
+  paneel: { wert: 20, wort: 'textKlein', abstand: 14, zeile: 6, balken: 6 },
+  kompakt: { wert: 15, wort: 'textKlein', abstand: 8, zeile: 4, balken: 4 },
+  zeile: { wert: 13, wort: 'meta', abstand: 6, zeile: 3, balken: 4 },
 } as const;
 
 /**
@@ -111,8 +113,7 @@ export function Verteilungsliste({
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: token.marginXS,
-                ...monoStil(mass.wort),
-                letterSpacing: '0.06em',
+                ...schriftStil(mass.wort),
                 color: inZeile ? rollen.gedaempft : rollen.text,
               }}
             >
