@@ -2,7 +2,7 @@
 titel: Zugangsprotokoll
 gruppen: [administration]
 reihenfolge: 680
-quellen: [frontend/src/zugangsprotokoll/ZugangsprotokollPage.tsx, frontend/src/zugangsprotokoll/zugangsprotokollText.ts, frontend/src/api/zugangsprotokoll.ts, frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, src/routes/zugangsprotokoll.rs, src/auth/spur.rs, src/auth/audit.rs, src/auth/admin_audit.rs, src/auth/benutzername.rs, src/routes/auth.rs, src/routes/benutzer.rs, src/routes/sitzung.rs, src/routes/geraet.rs, src/auth/session.rs, frontend/src/stammdaten/rechteText.ts, src/extract.rs, src/einsatz/purge_scheduler.rs]
+quellen: [frontend/src/zugangsprotokoll/ZugangsprotokollPage.tsx, frontend/src/zugangsprotokoll/zugangsprotokollText.ts, frontend/src/api/zugangsprotokoll.ts, frontend/src/admin/adminNav.tsx, frontend/src/admin/AdminLayout.tsx, src/routes/zugangsprotokoll.rs, src/auth/spur.rs, src/auth/audit.rs, src/auth/admin_audit.rs, src/auth/benutzername.rs, src/routes/auth.rs, src/routes/benutzer.rs, src/routes/org_einstellungen.rs, src/routes/sitzung.rs, src/routes/geraet.rs, src/auth/session.rs, frontend/src/stammdaten/rechteText.ts, src/extract.rs, src/einsatz/purge_scheduler.rs]
 ---
 
 ## Überblick
@@ -90,6 +90,11 @@ abgewiesene Aktion hinterlässt nichts.
   [Aufbewahrung](aufbewahrung.md).
 - **„Archiv eingespielt“**: per Befehl am Server; unter „System-Admin“ steht der Befehl.
   „Ziel“ ist die Einsatznummer.
+- **„Ortung im Einsatz eingeschaltet“** und **„… ausgeschaltet“**, **„Ortung von Personen
+  eingeschaltet“** und **„… ausgeschaltet“**: unter „Einsatz-Vorgaben“, Bereich „Ortung“, nur wenn
+  der Schalter wirklich wechselt. Wer die Ortung ausschaltet, während Personen geortet wurden,
+  hinterlässt beide Zeilen. Das Einschalten der Ortung ist zugleich die Bestätigung von
+  Einwilligung bzw. Betriebsvereinbarung, siehe [Helfer anmelden](helfer-anmelden.md).
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 

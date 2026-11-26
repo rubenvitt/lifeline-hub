@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Fax und PDF des Ausgangs, LLH-2095; Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 25.11.2026 (Koordinaten über den Hub nur für gekoppelte Kennungen, LLH-2119; Fax und PDF des Ausgangs, LLH-2095; Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -64,9 +64,9 @@ beide Seiten Name für Name.
 ## 8.5 API-Kontrakt und Typ-Codegen
 
 Response-Typen entstehen aus dem Rust-Code: `#[derive(ToSchema)]` → `src/api_doc.rs` →
-`frontend/src/api/openapi.json` → `openapi-typescript` → `frontend/src/api/types.generated.ts`
-(Skript `gen:types` in `frontend/package.json`; openapi-typescript läuft dort mit der Compiler-API
-von TypeScript 6 über `frontend/scripts/ts6-fuer-codegen.mjs`, Rückbau LLH-2068). Ablauf, Wire-Enums und handgepflegte Reste
+`frontend/src/api/openapi.json` → `frontend/scripts/gen-types.mjs` → `frontend/src/api/types.generated.ts`
+(Skript `gen:types` in `frontend/package.json`; eigener Generator ohne Abhängigkeiten und ohne
+TS-Compiler-API, [ADR-0106](entscheidungen/ADR-0106-frontend-typen-kommen-aus-einem-eigenen-generator-ohne-ts-compiler-api.md)). Ablauf, Wire-Enums und handgepflegte Reste
 regelt [`src/AGENTS.md`](../../src/AGENTS.md), Abschnitt „Typ-Codegen“. Drift fängt
 `scripts/check-typ-codegen.sh` (Schritt 3 des Sammel-Gates) mit `tests/openapi_spec_aktuell.rs`;
 die Wire-Werte der Enums hält `tests/enum_wire_kontrakt.rs` fest.
@@ -539,6 +539,13 @@ Helfer-App (ADR-0101, Spec
   `position_aktualisiert_at`.
 - **Anzeige:** Quelle und Alter zeigt die Lagekarte wie für die Helfer-App („Ortung · vor 3 min“,
   ab 5 min blass und „veraltet“, `positionsAlter.ts`); ein Lagestand misst gegen seinen Stand.
+- **Über den Hub (LLH-2119, [ADR-0109](entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md)):** Koordinaten verlassen den Hub nur im Spiegelabgleich, nur für
+  Kennungen, die das führende ELW gekoppelt hat und in der Anfrage nennt, nur für eine abgebildete
+  Org, einen gültigen Zugang mit `positionen:write` und bei eingeschaltetem Schalter
+  (`src/ortung/fern.rs`). Die Kandidatenliste trägt keine Koordinaten, der Hub hält keinen Zustand
+  dazu, und kein Protokoll trägt Kennung, Schlüssel oder Koordinaten. Gibt ein Einsatz die
+  Führung ab, enden seine Kopplungen still (`beende_bei_fuehrungsabgabe_tx`, Ablauf 6.6e2). Design-Doc
+  [`2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`](../superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md).
 - **Anwender:** DSFA-Vorlage und Einrichtung im Kapitel [Anbindungen](../anwender/kapitel/anbindungen.md).
 
 ## 8.34 Nachrichten an Menschen: Ausgangskorb

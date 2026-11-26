@@ -126,13 +126,112 @@ async fn apply_position_gedrosselt_tx(
     else {
         return Ok(Uebernahme::Nichts);
     };
-    let zeitpunkt = klemme_zeitpunkt(&gemessen_at, jetzt);
+    schreibe_gedrosselt(
+        conn,
+        Fix {
+            ef_id,
+            einsatz_id,
+            breite,
+            laenge,
+            gemessen_at: &gemessen_at,
+            quelle: quelle.as_deref(),
+            aktualisiert_at: aktualisiert_at.as_deref(),
+        },
+        jetzt,
+        drosseln,
+    )
+    .await
+}
+
+/// Position über den Hub (LLH-2119): wie [`apply_position_tx`], nur dass die Position aus der
+/// Antwort des Hubs kommt statt aus `position_letzte` und die Kopplung an einem Zugang des Hubs
+/// hängt (`fremder_zugang_id`). `org_id` ist die Org, unter deren Kennung die Position kam; nur
+/// Kopplungszeilen dieser Org werden getroffen (ADR-0109, ADR-0039). Die Drossel gilt; ein
+/// Nachlauf wird **nicht** vorgemerkt: der nächste Abgleich bringt die jüngste Position ohnehin
+/// (Entwurf, „Übernahme am ELW“). Gehört in eine Schreibtransaktion des Aufrufers.
+#[allow(clippy::too_many_arguments)]
+pub async fn apply_remote_position_tx(
+    conn: &mut SqliteConnection,
+    instanz_kopplung_id: i64,
+    org_id: i64,
+    zugang_id: &str,
+    kennung: &str,
+    lat: f64,
+    lon: f64,
+    measured_at: &str,
+    jetzt: &str,
+) -> Result<Uebernahme, AppError> {
+    let zeile: Option<(i64, i64, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT k.einsatz_fahrzeug_id, k.einsatz_id, \
+                ef.position_quelle, ef.position_aktualisiert_at \
+         FROM ortung_kopplung k \
+         JOIN einsatz_fahrzeug ef ON ef.id = k.einsatz_fahrzeug_id AND ef.beendet_at IS NULL \
+         JOIN einsatz e ON e.id = ef.einsatz_id AND e.status = 'aktiv' AND e.spiegel = 0 \
+         JOIN org_einstellungen o ON o.org_id = k.org_id AND o.ortung_im_einsatz = 1 \
+         WHERE k.instanz_kopplung_id = ? AND k.org_id = ? AND k.fremder_zugang_id = ? \
+           AND k.kennung = ?",
+    )
+    .bind(instanz_kopplung_id)
+    .bind(org_id)
+    .bind(zugang_id)
+    .bind(kennung)
+    .fetch_optional(&mut *conn)
+    .await?;
+    let Some((ef_id, einsatz_id, quelle, aktualisiert_at)) = zeile else {
+        return Ok(Uebernahme::Nichts);
+    };
+    schreibe_gedrosselt(
+        conn,
+        Fix {
+            ef_id,
+            einsatz_id,
+            breite: lat,
+            laenge: lon,
+            gemessen_at: measured_at,
+            quelle: quelle.as_deref(),
+            aktualisiert_at: aktualisiert_at.as_deref(),
+        },
+        jetzt,
+        true,
+    )
+    .await
+}
+
+/// Eine fertige Position mit dem Stand des Fahrzeugs, in das sie soll.
+struct Fix<'a> {
+    ef_id: i64,
+    einsatz_id: i64,
+    breite: f64,
+    laenge: f64,
+    gemessen_at: &'a str,
+    quelle: Option<&'a str>,
+    aktualisiert_at: Option<&'a str>,
+}
+
+/// Gemeinsame Prüf- und Schreiblogik beider Wege (Ablage und Hub): Klemme, Vergleich mit der
+/// eigenen Quelle, Drossel, dann der Positionsbaustein.
+async fn schreibe_gedrosselt(
+    conn: &mut SqliteConnection,
+    fix: Fix<'_>,
+    jetzt: &str,
+    drosseln: bool,
+) -> Result<Uebernahme, AppError> {
+    let Fix {
+        ef_id,
+        einsatz_id,
+        breite,
+        laenge,
+        gemessen_at,
+        quelle,
+        aktualisiert_at,
+    } = fix;
+    let zeitpunkt = klemme_zeitpunkt(gemessen_at, jetzt);
 
     // Nur gegen die eigene Quelle: was schon steht (oder Jüngeres), ist nichts Neues, und ein
     // Fix knapp danach wird gedrosselt. Gegen `manuell` und `helfer` entscheidet allein der
     // Baustein.
-    if quelle.as_deref() == Some(Positionsquelle::Einwurf.as_str()) {
-        let alt = aktualisiert_at.as_deref().and_then(zeit::parse);
+    if quelle == Some(Positionsquelle::Einwurf.as_str()) {
+        let alt = aktualisiert_at.and_then(zeit::parse);
         let neu = zeit::parse(&zeitpunkt);
         if let (Some(alt), Some(neu)) = (alt, neu) {
             if neu <= alt {
@@ -218,7 +317,8 @@ async fn run_nachlauf(state: AppState, ef_id: i64, wache: NachlaufWache, warten:
     tokio::time::sleep(warten).await;
     drop(wache);
     let kopplung: Result<Option<(String, String)>, _> = sqlx::query_as(
-        "SELECT zugang_id, kennung FROM ortung_kopplung WHERE einsatz_fahrzeug_id = ?",
+        "SELECT zugang_id, kennung FROM ortung_kopplung \
+         WHERE einsatz_fahrzeug_id = ? AND zugang_id IS NOT NULL",
     )
     .bind(ef_id)
     .fetch_optional(&state.pool)

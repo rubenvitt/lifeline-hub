@@ -289,6 +289,41 @@ pub async fn setzen(
         )
         .await;
     }
+    // Ortung (LLH-2120): jeder echte Wechsel eines Schalters steht in der Admin-Spur. Geht die
+    // Ortung aus, während Personen geortet wurden, wechseln beide, also zwei Zeilen.
+    let ortung_neu = gespeichert.einstellungen.ortung_freigabe();
+    let vorher = gespeichert.ortung_vorher;
+    let wechsel = [
+        (
+            vorher.im_einsatz,
+            ortung_neu.im_einsatz,
+            AdminAktion::OrtungEingeschaltet,
+            AdminAktion::OrtungAusgeschaltet,
+            "ortung",
+        ),
+        (
+            vorher.personen,
+            ortung_neu.personen,
+            AdminAktion::OrtungPersonenEingeschaltet,
+            AdminAktion::OrtungPersonenAusgeschaltet,
+            "ortung_personen",
+        ),
+    ];
+    for (alt, neu, an, aus, ziel) in wechsel {
+        if alt != neu {
+            schreibe(
+                &state.pool,
+                AdminEintrag {
+                    aktion: if neu { an } else { aus },
+                    akteur: &benutzer,
+                    ziel: Ziel::Org(ziel),
+                    angaben: None,
+                    peer_ip,
+                },
+            )
+            .await;
+        }
+    }
     for (einsatz_id, person_id) in gespeichert.personen_geloescht {
         crate::ortung::publiziere(
             &state,

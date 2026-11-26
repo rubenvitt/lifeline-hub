@@ -1822,3 +1822,137 @@ async fn nachlauf_uebernimmt_die_aktuelle_kopplung_nach_neukopplung() {
     .unwrap();
     bis(|| async { f.stand().await.0 == Some(50.5) }).await;
 }
+
+// ── Kopplung an Zugänge des Hubs (LLH-2119) ───────────────────────────────────────────────
+
+use lifeline_hub::ortung::kopplung::{
+    beende_im_einsatz_tx, delete_kopplung_tx, load_kopplung_tx, KopplungZugang,
+};
+
+/// Legt eine Instanzkopplung an und gibt ihre ID zurück.
+async fn instanz_kopplung_anlegen(pool: &SqlitePool) -> i64 {
+    sqlx::query_scalar(
+        "INSERT INTO instanz_kopplung (gegenueber_kennung, gegenueber_schluessel, \
+         gegenueber_name, richtung, zustand) \
+         VALUES ('hub-1', 'schluessel', 'Hub', 'wird_gemeldet', 'aktiv') RETURNING id",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap()
+}
+
+/// Fügt eine Hub-Zeile für das Fahrzeug ein.
+async fn hub_kopplung_einfuegen(f: &Fix, ef: i64, instanz: i64) {
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, \
+         instanz_kopplung_id, fremder_zugang_id, zugang_name, kennung, gekoppelt_at, \
+         gekoppelt_von) VALUES (?, ?, ?, ?, 'fremd-zugang', 'Fremder Tracker', 'hub-geraet', ?, 1)",
+    )
+    .bind(ef)
+    .bind(f.einsatz)
+    .bind(f.org)
+    .bind(instanz)
+    .bind(T)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn gemischte_kopplungszeile_wird_abgelehnt() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let ef2 = f.weiteres_fahrzeug(&admin, "Florian 2").await;
+    let instanz = instanz_kopplung_anlegen(&f.pool).await;
+    let fehler = sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, zugang_id, \
+         instanz_kopplung_id, fremder_zugang_id, zugang_name, kennung, gekoppelt_at, \
+         gekoppelt_von) VALUES (?, ?, ?, ?, ?, 'fremd-zugang', 'Name', 'x', ?, 1)",
+    )
+    .bind(ef2)
+    .bind(f.einsatz)
+    .bind(f.org)
+    .bind(&f.zugang)
+    .bind(instanz)
+    .bind(T)
+    .execute(&f.pool)
+    .await
+    .unwrap_err();
+    assert!(fehler.to_string().contains("CHECK"), "{fehler}");
+}
+
+#[tokio::test]
+async fn hub_kopplung_wird_mit_namen_geladen() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let ef2 = f.weiteres_fahrzeug(&admin, "Florian 2").await;
+    let instanz = instanz_kopplung_anlegen(&f.pool).await;
+    hub_kopplung_einfuegen(&f, ef2, instanz).await;
+    let mut conn = f.pool.acquire().await.unwrap();
+    let k = load_kopplung_tx(&mut conn, f.einsatz, ef2)
+        .await
+        .unwrap()
+        .expect("Hub-Kopplung");
+    assert_eq!(k.zugang_name, "Fremder Tracker");
+    assert_eq!(
+        k.zugang,
+        KopplungZugang::Hub {
+            instanz_kopplung_id: instanz,
+            zugang_id: "fremd-zugang".into()
+        }
+    );
+    assert_eq!(k.access_id(), "fremd-zugang");
+    // Die lokale Kopplung bleibt lokal und trägt den Namen des Zugangs.
+    let lokal = load_kopplung_tx(&mut conn, f.einsatz, f.ef)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(lokal.zugang_name, "Tracker");
+    assert_eq!(
+        lokal.zugang,
+        KopplungZugang::Lokal {
+            zugang_id: f.zugang.clone()
+        }
+    );
+}
+
+#[tokio::test]
+async fn trennen_und_abschluss_sehen_hub_kopplungen() {
+    let f = fix().await;
+    let admin = login_cookie(&f.app, "admin", "startpw12").await;
+    let ef2 = f.weiteres_fahrzeug(&admin, "Florian 2").await;
+    let ef3 = f.weiteres_fahrzeug(&admin, "Florian 3").await;
+    let instanz = instanz_kopplung_anlegen(&f.pool).await;
+    hub_kopplung_einfuegen(&f, ef2, instanz).await;
+    // Der Test-Pool hat eine Verbindung: sie wird vor jedem Zählen freigegeben.
+    let mut conn = f.pool.acquire().await.unwrap();
+    let getrennt = delete_kopplung_tx(&mut conn, f.einsatz, ef2).await.unwrap();
+    drop(conn);
+    assert!(getrennt.is_some());
+    assert_eq!(f.kopplungen().await, 1);
+    // Eine zweite Hub-Zeile (Kennung bleibt je Zugang eindeutig) fällt beim Abschluss.
+    sqlx::query(
+        "INSERT INTO ortung_kopplung (einsatz_fahrzeug_id, einsatz_id, org_id, \
+         instanz_kopplung_id, fremder_zugang_id, zugang_name, kennung, gekoppelt_at, \
+         gekoppelt_von) VALUES (?, ?, ?, ?, 'fremd-zugang', 'Fremder Tracker', 'hub-geraet', ?, 1)",
+    )
+    .bind(ef3)
+    .bind(f.einsatz)
+    .bind(f.org)
+    .bind(instanz)
+    .bind(T)
+    .execute(&f.pool)
+    .await
+    .unwrap();
+    let mut conn = f.pool.acquire().await.unwrap();
+    let ende = beende_im_einsatz_tx(&mut conn, f.einsatz).await.unwrap();
+    let mut ids: Vec<i64> = ende
+        .getrennt
+        .iter()
+        .map(|k| k.einsatz_fahrzeug_id)
+        .collect();
+    ids.sort_unstable();
+    assert_eq!(ids, vec![f.ef, ef3]);
+    drop(conn);
+    assert_eq!(f.kopplungen().await, 0);
+}

@@ -264,8 +264,15 @@ pub struct EntlassungVorzustand {
 /// Die Kopplung eines Fahrzeugs an eine Ortungs-Kennung vor dem Entlassen (LLH-2091).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct OrtungVorzustand {
+    /// Der lokale Einwurf-Zugang, mit `instanz_kopplung_id` der Zugang auf dem Hub.
     pub zugang_id: String,
     pub kennung: String,
+    /// Gesetzt: die Kopplung hing an einer Kennung des Hubs (LLH-2119).
+    #[serde(default)]
+    pub instanz_kopplung_id: Option<i64>,
+    /// Name des Hub-Zugangs für das ETB.
+    #[serde(default)]
+    pub zugang_name: Option<String>,
 }
 
 /// Höchstzahl je Liste im Vorzustand einer Rücknahme (`src/AGENTS.md`, „Eingabegrenzen“): mehr
