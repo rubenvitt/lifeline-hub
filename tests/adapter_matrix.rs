@@ -659,3 +659,51 @@ async fn abgebrochenes_verwerfen_loescht_das_verzeichnis_trotzdem() {
         std::fs::read_to_string(basis.path().join("matrix/a1").join(matrix::GERAET_DATEI)).unwrap();
     assert!(merk.contains("BOT2"), "{merk}");
 }
+
+#[tokio::test]
+async fn verwerfen_schliesst_den_speicher_auch_wenn_der_alte_client_noch_gehalten_wird() {
+    use matrix_sdk::store::StateStoreDataKey;
+
+    let basis = tempfile::tempdir().unwrap();
+    let clients = clients(&basis);
+    let (server, token) = homeserver("BOT1").await;
+    let ziel1 = ziel(&server, &token, "a1");
+    matrix::pruefe(&clients, &ziel1).await.expect("BOT1");
+
+    // Ein Hintergrund-Task hält den alten Client und liest weiter aus seinem Speicher. Sobald
+    // das Verwerfen läuft, muss der Speicher zu sein, nicht erst, wenn der Halter loslässt:
+    // sonst greift der alte Client noch auf Dateien zu, die fallen oder neu entstehen.
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    clients
+        .mit_client(&ziel1, |client| {
+            let halter = client.clone();
+            tokio::spawn(async move {
+                let frist = tokio::time::Instant::now() + Duration::from_secs(5);
+                let geschlossen = loop {
+                    let lesen = halter
+                        .state_store()
+                        .get_kv_data(StateStoreDataKey::SyncToken)
+                        .await;
+                    if lesen.is_err() {
+                        break true;
+                    }
+                    if tokio::time::Instant::now() >= frist {
+                        break false;
+                    }
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                };
+                drop(halter);
+                let _ = tx.send(geschlossen);
+            });
+            Box::pin(async {})
+        })
+        .await
+        .expect("Zugriff");
+
+    let (_, geschlossen) = tokio::join!(clients.verwerfen("a1"), rx);
+    assert!(
+        geschlossen.expect("Halter meldet sich"),
+        "der Speicher des alten Clients blieb offen, solange er gehalten wurde"
+    );
+    assert!(!basis.path().join("matrix/a1").exists());
+}

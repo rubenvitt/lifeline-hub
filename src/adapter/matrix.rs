@@ -180,6 +180,9 @@ struct Offen {
 #[derive(Default)]
 struct Zugriff {
     offen: Option<Offen>,
+    /// Ein Client, dessen Speicher noch zu schließen ist ([`schliesse`]). Er bleibt hier stark
+    /// gehalten, bis die Speicher zu sind: bricht das Schließen ab, schließt der nächste Halter.
+    schliessen: Option<matrix_sdk::Client>,
     /// Ein geschlossener Client, den womöglich noch ein Hintergrund-Task des SDK hält. Bevor ein
     /// neuer Client den Speicher öffnet oder das Verzeichnis fällt, muss er ganz los sein.
     alt: Option<matrix_sdk::WeakClient>,
@@ -611,20 +614,48 @@ async fn pruefe_ohne_frist(
     Ok(befund)
 }
 
-/// Schließt den offenen Client: lässt ihn los und wartet, bis auch Hintergrund-Tasks des SDK
-/// ihn losgelassen haben (keine starke Referenz mehr, damit Speicher und Verbindungen zu sind).
-/// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen. Der
-/// schwache Verweis bleibt unter der Sperre, bis er frei ist: bricht das Warten ab, wartet der
-/// nächste Halter weiter. Ist er nach [`FREIGABE_WARTEZEIT`] nicht frei, scheitert es mit `Zeit`
+/// Schließt den offenen Client: schließt zuerst seine Speicher (laufende Zugriffe enden, die
+/// Verbindungen zu SQLite gehen zu, jeder spätere Zugriff scheitert mit „Speicher geschlossen“),
+/// lässt ihn dann los und wartet, bis auch Hintergrund-Tasks des SDK ihn losgelassen haben.
+/// Erst danach darf ein neuer Client denselben Speicher öffnen oder das Verzeichnis fallen.
+///
+/// Das Schließen der Speicher ist nötig, weil „keine starke Referenz mehr“ nicht heißt, dass die
+/// Verbindungen zu sind: `matrix-sdk-sqlite` schließt sie beim Fallenlassen erst später auf
+/// einem Blocking-Thread, und ein Halter des alten Clients läse und schriebe bis dahin weiter
+/// (und öffnete neue Verbindungen, auch auf einen frisch angelegten Speicher am selben Pfad).
+///
+/// Was offen ist, bleibt unter der Sperre: bricht das Schließen oder Warten ab, macht der nächste
+/// Halter weiter. Ist der Client nach [`FREIGABE_WARTEZEIT`] nicht frei, scheitert es mit `Zeit`
 /// (vorübergehend: ein späterer Zugriff versucht es wieder).
 async fn schliesse(zugriff: &mut Zugriff, adapter_id: &str) -> Result<(), MatrixFehler> {
+    let frist = tokio::time::Instant::now() + FREIGABE_WARTEZEIT;
     if let Some(alt) = zugriff.offen.take() {
-        zugriff.alt = Some(alt.client.downgrade());
+        zugriff.schliessen = Some(alt.client);
+    }
+    if let Some(client) = &zugriff.schliessen {
+        // `pause` schließt alle vier Speicher; wiederholt aufgerufen tut es nichts mehr.
+        match tokio::time::timeout_at(frist, client.pause()).await {
+            Ok(Ok(())) => {}
+            Ok(Err(err)) => {
+                tracing::warn!(
+                    adapter = adapter_id,
+                    "Matrix-Speicher nicht geschlossen: {err}"
+                );
+                return Err(MatrixFehler::Verschluesselung);
+            }
+            Err(_) => {
+                tracing::warn!(
+                    adapter = adapter_id,
+                    "Matrix-Speicher nach {FREIGABE_WARTEZEIT:?} nicht geschlossen"
+                );
+                return Err(MatrixFehler::Zeit);
+            }
+        }
+        zugriff.alt = zugriff.schliessen.take().map(|c| c.downgrade());
     }
     let Some(schwach) = &zugriff.alt else {
         return Ok(());
     };
-    let frist = tokio::time::Instant::now() + FREIGABE_WARTEZEIT;
     while schwach.strong_count() > 0 {
         if tokio::time::Instant::now() >= frist {
             tracing::warn!(
@@ -911,6 +942,7 @@ mod tests {
         let gehalten = client.clone();
         let mut zugriff = Zugriff {
             offen: None,
+            schliessen: None,
             alt: Some(client.downgrade()),
         };
         drop(client);
