@@ -264,7 +264,11 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   Transaktion des Laufs. `uebernehmen` kann bei belegter Datenbank mehrmals laufen; es schreibt
   idempotent in den Vertrag der Art.
 - **Kein Client außerhalb von `adapter::ziel`** (`Zweck::Adapter`), keine Anfrage an `check_url`
-  vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters.
+  vorbei, keine Weiterleitung. Ein Ziel im LAN nur mit der LAN-Ausnahme des Adapters. Jede
+  Adapter-URL prüft `ziel::check_adapter_url`; `http` nur für eine Art mit
+  `AdapterArt::http_im_lan`, nur mit LAN-Ausnahme und nur zu einem privaten IP-Literal, nie zu
+  einem Hostnamen (LLH-2110,
+  [ADR-0105](../docs/architektur/entscheidungen/ADR-0105-adapter-rufen-http-nur-zu-privaten-ip-literalen.md)).
   Die Fremdebene (LLH-2100) ruft über `adapter::ziel::fetch_bedingt` ab.
 - **Geheimnisse:** nur über `PUT/DELETE /api/admin/adapter/{id}/secrets/{platz}`; gelesen und
   entschlüsselt nur im Lauf (`adapter::lauf`) und, für die eigenen Routen der Art, im Live-Abruf
@@ -305,6 +309,10 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
   eine Lieferung gilt ganz oder gar nicht (eine ungültige Zeile ist `antwort_ungueltig`). Keine
   Admin-Spur je Zeile: der Lauf ist kein Admin. Kein Name einer liefernden Anwendung im Code
   (Guard `veranstaltung_extern::tests::code_nennt_keine_liefernde_anwendung`).
+- **Drohnenarten** (LLH-2110): `drohne::ARTEN` (`suchlage`, `hls_adresse`); die Drohnenrouten
+  geben `live_kontext` die Art des Adapters aus der Datenbank (`drohne::drohnen_art`), nie eine
+  feste. Jede Playlist geht durch `drohne::video::rewrite_playlist` (nur Dateien im selben
+  Verzeichnis desselben Ziels, umgeschrieben auf den Dateinamen).
 - **Zuschaltung je Einsatz** (LLH-2105, `adapter_einsatz`, `drohne::repo`): welche Drohnenquelle
   in welchem Einsatz zugeschaltet ist. Die Datenbank ist die Quelle der Wahrheit,
   `drohne::Store` (`AppState.drohne`) nur ihr Abbild samt letztem Stand im Arbeitsspeicher; er

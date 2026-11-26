@@ -71,8 +71,8 @@ kein Schreibrecht.
 2. „In Kalender übernehmen“ wählen. Ohne Termin ist der Knopf gesperrt, daneben steht „Kein Termin“.
 3. Die Kalenderdatei wird gespeichert. Ihr Name trägt die Uhrzeit des Termins, für einen Termin
    um 14:30 etwa `lagebesprechung-einsatz-42-2026-11-24-1430.ics`. Am Rechner den Download öffnen
-   oder in die Kalender-App ziehen; in der Android-App öffnet sich direkt eine Kalender-App, sonst
-   das Teilen-Menü.
+   oder in die Kalender-App ziehen; in der Android-App öffnet sich direkt eine Kalender-App, in der
+   iOS-App das Fenster „Neues Ereignis“ (Kalender wählen, „Hinzufügen“), sonst das Teilen-Menü.
 4. Der Eintrag beginnt mit „Lagebesprechung – “, es folgt die Einsatzbezeichnung. Er dauert
    30 Minuten und erinnert 10 Minuten vorher.
 5. Scheitert die Übernahme, steht im Paneel „Nicht übernommen“ mit dem Grund; ohne Verbindung

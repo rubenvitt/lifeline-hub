@@ -79,6 +79,7 @@ object Downloadablage {
     /**
      * Kalenderdateien (`text/calendar` oder Endung `ics`) gehen per `ACTION_VIEW` an die
      * Kalender-App; Google Kalender nimmt sie nur so an. Alles andere geht ins Teilen-Blatt.
+     * Dieselbe Regel hat der iOS-Kern; Fälle: `src-tauri/faelle/kalender.json` (LLH-2127).
      */
     fun oeffnenAls(mimetyp: String, endung: String): Oeffnen {
         val typ = mimetyp.substringBefore(';').trim()

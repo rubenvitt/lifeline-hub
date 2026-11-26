@@ -1154,7 +1154,8 @@
           "plaetze",
           "felder",
           "intervall_min_s",
-          "intervall_vorschlag_s"
+          "intervall_vorschlag_s",
+          "http_im_lan"
         ],
         "properties": {
           "bezeichnung": {
@@ -1168,6 +1169,10 @@
             "items": {
               "$ref": "#/components/schemas/Feld"
             }
+          },
+          "http_im_lan": {
+            "type": "boolean",
+            "description": "Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105)."
           },
           "intervall_min_s": {
             "type": "integer",
@@ -10657,6 +10662,14 @@
           },
           "created_at": {
             "type": "string"
+          },
+          "data_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Bytes des normierten GeoJSON (LLH-2130): der Client misst damit sein Offline-Budget, ohne\nden Inhalt zu serialisieren. Fehlt ohne Inhalt."
           },
           "dropped_count": {
             "type": "integer",

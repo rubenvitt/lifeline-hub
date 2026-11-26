@@ -63,7 +63,10 @@ und `…/desktop-auslieferung/`, Betrieb `docs/betrieb/desktop-app.md`.
   kennen nur die mobilen Hüllen; sie stehen in deren Tests. `scripts/bereiche.sh` ordnet
   `src-tauri/faelle/*` allen drei Prüfungen zu. Ausnahme `helfer.json` (Helfer-App): nur die
   Kerne `ios/HelferKern` und `android/helferkern` lesen sie, die Desktop-Hülle hat keine Helfer-App;
-  `bereiche.sh` ordnet sie nur iOS und Android zu. Einen Wächter, der jede Datei in `faelle/` von
+  `bereiche.sh` ordnet sie nur iOS und Android zu. Ausnahme `kalender.json` (LLH-2127): die Kerne
+  `ios/LifelineKern` und `android/kern` lesen sie, dazu der Backend-Test in
+  `src/lagebesprechung/ics.rs`, nicht die Desktop-Hülle; `bereiche.sh` ordnet sie wie die übrigen
+  allen drei Prüfungen zu (`rust` umfasst das Backend). Einen Wächter, der jede Datei in `faelle/` von
   allen drei Hüllen gelesen verlangt, gibt es nicht.
 - **Fenster sind gleichrangig** (LLH-1281): Schließen des Hauptfensters schließt nichts mit;
   Maske und Serverwechsel bauen `main` bei Bedarf neu (`zeige_maske`, `lade_server`), alles

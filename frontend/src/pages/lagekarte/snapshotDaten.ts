@@ -15,8 +15,26 @@ import type {
   LageMeldungStand,
   KartenAnsicht,
 } from '../../api/types';
+import type { Fremdebene } from '../../api/fremdebenen';
 import type { Hintergrundbild } from '../../api/kartenbilder';
 import type { TierKartenEintrag } from './tierMarker';
+
+/**
+ * Eine Fremdebene, wie ein gesicherter Stand sie einfriert (LLH-2130, Rust:
+ * `lage_snapshot::fremdebene::FremdebeneImStand`): ohne `url`, mit dem Hash ihres Inhalts. `id`
+ * ist am Spiegel `null`, wenn die Ebene dort nicht (mehr) besteht.
+ */
+export interface FremdebeneImStand {
+  id: number | null;
+  name: string;
+  color: string;
+  source: Fremdebene['source'];
+  url_host?: string;
+  fetched_at?: string;
+  feature_count: number;
+  dropped_count: number;
+  sha256: string;
+}
 
 /**
  * Woraus die Lagekarte ihre Objekte zieht: der Live-Zustand oder ein eingefrorener Snapshot
@@ -70,4 +88,9 @@ export interface SnapshotDaten {
    * (`TierKarte` in `src/tier/mod.rs`). Optional wie `bereitstellungsraeume`.
    */
   tiere?: TierKartenEintrag[];
+  /**
+   * Fremdebenen mit Inhalt (LLH-2130): Angaben und Hash, der Inhalt kommt über
+   * `ladeStandFremdebeneDaten`. Optional: ältere Stände tragen das Feld nicht.
+   */
+  fremdebenen?: FremdebeneImStand[];
 }

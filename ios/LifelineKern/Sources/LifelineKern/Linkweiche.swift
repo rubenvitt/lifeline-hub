@@ -58,6 +58,13 @@ public enum Linkweiche {
     }
 }
 
+/// Wie die App eine geladene Datei übergibt: dem Kalender zeigen oder im Teilen-Blatt anbieten
+/// (wie `Oeffnen` im Kotlin-Kern; Fälle in `src-tauri/faelle/kalender.json`).
+public enum Oeffnen: String, Sendable {
+    case anzeigen
+    case teilen
+}
+
 /// Wohin ein Download geht: je Download ein eigenes Verzeichnis unter `basis` (die App nimmt das
 /// temporäre Verzeichnis), damit zwei Dateien gleichen Namens sich nicht überschreiben und das
 /// Teilen-Blatt den Namen des Servers zeigt.
@@ -65,6 +72,17 @@ public enum Downloadablage {
     public static func ziel(basis: URL, vorschlag: String, kennung: UUID) -> URL {
         basis.appendingPathComponent(kennung.uuidString, isDirectory: true)
             .appendingPathComponent(dateiname(vorschlag), isDirectory: false)
+    }
+
+    /// Kalenderdateien (`text/calendar` oder Endung `ics`) gehen an den Dialog „Neues Ereignis“,
+    /// alles andere ins Teilen-Blatt (LLH-2127). Parameter des Typs nach `;` zählen nicht.
+    public static func oeffnenAls(mimetyp: String, endung: String) -> Oeffnen {
+        let typ = mimetyp.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+            .first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        let istKalender =
+            typ.caseInsensitiveCompare("text/calendar") == .orderedSame
+            || endung.caseInsensitiveCompare("ics") == .orderedSame
+        return istKalender ? .anzeigen : .teilen
     }
 
     /// Nur der letzte Pfadteil, ohne Steuerzeichen und `:`, ohne führende Punkte.
