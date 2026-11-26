@@ -1,7 +1,8 @@
 ---
 id: ADR-0004
 titel: Antworttypen kommen per Codegen aus dem Rust-Code (OpenAPI nach TypeScript)
-status: akzeptiert
+status: ersetzt
+ersetzt_durch: ADR-0106
 datum: 2026-07-08
 gilt_fuer:
   - src/api_doc.rs
