@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 25.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -640,6 +640,49 @@ sequenceDiagram
   übernommen. Die Position selbst steht in `lat`/`lon`, `position_quelle` und
   `position_aktualisiert_at` von `einsatz_fahrzeug` und läuft wie jede Fahrzeugänderung zu den
   Spiegeln.
+
+## 6.6e2 Fahrzeugortung über den Hub: Positionen im Spiegelabgleich
+
+Gespiegelte Einsätze liefern die Position nicht über den Einwurf: Ein an einen Hub gekoppeltes ELW
+nimmt keinen Einwurf an, die Geräte melden an den Hub. Führt das ELW den Einsatz, holt es die
+Positionen seiner gekoppelten Hub-Kennungen im Abgleich ab (LLH-2119, [ADR-0109](entscheidungen/ADR-0109-hub-liefert-positionen-nur-fuer-kennungen-die-das-fuehrende-elw-gekoppelt-hat.md),
+Design-Doc [`2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md`](../superpowers/specs/2026-11-25-ypcadxzo-fahrzeugortung-spiegel-design.md)).
+
+```mermaid
+sequenceDiagram
+  participant FE as frontend Fahrzeuge
+  participant ELW as ELW (src/ortung/fern.rs, src/routes/ortung.rs)
+  participant Hub as lifeline-hub (src/ortung/fern.rs)
+  FE->>ELW: GET …/tracking/candidates
+  ELW-->>FE: Puffer der Kennungen des Hubs, pending bis die Antwort da ist
+  ELW->>Hub: POST /api/instance/mirror (tracking_requests, tracking_candidates_wanted)
+  Hub->>Hub: position_letzte lesen, nur für abgebildete Org, gültigen Zugang, Schalter an
+  Hub-->>ELW: tracking_positions, tracking_candidates (ohne Koordinaten)
+  ELW->>ELW: apply_remote_position_tx → ortung::schreibe_position (Quelle einwurf)
+  ELW-->>FE: Live fahrzeug (ortung::publiziere, nach dem Commit)
+```
+
+- **Koppeln am ELW:** `PUT …/tracking` liest `access_id` als Zugang des Hubs, wenn die Org einen Hub
+  hat (`hub_fuer_org`); die Kennung muss im Kandidaten-Puffer stehen (sonst 422). Die Zeile in
+  `ortung_kopplung` trägt dann `instanz_kopplung_id`, `fremder_zugang_id` und `zugang_name` statt
+  `zugang_id` (`migrations/0387_ortung_kopplung_hub.sql`, eine Art je Zeile per `CHECK`). Die
+  vorhandene Position kommt erst mit dem nächsten Abgleich; der Takt wird geweckt.
+- **Kandidaten:** `src/ortung/fern.rs` hält je Org einen flüchtigen Puffer und einen Wunsch (60 s).
+  Fehlt der Puffer oder ist er älter als 10 s, merkt die Route den Wunsch vor, weckt den Takt und
+  antwortet mit `pending`; der Dialog fragt alle 2 s, höchstens 15 s.
+- **Anfrage und Antwort:** `SpiegelPaket` trägt `tracking_requests`, `tracking_candidates_wanted`,
+  `tracking_positions` und `tracking_candidates` (`src/instanz/spiegel/paket.rs`, `serde(default)`,
+  höchstens `TRACKING_ANFRAGEN_MAX` Anfragen). Der Hub baut die Antwort in `answer_hub` nach dem
+  Abgleich, rein lesend; ein Fehler zählt eine Sammelzeile und liefert leere Listen.
+- **Übernahme:** nach dem Commit des Abgleichs in eigener Transaktion (`apply_answer`), über
+  `apply_remote_position_tx` in `src/ortung/uebernahme.rs` mit denselben Regeln wie die lokale
+  Übernahme (Schalter, aktives Fahrzeug, aktiver nicht gespiegelter Einsatz, Drossel 15 s). Einen
+  Nachlauf gibt es hier nicht; der nächste Abgleich bringt die jüngste Position. Der Spiegel am Hub
+  bekommt sie über die bestehenden Trigger.
+- **Führungsabgabe:** `fuehrung::werde_spiegel` ruft `ortung::kopplung::beende_bei_fuehrungsabgabe_tx`
+  neben `helfer::ende::beende_alle_im_einsatz`, vor dem Spiegel; alle Kopplungen des Einsatzes
+  enden ohne ETB-Eintrag (ein Eintrag nach `bekannt_bis` wäre eine Bruchstelle). Die Position
+  bleibt stehen und wird veraltet.
 
 ## 6.6f Ausgangsereignis: vom Schreiben bis zum Abruf
 

@@ -17735,11 +17735,27 @@
           "kennung"
         ],
         "properties": {
+          "instanz_kopplung_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Gesetzt: die Kopplung hing an einer Kennung des Hubs (LLH-2119)."
+          },
           "kennung": {
             "type": "string"
           },
           "zugang_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Der lokale Einwurf-Zugang, mit `instanz_kopplung_id` der Zugang auf dem Hub."
+          },
+          "zugang_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name des Hub-Zugangs für das ETB."
           }
         }
       },
@@ -23002,7 +23018,8 @@
           "access_name",
           "device_id",
           "received_at",
-          "coupled"
+          "coupled",
+          "via_hub"
         ],
         "properties": {
           "access_id": {
@@ -23020,6 +23037,10 @@
           },
           "received_at": {
             "type": "string"
+          },
+          "via_hub": {
+            "type": "boolean",
+            "description": "Kommt die Kennung vom Hub (gespiegelte Org) statt aus der eigenen Ablage?"
           }
         }
       },
@@ -23028,7 +23049,8 @@
         "description": "Antwort der Kandidatenliste: die Kennungen und ob der Org-Schalter „Ortung im Einsatz“\n(ADR-0101) an ist. Der Dialog liest so den Schalter, ohne die Org-Einstellungen lesen zu\ndürfen, und erklärt, warum Koppeln gesperrt ist.",
         "required": [
           "tracking_enabled",
-          "candidates"
+          "candidates",
+          "pending"
         ],
         "properties": {
           "candidates": {
@@ -23036,6 +23058,10 @@
             "items": {
               "$ref": "#/components/schemas/TrackingCandidate"
             }
+          },
+          "pending": {
+            "type": "boolean",
+            "description": "Die Liste des Hubs ist angefragt, aber noch nicht (frisch) da; der Dialog fragt erneut."
           },
           "tracking_enabled": {
             "type": "boolean",
