@@ -58,6 +58,23 @@ jobs:
         # Über das Skript: Frist und Wiederholung gegen einen hängenden Spiegel (LFH-1101).
         run: ./scripts/apt-pakete.sh nasm
 
+      # SPEICHER: Der Runner hat 4 Kerne und 15 GB. Seit Matrix (matrix-sdk, LLH-2094) brach das
+      # instrumentierte Bauen zweimal mit „runner has received a shutdown signal“ ab (f200153f,
+      # d8ccab46), beide Male mitten im Compile von matrix-sdk, ohne Fehlermeldung des Compilers:
+      # das Bild eines vollen Speichers, in dem der Runner-Dienst mitstirbt. Eine große
+      # Auslagerungsdatei fängt die Spitzen ab, ohne das Bauen zu drosseln, solange der Speicher
+      # reicht. `free` davor und danach.
+      - name: Auslagerung vergrößern
+        run: |
+          free -h
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 16G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile > /dev/null
+          sudo swapon /swapfile
+          free -h
+
       - name: Rust-Toolchain (stable + llvm-tools)
         run: |
           rustup toolchain install stable --profile minimal --component llvm-tools-preview --no-self-update
