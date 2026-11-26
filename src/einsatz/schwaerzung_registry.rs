@@ -2615,6 +2615,8 @@ pub const TABELLEN: &[TabellenRegel] = &[
             scrub("snap_anzeige", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
             retain("quittiert_at", G_ZEIT),
             retain("quittiert_von_id", G_FK),
+            // Helfer-App Stufe 2 (0389): an wie viele Helfer-Apps die Zeile ging.
+            retain("helfer_gesendet", G_ZAEHLER),
         ],
     },
     TabellenRegel {
@@ -3312,6 +3314,28 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("erstellt_von", G_FK),
             retain("erstellt_at", G_ZEIT),
             retain("einloesungen", G_ZAEHLER),
+        ],
+    },
+    // Push-Anmeldung der Helfer-App (Stufe 2, 0389): Gerätetoken und Schlüssel sind technisch,
+    // aber an ein Privatgerät gebunden; die Schwärzung überschreibt sie.
+    TabellenRegel {
+        tabelle: "helfer_push_anmeldung",
+        scoping: Scoping::UeberParent {
+            fk: "kopplung_id",
+            parent: "geraet_kopplung",
+        },
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("kopplung_id", G_FK),
+            retain(
+                "kennung",
+                "Zufällige Kennung einer Push-Anmeldung (technisch, kein Personenbezug)",
+            ),
+            scrub("token", Strategie::Platzhalter, Z_EINSATZ),
+            retain("umgebung", G_ENUM),
+            scrub("schluessel", Strategie::Platzhalter, Z_EINSATZ),
+            retain("angelegt_at", G_ZEIT),
         ],
     },
     TabellenRegel {

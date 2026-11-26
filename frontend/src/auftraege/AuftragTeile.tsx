@@ -15,6 +15,7 @@ import { MenueAusloeser } from '../components/MenueAusloeser';
 import type { KartenAktion } from '../components/kartenKontext';
 import EmpfaengerQuittung, { Quittungsstand } from './EmpfaengerQuittung';
 import { READ_LABEL, READ_ORDER } from './auftragsschemaKern';
+import { helferHinweis } from './helferZustellung';
 
 /**
  * Die Teile eines Einzelauftrags (Change `oxgob5gk-auftraege-befehle-angleichen`, design.md D4).
@@ -165,12 +166,16 @@ export function AuftragEmpfaenger({
 }: AuftragEmpfaengerProps) {
   const zeilen = useMemo(
     () =>
-      a.empfaenger.map((e) => ({
-        id: e.id,
-        name: mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung),
-        ariaName: e.snap_anzeige,
-        quittiertAt: e.quittiert_at,
-      })),
+      a.empfaenger.map((e) => {
+        const name = mitBesetzung(e.snap_anzeige, e.aktuelle_besetzung);
+        const hinweis = helferHinweis(e);
+        return {
+          id: e.id,
+          name: hinweis ? `${name} · ${hinweis}` : name,
+          ariaName: e.snap_anzeige,
+          quittiertAt: e.quittiert_at,
+        };
+      }),
     [a.empfaenger],
   );
   // Ein aufgehobener Auftrag erwartet keine Quittung mehr (LLH-1098): kein Knopf, die Zeile

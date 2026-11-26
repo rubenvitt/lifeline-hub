@@ -556,3 +556,82 @@ async fn felder_die_apple_ablehnt_werden_frueh_abgewiesen() {
     assert_eq!(a.status(), StatusCode::OK);
     assert_eq!(d.erfasst.lock().unwrap().len(), 100);
 }
+
+/// Wie [`aufbau`], aber mit weiteren erlaubten Bundle-IDs (ADR-0111).
+async fn aufbau_mit_themen(basis: &str, weitere: &str) -> (Router, String) {
+    let pool = speicher::oeffnen(":memory:").await.unwrap();
+    let zugang = speicher::registrieren(&pool, None, "1.0.0").await.unwrap();
+    let bearer = format!("Bearer {}.{}", zugang.server_id, zugang.geheimnis);
+    let mut cfg = gemeinsam::config(basis);
+    cfg.weitere_bundle_ids = weitere
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let apns = push_relais::apns::ApnsClient::neu(&cfg).unwrap();
+    let app = router(RelaisState::neu(pool, 10, ClientIpSource::Peer, apns, 600));
+    (app, bearer)
+}
+
+#[tokio::test]
+async fn thema_wird_als_apns_topic_gesendet() {
+    let d = doppel(200, "").await;
+    let (app, bearer) = aufbau_mit_themen(&d.basis, "dev.rubeen.lifeline.helfer").await;
+    let mut n = nachricht("alarm", "production");
+    n["thema"] = json!("dev.rubeen.lifeline.helfer");
+    let antwort = app
+        .oneshot(senden_anfrage(Some(&bearer), json!({ "nachrichten": [n] })))
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::OK);
+    assert_eq!(
+        json_antwort(antwort).await,
+        json!({ "ergebnisse": ["zugestellt"] })
+    );
+    let e = d.erfasst.lock().unwrap();
+    assert_eq!(e[0].koepfe["apns-topic"], "dev.rubeen.lifeline.helfer");
+}
+
+#[tokio::test]
+async fn ohne_thema_gilt_das_hauptbundle() {
+    let d = doppel(200, "").await;
+    let (app, bearer) = aufbau_mit_themen(&d.basis, "dev.rubeen.lifeline.helfer").await;
+    app.oneshot(senden_anfrage(
+        Some(&bearer),
+        json!({ "nachrichten": [nachricht("alarm", "production")] }),
+    ))
+    .await
+    .unwrap();
+    let e = d.erfasst.lock().unwrap();
+    assert_eq!(e[0].koepfe["apns-topic"], "dev.rubeen.lifeline.ios");
+}
+
+#[tokio::test]
+async fn fremdes_thema_ist_422_ohne_apns() {
+    let d = doppel(200, "").await;
+    let (app, bearer) = aufbau_mit_themen(&d.basis, "dev.rubeen.lifeline.helfer").await;
+    let mut n = nachricht("alarm", "production");
+    n["thema"] = json!("x.y");
+    let antwort = app
+        .oneshot(senden_anfrage(
+            Some(&bearer),
+            json!({ "nachrichten": [nachricht("alarm", "production"), n] }),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(d.erfasst.lock().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn hauptbundle_als_thema_ist_erlaubt() {
+    let d = doppel(200, "").await;
+    let (app, bearer) = aufbau_mit_themen(&d.basis, "").await;
+    let mut n = nachricht("alarm", "production");
+    n["thema"] = json!("dev.rubeen.lifeline.ios");
+    let antwort = app
+        .oneshot(senden_anfrage(Some(&bearer), json!({ "nachrichten": [n] })))
+        .await
+        .unwrap();
+    assert_eq!(antwort.status(), StatusCode::OK);
+}

@@ -43,3 +43,14 @@ und der Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026
 - **Lokal bauen** (mit SDK): `LC_ALL=C.UTF-8 android/gradlew -p android :helfer:testDebugUnitTest
   :helfer:assembleDebug`; der Kern allein ohne SDK: `LC_ALL=C.UTF-8 android/gradlew -p
   android/helferkern test`.
+
+## Aufträge (Stufe 2, ADR-0111)
+
+- **Ein Dienst für Ortung und Empfang** mit einer Benachrichtigung, Typen
+  `location|remoteMessaging`. Er startet beim Einlösen immer aus dem Vordergrund, ohne Ortung nur
+  mit `remoteMessaging`; kein FCM, kein Selbstneustart.
+- **Empfang** über `GET /api/incidents/{id}/live` (Ereignis `helfer_auftrag`) ab `aktiv`; SSE-Lesen,
+  Wiederverbinden, Ordnung, Quittungsstand und „Mitteilung ja/nein“ entscheidet `helferkern`
+  (`Livestrom`, `Empfang`, `Auftraege`) mit den Fällen `src-tauri/faelle/helfer-auftrag.json`.
+- **Mitteilungen** im Kanal „Aufträge“, `VISIBILITY_PRIVATE`, öffentliche Fassung „Neuer Auftrag“.
+  Ohne Mitteilungsrecht Hinweis in „Angemeldet“. Aufträge nie auf die Platte.

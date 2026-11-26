@@ -6,9 +6,18 @@
   Live-Aktivität die Anfrage ab, falls die App sie nicht selbst ausführen kann
   (Helfer/Gemeinsam/Pausieranfrage.swift). Das Sitzungs-Cookie liegt im Schlüsselbund der App,
   nicht in der Gruppe.
+  Aufträge (Stufe 2, ADR-0111): `aps-environment` steht wie in der Hülle (App/LifelineHub.entitlements)
+  fest auf development, der Export für App Store Connect setzt production; die Umgebung meldet die
+  App dem Server über `#if DEBUG` (App/Dienste/Mitteilungen.swift). Time Sensitive lässt Aufträge
+  durch den Fokus. Den Schlüssel der Nutzlast teilt die App über die App Group als
+  Schlüsselbund-Gruppe mit dem Mitteilungsdienst HelferDienst (Helfer/Dienst/HelferDienst.entitlements).
 -->
 <plist version="1.0">
 <dict>
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.dev.rubeen.lifeline.helfer</string>

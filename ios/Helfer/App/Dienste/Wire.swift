@@ -141,3 +141,13 @@ struct Zustand: Decodable, Equatable, Sendable {
         return Date().addingTimeInterval(ablauf.timeIntervalSince(server))
     }
 }
+
+/// Body von `PUT /api/devices/me/push` (`HelperPushBody`): Kennung (UUID, AAD der Nutzlast),
+/// APNs-Token als Hex, `sandbox` oder `production` und der Schlüssel (32 Byte, base64url). Nie
+/// loggen.
+struct Pushanmeldung: Encodable, Sendable {
+    let registrationId: String
+    let token: String
+    let environment: String
+    let key: String
+}

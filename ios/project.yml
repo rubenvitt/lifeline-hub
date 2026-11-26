@@ -16,6 +16,12 @@
 # schreibt scripts/ios/helfer-version.sh nach Helfer/App/Version.xcconfig (nicht versioniert).
 # XcodeGen braucht beide xcconfig für jedes Schema: vor `xcodegen generate` laufen immer
 # scripts/ios/version.sh und scripts/ios/helfer-version.sh (testflight.sh, simulator-pruefung.sh).
+#
+# Aufträge an die Helfer-App (Stufe 2, ADR-0111): `LifelineHelfer` trägt Push und Time Sensitive;
+# der Mitteilungsdienst `HelferDienst` entschlüsselt die Nutzlast mit `Gemeinsam/Entschluesseler.swift`
+# und liest den Schlüssel mit `Gemeinsam/Schluesselbund.swift`, beides wie in der Hülle. Als
+# Schlüsselbund-Gruppe dient die App Group der Helfer-App (keine `keychain-access-groups`: das
+# Sitzungs-Cookie bleibt so in der Standardgruppe der App).
 name: LifelineHub
 
 options:
@@ -214,13 +220,19 @@ targets:
           - "Version.xcconfig"
       # Live-Aktivität (Attribute, Pausieren) und Thema, gemeinsam mit der Erweiterung.
       - path: Helfer/Gemeinsam
+      # Schlüssel der Push-Nutzlast anlegen und ablegen, wie die Hülle (ADR-0111).
+      - path: Gemeinsam/Entschluesseler.swift
+      - path: Gemeinsam/Schluesselbund.swift
       - path: Helfer/App/PrivacyInfo.xcprivacy
         buildPhase: resources
       # App-Symbol und Startfarbe aus der Bildmarke (Spec `app-marke`), dieselben wie die Hülle.
       - path: App/Assets.xcassets
     dependencies:
       - package: HelferKern
+      - package: LifelineKern
       - target: HelferAktivitaet
+      # Wird als App-Erweiterung eingebettet (PlugIns/HelferDienst.appex).
+      - target: HelferDienst
     configFiles:
       Debug: Helfer/App/Version.xcconfig
       Release: Helfer/App/Version.xcconfig
@@ -240,6 +252,8 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         ITSAppUsesNonExemptEncryption: false
+        # Schlüsselbund-Gruppe des Push-Schlüssels (Gemeinsam/Schluesselbund.swift): die App Group.
+        LifelineSchluesselbundGruppe: group.dev.rubeen.lifeline.helfer
         LSRequiresIPhoneOS: true
         NSCameraUsageDescription: Zum Scannen des QR-Codes der Einsatzleitung.
         NSLocalNetworkUsageDescription: Lifeline Helfer verbindet sich mit dem Einsatzserver im lokalen Netz, etwa mit elw.local.
@@ -298,6 +312,48 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
+
+  # Mitteilungsdienst der Helfer-App (Notification Service Extension, ADR-0111): öffnet die
+  # verschlüsselte Nutzlast eines Auftrags, bevor iOS die Mitteilung zeigt.
+  HelferDienst:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.4"
+    sources:
+      - path: Helfer/Dienst
+        excludes:
+          - "Info.plist"
+          - "HelferDienst.entitlements"
+          - "PrivacyInfo.xcprivacy"
+      - path: Gemeinsam/Entschluesseler.swift
+      - path: Gemeinsam/Schluesselbund.swift
+      - path: Helfer/Dienst/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: HelferKern
+      - package: LifelineKern
+    # Dieselbe Version wie die App; App Store Connect lehnt eine abweichende ab.
+    configFiles:
+      Debug: Helfer/App/Version.xcconfig
+      Release: Helfer/App/Version.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.rubeen.lifeline.helfer.dienst
+        PRODUCT_NAME: HelferDienst
+        GENERATE_INFOPLIST_FILE: "NO"
+        CODE_SIGN_ENTITLEMENTS: Helfer/Dienst/HelferDienst.entitlements
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: "YES"
+    info:
+      path: Helfer/Dienst/Info.plist
+      properties:
+        CFBundleDisplayName: Lifeline Helfer
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LifelineSchluesselbundGruppe: group.dev.rubeen.lifeline.helfer
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).Dienst
 
   # Unit-Tests der Helfer-App im Simulator (Modell im Testzustand, ohne Netz).
   LifelineHelferTests:

@@ -17,6 +17,14 @@ enum Verbindungsstand: Equatable, Sendable {
 /// Bildschirmbilder in ios/HelferUITests.
 enum Testzustand: String, CaseIterable, Sendable {
     case start, anmelden, wartet, angemeldet, pausiert, ruht, beendet
+    // Aufträge (Stufe 2, ADR-0111): „Angemeldet“ mit Aufträgen und mit abgelehnten Mitteilungen,
+    // der Auftrag offen, von einem anderen übernommen, aufgehoben und mit gescheiterter Quittung.
+    case auftraege
+    case mitteilungenAus = "mitteilungen-aus"
+    case auftragOffen = "auftrag-offen"
+    case auftragUebernommen = "auftrag-uebernommen"
+    case auftragAufgehoben = "auftrag-aufgehoben"
+    case quittungFehler = "quittung-fehler"
 
     static let argument = "-HelferTestzustand"
 
@@ -63,6 +71,21 @@ final class HelferModell {
     /// Zählt jede Bestätigung durch die Leitung (Haptik der Seite).
     private(set) var bestaetigungen = 0
 
+    /// Aufträge der Kopplung, geordnet (`Auftraege.ordnen`); nur im Speicher, nie auf der Platte
+    /// (ADR-0111).
+    private(set) var auftraege: [HelferAuftrag] = []
+    /// Empfängerzeilen, deren Quittung gerade läuft.
+    private(set) var quittungLaeuft: Set<Int64> = []
+    /// Empfängerzeilen, deren Quittung scheiterte, mit dem Text für die Seite.
+    private(set) var quittungsfehler: [Int64: String] = [:]
+    /// Empfängerzeilen, die diese App erfolgreich quittiert hat und deren Quittung der Server als
+    /// eigene zurückgab (`Auftraege.istEigeneQuittung`); nur für die Haptik der Seite.
+    private(set) var eigeneQuittungen: Set<Int64> = []
+    /// Der geöffnete Auftrag (Detail), auch aus dem Tippen auf eine Mitteilung.
+    var geoeffneterAuftrag: Int64?
+    /// Mitteilungen abgelehnt: Aufträge kommen nur bei offener App (Hinweis in „Angemeldet“).
+    private(set) var mitteilungenAus = false
+
     /// Fehlermeldung für die aktuelle Seite.
     var meldung: String?
     /// Ein neuer Scan während einer Anmeldung; die Seite fragt, ob die alte enden soll.
@@ -82,6 +105,11 @@ final class HelferModell {
     @ObservationIgnored private var imVordergrund = false
     /// Die Ruhe endete im Hintergrund; die Ortung startet beim nächsten Öffnen.
     @ObservationIgnored private var startNachRuhe = false
+    /// Ob die Push-Anmeldung in diesem Lauf der App schon an den Server ging.
+    @ObservationIgnored private var pushGemeldet = false
+    /// Ein Tippen auf eine Mitteilung, bevor die Phase bekannt war (Kaltstart,
+    /// `Meldungstipp.warten`): `nil` innen heißt ohne Auftrag.
+    @ObservationIgnored private var wartenderTipp: Int64??
 
     private static let anzeigenameSchluessel = "anzeigename"
 
@@ -121,11 +149,21 @@ final class HelferModell {
             self?.verbindungsstand = zeit.map { .wiederholt($0) } ?? .verbunden
         }
         Pausieranfrage.ausfuehrung = { [weak self] in await self?.pausieren() }
+        // iOS hat das Token gewechselt: neu anmelden.
+        Geraetetoken.beiNeuemToken = { [weak self] _ in
+            self?.pushGemeldet = false
+            Task { await self?.meldePushAn() }
+        }
+        Meldungsweg.verbinde(self)
         let aktivitaet = aktivitaet
         Task { await aktivitaet?.beendeAlte() }
         if let sitzung = Sitzungsablage.lesen() {
             verbindung = Serververbindung(server: sitzung.server, cookie: sitzung.cookie)
-            Task { await aktualisiereZustand() }
+            Task {
+                await aktualisiereZustand()
+                // Einmal je Lauf: so kommt auch ein neues Token zum Server.
+                await meldePushAn()
+            }
         }
     }
 
@@ -141,15 +179,19 @@ final class HelferModell {
         if Pausieranfrage.abholen(), phase == .aktiv {
             Task { await pausieren() }
         }
-        // Die Freigabe kann sich in den Einstellungen geändert haben.
+        // Die Freigaben können sich in den Einstellungen geändert haben.
         if let ortung { ortungVerweigert = ortung.isVerweigert }
+        Task { await pruefeMitteilungen() }
         if startNachRuhe {
             startNachRuhe = false
             starteOrtung()
         }
+        // Ohne eigene Live-Verbindung (ADR-0111): die Aufträge kommen beim Öffnen, bei jedem Push
+        // (`pushEmpfangen`) und mit dieser Abfrage, auch wenn Mitteilungen aus sind.
         abfrage = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.aktualisiereZustand()
+                await self?.ladeAuftraege()
                 try? await Task.sleep(for: .seconds(15))
             }
         }
@@ -268,6 +310,9 @@ final class HelferModell {
         UserDefaults.standard.set(name, forKey: Self.anzeigenameSchluessel)
         Sitzungsablage.speichern(.init(server: ziel.server, cookie: cookie))
         self.verbindung = verbindung
+        // Eine neue Kopplung bekommt eine neue Kennung für Push.
+        Pushschluessel.loeschen()
+        pushGemeldet = false
         zustand = rueckmeldung.dekodiert(Zustand.self)
         anmeldung.verarbeite(.eingeloest)
         if let zustand {
@@ -275,6 +320,8 @@ final class HelferModell {
                 .zustand(zustand.state, grund: zustand.reason, rolle: zustand.rolle))
         }
         starteOrtung()
+        // Nach dem Einlösen fragt die App nach Mitteilungen und meldet Push an (ADR-0111).
+        await meldePushAn()
     }
 
     /// Startet die Ortung, solange die Phase sie verlangt; nur aus dem Vordergrund (Einlösen,
@@ -376,7 +423,11 @@ final class HelferModell {
         defer { beschaeftigt = false }
         let vorher = phase
         stoppeOrtung()
-        if let verbindung { _ = await verbindung.abmelden() }
+        if let verbindung {
+            // Erst Push abmelden, solange die Sitzung gilt.
+            _ = await verbindung.meldePushAb()
+            _ = await verbindung.abmelden()
+        }
         anmeldung.verarbeite(.abgemeldet)
         nachWechsel(von: vorher)
     }
@@ -391,6 +442,145 @@ final class HelferModell {
         verbindungsstand = .unbekannt
         gewaehltesZiel = nil
         meldung = nil
+        vergissAuftraege()
+    }
+
+    // MARK: Aufträge (Stufe 2, ADR-0111)
+
+    /// Lädt die eigenen Aufträge, solange die Kopplung bestätigt ist. Eine abgewiesene Sitzung
+    /// (401) beendet die Kopplung; alles andere lässt die Liste stehen.
+    func ladeAuftraege() async {
+        guard umgebung == .echt, phase.zeigtAuftraege, let verbindung else { return }
+        let rueckmeldung = await verbindung.auftraege()
+        guard rueckmeldung.istErfolg, let liste = Auftraege.liste(aus: rueckmeldung.daten) else {
+            if rueckmeldung.status == 401 { reagiere(auf: rueckmeldung) }
+            return
+        }
+        guard phase.zeigtAuftraege else { return }
+        uebernimm(liste)
+    }
+
+    /// „Übernommen“ an einer eigenen Zeile. Ein aufgehobener Auftrag (422) lädt die Liste neu und
+    /// zeigt „aufgehoben“; jeder andere Fehler „Bitte über Funk bestätigen“.
+    func quittiere(_ auftrag: HelferAuftrag, empfaenger: HelferAuftrag.Empfaenger) async {
+        guard stand(auftrag, empfaenger: empfaenger).kannQuittieren else { return }
+        quittungsfehler[empfaenger.id] = nil
+        quittungLaeuft.insert(empfaenger.id)
+        defer { quittungLaeuft.remove(empfaenger.id) }
+        if umgebung == .test {
+            let neu = Beispiel.quittiert(auftrag, empfaenger: empfaenger, von: anzeigename)
+            nachQuittung(neu, empfaenger: empfaenger.id)
+            return
+        }
+        guard let verbindung else {
+            quittungsfehler[empfaenger.id] = AuftragAnzeige.quittungFehlgeschlagen
+            return
+        }
+        let rueckmeldung = await verbindung.quittiere(auftrag: auftrag.id, empfaenger: empfaenger.id)
+        if rueckmeldung.istErfolg, let neu = Auftraege.auftrag(aus: rueckmeldung.daten) {
+            nachQuittung(neu, empfaenger: empfaenger.id)
+        } else if rueckmeldung.status == 422 {
+            await ladeAuftraege()
+        } else {
+            quittungsfehler[empfaenger.id] = AuftragAnzeige.quittungFehlgeschlagen
+            if rueckmeldung.status == 401 { reagiere(auf: rueckmeldung) }
+        }
+    }
+
+    /// Stand einer Zeile mit dem, was die App gerade tut.
+    func stand(_ auftrag: HelferAuftrag, empfaenger: HelferAuftrag.Empfaenger) -> Quittungsstand {
+        Quittungsstand.aus(
+            auftrag, empfaenger: empfaenger, sendet: quittungLaeuft.contains(empfaenger.id),
+            fehler: quittungsfehler[empfaenger.id])
+    }
+
+    /// Antwort einer angenommenen Quittung: übernehmen; eine eigene (der Kern vergleicht den Namen
+    /// des Servers mit dem eigenen) bekommt die Haptik. War ein anderer schneller, gibt der Server
+    /// dessen Quittung zurück.
+    private func nachQuittung(_ neu: HelferAuftrag, empfaenger id: Int64) {
+        if let zeile = neu.recipients.first(where: { $0.id == id }),
+            Auftraege.istEigeneQuittung(zeile, eigenerName: anzeigename)
+        {
+            eigeneQuittungen.insert(id)
+        }
+        ersetze(neu)
+    }
+
+    /// „Übernommen um …“ oder „Übernommen von … um …“; eigen oder fremd entscheidet der Kern.
+    func quittungstext(_ empfaenger: HelferAuftrag.Empfaenger, um: Date?, von: String?) -> String {
+        AuftragAnzeige.quittiert(um: um, von: von, eigenerName: anzeigename)
+    }
+
+    func auftrag(_ id: Int64) -> HelferAuftrag? {
+        auftraege.first { $0.id == id }
+    }
+
+    /// Ein Push bei offener App (`willPresent`): die Liste neu laden.
+    func pushEmpfangen() {
+        Task { await ladeAuftraege() }
+    }
+
+    /// Tippen auf eine Mitteilung: den Auftrag öffnen und die Liste neu laden. Beim Kaltstart ist
+    /// die Phase noch `.start`; dann wartet das Tippen bis zum ersten Phasenwechsel
+    /// (`nachWechsel`), was der Kern entscheidet (`Phase.meldungstipp`).
+    func meldungAngetippt(auftrag: Int64?) {
+        switch phase.meldungstipp {
+        case .oeffnen:
+            wartenderTipp = nil
+            if let auftrag { geoeffneterAuftrag = auftrag }
+            Task { await ladeAuftraege() }
+        case .warten:
+            wartenderTipp = .some(auftrag)
+        case .verwerfen:
+            wartenderTipp = nil
+        }
+    }
+
+    /// Fragt nach Mitteilungen (nur, solange nicht entschieden), holt das Token und meldet Kennung,
+    /// Token und Schlüssel mit `PUT /api/devices/me/push` an; einmal je Lauf und nach jedem
+    /// neuen Token. Abgelehnt → Hinweis, nichts an den Server.
+    func meldePushAn() async {
+        guard umgebung == .echt, phase.gekoppelt, let verbindung else { return }
+        let erlaubt = await Mitteilungen.erlaubtOderFragen()
+        mitteilungenAus = !erlaubt
+        guard erlaubt, !pushGemeldet else { return }
+        guard let token = try? await Geraetetoken.anfordern(),
+            let anmeldung = Pushschluessel.anmeldung(token: token),
+            phase.gekoppelt, self.verbindung === verbindung
+        else { return }
+        let rueckmeldung = await verbindung.meldePushAn(anmeldung)
+        if rueckmeldung.istErfolg {
+            pushGemeldet = true
+        } else if rueckmeldung.status == 401 {
+            reagiere(auf: rueckmeldung)
+        }
+    }
+
+    /// Ob Mitteilungen erlaubt sind; erst in den Einstellungen erlaubt, meldet die App neu an.
+    private func pruefeMitteilungen() async {
+        guard umgebung == .echt, phase.gekoppelt else { return }
+        let vorher = mitteilungenAus
+        mitteilungenAus = await Mitteilungen.freigabe() == .verweigert
+        if vorher, !mitteilungenAus { await meldePushAn() }
+    }
+
+    private func uebernimm(_ liste: [HelferAuftrag]) {
+        auftraege = Auftraege.ordnen(liste)
+        let zeilen = Set(auftraege.flatMap { $0.recipients.map(\.id) })
+        quittungsfehler = quittungsfehler.filter { zeilen.contains($0.key) }
+    }
+
+    private func ersetze(_ neu: HelferAuftrag) {
+        uebernimm(auftraege.map { $0.id == neu.id ? neu : $0 })
+    }
+
+    private func vergissAuftraege() {
+        auftraege = []
+        quittungLaeuft = []
+        quittungsfehler = [:]
+        eigeneQuittungen = []
+        geoeffneterAuftrag = nil
+        wartenderTipp = nil
     }
 
     // MARK: Antworten
@@ -463,9 +653,10 @@ final class HelferModell {
                 if phase.gekoppelt {
                     reagiere(auf: rueckmeldung)
                 } else {
-                    // Gespeicherte Sitzung beim Start ungültig: vergessen.
+                    // Gespeicherte Sitzung beim Start ungültig: vergessen, auch ein wartendes Tippen.
                     Sitzungsablage.loeschen()
                     self.verbindung = nil
+                    wartenderTipp = nil
                 }
             }
             return
@@ -488,9 +679,13 @@ final class HelferModell {
     /// abräumen.
     private func nachWechsel(von vorher: Phase) {
         guard phase != vorher else { return }
+        if let tipp = wartenderTipp, phase.meldungstipp != .warten {
+            meldungAngetippt(auftrag: tipp)
+        }
         if vorher == .unbestaetigt, phase == .aktiv {
             bestaetigungen += 1
             aktivitaet?.aktualisiere(aktivitaetsstand)
+            Task { await ladeAuftraege() }
         }
         let ruhteVorher: Bool
         if case .ruht = vorher { ruhteVorher = true } else { ruhteVorher = false }
@@ -519,6 +714,10 @@ final class HelferModell {
         startNachRuhe = false
         Sitzungsablage.loeschen()
         verbindung = nil
+        // Der Server löscht die Push-Anmeldung mit der Kopplung; hier fallen Kennung und Schlüssel.
+        if umgebung == .echt { Pushschluessel.loeschen() }
+        pushGemeldet = false
+        vergissAuftraege()
     }
 
     // MARK: Anzeige
@@ -553,7 +752,8 @@ final class HelferModell {
             self.einladung = einladung
             zielliste = Beispiel.zielliste
             gewaehltesZiel = Beispiel.zielliste.targets.first
-        case .wartet, .angemeldet, .pausiert, .ruht, .beendet:
+        case .wartet, .angemeldet, .pausiert, .ruht, .beendet, .auftraege, .mitteilungenAus,
+            .auftragOffen, .auftragUebernommen, .auftragAufgehoben, .quittungFehler:
             anmeldung.verarbeite(.gescannt(einladung))
             self.einladung = einladung
             zielliste = Beispiel.zielliste
@@ -581,6 +781,33 @@ final class HelferModell {
                     .zustand("beendet", grund: Grund.einsatzBeendet.wire, rolle: Beispiel.zustand(state: "aktiv").rolle))
                 ortungLaeuft = false
             }
+            zeigeAuftraege(testzustand)
+        }
+    }
+
+    private func zeigeAuftraege(_ testzustand: Testzustand) {
+        switch testzustand {
+        case .auftraege:
+            uebernimm(Beispiel.auftraege)
+        case .mitteilungenAus:
+            mitteilungenAus = true
+        case .auftragOffen:
+            uebernimm(Beispiel.auftraege)
+            geoeffneterAuftrag = Beispiel.offenerAuftrag
+        case .auftragUebernommen:
+            uebernimm(Beispiel.auftraege)
+            geoeffneterAuftrag = Beispiel.uebernommenerAuftrag
+        case .auftragAufgehoben:
+            uebernimm(Beispiel.auftraege)
+            geoeffneterAuftrag = Beispiel.aufgehobenerAuftrag
+        case .quittungFehler:
+            uebernimm(Beispiel.auftraege)
+            geoeffneterAuftrag = Beispiel.offenerAuftrag
+            if let zeile = auftrag(Beispiel.offenerAuftrag)?.recipients.first {
+                quittungsfehler[zeile.id] = AuftragAnzeige.quittungFehlgeschlagen
+            }
+        case .start, .anmelden, .wartet, .angemeldet, .pausiert, .ruht, .beendet:
+            break
         }
     }
 }
@@ -611,5 +838,57 @@ enum Beispiel {
             person: state == "aktiv" ? .init(id: 5, name: "Max Mustermann") : nil,
             isTracker: true, paused: false,
             expiresAt: "2026-11-25 22:00:00", serverTime: "2026-11-25 14:00:00")
+    }
+
+    static let offenerAuftrag: Int64 = 7
+    static let uebernommenerAuftrag: Int64 = 6
+    static let aufgehobenerAuftrag: Int64 = 5
+
+    /// Drei Aufträge: offen (sofort, an die Einheit und an dich), von einem anderen übernommen,
+    /// aufgehoben.
+    static let auftraege: [HelferAuftrag] = [
+        HelferAuftrag(
+            id: 7, number: 3, text: "Verletzte Person am Zelt 3, bitte Erstversorgung übernehmen",
+            location: "Zelt 3, Festplatz Nord", locationLat: 50.11, locationLon: 8.68,
+            priority: "sofort", deadlineAt: "2026-11-25 13:45:00",
+            issuedAt: "2026-11-25 13:32:00",
+            recipients: [
+                .init(id: 101, kind: "unit", label: "San-Trupp 2"),
+                .init(id: 102, kind: "person", label: "Max Mustermann"),
+            ]),
+        HelferAuftrag(
+            id: 6, number: 2, text: "Getränke zur Ausgabestelle Ost bringen",
+            location: "Ausgabestelle Ost", priority: "normal", issuedAt: "2026-11-25 13:05:00",
+            recipients: [
+                .init(
+                    id: 99, kind: "unit", label: "San-Trupp 2",
+                    acknowledgedAt: "2026-11-25 13:07:00", acknowledgedBy: "Lisa K.")
+            ]),
+        HelferAuftrag(
+            id: 5, number: 1, text: "Absperrung Parkplatz West besetzen", priority: "dringend",
+            issuedAt: "2026-11-25 12:40:00", cancelledAt: "2026-11-25 12:55:00",
+            recipients: [.init(id: 98, kind: "unit", label: "San-Trupp 2")]),
+    ]
+
+    /// Der Auftrag nach einer Quittung im Testzustand, wie der Server ihn zurückgäbe.
+    static func quittiert(
+        _ auftrag: HelferAuftrag, empfaenger: HelferAuftrag.Empfaenger, von: String
+    ) -> HelferAuftrag {
+        let format = DateFormatter()
+        format.locale = Locale(identifier: "en_US_POSIX")
+        format.timeZone = TimeZone(identifier: "UTC")
+        format.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let jetzt = format.string(from: Date())
+        return HelferAuftrag(
+            id: auftrag.id, number: auftrag.number, text: auftrag.text, location: auftrag.location,
+            locationLat: auftrag.locationLat, locationLon: auftrag.locationLon,
+            priority: auftrag.priority, deadlineAt: auftrag.deadlineAt, issuedAt: auftrag.issuedAt,
+            cancelledAt: auftrag.cancelledAt,
+            recipients: auftrag.recipients.map { zeile in
+                guard zeile.id == empfaenger.id else { return zeile }
+                return HelferAuftrag.Empfaenger(
+                    id: zeile.id, kind: zeile.kind, label: zeile.label, acknowledgedAt: jetzt,
+                    acknowledgedBy: von)
+            })
     }
 }

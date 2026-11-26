@@ -301,6 +301,16 @@ const HELFER: &[(&str, &str)] = &[
     ("POST", "/api/auth/logout"),
     ("GET", "/api/auth/me"),
     ("GET", "/api/incidents/{id}/live"),
+    // Stufe 2 (ADR-0111): die eigenen Aufträge und ihre Quittung; der Handler prüft „bestätigt“
+    // und „eigene Zeile“ (`helfer::auftraege`).
+    ("GET", "/api/devices/me/tasks"),
+    (
+        "POST",
+        "/api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge",
+    ),
+    // Push-Anmeldung der iOS-Helfer-App, an die Kopplung gebunden (`helfer::push`).
+    ("PUT", "/api/devices/me/push"),
+    ("DELETE", "/api/devices/me/push"),
 ];
 
 /// Zusätzliche Einsatzrouten des UHS-Tablets: die eigene UHS lesen, Belegung und
@@ -750,6 +760,13 @@ mod tests {
             ("POST", "/api/auth/logout"),
             ("GET", "/api/auth/me"),
             ("GET", "/api/incidents/{id}/live"),
+            ("GET", "/api/devices/me/tasks"),
+            (
+                "POST",
+                "/api/devices/me/tasks/{aid}/recipients/{empf}/acknowledge",
+            ),
+            ("PUT", "/api/devices/me/push"),
+            ("DELETE", "/api/devices/me/push"),
         ] {
             assert!(darf_route(h, m, p), "Helfer darf {m} {p}");
         }
@@ -758,6 +775,11 @@ mod tests {
             ("GET", "/api/incidents/{id}/module-access"),
             ("GET", "/api/incidents/{id}/requests"),
             ("GET", "/api/incidents/{id}/units"),
+            ("GET", "/api/incidents/{id}/tasks"),
+            (
+                "POST",
+                "/api/incidents/{id}/tasks/{aid}/recipients/{empf}/acknowledge",
+            ),
             ("GET", "/api/organization"),
             ("GET", "/api/map/config"),
             ("POST", "/api/client-errors"),

@@ -41,7 +41,8 @@ Release-Builds in der Produktion).
 | `PUSH_RELAIS_APNS_SCHLUESSEL` | `AuthKey.p8` | Pfad der `.p8`-Datei. Im Abbild `/geheimnisse/AuthKey.p8`. |
 | `PUSH_RELAIS_APNS_KEY_ID` | leer | Key ID des Schlüssels. **Pflicht**, sonst weist Apple das Anbieter-Token ab. |
 | `PUSH_RELAIS_APNS_TEAM_ID` | leer | Team ID des Entwicklerkontos. **Pflicht.** |
-| `PUSH_RELAIS_BUNDLE_ID` | `dev.rubeen.lifeline.ios` | Bundle-ID der App; geht als `apns-topic` an Apple. |
+| `PUSH_RELAIS_BUNDLE_ID` | `dev.rubeen.lifeline.ios` | Bundle-ID der App; geht als `apns-topic` an Apple, wenn eine Nachricht kein `thema` nennt. |
+| `PUSH_RELAIS_WEITERE_BUNDLE_IDS` | ungesetzt | Weitere erlaubte Bundle-IDs als Komma-Liste, z. B. `dev.rubeen.lifeline.helfer` für Aufträge an die Helfer-App (ADR-0111). Eine Nachricht wählt sie mit `thema`; ein anderes Thema weist `senden` mit 422 ab. Derselbe `.p8`-Schlüssel gilt für alle Apps des Teams. **Vor** einem Server mit Helfer-Aufträgen ausrollen: ein älteres Relais sendet sonst mit dem Hauptbundle, und Apple lehnt ab. |
 | `PUSH_RELAIS_LIMIT_MINUTE` | `600` | Nachrichten je Server und Minute; darüber antwortet das Relais mit 429. |
 | `PUSH_RELAIS_REGISTRIERUNGEN_STUNDE` | `10` | Registrierungen (`POST /v1/server`) je IP und Stunde; IPv6 zählt je /64. |
 | `PUSH_RELAIS_HINTER_PROXY` | `false` | Hinter genau einem TLS-Proxy ohne CDN davor `true`: dann zählt der letzte (rechte) Eintrag von `X-Forwarded-For` als Client-IP, den der Proxy anhängt, sonst die Peer-Adresse. Nicht zusammen mit `PUSH_RELAIS_TRUSTED_PROXIES`. |

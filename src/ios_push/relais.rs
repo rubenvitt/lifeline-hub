@@ -28,6 +28,9 @@ pub struct RelaisNachricht {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kollaps: Option<String>,
     pub nutzlast: String,
+    /// Bundle-ID der Ziel-App (ADR-0111); ohne gilt die Lifeline-App des Relais.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thema: Option<String>,
 }
 
 /// Ergebnis je Nachricht.

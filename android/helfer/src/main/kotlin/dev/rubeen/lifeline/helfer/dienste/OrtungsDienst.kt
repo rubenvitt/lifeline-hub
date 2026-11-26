@@ -26,43 +26,93 @@ import dev.rubeen.lifeline.helfer.MainActivity
 import dev.rubeen.lifeline.helfer.R
 import dev.rubeen.lifeline.helferkern.Antwort
 import dev.rubeen.lifeline.helferkern.Anzeige
+import dev.rubeen.lifeline.helferkern.Dienstanzeige
+import dev.rubeen.lifeline.helferkern.Dienstumfang
+import dev.rubeen.lifeline.helferkern.Empfang
+import dev.rubeen.lifeline.helferkern.LiveEreignis
+import dev.rubeen.lifeline.helferkern.Ortungslage
 import dev.rubeen.lifeline.helferkern.Position
 import dev.rubeen.lifeline.helferkern.Sendeplan
+import dev.rubeen.lifeline.helferkern.SseLeser
+import dev.rubeen.lifeline.helferkern.Wiederverbindung
+import dev.rubeen.lifeline.helferkern.Wire
 import java.time.Duration
 import java.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Die Helfer-Ortung (ADR-0101, Spec „Ortung im Hintergrund“ und „Senden, Takt, ohne Netz“): die
- * einzige Stelle, die im Hintergrund sendet.
+ * Was die App dem Helfer-Dienst vorgibt (aus der Phase der `Anmeldung`): ob er orten soll, ob er
+ * Aufträge empfängt und wie die Ortung steht. Ob `location` wirklich dazukommt, entscheiden Recht
+ * und System ([Dienstumfang]).
+ */
+data class Dienstvorgabe(
+    val einsatzId: Long,
+    val einsatz: String,
+    val ziel: String,
+    val orten: Boolean,
+    val empfangen: Boolean,
+    val lage: Ortungslage,
+    val imVordergrund: Boolean,
+)
+
+/**
+ * Der Helfer-Dienst (ADR-0101, ADR-0111): ortet und empfängt Aufträge, mit **einer**
+ * Benachrichtigung; die einzige Stelle, die im Hintergrund sendet und empfängt.
  *
- * - Ein Vordergrund-Dienst vom Typ `location`, gestartet nur aus der geöffneten App ([starte]);
- *   `START_NOT_STICKY`, nach dem Ende des Prozesses startet er nicht von selbst wieder.
- * - Sichtbar durch die dauerhafte Benachrichtigung „Lifeline ortet dich für Einsatz …“ mit
- *   „Pausieren“; Tippen öffnet die App. Ab Android 16 bittet sie um ein Live-Update.
+ * - Ein Vordergrund-Dienst vom Typ `location|remoteMessaging`, gestartet nur aus der geöffneten App
+ *   ([starte]), beim Einlösen immer: ohne Ortung (Recht fehlt, Pause, Ruhe, keine Rolle) allein mit
+ *   `remoteMessaging`. `location` nimmt er nur auf, wo Android es zulässt; sonst sagt die
+ *   Benachrichtigung „Ortung wartet — App öffnen“. `START_NOT_STICKY`, nach dem Ende des Prozesses
+ *   startet er nicht von selbst wieder; kein FCM.
+ * - Empfang ab `aktiv`: hält `GET /api/incidents/{id}/live` auf IO offen; Zeilen liest der
+ *   [SseLeser], wann neu verbunden wird, entscheidet [Empfang]. Auf `helfer_auftrag` und nach jedem
+ *   Verbinden lädt er die Liste; Mitteilungen nach `Auftraege.sollMitteilen` ([Auftragsstand]).
  * - Positionen vom `LocationManager` des Systems (der Fused Provider des Systems, wo es ihn gibt,
  *   sonst GPS und Netz, bei nur ungefährem Standort allein das Netz), weil die App ohne
  *   Play-Dienste verteilt wird: höchstens alle 30 s, ab 25 m Bewegung, dazu jede halbe Minute die
  *   Prüfung, ob ein Lebenszeichen fällig ist (dann eine frische Messung, nie eine alte neu datiert).
  * - Was gesendet wird und wann, entscheidet der [Sendeplan] im Kern; hier stehen nur Uhr, Netz und
- *   System. Kein Verlauf: nur die letzte Position, nur im Speicher.
+ *   System. Kein Verlauf: nur die letzte Position, nur im Speicher; Aufträge nie auf die Platte.
  */
 class OrtungsDienst : Service() {
     private val hauptfaden = Handler(Looper.getMainLooper())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val plan = Sendeplan()
+
+    @Volatile
     private var verbindung: Serververbindung? = null
 
-    /** Die Sitzung (Server und Cookie), mit der der Dienst gerade sendet. */
+    /** Die Sitzung (Server und Cookie), mit der der Dienst gerade sendet und empfängt. */
     private var aktiveSitzung: Sitzung? = null
+
+    @Volatile
     private var einsatz = ""
+
+    @Volatile
     private var ziel = ""
+
+    @Volatile
     private var ortet = false
+
+    @Volatile
+    private var lage = Ortungslage.AUS
+
+    /** Ob die Leitung bestätigt hat; vorher fragt der Empfang nur den Zustand ab. */
+    @Volatile
+    private var bestaetigt = false
+
+    /** Vom Hauptfaden gesetzt, von der Schleife des Empfangs (IO) gelesen. */
+    @Volatile
+    private var einsatzId = 0L
+    private var empfang: Job? = null
 
     /**
      * Ein Zuhörer je Anbieter: das System ersetzt die Anmeldung eines Zuhörers, der schon für einen
@@ -109,7 +159,7 @@ class OrtungsDienst : Service() {
         when {
             aktion == AKTION_PAUSIEREN -> pausieren()
             intent != null && aktion == AKTION_START -> starte(intent)
-            // Ohne Auftrag (etwa ein Neustart durch das System) ortet der Dienst nicht.
+            // Ohne Auftrag (etwa ein Neustart durch das System) läuft der Dienst nicht.
             else -> beenden()
         }
         return Service.START_NOT_STICKY
@@ -117,46 +167,102 @@ class OrtungsDienst : Service() {
 
     override fun onDestroy() {
         stoppeOrtung()
+        stoppeEmpfang()
+        Ortungsstand.dienstLaeuft.value = false
         scope.cancel()
         super.onDestroy()
     }
 
-    // Start und Stopp
+    // Start, Typwechsel und Stopp
 
     private fun starte(intent: Intent) {
         einsatz = intent.getStringExtra(EXTRA_EINSATZ).orEmpty()
         ziel = intent.getStringExtra(EXTRA_ZIEL).orEmpty()
-        // Erst in den Vordergrund (das System verlangt es binnen Sekunden nach dem Start), dann prüfen.
+        val orten = intent.getBooleanExtra(EXTRA_ORTEN, false)
+        val empfangen = intent.getBooleanExtra(EXTRA_EMPFANGEN, false)
+        val neueEinsatzId = intent.getLongExtra(EXTRA_EINSATZ_ID, 0L)
+        val vorgabe = intent.getStringExtra(EXTRA_LAGE)?.let { name -> Ortungslage.entries.firstOrNull { it.name == name } }
+        lage = vorgabe ?: Ortungslage.AUS
         legeKanalAn()
-        try {
-            startForeground(BENACHRICHTIGUNG, benachrichtigung(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
-        } catch (e: RuntimeException) {
-            // Ohne Standortrecht oder aus dem Hintergrund lässt das System den Dienst nicht zu.
-            Log.w(TAG, "Vordergrund-Dienst abgelehnt", e)
-            beenden()
-            return
+        // Erst in den Vordergrund (das System verlangt es binnen Sekunden nach dem Start), dann prüfen.
+        val umfang = Dienstumfang.fuer(orten, isStandortErlaubt())
+        if (!inDenVordergrund(umfang)) {
+            if (umfang == Dienstumfang.NUR_EMPFANG || !inDenVordergrund(Dienstumfang.NUR_EMPFANG)) {
+                // Das System lässt den Dienst gar nicht zu (etwa aus dem Hintergrund).
+                beenden()
+                return
+            }
+            // `location` nicht erlaubt (aus dem Hintergrund): weiter empfangen, Ortung wartet auf die App.
+            stoppeOrtung()
+            lage = Ortungslage.WARTET
+            aktualisiereBenachrichtigung()
         }
+        Ortungsstand.dienstLaeuft.value = true
         val sitzung = Sitzungsablage(this).lesen()
         if (sitzung == null) {
             beenden()
             return
         }
-        if (ortet) {
-            // Dieselbe Sitzung: der Dienst läuft schon, nur die Benachrichtigung ist neu.
-            if (sitzung == aktiveSitzung) return
-            // Inzwischen neu eingelöst: nie mit dem alten Cookie weiter senden.
+        if (sitzung != aktiveSitzung) {
+            // Inzwischen neu eingelöst: nie mit dem alten Cookie weiter senden oder empfangen.
+            stoppeOrtung()
+            stoppeEmpfang()
+            bestaetigt = false
+            aktiveSitzung = sitzung
+            verbindung = Serververbindung(sitzung.server, sitzung.cookie, kennung(this))
+        }
+        if (umfang == Dienstumfang.ORTUNG_UND_EMPFANG && lage != Ortungslage.WARTET) {
+            if (!ortet) {
+                if (fordereOrteAn()) {
+                    ortet = true
+                    Ortungsstand.laeuft.value = true
+                    hauptfaden.postDelayed(lebenszeichen, PRUEFUNG_MS)
+                } else {
+                    // Kein Anbieter oder das Recht fehlt doch: nur empfangen.
+                    lage = Ortungslage.AUS
+                    inDenVordergrund(Dienstumfang.NUR_EMPFANG)
+                }
+            }
+        } else {
             stoppeOrtung()
         }
-        aktiveSitzung = sitzung
-        verbindung = Serververbindung(sitzung.server, sitzung.cookie, kennung(this))
-        if (!fordereOrteAn()) {
-            beenden()
-            return
+        if (orten && ortet) lage = Ortungslage.AN
+        if (!ortet && lage == Ortungslage.AN) lage = Ortungslage.AUS
+        if (empfangen) bestaetigt = true
+        if (neueEinsatzId != 0L && neueEinsatzId != einsatzId) {
+            stoppeEmpfang()
+            einsatzId = neueEinsatzId
         }
-        ortet = true
-        Ortungsstand.laeuft.value = true
-        hauptfaden.postDelayed(lebenszeichen, PRUEFUNG_MS)
+        starteEmpfang()
+        aktualisiereBenachrichtigung()
     }
+
+    /**
+     * Setzt die Typen des Vordergrund-Dienstes; ein laufender Dienst wechselt sie mit einem
+     * erneuten `startForeground`. `false`, wenn das System den Typ nicht zulässt (`location` aus dem
+     * Hintergrund, kein Standortrecht).
+     */
+    @SuppressLint("InlinedApi") // `REMOTE_MESSAGING` ist eine Konstante; ältere Systeme kennen den Typ nur aus dem Manifest.
+    private fun inDenVordergrund(umfang: Dienstumfang): Boolean {
+        val typen = when (umfang) {
+            Dienstumfang.ORTUNG_UND_EMPFANG ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+            Dienstumfang.NUR_EMPFANG -> ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
+        }
+        return try {
+            startForeground(BENACHRICHTIGUNG, benachrichtigung(), typen)
+            true
+        } catch (e: RuntimeException) {
+            // Auch `SecurityException` und `ForegroundServiceStartNotAllowedException`.
+            Log.w(TAG, "Vordergrund-Dienst mit $umfang abgelehnt", e)
+            false
+        }
+    }
+
+    private fun isStandortErlaubt(): Boolean =
+        listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            .any { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+
 
     /**
      * Anbieter, die das Recht hergibt: der Fused Provider des Systems (ab Android 12, nimmt auch nur
@@ -237,6 +343,8 @@ class OrtungsDienst : Service() {
         einzelZuhoerer.clear()
     }
 
+
+    /** Ortung aus; der Dienst selbst läuft weiter, solange er empfängt. */
     private fun stoppeOrtung() {
         val manager = getSystemService(LocationManager::class.java)
         zuhoerer.forEach { manager?.removeUpdates(it) }
@@ -250,29 +358,39 @@ class OrtungsDienst : Service() {
         Ortungsstand.naechsterVersuch.value = null
     }
 
-    /** Ortung aus, Benachrichtigung weg, Dienst zu. */
+    /**
+     * Ortung aus und weiter empfangen (Pause, Ruhe): nur noch mit dem Typ `remoteMessaging`, die
+     * Benachrichtigung sagt es.
+     */
+    private fun nurEmpfangen(neueLage: Ortungslage) {
+        stoppeOrtung()
+        lage = neueLage
+        if (!inDenVordergrund(Dienstumfang.NUR_EMPFANG)) aktualisiereBenachrichtigung()
+    }
+
+    /** Ortung und Empfang aus, Benachrichtigung weg, Dienst zu (Ende der Kopplung, Abmelden). */
     private fun beenden() {
         stoppeOrtung()
+        stoppeEmpfang()
+        Ortungsstand.dienstLaeuft.value = false
         stopForeground(Service.STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     /**
      * „Pausieren“ aus der Benachrichtigung: die Ortung hört sofort auf, der Server erfährt es mit
-     * `paused: true`. Erreicht ihn das nicht, holt die App es bei der nächsten Abfrage nach.
+     * `paused: true`; der Empfang läuft weiter. Erreicht den Server die Pause nicht, holt die App es
+     * bei der nächsten Abfrage nach.
      */
     private fun pausieren() {
         val v = verbindung
-        stoppeOrtung()
+        nurEmpfangen(Ortungslage.PAUSIERT)
         Ortungsstand.pausiert.tryEmit(Unit)
         if (v == null) {
             beenden()
             return
         }
-        scope.launch {
-            withContext(Dispatchers.IO) { v.pausiere(true) }
-            beenden()
-        }
+        scope.launch { withContext(Dispatchers.IO) { v.pausiere(true) } }
     }
 
     // Takt und Senden (Sendeplan im Kern)
@@ -303,6 +421,11 @@ class OrtungsDienst : Service() {
             Antwort.WEITER -> {
                 Ortungsstand.letzteSendung.value = jetzt
                 Ortungsstand.naechsterVersuch.value = null
+                // Eine angenommene Sendung heißt: die Leitung hat bestätigt.
+                if (!bestaetigt) {
+                    bestaetigt = true
+                    starteEmpfang()
+                }
             }
             Antwort.WARTEN -> Ortungsstand.naechsterVersuch.value = null
             Antwort.WIEDERHOLEN -> plan.naechsterVersuch?.let { zeit ->
@@ -314,24 +437,131 @@ class OrtungsDienst : Service() {
         }
         // Das Modell entscheidet mit dem Grund, ob die Kopplung endet oder ruht (`Anmeldung`).
         Ortungsstand.antworten.tryEmit(Entscheidung(antwort, grund))
-        // Ruhen heißt für den Dienst dasselbe wie Stoppen: Ortung aus, Benachrichtigung weg.
-        if (antwort == Antwort.STOPPEN || antwort == Antwort.RUHEN) {
-            beenden()
-            return
+        when (antwort) {
+            Antwort.STOPPEN -> {
+                beenden()
+                return
+            }
+            // Ruhen: die Ortung ruht, die Kopplung besteht, der Empfang läuft weiter.
+            Antwort.RUHEN -> {
+                nurEmpfangen(Ortungslage.RUHT)
+                return
+            }
+            else -> Unit
         }
         aktualisiereBenachrichtigung()
         naechste?.let(::sende)
+    }
+
+    // Empfang (Livestrom und Empfang im Kern)
+
+    /**
+     * Hält den Live-Strom offen, auf IO: vor der Bestätigung prüft er nur den Zustand; danach
+     * verbindet er, lädt nach jedem Verbinden einmal die Liste und auf jedes `helfer_auftrag`
+     * erneut. Nach einem Abbruch wartet er nach [Empfang.nachAbbruch]; 401, 403 und 404 beenden die
+     * Kopplung.
+     */
+    private fun starteEmpfang() {
+        if (empfang?.isActive == true) return
+        val v = verbindung ?: return
+        empfang = scope.launch(Dispatchers.IO) {
+            val folge = Wiederverbindung()
+            while (isActive) {
+                if (!bestaetigt) {
+                    if (!pruefeBestaetigung(v)) {
+                        delay(PRUEFUNG_UNBESTAETIGT_MS)
+                        continue
+                    }
+                }
+                val id = einsatzId
+                if (id == 0L) {
+                    // Ohne Einsatz kein Strom; die App nennt ihn mit dem nächsten Start.
+                    delay(PRUEFUNG_UNBESTAETIGT_MS)
+                    continue
+                }
+                val leser = SseLeser()
+                val status = v.live(
+                    id,
+                    offen = {
+                        setzeVerbunden(true)
+                        ladeAuftraege(v)
+                    },
+                ) { zeile ->
+                    // Erst eine Zeile zeigt, dass die Verbindung trägt (`Wiederverbindung`).
+                    folge.daten()
+                    if (leser.zeile(zeile) is LiveEreignis.Auftrag) ladeAuftraege(v)
+                }
+                setzeVerbunden(false)
+                if (!isActive) break
+                if (Empfang.nachAntwort(status) == Empfang.Entscheidung.ENDEN) {
+                    withContext(Dispatchers.Main) {
+                        Ortungsstand.antworten.tryEmit(Entscheidung(Antwort.STOPPEN, null))
+                        beenden()
+                    }
+                    break
+                }
+                delay(folge.abbruch())
+            }
+        }
+    }
+
+    private fun stoppeEmpfang() {
+        empfang?.cancel()
+        empfang = null
+        verbindung?.trenneLive()
+        setzeVerbunden(false)
+    }
+
+    /**
+     * Vor der Bestätigung: der eigene Zustand. `true` ab `aktiv`; endet die Kopplung (401, 403, 404,
+     * `beendet`, `abgelehnt`), endet der Dienst, und das Modell erfährt es.
+     */
+    private suspend fun pruefeBestaetigung(v: Serververbindung): Boolean {
+        val rueckmeldung = v.zustand()
+        val zustand = if (rueckmeldung.isErfolg) Wire.zustand(rueckmeldung.text) else null
+        if (zustand == null) {
+            if (rueckmeldung.antwort == Antwort.STOPPEN) {
+                withContext(Dispatchers.Main) {
+                    Ortungsstand.antworten.tryEmit(Entscheidung(Antwort.STOPPEN, rueckmeldung.grund))
+                    beenden()
+                }
+            }
+            return false
+        }
+        if (zustand.state == "beendet" || zustand.state == "abgelehnt") {
+            withContext(Dispatchers.Main) { beenden() }
+            return false
+        }
+        if (zustand.state != "aktiv") return false
+        bestaetigt = true
+        if (einsatzId == 0L) einsatzId = zustand.incident.id
+        aktualisiereBenachrichtigung()
+        return true
+    }
+
+    /** Liste laden und Mitteilungen zeigen; blockiert (auf IO). */
+    private fun ladeAuftraege(v: Serververbindung) {
+        val rueckmeldung = v.auftraege()
+        val liste = if (rueckmeldung.isErfolg) Wire.auftraege(rueckmeldung.text) else null
+        liste?.let { Auftragsstand.uebernimm(this, it) }
+    }
+
+    private fun setzeVerbunden(verbunden: Boolean) {
+        if (Auftragsstand.verbunden.value == verbunden) return
+        Auftragsstand.verbunden.value = verbunden
+        if (Ortungsstand.dienstLaeuft.value) aktualisiereBenachrichtigung()
     }
 
     // Benachrichtigung
 
     private fun legeKanalAn() {
         val manager = getSystemService(NotificationManager::class.java) ?: return
-        val kanal = NotificationChannel(KANAL, "Ortung", NotificationManager.IMPORTANCE_LOW).apply {
-            description = "Zeigt, solange Lifeline Helfer deine Position an die Einsatzleitung sendet."
+        val kanal = NotificationChannel(KANAL, "Ortung und Empfang", NotificationManager.IMPORTANCE_LOW).apply {
+            description = "Zeigt, solange Lifeline Helfer Aufträge empfängt und deine Position an die Einsatzleitung sendet."
             setShowBadge(false)
         }
         manager.createNotificationChannel(kanal)
+        Mitteilungen.legeKanalAn(this)
     }
 
     private fun aktualisiereBenachrichtigung() {
@@ -349,23 +579,26 @@ class OrtungsDienst : Service() {
             Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val pausieren = PendingIntent.getService(
-            this, 1,
-            Intent(this, OrtungsDienst::class.java).setAction(AKTION_PAUSIEREN),
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val titel = if (einsatz.isEmpty()) "Lifeline ortet dich" else "Lifeline ortet dich für Einsatz $einsatz"
+        val titel = when {
+            ortet && einsatz.isNotEmpty() -> "Lifeline ortet dich für Einsatz $einsatz"
+            ortet -> "Lifeline ortet dich"
+            einsatz.isNotEmpty() -> "Lifeline Helfer für Einsatz $einsatz"
+            else -> "Lifeline Helfer"
+        }
         val zeile = buildList {
+            add(Dienstanzeige.zeile(lage, Auftragsstand.verbunden.value, bestaetigt))
             if (ziel.isNotEmpty()) add("Ziel: $ziel")
-            val versuch = Ortungsstand.naechsterVersuch.value
-            val letzte = Ortungsstand.letzteSendung.value
-            when {
-                versuch != null -> add("ohne Netz, neuer Versuch gleich")
-                letzte != null -> add("gesendet ${Anzeige.alter(Duration.between(letzte, Instant.now()).seconds)}")
+            if (ortet) {
+                val versuch = Ortungsstand.naechsterVersuch.value
+                val letzte = Ortungsstand.letzteSendung.value
+                when {
+                    versuch != null -> add("ohne Netz, neuer Versuch gleich")
+                    letzte != null -> add("gesendet ${Anzeige.alter(Duration.between(letzte, Instant.now()).seconds)}")
+                }
             }
         }.joinToString(" · ")
         val builder = Notification.Builder(this, KANAL)
-            .setSmallIcon(R.drawable.symbol_ortung)
+            .setSmallIcon(if (ortet) R.drawable.symbol_ortung else R.drawable.symbol_auftrag)
             .setContentTitle(titel)
             .setContentText(zeile)
             .setStyle(Notification.BigTextStyle().bigText(zeile))
@@ -373,18 +606,25 @@ class OrtungsDienst : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(oeffnen)
-            .addAction(
+        if (ortet) {
+            val pausieren = PendingIntent.getService(
+                this, 1,
+                Intent(this, OrtungsDienst::class.java).setAction(AKTION_PAUSIEREN),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(
                 Notification.Action.Builder(Icon.createWithResource(this, R.drawable.symbol_pause), "Pausieren", pausieren)
                     .build(),
             )
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
-            builder.setCategory(Notification.CATEGORY_LOCATION_SHARING)
+            builder.setCategory(if (ortet) Notification.CATEGORY_LOCATION_SHARING else Notification.CATEGORY_SERVICE)
         }
         // Ab Android 16: als Live-Update in Statusleiste und Sperrbildschirm (Spec „Gestalt“).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             builder.setRequestPromotedOngoing(true)
-            builder.setShortCriticalText("Ortung")
+            builder.setShortCriticalText(if (ortet) "Ortung" else "Empfang")
         }
         return builder.build()
     }
@@ -396,7 +636,11 @@ class OrtungsDienst : Service() {
         private const val AKTION_START = "dev.rubeen.lifeline.helfer.ORTUNG_STARTEN"
         private const val AKTION_PAUSIEREN = "dev.rubeen.lifeline.helfer.ORTUNG_PAUSIEREN"
         private const val EXTRA_EINSATZ = "einsatz"
+        private const val EXTRA_EINSATZ_ID = "einsatz_id"
         private const val EXTRA_ZIEL = "ziel"
+        private const val EXTRA_ORTEN = "orten"
+        private const val EXTRA_EMPFANGEN = "empfangen"
+        private const val EXTRA_LAGE = "lage"
 
         /** Takt des Systems: höchstens alle 30 s, ab 25 m (die Entscheidung trifft der Sendeplan). */
         private const val MINDESTABSTAND_MS = 30_000L
@@ -405,30 +649,41 @@ class OrtungsDienst : Service() {
         /** Prüfung auf ein Lebenszeichen jede halbe Minute (fällig nach 300 s, `Takt`). */
         private const val PRUEFUNG_MS = 30_000L
 
+        /** Vor der Bestätigung fragt der Empfang alle 30 s den Zustand ab. */
+        private const val PRUEFUNG_UNBESTAETIGT_MS = 30_000L
+
         /**
-         * Startet die Ortung; nur aus der geöffneten App (ADR-0101). `false`, wenn das System den
-         * Dienst nicht zulässt.
+         * Startet den Dienst oder gibt dem laufenden eine neue [vorgabe]. Gestartet wird er nur aus
+         * der geöffneten App (ADR-0101, ADR-0111); aus dem Hintergrund erreicht die Vorgabe nur einen
+         * Dienst, der schon läuft. `false`, wenn das System den Dienst nicht zulässt.
          */
-        fun starte(context: Context, einsatz: String, ziel: String): Boolean = try {
-            context.startForegroundService(
-                Intent(context, OrtungsDienst::class.java)
-                    .setAction(AKTION_START)
-                    .putExtra(EXTRA_EINSATZ, einsatz)
-                    .putExtra(EXTRA_ZIEL, ziel),
-            )
-            // Sofort sichtbar; lässt das System den Dienst doch nicht zu, setzt er es zurück.
-            Ortungsstand.laeuft.value = true
-            true
-        } catch (e: RuntimeException) {
-            Log.w(TAG, "Ortungsdienst nicht gestartet", e)
-            false
+        fun starte(context: Context, vorgabe: Dienstvorgabe): Boolean {
+            if (!vorgabe.imVordergrund && !Ortungsstand.dienstLaeuft.value) return false
+            val intent = Intent(context, OrtungsDienst::class.java)
+                .setAction(AKTION_START)
+                .putExtra(EXTRA_EINSATZ, vorgabe.einsatz)
+                .putExtra(EXTRA_EINSATZ_ID, vorgabe.einsatzId)
+                .putExtra(EXTRA_ZIEL, vorgabe.ziel)
+                .putExtra(EXTRA_ORTEN, vorgabe.orten)
+                .putExtra(EXTRA_EMPFANGEN, vorgabe.empfangen)
+                .putExtra(EXTRA_LAGE, vorgabe.lage.name)
+            return try {
+                if (vorgabe.imVordergrund) context.startForegroundService(intent) else context.startService(intent)
+                Ortungsstand.dienstLaeuft.value = true
+                true
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Helfer-Dienst nicht gestartet", e)
+                false
+            }
         }
 
-        /** Stoppt die Ortung (Abmelden, Pausieren in der App, Ende der Kopplung). */
+        /** Beendet Ortung und Empfang (Abmelden, Ende der Kopplung). */
         fun stoppe(context: Context) {
             context.stopService(Intent(context, OrtungsDienst::class.java))
+            Ortungsstand.dienstLaeuft.value = false
             Ortungsstand.laeuft.value = false
             Ortungsstand.naechsterVersuch.value = null
+            Auftragsstand.verbunden.value = false
         }
 
         /** Eigene Kennung und Version, damit der Server die Helfer-App erkennt. */

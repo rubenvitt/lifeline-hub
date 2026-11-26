@@ -932,6 +932,14 @@ pub async fn abschliessen(
         // Helfer-App: mit dem Einsatz endet jede Helfer-Kopplung (über den Status); die Position
         // der georteten Personen geht nicht ins Archiv (Spec Helfer-App, „Personenposition“).
         crate::helfer::ende::beende_ortung_im_einsatz(&mut tx, einsatz_id).await?;
+        // Stufe 2 (ADR-0111): nach dem Einsatz geht kein Auftrag mehr an eine Helfer-App.
+        sqlx::query(
+            "DELETE FROM helfer_push_anmeldung WHERE kopplung_id IN \
+               (SELECT id FROM geraet_kopplung WHERE einsatz_id = ?)",
+        )
+        .bind(einsatz_id)
+        .execute(&mut *tx)
+        .await?;
         // LLH-2091 (ADR-0103): die Fahrzeugortung aus dem Einwurf endet mit dem Einsatz, je
         // Fahrzeug ein ETB-Eintrag; GPS-Positionen gehören nicht in die Einsatzakte, manuelle
         // bleiben. Unabhängig von den Helfer-Kopplungen oben (Personen), dieselbe Transaktion.

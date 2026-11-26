@@ -5,6 +5,7 @@
 pub mod benachrichtigung;
 pub mod eingabe;
 pub mod etb_text;
+pub mod quittung;
 pub mod repo;
 
 pub use eingabe::{
@@ -273,6 +274,13 @@ pub struct AuftragEmpfaengerAnzeige {
     pub snap_anzeige: String,
     pub quittiert_at: Option<String>,
     pub quittiert_von_id: Option<i64>,
+    /// An wie viele Helfer-Apps die Zeile ging (ADR-0111); fehlt vor der Zustellung und bei
+    /// Typen, die kein Helfer empfängt.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub helfer_gesendet: Option<i64>,
+    /// Anzeigename der Helfer-Kopplung, deren Gerätekonto quittiert hat (ADR-0111).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quittiert_von_helfer: Option<String>,
 }
 
 /// Kennzahlen des Auftragsboards (LFH-1071, `GET …/tasks/metrics`): „Offen (n)“ und
@@ -346,6 +354,8 @@ pub async fn nach_erteilung(
     state
         .live
         .publiziere_einsatz(einsatz_id, crate::live::LiveEvent::Auftrag);
+    // Helfer-App Stufe 2 (ADR-0111): an die Helfer-Apps der Empfänger.
+    crate::helfer::pager::deliver(state, einsatz_id, auftrag_id).await;
     Ok(())
 }
 

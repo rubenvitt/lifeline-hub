@@ -245,7 +245,9 @@ pub async fn laden(pool: &SqlitePool, id: i64, jetzt: &str) -> Result<AuftragDet
 const EMPFAENGER_SPALTEN: &str =
     "id, auftrag_id, empfaenger_typ, abschnitt_id, einheit_id, person_id, fahrzeug_id, \
      funktion_text, funktion, extern_kategorie, extern_bezeichnung, snap_anzeige, quittiert_at, \
-     quittiert_von_id";
+     quittiert_von_id, helfer_gesendet, \
+     (SELECT q.anzeigename FROM geraet_kopplung q WHERE q.ansicht = 'helfer' \
+        AND q.benutzer_id = auftrag_empfaenger.quittiert_von_id) AS quittiert_von_helfer";
 
 /// Lädt die Empfänger-Zeilen eines Auftrags (Quittung pro Empfänger).
 pub async fn empfaenger_von(

@@ -38,7 +38,7 @@ herleitung:
 # Die Helfer-App ortet im Hintergrund (nur ihr Ziel trägt den Schlüssel; die Hülle nennt ihn nur im
 # Kommentar), unter Android nur als Vordergrund-Dienst vom Typ `location`.
 verlange '^        UIBackgroundModes:$' 'ios/project.yml'
-verlange 'foregroundServiceType="location"' 'android/helfer/src/main/AndroidManifest.xml'
+verlange 'foregroundServiceType="location[|"]' 'android/helfer/src/main/AndroidManifest.xml'
 verbiete 'NSLocationAlways' 'ios/Helfer/**/*.swift' 'ios/Helfer/**/*.plist' 'ios/project.yml'
 # Der Kern bleibt ohne System: kein UIKit, CoreLocation oder SwiftUI (ios/Helfer/AGENTS.md).
 verbiete '^import (UIKit|CoreLocation|SwiftUI)' 'ios/HelferKern/**/*.swift'
@@ -54,6 +54,9 @@ Lifeline-Hüllen (ADR-0068, ADR-0084) sind bewusst Webview-Hüllen ohne Anwendun
 ADR-0093 erlaubt ihnen Standort nur im Vordergrund. Beides trägt eine dauerhafte Ortung nicht.
 
 ## Konsequenzen
+
+Ergänzt durch [ADR-0111](ADR-0111-die-helfer-app-empfaengt-auftraege-nur-fuer-eine-bestaetigte-kopplung.md): Empfang von Aufträgen (iOS über das Relais, Android über die eigene Verbindung).
+
 
 Es gibt zwei eigene native Apps mit eigener Kennung, eigenem Kern und eigener Auslieferung; die
 Hüllen bleiben unverändert. Die Hintergrundortung ist auf die Dauer einer Kopplung begrenzt, für

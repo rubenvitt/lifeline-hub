@@ -206,6 +206,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
     ("geraet_kopplungscode", "Geräte hängen an einer Instanz"),
     ("geraet_kopplung_ereignis", "Geräte hängen an einer Instanz"),
     (
+        "helfer_push_anmeldung",
+        "Push-Anmeldungen hängen an einer Helfer-Kopplung dieser Instanz",
+    ),
+    (
         "helfer_einladung",
         "Helfer koppeln sich an der Instanz, die einlädt",
     ),

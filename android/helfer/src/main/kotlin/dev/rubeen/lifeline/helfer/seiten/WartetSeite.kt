@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import dev.rubeen.lifeline.helfer.HelferModell
+import dev.rubeen.lifeline.helferkern.empfaengt
 import dev.rubeen.lifeline.helfer.R
 import dev.rubeen.lifeline.helfer.ui.eckig
 import dev.rubeen.lifeline.helfer.ui.farbe
@@ -107,6 +108,18 @@ fun OrtungsHinweise(modell: HelferModell, onOrtungStarten: () -> Unit, onEinstel
                 flaeche = farbe.alarmFlaeche,
             )
             Nebenknopf("Einstellungen öffnen", onClick = onEinstellungen)
+        }
+    } else if (modell.isEcht && modell.phase.empfaengt && !modell.phase.ortet && !modell.dienstLaeuft) {
+        // Nach einem Neustart der App läuft auch der Empfang erst wieder, wenn die Kraft ihn startet.
+        Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {
+            Hinweis("Die App wurde neu gestartet. Aufträge kommen erst wieder als Mitteilung, wenn du den Empfang startest.")
+            Hauptknopf(
+                "Empfang starten",
+                onClick = onOrtungStarten,
+                modifier = Modifier.testTag("empfang-starten"),
+                rolle = Knopfrolle.NORMAL,
+                symbol = R.drawable.symbol_auftrag,
+            )
         }
     } else if (modell.phase.ortet && !modell.ortungLaeuft) {
         Column(verticalArrangement = Arrangement.spacedBy(Abstand.sm)) {

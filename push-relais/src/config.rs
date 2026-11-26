@@ -32,6 +32,15 @@ pub struct RelaisConfig {
         default_value = "dev.rubeen.lifeline.ios"
     )]
     pub bundle_id: String,
+    /// Weitere erlaubte Bundle-IDs als Komma-Liste (ADR-0111, etwa die Helfer-App). Eine
+    /// Nachricht wählt eine davon mit `thema`; ohne `thema` gilt `bundle_id`.
+    #[arg(
+        long,
+        env = "PUSH_RELAIS_WEITERE_BUNDLE_IDS",
+        value_delimiter = ',',
+        value_parser = bundle_id_parsen
+    )]
+    pub weitere_bundle_ids: Vec<String>,
     /// Nachrichten je Server und Minute.
     #[arg(long, env = "PUSH_RELAIS_LIMIT_MINUTE", default_value_t = 600)]
     pub limit_minute: u32,
@@ -127,6 +136,20 @@ fn proxy_netz_parsen(eintrag: &str) -> Result<IpNet, String> {
     Ok(netz)
 }
 
+/// Ein Eintrag der weiteren Bundle-IDs, getrimmt. Ein leerer Eintrag oder Zeichen außerhalb von
+/// Buchstaben, Ziffern, `.` und `-` brechen den Start ab.
+fn bundle_id_parsen(eintrag: &str) -> Result<String, String> {
+    let eintrag = eintrag.trim();
+    if eintrag.is_empty()
+        || !eintrag
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-')
+    {
+        return Err(format!("'{eintrag}' ist keine Bundle-ID"));
+    }
+    Ok(eintrag.to_string())
+}
+
 #[derive(Subcommand, Debug, Clone)]
 pub enum Command {
     /// Dauerbetrieb (Standard).
@@ -144,6 +167,17 @@ mod tests {
 
     fn parse(args: &[&str]) -> Result<RelaisConfig, clap::Error> {
         RelaisConfig::try_parse_from(std::iter::once("push-relais").chain(args.iter().copied()))
+    }
+
+    #[test]
+    fn config_liest_weitere_bundle_ids() {
+        let cfg = parse(&["--weitere-bundle-ids", "a.b, c.d"]).unwrap();
+        assert_eq!(
+            cfg.weitere_bundle_ids,
+            vec!["a.b".to_string(), "c.d".to_string()]
+        );
+        assert!(parse(&[]).unwrap().weitere_bundle_ids.is_empty());
+        assert!(parse(&["--weitere-bundle-ids", "a b"]).is_err());
     }
 
     #[test]

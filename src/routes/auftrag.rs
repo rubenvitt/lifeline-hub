@@ -285,35 +285,15 @@ pub async fn quittieren(
         .filter(|e| e.id == empfaenger_id)
         .collect();
     fordere_im_bereich(&state, &ctx, &zeile).await?;
-    let erste_quittung =
-        repo::quittiere_empfaenger(&state.pool, empfaenger_id, ctx.benutzer.id, &jetzt()).await?;
+    crate::auftrag::quittung::acknowledge(
+        &state,
+        einsatz_id,
+        auftrag_id,
+        empfaenger_id,
+        ctx.benutzer.id,
+    )
+    .await?;
     let d = repo::laden(&state.pool, auftrag_id, &jetzt()).await?;
-    // Nur die erste Quittung der Zeile meldet dem Auftraggeber; eine wiederholte bleibt still.
-    if erste_quittung {
-        crate::auftrag::benachrichtigung::quittiert(
-            &state.pool,
-            &state.live,
-            einsatz_id,
-            empfaenger_id,
-            d.auftrag.erstellt_von_id,
-            ctx.benutzer.id,
-        )
-        .await;
-    }
-
-    // LFH-118: sobald ALLE Empfänger quittiert haben, ist der Auftrag nicht mehr überfällig →
-    // die Auto-Frist-Erinnerung schließen (verstummt den Nachfass). Solange ein Empfänger offen
-    // ist, bleibt sie offen.
-    if d.auftrag.empfaenger_anzahl > 0 && d.auftrag.empfaenger_anzahl == d.auftrag.quittiert_anzahl
-    {
-        crate::erinnerung::repo::schliesse_offene_auto(
-            &state.pool,
-            crate::kommunikation::OBJEKT_AUFTRAG,
-            auftrag_id,
-            &jetzt(),
-        )
-        .await?;
-    }
 
     let mut d = d;
     anreichern_alle(
@@ -323,7 +303,6 @@ pub async fn quittieren(
         std::slice::from_mut(&mut d),
     )
     .await?;
-    sse(&state, einsatz_id);
     Ok(Json(d))
 }
 
@@ -513,6 +492,8 @@ pub async fn aufheben(
     )
     .await?;
     sse(&state, einsatz_id);
+    // Helfer-App Stufe 2: die App zeigt den Auftrag als aufgehoben (ADR-0111).
+    crate::helfer::pager::notify_changed(&state, einsatz_id, auftrag_id).await;
     Ok(Json(d))
 }
 
@@ -526,6 +507,11 @@ pub async fn berichtigen(
     JsonBody(req): JsonBody<crate::auftrag::AuftragPatch>,
 ) -> Result<Json<AuftragDetail>, AppError> {
     gehoert_pruefen(&state, &ctx, auftrag_id).await?;
+    // Helfer-App Stufe 2: wer den Auftrag vor der Berichtigung hatte, erfährt sie auch dann,
+    // wenn seine Zeile wegfällt (ADR-0111).
+    let helfer_vorher = crate::helfer::pager::kopplungen(&state.pool, einsatz_id, auftrag_id)
+        .await
+        .unwrap_or_default();
     let b =
         crate::auftrag::validate_berichtigung(&state.pool, einsatz_id, auftrag_id, &req).await?;
     let etb_startwert = einstellungen::etb_startwert(&state.pool, einsatz_id).await?;
@@ -555,6 +541,9 @@ pub async fn berichtigen(
         &berichtigt.hinzu,
     )
     .await;
+    // Helfer-App Stufe 2: neue Zeilen an ihre Helfer-Apps, die übrigen laden neu (ADR-0111).
+    crate::helfer::pager::deliver(&state, einsatz_id, auftrag_id).await;
+    crate::helfer::pager::notify_removed(&state, helfer_vorher, auftrag_id);
     let mut d = repo::laden(&state.pool, auftrag_id, &now).await?;
     anreichern_alle(
         &state.pool,

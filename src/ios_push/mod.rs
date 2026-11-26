@@ -9,6 +9,7 @@
 //!   Geräts ([`krypto`]), sodass Relais und Apple nichts davon lesen.
 //! - Kein Token, kein Schlüssel und keine Nutzlast in einem Log.
 
+pub mod helfer;
 pub mod inhalt;
 pub mod krypto;
 pub mod relais;
@@ -247,6 +248,7 @@ impl IosPush {
                 },
                 kollaps: Some(kollaps(&zugang.server_id, s.ereignis.benachrichtigung_id)),
                 nutzlast,
+                thema: None,
             });
             ziele.push((a.id, a.token));
         }

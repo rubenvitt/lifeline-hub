@@ -14,7 +14,11 @@ use sqlx::SqliteConnection;
 use std::collections::HashMap;
 
 /// Spalten, die nur an dieser Instanz gelten und nie geliefert werden.
-pub const LOKALE_SPALTEN: &[(&str, &str)] = &[("einsatz", "spiegel")];
+pub const LOKALE_SPALTEN: &[(&str, &str)] = &[
+    ("einsatz", "spiegel"),
+    // Helfer-Apps hängen an der Instanz, die zustellt (Helfer-App Stufe 2, 0389).
+    ("auftrag_empfaenger", "helfer_gesendet"),
+];
 
 /// Wohin ein Verweis zeigt und wie die Gegenseite ihn abbildet (D5).
 #[derive(Debug, Clone, PartialEq, Eq)]

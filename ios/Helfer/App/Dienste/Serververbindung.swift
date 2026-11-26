@@ -114,6 +114,29 @@ final class Serververbindung {
         await anfrage("PUT", "api/devices/me/position", body: Pausensendung(paused: pausiert))
     }
 
+    // MARK: Aufträge (Stufe 2, ADR-0111)
+
+    /// Eigene Aufträge; 403 `not_confirmed` vor der Bestätigung.
+    func auftraege() async -> Rueckmeldung {
+        await anfrage("GET", "api/devices/me/tasks")
+    }
+
+    /// „Übernommen“ an einer eigenen Empfängerzeile; 404 fremde Zeile, 422 aufgehoben.
+    func quittiere(auftrag: Int64, empfaenger: Int64) async -> Rueckmeldung {
+        await anfrage(
+            "POST", "api/devices/me/tasks/\(auftrag)/recipients/\(empfaenger)/acknowledge")
+    }
+
+    /// Push-Anmeldung der Kopplung (ersetzt eine vorige); 204.
+    func meldePushAn(_ anmeldung: Pushanmeldung) async -> Rueckmeldung {
+        await anfrage("PUT", "api/devices/me/push", body: anmeldung)
+    }
+
+    /// Meldet Push ab; 204, auch ohne Anmeldung.
+    func meldePushAb() async -> Rueckmeldung {
+        await anfrage("DELETE", "api/devices/me/push")
+    }
+
     func abmelden() async -> Rueckmeldung {
         let antwort = await anfrage("POST", "api/auth/logout")
         cookie = nil
