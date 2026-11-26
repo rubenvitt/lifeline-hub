@@ -318,6 +318,23 @@ impl Verzeichnis {
         ])
     }
 
+    /// Dasselbe Verzeichnis, die Art mit dem Code von `art` durch `art` ersetzt (e2e-Doppel).
+    pub fn ersetzt(self, art: Arc<dyn AdapterArt>) -> Self {
+        let code = art.code();
+        Verzeichnis::new(
+            self.0
+                .iter()
+                .map(|a| {
+                    if a.code() == code {
+                        art.clone()
+                    } else {
+                        a.clone()
+                    }
+                })
+                .collect(),
+        )
+    }
+
     pub fn find(&self, code: &str) -> Option<&Arc<dyn AdapterArt>> {
         self.0.iter().find(|a| a.code() == code)
     }

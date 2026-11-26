@@ -364,11 +364,20 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     let matrix = std::sync::Arc::new(lifeline_hub::adapter::matrix::Clients::new(
         lifeline_hub::config::default_matrix_dir(&config.db_path),
     ));
-    let adapter_rahmen = lifeline_hub::adapter::Rahmen::mit_matrix(
-        speicher,
-        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone(), matrix.clone()),
-        matrix,
-    );
+    let mut arten =
+        lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone(), matrix.clone());
+    // Neben den Test-Zustellern prüft der Faxzugang ohne Netz (sonst 401 auf das Token der
+    // e2e-Suite, und der Zugang stünde still); nur in Debug-Builds, wie die Zusteller.
+    if config.ausgang_testzusteller {
+        match lifeline_hub::adapter::sipgate_fax_art::SipgateFaxArt::ohne_netz() {
+            Some(fax) => arten = arten.ersetzt(std::sync::Arc::new(fax)),
+            None => {
+                eprintln!("--ausgang-testzusteller gibt es nur in Debug-Builds.");
+                std::process::exit(2);
+            }
+        }
+    }
+    let adapter_rahmen = lifeline_hub::adapter::Rahmen::mit_matrix(speicher, arten, matrix);
     // Schlüsselwechsel (LLH-2025): mit altem Schlüssel vor allem anderen umschlüsseln, damit Lauf
     // und Verwaltung schon den neuen Stand sehen. Scheitert es, liest der Speicher mit beiden.
     if let Some(alt) = adapter_rahmen.speicher.fingerabdruck_alt() {
