@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 25.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 26.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -807,7 +807,7 @@ sequenceDiagram
 
 ## 6.6i Versand an eine Externe Stelle
 
-Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)).
+Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)) oder in einen Matrix-Raum (LLH-2094, [ADR-0107](entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md)). Der Lauf gibt jede Zeile über `Zustellerwahl` (`src/ausgang/zusteller.rs`) dem Zusteller ihres Kanals; das Diagramm zeigt E-Mail.
 
 ```mermaid
 sequenceDiagram
@@ -837,6 +837,31 @@ sequenceDiagram
   (`src/ausgang/zustand.rs`).
 - Beim Start behandelt `beim_start` eine mitten in der Zustellung unterbrochene Zeile wie
   `ungewiss`.
+
+Matrix (`src/ausgang/zusteller/matrix.rs`, Client aus `src/adapter/matrix.rs`), an der Stelle
+von „STARTTLS … DATA“:
+
+```mermaid
+sequenceDiagram
+  participant Hub as lifeline-hub (src/ausgang/, adapter::matrix)
+  participant DB as SQLite (ausgang, ausgang_teil)
+  participant HS as Homeserver
+  Hub->>DB: Zeile, gemerkte Teile und Zugang lesen, Verbindung zurückgeben
+  Hub->>Hub: Client der Anbindung unter der Sperre (Speicher unter matrix/<adapter_id>/)
+  Hub->>HS: Alias auflösen, beitreten, falls nicht Mitglied
+  Hub->>HS: sync_once nur für den Raum (voller Zustand), sync_members
+  Hub->>HS: keys/query, keys/claim, Raumschlüssel an alle Geräte (verschlüsselter Raum)
+  Hub->>HS: PUT send mit txn ausgang-{versand_id}-0 (Text), dann je Anlage Upload und -{n}
+  HS-->>Hub: Event-IDs oder Fehler (errcode)
+  Hub->>DB: BEGIN, Ergebnis, gesendete Teile, ETB-Eintrag, COMMIT
+```
+
+- Gemerkte Teile gehen nicht noch einmal hinaus; dieselbe Transaktions-ID deckt die Lücke
+  zwischen Senden und Merken. Darum ist ein Abbruch vorübergehend und wird im Fenster wiederholt,
+  nie `ungewiss`; nur der Neustart mitten in der Zustellung bleibt `ungewiss`.
+- In einen verschlüsselten Raum geht nie Klartext: scheitert das Verschlüsseln, ist der Versand
+  `verschluesselung`. Der Prüflauf der Anbindung (`adapter::matrix::pruefe`) teilt denselben
+  Client und sendet nichts.
 
 Ein Fax (LLH-2095, [ADR-0110](entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md))
 läuft durch denselben Korb; sipgate nimmt nur an, ob es durchging, zeigt erst die Abfrage.

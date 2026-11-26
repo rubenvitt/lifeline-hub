@@ -2,9 +2,13 @@
 //!
 //! Je [`TAKT`] oder beim Wecken ein Durchgang: die fälligen Versände laden, bis zu [`PARALLEL`]
 //! gleichzeitig zustellen, keinen doppelt. Je Versand, in dieser Reihenfolge: Spiegel? Quelle
-//! überholt? SMTP-Zugang der Org; Beginn merken (`mark_begonnen`); Anhänge laden; Mail bauen;
-//! zustellen, **ohne** eine Datenbankverbindung zu halten; Ergebnis und ETB-Eintrag in einer
-//! Transaktion (`write_retry!`); nach dem Commit `publiziere` und das Ereignis der Versandliste.
+//! überholt? Zugang der Anbindung, die den Kanal bedient (SMTP oder Matrix, LLH-2094); Beginn
+//! merken (`mark_begonnen`); gesendete Teile und Anhänge laden; dem [`Zusteller`] den
+//! [`Versandauftrag`] geben, **ohne** eine Datenbankverbindung zu halten; gesendete Teile,
+//! Ergebnis und ETB-Eintrag in einer Transaktion (`write_retry!`); nach dem Commit `publiziere`
+//! und das Ereignis der Versandliste. Produktiv ist der Zusteller die [`Zustellerwahl`] je Kanal.
+//! Ein Fax (LLH-2095) geht als PDF über [`Zustellwege::fax`] an den Anbieter; dessen Stand fragt
+//! der Lauf danach ab, bis er `zugestellt` oder `nicht_zugestellt` meldet.
 //!
 //! Ein Versand ist nie halb: entweder übergeben **und** im ETB, oder sichtbar fehlgeschlagen
 //! (am Spiegel ohne ETB, das dort gesperrt ist). Kein Geheimnis und kein Text des Mailservers
@@ -21,14 +25,16 @@ use sqlx::SqlitePool;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::JoinHandle;
 
-use super::nachricht::{self, AnhangFehler, Schnappschuss};
+use super::nachricht::{self, Anhang, AnhangFehler};
 use super::repo::{self, Abfrage, Ergebnis};
 use super::zustand::{naechste_abfrage, naechster_versuch};
-pub use super::zusteller::{SmtpZusteller, Versandzugang, Zusteller, Zustellwege};
+pub use super::zusteller::{
+    Fehlschlag, SmtpZusteller, Versandauftrag, Versandzugang, Zusteller, Zustellerwahl,
+    Zustellfehler, Zustellt, Zustellwege,
+};
 use super::{AusgangFehler, QuelleArt, VersandZeile};
 use crate::adapter::sipgate::FaxStatus;
 use crate::adapter::sipgate::{FaxAuftrag, SipgateFehler};
-use crate::adapter::smtp::SmtpFehler;
 use crate::adapter::Rahmen;
 use crate::error::AppError;
 use crate::etb::nachlauf::{self, Luecke};
@@ -130,11 +136,18 @@ pub async fn beim_start(pool: &SqlitePool, live: &LiveHub) -> Result<u64, AppErr
 }
 
 /// Ab wann ein begonnener Versuch als hängengeblieben gilt: länger als jede Sitzung dauern
-/// kann (Dialog und Datenphase des SMTP-Clients) und zwei Minuten Rand.
+/// kann (Dialog und Datenphase des SMTP-Clients) und zwei Minuten Rand. Eine Matrix-Zustellung
+/// endet früher (`zusteller::MATRIX_ZUSTELL_ZEITLIMIT`).
 pub const HAENGT_NACH: Duration = Duration::from_secs(
     crate::adapter::smtp::SITZUNG_ZEITLIMIT.as_secs()
         + crate::adapter::smtp::DATEN_ZEITLIMIT.as_secs()
         + 120,
+);
+
+// Eine Matrix-Zustellung endet vor der Frist, ab der ein Merker als hängengeblieben gilt.
+const _: () = assert!(
+    super::zusteller::MATRIX_ZUSTELL_ZEITLIMIT.as_secs() < HAENGT_NACH.as_secs(),
+    "Matrix-Zustellung länger als HAENGT_NACH"
 );
 
 /// Im laufenden Betrieb: ein Versand, dessen Merker seit [`HAENGT_NACH`] steht und den kein
@@ -177,10 +190,10 @@ async fn schliesse_unterbrochen(pool: &SqlitePool, live: &LiveHub, zeile: &Versa
                 fehler: AusgangFehler::Spiegel,
                 status: None,
             };
-            return abschliessen(pool, live, zeile, begonnen, spiegel, None).await;
+            return abschliessen(pool, live, zeile, begonnen, spiegel, None, &[]).await;
         }
         let text = etb_text(zeile, AusgangFehler::Ungewiss, None);
-        abschliessen(pool, live, zeile, begonnen, ergebnis, Some(text)).await
+        abschliessen(pool, live, zeile, begonnen, ergebnis, Some(text), &[]).await
     };
     let (ergebnis, luecken) = nachlauf::klammer(pool, lauf).await;
     melde_luecken(&luecken);
@@ -353,19 +366,8 @@ pub(crate) async fn is_quelle_aktuell(
 async fn load_anhaenge(
     pool: &SqlitePool,
     zeile: &VersandZeile,
-) -> Result<Vec<(String, Vec<u8>)>, AnhangFehler> {
+) -> Result<Vec<Anhang>, AnhangFehler> {
     nachricht::load_anhaenge_quelle(pool, zeile.quelle_art, zeile.einsatz_id, zeile.quelle_id).await
-}
-
-/// Die Domain der Absenderadresse für die Message-ID (Spec Abschnitt 4). Ohne konfigurierten
-/// öffentlichen Hostnamen der Instanz ist sie der Name, unter dem die Mail ohnehin hinausgeht.
-fn message_id(zeile: &VersandZeile, von: &str) -> String {
-    let host = von
-        .rsplit_once('@')
-        .map(|(_, d)| d)
-        .filter(|d| !d.is_empty())
-        .unwrap_or(crate::adapter::smtp::EHLO_VORGABE);
-    format!("<ausgang-{}@{host}>", zeile.id)
 }
 
 /// Stellt einen Versand zu und schreibt sein Ergebnis.
@@ -387,13 +389,13 @@ async fn run_one(
     // Ein Spiegel nimmt kein ETB an: sichtbar fehlgeschlagen, ohne Eintrag.
     if is_spiegel(pool, zeile.einsatz_id).await? {
         let e = fehlgeschlagen(AusgangFehler::Spiegel);
-        return abschliessen(pool, live, &zeile, None, e, None).await;
+        return abschliessen(pool, live, &zeile, None, e, None, &[]).await;
     }
     // Im Wiederholungsfenster geht keine überholte Fassung hinaus.
     if !is_quelle_aktuell(pool, &zeile).await? {
         let text = etb_text(&zeile, AusgangFehler::Ueberholt, None);
         let e = fehlgeschlagen(AusgangFehler::Ueberholt);
-        return abschliessen(pool, live, &zeile, None, e, Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, e, Some(text), &[]).await;
     }
     let zugang =
         match crate::adapter::lauf::zugang_fuer_versand(pool, rahmen, zeile.org_id, zeile.kanal)
@@ -402,27 +404,18 @@ async fn run_one(
             Ok(z) => z,
             Err(f) => {
                 let text = etb_text(&zeile, f, None);
-                return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
+                return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text), &[])
+                    .await;
             }
         };
     let fax = zeile.kanal == KanalArt::Fax;
-    // Eine Mail braucht eine gültige Absenderadresse, ein Fax eine Faxline. Gespeichert ist die
-    // Adresse nur getrimmt (Task 5); hinaus geht sie normalisiert.
-    let von = if fax {
-        String::new()
-    } else {
-        match zugang
-            .absender()
-            .and_then(|a| crate::externe_stelle::kanal::normalize_email(a).ok())
-        {
-            Some(v) => v,
-            None => {
-                let f = AusgangFehler::AnbindungFehler;
-                let text = etb_text(&zeile, f, None);
-                return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
-            }
-        }
-    };
+    // Ohne gültige Absenderadresse geht keine Mail hinaus, ohne Faxline kein Fax; das steht vor
+    // dem Versuch fest.
+    if zeile.kanal == KanalArt::Email && super::zusteller::smtp_absender(&zugang).is_none() {
+        let f = AusgangFehler::AnbindungFehler;
+        let text = etb_text(&zeile, f, None);
+        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text), &[]).await;
+    }
     let faxline = zugang
         .einstellung("faxline_id")
         .map(str::to_string)
@@ -430,7 +423,7 @@ async fn run_one(
     if fax && faxline.is_none() {
         let f = AusgangFehler::AnbindungFehler;
         let text = etb_text(&zeile, f, None);
-        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text)).await;
+        return abschliessen(pool, live, &zeile, None, fehlgeschlagen(f), Some(text), &[]).await;
     }
 
     let begonnen = jetzt();
@@ -463,6 +456,15 @@ async fn run_one(
         ),
     };
 
+    // Was ein früherer Versuch schon gesendet hat, geht nicht noch einmal hinaus.
+    let gesendet = match repo::list_teile(pool, &zeile.id).await {
+        Ok(g) => g,
+        Err(e) => {
+            tracing::error!(versand = %zeile.id, "Ausgang: gesendete Teile nicht lesbar: {e}");
+            let (e, text) = vorher_gescheitert(jetzt());
+            return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
+        }
+    };
     let anhaenge = match load_anhaenge(pool, &zeile).await {
         Ok(a) => a,
         Err(AnhangFehler::ZuGross) => {
@@ -475,38 +477,45 @@ async fn run_one(
                 Some(&marke),
                 fehlgeschlagen(f),
                 Some(text),
+                &[],
             )
             .await;
         }
         Err(AnhangFehler::App(e)) => {
             tracing::error!(versand = %zeile.id, "Ausgang: Anhänge nicht lesbar: {e}");
             let (e, text) = vorher_gescheitert(jetzt());
-            return abschliessen(pool, live, &zeile, Some(&marke), e, text).await;
+            return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
         }
     };
-    // Das PDF (Spec Abschnitt 6): für das Fax Pflicht, für die Mail ein Anhang, wenn es entsteht.
+    // Das PDF (Spec Fax, Abschnitt 6): für das Fax Pflicht, für die Mail ein Anhang, wenn es
+    // entsteht; Matrix sendet Text und Anlagen ohne PDF.
+    let mit_pdf = matches!(zeile.kanal, KanalArt::Email | KanalArt::Fax);
     let kennung = if fax {
         zugang.einstellung("absender_kennung")
     } else {
         None
     };
-    let kopf = match nachricht::pdf_kopf_laden(
-        pool,
-        zeile.einsatz_id,
-        zeile.quelle_art,
-        zeile.quelle_id,
-        kennung,
-    )
-    .await
-    {
-        Ok(k) => Some(k),
-        Err(e) => {
-            tracing::error!(versand = %zeile.id, "Ausgang: Kopf des PDFs nicht lesbar: {e}");
-            if fax {
-                let (e, text) = vorher_gescheitert(jetzt());
-                return abschliessen(pool, live, &zeile, Some(&marke), e, text).await;
+    let kopf = if !mit_pdf {
+        None
+    } else {
+        match nachricht::pdf_kopf_laden(
+            pool,
+            zeile.einsatz_id,
+            zeile.quelle_art,
+            zeile.quelle_id,
+            kennung,
+        )
+        .await
+        {
+            Ok(k) => Some(k),
+            Err(e) => {
+                tracing::error!(versand = %zeile.id, "Ausgang: Kopf des PDFs nicht lesbar: {e}");
+                if fax {
+                    let (e, text) = vorher_gescheitert(jetzt());
+                    return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
+                }
+                None
             }
-            None
         }
     };
     let an = nachricht::an_text(zeile.kanal, &zeile.stelle_bezeichnung, &zeile.adresse);
@@ -543,6 +552,7 @@ async fn run_one(
                 Some(&marke),
                 fehlgeschlagen(f),
                 Some(text),
+                &[],
             )
             .await;
         };
@@ -568,7 +578,7 @@ async fn run_one(
             ),
             Err(e) => nach_fax_fehler(&zeile, *e, erster, versuche, t),
         };
-        abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text).await?;
+        abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text, &[]).await?;
         if let Err(SipgateFehler::Status(401 | 403)) = antwort {
             pruefung_vorziehen(pool, &zugang.adapter_id, t).await;
         }
@@ -576,64 +586,59 @@ async fn run_one(
     }
 
     // Die Mail: das PDF als erster Anhang, solange alle Anhänge zusammen in die Grenze passen.
+    // Matrix hat kein PDF und kennt `ohne_pdf` nicht.
     let png_summe: usize = anhaenge.iter().map(|(_, b)| b.len()).sum();
     let pdf = pdf.filter(|p| png_summe + p.bytes.len() <= nachricht::ANHANG_MAX_BYTES);
-    let ohne_pdf = pdf.is_none();
+    let ohne_pdf = zeile.kanal == KanalArt::Email && pdf.is_none();
     if ohne_pdf {
         tracing::warn!(versand = %zeile.id, "Ausgang: Mail geht ohne PDF hinaus");
     }
-    let schnappschuss = Schnappschuss {
-        betreff: zeile.betreff.clone(),
-        inhalt: zeile.inhalt.clone(),
-    };
-    let mail = match nachricht::baue_mail(
-        &von,
-        zugang.absender_name(),
-        &zeile.adresse,
-        &message_id(&zeile, &von),
-        &schnappschuss,
-        pdf.as_ref()
+    let auftrag = Versandauftrag {
+        versand_id: &zeile.id,
+        kanal: zeile.kanal,
+        zugang: &zugang,
+        adresse: &zeile.adresse,
+        betreff: &zeile.betreff,
+        inhalt: &zeile.inhalt,
+        anhaenge: &anhaenge,
+        pdf: pdf
+            .as_ref()
             .map(|p| (dateiname.as_str(), p.bytes.as_slice())),
-        &anhaenge,
-    ) {
-        Ok(m) => m,
-        Err(f) => {
-            let text = etb_text(&zeile, f, None);
-            return abschliessen(
-                pool,
-                live,
-                &zeile,
-                Some(&marke),
-                fehlgeschlagen(f),
-                Some(text),
-            )
-            .await;
-        }
+        gesendet: &gesendet,
     };
-    drop(anhaenge);
-    drop(pdf);
 
     // Das Netz, ohne Datenbankverbindung.
-    let antwort = zusteller
-        .mail
-        .zustellen(&zugang, &von, &zeile.adresse, &mail)
-        .await;
+    let antwort = zusteller.mail.zustellen(&auftrag).await;
+    drop(anhaenge);
+    drop(pdf);
     let t = jetzt();
-    let (ergebnis, text) = match antwort {
-        Ok(()) => (
+    // Die gesendeten Teile merkt sich der Lauf mit dem Ergebnis, auch bei einem Fehlschlag; bei
+    // SMTP sind sie leer.
+    let (ergebnis, text, teile) = match &antwort {
+        Ok(z) => (
             Ergebnis::Uebergeben {
                 at: t,
                 anbieter_ref: None,
                 ohne_pdf,
             },
             Some(etb_text_uebergeben(&zeile)),
+            &z.teile,
         ),
-        Err(e) => nach_fehler(&zeile, e, erster, versuche, t),
+        Err(f) => {
+            let (e, text) = nach_fehler(&zeile, f, erster, versuche, t);
+            (e, text, &f.teile)
+        }
     };
-    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text).await?;
-    // Anmeldung oder TLS brauchen einen Eingriff: der Lauf der Anbindung soll es gleich selbst
-    // feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
-    if let Err(SmtpFehler::Anmeldung | SmtpFehler::Tls) = antwort {
+    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text, teile).await?;
+    // Braucht die Anbindung einen Eingriff (SMTP: Anmeldung, TLS), soll ihr Lauf es gleich
+    // selbst feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
+    if let Err(Fehlschlag {
+        fehler: Zustellfehler::Anbindung {
+            pruefung_vorziehen: true,
+        },
+        ..
+    }) = antwort
+    {
         pruefung_vorziehen(pool, &zugang.adapter_id, t).await;
     }
     Ok(())
@@ -755,42 +760,43 @@ fn nach_fax_fehler(
     }
 }
 
-/// Ordnet einen Fehler der Zustellung zu: vorübergehend wird im Fenster wiederholt (ohne ETB),
-/// alles andere ist endgültig und steht im ETB.
+/// Ordnet einen Fehlschlag der Zustellung zu, für jeden Kanal an dieser einen Stelle:
+/// vorübergehend wird im Fenster wiederholt (ohne ETB, frühestens zu `nicht_vor`), alles andere
+/// ist endgültig und steht im ETB mit dem Grund des Zustellers.
 fn nach_fehler(
     zeile: &VersandZeile,
-    e: SmtpFehler,
+    f: &Fehlschlag,
     erster: DateTime<Utc>,
     versuche: i64,
     jetzt: DateTime<Utc>,
 ) -> (Ergebnis, Option<String>) {
-    let status = e.status();
+    let status = f.smtp_status;
     let endgueltig = |fehler| {
         (
             Ergebnis::Fehlgeschlagen { fehler, status },
-            Some(etb_text(zeile, fehler, Some(e))),
+            Some(etb_text(zeile, fehler, Some(&f.grund))),
         )
     };
-    match e {
-        SmtpFehler::Voruebergehend(_)
-        | SmtpFehler::Verbindung
-        | SmtpFehler::Zeitueberschreitung
-        | SmtpFehler::Dns => match naechster_versuch(erster, versuche, jetzt) {
-            Some(naechster) => (
-                Ergebnis::Wiederholen {
-                    naechster,
-                    fehler: AusgangFehler::Voruebergehend,
-                    status,
-                },
-                None,
-            ),
-            None => endgueltig(AusgangFehler::Voruebergehend),
-        },
-        SmtpFehler::Abgelehnt(_) => endgueltig(AusgangFehler::Abgelehnt),
-        SmtpFehler::Ungewiss => endgueltig(AusgangFehler::Ungewiss),
-        SmtpFehler::Anmeldung | SmtpFehler::Tls | SmtpFehler::ZielIntern | SmtpFehler::Antwort => {
-            endgueltig(AusgangFehler::AnbindungFehler)
+    match f.fehler {
+        Zustellfehler::Voruebergehend { nicht_vor } => {
+            match naechster_versuch(erster, versuche, jetzt) {
+                Some(naechster) => (
+                    Ergebnis::Wiederholen {
+                        naechster: nicht_vor.map_or(naechster, |n| naechster.max(n)),
+                        fehler: AusgangFehler::Voruebergehend,
+                        status,
+                    },
+                    None,
+                ),
+                None => endgueltig(AusgangFehler::Voruebergehend),
+            }
         }
+        Zustellfehler::Abgelehnt => endgueltig(AusgangFehler::Abgelehnt),
+        Zustellfehler::Ungewiss => endgueltig(AusgangFehler::Ungewiss),
+        Zustellfehler::ZuGross => endgueltig(AusgangFehler::ZuGross),
+        Zustellfehler::KeinZutritt => endgueltig(AusgangFehler::KeinZutritt),
+        Zustellfehler::Verschluesselung => endgueltig(AusgangFehler::Verschluesselung),
+        Zustellfehler::Anbindung { .. } => endgueltig(AusgangFehler::AnbindungFehler),
     }
 }
 
@@ -809,8 +815,10 @@ fn quelle_text(zeile: &VersandZeile) -> String {
 
 fn ziel_text(zeile: &VersandZeile) -> String {
     let weg = match zeile.kanal {
+        KanalArt::Email => "E-Mail",
+        KanalArt::Matrix => "Matrix",
         KanalArt::Fax => "Fax",
-        _ => "E-Mail",
+        KanalArt::Threema => "Threema",
     };
     format!(
         "{} per {weg} an {} ({})",
@@ -825,13 +833,16 @@ fn etb_text_uebergeben(zeile: &VersandZeile) -> String {
 }
 
 /// Der ETB-Text eines endgültigen Fehlschlags (Spec Abschnitt 6). Der Grund ist ein fester,
-/// kurzer deutscher Text; nie ein Text des Mailservers.
-fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, smtp: Option<SmtpFehler>) -> String {
-    let grund = match zeile.kanal {
-        KanalArt::Fax => grund_fax(fehler, None),
-        _ => grund(fehler, smtp),
-    };
-    etb_text_mit(zeile, fehler, &grund)
+/// kurzer deutscher Text: der des Zustellers (`grund`), sonst der feste je Fehler und Kanal; nie
+/// ein Text des Mailservers, Homeservers oder Fax-Anbieters.
+fn etb_text(zeile: &VersandZeile, fehler: AusgangFehler, grund: Option<&str>) -> String {
+    match grund {
+        Some(g) => etb_text_mit(zeile, fehler, g),
+        None if zeile.kanal == KanalArt::Fax => {
+            etb_text_mit(zeile, fehler, &grund_fax(fehler, None))
+        }
+        None => etb_text_mit(zeile, fehler, fester_grund(fehler, zeile.kanal)),
+    }
 }
 
 /// Der ETB-Text eines endgültigen Fehlschlags eines Faxes, mit dem Fehler von sipgate.
@@ -901,46 +912,35 @@ fn grund_fax(fehler: AusgangFehler, fax: Option<SipgateFehler>) -> String {
         (AusgangFehler::AnbindungAngehalten, _) => "Faxzugang angehalten".into(),
         (AusgangFehler::NichtZugestellt, _) => "Gegenstelle nicht erreicht".into(),
         (AusgangFehler::Ungewiss, _) => "Zustellung nicht bestätigt".into(),
-        (fehler, _) => grund(fehler, None),
+        (fehler, _) => fester_grund(fehler, KanalArt::Fax).into(),
     }
 }
 
-fn grund(fehler: AusgangFehler, smtp: Option<SmtpFehler>) -> String {
-    match (fehler, smtp) {
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Voruebergehend(c))) => {
-            format!("Mailserver nimmt vorübergehend nicht an (SMTP {c})")
+/// Der feste Grund je Fehler, wenn kein Zusteller einen genaueren nennt (Fehlschlag vor dem
+/// Netz); die Gründe der Anbindung je Kanal.
+fn fester_grund(fehler: AusgangFehler, kanal: KanalArt) -> &'static str {
+    if kanal == KanalArt::Matrix {
+        match fehler {
+            AusgangFehler::Voruebergehend => return "Homeserver nicht erreichbar",
+            AusgangFehler::AnbindungFehler => return "Matrix-Konto nicht nutzbar",
+            AusgangFehler::AnbindungFehlt => return "kein Matrix-Konto eingerichtet",
+            AusgangFehler::AnbindungAngehalten => return "Matrix-Konto angehalten",
+            _ => {}
         }
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Dns)) => {
-            "Mailserver nicht gefunden".into()
-        }
-        (AusgangFehler::Voruebergehend, Some(SmtpFehler::Zeitueberschreitung)) => {
-            "Mailserver antwortet nicht".into()
-        }
-        (AusgangFehler::Voruebergehend, _) => "Mailserver nicht erreichbar".into(),
-        (AusgangFehler::Abgelehnt, Some(SmtpFehler::Abgelehnt(c))) => {
-            format!("vom Mailserver abgelehnt (SMTP {c})")
-        }
-        (AusgangFehler::Abgelehnt, _) => "vom Mailserver abgelehnt".into(),
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Anmeldung)) => {
-            "Anmeldung am Mailserver abgelehnt".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Tls)) => {
-            "verschlüsselte Verbindung zum Mailserver gescheitert".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::ZielIntern)) => {
-            "Adresse des Mailservers nicht erlaubt".into()
-        }
-        (AusgangFehler::AnbindungFehler, Some(SmtpFehler::Antwort)) => {
-            "Antwort des Mailservers unlesbar".into()
-        }
-        (AusgangFehler::AnbindungFehler, _) => "Anbindung des Mailservers nicht nutzbar".into(),
-        (AusgangFehler::AnbindungFehlt, _) => "kein Mailserver eingerichtet".into(),
-        (AusgangFehler::AnbindungAngehalten, _) => "Mailserver angehalten".into(),
-        (AusgangFehler::Ungewiss, _) => "Zustellung unklar".into(),
-        (AusgangFehler::Ueberholt, _) => "Quelle überholt".into(),
-        (AusgangFehler::ZuGross, _) => "Anhänge zu groß".into(),
-        (AusgangFehler::Spiegel, _) => "Einsatz wird von einer anderen Instanz geführt".into(),
-        (AusgangFehler::NichtZugestellt, _) => "Fax nicht zugestellt".into(),
+    }
+    match fehler {
+        AusgangFehler::Voruebergehend => "Mailserver nicht erreichbar",
+        AusgangFehler::Abgelehnt => "vom Mailserver abgelehnt",
+        AusgangFehler::AnbindungFehler => "Anbindung des Mailservers nicht nutzbar",
+        AusgangFehler::AnbindungFehlt => "kein Mailserver eingerichtet",
+        AusgangFehler::AnbindungAngehalten => "Mailserver angehalten",
+        AusgangFehler::Ungewiss => "Zustellung unklar",
+        AusgangFehler::Ueberholt => "Quelle überholt",
+        AusgangFehler::ZuGross => "Anhänge zu groß",
+        AusgangFehler::Spiegel => "Einsatz wird von einer anderen Instanz geführt",
+        AusgangFehler::NichtZugestellt => "Fax nicht zugestellt",
+        AusgangFehler::KeinZutritt => "kein Zutritt zum Raum",
+        AusgangFehler::Verschluesselung => "Verschlüsseln nicht möglich",
     }
 }
 
@@ -963,7 +963,8 @@ async fn von_fuer(
     )
 }
 
-/// Schreibt das Ergebnis und, falls `etb` gesetzt, den ETB-Eintrag in einer Transaktion; nach
+/// Schreibt die gesendeten `teile` (`ausgang_teil`), das Ergebnis und, falls `etb` gesetzt, den
+/// ETB-Eintrag in einer Transaktion; nach
 /// dem Commit `publiziere` und das Ereignis der Versandliste. `begonnen` ist der Merker, den der
 /// Aufrufer hält (`repo::save_ergebnis_tx`): hat ein anderer Lauf den Versand schon
 /// abgeschlossen, ändert sich nichts und es entsteht kein ETB-Eintrag. Scheitert die
@@ -976,23 +977,30 @@ async fn abschliessen(
     begonnen: Option<&str>,
     ergebnis: Ergebnis,
     etb: Option<String>,
+    teile: &[(i64, String)],
 ) -> Result<(), AppError> {
     abschliessen_mit(
         pool,
         live,
         zeile,
-        Abschluss::Versuch { begonnen, ergebnis },
+        Abschluss::Versuch {
+            begonnen,
+            ergebnis,
+            teile,
+        },
         etb,
     )
     .await
 }
 
-/// Was [`abschliessen_mit`] schreibt: das Ergebnis eines Zustellversuchs oder einer Abfrage.
+/// Was [`abschliessen_mit`] schreibt: das Ergebnis eines Zustellversuchs samt den dabei
+/// gesendeten Teilen oder das einer Abfrage des Fax-Anbieters.
 #[derive(Clone)]
 enum Abschluss<'a> {
     Versuch {
         begonnen: Option<&'a str>,
         ergebnis: Ergebnis,
+        teile: &'a [(i64, String)],
     },
     Abfrage(Abfrage),
 }
@@ -1001,9 +1009,17 @@ async fn schreibe_abschluss(
     conn: &mut sqlx::SqliteConnection,
     id: &str,
     a: &Abschluss<'_>,
+    gesendet_at: DateTime<Utc>,
 ) -> Result<bool, AppError> {
     match a {
-        Abschluss::Versuch { begonnen, ergebnis } => {
+        Abschluss::Versuch {
+            begonnen,
+            ergebnis,
+            teile,
+        } => {
+            // Gesendete Teile sind hinaus, auch wenn ein anderer Lauf das Ergebnis schon schrieb:
+            // gemerkt werden sie immer, damit kein späterer Versuch sie doppelt sendet.
+            repo::save_teile_tx(&mut *conn, id, teile, gesendet_at).await?;
             repo::save_ergebnis_tx(conn, id, *begonnen, ergebnis.clone()).await
         }
         Abschluss::Abfrage(abfrage) => repo::save_abfrage_tx(conn, id, *abfrage).await,
@@ -1017,9 +1033,10 @@ async fn abschliessen_mit(
     abschluss: Abschluss<'_>,
     etb: Option<String>,
 ) -> Result<(), AppError> {
+    let gesendet_at = Utc::now();
     // `None`: nichts geändert; `Some(etb_id)`: Ergebnis geschrieben, mit oder ohne ETB.
     let mit_etb = crate::write_retry!(pool, |conn| {
-        if !schreibe_abschluss(&mut *conn, &zeile.id, &abschluss).await? {
+        if !schreibe_abschluss(&mut *conn, &zeile.id, &abschluss, gesendet_at).await? {
             return Ok(None);
         }
         let Some(text) = etb.as_deref() else {
@@ -1060,7 +1077,7 @@ async fn abschliessen_mit(
         Err(e) if etb.is_some() => {
             tracing::error!(versand = %zeile.id, "Ausgang: ETB-Eintrag nicht geschrieben: {e}");
             let geaendert = crate::write_retry!(pool, |conn| {
-                schreibe_abschluss(&mut *conn, &zeile.id, &abschluss).await
+                schreibe_abschluss(&mut *conn, &zeile.id, &abschluss, gesendet_at).await
             })?;
             if !geaendert {
                 return Ok(());
@@ -1078,7 +1095,9 @@ async fn abschliessen_mit(
 
 #[cfg(test)]
 mod tests {
+    use super::super::zusteller::smtp_fehlschlag;
     use super::*;
+    use crate::adapter::smtp::SmtpFehler;
 
     fn zeile(quelle: QuelleArt, betreff: &str) -> VersandZeile {
         VersandZeile {
@@ -1126,7 +1145,7 @@ mod tests {
             etb_text(
                 &z,
                 AusgangFehler::AnbindungFehler,
-                Some(SmtpFehler::Anmeldung)
+                Some(&smtp_fehlschlag(SmtpFehler::Anmeldung).grund)
             ),
             "Lagebericht Nr. 3 per E-Mail an Leitstelle Nord (lagedienst@ils.example) nicht \
              zugestellt: Anmeldung am Mailserver abgelehnt"
@@ -1149,11 +1168,11 @@ mod tests {
             SmtpFehler::Zeitueberschreitung,
             SmtpFehler::Dns,
         ] {
-            let (ergebnis, text) = nach_fehler(&z, e, t0, 1, t0);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0);
             assert!(matches!(ergebnis, Ergebnis::Wiederholen { .. }), "{e:?}");
             assert!(text.is_none());
             let spaet = t0 + chrono::Duration::minutes(31);
-            let (ergebnis, text) = nach_fehler(&z, e, t0, 2, spaet);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 2, spaet);
             assert!(
                 matches!(
                     ergebnis,
@@ -1166,7 +1185,7 @@ mod tests {
             );
             assert!(text.is_some());
         }
-        let fall = |e| match nach_fehler(&z, e, t0, 1, t0).0 {
+        let fall = |e| match nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0).0 {
             Ergebnis::Fehlgeschlagen { fehler, .. } => fehler,
             other => panic!("{other:?}"),
         };

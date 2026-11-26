@@ -1,5 +1,5 @@
 //! Kanaladressen einer externen Stelle (LLH-2093, Spec `ausgang-email` Abschnitt 1). Heute nimmt
-//! die Oberfläche E-Mail und Fax an (LLH-2095) ([`KanalArt::is_freigeschaltet`]); die Tabelle kennt schon alle
+//! die Oberfläche E-Mail, Fax (LLH-2095) und Matrix (LLH-2094) an ([`KanalArt::is_freigeschaltet`]); die Tabelle kennt schon alle
 //! vier Kanäle. Org-Isolation wie im Repo der Stelle: eine fremde Stelle oder Adresse ist
 //! `NotFound`.
 
@@ -91,6 +91,43 @@ pub fn normalize_fax(roh: &str) -> Result<String, String> {
     Ok(format!("+{ziffern}"))
 }
 
+/// Höchstlänge einer Matrix-Adresse in Bytes (Grenze der Matrix-Spec für IDs).
+pub const MATRIX_MAX: usize = 255;
+
+/// Prüft eine Matrix-Adresse und bringt sie in Speicherform: getrimmt, entweder Raum-ID
+/// (`!lokal:server`) oder Raum-Alias (`#lokal:server`), geprüft mit dem Parser von ruma. Nutzer-IDs
+/// und `matrix.to`-Links werden mit eigenem Text abgelehnt (das Entpacken eines Links ist nicht
+/// eingebaut; das Frontend nennt denselben Text, `ExterneStelleKanaele.tsx`). Der Fehlertext ist
+/// für die Oberfläche bestimmt.
+pub fn normalize_matrix(roh: &str) -> Result<String, String> {
+    use matrix_sdk::ruma::OwnedRoomOrAliasId;
+    let roh = roh.trim();
+    if roh.is_empty() {
+        return Err("Matrix-Adresse darf nicht leer sein".into());
+    }
+    if roh.starts_with('@') {
+        return Err("Nutzer-IDs gehen noch nicht, bitte den Raum eintragen".into());
+    }
+    let klein = roh.to_ascii_lowercase();
+    if klein.starts_with("https://matrix.to/") || klein.starts_with("http://matrix.to/") {
+        return Err("matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen".into());
+    }
+    if roh.len() > MATRIX_MAX {
+        return Err(format!(
+            "Matrix-Adresse darf höchstens {MATRIX_MAX} Bytes lang sein"
+        ));
+    }
+    // ruma lässt Leerraum im lokalen Teil zu; in einer von Hand getippten Adresse ist er ein Tippfehler.
+    if roh.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return Err("Matrix-Adresse darf keinen Leerraum enthalten".into());
+    }
+    let id: OwnedRoomOrAliasId = roh.try_into().map_err(|_| {
+        "Keine gültige Matrix-Adresse (Raum-ID „!raum:server“ oder Alias „#raum:server“)"
+            .to_string()
+    })?;
+    Ok(id.to_string())
+}
+
 /// Teil-Patch einer Adresse (Tri-State): `label: Some(None)` leert die Bezeichnung.
 #[derive(Debug, Default)]
 pub struct KanalPatch<'a> {
@@ -130,25 +167,27 @@ pub async fn list(
     .map_err(Into::into)
 }
 
-/// Alle Adressen eines Kanals an den **aktiven** Stellen der Organisation, mit ihrer Stelle;
-/// sortiert nach Stelle (wie der Katalog) und Adresse. Für die Auswahl im Senden-Dialog.
+/// Alle Adressen der gewünschten Kanäle der **aktiven** Stellen der Organisation, mit ihrer
+/// Stelle; sortiert nach Stelle (wie der Katalog) und Adresse. Für die Auswahl im Senden-Dialog.
 pub async fn list_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
-    kanal: KanalArt,
+    kanaele: &[KanalArt],
 ) -> Result<Vec<(ExterneStelle, ExterneStelleKanal)>, AppError> {
     let stellen = super::repo::list(pool, org_id, true).await?;
-    let kanaele = sqlx::query_as::<_, ExterneStelleKanal>(sqlx::AssertSqlSafe(format!(
+    let alle = sqlx::query_as::<_, ExterneStelleKanal>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM org_externe_stelle_kanal \
-         WHERE org_id = ? AND kanal = ? ORDER BY adresse COLLATE NOCASE, id"
+         WHERE org_id = ? ORDER BY adresse COLLATE NOCASE, id"
     )))
     .bind(org_id)
-    .bind(kanal.as_str())
     .fetch_all(pool)
     .await?;
     let mut aus = Vec::new();
     for stelle in stellen {
-        for k in kanaele.iter().filter(|k| k.externe_stelle_id == stelle.id) {
+        for k in alle
+            .iter()
+            .filter(|k| k.externe_stelle_id == stelle.id && kanaele.contains(&k.channel))
+        {
             aus.push((stelle.clone(), k.clone()));
         }
     }

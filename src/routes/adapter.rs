@@ -238,6 +238,8 @@ async fn anzeige(
         .map(|art| {
             art.plaetze()
                 .iter()
+                // Interne Plätze (`Platz::intern`) füllt der Server; die Verwaltung sieht sie nie.
+                .filter(|p| !p.intern)
                 .map(|p| {
                     let stand = gesetzt.iter().find(|g| g.name == p.name);
                     AdapterGeheimnisAnzeige {
@@ -377,6 +379,86 @@ fn art_von<'r>(rahmen: &'r Rahmen, a: &Adapter) -> Result<&'r dyn AdapterArt, Ap
     })
 }
 
+/// Ein Platz, den die Verwaltung setzen und entfernen darf; einen internen (`Platz::intern`) oder
+/// unbekannten gibt es für sie nicht (400).
+fn check_platz_setzbar(art: &dyn AdapterArt, platz: &str) -> Result<(), AppError> {
+    if art.plaetze().iter().any(|p| p.name == platz && !p.intern) {
+        Ok(())
+    } else {
+        Err(AppError::Validation(format!(
+            "Platz „{platz}“ gibt es bei dieser Art nicht"
+        )))
+    }
+}
+
+/// Die Meldung, wenn eine Art höchstens einmal je Org angelegt werden darf und es schon eine gibt
+/// (auch eine angehaltene zählt): `smtp` (LLH-2093), `sipgate_fax` (LLH-2095), `matrix`
+/// (LLH-2094). `None` für andere Arten.
+fn meldung_schon_vorhanden(code: &str) -> Option<&'static str> {
+    match code {
+        crate::adapter::smtp_art::CODE => {
+            Some("Es gibt schon eine E-Mail-Anbindung; ändere oder lösche sie.")
+        }
+        crate::adapter::sipgate_fax_art::CODE => {
+            Some("Es gibt schon eine Fax-Anbindung; ändere oder lösche sie.")
+        }
+        crate::adapter::matrix_art::CODE => {
+            Some("Es gibt schon eine Matrix-Anbindung; ändere oder lösche sie.")
+        }
+        _ => None,
+    }
+}
+
+/// Erzeugt die internen Geheimnisse einer Art (`Platz::intern`) für eine neue Anbindung: je Platz
+/// 32 Zufallsbytes, base64, verschlüsselt. Ohne Schlüssel des Speichers 422, denn ohne sie taugt
+/// die Anbindung nicht.
+async fn create_interne_geheimnisse(
+    rahmen: &Rahmen,
+    art: &dyn AdapterArt,
+) -> Result<Vec<(&'static str, Vec<u8>, String)>, AppError> {
+    use base64::Engine;
+    let mut erzeugt = Vec::new();
+    for platz in art.plaetze().iter().filter(|p| p.intern) {
+        if !rahmen.speicher.has_schluessel() {
+            return Err(AppError::UnprocessableEntity(
+                "Der Server hat keinen Schlüssel für Geheimnisse (LIFELINE_GEHEIMNIS_SCHLUESSEL); \
+                 ohne ihn lässt sich diese Anbindung nicht anlegen."
+                    .into(),
+            ));
+        }
+        let mut zufall = [0u8; 32];
+        getrandom::fill(&mut zufall).expect("Zufallsquelle des Systems");
+        let wert = SecretString::from(base64::engine::general_purpose::STANDARD.encode(zufall));
+        let speicher = rahmen.speicher.clone();
+        let (chiffrat, fp) = tokio::task::spawn_blocking(move || speicher.encrypt(&wert))
+            .await
+            .map_err(|e| AppError::Internal(format!("Verschlüsseln abgebrochen: {e}")))?
+            .map_err(|_| AppError::Internal("Verschlüsseln fehlgeschlagen".into()))?;
+        erzeugt.push((platz.name, chiffrat, fp));
+    }
+    Ok(erzeugt)
+}
+
+/// Wie lange ein Schreibweg nach dem Commit auf das Verwerfen des Matrix-Clients wartet. Hält ein
+/// Versand den Client länger, erledigt es der nächste Zugriff (`matrix::Clients::verwerfen`);
+/// der Request bleibt im Zeitbudget.
+const VERWERFEN_FRIST: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Verwirft nach dem Commit den Matrix-Client einer Anbindung samt Schlüsselspeicher (Spec
+/// Abschnitt 4: neues Token, neuer Homeserver, Anbindung gelöscht). Für andere Arten nichts.
+async fn verwerfen_falls_matrix(rahmen: &Rahmen, art: &str, id: &str) {
+    if art != crate::adapter::matrix_art::CODE {
+        return;
+    }
+    // Das Vormerken geschieht sofort; abgewartet wird höchstens die Frist.
+    let _ = tokio::time::timeout(VERWERFEN_FRIST, rahmen.matrix.verwerfen(id)).await;
+}
+
+/// Ob `platz` das Access-Token einer Matrix-Anbindung ist: ein neues Token ist ein neues Gerät.
+fn is_matrix_token(art: &str, platz: &str) -> bool {
+    art == crate::adapter::matrix_art::CODE && platz == crate::adapter::matrix_art::PLATZ_TOKEN
+}
+
 /// Sperrt das Schreiben, wenn die Org sich bei einem Hub meldet (409).
 async fn check_nicht_gesperrt(conn: &mut SqliteConnection, org_id: i64) -> Result<(), AppError> {
     match gesperrt_grund(conn, org_id).await? {
@@ -483,18 +565,15 @@ pub async fn create(
         )?,
         lan_erlaubt: body.lan_erlaubt,
     };
+    let interne = create_interne_geheimnisse(rahmen, &**art).await?;
     let jetzt = crate::zeit::jetzt();
     let (org_id, admin_id, code) = (admin.org_id, admin.id, art.code());
     let a = crate::write_retry!(&state.pool, |conn| {
         check_nicht_gesperrt(&mut *conn, org_id).await?;
-        // Eine Org hat höchstens eine E-Mail- und eine Fax-Anbindung, auch eine angehaltene
-        // zählt (LLH-2093, LLH-2095): der Ausgangskorb wählt die Anbindung je Kanal.
-        let versand = match code {
-            crate::adapter::smtp_art::CODE => Some("E-Mail"),
-            crate::adapter::sipgate_fax_art::CODE => Some("Fax"),
-            _ => None,
-        };
-        if let Some(kanal) = versand {
+        // Eine Org hat höchstens eine E-Mail-, eine Fax- und eine Matrix-Anbindung, auch eine
+        // angehaltene zählt (LLH-2093, LLH-2095, LLH-2094): der Ausgangskorb wählt die Anbindung
+        // je Kanal.
+        if let Some(meldung) = meldung_schon_vorhanden(code) {
             let (vorhanden,): (i64,) =
                 sqlx::query_as("SELECT COUNT(*) FROM adapter WHERE org_id = ? AND art = ?")
                     .bind(org_id)
@@ -502,12 +581,15 @@ pub async fn create(
                     .fetch_one(&mut *conn)
                     .await?;
             if vorhanden > 0 {
-                return Err(AppError::UnprocessableEntity(format!(
-                    "Es gibt schon eine {kanal}-Anbindung; ändere oder lösche sie."
-                )));
+                return Err(AppError::UnprocessableEntity(meldung.into()));
             }
         }
-        repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await
+        let a = repo::create(&mut *conn, org_id, code, &eingabe, admin_id, &jetzt).await?;
+        // Interne Geheimnisse ohne Admin-Spur: kein Admin hat sie gesetzt oder gesehen.
+        for (platz, chiffrat, fp) in &interne {
+            repo::save_geheimnis(&mut *conn, &a.id, platz, chiffrat, fp, admin_id, &jetzt).await?;
+        }
+        Ok(a)
     })?;
     spur(
         &state,
@@ -539,7 +621,8 @@ pub async fn create(
 /// PATCH /api/admin/adapter/{id} — Name, Einstellungen, Intervall, LAN-Ausnahme. Konflikt über
 /// `basis_geaendert_at` (409 `veraltet`). Ein wegen eines Fehlers angehaltener Adapter läuft nach
 /// geänderten Einstellungen oder geänderter LAN-Ausnahme wieder. Trägt die Änderung ein neues Ziel
-/// ein (anderer Host einer URL), werden die Geheimnisse entfernt, je Platz mit Admin-Spur.
+/// ein (anderer Host einer URL), werden die Geheimnisse entfernt, je Platz mit Admin-Spur; interne
+/// erzeugt der Server neu, und eine Matrix-Anbindung verliert Client und Schlüsselspeicher.
 pub async fn update(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -555,49 +638,65 @@ pub async fn update(
         .transpose()?;
     let jetzt = crate::zeit::jetzt();
     let org_id = admin.org_id;
-    let (vorher, nachher, entfernt, erledigt) = crate::write_retry!(&state.pool, |conn| {
-        let vorher = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
-        let art = art_von(rahmen, &vorher)?;
-        let lan_erlaubt = body.lan_erlaubt.unwrap_or(vorher.lan_erlaubt);
-        // Auch unveränderte Einstellungen werden mit der neuen Ausnahme geprüft: ohne sie darf ein
-        // LAN-Ziel nicht stehen bleiben.
-        let alte = Value::Object(vorher.einstellungen());
-        let einstellungen = check_einstellungen_von(
-            art,
-            Some(body.einstellungen.as_ref().unwrap_or(&alte)),
-            lan_erlaubt,
-        )?;
-        let eingabe = Eingabe {
-            name: name.clone().unwrap_or_else(|| vorher.name.clone()),
-            einstellungen,
-            intervall_s: check_intervall(art, body.intervall_s.unwrap_or(vorher.intervall_s))?,
-            lan_erlaubt,
-        };
-        let neues_ziel = has_neues_ziel(art, &vorher.einstellungen(), &eingabe.einstellungen);
-        let (vorher, nachher) = repo::update(
-            &mut *conn,
-            org_id,
-            &id,
-            body.basis_geaendert_at.as_deref(),
-            &eingabe,
-            &jetzt,
-        )
-        .await?
-        .ok_or(AppError::NotFound)?;
-        // Ein neues Ziel bekommt die gespeicherten Geheimnisse nicht: sie werden neu gesetzt.
-        let entfernt = if neues_ziel {
-            repo::delete_geheimnisse(&mut *conn, &id).await?
-        } else {
-            Vec::new()
-        };
-        // Hebt die Änderung einen Stopp des Laufs auf, ist die Meldung erledigt (LLH-2026).
-        let erledigt = if vorher.angehalten_grund.is_some() && nachher.angehalten_grund.is_none() {
-            repo::clear_gemeldet(&mut *conn, &id).await?
-        } else {
-            false
-        };
-        Ok((vorher, nachher, entfernt, erledigt))
-    })?;
+    let (vorher, nachher, entfernt, erledigt, neues_ziel) =
+        crate::write_retry!(&state.pool, |conn| {
+            let vorher = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
+            let art = art_von(rahmen, &vorher)?;
+            let lan_erlaubt = body.lan_erlaubt.unwrap_or(vorher.lan_erlaubt);
+            // Auch unveränderte Einstellungen werden mit der neuen Ausnahme geprüft: ohne sie darf
+            // ein LAN-Ziel nicht stehen bleiben.
+            let alte = Value::Object(vorher.einstellungen());
+            let einstellungen = check_einstellungen_von(
+                art,
+                Some(body.einstellungen.as_ref().unwrap_or(&alte)),
+                lan_erlaubt,
+            )?;
+            let eingabe = Eingabe {
+                name: name.clone().unwrap_or_else(|| vorher.name.clone()),
+                einstellungen,
+                intervall_s: check_intervall(art, body.intervall_s.unwrap_or(vorher.intervall_s))?,
+                lan_erlaubt,
+            };
+            let neues_ziel = has_neues_ziel(art, &vorher.einstellungen(), &eingabe.einstellungen);
+            let (vorher, nachher) = repo::update(
+                &mut *conn,
+                org_id,
+                &id,
+                body.basis_geaendert_at.as_deref(),
+                &eingabe,
+                &jetzt,
+            )
+            .await?
+            .ok_or(AppError::NotFound)?;
+            // Ein neues Ziel bekommt die gespeicherten Geheimnisse nicht: sie werden neu gesetzt.
+            // Die internen erzeugt der Server im selben Schreiben neu (Matrix: neue Passphrase für
+            // den neuen Speicher), sonst taugte die Anbindung nicht mehr.
+            let entfernt = if neues_ziel {
+                let entfernt = repo::delete_geheimnisse(&mut *conn, &id).await?;
+                for (platz, chiffrat, fp) in &create_interne_geheimnisse(rahmen, art).await? {
+                    repo::save_geheimnis(&mut *conn, &id, platz, chiffrat, fp, admin.id, &jetzt)
+                        .await?;
+                }
+                // Die Spur nennt nur, was ein Admin gesetzt hatte.
+                entfernt
+                    .into_iter()
+                    .filter(|platz| !art.plaetze().iter().any(|p| p.intern && p.name == platz))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            // Hebt die Änderung einen Stopp des Laufs auf, ist die Meldung erledigt (LLH-2026).
+            let erledigt =
+                if vorher.angehalten_grund.is_some() && nachher.angehalten_grund.is_none() {
+                    repo::clear_gemeldet(&mut *conn, &id).await?
+                } else {
+                    false
+                };
+            Ok((vorher, nachher, entfernt, erledigt, neues_ziel))
+        })?;
+    if neues_ziel {
+        verwerfen_falls_matrix(rahmen, &nachher.art, &id).await;
+    }
     meldung_erledigen(&state, org_id, &id, erledigt).await;
     if vorher.name != nachher.name
         || vorher.einstellungen_json != nachher.einstellungen_json
@@ -636,7 +735,8 @@ pub async fn update(
     Ok(Json(anzeige(&mut conn, rahmen, &nachher, true).await?))
 }
 
-/// DELETE /api/admin/adapter/{id} — löscht samt Geheimnissen und Verlauf (204).
+/// DELETE /api/admin/adapter/{id} — löscht samt Geheimnissen und Verlauf (204), bei Matrix auch
+/// den Schlüsselspeicher.
 pub async fn delete(
     State(state): State<AppState>,
     AdminUser(admin): AdminUser,
@@ -665,6 +765,7 @@ pub async fn delete(
     if let Err(e) = crate::routes::drohne::sync_store(&state, std::slice::from_ref(&id)).await {
         tracing::error!("Drohnen-Store nach dem Löschen nicht nachgeführt: {e}");
     }
+    verwerfen_falls_matrix(&state.adapter, &a.art, &id).await;
     crate::benachrichtigung::quittiert_zustellen_adapter(&state.live, org_id, &erledigt);
     spur(
         &state,
@@ -703,16 +804,13 @@ pub async fn set_geheimnis(
     let rahmen = &state.adapter;
     let org_id = admin.org_id;
     // Vorprüfung ohne Schreibsperre: Adapter, Art und Platz, bevor verschlüsselt wird.
-    {
+    let (art, neues_geraet) = {
         let mut conn = state.pool.acquire().await?;
         let a = load_fuer_schreiben(&mut conn, org_id, &id).await?;
         let art = art_von(rahmen, &a)?;
-        if !art.plaetze().iter().any(|p| p.name == platz) {
-            return Err(AppError::Validation(format!(
-                "Platz „{platz}“ gibt es bei dieser Art nicht"
-            )));
-        }
-    }
+        check_platz_setzbar(art, &platz)?;
+        (art, is_matrix_token(&a.art, &platz))
+    };
     if !rahmen.speicher.has_schluessel() {
         return Err(AppError::UnprocessableEntity(
             "Der Server hat keinen Schlüssel für Geheimnisse (LIFELINE_GEHEIMNIS_SCHLUESSEL); \
@@ -725,11 +823,20 @@ pub async fn set_geheimnis(
         .await
         .map_err(|e| AppError::Internal(format!("Verschlüsseln abgebrochen: {e}")))?
         .map_err(|_| AppError::Internal("Verschlüsseln fehlgeschlagen".into()))?;
+    // Ein neues Token ist ein neues Gerät mit neuem Speicher: der bekommt eine neue Passphrase.
+    let interne = if neues_geraet {
+        create_interne_geheimnisse(rahmen, art).await?
+    } else {
+        Vec::new()
+    };
     let jetzt = crate::zeit::jetzt();
     let admin_id = admin.id;
     let (a, erledigt) = crate::write_retry!(&state.pool, |conn| {
         let a = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
         repo::save_geheimnis(&mut *conn, &a.id, &platz, &chiffrat, &fp, admin_id, &jetzt).await?;
+        for (intern, chiffrat, fp) in &interne {
+            repo::save_geheimnis(&mut *conn, &a.id, intern, chiffrat, fp, admin_id, &jetzt).await?;
+        }
         // Ein neues Geheimnis hebt einen Stopp des Laufs auf: die Meldung ist erledigt (LLH-2026).
         let erledigt = if a.angehalten_grund.is_some() {
             repo::clear_gemeldet(&mut *conn, &a.id).await?
@@ -738,6 +845,9 @@ pub async fn set_geheimnis(
         };
         Ok((a, erledigt))
     })?;
+    if neues_geraet {
+        verwerfen_falls_matrix(rahmen, &a.art, &id).await;
+    }
     meldung_erledigen(&state, org_id, &id, erledigt).await;
     spur(
         &state,
@@ -760,13 +870,22 @@ pub async fn delete_geheimnis(
     PfadParam((id, platz)): PfadParam<(String, String)>,
 ) -> Result<StatusCode, AppError> {
     let org_id = admin.org_id;
+    let rahmen = &state.adapter;
     let a = crate::write_retry!(&state.pool, |conn| {
         let a = load_fuer_schreiben(&mut *conn, org_id, &id).await?;
+        // Eine Art, die der Server nicht mehr kennt, behält das Entfernen ihrer Geheimnisse.
+        if let Some(art) = rahmen.arten.find(&a.art) {
+            check_platz_setzbar(&**art, &platz)?;
+        }
         if !repo::delete_geheimnis(&mut *conn, &a.id, &platz).await? {
             return Err(AppError::NotFound);
         }
         Ok(a)
     })?;
+    // Ohne Token ist das Gerät des Speichers nicht mehr zu benutzen.
+    if is_matrix_token(&a.art, &platz) {
+        verwerfen_falls_matrix(rahmen, &a.art, &id).await;
+    }
     spur(
         &state,
         &admin,

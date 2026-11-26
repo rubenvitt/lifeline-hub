@@ -42,6 +42,21 @@ impl SipgatePruefer for EchterPruefer {
     }
 }
 
+/// Der Prüfer der e2e-Suite: nimmt jeden Zugang an, ohne Netz. Sonst prüfte der Lauf das
+/// erfundene Token der Suite gegen sipgate, bekäme 401 und hielte den Faxzugang an, und kein
+/// Fax käme mehr über „übergeben“ hinaus.
+struct PrueferOhneNetz;
+
+impl SipgatePruefer for PrueferOhneNetz {
+    fn pruefe<'a>(
+        &'a self,
+        _zugang: &'a SipgateZugang<'a>,
+        _faxline_id: &'a str,
+    ) -> BoxFuture<'a, Result<(), SipgateFehler>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
 pub struct SipgateFaxArt {
     pruefer: Arc<dyn SipgatePruefer>,
 }
@@ -50,6 +65,12 @@ impl SipgateFaxArt {
     /// Die Art dieses Builds, mit der echten API.
     pub fn produktiv() -> Self {
         SipgateFaxArt::new(Arc::new(EchterPruefer))
+    }
+
+    /// Die Art neben den Test-Zustellern (`--ausgang-testzusteller`): prüft ohne Netz. Nur in
+    /// Debug-Builds, wie [`crate::ausgang::zusteller::testfaxzusteller`].
+    pub fn ohne_netz() -> Option<Self> {
+        cfg!(debug_assertions).then(|| SipgateFaxArt::new(Arc::new(PrueferOhneNetz)))
     }
 
     /// Mit einem anderen Prüfer (Tests).
@@ -62,6 +83,7 @@ const PLAETZE: &[Platz] = &[Platz {
     name: "token",
     bezeichnung: "Token (Personal Access Token)",
     pflicht: true,
+    intern: false,
 }];
 
 const FELDER: &[Feld] = &[
@@ -157,6 +179,27 @@ impl AdapterArt for SipgateFaxArt {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn ohne_netz_nimmt_jeden_zugang_an_und_ersetzt_die_art() {
+        let art = super::SipgateFaxArt::ohne_netz().expect("Debug-Build");
+        let token = age::secrecy::SecretString::from("erfunden");
+        let zugang = super::SipgateZugang {
+            token_id: "token-e2e",
+            token: &token,
+            lan_erlaubt: false,
+        };
+        assert!(art.pruefer.pruefe(&zugang, "f0").await.is_ok());
+
+        let v = super::super::art::Verzeichnis::produktiv(
+            std::sync::Arc::new(crate::drohne::Store::new()),
+            Default::default(),
+        );
+        let codes: Vec<_> = v.iter().map(|a| a.code()).collect();
+        let neu = v.ersetzt(std::sync::Arc::new(art));
+        assert_eq!(neu.iter().map(|a| a.code()).collect::<Vec<_>>(), codes);
+        assert!(neu.find(super::CODE).is_some());
+    }
+
     #[test]
     fn faxline_id_ist_f_und_ziffern() {
         for gut in ["f0", "f12"] {

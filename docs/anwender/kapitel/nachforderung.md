@@ -295,24 +295,25 @@ Für Einsatzleitung und Führungspersonal:
 Eine abgelehnte Nachforderung ist abgeschlossen und lässt sich nicht wieder öffnen. Ist schon eine
 Einheit mit ihr verknüpft, steht im Menü „Ablehnen (Einheiten verknüpft)“ gesperrt.
 
-### Eine Nachforderung per E-Mail senden
+### Eine Nachforderung per E-Mail oder Matrix senden
 
 Für Einsatzleitung und Führungspersonal:
 
 1. An der Karte das Menü ⋮ öffnen und „Senden“ wählen.
-2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen; vorbelegt ist der Adressat der
-   Nachforderung, wenn er eine Mailadresse hat.
+2. Im Dialog „Senden“ unter „An“ die Adressen ankreuzen; vorbelegt ist der Adressat der
+   Nachforderung mit einer Adresse, wenn er eine hat: sein erster Matrix-Raum, sonst seine erste
+   Mailadresse.
 3. „Senden“ wählen. An der Karte zeigt der Abschnitt „Versand“ je Adresse den Stand und
    „Erneut senden“.
 
 ## Hintergrund
 
-### Versand per E-Mail
+### Versand per E-Mail und Matrix
 
 Gesendet wird der Stand der Nachforderung beim Absenden (Art, Anzahl, Ziel, Adressat); eine
 zurückgezogene oder abgelehnte Nachforderung lässt sich nicht senden, ein noch wartender Versand
 geht dann nicht mehr hinaus. Wiederholung, „Zustellung unklar“ und Eintrag im ETB wie beim
-Lagebericht (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail“).
+Lagebericht (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail und Matrix“).
 
 ### Benachrichtigungen zum Stand
 

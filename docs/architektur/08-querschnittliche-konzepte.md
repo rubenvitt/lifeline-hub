@@ -1,6 +1,6 @@
 # 8. Querschnittliche Konzepte
 
-Stand: 25.11.2026 (Koordinaten über den Hub nur für gekoppelte Kennungen, LLH-2119; Fax und PDF des Ausgangs, LLH-2095; Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
+Stand: 26.11.2026 (Koordinaten über den Hub nur für gekoppelte Kennungen, LLH-2119; Fax und PDF des Ausgangs, LLH-2095; Matrix als zweiter Kanal des Ausgangskorbs, LLH-2094; Nachrichten an Menschen über den Ausgangskorb, LLH-2093; Ortung von Fahrzeugen, LLH-2091; Ablage und Löschung abgerufener Veranstaltungen, LLH-2097; iOS-Push über das Push-Relais, LLH-1981; Schlüsselwechsel des Geheimnisspeichers, LLH-2025; Android-Hülle im Hüllen-Vertrag, LLH-1989; Geheimnisse und Abrufe der Adapter, LLH-2017; Hüllen-Vertrag der App-Hüllen, LLH-1978; Fehlergrenze und Client-Fehlerbericht, LLH-1822).
 
 Dieses Kapitel nennt jedes Konzept, das mehrere Bausteine trägt, sagt, wo es im Code sitzt, und
 zeigt auf die Stelle, an der seine Regeln stehen. Es wiederholt diese Regeln nicht: maßgeblich
@@ -550,9 +550,11 @@ Helfer-App (ADR-0101, Spec
 
 ## 8.34 Nachrichten an Menschen: Ausgangskorb
 
-Was ein Mensch an eine Externe Stelle sendet (E-Mail, LLH-2093; Fax, LLH-2095), geht nur über die Tabelle
-`ausgang` und den Lauf `src/ausgang/` ([ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md), Design-Doc
-[`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md)).
+Was ein Mensch an eine Externe Stelle sendet (E-Mail, LLH-2093; Fax, LLH-2095; Matrix-Raum,
+LLH-2094), geht nur über die Tabelle `ausgang` und den Lauf `src/ausgang/` ([ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
+[ADR-0107](entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md), Design-Docs
+[`2026-11-24-w1ymakq6-ausgang-email-design.md`](../superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md) und
+[`2026-11-25-ntaizave-ausgang-matrix-design.md`](../superpowers/specs/2026-11-25-ntaizave-ausgang-matrix-design.md)).
 
 - **Getrennt von Webhooks und Abruf:** ein Webhook meldet einem Fremdsystem, ein Adapter ruft ab;
   der Ausgangskorb stellt eine bewusst abgesandte Nachricht zu. Die Anbindung ist die Adapter-Art
@@ -562,6 +564,11 @@ Was ein Mensch an eine Externe Stelle sendet (E-Mail, LLH-2093; Fax, LLH-2095), 
   Zeile; jedes Ergebnis steht im ETB, Ergebnis und Eintrag in einer Transaktion. Der Mailserver
   bestätigt mit 250 oder gar nicht: ein Abbruch nach DATA ist `ungewiss` und wird nie selbst
   wiederholt.
+- **Kanalneutral:** je Kanal ein Zusteller hinter einem Trait, Wiederholung und ETB nur im Lauf.
+  Matrix geht Ende-zu-Ende-verschlüsselt (matrix-sdk), nie als Klartext in einen verschlüsselten
+  Raum; feste Transaktions-IDs und gemerkte Teile (`ausgang_teil`) machen eine Wiederholung
+  unschädlich, darum ist ein Matrix-Abbruch nicht `ungewiss`. Der Schlüsselspeicher je Anbindung
+  liegt unter `matrix/` neben der Datenbank und nie in einer Sicherung (Kapitel 7).
 - **Ein Kanal, eine Art:** Fax ist die Adapter-Art `sipgate_fax` mit Token als Geheimnis; das Fax
   ist ein PDF, das nur hier am Server entsteht
   ([ADR-0110](entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md)) und

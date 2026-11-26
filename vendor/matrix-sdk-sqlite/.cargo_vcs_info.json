@@ -1,0 +1,6 @@
+{
+  "git": {
+    "sha1": "bc1c5da3fbd63c4e9eaa8679bb60c36a8ec58c3b"
+  },
+  "path_in_vcs": "crates/matrix-sdk-sqlite"
+}

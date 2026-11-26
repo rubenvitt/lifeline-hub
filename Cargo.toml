@@ -179,6 +179,19 @@ lifeline-machine-client = { path = "crates/lifeline-machine-client", features = 
 p256 = { version = "0.14", default-features = false, features = ["ecdsa", "std"] }
 hmac = "0.13"
 hkdf = "0.13"
+# Ausgang per Matrix mit Ende-zu-Ende-Verschlüsselung (LLH-2094,
+# docs/superpowers/specs/2026-11-25-ntaizave-ausgang-matrix-design.md): Olm/Megolm über
+# `matrix-sdk-crypto`, Schlüsselspeicher je Anbindung über `matrix-sdk-sqlite`. Fest gepinnt, weil
+# `matrix-sdk-sqlite` gepatcht ist (`[patch.crates-io]` unten, `vendor/matrix-sdk-sqlite/PATCH.md`).
+# Ohne Vorgabe-Features: `rustls-aws-lc-rs` statt nativem TLS, damit kein zweiter Crypto-Provider
+# (`ring`) mitkommt (tls::tests::rcgen_pem_ist_per_rustls_ladbar); dasselbe reqwest 0.13.
+# Lizenzen: matrix-sdk ist Apache-2.0; der Baum bringt daneben MPL-2.0 mit (`eyeball`, `imbl`,
+# `readlock`, `as_variant` …), wie schon webauthn-rs und cssparser. Advisory: PATCH.md der Kopie.
+# `rusqlite` kommt nur transitiv über die Kopie, nie direkt (ADR-0108).
+matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown"] }
+# Nur für `CollectStrategy` (Raumschlüssel an alle Geräte, Spec Abschnitt 6), das matrix-sdk nicht
+# wieder ausführt; dieselbe Version, die matrix-sdk ohnehin zieht, ohne Features.
+matrix-sdk-crypto = { version = "=0.20.0", default-features = false }
 printpdf = { version = "0.12", default-features = false, features = ["png"] }
 
 [dev-dependencies]
@@ -200,6 +213,12 @@ tokio = { version = "1", features = ["full", "test-util"] }
 # Property-Tests (LLH-2090, `src/AGENTS.md`, „Backend↔Frontend — Property-Tests“): Eigenschaften,
 # die für jede Eingabe gelten, gegen viele erzeugte Fälle. Ohne Standard-Features: kein `fork`.
 proptest = { version = "1", default-features = false, features = ["std"] }
+# Nachgebauter Homeserver für den Matrix-Ausgang (LLH-2094, `tests/ausgang_matrix.rs`,
+# `tests/adapter_matrix.rs`): `testing` schaltet `matrix_sdk::test_utils::mocks::MatrixMockServer`
+# frei (wiremock), samt Schlüssel-Endpunkten, an denen ein zweites Gerät echte Olm-Schlüssel hochlädt. Nur Dev, wie oben.
+matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown", "testing"] }
+# Sync-Antworten und Raumereignisse für den Mock-Server; dieselbe Version wie matrix-sdk.
+matrix-sdk-test = "=0.20.0"
 
 [features]
 # clamav ist Default-AN (reines Rust). Der echte Scan braucht einen erreichbaren clamd; ohne
@@ -220,6 +239,17 @@ version = "1.0.0-alpha.198"
 
 [workspace]
 members = [".", "crates/karten-katalog", "crates/lifeline-machine-client", "karten-service", "push-relais", "src-tauri"]
+# Gepatchte Fremdkopie (LLH-2094, `vendor/matrix-sdk-sqlite/PATCH.md`): kein Mitglied, sonst
+# liefen ihre Tests, rustfmt und Lints im Workspace mit.
+exclude = ["vendor/matrix-sdk-sqlite"]
+
+# matrix-sdk-sqlite 0.20.0 verlangt rusqlite 0.41 und damit libsqlite3-sys 0.39; sqlx 0.9 nutzt
+# 0.40, und zwei Crates mit `links = "sqlite3"` lässt Cargo nicht zu. Die Kopie hebt nur rusqlite
+# auf 0.42 (libsqlite3-sys 0.40), sonst unverändert (LLH-2094, `vendor/matrix-sdk-sqlite/PATCH.md`).
+# Fällt, sobald upstream rusqlite hebt: Kopie und diesen Eintrag löschen, matrix-sdk heben.
+# Wächter: tests/sqlite_version.rs, `lockfile_hat_genau_ein_libsqlite3_sys`.
+[patch.crates-io]
+matrix-sdk-sqlite = { path = "vendor/matrix-sdk-sqlite" }
 
 # Debuginfo im Dev- und Testprofil (LFH-845): eigener Code nur Zeilentabellen, Abhängigkeiten
 # keine. Unter Linux linkt jedes der ~130 Binaries in target/debug/deps die Debuginfo neu mit;

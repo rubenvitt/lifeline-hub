@@ -419,6 +419,14 @@ describe('AdapterAnsicht', () => {
     expect(screen.queryByRole('button', { name: 'Ersetzen' })).not.toBeInTheDocument();
   });
 
+  /** LLH-2094: das Matrix-Konto trägt den Hinweis zur Verifizierung, andere Arten nicht. */
+  it('zeigt beim Matrix-Konto den Hinweis zur Verifizierung', async () => {
+    stelleBereit(adapterFixture('a1', { art: 'matrix', art_bezeichnung: 'Matrix' }));
+    rendere();
+    expect(await screen.findByRole('heading', { name: 'Verifizierung' })).toBeInTheDocument();
+    expect(screen.getByText(/nicht verifiziert/)).toBeInTheDocument();
+  });
+
   /** LLH-1194: der Stammdaten-Abruf zeigt seinen offenen Schnappschuss und „Erneut vorlegen“. */
   it('bietet beim Stammdaten-Abruf Hinweis und „Erneut vorlegen“', async () => {
     const aufrufe = stelleBereit(

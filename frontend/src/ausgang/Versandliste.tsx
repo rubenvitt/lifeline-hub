@@ -2,14 +2,16 @@ import { Button, Typography, theme } from 'antd';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import {
   ausgangFehlerText,
+  ausgangKanal,
   useVersaende,
   useWiederholeVersand,
   type QuelleFilter,
 } from '../api/ausgang';
 import type { Versand } from '../api/types';
 import { ZeilenFehler } from '../components/SpeicherHinweis';
-import { schriftStil } from '../components/instrument';
+import { Textstufe, schriftStil } from '../components/instrument';
 import { useOnline } from '../offline/useOnline';
+import { adresseAnzeige, kanalKurz } from './kanalAnzeige';
 
 /**
  * Zustandstext eines Versands (Spec 7): „wartet“, „übergeben 14:32“, beim Fax „übergeben 14:32,
@@ -26,13 +28,14 @@ export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) =>
     return fax ? `${zeit}, Zustellung wird geprüft` : `${zeit}${ohnePdf}`;
   }
   // Unklar ist kein Fehlschlag mit Grund, sondern eine offene Frage: der Wortlaut steht allein.
-  if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss', v.channel) as string;
-  const grund = ausgangFehlerText(v.error, v.channel);
+  const kanal = ausgangKanal(v.channel);
+  if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss', kanal) as string;
+  const grund = ausgangFehlerText(v.error, kanal);
   return grund ? `fehlgeschlagen: ${grund}` : 'fehlgeschlagen';
 }
 
 /**
- * Versandliste einer Quelle (LLH-2093, Fax LLH-2095): je Versand Stelle, Adresse, Zeit und Zustand, bei
+ * Versandliste einer Quelle (LLH-2093, Fax LLH-2095): je Versand Kanal, Stelle, Adresse (Matrix: der Raum), Zeit und Zustand, bei
  * `fehlgeschlagen` „Erneut senden“. Ohne Versand steht nichts da. Live über `ausgang`.
  */
 export default function Versandliste({
@@ -68,14 +71,14 @@ export default function Versandliste({
               style={{ paddingBlock: token.paddingXXS }}
             >
               <span style={{ ...schriftStil('text'), overflowWrap: 'anywhere' }}>
-                {v.agency_name} · {v.channel === 'fax' ? `Fax ${v.address}` : v.address}
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  {kanalKurz(v.channel)}
+                </Textstufe>{' '}
+                {v.agency_name} · {adresseAnzeige(v.channel, v.address)}
               </span>{' '}
-              <Typography.Text
-                type={fehlgeschlagen ? 'danger' : 'secondary'}
-                style={schriftStil('textKlein')}
-              >
+              <Textstufe stufe="textKlein" ton={fehlgeschlagen ? 'alarm' : 'gedaempft'}>
                 {versandZustandText(v, uhrzeit)}
-              </Typography.Text>
+              </Textstufe>
               {fehlgeschlagen && darfSchreiben && (
                 <>
                   {' '}
@@ -87,10 +90,10 @@ export default function Versandliste({
                     Erneut senden
                   </Button>
                   {!online && (
-                    <Typography.Text type="secondary" style={schriftStil('textKlein')}>
+                    <Textstufe stufe="textKlein" ton="gedaempft">
                       {' '}
                       Ohne Netz nicht möglich
-                    </Typography.Text>
+                    </Textstufe>
                   )}
                 </>
               )}

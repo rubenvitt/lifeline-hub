@@ -1,24 +1,30 @@
 import { Alert, Checkbox, Form, Skeleton, Typography, theme } from 'antd';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { adminSektionPfad, anbindungenPfad } from '../admin/adminPfade';
 import { ApiError } from '../api/client';
 import { useKanaeleSammlung } from '../api/externeStellen';
-import { useSendeVersaende, versandFehler, type QuelleFilter } from '../api/ausgang';
+import {
+  ANBINDUNG_GRUENDE,
+  AUSGANG_FEHLER_TEXT,
+  anbindungKanal,
+  useSendeVersaende,
+  versandFehler,
+  type QuelleFilter,
+} from '../api/ausgang';
+import type { AusgangFehler, KanalArt } from '../api/types';
 import { zahlText } from '../anzeige/zahl';
 import { useAuth } from '../auth/AuthContext';
 import { ErfassungsModal } from '../components/Erfassung';
-import { Feld, schriftStil } from '../components/instrument';
+import { Feld, Textstufe, schriftStil } from '../components/instrument';
 import { neueClientId } from '../offline/clientId';
 import { useOnline } from '../offline/useOnline';
 import { empfaengerVorschlag } from './empfaengerVorschlag';
+import { kanalKurz } from './kanalAnzeige';
 
 interface FormWerte {
   kanaele: number[];
 }
-
-/** Gründe, die auf eine fehlende oder gestörte Anbindung deuten: Admins bekommen den Weg dorthin. */
-const ANBINDUNG_GRUENDE = new Set(['anbindung_fehlt', 'anbindung_angehalten', 'anbindung_fehler']);
 
 const VORSCHAU_ZEILEN = 3;
 
@@ -29,10 +35,12 @@ function groesse(bytes: number): string {
 }
 
 /**
- * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail oder Fax
- * (LLH-2093, LLH-2095): Mailadressen und Faxnummern der aktiven Externen Stellen zum Anhaken,
- * getrennt nach Kanal. Vorbelegt sind nur die Mailadressen der Stellen des Verteilers bzw. des
- * Adressaten, damit eine Stelle nicht doppelt Post bekommt. Nur online; nie vorgemerkt.
+ * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax oder
+ * Matrix (LLH-2093, LLH-2095, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum
+ * Anhaken (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
+ * Adresse vorbelegt, nie mit einer Faxnummer, damit eine Stelle nicht doppelt Post bekommt. Fehlt
+ * das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein Versand wird nie
+ * vorgemerkt.
  */
 export default function SendenDialog({
   offen,
@@ -62,22 +70,23 @@ export default function SendenDialog({
   const online = useOnline();
   const [form] = Form.useForm<FormWerte>();
   const gewaehlt = Form.useWatch('kanaele', form) as number[] | undefined;
-  const mailQuery = useKanaeleSammlung('email');
-  const faxQuery = useKanaeleSammlung('fax');
+  const kanaeleQuery = useKanaeleSammlung();
   const sende = useSendeVersaende(einsatzId, quelle);
-  // Lädt eine Liste nicht, bleibt die andere nutzbar: ein Fehler bei den Faxnummern sperrt die
-  // Mail nicht (und umgekehrt).
-  const mailFehler = mailQuery.isError;
-  const faxFehler = faxQuery.isError;
-  const mails = useMemo(
-    () => mailQuery.data ?? (mailFehler ? [] : undefined),
-    [mailQuery.data, mailFehler],
+  // Der Server kennt heute E-Mail, Fax und Matrix; ein anderer Kanal bleibt aus der Auswahl.
+  const kanaele = useMemo(
+    () =>
+      kanaeleQuery.data?.filter(
+        (k) =>
+          k.channel.channel === 'email' ||
+          k.channel.channel === 'fax' ||
+          k.channel.channel === 'matrix',
+      ),
+    [kanaeleQuery.data],
   );
-  const faxe = useMemo(
-    () => faxQuery.data ?? (faxFehler ? [] : undefined),
-    [faxQuery.data, faxFehler],
-  );
-  const kanaele = mails && faxe ? [...mails, ...faxe] : undefined;
+  /** Grund, warum die Matrix-Adressen gesperrt sind, nachdem der Server das Konto abgelehnt hat. */
+  const [matrixGesperrt, setMatrixGesperrt] = useState<string | null>(null);
+  /** Kanäle der zuletzt gesendeten Adressen: nach ihnen richtet sich der Wortlaut einer Ablehnung. */
+  const [gesendet, setGesendet] = useState<KanalArt[]>([]);
 
   // Ein Schlüssel je Öffnen: ein zweiter Versuch derselben Eingabe legt keine zweite Mail an.
   // `offen` ist der Auslöser; der Wert hängt nur an der Öffnung.
@@ -88,10 +97,11 @@ export default function SendenDialog({
   // überschreibt keine Auswahl der Person.
   const vorbelegtFuer = useRef<string | null>(null);
   useEffect(() => {
-    if (!offen || !mails || !faxe || vorbelegtFuer.current === clientId) return;
+    if (!offen || !kanaele || vorbelegtFuer.current === clientId) return;
     vorbelegtFuer.current = clientId;
-    form.setFieldValue('kanaele', [...empfaengerVorschlag(mails, vorschlagNamen)]);
-  }, [offen, mails, faxe, clientId, form, vorschlagNamen]);
+    setMatrixGesperrt(null);
+    form.setFieldValue('kanaele', [...empfaengerVorschlag(kanaele, vorschlagNamen)]);
+  }, [offen, kanaele, clientId, form, vorschlagNamen]);
 
   const keineAdresse = kanaele !== undefined && kanaele.length === 0;
   const grund = !online
@@ -101,11 +111,41 @@ export default function SendenDialog({
       : null;
   const gesperrt = grund !== null || kanaele === undefined || (gewaehlt ?? []).length === 0;
 
-  const fehler = versandFehler(sende.error);
+  const fehler = versandFehler(sende.error, gesendet);
   const anbindungGestoert =
     sende.error instanceof ApiError &&
     !!sende.error.grund &&
     ANBINDUNG_GRUENDE.has(sende.error.grund);
+
+  /** Eine Ablehnung wegen des Matrix-Kontos sperrt die Matrix-Adressen, nicht den Dialog. */
+  const merkeMatrixSperre = (e: unknown, arten: readonly KanalArt[]) => {
+    if (
+      e instanceof ApiError &&
+      e.grund &&
+      ANBINDUNG_GRUENDE.has(e.grund) &&
+      anbindungKanal(e, arten) === 'matrix'
+    ) {
+      setMatrixGesperrt(AUSGANG_FEHLER_TEXT.matrix[e.grund as AusgangFehler]);
+      const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
+      const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
+      const rest = gewaehlteIds.filter((id) => kanalVon(id)?.channel.channel !== 'matrix');
+      // Betroffene Stellen: die erste Mailadresse derselben Stelle ersetzt die Matrix-Adresse.
+      const betroffen = new Set(
+        gewaehlteIds
+          .filter((id) => kanalVon(id)?.channel.channel === 'matrix')
+          .map((id) => kanalVon(id)?.agency_id),
+      );
+      for (const stelleId of betroffen) {
+        const stelleMails = (kanaele ?? []).filter(
+          (k) => k.agency_id === stelleId && k.channel.channel === 'email',
+        );
+        if (stelleMails.length > 0 && !stelleMails.some((k) => rest.includes(k.channel.id))) {
+          rest.push(stelleMails[0].channel.id);
+        }
+      }
+      form.setFieldValue('kanaele', rest);
+    }
+  };
 
   const vorschau = (vorschauText ?? '')
     .split('\n')
@@ -123,12 +163,22 @@ export default function SendenDialog({
       speicherung={{ error: fehler, isPending: sende.isPending, reset: sende.reset }}
       speicherFehlerTitel="Nicht gesendet"
       speicherFehlerFallback="Senden fehlgeschlagen"
-      onErfassen={(w) =>
-        sende.mutateAsync({
-          client_id: clientId,
-          recipients: w.kanaele.map((channel_id) => ({ channel_id })),
-        })
-      }
+      onErfassen={(w) => {
+        const arten = w.kanaele.flatMap((id) => {
+          const art = kanaele?.find((k) => k.channel.id === id)?.channel.channel;
+          return art ? [art] : [];
+        });
+        setGesendet(arten);
+        return sende
+          .mutateAsync({
+            client_id: clientId,
+            recipients: w.kanaele.map((channel_id) => ({ channel_id })),
+          })
+          .catch((e: unknown) => {
+            merkeMatrixSperre(e, arten);
+            throw e;
+          });
+      }}
       onFertig={onClose}
       onAbbrechen={onClose}
     >
@@ -150,31 +200,25 @@ export default function SendenDialog({
       ) : (
         <Feld label="An" name="kanaele">
           <Checkbox.Group style={{ display: 'flex', flexDirection: 'column', gap: token.marginXS }}>
-            {(
-              [
-                ['E-Mail', mails ?? []],
-                ['Fax', faxe ?? []],
-              ] as const
-            )
-              .filter(([, liste]) => liste.length > 0)
-              .map(([titel, liste]) => (
-                <div
-                  key={titel}
-                  role="group"
-                  aria-label={titel}
-                  style={{ display: 'flex', flexDirection: 'column', gap: token.marginXXS }}
-                >
-                  <Typography.Text type="secondary" style={schriftStil('textKlein')}>
-                    {titel}
+            {kanaele.map((k) => (
+              <Checkbox
+                key={k.channel.id}
+                value={k.channel.id}
+                disabled={k.channel.channel === 'matrix' && matrixGesperrt !== null}
+              >
+                <Textstufe stufe="textKlein" ton="gedaempft">
+                  {kanalKurz(k.channel.channel)}
+                </Textstufe>{' '}
+                {k.agency_name} · {k.channel.address}
+                {k.channel.label ? ` (${k.channel.label})` : ''}
+                {k.channel.channel === 'matrix' && matrixGesperrt !== null && (
+                  <Typography.Text type="danger" style={schriftStil('textKlein')}>
+                    {' '}
+                    · {matrixGesperrt}
                   </Typography.Text>
-                  {liste.map((k) => (
-                    <Checkbox key={k.channel.id} value={k.channel.id}>
-                      {k.agency_name} · {k.channel.address}
-                      {k.channel.label ? ` (${k.channel.label})` : ''}
-                    </Checkbox>
-                  ))}
-                </div>
-              ))}
+                )}
+              </Checkbox>
+            ))}
           </Checkbox.Group>
         </Feld>
       )}

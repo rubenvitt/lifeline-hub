@@ -16,6 +16,11 @@ use std::path::{Path, PathBuf};
 /// Die eine Stelle, an der ein Client gebaut und die Kennung gesetzt wird.
 const ZENTRALE: &str = "src/ausgehend.rs";
 
+/// Fundstellen, die kein HTTP-Client sind, je Datei und Code (LLH-2094): der Matrix-Client des
+/// SDK baut selbst keinen, er bekommt den `reqwest::Client` aus `adapter::ziel` (`http_client`).
+const KEIN_HTTP_CLIENT: &[(&str, &str)] =
+    &[("src/adapter/matrix.rs", "matrix_sdk::Client::builder()")];
+
 /// Sammelt rekursiv alle `.rs`-Dateien unter `dir`.
 fn rust_dateien(dir: &Path, aus: &mut Vec<PathBuf>) {
     for eintrag in fs::read_dir(dir).expect("Verzeichnis lesbar") {
@@ -167,6 +172,12 @@ fn http_clients_nur_ueber_die_zentrale_kennung() {
         let produktiv = ohne_testmodule(&quelle);
         for (nr, zeile) in produktiv.lines().enumerate() {
             let code = zeile.split("//").next().unwrap_or_default();
+            if KEIN_HTTP_CLIENT
+                .iter()
+                .any(|(datei, stelle)| pfad == *datei && code.contains(stelle))
+            {
+                continue;
+            }
             for muster in verboten {
                 if code.contains(muster) {
                     funde.push(format!("{pfad}:{}: {}", nr + 1, zeile.trim()));

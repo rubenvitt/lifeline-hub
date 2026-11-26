@@ -263,6 +263,16 @@ pub fn default_karten_dir(db_path: &str) -> std::path::PathBuf {
         .join("karten")
 }
 
+/// Verzeichnis der Matrix-Schlüsselspeicher (LLH-2094): `<Verzeichnis von db_path>/matrix`, je
+/// Anbindung ein Unterverzeichnis. Keine eigene Option, nicht in der Sicherung.
+pub fn default_matrix_dir(db_path: &str) -> std::path::PathBuf {
+    std::path::Path::new(db_path)
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("matrix")
+}
+
 /// Obergrenze von `--backup-intervall-minuten`: ein Jahr. Ein beliebig großer Wert liefe beim
 /// Umrechnen in Sekunden oder beim Addieren auf einen `Instant` über und brächte den
 /// Scheduler-Task zum Absturz wie die 0 (LFH-926).
@@ -2255,6 +2265,18 @@ mod tests {
         ]);
         assert_eq!(config.db_path, "/tmp/x.db");
         assert!(matches!(config.command, Some(Command::Backup { .. })));
+    }
+
+    #[test]
+    fn default_matrix_dir_folgt_db_pfad() {
+        assert_eq!(
+            default_matrix_dir("/var/lib/lifeline/lifeline.db"),
+            std::path::PathBuf::from("/var/lib/lifeline/matrix")
+        );
+        assert_eq!(
+            default_matrix_dir("lifeline.db"),
+            std::path::Path::new(".").join("matrix")
+        );
     }
 
     #[test]

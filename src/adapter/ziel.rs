@@ -32,17 +32,35 @@ pub const VERBINDUNG_ZEITLIMIT: Duration = Duration::from_secs(5);
 /// Anfrage der Verwaltung wartet.
 pub const ZEITLIMIT: Duration = Duration::from_secs(20);
 
-/// Die Schutzeinstellungen des Adapter-Clients, an einer Stelle: kein Proxy, keine
-/// Weiterleitung, nur `https`, Zeitlimits, pinnender Resolver. Die Tests des echten Abrufs
-/// (`ziel_fetch_tests.rs`) bauen darauf auf.
-fn protected_client_builder(lan_erlaubt: bool) -> reqwest::ClientBuilder {
+/// Der Bauplan des Adapter-Clients ohne Gesamtzeitlimit: kein Proxy, keine Weiterleitung, nur
+/// `https`, Verbindungsaufbau in [`VERBINDUNG_ZEITLIMIT`], der pinnende Resolver mit oder ohne
+/// LAN-Ausnahme. Für Arten, die einen fremden Client mit unserem `reqwest::Client` füttern
+/// (Matrix, LLH-2094); sie setzen ihr Zeitlimit selbst. IP-Literale umgeht der Resolver: die URL
+/// muss vorher [`check_url`] bestehen.
+pub fn client_builder_mit_zielschutz(lan_erlaubt: bool) -> reqwest::ClientBuilder {
     client_builder(Zweck::Adapter)
         .no_proxy()
         .redirect(reqwest::redirect::Policy::none())
         .https_only(true)
         .connect_timeout(VERBINDUNG_ZEITLIMIT)
-        .timeout(ZEITLIMIT)
         .dns_resolver(Arc::new(WebhookResolver { lan_erlaubt }))
+}
+
+/// Die Schutzeinstellungen des Adapter-Clients, an einer Stelle: [`client_builder_mit_zielschutz`]
+/// samt Gesamtzeitlimit [`ZEITLIMIT`]. Die Tests des echten Abrufs (`ziel_fetch_tests.rs`) bauen
+/// darauf auf.
+fn protected_client_builder(lan_erlaubt: bool) -> reqwest::ClientBuilder {
+    client_builder_mit_zielschutz(lan_erlaubt).timeout(ZEITLIMIT)
+}
+
+/// Nur für Tests gegen einen nachgebauten Server auf `http://127.0.0.1` (LLH-2094): ohne
+/// Zielschutz, sonst wie [`client_builder_mit_zielschutz`] (kein Proxy, keine Weiterleitung).
+/// Kein Produktivpfad ruft das auf.
+pub fn client_builder_ohne_zielschutz_fuer_tests() -> reqwest::ClientBuilder {
+    client_builder(Zweck::Adapter)
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(VERBINDUNG_ZEITLIMIT)
 }
 
 fn build_client(lan_erlaubt: bool) -> reqwest::Client {

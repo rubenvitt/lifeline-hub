@@ -61,6 +61,9 @@ wire_enum! {
         VersionUnbekannt => "version_unbekannt",
         /// Fehler im Server; steht im Log.
         Intern => "intern",
+        /// Der Schlüsselspeicher einer Matrix-Anbindung gehört zu einem anderen Gerät als dem des
+        /// Tokens (LLH-2094): ein neues Access-Token anlegen.
+        SchluesselPassenNicht => "schluessel_passen_nicht",
     }
 }
 
@@ -107,7 +110,8 @@ pub fn braucht_eingriff(fehler: AdapterFehler) -> bool {
         | GeheimnisUnlesbar
         | GeheimnisspeicherGesperrt
         | EinstellungUngueltig
-        | VersionUnbekannt => true,
+        | VersionUnbekannt
+        | SchluesselPassenNicht => true,
         Status | Zeitueberschreitung | Verbindung | Tls | Dns | ZuGross | AntwortUngueltig
         | Intern => false,
     }
@@ -316,6 +320,7 @@ mod tests {
             GeheimnisspeicherGesperrt,
             EinstellungUngueltig,
             VersionUnbekannt,
+            SchluesselPassenNicht,
         ] {
             assert!(braucht_eingriff(f), "{f:?}");
         }
@@ -331,7 +336,7 @@ mod tests {
         ] {
             assert!(!braucht_eingriff(f), "{f:?}");
         }
-        assert_eq!(AdapterFehler::ALLE.len(), 17);
+        assert_eq!(AdapterFehler::ALLE.len(), 18);
     }
 
     #[test]

@@ -40,7 +40,10 @@ async fn anlegen(app: &axum::Router, admin: &str, e: Value) -> (StatusCode, Valu
 
 #[test]
 fn smtp_art_ist_im_verzeichnis() {
-    let v = Verzeichnis::produktiv(std::sync::Arc::new(lifeline_hub::drohne::Store::new()));
+    let v = Verzeichnis::produktiv(
+        std::sync::Arc::new(lifeline_hub::drohne::Store::new()),
+        Default::default(),
+    );
     let art = v.find("smtp").expect("Art smtp");
     assert_eq!(art.bezeichnung(), "E-Mail (SMTP)");
     assert_eq!(art.intervall_min_s(), 900);

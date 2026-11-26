@@ -116,6 +116,8 @@ export const ADAPTER_FEHLER_TEXT: Record<AdapterFehler, string> = {
   einstellung_ungueltig: 'Einstellung ungültig',
   version_unbekannt: 'Unbekannte Schnittstellenversion',
   intern: 'Fehler im Server',
+  schluessel_passen_nicht:
+    'Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen.',
 };
 
 /** Klartext eines Fehlschlags, mit HTTP-Status, falls das Ziel antwortete. */

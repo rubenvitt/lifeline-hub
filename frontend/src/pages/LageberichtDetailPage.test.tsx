@@ -1136,7 +1136,7 @@ describe('LageberichtDetailPage — Senden (LLH-2093)', () => {
     expect(screen.getByRole('button', { name: 'Fortschreiben' })).toBeInTheDocument();
   });
 
-  it('öffnet den Dialog mit dem Grund, wenn keine Mailadresse hinterlegt ist', async () => {
+  it('öffnet den Dialog mit dem Grund, wenn keine Adresse hinterlegt ist', async () => {
     lade('einsatzleitung');
     renderBei('/einsaetze/1/lageberichte/9');
     await userEvent.click(await screen.findByRole('button', { name: 'Senden' }));

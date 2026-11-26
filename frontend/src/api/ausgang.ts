@@ -4,8 +4,9 @@ import { einsatzKeys } from './queryKeys';
 import type { AusgangFehler, KanalArt, QuelleArt, SendenAnfrage, Versand } from './types';
 
 /**
- * Ausgang per E-Mail (LLH-2093) und Fax (LLH-2095): Versand eines freigegebenen Lageberichts, Befehls oder einer
- * Nachforderung. Die Routen hängen am Dokument, die Liste und das Wiederholen am Einsatz.
+ * Ausgang per E-Mail (LLH-2093), Fax (LLH-2095) und Matrix (LLH-2094): Versand eines freigegebenen
+ * Lageberichts, Befehls oder einer Nachforderung. Die Routen hängen am Dokument, die Liste und das
+ * Wiederholen am Einsatz.
  */
 
 const QUELLE_SEGMENT: Record<QuelleArt, string> = {
@@ -19,72 +20,114 @@ export interface QuelleFilter {
   id: number;
 }
 
-/** Wortlaut je `AusgangFehler` (Code in `Versand.error` und im `grund` einer 422-Antwort). */
-export const AUSGANG_FEHLER_TEXT: Record<AusgangFehler, string> = {
-  voruebergehend: 'Mailserver vorübergehend nicht erreichbar',
-  abgelehnt: 'Vom Mailserver abgelehnt',
-  ungewiss: 'Zustellung unklar',
-  ueberholt: 'Neuere Fassung freigegeben',
-  anbindung_fehlt: 'Kein Mailserver eingerichtet',
-  anbindung_angehalten: 'Mailanbindung angehalten',
-  anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
-  zu_gross: 'Anhänge zu groß für eine Mail',
-  spiegel: 'Einsatz wird von einer anderen Instanz geführt',
-  nicht_zugestellt: 'Fax nicht zugestellt',
-};
+/** Kanäle, die der Ausgang heute bedient (Wire-Enum `KanalArt` kennt mehr). */
+export type AusgangKanal = 'email' | 'fax' | 'matrix';
 
-/** Wortlaut beim Fax, wo er sich von der Mail unterscheidet (LLH-2095). */
-export const AUSGANG_FEHLER_TEXT_FAX: Partial<Record<AusgangFehler, string>> = {
-  voruebergehend: 'sipgate vorübergehend nicht erreichbar',
-  abgelehnt: 'Von sipgate abgelehnt',
-  ungewiss: 'Zustellung nicht bestätigt',
-  anbindung_fehlt: 'Kein Faxzugang eingerichtet',
-  anbindung_angehalten: 'Faxzugang angehalten',
-  anbindung_fehler: 'Faxzugang fehlerhaft eingerichtet',
-  zu_gross: 'Fax zu lang (höchstens 30 Seiten)',
+/** Ein Kanal der Wire-Art: alles außer Fax und Matrix spricht mit dem Wortlaut der E-Mail. */
+export function ausgangKanal(kanal: KanalArt | null | undefined): AusgangKanal {
+  return kanal === 'matrix' ? 'matrix' : kanal === 'fax' ? 'fax' : 'email';
+}
+
+/**
+ * Wortlaut je `AusgangFehler` und Kanal (Code in `Versand.error` und im `grund` einer
+ * 422-Antwort). Die `anbindung_*`-Texte der Matrix entsprechen den Meldungen des Servers
+ * (`src/routes/ausgang.rs`, `meldung_anbindung`); beim Fax nennt der Wortlaut sipgate (LLH-2095).
+ */
+export const AUSGANG_FEHLER_TEXT: Record<AusgangKanal, Record<AusgangFehler, string>> = {
+  email: {
+    voruebergehend: 'Mailserver vorübergehend nicht erreichbar',
+    abgelehnt: 'Vom Mailserver abgelehnt',
+    ungewiss: 'Zustellung unklar',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Mailserver eingerichtet',
+    anbindung_angehalten: 'Mailanbindung angehalten',
+    anbindung_fehler: 'Mailanbindung fehlerhaft eingerichtet',
+    zu_gross: 'Anhänge zu groß für eine Mail',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    nicht_zugestellt: 'Fax nicht zugestellt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
+  fax: {
+    voruebergehend: 'sipgate vorübergehend nicht erreichbar',
+    abgelehnt: 'Von sipgate abgelehnt',
+    ungewiss: 'Zustellung nicht bestätigt',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Faxzugang eingerichtet',
+    anbindung_angehalten: 'Faxzugang angehalten',
+    anbindung_fehler: 'Faxzugang fehlerhaft eingerichtet',
+    zu_gross: 'Fax zu lang (höchstens 30 Seiten)',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    nicht_zugestellt: 'Fax nicht zugestellt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
+  matrix: {
+    voruebergehend: 'Matrix-Server vorübergehend nicht erreichbar',
+    abgelehnt: 'Vom Matrix-Server abgelehnt',
+    ungewiss: 'Zustellung unklar',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Matrix-Konto eingerichtet',
+    anbindung_angehalten: 'Das Matrix-Konto ist angehalten',
+    anbindung_fehler: 'Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen',
+    zu_gross: 'Anhänge zu groß für den Matrix-Server',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    nicht_zugestellt: 'Nicht zugestellt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
 };
 
 /** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */
 export function ausgangFehlerText(
   code: string | null | undefined,
-  kanal?: KanalArt,
+  kanal: AusgangKanal,
 ): string | null {
   if (!code) return null;
-  if (kanal === 'fax') {
-    const fax = (AUSGANG_FEHLER_TEXT_FAX as Record<string, string | undefined>)[code];
-    if (fax) return fax;
-  }
-  return (AUSGANG_FEHLER_TEXT as Record<string, string>)[code] ?? code;
+  return (AUSGANG_FEHLER_TEXT[kanal] as Record<string, string>)[code] ?? code;
 }
 
-/**
- * Gründe, deren Text der Server je Kanal setzt (Anbindung fehlt oder gestört; Fax zu lang oder
- * Anhänge zu groß): nur er weiß, ob die Mail oder das Fax es auslöste (LLH-2095).
- */
-const SERVER_TEXT_GRUENDE = new Set([
+/** Gründe, die auf ein fehlendes, angehaltenes oder gestörtes Konto des Kanals deuten. */
+export const ANBINDUNG_GRUENDE: ReadonlySet<string> = new Set([
   'anbindung_fehlt',
   'anbindung_angehalten',
   'anbindung_fehler',
-  'zu_gross',
 ]);
 
 /**
- * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
- * Servertextes; alles andere bleibt, wie es ist. Bei einer Anbindung und bei „zu groß“ bleibt
- * der Text des Servers, denn nur er weiß, ob Mail oder Fax es auslöste (LLH-2095).
+ * Der Kanal, auf den sich eine 422 mit `anbindung_*` bezieht. Er folgt den gesendeten Adressen:
+ * nur ein Kanal → dieser. Nur im gemischten Fall (oder ohne Angabe) entscheidet der Meldungstext
+ * des Servers („Kein Matrix-Konto eingerichtet“, „Kein Faxzugang eingerichtet“); ohne Hinweis
+ * auf Matrix oder Fax gilt die E-Mail.
  */
-export function versandFehler(fehler: unknown): unknown {
+export function anbindungKanal(fehler: unknown, gesendet?: readonly KanalArt[]): AusgangKanal {
+  const arten = new Set((gesendet ?? []).map(ausgangKanal));
+  if (arten.size === 1) return [...arten][0];
+  if (!(fehler instanceof ApiError)) return 'email';
+  if (/Matrix/.test(fehler.message)) return 'matrix';
+  if (/Fax/.test(fehler.message)) return 'fax';
+  return 'email';
+}
+
+/**
+ * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
+ * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist. Der Kanal
+ * einer `anbindung_*` folgt den gesendeten Adressen (`anbindungKanal`), sonst gilt die E-Mail.
+ * Bei „zu groß“ bleibt der Text des Servers, denn nur er weiß, ob Mail oder Fax es auslöste
+ * (LLH-2095).
+ */
+export function versandFehler(fehler: unknown, gesendet?: readonly KanalArt[]): unknown {
   if (
     fehler instanceof ApiError &&
-    fehler.grund &&
-    SERVER_TEXT_GRUENDE.has(fehler.grund) &&
+    fehler.grund === 'zu_gross' &&
     fehler.vomAnwendungsserver &&
     fehler.message
   ) {
     return fehler;
   }
-  if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT) {
-    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[fehler.grund as AusgangFehler], {
+  if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT.email) {
+    const kanal = ANBINDUNG_GRUENDE.has(fehler.grund) ? anbindungKanal(fehler, gesendet) : 'email';
+    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[kanal][fehler.grund as AusgangFehler], {
       grund: fehler.grund,
       vomAnwendungsserver: fehler.vomAnwendungsserver,
     });

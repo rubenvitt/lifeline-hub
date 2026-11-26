@@ -219,13 +219,13 @@ Ein Befehl ohne jeden Text lässt sich nicht freigeben; die Rückfrage meldet da
 leer und kann nicht freigegeben werden“. Die Fassung steht als „v1“, „v2“ … an der Karte; eine
 Fortschreibung trägt denselben Titel wie ihr Vorgänger.
 
-### Einen Einsatzbefehl per E-Mail senden
+### Einen Einsatzbefehl per E-Mail oder Matrix senden
 
 Für Einsatzleitung und Führungspersonal, mit freigegebenem Befehl:
 
 1. Den Befehl in der Ansicht „Freigegeben“ öffnen und „Senden“ wählen.
-2. Im Dialog „Senden“ unter „An“ die Stellen ankreuzen; vorbelegt sind die externen Stellen des
-   Verteilers mit Mailadresse.
+2. Im Dialog „Senden“ unter „An“ die Adressen ankreuzen; vorbelegt ist je externer Stelle des
+   Verteilers eine Adresse, ihr erster Matrix-Raum, sonst ihre erste Mailadresse.
 3. „Senden“ wählen. Unter dem Befehlstext zeigt der Abschnitt „Versand“ je Adresse „wartet“,
    „übergeben 14:32“ oder „fehlgeschlagen: …“; dort steht auch „Erneut senden“.
 
@@ -334,12 +334,12 @@ Verteiler steht. Entwurf und Bearbeiten melden nichts. Eine Fortschreibung melde
 ihrer eigenen Freigabe, dann erneut an alle Funktionen in ihrem Verteiler; jede Freigabe meldet
 sich genau einmal.
 
-### Versand per E-Mail
+### Versand per E-Mail und Matrix
 
 Der Versand eines Befehls verhält sich wie der eines Lageberichts: nur die jüngste freigegebene
 Fassung, höchstens 30 Minuten Wiederholung bei Störungen, „Zustellung unklar“ ohne Wiederholung
 von selbst, jedes Ergebnis im ETB. Einzelheiten stehen im Kapitel
-[Lageberichte](lageberichte.md), „Versand per E-Mail“. Ein Einzelauftrag wird nicht gesendet.
+[Lageberichte](lageberichte.md), „Versand per E-Mail und Matrix“. Ein Einzelauftrag wird nicht gesendet.
 
 ### Verteiler
 

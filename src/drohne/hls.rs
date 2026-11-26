@@ -22,6 +22,7 @@ const PLAETZE: &[Platz] = &[Platz {
     name: "passwort",
     bezeichnung: "Passwort",
     pflicht: false,
+    intern: false,
 }];
 
 const FELDER: &[Feld] = &[
@@ -350,7 +351,7 @@ mod tests {
 
     #[test]
     fn verzeichnis_enthaelt_hls_adresse() {
-        let v = Verzeichnis::produktiv(Arc::new(Store::new()));
+        let v = Verzeichnis::produktiv(Arc::new(Store::new()), Default::default());
         assert!(v.find("hls_adresse").is_some());
     }
 

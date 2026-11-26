@@ -73,12 +73,15 @@ fn mit_grund(fehler: AusgangFehler, meldung: &str) -> AppError {
     }
 }
 
-/// Text der Ablehnung, wenn die Anbindung eines Kanals fehlt oder nicht nutzbar ist.
-fn anbindung_meldung(kanal: KanalArt, fehler: AusgangFehler) -> &'static str {
+/// Die Meldung bei 422, wenn die Anbindung eines Kanals fehlt, angehalten oder nicht nutzbar ist.
+fn meldung_anbindung(kanal: KanalArt, fehler: AusgangFehler) -> &'static str {
     match (kanal, fehler) {
         (KanalArt::Fax, AusgangFehler::AnbindungFehlt) => "Kein Faxzugang eingerichtet",
         (KanalArt::Fax, AusgangFehler::AnbindungAngehalten) => "Der Faxzugang ist angehalten",
         (KanalArt::Fax, _) => "Der Faxzugang ist nicht nutzbar; Einstellungen prüfen",
+        (KanalArt::Matrix, AusgangFehler::AnbindungFehlt) => "Kein Matrix-Konto eingerichtet",
+        (KanalArt::Matrix, AusgangFehler::AnbindungAngehalten) => "Das Matrix-Konto ist angehalten",
+        (KanalArt::Matrix, _) => "Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen",
         (_, AusgangFehler::AnbindungFehlt) => "Kein Mailserver eingerichtet",
         (_, AusgangFehler::AnbindungAngehalten) => "Der Mailserver ist angehalten",
         _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
@@ -323,6 +326,7 @@ async fn anlegen(
                     stelle.bezeichnung
                 )));
             }
+            // Threema nimmt noch kein Versand an, auch wenn die Tabelle es kennt.
             if !kanal.channel.is_freigeschaltet() {
                 return Err(AppError::UnprocessableEntity(
                     "Dieser Kanal wird noch nicht unterstützt".into(),
@@ -332,21 +336,22 @@ async fn anlegen(
         }
     }
 
-    // Je Kanal eine nicht angehaltene Anbindung der Org (sonst 422 mit Code). Nur Zustand, kein
-    // Entschlüsseln: das Geheimnis liest allein der Lauf.
-    let mut kanaele: Vec<KanalArt> = adressen.iter().map(|(_, k, _)| k.channel).collect();
-    kanaele.sort_by_key(|k| k.as_str());
-    kanaele.dedup();
-    for kanal in &kanaele {
+    // Je Kanal der Empfänger eine nicht angehaltene Anbindung der Org (sonst 422 mit Code);
+    // gemischte Empfänger brauchen beide. Nur Zustand, kein Entschlüsseln: das Geheimnis liest
+    // allein der Lauf.
+    for kanal in KanalArt::ALLE {
+        if !adressen.iter().any(|(_, k, _)| k.channel == kanal) {
+            continue;
+        }
         if let Err(fehler) = crate::adapter::lauf::pruefe_versand_moeglich(
             &state.pool,
             &state.adapter,
             einsatz.org_id,
-            *kanal,
+            kanal,
         )
         .await?
         {
-            return Err(mit_grund(fehler, anbindung_meldung(*kanal, fehler)));
+            return Err(mit_grund(fehler, meldung_anbindung(kanal, fehler)));
         }
     }
 

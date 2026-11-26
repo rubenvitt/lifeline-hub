@@ -2,8 +2,8 @@
 //! Abschnitte 2, 3, 4 und 6): fällige Versände zustellen, Ergebnis und ETB in einer Transaktion,
 //! Wiederholung, überholte Quellen, Spiegel, angehaltene Anbindung, Neustart, keine Geheimnisse.
 //!
-//! Zugestellt wird über ein Skript (`Skript`), das die Ergebnisse vorgibt und mitschreibt, was es
-//! zustellen sollte. Die Versände legt der Test direkt in `ausgang` an (die Routen kommen
+//! Zugestellt wird über den echten `SmtpZusteller` mit einem Skript als SMTP-Transport (`Skript`),
+//! das die Ergebnisse vorgibt und mitschreibt, was es zustellen sollte. Die Versände legt der Test direkt in `ausgang` an (die Routen kommen
 //! später); Anbindung, Passwort, Lagebericht und Anlage entstehen über die echten Routen.
 
 use std::collections::VecDeque;
@@ -16,8 +16,11 @@ use futures::future::BoxFuture;
 use lifeline_hub::adapter::sipgate::{FaxStatus, SipgateFehler};
 use lifeline_hub::adapter::smtp::SmtpFehler;
 use lifeline_hub::adapter::Rahmen;
-use lifeline_hub::ausgang::lauf::{self, Versandzugang, Zusteller};
-use lifeline_hub::ausgang::zusteller::{AufzeichnenderFaxZusteller, Zustellwege};
+use lifeline_hub::ausgang::lauf::{self, SmtpZusteller, Versandzugang, Zusteller};
+use lifeline_hub::ausgang::lauf::{Fehlschlag, Versandauftrag, Zustellfehler, Zustellt};
+use lifeline_hub::ausgang::zusteller::{
+    AufzeichnenderFaxZusteller, AufzeichnenderZusteller, SmtpTransport, Zustellerwahl, Zustellwege,
+};
 use lifeline_hub::ausgang::{AusgangFehler, VersandZeile, VersandZustand};
 use lifeline_hub::live::LiveHub;
 use serde_json::json;
@@ -31,7 +34,7 @@ const ADRESSE: &str = "lagedienst@leitstelle.example";
 const STELLE: &str = "Leitstelle Nord";
 const FAXNUMMER: &str = "+49511123456";
 
-/// Ein Zusteller, der vorgegebene Ergebnisse abspielt (leer heißt angenommen) und mitschreibt.
+/// Ein SMTP-Transport, der vorgegebene Ergebnisse abspielt (leer heißt angenommen) und mitschreibt.
 #[derive(Default)]
 struct Skript {
     ergebnisse: Mutex<VecDeque<Result<(), SmtpFehler>>>,
@@ -55,8 +58,8 @@ impl Skript {
     }
 }
 
-impl Zusteller for Skript {
-    fn zustellen<'a>(
+impl SmtpTransport for Skript {
+    fn senden<'a>(
         &'a self,
         zugang: &'a Versandzugang,
         von: &'a str,
@@ -91,6 +94,8 @@ struct Welt {
     adapter_id: String,
     fax_adapter_id: String,
     skript: Arc<Skript>,
+    /// Was der Matrix-Zweig der Weiche angenommen hat (ohne Netz).
+    matrix: Arc<AufzeichnenderZusteller>,
     fax: Arc<AufzeichnenderFaxZusteller>,
     wege: Zustellwege,
 }
@@ -156,9 +161,15 @@ async fn welt() -> Welt {
     assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
 
     let skript = Arc::new(Skript::default());
+    let matrix = Arc::new(AufzeichnenderZusteller::default());
     let fax = Arc::new(AufzeichnenderFaxZusteller::default());
+    // Wie produktiv eine Weiche je Kanal: E-Mail über SMTP, Matrix an ein Doppel ohne Netz (der
+    // echte Matrix-Zusteller: `tests/ausgang_matrix.rs`); das Fax an das Fax-Doppel.
     let wege = Zustellwege {
-        mail: skript.clone(),
+        mail: Arc::new(Zustellerwahl::new(
+            Arc::new(SmtpZusteller::mit_transport(skript.clone())),
+            matrix.clone(),
+        )),
         fax: fax.clone(),
     };
     Welt {
@@ -173,12 +184,21 @@ async fn welt() -> Welt {
         adapter_id,
         fax_adapter_id,
         skript,
+        matrix,
         fax,
         wege,
     }
 }
 
 impl Welt {
+    /// Die Wege des Laufs mit einem eigenen Zusteller für E-Mail und Matrix; Faxe an das Doppel.
+    fn wege_mit(&self, mail: Arc<dyn Zusteller>) -> Zustellwege {
+        Zustellwege {
+            mail,
+            fax: self.fax.clone(),
+        }
+    }
+
     fn lb(&self, rest: &str) -> String {
         format!("/api/incidents/{}/situation-reports{rest}", self.einsatz)
     }
@@ -314,6 +334,41 @@ impl Welt {
         .fetch_all(&self.pool)
         .await
         .unwrap()
+    }
+
+    /// Legt die Matrix-Anbindung der Org an, mit Access-Token (ohne Netz).
+    async fn matrix_anbindung(&self) {
+        let body = json!({
+            "art": "matrix", "name": "Matrix",
+            "einstellungen": { "homeserver": "https://matrix.example.org" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        let (s, v) = anfrage_json(
+            &self.app,
+            "PUT",
+            &format!("/api/admin/adapter/{id}/secrets/access_token"),
+            &self.admin,
+            Some(&json!({ "wert": "syt_geheimes_token" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+
+    async fn teile(&self, id: &str) -> Vec<(i64, String)> {
+        sqlx::query_as("SELECT teil, event_id FROM ausgang_teil WHERE versand_id = ? ORDER BY teil")
+            .bind(id)
+            .fetch_all(&self.pool)
+            .await
+            .unwrap()
     }
 
     async fn etb_anzahl(&self) -> i64 {
@@ -742,8 +797,8 @@ struct Sperre {
     frei: tokio::sync::Semaphore,
 }
 
-impl Zusteller for Sperre {
-    fn zustellen<'a>(
+impl SmtpTransport for Sperre {
+    fn senden<'a>(
         &'a self,
         zugang: &'a Versandzugang,
         von: &'a str,
@@ -753,7 +808,7 @@ impl Zusteller for Sperre {
         Box::pin(async move {
             self.begonnen.notify_one();
             self.frei.acquire().await.unwrap().forget();
-            self.skript.zustellen(zugang, von, an, mail).await
+            self.skript.senden(zugang, von, an, mail).await
         })
     }
 }
@@ -816,7 +871,7 @@ async fn zwei_gleichzeitige_laeufe_derselben_zeile_stellen_einmal_zu() {
         frei: tokio::sync::Semaphore::new(0),
     });
     let gesperrt = Zustellwege {
-        mail: sperre.clone(),
+        mail: Arc::new(SmtpZusteller::mit_transport(sperre.clone())),
         fax: w.fax.clone(),
     };
 
@@ -919,7 +974,7 @@ async fn spiegel_waehrend_der_zustellung_bleibt_uebergeben_ohne_etb() {
         frei: tokio::sync::Semaphore::new(0),
     });
     let gesperrt = Zustellwege {
-        mail: sperre.clone(),
+        mail: Arc::new(SmtpZusteller::mit_transport(sperre.clone())),
         fax: w.fax.clone(),
     };
     let lauf_a = {
@@ -1033,6 +1088,238 @@ async fn lauf_prueft_die_echten_bytes_der_anlagen() {
     assert!(w.skript.gesehen().is_empty());
 }
 
+/// Ein Zusteller, der vorgegebene Antworten abspielt (leer heißt zugestellt ohne Teile) und
+/// sich merkt, welche Teile ihm als schon gesendet genannt wurden.
+#[derive(Default)]
+struct TeilDoppel {
+    antworten: Mutex<VecDeque<Result<Zustellt, Fehlschlag>>>,
+    gesendet: Mutex<Vec<Vec<i64>>>,
+}
+
+impl Zusteller for TeilDoppel {
+    fn zustellen<'a>(
+        &'a self,
+        auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            self.gesendet
+                .lock()
+                .unwrap()
+                .push(auftrag.gesendet.to_vec());
+            self.antworten
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or_else(|| Ok(Zustellt::default()))
+        })
+    }
+}
+
+fn teile(paare: &[(i64, &str)]) -> Vec<(i64, String)> {
+    paare.iter().map(|(n, e)| (*n, e.to_string())).collect()
+}
+
+#[tokio::test]
+async fn teile_werden_mit_dem_ergebnis_gespeichert() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(0, "$text"), (1, "$anlage")]),
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text"), (1, "$anlage")]));
+    let liste = lifeline_hub::ausgang::repo::list_teile(&w.pool, &id)
+        .await
+        .unwrap();
+    assert_eq!(liste, [0, 1]);
+    assert_eq!(doppel.gesendet.lock().unwrap().clone(), [Vec::<i64>::new()]);
+}
+
+#[tokio::test]
+async fn gemerkte_teile_gehen_dem_naechsten_versuch_mit() {
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w.versand("lagebericht", lid, t0).await;
+    let doppel = Arc::new(TeilDoppel::default());
+    // Der Text ging hinaus, die Anlage scheiterte vorübergehend.
+    doppel.antworten.lock().unwrap().push_back(Err(Fehlschlag {
+        fehler: Zustellfehler::Voruebergehend { nicht_vor: None },
+        grund: "Homeserver nicht erreichbar".into(),
+        smtp_status: None,
+        teile: teile(&[(0, "$text")]),
+    }));
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(1, "$anlage")]),
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Wartet);
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text")]));
+
+    let spaeter = t0 + chrono::Duration::minutes(5);
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, spaeter)
+        .await
+        .unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(
+        doppel.gesendet.lock().unwrap().clone(),
+        [Vec::<i64>::new(), vec![0]]
+    );
+    assert_eq!(w.teile(&id).await, teile(&[(0, "$text"), (1, "$anlage")]));
+}
+
+#[tokio::test]
+async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+
+    w.durchgang(t0).await;
+
+    assert!(w.skript.gesehen().is_empty(), "Matrix ging an SMTP");
+    let angenommen = w.matrix.angenommen();
+    assert_eq!(angenommen.len(), 1, "{angenommen:?}");
+    assert_eq!(angenommen[0].adresse, "#lage:example.org");
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Uebergeben);
+    let text: String = sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert!(text.contains("per Matrix an"), "{text}");
+}
+
+/// Ein Zusteller, der mit einem festen Fehlschlag scheitert.
+struct Scheitert(Zustellfehler, &'static str);
+
+impl Zusteller for Scheitert {
+    fn zustellen<'a>(
+        &'a self,
+        _auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            Err(Fehlschlag {
+                fehler: self.0.clone(),
+                grund: self.1.into(),
+                smtp_status: None,
+                teile: Vec::new(),
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn kein_zutritt_und_verschluesselung_sind_endgueltig_mit_eigenem_code() {
+    for (fehler, grund, code) in [
+        (
+            Zustellfehler::KeinZutritt,
+            "kein Zutritt zum Raum (M_FORBIDDEN)",
+            AusgangFehler::KeinZutritt,
+        ),
+        (
+            Zustellfehler::Verschluesselung,
+            "Verschlüsseln nicht möglich",
+            AusgangFehler::Verschluesselung,
+        ),
+    ] {
+        let w = welt().await;
+        w.matrix_anbindung().await;
+        let lid = w.lagebericht_freigeben(false).await;
+        let t0 = Utc::now();
+        let id = w
+            .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+            .await;
+        let zusteller = w.wege_mit(Arc::new(Scheitert(fehler, grund)));
+
+        lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+            .await
+            .unwrap();
+
+        let z = w.zeile(&id).await;
+        assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+        assert_eq!(z.fehler_art, Some(code));
+        let text: String = sqlx::query_scalar(
+            "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+        )
+        .bind(w.einsatz)
+        .fetch_one(&w.pool)
+        .await
+        .unwrap();
+        assert!(
+            text.ends_with(&format!("nicht zugestellt: {grund}")),
+            "{text}"
+        );
+    }
+}
+
+/// Ein Zusteller, der den Versand während der Zustellung verschwinden lässt (Einsatz gelöscht,
+/// Kaskade) und gesendete Teile meldet.
+struct LoeschtDieZeile(sqlx::SqlitePool);
+
+impl Zusteller for LoeschtDieZeile {
+    fn zustellen<'a>(
+        &'a self,
+        auftrag: &'a Versandauftrag<'a>,
+    ) -> BoxFuture<'a, Result<Zustellt, Fehlschlag>> {
+        Box::pin(async move {
+            sqlx::query("DELETE FROM ausgang WHERE id = ?")
+                .bind(auftrag.versand_id)
+                .execute(&self.0)
+                .await
+                .unwrap();
+            Ok(Zustellt {
+                teile: teile(&[(0, "$text")]),
+            })
+        })
+    }
+}
+
+#[tokio::test]
+async fn geloeschter_versand_nimmt_seine_teile_ohne_fehler_mit() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+    let zeile = w.zeile(&id).await;
+    let zusteller = w.wege_mit(Arc::new(LoeschtDieZeile(w.pool.clone())));
+    let vorher = w.etb_anzahl().await;
+
+    lauf::zustellen_zeile(&w.pool, &w.rahmen, &w.live, &zusteller, zeile, t0)
+        .await
+        .expect("ein verschwundener Versand ist kein Fehler");
+
+    assert!(w.teile(&id).await.is_empty());
+    assert_eq!(
+        w.etb_anzahl().await,
+        vorher,
+        "kein ETB-Eintrag für einen gelöschten Versand"
+    );
+}
+
 /// Ersetzt die Bytes der jüngsten PNG-Anlage durch ein PNG, das die Bereinigung durchlässt, das
 /// aber kein Bild ergibt (IDAT ohne gültige Daten).
 async fn anlage_unlesbar_machen(w: &Welt) {
@@ -1142,6 +1429,31 @@ async fn fax_402_ist_anbindung_fehler_mit_etb() {
              Guthaben bei sipgate aufgebraucht"
         )
     );
+}
+
+#[tokio::test]
+async fn matrix_zeile_ohne_matrix_anbindung_ist_anbindung_fehlt() {
+    // Der Mailserver ist da; er zählt für Matrix nicht.
+    let w = welt().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+
+    w.durchgang(t0).await;
+
+    assert!(w.skript.gesehen().is_empty());
+    let z = w.zeile(&id).await;
+    assert_eq!(z.fehler_art, Some(AusgangFehler::AnbindungFehlt));
+    let text: String = sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap();
+    assert!(text.contains("kein Matrix-Konto eingerichtet"), "{text}");
 }
 
 #[tokio::test]

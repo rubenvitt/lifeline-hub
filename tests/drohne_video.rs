@@ -42,7 +42,7 @@ async fn umgebung_mit(mit_schluessel: bool) -> Umgebung {
         use lifeline_hub::adapter::geheimnis::{GeheimnisSchluessel, Geheimnisspeicher};
         state.adapter = lifeline_hub::adapter::Rahmen::new(
             Geheimnisspeicher::new(Some(GeheimnisSchluessel::generate())),
-            Verzeichnis::produktiv(state.drohne.clone()),
+            Verzeichnis::produktiv(state.drohne.clone(), Default::default()),
         );
     }
     let drohne = state.drohne.clone();

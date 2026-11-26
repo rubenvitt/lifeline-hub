@@ -9,7 +9,12 @@ import type { ExterneStelle, KanalArt } from '../api/types';
 
 /** Höchstlänge einer Adresse, wie der Server sie prüft (RFC 5321). */
 const ADRESSE_MAX = 254;
+/** Höchstlänge einer Matrix-Adresse in Bytes, wie der Server sie prüft (Spec 2). */
+const MATRIX_MAX = 255;
 const BESCHRIFTUNG_MAX = 100;
+
+/** Kanäle, die eine Stelle heute bekommt (Server: `KanalArt::is_freigeschaltet`). */
+type Art = 'email' | 'fax' | 'matrix';
 
 /**
  * Grobe Formprüfung vor dem Senden: genau ein „@“, kein Leerzeichen, kein Komma, beidseitig
@@ -40,18 +45,44 @@ export function istFaxnummerGueltig(roh: string): boolean {
   return /^[1-9][0-9]{7,14}$/.test(ziffern);
 }
 
-const KANAL_TEXT: Record<'email' | 'fax', { name: string; adresse: string }> = {
+/**
+ * Grobe Formprüfung einer Matrix-Adresse: Raum-ID (`!…:server`) oder Alias (`#…:server`), kein
+ * Leerraum, beidseitig des Doppelpunkts etwas. Ein `matrix.to`-Link geht nicht durch: der Server
+ * packt ihn nicht aus und lehnt ihn ab. Die Antwort des Servers (ruma-Parser) ist maßgeblich.
+ */
+export function istMatrixFormGueltig(adresse: string): boolean {
+  const a = adresse.trim();
+  if (a.length === 0 || new TextEncoder().encode(a).length > MATRIX_MAX) return false;
+  return /^[!#][^\s:]+:\S+$/.test(a);
+}
+
+/**
+ * Meldung zu einer ungültigen Matrix-Eingabe; Nutzer-ID und `matrix.to`-Link bekommen den Text
+ * des Servers (`externe_stelle::kanal::normalize_matrix`).
+ */
+function matrixFormFehler(adresse: string): string {
+  const a = adresse.trim();
+  if (a.startsWith('@')) return 'Nutzer-IDs gehen noch nicht, bitte den Raum eintragen';
+  if (/^https?:\/\/matrix\.to\//i.test(a)) {
+    return 'matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen';
+  }
+  return 'Matrix-Raum ungültig';
+}
+
+const KANAL_TEXT: Record<Art, { name: string; adresse: string }> = {
   email: { name: 'E-Mail', adresse: 'Mailadresse' },
   fax: { name: 'Fax', adresse: 'Faxnummer' },
+  matrix: { name: 'Matrix', adresse: 'Matrix-Raum' },
 };
 
+/** Wie eine Adresse heißt (Knopf „… entfernen“); Threema spricht wie die E-Mail. */
 function adressName(kanal: KanalArt): string {
-  return kanal === 'fax' ? KANAL_TEXT.fax.adresse : KANAL_TEXT.email.adresse;
+  return kanal === 'threema' ? KANAL_TEXT.email.adresse : KANAL_TEXT[kanal].adresse;
 }
 
 /**
  * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093, Fax
- * LLH-2095): die Mailadressen und Faxnummern der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
+ * LLH-2095, Matrix LLH-2094): die Mailadressen, Faxnummern und Matrix-Räume der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
  * Eingaben hier stehen außerhalb seines `Form` (kein Feld, Enter fügt die Adresse hinzu, statt
  * das Modal abzusenden). Eine Stelle vom Hub ist nur lesbar, ihre Adressen kommen mit.
  */
@@ -62,7 +93,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
   const herkunft = useStammdatenHerkunft();
   const ohneNetz = useOhneVerbindung();
   const fehlerId = useId();
-  const [kanal, setKanal] = useState<'email' | 'fax'>('email');
+  const [kanal, setKanal] = useState<Art>('email');
   const [adresse, setAdresse] = useState('');
   const [beschriftung, setBeschriftung] = useState('');
   const [formFehler, setFormFehler] = useState<string | null>(null);
@@ -75,6 +106,10 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
     }
     if (kanal === 'fax' && !istFaxnummerGueltig(adresse)) {
       setFormFehler('Keine gültige Faxnummer');
+      return;
+    }
+    if (kanal === 'matrix' && !istMatrixFormGueltig(adresse)) {
+      setFormFehler(matrixFormFehler(adresse));
       return;
     }
     setFormFehler(null);
@@ -107,7 +142,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
             <li key={k.id}>
               <Stapel richtung="zeile" abstand="sm" ausrichten="baseline" umbruch>
                 <Textstufe stufe="textKlein" ton="gedaempft">
-                  {k.channel === 'fax' ? KANAL_TEXT.fax.name : KANAL_TEXT.email.name}
+                  {k.channel === 'threema' ? 'Threema' : KANAL_TEXT[k.channel].name}
                 </Textstufe>
                 <span data-schrift="kennung">{k.address}</span>
                 {k.label && (
@@ -136,7 +171,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
           </Textstufe>
         ) : (
           <Stapel abstand="xs">
-            <SegmentFeld<'email' | 'fax'>
+            <SegmentFeld<Art>
               beschriftung="Kanal der neuen Adresse"
               value={kanal}
               onChange={(w) => {
@@ -146,6 +181,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
               optionen={[
                 { wert: 'email', label: KANAL_TEXT.email.name },
                 { wert: 'fax', label: KANAL_TEXT.fax.name },
+                { wert: 'matrix', label: KANAL_TEXT.matrix.name },
               ]}
             />
             <Stapel richtung="zeile" abstand="sm" umbruch>
@@ -154,9 +190,15 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 aria-invalid={formFehler ? true : undefined}
                 aria-describedby={formFehler ? fehlerId : undefined}
                 type="text"
-                inputMode={kanal === 'fax' ? 'tel' : 'email'}
-                placeholder={kanal === 'fax' ? '0511 123456' : 'leitstelle@beispiel.de'}
-                maxLength={ADRESSE_MAX}
+                inputMode={kanal === 'fax' ? 'tel' : kanal === 'matrix' ? 'text' : 'email'}
+                placeholder={
+                  kanal === 'fax'
+                    ? '0511 123456'
+                    : kanal === 'matrix'
+                      ? '#lageraum:beispiel.de'
+                      : 'leitstelle@beispiel.de'
+                }
+                maxLength={kanal === 'matrix' ? MATRIX_MAX : ADRESSE_MAX}
                 value={adresse}
                 onChange={(e) => {
                   setAdresse(e.target.value);

@@ -230,7 +230,7 @@ Ein Mini-PC oder Notebook im ELW kann verloren gehen. Die Datenbank liegt im Kla
 Platte, mit allen Einsatzdaten und den Anhängen als BLOBs. Der Rechner, auf dem der Server
 läuft, **muss** deshalb einen verschlüsselten Datenträger haben:
 
-- **Linux:** LUKS2 für das Datenverzeichnis (`--db-path`, Sicherungen, Karten) **und** für den
+- **Linux:** LUKS2 für das Datenverzeichnis (`--db-path`, Sicherungen, Karten, `matrix/`) **und** für den
   Swap. Mit TPM-Entsperrung (`systemd-cryptenroll --tpm2-device=auto`) startet der Rechner ohne
   Eingabe, eine ausgebaute Platte bleibt trotzdem unlesbar.
 - **Windows:** BitLocker. Windows Home hat kein BitLocker, nur die „Geräteverschlüsselung“ auf

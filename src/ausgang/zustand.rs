@@ -35,7 +35,8 @@ wire_enum! {
 wire_enum! {
     /// Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des
     /// Ziels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter
-    /// meldet, dass das Fax nicht durchging (LLH-2095).
+    /// meldet, dass das Fax nicht durchging (LLH-2095). `kein_zutritt` und `verschluesselung`
+    /// kommen nur aus der Zustellung per Matrix (LLH-2094).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum AusgangFehler {
         Voruebergehend => "voruebergehend",
@@ -48,6 +49,8 @@ wire_enum! {
         ZuGross => "zu_gross",
         Spiegel => "spiegel",
         NichtZugestellt => "nicht_zugestellt",
+        KeinZutritt => "kein_zutritt",
+        Verschluesselung => "verschluesselung",
     }
     try_from = |s| format!("Ungültiger Fehler eines Versands: {s}");
     sqlx = |s| format!("Ungültiger Fehler eines Versands: {s}");

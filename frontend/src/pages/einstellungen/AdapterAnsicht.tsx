@@ -14,6 +14,7 @@ import {
   PaneelZeile,
   Stapel,
   Status,
+  Textstufe,
   monoStil,
   useRollen,
   type BearbeitbaresFeld,
@@ -49,6 +50,7 @@ import { globalKeys } from '../../api/queryKeys';
 import type { AdapterAnzeige, AdapterArtAnzeige, AdapterPruefErgebnis } from '../../api/types';
 import { ANBINDUNGEN_ABRUF_MS, anbindungenPath } from './anbindungAnzeige';
 import {
+  MATRIX_VERIFIZIERUNG_HINWEIS,
   adapterZustandAnzeige,
   einstellungenVon,
   einstellungenVonAdapter,
@@ -64,6 +66,9 @@ import SchnappschussHinweis from '../../stammdaten/SchnappschussHinweis';
 
 /** Art „Stammdaten-Abruf“ (LLH-1194): legt Schnappschüsse zum Prüfen an. */
 const STAMMDATEN_ABRUF = 'stammdaten_abruf';
+
+/** Art „Matrix“ (LLH-2094): Konto des Ausgangs; trägt den Hinweis zur Verifizierung. */
+const MATRIX = 'matrix';
 
 /** Formularwerte: Name, Intervall und je Einstellungsfeld `e_<name>` (flach für das Paneel). */
 type Werte = Record<string, unknown> & { name: string; intervall_s: number };
@@ -398,6 +403,15 @@ export default function AdapterAnsicht() {
       )}
       <Stapel abstand="md">
         {istAbruf && <SchnappschussHinweis adapterId={adapter.id} />}
+        {adapter.art === MATRIX && (
+          <Paneel titel="Verifizierung" koerperPolster>
+            <span data-lfh="adapter-matrix-verifizierung">
+              <Textstufe stufe="textKlein" ton="gedaempft">
+                {MATRIX_VERIFIZIERUNG_HINWEIS}
+              </Textstufe>
+            </span>
+          </Paneel>
+        )}
         <Paneel
           titel="Zustand"
           fuss={

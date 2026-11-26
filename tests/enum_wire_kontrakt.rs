@@ -388,6 +388,8 @@ fn serde_wire_gleich_as_str() {
         ZuGross,
         Spiegel,
         NichtZugestellt,
+        KeinZutritt,
+        Verschluesselung,
     });
     enum_wire_as_str!(lifeline_hub::externe_stelle::KanalArt {
         Email,
@@ -849,6 +851,7 @@ fn serde_wire_gleich_as_str() {
         EinstellungUngueltig => "einstellung_ungueltig",
         VersionUnbekannt => "version_unbekannt",
         Intern => "intern",
+        SchluesselPassenNicht => "schluessel_passen_nicht",
     });
     enum_wire!(lifeline_hub::adapter::zustand::AdapterZustand {
         Wartet => "wartet",

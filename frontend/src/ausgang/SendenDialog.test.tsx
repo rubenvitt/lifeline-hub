@@ -11,22 +11,18 @@ const kanal = (
   id: number,
   stelle: string,
   adresse: string,
-  art: 'email' | 'fax' = 'email',
+  art: 'email' | 'fax' | 'matrix' = 'email',
+  stelleId = id,
 ): KanalMitStelle => ({
-  agency_id: id,
+  agency_id: stelleId,
   agency_name: stelle,
-  channel: { id, externe_stelle_id: id, channel: art, address: adresse },
+  channel: { id, externe_stelle_id: stelleId, channel: art, address: adresse },
 });
 
 const KANAELE = [kanal(11, 'ILS Nord', 'ils@example.org'), kanal(12, 'THW OV', 'thw@example.org')];
 
 function kanaele(liste: KanalMitStelle[]) {
-  server.use(
-    http.get('/api/external-agencies/channels', ({ request }) => {
-      const art = new URL(request.url).searchParams.get('channel');
-      return HttpResponse.json(liste.filter((k) => k.channel.channel === art));
-    }),
-  );
+  server.use(http.get('/api/external-agencies/channels', () => HttpResponse.json(liste)));
 }
 
 function zeige(over: Partial<React.ComponentProps<typeof SendenDialog>> = {}) {
@@ -71,10 +67,7 @@ describe('SendenDialog (LLH-2093)', () => {
     kanaele(KANAELE);
     server.use(
       http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
-        HttpResponse.json(
-          { error: 'Kein Mailserver eingerichtet', grund: 'anbindung_fehlt' },
-          { status: 422 },
-        ),
+        HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
       ),
     );
     zeige();
@@ -83,7 +76,7 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(await screen.findByText('Kein Mailserver eingerichtet')).toBeInTheDocument();
   });
 
-  it('sperrt ohne Mailadresse mit sichtbarem Grund', async () => {
+  it('sperrt ohne Adresse mit sichtbarem Grund', async () => {
     kanaele([]);
     zeige();
     expect(await screen.findByText('Keine Adresse hinterlegt')).toBeInTheDocument();
@@ -114,7 +107,121 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(screen.getByRole('button', { name: 'Senden' })).toBeDisabled();
   });
 
-  it('zeigt Mail und Fax getrennt und sendet an eine Faxnummer', async () => {
+  it('sammlung_zeigt_kanal_zeichen_je_adresse', async () => {
+    let abgerufen = '';
+    server.use(
+      http.get('/api/external-agencies/channels', ({ request }) => {
+        abgerufen = new URL(request.url).search;
+        return HttpResponse.json([
+          kanal(21, 'ILS Nord', 'ils@example.org'),
+          kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix'),
+        ]);
+      }),
+    );
+    zeige({ vorschlagNamen: [] });
+    const mail = await screen.findByRole('checkbox', { name: /ils@example\.org/ });
+    const matrix = screen.getByRole('checkbox', { name: /#lageraum:example\.org/ });
+    // Kanal als kleines Wort vor der Adresse, Sammlung ohne Filter.
+    expect(mail.closest('label')).toHaveTextContent(/^Mail\s*ILS Nord/);
+    expect(matrix.closest('label')).toHaveTextContent(/^Matrix\s*ILS Nord/);
+    expect(abgerufen).toBe('');
+  });
+
+  it('sperrt_nur_matrix_adressen_wenn_kein_matrix_konto', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Matrix-Konto eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    // Vorbelegt: je Stelle eine Adresse, Matrix vor Mail.
+    await waitFor(() => expect(matrix).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).not.toBeChecked();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText(/Kein Matrix-Konto eingerichtet/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
+    // Nur die Matrix-Adresse ist gesperrt und abgewählt; die Mailadresse bleibt wählbar.
+    await waitFor(() => expect(matrix).toBeDisabled());
+    expect(matrix).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeEnabled();
+  });
+  it('sperrt_bei_reinem_matrix_versand_die_matrix_adressen_mit_beliebigem_servertext', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText(/Kein Matrix-Konto eingerichtet/)).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
+    await waitFor(() => expect(matrix).toBeDisabled());
+  });
+
+  it('zieht_im_gemischten_fall_den_servertext_heran_und_sperrt_matrix_nicht', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Mailserver eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('checkbox', { name: /ils@example\.org/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    expect((await screen.findAllByText('Kein Mailserver eingerichtet')).length).toBeGreaterThan(0);
+    expect(matrix).toBeEnabled();
+  });
+
+  it('waehlt_nach_der_matrix_sperre_die_mailadresse_derselben_stelle_nach', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+      kanal(31, 'ILS Nord', 'zweite@example.org', 'email', 21),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json({ error: 'Anbindung fehlt', grund: 'anbindung_fehlt' }, { status: 422 }),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(matrix).toBeDisabled());
+    // Die erste Mailadresse derselben Stelle ersetzt die abgewählte Matrix-Adresse.
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /zweite@example\.org/ })).not.toBeChecked();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeEnabled();
+  });
+
+  it('zeigt Faxnummern mit Kanalzeichen und sendet an eine Faxnummer', async () => {
     kanaele([...KANAELE, kanal(21, 'Kreis', '+49511123456', 'fax')]);
     const bodies: unknown[] = [];
     server.use(
@@ -124,16 +231,16 @@ describe('SendenDialog (LLH-2093)', () => {
       }),
     );
     zeige({ vorschlagNamen: [] });
-    expect(await screen.findByText('E-Mail')).toBeInTheDocument();
-    expect(screen.getByText('Fax')).toBeInTheDocument();
-    await userEvent.click(await screen.findByRole('checkbox', { name: /Kreis · \+49511123456/ }));
+    const fax = await screen.findByRole('checkbox', { name: /Kreis · \+49511123456/ });
+    expect(fax.closest('label')).toHaveTextContent(/^Fax\s*Kreis/);
+    await userEvent.click(fax);
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect((bodies[0] as { recipients: unknown }).recipients).toEqual([{ channel_id: 21 }]);
   });
 
   it('belegt nur Mailadressen vor, nie zusätzlich die Faxnummer derselben Stelle', async () => {
-    kanaele([...KANAELE, kanal(21, 'ILS Nord', '+49511123456', 'fax')]);
+    kanaele([...KANAELE, kanal(21, 'ILS Nord', '+49511123456', 'fax', 11)]);
     zeige();
     await waitFor(() =>
       expect(screen.getByRole('checkbox', { name: /ILS Nord · ils@/ })).toBeChecked(),
@@ -141,7 +248,7 @@ describe('SendenDialog (LLH-2093)', () => {
     expect(screen.getByRole('checkbox', { name: /ILS Nord · \+49/ })).not.toBeChecked();
   });
 
-  it('zeigt den Text des Servers, wenn der Faxzugang fehlt', async () => {
+  it('nennt den fehlenden Faxzugang, wenn nur Faxe gehen', async () => {
     kanaele([kanal(21, 'Kreis', '+49511123456', 'fax')]);
     server.use(
       http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
@@ -155,6 +262,7 @@ describe('SendenDialog (LLH-2093)', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: /Kreis/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText('Kein Faxzugang eingerichtet')).toBeInTheDocument();
+    expect(screen.queryByText('Kein Mailserver eingerichtet')).toBeNull();
   });
 
   it('zeigt bei zu_gross den Text des Servers, der den Kanal nennt', async () => {
@@ -175,17 +283,5 @@ describe('SendenDialog (LLH-2093)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText(/Das Fax hätte 45 Seiten/)).toBeInTheDocument();
     expect(screen.queryByText('Anhänge zu groß für eine Mail')).toBeNull();
-  });
-
-  it('bietet die Mailadressen an, auch wenn die Faxnummern nicht laden', async () => {
-    server.use(
-      http.get('/api/external-agencies/channels', ({ request }) =>
-        new URL(request.url).searchParams.get('channel') === 'fax'
-          ? HttpResponse.json({ error: 'kaputt' }, { status: 500 })
-          : HttpResponse.json(KANAELE),
-      ),
-    );
-    zeige();
-    expect(await screen.findByRole('checkbox', { name: /ILS Nord/ })).toBeInTheDocument();
   });
 });

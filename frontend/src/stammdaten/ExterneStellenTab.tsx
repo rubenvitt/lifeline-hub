@@ -21,7 +21,8 @@ import {
   fetchExterneStellen,
   useKanaeleSammlung,
 } from '../api/externeStellen';
-import type { ExterneStelle, ExterneStelleArt } from '../api/types';
+import type { ExterneStelle, ExterneStelleArt, KanalArt } from '../api/types';
+import { KANAL_REIHENFOLGE, kanalKurz } from '../ausgang/kanalAnzeige';
 import { globalKeys } from '../api/queryKeys';
 import { STAMMDATEN_RECHTE_TEXT } from './rechteText';
 import ExterneStelleFormModal from './ExterneStelleFormModal';
@@ -47,16 +48,19 @@ export default function ExterneStellenTab() {
     queryKey: globalKeys.externeStellenListe('alle'),
     queryFn: () => fetchExterneStellen('alle'),
   });
-  // Adressen je Stelle für den Hinweis in der Liste (LLH-2093, Fax LLH-2095); nur aktive Stellen.
-  const mailQuery = useKanaeleSammlung('email');
-  const faxQuery = useKanaeleSammlung('fax');
-  const zaehle = (liste: readonly { agency_id: number }[] | undefined) => {
-    const m = new Map<number, number>();
-    for (const k of liste ?? []) m.set(k.agency_id, (m.get(k.agency_id) ?? 0) + 1);
-    return m;
-  };
-  const mailAnzahl = zaehle(mailQuery.data);
-  const faxAnzahl = zaehle(faxQuery.data);
+  // Adressen je Stelle und Kanal für den Hinweis in der Liste (LLH-2093, Fax LLH-2095, Matrix LLH-2094); nur aktive Stellen.
+  const kanaeleQuery = useKanaeleSammlung();
+  const anzahlJeKanal = new Map<KanalArt, Map<number, number>>();
+  for (const k of kanaeleQuery.data ?? []) {
+    const zaehler = anzahlJeKanal.get(k.channel.channel) ?? new Map<number, number>();
+    zaehler.set(k.agency_id, (zaehler.get(k.agency_id) ?? 0) + 1);
+    anzahlJeKanal.set(k.channel.channel, zaehler);
+  }
+  /** „2 Mail, 1 Matrix, 1 Fax“, je Kanal ein Posten; leer, wenn die Stelle keine Adresse hat. */
+  const adressenText = (id: number) =>
+    KANAL_REIHENFOLGE.filter((art) => anzahlJeKanal.get(art)?.has(id))
+      .map((art) => `${anzahlJeKanal.get(art)?.get(id)} ${kanalKurz(art)}`)
+      .join(', ');
   // Kommt die zuständige Leitstelle vom Hub, folgt die Markierung dem Hub (kjezbk06, D4).
   const zustaendigVomHub = (stellenQuery.data ?? []).some(
     (s) => s.zustaendig && herkunft.istVomHub('externe_stelle', s.id),
@@ -117,21 +121,11 @@ export default function ExterneStellenTab() {
               <Status groesse="klein" ton="normal" wort="zuständig" />
             </>
           )}
-          {(mailAnzahl.get(s.id) ?? 0) > 0 && (
+          {adressenText(s.id) !== '' && (
             <>
               {' '}
               <Textstufe stufe="textKlein" ton="gedaempft">
-                {mailAnzahl.get(s.id) === 1
-                  ? '1 Mailadresse'
-                  : `${mailAnzahl.get(s.id)} Mailadressen`}
-              </Textstufe>
-            </>
-          )}
-          {(faxAnzahl.get(s.id) ?? 0) > 0 && (
-            <>
-              {' '}
-              <Textstufe stufe="textKlein" ton="gedaempft">
-                {faxAnzahl.get(s.id) === 1 ? '1 Faxnummer' : `${faxAnzahl.get(s.id)} Faxnummern`}
+                {adressenText(s.id)}
               </Textstufe>
             </>
           )}

@@ -25,10 +25,10 @@ struct Welt {
 }
 
 async fn stelle_mit_kanal(pool: &sqlx::SqlitePool, org_id: i64, name: &str, adresse: &str) -> i64 {
-    stelle_mit_kanal_art(pool, org_id, name, "email", adresse).await
+    stelle_mit(pool, org_id, name, "email", adresse).await
 }
 
-async fn stelle_mit_kanal_art(
+async fn stelle_mit(
     pool: &sqlx::SqlitePool,
     org_id: i64,
     name: &str,
@@ -209,7 +209,7 @@ impl Welt {
 
     /// Eine Faxnummer an einer neuen Stelle.
     async fn faxkanal(&self) -> i64 {
-        stelle_mit_kanal_art(&self.pool, self.org_id, "Kreis Fax", "fax", "+49511123456").await
+        stelle_mit(&self.pool, self.org_id, "Kreis Fax", "fax", "+49511123456").await
     }
 
     /// Ein freigegebener Lagebericht, dessen PDF über 30 Seiten hat.
@@ -260,6 +260,45 @@ impl Welt {
         .await;
         assert_eq!(s, StatusCode::CREATED, "{n}");
         n["id"].as_i64().unwrap()
+    }
+
+    /// Legt die Matrix-Anbindung der Org an, mit Access-Token (ohne Netz).
+    async fn matrix_anbindung(&self) {
+        let body = json!({
+            "art": "matrix", "name": "Matrix",
+            "einstellungen": { "homeserver": "https://matrix.example.org" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        let (s, v) = anfrage_json(
+            &self.app,
+            "PUT",
+            &format!("/api/admin/adapter/{id}/secrets/access_token"),
+            &self.admin,
+            Some(&json!({ "wert": "syt_geheimes_token" })),
+        )
+        .await;
+        assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+
+    /// Eine Stelle mit einer Matrix-Kanaladresse.
+    async fn matrix_kanal(&self) -> i64 {
+        stelle_mit(
+            &self.pool,
+            self.org_id,
+            "Lagedienst",
+            "matrix",
+            "#lage:example.org",
+        )
+        .await
     }
 
     async fn setze_fehlgeschlagen(&self, id: &str) {
@@ -480,6 +519,104 @@ async fn fremde_kanaladresse_404() {
 
     assert_eq!(s, StatusCode::NOT_FOUND, "{v}");
     assert_eq!(w.anzahl().await, 0, "nichts darf halb angelegt sein");
+}
+
+#[tokio::test]
+async fn threema_adresse_ist_422_nicht_unterstuetzt() {
+    // Fax (LLH-2095) und Matrix (LLH-2094) gehen; Threema hat noch keinen Weg.
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    sqlx::query(
+        "UPDATE org_externe_stelle_kanal SET kanal = 'threema', adresse = 'ABCD1234' WHERE id = ?",
+    )
+    .bind(w.kanaele[0])
+    .execute(&w.pool)
+    .await
+    .unwrap();
+    let (s, v) = w.lb_senden(lid, "f-1", &[w.kanaele[0]]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert!(v.to_string().contains("noch nicht unterstützt"), "{v}");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn matrix_versand_ohne_matrix_anbindung_ist_422_anbindung_fehlt() {
+    // SMTP ist eingerichtet, Matrix nicht.
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let mk = w.matrix_kanal().await;
+    let (s, v) = w.lb_senden(lid, "m-1", &[mk]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_fehlt");
+    assert_eq!(v["error"], "Kein Matrix-Konto eingerichtet");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn angehaltenes_matrix_konto_ist_422_anbindung_angehalten() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht(true).await;
+    let mk = w.matrix_kanal().await;
+    sqlx::query("UPDATE adapter SET zustand = 'angehalten', angehalten_at = datetime('now') WHERE art = 'matrix'")
+        .execute(&w.pool)
+        .await
+        .unwrap();
+    let (s, v) = w.lb_senden(lid, "m-2", &[mk]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_angehalten");
+    assert_eq!(v["error"], "Das Matrix-Konto ist angehalten");
+    // E-Mail allein geht weiter.
+    let (s, v) = w.lb_senden(lid, "m-3", &w.kanaele[..1]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}
+
+#[tokio::test]
+async fn matrix_versand_mit_matrix_anbindung_legt_an() {
+    // Nur Matrix: ein fehlender Mailserver stört nicht.
+    let w = welt_mit(false).await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht(true).await;
+    let mk = w.matrix_kanal().await;
+    let (s, v) = w.lb_senden(lid, "m-4", &[mk]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v[0]["channel"], "matrix", "{v}");
+    assert_eq!(v[0]["address"], "#lage:example.org", "{v}");
+}
+
+#[tokio::test]
+async fn gemischte_empfaenger_brauchen_beide_anbindungen() {
+    // Mailserver da, Matrix fehlt: die Matrix-Meldung, nichts angelegt.
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let mk_w = w.matrix_kanal().await;
+    let (s, v) = w.lb_senden(lid, "g-1", &[w.kanaele[0], mk_w]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Kein Matrix-Konto eingerichtet");
+    assert_eq!(w.anzahl().await, 0);
+
+    // Matrix da, Mailserver fehlt: die Mail-Meldung, nichts angelegt.
+    let o = welt_mit(false).await;
+    o.matrix_anbindung().await;
+    let lid = o.lagebericht(true).await;
+    let mk = o.matrix_kanal().await;
+    let (s, v) = o.lb_senden(lid, "g-2", &[mk, o.kanaele[0]]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["error"], "Kein Mailserver eingerichtet");
+    assert_eq!(o.anzahl().await, 0);
+
+    // Beide da: je Empfänger ein Versand in seinem Kanal.
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht(true).await;
+    let (s, v) = w.lb_senden(lid, "g-3", &[w.kanaele[0], mk_w]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let kanaele: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|x| x["channel"].as_str().unwrap())
+        .collect();
+    assert_eq!(kanaele, ["email", "matrix"], "{v}");
 }
 
 #[tokio::test]

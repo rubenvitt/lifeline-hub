@@ -58,6 +58,13 @@ export function speicherHinweisText(speicher: GeheimnisspeicherZustand): string 
   }
 }
 
+/**
+ * Hinweis zur Verifizierung beim Matrix-Konto (LLH-2094, Spec 8): der Bot ist ein eigenes Gerät.
+ * Der Prüfbefund mit der Geräte-ID steht nicht auf dem Draht, deshalb nur der Text.
+ */
+export const MATRIX_VERIFIZIERUNG_HINWEIS =
+  'Der Versand läuft über ein eigenes Gerät dieses Kontos. In verschlüsselten Räumen zeigt der Client der Empfänger es als nicht verifiziert, bis es in der Geräteliste des Kontos bestätigt ist; die Nachricht kommt trotzdem an.';
+
 /** Setzt die Antwort einer eigenen Änderung in die Liste und lässt sie danach neu laden. */
 export function uebernimmAdapter(qc: QueryClient, a: AdapterAnzeige): void {
   qc.setQueryData<AdapterListe>(globalKeys.adapter(), (alt) =>

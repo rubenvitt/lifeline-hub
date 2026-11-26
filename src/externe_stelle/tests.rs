@@ -354,13 +354,24 @@ fn normalize_email_lehnt_mehrere_und_anzeigenamen_ab() {
 }
 
 #[test]
-fn email_und_fax_sind_freigeschaltet_matrix_und_threema_nicht() {
+fn email_fax_und_matrix_sind_freigeschaltet_threema_nicht() {
     use super::KanalArt;
     assert!(KanalArt::Email.is_freigeschaltet());
     assert!(KanalArt::Fax.is_freigeschaltet());
-    for k in [KanalArt::Matrix, KanalArt::Threema] {
-        assert!(!k.is_freigeschaltet());
-    }
+    assert!(KanalArt::Matrix.is_freigeschaltet());
+    assert!(!KanalArt::Threema.is_freigeschaltet());
+}
+
+#[test]
+fn matrix_raum_id_und_alias_werden_angenommen() {
+    assert_eq!(
+        super::kanal::normalize_matrix("!abc:example.org").unwrap(),
+        "!abc:example.org"
+    );
+    assert_eq!(
+        super::kanal::normalize_matrix(" #lage:example.org ").unwrap(),
+        "#lage:example.org"
+    );
 }
 
 #[test]
@@ -384,6 +395,49 @@ fn faxnummern_in_alltagsform_werden_e164() {
         normalize_fax("+0511123456").is_err(),
         "Länderkennung beginnt nie mit 0"
     );
+}
+
+#[test]
+fn matrix_nutzer_id_wird_mit_eigenem_text_abgelehnt() {
+    let fehler = super::kanal::normalize_matrix("@a:example.org").unwrap_err();
+    assert!(fehler.contains("Nutzer-IDs"), "{fehler}");
+}
+
+#[test]
+fn matrix_to_link_wird_mit_eigenem_text_abgelehnt() {
+    for roh in [
+        "https://matrix.to/#/#lage:example.org",
+        " https://matrix.to/#/!abc:example.org ",
+    ] {
+        assert_eq!(
+            super::kanal::normalize_matrix(roh).unwrap_err(),
+            "matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen"
+        );
+    }
+}
+
+#[test]
+fn matrix_ungueltige_adressen_werden_abgelehnt() {
+    for roh in [
+        "",
+        "  ",
+        "abc",
+        "#lage",
+        "lage@example.org",
+        "!a b:example.org",
+    ] {
+        assert!(
+            super::kanal::normalize_matrix(roh).is_err(),
+            "{roh:?} muss abgelehnt werden"
+        );
+    }
+}
+
+#[test]
+fn matrix_adresse_ueber_255_bytes_abgelehnt() {
+    let zu_lang = format!("#{}:example.org", "a".repeat(250));
+    assert!(zu_lang.len() > 255);
+    assert!(super::kanal::normalize_matrix(&zu_lang).is_err());
 }
 
 #[test]

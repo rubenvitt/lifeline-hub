@@ -512,7 +512,7 @@ export interface components {
          * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
          * @enum {string}
          */
-        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern";
+        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern" | "schluessel_passen_nicht";
         /** @description Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert. */
         AdapterGeheimnisAnzeige: {
             bezeichnung: string;
@@ -1329,10 +1329,11 @@ export interface components {
         /**
          * @description Letzter Fehler eines Versands. Nie Text des Ziels, nur dieser Code und der Status des
          *     Ziels (SMTP-Code bzw. HTTP-Status des Fax-Anbieters). `nicht_zugestellt`: der Fax-Anbieter
-         *     meldet, dass das Fax nicht durchging (LLH-2095).
+         *     meldet, dass das Fax nicht durchging (LLH-2095). `kein_zutritt` und `verschluesselung`
+         *     kommen nur aus der Zustellung per Matrix (LLH-2094).
          * @enum {string}
          */
-        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel" | "nicht_zugestellt";
+        AusgangFehler: "voruebergehend" | "abgelehnt" | "ungewiss" | "ueberholt" | "anbindung_fehlt" | "anbindung_angehalten" | "anbindung_fehler" | "zu_gross" | "spiegel" | "nicht_zugestellt" | "kein_zutritt" | "verschluesselung";
         /** @enum {string} */
         Ausmass: "gering" | "mittel" | "gross" | "katastrophal";
         /** @description Öffentliche Darstellung eines Providers für die Login-UI (`GET /api/auth/providers`). */
@@ -5285,7 +5286,7 @@ export interface components {
         /**
          * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
          *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
-         *     angenommen werden heute E-Mail und Fax (siehe [`KanalArt::is_freigeschaltet`]).
+         *     angenommen werden heute E-Mail, Fax und Matrix (siehe [`KanalArt::is_freigeschaltet`]).
          * @enum {string}
          */
         KanalArt: "email" | "fax" | "matrix" | "threema";

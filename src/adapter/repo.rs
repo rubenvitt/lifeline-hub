@@ -145,20 +145,20 @@ pub async fn load_in_org(
     .await
 }
 
-/// Die Anbindung einer Versand-Art einer Org (`smtp`, `sipgate_fax`; höchstens eine je Art,
-/// auch angehaltene zählen; LLH-2093, LLH-2095). Bei Altdaten mit mehreren gilt die zuerst
-/// angelegte.
+/// Die Anbindung einer Versand-Art einer Org (`smtp`, LLH-2093; `sipgate_fax`, LLH-2095;
+/// `matrix`, LLH-2094; höchstens eine je Art, auch angehaltene zählen). Bei Altdaten mit
+/// mehreren gilt die zuerst angelegte.
 pub async fn load_fuer_org(
     pool: &SqlitePool,
     org_id: i64,
-    art: &str,
+    art_code: &str,
 ) -> Result<Option<Adapter>, sqlx::Error> {
     sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {SPALTEN} FROM adapter WHERE org_id = ? AND art = ? \
          ORDER BY angelegt_at, id LIMIT 1"
     )))
     .bind(org_id)
-    .bind(art)
+    .bind(art_code)
     .fetch_optional(pool)
     .await
 }

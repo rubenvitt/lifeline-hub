@@ -40,3 +40,29 @@ async fn eingebettete_sqlite_version_ist_dokumentiert() {
          „Eingebettetes SQLite\" in docs/betrieb/packaging.md nachziehen."
     );
 }
+
+/// Im Lockfile steht genau ein `libsqlite3-sys` (LLH-2094).
+///
+/// matrix-sdk bringt über `matrix-sdk-sqlite` → `rusqlite` eine eigene Anbindung an SQLite mit.
+/// Upstream verlangt dort eine ältere `libsqlite3-sys` als sqlx; die gepatchte Kopie unter
+/// `vendor/matrix-sdk-sqlite/` (siehe `PATCH.md`) hebt `rusqlite`, damit beide dieselbe
+/// eingebackene SQLite teilen. Zwei Versionen hießen zwei SQLite-Kopien im Binary, und die
+/// Version oben hielte nur eine davon fest.
+#[test]
+fn lockfile_hat_genau_ein_libsqlite3_sys() {
+    let lockfile = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.lock"))
+        .expect("Cargo.lock lesbar");
+    let versionen: Vec<&str> = lockfile
+        .split("[[package]]")
+        .filter(|block| block.contains("\nname = \"libsqlite3-sys\"\n"))
+        .collect();
+
+    assert_eq!(
+        versionen.len(),
+        1,
+        "Cargo.lock führt {} Einträge für libsqlite3-sys; erwartet ist genau einer, den sqlx \
+         und matrix-sdk-sqlite teilen (vendor/matrix-sdk-sqlite/PATCH.md):\n{}",
+        versionen.len(),
+        versionen.join("\n---\n")
+    );
+}
