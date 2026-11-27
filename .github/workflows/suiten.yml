@@ -115,11 +115,25 @@ jobs:
           df -h / /mnt 2> /dev/null || df -h /
           free -h
       - name: Rust-Suite
-        # Platte und Speicher jede Minute ins Log: Stirbt der Runner, endet das Log hier mit dem
-        # letzten Stand, statt raten zu lassen, ob Platte oder Speicher ausging (so gefunden).
+        # Platte und Speicher jede Minute ins Log, dazu die drei größten Prozesse. Ein Wächter bricht
+        # den Bau ab, bevor Platte oder Speicher ganz ausgehen: Stirbt der Runner („lost
+        # communication“, zweimal am 27.11.), ist das ganze Log weg; bricht der Wächter ab, bleibt
+        # es stehen und nennt den Grund.
         run: |
           ( while sleep 60; do
-              echo "Stand $(date +%H:%M) Platte $(df -BG --output=avail / | tail -1 | tr -d ' ') frei, Speicher $(free -m | awk '/^Mem:/ {print $7}') MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt"
+              platte="$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
+              speicher="$(free -m | awk '/^Mem:/ {print $7}')"
+              auslagerung_frei="$(free -m | awk '/^Swap:/ {print $4}')"
+              echo "Stand $(date +%H:%M) Platte ${platte}G frei, Speicher ${speicher} MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt;" \
+                "$(ps -eo rss=,comm= --sort=-rss | head -3 | awk '{printf "%s %d MB; ", $2, $1/1024}')"
+              if [ "$platte" -lt 3 ] || { [ "$speicher" -lt 300 ] && [ "$auslagerung_frei" -lt 1000 ]; }; then
+                echo "::error::Wächter: Platte ${platte}G frei, Speicher ${speicher} MB, Auslagerung frei ${auslagerung_frei} MB. Bau abgebrochen, bevor der Runner stirbt."
+                ps -eo rss=,args= --sort=-rss | head -15 | cut -c1-200
+                du -sh "${CARGO_TARGET_DIR:-target}" 2> /dev/null || true
+                pkill -TERM -x cargo || true
+                pkill -TERM -x rustc || true
+                break
+              fi
             done ) &
           ./scripts/check-all.sh --nur rust
       - name: Plattenplatz danach
