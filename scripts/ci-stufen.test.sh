@@ -275,6 +275,17 @@ for ziel in linux-x86_64 linux-arm64; do
 done
 pruefe "artefakte.yml: Runner im Rust-Cache-Schlüssel" \
   enthaelt "$(job "$ART" bauen)" 'key: artefakt-${{ matrix.target }}-${{ matrix.runs-on }}'
+# Helfer-App mit jedem Release (ADR-0101): per Handstart, damit die Build-Nummer der
+# Helfer-Workflows weiterzählt; nach der Freigabe, ohne sie aufzuhalten.
+h="$(job "$ART" helfer)"
+pruefe "artefakte.yml: helfer nach freigeben" enthaelt "$h" "needs: [vorbereiten, freigeben]"
+pruefe "artefakte.yml: helfer nur bei erfolgreicher Freigabe" enthaelt "$h" "needs.freigeben.result == 'success'"
+for wf in ios-helfer.yml android-helfer.yml; do
+  pruefe "artefakte.yml: helfer startet $wf am Tag" grep -q "for workflow in ios-helfer.yml android-helfer.yml" <<< "$h"
+done
+pruefe "artefakte.yml: helfer per Handstart, nicht per uses" fehlt "$h" "uses: ./.github/workflows/ios-helfer.yml"
+pruefe "artefakte.yml: helfer darf Workflows starten" enthaelt "$h" "actions: write"
+pruefe "artefakte.yml: freigeben wartet nicht auf helfer" fehlt "$(job "$ART" freigeben)" "helfer"
 pruefe "artefakte.yml: Job ios ruft ios.yml" enthaelt "$(job "$ART" ios)" "uses: ./.github/workflows/ios.yml"
 pruefe "artefakte.yml: ios erbt die Secrets" enthaelt "$(job "$ART" ios)" "secrets: inherit"
 pruefe "artefakte.yml: ios nach freigeben" enthaelt "$(job "$ART" ios)" "needs: [vorbereiten, freigeben]"

@@ -10,7 +10,8 @@
 # - `pull_request`, sobald ein PR das Label `testflight-helfer` bekommt, und danach bei jedem Push
 #   auf den PR, solange das Label hängt. Ein anderes Label startet keinen Upload. PRs aus Forks
 #   haben keine Secrets; dort bricht das Skript mit einer Meldung ab.
-# - `workflow_dispatch` als Handstart für den gewählten Branch.
+# - `workflow_dispatch` als Handstart für den gewählten Branch. Diesen Handstart löst auch artefakte.yml
+#   (Job `helfer`) nach der Freigabe jedes Release-Tags aus, mit dem Tag als Stand.
 #
 # Version: MARKETING_VERSION aus scripts/ios/helfer-version.sh (einzige Stelle), Build-Nummer die
 # Laufnummer dieses Workflows plus 1000 (steigt mit jedem Lauf; App Store Connect verlangt eine

@@ -8,7 +8,8 @@
 # - `pull_request`, sobald ein PR das Label `apk-helfer` bekommt, und danach bei jedem Push auf den
 #   PR, solange das Label hängt. Ein anderes Label startet keinen Bau. PRs aus Forks haben keine
 #   Secrets; dort bricht der Lauf mit einer Meldung ab.
-# - `workflow_dispatch` als Handstart für den gewählten Branch.
+# - `workflow_dispatch` als Handstart für den gewählten Branch. Diesen Handstart löst auch artefakte.yml
+#   (Job `helfer`) nach der Freigabe jedes Release-Tags aus, mit dem Tag als Stand.
 #
 # Version: `HELFER_VERSION` aus scripts/ios/helfer-version.sh (liest build.gradle.kts), versionCode
 # die Laufnummer dieses Workflows plus 1000 (steigt mit jedem Lauf, Android ersetzt die App nur mit
