@@ -85,9 +85,20 @@ if [[ " \$* " == *" update "* ]] && [ ! -e "$ARBEIT/einmal-gehangen" ]; then
 fi
 EOF
 chmod +x "$ATTRAPPEN"/*
+# Quellen-Attrappe: ein Abbild mit Ubuntu-Quelle bleibt unberührt.
+quellen="$ARBEIT/etc-apt"
+mkdir -p "$quellen/sources.list.d"
+printf 'Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\nSuites: resolute\n' \
+  > "$quellen/sources.list.d/ubuntu.sources"
+printf 'ID=ubuntu\nVERSION_CODENAME=resolute\n' > "$ARBEIT/os-release"
 rc=0
-PATH="$ATTRAPPEN:$PATH" APT_FRIST_SEK=1 "$SKRIPTE/apt-pakete.sh" nasm libgtk-3-dev \
-  > "$ARBEIT/aus" 2>&1 || rc=$?
+PATH="$ATTRAPPEN:$PATH" APT_FRIST_SEK=1 APT_ETC="$quellen" APT_OS_RELEASE="$ARBEIT/os-release" \
+  "$SKRIPTE/apt-pakete.sh" nasm libgtk-3-dev > "$ARBEIT/aus" 2>&1 || rc=$?
+if [ ! -e "$quellen/sources.list.d/lifeline-ubuntu.sources" ]; then
+  ok "apt-pakete: vorhandene Ubuntu-Quelle bleibt unberührt"
+else
+  rot "apt-pakete: Quelle nachgetragen, obwohl eine Ubuntu-Quelle da war"
+fi
 erwartet="$(printf '%s\n' \
   "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120 update" \
   "-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120 update" \
@@ -98,6 +109,30 @@ else
   rot "apt-pakete: Exit $rc, Aufrufe:"
   cat "$ARBEIT/apt.log" "$ARBEIT/aus" >&2
 fi
+
+# Abbild ohne Ubuntu-Quelle (LLH-2152, ubuntu-26.04 20261122): nur Microsoft in den Quellen.
+for arch in amd64 arm64; do
+  leer="$ARBEIT/etc-apt-$arch"
+  mkdir -p "$leer/sources.list.d"
+  printf 'deb https://packages.microsoft.com/ubuntu/26.04/prod resolute main\n' \
+    > "$leer/sources.list.d/microsoft-prod.list"
+  rc=0
+  PATH="$ATTRAPPEN:$PATH" APT_ETC="$leer" APT_OS_RELEASE="$ARBEIT/os-release" APT_ARCH="$arch" \
+    "$SKRIPTE/apt-pakete.sh" nasm > "$ARBEIT/aus" 2>&1 || rc=$?
+  nachgetragen="$leer/sources.list.d/lifeline-ubuntu.sources"
+  case "$arch" in
+    amd64) uri="URIs: http://archive.ubuntu.com/ubuntu" ;;
+    *) uri="URIs: http://ports.ubuntu.com/ubuntu-ports" ;;
+  esac
+  if [ "$rc" -eq 0 ] && grep -qx "$uri" "$nachgetragen" \
+    && grep -qx "Suites: resolute resolute-updates resolute-backports" "$nachgetragen" \
+    && grep -qx "Suites: resolute-security" "$nachgetragen"; then
+    ok "apt-pakete ($arch): fehlende Ubuntu-Quelle wird nachgetragen"
+  else
+    rot "apt-pakete ($arch): Exit $rc, nachgetragen:"
+    cat "$nachgetragen" "$ARBEIT/aus" >&2 || true
+  fi
+done
 # Ein Zombie zählt als beendet: wo PID 1 nicht erntet (Container), bleibt er stehen.
 if [[ "$(ps -o stat= -p "$(cat "$ARBEIT/einmal-gehangen")" 2> /dev/null)" =~ ^[^Z] ]]; then
   rot "apt-pakete: abgebrochenes apt-get läuft noch (hielte den dpkg-Lock)"
