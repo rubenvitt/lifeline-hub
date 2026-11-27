@@ -61,6 +61,9 @@ jobs:
     # 120 statt 90: Ohne Cache-Treffer (nach einer Lockfile-Änderung, und bis ein Lauf ihn neu
     # schreibt) dauerte Schritt 4 am 26.11. 82 Minuten, mit Auslagerung beim Bauen.
     timeout-minutes: 120
+    permissions:
+      contents: read
+      statuses: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Immer aufräumen, aber im Hintergrund: Die Suite baut je Datei in `tests/` ein eigenes
@@ -116,15 +119,25 @@ jobs:
           free -h
       - name: Rust-Suite
         # Platte und Speicher jede Minute ins Log, dazu die drei größten Prozesse. Ein Wächter
-        # (alle 15 s) bricht den Bau ab, bevor Platte oder Speicher ausgehen: Stirbt der Runner
-        # („lost communication“, dreimal am 27.11.), ist das ganze Log weg; bricht der Wächter
-        # ab, bleibt es stehen und nennt den Grund. Knapper Speicher zählt auch bei freier
-        # Auslagerung: Wer dann weiter auslagert, lässt den Runner verhungern. Der Runner selbst
-        # ist vom OOM-Killer ausgenommen, der träfe sonst womöglich ihn statt rustc.
+        # (alle 15 s) bricht den Bau ab, bevor Platte oder Speicher ausgehen. Knapper Speicher
+        # zählt auch bei freier Auslagerung: Wer dann weiter auslagert, lässt den Runner
+        # verhungern. Der Runner selbst ist vom OOM-Killer ausgenommen.
+        # Stirbt der Runner trotzdem („lost communication“, dreimal am 27.11.), ist das ganze Log
+        # weg. Deshalb geht jeder Stand samt letzter Ausgabezeile zusätzlich als Commit-Status
+        # „Rust-Suite Wächter“ an den Commit; die Statusliste des Commits überlebt den Runner.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAND_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           for pid in $(pgrep -f 'Runner\.(Listener|Worker)|provjobd' || true); do
             echo -1000 | sudo tee "/proc/$pid/oom_score_adj" > /dev/null || true
           done
+          ausgabe="$RUNNER_TEMP/rust-suite.log"
+          : > "$ausgabe"
+          melden() { # <state> <text>
+            gh api "repos/$GITHUB_REPOSITORY/statuses/$STAND_SHA" -f state="$1" \
+              -f context="Rust-Suite Wächter" -f description="${2:0:139}" > /dev/null 2>&1 || true
+          }
           ( takt=0 knapp=0
             while sleep 15; do
               platte="$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
@@ -132,10 +145,13 @@ jobs:
               if [ $((takt++ % 4)) -eq 0 ]; then
                 echo "Stand $(date +%H:%M) Platte ${platte}G frei, Speicher ${speicher} MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt;" \
                   "$(ps -eo rss=,comm= --sort=-rss | head -3 | awk '{printf "%s %d MB; ", $2, $1/1024}')"
+                letzte="$(sed 's/\x1b\[[0-9;]*m//g' "$ausgabe" | grep -v '^\s*$' | tail -1 | tr -s ' ')"
+                melden pending "$(date -u +%H:%M)Z P${platte}G M${speicher} S$(free -m | awk '/^Swap:/ {print $3}') | ${letzte}"
               fi
               if [ "$speicher" -lt 400 ]; then knapp=$((knapp + 1)); else knapp=0; fi
               if [ "$platte" -lt 5 ] || [ "$knapp" -ge 2 ]; then
                 echo "::error::Wächter: Platte ${platte}G frei, Speicher ${speicher} MB frei (seit $((knapp * 15)) s knapp). Bau abgebrochen, bevor der Runner stirbt."
+                melden pending "Wächter-Abbruch: Platte ${platte}G, Speicher ${speicher} MB"
                 free -m
                 ps -eo rss=,args= --sort=-rss | head -15 | cut -c1-200
                 du -sh "${CARGO_TARGET_DIR:-target}" 2> /dev/null || true
@@ -144,7 +160,17 @@ jobs:
                 break
               fi
             done ) &
-          ./scripts/check-all.sh --nur rust
+          ./scripts/check-all.sh --nur rust 2>&1 | tee "$ausgabe"
+      - name: Wächter-Status abschließen
+        if: ${{ always() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STAND_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          zustand=success
+          [ "${{ job.status }}" = success ] || zustand=failure
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$STAND_SHA" -f state="$zustand" \
+            -f context="Rust-Suite Wächter" -f description="Lauf beendet: ${{ job.status }}" > /dev/null || true
       - name: Plattenplatz danach
         if: ${{ always() }}
         run: df -h /

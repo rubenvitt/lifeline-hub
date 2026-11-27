@@ -141,10 +141,12 @@ jobs:
   suiten:
     name: Suiten
     uses: ./.github/workflows/suiten.yml
-    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter.
+    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter, `statuses: write`
+    # braucht der Wächter der Rust-Suite (Stand als Commit-Status).
     permissions:
       contents: read
       checks: read
+      statuses: write
 
   # Der Release hängt hier und nicht in einem `workflow_run`-Workflow: semantic-release liest
   # den Branch aus GITHUB_REF, und ein workflow_run-Lauf trägt dort immer den Default-Branch

@@ -167,7 +167,9 @@ jobs:
     name: Suiten (voll)
     if: ${{ contains(github.event.pull_request.labels.*.name, 'voll') }}
     uses: ./.github/workflows/suiten.yml
-    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter.
+    # `checks: read` reicht der Aufruf an `suiten.yml` und `e2e.yml` weiter, `statuses: write`
+    # braucht der Wächter der Rust-Suite (Stand als Commit-Status).
     permissions:
       contents: read
       checks: read
+      statuses: write
