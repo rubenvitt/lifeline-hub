@@ -22,6 +22,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Pager (LLH-2157): Vollbild über dem Sperrbildschirm für neue Aufträge (PagerActivity). -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Ab Android 16 zeigt das System die Benachrichtigung des Dienstes als Live-Update. -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 
@@ -57,6 +59,16 @@
                 <data android:scheme="lifeline-helfer" android:host="anmelden" />
             </intent-filter>
         </activity>
+
+        <!-- Vollbild des Pagers (LLH-2157): über dem Sperrbildschirm, ohne Inhalt, eigener Task. -->
+        <activity
+            android:name=".PagerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:turnScreenOn="true" />
 
         <!--
           Die einzige Stelle, die im Hintergrund sendet und empfängt; nur aus der App gestartet

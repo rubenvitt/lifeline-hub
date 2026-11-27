@@ -235,6 +235,10 @@ public enum AuftragAnzeige {
     public static let quittungFehlgeschlagen = "Bitte über Funk bestätigen"
     /// Text der Mitteilung, wenn der Dienst die Nutzlast nicht öffnen kann.
     public static let rueckfall = "Öffnen, um den Auftrag zu sehen"
+    /// Vor dem Titel einer Erinnerung (LLH-2157, gemeinsame Fälle `erinnerung.praefix`).
+    public static let erinnerung = "Erinnerung · "
+    /// Ton des Pagers im App-Bündel (`ios/Helfer/App/Pagerton.caf`, `scripts/helfer/pagerton.sh`).
+    public static let pagerton = "Pagerton.caf"
 
     /// „Übernommen um 14:32“ bzw. „Übernommen von Max M. um 14:32“, wenn ein anderer schneller
     /// war; ob der Name der eigene ist, entscheidet `Auftraege.istEigeneQuittung` (`eigenerName`

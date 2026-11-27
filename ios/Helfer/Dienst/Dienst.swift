@@ -54,7 +54,8 @@ final class Dienst: UNNotificationServiceExtension {
         inhalt.title = meldung.titel
         inhalt.body = meldung.text
         inhalt.threadIdentifier = meldung.thread
-        inhalt.sound = .default
+        // Eigener Pagerton (LLH-2157) aus dem App-Bündel; fehlt er, spielt iOS den Standardton.
+        inhalt.sound = UNNotificationSound(named: UNNotificationSoundName(AuftragAnzeige.pagerton))
         inhalt.interruptionLevel = .timeSensitive
         var angaben = inhalt.userInfo
         angaben["task_id"] = NSNumber(value: meldung.auftragId)

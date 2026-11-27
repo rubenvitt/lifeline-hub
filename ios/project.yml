@@ -329,6 +329,9 @@ targets:
       - path: Gemeinsam/Schluesselbund.swift
       - path: Helfer/Dienst/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # Pagerton (LLH-2157): liegt im App-Bündel, hier zur Sicherheit auch im Bündel des Dienstes.
+      - path: Helfer/App/Pagerton.caf
+        buildPhase: resources
     dependencies:
       - package: HelferKern
       - package: LifelineKern

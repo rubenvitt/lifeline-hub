@@ -33,6 +33,7 @@ Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026-11-24-v
   (`aps-environment`), entschlüsselt im Mitteilungsdienst `ios/Helfer/Dienst`
   (`dev.rubeen.lifeline.helfer.dienst`). Ordnung der Liste, Quittungsstand, Nutzlast und
   „Mitteilung ja/nein“ entscheidet `HelferKern` (`Auftraege`, `PagerNutzlast`) mit den Fällen
-  `src-tauri/faelle/helfer-auftrag.json`. Keine eigene Live-Verbindung: offen lädt die App bei
+  `src-tauri/faelle/helfer-auftrag.json`. Pager (LLH-2157): Ton `Helfer/App/Pagerton.caf` (nur aus
+  `scripts/helfer/pagerton.sh`), Erinnerungen schickt der Server (`w` im Klartext → „Erinnerung · “). Keine eigene Live-Verbindung: offen lädt die App bei
   Push und beim Öffnen neu. Aufträge nie auf die Platte. Mitteilungen abgelehnt → Hinweis in
   „Angemeldet“.

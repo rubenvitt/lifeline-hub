@@ -814,6 +814,102 @@ async fn nutzlast_ist_entschluesselbar() {
     assert!(n["nachrichten"][0]["kollaps"].is_string());
 }
 
+/// Die Erinnerungen (LLH-2157) ohne Wartezeit: Stufe 1 und 2 nacheinander.
+fn sofort() -> Vec<(u8, std::time::Duration)> {
+    vec![
+        (1, std::time::Duration::ZERO),
+        (2, std::time::Duration::ZERO),
+    ]
+}
+
+#[tokio::test]
+async fn erinnerung_geht_an_offene_helfer_mit_stufe_und_gleichem_kollaps() {
+    let (l, mut relais) = lage_mit_relais().await;
+    let (gid1, _) = pager(&l, "unit", l.einheit, "Max M.", 1).await;
+    let (gid2, _) = pager(&l, "unit", l.einheit, "Lisa K.", 2).await;
+    let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
+    let erst = relais.naechste().await;
+    let kollaps = erst["nachrichten"][0]["kollaps"].clone();
+
+    lifeline_hub::helfer::pager::erinnern(
+        l.pool.clone(),
+        l.live.clone(),
+        l.einsatz,
+        auftrag,
+        vec![gid1, gid2],
+        sofort(),
+    )
+    .await;
+    for stufe in [1, 2] {
+        let n = relais.naechste().await;
+        assert_eq!(tokens(&n), vec![token(1), token(2)]);
+        for m in n["nachrichten"].as_array().unwrap() {
+            assert_eq!(m["kollaps"], kollaps, "{m}");
+            assert_eq!(m["stufe"], "alarm", "{m}");
+            let schluessel = if m["token"] == token(1) {
+                [1; 32]
+            } else {
+                [2; 32]
+            };
+            let (_, k) = common::relais::oeffnen(m["nutzlast"].as_str().unwrap(), &schluessel);
+            assert_eq!(k["w"], stufe, "{k}");
+            assert_eq!(k["t"], auftrag, "{k}");
+        }
+    }
+    relais.keine().await;
+}
+
+#[tokio::test]
+async fn nach_der_quittung_keine_erinnerung() {
+    let (l, mut relais) = lage_mit_relais().await;
+    let (gid, cookie) = pager(&l, "unit", l.einheit, "Max M.", 1).await;
+    let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
+    relais.naechste().await;
+    let empf = zeile(&l.pool, auftrag).await;
+    assert_eq!(
+        quittieren(&l, &cookie, auftrag, empf).await.status,
+        StatusCode::OK
+    );
+
+    lifeline_hub::helfer::pager::erinnern(
+        l.pool.clone(),
+        l.live.clone(),
+        l.einsatz,
+        auftrag,
+        vec![gid],
+        sofort(),
+    )
+    .await;
+    relais.keine().await;
+}
+
+#[tokio::test]
+async fn erinnerung_nicht_an_spaeter_hinzugekommene_oder_beendete_helfer() {
+    let (l, mut relais) = lage_mit_relais().await;
+    let (gid1, _) = pager(&l, "unit", l.einheit, "Max M.", 1).await;
+    let (auftrag, _) = erteilen(&l, "Zelt 3", json!([an_einheit(l.einheit)])).await;
+    relais.naechste().await;
+    // Kommt nach dem Erteilen hinzu: keine Erinnerung an einen Auftrag, den er nie bekam.
+    pager(&l, "unit", l.einheit, "Lisa K.", 2).await;
+    // Der erste Helfer ist beendet: nichts mehr.
+    sqlx::query("UPDATE geraet_kopplung SET widerrufen_at = datetime('now') WHERE id = ?")
+        .bind(gid1)
+        .execute(&l.pool)
+        .await
+        .unwrap();
+
+    lifeline_hub::helfer::pager::erinnern(
+        l.pool.clone(),
+        l.live.clone(),
+        l.einsatz,
+        auftrag,
+        vec![gid1],
+        sofort(),
+    )
+    .await;
+    relais.keine().await;
+}
+
 #[tokio::test]
 async fn ungueltiges_token_loescht_die_anmeldung() {
     let (l, mut relais) = lage_mit_relais().await;

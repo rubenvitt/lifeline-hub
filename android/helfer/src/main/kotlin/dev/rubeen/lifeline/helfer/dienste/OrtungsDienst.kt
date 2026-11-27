@@ -114,6 +114,9 @@ class OrtungsDienst : Service() {
     private var einsatzId = 0L
     private var empfang: Job? = null
 
+    /** Prüft alle [ERINNERUNG_PRUEFUNG_MS], ob der Pager an einen offenen Auftrag erinnert (LLH-2157). */
+    private var erinnerung: Job? = null
+
     /**
      * Ein Zuhörer je Anbieter: das System ersetzt die Anmeldung eines Zuhörers, der schon für einen
      * anderen Anbieter angemeldet ist. Ohne Messung (Anbieter aus, Recht entzogen) geht nichts raus.
@@ -464,6 +467,13 @@ class OrtungsDienst : Service() {
     private fun starteEmpfang() {
         if (empfang?.isActive == true) return
         val v = verbindung ?: return
+        erinnerung?.cancel()
+        erinnerung = scope.launch {
+            while (isActive) {
+                delay(ERINNERUNG_PRUEFUNG_MS)
+                Auftragsstand.erinnere(this@OrtungsDienst)
+            }
+        }
         empfang = scope.launch(Dispatchers.IO) {
             val folge = Wiederverbindung()
             while (isActive) {
@@ -508,6 +518,8 @@ class OrtungsDienst : Service() {
     private fun stoppeEmpfang() {
         empfang?.cancel()
         empfang = null
+        erinnerung?.cancel()
+        erinnerung = null
         verbindung?.trenneLive()
         setzeVerbunden(false)
     }
@@ -640,6 +652,7 @@ class OrtungsDienst : Service() {
         private const val EXTRA_ZIEL = "ziel"
         private const val EXTRA_ORTEN = "orten"
         private const val EXTRA_EMPFANGEN = "empfangen"
+        private const val ERINNERUNG_PRUEFUNG_MS = 15_000L
         private const val EXTRA_LAGE = "lage"
 
         /** Takt des Systems: höchstens alle 30 s, ab 25 m (die Entscheidung trifft der Sendeplan). */

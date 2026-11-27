@@ -152,6 +152,19 @@ class GemeinsameFaelleTest {
         val mitteilung: List<MitteilungFall>,
         val quittungsstand: List<StandFall>,
         val quittungstext: List<TextFall>,
+        val erinnerung: Erinnerung,
+    )
+
+    @Serializable
+    private class Erinnerung(val nach_s: List<Long>, val praefix: String, val faelle: List<ErinnerungFall>)
+
+    @Serializable
+    private class ErinnerungFall(
+        val beschreibung: String,
+        val auftrag: HelperTask,
+        val gemeldete_stufe: Int,
+        val jetzt: String,
+        val erwartet: Int? = null,
     )
 
     @Serializable
@@ -224,6 +237,19 @@ class GemeinsameFaelleTest {
             val jetzt = Wire.serverzeit(fall.jetzt) ?: error("jetzt unlesbar: ${fall.jetzt}")
             val soll = Auftraege.sollMitteilen(fall.auftrag, fall.bereits_gemeldet.toSet(), jetzt.toEpochMilli())
             assertEquals(fall.erwartet, soll, fall.beschreibung)
+        }
+    }
+
+    @Test
+    fun `jeder gemeinsame Fall von erinnerung gilt`() {
+        val e = auftraege().erinnerung
+        assertEquals(e.nach_s.map { it * 1_000 }, Auftraege.ERINNERUNG_NACH_MS)
+        assertEquals(e.praefix, Auftraege.ERINNERUNG)
+        assertTrue(e.faelle.size >= 6)
+        for (fall in e.faelle) {
+            val jetzt = Wire.serverzeit(fall.jetzt) ?: error("jetzt unlesbar: ${fall.jetzt}")
+            val faellig = Auftraege.erinnerungFaellig(fall.auftrag, fall.gemeldete_stufe, jetzt.toEpochMilli())
+            assertEquals(fall.erwartet, faellig, fall.beschreibung)
         }
     }
 
