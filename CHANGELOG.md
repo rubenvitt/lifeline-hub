@@ -1,3 +1,70 @@
+## [1.0.0-alpha.199](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.198...v1.0.0-alpha.199) (2026-11-27)
+
+### Wichtige Änderungen
+
+- **Datenbank-Migrationen:** Dieses Release legt neue Tabellen und Spalten an: Ausgangskorb mit Zustellzuständen, Kanaladressen je Externer Stelle, Ortungskopplungen (auch über den Hub), Push-Anmeldungen und Quittungen der Helfer-App sowie neue Protokollarten für die PASS-Liste. Vor dem Update ein Backup anlegen.
+- **Neue Anbindungsarten:** „E-Mail (SMTP)“, „Fax (sipgate)“, „Matrix“ und „Drohnenbild (HLS-Adresse)“. Jede Anbindung lässt sich vorab prüfen.
+- **http im lokalen Netz:** Einige Anbindungsarten, etwa das Drohnenbild über eine HLS-Adresse, erlauben jetzt `http://` zu privaten IP-Adressen im LAN. Alle anderen Arten verlangen weiterhin `https://`.
+- **Push-Relais:** Das Relais kann jetzt je Nachricht ein eigenes Thema setzen. Diese Fähigkeit ist Voraussetzung für Mitteilungen an die Helfer-App.
+
+### Kommunikation: Senden an Externe Stellen
+
+- **Neu: Ausgangskorb.** Freigegebene Lageberichte, Befehle und Nachforderungen lassen sich direkt an Externe Stellen senden, per **E-Mail**, **Fax** oder in einen **Matrix-Raum**. Matrix-Räume dürfen Ende-zu-Ende-verschlüsselt sein.
+- An jeder Externen Stelle lassen sich jetzt Mailadressen, Faxnummern und Matrix-Räume pflegen. Der Senden-Dialog schlägt Empfänger vor und zeigt die Adressen jeder Stelle zusammen an.
+- Jeder Versand wird ins Einsatztagebuch eingetragen. Die Versandliste zeigt den Zustand jedes Versands. Ein fehlgeschlagener Versand lässt sich mit „Erneut senden“ wiederholen.
+- Der Server erzeugt aus dem Inhalt ein PDF. Es geht als Fax hinaus und hängt bei E-Mails als Anlage an. Anlagen werden nur bereinigt verschickt, nie im Original.
+- Bei Faxen fragt Lifeline Hub nach, ob sie zugestellt wurden, und zeigt den Zustand „zugestellt“. Ist ein Dokument für ein Fax zu lang, nennt der Dialog das.
+- Eine hängengebliebene Zustellung wird im laufenden Betrieb als „ungewiss“ markiert und wartet nicht mehr bis zum nächsten Neustart. Wird eine Anfrage wiederholt, geht nichts doppelt hinaus.
+- Matrix: eigene Fehlermeldungen, wenn der Zugang zum Raum fehlt oder ein Verschlüsselungsproblem auftritt. Auch wenn der Server keine Größengrenze für Anlagen nennt, gibt es einen eigenen Hinweis. Formatierter Text erscheint ohne sichtbare Steuerzeichen. `matrix.to`-Links, die einen abweichenden Text zeigen, werden abgelehnt.
+- Ohne Netz zeigt der Senden-Dialog einen Hinweis.
+
+### Lagekarte
+
+- **Neu: Fahrzeugortung.** Fahrzeuge lassen sich im Einsatz mit einer Ortung koppeln. Die Lagekarte zeigt dann die GPS-Position und markiert sie, wenn sie veraltet ist.
+  - Für hauptamtliche Besatzungen gibt es einen eigenen Schalter.
+  - Eine Kopplung endet, wenn das Fahrzeug den Einsatz verlässt, der Einsatz endet oder die Führung abgegeben wird.
+  - Gesicherte Lagestände behalten die Position zum Zeitpunkt der Sicherung.
+- **Ortung in gespiegelten Einsätzen:** Der ELW übernimmt Positionen vom Hub und kann an Kennungen des Hubs koppeln. Antwortet der Hub nicht, endet die Nachfrage nach 15 Sekunden.
+- **Objekte aus Fremdebenen übernehmen:** Ein Objekt einer Fremdebene lässt sich als Zone oder freies Zeichen übernehmen. Die Herkunft bleibt vermerkt.
+- Fremdebenen sind jetzt in gesicherten Ständen enthalten und werden im Speicher für den Betrieb ohne Netz berücksichtigt. Der Rückblick zeigt sie mit an, ändert sie dort aber nicht.
+- **Neu: Export als GPX für Fireboard.** Der Export von Geodaten verwendet immer die Tagesfarben.
+- Das Drohnenbild lässt sich jetzt auch aus einer reinen HLS-Adresse einbinden, zum Beispiel aus Suchlage.
+
+### Lagemonitor
+
+- **Neue Kachel „Livebild“:** Sie zeigt das Drohnenbild, wenn an der Drohnenquelle der Schalter „Livebild auf dem Lagemonitor“ eingeschaltet ist. Neben dem Livebild steht nur der nächste Programmpunkt.
+
+### Betroffene
+
+- **Neu: PASS-Liste für die Personenauskunftsstelle.** Sie lässt sich drucken und als CSV exportieren. Druck und Export werden protokolliert. Umlaute werden nach DIN 5007-1 sortiert. Die Personenliste bietet dafür einen eigenen Eintrag „PASS-Liste“.
+
+### Helfer-App
+
+- **Aufträge auf dem Handy (iOS und Android):** Die Helfer-App empfängt Aufträge mit Push-Mitteilung und kann sie mit „Übernommen“ quittieren. Am Auftrag sieht die Führung, ob er zugestellt und quittiert wurde.
+- Wird ein Empfänger aus einem Auftrag entfernt, erfährt er von der Berichtigung.
+- Die Push-Anmeldung endet zusammen mit der Kopplung.
+- Behoben: Mitteilungen erscheinen nur noch einmal, und ein Auftrag öffnet sich aus der Mitteilung nur einmal. Der Empfang ist stabiler, wenn die Verbindung abbricht. iOS fragt die Erlaubnis für Mitteilungen ohne App-Badge an.
+- Das Markenzeichen der App ist jetzt die Lebenslinie statt des roten Kreuzes.
+
+### Lagebesprechung
+
+- In der iOS-App öffnet eine Kalenderdatei (.ics) den Dialog „Neues Ereignis“, damit der Termin der Lagebesprechung direkt in den Kalender übernommen werden kann.
+
+### Überblick
+
+- Ist ein Pegelwert veraltet, steht „veraltet“ an der Stelle des Trends.
+- Das Statuswort in der Verteilungsliste erscheint in der normalen Textschrift.
+
+### Verwaltung
+
+- Der Org-Schalter für die Fahrzeugortung liegt jetzt in der Verwaltung.
+- Übernommene Stammdaten erscheinen sofort bei allen anderen Nutzern, ohne neu zu laden.
+
+### Betrieb und Installation
+
+- Spiegelung und Schwärzung berücksichtigen jetzt die neuen Daten des Ausgangs und der Ortungskopplung.
+- Die Prüfung von Fax-Anbindungen funktioniert auch ohne Netz.
+
 ## [1.0.0-alpha.198](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.197...v1.0.0-alpha.198) (2026-11-25)
 
 ### Wichtige Änderungen
