@@ -1,3 +1,9 @@
+## [1.0.0-alpha.201](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.200...v1.0.0-alpha.201) (2026-11-27)
+
+### Betrieb und Installation
+
+- **Helfer-App erscheint mit jedem Release:** Mit jeder Freigabe einer neuen Version wird jetzt auch die Helfer-App gebaut und bereitgestellt, für iOS über TestFlight und für Android als APK. Bisher wurde sie nur bei Bedarf einzeln gebaut, sodass ein neues Release ohne passende Helfer-App erscheinen konnte.
+
 ## [1.0.0-alpha.200](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.199...v1.0.0-alpha.200) (2026-11-27)
 
 ### Betrieb und Installation
