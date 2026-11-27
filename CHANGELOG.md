@@ -1,3 +1,11 @@
+## [1.0.0-alpha.202](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.201...v1.0.0-alpha.202) (2026-11-27)
+
+### Helfer-App
+
+- **Aufträge melden sich deutlicher:** Ein neuer Auftrag in der Helfer-App kommt jetzt mit einem eigenen Pagerton statt mit dem Standardton für Mitteilungen.
+- **Android:** Aufträge laufen über einen eigenen Benachrichtigungskanal, der als Alarm eingestuft ist. Der Ton wiederholt sich, bis jemand reagiert. Der Auftrag öffnet sich als Vollbild, auch auf dem gesperrten Gerät.
+- **Erinnerung an offene Aufträge:** Ist ein Auftrag für ein gekoppeltes Gerät noch offen, erinnert die App nach 2 und nach 5 Minuten erneut daran. Damit fällt ein überhörter Auftrag nicht mehr unter den Tisch. Das gilt unter iOS und Android.
+
 ## [1.0.0-alpha.201](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.200...v1.0.0-alpha.201) (2026-11-27)
 
 ### Betrieb und Installation
