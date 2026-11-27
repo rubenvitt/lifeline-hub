@@ -52,5 +52,10 @@ und der Wurzel. Entscheidung: ADR-0101; Herleitung: `docs/superpowers/specs/2026
 - **Empfang** über `GET /api/incidents/{id}/live` (Ereignis `helfer_auftrag`) ab `aktiv`; SSE-Lesen,
   Wiederverbinden, Ordnung, Quittungsstand und „Mitteilung ja/nein“ entscheidet `helferkern`
   (`Livestrom`, `Empfang`, `Auftraege`) mit den Fällen `src-tauri/faelle/helfer-auftrag.json`.
-- **Mitteilungen** im Kanal „Aufträge“, `VISIBILITY_PRIVATE`, öffentliche Fassung „Neuer Auftrag“.
-  Ohne Mitteilungsrecht Hinweis in „Angemeldet“. Aufträge nie auf die Platte.
+- **Mitteilungen** im Kanal „Aufträge“ (`auftraege-pager`), `VISIBILITY_PRIVATE`, öffentliche
+  Fassung „Neuer Auftrag“. Ohne Mitteilungsrecht Hinweis in „Angemeldet“. Aufträge nie auf die Platte.
+- **Pager (LLH-2157):** Pagerton `res/raw/pagerton.wav` (nur aus `scripts/helfer/pagerton.sh`) mit
+  `USAGE_ALARM`, `CATEGORY_ALARM`, `FLAG_INSISTENT` und Full-Screen-Intent auf `PagerActivity`
+  (über dem Sperrbildschirm, ohne Inhalt; sichtbar macht sie die Mitteilung still). Ein Kanal ist
+  unveränderlich: ein neuer Ton braucht eine neue Kanal-Kennung, die alte wird gelöscht.
+  Erinnerungen entscheidet `Auftraege.erinnerungFaellig` (Fälle `erinnerung`), der Dienst prüft alle 15 s.

@@ -20,6 +20,12 @@ object Auftragsstand {
     /** Aufträge, die schon eine Mitteilung bekamen (je Prozess, nur im Speicher). */
     val gemeldet: MutableSet<Long> = java.util.Collections.synchronizedSet(mutableSetOf())
 
+    /** Die zuletzt gemeldete Stufe der Erinnerung je Auftrag (LLH-2157), unter `gemeldet` gesperrt. */
+    private val stufen: MutableMap<Long, Int> = mutableMapOf()
+
+    /** Die zuletzt gemeldete Stufe zu [auftragId] (0: erste Mitteilung). */
+    fun erinnerungsstufe(auftragId: Long): Int = synchronized(gemeldet) { stufen[auftragId] ?: 0 }
+
     /**
      * Übernimmt eine frisch geladene Liste: geordnet, Mitteilungen für die neuen, offenen, jungen
      * Aufträge ([Auftraege.sollMitteilen]), Mitteilungen erledigter Aufträge weg. Von Dienst und
@@ -46,7 +52,25 @@ object Auftragsstand {
     private fun merke(a: HelperTask, jetzt: Long): Boolean = synchronized(gemeldet) {
         if (!Auftraege.sollMitteilen(a, gemeldet, jetzt)) return@synchronized false
         gemeldet += a.id
+        // Kommt die erste Mitteilung spät, zählen schon vergangene Stufen als gemeldet.
+        stufen[a.id] = Auftraege.erinnerungsstufe(a, jetzt)
         true
+    }
+
+    /**
+     * Erinnert an offene Aufträge, die schon eine Mitteilung bekamen, sobald der Kern eine neue
+     * Stufe nennt ([Auftraege.erinnerungFaellig]); vom Dienst alle paar Sekunden gerufen.
+     */
+    fun erinnere(context: Context, jetzt: Long = System.currentTimeMillis()) {
+        val faellig = synchronized(gemeldet) {
+            liste.value.mapNotNull { a ->
+                if (a.id !in gemeldet) return@mapNotNull null
+                val stufe = Auftraege.erinnerungFaellig(a, stufen[a.id] ?: 0, jetzt) ?: return@mapNotNull null
+                stufen[a.id] = stufe
+                a to stufe
+            }
+        }
+        for ((a, stufe) in faellig) Mitteilungen.zeige(context, a, erinnerung = stufe)
     }
 
     /** Ersetzt einen Auftrag nach der Quittung (Antwort des Servers). */
@@ -58,6 +82,9 @@ object Auftragsstand {
     fun vergessen() {
         liste.value = emptyList()
         verbunden.value = false
-        gemeldet.clear()
+        synchronized(gemeldet) {
+            gemeldet.clear()
+            stufen.clear()
+        }
     }
 }

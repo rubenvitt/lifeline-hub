@@ -157,6 +157,7 @@ mod tests {
             t: 7,
             titel: "San-Trupp 2".into(),
             text: "Verletzte Person, Zelt 3".into(),
+            w: None,
         };
         assert_eq!(serde_json::to_string(&k).unwrap(), f["klartext"]);
     }
@@ -178,6 +179,7 @@ mod tests {
             t: 2,
             titel: "T".into(),
             text: "x".repeat(crate::helfer::pager::TEXT_MAX_ZEICHEN),
+            w: Some(2),
         };
         let u = umschlag_bauen(&a, &k).unwrap();
         let (kennung, nonce, c) = krypto::umschlag_lesen(&u).unwrap();

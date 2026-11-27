@@ -113,8 +113,10 @@ Für die Einsatzleitung:
 
 Für Helfende:
 
-1. Ein neuer Auftrag kommt als Mitteilung mit Ton, auch bei gesperrtem Bildschirm. Unter Android
-   steht auf dem Sperrbildschirm nur „Neuer Auftrag“.
+1. Ein neuer Auftrag kommt als Mitteilung mit eigenem Pagerton, auch bei gesperrtem Bildschirm.
+   Unter Android klingelt der Ton weiter, bis die Mitteilung angetippt wird, und über dem
+   Sperrbildschirm steht groß „Neuer Auftrag“ mit „Ansehen“; den Inhalt zeigt die App erst nach
+   dem Entsperren.
 2. Die Mitteilung antippen. Der Auftrag öffnet sich mit Text, Ort, Priorität, Frist und Empfänger.
 3. „Übernommen“ wählen. Danach steht dort „Übernommen um …“. War jemand derselben Einheit
    schneller, steht „Übernommen von …“.
@@ -184,6 +186,12 @@ ohne diese Anzeige.
   beendeter App; der Inhalt ist verschlüsselt und nur auf dem Gerät lesbar. Unter Android hält die
   App die Verbindung zum Server, solange die Anmeldung gilt; die Benachrichtigung „empfängt
   Aufträge“ zeigt das. Beendet Android die App, kommt nichts an.
+- **Erinnerung:** Ist der Auftrag 2 und 5 Minuten nach dem Erteilen noch nicht übernommen, kommt
+  er noch einmal als „Erinnerung · …“, danach nicht mehr. Übernimmt jemand derselben Einheit,
+  hört die Erinnerung für alle auf.
+- **Lautstärke:** Unter Android klingelt der Pagerton über die Weckerlautstärke, also auch, wenn
+  das Handy lautlos ist. Unter iOS gilt der Stummschalter: stumm vibriert das iPhone nur; im Fokus
+  kommt der Auftrag trotzdem durch (zeitkritische Mitteilung).
 - **Mitteilungen aus:** Wer Mitteilungen ablehnt, sieht in der App „Mitteilungen aus — du bekommst
   Aufträge nur bei offener App“.
 - **Ohne Netz:** Es gibt keine Warteschlange. Ein Auftrag, der nicht ankommt, bleibt ohne Quittung;

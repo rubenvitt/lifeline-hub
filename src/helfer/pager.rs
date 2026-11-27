@@ -8,6 +8,10 @@
 //!   ausgelieferten Zeilen (`helfer_gesendet IS NULL`), meldet allen Zielen live und schickt den
 //!   Zielen, für die der Auftrag neu ist, einen iOS-Push über das Relais.
 //! - [`notify_changed`] (Quittung, Aufhebung) meldet nur live.
+//! - [`erinnern`] (LLH-2157) schickt den iOS-Push nach [`ERINNERUNG_NACH_S`] erneut an die
+//!   Ziele, für die der Auftrag noch offen ist (keine eigene Zeile quittiert, nicht aufgehoben,
+//!   Kopplung bestätigt). Nur im Speicher: ein Neustart des Servers lässt ausstehende
+//!   Erinnerungen fallen (keine Warteschlange, ADR-0111).
 //!
 //! Die Zustellung lässt das Erteilen nie scheitern: Fehler werden ohne Token und Nutzlast geloggt.
 
@@ -17,6 +21,7 @@ use crate::helfer::auftraege::{EIGENE_ZEILE, PAGER_EMPFAENGER};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 /// Bundle-ID der Helfer-App; geht als `thema` an das Relais (`apns-topic`).
 pub const HELFER_BUNDLE_ID: &str = "dev.rubeen.lifeline.helfer";
@@ -24,6 +29,10 @@ pub const HELFER_BUNDLE_ID: &str = "dev.rubeen.lifeline.helfer";
 /// Größte Länge des Auftragstexts in der Nutzlast (Zeichen); der Umschlag muss in
 /// [`crate::ios_push::UMSCHLAG_MAX`] passen.
 pub const TEXT_MAX_ZEICHEN: usize = 600;
+
+/// Sekunden nach dem Erteilen, zu denen der Pager an einen offenen Auftrag erinnert (Stufe 1, 2);
+/// gemeinsame Fälle `src-tauri/faelle/helfer-auftrag.json`, Abschnitt `erinnerung`.
+pub const ERINNERUNG_NACH_S: [u64; 2] = [120, 300];
 
 /// Eine Helfer-Kopplung, an die ein Auftrag geht.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,6 +42,8 @@ pub struct PagerZiel {
     pub empfaenger_ids: Vec<i64>,
     /// Alle eigenen Zeilen sind noch nicht ausgeliefert: der Auftrag ist für diese Kopplung neu.
     pub is_new: bool,
+    /// Mindestens eine eigene Zeile ist noch nicht quittiert (wie `isOffen` in den Apps).
+    pub offen: bool,
     /// Anzeige der ersten eigenen Zeile (Titel der Mitteilung).
     pub titel: String,
 }
@@ -42,6 +53,7 @@ struct Treffer {
     kopplung_id: i64,
     empfaenger_id: i64,
     neu: bool,
+    quittiert: bool,
     empfaenger_typ: String,
     snap_anzeige: String,
 }
@@ -55,7 +67,8 @@ pub async fn resolve(
 ) -> Result<Vec<PagerZiel>, AppError> {
     let treffer: Vec<Treffer> = sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT gk.id AS kopplung_id, ae.id AS empfaenger_id, \
-                ae.helfer_gesendet IS NULL AS neu, ae.empfaenger_typ, ae.snap_anzeige \
+                ae.helfer_gesendet IS NULL AS neu, \
+                ae.quittiert_at IS NOT NULL AS quittiert, ae.empfaenger_typ, ae.snap_anzeige \
          FROM auftrag a \
          JOIN einsatz e ON e.id = a.einsatz_id \
          JOIN geraet_kopplung gk ON gk.einsatz_id = a.einsatz_id \
@@ -79,10 +92,12 @@ pub async fn resolve(
             kopplung_id: t.kopplung_id,
             empfaenger_ids: Vec::new(),
             is_new: true,
+            offen: false,
             titel,
         });
         z.empfaenger_ids.push(t.empfaenger_id);
         z.is_new &= t.neu;
+        z.offen |= !t.quittiert;
     }
     Ok(ziele.into_values().collect())
 }
@@ -101,6 +116,9 @@ pub struct PagerKlartext {
     pub t: i64,
     pub titel: String,
     pub text: String,
+    /// Stufe einer Erinnerung (1, 2); fehlt beim ersten Push.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub w: Option<u8>,
 }
 
 /// Kürzt `text` auf höchstens `max` Zeichen, mit `…` am Ende.
@@ -148,22 +166,48 @@ async fn deliver_inner(state: &AppState, einsatz_id: i64, auftrag_id: i64) -> Re
         .live
         .melde_helfer_auftrag(ziele.iter().map(|z| z.kopplung_id).collect(), auftrag_id);
     let neu: Vec<&PagerZiel> = ziele.iter().filter(|z| z.is_new).collect();
-    let Some(ios) = state.live.ios_push() else {
+    if neu.is_empty() || state.live.ios_push().is_none() {
+        return Ok(());
+    }
+    push_an(&state.pool, &state.live, einsatz_id, auftrag_id, &neu, None).await?;
+    let kopplungen: Vec<i64> = neu.iter().map(|z| z.kopplung_id).collect();
+    let abstaende = erinnerung_abstaende(&ERINNERUNG_NACH_S);
+    tokio::spawn(erinnern(
+        state.pool.clone(),
+        state.live.clone(),
+        einsatz_id,
+        auftrag_id,
+        kopplungen,
+        abstaende,
+    ));
+    Ok(())
+}
+
+/// Schickt den iOS-Push des Auftrags an die Anmeldungen der Ziele (`w`: Stufe einer Erinnerung).
+async fn push_an(
+    pool: &SqlitePool,
+    live: &crate::live::LiveHub,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    ziele: &[&PagerZiel],
+    w: Option<u8>,
+) -> Result<(), AppError> {
+    let Some(ios) = live.ios_push() else {
         return Ok(());
     };
-    if neu.is_empty() {
+    if ziele.is_empty() {
         return Ok(());
     }
     let text: String = sqlx::query_scalar("SELECT auftrag_text FROM auftrag WHERE id = ?")
         .bind(auftrag_id)
-        .fetch_one(&state.pool)
+        .fetch_one(pool)
         .await?;
-    let ids: Vec<i64> = neu.iter().map(|z| z.kopplung_id).collect();
-    let anmeldungen = crate::helfer::push::load_registrations(&state.pool, &ids).await?;
+    let ids: Vec<i64> = ziele.iter().map(|z| z.kopplung_id).collect();
+    let anmeldungen = crate::helfer::push::load_registrations(pool, &ids).await?;
     let sendungen: Vec<_> = anmeldungen
         .into_iter()
         .filter_map(|a| {
-            let z = neu.iter().find(|z| z.kopplung_id == a.kopplung_id)?;
+            let z = ziele.iter().find(|z| z.kopplung_id == a.kopplung_id)?;
             Some((
                 a,
                 PagerKlartext {
@@ -174,12 +218,73 @@ async fn deliver_inner(state: &AppState, einsatz_id: i64, auftrag_id: i64) -> Re
                     t: auftrag_id,
                     titel: z.titel.clone(),
                     text: kuerzen(&text, TEXT_MAX_ZEICHEN),
+                    w,
                 },
             ))
         })
         .collect();
-    ios.versenden_helfer(auftrag_id, sendungen);
+    if !sendungen.is_empty() {
+        ios.versenden_helfer(auftrag_id, sendungen);
+    }
     Ok(())
+}
+
+/// Wartezeiten zwischen den Erinnerungen aus den Zeitpunkten nach dem Erteilen: je Stufe
+/// (1, 2, …) die Zeit seit der vorigen.
+pub fn erinnerung_abstaende(nach_s: &[u64]) -> Vec<(u8, Duration)> {
+    let mut vorher = 0;
+    nach_s
+        .iter()
+        .enumerate()
+        .map(|(i, &n)| {
+            let warte = Duration::from_secs(n.saturating_sub(vorher));
+            vorher = n;
+            (u8::try_from(i + 1).unwrap_or(u8::MAX), warte)
+        })
+        .collect()
+}
+
+/// Die Ziele einer Erinnerung: aus `kopplungen` (die den Auftrag beim Erteilen neu bekamen) die,
+/// für die er jetzt noch offen ist. Ein beendetes Ziel fehlt in `ziele` ([`resolve`]).
+pub fn erinnerung_ziele<'a>(ziele: &'a [PagerZiel], kopplungen: &[i64]) -> Vec<&'a PagerZiel> {
+    ziele
+        .iter()
+        .filter(|z| z.offen && kopplungen.contains(&z.kopplung_id))
+        .collect()
+}
+
+/// Erinnert an einen offenen Auftrag (LLH-2157): wartet je Stufe, löst die Ziele frisch auf und
+/// schickt den iOS-Push mit `w` = Stufe erneut an die, für die er noch offen ist. Endet, sobald
+/// keines mehr offen ist. Fehler loggt es nur.
+pub async fn erinnern(
+    pool: SqlitePool,
+    live: crate::live::LiveHub,
+    einsatz_id: i64,
+    auftrag_id: i64,
+    kopplungen: Vec<i64>,
+    abstaende: Vec<(u8, Duration)>,
+) {
+    for (stufe, warte) in abstaende {
+        tokio::time::sleep(warte).await;
+        let ergebnis = async {
+            let ziele = resolve(&pool, einsatz_id, auftrag_id).await?;
+            let offen = erinnerung_ziele(&ziele, &kopplungen);
+            if offen.is_empty() {
+                return Ok::<bool, AppError>(false);
+            }
+            push_an(&pool, &live, einsatz_id, auftrag_id, &offen, Some(stufe)).await?;
+            Ok(true)
+        }
+        .await;
+        match ergebnis {
+            Ok(true) => {}
+            Ok(false) => return,
+            Err(e) => {
+                tracing::warn!(einsatz_id, auftrag_id, stufe, fehler = %e, "Erinnerung an Helfer-Apps fehlgeschlagen");
+                return;
+            }
+        }
+    }
 }
 
 /// Stellt einen erteilten oder berichtigten Auftrag zu: zählt neue Zeilen, meldet live, schickt
@@ -234,5 +339,53 @@ mod tests {
         assert_eq!(kuerzen("Zelt 3", 10), "Zelt 3");
         assert_eq!(kuerzen("Verletzte Person", 6), "Verle…");
         assert_eq!(kuerzen("Ääääää", 3), "Ää…");
+    }
+
+    fn faelle() -> serde_json::Value {
+        let pfad = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src-tauri/faelle/helfer-auftrag.json"
+        );
+        serde_json::from_str(&std::fs::read_to_string(pfad).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn erinnerung_folgt_den_gemeinsamen_faellen() {
+        let nach: Vec<u64> = faelle()["erinnerung"]["nach_s"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|n| n.as_u64().unwrap())
+            .collect();
+        assert_eq!(nach, ERINNERUNG_NACH_S);
+    }
+
+    #[test]
+    fn abstaende_zaehlen_ab_der_vorigen_stufe() {
+        assert_eq!(
+            erinnerung_abstaende(&[120, 300]),
+            vec![(1, Duration::from_secs(120)), (2, Duration::from_secs(180))]
+        );
+        assert!(erinnerung_abstaende(&[]).is_empty());
+    }
+
+    fn ziel(kopplung_id: i64, offen: bool) -> PagerZiel {
+        PagerZiel {
+            kopplung_id,
+            empfaenger_ids: vec![kopplung_id * 10],
+            is_new: false,
+            offen,
+            titel: "San-Trupp 2".into(),
+        }
+    }
+
+    #[test]
+    fn erinnert_nur_offene_ziele_vom_erteilen() {
+        let ziele = vec![ziel(1, true), ziel(2, false), ziel(3, true)];
+        let ids: Vec<i64> = erinnerung_ziele(&ziele, &[1, 2])
+            .iter()
+            .map(|z| z.kopplung_id)
+            .collect();
+        assert_eq!(ids, vec![1]);
     }
 }

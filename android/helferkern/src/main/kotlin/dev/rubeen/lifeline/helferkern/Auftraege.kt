@@ -24,6 +24,32 @@ object Auftraege {
     /** Eine Mitteilung bekommt nur ein Auftrag, der höchstens so alt ist (Entwurf: „jünger als 10 Minuten“). */
     const val MITTEILUNG_FENSTER_MS = 10 * 60 * 1_000L
 
+    /**
+     * Zeitpunkte nach dem Erteilen, zu denen der Pager an einen offenen Auftrag erinnert (Stufe 1,
+     * 2; LLH-2157, gemeinsame Fälle Abschnitt `erinnerung`, wie `ERINNERUNG_NACH_S` im Server).
+     */
+    val ERINNERUNG_NACH_MS = listOf(120_000L, 300_000L)
+
+    /**
+     * Die Stufe der Erinnerung zu [jetztMs]: wie viele Zeitpunkte aus [ERINNERUNG_NACH_MS] seit dem
+     * Erteilen vergangen sind; 0 ohne lesbare Zeit.
+     */
+    fun erinnerungsstufe(a: HelperTask, jetztMs: Long): Int {
+        val erteilt = Wire.serverzeit(a.issuedAt)?.toEpochMilli() ?: return 0
+        return ERINNERUNG_NACH_MS.count { jetztMs - erteilt >= it }
+    }
+
+    /**
+     * Die neue Stufe, an die der Pager für [a] jetzt erinnert, oder `null`: nur solange [a] offen
+     * ist und nur über [gemeldeteStufe] hinaus (jede Stufe einmal; eine verpasste springt auf die
+     * letzte fällige).
+     */
+    fun erinnerungFaellig(a: HelperTask, gemeldeteStufe: Int, jetztMs: Long): Int? {
+        if (!a.isOffen) return null
+        val stufe = erinnerungsstufe(a, jetztMs)
+        return stufe.takeIf { it > gemeldeteStufe }
+    }
+
     /** Offen vor quittiert vor aufgehoben, in jeder Gruppe der neueste zuerst. */
     fun ordnen(l: List<HelperTask>): List<HelperTask> =
         l.sortedWith(
@@ -109,5 +135,11 @@ object Auftraege {
     const val QUITTUNG_FEHLGESCHLAGEN = "Bitte über Funk bestätigen"
     const val AUFGEHOBEN = "aufgehoben"
     const val MITTEILUNG_OEFFENTLICH = "Neuer Auftrag"
+    /** Vor dem Titel einer Erinnerung (gemeinsame Fälle `erinnerung.praefix`). */
+    const val ERINNERUNG = "Erinnerung · "
+    /** Kopf des Vollbilds über dem Sperrbildschirm bei einer Erinnerung. */
+    const val ERINNERUNG_OEFFENTLICH = "Erinnerung: offener Auftrag"
+    /** Knopf des Vollbilds: entsperren und den Auftrag zeigen. */
+    const val ANSEHEN = "Ansehen"
     const val KANAL = "Aufträge"
 }

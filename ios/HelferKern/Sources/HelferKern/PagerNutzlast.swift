@@ -2,7 +2,8 @@ import Foundation
 import LifelineKern
 
 /// Der entschlüsselte Klartext eines Auftrags-Push (`PagerKlartext` in src/helfer/pager.rs):
-/// `{v: 1, s, art: "auftrag", e, t, titel, text}`.
+/// `{v: 1, s, art: "auftrag", e, t, titel, text}`, bei einer Erinnerung dazu `w` (Stufe 1, 2;
+/// LLH-2157).
 public struct PagerKlartext: Equatable, Sendable {
     public let version: Int
     /// Name des Servers (`s`).
@@ -11,6 +12,8 @@ public struct PagerKlartext: Equatable, Sendable {
     public let auftragId: Int64
     public let titel: String
     public let text: String?
+    /// Stufe der Erinnerung (`w`); `nil` beim ersten Push.
+    public let erinnerung: Int?
 }
 
 /// Was der Mitteilungsdienst anzeigt.
@@ -47,8 +50,9 @@ public enum PagerNutzlast {
         let t: Int64?
         let titel: String?
         let text: String?
+        let w: Int64?
 
-        private enum CodingKeys: String, CodingKey { case v, s, art, e, t, titel, text }
+        private enum CodingKeys: String, CodingKey { case v, s, art, e, t, titel, text, w }
 
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -65,6 +69,7 @@ public enum PagerNutzlast {
             t = zahl(.t)
             titel = wort(.titel)
             self.text = wort(.text)
+            w = zahl(.w)
         }
     }
 
@@ -76,14 +81,17 @@ public enum PagerNutzlast {
             let e = roh.e, let t = roh.t, let titel = roh.titel
         else { return nil }
         return PagerKlartext(
-            version: 1, server: roh.s, einsatzId: e, auftragId: t, titel: titel, text: roh.text)
+            version: 1, server: roh.s, einsatzId: e, auftragId: t, titel: titel, text: roh.text,
+            erinnerung: roh.w.flatMap { $0 > 0 ? Int($0) : nil })
     }
 
-    /// Die Meldung aus dem entschlüsselten Klartext; `nil` wie bei `klartext`.
+    /// Die Meldung aus dem entschlüsselten Klartext; `nil` wie bei `klartext`. Eine Erinnerung
+    /// trägt `AuftragAnzeige.erinnerung` vor dem Titel.
     public static func meldung(aus daten: Data) -> PagerMeldung? {
         guard let k = klartext(daten) else { return nil }
+        let titel = k.erinnerung == nil ? k.titel : AuftragAnzeige.erinnerung + k.titel
         return PagerMeldung(
-            titel: k.titel, text: k.text ?? "", thread: "auftraege-\(k.einsatzId)",
+            titel: titel, text: k.text ?? "", thread: "auftraege-\(k.einsatzId)",
             einsatzId: k.einsatzId, auftragId: k.auftragId)
     }
 }

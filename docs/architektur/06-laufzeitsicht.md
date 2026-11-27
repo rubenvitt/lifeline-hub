@@ -1103,3 +1103,9 @@ sequenceDiagram
 - Die Push-Anmeldung (`helfer_push_anmeldung`, Migration 0389) endet mit der Kopplung:
   `geraet::repo::beenden`, Ablauf-Takt (`geraet::ablauf::raeume_helfer`) und Einsatzabschluss
   (`einsatz::repo::abschliessen`) löschen sie; `resolve` prüft trotzdem bei jeder Zustellung frisch.
+- Erinnerung (LLH-2157): nach dem ersten Push startet `deliver` je Auftrag einen Task
+  `pager::erinnern`, der nach 2 und 5 Minuten (`ERINNERUNG_NACH_S`, Fälle `erinnerung` in
+  `src-tauri/faelle/helfer-auftrag.json`) die Ziele neu auflöst und nur an Kopplungen vom Erteilen
+  schickt, die noch eine eigene offene Zeile haben; gleiche Kollaps-Kennung, Klartext `w` = Stufe.
+  Ein Neustart des Servers verwirft ausstehende Erinnerungen. Android erinnert im Dienst selbst
+  (`Auftraege.erinnerungFaellig`, alle 15 s) mit Dauerton und Vollbild (`PagerActivity`).

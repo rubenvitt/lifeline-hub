@@ -1,5 +1,5 @@
 {
-  "zweck": "Gemeinsame Fälle der Aufträge an die Helfer-App (ADR-0111) für Server (Rust), HelferKern (Swift) und helferkern (Kotlin). nutzlast: Testvektor wie push-nutzlast.json (AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat + 16-Byte-Tag, umschlag = base64url des kompakten JSON {c,k,n}; alle Binärwerte base64url ohne Auffüllung). sse: Rohtext des Live-Stroms und die Ereignisse, die ein Leser daraus macht (ein Rahmen endet mit einer Leerzeile; nur event helfer_auftrag mit data {task_id} ist ein Auftrag, heartbeat ein Lebenszeichen, alles andere unbekannt; Kommentar- und retry-Rahmen ohne event erzeugen nichts). ordnung: Liste aus GET /api/devices/me/tasks → Reihenfolge der IDs. mitteilung: ob ein Auftrag eine Mitteilung bekommt (offen, nicht aufgehoben, noch nicht gemeldet, issued_at höchstens 10 Minuten vor jetzt; Zeiten UTC). quittungsstand: Stand einer Empfängerzeile (erste Zeile des Auftrags). quittungstext: ob eine quittierte Empfängerzeile die eigene ist (acknowledged_by leer oder gleich dem eigenen Anzeigenamen, beide ohne Rand verglichen) und der Text dazu in UTC; offen: nicht eigen, kein Text.",
+  "zweck": "Gemeinsame Fälle der Aufträge an die Helfer-App (ADR-0111) für Server (Rust), HelferKern (Swift) und helferkern (Kotlin). nutzlast: Testvektor wie push-nutzlast.json (AES-256-GCM, AAD = kennung als UTF-8, chiffrat = Chiffrat + 16-Byte-Tag, umschlag = base64url des kompakten JSON {c,k,n}; alle Binärwerte base64url ohne Auffüllung). sse: Rohtext des Live-Stroms und die Ereignisse, die ein Leser daraus macht (ein Rahmen endet mit einer Leerzeile; nur event helfer_auftrag mit data {task_id} ist ein Auftrag, heartbeat ein Lebenszeichen, alles andere unbekannt; Kommentar- und retry-Rahmen ohne event erzeugen nichts). ordnung: Liste aus GET /api/devices/me/tasks → Reihenfolge der IDs. mitteilung: ob ein Auftrag eine Mitteilung bekommt (offen, nicht aufgehoben, noch nicht gemeldet, issued_at höchstens 10 Minuten vor jetzt; Zeiten UTC). quittungsstand: Stand einer Empfängerzeile (erste Zeile des Auftrags). quittungstext: ob eine quittierte Empfängerzeile die eigene ist (acknowledged_by leer oder gleich dem eigenen Anzeigenamen, beide ohne Rand verglichen) und der Text dazu in UTC; offen: nicht eigen, kein Text. erinnerung (LLH-2157): solange ein Auftrag offen ist, erinnert der Pager nach_s Sekunden nach issued_at erneut (Stufe 1, 2, …; Server per iOS-Push mit w = Stufe im Klartext, Android im Dienst); eine Stufe kommt nur einmal (gemeldete_stufe), erwartet ist die neue Stufe oder null; der Titel einer Erinnerung ist praefix + Titel.",
   "nutzlast": [
     {
       "beschreibung": "Auftrag an eine Einheit",
@@ -533,5 +533,230 @@
         "text": null
       }
     }
-  ]
+  ],
+  "erinnerung": {
+    "nach_s": [
+      120,
+      300
+    ],
+    "praefix": "Erinnerung · ",
+    "faelle": [
+      {
+        "beschreibung": "vor zwei Minuten keine",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 0,
+        "jetzt": "2026-11-25 10:01:59",
+        "erwartet": null
+      },
+      {
+        "beschreibung": "nach zwei Minuten die erste",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 0,
+        "jetzt": "2026-11-25 10:02:00",
+        "erwartet": 1
+      },
+      {
+        "beschreibung": "die erste kommt nur einmal",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 1,
+        "jetzt": "2026-11-25 10:04:00",
+        "erwartet": null
+      },
+      {
+        "beschreibung": "nach fünf Minuten die zweite",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 1,
+        "jetzt": "2026-11-25 10:05:00",
+        "erwartet": 2
+      },
+      {
+        "beschreibung": "verpasste Stufe springt auf die letzte",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 0,
+        "jetzt": "2026-11-25 10:06:00",
+        "erwartet": 2
+      },
+      {
+        "beschreibung": "nach der letzten nichts mehr",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 2,
+        "jetzt": "2026-11-25 10:30:00",
+        "erwartet": null
+      },
+      {
+        "beschreibung": "quittiert: keine Erinnerung",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": null,
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": "2026-11-25 10:01:00",
+              "acknowledged_by": "Max M."
+            }
+          ]
+        },
+        "gemeldete_stufe": 0,
+        "jetzt": "2026-11-25 10:03:00",
+        "erwartet": null
+      },
+      {
+        "beschreibung": "aufgehoben: keine Erinnerung",
+        "auftrag": {
+          "id": 1,
+          "number": 1,
+          "text": "Auftrag 1",
+          "location": null,
+          "location_lat": null,
+          "location_lon": null,
+          "priority": "normal",
+          "deadline_at": null,
+          "issued_at": "2026-11-25 10:00:00",
+          "cancelled_at": "2026-11-25 10:01:00",
+          "recipients": [
+            {
+              "id": 101,
+              "kind": "unit",
+              "label": "San-Trupp 2",
+              "acknowledged_at": null,
+              "acknowledged_by": null
+            }
+          ]
+        },
+        "gemeldete_stufe": 0,
+        "jetzt": "2026-11-25 10:03:00",
+        "erwartet": null
+      }
+    ]
+  }
 }

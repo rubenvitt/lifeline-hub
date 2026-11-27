@@ -182,6 +182,14 @@ final class HelferAuftragFaelleTests: XCTestCase {
         let mitteilung: [MitteilungFall]
         let quittungsstand: [QuittungsstandFall]
         let quittungstext: [QuittungstextFall]
+        let erinnerung: Erinnerung
+    }
+
+    /// Abschnitt `erinnerung` (LLH-2157); die Zeitpunkte gelten im Server, hier nur der Titel.
+    struct Erinnerung: Decodable {
+        /// `nach_s` in der JSON.
+        let nachS: [Int]
+        let praefix: String
     }
 
     struct NutzlastFall: Decodable {
@@ -281,6 +289,25 @@ final class HelferAuftragFaelleTests: XCTestCase {
             XCTAssertEqual(meldung.auftragId, erwartet.t, fall.beschreibung)
             XCTAssertEqual(meldung.thread, "auftraege-\(erwartet.e)", fall.beschreibung)
         }
+    }
+
+    func testErinnerungTraegtDasPraefixVorDemTitel() throws {
+        let e = try datei().erinnerung
+        XCTAssertEqual(AuftragAnzeige.erinnerung, e.praefix)
+        XCTAssertEqual(e.nachS, [120, 300])
+        let roh = Data(
+            #"{"v":1,"s":"Lifeline","art":"auftrag","e":42,"t":7,"titel":"San-Trupp 2","text":"Zelt 3","w":2}"#
+                .utf8)
+        let klartext = try XCTUnwrap(PagerNutzlast.klartext(roh))
+        XCTAssertEqual(klartext.erinnerung, 2)
+        let meldung = try XCTUnwrap(PagerNutzlast.meldung(aus: roh))
+        XCTAssertEqual(meldung.titel, e.praefix + "San-Trupp 2")
+        // Ohne `w` (erster Push) bleibt der Titel, wie er ist.
+        let erst = Data(
+            #"{"v":1,"s":"Lifeline","art":"auftrag","e":42,"t":7,"titel":"San-Trupp 2","text":"Zelt 3"}"#
+                .utf8)
+        XCTAssertNil(try XCTUnwrap(PagerNutzlast.klartext(erst)).erinnerung)
+        XCTAssertEqual(try XCTUnwrap(PagerNutzlast.meldung(aus: erst)).titel, "San-Trupp 2")
     }
 
     func testJederGemeinsameFallVonOrdnungGilt() throws {
