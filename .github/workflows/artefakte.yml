@@ -388,6 +388,35 @@ jobs:
       tag: ${{ needs.vorbereiten.outputs.tag }}
     secrets: inherit
 
+  # ── Helfer-App (ADR-0101, Bau in ios-helfer.yml und android-helfer.yml) ─────────────
+  # Nach der Freigabe jedes Tags die Helfer-App mitbauen: TestFlight (Helfer) verteilt selbst an
+  # „Intern“, die Helfer-APK landet als Workflow-Artefakt (einen Update-Kanal hat sie noch nicht).
+  # Per Handstart (workflow_dispatch) statt workflow_call: die Build-Nummer ist die Laufnummer des
+  # Helfer-Workflows plus 1000 und muss mit jedem Lauf steigen; ein Aufruf hier trüge die
+  # Laufnummer von Artefakte und fiele hinter schon hochgeladene Builds zurück. Wie `ios` steht der
+  # Job in keinem `needs` davor: ein roter Helfer-Bau hält weder Release noch Deployment auf.
+  helfer:
+    name: Helfer-App anstoßen
+    needs: [vorbereiten, freigeben]
+    if: >-
+      ${{ !cancelled() && inputs.freigeben
+      && needs.freigeben.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: TestFlight (Helfer) und APK (Helfer) für den Tag starten
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.vorbereiten.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for workflow in ios-helfer.yml android-helfer.yml; do
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref "$TAG"
+            echo "Gestartet: $workflow für $TAG"
+          done
+
   # ── Android-App (LLH-1989, Bau und Ablage in android.yml) ───────────────────────────
   # Nach der Freigabe für jeden Kanal: signierte APK ans Release, Manifest und feste APK in die
   # Kanäle (Entwurf D9). Wie `ios` hängt der Job an `freigeben` und steht in keinem `needs` davor:

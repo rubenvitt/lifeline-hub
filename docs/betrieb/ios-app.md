@@ -290,7 +290,8 @@ Bildschirm. Bundle-ID `dev.rubeen.lifeline.helfer`, Widget-Erweiterung
 `dev.rubeen.lifeline.helfer.aktivitaet` (Live-Aktivität), App Group
 `group.dev.rubeen.lifeline.helfer`, eigene App „Lifeline Helfer“ in App Store Connect.
 
-- **Upload:** `.github/workflows/ios-helfer.yml` an einem PR mit dem Label `testflight-helfer`
+- **Upload:** `.github/workflows/ios-helfer.yml` nach jedem freigegebenen Release (Job `helfer`
+  in `artefakte.yml` startet ihn mit dem Tag), an einem PR mit dem Label `testflight-helfer`
   (beim Setzen und bei jedem weiteren Push) oder per Handstart (Actions → „Helfer-App
   (TestFlight)“). Den Ablauf trägt `scripts/ios/testflight.sh --app helfer --build <n>`; die
   Build-Nummer ist die Laufnummer plus 1000, die Version steht in `scripts/ios/helfer-version.sh`.
