@@ -41,14 +41,25 @@ describe('AnrufErfassung (LFH-554)', () => {
 
   it('steht auch dann wieder im Anliegen, wenn ein Frame vor dem Neu-Einhängen läuft', async () => {
     // `resetFields` hängt jedes Feld neu ein. Unter CI-Last lief ein `requestAnimationFrame` vor
-    // diesem Commit, der Fokus fiel auf `body`. Ein sofort laufender Frame stellt das nach.
+    // diesem Commit, der Fokus fiel auf `body`. Ein Frame gleich im nächsten Mikrotask stellt das
+    // nach. Nicht synchron im Aufruf: rc-motion (`useNextFrame`) liest im Rückruf die Kennung, die
+    // `raf()` erst zurückgibt, und ein synchroner Frame warf dort „Cannot access 'nextFrameId'
+    // before initialization“ als unbehandelten Fehler (Frontend-Suite 4/4, 27.11.).
     const erfassen = vi.fn().mockResolvedValue({});
     renderMitProviders(<AnrufErfassung onErfassen={erfassen} laeuft={false} fehler={null} />);
     await waehleAnliegen('Auskunft zur Lage');
     await userEvent.type(screen.getByLabelText('Notiz'), 'Sperrung B 3');
+    let letzteKennung = 0;
+    const abgesagt = new Set<number>();
     const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
-      cb(0);
-      return 0;
+      const kennung = ++letzteKennung;
+      queueMicrotask(() => {
+        if (!abgesagt.has(kennung)) cb(performance.now());
+      });
+      return kennung;
+    });
+    const absage = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((kennung) => {
+      abgesagt.add(kennung);
     });
     try {
       await userEvent.keyboard('{Enter}');
@@ -56,6 +67,7 @@ describe('AnrufErfassung (LFH-554)', () => {
       await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Anliegen')));
     } finally {
       frame.mockRestore();
+      absage.mockRestore();
     }
   });
 
