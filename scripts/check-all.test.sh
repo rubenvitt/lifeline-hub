@@ -273,7 +273,9 @@ schritt_4_def="$(sed -n '/^schritt_4() {/,/^}/p;/^rust_tests_in_teilen() {/,/^}/
 touch "$ARBEIT/s4/target/debug/build/hub/ab12/out/a-ab12" && chmod +x "$ARBEIT/s4/target/debug/build/hub/ab12/out/a-ab12"
 rc=0; fahren "ROOT='$ARBEIT/s4'; GITHUB_ACTIONS=1; RUST_TEST_TEILE=2; PATH='$ARBEIT/s4/bin':\"\$PATH\"; $attrappen; $schritt_4_def" 0 4 || rc=$?
 pruefe "18b Schritt 4 in Teilen grün" 0 "$rc"
-enthaelt "18b zuerst Bibliothek, Binaries, Beispiele" '^cargo-lief test --workspace --exclude lifeline-desktop --lib --bins --examples$'
+enthaelt "18b zuerst die Bibliothek allein" '^cargo-lief build --workspace --exclude lifeline-desktop --lib$'
+enthaelt "18b dann Bibliothek, Binaries, Beispiele" '^cargo-lief test --workspace --exclude lifeline-desktop --lib --bins --examples$'
+pruefe "18b Bibliothek vor ihren Unit-Tests" 0 "$(grep -m1 '^cargo-lief ' "$ARBEIT/aus" | grep -q '^cargo-lief build --workspace' && echo 0 || echo 1)"
 enthaelt "18b Doku-Tests" '^cargo-lief test --workspace --exclude lifeline-desktop --doc$'
 enthaelt "18b erster Teil" '^cargo-lief test --workspace --exclude lifeline-desktop --test a --test b$'
 enthaelt "18b zweiter Teil" '^cargo-lief test --workspace --exclude lifeline-desktop --test c --test d$'

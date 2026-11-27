@@ -115,19 +115,28 @@ jobs:
           df -h / /mnt 2> /dev/null || df -h /
           free -h
       - name: Rust-Suite
-        # Platte und Speicher jede Minute ins Log, dazu die drei größten Prozesse. Ein Wächter bricht
-        # den Bau ab, bevor Platte oder Speicher ganz ausgehen: Stirbt der Runner („lost
-        # communication“, zweimal am 27.11.), ist das ganze Log weg; bricht der Wächter ab, bleibt
-        # es stehen und nennt den Grund.
+        # Platte und Speicher jede Minute ins Log, dazu die drei größten Prozesse. Ein Wächter
+        # (alle 15 s) bricht den Bau ab, bevor Platte oder Speicher ausgehen: Stirbt der Runner
+        # („lost communication“, dreimal am 27.11.), ist das ganze Log weg; bricht der Wächter
+        # ab, bleibt es stehen und nennt den Grund. Knapper Speicher zählt auch bei freier
+        # Auslagerung: Wer dann weiter auslagert, lässt den Runner verhungern. Der Runner selbst
+        # ist vom OOM-Killer ausgenommen, der träfe sonst womöglich ihn statt rustc.
         run: |
-          ( while sleep 60; do
+          for pid in $(pgrep -f 'Runner\.(Listener|Worker)|provjobd' || true); do
+            echo -1000 | sudo tee "/proc/$pid/oom_score_adj" > /dev/null || true
+          done
+          ( takt=0 knapp=0
+            while sleep 15; do
               platte="$(df -BG --output=avail / | tail -1 | tr -dc '0-9')"
               speicher="$(free -m | awk '/^Mem:/ {print $7}')"
-              auslagerung_frei="$(free -m | awk '/^Swap:/ {print $4}')"
-              echo "Stand $(date +%H:%M) Platte ${platte}G frei, Speicher ${speicher} MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt;" \
-                "$(ps -eo rss=,comm= --sort=-rss | head -3 | awk '{printf "%s %d MB; ", $2, $1/1024}')"
-              if [ "$platte" -lt 3 ] || { [ "$speicher" -lt 300 ] && [ "$auslagerung_frei" -lt 1000 ]; }; then
-                echo "::error::Wächter: Platte ${platte}G frei, Speicher ${speicher} MB, Auslagerung frei ${auslagerung_frei} MB. Bau abgebrochen, bevor der Runner stirbt."
+              if [ $((takt++ % 4)) -eq 0 ]; then
+                echo "Stand $(date +%H:%M) Platte ${platte}G frei, Speicher ${speicher} MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt;" \
+                  "$(ps -eo rss=,comm= --sort=-rss | head -3 | awk '{printf "%s %d MB; ", $2, $1/1024}')"
+              fi
+              if [ "$speicher" -lt 400 ]; then knapp=$((knapp + 1)); else knapp=0; fi
+              if [ "$platte" -lt 5 ] || [ "$knapp" -ge 2 ]; then
+                echo "::error::Wächter: Platte ${platte}G frei, Speicher ${speicher} MB frei (seit $((knapp * 15)) s knapp). Bau abgebrochen, bevor der Runner stirbt."
+                free -m
                 ps -eo rss=,args= --sort=-rss | head -15 | cut -c1-200
                 du -sh "${CARGO_TARGET_DIR:-target}" 2> /dev/null || true
                 pkill -TERM -x cargo || true

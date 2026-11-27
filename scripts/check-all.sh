@@ -181,6 +181,10 @@ schritt_4() {
 rust_tests_in_teilen() {
   local -a ws=(--workspace --exclude lifeline-desktop) namen teil
   local anzahl groesse i n teile="${RUST_TEST_TEILE:-4}"
+  # Bibliothek erst allein: Ihr Bau (gut 5 GB) und ihr Unit-Test-Bau (gut 8 GB) liefen sonst
+  # gleichzeitig, auf 15 GB Speicher mit Auslagerung bis 9 GB (Stand-Log 27.11.). `cargo test`
+  # nimmt die fertige Bibliothek danach unverändert.
+  ohne_dev_env cargo build "${ws[@]}" --lib
   ohne_dev_env cargo test "${ws[@]}" --lib --bins --examples
   testprogramme_loeschen
   ohne_dev_env cargo test "${ws[@]}" --doc
