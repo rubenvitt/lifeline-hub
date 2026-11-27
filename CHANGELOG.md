@@ -1,3 +1,9 @@
+## [1.0.0-alpha.200](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.199...v1.0.0-alpha.200) (2026-11-27)
+
+### Betrieb und Installation
+
+- **Linux-Programmdatei (x86_64) läuft wieder auf verbreiteten Linux-Systemen:** Sie wird jetzt wie die ARM64-Ausgabe auf Ubuntu 24.04 gebaut. Damit startet sie auch auf Systemen mit älterer glibc, zum Beispiel auf Debian 13 und im offiziellen Container-Abbild. Die Vorgängerversion 1.0.0-alpha.199 brach dort beim Start ab und wurde deshalb weder freigegeben noch ausgeliefert. Wer von einer früheren Version aktualisiert, erhält ihre Änderungen mit diesem Release.
+
 ## [1.0.0-alpha.199](https://github.com/rubenvitt/lifeline-hub/compare/v1.0.0-alpha.198...v1.0.0-alpha.199) (2026-11-27)
 
 ### Wichtige Änderungen
