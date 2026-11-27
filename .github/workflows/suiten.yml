@@ -58,7 +58,9 @@ jobs:
       group: ci-rust-${{ github.event_name == 'push' && github.ref || github.run_id }}
       cancel-in-progress: false
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # 120 statt 90: Ohne Cache-Treffer (nach einer Lockfile-Änderung, und bis ein Lauf ihn neu
+    # schreibt) dauerte Schritt 4 am 26.11. 82 Minuten, mit Auslagerung beim Bauen.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # Immer aufräumen, aber im Hintergrund: Die Suite baut je Datei in `tests/` ein eigenes
@@ -94,8 +96,32 @@ jobs:
         with:
           version: 2026.9.1
           cache: true
+      # SPEICHER: 4 Kerne, 15 GB. Kalt gebaut (ohne Cache-Treffer) lief der Speicher am 26.11.
+      # nach drei Minuten voll, die vorhandene Auslagerung (rund 3 GB) auch, und der Runner starb
+      # mit „shutdown signal“ (Stand-Log im Rust-Job, f90df2a1). 12 GB Auslagerung, auf /mnt,
+      # wenn das eine eigene Platte ist, sonst auf / (kostet dann Platz, s. Plattenplatz).
+      - name: Auslagerung vergrößern
+        run: |
+          ort=/swapfile
+          if mountpoint -q /mnt && [ "$(df --output=source /mnt | tail -1)" != "$(df --output=source / | tail -1)" ]; then
+            ort=/mnt/swapfile
+          fi
+          sudo swapoff -a
+          sudo rm -f /mnt/swapfile /swapfile
+          sudo fallocate -l 12G "$ort"
+          sudo chmod 600 "$ort"
+          sudo mkswap "$ort" > /dev/null
+          sudo swapon "$ort"
+          df -h / /mnt 2> /dev/null || df -h /
+          free -h
       - name: Rust-Suite
-        run: ./scripts/check-all.sh --nur rust
+        # Platte und Speicher jede Minute ins Log: Stirbt der Runner, endet das Log hier mit dem
+        # letzten Stand, statt raten zu lassen, ob Platte oder Speicher ausging (so gefunden).
+        run: |
+          ( while sleep 60; do
+              echo "Stand $(date +%H:%M) Platte $(df -BG --output=avail / | tail -1 | tr -d ' ') frei, Speicher $(free -m | awk '/^Mem:/ {print $7}') MB frei, Auslagerung $(free -m | awk '/^Swap:/ {print $3}') MB belegt"
+            done ) &
+          ./scripts/check-all.sh --nur rust
       - name: Plattenplatz danach
         if: ${{ always() }}
         run: df -h /
