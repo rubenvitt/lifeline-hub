@@ -17,9 +17,10 @@ RUN mkdir -p /data
 # cc-debian13: glibc + libgcc, keine Shell. Reicht, weil SQLite und OpenSSL statisch eingebacken
 # sind.
 #
-# debian13, NICHT debian12: die Binary kommt von ubuntu-latest und verlangt GLIBC_2.38/2.39,
-# cc-debian12 hat nur 2.36. Wer den Runner in artefakte.yml hebt, prüft hier die glibc mit; der
-# Starttest dort fängt einen Rückfall ab.
+# debian13, NICHT debian12: die Binary kommt von ubuntu-24.04 und verlangt GLIBC_2.38/2.39,
+# cc-debian12 hat nur 2.36. Der Runner steht in artefakte.yml fest auf 24.04, weil ubuntu-latest
+# inzwischen 26.04 ist (glibc 2.43, mehr als die 2.41 von debian13). Wer ihn hebt, prüft hier die
+# glibc mit; der Starttest dort fängt einen Rückfall ab.
 FROM gcr.io/distroless/cc-debian13:nonroot
 
 ARG TARGETARCH

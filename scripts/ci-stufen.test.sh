@@ -267,6 +267,14 @@ for geheim in APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CON
   pruefe "ios.yml reicht $geheim an das Skript" \
     enthaelt "$(job "$IOSREL" testflight)" "$geheim: \${{ secrets.$geheim }}"
 done
+# Das Linux-Binary läuft im Abbild auf cc-debian13 (glibc 2.41): gebaut wird es auf 24.04
+# (glibc 2.39). ubuntu-latest ist 26.04 (glibc 2.43) und bräche den Starttest des Abbilds.
+for ziel in linux-x86_64 linux-arm64; do
+  pruefe "artefakte.yml: $ziel baut auf Ubuntu 24.04 (glibc des Abbilds)" \
+    grep -qzP "name: $ziel\n\s+runs-on: ubuntu-24\.04(-arm)?\n" <<< "$(job "$ART" bauen)"
+done
+pruefe "artefakte.yml: Runner im Rust-Cache-Schlüssel" \
+  enthaelt "$(job "$ART" bauen)" 'key: artefakt-${{ matrix.target }}-${{ matrix.runs-on }}'
 pruefe "artefakte.yml: Job ios ruft ios.yml" enthaelt "$(job "$ART" ios)" "uses: ./.github/workflows/ios.yml"
 pruefe "artefakte.yml: ios erbt die Secrets" enthaelt "$(job "$ART" ios)" "secrets: inherit"
 pruefe "artefakte.yml: ios nach freigeben" enthaelt "$(job "$ART" ios)" "needs: [vorbereiten, freigeben]"

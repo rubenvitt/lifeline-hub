@@ -106,8 +106,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Fest auf 24.04 (glibc 2.39), nicht ubuntu-latest: das Binary läuft im Abbild auf
+          # cc-debian13 (glibc 2.41). ubuntu-latest wurde im November 2026 zu 26.04 (glibc 2.43),
+          # und der Starttest im Job `docker` brach mit „GLIBC_2.43 not found“ ab. arm64 steht aus
+          # demselben Grund auf 24.04. Heben nur zusammen mit der Basis im Dockerfile.
           - name: linux-x86_64
-            runs-on: ubuntu-latest
+            runs-on: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             sbom: true
           - name: linux-arm64
@@ -146,7 +150,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          key: artefakt-${{ matrix.target }}
+          # Der Runner gehört in den Schlüssel: der Cache kennt die Abbildversion nicht, und ein
+          # unter 26.04 gebautes target/ (C-Teile gegen glibc 2.43) machte den Wechsel zurück
+          # auf 24.04 wirkungslos.
+          key: artefakt-${{ matrix.target }}-${{ matrix.runs-on }}
 
       - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
