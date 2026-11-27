@@ -255,6 +255,36 @@ printf '#!/bin/sh\ncase "$*" in *karten-service*) echo karten-rot; exit 101 ;; e
 rc=0; fahren "ROOT='$ARBEIT/s19'; PATH='$ARBEIT/s19/bin':\"\$PATH\"; $attrappen; $schritt_19_def" 0 19 || rc=$?
 pruefe "18 Schritt 19 rot, wenn der karten-service nicht übersetzt" 1 "$rc"
 
+# 18b — Schritt 4 in GitHub Actions in Teilen (LLH-2153): Bibliothek/Binaries/Beispiele, Doku,
+# dann die Integrationstests in RUST_TEST_TEILE Gruppen, jedes Mal mit `--workspace` (dieselbe
+# Feature-Vereinigung) und danach gelöschten Testprogrammen. Lokal ein einziger Aufruf.
+mkdir -p "$ARBEIT/s4/bin" "$ARBEIT/s4/target/debug/deps" "$ARBEIT/s4/target/debug/build/hub/ab12/out"
+cat > "$ARBEIT/s4/bin/cargo" <<'CARGO'
+#!/bin/sh
+if [ "$1" = metadata ]; then
+  printf '%s' '{"packages":[{"name":"lifeline-hub","targets":[{"kind":["lib"],"name":"lifeline_hub"},{"kind":["test"],"name":"a"},{"kind":["test"],"name":"b"},{"kind":["test"],"name":"c"}]},{"name":"push-relais","targets":[{"kind":["test"],"name":"d"}]},{"name":"lifeline-desktop","targets":[{"kind":["test"],"name":"hülle"}]}]}'
+  exit 0
+fi
+echo "cargo-lief $*"
+CARGO
+chmod +x "$ARBEIT/s4/bin/cargo"
+schritt_4_def="$(sed -n '/^schritt_4() {/,/^}/p;/^rust_tests_in_teilen() {/,/^}/p;/^testprogramme_loeschen() {/,/^}/p' "$CHECK_ALL")"
+[ -n "$schritt_4_def" ] || { echo "FAIL 18b schritt_4 fehlt in check-all.sh" >&2; fehler=1; }
+touch "$ARBEIT/s4/target/debug/build/hub/ab12/out/a-ab12" && chmod +x "$ARBEIT/s4/target/debug/build/hub/ab12/out/a-ab12"
+rc=0; fahren "ROOT='$ARBEIT/s4'; GITHUB_ACTIONS=1; RUST_TEST_TEILE=2; PATH='$ARBEIT/s4/bin':\"\$PATH\"; $attrappen; $schritt_4_def" 0 4 || rc=$?
+pruefe "18b Schritt 4 in Teilen grün" 0 "$rc"
+enthaelt "18b zuerst Bibliothek, Binaries, Beispiele" '^cargo-lief test --workspace --exclude lifeline-desktop --lib --bins --examples$'
+enthaelt "18b Doku-Tests" '^cargo-lief test --workspace --exclude lifeline-desktop --doc$'
+enthaelt "18b erster Teil" '^cargo-lief test --workspace --exclude lifeline-desktop --test a --test b$'
+enthaelt "18b zweiter Teil" '^cargo-lief test --workspace --exclude lifeline-desktop --test c --test d$'
+fehlt "18b die Hülle nicht in den Teilen" 'cargo-lief test --workspace.*hülle'
+enthaelt "18b Hülle getrennt" '^cargo-lief test -p lifeline-desktop$'
+pruefe "18b Testprogramm gelöscht" 1 "$([ -e "$ARBEIT/s4/target/debug/build/hub/ab12/out/a-ab12" ] && echo 0 || echo 1)"
+rc=0; fahren "ROOT='$ARBEIT/s4'; GITHUB_ACTIONS=; PATH='$ARBEIT/s4/bin':\"\$PATH\"; $attrappen; $schritt_4_def" 0 4 || rc=$?
+pruefe "18b lokal grün" 0 "$rc"
+enthaelt "18b lokal ein Aufruf" '^cargo-lief test --workspace --exclude lifeline-desktop$'
+fehlt "18b lokal keine Teile" 'cargo-lief .*--test '
+
 # 19 — Schritt 20, der Kotlin-Kern der Android-Hülle (LLH-1989): eigenes Bündel `android`, Teil des
 # vollen Laufs und von `--geaendert`, nicht von `schnell`; ohne Java lokal eine Lücke, in der CI
 # mit ANDROID_KERN_PFLICHT=1 rot; mit Java fährt er den Gradle-Wrapper im Kern.

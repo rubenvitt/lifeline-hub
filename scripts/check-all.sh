@@ -162,26 +162,56 @@ schritt_4() {
   # hat (u. a. zwei rustls-Provider, woran `tls::tests::rcgen_pem_ist_per_rustls_ladbar` als
   # Stolperdraht absichtlich bricht). Jedes Produkt läuft mit seinem eigenen Feature-Satz.
   bauziel_pruefen "$ROOT"
-  ohne_dev_env cargo test --workspace --exclude lifeline-desktop
-  # Nur in GitHub Actions: Die rund 300 Testprogramme (je Datei in `tests/` eines, jedes mit der
-  # ganzen Bibliothek) belegen dort fast die ganze Platte, und Schritt 15 und 19 bauen danach
-  # weiter; am 26.11. lief der Runner dabei voll (LLH-2150). Gelaufen sind sie hier schon, also
-  # weg damit. Lokal bleiben sie, ein erneutes `cargo test` müsste sie sonst neu linken.
-  # Ein Testprogramm heißt `<name>-<hash>`: im alten Ablageschema unter `debug/deps/`, im neuen
-  # (Cargo mit build-dir) unter `debug/build/<paket>/<hash>/out/`, dort mit demselben Hash wie
-  # sein Ordner. Nur solche Dateien gehen; Build-Skripte und ihre Ausgaben bleiben.
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
-    local ziel="${CARGO_TARGET_DIR:-$ROOT/target}/debug" datei hash
-    find "$ziel/deps" -maxdepth 1 -type f -perm -u+x ! -name '*.*' -delete 2> /dev/null || true
-    for datei in "$ziel"/build/*/*/out/*-*; do
-      [ -f "$datei" ] && [ -x "$datei" ] || continue
-      hash="${datei%/out/*}"
-      hash="${hash##*/}"
-      case "$datei" in *-"$hash") rm -f "$datei" ;; esac
-    done
-    echo "Testprogramme gelöscht: $(df -h / | tail -1)"
+    rust_tests_in_teilen
+  else
+    ohne_dev_env cargo test --workspace --exclude lifeline-desktop
   fi
   ohne_dev_env cargo test -p lifeline-desktop
+}
+
+# Nur in GitHub Actions: Die rund 300 Testprogramme (je Datei in `tests/` eines, jedes mit der
+# ganzen Bibliothek) brauchen zusammen gut 95 GB. Am 26.11. lief der Runner damit voll
+# (LLH-2150), am 27.11. blieben auf dem Abbild 20261122 rund 100 GB frei, und der Runner starb
+# zweimal mitten im Linken („lost communication“). Deshalb in Teilen: erst Bibliothek, Binaries
+# und Beispiele, dann Doku-Tests, dann die Integrationstests in RUST_TEST_TEILE Gruppen (Vorgabe
+# 4); nach jedem Teil gehen dessen Testprogramme weg. Dieselbe Auswahl wie `cargo test
+# --workspace --exclude lifeline-desktop`, mit derselben Feature-Vereinigung (immer
+# `--workspace`). Lokal bleibt der eine Aufruf, ein erneutes `cargo test` linkte sonst neu.
+rust_tests_in_teilen() {
+  local -a ws=(--workspace --exclude lifeline-desktop) namen teil
+  local anzahl groesse i n teile="${RUST_TEST_TEILE:-4}"
+  ohne_dev_env cargo test "${ws[@]}" --lib --bins --examples
+  testprogramme_loeschen
+  ohne_dev_env cargo test "${ws[@]}" --doc
+  mapfile -t namen < <(cargo metadata --format-version 1 --no-deps \
+    | jq -r '.packages[] | select(.name != "lifeline-desktop") | .targets[]
+      | select(.kind | index("test")) | .name' | sort -u)
+  anzahl="${#namen[@]}"
+  [ "$anzahl" -gt 0 ] || { echo "FEHLER: keine Integrationstests gefunden (cargo metadata)." >&2; return 1; }
+  groesse=$(((anzahl + teile - 1) / teile))
+  for ((i = 0; i < anzahl; i += groesse)); do
+    teil=()
+    for n in "${namen[@]:i:groesse}"; do teil+=(--test "$n"); done
+    echo "==> Integrationstests $((i + 1))–$((i + ${#teil[@]} / 2)) von $anzahl"
+    ohne_dev_env cargo test "${ws[@]}" "${teil[@]}"
+    testprogramme_loeschen
+  done
+}
+
+# Ein Testprogramm heißt `<name>-<hash>`: im alten Ablageschema unter `debug/deps/`, im neuen
+# (Cargo mit build-dir) unter `debug/build/<paket>/<hash>/out/`, dort mit demselben Hash wie sein
+# Ordner. Nur solche Dateien gehen; Build-Skripte und ihre Ausgaben bleiben.
+testprogramme_loeschen() {
+  local ziel="${CARGO_TARGET_DIR:-$ROOT/target}/debug" datei hash
+  find "$ziel/deps" -maxdepth 1 -type f -perm -u+x ! -name '*.*' -delete 2> /dev/null || true
+  for datei in "$ziel"/build/*/*/out/*-*; do
+    [ -f "$datei" ] && [ -x "$datei" ] || continue
+    hash="${datei%/out/*}"
+    hash="${hash##*/}"
+    case "$datei" in *-"$hash") rm -f "$datei" ;; esac
+  done
+  echo "Testprogramme gelöscht: $(df -h / | tail -1)"
 }
 
 schritt_5() {
