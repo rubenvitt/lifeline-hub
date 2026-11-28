@@ -8,7 +8,9 @@ import {
   ANBINDUNG_GRUENDE,
   AUSGANG_FEHLER_TEXT,
   anbindungKanal,
+  ausgangKanal,
   useSendeVersaende,
+  type AusgangKanal,
   versandFehler,
   type QuelleFilter,
 } from '../api/ausgang';
@@ -52,11 +54,22 @@ function nachStelle(kanaele: readonly KanalMitStelle[]): KanalMitStelle[][] {
 }
 
 /**
+ * Ersatz, wenn ein Kanal gesperrt ist: die erste Adresse dieses Kanals derselben Stelle. Eine
+ * Faxnummer wählt man bewusst, deshalb gibt es für sie keinen Ersatz und sie ersetzt nichts.
+ */
+const ERSATZ: Record<AusgangKanal, AusgangKanal | null> = {
+  email: 'matrix',
+  matrix: 'email',
+  fax: null,
+};
+
+/**
  * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax oder
  * Matrix (LLH-2093, LLH-2095, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum
  * Anhaken, je Stelle beisammen unter ihrem Namen (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
  * Adresse vorbelegt, nie mit einer Faxnummer, damit eine Stelle nicht doppelt Post bekommt. Fehlt
- * das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein Versand wird nie
+ * die Anbindung eines Kanals, sind nur dessen Adressen gesperrt, mit Grund je Kanal (LLH-2147).
+ * Nur online; ein Versand wird nie
  * vorgemerkt.
  */
 export default function SendenDialog({
@@ -100,8 +113,8 @@ export default function SendenDialog({
       ),
     [kanaeleQuery.data],
   );
-  /** Grund, warum die Matrix-Adressen gesperrt sind, nachdem der Server das Konto abgelehnt hat. */
-  const [matrixGesperrt, setMatrixGesperrt] = useState<string | null>(null);
+  /** Grund je Kanal, warum seine Adressen gesperrt sind, nachdem der Server die Anbindung ablehnte. */
+  const [kanalGesperrt, setKanalGesperrt] = useState<Partial<Record<AusgangKanal, string>>>({});
   /** Kanäle der zuletzt gesendeten Adressen: nach ihnen richtet sich der Wortlaut einer Ablehnung. */
   const [gesendet, setGesendet] = useState<KanalArt[]>([]);
 
@@ -116,7 +129,7 @@ export default function SendenDialog({
   useEffect(() => {
     if (!offen || !kanaele || vorbelegtFuer.current === clientId) return;
     vorbelegtFuer.current = clientId;
-    setMatrixGesperrt(null);
+    setKanalGesperrt({});
     form.setFieldValue('kanaele', [...empfaengerVorschlag(kanaele, vorschlagNamen)]);
   }, [offen, kanaele, clientId, form, vorschlagNamen]);
 
@@ -134,34 +147,41 @@ export default function SendenDialog({
     !!sende.error.grund &&
     ANBINDUNG_GRUENDE.has(sende.error.grund);
 
-  /** Eine Ablehnung wegen des Matrix-Kontos sperrt die Matrix-Adressen, nicht den Dialog. */
-  const merkeMatrixSperre = (e: unknown, arten: readonly KanalArt[]) => {
-    if (
-      e instanceof ApiError &&
-      e.grund &&
-      ANBINDUNG_GRUENDE.has(e.grund) &&
-      anbindungKanal(e, arten) === 'matrix'
-    ) {
-      setMatrixGesperrt(AUSGANG_FEHLER_TEXT.matrix[e.grund as AusgangFehler]);
-      const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
-      const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
-      const rest = gewaehlteIds.filter((id) => kanalVon(id)?.channel.channel !== 'matrix');
-      // Betroffene Stellen: die erste Mailadresse derselben Stelle ersetzt die Matrix-Adresse.
+  /**
+   * Eine Ablehnung wegen der Anbindung eines Kanals sperrt dessen Adressen, nicht den Dialog. Für
+   * eine abgewählte Adresse kommt die erste Adresse des Ersatzkanals derselben Stelle dazu
+   * (`ERSATZ`), sofern die Stelle nicht schon eine davon gewählt hat und der Ersatz frei ist.
+   */
+  const merkeKanalSperre = (e: unknown, arten: readonly KanalArt[]) => {
+    if (!(e instanceof ApiError) || !e.grund || !ANBINDUNG_GRUENDE.has(e.grund)) return;
+    const betroffenerKanal = anbindungKanal(e, arten);
+    const gesperrt = {
+      ...kanalGesperrt,
+      [betroffenerKanal]: AUSGANG_FEHLER_TEXT[betroffenerKanal][e.grund as AusgangFehler],
+    };
+    setKanalGesperrt(gesperrt);
+    const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
+    const istBetroffen = (id: number) => {
+      const art = kanalVon(id)?.channel.channel;
+      return art !== undefined && ausgangKanal(art) === betroffenerKanal;
+    };
+    const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
+    const rest = gewaehlteIds.filter((id) => !istBetroffen(id));
+    const ersatz = ERSATZ[betroffenerKanal];
+    if (ersatz && !gesperrt[ersatz]) {
       const betroffen = new Set(
-        gewaehlteIds
-          .filter((id) => kanalVon(id)?.channel.channel === 'matrix')
-          .map((id) => kanalVon(id)?.agency_id),
+        gewaehlteIds.filter(istBetroffen).map((id) => kanalVon(id)?.agency_id),
       );
       for (const stelleId of betroffen) {
-        const stelleMails = (kanaele ?? []).filter(
-          (k) => k.agency_id === stelleId && k.channel.channel === 'email',
+        const kandidaten = (kanaele ?? []).filter(
+          (k) => k.agency_id === stelleId && ausgangKanal(k.channel.channel) === ersatz,
         );
-        if (stelleMails.length > 0 && !stelleMails.some((k) => rest.includes(k.channel.id))) {
-          rest.push(stelleMails[0].channel.id);
+        if (kandidaten.length > 0 && !kandidaten.some((k) => rest.includes(k.channel.id))) {
+          rest.push(kandidaten[0].channel.id);
         }
       }
-      form.setFieldValue('kanaele', rest);
     }
+    form.setFieldValue('kanaele', rest);
   };
 
   const vorschau = (vorschauText ?? '')
@@ -192,7 +212,7 @@ export default function SendenDialog({
             recipients: w.kanaele.map((channel_id) => ({ channel_id })),
           })
           .catch((e: unknown) => {
-            merkeMatrixSperre(e, arten);
+            merkeKanalSperre(e, arten);
             throw e;
           });
       }}
@@ -229,12 +249,12 @@ export default function SendenDialog({
                   {gruppe[0].agency_name}
                 </Textstufe>
                 {gruppe.map((k) => {
-                  const gesperrtMatrix = k.channel.channel === 'matrix' && matrixGesperrt !== null;
+                  const sperrGrund = kanalGesperrt[ausgangKanal(k.channel.channel)];
                   return (
                     <Checkbox
                       key={k.channel.id}
                       value={k.channel.id}
-                      disabled={gesperrtMatrix}
+                      disabled={sperrGrund !== undefined}
                       aria-label={`${kanalKurz(k.channel.channel)} ${k.agency_name} · ${k.channel.address}`}
                     >
                       <Textstufe stufe="textKlein" ton="gedaempft">
@@ -242,10 +262,10 @@ export default function SendenDialog({
                       </Textstufe>{' '}
                       {k.channel.address}
                       {k.channel.label ? ` (${k.channel.label})` : ''}
-                      {gesperrtMatrix && (
+                      {sperrGrund && (
                         <Typography.Text type="danger" style={schriftStil('textKlein')}>
                           {' '}
-                          · {matrixGesperrt}
+                          · {sperrGrund}
                         </Typography.Text>
                       )}
                     </Checkbox>
