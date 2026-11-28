@@ -22,7 +22,7 @@ wire_enum! {
 
 impl Scope {
     /// Scope mit Einsatzbezug: Er wirkt nur auf den Einsatz, den die Einsatzleitung für den
-    /// Zugang freigegeben hat (`super::freigabe`, ADR-0035); ein Lese-Scope sieht nur ihn, ein
+    /// Zugang freigegeben hat (`super::freigabe`, ADR-0112); ein Lese-Scope sieht nur ihn, ein
     /// Schreib-Scope (`meldungen:write`) reicht nur dafür ein. Ein neuer solcher Scope kommt hier
     /// dazu, sobald seine Route steht; vorher zeigte das Paneel „Anbindungen“ einen Schalter
     /// ohne Wirkung.

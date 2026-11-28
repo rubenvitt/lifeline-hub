@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 26.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 28.11.2026 (Meldungsvorschlag, LLH-2112; Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -728,6 +728,37 @@ sequenceDiagram
   baut neu auf: mit `einsaetze:read` über `GET /api/v1/incidents`, sonst über
   `GET /api/v1/events` ohne `after` und `GET /api/v1/situation`. Stand und Zeilen liest der Abruf aus
   einem Schnappschuss, damit ein Purge dazwischen keine Lücke ohne `410` lässt.
+
+## 6.6f1 Meldungsvorschlag: vom Fremdsystem in den Meldungseingang
+
+Ein Fremdsystem mit Scope `meldungen:write` (etwa ein Mesh-Gateway am ELW) reicht Kurztext ein,
+den ein Mensch prüft ([ADR-0112](entscheidungen/ADR-0112-ein-maschinenzugang-liest-und-schreibt-einsatzbezogen-nur-im-freigegebenen-einsatz.md),
+Design `docs/superpowers/specs/2026-11-28-jd4jgna4-maschinen-eingang-meldungen-design.md`).
+
+```mermaid
+sequenceDiagram
+  participant F as Fremdsystem
+  participant PA as public_api
+  participant M as meldung
+  participant UI as Meldungseingang
+  F->>PA: POST /api/v1/report-suggestions (signiert)
+  PA->>PA: Einsatz allein aus der Freigabe, sonst 409 incident_not_released
+  PA->>M: Vorschlag ablegen (meldung_vorschlag), Live meldung
+  M-->>UI: Abschnitt Vorschläge, Modulzähler
+  UI->>M: accept (Schreibrecht für Meldungen): Meldung, Text wird geleert
+```
+
+- Dieselbe `external_id` am selben Zugang ergibt 200 mit dem bestehenden Vorschlag, sonst 201.
+  Der Einsatz kommt allein aus `public_api::freigabe`; führt die Instanz ihn nicht
+  (`einsatz_spiegel`), antwortet die Route mit 409 `fuehrung_elsewhere`.
+- Ein offener Vorschlag gilt nach 12 Stunden, mit dem Ende des Einsatzes und mit dem Verlust der
+  Führung als abgelaufen (beim Lesen bestimmt) und lässt sich dann nicht mehr übernehmen. Gelöscht
+  wird er 7 Tage nach der Erledigung, ein offener 7 Tage nach dem Eingang.
+- Die Übernahme legt die Meldung mit der Herkunft `maschinen_herkunft` an und schreibt den
+  ETB-Eintrag nur, wo die Regel „Auto-ETB“ des Einsatzes es verlangt. Einen Sofortalarm gibt es
+  für einen Vorschlag nicht.
+- An einer Instanz, die bei einem Hub meldet, gilt dieser Weg als einziger Fremdsystem-Zugang,
+  nur mit genau diesem Scope.
 
 ## 6.6g Adapter ruft ab
 

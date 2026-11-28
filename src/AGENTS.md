@@ -198,6 +198,11 @@ Spec `oeffentliche-api-vertrag`, Herleitung
   (`pfad_fuer_protokoll`, Test `app::tests::einwurf_schluessel_steht_in_keiner_logzeile`). Eine
   Antwort trägt nie Daten und unterscheidet neu nicht von wiederholt. Was ein Schlüsselinhaber je
   Aufruf auslösen kann, loggt als `log_drossel::SammelzeileJe` je Zugang.
+- **Maschinen-Eingang** (LLH-2112, [ADR-0112](../docs/architektur/entscheidungen/ADR-0112-ein-maschinenzugang-liest-und-schreibt-einsatzbezogen-nur-im-freigegebenen-einsatz.md)):
+  `POST /api/v1/report-suggestions` (Scope `meldungen:write`) legt nur einen Vorschlag
+  (`meldung_vorschlag`) im freigegebenen Einsatz an, nie eine Meldung oder einen ETB-Eintrag; Übernehmen und
+  Verwerfen stehen hinter `EinsatzSchreibzugriff`. An einer Instanz, die bei einem Hub meldet,
+  gilt nur ein Zugang mit genau diesem Scope und nur für einen selbst geführten Einsatz.
 
 ## Backend — Ausgangsereignisse für Fremdsysteme (LLH-1655)
 

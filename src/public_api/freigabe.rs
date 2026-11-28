@@ -1,8 +1,8 @@
-//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0035, Spec
+//! Freigabe eines Einsatzes für einen Maschinenzugang (LLH-1638, ADR-0112, Spec
 //! `maschinenzugang`, „Einsatzbezogenes Lesen braucht die Freigabe der Einsatzleitung“).
 //!
-//! Ein Lese-Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`]) sieht nur den Einsatz, den die
-//! Einsatzleitung für den Zugang freigegeben hat. Je Zugang ist das höchstens einer
+//! Ein Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`]) liest und beschickt nur den Einsatz,
+//! den die Einsatzleitung für den Zugang freigegeben hat. Je Zugang ist das höchstens einer
 //! (`maschinenzugang_freigabe`, eindeutiger Index auf `zugang_id`). **Wirksam** ist eine Freigabe
 //! nur an einem aktiven, nicht gelöschten Einsatz: so endet sie auch dort, wo kein Schreibweg sie
 //! löscht, etwa an einem Spiegel, dessen Abschluss über die Übernahme ankommt.
@@ -35,7 +35,7 @@ pub struct AnbindungFreigabe {
     pub freigegeben: bool,
     /// Der Zugang liest gerade einen anderen aktiven Einsatz; Einschalten stellt ihn um.
     pub anderer_einsatz: bool,
-    /// Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:
+    /// Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an (anders als einen reinen Meldungszugang):
     /// die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
     pub ruht: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -43,7 +43,7 @@ pub struct AnbindungFreigabe {
 }
 
 /// Lässt sich für diesen Zugang ein Einsatz freigeben? Nicht widerrufen, nicht abgelaufen und
-/// mit einem Lese-Scope mit Einsatzbezug. Ein Zugang, der noch auf seinen Schlüssel wartet,
+/// mit einem Scope mit Einsatzbezug (lesend oder schreibend). Ein Zugang, der noch auf seinen Schlüssel wartet,
 /// zählt: die Einsatzleitung kann vorab freigeben.
 pub fn is_freigebbar(zugang: &Zugang, jetzt: &str) -> bool {
     zugang.zustand != ZugangZustand::Widerrufen
@@ -58,10 +58,11 @@ pub fn is_am_hub_erlaubt(zugang: &Zugang) -> bool {
 }
 
 /// Meldet sich diese Instanz für die Org bei einem Hub? Dann lehnt der Extractor jeden Zugang
-/// der Org ab (Spec `maschinenzugang`, „Ein gekoppelter ELW nimmt keine Fremdsysteme an“): eine
-/// neue Freigabe hätte dort keine Wirkung, das Paneel zeigte Schalter ohne Folge. Die Zugänge
-/// selbst bleiben und gelten wieder, sobald die Kopplung endet; eine bestehende Freigabe ruht
-/// solange.
+/// der Org ab, dessen Scopes nicht genau `meldungen:write` sind ([`is_am_hub_erlaubt`], ADR-0112;
+/// vorher lehnte er alle ab, Spec `maschinenzugang`, „Ein gekoppelter ELW nimmt keine
+/// Fremdsysteme an“): eine neue Freigabe hätte dort keine Wirkung, das Paneel zeigte Schalter
+/// ohne Folge. Die abgelehnten Zugänge bleiben und gelten wieder, sobald die Kopplung endet; eine
+/// bestehende Freigabe ruht solange. Ein reiner Meldungszugang ruht nie.
 pub async fn is_org_am_hub(conn: &mut SqliteConnection, org_id: i64) -> Result<bool, AppError> {
     Ok(zugang::hub_fuer_org(conn, org_id).await?.is_some())
 }
@@ -112,8 +113,9 @@ pub async fn list_fuer_einsatz(
     Ok(liste)
 }
 
-/// Ein freigebbarer Zugang der Org; 404 sonst (fremd, widerrufen, abgelaufen, ohne Lese-Scope mit
-/// Einsatzbezug, oder die Instanz meldet sich für die Org bei einem Hub).
+/// Ein freigebbarer Zugang der Org; 404 sonst (fremd, widerrufen, abgelaufen, ohne Scope mit
+/// Einsatzbezug, oder die Instanz meldet sich für die Org bei einem Hub und der Zugang trägt mehr
+/// als `meldungen:write`).
 pub async fn load_freigebbar(
     conn: &mut SqliteConnection,
     org_id: i64,
@@ -179,7 +181,7 @@ pub async fn freigegebene_einsaetze(
 /// Darf der Zugang diesen Einsatz lesen? Genau dann, wenn er wirksam für ihn freigegeben ist und
 /// zur Org des Zugangs gehört. Für Routen, deren Anfrage einen Einsatz nennt (`einsatz_id` der
 /// Rechner-API, LLH-1856): die Kennung wählt nur unter den freigegebenen aus, sie öffnet nichts
-/// (ADR-0035). Die Org wird mitgeprüft, denn ein fremder Einsatz wäre ein Datenabfluss.
+/// (ADR-0112). Die Org wird mitgeprüft, denn ein fremder Einsatz wäre ein Datenabfluss.
 pub async fn is_lesbar(
     conn: &mut SqliteConnection,
     zugang_id: &str,

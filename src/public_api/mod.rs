@@ -14,7 +14,7 @@
 //!
 //! Maschinenzugang für Fremdsysteme (LLH-1652, Spec `maschinenzugang`): Repo [`zugang`], Scopes
 //! [`scope`], Drosselung [`drossel`] und Kommando [`kommando`]. Die Freigabe eines Einsatzes für
-//! einen Zugang (LLH-1638, ADR-0035) liegt in [`freigabe`].
+//! einen Zugang (LLH-1638, ADR-0112) liegt in [`freigabe`].
 //!
 //! Einwurf-Zugang für Absender ohne Signatur (LLH-1654, ADR-0023, Spec `einwurf-zugang`):
 //! [`einwurf`], die einzigen Routen ohne signierte Anfrage.

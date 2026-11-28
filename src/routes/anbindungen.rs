@@ -383,7 +383,7 @@ pub async fn aendern(
         let (vorher, nachher) = zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
-        // Jede Änderung an den Lese-Scopes mit Einsatzbezug beendet die Freigabe (LLH-1638,
+        // Jede Änderung an den Scopes mit Einsatzbezug beendet die Freigabe (LLH-1638,
         // LLH-1655, Entscheidung Ruben 13.11.2026): Die Einsatzleitung hat für einen Umfang
         // freigegeben; liest der Zugang mehr oder weniger, entscheidet sie neu. Sonst läse ein
         // Einsatzbuch, dem ein Admin „Lage lesen“ dazugibt, sofort die Lage, und ein Recht, das

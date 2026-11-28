@@ -96,7 +96,7 @@ ergänzt `frontend/AGENTS.md`. Pfade relativ zu `frontend/src/`, sofern nicht `s
   Basis; **den Einsatz nur über die Freigabe** (LLH-1856, Change
   `q9b4qq0o-rechner-einsatz-richtwerte`): `einsatz_id` im Body bzw. `?einsatz_id` wählt nur unter
   den Einsätzen, die die Einsatzleitung für den Zugang freigegeben hat
-  (`public_api::freigabe::is_lesbar`, ADR-0035), jeder andere ist dieselbe 404; geprüft wird erst
+  (`public_api::freigabe::is_lesbar`, ADR-0112), jeder andere ist dieselbe 404; geprüft wird erst
   die Anfrage (400/422), dann der Einsatz. Die Rangfolge der Ebenen kommt aus
   `unterkunft::zusammenfuehren`, die Anfrage liegt darüber; eine neue Ebene kommt dort hinein,
   nicht in `rechner.rs`. Jeder Schlüssel der Basis wird in beiden Kernen gelesen

@@ -46,7 +46,7 @@ impl Zugang {
         self.scopes.contains(&scope)
     }
 
-    /// Trägt der Zugang einen Lese-Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`])?
+    /// Trägt der Zugang einen Scope mit Einsatzbezug ([`Scope::has_einsatzbezug`])?
     pub fn has_einsatzbezug(&self) -> bool {
         self.scopes.iter().any(|s| s.has_einsatzbezug())
     }

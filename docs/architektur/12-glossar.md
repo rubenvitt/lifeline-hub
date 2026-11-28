@@ -1,6 +1,6 @@
 # 12. Glossar
 
-Stand: 26.11.2026 (Zugestellt, LLH-2095; Ausgangskorb mit Matrix, LLH-2094; Ausgangskorb, LLH-2093; Ortung und Kopplung (Ortung), LLH-2091; Fremdebene, LLH-2099; Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
+Stand: 28.11.2026 (Meldungsvorschlag, LLH-2112; Zugestellt, LLH-2095; Ausgangskorb mit Matrix, LLH-2094; Ausgangskorb, LLH-2093; Ortung und Kopplung (Ortung), LLH-2091; Fremdebene, LLH-2099; Push-Relais und Kennung des iOS-Push, LLH-1981; Schlüsselwechsel, LLH-2025; Glossar der API-Routen, LLH-1979; Adapter und Geheimnisspeicher, LLH-2017; Einwurf-Zugang, LLH-1654).
 
 Ein Begriff je Zeile. Wo eine Spec oder ein Design den Begriff festlegt, verweist die Zeile
 dorthin, statt ihn neu zu definieren. Begriffe der Oberfläche, die modulübergreifend gelten, legt
@@ -41,6 +41,7 @@ Die englischen Namen der Fachbegriffe in API-Routen stehen im Glossar
 | Funkplan | Aus Abschnitten, Einheiten, Fahrzeugen und Sprechgruppen abgeleitete Tabelle nach FwDV 100 Anlage 5. | Spec [`stab-funkplan`](../../openspec/specs/stab-funkplan/spec.md) |
 | Gefahren | Gefahrenmatrix und Warnstufen eines Einsatzes. | Spec [`gefahrenmatrix`](../../openspec/specs/gefahrenmatrix/spec.md) |
 | Haushalt | Personen, die zusammen an einer Betreuungsstelle ankommen, mit Nummer „H-n“ und Bezugsperson. | `src/betreuung/registrierung.rs`, [`frontend/src/betreuung/AGENTS.md`](../../frontend/src/betreuung/AGENTS.md) |
+| Meldungsvorschlag | Unverifizierter Kurztext, den ein Fremdsystem mit Scope `meldungen:write` im freigegebenen Einsatz einreicht; erst eine Person macht daraus eine Meldung (Übernahme) oder verwirft ihn. Gilt 12 Stunden. | `src/public_api/meldung_vorschlag.rs`, [ADR-0112](entscheidungen/ADR-0112-ein-maschinenzugang-liest-und-schreibt-einsatzbezogen-nur-im-freigegebenen-einsatz.md) |
 | Kostform | Essensform einer Person (Normalkost oder eine der fünf Sonderkost-Formen der Verpflegung); Grundlage des Sonderkost-Vorschlags. | `Kostform` in `src/person/mod.rs`, Spec `betreuung-registrierung` |
 | Kräfteübersicht | Status, Stärke und Gliederung der Kräfte (Modul-Key `kraefteuebersicht`); hieß bis November 2026 „Meldebild“. Nicht zu verwechseln mit „Sachverhalt / Meldebild“ der Einsatzdaten, dem Sachverhalt der Leitstelle. | `frontend/src/einsatz/modulRegistry.ts`, `src/einsatz/modul.rs` |
 | Lagebericht, Lagemeldung, lagerelevant, Meldung | Festgelegt im Meldungsmodell. | [`docs/design/2026-10-21-meldungsmodell/README.md`](../design/2026-10-21-meldungsmodell/README.md), Abschnitt „Begriffe“; Spec [`meldungseingang`](../../openspec/specs/meldungseingang/spec.md) |

@@ -1,8 +1,9 @@
 ---
 id: ADR-0035
 titel: Ein Maschinenzugang liest einsatzbezogen nur, was die Einsatzleitung für ihn freigegeben hat
-status: akzeptiert
+status: ersetzt
 datum: 2026-11-12
+ersetzt_durch: ADR-0112
 gilt_fuer:
   - src/public_api/**
   - src/routes/einsatz_anbindungen.rs

@@ -2,7 +2,7 @@
 titel: Anbindungen
 gruppen: [administration]
 reihenfolge: 795
-quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/adapter/matrix_art.rs, src/adapter/matrix.rs, src/drohne/art.rs, src/adapter/sipgate_fax_art.rs, src/adapter/sipgate.rs, src/ortung/fern.rs, src/instanz/spiegel/fuehrung.rs]
+quellen: [src/benachrichtigung/adapter.rs, frontend/src/pages/einstellungen/Anbindungen.tsx, frontend/src/pages/einstellungen/AnbindungAnsicht.tsx, frontend/src/api/anbindungen.ts, src/routes/anbindungen.rs, src/public_api/machine.rs, src/public_api/routen.rs, src/public_api/rechner.rs, src/public_api/zugang.rs, src/public_api/kommando.rs, src/public_api/freigabe.rs, src/public_api/meldung_vorschlag.rs, src/public_api/scope.rs, frontend/src/pages/einstellungen/EinwurfZugaenge.tsx, frontend/src/api/einwurfZugaenge.ts, src/routes/einwurf_zugaenge.rs, src/public_api/einwurf/mod.rs, src/public_api/einwurf/routen.rs, src/public_api/einwurf/ablage.rs, src/public_api/drossel.rs, src/extract.rs, src/public_api/einsaetze.rs, src/public_api/events.rs, frontend/src/pages/einstellungen/AnbindungWebhook.tsx, src/routes/anbindungen_webhook.rs, src/public_api/webhook/mod.rs, src/public_api/webhook/lauf.rs, src/public_api/webhook/ziel.rs, src/public_api/webhook/zustand.rs, src/public_api/webhook/repo.rs, src/instanz/zertifikat.rs, frontend/src/pages/einstellungen/AdapterPaneel.tsx, frontend/src/pages/einstellungen/AdapterAnsicht.tsx, frontend/src/pages/einstellungen/adapterAnzeige.ts, frontend/src/components/Geheimfeld.tsx, frontend/src/api/adapter.ts, src/routes/adapter.rs, src/adapter/lauf.rs, src/adapter/zustand.rs, src/adapter/geheimnis.rs, src/adapter/repo.rs, src/adapter/art.rs, src/veranstaltung_extern/art.rs, src/veranstaltung_extern/vertrag.rs, src/veranstaltung_extern/repo.rs, src/adapter/arten/stammdaten_abruf.rs, src/drohne/hls.rs, src/stammdaten_eingang/schnappschuss.rs, src/routes/stammdaten_schnappschuss.rs, frontend/src/stammdaten/SchnappschussHinweis.tsx, frontend/src/stammdaten/StammdatenEinlesen.tsx, frontend/src/kraefte/OrtungKoppelnDialog.tsx, src/ortung/kopplung.rs, src/ortung/uebernahme.rs, src/routes/ortung.rs, src/adapter/smtp_art.rs, src/adapter/smtp.rs, src/adapter/matrix_art.rs, src/adapter/matrix.rs, src/drohne/art.rs, src/adapter/sipgate_fax_art.rs, src/adapter/sipgate.rs, src/ortung/fern.rs, src/instanz/spiegel/fuehrung.rs]
 ---
 
 ## Überblick
@@ -445,8 +445,9 @@ tragen.
 | Alarmmeldungen einliefern | Alarme als Vorschlag einliefern, nie einen Einsatz |
 | Positionen einliefern     | Positionen melden                                  |
 | Rechner nutzen            | die Rechner verwenden                              |
+| Meldungen einreichen      | Text als unverifizierte Vorschläge einreichen      |
 
-Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen vier Rechte etwas:
+Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen fünf Rechte etwas:
 
 - „Rechner nutzen“: Damit rechnet ein Fremdsystem Unterkunft und Zelte durch, mit denselben
   Regeln wie der [Unterkunftsrechner](betreuung.md) und mit den Richtwerten der Organisation aus
@@ -461,6 +462,10 @@ Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen vi
   geändert hat, mit Zeitpunkt und Kennung des Einsatzes, ohne Inhalt. Allein öffnet dieses Recht
   nichts: Über den Einsatz erfährt nur etwas, wer auch „Einsätze lesen“ hat, über die Lage nur,
   wer auch „Lage lesen“ hat. Die Ereignisse bleiben sieben Tage abrufbar.
+- „Meldungen einreichen“ (`meldungen:write`): Das Fremdsystem liefert Kurztext, etwa ein
+  Funk-Gateway im Mesh-Netz. Er landet als unverifizierter Vorschlag im Meldungseingang des
+  freigegebenen Einsatzes, nie als Meldung (siehe [Meldungen](meldungen.md)). Eine Anbindung mit
+  diesem Recht steht im Paneel „Anbindungen“ und braucht die Freigabe wie die lesenden Rechte.
 
 Mit den übrigen Rechten prüft ein Fremdsystem bisher nur seine Anmeldung. Einliefern lässt sich
 heute über einen Einwurf-Zugang (siehe unten). Welche Daten die übrigen Rechte später öffnen,
@@ -515,8 +520,8 @@ Unter „Zustellungen“ stehen die letzten 50 Versuche mit Zeit, Nummer des Ere
 
 ### Lage und Einsätze lesen braucht die Freigabe der Einsatzleitung
 
-Eine Anbindung mit „Lage lesen“ oder „Einsätze lesen“ sieht nur den Einsatz, den die
-Einsatzleitung auf der Seite „Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben
+Eine Anbindung mit „Lage lesen“, „Einsätze lesen“ oder „Meldungen einreichen“ sieht und
+beschickt nur den Einsatz, den die Einsatzleitung auf der Seite „Geräte“ ihres Einsatzes im Paneel „Anbindungen“ für sie freigegeben
 hat, und höchstens einen. Ohne Freigabe geht nichts hinaus, auch kein Ereignis.
 Ihre Zeile nennt „liest“ mit der Bezeichnung des Einsatzes oder „kein Einsatz freigegeben“,
 solange die Anbindung weder widerrufen noch abgelaufen ist. Die
@@ -782,7 +787,11 @@ der abgerufenen Veranstaltungen gibt es in der App nicht.
 
 ### Am ELW
 
-Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an. Die
+Meldet sich die Instanz für die Organisation bei einem Hub, nimmt sie keine Fremdsysteme an, mit
+einer Ausnahme: eine Anbindung, die nur „Meldungen einreichen“ trägt, legt das ELW selbst an,
+nimmt sie an und gibt sie frei, aber nur für einen Einsatz, den es selbst führt; so erreicht ein
+Gateway am ELW den Meldungseingang. Mit einem weiteren Recht bleibt eine Anbindung dort
+abgelehnt, auch eine vor der Kopplung angelegte. Die
 Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt. Bestehende
 Anbindungen bleiben stehen und gelten wieder, sobald die Kopplung mit dem Hub endet; solange nennt
 ihre Zeile keinen Einsatz. Eine Freigabe aus der Zeit davor ruht (siehe

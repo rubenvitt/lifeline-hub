@@ -412,7 +412,7 @@ async fn lage_zaehlt_weiter_wenn_meldungen_im_einsatz_ausgeblendet() {
     assert!(v["einsatz"].get("ausgeblendet").is_none(), "{v}");
 }
 
-/// ADR-0035: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
+/// ADR-0112: Ein Lese-Scope mit Einsatzbezug (`Scope::has_einsatzbezug`) und die Routen, die
 /// ihren Einsatz aus der Freigabe nehmen, laufen nicht auseinander. Kommt eine Route mit einem
 /// solchen Scope dazu, steht sie hier, und der Test darunter belegt, dass sie ohne Freigabe
 /// keinen Einsatz liest.

@@ -2,7 +2,7 @@
 titel: Meldungen
 gruppen: [alle, fuehrung]
 reihenfolge: 520
-quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/VersorgtVon.tsx, frontend/src/personen/Patientenkopf.tsx]
+quellen: [frontend/src/components/listenFenster.ts, frontend/src/components/ZumKopfKnopf.tsx, frontend/src/etb/EtbBacklinkBadges.tsx, frontend/src/pages/MeldungenPage.tsx, frontend/src/meldungen/MeldungFormular.tsx, frontend/src/meldungen/MeldungKarte.tsx, frontend/src/meldungen/LagerelevantModal.tsx, frontend/src/pages/einheit/EinheitUebernahme.tsx, frontend/src/components/Erfassung.tsx, frontend/src/kommunikation/phase.ts, frontend/src/kommunikation/rueckgaengig.tsx, frontend/src/einsatz/AlarmZentrale.tsx, frontend/src/alarm/useBenachrichtigungen.ts, frontend/src/alarm/meldungInhalt.ts, frontend/src/alarm/useEingangshinweis.tsx, frontend/src/pages/einstellungen/EinsatzVerhalten.tsx, src/routes/meldung.rs, src/meldung/repo.rs, src/meldung/mod.rs, src/meldung/benachrichtigung.rs, src/benachrichtigung/text.rs, src/routes/auftrag.rs, src/erinnerung/benachrichtigung.rs, openspec/specs/meldungseingang/spec.md, frontend/src/meldungen/MeldungVorschlaege.tsx, frontend/src/meldungen/maschinenHerkunft.ts, frontend/src/meldungen/MaschinenHerkunftMarke.tsx, src/meldung/vorschlag.rs, src/public_api/meldung_vorschlag.rs, src/routes/meldung_vorschlag.rs, frontend/src/meldungen/MeldungKorrektur.tsx, frontend/src/meldungen/meldungKorrekturKern.ts, src/routes/meldung_korrektur.rs, src/meldung/korrektur.rs, frontend/src/meldungen/BerichtigtMarke.tsx, frontend/src/meldungen/MeldungVorschau.tsx, frontend/src/components/StammdatenFeld.tsx, frontend/src/stammdaten/vorschlagsquellen.ts, frontend/src/personen/PersonErfassungModal.tsx, frontend/src/personen/AufnahmeFelder.tsx, frontend/src/personen/VersorgtVon.tsx, frontend/src/personen/Patientenkopf.tsx]
 ---
 
 ## Überblick
@@ -87,6 +87,21 @@ sich unter Verwaltung › Stammdaten › Externe Stellen ändern. Enter bei offe
 Für mehrere Meldungen hintereinander speichert „Speichern und nächste“ (Strg+Enter, am Mac
 ⌘+Enter) und leert das Formular. Mit dem Häkchen „Werte behalten“ bleiben dabei „Von Einheit /
 Abschnitt“, Absender, Meldeweg, Empfängerfunktion und Empfänger stehen.
+
+### Einen Vorschlag aus dem Maschinen-Eingang übernehmen oder verwerfen
+
+Für alle mit Schreibrecht für Meldungen (Einsatzleitung und Führungspersonal). Liefert ein
+Fremdsystem Text ein, etwa ein Funk-Gateway im Mesh-Netz, steht er über der Liste im Abschnitt
+„Vorschläge · unverifiziert (n)“, mit Zeit, Herkunft und Wortlaut.
+
+1. Den Vorschlag lesen. Die Herkunft nennt das System, den Absender und ob die Nachricht
+   signiert ist, etwa „Mesh · Knoten „Nord-1“ (!a1b2c3d4) · nicht signiert“.
+2. „Als Meldung übernehmen“ wählen. Das Formular öffnet mit Wortlaut, Absender, Zeit und Art
+   „Sonstige“ vorbelegt, der Meldeweg steht auf „Funk“. Angaben prüfen und ergänzen, dann speichern.
+3. Oder „Verwerfen“ wählen und „Vorschlag verwerfen“ bestätigen. Er lässt sich danach nicht mehr
+   übernehmen.
+
+Wer die Meldung abbricht, lässt den Vorschlag offen. Wer nur lesen darf, sieht keine Knöpfe.
 
 ### Eine Sofortmeldung bestätigen
 
@@ -285,6 +300,29 @@ steht nie in der Alarmzone, und sein Ton kommt höchstens alle zwei Minuten.
 Als Empfängerfunktion stehen die Einsatzleitung und die Sachgebiete zur Wahl, S7 nur, wenn die
 Organisation sie eingeschaltet hat. Führungshilfspersonal und Fachberater sind keine
 Empfängerfunktion einer Meldung; für sie bleibt der freie Empfänger.
+
+### Vorschläge aus dem Maschinen-Eingang
+
+- **Unverifiziert:** Ein Fremdsystem legt nie selbst eine Meldung an. Was es liefert, bleibt ein
+  Vorschlag, bis eine Person ihn übernimmt. Erst die Übernahme schreibt die Meldung und, nach der
+  Einstellung „Automatische ETB-Einträge“, den Eintrag im Einsatztagebuch; für einen Vorschlag
+  allein gibt es weder ETB-Eintrag noch Sofortalarm noch Benachrichtigung.
+- **Rechte:** Übernehmen und Verwerfen verlangt das Schreibrecht für Meldungen. Die Rolle
+  „Mitarbeit“ darf sie nicht, obwohl sie sonst manches erfassen darf; gekoppelte Geräte sehen keine
+  Vorschläge (siehe [Rechte im Einsatz](rechte-im-einsatz.md)).
+- **Zähler:** Offene Vorschläge zählen im Zähler des Moduls „Meldungen“ mit, damit ein
+  unverifizierter Notruf nicht untergeht.
+- **Frist:** Ein offener Vorschlag verfällt nach 12 Stunden, mit dem Ende des Einsatzes und wenn
+  diese Instanz den Einsatz nicht mehr führt. Er verschwindet dann aus dem Abschnitt und lässt sich
+  nicht mehr übernehmen. Gelöscht wird er 7 Tage nach der Übernahme, dem Verwerfen oder dem Eingang.
+  Bei der Übernahme geht der Text des Vorschlags in die Meldung; der Vorschlag selbst behält ihn nicht.
+- **Zwei Personen:** Übernimmt eine zweite Person einen Vorschlag, den schon jemand übernommen oder
+  verworfen hat, lehnt der Server mit einem Hinweis ab; es entsteht keine zweite Meldung.
+- **Herkunft bleibt sichtbar:** Eine übernommene Meldung trägt an der Karte und in den
+  Lagemeldungen das Etikett „unverifiziert übernommen · Mesh · Nord-1 · nicht signiert“.
+- **Freigabe:** Ein Fremdsystem reicht nur in den Einsatz ein, den die Einsatzleitung für seine
+  Anbindung freigegeben hat (Kapitel [Anbindungen](anbindungen.md)). Ohne Freigabe oder an einer
+  Instanz, die den Einsatz nur spiegelt, nimmt der Server nichts an.
 
 ### Meldungen im Einsatztagebuch
 

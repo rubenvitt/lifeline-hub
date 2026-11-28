@@ -508,14 +508,7 @@ mod tests {
         };
         let (v2, _) = reiche(&pool, e2, &z, "ext-2", JETZT, JETZT).await;
         assert_eq!(offene(&pool, e2, JETZT).await.unwrap().len(), 1);
-        sqlx::raw_sql(sqlx::AssertSqlSafe(format!(
-            "INSERT INTO spiegel_uebernahme (id) VALUES (1); \
-             INSERT INTO einsatz_spiegel (einsatz_id, fremde_kennung) VALUES ({e2}, 'fremd-1'); \
-             DELETE FROM spiegel_uebernahme"
-        )))
-        .execute(&pool)
-        .await
-        .unwrap();
+        crate::einsatz::spiegel_filter::als_spiegel_markieren(&pool, e2).await;
         assert!(offene(&pool, e2, JETZT).await.unwrap().is_empty());
         let mut c = pool.acquire().await.unwrap();
         assert!(matches!(

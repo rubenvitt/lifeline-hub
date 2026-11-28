@@ -88,7 +88,8 @@ Modulen, Kopfdaten und Einstellungen; „Mitarbeit“ erfasst Meldungen, Chat un
     solchen Einträgen bietet das Menü „Berichtigen“ gar nicht an.
   - Fotos und Anhänge hochladen, nur eigene anhängen und nur eigene Uploads löschen.
 
-  Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Aufträge, Kräfte,
+  Alles andere bleibt zu: Meldungen bestätigen, zuweisen oder im Status ändern, Vorschläge aus dem
+  Maschinen-Eingang übernehmen oder verwerfen, Aufträge, Kräfte,
   Abschnitte und Einstellungen. Ein Modul, das auf „Führung im Einsatz“ steht, bleibt der Mitarbeit
   verschlossen. Ohne Netz laufen die erlaubten Eingaben nach (siehe [Ohne Netz](ohne-netz.md)); am
   Spiegel einer gekoppelten Instanz beantragt Mitarbeit nur Einträge des Einsatztagebuchs und

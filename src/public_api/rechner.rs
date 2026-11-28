@@ -12,7 +12,7 @@
 //! sich (400 `invalid_field`, der Text nennt das Feld), dann den Zusammenhang (422
 //! `unprocessable`). Wirksam ist je Richtwert Anfrage vor Einsatz vor Organisation des Zugangs
 //! vor Basis. Den Einsatz nennt `einsatz_id`; er gilt nur, wenn die Einsatzleitung ihn für den
-//! Zugang freigegeben hat (LLH-1856, ADR-0035, Change `q9b4qq0o-rechner-einsatz-richtwerte`),
+//! Zugang freigegeben hat (LLH-1856, ADR-0112, Change `q9b4qq0o-rechner-einsatz-richtwerte`),
 //! sonst 404. Geprüft wird erst die Anfrage, dann der Einsatz (design.md D3).
 
 use std::collections::{BTreeMap, HashMap};

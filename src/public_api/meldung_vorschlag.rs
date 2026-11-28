@@ -1,7 +1,7 @@
 //! `POST /api/v1/report-suggestions` (LLH-2112, Design-Doc
 //! `docs/superpowers/specs/2026-11-28-jd4jgna4-maschinen-eingang-meldungen-design.md`): ein
 //! Maschinenzugang mit `meldungen:write` reicht einen kurzen Text als unbestätigten Vorschlag für
-//! den Einsatz ein, den die Einsatzleitung für ihn freigegeben hat (ADR-0035). Daraus wird erst
+//! den Einsatz ein, den die Einsatzleitung für ihn freigegeben hat (ADR-0112). Daraus wird erst
 //! eine Meldung, wenn ein Mensch den Vorschlag übernimmt.
 
 use axum::extract::State;
