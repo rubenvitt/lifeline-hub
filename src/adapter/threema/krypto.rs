@@ -197,10 +197,12 @@ pub fn verschluessele_blob(bytes: &[u8]) -> Result<([u8; 32], Vec<u8>), KryptoFe
 /// Hex klein.
 pub fn hex_encode(bytes: &[u8]) -> String {
     use std::fmt::Write;
-    bytes.iter().fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 /// Hex in beliebiger Schreibung; `None` bei ungerader Länge oder fremden Zeichen.
@@ -225,7 +227,11 @@ mod tests {
     }
 
     /// Öffnet eine Nachricht als Empfänger und liefert (Typ, Nutzlast, Padding-Länge).
-    fn oeffnen(v: &Verschluesselt, empfaenger: &PrivaterSchluessel, absender: &[u8; 32]) -> (u8, Vec<u8>, u8) {
+    fn oeffnen(
+        v: &Verschluesselt,
+        empfaenger: &PrivaterSchluessel,
+        absender: &[u8; 32],
+    ) -> (u8, Vec<u8>, u8) {
         let kiste = SalsaBox::new(&PublicKey::from(*absender), &SecretKey::from(empfaenger.0));
         let klar = kiste
             .decrypt(GenericArray::from_slice(&v.nonce), v.box_.as_slice())
@@ -341,5 +347,6 @@ mod tests {
 
     /// Beim ersten grünen Lauf erzeugt und festgeschrieben: schlägt an, wenn sich Format,
     /// Padding oder Bibliothek still ändern.
-    const FESTER_VEKTOR: &str = "";
+    const FESTER_VEKTOR: &str =
+        "fdc1a57acf8834514ebfbc0ae8c457b3e2671e684e0a26b2381c3a6b66b6dce7d646bca9740816f84a47af5a6e79662f0e";
 }

@@ -141,9 +141,10 @@ pub fn normalize_threema(roh: &str) -> Result<String, String> {
         return Err("Threema-ID darf nicht leer sein".into());
     }
     let gueltig = id.len() == 8
-        && id.chars().enumerate().all(|(i, c)| {
-            c.is_ascii_uppercase() || c.is_ascii_digit() || (i == 0 && c == '*')
-        });
+        && id
+            .chars()
+            .enumerate()
+            .all(|(i, c)| c.is_ascii_uppercase() || c.is_ascii_digit() || (i == 0 && c == '*'));
     if !gueltig {
         return Err("Eine Threema-ID hat acht Zeichen (Buchstaben und Ziffern)".into());
     }

@@ -356,7 +356,12 @@ fn normalize_email_lehnt_mehrere_und_anzeigenamen_ab() {
 #[test]
 fn alle_vier_kanaele_sind_freigeschaltet() {
     use super::KanalArt;
-    for k in [KanalArt::Email, KanalArt::Fax, KanalArt::Matrix, KanalArt::Threema] {
+    for k in [
+        KanalArt::Email,
+        KanalArt::Fax,
+        KanalArt::Matrix,
+        KanalArt::Threema,
+    ] {
         assert!(k.is_freigeschaltet(), "{k:?}");
     }
 }
