@@ -176,7 +176,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
         (status = 400, description = "Der Body ist kein gültiges JSON", body = super::ApiErrorBody),
         (status = 401, description = "Anmeldung fehlgeschlagen (Grund nur am Zugang)", body = super::ApiErrorBody),
         (status = 403, description = "Dem Zugang fehlt das Recht `meldungen:write`", body = super::ApiErrorBody),
-        (status = 409, description = "`incident_not_released`: für den Zugang ist kein Einsatz freigegeben; `fuehrung_elsewhere`: eine andere Instanz führt den freigegebenen Einsatz", body = super::ApiErrorBody),
+        (status = 409, description = "`incident_not_released`: für den Zugang ist kein Einsatz freigegeben, oder das Modul Meldungen ist im freigegebenen Einsatz ausgeblendet (die Brücke puffert und versucht es später); `fuehrung_elsewhere`: eine andere Instanz führt den freigegebenen Einsatz", body = super::ApiErrorBody),
         (status = 413, description = "Der Body ist größer als 64 KiB", body = super::ApiErrorBody),
         (status = 422, description = "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
@@ -207,6 +207,25 @@ pub async fn einreichen(
         .await?;
         if gespiegelt {
             return Ok(Err(ApiError::from_code(ErrorCode::FuehrungElsewhere)));
+        }
+        let einsatz_org: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
+        // Ist „Meldungen“ ausgeblendet, sähe niemand den Vorschlag, bis er abläuft (Review I2):
+        // ablehnen, damit die Brücke puffert.
+        if crate::einsatz::berechtigung::is_modul_ausgeblendet_tx(
+            &mut *conn,
+            einsatz_id,
+            einsatz_org,
+            "meldungen",
+        )
+        .await?
+        {
+            return Ok(Err(ApiError::new(
+                ErrorCode::IncidentNotReleased,
+                "Das Modul Meldungen ist im freigegebenen Einsatz nicht sichtbar.",
+            )));
         }
         let eingabe = NeuerVorschlag {
             einsatz_id,

@@ -246,3 +246,36 @@ async fn nach_wechsel_der_freigabe_landet_der_neue_vorschlag_im_neuen_einsatz() 
     .unwrap();
     assert_eq!(offen, 1, "der alte Vorschlag bleibt im alten Einsatz offen");
 }
+
+/// LLH-2112, Review I2: Ist das Modul „Meldungen“ im freigegebenen Einsatz ausgeblendet, sähe
+/// niemand den Vorschlag. Die Route lehnt ab, damit die Brücke puffert.
+#[tokio::test]
+async fn bei_ausgeblendetem_modul_meldungen_lehnt_die_route_ab() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["meldungen:write"]), &schluessel(1), IP).await;
+    freigeben(&pool, &cred, einsatz).await;
+    sqlx::query(
+        "INSERT INTO einsatz_modul_override (einsatz_id, modul_key, sichtbar) \
+         VALUES (?, 'meldungen', 0)",
+    )
+    .bind(einsatz)
+    .execute(&pool)
+    .await
+    .unwrap();
+    let (s, _, v) = einreichen(&app, &cred, &koerper("a-1")).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["code"], "incident_not_released");
+    assert!(v["error"].as_str().unwrap().contains("Meldungen"), "{v}");
+    assert_eq!(zaehle(&pool, "meldung_vorschlag", einsatz).await, 0);
+
+    // Wieder eingeblendet, kommt derselbe Vorschlag an.
+    sqlx::query("DELETE FROM einsatz_modul_override WHERE einsatz_id = ?")
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, v) = einreichen(&app, &cred, &koerper("a-1")).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+}

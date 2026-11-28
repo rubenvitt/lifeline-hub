@@ -466,6 +466,8 @@ Die Rechte stehen fest, die Wege dahinter kommen nach und nach. Heute öffnen f�
   Funk-Gateway im Mesh-Netz. Er landet als unverifizierter Vorschlag im Meldungseingang des
   freigegebenen Einsatzes, nie als Meldung (siehe [Meldungen](meldungen.md)). Eine Anbindung mit
   diesem Recht steht im Paneel „Anbindungen“ und braucht die Freigabe wie die lesenden Rechte.
+  Ist das Modul „Meldungen“ im freigegebenen Einsatz ausgeblendet, nimmt der Server keinen
+  Vorschlag an, denn niemand sähe ihn; das Fremdsystem behält ihn und versucht es später wieder.
 
 Mit den übrigen Rechten prüft ein Fremdsystem bisher nur seine Anmeldung. Einliefern lässt sich
 heute über einen Einwurf-Zugang (siehe unten). Welche Daten die übrigen Rechte später öffnen,

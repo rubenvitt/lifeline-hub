@@ -373,6 +373,20 @@ pub async fn load_ausgeblendete_module(
     Ok(ausgeblendete_module_from(&overrides, &org_defaults))
 }
 
+/// Ob das Modul `modul_key` im Einsatz ausgeblendet ist ([`is_ausgeblendet`]), gelesen auf einer
+/// offenen Verbindung: für einen Schreibweg ohne Person, der in derselben Transaktion prüft, ob
+/// jemand das Ergebnis sehen kann (Meldungsvorschläge, LLH-2112).
+pub async fn is_modul_ausgeblendet_tx(
+    conn: &mut sqlx::SqliteConnection,
+    einsatz_id: i64,
+    org_id: i64,
+    modul_key: &str,
+) -> Result<bool, AppError> {
+    let overrides = modul_override::laden_alle(&mut *conn, einsatz_id).await?;
+    let org_defaults = crate::org::modul_einstellung::laden_alle(&mut *conn, org_id).await?;
+    Ok(is_ausgeblendet(&overrides, &org_defaults, modul_key))
+}
+
 /// Per-Handler-Guard für die Modul-Berechtigung (LFH-132): `Forbidden`, wenn
 /// [`modul_freigabe`] keinen Zugriff gibt.
 pub fn fordere_modul_zugriff(
