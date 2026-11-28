@@ -44,15 +44,15 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/x256kbnt8fqxc3jh3k4lf385
   `fn zweck(&self) -> AdapterZweck { AdapterZweck::Abruf }` in `AdapterArt`;
   `AdapterArtAnzeige.zweck: AdapterZweck`; im TS `AdapterArtAnzeige['zweck']: 'abruf' | 'versand'`.
 
-- [ ] **Step 1: Tests schreiben.** Unit-Test in `art.rs`: `Verzeichnis::produktiv(..)` liefert für `smtp`, `matrix`, `sipgate_fax` `zweck() == Versand`, für `stammdaten_abruf` `Abruf`. In `tests/adapter_smtp.rs`:
+- [x] **Step 1: Tests schreiben.** Unit-Test in `art.rs`: `Verzeichnis::produktiv(..)` liefert für `smtp`, `matrix`, `sipgate_fax` `zweck() == Versand`, für `stammdaten_abruf` `Abruf`. In `tests/adapter_smtp.rs`:
   `arten_liste_meldet_zweck_versand` (GET Liste: Art `smtp` hat `zweck == "versand"`),
   `anlegen_mit_abweichendem_intervall_ist_400` (`intervall_s: 900` → 400, Meldung enthält „fest“),
   `aendern_mit_abweichendem_intervall_ist_400`, `aendern_mit_vorschlag_intervall_ist_200`,
   `aendern_ohne_intervall_laesst_altwert_stehen` (Zeile per SQL auf 900 setzen, PATCH `name` → 200, `intervall_s == 900`).
-- [ ] **Step 2: Rot sehen** — `cargo test --test adapter_smtp` und `cargo test --lib adapter::art`.
-- [ ] **Step 3: Umsetzen.** Enum, Trait-Default, DTO-Feld in `AdapterArtAnzeige::aus`; die drei Arten überschreiben `zweck`. In `routes/adapter.rs` eine Funktion `check_intervall_fuer(art, gesendet: Option<i64>, bisher: i64) -> Result<i64, AppError>`: bei `Versand` → `Some(x) if x != vorschlag` ist 400, sonst `bisher`; bei `Abruf` wie bisher `check_intervall(art, gesendet.unwrap_or(bisher))`. Beim Anlegen ist `bisher` der Vorschlag.
-- [ ] **Step 4: Grün sehen**, dann `scripts/check-typ-codegen.sh` laufen lassen.
-- [ ] **Step 5: Commit** `feat: Zweck der Adapterart, festes Intervall für Versand-Anbindungen (LLH-2126)`.
+- [x] **Step 2: Rot sehen** — `cargo test --test adapter_smtp` und `cargo test --lib adapter::art`.
+- [x] **Step 3: Umsetzen.** Enum, Trait-Default, DTO-Feld in `AdapterArtAnzeige::aus`; die drei Arten überschreiben `zweck`. In `routes/adapter.rs` eine Funktion `check_intervall_fuer(art, gesendet: Option<i64>, bisher: i64) -> Result<i64, AppError>`: bei `Versand` → `Some(x) if x != vorschlag` ist 400, sonst `bisher`; bei `Abruf` wie bisher `check_intervall(art, gesendet.unwrap_or(bisher))`. Beim Anlegen ist `bisher` der Vorschlag.
+- [x] **Step 4: Grün sehen**, dann `scripts/check-typ-codegen.sh` laufen lassen.
+- [x] **Step 5: Commit** `feat: Zweck der Adapterart, festes Intervall für Versand-Anbindungen (LLH-2126)`.
 
 ### Task 2: Frontend — Prüfung statt Abruf
 
@@ -68,14 +68,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/x256kbnt8fqxc3jh3k4lf385
   `adapterZustandAnzeige(a, versand = false)` (Wort für `wartet` bei `versand`: „noch nicht geprüft“);
   `adapterVersuchText(v, versand = false)` (bei `versand`: Erfolg „erreichbar“, keine Eintragszahl).
 
-- [ ] **Step 1: Tests schreiben.** `adapterAnzeige.test.ts`: Zustandswort `wartet` mit/ohne `versand`; `isVersandArt(undefined) === false`. `AdapterAnsicht.test.tsx` mit SMTP-Art (`zweck: 'versand'`): kein „Intervall“, „Zuletzt geprüft“ ohne „Einträge“, „Nächste Prüfung“, Paneel „Letzte Prüfungen“, „Noch keine Prüfung.“, Verlaufseintrag „erreichbar“, gescheiterter Eintrag zeigt Fehlertext; Ergebnis „Verbindung prüfen“ ohne „nichts übernommen“. Gegenprobe mit Abruf-Art: alte Texte stehen. Art fehlt: Abruf-Texte. `AdapterPaneel.test.tsx`: Anlegen mit SMTP zeigt kein Intervallfeld und sendet kein `intervall_s`; Wechsel zu einer Abruf-Art zeigt es mit Vorschlag; Listenzeile „noch nicht geprüft“ bzw. „zuletzt geprüft …“.
-- [ ] **Step 2: Rot sehen** — `mise exec -- pnpm -C frontend exec vitest run src/pages/einstellungen/Adapter src/pages/einstellungen/adapterAnzeige`.
-- [ ] **Step 3: Umsetzen** nach der Tabelle des Design-Docs; Intervallfeld in `felder` und im Anlegen-Formular nur bei `!isVersandArt(art)`; `nebenangaben` bekommt die Art.
-- [ ] **Step 4: Grün sehen**, dazu `tsc` und Lint der geänderten Dateien.
-- [ ] **Step 5: Commit** `fix: Versand-Anbindung zeigt Prüfung statt Abruf (LLH-2126)`.
+- [x] **Step 1: Tests schreiben.** `adapterAnzeige.test.ts`: Zustandswort `wartet` mit/ohne `versand`; `isVersandArt(undefined) === false`. `AdapterAnsicht.test.tsx` mit SMTP-Art (`zweck: 'versand'`): kein „Intervall“, „Zuletzt geprüft“ ohne „Einträge“, „Nächste Prüfung“, Paneel „Letzte Prüfungen“, „Noch keine Prüfung.“, Verlaufseintrag „erreichbar“, gescheiterter Eintrag zeigt Fehlertext; Ergebnis „Verbindung prüfen“ ohne „nichts übernommen“. Gegenprobe mit Abruf-Art: alte Texte stehen. Art fehlt: Abruf-Texte. `AdapterPaneel.test.tsx`: Anlegen mit SMTP zeigt kein Intervallfeld und sendet kein `intervall_s`; Wechsel zu einer Abruf-Art zeigt es mit Vorschlag; Listenzeile „noch nicht geprüft“ bzw. „zuletzt geprüft …“.
+- [x] **Step 2: Rot sehen** — `mise exec -- pnpm -C frontend exec vitest run src/pages/einstellungen/Adapter src/pages/einstellungen/adapterAnzeige`.
+- [x] **Step 3: Umsetzen** nach der Tabelle des Design-Docs; Intervallfeld in `felder` und im Anlegen-Formular nur bei `!isVersandArt(art)`; `nebenangaben` bekommt die Art.
+- [x] **Step 4: Grün sehen**, dazu `tsc` und Lint der geänderten Dateien.
+- [x] **Step 5: Commit** `fix: Versand-Anbindung zeigt Prüfung statt Abruf (LLH-2126)`.
 
 ### Task 3: Abschluss
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] Bilder der SMTP-Ansicht vorher/nachher und des Anlegen-Formulars (Wegwerf-Spec).
-- [ ] Nachzug-Aufgabe „letzte Übergabe aus dem Ausgang an der Anbindung“ anlegen.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] Bilder der SMTP-Ansicht vorher/nachher und des Anlegen-Formulars (Wegwerf-Spec).
+- [x] Nachzug-Aufgabe „letzte Übergabe aus dem Ausgang an der Anbindung“ anlegen.
