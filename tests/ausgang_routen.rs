@@ -337,7 +337,7 @@ impl Welt {
         stelle_mit(
             &self.pool,
             self.org_id,
-            "Kreisverwaltung",
+            "Kreis Threema",
             "threema",
             "ECHOECHO",
         )
