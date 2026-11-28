@@ -17,10 +17,14 @@
 //! (`FREIGABE_WARTEZEIT`); sonst bleibt das Verwerfen vorgemerkt.
 //!
 //! Fehlerklassen: Datei-IO am Verzeichnis, ein gescheitertes Schließen oder Löschen, eine Panik
-//! im Räumen und ein Bau des Clients, der nicht am SDK-Speicher selbst scheitert, sind
+//! im Räumen, ein Bau des Clients, der nicht am SDK-Speicher selbst scheitert, und zur Laufzeit
+//! Sperre, Zustands-, Ereignis- und Medienspeicher des SDK sowie Datei-IO sind
 //! [`MatrixFehler::Speicher`] (vorübergehend, ein Versand bleibt im Wiederholungsfenster);
-//! [`MatrixFehler::Verschluesselung`] bleibt Fehlern der Krypto und des SDK-Speichers (Passphrase,
-//! Inhalt, Krypto-Zustand).
+//! [`MatrixFehler::Verschluesselung`] bleibt Fehlern der Krypto und des Schlüsselspeichers
+//! (Passphrase, Inhalt, Krypto-Zustand) und ist beim Prüfen ein Eingriff
+//! (`AdapterFehler::SchluesselspeicherUnlesbar`, LLH-2145). 403/404 des eigenen `keys/query` ist
+//! [`MatrixFehler::SchluesselabgleichVerweigert`], 403/404 erst beim Senden in einen Raum, in dem
+//! der Bot Mitglied ist, [`MatrixFehler::SendenVerweigert`]: beides ist kein „kein Zutritt“.
 //!
 //! Netz: matrix-sdk bekommt unseren `reqwest::Client` aus [`ziel::client_builder_mit_zielschutz`]
 //! (filternder Resolver, keine Weiterleitung, nur `https`); die Homeserver-URL besteht vorher
@@ -127,6 +131,13 @@ pub enum MatrixFehler {
     Speicher,
     /// Der Schlüsselspeicher gehört zu einem anderen Gerät als dem des Tokens.
     SchluesselPassenNicht,
+    /// Der Homeserver verweigert den eigenen Schlüsselabgleich (`keys/query` beim ersten Öffnen
+    /// des Speichers mit 403 oder 404, LLH-2145): ein Eingriff an Konto oder Homeserver.
+    SchluesselabgleichVerweigert,
+    /// 403 oder 404 beim Senden in einen Raum, in dem der Bot schon Mitglied ist (LLH-2145). Das
+    /// Senden selbst oder die Schlüsselverteilung, die das SDK dabei macht (`keys/query`,
+    /// `keys/claim`, `sendToDevice`); welcher Endpunkt es war, sagt das SDK nicht.
+    SendenVerweigert(u16),
     /// Der Homeserver nennt keine Grenze für Dateien (`m.upload.size` fehlt); ohne sie lädt das
     /// SDK keine Anlage hoch.
     KeineUploadGrenze,
@@ -143,6 +154,7 @@ impl MatrixFehler {
             MatrixFehler::NichtGefunden => Some(404),
             MatrixFehler::ZuGross => Some(413),
             MatrixFehler::RateLimit(_) => Some(429),
+            MatrixFehler::SendenVerweigert(status) => Some(*status),
             _ => None,
         }
     }
@@ -152,8 +164,13 @@ impl From<MatrixFehler> for AdapterFehler {
     fn from(f: MatrixFehler) -> Self {
         match f {
             // 401 und 403 sind beim Prüfen „Zugang abgelehnt“, wie `ziel::fehler_aus_status`.
-            MatrixFehler::Token | MatrixFehler::Verboten => AdapterFehler::Abgelehnt,
+            MatrixFehler::Token
+            | MatrixFehler::Verboten
+            | MatrixFehler::SchluesselabgleichVerweigert
+            | MatrixFehler::SendenVerweigert(_) => AdapterFehler::Abgelehnt,
             MatrixFehler::SchluesselPassenNicht => AdapterFehler::SchluesselPassenNicht,
+            // Passphrase, Inhalt oder Krypto-Zustand: ohne Eingriff geht es nicht weiter.
+            MatrixFehler::Verschluesselung => AdapterFehler::SchluesselspeicherUnlesbar,
             MatrixFehler::Netz => AdapterFehler::Verbindung,
             MatrixFehler::Zeit => AdapterFehler::Zeitueberschreitung,
             MatrixFehler::Dns => AdapterFehler::Dns,
@@ -162,7 +179,6 @@ impl From<MatrixFehler> for AdapterFehler {
             MatrixFehler::RateLimit(_)
             | MatrixFehler::NichtGefunden
             | MatrixFehler::ZuGross
-            | MatrixFehler::Verschluesselung
             | MatrixFehler::KeineUploadGrenze
             | MatrixFehler::Antwort => AdapterFehler::AntwortUngueltig,
         }
@@ -505,6 +521,10 @@ impl Clients {
             .await
             .map_err(|e| netzfehler(&e))?;
         let status = antwort.status().as_u16();
+        // Verweigert der Homeserver den Abgleich, ist das kein Raum, zu dem der Zutritt fehlt.
+        if matches!(status, 403 | 404) {
+            return Err(MatrixFehler::SchluesselabgleichVerweigert);
+        }
         if !(200..300).contains(&status) {
             let retry = if status == 429 {
                 retry_after(antwort).await
@@ -915,12 +935,14 @@ pub fn http_fehler(e: &HttpError) -> MatrixFehler {
 }
 
 /// Ordnet einen Fehler des SDK ein; Schlüsselspeicher eines anderen Kontos oder Geräts ist
-/// `SchluesselPassenNicht`, andere Fehler der Verschlüsselung und des (verschlüsselten)
-/// Speichers `Verschluesselung`. Eine Datei über der Grenze des Homeservers ist `ZuGross`, ein
-/// Raum, in dem der Bot nicht (mehr) Mitglied ist, `Verboten`.
+/// `SchluesselPassenNicht`, andere Fehler der Verschlüsselung und des Schlüsselspeichers
+/// `Verschluesselung`, ebenso ein Zustandsspeicher, der die Passphrase nicht annimmt. Sperre,
+/// übrige Fehler von Zustands-, Ereignis- und Medienspeicher und Datei-IO sind vorübergehend
+/// (`Speicher`, LLH-2145). Eine Datei über der Grenze des Homeservers ist `ZuGross`, ein Raum, in
+/// dem der Bot nicht (mehr) Mitglied ist, `Verboten`.
 pub fn sdk_fehler(e: &matrix_sdk::Error) -> MatrixFehler {
     use matrix_sdk::media::MediaError;
-    use matrix_sdk::Error;
+    use matrix_sdk::{Error, StoreError};
     match e {
         Error::Http(h) => http_fehler(h),
         Error::CryptoStoreError(c) if matches!(**c, CryptoStoreError::MismatchedAccount { .. }) => {
@@ -932,11 +954,23 @@ pub fn sdk_fehler(e: &matrix_sdk::Error) -> MatrixFehler {
         | Error::DecryptorError(_)
         | Error::SignatureError(_)
         | Error::BadCryptoStoreState
-        | Error::NoOlmMachine
-        | Error::StateStore(_)
+        | Error::NoOlmMachine => MatrixFehler::Verschluesselung,
+        Error::StateStore(store)
+            if matches!(
+                **store,
+                StoreError::StoreLocked | StoreError::UnencryptedStore | StoreError::Encryption(_)
+            ) =>
+        {
+            MatrixFehler::Verschluesselung
+        }
+        Error::StateStore(_)
         | Error::EventCacheStore(_)
         | Error::MediaStore(_)
-        | Error::CrossProcessLockError(_) => MatrixFehler::Verschluesselung,
+        | Error::CrossProcessLockError(_)
+        | Error::Io(_) => {
+            tracing::warn!("Matrix-Speicher vorübergehend nicht nutzbar: {e}");
+            MatrixFehler::Speicher
+        }
         Error::Media(MediaError::MediaTooLargeToUpload { .. }) => MatrixFehler::ZuGross,
         Error::Media(MediaError::FetchMaxUploadSizeFailed(_)) => MatrixFehler::KeineUploadGrenze,
         Error::WrongRoomState(_) => MatrixFehler::Verboten,
@@ -976,10 +1010,38 @@ mod tests {
             AdapterFehler::from(MatrixFehler::ZielIntern),
             AdapterFehler::ZielIntern
         );
+        // Ein Schlüsselspeicher, der nicht aufgeht (Passphrase, Inhalt), braucht einen Eingriff
+        // (LLH-2145), keine „Antwort ungültig“.
         assert_eq!(
             AdapterFehler::from(MatrixFehler::Verschluesselung),
-            AdapterFehler::AntwortUngueltig
+            AdapterFehler::SchluesselspeicherUnlesbar
         );
+        assert!(crate::adapter::zustand::braucht_eingriff(
+            AdapterFehler::SchluesselspeicherUnlesbar
+        ));
+        assert_eq!(
+            AdapterFehler::from(MatrixFehler::SchluesselabgleichVerweigert),
+            AdapterFehler::Abgelehnt
+        );
+    }
+
+    /// Sperre, Zustands-, Ereignis- und Medienspeicher und Datei-IO sind vorübergehend
+    /// (`Speicher`); ein Zustandsspeicher, der die Passphrase nicht annimmt, bleibt
+    /// `Verschluesselung` (LLH-2145).
+    #[test]
+    fn sperre_und_speicher_des_sdk_sind_voruebergehend() {
+        use matrix_sdk::cross_process_lock::CrossProcessLockError;
+        use matrix_sdk::{Error, StoreError};
+        let io = Error::Io(std::io::Error::other("Platte voll"));
+        assert_eq!(sdk_fehler(&io), MatrixFehler::Speicher);
+        let sperre = Error::CrossProcessLockError(Box::new(CrossProcessLockError::TryLock(
+            Arc::new(std::io::Error::other("belegt")),
+        )));
+        assert_eq!(sdk_fehler(&sperre), MatrixFehler::Speicher);
+        let belegt = Error::StateStore(Box::new(StoreError::Backend("database is locked".into())));
+        assert_eq!(sdk_fehler(&belegt), MatrixFehler::Speicher);
+        let verschlossen = Error::StateStore(Box::new(StoreError::StoreLocked));
+        assert_eq!(sdk_fehler(&verschlossen), MatrixFehler::Verschluesselung);
     }
 
     #[test]

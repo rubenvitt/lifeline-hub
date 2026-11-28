@@ -64,6 +64,9 @@ wire_enum! {
         /// Der Schlüsselspeicher einer Matrix-Anbindung gehört zu einem anderen Gerät als dem des
         /// Tokens (LLH-2094): ein neues Access-Token anlegen.
         SchluesselPassenNicht => "schluessel_passen_nicht",
+        /// Der Schlüsselspeicher einer Matrix-Anbindung lässt sich nicht öffnen oder nutzen
+        /// (Passphrase, Inhalt, Krypto-Zustand; LLH-2145): ein Eingriff ist nötig.
+        SchluesselspeicherUnlesbar => "schluesselspeicher_unlesbar",
     }
 }
 
@@ -111,7 +114,8 @@ pub fn braucht_eingriff(fehler: AdapterFehler) -> bool {
         | GeheimnisspeicherGesperrt
         | EinstellungUngueltig
         | VersionUnbekannt
-        | SchluesselPassenNicht => true,
+        | SchluesselPassenNicht
+        | SchluesselspeicherUnlesbar => true,
         Status | Zeitueberschreitung | Verbindung | Tls | Dns | ZuGross | AntwortUngueltig
         | Intern => false,
     }

@@ -230,6 +230,12 @@ Verworfen:
   Untergrenze), 5xx → vorübergehend; 401/`M_UNKNOWN_TOKEN` → `anbindung_fehler` (und Prüflauf
   vorziehen wie bei SMTP-Anmeldung); 403/`M_FORBIDDEN` beim Senden, Raum unbekannt →
   `kein_zutritt`; `M_TOO_LARGE` → `zu_gross`; Verschlüsselungsfehler → `verschluesselung`.
+  *Berichtigt 28.11.2026 (LLH-2145):* `kein_zutritt` gilt nur für Auflösen, Beitreten, Sync und
+  Mitgliederliste; 403/404 erst beim Senden (dabei verteilt das SDK auch Schlüssel) ist
+  `abgelehnt`, 403/404 des eigenen `keys/query` ein verweigerter Schlüsselabgleich
+  (`anbindung_fehler`, beim Prüfen `abgelehnt`). Sperre, Zustands-, Ereignis- und Medienspeicher
+  und Datei-IO des SDK sind vorübergehend; ein Schlüsselspeicher, der nicht aufgeht, ist beim
+  Prüfen `schluesselspeicher_unlesbar` (braucht Eingriff) statt „Antwort ungültig“.
 - **Neue `AusgangFehler`-Codes:** `kein_zutritt` („Kein Zutritt zum Raum“) und
   `verschluesselung` („Verschlüsseln nicht möglich“), mit Enum-Kontrakt, Texten im Frontend und
   Typ-Codegen. Das Wire-Feld `smtp_status` bleibt (Grenzwert); für Matrix bleibt es leer, der

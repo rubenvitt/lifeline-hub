@@ -194,7 +194,7 @@ async fn sende(client: &matrix_sdk::Client, plan: Plan, teile: &Teile) -> Result
             .send(RoomMessageEventContent::text_html(klartext, html))
             .with_transaction_id(txn(&plan.versand_id, 0))
             .await
-            .map_err(sdk)?;
+            .map_err(|e| beim_senden(sdk(e)))?;
         merke(teile, 0, antwort.response.event_id);
     }
     let png: mime_guess::Mime = "image/png".parse().map_err(|_| MatrixFehler::Antwort)?;
@@ -213,10 +213,22 @@ async fn sende(client: &matrix_sdk::Client, plan: Plan, teile: &Teile) -> Result
         let antwort = raum
             .send_attachment(name, &png, daten, config)
             .await
-            .map_err(sdk)?;
+            .map_err(|e| beim_senden(sdk(e)))?;
         merke(teile, teil, antwort.event_id);
     }
     Ok(())
+}
+
+/// Ein 403 oder 404 beim Senden selbst: die Mitgliedschaft steht da schon fest (Beitritt, Sync,
+/// Zustand `Joined`), und das SDK verteilt dabei auch die Schlüssel (`keys/query`, `keys/claim`,
+/// `sendToDevice`), ohne den Endpunkt zu nennen. Deshalb nicht „kein Zutritt zum Raum“
+/// (LLH-2145).
+fn beim_senden(f: MatrixFehler) -> MatrixFehler {
+    match f {
+        MatrixFehler::Verboten => MatrixFehler::SendenVerweigert(403),
+        MatrixFehler::NichtGefunden => MatrixFehler::SendenVerweigert(404),
+        anders => anders,
+    }
 }
 
 fn merke(teile: &Teile, teil: i64, event_id: OwnedEventId) {
@@ -379,6 +391,10 @@ fn matrix_fehlschlag(f: MatrixFehler, teile: Vec<(i64, String)>) -> Fehlschlag {
                 anbindung(true),
                 "Schlüsselspeicher passt nicht zum Gerät des Tokens",
             ),
+            MatrixFehler::SchluesselabgleichVerweigert => (
+                anbindung(true),
+                "Homeserver verweigert den Schlüsselabgleich",
+            ),
             MatrixFehler::ZielIntern => (anbindung(false), "Adresse des Homeservers nicht erlaubt"),
             MatrixFehler::Verboten => (
                 Zustellfehler::KeinZutritt,
@@ -387,6 +403,14 @@ fn matrix_fehlschlag(f: MatrixFehler, teile: Vec<(i64, String)>) -> Fehlschlag {
             MatrixFehler::NichtGefunden => (
                 Zustellfehler::KeinZutritt,
                 "kein Zutritt zum Raum, Raum unbekannt (M_NOT_FOUND)",
+            ),
+            MatrixFehler::SendenVerweigert(status) => (
+                Zustellfehler::Abgelehnt,
+                if status == 404 {
+                    "Senden oder Schlüsselverteilung vom Homeserver verweigert (M_NOT_FOUND)"
+                } else {
+                    "Senden oder Schlüsselverteilung vom Homeserver verweigert (M_FORBIDDEN)"
+                },
             ),
             MatrixFehler::ZuGross => (
                 Zustellfehler::ZuGross,
@@ -505,6 +529,8 @@ mod tests {
             M::Verschluesselung,
             M::Speicher,
             M::SchluesselPassenNicht,
+            M::SchluesselabgleichVerweigert,
+            M::SendenVerweigert(403),
             M::KeineUploadGrenze,
             M::Antwort,
         ];
@@ -527,6 +553,29 @@ mod tests {
         );
         assert_eq!(art(M::Verboten), Zustellfehler::KeinZutritt);
         assert_eq!(art(M::NichtGefunden), Zustellfehler::KeinZutritt);
+        // 403/404 erst beim Senden, nach festgestellter Mitgliedschaft, und 403/404 des eigenen
+        // Schlüsselabgleichs sind kein „kein Zutritt zum Raum“ (LLH-2145).
+        assert_eq!(art(M::SendenVerweigert(403)), Zustellfehler::Abgelehnt);
+        assert_eq!(
+            matrix_fehlschlag(M::SendenVerweigert(403), Vec::new()).grund,
+            "Senden oder Schlüsselverteilung vom Homeserver verweigert (M_FORBIDDEN)"
+        );
+        assert_eq!(
+            matrix_fehlschlag(M::SendenVerweigert(404), Vec::new()).grund,
+            "Senden oder Schlüsselverteilung vom Homeserver verweigert (M_NOT_FOUND)"
+        );
+        assert_eq!(
+            art(M::SchluesselabgleichVerweigert),
+            Zustellfehler::Anbindung {
+                pruefung_vorziehen: true
+            }
+        );
+        assert_eq!(
+            beim_senden(M::Verboten),
+            M::SendenVerweigert(403)
+        );
+        assert_eq!(beim_senden(M::NichtGefunden), M::SendenVerweigert(404));
+        assert_eq!(beim_senden(M::Netz), M::Netz);
         assert_eq!(art(M::ZuGross), Zustellfehler::ZuGross);
         assert_eq!(art(M::Verschluesselung), Zustellfehler::Verschluesselung);
         // Datei-IO, Schließen und Löschen des Speichers sind Probleme des Hubs, nicht der
