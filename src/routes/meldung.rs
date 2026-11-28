@@ -248,19 +248,9 @@ pub(crate) async fn empfaenger_funktion_pruefen(
     Ok(crate::fuehrung::pruefe_funktion(Some(code), None, s7_aktiv)?.funktion)
 }
 
-/// POST /api/incidents/{id}/reports — Meldung erfassen (Erfassungsrecht + aktiv; die Mitarbeit
-/// meldet keine Lagemeldung, LLH-1817).
-pub async fn anlegen(
-    State(state): State<AppState>,
-    ctx: EinsatzErfassungsfreigabe<Meldungen>,
-    headers: HeaderMap,
-    JsonBody(req): JsonBody<NeueMeldung>,
-) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
-    let einsatz_id = ctx.einsatz.id;
-    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
-
-    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-/Lese-Gates (LFH-769), aber
-    // vor dem Aktiv-Gate erkennen. Der Lookup bleibt durch die Einsatz-ID mandantenfest.
+/// Der getrimmte Idempotenzschlüssel einer neuen Meldung; leer ist keiner, länger als 64 Zeichen
+/// ist 400.
+pub(crate) fn client_id_aus(req: &NeueMeldung) -> Result<Option<&str>, AppError> {
     let client_id = req
         .client_id
         .as_deref()
@@ -271,29 +261,90 @@ pub async fn anlegen(
             "client_id zu lang (max. 64 Zeichen)".into(),
         ));
     }
-    if let Some(cid) = client_id {
-        let aktuell = jetzt();
-        if let Some(meldung) =
-            repo::laden_nach_client_id(&state.pool, einsatz_id, cid, &aktuell).await?
-        {
-            // Eine fremde Meldung gibt die Wiederholung einem Gerät nicht heraus (LFH-892).
-            if ctx.geraet.is_some() && meldung.erfasst_von_id != ctx.benutzer.id {
-                return Err(AppError::Conflict("client_id bereits vergeben".into()));
-            }
-            crate::meldung::live_publikation_sicherstellen(&state, &meldung).await?;
-            crate::meldung::auto_frist_erinnerung_sicherstellen(
-                &state,
-                &meldung,
-                AutoFristHerkunft::Meldung,
-            )
-            .await?;
-            let mut meldung = meldung;
-            ohne_namen_fuer_geraet(ctx.geraet.as_ref(), &mut meldung);
-            return Ok((StatusCode::CREATED, Json(meldung)));
+    Ok(client_id)
+}
+
+/// Eine bereits committete Offline-Aktion (LFH-769): die Meldung mit dieser `client_id` im
+/// Einsatz, mit nachgestelltem Live-Bündel und Auto-Frist-Erinnerung. Der Lookup bleibt durch die
+/// Einsatz-ID mandantenfest; eine fremde Meldung gibt die Wiederholung einem Gerät nicht heraus
+/// (LFH-892, 409).
+pub(crate) async fn bestehende_meldung(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    client_id: &str,
+) -> Result<Option<MeldungAnzeige>, AppError> {
+    let aktuell = jetzt();
+    let Some(mut meldung) =
+        repo::laden_nach_client_id(&state.pool, ctx.einsatz.id, client_id, &aktuell).await?
+    else {
+        return Ok(None);
+    };
+    if ctx.geraet.is_some() && meldung.erfasst_von_id != ctx.benutzer.id {
+        return Err(AppError::Conflict("client_id bereits vergeben".into()));
+    }
+    crate::meldung::live_publikation_sicherstellen(state, &meldung).await?;
+    crate::meldung::auto_frist_erinnerung_sicherstellen(
+        state,
+        &meldung,
+        AutoFristHerkunft::Meldung,
+    )
+    .await?;
+    ohne_namen_fuer_geraet(ctx.geraet.as_ref(), &mut meldung);
+    Ok(Some(meldung))
+}
+
+/// Die geprüften Werte einer neuen Meldung ([`pruefe_neue_meldung`]), getrimmt und normalisiert.
+#[derive(Debug)]
+pub(crate) struct GepruefteMeldung {
+    absender: String,
+    empfaenger: Option<String>,
+    empfaenger_funktion: Option<Fuehrungsfunktion>,
+    meldeweg: String,
+    inhalt: String,
+    meldungsart: String,
+    prioritaet: String,
+    richtung: String,
+    ereigniszeit: String,
+    eingang: String,
+    bestaetigung_pflicht: bool,
+    bestaetigung_frist_at: Option<String>,
+    einheit_id: Option<i64>,
+    abschnitt_id: Option<i64>,
+    geo: Option<(f64, f64)>,
+}
+
+impl GepruefteMeldung {
+    pub(crate) fn daten(&self) -> repo::MeldungDaten<'_> {
+        repo::MeldungDaten {
+            absender: &self.absender,
+            empfaenger: self.empfaenger.as_deref(),
+            empfaenger_funktion: self.empfaenger_funktion,
+            meldeweg: &self.meldeweg,
+            inhalt: &self.inhalt,
+            meldungsart: &self.meldungsart,
+            prioritaet: &self.prioritaet,
+            richtung: &self.richtung,
+            ereigniszeit: &self.ereigniszeit,
+            eingang_at: &self.eingang,
+            bestaetigung_pflicht: self.bestaetigung_pflicht,
+            bestaetigung_frist_at: self.bestaetigung_frist_at.as_deref(),
+            einheit_id: self.einheit_id,
+            abschnitt_id: self.abschnitt_id,
+            geo: self.geo,
         }
     }
-    ctx.fordere_aktiv()?;
+}
 
+/// Alle Prüfungen einer neuen Meldung vor dem Schreiben: Pflichtfelder und Grenzen, Vokabular,
+/// Art für die Rolle, Verortung, Empfängerfunktion, Absenderbezug, Ereigniszeit und
+/// Bestätigungsfrist. Gemeinsam für das Erfassen und die Übernahme eines Vorschlags (LLH-2112),
+/// damit beide denselben Weg gehen. Der Aufrufer hat das Aktiv-Gate schon geprüft.
+pub(crate) async fn pruefe_neue_meldung(
+    state: &AppState,
+    ctx: &EinsatzErfassungsfreigabe<Meldungen>,
+    req: &NeueMeldung,
+) -> Result<GepruefteMeldung, AppError> {
+    let einsatz_id = ctx.einsatz.id;
     // Mindestfelder: Absender, Inhalt, Meldeweg.
     // Absender, Empfänger und Inhalt landen unverändert im ETB: dessen Grenzen (LFH-937, D2).
     let absender = pflicht_max(&req.absender, "Absender", crate::etb::PARTEI_MAX)?;
@@ -358,7 +409,7 @@ pub async fn anlegen(
         }
     }
     let empfaenger_funktion = empfaenger_funktion_pruefen(
-        &state,
+        state,
         ctx.einsatz.org_id,
         req.empfaenger_funktion.as_deref(),
     )
@@ -369,7 +420,7 @@ pub async fn anlegen(
         match crate::geraet::abschnitt::bereich(&state.pool, ctx.geraet.as_ref()).await? {
             Some(b) => b.meldungs_absender(req.einheit_id, req.abschnitt_id)?,
             None => {
-                absender_bezug_aufloesen(&state, einsatz_id, req.einheit_id, req.abschnitt_id)
+                absender_bezug_aufloesen(state, einsatz_id, req.einheit_id, req.abschnitt_id)
                     .await?
             }
         };
@@ -405,28 +456,52 @@ pub async fn anlegen(
         None
     };
 
+    Ok(GepruefteMeldung {
+        absender,
+        empfaenger: trimme(&req.empfaenger).map(str::to_owned),
+        empfaenger_funktion,
+        meldeweg: req.meldeweg.trim().to_owned(),
+        inhalt,
+        meldungsart: meldungsart.to_owned(),
+        prioritaet: prioritaet.to_owned(),
+        richtung: richtung.to_owned(),
+        ereigniszeit,
+        eingang,
+        bestaetigung_pflicht: pflicht,
+        bestaetigung_frist_at: frist_at,
+        einheit_id,
+        abschnitt_id,
+        geo,
+    })
+}
+
+/// POST /api/incidents/{id}/reports — Meldung erfassen (Erfassungsrecht + aktiv; die Mitarbeit
+/// meldet keine Lagemeldung, LLH-1817).
+pub async fn anlegen(
+    State(state): State<AppState>,
+    ctx: EinsatzErfassungsfreigabe<Meldungen>,
+    headers: HeaderMap,
+    JsonBody(req): JsonBody<NeueMeldung>,
+) -> Result<(StatusCode, Json<MeldungAnzeige>), AppError> {
+    crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
+
+    // Bereits committete Offline-Aktion nach Auth-/Schreib-/Modul-/Lese-Gates (LFH-769), aber
+    // vor dem Aktiv-Gate erkennen.
+    let client_id = client_id_aus(&req)?;
+    if let Some(cid) = client_id {
+        if let Some(meldung) = bestehende_meldung(&state, &ctx, cid).await? {
+            return Ok((StatusCode::CREATED, Json(meldung)));
+        }
+    }
+    ctx.fordere_aktiv()?;
+    let geprueft = pruefe_neue_meldung(&state, &ctx, &req).await?;
+
     let (m, _war_neu) = repo::anlegen_idempotent(
         &state.pool,
-        einsatz_id,
+        ctx.einsatz.id,
         ctx.benutzer.id,
         client_id,
-        repo::MeldungDaten {
-            absender: &absender,
-            empfaenger: trimme(&req.empfaenger),
-            empfaenger_funktion,
-            meldeweg: req.meldeweg.trim(),
-            inhalt: &inhalt,
-            meldungsart,
-            prioritaet,
-            richtung,
-            ereigniszeit: &ereigniszeit,
-            eingang_at: &eingang,
-            bestaetigung_pflicht: pflicht,
-            bestaetigung_frist_at: frist_at.as_deref(),
-            einheit_id,
-            abschnitt_id,
-            geo,
-        },
+        geprueft.daten(),
     )
     .await?;
 
