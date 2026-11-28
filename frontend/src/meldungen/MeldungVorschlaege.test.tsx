@@ -9,7 +9,9 @@ import type { ReportSuggestion } from '../api/types';
 const listeMeldungVorschlaege = vi.fn();
 const uebernehmeMeldungVorschlag = vi.fn();
 const verwirfMeldungVorschlag = vi.fn();
+const legeMeldungAn = vi.fn();
 vi.mock('../api/meldungen', () => ({
+  legeMeldungAn: (...a: unknown[]) => legeMeldungAn(...a),
   listeMeldungVorschlaege: (...a: unknown[]) => listeMeldungVorschlaege(...a),
   uebernehmeMeldungVorschlag: (...a: unknown[]) => uebernehmeMeldungVorschlag(...a),
   verwirfMeldungVorschlag: (...a: unknown[]) => verwirfMeldungVorschlag(...a),
@@ -34,6 +36,7 @@ beforeEach(() => {
   listeMeldungVorschlaege.mockReset().mockResolvedValue([NORD, BRUECKE]);
   uebernehmeMeldungVorschlag.mockReset().mockResolvedValue({ id: 99, lfd_nr: 5 });
   verwirfMeldungVorschlag.mockReset().mockResolvedValue(undefined);
+  legeMeldungAn.mockReset().mockResolvedValue({ id: 100, lfd_nr: 6 });
 });
 
 describe('Vorschläge im Meldungseingang (LLH-2112)', () => {
@@ -110,6 +113,51 @@ describe('Vorschläge im Meldungseingang (LLH-2112)', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
     expect(await within(dialog).findByText(/nicht mehr offen/)).toBeInTheDocument();
     await waitFor(() => expect(listeMeldungVorschlaege).toHaveBeenCalledTimes(2));
+  });
+
+  it('sendet je geöffnetem Dialog eine eigene client_id, bei Wiederholung dieselbe', async () => {
+    uebernehmeMeldungVorschlag.mockRejectedValueOnce(new ApiError(0, 'Netz weg'));
+    renderMitProviders(<MeldungVorschlaege einsatzId={7} darfSchreiben />);
+    const knoepfe = await screen.findAllByRole('button', { name: 'Als Meldung übernehmen' });
+    await userEvent.click(knoepfe[0]);
+    let dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(uebernehmeMeldungVorschlag).toHaveBeenCalledTimes(1));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(uebernehmeMeldungVorschlag).toHaveBeenCalledTimes(2));
+    const erste = uebernehmeMeldungVorschlag.mock.calls[0][2].client_id;
+    expect(erste).toEqual(expect.any(String));
+    expect(uebernehmeMeldungVorschlag.mock.calls[1][2].client_id).toBe(erste);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await userEvent.click(
+      (await screen.findAllByRole('button', { name: 'Als Meldung übernehmen' }))[1],
+    );
+    dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    await waitFor(() => expect(uebernehmeMeldungVorschlag).toHaveBeenCalledTimes(3));
+    expect(uebernehmeMeldungVorschlag.mock.calls[2][2].client_id).not.toBe(erste);
+  });
+
+  it('bietet bei 409 an, die Eingaben als neue Meldung zu erfassen', async () => {
+    uebernehmeMeldungVorschlag.mockRejectedValue(
+      new ApiError(409, 'Der Vorschlag ist nicht mehr offen'),
+    );
+    renderMitProviders(<MeldungVorschlaege einsatzId={7} darfSchreiben />);
+    const knoepfe = await screen.findAllByRole('button', { name: 'Als Meldung übernehmen' });
+    await userEvent.click(knoepfe[0]);
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Erfassen' }));
+    expect(await within(dialog).findByText(/Der Vorschlag ist nicht mehr da/)).toBeInTheDocument();
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Als neue Meldung erfassen' }),
+    );
+    await waitFor(() => expect(legeMeldungAn).toHaveBeenCalledTimes(1));
+    const [einsatzId, daten] = legeMeldungAn.mock.calls[0];
+    expect(einsatzId).toBe(7);
+    expect(daten).toMatchObject({ inhalt: NORD.text, absender: 'Nord-1', meldeweg: 'funk' });
+    expect(daten.client_id).not.toBe(uebernehmeMeldungVorschlag.mock.calls[0][2].client_id);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
   it('verwirft einen Vorschlag nach Rückfrage', async () => {

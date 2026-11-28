@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { einsatzKeys } from '../api/queryKeys';
 import {
+  legeMeldungAn,
   listeMeldungVorschlaege,
   uebernehmeMeldungVorschlag,
   verwirfMeldungVorschlag,
 } from '../api/meldungen';
-import { ApiError } from '../api/client';
+import { ApiError, fehlerText } from '../api/client';
 import type { Einheit, Einsatzabschnitt, NeueMeldung, ReportSuggestion } from '../api/types';
 import {
   Knopfreihe,
@@ -29,12 +30,21 @@ import type { FunktionsVorschlaege } from '../fuehrung/funktionsOptionenKern';
 import type { StandardRufname } from '../etb/standardRufname';
 import MeldungFormular, { type MeldungFormWerte } from './MeldungFormular';
 import { herkunftAbsender, herkunftText } from './maschinenHerkunft';
+import { neueClientId } from '../offline/clientId';
 
 /** Ein offener Übernahme-Dialog samt dem Einsatz, in dem er geöffnet wurde. */
 interface Auswahl {
   einsatzId: number;
   vorschlag: ReportSuggestion;
+  /** Je geöffnetem Dialog eine: eine Wiederholung nach verlorener Antwort liefert die schon
+   *  angelegte Meldung statt 409 (Review M3). */
+  clientId: string;
+  /** Für „Als neue Meldung erfassen“, wenn der Vorschlag weg ist (eigene, denn die erste kann
+   *  schon vergeben sein). */
+  ersatzClientId: string;
 }
+
+const istKonflikt = (e: unknown) => e instanceof ApiError && e.status === 409;
 
 /** Vorbelegung der Meldung aus dem Vorschlag (Design LLH-2112, „Oberfläche“). */
 function vorbelegungAus(v: ReportSuggestion): Partial<MeldungFormWerte> {
@@ -106,11 +116,37 @@ export default function MeldungVorschlaege({
       if (e instanceof ApiError && e.status === 409) void neuAbfragen(v.einsatzId);
     },
   });
-  const diese = annahme.variables?.einsatzId === einsatzId;
+  const diese =
+    annahme.variables?.einsatzId === einsatzId && annahme.variables.vorschlagId === offen?.id;
+  // 409: übernommen, verworfen oder abgelaufen. Das Formular bietet dann das normale Erfassen an
+  // (Review M9), statt beim nächsten Speichern wieder abgelehnt zu werden.
+  const verloren = diese && istKonflikt(annahme.error);
   const speicherung: Speicherung = {
-    error: diese ? annahme.error : null,
+    error: diese && !verloren ? annahme.error : null,
     isPending: diese && annahme.isPending,
     reset: annahme.reset,
+  };
+
+  const alsNeue = useMutation({
+    mutationFn: (v: { einsatzId: number; daten: NeueMeldung }) =>
+      legeMeldungAn(v.einsatzId, v.daten),
+    onSuccess: (meldung, v) => {
+      void qc.invalidateQueries({ queryKey: einsatzKeys.meldungen(v.einsatzId) });
+      void qc.invalidateQueries({ queryKey: einsatzKeys.modulZaehler(v.einsatzId) });
+      message.success(`Meldung #${meldung.lfd_nr} erfasst`);
+      annahme.reset();
+      setAuswahl(null);
+    },
+  });
+  const oeffnen = (v: ReportSuggestion) => {
+    annahme.reset();
+    alsNeue.reset();
+    setAuswahl({
+      einsatzId,
+      vorschlag: v,
+      clientId: neueClientId(),
+      ersatzClientId: neueClientId(),
+    });
   };
 
   // Grund einer Ablehnung an der Zeile (LFH-1077); ein 409 holt den Stand, die Zeile fällt dann weg.
@@ -167,10 +203,7 @@ export default function MeldungVorschlaege({
                   {grund && <ZeilenFehler fehler={grund.fehler} fallback={grund.fallback} />}
                   {darfSchreiben && (
                     <Knopfreihe aria-label={`Vorschlag von ${herkunftAbsender(v.source)}`}>
-                      <Button
-                        type="primary"
-                        onClick={() => setAuswahl({ einsatzId, vorschlag: v })}
-                      >
+                      <Button type="primary" onClick={() => oeffnen(v)}>
                         Als Meldung übernehmen
                       </Button>
                       <Popconfirm
@@ -210,14 +243,52 @@ export default function MeldungVorschlaege({
           onFertig={() => setAuswahl(null)}
           senden={speicherung.isPending}
           speicherung={speicherung}
-          onAnlegen={(daten) => annahme.mutateAsync({ einsatzId, vorschlagId: offen.id, daten })}
+          onAnlegen={(daten) =>
+            annahme.mutateAsync({
+              einsatzId,
+              vorschlagId: offen.id,
+              daten: { ...daten, client_id: auswahl?.clientId },
+            })
+          }
           vorbelegung={vorbelegung}
           hinweis={
-            <Alert
-              type="warning"
-              showIcon
-              title={`Unverifiziert · ${herkunftText(offen.source)}`}
-            />
+            <Stapel abstand="sm">
+              <Alert
+                type="warning"
+                showIcon
+                title={`Unverifiziert · ${herkunftText(offen.source)}`}
+              />
+              {verloren && annahme.variables && (
+                <Alert
+                  type="error"
+                  showIcon
+                  title="Der Vorschlag ist nicht mehr da: übernommen, verworfen oder abgelaufen."
+                  description={
+                    <Stapel abstand="xs">
+                      <span>{fehlerText(annahme.error)}</span>
+                      <span>Die Eingaben lassen sich als neue Meldung erfassen.</span>
+                      {alsNeue.error != null && (
+                        <ZeilenFehler fehler={alsNeue.error} fallback="Erfassen fehlgeschlagen" />
+                      )}
+                    </Stapel>
+                  }
+                  action={
+                    <Button
+                      loading={alsNeue.isPending}
+                      onClick={() =>
+                        annahme.variables &&
+                        alsNeue.mutate({
+                          einsatzId,
+                          daten: { ...annahme.variables.daten, client_id: auswahl?.ersatzClientId },
+                        })
+                      }
+                    >
+                      Als neue Meldung erfassen
+                    </Button>
+                  }
+                />
+              )}
+            </Stapel>
           }
           einsatzId={einsatzId}
           einheiten={einheiten}
