@@ -5,10 +5,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { adapterFixture, adapterListeFixture } from '../../test/adapterDaten';
+import {
+  adapterFixture,
+  adapterListeFixture,
+  SMTP_ART,
+  smtpAdapterFixture,
+} from '../../test/adapterDaten';
 import type { AdapterAnzeige, AdapterListe } from '../../api/types';
 import { globalKeys } from '../../api/queryKeys';
-import AdapterAnsicht from './AdapterAnsicht';
+import AdapterAnsicht, { adapterPatch } from './AdapterAnsicht';
 
 vi.mock('../../auth/AuthContext', () => ({
   useAuth: vi.fn(),
@@ -479,5 +484,64 @@ describe('AdapterAnsicht', () => {
     rendere();
     await screen.findByRole('button', { name: 'Verbindung prüfen' });
     expect(screen.queryByRole('button', { name: 'Erneut vorlegen' })).not.toBeInTheDocument();
+  });
+
+  /** LLH-2126: eine Versand-Anbindung spricht von Prüfung, nicht von Abruf. */
+  describe('Versand-Anbindung', () => {
+    const bereit = (extra: Partial<AdapterAnzeige> = {}) =>
+      stelleBereit(smtpAdapterFixture('a1', extra), { arten: [SMTP_ART] });
+
+    it('zeigt Prüfung statt Abruf und kein Intervall', async () => {
+      bereit();
+      rendere();
+      const zustand = await waitFor(() => paneel('Zustand'));
+      expect(zustand).toHaveTextContent('Zuletzt geprüft');
+      expect(zustand).not.toHaveTextContent('Zuletzt erfolgreich');
+      expect(zustand).not.toHaveTextContent('Einträge');
+      expect(zustand).toHaveTextContent('Nächste Prüfung');
+      expect(zustand).not.toHaveTextContent('Nächster Versuch');
+      expect(paneel('Einstellungen')).not.toHaveTextContent('Intervall');
+      const verlauf = paneel('Letzte Prüfungen');
+      expect(await within(verlauf).findByText('erreichbar · Prüfung')).toBeInTheDocument();
+      expect(within(verlauf).getByText('Keine Antwort in 20 s')).toBeInTheDocument();
+    });
+
+    it('nennt eine noch nie geprüfte Anbindung „noch nicht geprüft“', async () => {
+      bereit({ zustand: 'wartet', letzter_erfolg_at: undefined, letzte_anzahl: undefined });
+      server.use(http.get('/api/admin/adapter/a1/attempts', () => HttpResponse.json([])));
+      rendere();
+      const zustand = await waitFor(() => paneel('Zustand'));
+      expect(zustand).toHaveTextContent('noch nicht geprüft');
+      expect(zustand).not.toHaveTextContent('abgerufen');
+      expect(
+        await within(paneel('Letzte Prüfungen')).findByText('Noch keine Prüfung.'),
+      ).toBeInTheDocument();
+    });
+
+    it('zeigt das Ergebnis von „Verbindung prüfen“ ohne „nichts übernommen“', async () => {
+      bereit();
+      const user = userEvent.setup();
+      rendere();
+      await user.click(await screen.findByRole('button', { name: 'Verbindung prüfen' }));
+      await screen.findByText(/Verbindung prüfen: erreichbar/);
+      const ergebnis = document.querySelector('[data-lfh="adapter-pruefung"]');
+      expect(ergebnis).toHaveTextContent('412 ms');
+      expect(ergebnis).not.toHaveTextContent('nichts übernommen');
+      expect(ergebnis).not.toHaveTextContent('Einträge');
+    });
+
+    it('lässt das Intervall aus dem Patch einer Versand-Art', () => {
+      const vorher = { name: 'Ausgang', intervall_s: 3600 };
+      const nachher = { name: 'Mail' } as unknown as typeof vorher;
+      expect(adapterPatch(SMTP_ART, vorher, nachher)).toEqual({ name: 'Mail' });
+    });
+  });
+
+  it('zeigt bei unbekannter Art weiter die Abruf-Texte', async () => {
+    stelleBereit(smtpAdapterFixture('a1', { zustand: 'art_unbekannt' }), { arten: [] });
+    rendere();
+    const zustand = await waitFor(() => paneel('Zustand'));
+    expect(zustand).toHaveTextContent('Zuletzt erfolgreich');
+    expect(paneel('Letzte Versuche')).toBeInTheDocument();
   });
 });

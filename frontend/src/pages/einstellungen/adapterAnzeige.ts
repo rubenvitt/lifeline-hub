@@ -5,6 +5,7 @@ import type { AdapterEinstellungen } from '../../api/adapter';
 import { globalKeys } from '../../api/queryKeys';
 import type {
   AdapterAnzeige,
+  AdapterArtAnzeige,
   AdapterFeld,
   AdapterListe,
   AdapterZustand,
@@ -30,11 +31,26 @@ const ZUSTAND: Record<AdapterZustand, { wort: string; ton: Ton }> = {
   art_unbekannt: { wort: 'Art unbekannt', ton: 'achtung' },
 };
 
-/** Wort und Ton des Zustands (Entwurf `docs/design/2026-11-22-adapter/`). */
-export function adapterZustandAnzeige(a: Pick<AdapterAnzeige, 'zustand'>): {
+/**
+ * Ob die Art nur versendet (SMTP, Matrix, Fax): ihr Lauf prüft im festen Takt nur die
+ * Verbindung, sie ruft nichts ab (LLH-2126). Eine unbekannte Art gilt als Abruf.
+ */
+export function isVersandArt(art: Pick<AdapterArtAnzeige, 'zweck'> | undefined): boolean {
+  return art?.zweck === 'versand';
+}
+
+/**
+ * Wort und Ton des Zustands (Entwurf `docs/design/2026-11-22-adapter/`). Eine Versand-Anbindung
+ * ist vor ihrer ersten Prüfung „noch nicht geprüft“ (LLH-2126).
+ */
+export function adapterZustandAnzeige(
+  a: Pick<AdapterAnzeige, 'zustand'>,
+  versand = false,
+): {
   wort: string;
   ton: Ton;
 } {
+  if (versand && a.zustand === 'wartet') return { ...ZUSTAND.wartet, wort: 'noch nicht geprüft' };
   return ZUSTAND[a.zustand];
 }
 

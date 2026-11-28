@@ -28,6 +28,7 @@ import { ANBINDUNGEN_ABRUF_MS } from './anbindungAnzeige';
 import {
   adapterPath,
   adapterZustandAnzeige,
+  isVersandArt,
   einstellungenVon,
   einstellungsRegeln,
   isZustandSichtbar,
@@ -76,14 +77,21 @@ export function EinstellungsFeld({
   );
 }
 
-/** Zweite Zeile eines Adapters: Art, letzter Erfolg und, wenn er etwas verlangt, der Grund. */
-function nebenangaben(a: AdapterAnzeige, zeit: (w: string) => string): string {
+/**
+ * Zweite Zeile eines Adapters: Art, letzter Erfolg und, wenn er etwas verlangt, der Grund. Eine
+ * Versand-Anbindung nennt die letzte Prüfung (LLH-2126).
+ */
+function nebenangaben(a: AdapterAnzeige, zeit: (w: string) => string, versand: boolean): string {
   const teile = [a.art_bezeichnung ?? a.art];
   if (a.zustand === 'braucht_eingriff' && a.angehalten_grund) {
     teile.push(`angehalten: ${adapterFehlerText(a.angehalten_grund, a.letzter_fehler?.status)}`);
   }
   teile.push(
-    a.letzter_erfolg_at ? `zuletzt erfolgreich ${zeit(a.letzter_erfolg_at)}` : 'noch nie abgerufen',
+    a.letzter_erfolg_at
+      ? `${versand ? 'zuletzt geprüft' : 'zuletzt erfolgreich'} ${zeit(a.letzter_erfolg_at)}`
+      : versand
+        ? 'noch nicht geprüft'
+        : 'noch nie abgerufen',
   );
   if (a.zustand === 'gestoert' && a.letzter_fehler) {
     teile.push(
@@ -161,7 +169,10 @@ export default function AdapterPaneel() {
       art: gewaehlteArt.code,
       name: (w.name ?? '').trim(),
       einstellungen: einstellungenVon(gewaehlteArt.felder, w.einstellungen ?? {}),
-      ...(w.intervall_s != null ? { intervall_s: w.intervall_s } : {}),
+      // Eine Versand-Art prüft im festen Takt der Art; der Server setzt ihn (LLH-2126).
+      ...(w.intervall_s != null && !isVersandArt(gewaehlteArt)
+        ? { intervall_s: w.intervall_s }
+        : {}),
       ...(w.lan_erlaubt ? { lan_erlaubt: true } : {}),
     };
   };
@@ -212,7 +223,8 @@ export default function AdapterPaneel() {
           rowKey={(a) => a.id}
           emptyText="Noch kein Adapter"
           renderItem={(a) => {
-            const zustand = adapterZustandAnzeige(a);
+            const versand = isVersandArt(liste.arten.find((x) => x.code === a.art));
+            const zustand = adapterZustandAnzeige(a, versand);
             return (
               <div data-lfh="adapter-eintrag">
                 <ListenEintrag>
@@ -233,7 +245,7 @@ export default function AdapterPaneel() {
                       </span>
                     }
                     description={
-                      <span style={{ color: rollen.gedaempft }}>{nebenangaben(a, zeit)}</span>
+                      <span style={{ color: rollen.gedaempft }}>{nebenangaben(a, zeit, versand)}</span>
                     }
                   />
                 </ListenEintrag>
@@ -287,7 +299,7 @@ export default function AdapterPaneel() {
             httpImLan={art.http_im_lan}
           />
         ))}
-        {art && (
+        {art && !isVersandArt(art) && (
           <Feld label="Intervall" name="intervall_s" rules={[pflicht('Intervall')]}>
             <ZahlFeld
               min={art.intervall_min_s}

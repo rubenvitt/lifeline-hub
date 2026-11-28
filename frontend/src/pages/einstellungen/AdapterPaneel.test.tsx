@@ -5,7 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Route, Routes } from 'react-router';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { adapterFixture, adapterListeFixture } from '../../test/adapterDaten';
+import {
+  adapterFixture,
+  adapterListeFixture,
+  BEISPIEL_ART,
+  SMTP_ART,
+  smtpAdapterFixture,
+} from '../../test/adapterDaten';
 import type { AdapterListe } from '../../api/types';
 import AdapterPaneel from './AdapterPaneel';
 
@@ -229,5 +235,68 @@ describe('AdapterPaneel', () => {
     stelleBereit(adapterListeFixture({ gesperrt_grund: 'Diese Instanz meldet sich beim Hub.' }));
     rendere();
     expect(await screen.findByRole('button', { name: 'Adapter anlegen' })).toBeDisabled();
+  });
+
+  /** LLH-2126: eine Versand-Anbindung spricht von Prüfung und hat kein Intervall. */
+  it('nennt in der Liste bei einer Versand-Anbindung die Prüfung', async () => {
+    stelleBereit(
+      adapterListeFixture({
+        adapter: [
+          smtpAdapterFixture('ge'),
+          smtpAdapterFixture('nie', {
+            name: 'Mail neu',
+            zustand: 'wartet',
+            letzter_erfolg_at: undefined,
+          }),
+        ],
+        arten: [BEISPIEL_ART, SMTP_ART],
+      }),
+    );
+    rendere();
+    const ge = (await screen.findByRole('link', { name: 'Adapter ge' })).closest<HTMLElement>(
+      '[data-lfh="adapter-eintrag"]',
+    )!;
+    expect(ge).toHaveTextContent(/E-Mail \(SMTP\) · zuletzt geprüft/);
+    const nie = screen
+      .getByRole('link', { name: 'Mail neu' })
+      .closest<HTMLElement>('[data-lfh="adapter-eintrag"]')!;
+    expect(nie).toHaveTextContent('noch nicht geprüft');
+    expect(nie).not.toHaveTextContent('abgerufen');
+  });
+
+  it('legt eine Versand-Anbindung ohne Intervall an und zeigt es bei einer Abruf-Art wieder', async () => {
+    const aufrufe = stelleBereit(adapterListeFixture({ adapter: [], arten: [SMTP_ART, BEISPIEL_ART] }));
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adapter anlegen' });
+    expect(within(dialog).queryByRole('spinbutton', { name: 'Intervall' })).not.toBeInTheDocument();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Ausgang');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Server' }), 'mail.example.org');
+    await user.type(
+      within(dialog).getByRole('textbox', { name: 'Absenderadresse' }),
+      'einsatz@example.org',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          art: 'smtp',
+          name: 'Ausgang',
+          einstellungen: { host: 'mail.example.org', absender: 'einsatz@example.org' },
+        },
+      ]),
+    );
+  });
+
+  it('zeigt das Intervall mit Vorschlag nach dem Wechsel zu einer Abruf-Art', async () => {
+    stelleBereit(adapterListeFixture({ adapter: [], arten: [SMTP_ART, BEISPIEL_ART] }));
+    const user = userEvent.setup();
+    rendere();
+    await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adapter anlegen' });
+    await user.click(within(dialog).getByRole('combobox', { name: 'Art' }));
+    await user.click(await screen.findByTitle('Beispiel-Alarmquelle'));
+    expect(within(dialog).getByRole('spinbutton', { name: 'Intervall' })).toHaveValue('60');
   });
 });

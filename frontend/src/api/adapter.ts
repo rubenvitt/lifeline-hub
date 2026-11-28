@@ -130,16 +130,19 @@ const eintraege = (n: number) => (n === 1 ? '1 Eintrag' : `${n} Einträge`);
 
 /**
  * Ergebnis eines Versuchs oder einer Prüfung in einer Zeile: „abgerufen (200) · 4 Einträge“, bei
- * einer Prüfung „erreichbar …· Prüfung“, sonst der Fehler.
+ * einer Prüfung „erreichbar …· Prüfung“, sonst der Fehler. Bei einer Versand-Art (`versand`)
+ * heißt jeder Erfolg „erreichbar“, ohne Eintragszahl.
  */
 export function adapterVersuchText(
   v: Pick<AdapterVersuchAnzeige, 'erfolg' | 'status' | 'fehler_art' | 'anzahl' | 'probe'>,
+  versand = false,
 ): string {
   const teile: string[] = [];
   if (v.erfolg) {
-    const wort = v.probe ? 'erreichbar' : 'abgerufen';
+    // Eine Versand-Art ruft nie ab: ihr Lauf prüft nur die Verbindung (LLH-2126).
+    const wort = v.probe || versand ? 'erreichbar' : 'abgerufen';
     teile.push(v.status != null ? `${wort} (${v.status})` : wort);
-    if (v.anzahl != null) teile.push(eintraege(v.anzahl));
+    if (v.anzahl != null && !versand) teile.push(eintraege(v.anzahl));
   } else {
     teile.push(v.fehler_art ? adapterFehlerText(v.fehler_art, v.status) : 'gescheitert');
   }
