@@ -183,8 +183,11 @@ pub async fn redeem(
             .await?
             .ok_or(crate::error::AppError::NotFound)?;
         // Vor dem Verbrauch: am gekoppelten ELW bleibt der Code einlösbar, falls die Kopplung
-        // endet, und der Grund steht am Zugang.
-        if zugang::hub_fuer_org(&mut *conn, z.org_id).await?.is_some() {
+        // endet, und der Grund steht am Zugang. Ausgenommen ist ein reiner Meldungszugang
+        // (LLH-2112), wie im Extractor.
+        if zugang::hub_fuer_org(&mut *conn, z.org_id).await?.is_some()
+            && !super::scope::is_nur_meldungen(&z.scopes)
+        {
             return Ok(Einloesung::AmElw(z));
         }
         if !zugang::consume_code(&mut *conn, &lookup, &jetzt).await? {

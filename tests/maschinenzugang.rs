@@ -1026,6 +1026,81 @@ async fn ein_gemischter_zugang_von_vor_der_kopplung_bleibt_am_elw_abgelehnt() {
     );
 }
 
+/// Der Hauptfall des Designs (LLH-2112, Gateway am ELW): erst gekoppelt, dann wird der reine
+/// Meldungszugang angelegt, sein Code eingelöst und ein Vorschlag eingereicht. Ein gemischter
+/// Zugang lässt sich am gekoppelten ELW weiter nicht einlösen.
+#[tokio::test]
+async fn am_gekoppelten_elw_laesst_sich_ein_reiner_meldungszugang_einloesen_und_nutzen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let ip = "198.51.100.112";
+    let einsatz = common::einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    org_koppeln(&pool, "hub-4", "Hub Kreis", "standard").await;
+
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "Gateway", "scopes": ["meldungen:write"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    let (s, v) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/code"), &admin, None).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, cred) = einloesen(&app, v["code"].as_str().unwrap(), &schluessel(16), ip).await;
+    assert_eq!(s, StatusCode::OK);
+    let cred = cred.unwrap();
+    sqlx::query("INSERT INTO maschinenzugang_freigabe (zugang_id, einsatz_id) VALUES (?, ?)")
+        .bind(&cred.zugang_id)
+        .bind(einsatz)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let body = json!({
+        "text": "Verletzte Person am Nordtor",
+        "external_id": "gw-1",
+        "source": { "adapter": "funk-gateway", "sender_id": "unit-7", "signed": true }
+    });
+    let (s, _, v) = common::maschine::signiert_mit_body(
+        &app,
+        &cred,
+        "POST",
+        "/api/v1/report-suggestions",
+        serde_json::to_vec(&body).unwrap(),
+        jetzt(),
+        "gw-jti-1",
+        ip,
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v["status"], "offen");
+}
+
+/// Ein gemischter Zugang, dessen Code erst nach der Kopplung eingelöst wird, bleibt gesperrt.
+#[tokio::test]
+async fn am_gekoppelten_elw_bleibt_der_code_eines_gemischten_zugangs_gesperrt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "gemischt", "scopes": ["meldungen:write", "lage:read"] }),
+    )
+    .await;
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    let code = v["code"].as_str().unwrap().to_string();
+    org_koppeln(&pool, "hub-5", "Hub", "standard").await;
+    assert_eq!(
+        einloesen(&app, &code, &schluessel(17), "198.51.100.113")
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let z = zugang_zeile(&app, &admin, &id).await;
+    assert_eq!(z["letzte_ablehnung"]["grund"], "instanz_gekoppelt");
+}
+
 /// LLH-1868: Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub; der ELW nimmt
 /// Fremdsysteme weiter selbst an.
 #[tokio::test]
