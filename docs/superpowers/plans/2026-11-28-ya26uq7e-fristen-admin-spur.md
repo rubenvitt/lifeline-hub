@@ -38,11 +38,11 @@
 **Interfaces:**
 - Produces: `AdminAktion::{AufbewahrungFristGeaendert, SkelettFristGeaendert, NachbereitungFristGeaendert}`; `ZugangsAngaben.tage_vorher: Option<i64>`, `ZugangsAngaben.tage: Option<i64>` (serde default, skip if none).
 
-- [ ] **Step 1:** Varianten und Felder ergänzen, Kontrakt-Liste erweitern. `jede_aktion_passiert_den_db_check` ist der rote Test (CHECK kennt die Werte nicht).
-- [ ] **Step 2:** `cargo test --lib jede_aktion_passiert_den_db_check` → FAIL (CHECK constraint).
-- [ ] **Step 3:** Migration 0392 als Kopie von 0386 mit den drei Werten im CHECK, Kopf „LLH-2140“.
-- [ ] **Step 4:** `cargo test --lib admin_audit` und `cargo test --test enum_wire_kontrakt` → PASS.
-- [ ] **Step 5:** Commit.
+- [x] **Step 1:** Varianten und Felder ergänzen, Kontrakt-Liste erweitern. `jede_aktion_passiert_den_db_check` ist der rote Test (CHECK kennt die Werte nicht).
+- [x] **Step 2:** `cargo test --lib jede_aktion_passiert_den_db_check` → FAIL (CHECK constraint).
+- [x] **Step 3:** Migration 0392 als Kopie von 0386 mit den drei Werten im CHECK, Kopf „LLH-2140“.
+- [x] **Step 4:** `cargo test --lib admin_audit` und `cargo test --test enum_wire_kontrakt` → PASS.
+- [x] **Step 5:** Commit.
 
 ### Task 2: Vorher-Stand und Spur beim Speichern
 

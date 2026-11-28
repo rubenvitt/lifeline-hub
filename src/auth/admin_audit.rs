@@ -35,7 +35,7 @@ wire_enum! {
     /// Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
     /// `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
     /// `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
-    /// `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten
+    /// `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0392_admin_audit_fristen.sql`) — beide Seiten
     /// müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
     /// Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -189,6 +189,14 @@ wire_enum! {
         OrtungPersonenEingeschaltet => "ortung_personen_eingeschaltet",
         /// „Auch Personen orten“ ausgeschaltet, von Hand oder mit „Ortung im Einsatz“.
         OrtungPersonenAusgeschaltet => "ortung_personen_ausgeschaltet",
+        /// Aufbewahrungs-Dauer der Org geändert (LLH-2140, Migration 0392); Ziel
+        /// `aufbewahrung_frist`, die Angaben nennen `tage_vorher` → `tage` (fehlt = keine Frist).
+        AufbewahrungFristGeaendert => "aufbewahrung_frist_geaendert",
+        /// Skelett-Frist der Org geändert; Ziel `skelett_frist`. Eine kürzere Frist löscht im
+        /// nächsten Purge-Lauf unumkehrbar, die Spur zeigt, wer sie gesetzt hat.
+        SkelettFristGeaendert => "skelett_frist_geaendert",
+        /// Nachbereitung der Org geändert; Ziel `nachbereitung_frist`.
+        NachbereitungFristGeaendert => "nachbereitung_frist_geaendert",
     }
 }
 
@@ -304,6 +312,12 @@ pub struct ZugangsAngaben {
     /// Adapter: Platz des gesetzten oder entfernten Geheimnisses (nie der Wert).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub platz: Option<String>,
+    /// Frist der Org (LLH-2140): Tage vor der Änderung; fehlt, wenn vorher keine Frist galt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tage_vorher: Option<i64>,
+    /// Frist der Org: Tage nach der Änderung; fehlt, wenn die Frist geleert wurde.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tage: Option<i64>,
 }
 
 impl ZugangsAngaben {
