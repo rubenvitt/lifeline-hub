@@ -139,3 +139,85 @@ async fn probe_meldet_anmeldefehler_als_abgelehnt() {
     assert_eq!(e["fehler_art"], "status");
     assert_eq!(e["status"], 554);
 }
+
+// LLH-2126: Eine Versand-Anbindung meldet ihren Zweck und prüft im festen Takt der Art.
+
+#[tokio::test]
+async fn arten_liste_meldet_zweck_versand() {
+    let (app, admin, _) = setup().await;
+    let (s, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
+    assert_eq!(s, StatusCode::OK, "{liste}");
+    assert_eq!(liste["arten"][0]["code"], "smtp");
+    assert_eq!(liste["arten"][0]["zweck"], "versand");
+}
+
+#[tokio::test]
+async fn anlegen_mit_abweichendem_intervall_ist_400() {
+    let (app, admin, _) = setup().await;
+    let body = json!({
+        "art": "smtp", "name": "Ausgang", "einstellungen": einstellungen(), "intervall_s": 900
+    });
+    let (s, b) = anfrage_json(&app, "POST", LISTE, &admin, Some(&body)).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
+    assert!(b.to_string().contains("fest"), "{b}");
+}
+
+#[tokio::test]
+async fn aendern_mit_abweichendem_intervall_ist_400() {
+    let (app, admin, _) = setup().await;
+    let (_, a) = anlegen(&app, &admin, einstellungen()).await;
+    let pfad = format!("{LISTE}/{}", a["id"].as_str().unwrap());
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "intervall_s": 7200 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "{b}");
+    assert!(b.to_string().contains("fest"), "{b}");
+}
+
+#[tokio::test]
+async fn aendern_mit_vorschlag_intervall_ist_200() {
+    let (app, admin, _) = setup().await;
+    let (_, a) = anlegen(&app, &admin, einstellungen()).await;
+    let pfad = format!("{LISTE}/{}", a["id"].as_str().unwrap());
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "intervall_s": 3600 })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["intervall_s"], 3600);
+}
+
+#[tokio::test]
+async fn aendern_ohne_intervall_laesst_altwert_stehen() {
+    let (rahmen, _) = adapter_testart::rahmen_smtp();
+    let (app, pool) = setup_mit_state(|s| s.adapter = rahmen).await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, a) = anlegen(&app, &admin, einstellungen()).await;
+    let id = a["id"].as_str().unwrap().to_string();
+    sqlx::query("UPDATE adapter SET intervall_s = 900 WHERE id = ?")
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let pfad = format!("{LISTE}/{id}");
+    let (s, b) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "name": "Mail" })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    assert_eq!(b["name"], "Mail");
+    assert_eq!(b["intervall_s"], 900);
+}

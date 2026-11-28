@@ -14,7 +14,9 @@ use age::secrecy::SecretString;
 use futures::future::BoxFuture;
 use serde_json::{Map, Value};
 
-use super::art::{AdapterArt, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme};
+use super::art::{
+    AdapterArt, AdapterZweck, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme,
+};
 use super::matrix::{self, Clients, MatrixZiel};
 use super::ziel::AbrufKontext;
 use super::zustand::AdapterFehler;
@@ -137,6 +139,9 @@ impl AdapterArt for MatrixArt {
     }
     fn intervall_vorschlag_s(&self) -> i64 {
         3600
+    }
+    fn zweck(&self) -> AdapterZweck {
+        AdapterZweck::Versand
     }
 
     fn abrufen<'a>(

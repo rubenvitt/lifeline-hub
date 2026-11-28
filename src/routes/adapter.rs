@@ -19,7 +19,7 @@ use sqlx::SqliteConnection;
 use utoipa::ToSchema;
 
 use crate::adapter::art::{
-    check_einstellungen, has_neues_ziel, AdapterArt, AdapterArtAnzeige, FeldTyp,
+    check_einstellungen, has_neues_ziel, AdapterArt, AdapterArtAnzeige, AdapterZweck, FeldTyp,
 };
 use crate::adapter::geheimnis::GEHEIMNIS_MAX;
 use crate::adapter::repo::{self, Adapter, Eingabe, Versuch};
@@ -337,6 +337,26 @@ async fn spur(
     .await;
 }
 
+/// Das Intervall nach einer Eingabe (`gesendet`) oder, ohne sie, der bisherige Wert. Eine
+/// Versand-Art prüft im festen Takt ihres Vorschlags: ein abweichender Wert ist 400, ein
+/// fehlender lässt den bisherigen stehen, auch einen älteren anderen (LLH-2126).
+fn check_intervall_fuer(
+    art: &dyn AdapterArt,
+    gesendet: Option<i64>,
+    bisher: i64,
+) -> Result<i64, AppError> {
+    if art.zweck() == AdapterZweck::Versand {
+        return match gesendet {
+            Some(s) if s != art.intervall_vorschlag_s() => Err(AppError::Validation(
+                "intervall_s: bei einer Versand-Anbindung fest".into(),
+            )),
+            Some(s) => Ok(s),
+            None => Ok(bisher),
+        };
+    }
+    check_intervall(art, gesendet.unwrap_or(bisher))
+}
+
 /// Prüft Intervall gegen die Art (400).
 fn check_intervall(art: &dyn AdapterArt, intervall_s: i64) -> Result<i64, AppError> {
     let min = art.intervall_min_s();
@@ -558,11 +578,7 @@ pub async fn create(
             body.einstellungen.as_ref(),
             body.lan_erlaubt,
         )?,
-        intervall_s: check_intervall(
-            &**art,
-            body.intervall_s
-                .unwrap_or_else(|| art.intervall_vorschlag_s()),
-        )?,
+        intervall_s: check_intervall_fuer(&**art, body.intervall_s, art.intervall_vorschlag_s())?,
         lan_erlaubt: body.lan_erlaubt,
     };
     let interne = create_interne_geheimnisse(rahmen, &**art).await?;
@@ -654,7 +670,7 @@ pub async fn update(
             let eingabe = Eingabe {
                 name: name.clone().unwrap_or_else(|| vorher.name.clone()),
                 einstellungen,
-                intervall_s: check_intervall(art, body.intervall_s.unwrap_or(vorher.intervall_s))?,
+                intervall_s: check_intervall_fuer(art, body.intervall_s, vorher.intervall_s)?,
                 lan_erlaubt,
             };
             let neues_ziel = has_neues_ziel(art, &vorher.einstellungen(), &eingabe.einstellungen);
