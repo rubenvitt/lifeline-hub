@@ -100,9 +100,29 @@ pub async fn liste(
     ))
 }
 
+/// Die Meldung zu einer schon vergebenen `client_id`, wenn sie die Übernahme genau dieses
+/// Vorschlags ist (Wiederholung aus der Offline-Queue oder nach verlorener Antwort). Gehört die
+/// `client_id` zu einer anderen Meldung, ist das kein Replay: 409, der Vorschlag bleibt offen
+/// (Review M3).
+async fn wiederholung(
+    state: &AppState,
+    ctx: &EinsatzKontext,
+    client_id: &str,
+    vorschlag_id: i64,
+) -> Result<Option<MeldungAnzeige>, AppError> {
+    let Some(m) = meldung::bestehende_meldung(state, ctx, client_id).await? else {
+        return Ok(None);
+    };
+    if vorschlag::meldung_id(&state.pool, ctx.einsatz.id, vorschlag_id).await? != Some(m.id) {
+        return Err(AppError::Conflict("client_id bereits vergeben".into()));
+    }
+    Ok(Some(m))
+}
+
 /// POST /api/incidents/{id}/report-suggestions/{vid}/accept — den Vorschlag als Meldung
 /// übernehmen. Körper wie beim Erfassen; `client_id` wirkt wie dort (eine Wiederholung liefert
-/// die schon angelegte Meldung, auch wenn der Vorschlag inzwischen angenommen ist).
+/// die schon angelegte Meldung, auch wenn der Vorschlag inzwischen angenommen ist), aber nur für
+/// die Meldung dieses Vorschlags ([`wiederholung`]).
 pub async fn accept(
     State(state): State<AppState>,
     ctx: EinsatzSchreibzugriff<Meldungen>,
@@ -114,7 +134,7 @@ pub async fn accept(
     crate::routes::support::fordere_offline_queue_benutzer(&headers, ctx.benutzer.id)?;
     let client_id = meldung::client_id_aus(&req)?;
     if let Some(cid) = client_id {
-        if let Some(m) = meldung::bestehende_meldung(&state, &ctx, cid).await? {
+        if let Some(m) = wiederholung(&state, &ctx, cid, vorschlag_id).await? {
             return Ok((StatusCode::CREATED, Json(m)));
         }
     }
@@ -137,7 +157,7 @@ pub async fn accept(
         // Ein paralleler Tab mit derselben `client_id` kann gewonnen haben: der Unique-Fehler
         // rollt alles zurück, die Antwort ist dann die Meldung des Gewinners (wie beim Erfassen).
         Err(e) => match client_id {
-            Some(cid) => match meldung::bestehende_meldung(&state, &ctx, cid).await? {
+            Some(cid) => match wiederholung(&state, &ctx, cid, vorschlag_id).await? {
                 Some(m) => return Ok((StatusCode::CREATED, Json(m))),
                 None => return Err(e),
             },

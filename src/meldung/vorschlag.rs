@@ -200,6 +200,23 @@ pub async fn zaehle_offene(
         .await?)
 }
 
+/// Die Meldung, als die der Vorschlag des Einsatzes übernommen wurde; `None`, solange er nicht
+/// angenommen ist (oder fremd/unbekannt). Für die Wiederholung einer Übernahme mit `client_id`.
+pub async fn meldung_id(
+    pool: &SqlitePool,
+    einsatz_id: i64,
+    vorschlag_id: i64,
+) -> Result<Option<i64>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT meldung_id FROM meldung_vorschlag WHERE id = ? AND einsatz_id = ?",
+    )
+    .bind(vorschlag_id)
+    .bind(einsatz_id)
+    .fetch_optional(pool)
+    .await?
+    .flatten())
+}
+
 /// Lädt einen Vorschlag des Einsatzes, der noch offen und nicht abgelaufen ist. Fremd oder
 /// unbekannt ist `NotFound`, nicht mehr offen oder abgelaufen ist `Conflict`.
 pub async fn laden_offen_tx(

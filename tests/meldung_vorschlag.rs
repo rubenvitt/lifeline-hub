@@ -350,6 +350,44 @@ async fn wiederholte_uebernahme_mit_derselben_client_id_liefert_dieselbe_meldung
     assert_eq!(meldungen_im_einsatz(&pool, e).await, 1);
 }
 
+/// Review M3: Eine `client_id`, die schon zu einer anderen Meldung gehört (normales Erfassen
+/// oder ein anderer Vorschlag), ist kein Replay dieser Übernahme: 409, der Vorschlag bleibt offen.
+#[tokio::test]
+async fn fremde_client_id_bei_der_uebernahme_ist_409_und_der_vorschlag_bleibt_offen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = zugang_anlegen(&pool, e).await;
+    let a = vorschlag(&pool, e, &z, "a", "Text A").await;
+    let b = vorschlag(&pool, e, &z, "b", "Text B").await;
+
+    let (s, v) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/incidents/{e}/reports"),
+        &admin,
+        Some(&meldung_koerper("Normal", Some("normal-1"))),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = uebernehmen(&app, &admin, e, a, &meldung_koerper("A", Some("normal-1"))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v.to_string().contains("client_id bereits vergeben"), "{v}");
+
+    let (s, v) = uebernehmen(&app, &admin, e, b, &meldung_koerper("B", Some("b-1"))).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let (s, v) = uebernehmen(&app, &admin, e, a, &meldung_koerper("A", Some("b-1"))).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+
+    let offen: Vec<i64> = liste(&app, &admin, e)
+        .await
+        .iter()
+        .map(|v| v["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(offen, vec![a]);
+    assert_eq!(meldungen_im_einsatz(&pool, e).await, 2);
+}
+
 #[tokio::test]
 async fn verwerfen_entfernt_den_vorschlag_und_legt_nichts_an() {
     let (app, pool) = setup_mit_pool().await;
