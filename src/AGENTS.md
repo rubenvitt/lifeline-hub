@@ -574,7 +574,12 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   `m.image` mit Teil 1…; jeder Teil trägt die Transaktions-ID `ausgang-{versand_id}-{teil}`, und
   jeder gelungene Teil steht mit Event-ID in `ausgang_teil` (`Fehlschlag`/`Zustellt.teile`); ein
   späterer Versuch und „Erneut senden“ überspringen gemerkte Teile (`Versandauftrag::gesendet`).
-  Darum ist ein abgebrochener Matrix-Versuch vorübergehend, nicht `ungewiss`. Eine Anlage über
+  Darum ist ein abgebrochener Matrix-Versuch vorübergehend, nicht `ungewiss`. **Teilzustellung**
+  (LLH-2146): scheitert ein Versand endgültig, nachdem Teil 0 (aus diesem oder einem früheren
+  Versuch) hinausging, bleibt er `fehlgeschlagen`, `ausgang.anlagen_offen` (Wire
+  `attachments_missing`) hält die Zahl der fehlenden Anlagen (`lauf::anlagen_offen`), und ETB wie
+  Versandliste sagen fest „teilweise zugestellt (Text ja, n Anlagen nein): <Grund>“; `ungewiss`
+  bleibt „unklar“. „Übergeben“ und „Erneut senden“ leeren die Spalte. Eine Anlage über
   `m.upload.size` bricht vor dem Text ab (`zu_gross`); nennt der Homeserver keine Grenze, gehen
   keine Anlagen (eigener Grund). Fehlercodes dazu: `kein_zutritt`, `verschluesselung`; das ETB
   nennt höchstens den Matrix-`errcode`, `smtp_status` bleibt leer.

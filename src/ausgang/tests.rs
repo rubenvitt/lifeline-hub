@@ -186,6 +186,7 @@ async fn retry_nur_aus_fehlgeschlagen() {
         Ergebnis::Fehlgeschlagen {
             fehler: AusgangFehler::Abgelehnt,
             status: Some(550),
+            anlagen_offen: None,
         },
     )
     .await

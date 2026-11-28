@@ -9811,6 +9811,12 @@ export interface components {
             /** Format: int64 */
             agency_id?: number | null;
             agency_name: string;
+            /**
+             * Format: int64
+             * @description Teilzustellung (Matrix, LLH-2146): der Text ging hinaus, so viele Anlagen nicht; nur bei
+             *     `fehlgeschlagen`.
+             */
+            attachments_missing?: number | null;
             /** Format: int64 */
             attempts: number;
             channel: components["schemas"]["KanalArt"];

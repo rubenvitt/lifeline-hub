@@ -1182,6 +1182,129 @@ async fn gemerkte_teile_gehen_dem_naechsten_versuch_mit() {
     assert_eq!(w.teile(&id).await, teile(&[(0, "$text"), (1, "$anlage")]));
 }
 
+/// Der jüngste Systemeintrag des Einsatzes.
+async fn letzter_systemeintrag(w: &Welt) -> String {
+    sqlx::query_scalar(
+        "SELECT inhalt FROM etb_eintrag WHERE einsatz_id = ? AND typ = 'system' ORDER BY id DESC LIMIT 1",
+    )
+    .bind(w.einsatz)
+    .fetch_one(&w.pool)
+    .await
+    .unwrap()
+}
+
+async fn attachments_missing(w: &Welt, id: &str) -> Option<i64> {
+    lifeline_hub::ausgang::repo::list_fuer_einsatz(&w.pool, w.einsatz)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|v| v.id == id)
+        .unwrap()
+        .attachments_missing
+}
+
+#[tokio::test]
+async fn text_ging_anlage_endgueltig_nicht_heisst_teilweise_zugestellt() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Err(Fehlschlag {
+        fehler: Zustellfehler::Abgelehnt,
+        grund: "vom Homeserver abgelehnt (M_UNKNOWN)".into(),
+        smtp_status: None,
+        teile: teile(&[(0, "$text")]),
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Abgelehnt));
+    assert_eq!(attachments_missing(&w, &id).await, Some(1));
+    let text = letzter_systemeintrag(&w).await;
+    assert!(
+        text.ends_with(
+            "per Matrix an Leitstelle Nord (#lage:example.org) teilweise zugestellt \
+             (Text ja, 1 Anlage nein): vom Homeserver abgelehnt (M_UNKNOWN)"
+        ),
+        "{text}"
+    );
+
+    // „Erneut senden“ leert die Teilzustellung; der Erfolg danach ist keine.
+    let mut conn = w.pool.acquire().await.unwrap();
+    let v = lifeline_hub::ausgang::repo::retry_tx(&mut conn, w.einsatz, &id, t0)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(v.attachments_missing, None);
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(1, "$anlage")]),
+    }));
+    let spaeter = t0 + chrono::Duration::minutes(1);
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, spaeter)
+        .await
+        .unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(attachments_missing(&w, &id).await, None);
+}
+
+#[tokio::test]
+async fn text_aus_frueherem_versuch_zaehlt_fuer_die_teilzustellung() {
+    let w = welt().await;
+    w.matrix_anbindung().await;
+    let lid = w.lagebericht_freigeben(true).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("matrix", "#lage:example.org", "lagebericht", lid, t0)
+        .await;
+    let doppel = Arc::new(TeilDoppel::default());
+    let voruebergehend = |teile| Fehlschlag {
+        fehler: Zustellfehler::Voruebergehend { nicht_vor: None },
+        grund: "Homeserver nicht erreichbar".into(),
+        smtp_status: None,
+        teile,
+    };
+    doppel
+        .antworten
+        .lock()
+        .unwrap()
+        .push_back(Err(voruebergehend(teile(&[(0, "$text")]))));
+    doppel
+        .antworten
+        .lock()
+        .unwrap()
+        .push_back(Err(voruebergehend(Vec::new())));
+    let zusteller = w.wege_mit(doppel.clone());
+
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Wartet);
+    // Nach dem Fenster von 30 min ist der nächste Fehlschlag endgültig.
+    let spaet = t0 + chrono::Duration::minutes(31);
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, spaet)
+        .await
+        .unwrap();
+
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(attachments_missing(&w, &id).await, Some(1));
+    let text = letzter_systemeintrag(&w).await;
+    assert!(
+        text.ends_with(
+            "teilweise zugestellt (Text ja, 1 Anlage nein): Homeserver nicht erreichbar"
+        ),
+        "{text}"
+    );
+}
+
 #[tokio::test]
 async fn matrix_zeile_erreicht_nie_den_smtp_zusteller() {
     let w = welt().await;
