@@ -87,7 +87,15 @@ export default function DrohnenVideoFenster({
             playsInline
             aria-label="Livebild der Drohne"
             hidden={kein}
-            style={{ display: kein ? 'none' : 'block', width: '100%', height: '100%' }}
+            style={{
+              display: kein ? 'none' : 'block',
+              width: '100%',
+              height: '100%',
+              // Kein Überlagerungsweg für das Video: ohne Filter malte Chromium unter dem Fenster im
+              // linken Block einen Kasten in der Farbe der Bildfläche über die Karte, der erst mit
+              // dem Fenster verschwand (LLH-2137, Bildlauf der Anwenderdoku).
+              filter: 'opacity(1)',
+            }}
           />
           {zustand !== 'laeuft' && (
             <div
