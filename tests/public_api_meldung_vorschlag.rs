@@ -349,3 +349,44 @@ async fn sent_at_wird_normalisiert_und_auf_plausibilitaet_geprueft() {
         assert_eq!(v["code"], "unprocessable");
     }
 }
+
+/// Review M7: `external_id` und `source.sender_id` werden getrimmt; leer nach dem Trimmen und
+/// Steuerzeichen sind 422.
+#[tokio::test]
+async fn kennungen_werden_getrimmt_und_ohne_steuerzeichen_angenommen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["meldungen:write"]), &schluessel(1), IP).await;
+    freigeben(&pool, &cred, einsatz).await;
+
+    let mut leer = koerper(" ");
+    leer["text"] = json!("x");
+    let mut steuer_id = koerper("a\u{0}b");
+    steuer_id["text"] = json!("x");
+    let mut kennung_leer = koerper("k-1");
+    kennung_leer["source"]["sender_id"] = json!("   ");
+    let mut kennung_umbruch = koerper("k-2");
+    kennung_umbruch["source"]["sender_id"] = json!("unit\n7");
+    let mut name_umbruch = koerper("k-3");
+    name_umbruch["source"]["sender_name"] = json!("Trupp\u{1b}[31m");
+    for body in [leer, steuer_id, kennung_leer, kennung_umbruch, name_umbruch] {
+        let (s, _, v) = einreichen(&app, &cred, &body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{body} -> {v}");
+    }
+
+    let (s1, _, erst) = einreichen(&app, &cred, &koerper("a")).await;
+    assert_eq!(s1, StatusCode::CREATED, "{erst}");
+    let mut gepolstert = koerper(" a ");
+    gepolstert["source"]["sender_id"] = json!(" unit-7 ");
+    let (s2, _, zweit) = einreichen(&app, &cred, &gepolstert).await;
+    assert_eq!(s2, StatusCode::OK, "{zweit}");
+    assert_eq!(erst["id"], zweit["id"]);
+    let kennung: String =
+        sqlx::query_scalar("SELECT absender_kennung FROM meldung_vorschlag WHERE id = ?")
+            .bind(erst["id"].as_i64().unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(kennung, "unit-7");
+}

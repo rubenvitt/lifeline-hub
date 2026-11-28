@@ -93,6 +93,22 @@ fn pruefe_sent_at(roh: &str) -> Result<String, ApiError> {
     crate::zeit::im_jahresbereich(normal, "sent_at").map_err(|_| ungueltig())
 }
 
+fn hat_steuerzeichen(s: &str) -> bool {
+    s.chars().any(char::is_control)
+}
+
+/// Eine Kennung getrimmt und ohne Steuerzeichen (Review M7): `"a"` und `"a "` sind derselbe
+/// Vorschlag, und kein Zeilenumbruch landet im Absender der Meldung oder im ETB.
+fn kennung_getrimmt(roh: Option<String>, feld: &str) -> Result<String, ApiError> {
+    let k = roh.as_deref().map(str::trim).unwrap_or_default();
+    if hat_steuerzeichen(k) {
+        return Err(unprocessable(format!(
+            "{feld} darf keine Steuerzeichen enthalten"
+        )));
+    }
+    Ok(k.to_string())
+}
+
 fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
     let roh: ReportSuggestionRequest = serde_json::from_slice(body).map_err(|e| {
         if e.is_data() {
@@ -116,7 +132,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
             crate::etb::INHALT_MAX
         )));
     }
-    let external_id = roh.external_id.unwrap_or_default();
+    let external_id = kennung_getrimmt(roh.external_id, "external_id")?;
     if external_id.is_empty() || external_id.chars().count() > EXTERNAL_ID_MAX {
         return Err(unprocessable(format!(
             "external_id ist Pflicht und hat höchstens {EXTERNAL_ID_MAX} Zeichen"
@@ -131,7 +147,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
             "source.adapter muss aus Kleinbuchstaben, Ziffern, - und _ bestehen (1 bis {ADAPTER_MAX} Zeichen)"
         )));
     }
-    let kennung = source.sender_id.unwrap_or_default();
+    let kennung = kennung_getrimmt(source.sender_id, "source.sender_id")?;
     if kennung.is_empty() || kennung.chars().count() > SENDER_ID_MAX {
         return Err(unprocessable(format!(
             "source.sender_id ist Pflicht und hat höchstens {SENDER_ID_MAX} Zeichen"
@@ -141,6 +157,11 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
         .sender_name
         .map(|n| n.trim().to_string())
         .filter(|n| !n.is_empty());
+    if name.as_deref().is_some_and(hat_steuerzeichen) {
+        return Err(unprocessable(
+            "source.sender_name darf keine Steuerzeichen enthalten",
+        ));
+    }
     if name
         .as_deref()
         .is_some_and(|n| n.chars().count() > crate::etb::PARTEI_MAX)
@@ -187,7 +208,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
         (status = 403, description = "Dem Zugang fehlt das Recht `meldungen:write`", body = super::ApiErrorBody),
         (status = 409, description = "`incident_not_released`: für den Zugang ist kein Einsatz freigegeben, oder das Modul Meldungen ist im freigegebenen Einsatz ausgeblendet (die Brücke puffert und versucht es später); `fuehrung_elsewhere`: eine andere Instanz führt den freigegebenen Einsatz", body = super::ApiErrorBody),
         (status = 413, description = "Der Body ist größer als 64 KiB", body = super::ApiErrorBody),
-        (status = 422, description = "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100", body = super::ApiErrorBody),
+        (status = 422, description = "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100, Steuerzeichen in `external_id`, `source.sender_id` oder `source.sender_name` (Kennungen werden getrimmt)", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),

@@ -1286,7 +1286,7 @@
             }
           },
           "422": {
-            "description": "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100",
+            "description": "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100, Steuerzeichen in `external_id`, `source.sender_id` oder `source.sender_name` (Kennungen werden getrimmt)",
             "content": {
               "application/json": {
                 "schema": {
