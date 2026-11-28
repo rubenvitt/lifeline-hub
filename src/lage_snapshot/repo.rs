@@ -289,6 +289,8 @@ pub async fn erzeuge(
             einsatzleiter: None,
             // Die Führung je Einsatz ist ein Zustand der Kopplung, kein Teil des Lagebilds.
             fuehrung: None,
+            // Ebenso die Sperre eines Hubs für iOS-Push (LLH-2086).
+            ios_push_hub_gesperrt: Vec::new(),
             // Den Namen der abschließenden Person friert der Stand ebenso wenig ein (LLH-1814).
             abgeschlossen_von_name: None,
             ..einsatz.anzeige(None, None, &crate::fuehrung::Labelkarte::standard())
