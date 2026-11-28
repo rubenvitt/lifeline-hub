@@ -11,7 +11,7 @@
 //! (`instanz::spiegel::art::AUSGENOMMEN`). Herleitung:
 //! `openspec/changes/archive/2026-11-12-f658d8o6-lage-fuer-maschinenzugaenge/design.md` (D2, D3).
 
-use super::scope::{Scope, ZugangZustand};
+use super::scope::{self, Scope, ZugangZustand};
 use super::zugang::{self, Zugang};
 use crate::error::AppError;
 use serde::Serialize;
@@ -51,6 +51,12 @@ pub fn is_freigebbar(zugang: &Zugang, jetzt: &str) -> bool {
         && zugang.has_einsatzbezug()
 }
 
+/// Darf der Zugang auch an einer Instanz gelten, die sich für die Org bei einem Hub meldet? Nur
+/// ein reiner Meldungszugang: er reicht Vorschläge für Einsätze ein, die diese Instanz führt.
+pub fn is_am_hub_erlaubt(zugang: &Zugang) -> bool {
+    scope::is_nur_meldungen(&zugang.scopes)
+}
+
 /// Meldet sich diese Instanz für die Org bei einem Hub? Dann lehnt der Extractor jeden Zugang
 /// der Org ab (Spec `maschinenzugang`, „Ein gekoppelter ELW nimmt keine Fremdsysteme an“): eine
 /// neue Freigabe hätte dort keine Wirkung, das Paneel zeigte Schalter ohne Folge. Die Zugänge
@@ -70,7 +76,7 @@ pub async fn list_fuer_einsatz(
     einsatz_id: i64,
     jetzt: &str,
 ) -> Result<Vec<AnbindungFreigabe>, AppError> {
-    let ruht = is_org_am_hub(conn, org_id).await?;
+    let am_hub = is_org_am_hub(conn, org_id).await?;
     let wirksam: Vec<(String, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(FREIGABE_WIRKSAM))
         .fetch_all(&mut *conn)
         .await?;
@@ -79,6 +85,7 @@ pub async fn list_fuer_einsatz(
         .into_iter()
         .filter(|z| is_freigebbar(z, jetzt))
         .map(|z| {
+            let ruht = am_hub && !is_am_hub_erlaubt(&z);
             let liest = wirksam
                 .iter()
                 .find(|(zugang_id, _)| *zugang_id == z.id)
@@ -113,12 +120,11 @@ pub async fn load_freigebbar(
     zugang_id: &str,
     jetzt: &str,
 ) -> Result<Zugang, AppError> {
-    if is_org_am_hub(conn, org_id).await? {
-        return Err(AppError::NotFound);
-    }
+    let am_hub = is_org_am_hub(conn, org_id).await?;
     zugang::laden_in_org(conn, org_id, zugang_id)
         .await?
         .filter(|z| is_freigebbar(z, jetzt))
+        .filter(|z| !am_hub || is_am_hub_erlaubt(z))
         .ok_or(AppError::NotFound)
 }
 

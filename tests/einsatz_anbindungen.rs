@@ -673,6 +673,90 @@ async fn am_gekoppelten_elw_ruht_die_freigabe_und_laesst_sich_beenden() {
     );
 }
 
+/// Ein reiner Meldungszugang lässt sich am gekoppelten ELW freigeben, ein Lese-Zugang nicht.
+#[tokio::test]
+async fn reiner_meldungszugang_laesst_sich_am_gekoppelten_elw_freigeben() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let meldung = angebunden_als(
+        &app,
+        &admin,
+        "Telegram",
+        json!(["meldungen:write"]),
+        &schluessel(1),
+        IP,
+    )
+    .await;
+    let lese = angebunden_als(
+        &app,
+        &admin,
+        "Monitor",
+        json!(["lage:read"]),
+        &schluessel(2),
+        IP,
+    )
+    .await;
+    org_an_hub_koppeln(&pool).await;
+
+    let v = liste(&app, &admin, einsatz).await;
+    assert_eq!(v.as_array().unwrap().len(), 1, "{v}");
+    assert_eq!(v[0]["zugang_id"], json!(meldung.zugang_id));
+    assert_eq!(v[0]["ruht"], json!(false), "{v}");
+    let (s, v) = freigeben(&app, &admin, einsatz, &meldung.zugang_id).await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v[0]["freigegeben"], json!(true), "{v}");
+    assert_eq!(v[0]["ruht"], json!(false), "{v}");
+    let (s, _) = freigeben(&app, &admin, einsatz, &lese.zugang_id).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+}
+
+/// Am Spiegel führt diese Instanz den Einsatz nicht: Vorschläge gingen ins Leere.
+#[tokio::test]
+async fn meldungszugang_laesst_sich_am_spiegel_nicht_freigeben() {
+    use instanz_hilfen::{eine, exec, gekoppelt, lokale_id, melden};
+
+    let (hub, elw) = gekoppelt().await;
+    melden(&elw).await;
+    let (s, v) = anfrage_json(
+        &hub.app,
+        "POST",
+        "/api/users",
+        &hub.admin,
+        Some(&json!({"anzeigename": "Erika", "benutzername": "erika",
+                     "passwort": "erikapw12345"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    exec(
+        &hub.pool,
+        "UPDATE benutzer SET passwort_wechsel_pflicht = 0",
+    )
+    .await;
+    let erika = login_cookie(&hub.app, "erika", "erikapw12345").await;
+    melden(&elw).await;
+    let erika_elw = lokale_id(&elw, "benutzer", "benutzername", "erika").await;
+    let e = einsatz_anlegen_mit(&elw.app, &elw.admin, "Deichbruch").await;
+    rolle_setzen(&elw.app, &elw.admin, e, erika_elw, "einsatzleitung").await;
+    lifeline_hub::instanz::spiegel::takt::durchlauf(&elw.pool, Some(&elw.app), true)
+        .await
+        .unwrap();
+    let s: i64 = eine(&hub.pool, "SELECT einsatz_id FROM einsatz_spiegel").await;
+
+    let meldung = angebunden_als(
+        &hub.app,
+        &hub.admin,
+        "Telegram",
+        json!(["meldungen:write"]),
+        &schluessel(1),
+        IP,
+    )
+    .await;
+    let (status, v) = freigeben(&hub.app, &erika, s, &meldung.zugang_id).await;
+    assert_eq!(status, StatusCode::CONFLICT, "{v}");
+    assert!(v.to_string().contains("anderen Instanz"), "{v}");
+}
+
 // ── Am Spiegel (design.md D4, D5, D8) ────────────────────────────────────────────────────────
 
 #[tokio::test]

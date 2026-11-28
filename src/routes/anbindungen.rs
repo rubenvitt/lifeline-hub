@@ -13,7 +13,7 @@ use crate::extract::{JsonBody, PeerIp, PfadParam};
 use crate::instanz::basis32::{fingerabdruck, parse_b64};
 use crate::instanz::{code as kcode, identitaet};
 use crate::public_api::freigabe;
-use crate::public_api::scope::{parse_scopes, AblehnungGrund, Scope, ZugangZustand};
+use crate::public_api::scope::{self, parse_scopes, AblehnungGrund, Scope, ZugangZustand};
 use crate::public_api::zugang::{self, Zugang};
 use crate::routes::anbindungen_webhook::WebhookAnzeige;
 use crate::routes::einsatz_anbindungen::freigabe_entziehen_tx;
@@ -120,7 +120,9 @@ impl AnbindungAnzeige {
     ) -> Result<Self, AppError> {
         let mut anzeige = Self::aus(z, jetzt);
         anzeige.webhook = WebhookAnzeige::load(conn, z, jetzt, mit_url).await?;
-        if freigabe::is_freigebbar(z, jetzt) && !freigabe::is_org_am_hub(conn, z.org_id).await? {
+        if freigabe::is_freigebbar(z, jetzt)
+            && (freigabe::is_am_hub_erlaubt(z) || !freigabe::is_org_am_hub(conn, z.org_id).await?)
+        {
             anzeige.einsatz_freigebbar = true;
             if let Some((id, bezeichnung)) = freigabe::gelesener_einsatz(conn, &z.id).await? {
                 anzeige.einsatz_id = Some(id);
@@ -307,8 +309,10 @@ pub async fn anlegen(
     let (name, scopes, gueltig_bis) = check_eingabe(&body, &jetzt)?;
     let (org_id, von) = (admin.org_id, admin.id);
     let (z, code, laeuft_ab_at, anzeige) = crate::write_retry!(&state.pool, |conn| {
-        if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
-            return Err(AppError::Conflict(grund));
+        if !scope::is_nur_meldungen(&scopes) {
+            if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
+                return Err(AppError::Conflict(grund));
+            }
         }
         let id = zugang::anlegen(
             &mut *conn,
@@ -491,8 +495,10 @@ pub async fn code(
                 "Ein widerrufener Zugang bekommt keinen neuen Code.".into(),
             ));
         }
-        if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
-            return Err(AppError::Conflict(grund));
+        if !freigabe::is_am_hub_erlaubt(&z) {
+            if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
+                return Err(AppError::Conflict(grund));
+            }
         }
         let (code, laeuft_ab_at) = neuer_code(&mut *conn, &id, von, &jetzt).await?;
         let anzeige = AnbindungAnzeige::load(&mut *conn, &z, &jetzt, true).await?;

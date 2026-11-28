@@ -125,6 +125,11 @@ pub async fn freigeben(
         // Führungsübergabe dazwischen darf keine Freigabe hinterlassen.
         im_tx_aktiv(conn, einsatz_id, spiegel).await?;
         let zugang = freigabe::load_freigebbar(conn, org_id, &zugang_id, &jetzt).await?;
+        if spiegel && freigabe::is_am_hub_erlaubt(&zugang) {
+            return Err(AppError::Conflict(
+                "Der Einsatz wird an einer anderen Instanz geführt".into(),
+            ));
+        }
         let mut etb_ids = Vec::new();
         match freigabe::freigeben_tx(conn, &zugang.id, einsatz_id, von).await? {
             FreigabeWirkung::Keine => {}

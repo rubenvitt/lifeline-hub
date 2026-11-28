@@ -271,7 +271,9 @@ impl FromRequest<AppState> for MachineClient {
                 .await
                 .map_err(intern)?
         };
-        if hub.is_some() {
+        // Ausnahme: ein reiner Meldungszugang (`meldungen:write`) reicht Texte als Vorschläge ein,
+        // auch an einer gekoppelten Instanz.
+        if hub.is_some() && !super::scope::is_nur_meldungen(&zugang.scopes) {
             return Err(ablehnen(state, &zugang, AblehnungGrund::InstanzGekoppelt, None).await);
         }
 

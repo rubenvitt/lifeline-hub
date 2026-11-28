@@ -955,6 +955,77 @@ async fn gekoppelter_elw_lehnt_vorhandene_zugaenge_ab() {
     assert_eq!(z["letzte_ablehnung"]["grund"], "instanz_gekoppelt");
 }
 
+/// Ein reiner Meldungszugang (genau `meldungen:write`) darf auch am gekoppelten ELW angelegt
+/// werden; jeder weitere Scope macht ihn zum gesperrten Fremdsystem.
+#[tokio::test]
+async fn am_gekoppelten_elw_geht_ein_reiner_meldungszugang() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    org_koppeln(&pool, "hub-1", "Hub Kreis", "standard").await;
+
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "Telegram", "scopes": ["meldungen:write"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    // Neuer Code für den reinen Meldungszugang geht ebenfalls.
+    let (s, _) = anfrage_json(&app, "POST", &format!("{LISTE}/{id}/code"), &admin, None).await;
+    assert_eq!(s, StatusCode::CREATED);
+
+    let (s, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "gemischt", "scopes": ["meldungen:write", "lage:read"] }),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v.to_string().contains("Hub Kreis"), "{v}");
+}
+
+/// Ein gemischter Zugang aus der Zeit vor der Kopplung bleibt am ELW abgelehnt; der reine
+/// Meldungszugang kommt durch.
+#[tokio::test]
+async fn ein_gemischter_zugang_von_vor_der_kopplung_bleibt_am_elw_abgelehnt() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let ip = "198.51.100.111";
+    let gemischt = angebunden(
+        &app,
+        &admin,
+        json!(["meldungen:write", "lage:read"]),
+        &schluessel(14),
+        ip,
+    )
+    .await;
+    let rein = angebunden(
+        &app,
+        &admin,
+        json!(["meldungen:write"]),
+        &schluessel(15),
+        ip,
+    )
+    .await;
+    org_koppeln(&pool, "hub-2", "Hub", "standard").await;
+
+    assert_eq!(
+        signiert(&app, &gemischt, "GET", "/api/v1/me", jetzt(), "m1", ip)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let z = zugang_zeile(&app, &admin, &gemischt.zugang_id).await;
+    assert_eq!(z["letzte_ablehnung"]["grund"], "instanz_gekoppelt");
+    assert_eq!(
+        signiert(&app, &rein, "GET", "/api/v1/me", jetzt(), "m2", ip)
+            .await
+            .0,
+        StatusCode::OK
+    );
+}
+
 /// LLH-1868: Eine Direktkopplung vor Ort mit einem zweiten ELW ist kein Hub; der ELW nimmt
 /// Fremdsysteme weiter selbst an.
 #[tokio::test]
