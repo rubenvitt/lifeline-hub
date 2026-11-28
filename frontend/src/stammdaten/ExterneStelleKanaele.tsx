@@ -13,8 +13,13 @@ const ADRESSE_MAX = 254;
 const MATRIX_MAX = 255;
 const BESCHRIFTUNG_MAX = 100;
 
-/** Kanäle, die eine Stelle heute bekommt (Server: `KanalArt::is_freigeschaltet`). */
-type Art = 'email' | 'fax' | 'matrix';
+/** Kanäle einer Stelle (Server: `KanalArt::is_freigeschaltet`). */
+type Art = KanalArt;
+
+/** Länge einer Threema-ID. */
+const THREEMA_LAENGE = 8;
+/** Fehlertext wie am Server (`externe_stelle::kanal::normalize_threema`). */
+const THREEMA_FEHLER = 'Eine Threema-ID hat acht Zeichen (Buchstaben und Ziffern)';
 
 /**
  * Grobe Formprüfung vor dem Senden: genau ein „@“, kein Leerzeichen, kein Komma, beidseitig
@@ -69,20 +74,30 @@ function matrixFormFehler(adresse: string): string {
   return 'Matrix-Raum ungültig';
 }
 
+/**
+ * Grobe Prüfung einer Threema-ID wie der Server (LLH-2096): ohne Leerraum, in Großbuchstaben
+ * acht Zeichen aus `A–Z` und `0–9`, das erste darf `*` sein. Der Server bringt die ID in Form.
+ */
+export function istThreemaIdGueltig(roh: string): boolean {
+  const a = roh.replace(/\s/g, '').toUpperCase();
+  return a.length === THREEMA_LAENGE && /^[A-Z0-9*][A-Z0-9]{7}$/.test(a);
+}
+
 const KANAL_TEXT: Record<Art, { name: string; adresse: string }> = {
   email: { name: 'E-Mail', adresse: 'Mailadresse' },
   fax: { name: 'Fax', adresse: 'Faxnummer' },
   matrix: { name: 'Matrix', adresse: 'Matrix-Raum' },
+  threema: { name: 'Threema', adresse: 'Threema-ID' },
 };
 
-/** Wie eine Adresse heißt (Knopf „… entfernen“); Threema spricht wie die E-Mail. */
+/** Wie eine Adresse heißt (Knopf „… entfernen“). */
 function adressName(kanal: KanalArt): string {
-  return kanal === 'threema' ? KANAL_TEXT.email.adresse : KANAL_TEXT[kanal].adresse;
+  return KANAL_TEXT[kanal].adresse;
 }
 
 /**
  * Abschnitt „Erreichbar per“ im Formular einer bestehenden externen Stelle (LLH-2093, Fax
- * LLH-2095, Matrix LLH-2094): die Mailadressen, Faxnummern und Matrix-Räume der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
+ * LLH-2095, Matrix LLH-2094, Threema LLH-2096): die Adressen der Stelle, jede sofort gespeichert. Das Formular selbst gehört dem Modal; die
  * Eingaben hier stehen außerhalb seines `Form` (kein Feld, Enter fügt die Adresse hinzu, statt
  * das Modal abzusenden). Eine Stelle vom Hub ist nur lesbar, ihre Adressen kommen mit.
  */
@@ -110,6 +125,10 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
     }
     if (kanal === 'matrix' && !istMatrixFormGueltig(adresse)) {
       setFormFehler(matrixFormFehler(adresse));
+      return;
+    }
+    if (kanal === 'threema' && !istThreemaIdGueltig(adresse)) {
+      setFormFehler(THREEMA_FEHLER);
       return;
     }
     setFormFehler(null);
@@ -142,7 +161,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
             <li key={k.id}>
               <Stapel richtung="zeile" abstand="sm" ausrichten="baseline" umbruch>
                 <Textstufe stufe="textKlein" ton="gedaempft">
-                  {k.channel === 'threema' ? 'Threema' : KANAL_TEXT[k.channel].name}
+                  {KANAL_TEXT[k.channel].name}
                 </Textstufe>
                 <span data-schrift="kennung">{k.address}</span>
                 {k.label && (
@@ -182,6 +201,7 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 { wert: 'email', label: KANAL_TEXT.email.name },
                 { wert: 'fax', label: KANAL_TEXT.fax.name },
                 { wert: 'matrix', label: KANAL_TEXT.matrix.name },
+                { wert: 'threema', label: KANAL_TEXT.threema.name },
               ]}
             />
             <Stapel richtung="zeile" abstand="sm" umbruch>
@@ -190,13 +210,15 @@ export default function ExterneStelleKanaele({ stelle }: { stelle: ExterneStelle
                 aria-invalid={formFehler ? true : undefined}
                 aria-describedby={formFehler ? fehlerId : undefined}
                 type="text"
-                inputMode={kanal === 'fax' ? 'tel' : kanal === 'matrix' ? 'text' : 'email'}
+                inputMode={kanal === 'fax' ? 'tel' : kanal === 'email' ? 'email' : 'text'}
                 placeholder={
                   kanal === 'fax'
                     ? '0511 123456'
                     : kanal === 'matrix'
                       ? '#lageraum:beispiel.de'
-                      : 'leitstelle@beispiel.de'
+                      : kanal === 'threema'
+                        ? 'ECHOECHO'
+                        : 'leitstelle@beispiel.de'
                 }
                 maxLength={kanal === 'matrix' ? MATRIX_MAX : ADRESSE_MAX}
                 value={adresse}

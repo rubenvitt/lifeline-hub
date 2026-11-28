@@ -155,17 +155,20 @@ Adressaten einer Nachforderung und beim Hinzufügen einer Stelle zum
 5. Nach Bedarf „Rufnummer und Funkrufname“ aufklappen und beides eintragen.
 6. „Anlegen“ wählen.
 
-Mailadressen, Faxnummern und Matrix-Räume einer bestehenden Stelle (für das Senden von
-Lageberichten, Befehlen und Nachforderungen):
+Mailadressen, Faxnummern, Matrix-Räume und Threema-IDs einer bestehenden Stelle (für das Senden
+von Lageberichten, Befehlen und Nachforderungen):
 
 1. In der Zeile der Stelle „Bearbeiten“ wählen. Im Abschnitt „Erreichbar per“ unter „Kanal der
-   neuen Adresse“ „E-Mail“, „Fax“ oder „Matrix“ wählen.
+   neuen Adresse“ „E-Mail“, „Fax“, „Matrix“ oder „Threema“ wählen.
 2. Die „Mailadresse“, die „Faxnummer“ bzw. den „Matrix-Raum“ eintragen, nach Bedarf eine
    Beschriftung („Lagedienst“). Ein Matrix-Raum ist eine Raum-ID (`!abc123:beispiel.de`) oder ein
    Alias (`#lageraum:beispiel.de`), wie ihn der Matrix-Client in den Raumeinstellungen zeigt.
+   Eine „Threema-ID“ hat acht Zeichen (`ECHOECHO`); Leerzeichen und Kleinschreibung sind egal,
+   gespeichert wird sie in Großbuchstaben.
 3. „Adresse hinzufügen“ wählen. Die Adresse ist sofort gespeichert und steht mit „E-Mail“, „Fax“
    oder „Matrix“ davor in der Liste. Stimmt sie nicht, erscheint „Mailadresse ungültig“, „Keine
-   gültige Faxnummer“ bzw. „Matrix-Raum ungültig“; eine Nutzer-ID (`@name:server`) lehnt das Feld
+   gültige Faxnummer“, „Matrix-Raum ungültig“ bzw. „Eine Threema-ID hat acht Zeichen (Buchstaben
+   und Ziffern)“; eine Nutzer-ID (`@name:server`) lehnt das Feld
    mit „Nutzer-IDs gehen noch nicht, bitte den Raum eintragen“ ab, einen `matrix.to`-Link mit
    „matrix.to-Links gehen nicht, bitte Raum-ID oder Alias eintragen“: dann die Raum-ID oder den
    Alias aus dem Link (hinter `#/`) eintragen.

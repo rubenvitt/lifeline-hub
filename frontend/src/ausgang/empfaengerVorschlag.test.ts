@@ -10,7 +10,7 @@ const kanal = (
   id: number,
   stelle: string,
   stelleId = id,
-  art: 'email' | 'matrix' = 'email',
+  art: 'email' | 'matrix' | 'threema' | 'fax' = 'email',
 ): KanalMitStelle => ({
   agency_id: stelleId,
   agency_name: stelle,
@@ -18,7 +18,14 @@ const kanal = (
     id,
     externe_stelle_id: stelleId,
     channel: art,
-    address: art === 'matrix' ? `#raum${id}:example.org` : `s${id}@example.org`,
+    address:
+      art === 'matrix'
+        ? `#raum${id}:example.org`
+        : art === 'threema'
+          ? `ECHOECH${id}`
+          : art === 'fax'
+            ? `+4951112345${id}`
+            : `s${id}@example.org`,
   },
 });
 
@@ -44,6 +51,21 @@ describe('empfaengerVorschlag', () => {
     ];
     // ILS: die erste Matrix-Adresse (2), Andere: die erste Mail (4); Dritte steht nicht im Verteiler.
     expect(empfaengerVorschlag(k, ['ils', 'andere'])).toEqual(new Set([2, 4]));
+  });
+
+  it('threema_vor_mail', () => {
+    const k = [kanal(1, 'ILS', 7), kanal(2, 'ILS', 7, 'threema')];
+    expect(empfaengerVorschlag(k, ['ils'])).toEqual(new Set([2]));
+  });
+
+  it('matrix_vor_threema', () => {
+    const k = [kanal(1, 'ILS', 7, 'threema'), kanal(2, 'ILS', 7, 'matrix'), kanal(3, 'ILS', 7)];
+    expect(empfaengerVorschlag(k, ['ils'])).toEqual(new Set([2]));
+  });
+
+  it('fax_nie', () => {
+    const k = [kanal(1, 'ILS', 7, 'fax')];
+    expect(empfaengerVorschlag(k, ['ils']).size).toBe(0);
   });
 
   it('ignoriert leere Namen', () => {

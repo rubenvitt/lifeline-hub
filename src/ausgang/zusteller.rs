@@ -12,7 +12,11 @@
 use std::sync::Arc;
 
 mod matrix;
+mod threema;
 pub use matrix::{MatrixZusteller, MATRIX_ZUSTELL_ZEITLIMIT};
+pub use threema::{
+    teile_text, threema_teile, Teil, ThreemaZusteller, ZielWahl, THREEMA_ZUSTELL_ZEITLIMIT,
+};
 
 use chrono::{DateTime, Utc};
 use futures::future::BoxFuture;
@@ -41,6 +45,9 @@ pub struct Versandauftrag<'a> {
     /// Schon gesendete und gemerkte Teile eines früheren Versuchs (`ausgang_teil`); der Zusteller
     /// lässt sie aus. Bei SMTP immer leer.
     pub gesendet: &'a [i64],
+    /// Der gemerkte öffentliche Schlüssel des Empfängers als Hex (`org_threema_schluessel`,
+    /// LLH-2096); nur bei Threema gesetzt, und nur wenn schon einer gemerkt ist.
+    pub threema_schluessel: Option<&'a str>,
 }
 
 /// Warum eine Zustellung scheiterte, kanalneutral. Der Lauf ordnet daraus `AusgangFehler` zu.
@@ -69,6 +76,9 @@ pub enum Zustellfehler {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Zustellt {
     pub teile: Vec<(i64, String)>,
+    /// Der beim Gateway abgefragte Schlüssel des Empfängers, wenn noch keiner gemerkt war
+    /// (Threema, LLH-2096); der Lauf merkt ihn mit dem Ergebnis.
+    pub neuer_schluessel: Option<String>,
 }
 
 /// Eine gescheiterte Zustellung. `grund` ist der fertige, feste deutsche Grund für den ETB-Text
@@ -80,6 +90,8 @@ pub struct Fehlschlag {
     pub grund: String,
     pub smtp_status: Option<u16>,
     pub teile: Vec<(i64, String)>,
+    /// Wie [`Zustellt::neuer_schluessel`]: auch ein Fehlschlag nach der Abfrage merkt ihn.
+    pub neuer_schluessel: Option<String>,
 }
 
 /// Stellt einen Versand über den Zugang seiner Anbindung zu.
@@ -360,28 +372,40 @@ fn kanal_nicht_bedient() -> Fehlschlag {
         grund: "Kanal wird hier nicht zugestellt".into(),
         smtp_status: None,
         teile: Vec::new(),
+        neuer_schluessel: None,
     }
 }
 
 /// Die Weiche des Laufs: gibt jeden Versand dem Zusteller seines Kanals (LLH-2094, Spec
-/// Abschnitt 6). Das Fax geht nicht hier, sondern über [`Zustellwege::fax`]; Fax und Threema
-/// scheitern hier ohne Netz.
+/// Abschnitt 6) und Threema (LLH-2096). Das Fax geht nicht hier, sondern über
+/// [`Zustellwege::fax`]; es scheitert hier ohne Netz.
 pub struct Zustellerwahl {
     email: Arc<dyn Zusteller>,
     matrix: Arc<dyn Zusteller>,
+    threema: Arc<dyn Zusteller>,
 }
 
 impl Zustellerwahl {
-    pub fn new(email: Arc<dyn Zusteller>, matrix: Arc<dyn Zusteller>) -> Self {
-        Zustellerwahl { email, matrix }
+    pub fn new(
+        email: Arc<dyn Zusteller>,
+        matrix: Arc<dyn Zusteller>,
+        threema: Arc<dyn Zusteller>,
+    ) -> Self {
+        Zustellerwahl {
+            email,
+            matrix,
+            threema,
+        }
     }
 
     /// E-Mail über [`SmtpZusteller::produktiv`], Matrix über [`MatrixZusteller`] mit den Clients
-    /// des Prozesses (dieselben wie in `Rahmen::matrix`).
+    /// des Prozesses (dieselben wie in `Rahmen::matrix`), Threema über
+    /// [`ThreemaZusteller::produktiv`].
     pub fn produktiv(matrix: Arc<crate::adapter::matrix::Clients>) -> Self {
         Zustellerwahl::new(
             Arc::new(SmtpZusteller::produktiv()),
             Arc::new(MatrixZusteller::new(matrix)),
+            Arc::new(ThreemaZusteller::produktiv()),
         )
     }
 }
@@ -394,7 +418,8 @@ impl Zusteller for Zustellerwahl {
         match auftrag.kanal {
             KanalArt::Email => self.email.zustellen(auftrag),
             KanalArt::Matrix => self.matrix.zustellen(auftrag),
-            KanalArt::Fax | KanalArt::Threema => Box::pin(async { Err(kanal_nicht_bedient()) }),
+            KanalArt::Threema => self.threema.zustellen(auftrag),
+            KanalArt::Fax => Box::pin(async { Err(kanal_nicht_bedient()) }),
         }
     }
 }
@@ -428,6 +453,7 @@ fn anbindung_unbrauchbar() -> Fehlschlag {
         grund: "Anbindung des Mailservers nicht nutzbar".into(),
         smtp_status: None,
         teile: Vec::new(),
+        neuer_schluessel: None,
     }
 }
 
@@ -486,6 +512,7 @@ pub fn smtp_fehlschlag(e: SmtpFehler) -> Fehlschlag {
         grund,
         smtp_status: e.status(),
         teile: Vec::new(),
+        neuer_schluessel: None,
     }
 }
 
@@ -568,6 +595,7 @@ mod tests {
             anhaenge: &[],
             pdf: None,
             gesendet: &[],
+            threema_schluessel: None,
         };
         z.zustellen(&auftrag).await.unwrap();
         let angenommen = z.angenommen();
@@ -599,6 +627,7 @@ mod tests {
             anhaenge: &[],
             pdf: None,
             gesendet: &[],
+            threema_schluessel: None,
         }
     }
 
@@ -641,7 +670,8 @@ mod tests {
     async fn zustellerwahl_gibt_jedem_kanal_seinen_zusteller() {
         let email = Arc::new(AufzeichnenderZusteller::default());
         let matrix = Arc::new(AufzeichnenderZusteller::default());
-        let wahl = Zustellerwahl::new(email.clone(), matrix.clone());
+        let threema = Arc::new(AufzeichnenderZusteller::default());
+        let wahl = Zustellerwahl::new(email.clone(), matrix.clone(), threema.clone());
         let zugang = zugang();
         wahl.zustellen(&auftrag(KanalArt::Matrix, &zugang))
             .await
@@ -652,11 +682,19 @@ mod tests {
         a.adresse = "an@example.org";
         wahl.zustellen(&a).await.unwrap();
         assert_eq!(email.angenommen().len(), 1);
-        for kanal in [KanalArt::Fax, KanalArt::Threema] {
-            let f = wahl.zustellen(&auftrag(kanal, &zugang)).await.unwrap_err();
-            assert!(matches!(f.fehler, Zustellfehler::Anbindung { .. }));
-        }
-        assert_eq!(email.angenommen().len() + matrix.angenommen().len(), 2);
+        wahl.zustellen(&auftrag(KanalArt::Threema, &zugang))
+            .await
+            .unwrap();
+        assert_eq!(threema.angenommen().len(), 1);
+        let f = wahl
+            .zustellen(&auftrag(KanalArt::Fax, &zugang))
+            .await
+            .unwrap_err();
+        assert!(matches!(f.fehler, Zustellfehler::Anbindung { .. }));
+        assert_eq!(
+            email.angenommen().len() + matrix.angenommen().len() + threema.angenommen().len(),
+            3
+        );
     }
 
     /// Die ETB-Gründe der E-Mail stehen fest: eine Änderung hier ist eine bewusste Änderung der

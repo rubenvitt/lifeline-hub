@@ -259,6 +259,27 @@ Für den System-Admin; jede Organisation hat höchstens ein Matrix-Konto:
 Ohne dieses Konto sind im Senden-Dialog die Matrix-Räume nach dem Senden mit „Kein Matrix-Konto
 eingerichtet“ gesperrt; ist es angehalten, mit „Das Matrix-Konto ist angehalten“.
 
+### Threema Gateway für den Versand einrichten
+
+Für den System-Admin; jede Organisation hat höchstens ein Threema-Gateway. Vorher bei Threema eine
+**E2E-ID** für das Gateway beantragen (sie beginnt mit `*`, etwa `*LAGE123`) und dafür mit dem
+Werkzeug von Threema ein Schlüsselpaar erzeugen; Threema nennt danach das API-Secret:
+
+1. Unter „Einstellungen“ „Anbindungen“ im Paneel „Adapter“ „Adapter anlegen“ wählen und die Art
+   „Threema Gateway“ wählen.
+2. Unter „Gateway-ID (etwa *LAGE123)“ die ID in Großbuchstaben eintragen.
+3. „Anlegen“ wählen und in der Ansicht des Adapters „API-Secret“ und „Privater Schlüssel“ als
+   Geheimnisse setzen. Der private Schlüssel hat 64 Hex-Zeichen und darf mit `private:` beginnen,
+   wie ihn das Werkzeug von Threema ausgibt.
+4. „Verbindung prüfen“ wählen. Es wird nichts gesendet. Das Paneel „Guthaben“ zeigt die
+   verbleibenden Credits; bei 0 steht dort „Kein Guthaben: jeder Versand scheitert, bis Credits
+   nachgekauft sind.“
+
+Passt der private Schlüssel nicht zur Gateway-ID, meldet die Prüfung „Schlüssel passen nicht zum
+Zugang. Bei Matrix ein neues Access-Token anlegen, bei Threema den privaten Schlüssel der Gateway-ID
+eintragen.“ Ohne Gateway sind im Senden-Dialog die Threema-IDs nach dem Senden mit „Kein
+Threema-Gateway eingerichtet“ gesperrt.
+
 ### Faxzugang (sipgate) für den Versand einrichten
 
 Für den System-Admin; jede Organisation hat höchstens eine Fax-Anbindung. Vorher in der
@@ -731,6 +752,27 @@ die sich bei einem Hub meldet, hat kein eigenes Matrix-Konto.
 - **Fehler.** Ein abgelehntes Token hält die Anbindung mit „Zugang abgelehnt“ an. Die Versandliste nennt
   nur feste Gründe („Kein Zutritt zum Raum“, „Verschlüsseln nicht möglich“, „Vom Matrix-Server
   abgelehnt“), das ETB höchstens den Fehlercode des Matrix-Servers, nie seinen Text.
+
+### Versand an Threema-IDs
+
+Die Art „Threema Gateway“ ruft nichts ab: ihr regelmäßiger Lauf prüft Zugang, Schlüssel und
+Guthaben. Gesprochen wird nur mit `msgapi.threema.ch`, ohne Weiterleitung.
+
+- **Ende-zu-Ende.** Lifeline Hub verschlüsselt jede Nachricht selbst, auch die Bilder der Anlagen;
+  Threema transportiert sie nur und kann sie nicht lesen. Den Basis-Modus, in dem Threema
+  verschlüsselt, nutzt Lifeline Hub nicht.
+- **Schlüssel der Empfänger.** Beim ersten Versand an eine Threema-ID merkt sich Lifeline Hub
+  ihren öffentlichen Schlüssel. Meldet Threema später einen anderen, geht an diese ID nichts mehr
+  hinaus: die Versandliste zeigt „Verschlüsseln nicht möglich“, das ETB „Der Schlüssel der
+  Threema-ID hat sich geändert“. Eine Threema-ID behält ihren Schlüssel sonst dauerhaft; im
+  Zweifel bei der Stelle nachfragen und eine neue ID eintragen.
+- **Kosten.** Jede Nachricht kostet Credits. Ein langer Lagebericht wird in mehrere Nachrichten
+  geteilt („(1/2)“, „(2/2)“), jede Anlage ist eine weitere.
+- **Kein „zugestellt“.** Threema bestätigt nur die Annahme; der Versand steht danach auf
+  „übergeben“. Bricht die Verbindung mitten im Senden ab, steht er auf „Zustellung unklar“ und
+  wird nicht von selbst wiederholt.
+- **Fehler.** Ein abgelehntes Secret oder fehlendes Guthaben lässt die Anbindung sich gleich neu
+  prüfen; die Versandliste nennt nur feste Gründe, nie einen Text von Threema.
 
 ### Faxversand
 

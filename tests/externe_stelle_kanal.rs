@@ -154,7 +154,7 @@ async fn sammelroute_liefert_je_kanal_nur_dessen_adressen_aktiver_stellen() {
     let (status, _) = anfrage(
         &app,
         "GET",
-        &format!("{PFAD}/channels?channel=threema"),
+        &format!("{PFAD}/channels?channel=brieftaube"),
         &admin,
         None,
     )
@@ -187,7 +187,7 @@ async fn faxnummer_wird_normalisiert_und_ungueltige_abgelehnt() {
 }
 
 #[tokio::test]
-async fn threema_ist_noch_nicht_freigeschaltet() {
+async fn unbekannter_kanal_und_ungueltige_threema_id_sind_400() {
     let app = setup().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
     let stelle = stelle_anlegen(&app, &admin, "Kreisverwaltung").await;
@@ -209,6 +209,23 @@ async fn threema_ist_noch_nicht_freigeschaltet() {
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn threema_id_wird_normalisiert_angelegt() {
+    let app = setup().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let stelle = stelle_anlegen(&app, &admin, "Kreisverwaltung").await;
+    let (status, json) = kanal_anlegen(
+        &app,
+        &admin,
+        stelle,
+        r#"{"channel":"threema","address":" echo echo "}"#,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{json}");
+    assert_eq!(json["address"], "ECHOECHO");
+    assert_eq!(json["channel"], "threema");
 }
 
 #[tokio::test]

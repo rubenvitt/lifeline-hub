@@ -393,7 +393,7 @@ fn check_platz_setzbar(art: &dyn AdapterArt, platz: &str) -> Result<(), AppError
 
 /// Die Meldung, wenn eine Art höchstens einmal je Org angelegt werden darf und es schon eine gibt
 /// (auch eine angehaltene zählt): `smtp` (LLH-2093), `sipgate_fax` (LLH-2095), `matrix`
-/// (LLH-2094). `None` für andere Arten.
+/// (LLH-2094), `threema` (LLH-2096). `None` für andere Arten.
 fn meldung_schon_vorhanden(code: &str) -> Option<&'static str> {
     match code {
         crate::adapter::smtp_art::CODE => {
@@ -404,6 +404,9 @@ fn meldung_schon_vorhanden(code: &str) -> Option<&'static str> {
         }
         crate::adapter::matrix_art::CODE => {
             Some("Es gibt schon eine Matrix-Anbindung; ändere oder lösche sie.")
+        }
+        crate::adapter::threema_art::CODE => {
+            Some("Es gibt schon eine Threema-Anbindung; ändere oder lösche sie.")
         }
         _ => None,
     }
@@ -799,18 +802,25 @@ pub async fn set_geheimnis(
             "wert darf höchstens {GEHEIMNIS_MAX} Zeichen lang sein"
         )));
     }
-    let wert = SecretString::from(wert.to_string());
-    drop(body);
     let rahmen = &state.adapter;
     let org_id = admin.org_id;
-    // Vorprüfung ohne Schreibsperre: Adapter, Art und Platz, bevor verschlüsselt wird.
-    let (art, neues_geraet) = {
+    // Vorprüfung ohne Schreibsperre: Adapter, Art und Platz, bevor verschlüsselt wird; die Art
+    // prüft und bereinigt den Wert (Threema: privater Schlüssel, LLH-2096).
+    let (art, neues_geraet, wert) = {
         let mut conn = state.pool.acquire().await?;
         let a = load_fuer_schreiben(&mut conn, org_id, &id).await?;
         let art = art_von(rahmen, &a)?;
         check_platz_setzbar(art, &platz)?;
-        (art, is_matrix_token(&a.art, &platz))
+        let wert = art
+            .check_geheimnis(&platz, wert)
+            .map_err(|m| AppError::Validation(format!("wert: {m}")))?;
+        (
+            art,
+            is_matrix_token(&a.art, &platz),
+            SecretString::from(wert),
+        )
     };
+    drop(body);
     if !rahmen.speicher.has_schluessel() {
         return Err(AppError::UnprocessableEntity(
             "Der Server hat keinen Schlüssel für Geheimnisse (LIFELINE_GEHEIMNIS_SCHLUESSEL); \

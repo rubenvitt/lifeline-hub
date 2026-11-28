@@ -116,8 +116,9 @@ pub fn fehler_text(fehler: AdapterFehler, status: Option<i64>) -> String {
         EinstellungUngueltig => "Einstellung ungültig",
         VersionUnbekannt => "Unbekannte Schnittstellenversion",
         Intern => "Fehler im Server",
+        // Für Matrix (LLH-2094) und Threema (LLH-2096); der Text gilt je Code, nicht je Art.
         SchluesselPassenNicht => {
-            "Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen."
+            "Schlüssel passen nicht zum Zugang. Bei Matrix ein neues Access-Token anlegen, bei Threema den privaten Schlüssel der Gateway-ID eintragen."
         }
     };
     match status {

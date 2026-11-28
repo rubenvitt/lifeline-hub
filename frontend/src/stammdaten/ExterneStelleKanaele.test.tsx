@@ -98,6 +98,42 @@ describe('ExterneStelle Kanaladressen', () => {
     expect(eintrag).toHaveTextContent('Matrix');
   });
 
+  it('threema_id_hinzufuegen', async () => {
+    const liste: unknown[] = [];
+    const bodies: unknown[] = [];
+    server.use(
+      kanaeleHandler(liste),
+      http.post('/api/external-agencies/4/channels', async ({ request }) => {
+        const body = await request.json();
+        bodies.push(body);
+        const neu = { id: 30, externe_stelle_id: 4, ...(body as object), address: 'ECHOECHO' };
+        liste.push(neu);
+        return HttpResponse.json(neu, { status: 201 });
+      }),
+    );
+    const nutzer = userEvent.setup();
+    renderMitProviders(<ExterneStelleFormModal offen stelle={ils} onClose={() => {}} />);
+
+    await nutzer.click(await screen.findByRole('radio', { name: 'Threema' }));
+    // Sieben Zeichen sind keine Threema-ID, ohne Request.
+    await nutzer.type(screen.getByLabelText('Threema-ID'), 'ECHOECH');
+    await nutzer.click(screen.getByRole('button', { name: 'Adresse hinzufügen' }));
+    expect(
+      await screen.findByText('Eine Threema-ID hat acht Zeichen (Buchstaben und Ziffern)'),
+    ).toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+
+    await nutzer.clear(screen.getByLabelText('Threema-ID'));
+    await nutzer.type(screen.getByLabelText('Threema-ID'), 'echo echo');
+    await nutzer.click(screen.getByRole('button', { name: 'Adresse hinzufügen' }));
+    await waitFor(() => expect(bodies).toEqual([{ channel: 'threema', address: 'echo echo' }]));
+    const eintrag = (await screen.findByText('ECHOECHO')).closest('li');
+    expect(eintrag).toHaveTextContent('Threema');
+    expect(
+      screen.getByRole('button', { name: 'Threema-ID ECHOECHO entfernen' }),
+    ).toBeInTheDocument();
+  });
+
   it('lehnt einen matrix.to-Link mit eigenem Text ohne Request ab', async () => {
     let gepostet = false;
     server.use(

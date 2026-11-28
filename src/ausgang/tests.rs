@@ -418,3 +418,45 @@ async fn check_listen_entsprechen_den_enums() {
         ist(KanalArt::ALLE.iter().map(|a| a.as_str()).collect())
     );
 }
+
+async fn zweite_org(pool: &SqlitePool) -> i64 {
+    sqlx::query_scalar("INSERT INTO organisation (name) VALUES ('Zweite Org') RETURNING id")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn threema_schluessel_wird_gemerkt_und_nie_ueberschrieben() {
+    let w = welt().await;
+    let (a, b) = ("ab".repeat(32), "cd".repeat(32));
+    for k in [&a, &b] {
+        let mut conn = w.pool.acquire().await.unwrap();
+        repo::save_threema_schluessel_tx(&mut conn, w.org_id, "ECHOECHO", k, t0())
+            .await
+            .unwrap();
+    }
+    assert_eq!(
+        repo::load_threema_schluessel(&w.pool, w.org_id, "ECHOECHO")
+            .await
+            .unwrap(),
+        Some(a)
+    );
+}
+
+#[tokio::test]
+async fn threema_schluessel_sind_je_org_getrennt() {
+    let w = welt().await;
+    let andere = zweite_org(&w.pool).await;
+    let mut conn = w.pool.acquire().await.unwrap();
+    repo::save_threema_schluessel_tx(&mut conn, w.org_id, "ECHOECHO", &"ab".repeat(32), t0())
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(
+        repo::load_threema_schluessel(&w.pool, andere, "ECHOECHO")
+            .await
+            .unwrap(),
+        None
+    );
+}

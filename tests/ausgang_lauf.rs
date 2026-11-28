@@ -169,6 +169,7 @@ async fn welt() -> Welt {
         mail: Arc::new(Zustellerwahl::new(
             Arc::new(SmtpZusteller::mit_transport(skript.clone())),
             matrix.clone(),
+            matrix.clone(),
         )),
         fax: fax.clone(),
     };
@@ -361,6 +362,46 @@ impl Welt {
         )
         .await;
         assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+    }
+
+    async fn threema_anbindung(&self) {
+        let body = json!({
+            "art": "threema", "name": "Threema",
+            "einstellungen": { "gateway_id": "*LAGE123" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        for (platz, wert) in [
+            ("secret", "geheim".to_string()),
+            ("privater_schluessel", "05".repeat(32)),
+        ] {
+            let (s, v) = anfrage_json(
+                &self.app,
+                "PUT",
+                &format!("/api/admin/adapter/{id}/secrets/{platz}"),
+                &self.admin,
+                Some(&json!({ "wert": wert })),
+            )
+            .await;
+            assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        }
+    }
+
+    async fn threema_schluessel(&self) -> Option<String> {
+        sqlx::query_scalar(
+            "SELECT public_key FROM org_threema_schluessel WHERE threema_id = 'ECHOECHO'",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .unwrap()
     }
 
     async fn teile(&self, id: &str) -> Vec<(i64, String)> {
@@ -1094,6 +1135,8 @@ async fn lauf_prueft_die_echten_bytes_der_anlagen() {
 struct TeilDoppel {
     antworten: Mutex<VecDeque<Result<Zustellt, Fehlschlag>>>,
     gesendet: Mutex<Vec<Vec<i64>>>,
+    /// Der gemerkte Threema-Schlüssel je Aufruf (LLH-2096).
+    schluessel: Mutex<Vec<Option<String>>>,
 }
 
 impl Zusteller for TeilDoppel {
@@ -1106,6 +1149,10 @@ impl Zusteller for TeilDoppel {
                 .lock()
                 .unwrap()
                 .push(auftrag.gesendet.to_vec());
+            self.schluessel
+                .lock()
+                .unwrap()
+                .push(auftrag.threema_schluessel.map(str::to_string));
             self.antworten
                 .lock()
                 .unwrap()
@@ -1128,6 +1175,7 @@ async fn teile_werden_mit_dem_ergebnis_gespeichert() {
     let doppel = Arc::new(TeilDoppel::default());
     doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
         teile: teile(&[(0, "$text"), (1, "$anlage")]),
+        neuer_schluessel: None,
     }));
     let zusteller = w.wege_mit(doppel.clone());
 
@@ -1157,9 +1205,11 @@ async fn gemerkte_teile_gehen_dem_naechsten_versuch_mit() {
         grund: "Homeserver nicht erreichbar".into(),
         smtp_status: None,
         teile: teile(&[(0, "$text")]),
+        neuer_schluessel: None,
     }));
     doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
         teile: teile(&[(1, "$anlage")]),
+        neuer_schluessel: None,
     }));
     let zusteller = w.wege_mit(doppel.clone());
 
@@ -1224,6 +1274,7 @@ impl Zusteller for Scheitert {
                 grund: self.1.into(),
                 smtp_status: None,
                 teile: Vec::new(),
+                neuer_schluessel: None,
             })
         })
     }
@@ -1290,6 +1341,7 @@ impl Zusteller for LoeschtDieZeile {
                 .unwrap();
             Ok(Zustellt {
                 teile: teile(&[(0, "$text")]),
+                neuer_schluessel: None,
             })
         })
     }
@@ -1706,4 +1758,113 @@ async fn eine_mail_auf_uebergeben_wird_nie_abgefragt() {
     w.durchgang(t0 + chrono::Duration::minutes(5)).await;
     assert_eq!(w.fax.abfragen(), 0);
     assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+}
+
+// --- Threema (LLH-2096) ---
+
+const SCHLUESSEL: &str = "abababababababababababababababababababababababababababababababab";
+
+#[tokio::test]
+async fn threema_schluessel_wird_mit_dem_ergebnis_gemerkt_und_geht_in_den_auftrag() {
+    let w = welt().await;
+    w.threema_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("threema", "ECHOECHO", "lagebericht", lid, t0)
+        .await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Ok(Zustellt {
+        teile: teile(&[(0, "id-text")]),
+        neuer_schluessel: Some(SCHLUESSEL.into()),
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    assert_eq!(w.zeile(&id).await.zustand, VersandZustand::Uebergeben);
+    assert_eq!(w.threema_schluessel().await.as_deref(), Some(SCHLUESSEL));
+    assert_eq!(doppel.schluessel.lock().unwrap().clone(), [None]);
+
+    // Ein zweiter Versand bekommt den gemerkten Schlüssel mit.
+    let lid2 = w.lagebericht_freigeben(false).await;
+    w.versand_an("threema", "ECHOECHO", "lagebericht", lid2, t0)
+        .await;
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    assert_eq!(
+        doppel
+            .schluessel
+            .lock()
+            .unwrap()
+            .last()
+            .cloned()
+            .flatten()
+            .as_deref(),
+        Some(SCHLUESSEL)
+    );
+}
+
+#[tokio::test]
+async fn threema_schluessel_wird_auch_bei_fehlschlag_gemerkt() {
+    let w = welt().await;
+    w.threema_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    w.versand_an("threema", "ECHOECHO", "lagebericht", lid, t0)
+        .await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Err(Fehlschlag {
+        fehler: Zustellfehler::Voruebergehend { nicht_vor: None },
+        grund: "Threema nicht erreichbar".into(),
+        smtp_status: None,
+        teile: Vec::new(),
+        neuer_schluessel: Some(SCHLUESSEL.into()),
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    assert_eq!(w.threema_schluessel().await.as_deref(), Some(SCHLUESSEL));
+}
+
+#[tokio::test]
+async fn ungewiss_bei_threema_wird_nicht_wiederholt() {
+    let w = welt().await;
+    w.threema_anbindung().await;
+    let lid = w.lagebericht_freigeben(false).await;
+    let t0 = Utc::now();
+    let id = w
+        .versand_an("threema", "ECHOECHO", "lagebericht", lid, t0)
+        .await;
+    let doppel = Arc::new(TeilDoppel::default());
+    doppel.antworten.lock().unwrap().push_back(Err(Fehlschlag {
+        fehler: Zustellfehler::Ungewiss,
+        grund: "Ob Threema die Nachricht angenommen hat, ist unklar".into(),
+        smtp_status: None,
+        teile: Vec::new(),
+        neuer_schluessel: None,
+    }));
+    let zusteller = w.wege_mit(doppel.clone());
+    lauf::durchgang(&w.pool, &w.rahmen, &w.live, &zusteller, t0)
+        .await
+        .unwrap();
+    let z = w.zeile(&id).await;
+    assert_eq!(z.zustand, VersandZustand::Fehlgeschlagen);
+    assert_eq!(z.fehler_art, Some(AusgangFehler::Ungewiss));
+    lauf::durchgang(
+        &w.pool,
+        &w.rahmen,
+        &w.live,
+        &zusteller,
+        t0 + chrono::Duration::minutes(5),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        doppel.gesendet.lock().unwrap().len(),
+        1,
+        "kein zweiter Versuch"
+    );
 }

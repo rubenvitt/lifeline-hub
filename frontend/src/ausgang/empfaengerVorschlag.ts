@@ -1,4 +1,7 @@
-import type { KanalMitStelle } from '../api/types';
+import type { KanalArt, KanalMitStelle } from '../api/types';
+
+/** Rang der Vorbelegung je Kanal (kleiner gewinnt); Fax wird vorher ausgelassen. */
+const RANG: Record<KanalArt, number> = { matrix: 0, threema: 1, email: 2, fax: 3 };
 
 /** Vergleichsform eines Namens: ohne Groß/Klein, Leerraum zusammengezogen. */
 function norm(name: string): string {
@@ -8,7 +11,8 @@ function norm(name: string): string {
 /**
  * Vorbelegung des Senden-Dialogs (LLH-2093, LLH-2094, Spec 8): je Stelle, deren Bezeichnung einem
  * Namen aus dem Verteiler bzw. dem Adressaten gleicht, genau eine Adresse: die erste
- * Matrix-Adresse, sonst die erste Mailadresse; eine Faxnummer nie (LLH-2095). Ganze Namen, kein
+ * Matrix-Adresse, sonst die erste Threema-ID (LLH-2096), sonst die erste Mailadresse; eine
+ * Faxnummer nie (LLH-2095). Ganze Namen, kein
  * Teilvergleich: „Nord“ trifft nicht „Leitstelle Nord“. Ein Bericht soll bei derselben Stelle
  * nicht doppelt landen. Liefert die `id`s der Adressen.
  */
@@ -21,8 +25,8 @@ export function empfaengerVorschlag(
   for (const k of kanaele) {
     if (k.channel.channel === 'fax' || !gesucht.has(norm(k.agency_name))) continue;
     const bisher = jeStelle.get(k.agency_id);
-    // Matrix verdrängt eine Mail; sonst bleibt die erste.
-    if (!bisher || (bisher.channel.channel !== 'matrix' && k.channel.channel === 'matrix')) {
+    // Ein höherer Rang verdrängt; bei gleichem bleibt die erste.
+    if (!bisher || RANG[k.channel.channel] < RANG[bisher.channel.channel]) {
       jeStelle.set(k.agency_id, k);
     }
   }

@@ -156,8 +156,7 @@ fn pruefe_adresse(kanal: KanalArt, roh: &str) -> Result<String, AppError> {
         KanalArt::Email => kanal::normalize_email(roh).map_err(AppError::Validation),
         KanalArt::Fax => kanal::normalize_fax(roh).map_err(AppError::Validation),
         KanalArt::Matrix => kanal::normalize_matrix(roh).map_err(AppError::Validation),
-        // `parse_kanal` lässt nur freigeschaltete Kanäle durch.
-        _ => Err(AppError::Validation(KANAL_NICHT_FREIGESCHALTET.into())),
+        KanalArt::Threema => kanal::normalize_threema(roh).map_err(AppError::Validation),
     }
 }
 

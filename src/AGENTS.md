@@ -485,24 +485,30 @@ gespeichert bleibt das Original (Beweismittel), **ausgeliefert wird bereinigt**.
   sie zur Laufzeit. `static_files.rs` liefert sie mit `no-cache` und ETag und nimmt aus
   `--heic-decoder-verzeichnis` genau diese zwei Namen.
 
-## Ausgang an Menschen (LLH-2093, Fax LLH-2095, Matrix LLH-2094)
+## Ausgang an Menschen (LLH-2093, Fax LLH-2095, Matrix LLH-2094, Threema LLH-2096)
 
-Nachrichten an Menschen (E-Mail, Fax und Matrix-Räume Externer Stellen): `src/ausgang/`,
-Anbindungen `src/adapter/smtp.rs`, `smtp_art.rs`, `sipgate.rs`, `sipgate_fax_art.rs`,
-`matrix.rs` und `matrix_art.rs`, Routen `src/routes/ausgang.rs`
+Nachrichten an Menschen (E-Mail, Fax, Matrix-Räume und Threema-IDs Externer Stellen):
+`src/ausgang/`, Anbindungen `src/adapter/smtp.rs`, `smtp_art.rs`, `sipgate.rs`,
+`sipgate_fax_art.rs`, `matrix.rs`, `matrix_art.rs`, `threema.rs` und `threema_art.rs`, Routen
+`src/routes/ausgang.rs`
 ([ADR-0104](../docs/architektur/entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md),
 [ADR-0110](../docs/architektur/entscheidungen/ADR-0110-ein-pdf-entsteht-am-server-nur-fuer-den-ausgang.md),
 [ADR-0107](../docs/architektur/entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md),
+[ADR-0112](../docs/architektur/entscheidungen/ADR-0112-threema-ist-ein-kanal-des-ausgangskorbs-nur-e2e-mit-gemerktem-schluessel.md),
 Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`,
-`docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md` und
-`docs/superpowers/specs/2026-11-25-ntaizave-ausgang-matrix-design.md`):
+`docs/superpowers/specs/2026-11-25-atnsssv3-ausgang-fax-pdf-design.md`,
+`docs/superpowers/specs/2026-11-25-ntaizave-ausgang-matrix-design.md` und
+`docs/superpowers/specs/2026-11-28-gq6qs7tg-ausgang-threema-design.md`):
 - **Ein Kanal, eine Anbindung:** `KanalArt::adapter_art` wählt die Art (`email` → `smtp`,
-  `fax` → `sipgate_fax`, `matrix` → `matrix`), höchstens eine je Art und Org. `pruefe_versand_moeglich` und
+  `fax` → `sipgate_fax`, `matrix` → `matrix`, `threema` → `threema`), höchstens eine je Art und
+  Org. Eine Ablehnung beim Anlegen nennt jeden Kanal ohne nutzbare Anbindung, mit „; “ verbunden;
+  der Code ist der des ersten. `pruefe_versand_moeglich` und
   `zugang_fuer_versand` nehmen den Kanal; der Lauf verzweigt in `run_one` auf `zeile.kanal`,
   ohne zweiten Korb oder Lauf: das Fax über `Zustellwege::fax`, alles andere über
   `Zustellwege::mail` (die `Zustellerwahl`). Ein neuer Kanal kommt in `KanalArt`, bekommt eine Art
   und einen Zusteller in der `Zustellerwahl` (oder, mit eigenem Ablauf wie das Fax, in
-  `ausgang::zusteller::Zustellwege`). Ein PDF entsteht nur für E-Mail und Fax, nicht für Matrix.
+  `ausgang::zusteller::Zustellwege`). Ein PDF entsteht nur für E-Mail und Fax, nicht für Matrix
+  und Threema.
 - **Faxnummern** stehen in E.164 (`externe_stelle::kanal::normalize_fax`, `+49` bei nationaler
   Form). Das Fax ist das PDF aus `ausgang::pdf` (ADR-0110); die Grenze von 30 Seiten und 10 MiB
   gilt nur für Fax und wird **beim Anlegen** geprüft (der ganze Antrag 422 `zu_gross`). Eine Mail
@@ -559,9 +565,8 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   `adapter::ziel`); `lettre` baut nur die Nachricht, nie den Transport.
 - **Kanalneutraler Zusteller** (LLH-2094): `ausgang::zusteller::Zusteller` nimmt einen
   `Versandauftrag` und liefert `Zustellt` oder `Fehlschlag` mit `Zustellfehler`;
-  `Zustellerwahl` gibt ihn dem Zusteller seines Kanals (`SmtpZusteller`, `MatrixZusteller`); das
-  Fax geht nicht hier, sondern über `FaxZusteller` (`Zustellwege::fax`), Threema scheitert ohne
-  Netz. Die Zuordnung `Zustellfehler → AusgangFehler`, Wiederholung, ETB
+  `Zustellerwahl` gibt ihn dem Zusteller seines Kanals (`SmtpZusteller`, `MatrixZusteller`,
+  `ThreemaZusteller`); das Fax geht nicht hier, sondern über `FaxZusteller` (`Zustellwege::fax`). Die Zuordnung `Zustellfehler → AusgangFehler`, Wiederholung, ETB
   und Abschluss stehen nur im Lauf. Ein neuer Kanal bringt einen Zusteller, keinen Lauf. Das
   Anlegen prüft je Empfänger die Anbindung seines Kanals (`pruefe_versand_moeglich(…, kanal)`).
 - **Matrix-Zustellung** (`ausgang/zusteller/matrix.rs`, unter der Sperre des Clients): Alias
@@ -601,6 +606,19 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
 - **Routen** bleiben unter `/api/incidents/{id}/…` (Segmente `deliveries`, `retry`): die
   Gerätebindung in `auth/session.rs` hängt an diesem Präfix. Die Kanaltabelle
   `org_externe_stelle_kanal` hat keine Änderungsspur (nicht Teil des ELW-Abgleichs).
+- **Threema** (LLH-2096, ADR-0112): nur E2E über `adapter::threema` (`send_e2e`, nie
+  `send_simple`), fester Host `https://msgapi.threema.ch` über den Zielschutz; der Hub
+  verschlüsselt selbst (`adapter::threema::krypto`). Secret und privater Schlüssel sind Plätze der
+  Art (`check_geheimnis` prüft und bereinigt den Schlüssel beim Setzen); bei `GET` und Upload
+  steht das Secret in der Query, darum nennt kein Fehler und kein Log eine URL. Der öffentliche
+  Schlüssel einer ID wird beim ersten Versand in `org_threema_schluessel` gemerkt (im selben
+  Abschluss wie Teile und Ergebnis, `ON CONFLICT DO NOTHING`) und nie überschrieben; weicht er ab,
+  scheitert der Versand mit `verschluesselung`, bevor etwas hinausgeht. Teile: zuerst der Text
+  (`*Betreff*`, Inhalt mit Fuß, über 3500 Bytes an Absätzen geteilt mit „(i/k)“), dann je
+  PNG-Anlage eine Dateinachricht; Nummern fortlaufend ab 0, gemerkte werden ausgelassen. Ein
+  Abbruch nach dem Absenden ist `ungewiss` (keine Transaktions-ID), ein Upload-Abbruch
+  vorübergehend. Endstand `uebergeben`; Empfangsbestätigungen sind abbestellt (LLH-2159). Das
+  Guthaben ist die Anzahl der Prüfung (`letzte_anzahl`).
 
 ## Backend — Schutzköpfe (LFH-797)
 

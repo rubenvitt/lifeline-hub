@@ -5285,8 +5285,7 @@ export interface components {
         JetztPhase: "laedt" | "bau_wartet" | "baut" | "aktuell";
         /**
          * @description Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
-         *     Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
-         *     angenommen werden heute E-Mail, Fax und Matrix (siehe [`KanalArt::is_freigeschaltet`]).
+         *     Tabelle `org_externe_stelle_kanal`; seit LLH-2096 nehmen API und Oberfläche alle vier an.
          * @enum {string}
          */
         KanalArt: "email" | "fax" | "matrix" | "threema";

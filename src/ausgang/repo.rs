@@ -484,6 +484,44 @@ pub async fn save_teile_tx(
     Ok(())
 }
 
+/// Der gemerkte öffentliche Schlüssel einer Threema-ID der Org (Hex), falls es einen gibt
+/// (LLH-2096).
+pub async fn load_threema_schluessel(
+    pool: &SqlitePool,
+    org_id: i64,
+    threema_id: &str,
+) -> Result<Option<String>, AppError> {
+    Ok(sqlx::query_scalar(
+        "SELECT public_key FROM org_threema_schluessel WHERE org_id = ? AND threema_id = ?",
+    )
+    .bind(org_id)
+    .bind(threema_id)
+    .fetch_optional(pool)
+    .await?)
+}
+
+/// Merkt den öffentlichen Schlüssel einer Threema-ID; ein schon gemerkter bleibt, er wird nie
+/// überschrieben (LLH-2096).
+pub async fn save_threema_schluessel_tx(
+    conn: &mut SqliteConnection,
+    org_id: i64,
+    threema_id: &str,
+    public_key: &str,
+    at: DateTime<Utc>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO org_threema_schluessel (org_id, threema_id, public_key, gemerkt_at) \
+         VALUES (?, ?, ?, ?) ON CONFLICT (org_id, threema_id) DO NOTHING",
+    )
+    .bind(org_id)
+    .bind(threema_id)
+    .bind(public_key)
+    .bind(zeit(at))
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 /// Merkt den ETB-Eintrag eines Versands (der letzte gewinnt).
 pub async fn save_etb_eintrag_tx(
     conn: &mut SqliteConnection,

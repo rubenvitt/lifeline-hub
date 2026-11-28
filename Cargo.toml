@@ -73,6 +73,13 @@ tempfile = "3"
 # X25519-Empfänger, der private Schlüssel liegt offline. Reines Rust, ohne Vorgabe-Features
 # (kein SSH, keine Plugins).
 age = { version = "0.12", default-features = false, features = ["armor"] }
+# Ende-zu-Ende-Verschlüsselung für das Threema Gateway (LLH-2096, `adapter::threema::krypto`):
+# NaCl `crypto_box` (X25519, XSalsa20-Poly1305) für Nachrichten, `crypto_secretbox` für Dateiblobs.
+# RustCrypto, MIT/Apache, reines Rust; dieselben Versionen wie das Paket `threema-gateway`.
+crypto_box = { version = "0.9.1", default-features = false, features = ["salsa20", "alloc"] }
+crypto_secretbox = { version = "0.1.1", default-features = false, features = ["salsa20", "alloc"] }
+# Schlüsselmaterial nach Gebrauch nullen (Threema, privater Schlüssel).
+zeroize = "1"
 sha2 = "0.11"
 base64 = "0.23"
 mime_guess = "2"

@@ -4,7 +4,7 @@ import { einsatzKeys } from './queryKeys';
 import type { AusgangFehler, KanalArt, QuelleArt, SendenAnfrage, Versand } from './types';
 
 /**
- * Ausgang per E-Mail (LLH-2093), Fax (LLH-2095) und Matrix (LLH-2094): Versand eines freigegebenen
+ * Ausgang per E-Mail (LLH-2093), Fax (LLH-2095), Matrix (LLH-2094) und Threema (LLH-2096): Versand eines freigegebenen
  * Lageberichts, Befehls oder einer Nachforderung. Die Routen hängen am Dokument, die Liste und das
  * Wiederholen am Einsatz.
  */
@@ -20,12 +20,12 @@ export interface QuelleFilter {
   id: number;
 }
 
-/** Kanäle, die der Ausgang heute bedient (Wire-Enum `KanalArt` kennt mehr). */
-export type AusgangKanal = 'email' | 'fax' | 'matrix';
+/** Kanäle, die der Ausgang bedient. */
+export type AusgangKanal = 'email' | 'fax' | 'matrix' | 'threema';
 
-/** Ein Kanal der Wire-Art: alles außer Fax und Matrix spricht mit dem Wortlaut der E-Mail. */
+/** Ein Kanal der Wire-Art; ohne Angabe spricht der Wortlaut der E-Mail. */
 export function ausgangKanal(kanal: KanalArt | null | undefined): AusgangKanal {
-  return kanal === 'matrix' ? 'matrix' : kanal === 'fax' ? 'fax' : 'email';
+  return kanal ?? 'email';
 }
 
 /**
@@ -76,6 +76,20 @@ export const AUSGANG_FEHLER_TEXT: Record<AusgangKanal, Record<AusgangFehler, str
     kein_zutritt: 'Kein Zutritt zum Raum',
     verschluesselung: 'Verschlüsseln nicht möglich',
   },
+  threema: {
+    voruebergehend: 'Threema vorübergehend nicht erreichbar',
+    abgelehnt: 'Von Threema abgelehnt',
+    ungewiss: 'Zustellung unklar',
+    ueberholt: 'Neuere Fassung freigegeben',
+    anbindung_fehlt: 'Kein Threema-Gateway eingerichtet',
+    anbindung_angehalten: 'Das Threema-Gateway ist angehalten',
+    anbindung_fehler: 'Das Threema-Gateway ist nicht nutzbar; Einstellungen prüfen',
+    zu_gross: 'Anlage zu groß für Threema',
+    spiegel: 'Einsatz wird von einer anderen Instanz geführt',
+    nicht_zugestellt: 'Nicht zugestellt',
+    kein_zutritt: 'Kein Zutritt zum Raum',
+    verschluesselung: 'Verschlüsseln nicht möglich',
+  },
 };
 
 /** Text zu einem Code; ein unbekannter Code (neuerer Server) bleibt sichtbar statt zu verschwinden. */
@@ -95,24 +109,55 @@ export const ANBINDUNG_GRUENDE: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Der Kanal, auf den sich eine 422 mit `anbindung_*` bezieht. Er folgt den gesendeten Adressen:
- * nur ein Kanal → dieser. Nur im gemischten Fall (oder ohne Angabe) entscheidet der Meldungstext
- * des Servers („Kein Matrix-Konto eingerichtet“, „Kein Faxzugang eingerichtet“); ohne Hinweis
- * auf Matrix oder Fax gilt die E-Mail.
+ * Die Kanäle, auf die sich eine 422 mit `anbindung_*` bezieht. Sie folgen den gesendeten
+ * Adressen: nur ein Kanal → dieser. Sonst nennt der Server in einer Ablehnung jeden Kanal ohne
+ * nutzbare Anbindung (`src/routes/ausgang.rs`, `meldung_anbindung`, mit „; “ verbunden, LLH-2096);
+ * ohne Hinweis auf Matrix, Threema oder Fax gilt die E-Mail.
  */
-export function anbindungKanal(fehler: unknown, gesendet?: readonly KanalArt[]): AusgangKanal {
+export function anbindungKanaele(fehler: unknown, gesendet?: readonly KanalArt[]): AusgangKanal[] {
   const arten = new Set((gesendet ?? []).map(ausgangKanal));
-  if (arten.size === 1) return [...arten][0];
-  if (!(fehler instanceof ApiError)) return 'email';
-  if (/Matrix/.test(fehler.message)) return 'matrix';
-  if (/Fax/.test(fehler.message)) return 'fax';
-  return 'email';
+  if (arten.size === 1) return [...arten];
+  if (!(fehler instanceof ApiError)) return ['email'];
+  const genannt: AusgangKanal[] = [];
+  if (/Matrix/.test(fehler.message)) genannt.push('matrix');
+  if (/Threema/.test(fehler.message)) genannt.push('threema');
+  if (/Fax/.test(fehler.message)) genannt.push('fax');
+  if (/Mailserver/.test(fehler.message)) genannt.push('email');
+  return genannt.length > 0 ? genannt : ['email'];
+}
+
+/** Woran der Text des Servers einen Kanal erkennt (`meldung_anbindung`). */
+const KANAL_IN_MELDUNG: Record<AusgangKanal, RegExp> = {
+  matrix: /Matrix/,
+  threema: /Threema/,
+  fax: /Fax/,
+  email: /Mail/,
+};
+
+/**
+ * Der Text je Kanal einer Ablehnung mit `anbindung_*`. Eine gemeinsame Ablehnung trägt nur den
+ * `grund` des ersten Kanals; je Kanal gilt darum das Stück der Meldung des Servers, das ihn nennt,
+ * und nur ohne ein solches der Wortlaut zum `grund`.
+ */
+export function anbindungTexte(
+  fehler: ApiError,
+  gesendet?: readonly KanalArt[],
+): Partial<Record<AusgangKanal, string>> {
+  const stuecke = fehler.message.split('; ');
+  const texte: Partial<Record<AusgangKanal, string>> = {};
+  for (const k of anbindungKanaele(fehler, gesendet)) {
+    texte[k] =
+      (fehler.vomAnwendungsserver || stuecke.length > 1
+        ? stuecke.find((t) => KANAL_IN_MELDUNG[k].test(t))
+        : undefined) ?? AUSGANG_FEHLER_TEXT[k][fehler.grund as AusgangFehler];
+  }
+  return texte;
 }
 
 /**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
  * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist. Der Kanal
- * einer `anbindung_*` folgt den gesendeten Adressen (`anbindungKanal`), sonst gilt die E-Mail.
+ * einer `anbindung_*` folgt den gesendeten Adressen (`anbindungKanaele`), sonst gilt die E-Mail.
  * Bei „zu groß“ bleibt der Text des Servers, denn nur er weiß, ob Mail oder Fax es auslöste
  * (LLH-2095).
  */
@@ -126,8 +171,10 @@ export function versandFehler(fehler: unknown, gesendet?: readonly KanalArt[]): 
     return fehler;
   }
   if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT.email) {
-    const kanal = ANBINDUNG_GRUENDE.has(fehler.grund) ? anbindungKanal(fehler, gesendet) : 'email';
-    return new ApiError(fehler.status, AUSGANG_FEHLER_TEXT[kanal][fehler.grund as AusgangFehler], {
+    const text = ANBINDUNG_GRUENDE.has(fehler.grund)
+      ? Object.values(anbindungTexte(fehler, gesendet)).join('; ')
+      : AUSGANG_FEHLER_TEXT.email[fehler.grund as AusgangFehler];
+    return new ApiError(fehler.status, text, {
       grund: fehler.grund,
       vomAnwendungsserver: fehler.vomAnwendungsserver,
     });

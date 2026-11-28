@@ -149,6 +149,10 @@ const _: () = assert!(
     super::zusteller::MATRIX_ZUSTELL_ZEITLIMIT.as_secs() < HAENGT_NACH.as_secs(),
     "Matrix-Zustellung länger als HAENGT_NACH"
 );
+const _: () = assert!(
+    super::zusteller::THREEMA_ZUSTELL_ZEITLIMIT.as_secs() < HAENGT_NACH.as_secs(),
+    "Threema-Zustellung länger als HAENGT_NACH"
+);
 
 /// Im laufenden Betrieb: ein Versand, dessen Merker seit [`HAENGT_NACH`] steht und den kein
 /// Versuch dieses Laufs mehr hält (der Abschluss scheiterte zweimal, die Zustellung stürzte
@@ -465,6 +469,19 @@ async fn run_one(
             return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
         }
     };
+    // Threema (LLH-2096): der gemerkte Schlüssel des Empfängers; der Zusteller vergleicht.
+    let gemerkt = if zeile.kanal == KanalArt::Threema {
+        match repo::load_threema_schluessel(pool, zeile.org_id, &zeile.adresse).await {
+            Ok(k) => k,
+            Err(e) => {
+                tracing::error!(versand = %zeile.id, "Ausgang: Threema-Schlüssel nicht lesbar: {e}");
+                let (e, text) = vorher_gescheitert(jetzt());
+                return abschliessen(pool, live, &zeile, Some(&marke), e, text, &[]).await;
+            }
+        }
+    } else {
+        None
+    };
     let anhaenge = match load_anhaenge(pool, &zeile).await {
         Ok(a) => a,
         Err(AnhangFehler::ZuGross) => {
@@ -605,6 +622,7 @@ async fn run_one(
             .as_ref()
             .map(|p| (dateiname.as_str(), p.bytes.as_slice())),
         gesendet: &gesendet,
+        threema_schluessel: gemerkt.as_deref(),
     };
 
     // Das Netz, ohne Datenbankverbindung.
@@ -614,6 +632,10 @@ async fn run_one(
     let t = jetzt();
     // Die gesendeten Teile merkt sich der Lauf mit dem Ergebnis, auch bei einem Fehlschlag; bei
     // SMTP sind sie leer.
+    let neuer_schluessel = match &antwort {
+        Ok(z) => z.neuer_schluessel.as_deref(),
+        Err(f) => f.neuer_schluessel.as_deref(),
+    };
     let (ergebnis, text, teile) = match &antwort {
         Ok(z) => (
             Ergebnis::Uebergeben {
@@ -629,7 +651,19 @@ async fn run_one(
             (e, text, &f.teile)
         }
     };
-    abschliessen(pool, live, &zeile, Some(&marke), ergebnis, text, teile).await?;
+    abschliessen_mit(
+        pool,
+        live,
+        &zeile,
+        Abschluss::Versuch {
+            begonnen: Some(&marke),
+            ergebnis,
+            teile,
+            schluessel: neuer_schluessel.map(|k| (zeile.org_id, zeile.adresse.as_str(), k)),
+        },
+        text,
+    )
+    .await?;
     // Braucht die Anbindung einen Eingriff (SMTP: Anmeldung, TLS), soll ihr Lauf es gleich
     // selbst feststellen und melden (ADR-0086); der Versand ändert ihren Zustand nie.
     if let Err(Fehlschlag {
@@ -987,6 +1021,7 @@ async fn abschliessen(
             begonnen,
             ergebnis,
             teile,
+            schluessel: None,
         },
         etb,
     )
@@ -1001,6 +1036,9 @@ enum Abschluss<'a> {
         begonnen: Option<&'a str>,
         ergebnis: Ergebnis,
         teile: &'a [(i64, String)],
+        /// Ein neu abgefragter Threema-Schlüssel `(org_id, threema_id, public_key)` (LLH-2096),
+        /// gemerkt in derselben Transaktion wie Teile und Ergebnis.
+        schluessel: Option<(i64, &'a str, &'a str)>,
     },
     Abfrage(Abfrage),
 }
@@ -1016,10 +1054,21 @@ async fn schreibe_abschluss(
             begonnen,
             ergebnis,
             teile,
+            schluessel,
         } => {
             // Gesendete Teile sind hinaus, auch wenn ein anderer Lauf das Ergebnis schon schrieb:
             // gemerkt werden sie immer, damit kein späterer Versuch sie doppelt sendet.
             repo::save_teile_tx(&mut *conn, id, teile, gesendet_at).await?;
+            if let Some((org_id, threema_id, public_key)) = schluessel {
+                repo::save_threema_schluessel_tx(
+                    &mut *conn,
+                    *org_id,
+                    threema_id,
+                    public_key,
+                    gesendet_at,
+                )
+                .await?;
+            }
             repo::save_ergebnis_tx(conn, id, *begonnen, ergebnis.clone()).await
         }
         Abschluss::Abfrage(abfrage) => repo::save_abfrage_tx(conn, id, *abfrage).await,
