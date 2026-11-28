@@ -644,6 +644,12 @@ export interface components {
         };
         /** @description Ein Zugang, wie die Seite „Anbindungen“ ihn zeigt. Schlüssel nur als Fingerabdruck. */
         AnbindungAnzeige: {
+            /**
+             * @description Der Zugang gilt auch, wenn sich die Instanz für die Org bei einem Hub meldet: ein reiner
+             *     Meldungszugang (genau `meldungen:write`, LLH-2112). Die Seite gibt an einem gekoppelten
+             *     ELW nur für ihn „Neuer Code“ frei.
+             */
+            am_hub_erlaubt: boolean;
             angelegt_at: string;
             einsatz_bezeichnung?: string | null;
             /**
@@ -711,11 +717,17 @@ export interface components {
         AnbindungenListe: {
             /**
              * @description Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):
-             *     Anlegen und neue Codes sind dann gesperrt.
+             *     Anlegen und neue Codes sind dann gesperrt, außer für reine Meldungszugänge
+             *     (`nur_meldungen_hinweis`, `am_hub_erlaubt`).
              */
             gesperrt_grund?: string | null;
             /** @description Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem. */
             instanz_fingerabdruck: string;
+            /**
+             * @description Zusammen mit `gesperrt_grund`: die Ausnahme davon. Ein Zugang, der nur „Meldungen
+             *     einreichen“ trägt, lässt sich hier weiter anlegen und einlösen (LLH-2112).
+             */
+            nur_meldungen_hinweis?: string | null;
             zugaenge: components["schemas"]["AnbindungAnzeige"][];
         };
         /**

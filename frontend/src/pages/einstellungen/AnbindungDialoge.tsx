@@ -1,11 +1,12 @@
-import { Button, Modal } from 'antd';
+import { Button, Checkbox, Modal, Typography } from 'antd';
+import type { ComponentProps } from 'react';
 import KopierbarerText from '../../components/KopierbarerText';
 import { Stapel, monoStil, useRollen } from '../../components/instrument';
 import { SpeicherFehler } from '../../components/SpeicherHinweis';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
-import { scopeText } from '../../api/anbindungen';
-import type { AnbindungAnzeige, AnbindungCode } from '../../api/types';
+import { AM_HUB_SCOPE, SCOPES, SCOPE_TEXT, scopeText } from '../../api/anbindungen';
+import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
 
 /** Rechte eines Zugangs: Klartext und daneben der Wire-Wert für den Abgleich mit dem Fremdsystem. */
 export function RechteText({ scopes }: { scopes: readonly string[] }) {
@@ -20,6 +21,43 @@ export function RechteText({ scopes }: { scopes: readonly string[] }) {
         </span>
       ))}
     </span>
+  );
+}
+
+/**
+ * Auswahl der Rechte für Anlegen und Bearbeiten (Form-Steuerelement: `value`/`onChange` gehen an
+ * die Gruppe). Meldet sich die Instanz bei einem Hub (`amHubGrund`, der Grund vom Server), ist nur
+ * „Meldungen einreichen“ wählbar (LLH-2112); ein Recht, das der Zugang schon hat (`behalten`),
+ * lässt sich dort noch abwählen.
+ */
+export function RechteAuswahl({
+  amHubGrund = null,
+  behalten = [],
+  ...gruppe
+}: {
+  amHubGrund?: string | null;
+  behalten?: readonly Scope[];
+} & ComponentProps<typeof Checkbox.Group<Scope>>) {
+  const { rollen } = useRollen();
+  const gesperrt = (s: Scope) => amHubGrund != null && s !== AM_HUB_SCOPE && !behalten.includes(s);
+  return (
+    <Stapel abstand="xs">
+      <Checkbox.Group<Scope> {...gruppe}>
+        <Stapel abstand="xxs">
+          {SCOPES.map((s) => (
+            <Checkbox key={s} value={s} disabled={gesperrt(s)}>
+              {SCOPE_TEXT[s]}{' '}
+              <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{s}</span>
+            </Checkbox>
+          ))}
+        </Stapel>
+      </Checkbox.Group>
+      {amHubGrund != null && (
+        <Typography.Text type="secondary" data-lfh="anbindung-rechte-am-hub">
+          {`${amHubGrund} Hier ist nur „${SCOPE_TEXT[AM_HUB_SCOPE]}“ wählbar.`}
+        </Typography.Text>
+      )}
+    </Stapel>
   );
 }
 

@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { server } from '../../test/server';
 import { renderMitProviders } from '../../test/utils';
-import { waehleMenueEintrag } from '../../test/menue';
+import { offenesMenue, waehleMenueEintrag } from '../../test/menue';
 import { Route, Routes } from 'react-router';
 import Anbindungen from './Anbindungen';
 import AnbindungAnsicht, { zugangPatch } from './AnbindungAnsicht';
@@ -38,6 +38,7 @@ const zugang = (id: string, extra: Record<string, unknown> = {}) => ({
   zuletzt_genutzt_at: null,
   letzte_ablehnung: null,
   einsatz_freigebbar: false,
+  am_hub_erlaubt: false,
   ...extra,
 });
 
@@ -52,6 +53,10 @@ function einwurfLeer() {
     ),
   );
 }
+
+const HUB = 'Diese Instanz meldet sich für die Organisation bei Hub Kreis.';
+const HINWEIS =
+  'Eine Anbindung, die nur „Meldungen einreichen“ trägt, lässt sich hier weiter anlegen.';
 
 /** Der nächste PATCH mit Basis antwortet 409 (ein anderer hat inzwischen geändert). */
 const konflikt = { offen: false };
@@ -84,6 +89,7 @@ function stelleBereit(zugaenge: unknown[] = [zugang('a')], gesperrt: string | nu
       HttpResponse.json({
         zugaenge: stand,
         gesperrt_grund: gesperrt,
+        nur_meldungen_hinweis: gesperrt ? HINWEIS : null,
         instanz_fingerabdruck: 'ABCD',
       }),
     ),
@@ -297,13 +303,82 @@ describe('Anbindungen (LLH-1652)', () => {
     expect(screen.queryByRole('button', { name: /Aktionen zu/ })).not.toBeInTheDocument();
   });
 
-  it('sperrt am gekoppelten ELW das Anlegen und nennt den Hub', async () => {
-    stelleBereit([], 'Diese Instanz meldet sich für die Organisation bei Hub Kreis.');
+  it('nennt am gekoppelten ELW den Hub und legt nur reine Meldungszugänge an', async () => {
+    const aufrufe = stelleBereit([], HUB);
+    const user = userEvent.setup();
     renderSeiten();
     expect(
       await screen.findByText(/meldet sich für die Organisation bei Hub Kreis/),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Anbindung anlegen/ })).toBeDisabled();
+    expect(screen.getByText(HINWEIS)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Anbindung anlegen/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Anbindung anlegen' });
+    expect(within(dialog).getByRole('checkbox', { name: /Lage lesen/ })).toBeDisabled();
+    expect(within(dialog).getByRole('checkbox', { name: /Rechner nutzen/ })).toBeDisabled();
+    expect(within(dialog).getByText(/bei Hub Kreis/)).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Name' }), 'Gateway');
+    await user.click(within(dialog).getByRole('checkbox', { name: /Meldungen einreichen/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Anlegen und Code zeigen' }));
+    await waitFor(() =>
+      expect(aufrufe).toEqual([
+        {
+          pfad: 'anlegen',
+          body: { name: 'Gateway', scopes: ['meldungen:write'], gueltig_bis: null },
+        },
+      ]),
+    );
+  });
+
+  it('gibt am gekoppelten ELW „Neuer Code“ nur für reine Meldungszugänge frei', async () => {
+    const aufrufe = stelleBereit(
+      [
+        zugang('a', { scopes: ['meldungen:write'], am_hub_erlaubt: true }),
+        zugang('b', { name: 'Monitor', scopes: ['lage:read'] }),
+      ],
+      HUB,
+    );
+    renderSeiten();
+    await screen.findByText('Adapter a');
+    await waehleMenueEintrag(
+      screen.getByRole('button', { name: 'Aktionen zu Anbindung Adapter a' }),
+      /Neuer Code/,
+    );
+    expect(await screen.findByText('ZZZZ-YYYY-XXXX-WWWW')).toBeInTheDocument();
+    expect(aufrufe).toEqual([{ pfad: 'code', body: null }]);
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Fertig' }));
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: 'Aktionen zu Anbindung Monitor' }));
+    const menue = await waitFor(() => {
+      const m = offenesMenue();
+      expect(within(m).getByRole('menuitem', { name: /Widerrufen/ })).toBeInTheDocument();
+      return m;
+    });
+    expect(within(menue).queryByRole('menuitem', { name: /Neuer Code/ })).toBeNull();
+  });
+
+  it('zeigt in der Ansicht eines reinen Meldungszugangs am ELW „Neuer Code“ ohne Sperrhinweis', async () => {
+    stelleBereit([zugang('a', { scopes: ['meldungen:write'], am_hub_erlaubt: true })], HUB);
+    const user = userEvent.setup();
+    renderSeiten('/admin/einstellungen/anbindungen/a');
+    expect(await screen.findByRole('button', { name: 'Neuer Code' })).toBeEnabled();
+    expect(screen.queryByText(/bei Hub Kreis/)).toBeNull();
+    // Beim Bearbeiten bleibt nur „Meldungen einreichen“ wählbar.
+    await user.click(screen.getByRole('button', { name: 'Zugang bearbeiten' }));
+    expect(screen.getByRole('checkbox', { name: /Lage lesen/ })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: /Meldungen einreichen/ })).toBeEnabled();
+  });
+
+  it('sperrt in der Ansicht eines anderen Zugangs am ELW „Neuer Code“ mit Grund', async () => {
+    stelleBereit([zugang('a', { scopes: ['meldungen:write', 'lage:read'] })], HUB);
+    const user = userEvent.setup();
+    renderSeiten('/admin/einstellungen/anbindungen/a');
+    expect(await screen.findByRole('button', { name: 'Neuer Code' })).toBeDisabled();
+    expect(screen.getAllByText(/bei Hub Kreis/).length).toBeGreaterThan(0);
+    // Ein vorhandenes Recht lässt sich abwählen, ein neues nicht wählen.
+    await user.click(screen.getByRole('button', { name: 'Zugang bearbeiten' }));
+    expect(screen.getByRole('checkbox', { name: /Lage lesen/ })).toBeEnabled();
+    expect(screen.getByRole('checkbox', { name: /Rechner nutzen/ })).toBeDisabled();
   });
 });
 

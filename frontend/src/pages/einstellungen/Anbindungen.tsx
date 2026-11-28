@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { App, Button, Checkbox, Form, Input, Spin } from 'antd';
+import { App, Button, Form, Input, Spin, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { Link, useNavigate } from 'react-router';
@@ -20,8 +20,6 @@ import { zeitKurz } from '../../anzeige/zeitDarstellung';
 import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit } from '../../anzeige/zeitEingabe';
 import {
-  SCOPES,
-  SCOPE_TEXT,
   ablehnungText,
   ladeAnbindungen,
   legeAnbindungAn,
@@ -32,7 +30,7 @@ import {
 import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
-import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
+import { CodeDialog, RechteAuswahl, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import EinwurfZugaenge from './EinwurfZugaenge';
 import AdapterPaneel from './AdapterPaneel';
 import {
@@ -130,7 +128,10 @@ export default function Anbindungen() {
           z.zustand === 'widerrufen'
             ? []
             : [
-                ...(gesperrt ? [] : [{ key: 'code', label: 'Neuer Code (Schlüssel wechseln)' }]),
+                // Am gekoppelten ELW nur für einen reinen Meldungszugang (LLH-2112).
+                ...(gesperrt && !z.am_hub_erlaubt
+                  ? []
+                  : [{ key: 'code', label: 'Neuer Code (Schlüssel wechseln)' }]),
                 { key: 'widerrufen', icon: <IconKreuz />, label: 'Widerrufen …', gefahr: true },
               ],
         zugaenglicherName: (z) => `Aktionen zu Anbindung ${z.name}`,
@@ -158,7 +159,7 @@ export default function Anbindungen() {
           <Button
             type="primary"
             icon={<IconPlus />}
-            disabled={liste == null || gesperrt != null}
+            disabled={liste == null}
             onClick={() => {
               anlegen.reset();
               setAnlegenOffen(true);
@@ -180,6 +181,15 @@ export default function Anbindungen() {
       {gesperrt && (
         <div data-lfh="anbindungen-gesperrt" style={{ marginBlockEnd: token.margin }}>
           <RechteHinweis sichtbar marke="Am Hub anbinden" text={gesperrt} />
+          {liste?.nur_meldungen_hinweis && (
+            <Typography.Text
+              type="secondary"
+              data-lfh="anbindungen-nur-meldungen"
+              style={{ display: 'block', marginBlockStart: token.marginXS }}
+            >
+              {liste.nur_meldungen_hinweis}
+            </Typography.Text>
+          )}
         </div>
       )}
       <Paneel titel="Zugänge" meta={listeQ.isSuccess ? zugaenge.length : undefined} koerperPolster>
@@ -336,16 +346,7 @@ export default function Anbindungen() {
           <Input placeholder="Alarm-Adapter Wache 1" maxLength={ANBINDUNG_NAME_MAX} />
         </Feld>
         <Feld label="Rechte" name="scopes" rules={[pflicht('Rechte')]}>
-          <Checkbox.Group>
-            <Stapel abstand="xxs">
-              {SCOPES.map((s) => (
-                <Checkbox key={s} value={s}>
-                  {SCOPE_TEXT[s]}{' '}
-                  <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{s}</span>
-                </Checkbox>
-              ))}
-            </Stapel>
-          </Checkbox.Group>
+          <RechteAuswahl amHubGrund={gesperrt} />
         </Feld>
         <Feld label="Gültig bis" name="gueltig_bis">
           <ZeitpunktEingabe art="frist" placeholder="bis zum Widerruf" style={{ width: '100%' }} />

@@ -61,6 +61,10 @@ pub struct AnbindungAnzeige {
     /// Einsatzbezug, nicht widerrufen, nicht abgelaufen, und die Instanz nimmt für die Org
     /// Fremdsysteme an. Die Seite zeigt dann, welchen Einsatz er liest.
     pub einsatz_freigebbar: bool,
+    /// Der Zugang gilt auch, wenn sich die Instanz für die Org bei einem Hub meldet: ein reiner
+    /// Meldungszugang (genau `meldungen:write`, LLH-2112). Die Seite gibt an einem gekoppelten
+    /// ELW nur für ihn „Neuer Code“ frei.
+    pub am_hub_erlaubt: bool,
     /// Der aktive Einsatz, den der Zugang gerade liest (Freigabe der Einsatzleitung, LLH-1638).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub einsatz_id: Option<i64>,
@@ -102,6 +106,7 @@ impl AnbindungAnzeige {
                 _ => None,
             },
             einsatz_freigebbar: false,
+            am_hub_erlaubt: freigabe::is_am_hub_erlaubt(z),
             einsatz_id: None,
             einsatz_bezeichnung: None,
             webhook: None,
@@ -138,8 +143,12 @@ impl AnbindungAnzeige {
 pub struct AnbindungenListe {
     pub zugaenge: Vec<AnbindungAnzeige>,
     /// Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):
-    /// Anlegen und neue Codes sind dann gesperrt.
+    /// Anlegen und neue Codes sind dann gesperrt, außer für reine Meldungszugänge
+    /// (`nur_meldungen_hinweis`, `am_hub_erlaubt`).
     pub gesperrt_grund: Option<String>,
+    /// Zusammen mit `gesperrt_grund`: die Ausnahme davon. Ein Zugang, der nur „Meldungen
+    /// einreichen“ trägt, lässt sich hier weiter anlegen und einlösen (LLH-2112).
+    pub nur_meldungen_hinweis: Option<String>,
     /// Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem.
     pub instanz_fingerabdruck: String,
 }
@@ -235,6 +244,10 @@ pub struct AnbindungAenderung {
     pub basis_geaendert_at: Option<String>,
 }
 
+/// Die Ausnahme am gekoppelten ELW (LLH-2112), für die Seite.
+const NUR_MELDUNGEN_HINWEIS: &str = "Eine Anbindung, die nur „Meldungen einreichen“ trägt, \
+    lässt sich hier weiter anlegen, etwa für ein Gateway am ELW.";
+
 /// Text für den gekoppelten ELW (design.md D10), `None` wenn Anbindungen hier angenommen werden.
 pub(crate) async fn gesperrt_grund(
     conn: &mut SqliteConnection,
@@ -290,9 +303,13 @@ pub async fn liste(
     for z in zugang::liste(&mut conn, benutzer.org_id).await? {
         zugaenge.push(AnbindungAnzeige::load(&mut conn, &z, &jetzt, benutzer.ist_admin()).await?);
     }
+    let gesperrt_grund = gesperrt_grund(&mut conn, benutzer.org_id).await?;
     Ok(Json(AnbindungenListe {
         zugaenge,
-        gesperrt_grund: gesperrt_grund(&mut conn, benutzer.org_id).await?,
+        nur_meldungen_hinweis: gesperrt_grund
+            .as_ref()
+            .map(|_| NUR_MELDUNGEN_HINWEIS.to_string()),
+        gesperrt_grund,
         instanz_fingerabdruck: i.fingerabdruck(),
     }))
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Checkbox, Input } from 'antd';
+import { Button, Input } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Dayjs } from 'dayjs';
 import { useParams } from 'react-router';
@@ -26,7 +26,6 @@ import { ZeitpunktEingabe } from '../../anzeige/ZeitpunktEingabe';
 import { alsBackendZeit, alsZeitpunkt } from '../../anzeige/zeitEingabe';
 import {
   SCOPES,
-  SCOPE_TEXT,
   ablehnungText,
   aendereAnbindung,
   ladeAnbindungen,
@@ -37,7 +36,7 @@ import {
 import { ANBINDUNG_NAME_MAX } from '../../api/eingabegrenzen';
 import { globalKeys } from '../../api/queryKeys';
 import type { AnbindungAnzeige, AnbindungCode, Scope } from '../../api/types';
-import { CodeDialog, RechteText, WiderrufDialog } from './AnbindungDialoge';
+import { CodeDialog, RechteAuswahl, RechteText, WiderrufDialog } from './AnbindungDialoge';
 import AnbindungWebhook from './AnbindungWebhook';
 import {
   ANBINDUNGEN_ABRUF_MS,
@@ -154,7 +153,9 @@ export default function AnbindungAnsicht() {
   const zustand = zustandAnzeige(zugang);
   const einsatz = einsatzAnzeige(zugang);
   const istWiderrufen = zugang.zustand === 'widerrufen';
-  const gesperrt = liste.gesperrt_grund ?? null;
+  const amHubGrund = liste.gesperrt_grund ?? null;
+  // Am gekoppelten ELW gilt ein reiner Meldungszugang weiter (LLH-2112): für ihn kein Sperrgrund.
+  const gesperrt = zugang.am_hub_erlaubt ? null : amHubGrund;
 
   const speichern = async (patch: AnbindungPatch, basis: string | undefined) => {
     const z = await aendereAnbindung(zugang.id, {
@@ -188,18 +189,7 @@ export default function AnbindungAnsicht() {
       label: 'Rechte',
       breit: true,
       anzeige: <RechteText scopes={zugang.scopes} />,
-      eingabe: (
-        <Checkbox.Group>
-          <Stapel abstand="xxs">
-            {SCOPES.map((s) => (
-              <Checkbox key={s} value={s}>
-                {SCOPE_TEXT[s]}{' '}
-                <span style={{ ...monoStil('monoFein', 500), color: rollen.schwach }}>{s}</span>
-              </Checkbox>
-            ))}
-          </Stapel>
-        </Checkbox.Group>
-      ),
+      eingabe: <RechteAuswahl amHubGrund={amHubGrund} behalten={zugang.scopes} />,
       regeln: [pflicht('Rechte')],
     },
   ];

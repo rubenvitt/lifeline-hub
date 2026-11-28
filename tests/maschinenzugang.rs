@@ -1118,6 +1118,50 @@ async fn am_gekoppelten_elw_aendert_patch_die_scopes_nur_auf_meldungen() {
     assert_eq!(v["name"], "Gateway 2");
 }
 
+/// Review I1: Die Liste sagt der Seite, welche Zugänge am gekoppelten ELW gelten
+/// (`am_hub_erlaubt`), und nennt die Ausnahme für reine Meldungszugänge.
+#[tokio::test]
+async fn die_liste_nennt_am_gekoppelten_elw_die_ausnahme_fuer_meldungszugaenge() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "Gateway", "scopes": ["meldungen:write"] }),
+    )
+    .await;
+    let rein = v["zugang"]["id"].as_str().unwrap().to_string();
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "Monitor", "scopes": ["lage:read"] }),
+    )
+    .await;
+    let lese = v["zugang"]["id"].as_str().unwrap().to_string();
+
+    let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
+    assert!(liste["nur_meldungen_hinweis"].is_null(), "{liste}");
+    assert_eq!(
+        zugang_zeile(&app, &admin, &rein).await["am_hub_erlaubt"],
+        true
+    );
+    assert_eq!(
+        zugang_zeile(&app, &admin, &lese).await["am_hub_erlaubt"],
+        false
+    );
+
+    org_koppeln(&pool, "hub-7", "Hub Kreis", "standard").await;
+    let (_, liste) = anfrage_json(&app, "GET", LISTE, &admin, None).await;
+    assert!(liste["gesperrt_grund"].is_string(), "{liste}");
+    assert!(
+        liste["nur_meldungen_hinweis"]
+            .as_str()
+            .unwrap()
+            .contains("Meldungen einreichen"),
+        "{liste}"
+    );
+}
+
 /// Ein gemischter Zugang, dessen Code erst nach der Kopplung eingelöst wird, bleibt gesperrt.
 #[tokio::test]
 async fn am_gekoppelten_elw_bleibt_der_code_eines_gemischten_zugangs_gesperrt() {

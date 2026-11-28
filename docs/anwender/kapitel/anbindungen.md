@@ -794,7 +794,9 @@ einer Ausnahme: eine Anbindung, die nur „Meldungen einreichen“ trägt, legt 
 nimmt sie an und gibt sie frei, aber nur für einen Einsatz, den es selbst führt; so erreicht ein
 Gateway am ELW den Meldungseingang. Mit einem weiteren Recht bleibt eine Anbindung dort
 abgelehnt, auch eine vor der Kopplung angelegte. Die
-Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt. Bestehende
+Seite nennt dann den Hub; Anbindungen und Einwurf-Zugänge werden dort angelegt. „Anbindung
+anlegen“ bietet am ELW nur das Recht „Meldungen einreichen“ an, die übrigen Rechte sind mit dem
+Grund gesperrt; „Neuer Code“ gibt es dort nur für eine Anbindung, die allein dieses Recht trägt. Bestehende
 Anbindungen bleiben stehen und gelten wieder, sobald die Kopplung mit dem Hub endet; solange nennt
 ihre Zeile keinen Einsatz. Eine Freigabe aus der Zeit davor ruht (siehe
 [Externe Lagemonitore](externe-lagemonitore.md)). Bestehende Einwurf-Zugänge lassen sich weiter

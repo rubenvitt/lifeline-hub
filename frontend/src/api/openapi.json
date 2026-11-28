@@ -1653,9 +1653,14 @@
           "is_abgelaufen",
           "angelegt_at",
           "geaendert_at",
-          "einsatz_freigebbar"
+          "einsatz_freigebbar",
+          "am_hub_erlaubt"
         ],
         "properties": {
+          "am_hub_erlaubt": {
+            "type": "boolean",
+            "description": "Der Zugang gilt auch, wenn sich die Instanz für die Org bei einem Hub meldet: ein reiner\nMeldungszugang (genau `meldungen:write`, LLH-2112). Die Seite gibt an einem gekoppelten\nELW nur für ihn „Neuer Code“ frei."
+          },
           "angelegt_at": {
             "type": "string"
           },
@@ -1851,11 +1856,18 @@
               "string",
               "null"
             ],
-            "description": "Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):\nAnlegen und neue Codes sind dann gesperrt."
+            "description": "Gesetzt, wenn diese Instanz sich für die Org bei einem Hub meldet (design.md D10):\nAnlegen und neue Codes sind dann gesperrt, außer für reine Meldungszugänge\n(`nur_meldungen_hinweis`, `am_hub_erlaubt`)."
           },
           "instanz_fingerabdruck": {
             "type": "string",
             "description": "Fingerabdruck dieser Instanz, zum Abgleich am Fremdsystem."
+          },
+          "nur_meldungen_hinweis": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zusammen mit `gesperrt_grund`: die Ausnahme davon. Ein Zugang, der nur „Meldungen\neinreichen“ trägt, lässt sich hier weiter anlegen und einlösen (LLH-2112)."
           },
           "zugaenge": {
             "type": "array",

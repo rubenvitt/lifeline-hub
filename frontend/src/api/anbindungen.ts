@@ -98,6 +98,13 @@ export const SCOPE_TEXT: Record<Scope, string> = {
 
 export const SCOPES = Object.keys(SCOPE_TEXT) as Scope[];
 
+/**
+ * Das eine Recht, mit dem eine Anbindung auch an einer Instanz gilt, die sich für die Org bei einem
+ * Hub meldet (LLH-2112, Server `scope::is_nur_meldungen`). Ob ein Zugang das erfüllt, sagt der
+ * Server (`am_hub_erlaubt`); die Auswahl braucht den Wert, um nur dieses Recht anzubieten.
+ */
+export const AM_HUB_SCOPE: Scope = 'meldungen:write';
+
 /** Klartext eines Scopes; ein unbekannter (neuerer Server) bleibt als Wire-Wert stehen. */
 export function scopeText(scope: string): string {
   return Object.prototype.hasOwnProperty.call(SCOPE_TEXT, scope)
