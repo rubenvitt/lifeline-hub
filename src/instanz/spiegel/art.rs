@@ -162,6 +162,10 @@ pub const AUSGENOMMEN: &[(&str, &str)] = &[
         "Zustellung ist an die Instanz mit Anbindung und Geheimnis gebunden; der Versand steht über das ETB im Spiegel",
     ),
     (
+        "meldung_vorschlag",
+        "Vorschläge von Fremdsystemen hängen an der Instanz des Zugangs (LLH-2112)",
+    ),
+    (
         "ausgang_teil",
         "Gesendete Teile eines Versands gehören zur Zustellung der Instanz mit Anbindung, wie `ausgang`",
     ),

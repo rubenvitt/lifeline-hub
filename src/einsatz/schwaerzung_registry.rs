@@ -2545,6 +2545,12 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("lage_gesehen_von_id", G_FK),
             // Merker „Sofortalarm ausgelöst“ (LLH-1380), ein Zeitpunkt.
             retain("sofortalarm_at", G_ZEIT),
+            // Herkunft aus einem Vorschlag eines Fremdsystems (LLH-2112): Kennung und Name des
+            // Absenders sind Freitext des Fremdsystems und gehen; Adapter und Siegel bleiben.
+            retain("herkunft_adapter", G_ENUM),
+            scrub("herkunft_kennung", Strategie::NullSetzen, Z_EINSATZ),
+            scrub("herkunft_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("herkunft_signiert", G_KONFIG),
         ],
     },
     TabellenRegel {
@@ -3195,6 +3201,32 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("einsatz_id", G_SCOPE),
             retain("freigegeben_von", G_FK),
             retain("freigegeben_at", G_ZEIT),
+        ],
+    },
+    // ---------- Vorschläge von Fremdsystemen (LLH-2112, migrations/0392_meldung_vorschlag.sql) ----------
+    // Der Text und die Absenderangaben sind Freitext eines Fremdsystems und gehen mit dem
+    // Einsatz; Kennungen, Zeiten und Zustand bleiben Skelett.
+    TabellenRegel {
+        tabelle: "meldung_vorschlag",
+        scoping: Scoping::EinsatzId,
+        zeilenfilter: None,
+        person_bezug: None,
+        spalten: &[
+            retain("id", G_PK),
+            retain("einsatz_id", G_SCOPE),
+            retain("zugang_id", G_FK_MASCHINE),
+            retain("external_id", G_IDEMPOTENZ),
+            scrub("text", Strategie::NullSetzen, Z_EINSATZ),
+            retain("adapter", G_ENUM),
+            scrub("absender_kennung", Strategie::Platzhalter, Z_EINSATZ), // NOT NULL
+            scrub("absender_name", Strategie::NullSetzen, Z_EINSATZ),
+            retain("signiert", G_KONFIG),
+            retain("gesendet_at", G_ZEIT),
+            retain("empfangen_at", G_ZEIT),
+            retain("status", G_ENUM),
+            retain("erledigt_at", G_ZEIT),
+            retain("erledigt_von_id", G_FK),
+            retain("meldung_id", G_FK),
         ],
     },
     // ---------- Zuschaltung einer Drohnenquelle (LLH-2105, migrations/0373_adapter_einsatz.sql) ----------

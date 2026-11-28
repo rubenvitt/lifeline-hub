@@ -365,6 +365,12 @@ async fn tick_rumpf(
         tracing::error!("Purge Einwurf-Ablage fehlgeschlagen: {e}");
     }
 
+    // Vorschläge von Fremdsystemen (LLH-2112): sieben Tage nach Erledigung, offene sieben Tage
+    // nach Empfang.
+    if let Err(e) = crate::meldung::vorschlag::purge(pool, &crate::zeit::jetzt()).await {
+        tracing::error!("Purge Meldungsvorschläge fehlgeschlagen: {e}");
+    }
+
     // Abgerufene Veranstaltungen (LLH-2097): 14 Tage nach ihrem Ende.
     match crate::veranstaltung_extern::repo::purge(pool, &jetzt_s).await {
         Ok(0) => {}
