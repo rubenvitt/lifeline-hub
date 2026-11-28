@@ -259,6 +259,7 @@ function FachebenenZeile({ quelle, props }: { quelle: FachebeneQuelle; props: Si
           einsatzId={props.einsatzId}
           darfSchalten={props.drohne.darfSchalten}
           onLivebild={props.drohne.onLivebild}
+          onZugeschaltet={props.drohne.onZugeschaltet}
         />
       )}
     </div>

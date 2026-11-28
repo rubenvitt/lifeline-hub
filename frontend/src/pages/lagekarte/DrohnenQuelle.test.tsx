@@ -71,6 +71,44 @@ describe('DrohnenQuelle (LLH-2106)', () => {
     await waitFor(() => expect(api.loadDrohnenQuellen.mock.calls.length).toBeGreaterThan(1));
   });
 
+  // LLH-2138: die Lage erscheint direkt nach dem Zuschalten, ohne eigenen Tipp auf die Ebene.
+  it('meldet ein erfolgreiches Zuschalten, damit die Seite die Ebene einblendet', async () => {
+    api.schalteDrohnenQuelleZu.mockResolvedValue(quelle({ connected: true }));
+    const onZugeschaltet = vi.fn();
+    renderMitProviders(
+      <DrohnenQuelle einsatzId={7} darfSchalten onZugeschaltet={onZugeschaltet} />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Suchlage zuschalten' }));
+    await waitFor(() => expect(onZugeschaltet).toHaveBeenCalledTimes(1));
+  });
+
+  it('meldet kein Zuschalten, wenn der Server ablehnt', async () => {
+    api.schalteDrohnenQuelleZu.mockRejectedValue(new ApiError(409, 'Konflikt'));
+    const onZugeschaltet = vi.fn();
+    renderMitProviders(
+      <DrohnenQuelle einsatzId={7} darfSchalten onZugeschaltet={onZugeschaltet} />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Suchlage zuschalten' }));
+    expect(
+      await screen.findByText('Bereits an einem anderen Einsatz zugeschaltet.'),
+    ).toBeInTheDocument();
+    expect(onZugeschaltet).not.toHaveBeenCalled();
+  });
+
+  it('meldet kein Zuschalten, wenn nur der Lagemonitor-Schalter umgelegt wird', async () => {
+    api.loadDrohnenQuellen.mockResolvedValue([quelle({ connected: true })]);
+    api.schalteDrohnenQuelleZu.mockResolvedValue(quelle({ connected: true, lagemonitor: true }));
+    const onZugeschaltet = vi.fn();
+    renderMitProviders(
+      <DrohnenQuelle einsatzId={7} darfSchalten onZugeschaltet={onZugeschaltet} />,
+    );
+    fireEvent.click(await screen.findByRole('switch'));
+    await waitFor(() =>
+      expect(api.schalteDrohnenQuelleZu).toHaveBeenCalledWith(7, 'suchlage-1', true),
+    );
+    expect(onZugeschaltet).not.toHaveBeenCalled();
+  });
+
   it('zeigt den Missionsnamen und „Abschalten“, sobald zugeschaltet', async () => {
     api.loadDrohnenQuellen.mockResolvedValue([
       quelle({ connected: true, mission_name: 'Waldsuche Ost' }),

@@ -249,10 +249,11 @@ Für die Einsatzleitung in einem laufenden Einsatz. Voraussetzung ist eine Anbin
    ![Gruppe „Drohne“ mit der Quelle „Drohnengruppe Suchlage“, „Nicht zugeschaltet“ und dem Knopf „Suchlage zuschalten“](../bilder/lagekarte/drohne-zuschalten.png)
 
 2. „Suchlage zuschalten“ wählen. Die Zeile zeigt danach „Zugeschaltet · Mission …“ mit dem Namen
-   des laufenden Einsatzes in Suchlage.
-3. Die Ebene „Drohnenlage (Suchlage)“ antippen, um sie einzublenden; sie steht zunächst aus. Auf
-   der Karte erscheinen Fluggerät mit Blickrichtung, Flugspur, Suchgebiete und Fotos der Drohne.
-4. Zum Abschalten in derselben Zeile „Abschalten“ wählen. Die Zeile steht wieder auf „Nicht
+   des laufenden Einsatzes in Suchlage, und die Ebene „Drohnenlage (Suchlage)“ ist eingeblendet:
+   Auf der Karte erscheinen Fluggerät mit Blickrichtung, Flugspur, Suchgebiete und Fotos der
+   Drohne. An anderen Arbeitsplätzen steht die Quelle ebenfalls auf „Zugeschaltet“; dort blendet
+   man die Ebene mit einem Tipp auf „Drohnenlage (Suchlage)“ selbst ein.
+3. Zum Abschalten in derselben Zeile „Abschalten“ wählen. Die Zeile steht wieder auf „Nicht
    zugeschaltet“, und die Drohnenlage verschwindet von der Karte.
 
 ### Das Livebild der Drohne ansehen

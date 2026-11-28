@@ -305,7 +305,12 @@ export interface SidebarProps {
     'liste' | 'deckkraft' | 'onDeckkraft'
   >;
   /** Drohnenlage (LLH-2106): die Quellenzeile unter der Ebene; schalten darf nur die Einsatzleitung. */
-  drohne?: { darfSchalten: boolean; onLivebild?: (adapterId: string) => void };
+  drohne?: {
+    darfSchalten: boolean;
+    onLivebild?: (adapterId: string) => void;
+    /** Nach erfolgreichem Zuschalten die Ebene einblenden (LLH-2138). */
+    onZugeschaltet?: () => void;
+  };
   /** Je bbox-abhängiger Ebene: aktiv, aber zu weit herausgezoomt für eine Abfrage. */
   zoomZuKlein?: Partial<Record<import('../../api/fachebenen').FachebeneQuelle, boolean>>;
   /** Lade-Zustand je Fachebene (z. B. KRITIS/Overpass lädt länger → Spinner). */

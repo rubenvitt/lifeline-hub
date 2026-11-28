@@ -2202,7 +2202,13 @@ export default function LagekartePage() {
         // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
         drohne={
           snapshotParam == null
-            ? { darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }
+            ? {
+                darfSchalten: darfDrohneSchalten,
+                onLivebild: setLivebildQuelle,
+                // Die Lage erscheint direkt nach dem Zuschalten, nur an diesem Arbeitsplatz und
+                // wie ein Tipp auf die Ebene: die Ansicht gilt als geändert (LLH-2138).
+                onZugeschaltet: () => onFachebeneToggle('drohne', true),
+              }
             : undefined
         }
         fachebenenLaedt={fachebenenLaedt}
