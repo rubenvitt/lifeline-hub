@@ -691,7 +691,7 @@ export interface components {
             freigegeben: boolean;
             name: string;
             /**
-             * @description Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:
+             * @description Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an (anders als einen reinen Meldungszugang):
              *     die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
              */
             ruht: boolean;

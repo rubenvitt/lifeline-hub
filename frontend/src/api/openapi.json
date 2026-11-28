@@ -1808,7 +1808,7 @@
           },
           "ruht": {
             "type": "boolean",
-            "description": "Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an:\ndie Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden."
+            "description": "Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an (anders als einen reinen Meldungszugang):\ndie Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden."
           },
           "scopes": {
             "type": "array",
