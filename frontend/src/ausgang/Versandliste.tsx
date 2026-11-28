@@ -16,7 +16,7 @@ import { adresseAnzeige, kanalKurz } from './kanalAnzeige';
 /**
  * Zustandstext eines Versands (Spec 7): „wartet“, „übergeben 14:32“, beim Fax „übergeben 14:32,
  * Zustellung wird geprüft“ und „zugestellt 14:34“ (LLH-2095), „fehlgeschlagen: …“. Eine Mail
- * ohne PDF sagt es dazu.
+ * ohne PDF sagt es dazu; eine Teilzustellung (LLH-2146) „teilweise zugestellt (Text ja, n Anlagen nein): …“.
  */
 export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) => string): string {
   const fax = v.channel === 'fax';
@@ -31,6 +31,12 @@ export function versandZustandText(v: Versand, uhrzeit: (utc?: string | null) =>
   const kanal = ausgangKanal(v.channel);
   if (v.error === 'ungewiss') return ausgangFehlerText('ungewiss', kanal) as string;
   const grund = ausgangFehlerText(v.error, kanal);
+  // Teilzustellung (Matrix, LLH-2146): der Text ging hinaus, n Anlagen nicht.
+  const offen = v.attachments_missing;
+  if (offen) {
+    const teil = `teilweise zugestellt (Text ja, ${offen} ${offen === 1 ? 'Anlage' : 'Anlagen'} nein)`;
+    return grund ? `${teil}: ${grund}` : teil;
+  }
   return grund ? `fehlgeschlagen: ${grund}` : 'fehlgeschlagen';
 }
 

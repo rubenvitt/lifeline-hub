@@ -53,6 +53,37 @@ describe('Versandliste (LLH-2093)', () => {
     expect(screen.getAllByRole('button', { name: 'Erneut senden' })).toHaveLength(2);
   });
 
+  it('zeigt eine Teilzustellung mit der Zahl der fehlenden Anlagen (LLH-2146)', async () => {
+    liste([
+      versand({
+        id: 'a',
+        channel: 'matrix',
+        state: 'fehlgeschlagen',
+        error: 'abgelehnt',
+        attachments_missing: 2,
+      }),
+      versand({
+        id: 'b',
+        channel: 'matrix',
+        state: 'fehlgeschlagen',
+        error: 'abgelehnt',
+        attachments_missing: 1,
+      }),
+      versand({ id: 'c', channel: 'matrix', state: 'fehlgeschlagen', error: 'abgelehnt' }),
+    ]);
+    renderMitProviders(<Versandliste einsatzId={1} quelle={quelle} />);
+
+    const grund = ausgangFehlerText('abgelehnt', 'matrix');
+    expect(
+      await screen.findByText(`teilweise zugestellt (Text ja, 2 Anlagen nein): ${grund}`),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`teilweise zugestellt (Text ja, 1 Anlage nein): ${grund}`),
+    ).toBeInTheDocument();
+    expect(screen.getByText(`fehlgeschlagen: ${grund}`)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Erneut senden' })).toHaveLength(3);
+  });
+
   it('schickt „Erneut senden“ als POST an /retry', async () => {
     liste([versand({ id: 'c', state: 'fehlgeschlagen', error: 'abgelehnt' })]);
     let pfad = '';
