@@ -154,6 +154,13 @@ describe('istLagebildOfflineKey', () => {
     expect(ERWARTET_EINSATZ.has('einsatz-antraege')).toBe(false);
   });
 
+  // Ausdrücklich draußen (LLH-2112): Vorschläge sind unverifiziert und laufen nach 12 h ab; ohne
+  // Netz ließe sich keiner übernehmen oder verwerfen.
+  it('nimmt die Vorschläge des Maschinen-Eingangs nicht offline (LLH-2112)', () => {
+    expect(istLagebildOfflineKey(einsatzKeys.meldungVorschlaege(7))).toBe(false);
+    expect(ERWARTET_EINSATZ.has('einsatz-meldung-vorschlaege')).toBe(false);
+  });
+
   it('nimmt die Lagebesprechung nicht offline (LLH-1111)', () => {
     expect(istLagebildOfflineKey(einsatzKeys.lagebesprechung(7))).toBe(false);
     expect(istLagebildOfflineKey(einsatzKeys.lagebesprechungen(7))).toBe(false);

@@ -9,6 +9,7 @@ import type {
   MeldungStatus,
   NeueMeldung,
   NeuerAuftrag,
+  ReportSuggestion,
   Rueckmeldungen,
 } from './types';
 
@@ -95,6 +96,34 @@ export function legeMeldungAn(
   optionen?: ApiSendOptionen,
 ): Promise<Meldung> {
   return apiSend<Meldung>(`/api/incidents/${einsatzId}/reports`, 'POST', daten, optionen);
+}
+
+/** Offene Vorschläge maschineller Zugänge, älteste zuerst (LLH-2112). Geräte bekommen 403. */
+export function listeMeldungVorschlaege(einsatzId: number): Promise<ReportSuggestion[]> {
+  return apiGet<ReportSuggestion[]>(`/api/incidents/${einsatzId}/report-suggestions`);
+}
+
+/** Einen Vorschlag als Meldung übernehmen (LLH-2112): Körper wie beim Erfassen; 409, wenn er nicht
+ *  mehr offen oder abgelaufen ist. */
+export function uebernehmeMeldungVorschlag(
+  einsatzId: number,
+  vorschlagId: number,
+  daten: NeueMeldung,
+): Promise<Meldung> {
+  return apiSend<Meldung>(
+    `/api/incidents/${einsatzId}/report-suggestions/${vorschlagId}/accept`,
+    'POST',
+    daten,
+  );
+}
+
+/** Einen Vorschlag verwerfen (LLH-2112); 409, wenn er nicht mehr offen ist. Kein Rückweg. */
+export function verwirfMeldungVorschlag(einsatzId: number, vorschlagId: number): Promise<void> {
+  return apiSend<void>(
+    `/api/incidents/${einsatzId}/report-suggestions/${vorschlagId}/discard`,
+    'POST',
+    {},
+  );
 }
 
 /** Triage-Status setzen (sichten/in Bearbeitung/erledigt) (LFH-94). */

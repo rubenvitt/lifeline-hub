@@ -92,6 +92,8 @@ vi.mock('../api/meldungen', async () => {
     markiereLagerelevant: (...a: unknown[]) => markiereLagerelevant(...a),
     bestaetigeMeldung: (...a: unknown[]) => bestaetigeMeldung(...a),
     erteileAuftragAusMeldung: (...a: unknown[]) => erteileAuftragAusMeldung(...a),
+    // Vorschläge des Maschinen-Eingangs (LLH-2112): eigene Aussagen in `MeldungVorschlaege.test`.
+    listeMeldungVorschlaege: async () => [],
   };
 });
 // Auftrags-Ziele: MeldungenPage lädt sie für das Meldung→Auftrag-Formular.

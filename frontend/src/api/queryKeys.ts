@@ -65,6 +65,9 @@ export const EINSATZ_KEYS = {
   // Lagebild offline (Kennungen fremder Geräte gehören nicht auf die Platte).
   ortungKandidaten: 'einsatz-ortung-kandidaten',
   meldungen: 'einsatz-meldungen',
+  // Vorschläge des Maschinen-Eingangs (LLH-2112): eigener Prefix, live über `meldung`, nicht im
+  // Lagebild offline (unverifiziert, nach 12 h abgelaufen, ohne Netz nicht zu behandeln).
+  meldungVorschlaege: 'einsatz-meldung-vorschlaege',
   lagemeldungen: 'einsatz-lagemeldungen',
   br: 'einsatz-br',
   brDetail: 'einsatz-br-detail',
@@ -387,7 +390,12 @@ export const EINSATZ_STREAM_EVENTS = {
   // Der Modulzähler zählt die offenen Nachforderungen je Stufe (LLH-1078).
   // Erwartete Kräfte eines Raums lesen Status, Zusage und Verweise (LLH-1387).
   nachforderung: [EINSATZ_KEYS.nachforderungen, EINSATZ_KEYS.brErwartet, EINSATZ_KEYS.modulZaehler],
-  meldung: [EINSATZ_KEYS.meldungen, EINSATZ_KEYS.lagemeldungen, EINSATZ_KEYS.modulZaehler],
+  meldung: [
+    EINSATZ_KEYS.meldungen,
+    EINSATZ_KEYS.lagemeldungen,
+    EINSATZ_KEYS.modulZaehler,
+    EINSATZ_KEYS.meldungVorschlaege,
+  ],
   // Liste + Detail + Verlauf (Prefix-Match: ['einsatz-br-detail', einsatzId] trifft alle brIds).
   bereitstellungsraum: [
     EINSATZ_KEYS.br,
@@ -1078,6 +1086,8 @@ export const einsatzKeys = {
    *  Meldungs-Invalidierung trifft sie mit. */
   meldungenRueckmeldungen: (einsatzId: number) =>
     [EINSATZ_KEYS.meldungen, einsatzId, RUECKMELDUNGEN_SUBKEY] as const,
+  /** Offene Vorschläge des Maschinen-Eingangs (LLH-2112). */
+  meldungVorschlaege: (einsatzId: number) => [EINSATZ_KEYS.meldungVorschlaege, einsatzId] as const,
   lagemeldungen: (einsatzId: number) => [EINSATZ_KEYS.lagemeldungen, einsatzId] as const,
   /** Vollliste ohne Phase: Überblick, Sprungpalette, Chat, Übernahme. */
   auftraege: (einsatzId: number) => [EINSATZ_KEYS.auftraege, einsatzId] as const,

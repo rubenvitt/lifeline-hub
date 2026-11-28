@@ -17,7 +17,15 @@ import {
 } from '../kommunikation';
 import { useAnzeigeKonventionen } from '../anzeige/AnzeigeKonventionenContext';
 import KommKarte from '../kommunikation/KommKarte';
-import { FELD_KLASSE, Status, Textstufe, schriftStil, useRollen } from '../components/instrument';
+import {
+  FELD_KLASSE,
+  Marke,
+  Status,
+  Textstufe,
+  schriftStil,
+  useRollen,
+} from '../components/instrument';
+import { herkunftKurz, herkunftText } from './maschinenHerkunft';
 import ZeitAnzeige from '../anzeige/ZeitAnzeige';
 import { MELDUNGSART_LABEL, istAlarmiert } from './meldungKennzahlen';
 import { useGeraetDarf } from '../geraet/geraetSicht';
@@ -367,6 +375,12 @@ function MeldungKarte({
           />
           {m.richtung === 'extern' && <Status groesse="klein" ton="neutral" wort="Extern" />}
           {m.lagerelevant && <Status groesse="klein" ton="bedien" wort="In der Lage ✓" />}
+          {/* Aus einem Vorschlag des Maschinen-Eingangs übernommen (LLH-2112): Herkunft, kein Zustand. */}
+          {m.maschinen_herkunft && (
+            <Marke data-lfh="meldung-maschinen-herkunft" title={herkunftText(m.maschinen_herkunft)}>
+              {`unverifiziert übernommen · ${herkunftKurz(m.maschinen_herkunft)}`}
+            </Marke>
+          )}
           {m.auftrag_id != null &&
             darf('fremde-module') &&
             (m.is_auftrag_aufgehoben ? (

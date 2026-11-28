@@ -1838,6 +1838,10 @@ export type MeldungStatus = S['MeldungStatus'];
 export type Meldungsart = S['Meldungsart'];
 export type MeldungMeldeweg = S['MeldeWeg'];
 export type Meldung = S['MeldungAnzeige'];
+/** Vorschlag eines maschinellen Zugangs im Meldungseingang, unverifiziert (LLH-2112). */
+export type ReportSuggestion = S['ReportSuggestion'];
+/** Herkunft einer aus einem Vorschlag übernommenen Meldung (LLH-2112). */
+export type MaschinenHerkunft = S['MaschinenHerkunft'];
 /** Zahlen der Meldungsseite aus einem eigenen Abruf (LFH-940): „Alarmiert“ quer zur Phase. */
 export type MeldungKennzahlen = S['MeldungKennzahlen'];
 

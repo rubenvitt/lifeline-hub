@@ -69,6 +69,27 @@ describe('Modul-Zähler', () => {
   });
 
   // LLH-1206: die neuen, für alle gleich; der Bestand steht im Seitenkopf, nicht im Menü.
+  // Offene Vorschläge des Maschinen-Eingangs (LLH-2112) warten wie offene Meldungen auf jemanden.
+  it('zählt offene Vorschläge zu den offenen Meldungen', () => {
+    expect(
+      bildeZaehler({
+        meldungen: {
+          offen: 2,
+          ungesehen: 1,
+          bestaetigung_ueberfaellig: 0,
+          sofort_offen: 0,
+          dringend_offen: 0,
+          vorschlaege_offen: 3,
+        },
+      }),
+    ).toEqual({
+      meldungen: {
+        wert: 5,
+        beschreibung: '2 offene Meldungen, davon 1 ungesehen, und 3 offene Vorschläge',
+      },
+    });
+  });
+
   it('bildet die neuen Lagemeldungen ab', () => {
     expect(bildeZaehler({ lagemeldungen: { neu: 2 } })).toEqual({
       lagemeldungen: { wert: 2, beschreibung: '2 neue Lagemeldungen' },

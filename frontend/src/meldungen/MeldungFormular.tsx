@@ -13,7 +13,7 @@ import { Select } from '../components/Select';
 import KoordinatenFeld from '../anzeige/KoordinatenFeld';
 import { alsLatLon, type KoordinatenWert } from '../anzeige/koordinatenWert';
 import { ErfassungsFormular, ErfassungsModal, type Speicherung } from '../components/Erfassung';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type dayjs from 'dayjs';
 import { serverJetzt } from '../offline/serveruhr';
 import {
@@ -39,7 +39,7 @@ const { TextArea } = Input;
 
 const KEINE_QUELLEN: readonly Vorschlagsquelle[] = [];
 
-interface MeldungFormWerte {
+export interface MeldungFormWerte {
   /** Strukturierter Absender: `einheit:<id>` bzw. `abschnitt:<id>`, leer = frei. */
   von?: string;
   absender: string;
@@ -168,6 +168,8 @@ export default function MeldungFormular({
   dialog,
   ohneLagemeldungsart = false,
   eigeneStelle = null,
+  vorbelegung,
+  hinweis,
 }: {
   senden: boolean;
   /**
@@ -220,11 +222,24 @@ export default function MeldungFormular({
    * geht von ihr aus, also Absender. `null`: keine Vorgabe.
    */
   eigeneStelle?: StandardRufname | null;
+  /**
+   * Startwerte über `DEFAULTS` (LLH-2112: Vorschlag aus dem Maschinen-Eingang übernehmen). Sie
+   * gelten wie `artVorgabe` für Start UND Reset-Ziel; `DEFAULTS` selbst bleiben unberührt. Die
+   * Hülle liest Startwerte beim Einhängen: wer die Vorbelegung wechselt, hängt das Formular neu
+   * ein (`key`).
+   */
+  vorbelegung?: Partial<MeldungFormWerte>;
+  /** Hinweis über den Feldern, etwa die Herkunft eines unverifizierten Vorschlags (LLH-2112). */
+  hinweis?: ReactNode;
 }) {
   const { token } = theme.useToken();
   const vorgaben = useMemo<MeldungFormWerte>(
-    () => (artVorgabe ? { ...DEFAULTS, meldungsart: artVorgabe } : DEFAULTS),
-    [artVorgabe],
+    () => ({
+      ...DEFAULTS,
+      ...(artVorgabe ? { meldungsart: artVorgabe } : {}),
+      ...vorbelegung,
+    }),
+    [artVorgabe, vorbelegung],
   );
   const [form] = Form.useForm<MeldungFormWerte>();
   const meldungsart = Form.useWatch('meldungsart', form);
@@ -411,6 +426,7 @@ export default function MeldungFormular({
 
   const felder = (
     <>
+      {hinweis != null && <div style={{ marginBottom: token.marginLG }}>{hinweis}</div>}
       {/* Fast-Path im Formularkörper statt Card-extra, damit er auch bei `card={false}` erhalten bleibt. */}
       {!artVorgabe && (
         <Space style={{ marginBottom: token.marginLG }} wrap>

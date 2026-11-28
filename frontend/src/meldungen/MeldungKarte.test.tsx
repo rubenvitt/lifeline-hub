@@ -164,6 +164,33 @@ describe('MeldungKarte — aufgehobener Auftrag (LLH-1177)', () => {
   });
 });
 
+// LLH-2112: Eine aus einem Maschinen-Vorschlag übernommene Meldung trägt ihre Herkunft im Kopf.
+describe('MeldungKarte — Herkunft aus dem Maschinen-Eingang (LLH-2112)', () => {
+  it('zeigt „unverifiziert übernommen“ mit der Herkunft', () => {
+    renderKarte(
+      <MeldungKarte
+        meldung={meldung({
+          maschinen_herkunft: {
+            adapter: 'meshtastic',
+            kennung: '!a1b2c3d4',
+            name: 'Nord-1',
+            signiert: false,
+          },
+        })}
+        einsatzId={7}
+      />,
+    );
+    expect(
+      screen.getByText('unverifiziert übernommen · Mesh · Nord-1 · nicht signiert'),
+    ).toBeInTheDocument();
+  });
+
+  it('zeigt ohne Herkunft kein Merkmal', () => {
+    renderKarte(<MeldungKarte meldung={meldung()} einsatzId={7} />);
+    expect(screen.queryByText(/unverifiziert übernommen/)).toBeNull();
+  });
+});
+
 // LLH-1382: Der Wortlaut bleibt, eine ETB-Berichtigung seines Eintrags steht als Marke daneben.
 describe('MeldungKarte — berichtigter ETB-Eintrag (LLH-1382)', () => {
   it('zeigt die Marke „berichtigt“ mit Sprung zur Berichtigung und behält den Wortlaut', () => {

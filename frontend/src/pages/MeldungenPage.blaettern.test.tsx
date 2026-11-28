@@ -56,6 +56,8 @@ vi.mock('../api/meldungen', async (importOriginal) => {
     listeAbgeschlosseneMeldungen: (...a: unknown[]) => listeAbgeschlosseneMeldungen(...a),
     ladeMeldungKennzahlen: (...a: unknown[]) => ladeMeldungKennzahlen(...a),
     ladeMeldung: (...a: unknown[]) => ladeMeldung(...a),
+    // Vorschläge des Maschinen-Eingangs (LLH-2112): hier keine.
+    listeMeldungVorschlaege: async () => [],
   };
 });
 

@@ -59,6 +59,7 @@ import { MELDUNG_STATUS, istAbgeschlossen, prioRang } from '../kommunikation';
 import { zeigeRueckgaengig } from '../kommunikation/rueckgaengig';
 import MeldungListe from '../meldungen/MeldungListe';
 import MeldungFormular from '../meldungen/MeldungFormular';
+import MeldungVorschlaege from '../meldungen/MeldungVorschlaege';
 import { useStandardRufname } from '../etb/useStandardRufname';
 import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { meldungsFunktionsOptionen } from '../fuehrung/funktionsOptionenKern';
@@ -1008,6 +1009,20 @@ export default function MeldungenPage() {
         </Paneel>
       )}
 
+      {/* Vorschläge des Maschinen-Eingangs (LLH-2112): über der Liste in jeder Breite, nur solange
+          offene da sind. Geräte lesen sie nicht (403); übernehmen und verwerfen darf, wer
+          Meldungen bearbeitet (`darfSchreiben`), Mitarbeit sieht sie nur. */}
+      {benutzer?.geraet == null && (
+        <MeldungVorschlaege
+          einsatzId={einsatzId}
+          darfSchreiben={darfSchreiben}
+          einheiten={einheitenQuery.data}
+          abschnitte={abschnitteQuery.data}
+          funktionsVorschlaege={funktionsVorschlaege}
+          vorschlagsquellen={vorschlagsquellen}
+          eigeneStelle={eigeneStelle}
+        />
+      )}
       <DeeplinkHinweis lage={deeplinkHinweis} sache="Meldung" />
       <div
         style={{

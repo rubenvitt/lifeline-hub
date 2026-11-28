@@ -58,9 +58,15 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
     wert: gesamt,
     beschreibung: anzahl(gesamt, 'Einsatzabschnitt', 'Einsatzabschnitte'),
   }),
-  meldungen: ({ offen, ungesehen }) => ({
-    wert: offen,
-    beschreibung: `${anzahl(offen, 'offene Meldung', 'offene Meldungen')}, davon ${anzahl(ungesehen, 'ungesehen', 'ungesehen')}`,
+  // Offene Vorschläge des Maschinen-Eingangs (LLH-2112) warten wie offene Meldungen; der Zähler im
+  // Menü nennt beide, die Zahl `offen` selbst bleibt die der Meldungen (Überblick, Vorbereitung).
+  meldungen: ({ offen, ungesehen, vorschlaege_offen }) => ({
+    wert: offen + vorschlaege_offen,
+    beschreibung:
+      `${anzahl(offen, 'offene Meldung', 'offene Meldungen')}, davon ${anzahl(ungesehen, 'ungesehen', 'ungesehen')}` +
+      (vorschlaege_offen > 0
+        ? `, und ${anzahl(vorschlaege_offen, 'offener Vorschlag', 'offene Vorschläge')}`
+        : ''),
   }),
   auftraege: ({ offen, ueberfaellig }) => ({
     wert: offen,

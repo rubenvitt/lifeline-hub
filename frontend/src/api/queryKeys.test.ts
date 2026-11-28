@@ -218,10 +218,12 @@ describe('EINSATZ_STREAM_EVENTS (LFH-122)', () => {
       EINSATZ_KEYS.gefahrengebiete,
       EINSATZ_KEYS.lagemonitor,
     ]);
+    // Vorschläge aus dem Maschinen-Eingang (LLH-2112) gleicht dasselbe Ereignis ab.
     expect(EINSATZ_STREAM_EVENTS.meldung).toEqual([
       EINSATZ_KEYS.meldungen,
       EINSATZ_KEYS.lagemeldungen,
       EINSATZ_KEYS.modulZaehler,
+      EINSATZ_KEYS.meldungVorschlaege,
     ]);
     expect(EINSATZ_STREAM_EVENTS.bereitstellungsraum).toEqual([
       EINSATZ_KEYS.br,
