@@ -8,6 +8,7 @@ import {
   ANBINDUNG_GRUENDE,
   AUSGANG_FEHLER_TEXT,
   anbindungKanaele,
+  anbindungTexte,
   useSendeVersaende,
   versandFehler,
   type AusgangKanal,
@@ -138,12 +139,13 @@ export default function SendenDialog({
    */
   const merkeSperren = (e: unknown, arten: readonly KanalArt[]) => {
     if (!(e instanceof ApiError) || !e.grund || !ANBINDUNG_GRUENDE.has(e.grund)) return;
+    const texte = anbindungTexte(e, arten);
     const neu = anbindungKanaele(e, arten).filter(
       (k): k is 'matrix' | 'threema' => k === 'matrix' || k === 'threema',
     );
     if (neu.length === 0) return;
     const alle = { ...sperren };
-    for (const k of neu) alle[k] = AUSGANG_FEHLER_TEXT[k][e.grund as AusgangFehler];
+    for (const k of neu) alle[k] = texte[k] ?? AUSGANG_FEHLER_TEXT[k][e.grund as AusgangFehler];
     setSperren(alle);
     const gesperrt = (k: KanalMitStelle) => k.channel.channel in alle;
     const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);

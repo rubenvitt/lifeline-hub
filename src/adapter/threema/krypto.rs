@@ -207,7 +207,7 @@ pub fn hex_encode(bytes: &[u8]) -> String {
 
 /// Hex in beliebiger Schreibung; `None` bei ungerader Länge oder fremden Zeichen.
 pub fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 || !s.is_ascii() {
+    if s.len() % 2 != 0 || !s.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
     (0..s.len())
@@ -329,6 +329,13 @@ mod tests {
                 "{roh:?}"
             );
         }
+    }
+
+    #[test]
+    fn hex_nimmt_kein_vorzeichen() {
+        assert_eq!(hex_decode("+a"), None);
+        assert!(normalize_privater_schluessel(&"+a".repeat(32)).is_err());
+        assert_eq!(hex_decode("0aFF"), Some(vec![0x0a, 0xff]));
     }
 
     #[test]

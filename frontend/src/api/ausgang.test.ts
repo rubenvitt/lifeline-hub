@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from './client';
-import { anbindungKanaele, ausgangKanal } from './ausgang';
+import { anbindungKanaele, anbindungTexte, ausgangKanal, versandFehler } from './ausgang';
 
 describe('Ausgang: Kanal einer Ablehnung (LLH-2096)', () => {
   it('anbindungKanaele_liest_beide_aus_der_meldung', () => {
@@ -24,5 +24,21 @@ describe('Ausgang: Kanal einer Ablehnung (LLH-2096)', () => {
 
   it('threema_ist_ein_eigener_kanal', () => {
     expect(ausgangKanal('threema')).toBe('threema');
+  });
+});
+
+describe('Ausgang: Text je Kanal einer gemeinsamen Ablehnung (LLH-2096)', () => {
+  it('nimmt_je_kanal_den_text_des_servers', () => {
+    const e = new ApiError(
+      422,
+      'Das Matrix-Konto ist angehalten; Kein Threema-Gateway eingerichtet',
+      { grund: 'anbindung_angehalten' },
+    );
+    expect(anbindungTexte(e, ['matrix', 'threema'])).toEqual({
+      matrix: 'Das Matrix-Konto ist angehalten',
+      threema: 'Kein Threema-Gateway eingerichtet',
+    });
+    const v = versandFehler(e, ['matrix', 'threema']) as ApiError;
+    expect(v.message).toBe('Das Matrix-Konto ist angehalten; Kein Threema-Gateway eingerichtet');
   });
 });

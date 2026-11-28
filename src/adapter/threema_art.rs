@@ -149,10 +149,11 @@ impl AdapterArt for ThreemaArt {
     }
 
     fn check_geheimnis(&self, platz: &str, wert: &str) -> Result<String, String> {
-        if platz == PLATZ_PRIVAT {
-            normalize_privater_schluessel(wert).map_err(str::to_string)
-        } else {
-            Ok(wert.to_string())
+        match platz {
+            PLATZ_PRIVAT => normalize_privater_schluessel(wert).map_err(str::to_string),
+            // Ein API-Secret hat keinen Leerraum; ein eingefügter Rand gälte sonst nie.
+            PLATZ_SECRET => Ok(wert.trim().to_string()),
+            _ => Ok(wert.to_string()),
         }
     }
 
@@ -218,7 +219,8 @@ mod tests {
             Ok(hex)
         );
         assert!(art.check_geheimnis(PLATZ_PRIVAT, "abc").is_err());
-        assert_eq!(art.check_geheimnis(PLATZ_SECRET, " x "), Ok(" x ".into()));
+        // Ein eingefügtes Secret mit Zeilenumbruch oder Leerzeichen am Rand gälte sonst nie.
+        assert_eq!(art.check_geheimnis(PLATZ_SECRET, " x\n"), Ok("x".into()));
     }
 
     #[tokio::test]

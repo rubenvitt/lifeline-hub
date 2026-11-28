@@ -129,6 +129,34 @@ export function anbindungKanaele(
   return genannt.length > 0 ? genannt : ['email'];
 }
 
+/** Woran der Text des Servers einen Kanal erkennt (`meldung_anbindung`). */
+const KANAL_IN_MELDUNG: Record<AusgangKanal, RegExp> = {
+  matrix: /Matrix/,
+  threema: /Threema/,
+  fax: /Fax/,
+  email: /Mail/,
+};
+
+/**
+ * Der Text je Kanal einer Ablehnung mit `anbindung_*`. Eine gemeinsame Ablehnung trägt nur den
+ * `grund` des ersten Kanals; je Kanal gilt darum das Stück der Meldung des Servers, das ihn nennt,
+ * und nur ohne ein solches der Wortlaut zum `grund`.
+ */
+export function anbindungTexte(
+  fehler: ApiError,
+  gesendet?: readonly KanalArt[],
+): Partial<Record<AusgangKanal, string>> {
+  const stuecke = fehler.message.split('; ');
+  const texte: Partial<Record<AusgangKanal, string>> = {};
+  for (const k of anbindungKanaele(fehler, gesendet)) {
+    texte[k] =
+      (fehler.vomAnwendungsserver || stuecke.length > 1
+        ? stuecke.find((t) => KANAL_IN_MELDUNG[k].test(t))
+        : undefined) ?? AUSGANG_FEHLER_TEXT[k][fehler.grund as AusgangFehler];
+  }
+  return texte;
+}
+
 /**
  * Eine Ablehnung des Servers mit bekanntem `grund` trägt den Wortlaut der Oberfläche statt des
  * Servertextes („Kein Mailserver eingerichtet“); alles andere bleibt, wie es ist. Der Kanal
@@ -146,12 +174,9 @@ export function versandFehler(fehler: unknown, gesendet?: readonly KanalArt[]): 
     return fehler;
   }
   if (fehler instanceof ApiError && fehler.grund && fehler.grund in AUSGANG_FEHLER_TEXT.email) {
-    const kanaele = ANBINDUNG_GRUENDE.has(fehler.grund)
-      ? anbindungKanaele(fehler, gesendet)
-      : (['email'] as AusgangKanal[]);
-    const text = kanaele
-      .map((k) => AUSGANG_FEHLER_TEXT[k][fehler.grund as AusgangFehler])
-      .join('; ');
+    const text = ANBINDUNG_GRUENDE.has(fehler.grund)
+      ? Object.values(anbindungTexte(fehler, gesendet)).join('; ')
+      : AUSGANG_FEHLER_TEXT.email[fehler.grund as AusgangFehler];
     return new ApiError(fehler.status, text, {
       grund: fehler.grund,
       vomAnwendungsserver: fehler.vomAnwendungsserver,

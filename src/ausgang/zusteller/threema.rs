@@ -196,6 +196,18 @@ fn einordnen(e: ThreemaFehler) -> (Zustellfehler, &'static str) {
     }
 }
 
+/// Ein Upload sendet keine Nachricht: nur Anmeldung, Guthaben und Größe zählen wie beim Senden,
+/// alles andere ist vorübergehend (eine ID gibt es beim Upload nicht).
+fn einordnen_upload(e: ThreemaFehler) -> (Zustellfehler, &'static str) {
+    match e {
+        ThreemaFehler::Status(401 | 402 | 413) => einordnen(e),
+        _ => (
+            Zustellfehler::Voruebergehend { nicht_vor: None },
+            "Threema nicht erreichbar",
+        ),
+    }
+}
+
 const SCHLUESSEL_GEAENDERT: &str = "Der Schlüssel der Threema-ID hat sich geändert";
 const NICHT_VERSCHLUESSELBAR: &str = "Verschlüsseln nicht möglich";
 
@@ -307,7 +319,7 @@ async fn senden(
                     verschluessele_blob(bytes).map_err(kein_krypto)?;
                 let blob_id = threema::upload_blob(ziel, zugang, &chiffrat)
                     .await
-                    .map_err(einordnen)?;
+                    .map_err(einordnen_upload)?;
                 let inhalt = Inhalt::Datei {
                     blob_id: &blob_id,
                     schluessel: &blob_schluessel,
@@ -589,6 +601,27 @@ mod tests {
                 "{code}: Schlüssel trotzdem merken"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn upload_400_ist_voruebergehend_nicht_id_unbekannt() {
+        let (wahl, _) = gateway(empfaenger(), vec![], 400).await;
+        let f = zustellen(wahl, &[], None).await.unwrap_err();
+        assert_eq!(f.fehler, Zustellfehler::Voruebergehend { nicht_vor: None });
+        assert_eq!(f.grund, "Threema nicht erreichbar");
+        assert_eq!(f.teile, vec![(0, "id00000000000000".into())]);
+    }
+
+    #[tokio::test]
+    async fn upload_402_bleibt_fehler_der_anbindung() {
+        let (wahl, _) = gateway(empfaenger(), vec![], 402).await;
+        let f = zustellen(wahl, &[], None).await.unwrap_err();
+        assert_eq!(
+            f.fehler,
+            Zustellfehler::Anbindung {
+                pruefung_vorziehen: true
+            }
+        );
     }
 
     #[tokio::test]

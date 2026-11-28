@@ -142,14 +142,22 @@ fn build_client(lan_erlaubt: bool, zeitlimit: Duration) -> reqwest::Client {
         .expect("Threema-Client baubar")
 }
 
-/// Ordnet einen Fehler von reqwest ein, ohne seine URL weiterzutragen. Bei `send_e2e` zählt nur
-/// ein Fehler beim Verbindungsaufbau als wiederholbar; alles danach ist `Ungewiss`.
+/// Ordnet einen Fehler von reqwest ein, ohne seine URL weiterzutragen.
 fn von_reqwest(e: &reqwest::Error, senden: bool) -> ThreemaFehler {
-    match fehler_art(e) {
+    netzfehler(fehler_art(e), e.is_connect(), senden)
+}
+
+/// Bei `send_e2e` zählt nur ein Fehler beim Verbindungsaufbau als wiederholbar; alles danach ist
+/// `Ungewiss`, auch ein TLS-Fehler (etwa ein Abbruch ohne `close_notify`), bevor die Art des
+/// Fehlers zählt: sonst ginge dieselbe Nachricht ein zweites Mal hinaus.
+fn netzfehler(art: WebhookFehler, beim_aufbau: bool, senden: bool) -> ThreemaFehler {
+    if senden && !beim_aufbau {
+        return ThreemaFehler::Ungewiss;
+    }
+    match art {
         WebhookFehler::ZielIntern => ThreemaFehler::ZielIntern,
         WebhookFehler::Tls => ThreemaFehler::Tls,
         WebhookFehler::Dns => ThreemaFehler::Dns,
-        _ if senden && !e.is_connect() => ThreemaFehler::Ungewiss,
         _ => ThreemaFehler::Verbindung,
     }
 }
@@ -333,6 +341,44 @@ mod tests {
 
     fn privat() -> PrivaterSchluessel {
         PrivaterSchluessel::from_bytes([5; 32])
+    }
+
+    #[test]
+    fn jeder_abbruch_nach_dem_absenden_ist_ungewiss_auch_tls() {
+        // Ein TLS-Abbruch nach dem Absenden (etwa ohne close_notify) darf nie wiederholt werden.
+        for art in [
+            WebhookFehler::Tls,
+            WebhookFehler::Dns,
+            WebhookFehler::Verbindung,
+        ] {
+            assert_eq!(
+                netzfehler(art, false, true),
+                ThreemaFehler::Ungewiss,
+                "{art:?}"
+            );
+        }
+        // Beim Verbindungsaufbau bleibt es der Fehler selbst, wiederholbar.
+        assert_eq!(
+            netzfehler(WebhookFehler::Tls, true, true),
+            ThreemaFehler::Tls
+        );
+        assert_eq!(
+            netzfehler(WebhookFehler::Verbindung, true, true),
+            ThreemaFehler::Verbindung
+        );
+        assert_eq!(
+            netzfehler(WebhookFehler::ZielIntern, true, true),
+            ThreemaFehler::ZielIntern
+        );
+        // Abfragen und Upload senden keine Nachricht: nie ungewiss.
+        assert_eq!(
+            netzfehler(WebhookFehler::Tls, false, false),
+            ThreemaFehler::Tls
+        );
+        assert_eq!(
+            netzfehler(WebhookFehler::Verbindung, false, false),
+            ThreemaFehler::Verbindung
+        );
     }
 
     #[tokio::test]
