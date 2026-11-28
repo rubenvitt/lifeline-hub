@@ -1,6 +1,6 @@
 # Maschinen-Eingang für Meldungen Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Ein signierter Maschinenzugang mit Scope `meldungen:write` legt Kurztexte als
 unverifizierte Vorschläge im freigegebenen Einsatz ab; ein Mensch übernimmt sie als Meldung oder
@@ -55,11 +55,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 **Interfaces:**
 - Produces: `Scope::MeldungenWrite`; `pub fn is_nur_meldungen(scopes: &[Scope]) -> bool` in `scope.rs` (true genau bei `[MeldungenWrite]`).
 
-- [ ] **Step 1: Failing tests** in `scope.rs`: Test `lage_und_einsaetze_lesen_haben_einsatzbezug` umbenennen zu `scopes_mit_einsatzbezug` mit Erwartung `["lage:read", "einsaetze:read", "meldungen:write"]`; neuer Test `nur_meldungen_ist_genau_der_eine_scope`: `is_nur_meldungen(&[MeldungenWrite])`, nicht für `&[]`, nicht für `&[MeldungenWrite, LageRead]`. In `enum_wire_kontrakt.rs` den Wert `meldungen:write` ergänzen.
-- [ ] **Step 2:** `cargo test --lib public_api::scope` → FAIL (Variante fehlt).
-- [ ] **Step 3:** Variante, `has_einsatzbezug`-Zweig, `is_nur_meldungen` implementieren; Doc-Kommentar von „Lese-Scope“ auf „Scope mit Einsatzbezug“. `SCOPE_TEXT`: `'meldungen:write': 'Meldungen einreichen (als unverifizierte Vorschläge)'`. `description.md` ergänzen.
-- [ ] **Step 4:** `cargo test --lib public_api::scope && cargo test --test enum_wire_kontrakt` → PASS; `mise exec -- pnpm -C frontend typecheck` → PASS.
-- [ ] **Step 5: Commit** `feat(public-api): Scope meldungen:write mit Einsatzbezug (LLH-2112)`.
+- [x] **Step 1: Failing tests** in `scope.rs`: Test `lage_und_einsaetze_lesen_haben_einsatzbezug` umbenennen zu `scopes_mit_einsatzbezug` mit Erwartung `["lage:read", "einsaetze:read", "meldungen:write"]`; neuer Test `nur_meldungen_ist_genau_der_eine_scope`: `is_nur_meldungen(&[MeldungenWrite])`, nicht für `&[]`, nicht für `&[MeldungenWrite, LageRead]`. In `enum_wire_kontrakt.rs` den Wert `meldungen:write` ergänzen.
+- [x] **Step 2:** `cargo test --lib public_api::scope` → FAIL (Variante fehlt).
+- [x] **Step 3:** Variante, `has_einsatzbezug`-Zweig, `is_nur_meldungen` implementieren; Doc-Kommentar von „Lese-Scope“ auf „Scope mit Einsatzbezug“. `SCOPE_TEXT`: `'meldungen:write': 'Meldungen einreichen (als unverifizierte Vorschläge)'`. `description.md` ergänzen.
+- [x] **Step 4:** `cargo test --lib public_api::scope && cargo test --test enum_wire_kontrakt` → PASS; `mise exec -- pnpm -C frontend typecheck` → PASS.
+- [x] **Step 5: Commit** `feat(public-api): Scope meldungen:write mit Einsatzbezug (LLH-2112)`.
 
 ### Task 2: Ausnahme am gekoppelten ELW
 
@@ -74,14 +74,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 - Consumes: `scope::is_nur_meldungen`.
 - Produces: `pub fn is_am_hub_erlaubt(zugang: &Zugang) -> bool` in `freigabe.rs` (= `is_nur_meldungen(&zugang.scopes)`); `AnbindungFreigabe.ruht` ist `am_hub && !is_am_hub_erlaubt(z)`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `tests/maschinenzugang.rs`: `am_gekoppelten_elw_geht_ein_reiner_meldungszugang` — nach `org_koppeln(…, "standard")` legt `POST /api/integrations` (Route wie im bestehenden Test `am_gekoppelten_elw_ist_anlegen_gesperrt`) einen Zugang mit `["meldungen:write"]` an (201), mit `["meldungen:write","lage:read"]` nicht (Status und Grund wie im bestehenden Test).
   - `ein_gemischter_zugang_von_vor_der_kopplung_bleibt_am_elw_abgelehnt`: Zugang mit `meldungen:write` + `lage:read` anbinden, dann koppeln; signiertes `GET /api/v1/me` → 401 und am Zugang `letzte_ablehnung = "instanz_gekoppelt"`. Der reine Meldungszugang bekommt 200.
   - `tests/einsatz_anbindungen.rs`: `reiner_meldungszugang_laesst_sich_am_gekoppelten_elw_freigeben` (200, `ruht == false`) und `meldungszugang_laesst_sich_am_spiegel_nicht_freigeben` (409).
-- [ ] **Step 2:** `cargo test --test maschinenzugang --test einsatz_anbindungen` → die neuen FAIL.
-- [ ] **Step 3:** Implementieren: Extractor lehnt bei Hub nur ab, wenn `!is_nur_meldungen(&zugang.scopes)`. Anlegen/Ändern: `gesperrt_grund` greift nur, wenn die angefragten Scopes nicht `is_nur_meldungen` sind (die Fehlermeldung bleibt). `list_fuer_einsatz`/`load_freigebbar` nach `is_am_hub_erlaubt`. Freigeben eines `is_nur_meldungen`-Zugangs an einem Einsatz mit `ctx.einsatz.spiegel.spiegel_ist` → `AppError::Conflict("Der Einsatz wird an einer anderen Instanz geführt".into())`.
-- [ ] **Step 4:** Dieselben Tests → PASS; außerdem `cargo test --lib public_api::freigabe` (bestehende Ruht-Tests bleiben grün).
-- [ ] **Step 5: Commit** `feat(public-api): reiner Meldungszugang am gekoppelten ELW (LLH-2112)`.
+- [x] **Step 2:** `cargo test --test maschinenzugang --test einsatz_anbindungen` → die neuen FAIL.
+- [x] **Step 3:** Implementieren: Extractor lehnt bei Hub nur ab, wenn `!is_nur_meldungen(&zugang.scopes)`. Anlegen/Ändern: `gesperrt_grund` greift nur, wenn die angefragten Scopes nicht `is_nur_meldungen` sind (die Fehlermeldung bleibt). `list_fuer_einsatz`/`load_freigebbar` nach `is_am_hub_erlaubt`. Freigeben eines `is_nur_meldungen`-Zugangs an einem Einsatz mit `ctx.einsatz.spiegel.spiegel_ist` → `AppError::Conflict("Der Einsatz wird an einer anderen Instanz geführt".into())`.
+- [x] **Step 4:** Dieselben Tests → PASS; außerdem `cargo test --lib public_api::freigabe` (bestehende Ruht-Tests bleiben grün).
+- [x] **Step 5: Commit** `feat(public-api): reiner Meldungszugang am gekoppelten ELW (LLH-2112)`.
 
 ### Task 3: Tabelle und Repo der Vorschläge
 
@@ -109,7 +109,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
   - `pub async fn purge(pool, jetzt) -> Result<u64, AppError>`
   - Abgelaufen-Regel als ein SQL-Fragment (Makro oder `const`), das alle Lesewege teilen.
 
-- [ ] **Step 1: Failing tests** (Modul-Tests in `vorschlag.rs`, Testpool des Bestands):
+- [x] **Step 1: Failing tests** (Modul-Tests in `vorschlag.rs`, Testpool des Bestands):
   - `einreichen_legt_an_und_meldet_die_dopplung` (zweiter Aufruf gleiche `external_id` → `false`, gleiche `id`).
   - `gleiche_external_id_zweier_zugaenge_sind_zwei_vorschlaege` (Review Focus 4).
   - `nach_zwoelf_stunden_ist_ein_vorschlag_abgelaufen` (`jetzt` = `empfangen_at` + 12 h 1 min → nicht in `offene`, Status `Abgelaufen`, `laden_offen_tx` → Conflict).
@@ -117,10 +117,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
   - `annehmen_leert_den_text_und_setzt_die_herkunft_der_meldung`.
   - `annehmen_zweimal_ist_ein_konflikt`.
   - `purge_loescht_nach_sieben_tagen_und_laesst_juengere`.
-- [ ] **Step 2:** `cargo test --lib meldung::vorschlag` → FAIL.
-- [ ] **Step 3:** Migration, Repo, `AUSGENOMMEN`-Eintrag, Purge-Aufruf (`tracing::error!` bei Fehler wie der Einwurf) implementieren.
-- [ ] **Step 4:** `cargo test --lib meldung::vorschlag && cargo test --lib instanz::spiegel` → PASS; `scripts/check-migrationen.sh` → OK.
-- [ ] **Step 5: Commit** `feat(meldung): Ablage für Meldungsvorschläge (LLH-2112)`.
+- [x] **Step 2:** `cargo test --lib meldung::vorschlag` → FAIL.
+- [x] **Step 3:** Migration, Repo, `AUSGENOMMEN`-Eintrag, Purge-Aufruf (`tracing::error!` bei Fehler wie der Einwurf) implementieren.
+- [x] **Step 4:** `cargo test --lib meldung::vorschlag && cargo test --lib instanz::spiegel` → PASS; `scripts/check-migrationen.sh` → OK.
+- [x] **Step 5: Commit** `feat(meldung): Ablage für Meldungsvorschläge (LLH-2112)`.
 
 ### Task 4: Öffentliche Route `POST /api/v1/report-suggestions`
 
@@ -135,7 +135,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 - Consumes: `vorschlag::einreichen_tx`, `freigabe::freigegebener_einsatz_tx`, `MachineClient::antwort`.
 - Produces: Typen `ReportSuggestionRequest { text, external_id, sent_at: Option<String>, source: ReportSuggestionSource { adapter, sender_id, sender_name: Option<String>, signed: bool } }` und `ReportSuggestionResponse { id: i64, status: String, received_at: String }` (ToSchema); Handler `pub async fn einreichen(State<AppState>, MachineClient) -> Result<Response, ApiError>`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `ohne_freigabe_lehnt_die_route_mit_incident_not_released_ab` (409, `code`).
   - `mit_freigabe_entsteht_ein_vorschlag_und_kein_etb_eintrag` (201, Körper `status:"offen"`; `SELECT COUNT(*) FROM meldung` und `etb_eintrag` des Einsatzes unverändert; Antwort hat `Lifeline-Signature`).
   - `dieselbe_external_id_liefert_200_und_denselben_vorschlag`.
@@ -143,10 +143,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
   - `ungueltige_felder_sind_422` (leerer Text, Text > `INHALT_MAX`, `adapter` mit Großbuchstaben, fehlendes `signed`).
   - `ohne_scope_ist_403_missing_scope`.
   - `nach_wechsel_der_freigabe_landet_der_neue_vorschlag_im_neuen_einsatz` (Review Focus 5).
-- [ ] **Step 2:** `cargo test --test public_api_meldung_vorschlag` → FAIL.
-- [ ] **Step 3:** Handler: Body aus `client.body` parsen (wie die übrigen schreibenden v1-Routen), prüfen, in `write_retry!`-Transaktion Freigabe lesen (keine → `IncidentNotReleased`), Spiegel prüfen (`einsatz_spiegel` → `FuehrungElsewhere`), `einreichen_tx`; nach dem Commit bei `neu` `state.live.publiziere_einsatz(einsatz_id, LiveEvent::Meldung)`. `utoipa::path` mit allen Antworten. Glossarzeile anhängen.
-- [ ] **Step 4:** Test → PASS; `cargo test --test public_api_spec_aktuell` nach Neuerzeugen von `docs/api/public-v1.json` (Befehl in `docs/api/maschinenzugang.md`) → PASS; `scripts/check-api-routen.sh` → OK.
-- [ ] **Step 5: Commit** `feat(public-api): Meldungsvorschläge einreichen (LLH-2112)`.
+- [x] **Step 2:** `cargo test --test public_api_meldung_vorschlag` → FAIL.
+- [x] **Step 3:** Handler: Body aus `client.body` parsen (wie die übrigen schreibenden v1-Routen), prüfen, in `write_retry!`-Transaktion Freigabe lesen (keine → `IncidentNotReleased`), Spiegel prüfen (`einsatz_spiegel` → `FuehrungElsewhere`), `einreichen_tx`; nach dem Commit bei `neu` `state.live.publiziere_einsatz(einsatz_id, LiveEvent::Meldung)`. `utoipa::path` mit allen Antworten. Glossarzeile anhängen.
+- [x] **Step 4:** Test → PASS; `cargo test --test public_api_spec_aktuell` nach Neuerzeugen von `docs/api/public-v1.json` (Befehl in `docs/api/maschinenzugang.md`) → PASS; `scripts/check-api-routen.sh` → OK.
+- [x] **Step 5: Commit** `feat(public-api): Meldungsvorschläge einreichen (LLH-2112)`.
 
 ### Task 5: Interne Routen: Liste, Übernehmen, Verwerfen
 
@@ -162,7 +162,7 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 - Consumes: Task 3, `pruefe_neue_meldung`, `repo::anlegen_mit_client_id_tx`, `meldung::live_publikation_sicherstellen`, `meldung::auto_frist_erinnerung_sicherstellen`.
 - Produces: Handler `liste` (`EinsatzLesezugriff<Meldungen>`), `accept` (`EinsatzErfassungsfreigabe<Meldungen>`, `JsonBody<NeueMeldung>`, Antwort `(StatusCode::CREATED, Json<MeldungAnzeige>)`), `discard` (`EinsatzErfassungsfreigabe<Meldungen>`, 204). Antworttyp der Liste `ReportSuggestion { id, text, source { adapter, sender_id, sender_name, signed }, sent_at, received_at }` (ToSchema, im generierten Typ).
 
-- [ ] **Step 1: Failing tests** (`tests/meldung_vorschlag.rs`, Vorschlag direkt per `vorschlag::einreichen_tx` anlegen):
+- [x] **Step 1: Failing tests** (`tests/meldung_vorschlag.rs`, Vorschlag direkt per `vorschlag::einreichen_tx` anlegen):
   - `liste_zeigt_offene_vorschlaege_aelteste_zuerst`.
   - `uebernahme_legt_meldung_mit_herkunft_an_und_schreibt_etb_nur_mit_auto_etb` (zwei Fälle: Auto-ETB an → `etb_meldung_id` gesetzt; aus → `NULL`; beide Male `maschinen_herkunft` in der Antwort, Vorschlag nicht mehr in der Liste).
   - `uebernahme_eines_abgelaufenen_oder_angenommenen_vorschlags_ist_409` (Review Focus 2; danach genau eine Meldung).
@@ -172,10 +172,10 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
   - `am_spiegel_lehnen_uebernahme_und_verwerfen_ab` (409).
   - `vorschlag_eines_anderen_einsatzes_ist_404`.
   - Bestehende Tests in `tests/meldung.rs` bleiben grün (Verhalten von `anlegen` unverändert).
-- [ ] **Step 2:** `cargo test --test meldung_vorschlag` → FAIL.
-- [ ] **Step 3:** Implementieren. `accept`: Gerät → 403; `client_id`-Wiederholung vor allem anderen wie in `anlegen` (liefert Bestand, 201); `ctx.fordere_aktiv()`; Spiegel → 409; `pruefe_neue_meldung`; dann eine Transaktion: `laden_offen_tx` → `anlegen_mit_client_id_tx` → `annehmen_tx` → Commit; danach `repo::laden`, `live_publikation_sicherstellen`, `auto_frist_erinnerung_sicherstellen`, `publiziere_einsatz(…, LiveEvent::Meldung)`. `discard`: Gerät 403, aktiv, Spiegel 409, `verwerfen_tx`, Live.
-- [ ] **Step 4:** `cargo test --test meldung_vorschlag --test meldung --test etb_meldungseingang` → PASS; `scripts/check-typ-codegen.sh` → keine Abweichung nach dem Mitcommitten.
-- [ ] **Step 5: Commit** `refactor(meldung): Prüfung der Erfassung herausgelöst (LLH-2112)` (nur der Schnitt in `routes/meldung.rs`) und danach `feat(meldung): Vorschläge übernehmen und verwerfen (LLH-2112)`.
+- [x] **Step 2:** `cargo test --test meldung_vorschlag` → FAIL.
+- [x] **Step 3:** Implementieren. `accept`: Gerät → 403; `client_id`-Wiederholung vor allem anderen wie in `anlegen` (liefert Bestand, 201); `ctx.fordere_aktiv()`; Spiegel → 409; `pruefe_neue_meldung`; dann eine Transaktion: `laden_offen_tx` → `anlegen_mit_client_id_tx` → `annehmen_tx` → Commit; danach `repo::laden`, `live_publikation_sicherstellen`, `auto_frist_erinnerung_sicherstellen`, `publiziere_einsatz(…, LiveEvent::Meldung)`. `discard`: Gerät 403, aktiv, Spiegel 409, `verwerfen_tx`, Live.
+- [x] **Step 4:** `cargo test --test meldung_vorschlag --test meldung --test etb_meldungseingang` → PASS; `scripts/check-typ-codegen.sh` → keine Abweichung nach dem Mitcommitten.
+- [x] **Step 5: Commit** `refactor(meldung): Prüfung der Erfassung herausgelöst (LLH-2112)` (nur der Schnitt in `routes/meldung.rs`) und danach `feat(meldung): Vorschläge übernehmen und verwerfen (LLH-2112)`.
 
 ### Task 6: Modulzähler
 
@@ -184,11 +184,11 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 - Test: `tests/modul_zaehler.rs`
 - Regenerate: Typ-Codegen
 
-- [ ] **Step 1: Failing test** `offene_vorschlaege_zaehlen_im_meldungszaehler`: zwei offene, ein abgelaufener, ein verworfener → `vorschlaege_offen == 2`, `offen` unverändert.
-- [ ] **Step 2:** `cargo test --test modul_zaehler` → FAIL.
-- [ ] **Step 3:** Implementieren; reine Zählregel `zaehle_meldungen` bleibt unberührt, `zaehlen` setzt das Feld wie `sofort_aelteste_at`.
-- [ ] **Step 4:** `cargo test --test modul_zaehler --test modul_zaehler_abfragen` → PASS.
-- [ ] **Step 5: Commit** `feat(meldung): offene Vorschläge im Modulzähler (LLH-2112)`.
+- [x] **Step 1: Failing test** `offene_vorschlaege_zaehlen_im_meldungszaehler`: zwei offene, ein abgelaufener, ein verworfener → `vorschlaege_offen == 2`, `offen` unverändert.
+- [x] **Step 2:** `cargo test --test modul_zaehler` → FAIL.
+- [x] **Step 3:** Implementieren; reine Zählregel `zaehle_meldungen` bleibt unberührt, `zaehlen` setzt das Feld wie `sofort_aelteste_at`.
+- [x] **Step 4:** `cargo test --test modul_zaehler --test modul_zaehler_abfragen` → PASS.
+- [x] **Step 5: Commit** `feat(meldung): offene Vorschläge im Modulzähler (LLH-2112)`.
 
 ### Task 7: Oberfläche
 
@@ -202,14 +202,14 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 **Interfaces:**
 - Produces: `herkunftText(h: { adapter: string; kennung|sender_id: string; name?|sender_name?: string|null; signiert|signed: boolean }): string` in `maschinenHerkunft.ts` → `"Mesh · Knoten „Nord-1“ (!a1b2c3d4) · nicht signiert"`; Adapternamen `{ meshtastic: 'Mesh' }`, sonst das Kennwort; ohne Name `"Mesh · Knoten !77ee01ff · signiert"`.
 
-- [ ] **Step 1: Failing tests:**
+- [x] **Step 1: Failing tests:**
   - `maschinenHerkunft.test.ts`: die beiden Texte oben, unbekannter Adapter `postfach` → `"postfach · …"`.
   - `MeldungVorschlaege.test.tsx`: ohne Vorschläge rendert nichts; mit zwei zeigt die Überschrift „Vorschläge · unverifiziert (2)“, Text, Herkunft; „Als Meldung übernehmen“ öffnet das Formular mit Inhalt = Text, Absender = Name sonst Kennung, Meldeweg `funk`, Ereigniszeit = `sent_at` sonst `received_at`, und Speichern ruft `uebernehmeMeldungVorschlag`; „Verwerfen“ ruft `verwirfMeldungVorschlag`.
   - `MeldungKarte.test.tsx`: mit `maschinen_herkunft` erscheint „unverifiziert übernommen · …“, ohne nicht.
-- [ ] **Step 2:** `mise exec -- pnpm -C frontend test -- --run meldungen` → FAIL.
-- [ ] **Step 3:** Implementieren nach `frontend/AGENTS.md` (Gestaltungssprache, Bedien-Leitlinie, Query-Keys). Ob „Verwerfen“ eine Rückfrage bekommt, entscheidet die Bedien-Leitlinie; die Wahl im Commit nennen.
-- [ ] **Step 4:** `mise exec -- pnpm -C frontend test -- --run && mise exec -- pnpm -C frontend typecheck && mise exec -- pnpm -C frontend lint` → PASS.
-- [ ] **Step 5: Commit** `feat(meldungen): Vorschläge im Meldungseingang (LLH-2112)`.
+- [x] **Step 2:** `mise exec -- pnpm -C frontend test -- --run meldungen` → FAIL.
+- [x] **Step 3:** Implementieren nach `frontend/AGENTS.md` (Gestaltungssprache, Bedien-Leitlinie, Query-Keys). Ob „Verwerfen“ eine Rückfrage bekommt, entscheidet die Bedien-Leitlinie; die Wahl im Commit nennen.
+- [x] **Step 4:** `mise exec -- pnpm -C frontend test -- --run && mise exec -- pnpm -C frontend typecheck && mise exec -- pnpm -C frontend lint` → PASS.
+- [x] **Step 5: Commit** `feat(meldungen): Vorschläge im Meldungseingang (LLH-2112)`.
 
 ### Task 8: Regeln, Doku, Gates, Bilder
 
@@ -219,8 +219,8 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/jd4jgna48kqghdvwl9yz5lev
 - Modify: `src/AGENTS.md`, Abschnitt „Öffentliche API v1“ (zwei Sätze mit Verweis auf ADR-0112); Verweise auf ADR-0035 im Code greppen und, wo sie die Regel meinen, auf ADR-0112 umstellen
 - Modify: Anwenderdoku (Kapitel Meldungseingang, Kapitel Anbindungen) und Architekturdoku nach `docs/anwender/AGENTS.md` bzw. `docs/architektur/AGENTS.md`
 
-- [ ] **Step 1:** `scripts/adr-fuer.sh src/public_api/scope.rs` zeigt ADR-0112 mit ihren Regeln; `scripts/check-adr-nummern.sh` → OK.
-- [ ] **Step 2:** Doku schreiben, Wächter der Anwenderdoku laufen lassen (Kommando in `docs/anwender/AGENTS.md`).
-- [ ] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf, ggf. `run_in_background`).
-- [ ] **Step 4:** Bilder der Änderung per Wegwerf-Spec `frontend/e2e/doku-bilder/zz-jd4jgna4.bilder.ts` (Vorschlagsbereich mit zwei Vorschlägen, vorbelegtes Formular, Meldungskarte mit Herkunft); Spec danach löschen.
-- [ ] **Step 5: Commit** `docs(meldung): ADR-0112 und Doku zum Maschinen-Eingang (LLH-2112)`.
+- [x] **Step 1:** `scripts/adr-fuer.sh src/public_api/scope.rs` zeigt ADR-0112 mit ihren Regeln; `scripts/check-adr-nummern.sh` → OK.
+- [x] **Step 2:** Doku schreiben, Wächter der Anwenderdoku laufen lassen (Kommando in `docs/anwender/AGENTS.md`).
+- [x] **Step 3:** `./scripts/check-all.sh --geaendert --ohne-e2e` → grün (ein Aufruf, ggf. `run_in_background`).
+- [x] **Step 4:** Bilder der Änderung per Wegwerf-Spec `frontend/e2e/doku-bilder/zz-jd4jgna4.bilder.ts` (Vorschlagsbereich mit zwei Vorschlägen, vorbelegtes Formular, Meldungskarte mit Herkunft); Spec danach löschen.
+- [x] **Step 5: Commit** `docs(meldung): ADR-0112 und Doku zum Maschinen-Eingang (LLH-2112)`.
