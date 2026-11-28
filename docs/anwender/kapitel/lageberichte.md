@@ -206,10 +206,12 @@ Freigabe meldet sich genau einmal.
 
 ### Versand per E-Mail und Matrix
 
-Der Versand gilt nur für Stellen mit hinterlegter Mailadresse oder hinterlegtem Matrix-Raum
-(Kapitel [Stammdaten](stammdaten.md), „Externe Stellen“) und braucht für jeden Weg die passende
-Anbindung der Organisation: einen Mailserver bzw. ein Matrix-Konto (Kapitel
-[Anbindungen](anbindungen.md)). Ein Mensch löst jeden Versand aus; nichts geht von selbst hinaus.
+Der Versand gilt nur für Stellen mit hinterlegter Mailadresse, hinterlegtem Matrix-Raum oder
+hinterlegter Threema-ID (Kapitel [Stammdaten](stammdaten.md), „Externe Stellen“) und braucht für
+jeden Weg die passende Anbindung der Organisation: einen Mailserver, ein Matrix-Konto bzw. ein
+Threema-Gateway (Kapitel [Anbindungen](anbindungen.md)). Vorgewählt ist je Stelle eine Adresse:
+der Matrix-Raum, sonst die Threema-ID, sonst die Mailadresse. Fehlt eine Anbindung, sperrt der
+Dialog nach dem Senden die Adressen dieses Weges und wählt je Stelle die nächste vor. Ein Mensch löst jeden Versand aus; nichts geht von selbst hinaus.
 
 - **Nur freigegebene, jüngste Fassung.** Gesendet wird der Text der Freigabe mit den Anlagen als
   Bilder und einem Fuß mit Einsatz, Absender und Zeit. Wird inzwischen eine neuere Fassung
@@ -232,6 +234,12 @@ Anbindung der Organisation: einen Mailserver bzw. ein Matrix-Konto (Kapitel
   verschlüsselt hinaus, nie im Klartext; geht das nicht, steht der Versand als „fehlgeschlagen:
   Verschlüsseln nicht möglich“ da. Das Matrix-Konto tritt einem Raum bei, wenn es eingeladen ist
   oder der Raum öffentlich ist; sonst „fehlgeschlagen: Kein Zutritt zum Raum“.
+- **Threema-IDs.** Eine Nachricht an eine Threema-ID besteht aus dem Text (Betreff fett) und je
+  Anlage einem Bild, alles Ende-zu-Ende verschlüsselt. Ein Text über 3500 Bytes wird an Absätzen
+  in mehrere Nachrichten geteilt („(1/2)“ …). Threema bestätigt nur die Annahme, der Versand steht
+  dann auf „übergeben“. Bricht die Verbindung mitten im Senden ab, steht er auf „Zustellung
+  unklar“; „Erneut senden“ schickt nur, was noch nicht angekommen ist. Hat sich der Schlüssel
+  der Threema-ID geändert, geht nichts hinaus („fehlgeschlagen: Verschlüsseln nicht möglich“).
 - **Einsatztagebuch.** Jedes Ergebnis steht im ETB, etwa „Lagebericht Nr. 3 per E-Mail an Leitstelle
   Nord (lagedienst@…) übergeben“ oder „… per Matrix an Leitstelle Nord (#lage:…) übergeben“; ein Wiederholungsversuch im Fenster schreibt nichts. Ein Versand
   ist nie halb: er ist übergeben und im ETB, oder er steht sichtbar als fehlgeschlagen da.

@@ -1,6 +1,6 @@
 # 6. Laufzeitsicht
 
-Stand: 26.11.2026 (Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
+Stand: 28.11.2026 (Versand an Threema-IDs, LLH-2096; Ortung über den Hub im Spiegelabgleich, LLH-2119; Fax mit Abfrage bis „zugestellt“, LLH-2095; Auftrag an die Helfer-App, LLH-2111; Versand in Matrix-Räume, LLH-2094; Versand an Menschen, LLH-2093; Fahrzeugortung über den Positionsbaustein, LLH-2091; Fremdebene aus URL beim Lesen nachholen, LLH-2099; Live-Ereignis der Helfer-App nur für die Einsatzleitung, ADR-0101; Sperre des Push-Relais am ELW, LLH-2074; iOS-Push über das Push-Relais, LLH-1981; Neu vergebene IDs am Spiegel, LLH-1893; Abruf eines Adapters, LLH-2017).
 
 Dieses Kapitel zeigt zehn Abläufe über mehrere Bausteine. Die Bausteine heißen wie in der
 [Bausteinsicht](05-bausteinsicht.md). Die Diagramme zeigen den Regelfall; Sonderfälle und Regeln
@@ -807,7 +807,7 @@ sequenceDiagram
 
 ## 6.6i Versand an eine Externe Stelle
 
-Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)) oder in einen Matrix-Raum (LLH-2094, [ADR-0107](entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md)). Der Lauf gibt jede Zeile über `Zustellerwahl` (`src/ausgang/zusteller.rs`) dem Zusteller ihres Kanals; das Diagramm zeigt E-Mail.
+Ein Mensch sendet ein freigegebenes Dokument per E-Mail (LLH-2093, [ADR-0104](entscheidungen/ADR-0104-nachrichten-an-menschen-gehen-nur-ueber-den-ausgangskorb.md)) oder in einen Matrix-Raum (LLH-2094, [ADR-0107](entscheidungen/ADR-0107-matrix-ist-ein-kanal-des-ausgangskorbs-verschluesselt-mit-einem-speicher-je-anbindung.md)) oder an eine Threema-ID (LLH-2096, [ADR-0112](entscheidungen/ADR-0112-threema-ist-ein-kanal-des-ausgangskorbs-nur-e2e-mit-gemerktem-schluessel.md)). Der Lauf gibt jede Zeile über `Zustellerwahl` (`src/ausgang/zusteller.rs`) dem Zusteller ihres Kanals; das Diagramm zeigt E-Mail.
 
 ```mermaid
 sequenceDiagram
@@ -855,6 +855,33 @@ sequenceDiagram
   HS-->>Hub: Event-IDs oder Fehler (errcode)
   Hub->>DB: BEGIN, Ergebnis, gesendete Teile, ETB-Eintrag, COMMIT
 ```
+
+Threema (`src/ausgang/zusteller/threema.rs`, Client aus `src/adapter/threema.rs`), an der Stelle
+von „STARTTLS … DATA“:
+
+```mermaid
+sequenceDiagram
+  participant Hub as lifeline-hub (src/ausgang/, adapter::threema)
+  participant DB as SQLite (ausgang, ausgang_teil, org_threema_schluessel)
+  participant GW as Threema Gateway (msgapi.threema.ch)
+  Hub->>DB: Zeile, gemerkte Teile, gemerkten Schlüssel und Zugang lesen, Verbindung zurückgeben
+  Hub->>GW: GET /pubkeys/{id}
+  alt Schlüssel weicht vom gemerkten ab
+    Hub->>DB: fehlgeschlagen (verschluesselung), nichts gesendet
+  else
+    loop je fehlendem Teil (Text, dann Anlagen)
+      opt Anlage
+        Hub->>GW: POST /upload_blob (verschlüsselter Blob)
+      end
+      Hub->>GW: POST /send_e2e (crypto_box)
+      GW-->>Hub: Nachrichten-ID
+    end
+    Hub->>DB: Teile, neuer Schlüssel, Ergebnis und ETB-Eintrag in einer Transaktion
+  end
+```
+
+- Bricht die Verbindung nach dem Absenden von `send_e2e` ab, ist der Versand `ungewiss` und wird
+  nicht selbst wiederholt; ein abgebrochener Upload ist vorübergehend.
 
 - Gemerkte Teile gehen nicht noch einmal hinaus; dieselbe Transaktions-ID deckt die Lücke
   zwischen Senden und Merken. Darum ist ein Abbruch vorübergehend und wird im Fenster wiederholt,
