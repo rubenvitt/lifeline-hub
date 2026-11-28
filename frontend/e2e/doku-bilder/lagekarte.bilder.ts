@@ -234,9 +234,8 @@ test.describe(KAPITEL, () => {
     // Zuschalten über den Server; die Lage erscheint, die Zeile nennt die Mission.
     await zuschalten.click();
     await expect(gruppe.getByText(`Zugeschaltet · Mission ${DROHNEN_MISSION}`)).toBeVisible();
-    // Die Ebene steht nach dem Zuschalten noch aus (Vorgabe der Fachebenen): einblenden.
+    // Das Zuschalten blendet die Ebene an diesem Arbeitsplatz ein (LLH-2138), kein eigener Tipp.
     const ebene = gruppe.getByRole('switch', { name: /^Drohnenlage \(Suchlage\)/ });
-    await ebene.click();
     await expect(ebene).toHaveAttribute('aria-checked', 'true');
 
     // Livebild über der Karte, mit laufendem Bild.

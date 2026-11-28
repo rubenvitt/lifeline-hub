@@ -1864,6 +1864,17 @@ export default function LagekartePage() {
         suchnadel={suchnadel}
       />
       <KartenUeberlagerung
+        // Das Livebild gehört zur laufenden Lage, nicht zu einem gesicherten Stand (LLH-2107); es
+        // steht unter der Zeigerkoordinate im linken Block (LLH-2137).
+        livebild={
+          livebildQuelle != null && snapshotParam == null ? (
+            <DrohnenVideoHalter
+              einsatzId={einsatzId}
+              adapterId={livebildQuelle}
+              onClose={() => setLivebildQuelle(null)}
+            />
+          ) : undefined
+        }
         grundlage={
           istSchmal ? (
             // Die Leiste liegt im zugeklappten Paneel; die schwarze Karte erklärt sich trotzdem
@@ -1910,14 +1921,6 @@ export default function LagekartePage() {
             : undefined
         }
       />
-      {/* Das Livebild gehört zur laufenden Lage, nicht zu einem gesicherten Stand (LLH-2107). */}
-      {livebildQuelle != null && snapshotParam == null && (
-        <DrohnenVideoHalter
-          einsatzId={einsatzId}
-          adapterId={livebildQuelle}
-          onClose={() => setLivebildQuelle(null)}
-        />
-      )}
       {/* Gemeinsamer unterer Rand: Zeichnen-Steuerung, Maßstab und Zeitachse als Flow-Bänder in
           einer Spalte — zwei Elemente im Fluss überlagern sich nicht. Begründung in
           `lagekarte/KartenFuss.tsx`. */}
@@ -2202,7 +2205,13 @@ export default function LagekartePage() {
         // Im gesicherten Stand keine Quellenzeile und keine Abfrage: sie zeigte die Lage von jetzt.
         drohne={
           snapshotParam == null
-            ? { darfSchalten: darfDrohneSchalten, onLivebild: setLivebildQuelle }
+            ? {
+                darfSchalten: darfDrohneSchalten,
+                onLivebild: setLivebildQuelle,
+                // Die Lage erscheint direkt nach dem Zuschalten, nur an diesem Arbeitsplatz und
+                // wie ein Tipp auf die Ebene: die Ansicht gilt als geändert (LLH-2138).
+                onZugeschaltet: () => onFachebeneToggle('drohne', true),
+              }
             : undefined
         }
         fachebenenLaedt={fachebenenLaedt}

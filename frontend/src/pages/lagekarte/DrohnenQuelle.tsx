@@ -15,6 +15,12 @@ export interface DrohnenQuelleProps {
   darfSchalten: boolean;
   /** Öffnet das Livebild der Quelle (Fenster über der Karte); ohne sie kein Knopf. */
   onLivebild?: (adapterId: string) => void;
+  /**
+   * Eine Quelle ist auf „Suchlage zuschalten“ hin zugeschaltet (LLH-2138): die Seite blendet die
+   * Ebene „Drohnenlage“ an diesem Arbeitsplatz ein, wie ein Tipp auf sie. Nicht beim Umlegen des
+   * Lagemonitor-Schalters und nicht nach einer Ablehnung.
+   */
+  onZugeschaltet?: () => void;
 }
 
 /** Zustand der Quelle in diesem Einsatz als Wort — der zweite Kanal neben jeder Farbe. */
@@ -48,7 +54,12 @@ export const LAGEMONITOR_AN =
  * Vorgabe aus): Auf dem Großbild können Personen im Bild zu sehen sein, deshalb legt nur die
  * Einsatzleitung es dorthin. Ohne Schaltrecht steht nur die Zeile, die sagt, was gilt.
  */
-export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: DrohnenQuelleProps) {
+export default function DrohnenQuelle({
+  einsatzId,
+  darfSchalten,
+  onLivebild,
+  onZugeschaltet,
+}: DrohnenQuelleProps) {
   const { token, rollen } = useRollen();
   const listeId = useId();
   const quellen = useDrohnenQuellen(einsatzId);
@@ -136,7 +147,10 @@ export default function DrohnenQuelle({ einsatzId, darfSchalten, onLivebild }: D
                   onClick={() =>
                     q.connected
                       ? abschalten.mutate(q.adapter_id)
-                      : zuschalten.mutate({ adapterId: q.adapter_id, lagemonitor: false })
+                      : zuschalten.mutate(
+                          { adapterId: q.adapter_id, lagemonitor: false },
+                          { onSuccess: () => onZugeschaltet?.() },
+                        )
                   }
                 >
                   {q.connected ? 'Abschalten' : 'Suchlage zuschalten'}

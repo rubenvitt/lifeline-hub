@@ -467,6 +467,11 @@ function Kartenknopf({
 interface KartenUeberlagerungProps {
   /** Wahl der Kartengrundlage (`GrundlageLeiste`); `null` = steht anderswo (Handschirm). */
   grundlage: ReactNode;
+  /**
+   * Livebild der Drohne (LLH-2137): steht als letztes Element im linken Block, unter der
+   * Zeigerkoordinate, und liegt so nie über ihm. Nicht gesetzt → nichts.
+   */
+  livebild?: ReactNode;
   zeigerQuelle: ZeigerQuelle;
   onZoomRein: () => void;
   onZoomRaus: () => void;
@@ -525,6 +530,7 @@ export default function KartenUeberlagerung(props: KartenUeberlagerungProps) {
       >
         {props.grundlage}
         <ZeigerKoordinate quelle={props.zeigerQuelle} />
+        {props.livebild}
       </div>
       {/* Fugenraster: Knopfzellen mit 1 px Fuge auf `linieStark`, Einzug in der Zelle (LFH-865).
           Der Block endet am unteren Kartenrand und rollt, wenn er höher wäre: im Handschuh mit
