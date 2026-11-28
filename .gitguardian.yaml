@@ -1,0 +1,14 @@
+# GitGuardian: bekannte Fehlalarme (LLH-2142).
+#
+# Nur einzelne Werte ausnehmen, nie ganze Pfade: ein echtes Geheimnis in derselben Datei soll
+# weiter auffallen. `match` ist der SHA-256 des Werts (`printf %s '<wert>' | sha256sum`).
+version: 2
+secret:
+  ignored_matches:
+    # Erfundene APNs-Gerätetoken (64 Hex-Zeichen) der Tests zur iOS-Push-Anmeldung.
+    - name: tests/ios_push.rs TOKEN (Testwert)
+      match: 79175e70eb2236876b0c003be58294690c0e36b44c0947ae80f599ea9d039833
+    - name: tests/ios_push.rs TOKEN_2 (Testwert)
+      match: 57cc4ac1a6fcc05829c8984268f52b765209b126c5c7cb07337559451a67fcfd
+    - name: tests/ios_push.rs TOKEN_3 (Testwert)
+      match: a8ae6e6ee929abea3afcfc5258c8ccd6f85273e0d4626d26c7279f3250f77c8e
