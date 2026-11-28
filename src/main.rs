@@ -366,12 +366,19 @@ async fn run_server(config: Config) -> anyhow::Result<()> {
     ));
     let mut arten =
         lifeline_hub::adapter::art::Verzeichnis::produktiv(drohne.clone(), matrix.clone());
-    // Neben den Test-Zustellern prüft der Faxzugang ohne Netz (sonst 401 auf das Token der
+    // Neben den Test-Zustellern prüfen Faxzugang und Threema-Gateway (LLH-2096) ohne Netz (sonst 401 auf das Token der
     // e2e-Suite, und der Zugang stünde still); nur in Debug-Builds, wie die Zusteller.
     if config.ausgang_testzusteller {
-        match lifeline_hub::adapter::sipgate_fax_art::SipgateFaxArt::ohne_netz() {
-            Some(fax) => arten = arten.ersetzt(std::sync::Arc::new(fax)),
-            None => {
+        match (
+            lifeline_hub::adapter::sipgate_fax_art::SipgateFaxArt::ohne_netz(),
+            lifeline_hub::adapter::threema_art::ThreemaArt::ohne_netz(),
+        ) {
+            (Some(fax), Some(threema)) => {
+                arten = arten
+                    .ersetzt(std::sync::Arc::new(fax))
+                    .ersetzt(std::sync::Arc::new(threema))
+            }
+            _ => {
                 eprintln!("--ausgang-testzusteller gibt es nur in Debug-Builds.");
                 std::process::exit(2);
             }

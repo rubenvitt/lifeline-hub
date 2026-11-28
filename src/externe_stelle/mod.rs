@@ -61,7 +61,7 @@ impl KanalArt {
             KanalArt::Email => Some(crate::adapter::smtp_art::CODE),
             KanalArt::Fax => Some(crate::adapter::sipgate_fax_art::CODE),
             KanalArt::Matrix => Some(crate::adapter::matrix_art::CODE),
-            KanalArt::Threema => Some("threema"),
+            KanalArt::Threema => Some(crate::adapter::threema_art::CODE),
         }
     }
 }

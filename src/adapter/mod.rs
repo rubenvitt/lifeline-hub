@@ -20,6 +20,7 @@ pub mod sipgate_fax_art;
 pub mod smtp;
 pub mod smtp_art;
 pub mod threema;
+pub mod threema_art;
 pub mod ziel;
 pub mod zustand;
 

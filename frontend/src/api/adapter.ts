@@ -117,7 +117,7 @@ export const ADAPTER_FEHLER_TEXT: Record<AdapterFehler, string> = {
   version_unbekannt: 'Unbekannte Schnittstellenversion',
   intern: 'Fehler im Server',
   schluessel_passen_nicht:
-    'Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen.',
+    'Schlüssel passen nicht zum Zugang. Bei Matrix ein neues Access-Token anlegen, bei Threema den privaten Schlüssel der Gateway-ID eintragen.',
 };
 
 /** Klartext eines Fehlschlags, mit HTTP-Status, falls das Ziel antwortete. */

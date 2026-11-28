@@ -161,6 +161,12 @@ pub trait AdapterArt: Send + Sync + 'static {
         Ok(())
     }
 
+    /// Prüft und bereinigt den Wert eines Geheimnisses, bevor er verschlüsselt wird (LLH-2096,
+    /// privater Schlüssel des Threema Gateway); der Text des Fehlers geht an die Verwaltung.
+    fn check_geheimnis(&self, _platz: &str, wert: &str) -> Result<String, String> {
+        Ok(wert.to_string())
+    }
+
     /// Erste Phase: abrufen, nur Netz. Liefert die Übernahme für die zweite Phase.
     fn abrufen<'a>(
         &'a self,
@@ -314,6 +320,7 @@ impl Verzeichnis {
             Arc::new(super::smtp_art::SmtpArt::produktiv()),
             Arc::new(super::matrix_art::MatrixArt::new(matrix)),
             Arc::new(super::sipgate_fax_art::SipgateFaxArt::produktiv()),
+            Arc::new(super::threema_art::ThreemaArt::produktiv()),
             Arc::new(super::arten::stammdaten_abruf::StammdatenAbruf),
         ])
     }
