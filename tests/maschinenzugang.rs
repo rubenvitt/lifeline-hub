@@ -1077,6 +1077,47 @@ async fn am_gekoppelten_elw_laesst_sich_ein_reiner_meldungszugang_einloesen_und_
     assert_eq!(v["status"], "offen");
 }
 
+/// Am gekoppelten ELW lassen sich die Scopes nur auf genau `meldungen:write` ändern; der Name
+/// eines Zugangs bleibt änderbar.
+#[tokio::test]
+async fn am_gekoppelten_elw_aendert_patch_die_scopes_nur_auf_meldungen() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    org_koppeln(&pool, "hub-6", "Hub Kreis", "standard").await;
+    let (_, v) = anlegen(
+        &app,
+        &admin,
+        json!({ "name": "Gateway", "scopes": ["meldungen:write"] }),
+    )
+    .await;
+    let id = v["zugang"]["id"].as_str().unwrap().to_string();
+    let pfad = format!("{LISTE}/{id}");
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "scopes": ["meldungen:write", "rechner:use"] })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert!(v.to_string().contains("Hub Kreis"), "{v}");
+    let z = zugang_zeile(&app, &admin, &id).await;
+    assert_eq!(z["scopes"], json!(["meldungen:write"]));
+
+    let (s, v) = anfrage_json(
+        &app,
+        "PATCH",
+        &pfad,
+        &admin,
+        Some(&json!({ "name": "Gateway 2", "scopes": ["meldungen:write"] })),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert_eq!(v["name"], "Gateway 2");
+}
+
 /// Ein gemischter Zugang, dessen Code erst nach der Kopplung eingelöst wird, bleibt gesperrt.
 #[tokio::test]
 async fn am_gekoppelten_elw_bleibt_der_code_eines_gemischten_zugangs_gesperrt() {

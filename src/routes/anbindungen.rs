@@ -380,6 +380,16 @@ pub async fn aendern(
     let (org_id, von) = (admin.org_id, admin.id);
     let admin_name = admin.anzeigename.clone();
     let (vorher, nachher, etb, anzeige) = crate::write_retry!(&state.pool, |conn| {
+        // Am gekoppelten ELW nur auf genau `meldungen:write` (LLH-2112, wie beim Anlegen): sonst
+        // fiele ein Zugang still unter die Sperre und käme mit seiner Freigabe ohne neue
+        // Entscheidung zurück, sobald die Scopes wieder passen.
+        if let Some(scopes) = &aenderung.scopes {
+            if !scope::is_nur_meldungen(scopes) {
+                if let Some(grund) = gesperrt_grund(&mut *conn, org_id).await? {
+                    return Err(AppError::Conflict(grund));
+                }
+            }
+        }
         let (vorher, nachher) = zugang::aendern(&mut *conn, org_id, &id, &aenderung, &jetzt)
             .await?
             .ok_or(AppError::NotFound)?;
