@@ -410,7 +410,10 @@ impl Clients {
         };
         let frei = zugriff.offen.is_none()
             && zugriff.schliessen.is_none()
-            && zugriff.alt.as_ref().is_none_or(|alt| alt.strong_count() == 0);
+            && zugriff
+                .alt
+                .as_ref()
+                .is_none_or(|alt| alt.strong_count() == 0);
         drop(zugriff);
         if frei {
             eintraege.remove(adapter_id);
