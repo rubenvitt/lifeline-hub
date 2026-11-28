@@ -15749,6 +15749,32 @@
           "lagged"
         ]
       },
+      "MaschinenHerkunft": {
+        "type": "object",
+        "description": "Wer einen übernommenen Meldungsvorschlag geschickt hat (LLH-2112): Adapter, Kennung und\nName des Absenders im Fremdsystem, und ob das Fremdsystem die Nachricht als signiert meldet.",
+        "required": [
+          "adapter",
+          "kennung",
+          "signiert"
+        ],
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "kennung": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signiert": {
+            "type": "boolean"
+          }
+        }
+      },
       "MassnahmeAnzeige": {
         "type": "object",
         "description": "Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`.",
@@ -16293,6 +16319,17 @@
               "null"
             ],
             "format": "double"
+          },
+          "maschinen_herkunft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MaschinenHerkunft",
+                "description": "Herkunft einer aus einem Maschinenvorschlag übernommenen Meldung (LLH-2112): wer sie\ngeschickt hat. Fehlt bei jeder anderen Meldung; ändert sich nie."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "meldeweg": {
             "$ref": "#/components/schemas/MeldeWeg"
@@ -20763,6 +20800,66 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ReportSuggestion": {
+        "type": "object",
+        "description": "Ein offener Meldungsvorschlag eines Fremdsystems (`GET …/report-suggestions`).",
+        "required": [
+          "id",
+          "text",
+          "source",
+          "received_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_at": {
+            "type": "string",
+            "description": "Empfangszeitpunkt am Server (UTC)."
+          },
+          "sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Sendezeitpunkt laut Fremdsystem (UTC), wenn es einen nannte."
+          },
+          "source": {
+            "$ref": "#/components/schemas/ReportSuggestionSource"
+          },
+          "text": {
+            "type": "string"
+          }
+        }
+      },
+      "ReportSuggestionSource": {
+        "type": "object",
+        "description": "Wer einen Vorschlag geschickt hat.",
+        "required": [
+          "adapter",
+          "sender_id",
+          "signed"
+        ],
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "sender_id": {
+            "type": "string"
+          },
+          "sender_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "signed": {
+            "type": "boolean",
+            "description": "Das Fremdsystem meldet die Nachricht als signiert; der Server prüft das nicht."
           }
         }
       },

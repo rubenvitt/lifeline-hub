@@ -163,6 +163,8 @@ pub const PFAD_KEY: &[(&str, Option<&str>)] = &[
         Some("lagemeldungen"),
     ),
     ("/api/incidents/{id}/reports", Some("meldungen")),
+    // LLH-2112: Meldungsvorschläge gehören dem Modul Meldungen.
+    ("/api/incidents/{id}/report-suggestions", Some("meldungen")),
     ("/api/incidents/{id}/tasks", Some("auftraege")),
     // LLH-1111: Stand und Termin unter `…/briefing`, Verlauf und Abschluss unter
     // `…/briefings` — zwei Einträge, weil der Präfixvergleich an Pfadsegmenten endet.

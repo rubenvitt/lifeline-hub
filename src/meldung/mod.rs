@@ -211,6 +211,22 @@ pub struct MeldungAnzeige {
     #[serde(skip_serializing_if = "MeldungPatienten::is_empty")]
     #[schema(value_type = Option<Vec<MeldungPatient>>)]
     pub patienten: MeldungPatienten,
+    /// Herkunft einer aus einem Maschinenvorschlag übernommenen Meldung (LLH-2112): wer sie
+    /// geschickt hat. Fehlt bei jeder anderen Meldung; ändert sich nie.
+    #[sqlx(json(nullable))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maschinen_herkunft: Option<MaschinenHerkunft>,
+}
+
+/// Wer einen übernommenen Meldungsvorschlag geschickt hat (LLH-2112): Adapter, Kennung und
+/// Name des Absenders im Fremdsystem, und ob das Fremdsystem die Nachricht als signiert meldet.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, serde::Deserialize, ToSchema)]
+pub struct MaschinenHerkunft {
+    pub adapter: String,
+    pub kennung: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    pub signiert: bool,
 }
 
 /// Ein aus einer Meldung angelegter Patient (LLH-1567): Kennung und Registriernummer, sonst nichts.

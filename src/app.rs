@@ -1059,6 +1059,19 @@ pub fn build_router_mit(state: AppState, opt: RouterOptionen) -> Router {
             "/api/incidents/{id}/reports/{mid}/task",
             post(routes::meldung::auftrag_erteilen),
         )
+        // Meldungsvorschläge von Fremdsystemen (LLH-2112): Liste, Übernahme, Verwerfen.
+        .route(
+            "/api/incidents/{id}/report-suggestions",
+            get(routes::meldung_vorschlag::liste),
+        )
+        .route(
+            "/api/incidents/{id}/report-suggestions/{vid}/accept",
+            post(routes::meldung_vorschlag::accept),
+        )
+        .route(
+            "/api/incidents/{id}/report-suggestions/{vid}/discard",
+            post(routes::meldung_vorschlag::discard),
+        )
         .route(
             "/api/incidents/{id}/situation/reports",
             get(routes::meldung::lage_liste),

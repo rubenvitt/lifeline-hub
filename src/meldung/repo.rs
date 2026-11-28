@@ -137,7 +137,12 @@ const ANZEIGE_SELECT: &str = concat!(
             (SELECT json_group_array(json_object('id', p.id, 'registrier_nr', p.registrier_nr)) \
              FROM (SELECT id, registrier_nr FROM einsatz_person \
                    WHERE meldung_id = m.id AND storniert_at IS NULL \
-                   ORDER BY registrier_nr) p) AS patienten \
+                   ORDER BY registrier_nr) p) AS patienten, \
+            CASE WHEN m.herkunft_adapter IS NULL THEN NULL ELSE json_object( \
+              'adapter', m.herkunft_adapter, 'kennung', m.herkunft_kennung, \
+              'name', m.herkunft_name, \
+              'signiert', json(CASE WHEN m.herkunft_signiert = 1 THEN 'true' ELSE 'false' END)) \
+            END AS maschinen_herkunft \
      FROM meldung m \
      LEFT JOIN benutzer b ON b.id = m.bearbeiter_id",
     quittung_join_sql!(),
@@ -425,7 +430,7 @@ async fn anlegen_mit_client_id(
 /// Rumpf der Meldungsanlage auf einer offenen Verbindung/Transaktion: [`einfuegen_tx`] und —
 /// bei aktivem Auto-ETB — der gekoppelte ETB-Eintrag mit beidseitigem Backlink. Liefert die
 /// neue `meldung_id`.
-async fn anlegen_mit_client_id_tx(
+pub(crate) async fn anlegen_mit_client_id_tx(
     conn: &mut SqliteConnection,
     einsatz_id: i64,
     erfasser_id: i64,

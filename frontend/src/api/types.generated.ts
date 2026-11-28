@@ -6292,6 +6292,16 @@ export interface components {
          * @enum {string}
          */
         LiveEvent: "uhs" | "schaden" | "fahrzeug" | "material" | "tier" | "lage_zone" | "freies_zeichen" | "gefahr" | "einheit" | "abschnitt" | "person" | "personal" | "lagebericht" | "chat" | "erinnerung" | "auftrag" | "nachforderung" | "meldung" | "bereitstellungsraum" | "karte_bild" | "karte_fremdebene" | "etb" | "befehl" | "ausgang" | "lagebesprechung" | "fernmeldewesen" | "dokument" | "abloesung" | "betreuung" | "evakuierung" | "verpflegung" | "infotelefon" | "karten_ansicht" | "lage_snapshot" | "sofortmeldung" | "einsatz" | "mitglieder" | "benachrichtigung" | "praesenz" | "helfer" | "helfer_auftrag" | "lagged";
+        /**
+         * @description Wer einen übernommenen Meldungsvorschlag geschickt hat (LLH-2112): Adapter, Kennung und
+         *     Name des Absenders im Fremdsystem, und ob das Fremdsystem die Nachricht als signiert meldet.
+         */
+        MaschinenHerkunft: {
+            adapter: string;
+            kennung: string;
+            name?: string | null;
+            signiert: boolean;
+        };
         /** @description Eine Maßnahme (1:1 zu `person_massnahme`); eine aufgehobene trägt `aufgehoben_at`. */
         MassnahmeAnzeige: {
             art: components["schemas"]["MassnahmeArt"];
@@ -6515,6 +6525,7 @@ export interface components {
             lfd_nr: number;
             /** Format: double */
             lon?: number | null;
+            maschinen_herkunft?: components["schemas"]["MaschinenHerkunft"] | null;
             meldeweg: components["schemas"]["MeldeWeg"];
             meldungsart: components["schemas"]["Meldungsart"];
             /**
@@ -8303,6 +8314,25 @@ export interface components {
             registrier_nr: number;
             unvertraeglichkeiten?: string | null;
             vorname?: string | null;
+        };
+        /** @description Ein offener Meldungsvorschlag eines Fremdsystems (`GET …/report-suggestions`). */
+        ReportSuggestion: {
+            /** Format: int64 */
+            id: number;
+            /** @description Empfangszeitpunkt am Server (UTC). */
+            received_at: string;
+            /** @description Sendezeitpunkt laut Fremdsystem (UTC), wenn es einen nannte. */
+            sent_at?: string | null;
+            source: components["schemas"]["ReportSuggestionSource"];
+            text: string;
+        };
+        /** @description Wer einen Vorschlag geschickt hat. */
+        ReportSuggestionSource: {
+            adapter: string;
+            sender_id: string;
+            sender_name?: string | null;
+            /** @description Das Fremdsystem meldet die Nachricht als signiert; der Server prüft das nicht. */
+            signed: boolean;
         };
         /**
          * @description Stand eines für eine Person angeforderten Rettungsmittels (LLH-1573 design.md D4), gelesen aus
