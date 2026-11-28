@@ -325,6 +325,7 @@ mod tests {
             EinstellungUngueltig,
             VersionUnbekannt,
             SchluesselPassenNicht,
+            SchluesselspeicherUnlesbar,
         ] {
             assert!(braucht_eingriff(f), "{f:?}");
         }
@@ -340,7 +341,7 @@ mod tests {
         ] {
             assert!(!braucht_eingriff(f), "{f:?}");
         }
-        assert_eq!(AdapterFehler::ALLE.len(), 18);
+        assert_eq!(AdapterFehler::ALLE.len(), 19);
     }
 
     #[test]
