@@ -311,7 +311,10 @@ describe('SendenDialog (LLH-2093)', () => {
   });
 
   it('threema_wird_angeboten', async () => {
-    kanaele([kanal(21, 'ILS Nord', 'ils@example.org'), kanal(22, 'ILS Nord', 'ECHOECHO', 'threema', 21)]);
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', 'ECHOECHO', 'threema', 21),
+    ]);
     zeige();
     const threema = await screen.findByRole('checkbox', { name: /ECHOECHO/ });
     expect(threema.closest('label')).toHaveTextContent(/^Threema\s*ECHOECHO/);

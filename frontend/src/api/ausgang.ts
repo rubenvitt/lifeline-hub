@@ -114,10 +114,7 @@ export const ANBINDUNG_GRUENDE: ReadonlySet<string> = new Set([
  * nutzbare Anbindung (`src/routes/ausgang.rs`, `meldung_anbindung`, mit „; “ verbunden, LLH-2096);
  * ohne Hinweis auf Matrix, Threema oder Fax gilt die E-Mail.
  */
-export function anbindungKanaele(
-  fehler: unknown,
-  gesendet?: readonly KanalArt[],
-): AusgangKanal[] {
+export function anbindungKanaele(fehler: unknown, gesendet?: readonly KanalArt[]): AusgangKanal[] {
   const arten = new Set((gesendet ?? []).map(ausgangKanal));
   if (arten.size === 1) return [...arten];
   if (!(fehler instanceof ApiError)) return ['email'];

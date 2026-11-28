@@ -163,7 +163,9 @@ export default function SendenDialog({
     for (const stelleId of betroffen) {
       const ersatz = (kanaele ?? [])
         .filter((k) => k.agency_id === stelleId && k.channel.channel !== 'fax' && !gesperrt(k))
-        .sort((a, b) => RUECKFALL.indexOf(a.channel.channel) - RUECKFALL.indexOf(b.channel.channel));
+        .sort(
+          (a, b) => RUECKFALL.indexOf(a.channel.channel) - RUECKFALL.indexOf(b.channel.channel),
+        );
       if (ersatz.length > 0 && !ersatz.some((k) => rest.includes(k.channel.id))) {
         rest.push(ersatz[0].channel.id);
       }
