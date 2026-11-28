@@ -33,6 +33,8 @@ crate::wire_enum::wire_enum! {
         Conflict => "conflict",
         /// 409: eine andere Instanz führt den Einsatz.
         FuehrungElsewhere => "fuehrung_elsewhere",
+        /// 409: für den Zugang ist kein Einsatz freigegeben.
+        IncidentNotReleased => "incident_not_released",
         /// 410: der Cursor ist älter als die Aufbewahrung der Ereignisse.
         CursorExpired => "cursor_expired",
         /// 413: der Body ist größer als 64 KiB.
@@ -57,7 +59,9 @@ impl ErrorCode {
             ErrorCode::MissingScope | ErrorCode::TlsRequired => StatusCode::FORBIDDEN,
             ErrorCode::NotFound => StatusCode::NOT_FOUND,
             ErrorCode::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
-            ErrorCode::Conflict | ErrorCode::FuehrungElsewhere => StatusCode::CONFLICT,
+            ErrorCode::Conflict | ErrorCode::FuehrungElsewhere | ErrorCode::IncidentNotReleased => {
+                StatusCode::CONFLICT
+            }
             ErrorCode::CursorExpired => StatusCode::GONE,
             ErrorCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
             ErrorCode::Unprocessable => StatusCode::UNPROCESSABLE_ENTITY,
@@ -99,6 +103,7 @@ impl ErrorCode {
             ErrorCode::MethodNotAllowed => "Methode für diesen Pfad nicht erlaubt",
             ErrorCode::Conflict => "Konflikt mit dem aktuellen Zustand",
             ErrorCode::FuehrungElsewhere => "Eine andere Instanz führt diesen Einsatz",
+            ErrorCode::IncidentNotReleased => "Für diesen Zugang ist kein Einsatz freigegeben",
             ErrorCode::CursorExpired => "Der Cursor ist abgelaufen",
             ErrorCode::PayloadTooLarge => "Anfrage ist zu groß.",
             ErrorCode::Unprocessable => "Anfrage nicht verarbeitbar",
@@ -267,7 +272,12 @@ mod tests {
             let default = ErrorCode::for_status(code.status());
             assert!(
                 default == code
-                    || matches!(code, ErrorCode::TlsRequired | ErrorCode::FuehrungElsewhere),
+                    || matches!(
+                        code,
+                        ErrorCode::TlsRequired
+                            | ErrorCode::FuehrungElsewhere
+                            | ErrorCode::IncidentNotReleased
+                    ),
                 "{} antwortet mit {}, dessen Vorgabe {} ist",
                 code.as_str(),
                 code.status(),

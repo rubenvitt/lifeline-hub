@@ -37,6 +37,7 @@ pub mod freigabe;
 pub mod kommando;
 pub mod lage;
 pub mod machine;
+pub mod meldung_vorschlag;
 pub mod rechner;
 pub mod routen;
 pub mod scope;
@@ -136,6 +137,11 @@ pub fn router() -> OpenApiRouter<crate::app::AppState> {
         )
         // Lage des freigegebenen Einsatzes (LLH-1638).
         .routes(routes!(lage::lage).layer(Extension(ScopeAnforderung::Scope(Scope::LageRead))))
+        // Meldungsvorschläge (LLH-2112): unbestätigt, übernimmt ein Mensch.
+        .routes(
+            routes!(meldung_vorschlag::einreichen)
+                .layer(Extension(ScopeAnforderung::Scope(Scope::MeldungenWrite))),
+        )
         // Rechner (LLH-1524, Spec `rechner-api-unterkunft`).
         .routes(
             routes!(rechner::calculate_unterkunft)

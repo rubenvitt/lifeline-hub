@@ -2246,6 +2246,7 @@ fn public_api_error_code_wire() {
         MethodNotAllowed => "method_not_allowed",
         Conflict => "conflict",
         FuehrungElsewhere => "fuehrung_elsewhere",
+        IncidentNotReleased => "incident_not_released",
         CursorExpired => "cursor_expired",
         PayloadTooLarge => "payload_too_large",
         Unprocessable => "unprocessable",

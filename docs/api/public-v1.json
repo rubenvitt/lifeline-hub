@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Lifeline Hub, öffentliche API",
-    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0096.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0096).\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nPfade sind englisch, auch für Fachbegriffe (ADR-0097). In Feldern, Werten, Scopes und\nEreignisarten sind Fachbegriffe deutsch und alles Technische englisch. Umlaute werden\numschrieben (`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | – | `incidents`, `situation`, `intake`, `alarm`, `position`, `calculators`, `accommodation`, `reference-values`, `access`, `instance`, `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`, `meldungen:write`) wirkt nur auf den\nEinsatz, den die Einsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz\nläuft; die Lese-Scopes sehen ihn, `meldungen:write` reicht dafür Meldungen ein. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/situation` mit `einsatz: null` und\n`GET /api/v1/incidents` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/incidents/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage\nihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von\n`rechner:use` beendet eine Freigabe nicht.\n\n## Meldungsvorschläge\n\nMit `meldungen:write` reicht ein Zugang kurze Texte als unverifizierte Vorschläge für den\nfreigegebenen Einsatz ein; die Einsatzleitung übernimmt sie oder verwirft sie. Die Route\n`POST /api/v1/report-suggestions` folgt.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit\n  `einsaetze:read` über `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und\n  danach `GET /api/v1/situation`.\n\n## Einwurf\n\nAbsender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 mit „URL öffnen“,\nDivera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,\nnimmt den Maschinenzugang.\n\n- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/intake/{schluessel}/alarm` oder\n  `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt\n  es hier nicht.\n- Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.\n  Eine neue Meldung und eine Wiederholung bekommen dieselbe Antwort.\n- Nur über TLS, sonst `403 tls_required`. Wer POST kann, nimmt POST: Bei GET stehen Schlüssel und\n  Inhalt in der URL.\n- **Alarmmeldung:** Abfrage und Body werden unverändert abgelegt und nicht gedeutet. Der Server\n  erkennt nur `external_id` und `message_id`. Mit ihnen ist eine Wiederholung dauerhaft\n  idempotent; ohne sie gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als\n  Wiederholung, danach entsteht ein neuer Eintrag.\n- **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und\n  `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird\n  nicht übernommen.\n- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.\n- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,\n  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200\n  Kennungen für Positionen je Zugang.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß, bei einem Einwurf 16 KiB.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
+    "description": "Öffentliche API von Lifeline Hub für Fremdsysteme (Alarmübernahme, Lagemonitore, Einsatzbuch,\neigene Skripte). Grundlage: ADR-0096.\n\n## Stabilitätszusage\n\n- Nur die Pfade unter `/api/v1/` sind öffentlich. Die übrige API dient der eigenen Oberfläche und\n  ändert sich ohne Ankündigung.\n- Die Zusage gilt ab Version 1.0.0. Bis dahin kann sich v1 noch brechend ändern (ADR-0096).\n- Innerhalb von v1 kommen nur hinzu: neue Routen, neue optionale Felder, neue Scopes, neue\n  Enum-Werte und neue Fehlercodes.\n- Clients überspringen unbekannte Felder und unbekannte Enum-Werte, statt abzubrechen.\n- Wer entfernen oder umdeuten muss, macht `/api/v2/`. v1 bleibt dann mindestens sechs Monate\n  erreichbar und meldet `Deprecation` und `Sunset` im Kopf jeder Antwort.\n\n## Namen\n\nPfade sind englisch, auch für Fachbegriffe (ADR-0097). In Feldern, Werten, Scopes und\nEreignisarten sind Fachbegriffe deutsch und alles Technische englisch. Umlaute werden\numschrieben (`einsaetze`).\n\n| Art | Deutsch (Fachbegriff) | Englisch (Technik) |\n| --- | --- | --- |\n| Pfade | – | `incidents`, `situation`, `intake`, `alarm`, `position`, `calculators`, `accommodation`, `reference-values`, `access`, `instance`, `v1`, `me`, `events`, `redeem`, `jwks.json`, `openapi.json` |\n| Felder | `stichwort`, `einsatznummer`, `einsatz_id`, `alarmiert_at`, `lagemeldung`, `stand_at`, `weg`, `trennung`, `raeume`, `richtwerte`, `herkunft` | `id`, `external_id`, `cursor`, `type`, `occurred_at`, `state`, `kind` |\n| Abfrage | `karte` | `after`, `wait` |\n| Fehler | Text (`error`) | `code` |\n\nFelder sind `snake_case`.\n\n## Einsatzbezug\n\nEin Scope mit Einsatzbezug (`lage:read`, `einsaetze:read`, `meldungen:write`) wirkt nur auf den\nEinsatz, den die Einsatzleitung für den Zugang freigegeben hat, und nur, solange dieser Einsatz\nläuft; die Lese-Scopes sehen ihn, `meldungen:write` reicht dafür Meldungen ein. Je Zugang ist\ndas höchstens einer. Ohne Freigabe antwortet `GET /api/v1/situation` mit `einsatz: null` und\n`GET /api/v1/incidents` mit einer leeren Liste, nicht mit einem Fehler; `GET /api/v1/incidents/{id}`\nantwortet mit `404 not_found`. Die Ereignisse eines Zugangs betreffen nur seinen freigegebenen\nEinsatz. Dieselbe Freigabe öffnet `rechner:use` die Richtwerte dieses Einsatzes, wenn die Anfrage\nihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben oder Nehmen von\n`rechner:use` beendet eine Freigabe nicht.\n\n## Meldungsvorschläge\n\nMit `meldungen:write` reicht ein Zugang kurze Texte als unverifizierte Vorschläge für den\nfreigegebenen Einsatz ein; die Einsatzleitung übernimmt sie oder verwirft sie. Die Route\n`POST /api/v1/report-suggestions` legt einen Vorschlag an (201), eine Wiederholung mit derselben\n`external_id` am selben Zugang antwortet 200 mit demselben Vorschlag. Ohne Freigabe antwortet sie\n409 `incident_not_released`.\n\n## Zeitpunkte\n\nZeitpunkte sind UTC im Format `JJJJ-MM-TT hh:mm:ss` (etwa `2026-11-12 08:30:00`), ohne\nZonenkennung, und enden auf `_at`.\n\n## Fehler\n\nJede Fehlerantwort ist `{\"error\": \"<Text>\", \"code\": \"<code>\"}`. Vertrag ist `code`; der Text ist\ndeutsch, für Menschen gedacht und kann sich ändern.\n\n| Status | `code` |\n| --- | --- |\n| 400 | `invalid_field` |\n| 401 | `unauthorized` |\n| 403 | `missing_scope` |\n| 403 | `tls_required` |\n| 404 | `not_found` |\n| 405 | `method_not_allowed` |\n| 409 | `conflict` |\n| 409 | `fuehrung_elsewhere` |\n| 409 | `incident_not_released` |\n| 410 | `cursor_expired` |\n| 413 | `payload_too_large` |\n| 422 | `unprocessable` |\n| 429 | `rate_limited` |\n| 500 | `internal_error` |\n| 503 | `unavailable` |\n\n`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. `incident_not_released` heißt: Für den Zugang ist kein Einsatz freigegeben. Ein Status ohne eigene Zeile\nträgt `unprocessable` (4xx) oder `internal_error` (5xx).\n\n## Ereignisse\n\n`GET /api/v1/events` (Scope `events:read`) sagt einem Fremdsystem, dass sich an einem für seinen\nZugang freigegebenen Einsatz etwas getan hat. Ein Ereignis trägt nur `id`, `type`, `occurred_at`\nund `einsatz_id`; den Inhalt liest der Client über die Leserouten nach.\n\n| `type` | Bedeutung | Sichtbar mit |\n| --- | --- | --- |\n| `einsatz.created` | Der Einsatz ist für den Zugang lesbar geworden. | `einsaetze:read` |\n| `einsatz.updated` | Ein Feld des Einsatzes hat sich geändert. | `einsaetze:read` |\n| `einsatz.closed` | Der Einsatz ist für den Zugang nicht mehr lesbar. | `einsaetze:read` |\n| `lage.changed` | Die Lage des Einsatzes kann sich geändert haben. | `lage:read` |\n\n- **Cursor:** `id` steigt fortlaufend. Jede Antwort nennt einen `cursor`; der nächste Abruf gibt\n  ihn als `after` mit. Ohne `after` kommt der aktuelle Stand ohne Ereignisse.\n- **Warten:** `wait` hält den Abruf höchstens 25 Sekunden offen, bis ein Ereignis vorliegt. Es\n  warten höchstens 32 Abrufe zugleich, je Zugang einer. Ein Abruf darüber antwortet sofort und\n  setzt `Retry-After`.\n- **Seiten:** Eine Antwort trägt höchstens 500 Ereignisse. Bei einer vollen Seite gleich mit dem\n  neuen Cursor weiter abrufen.\n- **`lage.changed` ist verdichtet:** Je Einsatz liegt höchstens eines vor; ein neues ersetzt das\n  alte und trägt eine höhere `id`.\n- **Aufbewahrung:** Ereignisse leben sieben Tage. Ein älterer Cursor ergibt `410 cursor_expired`;\n  der Client baut den Stand neu auf und fährt mit dem dabei gelieferten Cursor fort: mit\n  `einsaetze:read` über `GET /api/v1/incidents`, sonst über `GET /api/v1/events` ohne `after` und\n  danach `GET /api/v1/situation`.\n\n## Einwurf\n\nAbsender, die nur eine URL aufrufen und nicht signieren können (BOSWatch, FE2 mit „URL öffnen“,\nDivera-Webhook, OsmAnd), werfen über einen Einwurf-Zugang ein (ADR-0023). Wer signieren kann,\nnimmt den Maschinenzugang.\n\n- Der Schlüssel (`llh_ew_…`) steht im Pfad: `/api/v1/intake/{schluessel}/alarm` oder\n  `…/position`, je nach Zweck des Zugangs. Er ist die Anmeldung; einen Kopf `Authorization` gibt\n  es hier nicht.\n- Ein Einwurf schreibt nur und liest nichts. Die Antwort ist `204` ohne Body oder ein Fehler.\n  Eine neue Meldung und eine Wiederholung bekommen dieselbe Antwort.\n- Nur über TLS, sonst `403 tls_required`. Wer POST kann, nimmt POST: Bei GET stehen Schlüssel und\n  Inhalt in der URL.\n- **Alarmmeldung:** Abfrage und Body werden unverändert abgelegt und nicht gedeutet. Der Server\n  erkennt nur `external_id` und `message_id`. Mit ihnen ist eine Wiederholung dauerhaft\n  idempotent; ohne sie gilt gleicher Inhalt desselben Zugangs zwei Minuten lang als\n  Wiederholung, danach entsteht ein neuer Eintrag.\n- **Position:** `id`, `lat`, `lon` und optional `timestamp` (OsmAnd-Protokoll). Je Zugang und\n  `id` hält der Server genau eine Position, ohne Verlauf; eine mit älterem Zeitstempel wird\n  nicht übernommen.\n- Nur GET und POST; jede andere Methode, auch HEAD, ergibt `405`.\n- Grenzen: Body höchstens 16 KiB, Abfrage höchstens 8 KiB, abgelegte Rohdaten höchstens 48 KiB,\n  30 Einwürfe je Minute und Zugang, 5 000 neue Alarmmeldungen je Zugang in 24 Stunden, 200\n  Kennungen für Positionen je Zugang.\n\n## Grenzen\n\n- Ein Body ist höchstens 64 KiB groß, bei einem Einwurf 16 KiB.\n- Antworten tragen `Cache-Control: no-store`.\n- Es gibt kein CORS: Browser-Clients fremder Seiten sind nicht vorgesehen.\n",
     "version": "1"
   },
   "servers": [
@@ -1196,6 +1196,133 @@
         }
       }
     },
+    "/api/v1/report-suggestions": {
+      "post": {
+        "tags": [
+          "Meldungen"
+        ],
+        "summary": "Einen Vorschlag für den Meldungseingang des freigegebenen Einsatzes einreichen.",
+        "description": "Der Vorschlag ist unbestätigt: weder Meldung noch ETB-Eintrag, kein Alarm. Die Einsatzleitung\nübernimmt ihn oder verwirft ihn; offen bleibt er höchstens 12 Stunden. Eine Wiederholung mit\nderselben `external_id` am selben Zugang antwortet 200 mit demselben Vorschlag.",
+        "operationId": "create_report_suggestion",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportSuggestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Diese `external_id` kam an diesem Zugang schon an; es kommt der bestehende Vorschlag mit seinem jetzigen Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSuggestionResponse"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Der Vorschlag ist neu abgelegt; Antwort signiert im Kopf `Lifeline-Signature`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSuggestionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Der Body ist kein gültiges JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Anmeldung fehlgeschlagen (Grund nur am Zugang)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Dem Zugang fehlt das Recht `meldungen:write`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`incident_not_released`: für den Zugang ist kein Einsatz freigegeben; `fuehrung_elsewhere`: eine andere Instanz führt den freigegebenen Einsatz",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Der Body ist größer als 64 KiB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Gedrosselt; `Retry-After` nennt die Wartezeit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Fehler mit stabilem `code`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "machine": []
+          }
+        ]
+      }
+    },
     "/api/v1/situation": {
       "get": {
         "tags": [
@@ -1413,6 +1540,7 @@
           "method_not_allowed",
           "conflict",
           "fuehrung_elsewhere",
+          "incident_not_released",
           "cursor_expired",
           "payload_too_large",
           "unprocessable",
@@ -2377,6 +2505,101 @@
           "zugang_id": {
             "type": "string",
             "description": "Kennung des Zugangs: `kid` und `iss` jeder Anfrage."
+          }
+        }
+      },
+      "ReportSuggestionRequest": {
+        "type": "object",
+        "description": "Ein Vorschlag für den Meldungseingang.",
+        "properties": {
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennung des Vorschlags im Fremdsystem (Pflicht, höchstens 128 Zeichen). Dieselbe Kennung\nam selben Zugang ergibt denselben Vorschlag (Wiederholung)."
+          },
+          "sent_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Zeitpunkt der Absendung beim Fremdsystem (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+          },
+          "source": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReportSuggestionSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Der Text, nicht leer, höchstens 20 000 Zeichen."
+          }
+        }
+      },
+      "ReportSuggestionResponse": {
+        "type": "object",
+        "description": "Der abgelegte Vorschlag.",
+        "required": [
+          "id",
+          "status",
+          "received_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "received_at": {
+            "type": "string",
+            "description": "Zeitpunkt des Empfangs (UTC)."
+          },
+          "status": {
+            "type": "string",
+            "description": "`offen`, `angenommen`, `verworfen` oder `abgelaufen`."
+          }
+        }
+      },
+      "ReportSuggestionSource": {
+        "type": "object",
+        "description": "Herkunft des Vorschlags beim Fremdsystem.",
+        "properties": {
+          "adapter": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennung des Adapters oder Kanals: Kleinbuchstaben, Ziffern, `-` und `_`, 1 bis 32 Zeichen.",
+            "example": "funk-gateway"
+          },
+          "sender_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Kennung des Absenders im Fremdsystem, 1 bis 64 Zeichen."
+          },
+          "sender_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Anzeigename des Absenders, höchstens 500 Zeichen."
+          },
+          "signed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Ob das Fremdsystem den Absender selbst geprüft hat (Pflicht)."
           }
         }
       },

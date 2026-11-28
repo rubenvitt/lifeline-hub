@@ -43,7 +43,9 @@ ihn mit `einsatz_id` nennt; jeder andere Einsatz ergibt `404 not_found`. Geben o
 
 Mit `meldungen:write` reicht ein Zugang kurze Texte als unverifizierte Vorschläge für den
 freigegebenen Einsatz ein; die Einsatzleitung übernimmt sie oder verwirft sie. Die Route
-`POST /api/v1/report-suggestions` folgt.
+`POST /api/v1/report-suggestions` legt einen Vorschlag an (201), eine Wiederholung mit derselben
+`external_id` am selben Zugang antwortet 200 mit demselben Vorschlag. Ohne Freigabe antwortet sie
+409 `incident_not_released`.
 
 ## Zeitpunkte
 
@@ -65,6 +67,7 @@ deutsch, für Menschen gedacht und kann sich ändern.
 | 405 | `method_not_allowed` |
 | 409 | `conflict` |
 | 409 | `fuehrung_elsewhere` |
+| 409 | `incident_not_released` |
 | 410 | `cursor_expired` |
 | 413 | `payload_too_large` |
 | 422 | `unprocessable` |
@@ -72,7 +75,7 @@ deutsch, für Menschen gedacht und kann sich ändern.
 | 500 | `internal_error` |
 | 503 | `unavailable` |
 
-`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. Ein Status ohne eigene Zeile
+`fuehrung_elsewhere` heißt: Eine andere Instanz führt den Einsatz. `incident_not_released` heißt: Für den Zugang ist kein Einsatz freigegeben. Ein Status ohne eigene Zeile
 trägt `unprocessable` (4xx) oder `internal_error` (5xx).
 
 ## Ereignisse
