@@ -38,9 +38,18 @@ pub struct AnbindungFreigabe {
     /// Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an (anders als einen reinen Meldungszugang):
     /// die Freigabe ruht, bis die Kopplung endet, und lässt sich hier nur beenden.
     pub ruht: bool,
+    /// Gesetzt, wenn sich die Freigabe hier nicht einschalten lässt, mit dem Grund für das
+    /// Paneel: ein reiner Meldungszugang an einem Spiegel (Vorschläge nimmt die führende Instanz
+    /// an, LLH-2112). Eine bestehende Freigabe lässt sich trotzdem beenden.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gesperrt_grund: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub zuletzt_genutzt_at: Option<String>,
 }
+
+/// Grund, warum ein reiner Meldungszugang am Spiegel nicht freigegeben wird; derselbe Text
+/// steht im 409 der Freigabe.
+pub const SPIEGEL_MELDUNGEN_GRUND: &str = "Der Einsatz wird an einer anderen Instanz geführt";
 
 /// Lässt sich für diesen Zugang ein Einsatz freigeben? Nicht widerrufen, nicht abgelaufen und
 /// mit einem Scope mit Einsatzbezug (lesend oder schreibend). Ein Zugang, der noch auf seinen Schlüssel wartet,
@@ -78,6 +87,11 @@ pub async fn list_fuer_einsatz(
     jetzt: &str,
 ) -> Result<Vec<AnbindungFreigabe>, AppError> {
     let am_hub = is_org_am_hub(conn, org_id).await?;
+    let spiegel: bool =
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM einsatz_spiegel WHERE einsatz_id = ?)")
+            .bind(einsatz_id)
+            .fetch_one(&mut *conn)
+            .await?;
     let wirksam: Vec<(String, i64)> = sqlx::query_as(sqlx::AssertSqlSafe(FREIGABE_WIRKSAM))
         .fetch_all(&mut *conn)
         .await?;
@@ -91,7 +105,10 @@ pub async fn list_fuer_einsatz(
                 .iter()
                 .find(|(zugang_id, _)| *zugang_id == z.id)
                 .map(|(_, e)| *e);
+            let gesperrt_grund = (spiegel && is_am_hub_erlaubt(&z))
+                .then(|| format!("{SPIEGEL_MELDUNGEN_GRUND}; dort werden Meldungen eingereicht."));
             AnbindungFreigabe {
+                gesperrt_grund,
                 freigegeben: liest == Some(einsatz_id),
                 anderer_einsatz: liest.is_some_and(|e| e != einsatz_id),
                 ruht,

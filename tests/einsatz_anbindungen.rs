@@ -752,6 +752,41 @@ async fn meldungszugang_laesst_sich_am_spiegel_nicht_freigeben() {
         IP,
     )
     .await;
+    // Das Paneel zeigt den Schalter dort nicht schaltbar, mit Grund (Review M4); ein
+    // Lesezugang bleibt schaltbar.
+    let lese = angebunden_als(
+        &hub.app,
+        &hub.admin,
+        "Monitor",
+        json!(["lage:read"]),
+        &schluessel(2),
+        IP,
+    )
+    .await;
+    let l = liste(&hub.app, &erika, s).await;
+    let zeile = |id: &str| {
+        l.as_array()
+            .unwrap()
+            .iter()
+            .find(|f| f["zugang_id"] == id)
+            .cloned()
+            .unwrap()
+    };
+    assert!(
+        zeile(&meldung.zugang_id)["gesperrt_grund"]
+            .as_str()
+            .unwrap()
+            .contains("anderen Instanz"),
+        "{l}"
+    );
+    assert!(
+        !zeile(&lese.zugang_id)
+            .as_object()
+            .unwrap()
+            .contains_key("gesperrt_grund"),
+        "{l}"
+    );
+
     let (status, v) = freigeben(&hub.app, &erika, s, &meldung.zugang_id).await;
     assert_eq!(status, StatusCode::CONFLICT, "{v}");
     assert!(v.to_string().contains("anderen Instanz"), "{v}");

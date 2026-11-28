@@ -1803,6 +1803,13 @@
             "type": "boolean",
             "description": "Der Zugang liest diesen Einsatz."
           },
+          "gesperrt_grund": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Gesetzt, wenn sich die Freigabe hier nicht einschalten lässt, mit dem Grund für das\nPaneel: ein reiner Meldungszugang an einem Spiegel (Vorschläge nimmt die führende Instanz\nan, LLH-2112). Eine bestehende Freigabe lässt sich trotzdem beenden."
+          },
           "name": {
             "type": "string"
           },

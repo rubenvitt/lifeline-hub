@@ -33,6 +33,15 @@ export function freigabeZustand(f: AnbindungFreigabe, zeit: (wert: string) => st
 }
 
 /**
+ * Warum sich die Freigabe nicht einschalten lässt (Grund vom Server, etwa ein reiner
+ * Meldungszugang am Spiegel, LLH-2112); `null`, wenn der Schalter schaltbar ist. Eine bestehende
+ * Freigabe lässt sich immer beenden.
+ */
+export function schalterSperrgrund(f: AnbindungFreigabe): string | null {
+  return f.gesperrt_grund != null && !f.freigegeben ? f.gesperrt_grund : null;
+}
+
+/**
  * Anbindungen auf der Seite „Geräte“ (LLH-1638, Spec `maschinenzugang`). Die Zugänge legt der
  * System-Admin in der Verwaltung an; hier schaltet die Einsatzleitung, ob eine Anbindung diesen
  * Einsatz liest. Eine Anbindung liest höchstens einen Einsatz: das Einschalten löst eine Freigabe
@@ -150,39 +159,52 @@ export default function EinsatzAnbindungen({
           bordered
           dataSource={freigaben}
           rowKey={(f) => f.zugang_id}
-          renderItem={(f) => (
-            <div data-lfh="einsatz-anbindung">
-              <ListenEintrag
-                actions={[
-                  <Switch
-                    key="freigabe"
-                    aria-label={`Anbindung ${f.name} liest diesen Einsatz`}
-                    aria-describedby={darf && ohneNetz ? grundId : undefined}
-                    checked={f.freigegeben}
-                    disabled={gesperrt}
-                    onChange={(an) => schalten.mutate({ zugangId: f.zugang_id, name: f.name, an })}
-                  />,
-                ]}
-              >
-                <ListenEintragMeta
-                  title={<span data-lfh="einsatz-anbindung-titel">{f.name}</span>}
-                  description={
-                    <>
-                      <div style={{ color: rollen.gedaempft }}>
-                        <RechteText scopes={f.scopes} />
-                      </div>
-                      <span
-                        style={{ color: rollen.gedaempft }}
-                        data-lfh="einsatz-anbindung-zustand"
-                      >
-                        {freigabeZustand(f, zeit)}
-                      </span>
-                    </>
-                  }
-                />
-              </ListenEintrag>
-            </div>
-          )}
+          renderItem={(f) => {
+            const sperrgrund = schalterSperrgrund(f);
+            return (
+              <div data-lfh="einsatz-anbindung">
+                <ListenEintrag
+                  actions={[
+                    <Switch
+                      key="freigabe"
+                      aria-label={`Anbindung ${f.name} liest diesen Einsatz`}
+                      aria-describedby={darf && ohneNetz ? grundId : undefined}
+                      checked={f.freigegeben}
+                      disabled={gesperrt || sperrgrund != null}
+                      onChange={(an) =>
+                        schalten.mutate({ zugangId: f.zugang_id, name: f.name, an })
+                      }
+                    />,
+                  ]}
+                >
+                  <ListenEintragMeta
+                    title={<span data-lfh="einsatz-anbindung-titel">{f.name}</span>}
+                    description={
+                      <>
+                        <div style={{ color: rollen.gedaempft }}>
+                          <RechteText scopes={f.scopes} />
+                        </div>
+                        <span
+                          style={{ color: rollen.gedaempft }}
+                          data-lfh="einsatz-anbindung-zustand"
+                        >
+                          {freigabeZustand(f, zeit)}
+                        </span>
+                        {sperrgrund != null && (
+                          <div
+                            style={{ color: rollen.gedaempft }}
+                            data-lfh="einsatz-anbindung-sperrgrund"
+                          >
+                            {sperrgrund}
+                          </div>
+                        )}
+                      </>
+                    }
+                  />
+                </ListenEintrag>
+              </div>
+            );
+          }}
         />
       )}
     </Formularpaneel>

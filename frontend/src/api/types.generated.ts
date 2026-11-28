@@ -689,6 +689,12 @@ export interface components {
             anderer_einsatz: boolean;
             /** @description Der Zugang liest diesen Einsatz. */
             freigegeben: boolean;
+            /**
+             * @description Gesetzt, wenn sich die Freigabe hier nicht einschalten lässt, mit dem Grund für das
+             *     Paneel: ein reiner Meldungszugang an einem Spiegel (Vorschläge nimmt die führende Instanz
+             *     an, LLH-2112). Eine bestehende Freigabe lässt sich trotzdem beenden.
+             */
+            gesperrt_grund?: string | null;
             name: string;
             /**
              * @description Die Instanz meldet sich für die Org bei einem Hub und nimmt den Zugang deshalb nicht an (anders als einen reinen Meldungszugang):

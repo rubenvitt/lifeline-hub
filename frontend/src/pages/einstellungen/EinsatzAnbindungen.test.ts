@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnbindungFreigabe } from '../../api/types';
-import { freigabeZustand } from './EinsatzAnbindungen';
+import { freigabeZustand, schalterSperrgrund } from './EinsatzAnbindungen';
 
 const anbindung = (extra: Partial<AnbindungFreigabe> = {}): AnbindungFreigabe => ({
   zugang_id: 'z-1',
@@ -39,5 +39,18 @@ describe('freigabeZustand (LLH-1638)', () => {
         zeit,
       ),
     ).toBe('liest diesen Einsatz · zuletzt 19:02');
+  });
+});
+
+describe('schalterSperrgrund (LLH-2112, Review M4)', () => {
+  const grund =
+    'Der Einsatz wird an einer anderen Instanz geführt; dort werden Meldungen eingereicht.';
+  it('sperrt das Einschalten mit dem Grund des Servers', () => {
+    expect(schalterSperrgrund(anbindung({ gesperrt_grund: grund }))).toBe(grund);
+    expect(schalterSperrgrund(anbindung())).toBeNull();
+  });
+
+  it('lässt eine bestehende Freigabe beenden', () => {
+    expect(schalterSperrgrund(anbindung({ gesperrt_grund: grund, freigegeben: true }))).toBeNull();
   });
 });
