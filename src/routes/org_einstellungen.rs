@@ -9,7 +9,7 @@
 //! `org_id` stammt stets aus dem eingeloggten Benutzer, nie aus dem Body (Org-Isolation).
 
 use crate::app::AppState;
-use crate::auth::admin_audit::{schreibe, AdminAktion, AdminEintrag, Ziel};
+use crate::auth::admin_audit::{schreibe, AdminAktion, AdminEintrag, Ziel, ZugangsAngaben};
 use crate::auth::session::{AdminUser, CurrentUser};
 use crate::einsatz::einstellungen::{
     ist_gueltige_frist_min, ist_gueltige_geocoder_url, ist_gueltige_retention_dauer,
@@ -318,6 +318,50 @@ pub async fn setzen(
                     akteur: &benutzer,
                     ziel: Ziel::Org(ziel),
                     angaben: None,
+                    peer_ip,
+                },
+            )
+            .await;
+        }
+    }
+    // Fristen (LLH-2140): jeder echte Wechsel mit altem und neuem Wert; ein fehlendes Feld leert
+    // die Frist (Vollersatz) und zählt mit. Vor allem eine kürzere Skelett-Frist löscht im
+    // nächsten Purge-Lauf unumkehrbar, die Spur hält fest, wer sie gesetzt hat.
+    let fristen_neu = gespeichert.einstellungen.fristen();
+    let fristen_vorher = gespeichert.fristen_vorher;
+    let fristen = [
+        (
+            fristen_vorher.aufbewahrung,
+            fristen_neu.aufbewahrung,
+            AdminAktion::AufbewahrungFristGeaendert,
+            "aufbewahrung_frist",
+        ),
+        (
+            fristen_vorher.skelett,
+            fristen_neu.skelett,
+            AdminAktion::SkelettFristGeaendert,
+            "skelett_frist",
+        ),
+        (
+            fristen_vorher.nachbereitung,
+            fristen_neu.nachbereitung,
+            AdminAktion::NachbereitungFristGeaendert,
+            "nachbereitung_frist",
+        ),
+    ];
+    for (alt, neu, aktion, ziel) in fristen {
+        if alt != neu {
+            schreibe(
+                &state.pool,
+                AdminEintrag {
+                    aktion,
+                    akteur: &benutzer,
+                    ziel: Ziel::Org(ziel),
+                    angaben: Some(ZugangsAngaben {
+                        tage_vorher: alt,
+                        tage: neu,
+                        ..ZugangsAngaben::default()
+                    }),
                     peer_ip,
                 },
             )

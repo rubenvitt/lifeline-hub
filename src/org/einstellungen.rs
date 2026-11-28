@@ -65,6 +65,15 @@ pub struct OrtungFreigabe {
     pub personen: bool,
 }
 
+/// Aufbewahrungs-Dauer, Skelett-Frist und Nachbereitung der Organisation in Tagen; `None` = keine
+/// Frist. Die Admin-Spur vergleicht sie vor und nach dem Speichern (LLH-2140).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Fristen {
+    pub aufbewahrung: Option<i64>,
+    pub skelett: Option<i64>,
+    pub nachbereitung: Option<i64>,
+}
+
 /// Liest die Ortungs-Freigabe der Organisation; ohne Zeile ist beides aus.
 pub async fn ortung_der_org(pool: &SqlitePool, org_id: i64) -> Result<OrtungFreigabe, AppError> {
     Ok(laden_oder_default(pool, org_id).await?.ortung_freigabe())
@@ -78,6 +87,15 @@ impl OrgEinstellungen {
         OrtungFreigabe {
             im_einsatz,
             personen: im_einsatz && self.ortung_personen != 0,
+        }
+    }
+
+    /// Die drei Fristen dieser Einstellungen (LLH-2140).
+    pub fn fristen(&self) -> Fristen {
+        Fristen {
+            aufbewahrung: self.retention_dauer_tage,
+            skelett: self.skelett_dauer_tage,
+            nachbereitung: self.nachbereitung_tage,
         }
     }
 
@@ -317,11 +335,12 @@ pub async fn speichern(
     // Schreibsperre gelesen. Zwei Admins, die gleichzeitig schalten, sehen je den Stand des
     // anderen, und der Eintrag der Admin-Spur folgt dem echten Wechsel (LLH-2099,
     // Abschluss-Review, M5).
-    // Ebenso die Ortungs-Schalter (LLH-2120).
+    // Ebenso die Ortungs-Schalter (LLH-2120) und die Fristen (LLH-2140).
     let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     let vorher = laden_oder_default(&mut *tx, org_id).await?;
     let lan_vorher = vorher.fremdebenen_lan_erlaubt != 0;
     let ortung_vorher = vorher.ortung_freigabe();
+    let fristen_vorher = vorher.fristen();
     let lan_neu = daten.fremdebenen_lan_erlaubt.unwrap_or(lan_vorher);
     sqlx::query(
         "INSERT INTO org_einstellungen \
@@ -416,6 +435,7 @@ pub async fn speichern(
         personen_geloescht,
         lan_vorher,
         ortung_vorher,
+        fristen_vorher,
     })
 }
 
@@ -431,6 +451,8 @@ pub struct Gespeichert {
     pub lan_vorher: bool,
     /// Ortungs-Schalter vor dem Speichern (LLH-2120), ebenso in derselben Transaktion gelesen.
     pub ortung_vorher: OrtungFreigabe,
+    /// Fristen vor dem Speichern (LLH-2140), ebenso in derselben Transaktion gelesen.
+    pub fristen_vorher: Fristen,
 }
 
 #[cfg(test)]
@@ -642,6 +664,26 @@ mod tests {
         assert_eq!(
             (g.einstellungen.fremdebenen_lan_erlaubt, g.lan_vorher),
             (0, true)
+        );
+    }
+
+    #[tokio::test]
+    async fn fristen_vorher_kommen_aus_der_speicher_transaktion() {
+        let pool = db::test_pool().await;
+        let bid = fixture(&pool).await;
+        let skelett = |tage: i64| OrgEinstellungenDaten {
+            skelett_dauer_tage: Some(tage),
+            ..Default::default()
+        };
+        let g = speichern(&pool, 1, bid, skelett(3650)).await.unwrap();
+        assert_eq!(
+            (g.einstellungen.fristen().skelett, g.fristen_vorher.skelett),
+            (Some(3650), None)
+        );
+        let g = speichern(&pool, 1, bid, skelett(365)).await.unwrap();
+        assert_eq!(
+            (g.einstellungen.fristen().skelett, g.fristen_vorher.skelett),
+            (Some(365), Some(3650))
         );
     }
 }

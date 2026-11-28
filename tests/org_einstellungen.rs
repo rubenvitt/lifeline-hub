@@ -1184,3 +1184,120 @@ async fn ortung_als_fuehrungskraft_schreibt_keine_spur() {
     assert_eq!(status, StatusCode::FORBIDDEN);
     assert!(ortung_spur(&pool).await.is_empty());
 }
+
+/// Zeilen der Fristen in der Admin-Spur (LLH-2140): Aktion, Ziel, Akteur, Detail als JSON.
+async fn fristen_spur(pool: &sqlx::SqlitePool) -> Vec<(String, String, Option<String>, Value)> {
+    let zeilen: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT aktion, ziel, akteur_name, detail FROM admin_audit \
+         WHERE aktion LIKE '%_frist_geaendert' ORDER BY id",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap();
+    zeilen
+        .into_iter()
+        .map(|(a, z, n, d)| {
+            let detail = d.map_or(Value::Null, |d| serde_json::from_str(&d).unwrap());
+            (a, z, n, detail)
+        })
+        .collect()
+}
+
+/// LLH-2140: Eine geänderte Aufbewahrungs-Dauer, Skelett-Frist oder Nachbereitung steht mit
+/// Person, altem und neuem Wert in der Admin-Spur. Dieselben Werte erneut speichern schreibt
+/// nichts, eine abgewiesene Anfrage auch nicht; ein fehlendes Feld leert die Frist (Vollersatz)
+/// und zählt als Wechsel.
+#[tokio::test]
+async fn fristen_aendern_schreibt_die_admin_spur_nur_bei_wechsel() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let zeile = |aktion: &str, ziel: &str, detail: Value| {
+        (
+            aktion.to_string(),
+            ziel.to_string(),
+            Some("admin".to_string()),
+            detail,
+        )
+    };
+    let alle = serde_json::json!({
+        "retention_dauer_tage": 365,
+        "skelett_dauer_tage": 3650,
+        "skelett_dauer_bestaetigt": true,
+        "nachbereitung_tage": 30,
+    });
+
+    let (status, body) = put_einstellungen(&app, &admin, alle.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let erste = vec![
+        zeile(
+            "aufbewahrung_frist_geaendert",
+            "aufbewahrung_frist",
+            serde_json::json!({"tage": 365}),
+        ),
+        zeile(
+            "skelett_frist_geaendert",
+            "skelett_frist",
+            serde_json::json!({"tage": 3650}),
+        ),
+        zeile(
+            "nachbereitung_frist_geaendert",
+            "nachbereitung_frist",
+            serde_json::json!({"tage": 30}),
+        ),
+    ];
+    assert_eq!(fristen_spur(&pool).await, erste);
+
+    // Dieselben Fristen, nur ein anderes Feld geändert: keine Zeile.
+    let mut gleich = alle.clone();
+    gleich["zeitzone"] = serde_json::json!("UTC");
+    let (status, _) = put_einstellungen(&app, &admin, gleich).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(fristen_spur(&pool).await, erste, "unverändert");
+
+    // Verkürzen ohne Bestätigung: 409, nichts geschrieben.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"retention_dauer_tage": 365, "skelett_dauer_tage": 365,
+                           "nachbereitung_tage": 30}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    assert_eq!(fristen_spur(&pool).await, erste, "abgewiesen");
+
+    // Skelett verkürzt, Nachbereitung fehlt (geleert): zwei Zeilen.
+    let (status, _) = put_einstellungen(
+        &app,
+        &admin,
+        serde_json::json!({"retention_dauer_tage": 365, "skelett_dauer_tage": 365,
+                           "skelett_dauer_bestaetigt": true}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let mut erwartet = erste.clone();
+    erwartet.push(zeile(
+        "skelett_frist_geaendert",
+        "skelett_frist",
+        serde_json::json!({"tage_vorher": 3650, "tage": 365}),
+    ));
+    erwartet.push(zeile(
+        "nachbereitung_frist_geaendert",
+        "nachbereitung_frist",
+        serde_json::json!({"tage_vorher": 30}),
+    ));
+    assert_eq!(fristen_spur(&pool).await, erwartet);
+}
+
+/// LLH-2140: Eine Führungskraft ändert keine Frist (403) und hinterlässt keine Spur.
+#[tokio::test]
+async fn fristen_als_fuehrungskraft_schreiben_keine_spur() {
+    let (app, pool) = common::setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    benutzer_anlegen(&app, &admin, "fk", "fkpw1234", "fuehrungskraft").await;
+    let fk = login_cookie(&app, "fk", "fkpw1234").await;
+
+    let (status, _) =
+        put_einstellungen(&app, &fk, serde_json::json!({"retention_dauer_tage": 365})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(fristen_spur(&pool).await.is_empty());
+}

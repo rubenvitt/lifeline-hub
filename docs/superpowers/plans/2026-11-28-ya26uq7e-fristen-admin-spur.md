@@ -55,14 +55,14 @@
 - Consumes: Task 1.
 - Produces: `pub struct Fristen { pub aufbewahrung: Option<i64>, pub skelett: Option<i64>, pub nachbereitung: Option<i64> }` und `OrgEinstellungen::fristen(&self) -> Fristen` in `src/org/einstellungen.rs`; `Gespeichert.fristen_vorher: Fristen`.
 
-- [ ] **Step 1: Failing tests**
+- [x] **Step 1: Failing tests**
   - Unit `fristen_vorher_kommt_aus_der_speicher_transaktion`: erstes Speichern mit `skelett_dauer_tage: Some(3650)` → `fristen_vorher.skelett == None`, Endstand 3650; zweites mit `Some(365)` → `fristen_vorher.skelett == Some(3650)`.
   - Integration `fristen_aendern_schreibt_die_admin_spur_nur_bei_wechsel`: PUT `{retention 365, skelett 3650 bestätigt, nachbereitung 30}` → drei Zeilen (`aufbewahrung_frist_geaendert`/`aufbewahrung_frist`, `{tage:365}`, …); gleicher PUT erneut plus `zeitzone: "UTC"` → keine neue Zeile; PUT `{skelett 365}` ohne Bestätigung → 409, keine Zeile; PUT `{retention 365, skelett 365 bestätigt}` → zwei Zeilen: Skelett `{tage_vorher:3650,tage:365}`, Nachbereitung `{tage_vorher:30}`; `akteur_name == "admin"`.
   - Integration `fristen_als_fuehrungskraft_schreiben_keine_spur`: 403, keine Zeile.
-- [ ] **Step 2:** `cargo test --test org_einstellungen fristen` → FAIL.
-- [ ] **Step 3:** `fristen_vorher = vorher.fristen()` in der Transaktion; im Handler nach der Ortung je Frist `(alt, neu, aktion, ziel)` vergleichen und bei `alt != neu` `schreibe` mit `ZugangsAngaben { tage_vorher: alt, tage: neu, ..Default::default() }`.
-- [ ] **Step 4:** `cargo test --test org_einstellungen` und `cargo test --lib org::einstellungen` → PASS.
-- [ ] **Step 5:** Commit.
+- [x] **Step 2:** `cargo test --test org_einstellungen fristen` → FAIL.
+- [x] **Step 3:** `fristen_vorher = vorher.fristen()` in der Transaktion; im Handler nach der Ortung je Frist `(alt, neu, aktion, ziel)` vergleichen und bei `alt != neu` `schreibe` mit `ZugangsAngaben { tage_vorher: alt, tage: neu, ..Default::default() }`.
+- [x] **Step 4:** `cargo test --test org_einstellungen` und `cargo test --lib org::einstellungen` → PASS.
+- [x] **Step 5:** Commit.
 
 ### Task 3: Zugangsprotokoll, Typen, Doku
 
