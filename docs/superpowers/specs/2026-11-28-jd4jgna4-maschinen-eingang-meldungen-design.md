@@ -111,6 +111,22 @@ angenommen („passt“).
    - Verworfen (b): nur auf der Seite. Der Grund: Ein unverifizierter Notruf darf nicht
      übersehen werden, weil niemand die Seite offen hat.
 
+8. **Gekoppelter ELW** (nach dem Builder-Check, 28.11.2026 entschieden). Ein ELW, der sich für
+   seine Org bei einem Hub meldet, nimmt heute keinen Maschinenzugang an
+   (`public_api::machine`, `AblehnungGrund::InstanzGekoppelt`; Spec `maschinenzugang`, „Ein
+   gekoppelter ELW nimmt keine Fremdsysteme an“). Am Hub liegt ein vom ELW geführter Einsatz nur
+   als Spiegel. Ohne Änderung entstünde im Hauptfall (Gateway-Knoten am ELW) nirgends ein
+   Vorschlag.
+   - Gewählt (a): eine **eng gefasste Ausnahme**. Ein gekoppelter ELW legt Zugänge an, deren
+     Scopes **nur** `meldungen:write` sind, und nimmt ihre Anfragen an. Er gibt sie nur für einen
+     Einsatz frei, den er selbst führt. Doppelten Eingang gibt es nicht, weil Zugang, Freigabe
+     und Vorschläge an der Instanz bleiben. Alle anderen Scopes bleiben am gekoppelten ELW
+     gesperrt.
+   - Verworfen (b): die Regel behalten und Mesh am gekoppelten ELW in eine Folgeaufgabe legen.
+     Der Grund: Gerade dort steht das Gateway.
+   - Verworfen (c): am Hub am Spiegel annehmen und über die Kopplung zum ELW weiterreichen. Der
+     Grund: ein großer Umbau für einen Weg, den der ELW selbst kürzer hat.
+
 ## Entwurf
 
 ### Entscheidung: neue ADR ersetzt ADR-0035
@@ -126,6 +142,11 @@ Einsatzbezug, lesend oder schreibend“, und ergänzt:
   ist ein Vorschlag; erst ein Mensch macht daraus eine Meldung (G1).
 - MUST: Die Freigabe endet mit dem Entzug seines letzten Scopes mit Einsatzbezug (statt „Lese-
   Scopes“).
+- MUST: Eine Instanz, die sich für die Org bei einem Hub meldet, nimmt Maschinenzugänge nur an,
+  wenn ihre Scopes allein `meldungen:write` sind. Einen solchen Zugang gibt sie nur für einen
+  Einsatz frei, den sie selbst führt (kein Spiegel). Jeder andere Zugang bleibt dort abgelehnt
+  (`instanz_gekoppelt`). Die Ausnahme ist die eine Abkehr von der Spec-Anforderung „Ein
+  gekoppelter ELW nimmt keine Fremdsysteme an“; die Spec selbst bleibt eingefroren, die ADR gilt.
 
 ADR-0035 bekommt `status: ersetzt` und `ersetzt_durch`. Die Prüfung der neuen ADR übernimmt die
 alte und ergänzt etwa `verlange 'Scope::MeldungenWrite' src/public_api/scope.rs` (im Block von
@@ -139,6 +160,14 @@ nur im Einsatz, den die Einsatzleitung für ihn freigegeben hat“.
   „Anbindungen“ der Seite „Geräte“ (`EinsatzAnbindungen.tsx`, `src/routes/einsatz_anbindungen.rs`),
   und die Einsatzleitung kann ihn freigeben. Kommentar und Test
   `lage_und_einsaetze_lesen_haben_einsatzbezug` ziehen mit.
+- **Gekoppelte Instanz:** Der Extractor (`public_api::machine`, Schritt 6) lehnt bei
+  `hub_fuer_org` nicht mehr pauschal ab, sondern nur, wenn der Zugang einen anderen Scope als
+  `meldungen:write` trägt. Ebenso das Anlegen und Ändern von Zugängen an der Seite „Anbindungen“
+  (`src/routes/anbindungen.rs`): an einer gekoppelten Instanz nur mit genau diesem Scope; die
+  Seite nennt den Grund weiter für alle anderen. Eine Freigabe ruht an einer gekoppelten Instanz
+  (`freigabe.rs`, `ruht`) nur noch für Zugänge mit anderen Scopes. Freigeben eines reinen
+  `meldungen:write`-Zugangs an einem Spiegel lehnt der Server ab (409); das Paneel zeigt den
+  Schalter dort nicht schaltbar, mit Grund „Der Einsatz wird an einer anderen Instanz geführt“.
 - Frontend: Eintrag in `SCOPE_TEXT` (`frontend/src/api/anbindungen.ts`), etwa „Meldungen
   einreichen (als unverifizierte Vorschläge)“.
 - `src/public_api/description.md`: neuer Abschnitt zum Scope und zur Route, und der Absatz
@@ -177,9 +206,13 @@ Anfrage (neuer Typ, englische Wire-Felder):
   Status zeigt es. Der Inhalt der Wiederholung wird nicht verglichen.
 - Ablehnungen mit stabilem `code` (ADR-0096):
   - `422` für ungültige Felder;
-  - `409 incident_not_released`, wenn keine wirksame Freigabe besteht;
-  - `409 incident_mirrored`, wenn der freigegebene Einsatz an dieser Instanz ein Spiegel ist
-    (meine Wahl, s. u.);
+  - `409 incident_not_released` (neuer Code), wenn keine wirksame Freigabe besteht. Die Brücke
+    erkennt daran, dass sie puffern muss. Er verrät dem Zugang nicht mehr als
+    `GET /api/v1/situation` mit `einsatz: null` heute schon;
+  - `409 fuehrung_elsewhere` (vorhandener Code), wenn der freigegebene Einsatz an dieser
+    Instanz ein Spiegel ist, etwa nach einem Wechsel der Führung. Die Route prüft das
+    ausdrücklich, denn `meldung_vorschlag` ist vom Spiegel ausgenommen und hat keinen
+    Schutz-Trigger;
   - `429` über die vorhandene Drossel.
 - Ablauf in einer Transaktion (`write_retry!` wie üblich): Freigabe lesen
   (`freigabe::freigegebener_einsatz_tx`), Dopplung prüfen, einfügen. Nach dem Commit ein
@@ -211,7 +244,8 @@ Eine Migration, Spalten sinngemäß:
   in `instanz::spiegel::art::AUSGENOMMEN`; die übernommene Meldung wird wie jede Meldung
   gespiegelt.
 - **Abgelaufen** wird beim Lesen bestimmt: Ein offener Vorschlag mit `empfangen_at` älter als
-  12 h, oder an einem Einsatz, der nicht aktiv ist, gilt als abgelaufen. Er erscheint nicht in
+  12 h, an einem Einsatz, der nicht aktiv ist, oder an einem Einsatz, den die Instanz nicht mehr
+  führt (Spiegel nach einem Wechsel der Führung), gilt als abgelaufen. Er erscheint nicht in
   der Liste, zählt nicht und lässt sich nicht mehr übernehmen. So braucht es keinen Planer, der
   Zustände umschreibt. Die Dopplungsantwort meldet dann `status: "abgelaufen"`.
 - **Löschen:** im vorhandenen Aufräumlauf (`src/einsatz/purge_scheduler.rs`, wie
@@ -242,7 +276,10 @@ Die Herkunft ändert sich nie (wie Wortlaut und Absender; ein PATCH darauf ist n
   Erfassen einer Meldung (`NeueMeldung`). Der Server legt die Meldung über denselben Code an wie
   `POST /api/incidents/{id}/reports` (Erfassungsrecht, aktiv, Prüfungen, Auto-ETB,
   Auto-Frist-Erinnerung, Live). Dafür wird der Rumpf von `routes::meldung::anlegen` in eine
-  gemeinsame Funktion gezogen, kein Kopieren. In derselben Transaktion setzt der Server den
+  gemeinsame Funktion gezogen, kein Kopieren. Heute legt `repo::anlegen_idempotent` die Meldung
+  über den Pool an (`src/routes/meldung.rs`); es braucht eine Variante in einer übergebenen
+  Transaktion, damit Meldung und Vorschlag zusammen geschrieben werden. In derselben Transaktion
+  setzt der Server den
   Vorschlag auf `angenommen` (nur aus `offen`, nicht abgelaufen), leert den Text, setzt
   `meldung_id`, `erledigt_*` und die Herkunftsspalten der Meldung. Antwort wie das Erfassen:
   `201` mit `MeldungAnzeige`.
@@ -253,8 +290,12 @@ Die Herkunft ändert sich nie (wie Wortlaut und Absender; ein PATCH darauf ist n
 - `POST /api/incidents/{id}/report-suggestions/{vid}/discard`: Recht wie das Erfassen einer
   Meldung, aktiver Einsatz, kein Gerät. Setzt `verworfen` und `erledigt_*`; aus einem anderen
   Zustand als `offen` antwortet der Server mit `409`. Kein Körper, Antwort `204`.
-- Am Spiegel lehnen Übernehmen und Verwerfen ab wie jedes Schreiben dort (409). Durch
-  `incident_mirrored` entsteht dort ohnehin kein Vorschlag.
+- Am Spiegel lehnen Übernehmen und Verwerfen mit 409 ab. Beide Routen prüfen das ausdrücklich,
+  denn ein Verwerfen schreibt nur in die ausgenommene `meldung_vorschlag`, an der kein
+  Schutz-Trigger sitzt. Neu entsteht dort ohnehin kein Vorschlag (`fuehrung_elsewhere`).
+- Ein Vorschlag löst **keinen** Sofortalarm und keine Benachrichtigung aus; das tut erst die
+  übernommene Meldung über den vorhandenen Weg (`src/meldung/mod.rs`). Ein unverifizierter Text
+  soll nicht alarmieren.
 
 Wer verworfen hat, steht nur in der Tabelle. Einen ETB- oder Audit-Eintrag fürs Verwerfen gibt
 es nicht, denn es ist kein Vorgang im Einsatz (meine Wahl).
@@ -303,9 +344,11 @@ Liste ein Bereich, nur wenn es offene Vorschläge gibt:
   Abbrechen lässt den Vorschlag offen.
 - „Verwerfen“ ruft `discard`; ob mit Rückfrage, entscheidet der Builder nach der
   Bedien-Leitlinie (`frontend/AGENTS.md`).
-- `MeldungKarte` und die Detailansicht zeigen bei `maschinen_herkunft` ein Merkmal
-  „unverifiziert übernommen · Mesh · Nord-1 · nicht signiert“ in derselben Form wie die heutige
-  Geräte-Herkunft (`is_von_geraet`).
+- `MeldungKarte`, die Detailansicht und die Lagemeldungsliste (`LagemeldungenPage.tsx`) zeigen
+  bei `maschinen_herkunft` ein Merkmal „unverifiziert übernommen · Mesh · Nord-1 · nicht
+  signiert“. Eine Vorlage dafür gibt es an der Meldungskarte nicht (die Geräte-Herkunft
+  `is_von_geraet` hängt nur an der Lagemeldungsliste); das Merkmal wird neu gestaltet, als
+  kleines Etikett in der Kopfzeile der Karte nach der Gestaltungssprache in `frontend/AGENTS.md`.
 - Druck der Meldung: die Herkunft als eine Zeile, falls der Meldungsdruck Herkunftsangaben schon
   zeigt; sonst nicht.
 
@@ -321,9 +364,14 @@ Liste ein Bereich, nur wenn es offene Vorschläge gibt:
 
 ## Meine Wahl (bitte beim Lesen prüfen)
 
-- **Spiegel:** Am Spiegel entsteht kein Vorschlag (`409 incident_mirrored`), denn dort ließe er
+- **Spiegel:** Am Spiegel entsteht kein Vorschlag (`409 fuehrung_elsewhere`), denn dort ließe er
   sich ohnehin nicht übernehmen. Die Brücke spricht nach der Machbarkeitsnotiz immer mit dem
-  Server, der den Einsatz führt (im ELW der ELW).
+  Server, der den Einsatz führt (im ELW der ELW, auch wenn er gekoppelt ist, s. Ansatz 8).
+- **Wechsel der Führung:** Offene Vorschläge an der Instanz, die nicht mehr führt, gelten als
+  abgelaufen; sie wandern nicht mit.
+- **Fehlercodes:** nur ein neuer (`incident_not_released`), am Spiegel der vorhandene
+  `fuehrung_elsewhere`.
+- **Kein Sofortalarm und keine Benachrichtigung** für Vorschläge, nur der Zähler.
 - **`external_id` Pflicht** statt einer Dopplungserkennung über Text und Zeitfenster wie bei
   Alarmmeldungen. Mesh und Postfach haben eine Nachrichtenkennung, und der Vergleich bleibt damit
   eindeutig.
